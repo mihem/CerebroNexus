@@ -12,4 +12,4 @@ if ( grepl(tolower(Sys.info()["sysname"]), pattern = "^win") )
 ##----------------------------------------------------------------------------##
 ## launch Cerebro interface
 ##----------------------------------------------------------------------------##
-cerebroApp::launchCerebro()
+cerebroAppLite::launchCerebro()

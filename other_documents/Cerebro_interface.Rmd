@@ -1,0 +1,150 @@
+---
+title: "Introduction to the Cerebro interface"
+author: "Roman Hillje"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    self_contained: yes
+    mode: selfcontained
+vignette: >
+  %\VignetteIndexEntry{Introduction to the Cerebro interface}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction to the Cerebro user interface
+
+After launching Cerebro, you will see the Cerebro dashboard with all available tabs on the left.
+We will go through each tab and see what information is be available there.
+
+A few general notes:
+
+* Please note that we have placed "info" boxes in many title bars which might provide helpful information.
+* Most plots are interactive. Hover over them with your cursor to get additional information.
+* Most plots can be exported to a file PNG file (a small button in the top right corner of the plot that looks like a camera), but some - projections/dimensional reductions - can be saved as a PDF file through the dedicated button in the respective title bar.
+* Tables can be sorted (by clicking on the respective column title) and columns can be dragged in a different order. Some can also be searched through the search boxes, and exported to either CSV or Excel format. Some tables also have a "Column visibility" button that allows you to hide some columns (which is useful on small screens and/or when there are many columns). Please note that in some tables some columns are hidden by default and need to be activated to be seen. Some tables also offer to automatically format numbers, e.g. hide decimals for integers or show p-values in scientific format, and highlight values through colors, e.g. clusters or high expression values. The functions behind those features try to guess the content of a column, which doesn't always work perfectly. If it doesn't feel free to switch the automatic formatting and color highlighting off to see the plain table.
+
+# Data info
+
+This is the tab that will be shown to you when you launch Cerebro.
+If Cerebro is operating in "open" mode, you can choose a `.crb` to upload, otherwise you can only look at the data that was loaded into Cerebro.
+Please be patient during the uploading process and wait until the progress bar says "Upload complete.".
+The numbers in the different tiles will now update and give you some numbers about your data sets, including the experiment name, number of cells, number of grouping variables, and the organism.
+
+In this tab, you can also configure WebGL and hover info preferences. WebGL is a technology used to accelerate generation and interaction with complex graphics, such as the dimensional reduction plot with many cells. Most modern browsers should be compatible with WebGL, but if you experience problems with the dimensional reduction plots, for example cells/dots are not visible, switching off WebGL might fix that.
+
+After loading the data set, there is not much more to do here so let's move on to the "Main" panel.
+
+# Main
+
+In the "Main" tab, you have access to all the dimensional reductions (e.g. t-SNE or UMAP) that have been generated for this data set.
+Dimensional reductions can be either 2- or 3-dimensional and aim to represent the complex expression profiles of all the cells in a more interpretable way.
+
+The plot is interactive which means you can hover over the cells with your cursor to get extra info, zoom in and out, and pan around.
+You may also export the plot to a PDF image by hitting the "export to PDF" button in the title bar.
+The file will the stored on your desktop.
+
+In the input box on the left, you can select a bunch of parameters for the plot.
+For example, if there are multiple dimensional reductions, you can choose which one should be shown.
+Also, you can exclude entire samples or clusters from the plot.
+Sometimes, data sets can become quite large which can make the plots dreadfully slow on older machines.
+In those cases, consider showing only a random subset of cells by dragging the slider down from 100% to a lower value.
+Next, you can choose which meta information to color the cells by.
+By default, they will be colored by the sample the cells originate from, but you can change this to any meta information that is available, e.g. cluster label, cell cycle phase, etc.
+The rest of the parameters are aesthetic and allow you to adjust dot size, dot opacity (transparency), and range of the X and Y scale.
+
+### Samples
+
+The "Samples" panel gives you a sample-centric view of the loaded data.
+That means, cells are grouped by the sample they came from.
+
+First, you'll see a table and bar plot showing you the composition of samples by the identified cluster.
+
+Then, you will see the distribution of the number of transcripts by sample in the form of a violin plot.
+More statistical info, such as the mean, median, quartiles, and min/max values, is shown when hovering over the distributions.
+
+The same violin + box plot format is then used to show you the distribution of the number of expressed genes per sample, and, if available, also of the percentage of mitochondrial and ribosomal genes (percentage of transcripts coming from mitochondrial/ribosomal genes).
+
+The last two boxes, if available, show the percentage of cells in the cell cycle phases calculated with two different methods (Seurat and Cyclone).
+
+### Clusters
+
+The "Clusters" panel gives a cluster-centric view of the data.
+Except for the first plot (the cluster tree), it shows the same info as the "Samples" panel however now the cells are grouped by the cluster they were assigned to.
+
+The cluster tree shows you the similarity between clusters.
+This can be useful if you want to merge clusters and want to know which ones are most similar to each other.
+
+Then, the composition of each cluster by sample is provided in the form of a table and plot, followed by distributions of the number of transcripts, expressed genes, and, if available, mitochondrial and ribosomal gene expression.
+
+As before, we also see the distribution of clusters into the cell cycle phases from either Seurat or Cyclone, if they have been calculated.
+
+### Marker genes
+
+The "Marker genes" panel provides tables of - surprise - marker genes for each sample and cluster.
+
+In the case of marker genes per sample, this list conceptually resembles differential expression analysis of a bulk RNA-seq experiment.
+Instead, the expression profiles of clusters are expected to be more homogeneous.
+
+Marker genes should help to identify the cell type of a sample or cluster, and find new markers to purify that cell population.
+
+It is important to know that in this analysis, each cell group (sample or cluster) is compared to all other cells combined.
+This is important because it means marker genes don't have to be exclusive to one cell group.
+Instead, they can be shared by multiple groups.
+
+There are multiple parameters and cut-offs that need to be chosen during the analysis.
+Check the "Marker genes" section in the "Analysis info" panel to find some details.
+You can sort the genes by the average logFC, the percentage of cells that express this gene (at least 1 transcript) in the cell population of interest or the rest of cells (which it is tested against), and the adjusted p-value.
+If analyzing human or mouse data, there will be an extra column indicating whether or not this gene **might** be present on the cell surface.
+This information is generated by checking if the genes are associated with the gene ontology (GO) term "cell surface" (GO:0009986).
+Even though this information is not 100% reliable, it might point you to genes which allow you to purify the respective cell population.
+
+### Gene expression
+
+The "Gene expression" panel allows you to visualize the log-normalized expression of one or multiple genes.
+
+The interface is similar to the one in the "Main" panel.
+Cells are shown in the selected dimensional reduction, samples and clusters can be removed from the plot, and dot size size, opacity, as well as X and Y axis ranges can be adjusted.
+The color of each cell represents the expression of the queried genes ("Genes(s)" text box in top left corner).
+If inserting multiple genes, these must be posted on separate lines or separated through a comma (`,`), a space (` `), or semicolon (`;`).
+The colors are updated after you press `ENTER` or `SPACE`.
+
+In addition to the dimensional reduction plot shown in the "Main" panel, you may also choose whether cells should be plotted in random order or if you prefer to have cells with highest expression to be on top of the others.
+
+Below the dimensional reduction you can see which genes are currently shown in the plot and which genes were not found (not present in the data set).
+
+Further down you will find violin + box plots showing the distribution of expression of the selected genes grouped by sample and cluster.
+
+The last plot of this panel shows the average expression of the 50 most expressed genes (of the ones specified by the user) across all cells to quickly spot which genes influence the color scale the most.
+
+### Gene set expression
+
+The "Gene set expression" panel is essentially the same as the "Gene expression" panel, except that it allows to select gene sets from [MSigDB](https://http://software.broadinstitute.org/gsea/msigdb) (requires internet connection).
+The MSigDB database is quite large, depending on your internet connection, it might take a few seconds to load the lists.
+
+This feature is only available for human and mouse data.
+
+### Gene ID conversion
+
+The "Gene ID conversion" panel provides tables which allow to convert gene IDs and names.
+
+For the moment, only tables for mouse and human genes are available.
+The tables include GENCODE identifier, ENSEMBL identifier, HAVANA identifier, gene symbol and gene type and have been derived from the GENCODE annotation version M16 (mouse) and version 27 (human).
+
+### Analysis info
+
+The "Analysis info" panel gives you an overview of the parameters which were used during the analysis (as long as they were recorded).
+
+Shown can be:
+
+* General information.
+* Parameters used during pre-processing (cell/gene filtering, cluster resolution, etc.).
+* Gene lists used for cell cycle analysis and calculation of the percentage of mitochondrial and ribosomal gene expression.
+* Parameters used for marker gene detection.
+* Technical information.
+
+### About
+
+The "About" panel provides information about Cerebro and the author.

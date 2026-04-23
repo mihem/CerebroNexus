@@ -46,8 +46,8 @@ This function uses the enrichR API to look for enriched pathways in marker
 gene sets of all available grouping variables.
 }
 \examples{
-pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-  package = "cerebroApp"))
+pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+  package = "cerebroAppLite"))
 pbmc <- getEnrichedPathways(
   object = pbmc,
   marker_genes_input = 'cerebro_seurat',

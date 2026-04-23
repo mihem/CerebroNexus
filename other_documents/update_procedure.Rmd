@@ -1,6 +1,6 @@
 ---
-title: "Update procedure"
-author: "Roman Hillje"
+title: 'Update procedure'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -14,9 +14,9 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-__Creation of standalone version is currently suspended because the internal R version is too old and I haven't been able to update it.__
+**Creation of standalone version is currently suspended because the internal R version is too old and I haven't been able to update it.**
 
-- Create new branch from `develop` branch, e.g. `v1.3`
+- Create new branch from `develop` branch, e.g. `v1.4`
 - Make changes to cerebroApp functions, Shiny app, etc.
 - Test extensively.
 - Prepare example data set.

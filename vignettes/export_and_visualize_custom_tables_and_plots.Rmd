@@ -1,6 +1,6 @@
 ---
-title: "Export and visualize custom tables and plots"
-author: "Roman Hillje"
+title: 'Export and visualize custom tables and plots'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -23,15 +23,15 @@ knitr::opts_chunk$set(
 
 # Overview
 
-cerebroApp v1.3 provides new possibilities to export and visualize custom data that you would like to share alongside with your scRNA-seq data. At the time of writing, you can attach tables and plots (made with ggplot2) to your data set. In this article, I will show you to do it.
+cerebroAppLite provides new possibilities to export and visualize custom data that you would like to share alongside with your scRNA-seq data. At the time of writing, you can attach tables and plots (made with ggplot2) to your data set. In this article, I will show you to do it.
 
 # Tables
 
-In previous cerebroApp versions, a very specific format for tables containing marker genes and enriched pathways was expected, resulting in a severe limitation of which methods you can use to generate the results, or alternatively requiring manual modification of the table to fit the format. Since cerebroApp v1.3, it is possible to export and visualize tables of any format in Cerebro, as long as they are a `data.frame`. Due to dynamic column formatting and color highlighting, the table content can be visually enhanced anyway.
+In previous cerebroAppLite versions, a very specific format for tables containing marker genes and enriched pathways was expected, resulting in a severe limitation of which methods you can use to generate the results, or alternatively requiring manual modification of the table to fit the format. Since cerebroAppLite, it is possible to export and visualize tables of any format in Cerebro, as long as they are a `data.frame`. Due to dynamic column formatting and color highlighting, the table content can be visually enhanced anyway.
 
 ## Marker genes and enriched pathways
 
-Let's assume you have a `Seurat` object but generated tables of differentially expressed genes and enriched pathways using other tools/methods than those built into cerebroApp. To export those tables, you just need to put it in the right place, following a "method" and "name" scheme. In this example, we assume you have a table of marker genes called `custom_table` that looks like this:
+Let's assume you have a `Seurat` object but generated tables of differentially expressed genes and enriched pathways using other tools/methods than those built into cerebroAppLite. To export those tables, you just need to put it in the right place, following a "method" and "name" scheme. In this example, we assume you have a table of marker genes called `custom_table` that looks like this:
 
 ```{r eval=FALSE}
 library(tibble)
@@ -73,7 +73,7 @@ exportFromSeurat(
 [15:28:21] Start collecting data...
 [15:28:21] Overview of Cerebro object:
 
-class: Cerebro_v1.3
+class: Cerebro
 cerebroApp version: 1.3.0
 experiment name: pbmc_Seurat
 organism: hg
@@ -87,10 +87,10 @@ projections (2): UMAP, UMAP_3D
 trees (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode_main
 marker genes:
- - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+ - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
  - custom_method (1): custom_table
 enriched pathways:
- - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+ - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
  - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 trajectories:
  - monocle2 (1): highly_variable_genes
@@ -143,7 +143,7 @@ exportFromSeurat(
 [15:07:48] Start collecting data...
 [15:07:50] Overview of Cerebro object:
 
-class: Cerebro_v1.3
+class: Cerebro
 cerebroApp version: 1.3.0
 experiment name: pbmc_Seurat
 organism: hg
@@ -157,10 +157,10 @@ projections (2): UMAP, UMAP_3D
 trees (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode_main
 marker genes:
-  - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+  - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
   - custom_method (1): custom_table
 enriched pathways:
-  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
   - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 trajectories:
   - monocle2 (1): highly_variable_genes
@@ -215,7 +215,7 @@ exportFromSeurat(
 [11:54:33] Start collecting data...
 [11:54:33] Overview of Cerebro object:
 
-class: Cerebro_v1.3
+class: Cerebro
 cerebroApp version: 1.3.0
 experiment name: pbmc_Seurat
 organism: hg
@@ -231,7 +231,7 @@ most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode
 marker genes:
   - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 enriched pathways:
-  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
   - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 trajectories:
   - monocle2 (1): highly_variable_genes
@@ -371,7 +371,7 @@ exportFromSeurat(
 [10:03:13] Start collecting data...
 [10:03:14] Overview of Cerebro object:
 
-class: Cerebro_v1.3
+class: Cerebro
 cerebroApp version: 1.3.0
 experiment name: pbmc_Seurat
 organism: hg
@@ -387,7 +387,7 @@ most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode
 marker genes:
   - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 enriched pathways:
-  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main,
   - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
 trajectories:
   - monocle2 (1): highly_variable_genes

@@ -1,0 +1,278 @@
+---
+title: "Release notes: Cerebro/cerebroApp"
+author: "Roman Hillje"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    self_contained: yes
+    mode: selfcontained
+vignette: >
+  %\VignetteIndexEntry{Release notes: Cerebro/cerebroApp}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction
+
+This document contains release notes for Cerebro/cerebroApp and cerebroAppLite.
+
+# cerebroAppLite 1.5.3
+
+## Fixes
+
+- Several bug fixes so that launchCerebro should work again
+
+# cerebroAppLite 1.5.2
+
+## New features
+
+- Allow plot settings (size, opacity, number of cells to show) to be different in gene expression and overview (useful for large datasets with slow gene expression)
+
+# cerebroAppLite 1.5.1
+
+## Changes
+
+- Remove unused functions in group
+
+# cerebroAppLite 1.5.0
+
+## Major changes
+
+- Make compatible with Seurat v5, especially with BPCells Matrix
+- New parameter `expression_matrix_BPCells` in `launchCerebro()` to load expression matrices stored in BPCells format for improved performance with large datasets
+
+# cerebroAppLite 1.4.1
+
+## New features
+
+- Timeout function added. This logs out the user after 600 seconds of inactivity (can be changed in `shiny_ui.R`). The JS function was taken from https://stackoverflow.com/a/53207050/21417317.
+- Add option to show up to 1000 cells in `Main`, which is useful for exports.
+
+# cerebroAppLite 1.4.0
+
+## Introduction
+
+This is the first update of this cerebroApp fork. Its aim is to continue a lightweight version of the excellent cerebroApp with only the main function as the cerebroApp by Roman Hillje is sadly discontinued.
+
+## Major changes
+
+- Remove enriched pathways, extra material, most expressed genes and trajectory functions since the goal of this fork is to continue with a lightweight version
+
+## Minor changes
+
+- `Load Data` is renamed to `Data info` and `Overview` to `Main`
+- Preferences about WebGL and hover info are now show in the first tab called `Data info`
+- More colorful boxes for the sample information
+- Different icons for tabs `Data info`, `Main`, `Groups` and `Marker Groups`
+
+# cerebroApp 1.3.1
+
+## Major changes
+
+- Projections in the "Overview" and "Gene (set) expression" are now updated using the `Plotly.react()` Javascript function instead of redrawn from scratch inside R when changing the input variables. For the user, that means that (1) plots are drawn much quicker and (2) the current zoom/pan settings are maintained when switching plot parameters (coloring variable, point size/opacity, etc).
+
+## Minor changes
+
+- It is now possible to define several settings related to the projections shown in the "Overview" and "Gene (set) expression" tabs. For example, you can change the default point size and opacity, the default percentage of cells to show, and whether or not hover info should be activated in the projections. These settings are optional but useful when hosting a known data sets in `closed` mode, e.g. because you want to decrease the point size in a large data set. The respective parameters can be found in the description of the `launchCerebroV1.3()` function.
+- Hover/tooltip info for cells in projections can be deactivated through a checkbox on the "About" tab. Deactivating hover info increases performance of projections.
+- Hover/tooltip info for cells in the gene expression projection no longer contain the gene expression value. This is because preparing the hover info is an expensive computation with little return. As a result of removing the gene expression value, the hover info does not need to be recalculated every time a gene is added to or removed from the list of genes to show expression for. For the same reason, when plotting a trajectory, the state and pseudotime are not added to the hover info either.
+- Internally, data for plotting in projections is rearranged, stored in different variables, and the final output is debounced to avoid unnecessary redrawing of the projections on initialization.
+- The feature to show expression of multiple genes in separate panels has been matured. Up to 9 genes can be shown in a 3x3 panel matrix but all share the same color scale. While cells can be selected in any of the panels, the expression levels shown in the other UI element, e.g. table of selected cells or expression by group, refers to the mean expression of all selected genes (not just the one the cells were selected in).
+- When coloring cells in projections by a caterogical variable, e.g. cell type, the dots in the legend are now larger and independent from the selected point size.
+- Tables are now rendered server-side to improve performance for large tables.
+- Cellular barcodes in tables of selected cells are formatted in monospace font.
+- Columns in meta data tables, e.g. table of cells selected in projections, which are identified to contain percentage on a 0-100 scale are changed to a 0-1 scale to prevent non-sensical values such as 500%.
+- Add comma to Y axis and hover info in bar chart of selected cells in projection ("Overview" tab).
+- The `crb_file_to_load` parameter of the `launchCerebroV1.3()` function (or as part of `Cerebro.options`) can now be set to the name of a `Cerebro_v1.3` object. That means you can load the data set before launching Cerebro (with `readRDS()`) and make Cerebro initialize itself with it. This is particularly useful when hosting Cerebro in `closed` mode, preventing that each user session has to read the data set from disk.
+- Update author info in "About" tab.
+
+## Fixes
+
+- Colors assigned to groups in bar chart of selected cells in projection ("Overview" tab) sometimes did not match those shown in the projection. This only applied to categorical grouping variables that are not registered as grouping variables.
+- Update Enrichr API for `getEnrichedPathways()` function. Make it configurable in case of further changes to the API.
+
+# cerebroApp 1.3.0
+
+## Introduction
+
+This release of Cerebro/cerebroApp comes with some major changes, enough to justify a dedicated article.
+Here, I will go over the changes and motivations.
+
+TL;DR: Possibly the best thing to happen in 2020!
+
+## Flexible grouping variables
+
+Previous versions of Cerebro expected your cells to be grouped into different samples and clusters. Those were the two major grouping variables, without allowing the user to specify and visualize others. With data sets becoming more and more complex, containing several samples from different batches, cell types, etc., it became evident that this limitation can be a severe bottleneck in some situations. On the other hand, small data sets might consist of a single sample, making it unnecessary to analyze cells by sample since they all belong to the same. In Cerebro v1.3, users can specify one or multiple grouping variables through the `groups` parameter when exporting their data set. The user interface has been adapted in several places accordingly.
+
+## Dynamic table formatting
+
+Another limitation of previous Cerebro versions is that tables of marker genes and enriched pathways are expected to be formatted in a very specific way. More or less, the only way to get a table to be displayed correctly was to generate it with pre-processing functions of cerebroApp, e.g. `getMarkerGenes()`. These functions are bound to a specific method, e.g. the `FindAllMarkers()` function of the Seurat package. Results from other methods generally don't fit the expected format and will cause an error, even when stored in the right place in the Seurat object. The benefit of this limitation was that, since I knew the format of the tables, I was able to enhance them with colors and other visual clues. With the release of Cerebro v1.3, I have implemented a dynamic way of formatting and highlighting values that is agnostic of the table format. Number formatting and color highlighting can be switched on or off, and rely on guessing the column content based on a set of rules. For example, columns containing integers that are falsely stored as a different type, e.g. double, will be converted to integers to remove decimals. Another example are p-values, which are generally better represented in a scientific notation. This transition to dynamic table formatting means that now, you can export any table generated by any method - as long as it is a data frame - and visualize its content in Cerebro.
+
+This is how the meta data table of selected cells in the "Overview" tab looks like with both options active:
+
+<a target="_blank" href="release_notes_files/dynamic_table_formatting_on.png"><img src="release_notes_files/dynamic_table_formatting_on.png" alt="Dynamic table formatting on" width="100%" height="auto" /></a>
+
+And this is the same table with both options switched off:
+
+<a target="_blank" href="release_notes_files/dynamic_table_formatting_off.png"><img src="release_notes_files/dynamic_table_formatting_off.png" alt="Dynamic table formatting off" width="100%" height="auto" /></a>
+
+Below you can find the details and actions of the two options:
+
+### Automatic formatting of numbers
+
+Columns containing numeric values are split into those containing integers, p-values, logFC, percentages, and others. This is done based on the name of the column and the range of the values inside it. For example, p-values and percentages should never be smaller than 0 or greater than 1. Then, each category is formatted differently:
+
+* Integers: remove decimal places; show thousand separator
+* p-values: limit to 3 significant decimal places, scientific notation when useful
+* logFC: round to 3 decimal places
+* Percentage: show as percentage with 2 decimal places
+* Others: round to 3 significant decimal places
+
+### Color highlighting
+
+Columns are split into different categories in the same way as described above. However, color highlighting also applies to columns containing grouping variables and logicals/booleans.
+
+* Grouping variables and cell cycle assignments: set background color to the colors specified in the "Color management" tab
+* p-values: red color bar that fills the cell from the right
+* Percentage: pink color bar that fills the cell from the right
+* Integers, logFC and others: background color indicates value from white (min) to orange (max); only works when minimum and maximum values are not the same
+* Logical: `TRUE` is shown in green and `FALSE` in red
+
+## Export `SCE`/`SingleCellExperiment` objects
+
+The Seurat framework is a great toolkit to analyze single cell data. But that doesn't mean it is the only good analysis framework out there. Another step towards making Cerebro more flexible is to allow exporting `SCE`/`SingleCellExperiment` object for visualization in Cerebro. An example of the workflow can be found [here](exporting_a_data_set_in_SCE_format.html).
+
+Please note that pre-processing functions are still limited to `Seurat` object as an input. It is on the roadmap to adapt those functions.
+
+## The `Cerebro_v1.3` class
+
+Starting with v1.3, the data that is exported by cerebroApp and stored as a `.crb` file is organized in a dedicated class: `Cerebro_v1.3` (based on R6 reference class). Given the increasing amount of data that can be exported and visualized, this appeard to be an inevitable step. Furthermore, it aims to improve backwards-compatibility between exported data and Cerebro interfaces because data is not accessed directly, but rather returned by the object through dedicated functions/methods that, even when changing data organization inside the object in the future, can keep their name and return the same output.
+
+Since `.crb` files are just `.rds` files with a different extension, you can get an overview of an exported data set - to understand what it contains - by loading it into R and calling its `print()` function:
+
+```{r eval=FALSE}
+data_set <- readRDS('my_data_set.crb')
+data_set$print()
+```
+
+You should then get an output similar to this:
+
+```
+class: Cerebro_v1.3
+cerebroApp version: 1.3.0
+experiment name: pbmc_Seurat
+organism: hg
+date of analysis: 2020-02-19
+date of export: 2020-09-08
+number of cells: 5,697
+number of genes: 15,907
+grouping variables (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
+cell cycle variables (1): cell_cycle_seurat
+projections (2): UMAP, UMAP_3D
+trees (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
+most expressed genes: sample, seurat_clusters, cell_type_singler_blueprintencode_main
+marker genes:
+  - cerebro_seurat (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
+enriched pathways:
+  - cerebro_seurat_enrichr (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main, 
+  - cerebro_GSVA (3): sample, seurat_clusters, cell_type_singler_blueprintencode_main
+trajectories:
+  - monocle2 (1): highly_variable_genes
+```
+
+From this, you can tell when an object was originally exported, the number of cells and genes, what organism the cells were derived from, what grouping variables have been specified, the projections that can be accessed, whether it contains tables for most expressed genes, marker genes, and if so, which method was used to generate them, etc.
+
+## `open` and `closed` mode and pre-loading data
+
+In the past months, I have been contacted by researchers who wanted to share their Cerebro data set with the public by hosting Cerebro on a web server and providing access to their data set. However, when hosting Cerebro on a server - without any changes to the source code - users would have the possibility to upload their own data set, which was not the intention. With this version of Cerebro, I introduced a new `mode` parameter when launching Cerebro, which can be set to `closed` to remove the "Load data" UI element, preventing others from uploading their own data.
+
+Along with this, the new `crb_file_to_load` parameter allows you specify the path to a `.crb` file which will be loaded at the launch of Cerebro without having to select the file manually. Together, these two parameters allow you to give others access to your data without letting them use your server for their own data set.
+
+You might also find the new `welcome_message` parameter useful, which allows you to create a custom welcome message that will be displayed when launching Cerebro. You can use this to introduce viewers to your data set and the experimental context that was used to derive it from.
+
+You can find an example for the `closed` mode with a pre-loaded data set and a custom welcome message in [this vignette](launch_cerebro_with_pre-loaded_data_set.html).
+
+## User interface
+
+Here, I will go through the changes to the different tabs in the UI.
+
+### Groups
+
+The new "Groups" tab replaces the previous "Samples" and "Clusters" tab in order to accommodate flexible number of grouping variables in the data set. The structure of this tab is very similar to the one previously used in the "Samples" and "Clusters" tabs, with the difference that now, at the top of the page, the user can select one of the grouping variables that have been provided when exporting the data set.
+
+If a phylogenetic tree has been calculated to represent the relationship between the group levels, the tree is plotted with functions from the `ape` package. The plot is not interactive, but you have two different forms of representation (unrooted and phylogram). Moreover, additional parameters for the plot can be controlled through elements in the dropdown menu (gear icon) in the title bar.
+
+<a target="_blank" href="release_notes_files/groups_tree.png"><img src="release_notes_files/groups_tree.png" alt="Groups: Phylogenetic tree" width="100%" height="auto" /></a>
+
+The relationship between the selected grouping variable and another can be seen in the "Composition by other group" panel. For example, you can see how samples split into clusters, or clusters into cell types, assuming that those are among the grouping variables you specified when exporting the data. As in previous versions of Cerebro, this relationship is shown as a stacked bar chart. However, now you can also chose to visualize it as a Sankey plot, which sometimes makes relationships between the groups more apparent. Similarly, the plots related to the cell cycle have been combined - you can choose among the provided columns holding cell cycle assignments for cells (see the `cell_cycle` parameter in the `exportFromSeurat()` function) - and can be shown as bar charts or Sankey plots. As before, tables are hidden by default but can be shown using the switches above the plot, and you can switch between actual cell counts and percentage of cells (this option won't affect the Sankey plot).
+
+<a target="_blank" href="release_notes_files/groups_sankey.png"><img src="release_notes_files/groups_sankey.png" alt="Groups: Sankey plot to represent relationship between grouping variables" width="100%" height="auto" /></a>
+
+The new "Expression metrics" panel contains plots for the number of transcripts, number of expressed genes, and percentage of mitochondrial and ribosomal genes per group.
+
+### Most expressed genes, marker genes, enriched pathways
+
+These tabs all still display the same content as before, however with a few small adjustments.
+
+In the "Most expressed genes" tab, at the top of the page, you can select the grouping variable of interest. In the "Marker genes" and "Enriched pathways" tabs, before selecting the grouping variable, you have to choose the method that was used to generate the results. This allows you to export and visualize more results in Cerebro, while also keeping them structured.
+
+In all three tabs, there is a switch that allows you to show results for all group levels of the selected grouping variable. When this switch is off, you will see a UI element that you can use to filter the table for the group level you want. When the switch is activated, the UI element for group level selection will disappear and the table will contain results for all group levels. You can then still filter the table for one or several group levels through the column filters. This can be useful when you want to collectively show the results for multiple group levels together. However, to improve performance for very large tables, you might prefer to filter the table using the UI element described above (pre-filtering).
+
+In the "Marker genes" and "Enriched pathways" tabs, in addition to the group level filtering, you can toggle automatic number formatting and color highlighting in the table. For a more detailed description of these settings, please see the descriptions above. In summary, with these options activated, numbers will be formatted depending on what kind of values they are, and colors and color bars will be applied the numbers and grouping variables to facilitate interpretation.
+
+<a target="_blank" href="release_notes_files/marker_genes.png"><img src="release_notes_files/marker_genes.png" alt="Marker genes" width="100%" height="auto" /></a>
+
+Moreover, it is now possible to export results for marker genes / differentially expressed genes and enriched pathways generated other tools. You can find an example on how to do that in this vignette: [Export and visualize custom tables and plots](export_and_visualize_custom_tables_and_plots.html).
+
+As in previous versions of Cerebro, you can export the tables in CSV or Excel format and hide columns using the "Column visibility" button.
+
+Also note that, due to generating the tables with pure `DT` instead of also using the `formattable` package, you can use the column filters to specify ranges for columns containing numeric values.
+
+### Gene (set) expression
+
+The content of the "Gene expression" and "Gene set expression" tabs has been combined and now lives in a single tab. This made a lot of sense because the content was anyway almost the same. I wonder why I have created separate tabs in the first place. Now, in the parameter panel on the left, you can switch between the selection of genes and gene sets.
+
+Also, you can now select an exported trajectory as the projection, allowing you to visualize expression along developmental trajectories. To address this question further, when a trajectory is selected as a projection, a new panel called "Expression levels by pseudotime" will be shown at the bottom of the tab. In this panel, you see the expression levels of the selected gene(s)/gene set as a function of pseudotime. A trend line is fitted on it to help you judge whether there could be a relationship between pseudotime and expression levels. You can control the parameters of the trend line through element in the dropdown menu (gear icon) in the title bar.
+
+<a target="_blank" href="release_notes_files/expression_pseudotime.png"><img src="release_notes_files/expression_pseudotime.png" alt="Gene (set) expression: Expression levels over pseudotime" width="100%" height="auto" /></a>
+
+There is another new feature, however quite experimental at this points, that allows you to plot expression of multiple genes at the same time in separate facets. For this, you need to activate the option in the dropdown menu (gear icon) in the title bar and select at least 2 genes but no more than 8. You should then see a facet for each gene. This feature is experimental because there are still quite a few limitations. While exporting the plot to a PDF works, you can not do this with trajectories, it spams the console with messages, the hover info tooltip contains very limited information (position of a cell and the expression level), and all facets have the same color scale, which sometimes makes it difficult to interpret the plot when one gene has a much higher expression than the others. I will try to improve this feature in coming releases.
+
+<a target="_blank" href="release_notes_files/expression_facets.png"><img src="release_notes_files/expression_facets.png" alt="Gene (set) expression: Separate facet per gene" width="100%" height="auto" /></a>
+
+### Trajectory
+
+Similar to the "Marker genes" and "Enriched pathways" tabs, you now have to choose the method that was used to generate the trajectory, and then the specific trajectory from that method. Still, only trajectories from Monocle 2 are supported, but I am planning to implement support for trajectories from other methods.
+
+In the "Distribution along pseudotime" panel, you can now choose a variable that you want to compare to pseudotime independently from the coloring variable in the projection. If you choose a categorical variable, e.g. clusters, you will see a distribution plot, which now is created with plotly directly. Instead, if you select a numerical variable, e.g. the number of transcripts (nUMI), you will see a scatter plot with a trend line fitted on it. In the dropdown menu (gear icon) in the the title bar, you can find options to control opacity of the density curve, deactive the trend line, and set parameters of the trend line.
+
+<a target="_blank" href="release_notes_files/trajectory_density.png"><img src="release_notes_files/trajectory_density.png" alt="Trajectory: Distribution of groups along pseudotime" width="100%" height="auto" /></a>
+
+The "States by group" panel works similar to the "Composition by other group" in the "Groups" tab, meaning that you can represent the relationship between the trajectory states and other grouping variables and cell cycle assignments as a bar chart or Sankey plot.
+
+In the "Expression metrics" panel you can visualize the number of transcripts, number of expressed genes, and the percentage of mitochondrial and ribosomal transcripts for each state.
+
+__Note:__ This tab is only visible if any trajectory is present in the currently loaded data set.
+
+### Extra material
+
+In some cases, it is useful to share material with Cerebro users that doesn't fit into any of the existing categories. For those cases, a new tab called "Extra material" has been created. It will only appear if extra material is present in the data set. At the moment, only tables (data frames) and plots (made with ggplot2) can be exported as extra material, but support for other types of content can be added in the future upon user request. You can see two examples below:
+
+<a target="_blank" href="release_notes_files/extra_material_table.png"><img src="release_notes_files/extra_material_table.png" alt="Extra material" width="100%" height="auto" /></a>
+
+<a target="_blank" href="release_notes_files/extra_material_plot.png"><img src="release_notes_files/extra_material_plot.png" alt="Extra material" width="100%" height="auto" /></a>
+
+Have a look at this vignette if you would like to know how you can export your tables as additional material: [Export and visualize custom tables and plots](export_and_visualize_custom_tables_and_plots.html).
+
+__Note:__ This tab is only visible if any extra material is present in the currently loaded data set.
+
+### Miscellaneous
+
+* Hover info in scatter plots, e.g. projections, now contain info about all grouping variables that were specified when exporting the data.
+* There is a new info element below projection/trajectory plots that indicates how many cells have been selected. Note that the selection is maintained when changing the coloring variable, even though the selection box disappeared from the plot.
+* Cells selected in the projection/trajectory plot in the "Overview" tab can be grouped separately from the selected coloring variable.
+* `export to PDF` buttons now open a dialog that allows you to choose where to save the plot and how to name it.
+* In the "Color management" tab, color selection elements will be shown for all group levels of all grouping variables that were specified when exporting the data.
+* In the "Analysis info" tab, the content is put together dynamically, allowing you to store, export, and display information more flexibly.

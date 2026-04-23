@@ -10,7 +10,7 @@ library(shinydashboard)
 library(shinyWidgets)
 
 ## load data set -------------------------------------------------------------##
-my_data_set <<- readRDS("extdata/v1.3/example.crb")
+my_data_set <<- readRDS("extdata/example.crb")
 
 ## set parameters ------------------------------------------------------------##
 Cerebro.options <<- list(
@@ -25,8 +25,8 @@ shiny_options <- list(
 )
 
 ## load server and UI functions ----------------------------------------------##
-source(glue::glue("{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_UI.R"))
-source(glue::glue("{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_server.R"))
+source(glue::glue("{Cerebro.options$cerebro_root}/shiny/shiny_UI.R"))
+source(glue::glue("{Cerebro.options$cerebro_root}/shiny/shiny_server.R"))
 
 ## launch app ----------------------------------------------------------------##
 shiny::shinyApp(

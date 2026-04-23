@@ -70,8 +70,8 @@ This function allows to export a \code{SingleCellExperiment} (\code{SCE})
 object to visualize in Cerebro.
 }
 \examples{
-pbmc <- readRDS(system.file("extdata/v1.3/pbmc_SCE.rds",
-  package = "cerebroApp"))
+pbmc <- readRDS(system.file("extdata/pbmc_SCE.rds",
+  package = "cerebroAppLite"))
 exportFromSCE(
   object = pbmc,
   file = 'pbmc_SCE.crb',

@@ -30,8 +30,8 @@
 #' stored in \code{object@misc$marker_genes}.
 #'
 #' @examples
-#' pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-#'   package = "cerebroApp"))
+#' pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+#'   package = "cerebroAppLite"))
 #' pbmc <- getMarkerGenes(
 #'   object = pbmc,
 #'   assay = 'RNA',
@@ -134,6 +134,19 @@ getMarkerGenes <- function(
     )
   }
 
+  ## check if provided groups are factors or characters
+  for (group in groups) {
+    if ( !is.factor(object@meta.data[[group]]) && !is.character(object@meta.data[[group]]) ) {
+      stop(
+        paste0(
+          "Group `", group, "` is neither a factor nor a character vector. ",
+          "Please convert it to one of these types before running this function."
+        ),
+        call. = FALSE
+      )
+    }
+  }
+
   ## check if 'marker_genes' slot already exists and create it if not
   if ( is.null(object@misc$marker_genes) ) {
     object@misc$marker_genes <- list()
@@ -177,6 +190,7 @@ getMarkerGenes <- function(
       !exists('genes_on_cell_surface') &&
       attempt <= 3
     ) {
+      attempt <- attempt + 1
       try(
         genes_on_cell_surface <- biomaRt::getBM(
           attributes = temp_attributes,

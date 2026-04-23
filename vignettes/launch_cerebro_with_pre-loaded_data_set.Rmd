@@ -1,6 +1,6 @@
 ---
-title: "Launch Cerebro with pre-loaded data set"
-author: "Roman Hillje"
+title: 'Launch Cerebro with pre-loaded data set'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -23,18 +23,17 @@ knitr::opts_chunk$set(
 
 # Overview
 
-A new feature in cerebroApp v1.3 is to specify a `.crb` file when launching Cerebro and preventing the user from uploading their own data set.
+A new feature in cerebroAppLite is to specify a `.crb` file when launching Cerebro and preventing the user from uploading their own data set.
 This is can be useful when you want to share your Cerebro data set on a web server, e.g. along with a publication, but don't want users to use your web server to upload their own data sets.
 
 # How to do it
 
-It's very simple, all you have to do is provide some parameters to `launchCerebro()` / `launchCerebroV1.3()`.
+It's very simple, all you have to do is provide some parameters to `launchCerebro()`.
 Let's say your data set is stored here: `~/Cerebro/data_sets/pbmc_v3.crb`.
 Then, launch Cerebro as shown below:
 
 ```{r eval=FALSE}
 launchCerebro(
-  version = "v1.3",
   crb_file_to_load = "~/Cerebro/data_sets/pbmc_v3.crb",
   mode = "closed"
 )
@@ -46,7 +45,7 @@ That's it.
 
 # Modify welcome page
 
-If you would like to modify the message on the "Load data"/welcome page, e.g. to link to a publication or give an introduction to the data set, you can use the `welcome_message` parameter of `launchCerebroV1.3`.
+If you would like to modify the message on the "Load data"/welcome page, e.g. to link to a publication or give an introduction to the data set, you can use the `welcome_message` parameter of `launchCerebro`.
 The provided string for that parameter can/should be written in HTML as shown below:
 
 ```{r eval=FALSE}
@@ -56,7 +55,6 @@ custom_welcome_message <- '<h3 style="text-align: center; margin-top: 0px"><stro
   Please contact us at ... if you have any questions.</p>'
 
 launchCerebro(
-  version = "v1.3"
   crb_file_to_load = "~/Cerebro/data_sets/pbmc_v3.crb",
   mode = "closed",
   welcome_message = custom_welcome_message
@@ -67,5 +65,5 @@ launchCerebro(
 
 # See also
 
-* [Host Cerebro on shinyapps.io](host_cerebro_on_shinyapps.html)
-* [Control access to Cerebro with a login page](control_access_to_cerebro_with_a_login_page.html)
+- [Host Cerebro on shinyapps.io](host_cerebro_on_shinyapps.html)
+- [Control access to Cerebro with a login page](control_access_to_cerebro_with_a_login_page.html)

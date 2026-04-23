@@ -72,8 +72,8 @@ No data returned.
 This function allows to export a Seurat object to visualize in Cerebro.
 }
 \examples{
-pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-  package = "cerebroApp"))
+pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+  package = "cerebroAppLite"))
 exportFromSeurat(
   object = pbmc,
   file = 'pbmc_Seurat.crb',

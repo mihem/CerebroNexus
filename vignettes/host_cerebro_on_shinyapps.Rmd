@@ -1,6 +1,6 @@
 ---
-title: "Host Cerebro on shinyapps.io"
-author: "Roman Hillje"
+title: 'Host Cerebro on shinyapps.io'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -33,11 +33,11 @@ The free account comes with a limit on (1) the number of applications that can b
 # Setup
 
 To upload Cerebro to shinyapps.io, we will use the [`rsconnect`](https://cran.r-project.org/web/packages/rsconnect/index.html) package, therefore it needs to be installed first.
-Of course, we also need the cerebroApp package.
+Of course, we also need the cerebroAppLite package.
 
 ```{r eval=FALSE}
 if ( 'rsconnect' %in% installed.packages() == FALSE ) install.packages('rsconnect')
-if ( 'cerebroApp' %in% installed.packages() == FALSE ) install.packages('romanhaa/cerebroApp')
+if ( 'cerebroAppLite' %in% installed.packages() == FALSE ) install.packages('mihem/cerebroAppLite')
 
 library(rsconnect)
 ```
@@ -53,7 +53,7 @@ rsconnect::setAccountInfo(name="<ACCOUNT>", token="<TOKEN>", secret="<SECRET>")
 
 # Prepare Shiny files
 
-Next, we need to copy the Shiny files and some other data for Cerebro v1.3 to a dedicated directory, here `~/test_cerebro_shinyapps`.
+Next, we need to copy the Shiny files and some other data for Cerebro to a dedicated directory, here `~/test_cerebro_shinyapps`.
 If you prefer to host a different version of Cerebro, adapt the code accordingly.
 
 ```{r eval=FALSE}
@@ -63,20 +63,13 @@ dir.create(app_directory)
 dir.create(glue::glue('{app_directory}/shiny'))
 
 file.copy(
-  system.file('extdata', package = 'cerebroApp'),
+  system.file('extdata', package = 'cerebroAppLite'),
   app_directory,
   recursive = TRUE
 )
 
-unlink(
-  c(glue::glue('{app_directory}/extdata/v1.0'),
-    glue::glue('{app_directory}/extdata/v1.1'),
-    glue::glue('{app_directory}/extdata/v1.2')),
-  recursive = TRUE
-)
-
 file.copy(
-  system.file('shiny', 'v1.3', package = 'cerebroApp'),
+  system.file('shiny', package = 'cerebroAppLite'),
   glue::glue('{app_directory}/shiny'),
   recursive = TRUE
 )
@@ -99,7 +92,7 @@ library(shinyWidgets)
 ## set parameters ------------------------------------------------------------##
 Cerebro.options <<- list(
   "mode" = "open",
-  "crb_file_to_load" = "extdata/v1.3/example.crb",
+  "crb_file_to_load" = "extdata/example.crb",
   "cerebro_root" = "."
 )
 
@@ -129,7 +122,7 @@ Since we have a dependency from [Bioconductor](http://bioconductor.org), we have
 When doing so, you will be asked which repositories should be used in this session.
 For what we are doing here, selecting `CRAN` and `BioC software` should be sufficient.
 
-When you run the `deployApp()` command, you might receive a warning about a hidden `browser()` call in the `shiny/v1.3/about/server.R` file, but you can ignore that and proceed.
+When you run the `deployApp()` command, you might receive a warning about a hidden `browser()` call in the `shiny/about/server.R` file, but you can ignore that and proceed.
 Alternatively, you can simply comment out the respective line.
 
 ```{r eval=FALSE}
@@ -145,9 +138,9 @@ The larger the data set you want to upload to Cerebro, the more memory will be n
 
 # See also
 
-* [Launch Cerebro with pre-loaded data set](launch_cerebro_with_pre-loaded_data_set.html)
-* [Control access to Cerebro with a login page](control_access_to_cerebro_with_a_login_page.html)
+- [Launch Cerebro with pre-loaded data set](launch_cerebro_with_pre-loaded_data_set.html)
+- [Control access to Cerebro with a login page](control_access_to_cerebro_with_a_login_page.html)
 
 # Known issues
 
-* Exporting plots to PDF through the `export to PDF` buttons effectively does not work at the moment. That is because it will trigger a file selection dialog on the server side, not allowing the user to specify a location on their local machine.
+- Exporting plots to PDF through the `export to PDF` buttons effectively does not work at the moment. That is because it will trigger a file selection dialog on the server side, not allowing the user to specify a location on their local machine.

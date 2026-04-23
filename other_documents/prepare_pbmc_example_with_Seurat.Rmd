@@ -1,6 +1,6 @@
 ---
-title: "How to generate the Seurat PBMC example data set used in the examples parts of cerebroApp function"
-author: "Roman Hillje"
+title: 'How to generate the Seurat PBMC example data set used in the examples parts of cerebroApp function'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -18,7 +18,7 @@ Run this.
 
 ```{r}
 library(Seurat)
-library(cerebroApp)
+library(cerebroAppLite)
 
 pbmc_counts <- read.table(
   file = system.file('extdata', 'pbmc_raw.txt', package = 'Seurat'),
@@ -56,5 +56,5 @@ pbmc <- getMarkerGenes(
   groups = c('sample','seurat_clusters')
 )
 
-saveRDS(pbmc, '~/Research/GitHub/cerebroApp_v1.3/inst/extdata/v1.3/pbmc_seurat.rds')
+saveRDS(pbmc, '~/Research/GitHub/cerebroAppLite/inst/extdata/pbmc_seurat.rds')
 ```

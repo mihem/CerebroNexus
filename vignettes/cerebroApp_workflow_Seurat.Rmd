@@ -1,6 +1,6 @@
 ---
-title: "Introduction to the cerebroApp workflow (Seurat)"
-author: "Roman Hillje"
+title: 'Introduction to the cerebroApp workflow (Seurat)'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -29,14 +29,14 @@ This vignette will give you an example of how scRNA-seq data can be processed us
 
 Ket features that can be accessed through Cerebro:
 
-* Interactive 2D and 3D dimensional reductions.
-* Overview panels for all grouping variables, e.g. samples and clusters.
-* Tables of most expressed genes and marker genes for subgroups of grouping variables.
-* Tables of enriched pathways for subgroups of grouping variables.
-* Query gene(s) and gene sets from MSigDB and show their expression in dimensional reductions.
-* Visualize trajectories calculated with Monocle v2.
-* All plots can be exported to PNG. In addition, 2D dimensional reductions can be exported to PDF.
-* Tables can be downloaded in CSV or Excel format.
+- Interactive 2D and 3D dimensional reductions.
+- Overview panels for all grouping variables, e.g. samples and clusters.
+- Tables of most expressed genes and marker genes for subgroups of grouping variables.
+- Tables of enriched pathways for subgroups of grouping variables.
+- Query gene(s) and gene sets from MSigDB and show their expression in dimensional reductions.
+- Visualize trajectories calculated with Monocle v2.
+- All plots can be exported to PNG. In addition, 2D dimensional reductions can be exported to PDF.
+- Tables can be downloaded in CSV or Excel format.
 
 # Installation
 
@@ -48,7 +48,7 @@ if ( 'BiocManager' %in% installed.packages() == FALSE ) install.packages('BiocMa
 
 library(BiocManager)
 
-if ( 'cerebroApp' %in% installed.packages() == FALSE ) install('romanhaa/cerebroApp')
+if ( 'cerebroAppLite' %in% installed.packages() == FALSE ) install('mihem/cerebroAppLite')
 if ( 'Seurat' %in% installed.packages() == FALSE ) install('Seurat')
 if ( 'SingleR' %in% installed.packages() == FALSE ) install('SingleR')
 if ( 'monocle' %in% installed.packages() == FALSE ) install('monocle')
@@ -63,7 +63,7 @@ library(dplyr)
 library(Seurat)
 library(SingleR)
 library(monocle)
-library(cerebroApp)
+library(cerebroAppLite)
 
 options(width = 100)
 set.seed(1234567)
@@ -87,10 +87,10 @@ Now, we create a `Seurat` object and filter out cells with less than `50` transc
 Those cut-offs are only reasonable for this example data set and will likely need to be adjusted in a real data set.
 Then, we follow the [standard Seurat workflow](https://satijalab.org/seurat/essential_commands.html), including...
 
-* log-normalization of transcript counts,
-* identification of highly variably genes,
-* scaling of expression values and regression for the number of transcripts per cell,
-* principal component analysis (PCA).
+- log-normalization of transcript counts,
+- identification of highly variably genes,
+- scaling of expression values and regression for the number of transcripts per cell,
+- principal component analysis (PCA).
 
 ```{r pre_processing, warning=FALSE}
 seurat <- CreateSeuratObject(
@@ -189,7 +189,7 @@ seurat@misc$parameters$filtering <- list(
   genes_max = Inf
 )
 
-seurat@misc$technical_info$cerebroApp_version <- utils::packageVersion('cerebroApp')
+seurat@misc$technical_info$cerebroApp_version <- utils::packageVersion('cerebroAppLite')
 seurat@misc$technical_info$Seurat <- utils::packageVersion('Seurat')
 seurat@misc$technical_info <- list(
   'R' = capture.output(devtools::session_info())
@@ -321,7 +321,7 @@ On top of querying the databases of the [Enrichr](https://amp.pharm.mssm.edu/Enr
 The `performGeneSetEnrichmentAnalysis()` function uses the [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html) method in combination with additional statistics as published by [Diaz-Mejia et. al.](https://f1000research.com/articles/8-296).
 
 ```{r performGeneSetEnrichmentAnalysis, eval=FALSE}
-example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "cerebroApp")
+example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "cerebroAppLite")
 
 seurat <- performGeneSetEnrichmentAnalysis(
   seurat,

@@ -50,10 +50,10 @@ labels to cell clusters from single-cell RNA-sequencing data", Diaz-Mejia et
 al., F1000Research (2019).
 }
 \examples{
-pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-  package = "cerebroApp"))
+pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+  package = "cerebroAppLite"))
 example_gene_set <- system.file("extdata/example_gene_set.gmt",
-  package = "cerebroApp")
+  package = "cerebroAppLite")
 pbmc <- performGeneSetEnrichmentAnalysis(
   object = pbmc,
   GMT_file = example_gene_set,

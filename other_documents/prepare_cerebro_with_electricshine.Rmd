@@ -1,6 +1,6 @@
 ---
-title: "Prepare Cerebro with `electricShine`"
-author: "Roman Hillje"
+title: 'Prepare Cerebro with `electricShine`'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -28,7 +28,7 @@ electricShine::electrify(
   build_path = '~/Research/test_electric_shine/',
   cran_like_url = "https://cran.r-project.org",
   function_name = "launchCerebro",
-  local_package_path = "/Users/romanhaa/Research/GitHub/cerebroApp_v1.3",
+  local_package_path = "/Users/romanhaa/Research/GitHub/cerebroAppLite",
   package_install_opts = list(type = c("source")),
   mac_url = "https://mac.r-project.org/high-sierra/R-4.0-branch/x86_64/R-4.0-branch.tar.gz"
 )
@@ -70,7 +70,7 @@ library_path <- file.path(library_path, "Resources/library", fsep = "/")
 my_package_name <- install_user_app(
   library_path = library_path,
   repo_location = "local",
-  repo = "~/Research/GitHub/cerebroApp_v1.3/",
+  repo = "~/Research/GitHub/cerebroAppLite/",
   repos = "https://cran.r-project.org",
   package_install_opts = list(type = c("both"))
 )

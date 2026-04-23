@@ -1,6 +1,6 @@
 ---
-title: "Prepare Cerebro files for edge cases"
-author: "Roman Hillje"
+title: 'Prepare Cerebro files for edge cases'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -16,12 +16,12 @@ vignette: >
 
 # Scenarios to test
 
-* Cerebro modes: `open` and `closed`
-* Absence of most expressed genes.
-* Absence of marker genes.
-* Absence of enriched pathways.
-* Absence of trajectories.
-* Expression data is present in "normal" sparse matrix.
+- Cerebro modes: `open` and `closed`
+- Absence of most expressed genes.
+- Absence of marker genes.
+- Absence of enriched pathways.
+- Absence of trajectories.
+- Expression data is present in "normal" sparse matrix.
 
 # Test several cases of custom, missing or incomplete data
 
@@ -197,8 +197,8 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   verbose = FALSE
 )
-# class: Cerebro_v1.3
-# cerebroApp version: 1.3.0
+# class: Cerebro
+# cerebroApp version: 1.4.0
 # experiment name: pbmc_Seurat
 # organism: hg
 # date of analysis: 2020-02-19
@@ -316,8 +316,8 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   verbose = FALSE
 )
-# class: Cerebro_v1.3
-# cerebroApp version: 1.3.0
+# class: Cerebro
+# cerebroApp version: 1.4.0
 # experiment name: pbmc_Seurat
 # organism: hg
 # date of analysis: 2020-02-19

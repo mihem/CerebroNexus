@@ -1,6 +1,6 @@
 ---
-title: "Export a data set in SCE format"
-author: "Roman Hillje"
+title: 'Export a data set in SCE format'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -30,7 +30,7 @@ Do not use this workflow as a reference for how to properly process your data.
 
 # Installation
 
-Before starting the workflow, we need to install `cerebroApp`, as well as the [`scran`](https://bioconductor.org/packages/release/bioc/html/scran.html), [`scater`](https://bioconductor.org/packages/3.11/bioc/html/scater.html) and [`SingleR`](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html) packages, which are not installed as dependencies of cerebroApp because they are only necessary if you want/need to pre-process your scRNA-seq data.
+Before starting the workflow, we need to install `cerebroAppLite`, as well as the [`scran`](https://bioconductor.org/packages/release/bioc/html/scran.html), [`scater`](https://bioconductor.org/packages/3.11/bioc/html/scater.html) and [`SingleR`](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html) packages, which are not installed as dependencies of cerebroAppLite because they are only necessary if you want/need to pre-process your scRNA-seq data.
 If you just want to launch the Cerebro user interface, e.g. because you already have the pre-processed data, you don't need those packages.
 
 ```{r installation, message=FALSE, warning=FALSE}
@@ -38,7 +38,7 @@ if ( 'BiocManager' %in% installed.packages() == FALSE ) install.packages('BiocMa
 
 library(BiocManager)
 
-if ( 'cerebroApp' %in% installed.packages() == FALSE ) install('romanhaa/cerebroApp')
+if ( 'cerebroAppLite' %in% installed.packages() == FALSE ) install('mihem/cerebroAppLite')
 if ( 'scran' %in% installed.packages() == FALSE ) install('scran')
 if ( 'scater' %in% installed.packages() == FALSE ) install('scater')
 if ( 'SingleR' %in% installed.packages() == FALSE ) install('SingleR')
@@ -54,7 +54,7 @@ library(dplyr)
 library(scran)
 library(scater)
 library(SingleR)
-library(cerebroApp)
+library(cerebroAppLite)
 
 options(width = 100)
 set.seed(1234567)
@@ -78,10 +78,10 @@ Now, we create a `SingleCellExperiment` object and filter out cells with less th
 Those cut-offs are only reasonable for this example data set and will likely need to be adjusted in a real data set.
 Then, we...
 
-* remove genes expressed in less than 5 cells,
-* log-normalize transcript counts,
-* identify highly variably genes,
-* perform principal component analysis (PCA).
+- remove genes expressed in less than 5 cells,
+- log-normalize transcript counts,
+- identify highly variably genes,
+- perform principal component analysis (PCA).
 
 ```{r pre_processing, warning=FALSE}
 sce <- SingleCellExperiment::SingleCellExperiment(
@@ -162,7 +162,7 @@ sce@metadata$parameters$filtering <- list(
   genes_max = Inf
 )
 
-sce@metadata$technical_info$cerebroApp_version <- utils::packageVersion('cerebroApp')
+sce@metadata$technical_info$cerebroApp_version <- utils::packageVersion('cerebroAppLite')
 sce@metadata$technical_info$scran <- utils::packageVersion('scran')
 sce@metadata$technical_info$scater <- utils::packageVersion('scater')
 sce@metadata$technical_info <- list(
@@ -265,7 +265,7 @@ marker_genes_cell_type %>% select(1:6) %>% head() %>% knitr::kable(booktabs = T)
 
 # Export to Cerebro format
 
-Finally, we use the `exportFromSeurat()` function of cerebroApp to export our Seurat object to a `.crb` file which can be loaded into Cerebro.
+Finally, we use the `exportFromSeurat()` function of cerebroAppLite to export our Seurat object to a `.crb` file which can be loaded into Cerebro.
 
 ```{r export_data}
 exportFromSCE(

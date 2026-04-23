@@ -1,6 +1,6 @@
 ---
-title: "How to generate the pre-loaded example data set for the Cerebro user interface"
-author: "Roman Hillje"
+title: 'How to generate the pre-loaded example data set for the Cerebro user interface'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -27,7 +27,7 @@ library(dplyr)
 library(Seurat)
 library(SingleR)
 library(monocle)
-library(cerebroApp)
+library(cerebroAppLite)
 
 options(width = 100)
 set.seed(1234567)
@@ -157,7 +157,7 @@ seurat@misc$parameters$filtering <- list(
   genes_max = Inf
 )
 
-seurat@misc$technical_info$cerebroApp_version <- utils::packageVersion('cerebroApp')
+seurat@misc$technical_info$cerebroApp_version <- utils::packageVersion('cerebroAppLite')
 seurat@misc$technical_info$Seurat <- utils::packageVersion('Seurat')
 seurat@misc$technical_info <- list(
   'R' = capture.output(devtools::session_info())
@@ -264,7 +264,7 @@ seurat <- getEnrichedPathways(
   max_terms = 100
 )
 
-example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "cerebroApp")
+example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "cerebroAppLite")
 
 seurat <- performGeneSetEnrichmentAnalysis(
   seurat,
@@ -341,7 +341,7 @@ exportFromSeurat(
   seurat,
   assay = 'RNA',
   slot = 'data',
-  file = '~/Research/GitHub/cerebroApp_v1.3/inst/extdata/v1.3/example.crb',
+  file = '~/Research/GitHub/cerebroAppLite/inst/extdata/example.crb',
   experiment_name = 'pbmc_10k_v3',
   organism = 'hg',
   groups = c('sample','seurat_clusters','cell_type_singler_blueprintencode_main'),

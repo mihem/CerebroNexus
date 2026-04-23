@@ -60,8 +60,8 @@ This function gets marker genes for one or multiple grouping variables in
 the meta data of the provided Seurat object.
 }
 \examples{
-pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-  package = "cerebroApp"))
+pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+  package = "cerebroAppLite"))
 pbmc <- getMarkerGenes(
   object = pbmc,
   assay = 'RNA',

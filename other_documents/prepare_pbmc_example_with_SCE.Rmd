@@ -1,6 +1,6 @@
 ---
-title: "How to generate the SCE PBMC example data set used in the examples parts of cerebroApp function"
-author: "Roman Hillje"
+title: 'How to generate the SCE PBMC example data set used in the examples parts of cerebroApp function'
+author: 'Roman Hillje'
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -20,7 +20,7 @@ Run this.
 library(dplyr)
 library(scran)
 library(scater)
-library(cerebroApp)
+library(cerebroAppLite)
 
 ## load counts
 pbmc_counts <- read.table(
@@ -51,5 +51,5 @@ pbmc$cluster <- factor(cluster)
 ## calculate UMAP
 pbmc <- runUMAP(pbmc)
 
-saveRDS(pbmc, '~/Research/GitHub/cerebroApp_v1.3/inst/extdata/v1.3/pbmc_SCE.rds')
+saveRDS(pbmc, '~/Research/GitHub/cerebroAppLite/inst/extdata/pbmc_SCE.rds')
 ```

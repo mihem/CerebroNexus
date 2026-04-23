@@ -5,7 +5,7 @@ Storing gene sets in the `GMT` format requires a name, a description (here we us
 All elements are separated by tabs.
 One gene set per line.
 
-I have taken random genes from the Cerebro v1.3 example data set as shown below.
+I have taken random genes from the Cerebro example data set as shown below.
 
 ```r
 pbmc <- read.table(file = system.file('extdata', 'pbmc_raw.txt', package = 'Seurat'), as.is = TRUE)

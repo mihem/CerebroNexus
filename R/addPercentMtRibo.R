@@ -18,8 +18,8 @@
 #' mitochondrial and ribosomal gene expression for each cell.
 #'
 #' @examples
-#' pbmc <- readRDS(system.file("extdata/v1.3/pbmc_seurat.rds",
-#'   package = "cerebroApp"))
+#' pbmc <- readRDS(system.file("extdata/pbmc_seurat.rds",
+#'   package = "cerebroAppLite"))
 #' pbmc <- addPercentMtRibo(
 #'   object = pbmc,
 #'   assay = 'RNA',
@@ -115,7 +115,7 @@ addPercentMtRibo <- function(
         paste0(
           'extdata/genes_mt_', organism, '_', gene_nomenclature, '.tsv.gz'
         ),
-        package = 'cerebroApp'
+        package = 'cerebroAppLite'
       ),
       col_types = readr::cols(),
       col_names = FALSE
@@ -128,7 +128,7 @@ addPercentMtRibo <- function(
         paste0(
           'extdata/genes_ribo_', organism, '_', gene_nomenclature, '.tsv.gz'
         ),
-        package = 'cerebroApp'
+        package = 'cerebroAppLite'
       ),
       col_types = readr::cols(),
       col_names = FALSE
@@ -204,7 +204,7 @@ addPercentMtRibo <- function(
         ' mitochondrial transcript(s) present in the data set...'
       )
     )
-    values_mt <- cerebroApp::calculatePercentGenes(
+    values_mt <- cerebroAppLite::calculatePercentGenes(
       object,
       assay = assay,
       list('genes_mt' = genes_mt_here)
@@ -233,7 +233,7 @@ addPercentMtRibo <- function(
         ' ribosomal transcript(s) present in the data set...'
       )
     )
-    values_ribo <- cerebroApp::calculatePercentGenes(
+    values_ribo <- cerebroAppLite::calculatePercentGenes(
       object,
       assay = assay,
       list('genes_ribo' = genes_ribo_here)
