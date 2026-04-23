@@ -169,9 +169,9 @@ trajectory_projection_main_parameters_info <- list(
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
-  
+
   default_point_size <- preferences[["scatter_plot_point_size"]][["default"]]
-  
+
   if (
     exists("Cerebro.options") &&
     !is.null(Cerebro.options[["point_size"]]) &&
@@ -353,7 +353,7 @@ output[["trajectory_projection"]] <- plotly::renderPlotly({
 
   ## convert edges of trajectory into list format to plot with plotly
   trajectory_edges <- trajectory_data[["edges"]]
-  
+
   trajectory_lines <- lapply(seq_len(nrow(trajectory_edges)), function(i) {
     list(
       type = "line",
@@ -499,12 +499,12 @@ trajectory_projection_info <- list(
 )
 
 ##----------------------------------------------------------------------------##
-## Text showing the number of selected cells.
+## Reactive that holds IDs of selected cells (ID is built from position in
+## projection).
 ##----------------------------------------------------------------------------##
-
-output[["trajectory_number_of_selected_cells"]] <- renderText({
-
-  ## don't proceed without these inputs
+trajectory_projection_selected_cells <- reactive({
+  ## make sure plot parameters are set because it means that the plot can be
+  ## generated
   req(
     input[["trajectory_selected_method"]],
     input[["trajectory_selected_name"]],
@@ -520,6 +520,25 @@ output[["trajectory_number_of_selected_cells"]] <- renderText({
     is.null(plotly::event_data("plotly_selected", source = "trajectory_projection")) ||
     length(plotly::event_data("plotly_selected", source = "trajectory_projection")) == 0
   ) {
+    return(NULL)
+  ## ... selection has been made and at least 1 cell is in it
+  } else {
+    ## get number of selected cells
+    plotly::event_data("plotly_selected", source = "trajectory_projection") %>%
+    dplyr::mutate(identifier = paste0(x, '-', y)) %>%
+    return()
+  }
+})
+
+##----------------------------------------------------------------------------##
+## Text showing the number of selected cells.
+##----------------------------------------------------------------------------##
+
+output[["trajectory_number_of_selected_cells"]] <- renderText({
+
+  ## check selection
+  ## ... selection has not been made or there is no cell in it
+  if ( is.null(trajectory_projection_selected_cells()) ) {
 
     ## manually set counter to 0
     number_of_selected_cells <- 0
@@ -528,7 +547,7 @@ output[["trajectory_number_of_selected_cells"]] <- renderText({
   } else {
 
     ## get number of selected cells
-    number_of_selected_cells <- formatC(nrow(plotly::event_data("plotly_selected", source = "trajectory_projection")), format = "f", big.mark = ",", digits = 0)
+    number_of_selected_cells <- formatC(nrow(trajectory_projection_selected_cells()), format = "f", big.mark = ",", digits = 0)
   }
 
   ## prepare string to show

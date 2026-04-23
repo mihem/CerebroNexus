@@ -10,6 +10,9 @@ server <- function(input, output, session) {
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/plotting_functions.R"), local = TRUE)
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/utility_functions.R"), local = TRUE)
 
+  ## Load module server
+  source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/module/projection/projection_server.R"), local = TRUE)
+
   ##--------------------------------------------------------------------------##
   ## Central parameters.
   ##--------------------------------------------------------------------------##
@@ -360,10 +363,7 @@ server <- function(input, output, session) {
 
   show_marker_genes_tab <- reactive({
     req(!is.null(data_set()))
-    if (
-      !is.null(getMethodsForMarkerGenes()) &&
-      length(getMethodsForMarkerGenes()) > 0
-    ) {
+    if (hasMarkerGenes()) {
       return(TRUE)
     } else {
       return(FALSE)
@@ -551,4 +551,9 @@ server <- function(input, output, session) {
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/trajectory/server.R"), local = TRUE)
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/extra_material/server.R"), local = TRUE)
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/analysis_info/server.R"), local = TRUE)
+
+  ##--------------------------------------------------------------------------##
+  ## Call projection module for Test tab
+  ##--------------------------------------------------------------------------##
+  projection_server("test_projection", projection_type = "spatial")
 }

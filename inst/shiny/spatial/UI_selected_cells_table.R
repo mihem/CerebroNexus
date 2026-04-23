@@ -2,6 +2,8 @@
 ## UI element for output.
 ##----------------------------------------------------------------------------##
 output[["spatial_selected_cells_table_UI"]] <- renderUI({
+  req(spatial_projection_selected_cells())
+
   fluidRow(
     cerebroBox(
       title = tagList(

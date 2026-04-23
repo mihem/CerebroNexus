@@ -1094,3 +1094,24 @@ a:hover {
 .skin-blue .sidebar-menu > li > a:hover::before {
   transform: scaleY(1);
 }
+
+/* Breathing animation for standard button */
+.btn-breathing {
+  animation: breathe-btn 2.5s infinite ease-in-out;
+}
+
+@keyframes breathe-btn {
+  0% {
+    box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(224, 122, 95, 0.3);
+    transform: scale(1.05);
+    border-color: #fad2c7;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4);
+    transform: scale(1);
+  }
+}

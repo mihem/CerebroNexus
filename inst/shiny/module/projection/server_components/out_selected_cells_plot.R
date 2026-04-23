@@ -1,20 +1,16 @@
 ##----------------------------------------------------------------------------##
-## Plot for selected cells.
-## - in sync with selected color variable
-##   - if categorical: number of cells in each group
-##   - if numerical: box/violin plot
+## Plotly plot of selected cells.
 ##----------------------------------------------------------------------------##
-output[["spatial_details_selected_cells_plot"]] <- plotly::renderPlotly({
+output[["details_selected_cells_plot"]] <- plotly::renderPlotly({
   req(
-    input[["spatial_projection_to_display"]],
-    input[["spatial_projection_to_display"]] %in% availableSpatial(),
-    input[["spatial_selected_cells_plot_select_variable"]],
-    spatial_projection_data_to_plot()
+    projection_selected_cells(),
+    input[["selected_cells_plot_select_variable"]],
+    projection_data_to_plot()
   )
 
-  ## Use the actual plotted coordinates from spatial_projection_data_to_plot()
-  ## instead of getProjection() to match the selection coordinates
-  plot_data <- spatial_projection_data_to_plot()
+  ## Use the actual plotted coordinates from projection_data_to_plot()
+  ## instead of get_data() to match the selection coordinates
+  plot_data <- projection_data_to_plot()
 
   ## extract cells to plot - use the coordinates that were actually plotted
   cells_df <- cbind(
@@ -22,31 +18,26 @@ output[["spatial_details_selected_cells_plot"]] <- plotly::renderPlotly({
     plot_data$cells_df
   )
 
-  ## check selection
+  ## check if selection has been made
   ## ... selection has not been made or there is no cell in it
-  if ( is.null(spatial_projection_selected_cells()) ) {
-    ###
+  if ( is.null(projection_selected_cells()) ) {
+    ## create column where all cells are marked as 'not selected'
     cells_df <- cells_df %>%
       dplyr::mutate(group = 'not selected')
   ## ... selection has been made and at least 1 cell is in it
   } else {
-    ##
+    ## create column where cells are marked as 'selected' or 'not selected'
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
       dplyr::mutate(
         identifier = paste0(X1, '-', X2),
-        group = ifelse(identifier %in% spatial_projection_selected_cells()$identifier, 'selected', 'not selected'),
+        group = ifelse(identifier %in% projection_selected_cells()$identifier, 'selected', 'not selected'),
         group = factor(group, levels = c('selected', 'not selected'))
       )
-
-    ## DEBUG: Check identifier matching
-    message("=== DEBUG: out_details_selected_cells_plot ===")
-    message("  cells_df identifiers (first 5): ", paste(head(cells_df$identifier, 5), collapse = ", "))
-    message("  selected cells identifiers (first 5): ", paste(head(spatial_projection_selected_cells()$identifier, 5), collapse = ", "))
-    message("  Number of matches: ", sum(cells_df$identifier %in% spatial_projection_selected_cells()$identifier))
-    message("  Total selected: ", nrow(spatial_projection_selected_cells()))
   }
-  color_variable <- input[["spatial_selected_cells_plot_select_variable"]]
+
+  color_variable <- input[["selected_cells_plot_select_variable"]]
+
   ## if the selected coloring variable is categorical, represent the selected
   ## cells in a bar chart
   if (
@@ -56,6 +47,7 @@ output[["spatial_details_selected_cells_plot"]] <- plotly::renderPlotly({
     ## filter table for selected cells
     cells_df <- cells_df %>%
       dplyr::filter(group == 'selected')
+
     ## prepare table, depending on whether at least a single cell is selected
     ## ... at least 1 cell is selected
     if ( nrow(cells_df) > 0 ) {

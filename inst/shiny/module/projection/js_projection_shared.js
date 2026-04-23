@@ -1,6 +1,12 @@
+// Shared JS for projection module
+// Following the style of js_projection_update_plot.js
+
+// layout uirevision for axis persistence
+var projection_uirevision = 'true';
+
 // layout for 2D projections
-const spatial_projection_layout_2D = {
-  uirevision: 'true',
+const projection_layout_2D = {
+  // uirevision will be set dynamically
   hovermode: 'closest',
   dragmode: 'select',
   margin: {
@@ -61,12 +67,92 @@ const spatial_projection_layout_2D = {
   paper_bgcolor: 'rgba(255, 255, 255, 0)',
 };
 
-// Inject CSS for spatial projection
+// layout for 3D projections
+const projection_layout_3D = {
+  // uirevision will be set dynamically
+  hovermode: 'closest',
+  margin: {
+    l: 50,
+    r: 50,
+    b: 50,
+    t: 50,
+    pad: 4,
+  },
+  legend: {
+    itemsizing: 'constant',
+  },
+  scene: {
+    xaxis: {
+      autorange: true,
+      mirror: true,
+      showline: true,
+      zeroline: false,
+      range: [],
+      gridcolor: '#E2E8F0',
+      linecolor: '#CBD5E0',
+      tickfont: {
+        color: '#718096',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+      titlefont: {
+        color: '#2D3748',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+    },
+    yaxis: {
+      autorange: true,
+      mirror: true,
+      showline: true,
+      zeroline: false,
+      range: [],
+      gridcolor: '#E2E8F0',
+      linecolor: '#CBD5E0',
+      tickfont: {
+        color: '#718096',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+      titlefont: {
+        color: '#2D3748',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+    },
+    zaxis: {
+      autorange: true,
+      mirror: true,
+      showline: true,
+      zeroline: false,
+      gridcolor: '#E2E8F0',
+      linecolor: '#CBD5E0',
+      tickfont: {
+        color: '#718096',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+      titlefont: {
+        color: '#2D3748',
+        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      },
+    },
+  },
+  hoverlabel: {
+    font: {
+      size: 12,
+      color: '#2D3748',
+      family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    },
+    bgcolor: 'rgba(255, 255, 255, 0.95)',
+    bordercolor: '#E2E8F0',
+    align: 'left',
+  },
+  plot_bgcolor: 'rgba(255, 255, 255, 0)',
+  paper_bgcolor: 'rgba(255, 255, 255, 0)',
+};
+
+// Inject CSS for projection module
 (function () {
   const style = document.createElement('style');
   style.innerHTML = `
     /* Custom Legend Styles */
-    #spatial_projection_legend {
+    .projection-legend {
       position: absolute;
       top: 10px;
       right: 10px;
@@ -78,6 +164,8 @@ const spatial_projection_layout_2D = {
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       cursor: move;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     .custom-legend-item {
       display: flex;
@@ -117,7 +205,7 @@ const spatial_projection_layout_2D = {
     }
 
     /* Continuous Legend Styles */
-    .continuous-legend {
+    .projection-continuous-legend {
       position: absolute;
       top: 10px;
       right: 10px;
@@ -198,18 +286,81 @@ const spatial_projection_layout_2D = {
       align-items: center !important;
       gap: 8px !important;
     }
-    #spatial_projection_background {
+
+    /* Legend Header with Drag Handle */
+    .legend-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #E2E8F0;
+      cursor: grab;
+    }
+    .legend-header:active {
+      cursor: grabbing;
+    }
+    .legend-drag-handle {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-right: 8px;
+      opacity: 0.4;
+      transition: opacity 0.2s ease;
+    }
+    .projection-legend:hover .legend-drag-handle,
+    .projection-continuous-legend:hover .legend-drag-handle {
+      opacity: 0.7;
+    }
+    .legend-drag-handle-dots {
+      display: flex;
+      gap: 2px;
+    }
+    .legend-drag-handle-dot {
+      width: 3px;
+      height: 3px;
+      background-color: #718096;
+      border-radius: 50%;
+    }
+    .legend-title-text {
+      font-size: 12px;
+      color: #718096;
+      font-weight: 500;
+      flex-grow: 1;
+    }
+
+    /* Drag Tip Tooltip */
+    .legend-drag-tip {
       position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      background-repeat: no-repeat;
-      background-position: center center;
-      background-size: 100% 100%;
-      pointer-events: none;
-      transform-origin: center center;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100%);
+      background: #2D3748;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
+      z-index: 1001;
+      animation: legendTipFadeIn 0.3s ease;
+    }
+    .legend-drag-tip::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px 6px 0 6px;
+      border-style: solid;
+      border-color: #2D3748 transparent transparent transparent;
+    }
+    @keyframes legendTipFadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-90%); }
+      to { opacity: 1; transform: translateX(-50%) translateY(-100%); }
+    }
+    @keyframes legendTipFadeOut {
+      from { opacity: 1; transform: translateX(-50%) translateY(-100%); }
+      to { opacity: 0; transform: translateX(-50%) translateY(-90%); }
     }
 
     /* Scroll Down Arrow Indicator */
@@ -354,8 +505,9 @@ shinyjs.hideScrollDownIndicator = function () {
   }
 };
 
-shinyjs.detachModebar = function () {
-  const plotContainer = document.getElementById('spatial_projection');
+// Detach modebar from plot
+shinyjs.detachProjectionModebar = function (plotId) {
+  const plotContainer = document.getElementById(plotId);
   if (!plotContainer) return;
 
   const parent = plotContainer.parentElement;
@@ -376,93 +528,8 @@ shinyjs.detachModebar = function () {
   }
 };
 
-shinyjs.applySpatialBackground = function () {
-  const plotContainer = document.getElementById('spatial_projection');
-  const bg = document.getElementById('spatial_projection_background');
-  if (!plotContainer || !bg) return;
-
-  const backgroundImage = bg.dataset.backgroundImage;
-
-  if (backgroundImage) {
-    bg.style.display = 'block';
-    bg.style.backgroundImage = `url("${backgroundImage}")`;
-
-    const flipX = bg.dataset.flipX === 'true';
-    const flipY = bg.dataset.flipY === 'true';
-    const scaleX = parseFloat(bg.dataset.scaleX) || 1;
-    const scaleY = parseFloat(bg.dataset.scaleY) || 1;
-    const opacity = parseFloat(bg.dataset.opacity);
-
-    const finalScaleX = (flipX ? -1 : 1) * scaleX;
-    const finalScaleY = (flipY ? -1 : 1) * scaleY;
-    bg.style.transform = `scale(${finalScaleX}, ${finalScaleY})`;
-    bg.style.opacity = isNaN(opacity) ? 1 : opacity;
-
-    const size = plotContainer._fullLayout && plotContainer._fullLayout._size ? plotContainer._fullLayout._size : null;
-    if (size) {
-      bg.style.left = size.l + 'px';
-      bg.style.top = size.t + 'px';
-      bg.style.width = size.w + 'px';
-      bg.style.height = size.h + 'px';
-    } else {
-      const parent = plotContainer.parentElement;
-      bg.style.left = '0px';
-      bg.style.top = '0px';
-      bg.style.width = parent.clientWidth + 'px';
-      bg.style.height = parent.clientHeight + 'px';
-    }
-  } else {
-    bg.style.display = 'none';
-    bg.style.backgroundImage = '';
-    bg.style.transform = '';
-    bg.style.opacity = '';
-  }
-};
-
-shinyjs.syncSpatialBackground = function (backgroundImage, flipX, flipY, scaleX, scaleY, opacity) {
-  const plotContainer = document.getElementById('spatial_projection');
-  if (!plotContainer) return;
-  let parent = plotContainer.parentElement;
-  let wrapper = parent && parent.id === 'spatial_projection_wrapper' ? parent : null;
-  if (!wrapper) {
-    wrapper = document.createElement('div');
-    wrapper.id = 'spatial_projection_wrapper';
-    wrapper.style.position = 'relative';
-    wrapper.style.width = '100%';
-    wrapper.style.height = '100%';
-    wrapper.style.overflow = 'hidden';
-    parent.insertBefore(wrapper, plotContainer);
-    wrapper.appendChild(plotContainer);
-  }
-  parent = wrapper;
-  let bg = document.getElementById('spatial_projection_background');
-  if (!bg) {
-    bg = document.createElement('div');
-    bg.id = 'spatial_projection_background';
-    bg.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease';
-    parent.insertBefore(bg, plotContainer);
-  }
-
-  if (backgroundImage !== undefined) bg.dataset.backgroundImage = backgroundImage || '';
-  if (flipX !== undefined) bg.dataset.flipX = String(flipX);
-  if (flipY !== undefined) bg.dataset.flipY = String(flipY);
-  if (scaleX !== undefined) bg.dataset.scaleX = String(scaleX || 1);
-  if (scaleY !== undefined) bg.dataset.scaleY = String(scaleY || 1);
-  if (opacity !== undefined) bg.dataset.opacity = String(opacity === null ? 1 : opacity);
-
-  shinyjs.applySpatialBackground();
-
-  plotContainer.style.position = 'relative';
-  plotContainer.style.zIndex = '1';
-
-  if (!plotContainer.dataset.bgListenerAttached && typeof plotContainer.on === 'function') {
-    plotContainer.on('plotly_afterplot', shinyjs.applySpatialBackground);
-    plotContainer.dataset.bgListenerAttached = 'true';
-  }
-};
-
-// Custom Legend Helper Functions
-shinyjs.makeDraggable = function (el) {
+// Custom Legend Helper Functions - make legend draggable
+shinyjs.makeProjectionDraggable = function (el) {
   let isDragging = false;
   let hasMoved = false;
   let startX, startY, initialLeft, initialTop;
@@ -508,6 +575,17 @@ shinyjs.makeDraggable = function (el) {
     if (dx !== 0 || dy !== 0) {
       hasMoved = true;
       el.dataset.isDragging = 'true';
+
+      // Record that user has dragged a legend (first time)
+      if (!localStorage.getItem('cerebro_legend_dragged')) {
+        localStorage.setItem('cerebro_legend_dragged', 'true');
+        // Remove tip if it exists
+        const tip = el.querySelector('.legend-drag-tip');
+        if (tip) {
+          tip.style.animation = 'legendTipFadeOut 0.2s ease forwards';
+          setTimeout(() => tip.remove(), 200);
+        }
+      }
     }
 
     el.style.left = initialLeft + dx + 'px';
@@ -516,7 +594,7 @@ shinyjs.makeDraggable = function (el) {
 
   function onMouseUp(e) {
     isDragging = false;
-    el.style.cursor = 'move';
+    el.style.cursor = 'grab';
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
 
@@ -531,8 +609,67 @@ shinyjs.makeDraggable = function (el) {
   }
 };
 
-shinyjs.createCustomLegend = function (traces, colors) {
-  const plotContainer = document.getElementById('spatial_projection');
+// Helper: Create drag handle element
+function createLegendDragHandle() {
+  const handle = document.createElement('div');
+  handle.className = 'legend-drag-handle';
+  // Create 3 rows of 2 dots each
+  for (let i = 0; i < 3; i++) {
+    const row = document.createElement('div');
+    row.className = 'legend-drag-handle-dots';
+    for (let j = 0; j < 2; j++) {
+      const dot = document.createElement('div');
+      dot.className = 'legend-drag-handle-dot';
+      row.appendChild(dot);
+    }
+    handle.appendChild(row);
+  }
+  return handle;
+}
+
+// Helper: Create legend header with drag handle
+function createLegendHeader(titleText) {
+  const header = document.createElement('div');
+  header.className = 'legend-header';
+
+  const handle = createLegendDragHandle();
+  header.appendChild(handle);
+
+  if (titleText) {
+    const title = document.createElement('div');
+    title.className = 'legend-title-text';
+    title.innerText = titleText;
+    header.appendChild(title);
+  }
+
+  return header;
+}
+
+// Helper: Show first-time drag tip
+function showLegendDragTip(legendContainer) {
+  // Check if user has already dragged before
+  if (localStorage.getItem('cerebro_legend_dragged')) {
+    return;
+  }
+
+  // Create tip element
+  const tip = document.createElement('div');
+  tip.className = 'legend-drag-tip';
+  tip.innerHTML = '💡 Drag to reposition';
+  legendContainer.appendChild(tip);
+
+  // Auto-hide after 4 seconds
+  setTimeout(() => {
+    if (tip.parentElement) {
+      tip.style.animation = 'legendTipFadeOut 0.3s ease forwards';
+      setTimeout(() => tip.remove(), 300);
+    }
+  }, 4000);
+}
+
+// Create categorical custom legend
+shinyjs.createProjectionCustomLegend = function (plotId, traces, colors) {
+  const plotContainer = document.getElementById(plotId);
   if (!plotContainer) return;
 
   // Ensure parent has relative positioning
@@ -541,27 +678,38 @@ shinyjs.createCustomLegend = function (traces, colors) {
     parent.style.position = 'relative';
   }
 
+  const legendId = plotId + '_legend';
+
   // Find or create legend container
-  let legendContainer = document.getElementById('spatial_projection_legend');
+  let legendContainer = document.getElementById(legendId);
   if (!legendContainer) {
     legendContainer = document.createElement('div');
-    legendContainer.id = 'spatial_projection_legend';
+    legendContainer.id = legendId;
+    legendContainer.className = 'projection-legend';
     parent.appendChild(legendContainer);
   }
 
   // Enable dragging
-  shinyjs.makeDraggable(legendContainer);
+  shinyjs.makeProjectionDraggable(legendContainer);
 
   // Reset content
   legendContainer.innerHTML = '';
   legendContainer.style.display = 'block';
+  legendContainer.style.cursor = 'grab';
+
+  // Add header with drag handle
+  const header = createLegendHeader('Legend');
+  legendContainer.appendChild(header);
+
+  // Show first-time tip
+  showLegendDragTip(legendContainer);
 
   // Calculate scaling based on number of traces
   const count = traces.length;
   let fontSize = 13;
   let itemMargin = 6;
-  let itemPadding = 4; // top/bottom padding
-  let itemPaddingX = 6; // left/right padding
+  let itemPadding = 4;
+  let itemPaddingX = 6;
   let boxSize = 16;
 
   if (count > 10) {
@@ -592,22 +740,18 @@ shinyjs.createCustomLegend = function (traces, colors) {
   traces.forEach((traceName, index) => {
     const item = document.createElement('div');
     item.className = 'custom-legend-item';
-
-    // Apply dynamic styles
     item.style.marginBottom = itemMargin + 'px';
     item.style.padding = itemPadding + 'px ' + itemPaddingX + 'px';
 
     const colorBox = document.createElement('span');
     colorBox.className = 'legend-color-box';
     colorBox.style.backgroundColor = colors[index];
-    // Apply dynamic box size
     colorBox.style.width = boxSize + 'px';
     colorBox.style.height = boxSize + 'px';
 
     const text = document.createElement('span');
     text.className = 'legend-text';
     text.innerText = traceName;
-    // Apply dynamic font size
     text.style.fontSize = fontSize + 'px';
 
     item.appendChild(colorBox);
@@ -617,16 +761,15 @@ shinyjs.createCustomLegend = function (traces, colors) {
     item.onclick = function () {
       if (legendContainer.dataset.isDragging === 'true') return;
 
-      const plot = document.getElementById('spatial_projection');
+      const plot = document.getElementById(plotId);
       // Check current visibility status (default is visible/true)
-      // We assume trace index corresponds to legend index
       let isVisible = true;
       if (plot.data && plot.data[index]) {
         isVisible = plot.data[index].visible !== false && plot.data[index].visible !== 'legendonly';
       }
 
       const newVisible = isVisible ? false : true;
-      Plotly.restyle('spatial_projection', { visible: newVisible }, [index]);
+      Plotly.restyle(plotId, { visible: newVisible }, [index]);
 
       item.classList.toggle('legend-item-hidden', isVisible);
     };
@@ -635,15 +778,18 @@ shinyjs.createCustomLegend = function (traces, colors) {
   });
 };
 
-shinyjs.removeCustomLegend = function () {
-  const legendContainer = document.getElementById('spatial_projection_legend');
+// Remove categorical custom legend
+shinyjs.removeProjectionCustomLegend = function (plotId) {
+  const legendId = plotId + '_legend';
+  const legendContainer = document.getElementById(legendId);
   if (legendContainer) {
     legendContainer.style.display = 'none';
   }
 };
 
-shinyjs.createContinuousLegend = function (title, colorMin, colorMax, colorscale) {
-  const plotContainer = document.getElementById('spatial_projection');
+// Create continuous legend
+shinyjs.createProjectionContinuousLegend = function (plotId, title, colorMin, colorMax, colorscale) {
+  const plotContainer = document.getElementById(plotId);
   if (!plotContainer) return;
 
   const parent = plotContainer.parentElement;
@@ -651,22 +797,27 @@ shinyjs.createContinuousLegend = function (title, colorMin, colorMax, colorscale
     parent.style.position = 'relative';
   }
 
-  let legendContainer = document.getElementById('spatial_projection_continuous_legend');
+  const legendId = plotId + '_continuous_legend';
+
+  let legendContainer = document.getElementById(legendId);
   if (!legendContainer) {
     legendContainer = document.createElement('div');
-    legendContainer.id = 'spatial_projection_continuous_legend';
+    legendContainer.id = legendId;
+    legendContainer.className = 'projection-continuous-legend';
     parent.appendChild(legendContainer);
   }
 
-  shinyjs.makeDraggable(legendContainer);
+  shinyjs.makeProjectionDraggable(legendContainer);
   legendContainer.innerHTML = '';
   legendContainer.style.display = 'block';
-  legendContainer.className = 'continuous-legend';
+  legendContainer.style.cursor = 'grab';
 
-  const titleEl = document.createElement('div');
-  titleEl.className = 'continuous-legend-title';
-  titleEl.innerText = title;
-  legendContainer.appendChild(titleEl);
+  // Add header with drag handle and title
+  const header = createLegendHeader(title);
+  legendContainer.appendChild(header);
+
+  // Show first-time tip
+  showLegendDragTip(legendContainer);
 
   const contentEl = document.createElement('div');
   contentEl.className = 'continuous-legend-content';
@@ -674,19 +825,20 @@ shinyjs.createContinuousLegend = function (title, colorMin, colorMax, colorscale
   const gradientEl = document.createElement('div');
   gradientEl.className = 'continuous-legend-gradient';
 
+  // colorscale is array of [pos, color]
   const gradientColors = colorscale.map((item) => item[1]).join(', ');
   gradientEl.style.background = `linear-gradient(to top, ${gradientColors})`;
 
   const labelsEl = document.createElement('div');
   labelsEl.className = 'continuous-legend-labels';
 
-  const minLabel = document.createElement('div');
-  minLabel.className = 'continuous-legend-label';
-  minLabel.innerText = colorMin.toFixed(2);
-
   const maxLabel = document.createElement('div');
   maxLabel.className = 'continuous-legend-label';
   maxLabel.innerText = colorMax.toFixed(2);
+
+  const minLabel = document.createElement('div');
+  minLabel.className = 'continuous-legend-label';
+  minLabel.innerText = colorMin.toFixed(2);
 
   labelsEl.appendChild(maxLabel);
   labelsEl.appendChild(minLabel);
@@ -696,111 +848,41 @@ shinyjs.createContinuousLegend = function (title, colorMin, colorMax, colorscale
   legendContainer.appendChild(contentEl);
 };
 
-shinyjs.removeContinuousLegend = function () {
-  const legendContainer = document.getElementById('spatial_projection_continuous_legend');
+// Remove continuous legend
+shinyjs.removeProjectionContinuousLegend = function (plotId) {
+  const legendId = plotId + '_continuous_legend';
+  const legendContainer = document.getElementById(legendId);
   if (legendContainer) {
     legendContainer.style.display = 'none';
   }
 };
 
-// layout for 3D projections
-const spatial_projection_layout_3D = {
-  uirevision: 'true',
-  hovermode: 'closest',
-  margin: {
-    l: 50,
-    r: 50,
-    b: 50,
-    t: 50,
-    pad: 4,
-  },
-  legend: {
-    itemsizing: 'constant',
-  },
-  scene: {
-    xaxis: {
-      autorange: true,
-      mirror: true,
-      showline: true,
-      zeroline: false,
-      range: [],
-      gridcolor: '#E2E8F0',
-      linecolor: '#CBD5E0',
-      tickfont: {
-        color: '#718096',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-      titlefont: {
-        color: '#2D3748',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-    },
-    yaxis: {
-      autorange: true,
-      mirror: true,
-      showline: true,
-      zeroline: false,
-      range: [],
-      gridcolor: '#E2E8F0',
-      linecolor: '#CBD5E0',
-      tickfont: {
-        color: '#718096',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-      titlefont: {
-        color: '#2D3748',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-    },
-    zaxis: {
-      autorange: true,
-      mirror: true,
-      showline: true,
-      zeroline: false,
-      gridcolor: '#E2E8F0',
-      linecolor: '#CBD5E0',
-      tickfont: {
-        color: '#718096',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-      titlefont: {
-        color: '#2D3748',
-        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      },
-    },
-  },
-  hoverlabel: {
-    font: {
-      size: 12,
-      color: '#2D3748',
-      family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    },
-    bgcolor: 'rgba(255, 255, 255, 0.95)',
-    bordercolor: '#E2E8F0',
-    align: 'left',
-  },
-  plot_bgcolor: 'rgba(255, 255, 255, 0)',
-  paper_bgcolor: 'rgba(255, 255, 255, 0)',
-};
-
 // structure of input data
-const spatial_projection_default_params = {
+const projection_default_params = {
   meta: {
     color_type: '',
     traces: [],
     color_variable: '',
+    background_image: null,
+    image_bounds: {},
+    background_flip_x: false,
+    background_flip_y: false,
+    background_scale_x: 1,
+    background_scale_y: 1,
+    background_opacity: 1,
   },
   data: {
     x: [],
     y: [],
     z: [],
     color: [],
-    size: '',
-    opacity: '',
-    line: {},
+    point_size: 5,
+    point_opacity: 1,
+    point_line: {},
     x_range: [],
     y_range: [],
     reset_axes: false,
+    n_dimensions: 2,
   },
   hover: {
     hoverinfo: '',
@@ -811,20 +893,24 @@ const spatial_projection_default_params = {
     x: [],
     y: [],
     z: [],
+    color: [],
   },
-  container: {
-    width: null,
-    height: null,
-  },
+  plot_id: null,
 };
 
 // update 2D projection with continuous coloring
-shinyjs.updatePlot2DContinuousSpatial = function (params) {
-  params = shinyjs.getParams(params, spatial_projection_default_params);
+shinyjs.updateProjectionPlot2DContinuous = function (params) {
+  params = shinyjs.getParams(params, projection_default_params);
 
-  shinyjs.removeCustomLegend();
-  shinyjs.removeContinuousLegend();
-  const data = [];
+  const plotId = params.plot_id;
+  if (!plotId) {
+    console.error('[projection] plotId is required');
+    return;
+  }
+
+  shinyjs.removeProjectionCustomLegend(plotId);
+  shinyjs.removeProjectionContinuousLegend(plotId);
+
   const colorArray = params.data.color;
   const colorMin = Math.min(...colorArray);
   const colorMax = Math.max(...colorArray);
@@ -836,6 +922,8 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
     [0.8, '#5B9FB8'],
     [1, '#3D7A9E'],
   ];
+
+  const data = [];
   data.push({
     x: params.data.x,
     y: params.data.y,
@@ -849,42 +937,44 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
       cmin: colorMin,
       cmax: colorMax,
       colorscale: colorscale,
-      showscale: false,
+      showscale: false, // Hide default colorbar
     },
     hoverinfo: params.hover.hoverinfo,
+    text: params.hover.text,
+    showlegend: false,
   });
-  shinyjs.createContinuousLegend(params.meta.color_variable, colorMin, colorMax, colorscale);
 
-  // Use deep clone to avoid mutating global layout
-  const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_2D));
+  shinyjs.createProjectionContinuousLegend(plotId, params.meta.color_variable, colorMin, colorMax, colorscale);
 
-  if (params.data.reset_axes) {
-    layout_here.xaxis['autorange'] = true;
-    layout_here.yaxis['autorange'] = true;
-  } else {
-    layout_here.xaxis['autorange'] = false;
-    layout_here.xaxis['range'] = params.data.x_range;
-    layout_here.yaxis['autorange'] = false;
-    layout_here.yaxis['range'] = params.data.y_range;
+  const layout_here = JSON.parse(JSON.stringify(projection_layout_2D));
+
+  // if (params.data.reset_axes) {
+  //   projection_uirevision = Date.now().toString();
+  //   layout_here.xaxis['autorange'] = true;
+  //   layout_here.yaxis['autorange'] = true;
+  // } else {
+  //   layout_here.xaxis['autorange'] = false;
+  //   layout_here.xaxis['range'] = params.data.x_range;
+  //   layout_here.xaxis['constrain'] = 'range';
+  //   layout_here.yaxis['autorange'] = false;
+  //   layout_here.yaxis['range'] = params.data.y_range;
+  //   layout_here.yaxis['constrain'] = 'range';
+  //   layout_here.yaxis['scaleanchor'] = 'x';
+  //   layout_here.yaxis['scaleratio'] = 1;
+  // }
+  layout_here.uirevision = projection_uirevision;
+
+  // Maximize plot area
+  const plotContainer = document.getElementById(plotId);
+  if (plotContainer && plotContainer.parentElement) {
+    layout_here.width = plotContainer.parentElement.clientWidth;
+    layout_here.height = plotContainer.parentElement.clientHeight;
   }
-  if (params.container && params.container.width && params.container.height) {
-    layout_here.width = params.container.width;
-    layout_here.height = params.container.height;
-  } else {
-    const plotContainer = document.getElementById('spatial_projection');
-    if (plotContainer && plotContainer.parentElement) {
-      layout_here.width = plotContainer.parentElement.clientWidth;
-      layout_here.height = plotContainer.parentElement.clientHeight;
-    }
-  }
 
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
-    // Re-attach selection debug listeners
-    if (typeof shinyjs.setupSelectionDebug === 'function') {
-      shinyjs.setupSelectionDebug();
-    }
-
-    shinyjs.syncSpatialBackground(
+  Plotly.react(plotId, data, layout_here).then(() => {
+    shinyjs.detachProjectionModebar(plotId);
+    syncProjectionBackground(
+      plotId,
       params.meta.background_image,
       params.meta.background_flip_x,
       params.meta.background_flip_y,
@@ -892,16 +982,22 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
       params.meta.background_scale_y,
       params.meta.background_opacity
     );
-    shinyjs.detachModebar();
   });
 };
 
 // update 3D projection with continuous coloring
-shinyjs.updatePlot3DContinuousSpatial = function (params) {
-  params = shinyjs.getParams(params, spatial_projection_default_params);
-  shinyjs.removeCustomLegend();
-  shinyjs.removeContinuousLegend();
-  const data = [];
+shinyjs.updateProjectionPlot3DContinuous = function (params) {
+  params = shinyjs.getParams(params, projection_default_params);
+
+  const plotId = params.plot_id;
+  if (!plotId) {
+    console.error('[projection] plotId is required');
+    return;
+  }
+
+  shinyjs.removeProjectionCustomLegend(plotId);
+  shinyjs.removeProjectionContinuousLegend(plotId);
+
   const colorArray = params.data.color;
   const colorMin = Math.min(...colorArray);
   const colorMax = Math.max(...colorArray);
@@ -913,6 +1009,8 @@ shinyjs.updatePlot3DContinuousSpatial = function (params) {
     [0.8, '#5B9FB8'],
     [1, '#3D7A9E'],
   ];
+
+  const data = [];
   data.push({
     x: params.data.x,
     y: params.data.y,
@@ -928,53 +1026,50 @@ shinyjs.updatePlot3DContinuousSpatial = function (params) {
       cmax: colorMax,
       colorscale: colorscale,
       reversescale: true,
-      showscale: false,
+      showscale: false, // Hide default colorbar
     },
+    hoverinfo: params.hover.hoverinfo,
+    text: params.hover.text,
     showlegend: false,
   });
-  shinyjs.createContinuousLegend(params.meta.color_variable, colorMin, colorMax, colorscale);
 
-  // Use deep clone
-  const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_3D));
+  shinyjs.createProjectionContinuousLegend(plotId, params.meta.color_variable, colorMin, colorMax, colorscale);
 
-  if (params.container && params.container.width && params.container.height) {
-    layout_here.width = params.container.width;
-    layout_here.height = params.container.height;
-  } else {
-    const plotContainer = document.getElementById('spatial_projection');
-    if (plotContainer && plotContainer.parentElement) {
-      layout_here.width = plotContainer.parentElement.clientWidth;
-      layout_here.height = plotContainer.parentElement.clientHeight;
-    }
+  const layout_here = JSON.parse(JSON.stringify(projection_layout_3D));
+
+  if (params.data.reset_axes) {
+    projection_uirevision = Date.now().toString();
   }
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
-    shinyjs.syncSpatialBackground(null, false, false, 1, 1, 1);
-    shinyjs.detachModebar();
+  layout_here.uirevision = projection_uirevision;
+
+  // Maximize plot area
+  const plotContainer = document.getElementById(plotId);
+  if (plotContainer && plotContainer.parentElement) {
+    layout_here.width = plotContainer.parentElement.clientWidth;
+    layout_here.height = plotContainer.parentElement.clientHeight;
+  }
+
+  Plotly.react(plotId, data, layout_here).then(() => {
+    shinyjs.detachProjectionModebar(plotId);
   });
-};
-
-shinyjs.getContainerDimensions = function () {
-  const plotContainer = document.getElementById('spatial_projection');
-  if (plotContainer) {
-    const parentContainer = plotContainer.parentElement;
-    return {
-      width: parentContainer.clientWidth,
-      height: parentContainer.clientHeight,
-    };
-  }
-  return { width: 0, height: 0 };
 };
 
 // update 2D projection with categorical coloring
-shinyjs.updatePlot2DCategoricalSpatial = function (params) {
-  params = shinyjs.getParams(params, spatial_projection_default_params);
+shinyjs.updateProjectionPlot2DCategorical = function (params) {
+  params = shinyjs.getParams(params, projection_default_params);
 
-  shinyjs.removeContinuousLegend();
-  shinyjs.createCustomLegend(params.meta.traces, params.data.color);
+  const plotId = params.plot_id;
+  if (!plotId) {
+    console.error('[projection] plotId is required');
+    return;
+  }
 
-  // Optimization: Use map instead of loop push
-  const data = params.data.x.map((xVal, i) => ({
-    x: xVal,
+  shinyjs.removeProjectionContinuousLegend(plotId);
+  shinyjs.createProjectionCustomLegend(plotId, params.meta.traces, params.data.color);
+
+  // Optimization: map directly to data array
+  const data = params.data.x.map((_, i) => ({
+    x: params.data.x[i],
     y: params.data.y[i],
     name: params.meta.traces[i],
     mode: 'markers',
@@ -988,7 +1083,7 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
     hoverinfo: params.hover.hoverinfo,
     text: params.hover.text[i],
     hoverlabel: {
-      bgcolor: 'rgba(255, 255, 255, 0.95)',
+      bgcolor: params.data.color[i],
       bordercolor: '#E2E8F0',
       font: {
         color: '#2D3748',
@@ -996,7 +1091,7 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
         family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       },
     },
-    showlegend: false,
+    showlegend: false, // Hide default legend
   }));
 
   if (params.group_centers.group.length >= 1) {
@@ -1004,7 +1099,7 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
       x: params.group_centers.x,
       y: params.group_centers.y,
       text: params.group_centers.group,
-      type: 'scatter',
+      type: 'scattergl',
       mode: 'text',
       name: 'Labels',
       textposition: 'middle center',
@@ -1018,38 +1113,37 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
     });
   }
 
-  // Use deep clone
-  const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_2D));
+  const layout_here = JSON.parse(JSON.stringify(projection_layout_2D));
 
-  if (params.data.reset_axes) {
-    layout_here.xaxis.autorange = true;
-    delete layout_here.xaxis.range;
-    layout_here.yaxis.autorange = true;
-    delete layout_here.yaxis.range;
-  } else {
-    layout_here.xaxis.autorange = false;
-    layout_here.xaxis.range = [...params.data.x_range];
-    layout_here.yaxis.autorange = false;
-    layout_here.yaxis.range = [...params.data.y_range];
+  // if (params.data.reset_axes) {
+  //   projection_uirevision = Date.now().toString();
+  //   layout_here.xaxis['autorange'] = true;
+  //   layout_here.yaxis['autorange'] = true;
+  //   delete layout_here.xaxis.range;
+  //   delete layout_here.yaxis.range;
+  // } else {
+  //   layout_here.xaxis['autorange'] = false;
+  //   layout_here.xaxis['range'] = [...params.data.x_range];
+  //   layout_here.xaxis['constrain'] = 'range';
+  //   layout_here.yaxis['autorange'] = false;
+  //   layout_here.yaxis['range'] = [...params.data.y_range];
+  //   layout_here.yaxis['constrain'] = 'range';
+  //   layout_here.yaxis['scaleanchor'] = 'x';
+  //   layout_here.yaxis['scaleratio'] = 1;
+  // }
+  layout_here.uirevision = projection_uirevision;
+
+  // Maximize plot area
+  const plotContainer = document.getElementById(plotId);
+  if (plotContainer && plotContainer.parentElement) {
+    layout_here.width = plotContainer.parentElement.clientWidth;
+    layout_here.height = plotContainer.parentElement.clientHeight;
   }
-  if (params.container && params.container.width && params.container.height) {
-    layout_here.width = params.container.width;
-    layout_here.height = params.container.height;
-  } else {
-    const plotContainer = document.getElementById('spatial_projection');
-    if (plotContainer && plotContainer.parentElement) {
-      layout_here.width = plotContainer.parentElement.clientWidth;
-      layout_here.height = plotContainer.parentElement.clientHeight;
-    }
-  }
 
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
-    // Re-attach selection debug listeners
-    if (typeof shinyjs.setupSelectionDebug === 'function') {
-      shinyjs.setupSelectionDebug();
-    }
-
-    shinyjs.syncSpatialBackground(
+  Plotly.react(plotId, data, layout_here).then(() => {
+    shinyjs.detachProjectionModebar(plotId);
+    syncProjectionBackground(
+      plotId,
       params.meta.background_image,
       params.meta.background_flip_x,
       params.meta.background_flip_y,
@@ -1057,19 +1151,24 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
       params.meta.background_scale_y,
       params.meta.background_opacity
     );
-    shinyjs.detachModebar();
   });
 };
 
 // update 3D projection with categorical coloring
-shinyjs.updatePlot3DCategoricalSpatial = function (params) {
-  params = shinyjs.getParams(params, spatial_projection_default_params);
-  shinyjs.removeContinuousLegend();
-  shinyjs.createCustomLegend(params.meta.traces, params.data.color);
+shinyjs.updateProjectionPlot3DCategorical = function (params) {
+  params = shinyjs.getParams(params, projection_default_params);
 
-  // Optimization: Use map
-  const data = params.data.x.map((xVal, i) => ({
-    x: xVal,
+  const plotId = params.plot_id;
+  if (!plotId) {
+    console.error('[projection] plotId is required');
+    return;
+  }
+
+  shinyjs.removeProjectionContinuousLegend(plotId);
+  shinyjs.createProjectionCustomLegend(plotId, params.meta.traces, params.data.color);
+
+  const data = params.data.x.map((_, i) => ({
+    x: params.data.x[i],
     y: params.data.y[i],
     z: params.data.z[i],
     name: params.meta.traces[i],
@@ -1084,7 +1183,7 @@ shinyjs.updatePlot3DCategoricalSpatial = function (params) {
     hoverinfo: params.hover.hoverinfo,
     text: params.hover.text[i],
     hoverlabel: {
-      bgcolor: 'rgba(255, 255, 255, 0.95)',
+      bgcolor: params.data.color[i],
       bordercolor: '#E2E8F0',
       font: {
         color: '#2D3748',
@@ -1092,7 +1191,7 @@ shinyjs.updatePlot3DCategoricalSpatial = function (params) {
         family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       },
     },
-    showlegend: false,
+    showlegend: false, // Hide default legend
   }));
 
   if (params.group_centers.group.length >= 1) {
@@ -1115,81 +1214,51 @@ shinyjs.updatePlot3DCategoricalSpatial = function (params) {
     });
   }
 
-  // Use deep clone
-  const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_3D));
+  const layout_here = JSON.parse(JSON.stringify(projection_layout_3D));
 
-  if (params.container && params.container.width && params.container.height) {
-    layout_here.width = params.container.width;
-    layout_here.height = params.container.height;
+  if (params.data.reset_axes) {
+    projection_uirevision = Date.now().toString();
+  }
+  layout_here.uirevision = projection_uirevision;
+
+  // Maximize plot area
+  const plotContainer = document.getElementById(plotId);
+  if (plotContainer && plotContainer.parentElement) {
+    layout_here.width = plotContainer.parentElement.clientWidth;
+    layout_here.height = plotContainer.parentElement.clientHeight;
+  }
+
+  Plotly.react(plotId, data, layout_here).then(() => {
+    shinyjs.detachProjectionModebar(plotId);
+  });
+};
+
+// Unified update function that routes to the correct function based on color type and dimensions
+shinyjs.updateProjectionPlot = function (params) {
+  params = shinyjs.getParams(params, projection_default_params);
+
+  const colorType = params.meta.color_type;
+  const nDimensions = params.data.n_dimensions || 2;
+
+  if (colorType === 'continuous') {
+    if (nDimensions === 3) {
+      shinyjs.updateProjectionPlot3DContinuous(params);
+    } else {
+      shinyjs.updateProjectionPlot2DContinuous(params);
+    }
   } else {
-    const plotContainer = document.getElementById('spatial_projection');
-    if (plotContainer && plotContainer.parentElement) {
-      layout_here.width = plotContainer.parentElement.clientWidth;
-      layout_here.height = plotContainer.parentElement.clientHeight;
+    // categorical
+    if (nDimensions === 3) {
+      shinyjs.updateProjectionPlot3DCategorical(params);
+    } else {
+      shinyjs.updateProjectionPlot2DCategorical(params);
     }
   }
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
-    shinyjs.syncSpatialBackground(null, false, false, 1, 1, 1);
-    shinyjs.detachModebar();
-  });
 };
 
-// =============================================================================
-// DEBUG: Selection Event Monitoring
-// =============================================================================
-
-// Debug helper to monitor plotly selection events
-shinyjs.setupSelectionDebug = function () {
-  const plotContainer = document.getElementById('spatial_projection');
-  if (!plotContainer) {
-    return;
-  }
-
-  // Monitor plotly_selected event
-  plotContainer.on('plotly_selected', function (eventData) {
-    // Check if Shiny is available
-    if (typeof Shiny !== 'undefined') {
-      // Event will be sent to Shiny automatically via plotly input binding
-    }
-  });
-
-  // Monitor plotly_deselect event
-  plotContainer.on('plotly_deselect', function () {
-    // Selection cleared
-  });
-};
-
-// Debug function to check plot configuration
-shinyjs.debugPlotConfig = function () {
-  const plotContainer = document.getElementById('spatial_projection');
-  if (!plotContainer) {
-    return;
-  }
-  // Debug info suppressed for production
-};
-
-// Auto-setup debug when document is ready
-$(document).ready(function () {
-  // Wait for plot to be initialized
-  setTimeout(function () {
-    shinyjs.setupSelectionDebug();
-  }, 2000);
-
-  // Also setup on any plot update
-  const observer = new MutationObserver(function (mutations) {
-    const plotContainer = document.getElementById('spatial_projection');
-    if (plotContainer && !plotContainer.dataset.debugListenerAttached) {
-      shinyjs.setupSelectionDebug();
-      plotContainer.dataset.debugListenerAttached = 'true';
-    }
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-});
-
-// Clear selection on the spatial projection plot
-shinyjs.spatialClearSelection = function () {
-  const plotContainer = document.getElementById('spatial_projection');
+// Clear selection on projection plot
+shinyjs.projectionClearSelection = function (plotId) {
+  const plotContainer = document.getElementById(plotId);
   if (plotContainer && plotContainer.data) {
     // Use Plotly.update to reset both data selection and layout in one call
     // Setting selectedpoints to null for all traces restores full opacity
@@ -1202,7 +1271,7 @@ shinyjs.spatialClearSelection = function () {
 
     // Combine restyle and relayout in one update call
     Plotly.update(
-      'spatial_projection',
+      plotId,
       { selectedpoints: null }, // Reset selected points for all traces
       { selections: [], dragmode: 'select' } // Clear selection box, keep select mode
     ).then(function () {
@@ -1211,3 +1280,113 @@ shinyjs.spatialClearSelection = function () {
     });
   }
 };
+
+// Background image support functions
+function applyProjectionBackground(plotId) {
+  const plotContainer = document.getElementById(plotId);
+  const bgId = plotId + '_background';
+  const bg = document.getElementById(bgId);
+
+  if (!plotContainer || !bg) {
+    return;
+  }
+
+  const backgroundImage = bg.dataset.backgroundImage;
+
+  if (backgroundImage) {
+    bg.style.display = 'block';
+    bg.style.backgroundImage = `url("${backgroundImage}")`;
+    bg.style.backgroundSize = '100% 100%';
+    bg.style.backgroundRepeat = 'no-repeat';
+    bg.style.backgroundPosition = 'center center';
+    bg.style.position = 'absolute';
+    bg.style.pointerEvents = 'none';
+    bg.style.transformOrigin = 'center center';
+
+    // Parse flip values - handle both boolean and string
+    const flipX = bg.dataset.flipX === 'true' || bg.dataset.flipX === true;
+    const flipY = bg.dataset.flipY === 'true' || bg.dataset.flipY === true;
+    const scaleX = parseFloat(bg.dataset.scaleX) || 1;
+    const scaleY = parseFloat(bg.dataset.scaleY) || 1;
+    const opacity = parseFloat(bg.dataset.opacity);
+
+    const finalScaleX = (flipX ? -1 : 1) * scaleX;
+    const finalScaleY = (flipY ? -1 : 1) * scaleY;
+    bg.style.transform = `scale(${finalScaleX}, ${finalScaleY})`;
+    bg.style.opacity = isNaN(opacity) ? 1 : opacity;
+    bg.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease';
+
+    // Get plot area size from Plotly layout
+    const size = plotContainer._fullLayout && plotContainer._fullLayout._size ? plotContainer._fullLayout._size : null;
+    if (size) {
+      bg.style.left = size.l + 'px';
+      bg.style.top = size.t + 'px';
+      bg.style.width = size.w + 'px';
+      bg.style.height = size.h + 'px';
+    } else {
+      const parent = plotContainer.parentElement;
+      bg.style.left = '0px';
+      bg.style.top = '0px';
+      bg.style.width = parent.clientWidth + 'px';
+      bg.style.height = parent.clientHeight + 'px';
+    }
+  } else {
+    bg.style.display = 'none';
+    bg.style.backgroundImage = '';
+    bg.style.transform = '';
+    bg.style.opacity = '';
+  }
+}
+
+function syncProjectionBackground(plotId, backgroundImage, flipX, flipY, scaleX, scaleY, opacity) {
+  const plotContainer = document.getElementById(plotId);
+  if (!plotContainer) {
+    return;
+  }
+
+  let parent = plotContainer.parentElement;
+  const wrapperId = plotId + '_wrapper';
+  let wrapper = parent && parent.id === wrapperId ? parent : null;
+
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.id = wrapperId;
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100%';
+    wrapper.style.overflow = 'hidden';
+    parent.insertBefore(wrapper, plotContainer);
+    wrapper.appendChild(plotContainer);
+  }
+  parent = wrapper;
+
+  const bgId = plotId + '_background';
+  let bg = document.getElementById(bgId);
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.id = bgId;
+    bg.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease';
+    parent.insertBefore(bg, plotContainer);
+  }
+
+  // Store parameters in dataset - ensure boolean values are stored correctly
+  if (backgroundImage !== undefined) bg.dataset.backgroundImage = backgroundImage || '';
+  if (flipX !== undefined) bg.dataset.flipX = String(flipX === true || flipX === 'true');
+  if (flipY !== undefined) bg.dataset.flipY = String(flipY === true || flipY === 'true');
+  if (scaleX !== undefined) bg.dataset.scaleX = String(scaleX || 1);
+  if (scaleY !== undefined) bg.dataset.scaleY = String(scaleY || 1);
+  if (opacity !== undefined) bg.dataset.opacity = String(opacity === null || opacity === undefined ? 1 : opacity);
+
+  applyProjectionBackground(plotId);
+
+  plotContainer.style.position = 'relative';
+  plotContainer.style.zIndex = '1';
+
+  // Attach listener for plot updates
+  if (!plotContainer.dataset.bgListenerAttached && typeof plotContainer.on === 'function') {
+    plotContainer.on('plotly_afterplot', function () {
+      applyProjectionBackground(plotId);
+    });
+    plotContainer.dataset.bgListenerAttached = 'true';
+  }
+}

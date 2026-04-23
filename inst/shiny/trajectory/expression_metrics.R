@@ -6,6 +6,7 @@
 ## - number of expressed genes
 ## - percent of transcripts from mitochondrial genes
 ## - percent of transcripts from ribosomal genes
+## - percent of transcripts from erythrocyte/hemoglobin genes
 ##----------------------------------------------------------------------------##
 
 ##----------------------------------------------------------------------------##
@@ -20,6 +21,43 @@ output[["trajectory_expression_metrics_UI"]] <- renderUI({
     input[["trajectory_selected_name"]]
   )
 
+  ## build list of tab panels dynamically based on available data
+  tab_panels <- list()
+
+  ## always show nUMI and nGene tabs
+  tab_panels[[length(tab_panels) + 1]] <- tabPanel(
+    "Number of transcripts",
+    uiOutput("trajectory_states_nUMI_UI")
+  )
+  tab_panels[[length(tab_panels) + 1]] <- tabPanel(
+    "Number of expressed genes",
+    uiOutput("trajectory_states_nGene_UI")
+  )
+
+  ## conditionally add mito tab
+  if (hasMitoColumn()) {
+    tab_panels[[length(tab_panels) + 1]] <- tabPanel(
+      "Mitochondrial gene expression",
+      uiOutput("trajectory_states_percent_mt_UI")
+    )
+  }
+
+  ## conditionally add ribo tab
+  if (hasRiboColumn()) {
+    tab_panels[[length(tab_panels) + 1]] <- tabPanel(
+      "Ribosomal gene expression",
+      uiOutput("trajectory_states_percent_ribo_UI")
+    )
+  }
+
+  ## conditionally add ery tab
+  if (hasEryColumn()) {
+    tab_panels[[length(tab_panels) + 1]] <- tabPanel(
+      "Erythrocyte gene expression",
+      uiOutput("trajectory_states_percent_ery_UI")
+    )
+  }
+
   ##
   fluidRow(
     cerebroBox(
@@ -27,25 +65,11 @@ output[["trajectory_expression_metrics_UI"]] <- renderUI({
         boxTitle("Expression metrics"),
         cerebroInfoButton("trajectory_expression_metrics_info")
       ),
-      tabBox(
-        title = NULL,
-        width = 12,
-        id = "trajectory_expression_metrics_tabs",
-        tabPanel(
-          "Number of transcripts",
-          uiOutput("trajectory_states_nUMI_UI")
-        ),
-        tabPanel(
-          "Number of expressed genes",
-          uiOutput("trajectory_states_nGene_UI")
-        ),
-        tabPanel(
-          "Mitochondrial gene expression",
-          uiOutput("trajectory_states_percent_mt_UI")
-        ),
-        tabPanel(
-          "Ribosomal gene expression",
-          uiOutput("trajectory_states_percent_ribo_UI")
+      do.call(
+        tabBox,
+        c(
+          list(title = NULL, width = 12, id = "trajectory_expression_metrics_tabs"),
+          tab_panels
         )
       )
     )
@@ -153,7 +177,7 @@ output[["trajectory_states_nGene_plot"]] <- plotly::renderPlotly({
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_states_percent_mt_UI"]] <- renderUI({
-  if ( "percent_mt" %in% colnames(getMetaData()) ) {
+  if ( hasMitoColumn() ) {
     plotly::plotlyOutput("trajectory_states_percent_mt_plot")
   } else {
     textOutput("trajectory_states_percent_mt_text")
@@ -172,6 +196,9 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
     input[["trajectory_selected_name"]]
   )
 
+  mito_col <- getMitoColumn()
+  req(mito_col)
+
   ## collect trajectory data
   trajectory_data <- getTrajectory(
     input[["trajectory_selected_method"]],
@@ -188,7 +215,7 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
   ##
   plotlyViolin(
     table = cbind(trajectory_data, getMetaData()),
-    metric = "percent_mt",
+    metric = mito_col,
     coloring_variable = "state",
     colors = state_colors,
     y_title = "Percentage of transcripts",
@@ -201,7 +228,7 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_states_percent_ribo_UI"]] <- renderUI({
-  if ( "percent_ribo" %in% colnames(getMetaData()) ) {
+  if ( hasRiboColumn() ) {
     plotly::plotlyOutput("trajectory_states_percent_ribo_plot")
   } else {
     textOutput("trajectory_states_percent_ribo_text")
@@ -220,6 +247,9 @@ output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
     input[["trajectory_selected_name"]]
   )
 
+  ribo_col <- getRiboColumn()
+  req(ribo_col)
+
   ## collect trajectory data
   trajectory_data <- getTrajectory(
     input[["trajectory_selected_method"]],
@@ -236,7 +266,58 @@ output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
   ##
   plotlyViolin(
     table = cbind(trajectory_data, getMetaData()),
-    metric = "percent_ribo",
+    metric = ribo_col,
+    coloring_variable = "state",
+    colors = state_colors,
+    y_title = "Percentage of transcripts",
+    mode = "percent"
+  )
+})
+
+##----------------------------------------------------------------------------##
+## Expression from erythrocyte/hemoglobin genes.
+##----------------------------------------------------------------------------##
+
+output[["trajectory_states_percent_ery_UI"]] <- renderUI({
+  if ( hasEryColumn() ) {
+    plotly::plotlyOutput("trajectory_states_percent_ery_plot")
+  } else {
+    textOutput("trajectory_states_percent_ery_text")
+  }
+})
+
+output[["trajectory_states_percent_ery_text"]] <- renderText({
+  "Column with percentage of erythrocyte/hemoglobin expression not available."
+})
+
+output[["trajectory_states_percent_ery_plot"]] <- plotly::renderPlotly({
+
+  ##
+  req(
+    input[["trajectory_selected_method"]],
+    input[["trajectory_selected_name"]]
+  )
+
+  ery_col <- getEryColumn()
+  req(ery_col)
+
+  ## collect trajectory data
+  trajectory_data <- getTrajectory(
+    input[["trajectory_selected_method"]],
+    input[["trajectory_selected_name"]]
+  )
+  trajectory_data <- trajectory_data[["meta"]]
+
+  ##
+  state_colors <- setNames(
+    default_colorset[seq_along(levels(trajectory_data$state))],
+    levels(trajectory_data$state)
+  )
+
+  ##
+  plotlyViolin(
+    table = cbind(trajectory_data, getMetaData()),
+    metric = ery_col,
     coloring_variable = "state",
     colors = state_colors,
     y_title = "Percentage of transcripts",
@@ -266,5 +347,5 @@ observeEvent(input[["trajectory_expression_metrics_info"]], {
 
 trajectory_expression_metrics_info <- list(
   title = "Number of transcripts",
-  text = HTML("Violin plots showing the number of transcripts (nUMI/nCounts), the number of expressed genes (nGene/nFeature), as well as the percentage of transcripts coming from mitochondrial and ribosomal genes in each state.")
+  text = HTML("Violin plots showing the number of transcripts (nUMI/nCounts), the number of expressed genes (nGene/nFeature), as well as the percentage of transcripts coming from mitochondrial, ribosomal, and erythrocyte/hemoglobin genes in each state.")
 )

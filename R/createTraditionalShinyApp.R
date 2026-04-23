@@ -124,6 +124,15 @@ dedent <- function(string) {
 #' @param spatial_images_flip_y Named list/vector. Whether to flip spatial images vertically, names must match cerebro_data.
 #' @param spatial_images_scale_x Named list/vector. Scaling factor for X axis of spatial images, names must match cerebro_data.
 #' @param spatial_images_scale_y Named list/vector. Scaling factor for Y axis of spatial images, names must match cerebro_data.
+#' @param variable_to_compare Controls the choices for "Variable to compare" in selected cells plots.
+#'   Can be one of:
+#'   \itemize{
+#'     \item \code{NULL} (default): Use all metadata columns except cell_barcode.
+#'     \item \code{TRUE}: Use intersection of getGroups() and metadata columns for all datasets.
+#'     \item \code{FALSE}: Use all metadata columns (same as NULL).
+#'     \item Named list/vector: Dataset-specific settings where names must match \code{cerebro_data}.
+#'       Each value can be TRUE (use groups intersection) or FALSE (use all metadata).
+#'   }
 #'
 #' @return Invisibly returns the path to the result directory.
 #'
@@ -188,11 +197,9 @@ createTraditionalShinyApp <- function(cerebro_data,
                                       show_upload_ui = TRUE,
                                       welcome_message = "Welcome to Cerebro App!",
                                       point_size = list(
-                                      overview_projection_point_size = NULL,
-                                      trajectory_point_size = NULL,
-                                      expression_projection_point_size = NULL,
-                                      spatial_projection_point_size = NULL
-                                    )) {
+                                        overview_projection_point_size = NULL,
+                                        spatial_projection_point_size = NULL),
+                                      variable_to_compare = NULL) {
 
   # Validate input parameters ------------------------------------------------##
   if (!all(file.exists(cerebro_data))) {
@@ -284,6 +291,23 @@ createTraditionalShinyApp <- function(cerebro_data,
     } else if (length(intersect(names(spatial_images_scale_y), names(cerebro_data))) == 0) {
       warning("No matching names found between spatial_images_scale_y and cerebro_data. Ignoring.", call. = FALSE)
       spatial_images_scale_y <- NULL
+    }
+  }
+
+  # Validate variable_to_compare if provided
+  # Accepts: NULL, single boolean (TRUE/FALSE), or named list/vector with names matching cerebro_data
+  if (!is.null(variable_to_compare)) {
+    if (is.logical(variable_to_compare) && length(variable_to_compare) == 1) {
+      # Single boolean is valid
+    } else if ((is.list(variable_to_compare) || is.vector(variable_to_compare)) && !is.null(names(variable_to_compare))) {
+      # Named list/vector - check if names match cerebro_data
+      if (length(intersect(names(variable_to_compare), names(cerebro_data))) == 0) {
+        warning("No matching names found between variable_to_compare and cerebro_data. Ignoring.", call. = FALSE)
+        variable_to_compare <- NULL
+      }
+    } else {
+      warning("variable_to_compare must be NULL, a single boolean, or a named list/vector. Ignoring.", call. = FALSE)
+      variable_to_compare <- NULL
     }
   }
 
@@ -508,6 +532,7 @@ createTraditionalShinyApp <- function(cerebro_data,
   if (!is.null(spatial_images_scale_x)) cerebro_options[["spatial_images_scale_x"]] <- spatial_images_scale_x
   if (!is.null(spatial_images_scale_y)) cerebro_options[["spatial_images_scale_y"]] <- spatial_images_scale_y
   if (!is.null(welcome_message)) cerebro_options[["welcome_message"]] <- welcome_message
+  if (!is.null(variable_to_compare)) cerebro_options[["variable_to_compare"]] <- variable_to_compare
 
   # Save configuration to RDS
   saveRDS(cerebro_options, file.path(result_dir, "cerebro_config.rds"))

@@ -869,6 +869,68 @@ getGroups <- function() {
     return(data_set()$getGroups())
   }
 }
+
+##----------------------------------------------------------------------------##
+## Get choices for "Variable to compare" based on Cerebro.options$variable_to_compare
+## - If variable_to_compare is NULL or empty: use all metadata columns except cell_barcode
+## - If variable_to_compare is TRUE (single boolean): use intersection of getGroups() and metadata columns
+## - If variable_to_compare is a named list/vector: check if current crb file name exists as a key
+##   - If the value for current file is TRUE: use intersection of getGroups() and metadata columns
+##   - Otherwise: use all metadata columns except cell_barcode
+##----------------------------------------------------------------------------##
+getVariableToCompareChoices <- function() {
+  ## default: all metadata columns except cell_barcode
+  all_cols <- colnames(getMetaData())[! colnames(getMetaData()) %in% c("cell_barcode")]
+
+  ## check if variable_to_compare option exists
+  if (!exists('Cerebro.options') || is.null(Cerebro.options[['variable_to_compare']])) {
+    return(all_cols)
+  }
+
+  var_compare <- Cerebro.options[['variable_to_compare']]
+  use_groups_intersection <- FALSE
+
+  ## case 1: single boolean TRUE
+  if (is.logical(var_compare) && length(var_compare) == 1 && !is.na(var_compare)) {
+    use_groups_intersection <- var_compare
+  }
+  ## case 2: named list or vector
+  else if ((is.list(var_compare) || is.vector(var_compare)) && !is.null(names(var_compare))) {
+    ## get current crb file name
+    current_name <- NULL
+    if (exists("available_crb_files") &&
+        !is.null(available_crb_files$files) &&
+        !is.null(available_crb_files$selected)) {
+      idx <- which(available_crb_files$files == available_crb_files$selected)
+      if (length(idx) > 0 && !is.null(available_crb_files$names)) {
+        current_name <- available_crb_files$names[idx[1]]
+      }
+    }
+
+    ## check if current file name exists in the named list/vector
+    if (!is.null(current_name) && current_name %in% names(var_compare)) {
+      val <- var_compare[[current_name]]
+      if (is.logical(val) && length(val) == 1 && !is.na(val)) {
+        use_groups_intersection <- val
+      }
+    }
+  }
+
+  ## if should use intersection of groups and metadata columns
+  if (use_groups_intersection) {
+    groups <- getGroups()
+    if (!is.null(groups) && length(groups) > 0) {
+      intersection <- intersect(groups, all_cols)
+      if (length(intersection) > 0) {
+        return(intersection)
+      }
+    }
+  }
+
+  ## default fallback
+  return(all_cols)
+}
+
 getGroupLevels <- function(group) {
   if ( any(grepl('Cerebro', class(data_set()))) ) {
     return(data_set()$getGroupLevels(group))
@@ -884,6 +946,115 @@ getMetaData <- function() {
     return(data_set()$getMetaData())
   }
 }
+
+##----------------------------------------------------------------------------##
+## Helper functions to detect mitochondrial and ribosomal percentage columns
+## These support multiple naming conventions:
+## - Mitochondrial: percent_mt, percent_mito, pct_mt, pct_mito, mito_percent, etc.
+## - Ribosomal: percent_ribo, percent_ribosomal, pct_ribo, ribo_percent, etc.
+##----------------------------------------------------------------------------##
+
+## Get the name of mitochondrial percentage column (if exists)
+getMitoColumn <- function() {
+  cols <- colnames(getMetaData())
+  ## patterns to match (case insensitive)
+  patterns <- c(
+    "^percent[_.]?mt$",
+    "^percent[_.]?mito$",
+    "^percent[_.]?mitochondrial$",
+    "^pct[_.]?mt$",
+    "^pct[_.]?mito$",
+    "^pct[_.]?mitochondrial$",
+    "^mt[_.]?percent$",
+    "^mito[_.]?percent$",
+    "^mitochondrial[_.]?percent$",
+    "^mito[_.]?pct$",
+    "^mt[_.]?pct$"
+  )
+  for (pattern in patterns) {
+    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
+    if (length(matches) > 0) {
+      return(matches[1])
+    }
+  }
+  return(NULL)
+}
+
+## Get the name of ribosomal percentage column (if exists)
+getRiboColumn <- function() {
+  cols <- colnames(getMetaData())
+  ## patterns to match (case insensitive)
+  patterns <- c(
+    "^percent[_.]?ribo$",
+    "^percent[_.]?ribosomal$",
+    "^pct[_.]?ribo$",
+    "^pct[_.]?ribosomal$",
+    "^ribo[_.]?percent$",
+    "^ribosomal[_.]?percent$",
+    "^ribo[_.]?pct$",
+    "^ribosomal[_.]?pct$"
+  )
+  for (pattern in patterns) {
+    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
+    if (length(matches) > 0) {
+      return(matches[1])
+    }
+  }
+  return(NULL)
+}
+
+## Check if mitochondrial percentage column exists
+hasMitoColumn <- function() {
+  !is.null(getMitoColumn())
+}
+
+## Check if ribosomal percentage column exists
+hasRiboColumn <- function() {
+  !is.null(getRiboColumn())
+}
+
+## Get the name of erythrocyte/hemoglobin percentage column (if exists)
+getEryColumn <- function() {
+  cols <- colnames(getMetaData())
+  ## patterns to match (case insensitive)
+  ## supports: percent_ery, percent_hb, percent_hgb, percent_hemoglobin, etc.
+  patterns <- c(
+    "^percent[_.]?ery$",
+    "^percent[_.]?erythrocyte$",
+    "^percent[_.]?hb$",
+    "^percent[_.]?hgb$",
+    "^percent[_.]?hemoglobin$",
+    "^percent[_.]?haemoglobin$",
+    "^pct[_.]?ery$",
+    "^pct[_.]?erythrocyte$",
+    "^pct[_.]?hb$",
+    "^pct[_.]?hgb$",
+    "^pct[_.]?hemoglobin$",
+    "^pct[_.]?haemoglobin$",
+    "^ery[_.]?percent$",
+    "^erythrocyte[_.]?percent$",
+    "^hb[_.]?percent$",
+    "^hgb[_.]?percent$",
+    "^hemoglobin[_.]?percent$",
+    "^haemoglobin[_.]?percent$",
+    "^ery[_.]?pct$",
+    "^hb[_.]?pct$",
+    "^hgb[_.]?pct$"
+  )
+  for (pattern in patterns) {
+    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
+    if (length(matches) > 0) {
+      return(matches[1])
+    }
+  }
+  return(NULL)
+}
+
+## Check if erythrocyte/hemoglobin percentage column exists
+hasEryColumn <- function() {
+  !is.null(getEryColumn())
+}
+
 availableProjections <- function() {
   if ( any(grepl('Cerebro', class(data_set()))) ) {
     return(data_set()$availableProjections())
@@ -919,20 +1090,33 @@ getMostExpressedGenes <- function(group) {
     return(data_set()$getMostExpressedGenes(group))
   }
 }
-getMethodsForMarkerGenes <- function() {
+getGroupsWithMeanExpression <- function() {
   if ( any(grepl('Cerebro', class(data_set()))) ) {
-    return(data_set()$getMethodsWithMarkerGenes())
+    return(data_set()$getGroupsWithMeanExpression())
   }
 }
-getGroupsWithMarkerGenes <- function(method) {
+getMeanExpression <- function(group) {
   if ( any(grepl('Cerebro', class(data_set()))) ) {
-    return(data_set()$getGroupsWithMarkerGenes(method))
+    return(data_set()$getMeanExpression(group))
   }
 }
-getMarkerGenes <- function(method, group) {
+hasMarkerGenes <- function() {
   if ( any(grepl('Cerebro', class(data_set()))) ) {
-    return(data_set()$getMarkerGenes(method, group))
+    return(data_set()$hasMarkerGenes())
   }
+  return(FALSE)
+}
+getMarkerGenes <- function() {
+  if ( any(grepl('Cerebro', class(data_set()))) ) {
+    return(data_set()$getMarkerGenes())
+  }
+}
+getMarkerClusters <- function() {
+  if ( is.null(data_set()) ) return(NULL)
+  if ( any(grepl('Cerebro', class(data_set()))) ) {
+    return(data_set()$getMarkerClusters())
+  }
+  return(NULL)
 }
 getMethodsForEnrichedPathways <- function() {
   if ( any(grepl('Cerebro', class(data_set()))) ) {

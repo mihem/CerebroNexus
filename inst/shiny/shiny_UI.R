@@ -72,6 +72,9 @@ source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/gene_id_conversion/UI.R
 source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/color_management/UI.R"), local = TRUE)
 source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/about/UI.R"), local = TRUE)
 
+## Load module UI
+source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/module/projection/projection_UI.R"), local = TRUE)
+
 ## Immune Repertoire tabs (BCR/TCR)
 source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/immune_repertoire/UI.R"), local = TRUE)
 source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/most_expressed_genes/UI.R"), local = TRUE)
@@ -94,9 +97,10 @@ ui <- dashboardPage(
       id = "sidebar",
       menuItem("Data info", tabName = "loadData", icon = icon("info"), selected = TRUE),
       menuItem("Main", tabName = "overview", icon = icon("home")),
+      menuItem("Test", tabName = "test", icon = icon("flask")),
       div(id = "sidebar_item_spatial_placeholder"),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
-      menuItem("Most expressed genes", tabName = "mostExpressedGenes", icon = icon("bullhorn")),
+      menuItem("Gene counts", tabName = "mostExpressedGenes", icon = icon("bullhorn")),
       div(id = "sidebar_item_marker_genes_placeholder"),
       div(id = "sidebar_item_enriched_pathways_placeholder"),
       menuItem("Gene expression", tabName = "geneExpression", icon = icon("signal")),
@@ -178,6 +182,7 @@ ui <- dashboardPage(
     tabItems(
       tab_load_data,
       tab_overview,
+      tabItem(tabName = "test", projection_UI("test_projection")),
       tab_spatial,
       tab_groups,
       tab_marker_genes,

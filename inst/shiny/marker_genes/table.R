@@ -6,19 +6,24 @@
 ## UI element for output.
 ##----------------------------------------------------------------------------##
 output[["marker_genes_table_UI"]] <- renderUI({
-  req(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]]
-  )
-  fluidRow(
-    cerebroBox(
-      title = tagList(
-        boxTitle("Marker genes"),
-        cerebroInfoButton("marker_genes_info")
-      ),
-      uiOutput("marker_genes_table_or_text_UI")
+  if (!hasMarkerGenes()) {
+    fluidRow(
+      cerebroBox(
+        title = boxTitle("Marker genes"),
+        textOutput("marker_genes_message_no_data_found")
+      )
     )
-  )
+  } else {
+    fluidRow(
+      cerebroBox(
+        title = tagList(
+          boxTitle("Marker genes"),
+          cerebroInfoButton("marker_genes_info")
+        ),
+        uiOutput("marker_genes_table_or_text_UI")
+      )
+    )
+  }
 })
 
 ##----------------------------------------------------------------------------##
@@ -27,104 +32,60 @@ output[["marker_genes_table_UI"]] <- renderUI({
 ## messages if no marker genes were found or data is missing.
 ##----------------------------------------------------------------------------##
 output[["marker_genes_table_or_text_UI"]] <- renderUI({
-  req(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
-  )
+  req(hasMarkerGenes())
   ## fetch results
-  results_type <- getMarkerGenes(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]]
-  )
-  if ( length(results_type) > 0 ) {
-    if ( is.data.frame(results_type) ) {
-      fluidRow(
-        column(12,
-          shinyWidgets::materialSwitch(
-            inputId = "marker_genes_table_filter_switch",
-            label = "Show results for all subgroups (no pre-filtering):",
-            value = FALSE,
-            status = "primary",
-            inline = TRUE
-          ),
-          shinyWidgets::materialSwitch(
-            inputId = "marker_genes_table_number_formatting",
-            label = "Automatically format numbers:",
-            value = TRUE,
-            status = "primary",
-            inline = TRUE
-          ),
-          shinyWidgets::materialSwitch(
-            inputId = "marker_genes_table_color_highlighting",
-            label = "Highlight values with colors:",
-            value = TRUE,
-            status = "primary",
-            inline = TRUE
-          )
+  results_df <- getMarkerGenes()
+  if ( is.data.frame(results_df) && nrow(results_df) > 0 ) {
+    fluidRow(
+      column(12,
+        shinyWidgets::materialSwitch(
+          inputId = "marker_genes_table_number_formatting",
+          label = "Automatically format numbers:",
+          value = TRUE,
+          status = "primary",
+          inline = TRUE
         ),
-        column(12,
-          uiOutput("marker_genes_filter_subgroups_UI")
-        ),
-        column(12,
-          DT::dataTableOutput("marker_genes_table")
+        shinyWidgets::materialSwitch(
+          inputId = "marker_genes_table_color_highlighting",
+          label = "Highlight values with colors:",
+          value = TRUE,
+          status = "primary",
+          inline = TRUE
         )
+      ),
+      column(12,
+        uiOutput("marker_genes_filter_cluster_UI")
+      ),
+      column(12,
+        DT::dataTableOutput("marker_genes_table")
       )
-    } else if (
-      is.character(results_type) &&
-      results_type == "no_markers_found"
-    ) {
-      textOutput("marker_genes_table_no_markers_found")
-    }
+    )
   } else {
     textOutput("marker_genes_table_no_data")
   }
 })
 
 ##----------------------------------------------------------------------------##
-## UI element for sub-filtering of results if toggled.
+## UI element for cluster filtering dropdown.
 ##----------------------------------------------------------------------------##
-output[["marker_genes_filter_subgroups_UI"]] <- renderUI({
-  req(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]]),
-    !is.null(input[["marker_genes_table_filter_switch"]])
-  )
-  ## fetch results
-  results_df <- getMarkerGenes(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]]
-  )
-  ## don't proceed if input is not a data frame
-  req(is.data.frame(results_df))
-  ## check if pre-filtering is activated and name of first column in table is
-  ## one of the registered groups
-  ## ... it's not
-  if (
-    input[["marker_genes_table_filter_switch"]] == TRUE ||
-    colnames(results_df)[1] %in% getGroups() == FALSE
-  ) {
-    ## return nothing (empty row)
-    fluidRow()
-  ## ... it is
-  } else {
-    ## check for which groups results exist
-    if ( is.character(results_df[[1]]) ) {
-      available_groups <- unique(results_df[[1]])
-    } else if ( is.factor(results_df[[1]]) ) {
-      available_groups <- levels(results_df[[1]])
-    }
-    ## create input selection for available groups
+output[["marker_genes_filter_cluster_UI"]] <- renderUI({
+  req(hasMarkerGenes())
+  ## get available clusters
+  clusters <- getMarkerClusters()
+  ## only show dropdown if clusters are available
+  if (!is.null(clusters) && length(clusters) > 0) {
     fluidRow(
       column(12,
         selectInput(
-          "marker_genes_table_select_group_level",
-          label = "Filter results for subgroup:",
-          choices = available_groups
+          "marker_genes_select_cluster",
+          label = "Filter by cluster:",
+          choices = c("All clusters" = "__ALL__", clusters),
+          selected = "__ALL__"
         )
       )
     )
+  } else {
+    fluidRow()
   }
 })
 
@@ -132,29 +93,41 @@ output[["marker_genes_filter_subgroups_UI"]] <- renderUI({
 ## Table with results.
 ##----------------------------------------------------------------------------##
 output[["marker_genes_table"]] <- DT::renderDataTable({
-  req(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
-  )
+  req(hasMarkerGenes())
   ## fetch results
-  results_df <- getMarkerGenes(
-    input[["marker_genes_selected_method"]],
-    input[["marker_genes_selected_table"]]
-  )
+  results_df <- getMarkerGenes()
   ## don't proceed if input is not a data frame
   req(is.data.frame(results_df))
-  ## filter the table for a specific subgroup only if specified by the user
-  ## (otherwise show all results)
-  if (
-    input[["marker_genes_table_filter_switch"]] == FALSE &&
-    colnames(results_df)[1] %in% getGroups() == TRUE
-  ) {
-    ## don't proceed if selection of subgroup is not available
-    req(input[["marker_genes_table_select_group_level"]])
-    ## filter table
-    results_df <- results_df[ which(results_df[[1]] == input[["marker_genes_table_select_group_level"]]) , ]
+
+  ## filter by cluster if user selected one
+  clusters <- getMarkerClusters()
+  if (!is.null(clusters) && length(clusters) > 0 &&
+      !is.null(input[["marker_genes_select_cluster"]]) &&
+      input[["marker_genes_select_cluster"]] != "__ALL__") {
+    ## find the cluster column
+    possible_cols <- c("group", "cluster", "cell_type", "celltype", "identity", "ident")
+    col_names <- colnames(results_df)
+    cluster_col <- NULL
+    for (col in possible_cols) {
+      idx <- which(tolower(col_names) == tolower(col))
+      if (length(idx) > 0) {
+        cluster_col <- col_names[idx[1]]
+        break
+      }
+    }
+    ## fallback to first column if it's categorical
+    if (is.null(cluster_col) && ncol(results_df) > 0) {
+      first_col <- results_df[[1]]
+      if (is.character(first_col) || is.factor(first_col)) {
+        cluster_col <- col_names[1]
+      }
+    }
+    ## filter if cluster column found
+    if (!is.null(cluster_col)) {
+      results_df <- results_df[results_df[[cluster_col]] == input[["marker_genes_select_cluster"]], ]
+    }
   }
+
   ## if the table is empty, e.g. because the filtering of results for a specific
   ## subgroup did not work properly, skip the processing and show and empty
   ## table (otherwise the procedure would result in an error)
@@ -173,11 +146,7 @@ output[["marker_genes_table"]] <- DT::renderDataTable({
       number_formatting = input[["marker_genes_table_number_formatting"]],
       color_highlighting = input[["marker_genes_table_color_highlighting"]],
       hide_long_columns = TRUE,
-      download_file_name = paste0(
-        "marker_genes_by_",
-        input[["marker_genes_selected_method"]], "_",
-        input[["marker_genes_selected_table"]]
-      ),
+      download_file_name = "marker_genes",
       page_length_default = 20,
       page_length_menu = c(20, 50, 100)
     )

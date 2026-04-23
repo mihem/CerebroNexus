@@ -62,9 +62,9 @@
 
 #' @keywords internal
 #' @noRd
-.readMarkerFile <- function(marker_file, marker_method, verbose = TRUE) {
+.readMarkerFile <- function(marker_file, verbose = TRUE) {
   ext <- tolower(tools::file_ext(marker_file))
-  markers_list <- NULL
+  markers_df <- NULL
 
   # Read file based on extension
   if (ext %in% c("xls", "xlsx")) {
@@ -72,46 +72,30 @@
       stop("Package 'readxl' is required to read Excel files (xls/xlsx).", call. = FALSE)
     }
     sheet_names <- readxl::excel_sheets(marker_file)
-    if (length(sheet_names) > 1) {
-      markers_list <- lapply(sheet_names, function(sheet_name) {
-        df <- readxl::read_excel(marker_file, sheet = sheet_name)
-        as.data.frame(df, stringsAsFactors = FALSE, check.names = FALSE)
-      })
-      names(markers_list) <- sheet_names
-    } else {
-      markers <- readxl::read_excel(marker_file, sheet = sheet_names[1])
-      markers <- as.data.frame(markers, stringsAsFactors = FALSE, check.names = FALSE)
-    }
+    # Read all sheets and combine into one data.frame
+    markers_list <- lapply(sheet_names, function(sheet_name) {
+      df <- readxl::read_excel(marker_file, sheet = sheet_name)
+      as.data.frame(df, stringsAsFactors = FALSE, check.names = FALSE)
+    })
+    markers_df <- do.call(rbind, markers_list)
   } else if (ext == "csv") {
-    markers <- utils::read.csv(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
+    markers_df <- utils::read.csv(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
   } else if (ext %in% c("tsv", "txt", "tab")) {
-    markers <- utils::read.delim(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
+    markers_df <- utils::read.delim(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
   } else {
     stop("Unsupported marker_file format: .", ext, ". Supported: xls, xlsx, csv, tsv, txt, tab.", call. = FALSE)
   }
 
-  # Process single table if markers_list is not yet set
-  if (is.null(markers_list)) {
-    if (nrow(markers) == 0) stop("marker_file read produced an empty table.", call. = FALSE)
-
-    group_col <- names(markers)[1] # First column is grouping
-    if (length(names(markers)) >= 1) {
-       if (is.factor(markers[[group_col]])) markers[[group_col]] <- as.character(markers[[group_col]])
-       markers[[group_col]][is.na(markers[[group_col]])] <- "N/A"
-       markers_list <- split(markers, markers[[group_col]], drop = TRUE)
-    } else {
-       markers_list <- list(custom = markers)
-    }
+  if (is.null(markers_df) || nrow(markers_df) == 0) {
+    stop("marker_file read produced an empty table.", call. = FALSE)
   }
 
   if (verbose) {
-       total_rows <- sum(vapply(markers_list, nrow, integer(1)))
-       message(paste0("[", format(Sys.time(), "%H:%M:%S"), "] Loaded marker_file (",
-                      total_rows, " rows) as method '", marker_method,
-                      "' with ", length(markers_list), " group(s)."))
+    message(paste0("[", format(Sys.time(), "%H:%M:%S"), "] Loaded marker_file (",
+                   nrow(markers_df), " rows)."))
   }
 
-  return(markers_list)
+  return(markers_df)
 }
 
 #' @title
@@ -348,20 +332,16 @@ convertSeuratToCerebro <- function(seurat_file,
   }
 
   # Load marker table (optional) --------------------------------------------##
-  if (!is.null(marker_file) && nzchar(marker_file) &&
-      !is.null(marker_method) && nzchar(marker_method)) {
+  if (!is.null(marker_file) && nzchar(marker_file)) {
     if (!file.exists(marker_file)) {
       stop("marker_file not found: ", marker_file, call. = FALSE)
     }
 
-    markers_list <- .readMarkerFile(marker_file, marker_method, verbose)
+    markers_df <- .readMarkerFile(marker_file, verbose)
 
-    # Attach to Seurat object under misc$marker_genes
-    if (!is.null(markers_list) && length(markers_list) > 0) {
-      if (is.null(seurat@misc$marker_genes) || !is.list(seurat@misc$marker_genes)) {
-        seurat@misc$marker_genes <- list()
-      }
-      seurat@misc$marker_genes[[marker_method]] <- markers_list
+    # Attach to Seurat object under misc$marker_genes as a single data.frame
+    if (!is.null(markers_df) && nrow(markers_df) > 0) {
+      seurat@misc$marker_genes <- markers_df
     }
   }
   # Handle most_expressed_genes input ---------------------------------------##
@@ -416,19 +396,22 @@ convertSeuratToCerebro <- function(seurat_file,
     add_most_expressed_genes <- FALSE
   }
 
-  # Calculate most expressed genes from Seurat object ----------------------##
+  # Calculate most expressed genes and mean expression from Seurat object ---##
   if (add_most_expressed_genes) {
     if (verbose) {
       message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                     "] Calculating most expressed genes for each group..."))
+                     "] Calculating most expressed genes and mean expression for each group..."))
     }
 
     # Get expression matrix
     expr_matrix <- .getExpressionMatrix(seurat, assay = assay, slot = slot, join_samples = TRUE)
 
-    # Initialize list structure
+    # Initialize list structures
     if (is.null(seurat@misc$most_expressed_genes) || !is.list(seurat@misc$most_expressed_genes)) {
       seurat@misc$most_expressed_genes <- list()
+    }
+    if (is.null(seurat@misc$mean_expression) || !is.list(seurat@misc$mean_expression)) {
+      seurat@misc$mean_expression <- list()
     }
 
     # Calculate for each group
@@ -441,7 +424,8 @@ convertSeuratToCerebro <- function(seurat_file,
       group_values <- unique(seurat@meta.data[[group_name]])
       group_values <- group_values[!is.na(group_values)]
 
-      group_results <- list()
+      pct_results <- list()
+      expr_results <- list()
 
       for (group_value in group_values) {
         # Get cells belonging to this group value using cell names (more robust)
@@ -451,38 +435,62 @@ convertSeuratToCerebro <- function(seurat_file,
 
         if (length(cells_in_group) == 0) next
 
-        # Calculate percentage of cells expressing each gene
+        # Get expression subset for this group
         expr_subset <- expr_matrix[, cells_in_group, drop = FALSE]
+
+        # Calculate percentage of cells expressing each gene
         gene_pct <- Matrix::rowSums(expr_subset > 0) / length(cells_in_group) * 100
 
-        # Create data frame and sort by percentage
-        gene_df <- data.frame(
+        # Calculate mean expression per gene
+        gene_mean <- Matrix::rowMeans(expr_subset)
+
+        # Create data frame for percentage and sort
+        gene_pct_df <- data.frame(
           gene = names(gene_pct),
           pct = as.numeric(gene_pct),
           stringsAsFactors = FALSE
         )
-        gene_df[["cluster"]] = as.character(group_value)
-        gene_df <- gene_df[order(-gene_df$pct), ]
-        rownames(gene_df) <- NULL
+        gene_pct_df[["cluster"]] <- as.character(group_value)
+        gene_pct_df <- gene_pct_df[order(-gene_pct_df$pct), ]
+        rownames(gene_pct_df) <- NULL
 
-        group_results[[as.character(group_value)]] <- gene_df
+        # Create data frame for mean expression and sort
+        gene_expr_df <- data.frame(
+          gene = names(gene_mean),
+          mean_expr = as.numeric(gene_mean),
+          stringsAsFactors = FALSE
+        )
+        gene_expr_df[["cluster"]] <- as.character(group_value)
+        gene_expr_df <- gene_expr_df[order(-gene_expr_df$mean_expr), ]
+        rownames(gene_expr_df) <- NULL
+
+        pct_results[[as.character(group_value)]] <- gene_pct_df
+        expr_results[[as.character(group_value)]] <- gene_expr_df
       }
 
       # Merge all data frames into one and reorder columns with cluster first
-      if (length(group_results) > 0) {
-        group_results_df <- do.call(rbind, group_results)
-        rownames(group_results_df) <- NULL
-        # Reorder columns with cluster first
-        group_results_df <- group_results_df[, c("cluster", setdiff(names(group_results_df), "cluster"))]
-        seurat@misc$most_expressed_genes[[group_name]] <- group_results_df
+      if (length(pct_results) > 0) {
+        pct_results_df <- do.call(rbind, pct_results)
+        rownames(pct_results_df) <- NULL
+        pct_results_df <- pct_results_df[, c("cluster", setdiff(names(pct_results_df), "cluster"))]
+        seurat@misc$most_expressed_genes[[group_name]] <- pct_results_df
       } else {
         seurat@misc$most_expressed_genes[[group_name]] <- data.frame()
+      }
+
+      if (length(expr_results) > 0) {
+        expr_results_df <- do.call(rbind, expr_results)
+        rownames(expr_results_df) <- NULL
+        expr_results_df <- expr_results_df[, c("cluster", setdiff(names(expr_results_df), "cluster"))]
+        seurat@misc$mean_expression[[group_name]] <- expr_results_df
+      } else {
+        seurat@misc$mean_expression[[group_name]] <- data.frame()
       }
     }
 
     if (verbose) {
       message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                     "] Most expressed genes calculation completed."))
+                     "] Most expressed genes and mean expression calculation completed."))
     }
   }
 

@@ -64,6 +64,10 @@ Cerebro <- R6::R6Class(
     #' specified during the call to \code{\link{getMostExpressedGenes}}.
     most_expressed_genes = list(),
 
+    #' @field mean_expression \code{list} that contains a \code{data.frame}
+    #' holding the mean expression per gene for each grouping variable.
+    mean_expression = list(),
+
     #' @field marker_genes \code{list} that contains a \code{list} for every
     #' method that was used to calculate marker genes, and a \code{data.frame}
     #' for each grouping variable, e.g. those that were specified during the
@@ -546,65 +550,105 @@ Cerebro <- R6::R6Class(
     },
 
     #' @description
-    #' Add table of marker genes.
+    #' Add table of mean expression per gene.
     #'
-    #' @param method Name of method that was used to calculate marker genes.
-    #' @param group_name Name of grouping variable that the marker genes belong
-    #' to. Must be registered in the \code{groups} field.
-    #' @param table \code{data.frame} that contains the marker genes.
-    addMarkerGenes = function(method, group_name, table) {
+    #' @param group_name Name of grouping variable that the mean expression
+    #' belongs to. Must be registered in the \code{groups} field.
+    #' @param table \code{data.frame} that contains the mean expression per gene.
+    addMeanExpression = function(group_name, table) {
       self$checkIfGroupExists(group_name)
       self$checkIfColumnExistsInMetadata(group_name)
-      self$marker_genes[[method]][[group_name]] <- table
+      self$mean_expression[[group_name]] <- table
     },
 
     #' @description
-    #' Retrieve names of methods for which marker genes are available.
+    #' Retrieve names of grouping variables for which mean expression data is
+    #' available.
     #'
     #' @return
-    #' \code{vector} of methods for which marker genes are available.
-    getMethodsWithMarkerGenes = function() {
-      return(names(self$marker_genes))
+    #' \code{vector} of grouping variables for which mean expression is
+    #' available.
+    getGroupsWithMeanExpression = function() {
+      return(names(self$mean_expression))
     },
 
     #' @description
-    #' Retrieve names of grouping variables for which marker genes are
-    #' available for a specific method.
+    #' Retrieve table of mean expression for a specific grouping variable.
     #'
-    #' @param method Name of method for which to retrieve grouping variables.
+    #' @param group_name Name of grouping variable for which to retrieve mean
+    #' expression.
     #'
     #' @return
-    #' \code{vector} of grouping variables for which marker genes are available.
-    getGroupsWithMarkerGenes = function(method) {
-      if ( method %in% self$getMethodsWithMarkerGenes() == FALSE ) {
-        stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
-      } else {
-        return(names(self$marker_genes[[method]]))
+    #' \code{data.frame} containing the mean expression per gene.
+    getMeanExpression = function(group_name) {
+      self$checkIfGroupExists(group_name)
+      self$checkIfColumnExistsInMetadata(group_name)
+      return(self$mean_expression[[group_name]])
+    },
+
+    #' @description
+    #' Set marker genes table.
+    #'
+    #' @param table \code{data.frame} that contains the marker genes.
+    setMarkerGenes = function(table) {
+      if (!is.data.frame(table)) {
+        stop("Marker genes must be a data.frame.", call. = FALSE)
       }
+      self$marker_genes <- table
     },
 
     #' @description
-    #' Retrieve table of marker genes for a specific method and grouping
-    #' variable.
+    #' Check if marker genes are available.
     #'
-    #' @param method Name of method for which to retrieve marker genes.
-    #' @param group_name Name of grouping variable for which to retrieve marker
-    #' genes.
+    #' @return
+    #' \code{logical} indicating whether marker genes are available.
+    hasMarkerGenes = function() {
+      return(!is.null(self$marker_genes) && is.data.frame(self$marker_genes) && nrow(self$marker_genes) > 0)
+    },
+
+    #' @description
+    #' Retrieve marker genes table.
     #'
     #' @return
     #' \code{data.frame} containing the marker genes.
-    getMarkerGenes = function(method, group_name) {
-      if ( method %in% self$getMethodsWithMarkerGenes() == FALSE ) {
-        stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
-      } else {
-        if ( group_name %in% self$getGroupsWithMarkerGenes(method) == FALSE ) {
-          stop(
-            glue::glue('Group `{group_name}` is not available for method `{method}`.'),
-            call. = FALSE
-          )
-        } else {
-          return(self$marker_genes[[method]][[group_name]])
+    getMarkerGenes = function() {
+      return(self$marker_genes)
+    },
+
+    #' @description
+    #' Get unique cluster/group values from marker genes table.
+    #' Looks for common column names like "group", "cluster", "cell_type", etc.
+    #'
+    #' @return
+    #' \code{vector} of unique cluster/group values, or \code{NULL} if not found.
+    getMarkerClusters = function() {
+      if ( !self$hasMarkerGenes() ) {
+        return(NULL)
+      }
+      ## common column names for cluster/group information
+      possible_cols <- c("group", "cluster", "cell_type", "celltype", "identity", "ident")
+      ## find the first matching column (case-insensitive)
+      col_names <- colnames(self$marker_genes)
+      matched_col <- NULL
+      for (col in possible_cols) {
+        idx <- which(tolower(col_names) == tolower(col))
+        if (length(idx) > 0) {
+          matched_col <- col_names[idx[1]]
+          break
         }
+      }
+      ## if no match found, try the first column if it looks categorical
+      if (is.null(matched_col) && ncol(self$marker_genes) > 0) {
+        first_col <- self$marker_genes[[1]]
+        if (is.character(first_col) || is.factor(first_col)) {
+          matched_col <- col_names[1]
+        }
+      }
+      ## return unique values or NULL
+      if (!is.null(matched_col)) {
+        return(unique(self$marker_genes[[matched_col]]))
+      } else {
+        return(NULL)
       }
     },
 

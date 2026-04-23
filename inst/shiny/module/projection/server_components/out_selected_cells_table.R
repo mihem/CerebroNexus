@@ -1,26 +1,27 @@
 ##----------------------------------------------------------------------------##
 ## Table.
 ##----------------------------------------------------------------------------##
-output[["spatial_details_selected_cells_table"]] <- DT::renderDataTable({
+output[["details_selected_cells_table"]] <- DT::renderDataTable({
   ## don't proceed without these inputs
   req(
-    input[["spatial_projection_to_display"]],
-    input[["spatial_projection_to_display"]] %in% availableSpatial(),
-    spatial_projection_data_to_plot()
+    input[["to_display"]],
+    input[["to_display"]] %in% get_available(),
+    projection_data_to_plot()
   )
+
   meta_data <- getMetaData()
   req(!is.null(meta_data))
   ## check selection
   ## ... selection has not been made or there is no cell in it
-  if ( is.null(spatial_projection_selected_cells()) ) {
+  if ( is.null(projection_selected_cells()) ) {
     ## prepare empty table
     meta_data %>%
     dplyr::slice(0) %>%
     prepareEmptyTable()
   ## ... selection has been made and at least 1 cell is in it
   } else {
-    ## Use the actual plotted coordinates from spatial_projection_data_to_plot()
-    plot_data <- spatial_projection_data_to_plot()
+    ## Use the actual plotted coordinates from projection_data_to_plot()
+    plot_data <- projection_data_to_plot()
 
     ## extract cells for table - use the coordinates that were actually plotted
     cells_df <- cbind(
@@ -32,7 +33,7 @@ output[["spatial_details_selected_cells_table"]] <- DT::renderDataTable({
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
       dplyr::mutate(identifier = paste0(X1, '-', X2)) %>%
-      dplyr::filter(identifier %in% spatial_projection_selected_cells()$identifier) %>%
+      dplyr::filter(identifier %in% projection_selected_cells()$identifier) %>%
       dplyr::select(-c(X1, X2, identifier)) %>%
       dplyr::select(cell_barcode, everything())
     ## check how many cells are left after filtering
@@ -50,10 +51,10 @@ output[["spatial_details_selected_cells_table"]] <- DT::renderDataTable({
         filter = list(position = "top", clear = TRUE),
         dom = "Brtlip",
         show_buttons = TRUE,
-        number_formatting = input[["spatial_details_selected_cells_table_number_formatting"]],
-        color_highlighting = input[["spatial_details_selected_cells_table_color_highlighting"]],
+        number_formatting = input[["details_selected_cells_table_number_formatting"]],
+        color_highlighting = input[["details_selected_cells_table_color_highlighting"]],
         hide_long_columns = TRUE,
-        download_file_name = "spatial_details_of_selected_cells"
+        download_file_name = "details_of_selected_cells"
       )
     }
   }

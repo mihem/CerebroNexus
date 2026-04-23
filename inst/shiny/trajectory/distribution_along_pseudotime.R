@@ -72,7 +72,7 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
           label = "Variable to show along pseudotime:",
           choices = c(
             "state",
-            colnames(getMetaData())[! colnames(getMetaData()) %in% c("cell_barcode")]
+            getVariableToCompareChoices()
           )
         ),
         plotly::plotlyOutput("trajectory_distribution_along_pseudotime_plot")
@@ -102,7 +102,7 @@ output[["trajectory_distribution_along_pseudotime_plot"]] <- plotly::renderPlotl
 
   ## collect trajectory data
   trajectory_data <- trajectory_data_reactive()
-  
+
   ## extract cells to plot
   cells_df <- cbind(trajectory_data[["meta"]], getMetaData()) %>%
     dplyr::filter(!is.na(pseudotime))
@@ -131,7 +131,7 @@ output[["trajectory_distribution_along_pseudotime_plot"]] <- plotly::renderPlotl
 
     ## create empty plot
     plot <- plotly::plot_ly()
-    
+
     incProgress(0.4, detail = "Calculating densities...")
 
     ## add trace to plot for every group level

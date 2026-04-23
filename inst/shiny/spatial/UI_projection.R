@@ -101,12 +101,14 @@ output[["spatial_projection_UI"]] <- renderUI({
               htmlOutput("spatial_number_of_selected_cells")
             ),
             column(width = 4, style = "text-align: right;",
-              actionButton(
-                inputId = "spatial_projection_clear_selection",
-                label = "Clear selection",
-                icon = icon("eraser"),
-                class = "btn-xs btn-default",
-                style = "margin-top: 5px;"
+              shinyjs::hidden(
+                actionButton(
+                  inputId = "spatial_projection_clear_selection",
+                  label = "Clear selection",
+                  icon = icon("eraser"),
+                  class = "btn-xs btn-default btn-breathing",
+                  style = "margin-top: 5px;"
+                )
               )
             )
           )
