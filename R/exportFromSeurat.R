@@ -225,31 +225,14 @@ exportFromSeurat <- function(
   ## add transcript counts
   ##--------------------------------------------------------------------------##
 
-  ## get expression data
-  ## Seurat v5 renamed the 'slot' argument to 'layer'; try both
-  expression_data <- tryCatch(
-    Seurat::GetAssayData(object, assay = assay, layer = slot),
-    error = function(e) {
-      try(
-        Seurat::GetAssayData(object, assay = assay, slot = slot),
-        silent = TRUE
-      )
-    }
+  ## get expression data (v3/v4 slot= and v5 layer= both handled inside)
+  expression_data <- .getExpressionMatrix(
+    object,
+    assay = assay,
+    slot = slot,
+    join_samples = TRUE,
+    verbose = verbose
   )
-
-  ## check if provided slot exists in provided assay
-  if (inherits(expression_data, 'try-error')) {
-    stop(
-      paste0(
-        'Slot `',
-        slot,
-        '` could not be found in `',
-        assay,
-        '` assay slot.'
-      ),
-      call. = FALSE
-    )
-  }
 
   ## convert expression data to "RleArray" if requested, if it is "dgCMatrix" or
   ## "matrix" format, and if the "DelayedArray" package is available
