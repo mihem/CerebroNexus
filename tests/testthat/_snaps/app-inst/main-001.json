@@ -1,0 +1,8 @@
+{
+  "input": {
+    "overview_projection_group_filter_seurat_clusters": "0",
+    "overview_projection_percentage_cells_to_show": 60,
+    "overview_projection_point_opacity": 0.9,
+    "overview_projection_point_size": 9
+  }
+}
