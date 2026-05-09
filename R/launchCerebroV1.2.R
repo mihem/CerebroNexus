@@ -90,14 +90,14 @@ launchCerebroV1.2 <- function(
   source(
     system.file(
       paste0("shiny/v1.2/shiny_UI.R"),
-      package = "cerebroApp"
+      package = "cerebroAppLite"
     ),
     local = TRUE
   )
   source(
     system.file(
       paste0("shiny/v1.2/shiny_server.R"),
-      package = "cerebroApp"
+      package = "cerebroAppLite"
     ),
     local = TRUE
   )

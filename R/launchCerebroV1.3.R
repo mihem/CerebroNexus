@@ -143,7 +143,7 @@ launchCerebroV1.3 <- function(
     "crb_file_to_load" = crb_file_to_load,
     "expression_matrix_h5" = expression_matrix_h5,
     "welcome_message" = welcome_message,
-    "cerebro_root" = system.file(package = "cerebroApp"),
+    "cerebro_root" = system.file(package = "cerebroAppLite"),
     "projections_default_point_size" = projections_default_point_size,
     "projections_default_point_opacity" = projections_default_point_opacity,
     "projections_default_percentage_cells_to_show" = projections_default_percentage_cells_to_show,
@@ -161,14 +161,14 @@ launchCerebroV1.3 <- function(
   source(
     system.file(
       paste0("shiny/v1.3/shiny_UI.R"),
-      package = "cerebroApp"
+      package = "cerebroAppLite"
     ),
     local = TRUE
   )
   source(
     system.file(
       paste0("shiny/v1.3/shiny_server.R"),
-      package = "cerebroApp"
+      package = "cerebroAppLite"
     ),
     local = TRUE
   )
