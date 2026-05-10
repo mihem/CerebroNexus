@@ -31,7 +31,7 @@ correctly was to generate it with pre-processing functions of
 cerebroApp,
 e.g. [`getMarkerGenes()`](https://mihem.github.io/cerebroAppLite/reference/getMarkerGenes.md).
 These functions are bound to a specific method, e.g. the
-[`FindAllMarkers()`](https://rdrr.io/pkg/Seurat/man/FindAllMarkers.html)
+[`FindAllMarkers()`](https://satijalab.org/seurat/reference/FindAllMarkers.html)
 function of the Seurat package. Results from other methods generally
 don’t fit the expected format and will cause an error, even when stored
 in the right place in the Seurat object. The benefit of this limitation

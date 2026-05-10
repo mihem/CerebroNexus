@@ -122,7 +122,7 @@ seurat@meta.data$RNA_snn_res.0.5 <- NULL
 ## Cell cycle analysis
 
 We could also perform cell cycle analysis using the
-[`CellCycleScoring()`](https://rdrr.io/pkg/Seurat/man/CellCycleScoring.html)
+[`CellCycleScoring()`](https://satijalab.org/seurat/reference/CellCycleScoring.html)
 built into Seurat. However, too few of the cell cycle genes are present
 in this example data set so we will skip it here. The code below should
 work with a real data set.
@@ -312,7 +312,7 @@ can help to distinguish the role of different cell groups in the data
 set. We can identify marker genes using the
 [`getMarkerGenes()`](https://mihem.github.io/cerebroAppLite/reference/getMarkerGenes.md)
 function which internally uses the
-[`Seurat::FindAllMarkers()`](https://rdrr.io/pkg/Seurat/man/FindAllMarkers.html)
+[`Seurat::FindAllMarkers()`](https://satijalab.org/seurat/reference/FindAllMarkers.html)
 function but also stores the results in the Seurat object under the
 `misc` slot.
 

@@ -192,10 +192,10 @@ transcripts per cell,</li>
 <span>  min.cells <span class="op">=</span> <span class="fl">5</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">seurat</span>, subset <span class="op">=</span> <span class="va">nCount_RNA</span> <span class="op">&gt;=</span> <span class="fl">50</span> <span class="op">&amp;</span> <span class="va">nFeature_RNA</span> <span class="op">&gt;=</span> <span class="fl">10</span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/NormalizeData.html" class="external-link">NormalizeData</a></span><span class="op">(</span><span class="va">seurat</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/FindVariableFeatures.html" class="external-link">FindVariableFeatures</a></span><span class="op">(</span><span class="va">seurat</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/ScaleData.html" class="external-link">ScaleData</a></span><span class="op">(</span><span class="va">seurat</span>, vars.to.regress <span class="op">=</span> <span class="st">'nCount_RNA'</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/RunPCA.html" class="external-link">RunPCA</a></span><span class="op">(</span><span class="va">seurat</span>, features <span class="op">=</span> <span class="va">seurat</span><span class="op">@</span><span class="va">assays</span><span class="op">$</span><span class="va">RNA</span><span class="op">@</span><span class="va">var.features</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/NormalizeData.html" class="external-link">NormalizeData</a></span><span class="op">(</span><span class="va">seurat</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/FindVariableFeatures.html" class="external-link">FindVariableFeatures</a></span><span class="op">(</span><span class="va">seurat</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/ScaleData.html" class="external-link">ScaleData</a></span><span class="op">(</span><span class="va">seurat</span>, vars.to.regress <span class="op">=</span> <span class="st">'nCount_RNA'</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/RunPCA.html" class="external-link">RunPCA</a></span><span class="op">(</span><span class="va">seurat</span>, features <span class="op">=</span> <span class="va">seurat</span><span class="op">@</span><span class="va">assays</span><span class="op">$</span><span class="va">RNA</span><span class="op">@</span><span class="va">var.features</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="clustering">Clustering<a class="anchor" aria-label="anchor" href="#clustering"></a>
@@ -203,19 +203,19 @@ transcripts per cell,</li>
 <p>Then, we identify clusters with a relatively low resolution, again,
 because of the small size of this data set.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/FindNeighbors.html" class="external-link">FindNeighbors</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/FindClusters.html" class="external-link">FindClusters</a></span><span class="op">(</span><span class="va">seurat</span>, resolution <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/FindNeighbors.html" class="external-link">FindNeighbors</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/FindClusters.html" class="external-link">FindClusters</a></span><span class="op">(</span><span class="va">seurat</span>, resolution <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">$</span><span class="va">RNA_snn_res.0.5</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="cell-cycle-analysis">Cell cycle analysis<a class="anchor" aria-label="anchor" href="#cell-cycle-analysis"></a>
 </h2>
 <p>We could also perform cell cycle analysis using the
-<code><a href="https://rdrr.io/pkg/Seurat/man/CellCycleScoring.html" class="external-link">CellCycleScoring()</a></code> built into Seurat. However, too few of
+<code><a href="https://satijalab.org/seurat/reference/CellCycleScoring.html" class="external-link">CellCycleScoring()</a></code> built into Seurat. However, too few of
 the cell cycle genes are present in this example data set so we will
 skip it here. The code below should work with a real data set.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/CellCycleScoring.html" class="external-link">CellCycleScoring</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/CellCycleScoring.html" class="external-link">CellCycleScoring</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  g2m.features <span class="op">=</span> <span class="va">cc.genes</span><span class="op">$</span><span class="va">g2m.genes</span>,</span>
 <span>  s.features <span class="op">=</span> <span class="va">cc.genes</span><span class="op">$</span><span class="va">s.genes</span></span>
@@ -230,7 +230,7 @@ skip it here. The code below should work with a real data set.</p>
 <p>Next, we use the UMAP technique to generate two- and
 three-dimensional projections.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/RunUMAP.html" class="external-link">RunUMAP</a></span><span class="op">(</span></span>
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/RunUMAP.html" class="external-link">RunUMAP</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  reduction.name <span class="op">=</span> <span class="st">'UMAP'</span>,</span>
 <span>  reduction.key <span class="op">=</span> <span class="st">'UMAP_'</span>,</span>
@@ -240,7 +240,7 @@ three-dimensional projections.</p>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/RunUMAP.html" class="external-link">RunUMAP</a></span><span class="op">(</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/RunUMAP.html" class="external-link">RunUMAP</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  reduction.name <span class="op">=</span> <span class="st">'UMAP_3D'</span>,</span>
 <span>  reduction.key <span class="op">=</span> <span class="st">'UMAP3D_'</span>,</span>
@@ -332,7 +332,7 @@ later.</p>
 </h3>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://satijalab.github.io/seurat-object/reference/Idents.html" class="external-link">Idents</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"seurat_clusters"</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/BuildClusterTree.html" class="external-link">BuildClusterTree</a></span><span class="op">(</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/BuildClusterTree.html" class="external-link">BuildClusterTree</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  dims <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">30</span>,</span>
 <span>  reorder <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -345,7 +345,7 @@ later.</p>
 </h3>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://satijalab.github.io/seurat-object/reference/Idents.html" class="external-link">Idents</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"cell_type_singler_blueprintencode_main"</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Seurat/man/BuildClusterTree.html" class="external-link">BuildClusterTree</a></span><span class="op">(</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/BuildClusterTree.html" class="external-link">BuildClusterTree</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  dims <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">30</span>,</span>
 <span>  reorder <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -394,7 +394,7 @@ expressed in a given cell population, e.g. a cluster. This information
 can help to distinguish the role of different cell groups in the data
 set. We can identify marker genes using the
 <code><a href="../reference/getMarkerGenes.html">getMarkerGenes()</a></code> function which internally uses the
-<code><a href="https://rdrr.io/pkg/Seurat/man/FindAllMarkers.html" class="external-link">Seurat::FindAllMarkers()</a></code> function but also stores the
+<code><a href="https://satijalab.org/seurat/reference/FindAllMarkers.html" class="external-link">Seurat::FindAllMarkers()</a></code> function but also stores the
 results in the Seurat object under the <code>misc</code> slot.</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/getMarkerGenes.html">getMarkerGenes</a></span><span class="op">(</span></span>
