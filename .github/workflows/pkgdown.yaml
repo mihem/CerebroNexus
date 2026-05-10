@@ -1,20 +1,23 @@
 name: pkgdown
 
 on:
+  push:
+    branches: [master]
   pull_request:
     branches: [master]
   release:
     types: [published]
   workflow_dispatch:
 
+concurrency:
+  group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+  cancel-in-progress: true
 
 permissions: read-all
 
 jobs:
   pkgdown:
     runs-on: ubuntu-latest
-    concurrency:
-      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     permissions:
@@ -54,12 +57,6 @@ jobs:
           nix-shell default.nix --run "Rscript -e \"
             pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
           \""
-      
-      - name: Build pkgdown site
-        run: |
-          nix-shell default.nix --run "Rscript -e \"
-            pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
-           \""
 
       - name: Deploy to GitHub Pages
         if: github.event_name != 'pull_request'
