@@ -22,11 +22,13 @@ jobs:
   update-nix:
     runs-on: ubuntu-latest
     env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+      GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Create folder to silence Nix warning
         run: mkdir -p ~/.nix-defexpr/channels
