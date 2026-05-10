@@ -1,3 +1,35 @@
+# cerebroAppLite 1.6.0
+
+## Bug fixes
+
+- Fixed all errors and warnings identified by R CMD CHECK, making the package ready for CRAN submission
+- Fixed Seurat v5 API: replaced deprecated slot access (`@counts`, `@data`) with `GetAssayData()` across multiple functions
+- Fixed `addPercentMtRibo`, `calculatePercentGenes`, `getMostExpressedGenes`, `performGeneSetEnrichmentAnalysis`, `getMarkerGenes`, `getEnrichedPathways`, `exportFromSCE`, `exportFromSeurat`
+- Fixed GSVA v2.x API compatibility: now uses `gsvaParam()` with version check for backward compatibility
+- Fixed `class(x) == "..."` checks replaced with `inherits()` across all relevant functions
+- Fixed `require()` replaced with `requireNamespace()` throughout
+- Fixed cross-references and examples in documentation
+
+## Testing
+
+- Added unit tests for all core R functions
+- Added shinytest2 integration tests for the full Cerebro interface, covering gene expression, group/marker genes, color management, and more
+- Tests run in a reproducible Nix environment via GitHub Actions
+
+## CI/CD
+
+- Added Nix-based GitHub Actions workflows for R CMD CHECK, R tests, pkgdown, code style, and automatic `default.nix` updates
+- Added `update-nix` workflow: regenerates `default.nix` weekly via `create_env.R` and opens a PR automatically; BPCells commit SHA is now auto-fetched from GitHub
+- Added `style` workflow: formats R code via [air](https://github.com/posit-dev/air) on every PR
+- Added `sync-dev` workflow: automatically merges master back into dev after every merge to keep branches in sync
+- Switched Nix environment to `bleeding-edge` for always up-to-date CRAN packages
+- Branch protection rulesets configured for both `master` and `dev` with required status checks and auto-merge
+
+## Documentation
+
+- Added pkgdown site at <https://mihem.github.io/cerebroAppLite/> with light/dark/auto theme switch, search, and all vignettes as articles
+- Site automatically builds and deploys to GitHub Pages on push to master
+
 # cerebroAppLite 1.5.3
  - several bug fixes so that launchCerebro should work again
 
