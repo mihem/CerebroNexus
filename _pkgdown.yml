@@ -9,6 +9,7 @@ home:
 
 navbar:
   structure:
+    left: [home, reference, articles, news]
     right: [search, github, homepage]
   components:
     github:
