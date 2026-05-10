@@ -2,8 +2,13 @@ url: https://mihem.github.io/cerebroAppLite/
 
 template:
   bootstrap: 5
-  bootswatch: flatly
   light-switch: true
+  bslib:
+    primary: "#2c3e50"
+    navbar-bg: "#2c3e50"
+    navbar-light-color: "#ffffff"
+    navbar-light-hover-color: "#18bc9c"
+    navbar-light-active-color: "#18bc9c"
 
 home:
   title: cerebroAppLite
