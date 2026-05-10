@@ -75,7 +75,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if provided Seurat object is of class "Seurat"
-  if ( class(seurat) != "Seurat" ) {
+  if ( !inherits(seurat, "Seurat") ) {
     stop(
       paste0(
         "Provided object is of class `", class(seurat), "` but must be of class 'Seurat'."
