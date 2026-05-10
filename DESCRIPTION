@@ -7,10 +7,10 @@ Authors@R: c(
   )
 Description: cerebroAppLite is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.
 URL: 
-License: MIT + file LICENSE
+License: MIT + file LICENSE.md
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3
 Depends: R (>= 3.5.1)
 biocViews:
   FeatureExtraction,
@@ -24,7 +24,6 @@ biocViews:
   Visualization
 Imports:
   ape (>= 5.4),
-  BPCells,
   biomaRt (>= 2.38.0),
   colourpicker (>= 1.0),
   dplyr (>= 1.0.0),
@@ -33,7 +32,6 @@ Imports:
   ggplot2 (>= 3.2.1),
   glue (>= 1.4.0),
   GSVA (>= 1.30.0),
-  HDF5Array (>= 1.18.1),
   httr (>= 1.4.0),
   igraph,
   Matrix (>= 1.2),
@@ -60,10 +58,16 @@ Imports:
   utils,
   viridis (>= 0.5.1)
 Suggests:
+  BPCells,
+  DelayedArray,
   formattable (>= 0.2.0.1),
+  HDF5Array (>= 1.18.1),
+  jsonlite,
   knitr,
   rmarkdown,
   Seurat (>= 3.0.0),
+  SingleCellExperiment,
+  SummarizedExperiment,
   testthat (>= 3.0.0),
   shinytest2 (>= 0.2.0)
 Remotes:
