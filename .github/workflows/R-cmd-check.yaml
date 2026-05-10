@@ -52,10 +52,7 @@ jobs:
 
       # Run R CMD check via devtools::check()
       - name: Run R-CMD-check
-        env:
-          TMPDIR: ${{ runner.temp }}/r-check-tmp
         run: |
-          mkdir -p ${{ runner.temp }}/r-check-tmp
           nix-shell default.nix --run "Rscript -e \"
             devtools::check(vignettes = TRUE, error_on = 'error')
           \""
