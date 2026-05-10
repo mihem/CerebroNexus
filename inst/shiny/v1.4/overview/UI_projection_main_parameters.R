@@ -11,7 +11,9 @@ output[["overview_projection_main_parameters_UI"]] <- renderUI({
     selectInput(
       "overview_projection_point_color",
       label = "Color cells by",
-      choices = colnames(getMetaData())[! colnames(getMetaData()) %in% c("cell_barcode")]
+      choices = colnames(getMetaData())[
+        !colnames(getMetaData()) %in% c("cell_barcode")
+      ]
     )
   )
 })
@@ -35,7 +37,8 @@ observeEvent(input[["overview_projection_main_parameters_info"]], {
 ##----------------------------------------------------------------------------##
 overview_projection_main_parameters_info <- list(
   title = "Main parameters for projection",
-  text = HTML("
+  text = HTML(
+    "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
       <li><b>Projection:</b> Select here which projection you want to see in the scatter plot on the right.</li>

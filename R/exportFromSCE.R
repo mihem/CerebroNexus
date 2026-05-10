@@ -74,23 +74,24 @@ exportFromSCE <- function(
   use_delayed_array = FALSE,
   verbose = FALSE
 ) {
-
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
   ## check if provided object is of class "SingleCellExperiment"
-  if ( !inherits(object, "SingleCellExperiment") ) {
+  if (!inherits(object, "SingleCellExperiment")) {
     stop(
       paste0(
-        "Provided object is of class `", class(object), "` but must be of class 'SingleCellExperiment'."
+        "Provided object is of class `",
+        class(object),
+        "` but must be of class 'SingleCellExperiment'."
       ),
       call. = FALSE
     )
   }
 
   ## check if SingleCellExperiment is installed
-  if ( !requireNamespace("SingleCellExperiment", quietly = TRUE) ) {
+  if (!requireNamespace("SingleCellExperiment", quietly = TRUE)) {
     stop(
       "The 'SingleCellExperiment' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -98,12 +99,14 @@ exportFromSCE <- function(
   }
 
   ## `groups`
-  if ( any(groups %in% names(SingleCellExperiment::colData(object)) == FALSE ) ) {
+  if (any(groups %in% names(SingleCellExperiment::colData(object)) == FALSE)) {
     stop(
       paste0(
         'Some group columns could not be found in meta data: ',
         paste0(
-          groups[which(groups %in% names(SingleCellExperiment::colData(object)) == FALSE)],
+          groups[which(
+            groups %in% names(SingleCellExperiment::colData(object)) == FALSE
+          )],
           collapse = ', '
         )
       ),
@@ -112,10 +115,11 @@ exportFromSCE <- function(
   }
 
   ## `nUMI`
-  if ( (nUMI %in% names(SingleCellExperiment::colData(object)) == FALSE ) ) {
+  if ((nUMI %in% names(SingleCellExperiment::colData(object)) == FALSE)) {
     stop(
       paste0(
-        'Column with number of transcripts per cell (`', nUMI,
+        'Column with number of transcripts per cell (`',
+        nUMI,
         '`) not found in meta data.'
       ),
       call. = FALSE
@@ -123,10 +127,11 @@ exportFromSCE <- function(
   }
 
   ## `nGene`
-  if ( (nGene %in% names(SingleCellExperiment::colData(object)) == FALSE ) ) {
+  if ((nGene %in% names(SingleCellExperiment::colData(object)) == FALSE)) {
     stop(
       paste0(
-        'Column with number of expressed genes per cell (`', nGene,
+        'Column with number of expressed genes per cell (`',
+        nGene,
         '`) not found in meta data.'
       ),
       call. = FALSE
@@ -134,12 +139,17 @@ exportFromSCE <- function(
   }
 
   ## `cell_cycle`
-  if ( any(cell_cycle %in% names(SingleCellExperiment::colData(object)) == FALSE ) ) {
+  if (
+    any(cell_cycle %in% names(SingleCellExperiment::colData(object)) == FALSE)
+  ) {
     stop(
       paste0(
         'Some cell cycle columns could not be found in meta data: ',
         paste0(
-          cell_cycle[which(cell_cycle %in% names(SingleCellExperiment::colData(object)) == FALSE)],
+          cell_cycle[which(
+            cell_cycle %in% names(SingleCellExperiment::colData(object)) ==
+              FALSE
+          )],
           collapse = ', '
         )
       ),
@@ -148,7 +158,7 @@ exportFromSCE <- function(
   }
 
   ## check if provided assay exists
-  if ( (assay %in% names(SummarizedExperiment::assays(object)) == FALSE ) ) {
+  if ((assay %in% names(SummarizedExperiment::assays(object)) == FALSE)) {
     stop(
       glue::glue(
         'Specified assay `{assay}` could not be found in provided SCE object.'
@@ -160,16 +170,20 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## initialize Cerebro object
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Initializing Cerebro object...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Initializing Cerebro object...'
       )
     )
   } else {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Start collecting data...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Start collecting data...'
       )
     )
   }
@@ -197,10 +211,12 @@ exportFromSCE <- function(
   )
 
   ## check if provided slot exists in provided assay
-  if ( inherits(expression_data, 'try-error') ) {
+  if (inherits(expression_data, 'try-error')) {
     stop(
       paste0(
-        'Assay `', assay, '` could not be found.'
+        'Assay `',
+        assay,
+        '` could not be found.'
       ),
       call. = FALSE
     )
@@ -210,13 +226,15 @@ exportFromSCE <- function(
   ## "matrix" format, and if the "DelayedArray" package is available
   if (
     use_delayed_array == TRUE &&
-    inherits(expression_data, c('matrix','dgCMatrix')) &&
-    requireNamespace("DelayedArray", quietly = TRUE)
+      inherits(expression_data, c('matrix', 'dgCMatrix')) &&
+      requireNamespace("DelayedArray", quietly = TRUE)
   ) {
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] Storing expression data as ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] Storing expression data as ',
           'DelayedArray...'
         )
       )
@@ -233,16 +251,19 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
 
   ## date of analysis
-  if ( !is.null(object@metadata$experiment$date_of_analysis) ) {
-    export$addExperiment('date_of_analysis', object@metadata$experiment$date_of_analysis)
+  if (!is.null(object@metadata$experiment$date_of_analysis)) {
+    export$addExperiment(
+      'date_of_analysis',
+      object@metadata$experiment$date_of_analysis
+    )
   }
 
   ## date of export
   export$addExperiment('date_of_export', Sys.Date())
 
   ## `parameters`
-  if ( !is.null(object@metadata$parameters) ) {
-    for ( i in seq_along(object@metadata$parameters) ) {
+  if (!is.null(object@metadata$parameters)) {
+    for (i in seq_along(object@metadata$parameters)) {
       name <- names(object@metadata$parameters)[i]
       export$addParameters(
         name,
@@ -252,8 +273,8 @@ exportFromSCE <- function(
   }
 
   ## `technical_info`
-  if ( !is.null(object@metadata$technical_info) ) {
-    for ( i in seq_along(object@metadata$technical_info) ) {
+  if (!is.null(object@metadata$technical_info)) {
+    for (i in seq_along(object@metadata$technical_info)) {
       export$addTechnicalInfo(
         names(object@metadata$technical_info)[i],
         object@metadata$technical_info[[i]]
@@ -262,8 +283,8 @@ exportFromSCE <- function(
   }
 
   ## `gene_lists`
-  if ( !is.null(object@metadata$gene_lists) ) {
-    for ( i in seq_along(object@metadata$gene_lists) ) {
+  if (!is.null(object@metadata$gene_lists)) {
+    for (i in seq_along(object@metadata$gene_lists)) {
       export$addGeneList(
         names(object@metadata$gene_lists)[i],
         object@metadata$gene_lists[[i]]
@@ -274,10 +295,12 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## meta data
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Collecting available meta data...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Collecting available meta data...'
       )
     )
   }
@@ -293,22 +316,20 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
 
   ## go through grouping variables
-  for ( i in groups ) {
-
+  for (i in groups) {
     ## check content of column in meta data
     ## ... content not factorized
     if (
       !is.factor(SingleCellExperiment::colData(object)[[i]]) &&
-      is.character(SingleCellExperiment::colData(object)[[i]])
+        is.character(SingleCellExperiment::colData(object)[[i]])
     ) {
-
       ## get all values and unique values (sorted, which removes NA)
       values <- SingleCellExperiment::colData(object)[[i]]
       levels <- sort(unique(values), na.last = NA)
 
       ## check if there are NA values; if so, change NA values to 'N/A' and add
       ## 'N/A' to levels
-      if ( any(is.na(values)) ) {
+      if (any(is.na(values))) {
         values[is.na(values)] <- 'N/A'
         levels <- c(levels, 'N/A')
       }
@@ -316,16 +337,15 @@ exportFromSCE <- function(
       ## factorize values
       temp_meta_data[[i]] <- factor(values, levels = levels)
 
-    ## ... content is factorized but there are NA values and NA is not among the
-    ##     factor levels
+      ## ... content is factorized but there are NA values and NA is not among the
+      ##     factor levels
     } else if (
       is.factor(SingleCellExperiment::colData(object)[[i]]) &&
-      any(is.na(SingleCellExperiment::colData(object)[[i]])) &&
-      'NA' %in% levels(SingleCellExperiment::colData(object)[[i]]) == FALSE
+        any(is.na(SingleCellExperiment::colData(object)[[i]])) &&
+        'NA' %in% levels(SingleCellExperiment::colData(object)[[i]]) == FALSE
     ) {
-
       ## print log message
-      if ( verbose ) {
+      if (verbose) {
         message(
           glue::glue(
             '[{format(Sys.time(), "%H:%M:%S")}] Adding `NA` to factor levels ',
@@ -341,9 +361,8 @@ exportFromSCE <- function(
       values <- factor(values, levels = c(levels, 'N/A'))
       temp_meta_data[[i]] <- values
 
-    ## ... none of the above
+      ## ... none of the above
     } else {
-
       ## copy content to meta data
       temp_meta_data[[i]] <- SingleCellExperiment::colData(object)[[i]]
     }
@@ -364,33 +383,39 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   if (
     !is.null(cell_cycle) &&
-    length(cell_cycle) > 0
+      length(cell_cycle) > 0
   ) {
-    for ( i in cell_cycle ) {
-      if ( is.factor(SingleCellExperiment::colData(object)[[i]]) ) {
+    for (i in cell_cycle) {
+      if (is.factor(SingleCellExperiment::colData(object)[[i]])) {
         tmp_names <- levels(SingleCellExperiment::colData(object)[[i]])
       } else {
         tmp_names <- unique(SingleCellExperiment::colData(object)[[i]])
       }
       # colData(export$expression)[[i]] <- factor(SingleCellExperiment::colData(object)[[i]], levels = tmp_names)
-      temp_meta_data[[i]] <- factor(SingleCellExperiment::colData(object)[[i]], levels = tmp_names)
+      temp_meta_data[[i]] <- factor(
+        SingleCellExperiment::colData(object)[[i]],
+        levels = tmp_names
+      )
     }
-    meta_data_columns <- meta_data_columns[-which(meta_data_columns %in% cell_cycle)]
+    meta_data_columns <- meta_data_columns[
+      -which(meta_data_columns %in% cell_cycle)
+    ]
   }
 
   ##--------------------------------------------------------------------------##
   ## add all other meta data if specified
   ##--------------------------------------------------------------------------##
-  if ( add_all_meta_data == TRUE ) {
-    if ( verbose ) {
+  if (add_all_meta_data == TRUE) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting all meta data columns...'
         )
       )
     }
-    for ( i in meta_data_columns ) {
+    for (i in meta_data_columns) {
       # colData(export$expression)[[i]] <- SingleCellExperiment::colData(object)[[i]]
       temp_meta_data[[i]] <- SingleCellExperiment::colData(object)[[i]]
     }
@@ -408,13 +433,13 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## add grouping variables and cell cycle columns
   ##--------------------------------------------------------------------------##
-  for ( i in groups ) {
+  for (i in groups) {
     export$addGroup(i, levels(temp_meta_data[[i]]))
   }
 
   if (
     !is.null(cell_cycle) &&
-    length(cell_cycle) > 0
+      length(cell_cycle) > 0
   ) {
     export$setCellCycle(cell_cycle)
   }
@@ -422,10 +447,11 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## projections
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'),
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
         '] Extracting dimensional reductions...'
       )
     )
@@ -433,18 +459,26 @@ exportFromSCE <- function(
   projections <- list()
   projections_available <- names(SingleCellExperiment::reducedDims(object))
   projections_available_pca <- projections_available[grep(
-    projections_available, pattern = 'pca', ignore.case = TRUE, invert = FALSE
+    projections_available,
+    pattern = 'pca',
+    ignore.case = TRUE,
+    invert = FALSE
   )]
   projections_available_non_pca <- projections_available[grep(
-    projections_available, pattern = 'pca', ignore.case = TRUE, invert = TRUE
+    projections_available,
+    pattern = 'pca',
+    ignore.case = TRUE,
+    invert = TRUE
   )]
-  if ( length(projections_available) == 0 ) {
+  if (length(projections_available) == 0) {
     stop('No dimensional reductions available.', call. = FALSE)
   } else if (
     length(projections_available) == 1 &&
-    length(projections_available_pca) == 1 )
-  {
-    SingleCellExperiment::reducedDims(export$expression)[[projections_available]] <- SingleCellExperiment::reducedDims(object)[[projections_available]]
+      length(projections_available_pca) == 1
+  ) {
+    SingleCellExperiment::reducedDims(export$expression)[[
+      projections_available
+    ]] <- SingleCellExperiment::reducedDims(object)[[projections_available]]
     export$addProjection(
       projections_available,
       SingleCellExperiment::reducedDims(object)[[projections_available]]
@@ -456,17 +490,19 @@ exportFromSCE <- function(
         'UMAP instead.'
       )
     )
-  } else if ( length(projections_available_non_pca) >= 1 ) {
-    if ( verbose ) {
+  } else if (length(projections_available_non_pca) >= 1) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] ',
           'Will export the following dimensional reductions: ',
           paste(projections_available_non_pca, collapse = ', ')
         )
       )
     }
-    for ( projection in projections_available_non_pca ) {
+    for (projection in projections_available_non_pca) {
       # SingleCellExperiment::reducedDims(export$expression)[[projection]] <- SingleCellExperiment::reducedDims(object)[[projection]]
       export$addProjection(
         projection,
@@ -478,22 +514,24 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## group trees
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@metadata$trees) ) {
+  if (!is.null(object@metadata$trees)) {
     ## check if it's a list
-    if ( !is.list(object@metadata$trees) ) {
+    if (!is.list(object@metadata$trees)) {
       stop(
         '`object@metadata$trees` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] Extracting trees...'
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] Extracting trees...'
         )
       )
     }
-    for ( i in seq_along(object@metadata$trees) ) {
+    for (i in seq_along(object@metadata$trees)) {
       export$addTree(
         names(object@metadata$trees)[i],
         object@metadata$trees[[i]]
@@ -504,23 +542,24 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## most expressed genes
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@metadata$most_expressed_genes) ) {
+  if (!is.null(object@metadata$most_expressed_genes)) {
     ## check if it's a list
-    if ( !is.list(object@metadata$most_expressed_genes) ) {
+    if (!is.list(object@metadata$most_expressed_genes)) {
       stop(
         '`object@metadata$most_expressed_genes` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of most expressed genes...'
         )
       )
     }
-    for ( i in seq_along(object@metadata$most_expressed_genes) ) {
+    for (i in seq_along(object@metadata$most_expressed_genes)) {
       export$addMostExpressedGenes(
         names(object@metadata$most_expressed_genes)[i],
         object@metadata$most_expressed_genes[[i]]
@@ -531,28 +570,29 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## marker genes
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@metadata$marker_genes) ) {
+  if (!is.null(object@metadata$marker_genes)) {
     ## check if it's a list
-    if ( !is.list(object@metadata$marker_genes) ) {
+    if (!is.list(object@metadata$marker_genes)) {
       stop(
         '`object@metadata$marker_genes` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of marker genes...'
         )
       )
     }
     ## for each method
-    for ( i in seq_along(object@metadata$marker_genes) ) {
+    for (i in seq_along(object@metadata$marker_genes)) {
       method <- names(object@metadata$marker_genes)[i]
       ## for each group
-      for ( j in seq_along(object@metadata$marker_genes[[method]]) ) {
-        if ( is.list(object@metadata$marker_genes[[method]][j]) ) {
+      for (j in seq_along(object@metadata$marker_genes[[method]])) {
+        if (is.list(object@metadata$marker_genes[[method]][j])) {
           group <- names(object@metadata$marker_genes[[method]])[j]
           export$addMarkerGenes(
             method,
@@ -567,28 +607,29 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## enriched pathways
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@metadata$enriched_pathways) ) {
+  if (!is.null(object@metadata$enriched_pathways)) {
     ## check if it's a list
-    if ( !is.list(object@metadata$enriched_pathways) ) {
+    if (!is.list(object@metadata$enriched_pathways)) {
       stop(
         '`object@metadata$enriched_pathways` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting pathway enrichment results...'
         )
       )
     }
     ## for each method
-    for ( i in seq_along(object@metadata$enriched_pathways) ) {
+    for (i in seq_along(object@metadata$enriched_pathways)) {
       method <- names(object@metadata$enriched_pathways)[i]
       ## for each group
-      for ( j in seq_along(object@metadata$enriched_pathways[[method]]) ) {
-        if ( is.list(object@metadata$enriched_pathways[[method]][j]) ) {
+      for (j in seq_along(object@metadata$enriched_pathways[[method]])) {
+        if (is.list(object@metadata$enriched_pathways[[method]][j])) {
           group <- names(object@metadata$enriched_pathways[[method]])[j]
           export$addEnrichedPathways(
             method,
@@ -603,19 +644,23 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   ## trajectories
   ##--------------------------------------------------------------------------##
-  if ( length(object@metadata$trajectories) == 0 ) {
-    if ( verbose ) {
+  if (length(object@metadata$trajectories) == 0) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] No trajectories to extract...'
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] No trajectories to extract...'
         )
       )
     }
   } else {
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] ',
           # 'Extracting trajectories...'
           'Will export the following trajectories: ',
           paste(names(object@metadata$trajectories$monocle2), collapse = ', ')
@@ -623,11 +668,11 @@ exportFromSCE <- function(
       )
     }
     ## for each method
-    for ( i in seq_along(object@metadata$trajectories) ) {
+    for (i in seq_along(object@metadata$trajectories)) {
       method <- names(object@metadata$trajectories)[i]
-      if ( method == 'monocle2' ) {
+      if (method == 'monocle2') {
         ## for each trajectory
-        for ( j in seq_along(object@metadata$trajectories[[i]]) ) {
+        for (j in seq_along(object@metadata$trajectories[[i]])) {
           export$addTrajectory(
             method,
             names(object@metadata$trajectories[[i]])[j],
@@ -637,7 +682,9 @@ exportFromSCE <- function(
       } else {
         warning(
           paste0(
-            'Warning: Skipping trajectories of method `', method, '`. At the ',
+            'Warning: Skipping trajectories of method `',
+            method,
+            '`. At the ',
             'moment, only trajectories generated with Monocle 2 (`monocle2`) ',
             'are supported.'
           )
@@ -659,11 +706,10 @@ exportFromSCE <- function(
   ## list is not empty
   if (
     !is.null(object@metadata$extra_material) &&
-    is.list(object@metadata$extra_material) &&
-    length(object@metadata$extra_material) > 0
+      is.list(object@metadata$extra_material) &&
+      length(object@metadata$extra_material) > 0
   ) {
-
-    if ( verbose ) {
+    if (verbose) {
       message(
         glue::glue(
           '[{format(Sys.time(), "%H:%M:%S")}] Found extra material to export...'
@@ -672,14 +718,11 @@ exportFromSCE <- function(
     }
 
     ## go through categories in `extra_material` slot
-    for ( category in names(object@metadata$extra_material) ) {
-
+    for (category in names(object@metadata$extra_material)) {
       ## do this if category is `tables`
-      if ( category == 'tables' ) {
-
+      if (category == 'tables') {
         ## go through tables
-        for ( i in seq_along(object@metadata$extra_material$tables) ) {
-
+        for (i in seq_along(object@metadata$extra_material$tables)) {
           ## export table
           export$addExtraMaterial(
             category = 'tables',
@@ -688,12 +731,10 @@ exportFromSCE <- function(
           )
         }
 
-      ## do this if category is `plots`
-      } else if ( category == 'plots' ) {
-
+        ## do this if category is `plots`
+      } else if (category == 'plots') {
         ## go through tables
-        for ( i in seq_along(object@metadata$extra_material$plots) ) {
-
+        for (i in seq_along(object@metadata$extra_material$plots)) {
           ## export table
           export$addExtraMaterial(
             category = 'plots',
@@ -710,7 +751,9 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
   message(
     paste0(
-      '[', format(Sys.time(), '%H:%M:%S'), '] ',
+      '[',
+      format(Sys.time(), '%H:%M:%S'),
+      '] ',
       'Overview of Cerebro object:\n'
     )
   )
@@ -721,10 +764,11 @@ exportFromSCE <- function(
   ##--------------------------------------------------------------------------##
 
   ## check if output directory exists and create it if not
-  if ( !file.exists(dirname(file)) ) {
+  if (!file.exists(dirname(file))) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'),
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
         '] Creating output directory...'
       )
     )
@@ -734,7 +778,10 @@ exportFromSCE <- function(
   ## log message
   message(
     paste0(
-      '[', format(Sys.time(), '%H:%M:%S'), '] Saving Cerebro object to: ', file
+      '[',
+      format(Sys.time(), '%H:%M:%S'),
+      '] Saving Cerebro object to: ',
+      file
     )
   )
 
@@ -743,17 +790,21 @@ exportFromSCE <- function(
 
   ## log message
   ## ... writing to file was successful
-  if ( file.exists(file) ) {
+  if (file.exists(file)) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Done!'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Done!'
       )
     )
-  ## ... target file doesn't exist
+    ## ... target file doesn't exist
   } else {
     stop(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Something went wrong while ',
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Something went wrong while ',
         'saving the file.'
       ),
       .call = FALSE

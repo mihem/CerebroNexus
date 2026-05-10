@@ -18,7 +18,7 @@
 #' columns and cells as rows, contrary to the conventional format of genes as
 #' rows and cells as columns. This format greatly favors performance for
 #' extracting expression values for a gene (column), rather than a cell (row),
-#' which is the primary action in Cerebro. Importantly, the matrix should be 
+#' which is the primary action in Cerebro. Importantly, the matrix should be
 #' stored with "expression" as group name (see parameters of the
 #' \code{HDF5Array::writeTENxMatrix()} function). Saving the expression matrix
 #' in \code{TENxMatrix} format has the benefit of a low memory footprint since
@@ -89,12 +89,11 @@ launchCerebroV1.3 <- function(
   projections_default_percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   ...
-){
-
+) {
   ##--------------------------------------------------------------------------##
   ## Check validity of input parameters.
   ##--------------------------------------------------------------------------##
-  if ( mode %in% c('open','closed') == FALSE ) {
+  if (mode %in% c('open', 'closed') == FALSE) {
     stop(
       "'mode' parameter must be set to either 'open' or 'closed'.",
       call. = FALSE
@@ -102,7 +101,7 @@ launchCerebroV1.3 <- function(
   }
   if (
     projections_default_point_size < 0 ||
-    projections_default_point_size > 20
+      projections_default_point_size > 20
   ) {
     stop(
       "'projections_default_point_size' parameter must be between 1 and 20",
@@ -111,7 +110,7 @@ launchCerebroV1.3 <- function(
   }
   if (
     projections_default_point_opacity < 0 ||
-    projections_default_point_opacity > 1
+      projections_default_point_opacity > 1
   ) {
     stop(
       "'projections_default_point_opacity' parameter must be between 0 and 1",
@@ -120,14 +119,14 @@ launchCerebroV1.3 <- function(
   }
   if (
     projections_default_percentage_cells_to_show < 0 ||
-    projections_default_percentage_cells_to_show > 100
+      projections_default_percentage_cells_to_show > 100
   ) {
     stop(
       "'projections_default_percentage_cells_to_show' parameter must be between 0 and 100",
       call. = FALSE
     )
   }
-  if ( projections_show_hover_info %in% c(TRUE, FALSE) == FALSE ) {
+  if (projections_show_hover_info %in% c(TRUE, FALSE) == FALSE) {
     stop(
       "'projections_show_hover_info' parameter must be set to either TRUE or FALSE.",
       call. = FALSE

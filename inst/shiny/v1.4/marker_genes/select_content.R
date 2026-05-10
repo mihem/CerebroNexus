@@ -7,9 +7,9 @@
 ## because the group depends on which method is selected.
 ##----------------------------------------------------------------------------##
 output[["marker_genes_select_method_and_table_UI"]] <- renderUI({
-   if (
+  if (
     !is.null(getMethodsForMarkerGenes()) &&
-    length(getMethodsForMarkerGenes()) > 0
+      length(getMethodsForMarkerGenes()) > 0
   ) {
     tagList(
       fluidRow(
@@ -39,11 +39,14 @@ output[["marker_genes_select_method_and_table_UI"]] <- renderUI({
 output[["marker_genes_selected_method_UI"]] <- renderUI({
   tagList(
     div(
-      HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a method:</strong></h2>')
+      HTML(
+        '<h3 style="text-align: center; margin-top: 0"><strong>Choose a method:</strong></h2>'
+      )
     ),
     fluidRow(
       column(2),
-      column(8,
+      column(
+        8,
         selectInput(
           "marker_genes_selected_method",
           label = NULL,
@@ -63,15 +66,20 @@ output[["marker_genes_selected_table_UI"]] <- renderUI({
   req(input[["marker_genes_selected_method"]])
   tagList(
     div(
-      HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>')
+      HTML(
+        '<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>'
+      )
     ),
     fluidRow(
       column(2),
-      column(8,
+      column(
+        8,
         selectInput(
           "marker_genes_selected_table",
           label = NULL,
-          choices = getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]]),
+          choices = getGroupsWithMarkerGenes(input[[
+            "marker_genes_selected_method"
+          ]]),
           width = "100%"
         )
       ),

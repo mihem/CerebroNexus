@@ -33,13 +33,12 @@ calculatePercentGenes <- function(
   assay = 'RNA',
   genes
 ) {
-
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
   ## check if Seurat is installed
-  if ( !requireNamespace("Seurat", quietly = TRUE) ) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop(
       "The 'Seurat' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -47,10 +46,11 @@ calculatePercentGenes <- function(
   }
 
   ## check that Seurat package is at least v3.0
-  if ( utils::packageVersion('Seurat') < "3" ) {
+  if (utils::packageVersion('Seurat') < "3") {
     stop(
       paste0(
-        "The installed Seurat package is of version `", utils::packageVersion('Seurat'),
+        "The installed Seurat package is of version `",
+        utils::packageVersion('Seurat'),
         "`, but at least v3.0 is required."
       ),
       call. = FALSE
@@ -58,30 +58,36 @@ calculatePercentGenes <- function(
   }
 
   ## check if provided object is of class "Seurat"
-  if ( !inherits(object, "Seurat") ) {
+  if (!inherits(object, "Seurat")) {
     stop(
       paste0(
-        "Provided object is of class `", class(object), "` but must be of class 'Seurat'."
+        "Provided object is of class `",
+        class(object),
+        "` but must be of class 'Seurat'."
       ),
       call. = FALSE
     )
   }
 
   ## check version of Seurat object and stop if it is lower than 3
-  if ( object@version < "3" ) {
+  if (object@version < "3") {
     stop(
       paste0(
-        "Provided Seurat object has version `", object@version, "` but must be at least 3.0."
+        "Provided Seurat object has version `",
+        object@version,
+        "` but must be at least 3.0."
       ),
       call. = FALSE
     )
   }
 
   ## check if provided assay exists
-  if ( assay %in% names(object@assays) == FALSE ) {
+  if (assay %in% names(object@assays) == FALSE) {
     stop(
       paste0(
-        'Specified assay slot `', assay, '` could not be found in provided Seurat object.'
+        'Specified assay slot `',
+        assay,
+        '` could not be found in provided Seurat object.'
       ),
       call. = FALSE
     )
@@ -91,10 +97,12 @@ calculatePercentGenes <- function(
   counts_matrix <- Seurat::GetAssayData(object, assay = assay, layer = "counts")
 
   ## check if `counts` matrix exist in provided assay
-  if ( is.null(counts_matrix) || nrow(counts_matrix) == 0 ) {
+  if (is.null(counts_matrix) || nrow(counts_matrix) == 0) {
     stop(
       paste0(
-        '`counts` matrix could not be found in `', assay, '` assay slot of the provided Seurat object.'
+        '`counts` matrix could not be found in `',
+        assay,
+        '` assay slot of the provided Seurat object.'
       ),
       call. = FALSE
     )
@@ -109,12 +117,12 @@ calculatePercentGenes <- function(
     genes,
     function(x) {
       genes_here <- intersect(x, rownames(counts_matrix))
-      if ( length(genes_here) == 1 ) {
-        counts_matrix[genes_here,] /
-        Matrix::colSums(counts_matrix)
+      if (length(genes_here) == 1) {
+        counts_matrix[genes_here, ] /
+          Matrix::colSums(counts_matrix)
       } else {
-        Matrix::colSums(counts_matrix[genes_here,]) /
-        Matrix::colSums(counts_matrix)
+        Matrix::colSums(counts_matrix[genes_here, ]) /
+          Matrix::colSums(counts_matrix)
       }
     }
   )

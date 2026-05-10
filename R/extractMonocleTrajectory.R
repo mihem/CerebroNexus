@@ -42,13 +42,12 @@ extractMonocleTrajectory <- function(
   column_state = 'State',
   column_pseudotime = 'Pseudotime'
 ) {
-
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
   ## check if Seurat is installed
-  if ( !requireNamespace("Seurat", quietly = TRUE) ) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop(
       "The 'Seurat' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -56,10 +55,11 @@ extractMonocleTrajectory <- function(
   }
 
   ## check that Seurat package is at least v3.0
-  if ( utils::packageVersion('Seurat') < "3" ) {
+  if (utils::packageVersion('Seurat') < "3") {
     stop(
       paste0(
-        "The installed Seurat package is of version `", utils::packageVersion('Seurat'),
+        "The installed Seurat package is of version `",
+        utils::packageVersion('Seurat'),
         "`, but at least v3.0 is required."
       ),
       call. = FALSE
@@ -67,7 +67,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if monocle is installed
-  if ( !requireNamespace("monocle", quietly = TRUE) ) {
+  if (!requireNamespace("monocle", quietly = TRUE)) {
     stop(
       "The 'monocle' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -75,27 +75,31 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if provided Seurat object is of class "Seurat"
-  if ( !inherits(seurat, "Seurat") ) {
+  if (!inherits(seurat, "Seurat")) {
     stop(
       paste0(
-        "Provided object is of class `", class(seurat), "` but must be of class 'Seurat'."
+        "Provided object is of class `",
+        class(seurat),
+        "` but must be of class 'Seurat'."
       ),
       call. = FALSE
     )
   }
 
   ## check version of Seurat object and stop if it is lower than 3
-  if ( seurat@version < 3 ) {
+  if (seurat@version < 3) {
     stop(
       paste0(
-        "Provided Seurat object has version `", seurat@version, "` but must be at least 3.0."
+        "Provided Seurat object has version `",
+        seurat@version,
+        "` but must be at least 3.0."
       ),
       call. = FALSE
     )
   }
 
   ## check if provided monocle object is of class "CellDataSet"
-  if ( !methods::is(monocle, 'CellDataSet') ) {
+  if (!methods::is(monocle, 'CellDataSet')) {
     stop(
       "The provided object for 'monocle' is not of type 'CellDataSet'.",
       call. = FALSE
@@ -103,10 +107,11 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if "column_state" exists in monocle object
-  if ( (column_state %in% colnames(monocle@phenoData@data)) == FALSE ) {
+  if ((column_state %in% colnames(monocle@phenoData@data)) == FALSE) {
     stop(
       paste0(
-        "Specified column for state info ('", column_state,
+        "Specified column for state info ('",
+        column_state,
         "') could not be found in meta data."
       ),
       call. = FALSE
@@ -114,10 +119,11 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if "column_pseudotime" exists in monocle object
-  if ( (column_pseudotime %in% colnames(monocle@phenoData@data)) == FALSE ) {
+  if ((column_pseudotime %in% colnames(monocle@phenoData@data)) == FALSE) {
     stop(
       paste0(
-        "Specified column for pseudotime info ('", column_pseudotime,
+        "Specified column for pseudotime info ('",
+        column_pseudotime,
         "') could not be found in meta data."
       ),
       call. = FALSE
@@ -125,7 +131,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if "minSpanningTree" exists in monocle object
-  if ( length(monocle@minSpanningTree) == 0 ) {
+  if (length(monocle@minSpanningTree) == 0) {
     stop(
       'monocle@minSpanningTree appears to be empty but is required.',
       call. = FALSE
@@ -133,7 +139,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if "reducedDimS" exists in monocle object
-  if ( length(monocle@reducedDimS) == 0 ) {
+  if (length(monocle@reducedDimS) == 0) {
     stop(
       'monocle@reducedDimS appears to be empty but is required.',
       call. = FALSE
@@ -141,7 +147,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if "reducedDimK" exists in monocle object
-  if ( length(monocle@reducedDimK) == 0 ) {
+  if (length(monocle@reducedDimK) == 0) {
     stop(
       'monocle@reducedDimK appears to be empty but is required.',
       call. = FALSE
@@ -150,10 +156,11 @@ extractMonocleTrajectory <- function(
 
   ## check if a trajectory with name "trajectory_name" already exists in the
   ## Seurat object
-  if ( !is.null(seurat@misc$trajectories[[trajectory_name]]) ) {
+  if (!is.null(seurat@misc$trajectories[[trajectory_name]])) {
     stop(
       paste0(
-        "Trajectory with specified name ('", trajectory_name,
+        "Trajectory with specified name ('",
+        trajectory_name,
         "') already exists in seurat@misc$trajectories. Please choose a ',
         'different name or manually remove data from that slot."
       ),
@@ -163,12 +170,14 @@ extractMonocleTrajectory <- function(
 
   ## check if the monocle object contains more cells than the Seurat object
   ## (monocle object is only allowed to contain the same cells or a subset)
-  if ( nrow(monocle@phenoData@data) > nrow(seurat@meta.data) ) {
+  if (nrow(monocle@phenoData@data) > nrow(seurat@meta.data)) {
     stop(
       paste0(
-        'Number of cells in monocle object (', nrow(monocle@phenoData@data),
+        'Number of cells in monocle object (',
+        nrow(monocle@phenoData@data),
         ') cannot be larger than number of cells in Seurat object (',
-        nrow(seurat@meta.data), ').'
+        nrow(seurat@meta.data),
+        ').'
       ),
       call. = FALSE
     )
@@ -177,9 +186,12 @@ extractMonocleTrajectory <- function(
   ## check if monocle object contains cells that are not present in the Seurat
   ## object
   if (
-    length(which(rownames(monocle@phenoData@data) %in%
-    rownames(seurat@meta.data))) != nrow(monocle@phenoData@data) )
-  {
+    length(which(
+      rownames(monocle@phenoData@data) %in%
+        rownames(seurat@meta.data)
+    )) !=
+      nrow(monocle@phenoData@data)
+  ) {
     stop(
       paste0(
         'Some cells provided in the Monocle object are not present in the ',
@@ -192,7 +204,7 @@ extractMonocleTrajectory <- function(
   }
 
   ## check if trajectory in monocle object is two-dimensional
-  if ( nrow(monocle@reducedDimK) > 2 ) {
+  if (nrow(monocle@reducedDimK) > 2) {
     stop(
       'Currently only two-dimensional reductions are supported.',
       call. = FALSE
@@ -201,10 +213,11 @@ extractMonocleTrajectory <- function(
 
   ## check if monocle object contains a subset of cells in the Seurat object and
   ## print warning if that is the case
-  if ( nrow(monocle@phenoData@data) < nrow(seurat@meta.data) ) {
+  if (nrow(monocle@phenoData@data) < nrow(seurat@meta.data)) {
     warning(
       paste0(
-        'There are ', nrow(seurat@meta.data) - nrow(monocle@phenoData@data),
+        'There are ',
+        nrow(seurat@meta.data) - nrow(monocle@phenoData@data),
         ' cells present in the Seurat object but not in the Monocle object. ',
         'Cells without trajectory information will not be visible in Cerebro.'
       ),
@@ -233,26 +246,35 @@ extractMonocleTrajectory <- function(
     dplyr::rename(source = 'from', target = 'to')
 
   edges <- dplyr::left_join(
-      edges,
-      reduced_dim_K %>% dplyr::rename(
+    edges,
+    reduced_dim_K %>%
+      dplyr::rename(
         source = 'sample_name',
         source_dim_1 = 'dim_1',
         source_dim_2 = 'dim_2'
       ),
-      by = 'source'
-    )
+    by = 'source'
+  )
 
   edges <- dplyr::left_join(
-      edges,
-      reduced_dim_K %>% dplyr::rename(
+    edges,
+    reduced_dim_K %>%
+      dplyr::rename(
         target = 'sample_name',
         target_dim_1 = 'dim_1',
         target_dim_2 = 'dim_2'
       ),
-      by = 'target'
-    ) %>%
-    dplyr::select(c('source','target','weight','source_dim_1','source_dim_2',
-                    'target_dim_1','target_dim_2'))
+    by = 'target'
+  ) %>%
+    dplyr::select(c(
+      'source',
+      'target',
+      'weight',
+      'source_dim_1',
+      'source_dim_2',
+      'target_dim_1',
+      'target_dim_2'
+    ))
 
   ##--------------------------------------------------------------------------##
   ## Extract state and pseudotime info and cell position in projection.
@@ -275,17 +297,17 @@ extractMonocleTrajectory <- function(
     dplyr::mutate(cell = rownames(temp_reducedDimS))
 
   trajectory_info <- dplyr::left_join(
-      trajectory_info,
-      trajectory_meta_from_monocle,
-      by = 'cell'
-    )
+    trajectory_info,
+    trajectory_meta_from_monocle,
+    by = 'cell'
+  )
 
   trajectory_info <- dplyr::left_join(
-      seurat@meta.data %>% dplyr::mutate(cell = rownames(seurat@meta.data)),
-      trajectory_info,
-      by = 'cell'
-    ) %>%
-    dplyr::select(c('DR_1','DR_2','pseudotime','state','cell'))
+    seurat@meta.data %>% dplyr::mutate(cell = rownames(seurat@meta.data)),
+    trajectory_info,
+    by = 'cell'
+  ) %>%
+    dplyr::select(c('DR_1', 'DR_2', 'pseudotime', 'state', 'cell'))
 
   rownames(trajectory_info) <- trajectory_info$cell
   trajectory_info <- trajectory_info %>% dplyr::select(-'cell')
@@ -294,7 +316,7 @@ extractMonocleTrajectory <- function(
   ## Add trajectory info to Seurat object.
   ##--------------------------------------------------------------------------##
 
-  if ( is.null(seurat@misc$trajectories) ) {
+  if (is.null(seurat@misc$trajectories)) {
     seurat@misc$trajectories <- list()
   }
   seurat@misc$trajectories$monocle2[[trajectory_name]] <- list(

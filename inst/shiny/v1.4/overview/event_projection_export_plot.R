@@ -32,21 +32,21 @@ observeEvent(input[["overview_projection_export"]], {
   variable_to_color_cells <- plot_parameters[["color_variable"]]
   ## check if selection projection consists of 2 or 3 dimensions
   ## ... selection projection consists of 2 dimensions
-  if ( plot_parameters[['n_dimensions']] == 2 ) {
+  if (plot_parameters[['n_dimensions']] == 2) {
     ##
     stroke <- ifelse(plot_parameters[["draw_border"]], 0.2, 0)
     ## start building the plot
     plot <- ggplot(
-        cbind(coordinates, cells_df),
-        aes_q(
-          x = as.name(colnames(coordinates)[1]),
-          y = as.name(colnames(coordinates)[2]),
-          fill = as.name(variable_to_color_cells)
-        )
-      ) +
+      cbind(coordinates, cells_df),
+      aes_q(
+        x = as.name(colnames(coordinates)[1]),
+        y = as.name(colnames(coordinates)[2]),
+        fill = as.name(variable_to_color_cells)
+      )
+    ) +
       geom_point(
         shape = 21,
-        size = plot_parameters[["point_size"]]/3,
+        size = plot_parameters[["point_size"]] / 3,
         stroke = stroke,
         color = "#c4c4c4",
         alpha = plot_parameters[["point_opacity"]]
@@ -59,15 +59,20 @@ observeEvent(input[["overview_projection_export"]], {
     ## depending on type of cell coloring, add different color scale
     ## ... categorical
     if (
-      is.factor(cells_df[[ variable_to_color_cells ]]) ||
-      is.character(cells_df[[ variable_to_color_cells ]])
+      is.factor(cells_df[[variable_to_color_cells]]) ||
+        is.character(cells_df[[variable_to_color_cells]])
     ) {
       ## add color assignments
       plot <- plot + scale_fill_manual(values = color_assignments)
       ## check if group labels should be plotted and, if so, add them
-      if ( plot_parameters[["group_labels"]] == TRUE ) {
+      if (plot_parameters[["group_labels"]] == TRUE) {
         ## calculate group level centers
-        group_labels <- centerOfGroups(coordinates, cells_df, 2, variable_to_color_cells)
+        group_labels <- centerOfGroups(
+          coordinates,
+          cells_df,
+          2,
+          variable_to_color_cells
+        )
         ## add group level labels at center of respective groups
         plot <- plot +
           geom_label(
@@ -82,7 +87,7 @@ observeEvent(input[["overview_projection_export"]], {
             show.legend = FALSE
           )
       }
-    ## ... not categorical (probably numerical)
+      ## ... not categorical (probably numerical)
     } else {
       ## add continuous color scale
       plot <- plot +
@@ -97,7 +102,7 @@ observeEvent(input[["overview_projection_export"]], {
     ggsave(save_file_path, plot, height = 8, width = 11)
     ## check if file was succesfully saved
     ## ... successful
-    if ( file.exists(save_file_path) ) {
+    if (file.exists(save_file_path)) {
       ## give positive message
       shinyWidgets::sendSweetAlert(
         session = session,
@@ -105,7 +110,7 @@ observeEvent(input[["overview_projection_export"]], {
         text = paste0("Plot saved successfully as: ", save_file_path),
         type = "success"
       )
-    ## ... failed
+      ## ... failed
     } else {
       ## give negative message
       shinyWidgets::sendSweetAlert(
@@ -115,8 +120,8 @@ observeEvent(input[["overview_projection_export"]], {
         type = "error"
       )
     }
-  ## ... selection projection consists of 3 dimensions
-  } else if ( plot_parameters[['n_dimensions']] == 3 ) {
+    ## ... selection projection consists of 3 dimensions
+  } else if (plot_parameters[['n_dimensions']] == 3) {
     ## give error message
     shinyWidgets::sendSweetAlert(
       session = session,

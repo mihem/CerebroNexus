@@ -9,11 +9,11 @@ plotlyViolin <- function(
   y_title,
   mode
 ) {
-  if ( mode == "percent" ) {
-    y_range <- c(0,1)
+  if (mode == "percent") {
+    y_range <- c(0, 1)
     y_tickformat <- ",.0%"
     y_hoverformat <- ",.1%"
-  } else if ( mode == "integer" ) {
+  } else if (mode == "integer") {
     y_range <- NULL
     y_tickformat <- ",.0f"
     y_hoverformat <- ",.0f"
@@ -21,8 +21,8 @@ plotlyViolin <- function(
   ##
   plot <- table %>%
     plotly::plot_ly(
-      x = ~.[[ coloring_variable ]],
-      y = ~.[[ metric ]],
+      x = ~ .[[coloring_variable]],
+      y = ~ .[[metric]],
       type = "violin",
       box = list(
         visible = TRUE
@@ -30,7 +30,7 @@ plotlyViolin <- function(
       meanline = list(
         visible = TRUE
       ),
-      color = ~.[[ coloring_variable ]],
+      color = ~ .[[coloring_variable]],
       colors = colors,
       source = "subset",
       showlegend = FALSE,
@@ -74,7 +74,7 @@ plotlyBarChart <- function(
 ) {
   ## TODO: safety checks?
   ##
-  if ( percent == FALSE ) {
+  if (percent == FALSE) {
     y_title <- "Number of cells"
     y_range <- NULL
     y_tickformat <- ",.0f"
@@ -83,10 +83,10 @@ plotlyBarChart <- function(
       "<b>{table[[ second_grouping_variable ]]}:</b> ",
       "{formatC(table[['count']], big.mark = ',')}"
     )
-  ##
-  } else if ( percent == TRUE ) {
+    ##
+  } else if (percent == TRUE) {
     y_title <- "Percent of cells"
-    y_range <- c(0,1)
+    y_range <- c(0, 1)
     y_tickformat <- ",.0%"
     y_hoverformat <- ".1%"
     hover_info <- glue::glue(
@@ -97,10 +97,10 @@ plotlyBarChart <- function(
   ## generate plot
   plot <- table %>%
     plotly::plot_ly(
-      x = ~.[[ first_grouping_variable ]],
+      x = ~ .[[first_grouping_variable]],
       y = ~count,
       type = "bar",
-      color = ~.[[ second_grouping_variable ]],
+      color = ~ .[[second_grouping_variable]],
       colors = colors,
       hoverinfo = "text",
       text = hover_info
@@ -143,42 +143,48 @@ plotlySankeyPlot <- function(
   ## combine all factor levels in a single vector
   all_groups <- c(levels(table[[1]]), levels(table[[2]]))
   ## match color codes to group levels (from both groups)
-  colors_for_groups_all <- colors_for_groups[names(colors_for_groups) %in% all_groups]
+  colors_for_groups_all <- colors_for_groups[
+    names(colors_for_groups) %in% all_groups
+  ]
   ## prepare plot
   plot <- plotly::plot_ly(
-      type = "sankey",
-      orientation = "v",
-      valueformat = ".0f",
-      node = list(
-        label = all_groups,
-        hovertemplate = paste0(
-          "<b>%{label}</b><br>",
-          "%{value:,.0f} cells",
-          "<extra></extra>",
-          collapse = ""
-        ),
-        color = colors_for_groups_all,
-        pad = 15,
-        thickness = 20,
-        line = list(
-          color = "black",
-          width = 0.5
-        )
+    type = "sankey",
+    orientation = "v",
+    valueformat = ".0f",
+    node = list(
+      label = all_groups,
+      hovertemplate = paste0(
+        "<b>%{label}</b><br>",
+        "%{value:,.0f} cells",
+        "<extra></extra>",
+        collapse = ""
       ),
-      link = list(
-        source = table[["source"]],
-        target = table[["target"]],
-        value =  table[[3]],
-        hoverinfo = "all",
-        hovertemplate = paste0(
-          "<b>", first_grouping_variable, ":</b> %{source.label}<br>",
-          "<b>", second_grouping_variable, ":</b> %{target.label}<br>",
-          "<b>Number of cells:</b> %{value:,.0f}",
-          "<extra></extra>",
-          collapse = ""
-        )
+      color = colors_for_groups_all,
+      pad = 15,
+      thickness = 20,
+      line = list(
+        color = "black",
+        width = 0.5
+      )
+    ),
+    link = list(
+      source = table[["source"]],
+      target = table[["target"]],
+      value = table[[3]],
+      hoverinfo = "all",
+      hovertemplate = paste0(
+        "<b>",
+        first_grouping_variable,
+        ":</b> %{source.label}<br>",
+        "<b>",
+        second_grouping_variable,
+        ":</b> %{target.label}<br>",
+        "<b>Number of cells:</b> %{value:,.0f}",
+        "<extra></extra>",
+        collapse = ""
       )
     )
+  )
   ##
   return(plot)
 }

@@ -18,7 +18,6 @@
 .read_GMT_file <- function(
   file
 ) {
-
   ## read provided file
   gmt <- readr::read_delim(
     file,
@@ -31,8 +30,7 @@
   gene_set_genes <- list()
 
   ## cycle through gene sets (rows)
-  for ( i in seq_len(nrow(gmt)) ) {
-
+  for (i in seq_len(nrow(gmt))) {
     ## split line content by tab
     temp_genes <- strsplit(gmt$X1[i], split = '\t')[[1]] %>% unlist()
 
@@ -48,8 +46,11 @@
     genesets = gene_set_genes,
     geneset.names = lapply(strsplit(gmt$X1, split = '\t'), '[', 1) %>% unlist(),
     geneset.description = lapply(
-        strsplit(gmt$X1, split = '\t'), '[', 2
-      ) %>% unlist()
+      strsplit(gmt$X1, split = '\t'),
+      '[',
+      2
+    ) %>%
+      unlist()
   )
 
   ##

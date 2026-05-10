@@ -9,9 +9,9 @@ overview_projection_update_plot <- function(input) {
   plot_parameters <- input[['plot_parameters']]
   color_assignments <- input[['color_assignments']]
   hover_info <- input[['hover_info']]
-  color_input <- cells_df[[ plot_parameters[['color_variable']] ]]
+  color_input <- cells_df[[plot_parameters[['color_variable']]]]
   ## follow this when the coloring variable is numeric
-  if ( is.numeric(color_input) ) {
+  if (is.numeric(color_input)) {
     ## put together meta data
     output_meta <- list(
       color_type = 'continuous',
@@ -30,7 +30,7 @@ overview_projection_update_plot <- function(input) {
       y_range = plot_parameters[["y_range"]],
       reset_axes = reset_axes
     )
-    if ( plot_parameters[["draw_border"]] ) {
+    if (plot_parameters[["draw_border"]]) {
       output_data[['point_line']] <- list(
         color = "rgb(196,196,196)",
         width = 1
@@ -41,17 +41,17 @@ overview_projection_update_plot <- function(input) {
       hoverinfo = ifelse(plot_parameters[["hover_info"]], 'text', 'skip'),
       text = 'empty'
     )
-    if ( plot_parameters[["hover_info"]] ) {
+    if (plot_parameters[["hover_info"]]) {
       output_hover[['text']] <- unname(hover_info)
     }
     ## send request to update projection to JavaScript functions (2D / 3D)
-    if ( plot_parameters[['n_dimensions']] == 2 ) {
+    if (plot_parameters[['n_dimensions']] == 2) {
       shinyjs::js$updatePlot2DContinuous(
         output_meta,
         output_data,
         output_hover
       )
-    } else if ( plot_parameters[['n_dimensions']] == 3 ) {
+    } else if (plot_parameters[['n_dimensions']] == 3) {
       output_data[['z']] <- coordinates[[3]]
       shinyjs::js$updatePlot3DContinuous(
         output_meta,
@@ -59,7 +59,7 @@ overview_projection_update_plot <- function(input) {
         output_hover
       )
     }
-  ## follow this procedure when coloring variable is not numeric
+    ## follow this procedure when coloring variable is not numeric
   } else {
     ## put together meta data
     output_meta <- list(
@@ -80,7 +80,7 @@ overview_projection_update_plot <- function(input) {
       y_range = plot_parameters[["y_range"]],
       reset_axes = reset_axes
     )
-    if ( plot_parameters[["draw_border"]] ) {
+    if (plot_parameters[["draw_border"]]) {
       output_data[['point_line']] <- list(
         color = "rgb(196,196,196)",
         width = 1
@@ -93,15 +93,17 @@ overview_projection_update_plot <- function(input) {
     )
     ## prepare trace for each group of the catergorical coloring variable and
     ## send request to update projection to JavaScript function (2D/3D)
-    if ( plot_parameters[['n_dimensions']] == 2 ) {
+    if (plot_parameters[['n_dimensions']] == 2) {
       i <- 1
-      for ( j in names(color_assignments) ) {
+      for (j in names(color_assignments)) {
         output_meta[['traces']][[i]] <- j
-        cells_to_extract <- which(color_input==j)
+        cells_to_extract <- which(color_input == j)
         output_data[['x']][[i]] <- coordinates[[1]][cells_to_extract]
         output_data[['y']][[i]] <- coordinates[[2]][cells_to_extract]
-        output_data[['color']][[i]] <- unname(color_assignments[which(names(color_assignments)==j)])
-        if ( plot_parameters[["hover_info"]] ) {
+        output_data[['color']][[i]] <- unname(color_assignments[which(
+          names(color_assignments) == j
+        )])
+        if (plot_parameters[["hover_info"]]) {
           hover_info_matched <- match(
             cells_df[['cell_barcode']][cells_to_extract],
             names(hover_info)
@@ -110,7 +112,12 @@ overview_projection_update_plot <- function(input) {
         }
         i <- i + 1
       }
-      group_centers_df <- centerOfGroups(coordinates, cells_df, 2, plot_parameters[['color_variable']])
+      group_centers_df <- centerOfGroups(
+        coordinates,
+        cells_df,
+        2,
+        plot_parameters[['color_variable']]
+      )
       output_group_centers <- list(
         group = group_centers_df[['group']],
         x = group_centers_df[['x_median']],
@@ -122,16 +129,18 @@ overview_projection_update_plot <- function(input) {
         output_hover,
         output_group_centers
       )
-    } else if ( plot_parameters[['n_dimensions']] == 3 ) {
+    } else if (plot_parameters[['n_dimensions']] == 3) {
       i <- 1
-      for ( j in names(color_assignments) ) {
+      for (j in names(color_assignments)) {
         output_meta[['traces']][[i]] <- j
-        cells_to_extract <- which(color_input==j)
+        cells_to_extract <- which(color_input == j)
         output_data[['x']][[i]] <- coordinates[[1]][cells_to_extract]
         output_data[['y']][[i]] <- coordinates[[2]][cells_to_extract]
         output_data[['z']][[i]] <- coordinates[[3]][cells_to_extract]
-        output_data[['color']][[i]] <- unname(color_assignments[which(names(color_assignments)==j)])
-        if ( plot_parameters[["hover_info"]] ) {
+        output_data[['color']][[i]] <- unname(color_assignments[which(
+          names(color_assignments) == j
+        )])
+        if (plot_parameters[["hover_info"]]) {
           hover_info_matched <- match(
             cells_df[['cell_barcode']][cells_to_extract],
             names(hover_info)
@@ -140,7 +149,12 @@ overview_projection_update_plot <- function(input) {
         }
         i <- i + 1
       }
-      group_centers_df <- centerOfGroups(coordinates, cells_df, 3, plot_parameters[['color_variable']])
+      group_centers_df <- centerOfGroups(
+        coordinates,
+        cells_df,
+        3,
+        plot_parameters[['color_variable']]
+      )
       output_group_centers <- list(
         group = group_centers_df[['group']],
         x = group_centers_df[['x_median']],

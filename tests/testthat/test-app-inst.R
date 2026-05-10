@@ -104,8 +104,12 @@ test_that("{shinytest2} recording: groups", {
 
 test_that("{shinytest2} recording: marker_genes", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "marker_genes", height = 950,
-      width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "marker_genes",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "markerGenes")
@@ -122,8 +126,19 @@ test_that("{shinytest2} recording: marker_genes", {
   ## verify expected columns are present in the table header
   parsed <- jsonlite::fromJSON(table_val, simplifyVector = FALSE)
   container_html <- parsed$x$container
-  for (col in c("gene", "p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "on_cell_surface")) {
-    expect_true(grepl(col, container_html, fixed = TRUE), label = paste("column present:", col))
+  for (col in c(
+    "gene",
+    "p_val",
+    "avg_logFC",
+    "pct.1",
+    "pct.2",
+    "p_val_adj",
+    "on_cell_surface"
+  )) {
+    expect_true(
+      grepl(col, container_html, fixed = TRUE),
+      label = paste("column present:", col)
+    )
   }
 
   ## "no markers found" and "no data" messages should not be shown —
@@ -146,8 +161,12 @@ test_that("{shinytest2} recording: marker_genes", {
 
 test_that("{shinytest2} recording: gene_expression", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "gene_expression", height = 950,
-      width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "gene_expression",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "geneExpression")
@@ -179,7 +198,12 @@ test_that("{shinytest2} recording: gene_expression", {
 
 test_that("{shinytest2} recording: gene_id_conversion", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "gene_id_conversion", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "gene_id_conversion",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "geneIdConversion")
@@ -193,7 +217,12 @@ test_that("{shinytest2} recording: gene_id_conversion", {
 
 test_that("{shinytest2} recording: color_management", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "color_management", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "color_management",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "color_management")

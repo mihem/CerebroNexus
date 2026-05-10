@@ -9,7 +9,10 @@ skip_if_not_installed("Seurat")
 ## Load and prepare the shared object once for the whole file
 ## ---------------------------------------------------------------------------
 
-pbmc_path <- system.file("extdata/v1.4/pbmc_seurat.rds", package = "cerebroAppLite")
+pbmc_path <- system.file(
+  "extdata/v1.4/pbmc_seurat.rds",
+  package = "cerebroAppLite"
+)
 if (!nzchar(pbmc_path)) {
   pbmc_path <- testthat::test_path("../../inst/extdata/v1.4/pbmc_seurat.rds")
 }
@@ -17,12 +20,12 @@ obj_raw <- readRDS(pbmc_path)
 
 ## Convenience: shared valid call args (no file — added per test)
 valid_args <- list(
-  object          = obj_raw,
+  object = obj_raw,
   experiment_name = "PBMC test",
-  organism        = "hg",
-  groups          = c("sample", "seurat_clusters"),
-  nUMI            = "nCount_RNA",
-  nGene           = "nFeature_RNA"
+  organism = "hg",
+  groups = c("sample", "seurat_clusters"),
+  nUMI = "nCount_RNA",
+  nGene = "nFeature_RNA"
 )
 
 ## ---------------------------------------------------------------------------
@@ -32,21 +35,21 @@ valid_args <- list(
 test_that("exportFromSeurat: rejects non-Seurat object", {
   expect_error(
     exportFromSeurat(
-      object          = list(),
-      file            = tempfile(fileext = ".crb"),
+      object = list(),
+      file = tempfile(fileext = ".crb"),
       experiment_name = "test",
-      organism        = "hg",
-      groups          = "sample",
-      nUMI            = "nCount_RNA",
-      nGene           = "nFeature_RNA"
+      organism = "hg",
+      groups = "sample",
+      nUMI = "nCount_RNA",
+      nGene = "nFeature_RNA"
     ),
     regexp = "must be of class 'Seurat'"
   )
 })
 
 test_that("exportFromSeurat: rejects missing group column", {
-  args        <- valid_args
-  args$file   <- tempfile(fileext = ".crb")
+  args <- valid_args
+  args$file <- tempfile(fileext = ".crb")
   args$groups <- "nonexistent_col"
   expect_error(
     do.call(exportFromSeurat, args),
@@ -55,7 +58,7 @@ test_that("exportFromSeurat: rejects missing group column", {
 })
 
 test_that("exportFromSeurat: rejects missing nUMI column", {
-  args      <- valid_args
+  args <- valid_args
   args$file <- tempfile(fileext = ".crb")
   args$nUMI <- "missing_nUMI"
   expect_error(
@@ -65,8 +68,8 @@ test_that("exportFromSeurat: rejects missing nUMI column", {
 })
 
 test_that("exportFromSeurat: rejects missing nGene column", {
-  args       <- valid_args
-  args$file  <- tempfile(fileext = ".crb")
+  args <- valid_args
+  args$file <- tempfile(fileext = ".crb")
   args$nGene <- "missing_nGene"
   expect_error(
     do.call(exportFromSeurat, args),
@@ -75,8 +78,8 @@ test_that("exportFromSeurat: rejects missing nGene column", {
 })
 
 test_that("exportFromSeurat: rejects missing assay", {
-  args       <- valid_args
-  args$file  <- tempfile(fileext = ".crb")
+  args <- valid_args
+  args$file <- tempfile(fileext = ".crb")
   args$assay <- "SCT"
   expect_error(
     do.call(exportFromSeurat, args),
@@ -85,8 +88,8 @@ test_that("exportFromSeurat: rejects missing assay", {
 })
 
 test_that("exportFromSeurat: rejects missing cell_cycle column", {
-  args            <- valid_args
-  args$file       <- tempfile(fileext = ".crb")
+  args <- valid_args
+  args$file <- tempfile(fileext = ".crb")
   args$cell_cycle <- "no_such_phase_col"
   expect_error(
     do.call(exportFromSeurat, args),
@@ -99,8 +102,8 @@ test_that("exportFromSeurat: rejects missing cell_cycle column", {
 ## ---------------------------------------------------------------------------
 
 test_that("exportFromSeurat: produces a valid .crb file from pbmc_seurat.rds", {
-  outf      <- tempfile(fileext = ".crb")
-  args      <- valid_args
+  outf <- tempfile(fileext = ".crb")
+  args <- valid_args
   args$file <- outf
 
   expect_no_error(do.call(exportFromSeurat, args))
@@ -116,11 +119,11 @@ test_that("exportFromSeurat: produces a valid .crb file from pbmc_seurat.rds", {
   ## experiment metadata
   exp <- cerebro$getExperiment()
   expect_equal(exp$experiment_name, "PBMC test")
-  expect_equal(exp$organism,        "hg")
+  expect_equal(exp$organism, "hg")
 
   ## groups
   groups <- cerebro$getGroups()
-  expect_true("sample"          %in% groups)
+  expect_true("sample" %in% groups)
   expect_true("seurat_clusters" %in% groups)
 
   ## group levels

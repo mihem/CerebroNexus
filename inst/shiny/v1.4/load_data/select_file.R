@@ -11,21 +11,22 @@
 output[["load_data_select_file_UI"]] <- renderUI({
   if (
     exists('Cerebro.options') &&
-    !is.null(Cerebro.options[['mode']]) &&
-    Cerebro.options[["mode"]] != "closed"
+      !is.null(Cerebro.options[['mode']]) &&
+      Cerebro.options[["mode"]] != "closed"
   ) {
     tagList(
       fluidRow(
         htmlOutput("load_data_mode_open")
       ),
       fluidRow(
-        column(12,
+        column(
+          12,
           titlePanel("Load data"),
           fileInput(
             inputId = "input_file",
             label = "Select input data (.crb or .rds file)",
             multiple = FALSE,
-            accept = c(".rds",".crb",".cerebro"),
+            accept = c(".rds", ".crb", ".cerebro"),
             width = '350px',
             buttonLabel = "Browse...",
             placeholder = "No file selected"
@@ -47,7 +48,7 @@ output[["load_data_select_file_UI"]] <- renderUI({
 output[["load_data_mode_open"]] <- renderText({
   if (
     exists('Cerebro.options') &&
-    !is.null(Cerebro.options[["welcome_message"]])
+      !is.null(Cerebro.options[["welcome_message"]])
   ) {
     HTML(Cerebro.options[["welcome_message"]])
   } else {
@@ -65,7 +66,7 @@ output[["load_data_mode_open"]] <- renderText({
 output[["load_data_mode_closed"]] <- renderText({
   if (
     exists('Cerebro.options') &&
-    !is.null(Cerebro.options[["welcome_message"]])
+      !is.null(Cerebro.options[["welcome_message"]])
   ) {
     HTML(Cerebro.options[["welcome_message"]])
   } else {

@@ -3,7 +3,8 @@
 ##----------------------------------------------------------------------------##
 tab_groups <- tabItem(
   tabName = "groups",
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #groups_by_other_group_table .table th {
       text-align: center;
     }

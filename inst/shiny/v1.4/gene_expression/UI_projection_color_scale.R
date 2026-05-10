@@ -5,7 +5,15 @@ output[["expression_projection_color_scale_UI"]] <- renderUI({
   selectInput(
     "expression_projection_color_scale",
     label = "Color scale",
-    choices = c("YlGnBu", "YlOrRd","Blues","Greens","Reds","RdBu","Viridis"),
+    choices = c(
+      "YlGnBu",
+      "YlOrRd",
+      "Blues",
+      "Greens",
+      "Reds",
+      "RdBu",
+      "Viridis"
+    ),
     selected = "YlGnBu"
   )
 })

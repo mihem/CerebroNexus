@@ -16,10 +16,10 @@ expression_selected_genes <- reactive({
     "genes_to_display_missing" = character()
   )
   ## ...
-  if ( input[["expression_analysis_mode"]] == "Gene(s)" ) {
+  if (input[["expression_analysis_mode"]] == "Gene(s)") {
     ## check if user provided input in gene box
     ## ... if user provided input
-    if ( !is.null(input[["expression_genes_input"]]) ) {
+    if (!is.null(input[["expression_genes_input"]])) {
       ## - grab user input
       ## - split by comma, space, semicolon and line
       ## - convert to vector
@@ -33,17 +33,24 @@ expression_selected_genes <- reactive({
         unique() %>%
         .[. != ""]
     }
-  ## ...
-  } else if ( input[["expression_analysis_mode"]] == "Gene set" ) {
+    ## ...
+  } else if (input[["expression_analysis_mode"]] == "Gene set") {
     req(input[["expression_select_gene_set"]])
-    gene_sets[["genes_to_display"]] <- getGenesForGeneSet(input[["expression_select_gene_set"]])
+    gene_sets[["genes_to_display"]] <- getGenesForGeneSet(input[[
+      "expression_select_gene_set"
+    ]])
   }
   ## check which are available in the data set
-  genes_to_display_here <- list_of_genes()[ match(tolower(gene_sets[["genes_to_display"]]), tolower(list_of_genes())) ]
+  genes_to_display_here <- list_of_genes()[match(
+    tolower(gene_sets[["genes_to_display"]]),
+    tolower(list_of_genes())
+  )]
   ## get which genes are available in the data set
   gene_sets[["genes_to_display_present"]] <- na.omit(genes_to_display_here)
   ## get names of provided genes that are not in the data set
-  gene_sets[["genes_to_display_missing"]] <- gene_sets[["genes_to_display"]][ which(is.na(genes_to_display_here)) ]
+  gene_sets[["genes_to_display_missing"]] <- gene_sets[[
+    "genes_to_display"
+  ]][which(is.na(genes_to_display_here))]
   # message(str(gene_sets))
   return(gene_sets)
 })

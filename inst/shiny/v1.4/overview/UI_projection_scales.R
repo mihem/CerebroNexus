@@ -4,8 +4,9 @@
 output[["overview_projection_scales_UI"]] <- renderUI({
   if (
     is.null(input[["overview_projection_to_display"]]) ||
-    is.na(input[["overview_projection_to_display"]]) ||
-    input[["overview_projection_to_display"]] %in% availableProjections() == FALSE
+      is.na(input[["overview_projection_to_display"]]) ||
+      input[["overview_projection_to_display"]] %in% availableProjections() ==
+        FALSE
   ) {
     projection_to_display <- availableProjections()[1]
   } else {

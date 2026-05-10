@@ -20,7 +20,7 @@
 #' columns and cells as rows, contrary to the conventional format of genes as
 #' rows and cells as columns. This format greatly favors performance for
 #' extracting expression values for a gene (column), rather than a cell (row),
-#' which is the primary action in Cerebro. Importantly, the matrix should be 
+#' which is the primary action in Cerebro. Importantly, the matrix should be
 #' stored with "expression" as group name (see parameters of the
 #' \code{HDF5Array::writeTENxMatrix()} function). Saving the expression matrix
 #' in \code{TENxMatrix} format has the benefit of a low memory footprint since
@@ -30,15 +30,15 @@
 #' that needs to be loaded tends to be very small). By default, this value is
 #' set to \code{NULL}, meaning that the expression matrix is expected to be part
 #' of the \code{.crb} file.
-#' @param expression_matrix_BPCells Optional: Path to BPCells directory created with 
-#' \code{BPCells::write_matrix_dir()}. This is a hopefully faster alternative to h5 
+#' @param expression_matrix_BPCells Optional: Path to BPCells directory created with
+#' \code{BPCells::write_matrix_dir()}. This is a hopefully faster alternative to h5
 #' with a similar approach.
 #' @param welcome_message \code{string} with custom welcome message to display
 #' in the "Load data" tab. Can contain HTML formatting, e.g.
 #' \code{'<h3>Hi!</h3>'}. Defaults to \code{NULL}.
 #' @param overview_default_point_size Default point size in overview. This
 #' value can be changed in the UI; defaults to 5.
-#' @param gene_expression_default_point_size Default point size in gene_expression. This  
+#' @param gene_expression_default_point_size Default point size in gene_expression. This
 #' value can be changed in the UI; defaults to 5.
 #' @param overview_default_point_opacity Default point opacity in
 #' overview. This value can be changed in the UI; defaults to 1.0.
@@ -106,12 +106,11 @@ launchCerebroV1.4 <- function(
   gene_expression_default_percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   ...
-){
-
+) {
   ##--------------------------------------------------------------------------##
   ## Check validity of input parameters.
   ##--------------------------------------------------------------------------##
-  if ( mode %in% c('open','closed') == FALSE ) {
+  if (mode %in% c('open', 'closed') == FALSE) {
     stop(
       "'mode' parameter must be set to either 'open' or 'closed'.",
       call. = FALSE
@@ -119,7 +118,7 @@ launchCerebroV1.4 <- function(
   }
   if (
     overview_default_point_size < 0 ||
-    overview_default_point_size > 20
+      overview_default_point_size > 20
   ) {
     stop(
       "'overview_default_point_size' parameter must be between 1 and 20",
@@ -128,7 +127,7 @@ launchCerebroV1.4 <- function(
   }
   if (
     gene_expression_default_point_opacity < 0 ||
-    gene_expression_default_point_opacity > 1
+      gene_expression_default_point_opacity > 1
   ) {
     stop(
       "'gene_expression_default_point_opacity' parameter must be between 0 and 1",
@@ -137,14 +136,14 @@ launchCerebroV1.4 <- function(
   }
   if (
     gene_expression_default_percentage_cells_to_show < 0 ||
-    gene_expression_default_percentage_cells_to_show > 100
+      gene_expression_default_percentage_cells_to_show > 100
   ) {
     stop(
       "'gene_expression_default_percentage_cells_to_show' parameter must be between 0 and 100",
       call. = FALSE
     )
   }
-  if ( projections_show_hover_info %in% c(TRUE, FALSE) == FALSE ) {
+  if (projections_show_hover_info %in% c(TRUE, FALSE) == FALSE) {
     stop(
       "'projections_show_hover_info' parameter must be set to either TRUE or FALSE.",
       call. = FALSE

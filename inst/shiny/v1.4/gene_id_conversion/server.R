@@ -2,15 +2,19 @@
 ## Table of gene IDs and symbols.
 ##----------------------------------------------------------------------------##
 output[["gene_info"]] <- DT::renderDataTable({
-  if ( input[["geneIdConversion_organism"]] == "mouse" ) {
+  if (input[["geneIdConversion_organism"]] == "mouse") {
     conversion_table <- read.table(
       paste0(Cerebro.options$cerebro_root, "/extdata/mm10_gene_ID_name.tsv.gz"),
-      sep = "\t", header = TRUE, stringsAsFactors = FALSE
+      sep = "\t",
+      header = TRUE,
+      stringsAsFactors = FALSE
     )
-  } else if ( input[["geneIdConversion_organism"]] == "human" ) {
+  } else if (input[["geneIdConversion_organism"]] == "human") {
     conversion_table <- read.table(
       paste0(Cerebro.options$cerebro_root, "/extdata/hg38_gene_ID_name.tsv.gz"),
-      sep = "\t", header = TRUE, stringsAsFactors = FALSE
+      sep = "\t",
+      header = TRUE,
+      stringsAsFactors = FALSE
     )
   }
   DT::datatable(
@@ -49,5 +53,7 @@ observeEvent(input[["geneIdConversion_info"]], {
 ##----------------------------------------------------------------------------##
 geneIdConversion_info <- list(
   title = "Gene ID/symbol conversion",
-  text = p("Conversion table containing Gencode identifiers, Ensembl identifiers, Havana identifiers, gene symbol and gene type for mouse (version M16) and human (version 27).")
+  text = p(
+    "Conversion table containing Gencode identifiers, Ensembl identifiers, Havana identifiers, gene symbol and gene type for mouse (version M16) and human (version 27)."
+  )
 )

@@ -3,11 +3,12 @@
 ##----------------------------------------------------------------------------##
 findColumnsInteger <- function(df, columns_to_test) {
   columns_indices <- c()
-  for ( i in columns_to_test ) {
+  for (i in columns_to_test) {
     if (
       any(is.na(df[[i]])) == FALSE &&
-      is.numeric(df[[i]]) &&
-      all.equal(df[[i]], as.integer(df[[i]]), check.attributes = FALSE) == TRUE
+        is.numeric(df[[i]]) &&
+        all.equal(df[[i]], as.integer(df[[i]]), check.attributes = FALSE) ==
+          TRUE
     ) {
       columns_indices <- c(columns_indices, i)
     }
@@ -17,13 +18,13 @@ findColumnsInteger <- function(df, columns_to_test) {
 
 findColumnsPercentage <- function(df) {
   columns_indices <- c()
-  for ( i in 1:ncol(df) ) {
+  for (i in 1:ncol(df)) {
     if (
       grepl(colnames(df)[i], pattern = "pct|percent|%", ignore.case = TRUE) &&
-      any(is.na(df[[i]])) == FALSE &&
-      is.numeric(df[[i]]) &&
-      min(df[[i]], na.rm = TRUE) >= 0 &&
-      max(df[[i]], na.rm = TRUE) <= 100
+        any(is.na(df[[i]])) == FALSE &&
+        is.numeric(df[[i]]) &&
+        min(df[[i]], na.rm = TRUE) >= 0 &&
+        max(df[[i]], na.rm = TRUE) <= 100
     ) {
       columns_indices <- c(columns_indices, i)
     }
@@ -34,13 +35,17 @@ findColumnsPercentage <- function(df) {
 findColumnsPValues <- function(df) {
   pattern_columns_p_value <- "pval|p_val|p-val|p.val|padj|p_adj|p-adj|p.adj|adjp|adj_p|adj-p|adj.p|FDR|qval|q_val|q-val|q.val"
   columns_indices <- c()
-  for ( i in 1:ncol(df) ) {
+  for (i in 1:ncol(df)) {
     if (
-      grepl(colnames(df)[i], pattern = pattern_columns_p_value, ignore.case = TRUE) &&
-      any(is.na(df[[i]])) == FALSE &&
-      is.numeric(df[[i]]) &&
-      min(df[[i]], na.rm = TRUE) >= 0 &&
-      max(df[[i]], na.rm = TRUE) <= 1
+      grepl(
+        colnames(df)[i],
+        pattern = pattern_columns_p_value,
+        ignore.case = TRUE
+      ) &&
+        any(is.na(df[[i]])) == FALSE &&
+        is.numeric(df[[i]]) &&
+        min(df[[i]], na.rm = TRUE) >= 0 &&
+        max(df[[i]], na.rm = TRUE) <= 1
     ) {
       columns_indices <- c(columns_indices, i)
     }
@@ -50,11 +55,15 @@ findColumnsPValues <- function(df) {
 
 findColumnsLogFC <- function(df) {
   columns_indices <- c()
-  for ( i in 1:ncol(df) ) {
+  for (i in 1:ncol(df)) {
     if (
-      grepl(colnames(df)[i], pattern = "logFC|log-FC|log_FC|log.FC", ignore.case = TRUE) &&
-      any(is.na(df[[i]])) == FALSE &&
-      is.numeric(df[[i]])
+      grepl(
+        colnames(df)[i],
+        pattern = "logFC|log-FC|log_FC|log.FC",
+        ignore.case = TRUE
+      ) &&
+        any(is.na(df[[i]])) == FALSE &&
+        is.numeric(df[[i]])
     ) {
       columns_indices <- c(columns_indices, i)
     }
@@ -79,7 +88,6 @@ prettifyTable <- function(
   page_length_default = 15,
   page_length_menu = c(15, 30, 50, 100, 1000)
 ) {
-
   ## replace Inf and -Inf values in numeric columns with 999 or -999,
   ## respectively, because other the columns will be converted to characters
   ## which messes up sorting of values in that column
@@ -111,10 +119,10 @@ prettifyTable <- function(
   columns_with_long_content <- c()
   if (
     hide_long_columns == TRUE &&
-    length(columns_character) >= 1
+      length(columns_character) >= 1
   ) {
-    for ( i in columns_character ) {
-      if ( max(stringr::str_length(table[[i]]), na.rm = TRUE) > 200 ) {
+    for (i in columns_character) {
+      if (max(stringr::str_length(table[[i]]), na.rm = TRUE) > 200) {
         columns_with_long_content <- c(columns_with_long_content, i)
       }
     }
@@ -123,7 +131,7 @@ prettifyTable <- function(
   }
 
   ## add manually specified column types
-  if ( is.null(columns_percentage) == FALSE ) {
+  if (is.null(columns_percentage) == FALSE) {
     columns_percent <- c(columns_percent, columns_percentage)
   }
 
@@ -132,14 +140,14 @@ prettifyTable <- function(
   if (number_formatting == TRUE && length(columns_percent) > 0) {
     for (col in columns_percent) {
       col_name <- colnames(table)[col]
-      if (max(table[,col_name] > 1)) {
-        table[,col] <- table[,col] / 100
+      if (max(table[, col_name] > 1)) {
+        table[, col] <- table[, col] / 100
       }
     }
   }
 
   ## add manually specified columns to hide
-  if ( is.null(columns_hide) == FALSE ) {
+  if (is.null(columns_hide) == FALSE) {
     columns_hide <- columns_hide - 1
   } else {
     columns_hide <- c()
@@ -147,17 +155,27 @@ prettifyTable <- function(
 
   ## remove columns with p-values from numeric columns to avoid applying color
   ## tiles
-  columns_numeric <- columns_numeric[ columns_numeric %in% columns_p_value == FALSE ]
+  columns_numeric <- columns_numeric[
+    columns_numeric %in% columns_p_value == FALSE
+  ]
 
   ## get vector of column indices that contain numeric values which are
   ## neither integer, p-values, percentages, or logFC
   ## these columns will be rounded to significant digits
-  columns_only_numeric <- columns_numeric[ columns_numeric %in% c(
-    columns_p_value, columns_percent, columns_integer, columns_p_value,
-    columns_logFC) == FALSE ]
+  columns_only_numeric <- columns_numeric[
+    columns_numeric %in%
+      c(
+        columns_p_value,
+        columns_percent,
+        columns_integer,
+        columns_p_value,
+        columns_logFC
+      ) ==
+      FALSE
+  ]
 
   ## add buttons if specified
-  if ( show_buttons == TRUE ) {
+  if (show_buttons == TRUE) {
     table_extensions <- c("Buttons", "ColReorder")
     table_buttons <- list(
       "colvis",
@@ -189,30 +207,33 @@ prettifyTable <- function(
   ## - align factors/logicals in center
   ## - align numerics to the right
   table <- DT::datatable(
-      table,
-      autoHideNavigation = TRUE,
-      class = "stripe table-bordered table-condensed",
-      escape = FALSE,
-      extensions = table_extensions,
-      filter = filter,
-      rownames = FALSE,
-      selection = "single",
-      style = "bootstrap",
-      options = list(
-        buttons = table_buttons,
-        columnDefs = list(
-          list(targets = "_all", className = 'dt-middle'),
-          list(targets = c(columns_hide, columns_with_long_content), visible = FALSE)
-        ),
-        colReorder = list(
-          realtime = FALSE
-        ),
-        dom = dom,
-        lengthMenu = page_length_menu,
-        pageLength = page_length_default,
-        scrollX = TRUE
-      )
-    ) %>%
+    table,
+    autoHideNavigation = TRUE,
+    class = "stripe table-bordered table-condensed",
+    escape = FALSE,
+    extensions = table_extensions,
+    filter = filter,
+    rownames = FALSE,
+    selection = "single",
+    style = "bootstrap",
+    options = list(
+      buttons = table_buttons,
+      columnDefs = list(
+        list(targets = "_all", className = 'dt-middle'),
+        list(
+          targets = c(columns_hide, columns_with_long_content),
+          visible = FALSE
+        )
+      ),
+      colReorder = list(
+        realtime = FALSE
+      ),
+      dom = dom,
+      lengthMenu = page_length_menu,
+      pageLength = page_length_default,
+      scrollX = TRUE
+    )
+  ) %>%
     DT::formatStyle(
       columns = c(columns_character),
       textAlign = 'left',
@@ -232,8 +253,9 @@ prettifyTable <- function(
   if ('cell_barcode' %in% colnames(table_original)) {
     table <- table %>%
       DT::formatStyle(
-        columns = which(colnames(table_original)=='cell_barcode'),
-        target="cell", fontFamily="courier"
+        columns = which(colnames(table_original) == 'cell_barcode'),
+        target = "cell",
+        fontFamily = "courier"
       )
   }
 
@@ -244,12 +266,11 @@ prettifyTable <- function(
   ## - show percentage values with percent symbol and 2 decimals
   ## - show all other numeric values that are none of the above with 3
   ##   significant decimals
-  if ( number_formatting == TRUE ) {
-
+  if (number_formatting == TRUE) {
     ## integer values
     if (
       !is.null(columns_integer) &&
-      length(columns_integer) > 0
+        length(columns_integer) > 0
     ) {
       table <- table %>%
         DT::formatRound(
@@ -263,7 +284,7 @@ prettifyTable <- function(
     ## p-values
     if (
       !is.null(columns_p_value) &&
-      length(columns_p_value) > 0
+        length(columns_p_value) > 0
     ) {
       table <- table %>%
         DT::formatSignif(
@@ -275,7 +296,7 @@ prettifyTable <- function(
     ## logFC
     if (
       !is.null(columns_logFC) &&
-      length(columns_logFC) > 0
+        length(columns_logFC) > 0
     ) {
       table <- table %>%
         DT::formatRound(
@@ -287,19 +308,19 @@ prettifyTable <- function(
     ## percentage
     if (
       !is.null(columns_percent) &&
-      length(columns_percent) > 0
+        length(columns_percent) > 0
     ) {
       table <- table %>%
-      DT::formatPercentage(
-        columns = columns_percent,
-        digits = 2
-      )
+        DT::formatPercentage(
+          columns = columns_percent,
+          digits = 2
+        )
     }
 
     ## numeric but none of the above
     if (
       !is.null(columns_only_numeric) &&
-      length(columns_only_numeric) > 0
+        length(columns_only_numeric) > 0
     ) {
       table <- table %>%
         DT::formatSignif(
@@ -325,22 +346,21 @@ prettifyTable <- function(
   ## NOTES:
   ## - "styleInterval()" only works when there are at least two values that
   ##   are not the same, therefore a few tests are necessary to prevent errors
-  if ( color_highlighting == TRUE ) {
-
+  if (color_highlighting == TRUE) {
     ## integer
     if (
       !is.null(columns_integer) &&
-      length(columns_integer) > 0 &&
-      nrow(table_original) > 1
+        length(columns_integer) > 0 &&
+        nrow(table_original) > 1
     ) {
-      for ( i in columns_integer ) {
+      for (i in columns_integer) {
         range <- range(table_original[[i]])
-        if ( range[1] != range[2] ) {
+        if (range[1] != range[2]) {
           table <- table %>%
             DT::formatStyle(
               columns = i,
               backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2]-range[1])/100),
+                seq(range[1], range[2], (range[2] - range[1]) / 100),
                 colorRampPalette(colors = c('white', '#e67e22'))(102)
               )
             )
@@ -351,12 +371,12 @@ prettifyTable <- function(
     ## p-values
     if (
       !is.null(columns_p_value) &&
-      length(columns_p_value) > 0
+        length(columns_p_value) > 0
     ) {
       table <- table %>%
         DT::formatStyle(
           columns = columns_p_value,
-          background = DT::styleColorBar(c(1,0), '#e74c3c'),
+          background = DT::styleColorBar(c(1, 0), '#e74c3c'),
           backgroundSize = '98% 88%',
           backgroundRepeat = 'no-repeat',
           backgroundPosition = 'center'
@@ -366,17 +386,17 @@ prettifyTable <- function(
     ## logFC
     if (
       !is.null(columns_logFC) &&
-      length(columns_logFC) > 0 &&
-      nrow(table_original) > 1
+        length(columns_logFC) > 0 &&
+        nrow(table_original) > 1
     ) {
-      for ( i in columns_logFC ) {
+      for (i in columns_logFC) {
         range <- range(table_original[[i]])
-        if ( range[1] != range[2] ) {
+        if (range[1] != range[2]) {
           table <- table %>%
             DT::formatStyle(
               columns = i,
               backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2]-range[1])/100),
+                seq(range[1], range[2], (range[2] - range[1]) / 100),
                 colorRampPalette(colors = c('white', '#e67e22'))(102)
               )
             )
@@ -387,12 +407,12 @@ prettifyTable <- function(
     ## percentage
     if (
       !is.null(columns_percent) &&
-      length(columns_percent) > 0
+        length(columns_percent) > 0
     ) {
       table <- table %>%
         DT::formatStyle(
           columns = columns_percent,
-          background = DT::styleColorBar(c(0,1), 'pink'),
+          background = DT::styleColorBar(c(0, 1), 'pink'),
           backgroundSize = '98% 88%',
           backgroundRepeat = 'no-repeat',
           backgroundPosition = 'center'
@@ -402,17 +422,17 @@ prettifyTable <- function(
     ## numeric values that are non of the above
     if (
       !is.null(columns_only_numeric) &&
-      length(columns_only_numeric) > 0 &&
-      nrow(table_original) > 1
+        length(columns_only_numeric) > 0 &&
+        nrow(table_original) > 1
     ) {
-      for ( i in columns_only_numeric ) {
+      for (i in columns_only_numeric) {
         range <- range(table_original[[i]])
-        if ( range[1] != range[2] ) {
+        if (range[1] != range[2]) {
           table <- table %>%
             DT::formatStyle(
               columns = i,
               backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2]-range[1])/100),
+                seq(range[1], range[2], (range[2] - range[1]) / 100),
                 colorRampPalette(colors = c('white', '#e67e22'))(102)
               )
             )
@@ -423,7 +443,7 @@ prettifyTable <- function(
     ## logicals
     if (
       !is.null(columns_logical) &&
-      length(columns_logical) > 0
+        length(columns_logical) > 0
     ) {
       table <- table %>%
         DT::formatStyle(
@@ -435,10 +455,14 @@ prettifyTable <- function(
 
     ## grouping variables
     columns_groups <- which(colnames(table_original) %in% getGroups())
-    if ( length(columns_groups) > 0 ) {
-      for ( i in columns_groups ) {
+    if (length(columns_groups) > 0) {
+      for (i in columns_groups) {
         group <- colnames(table_original)[i]
-        if ( all(unique(table_original[[i]]) %in% names(reactive_colors()[[group]])) ) {
+        if (
+          all(
+            unique(table_original[[i]]) %in% names(reactive_colors()[[group]])
+          )
+        ) {
           table <- table %>%
             DT::formatStyle(
               i,
@@ -454,10 +478,14 @@ prettifyTable <- function(
 
     ## cell cycle assignments
     columns_cell_cycle <- which(colnames(table_original) %in% getCellCycle())
-    if ( length(columns_cell_cycle) > 0 ) {
-      for ( i in columns_cell_cycle ) {
+    if (length(columns_cell_cycle) > 0) {
+      for (i in columns_cell_cycle) {
         method <- colnames(table_original)[i]
-        if ( all(unique(table_original[[i]]) %in% names(reactive_colors()[[method]])) ) {
+        if (
+          all(
+            unique(table_original[[i]]) %in% names(reactive_colors()[[method]])
+          )
+        ) {
           table <- table %>%
             DT::formatStyle(
               i,
@@ -474,7 +502,6 @@ prettifyTable <- function(
 
   ## return the table
   return(table)
-
 }
 
 ##----------------------------------------------------------------------------##
@@ -510,11 +537,10 @@ calculateTableAB <- function(
   mode,
   percent
 ) {
-
   ## TODO: more safety checks?
 
   ## check if specified group columns exist in table
-  if ( groupA %in% colnames(table) == FALSE ) {
+  if (groupA %in% colnames(table) == FALSE) {
     stop(
       glue::glue(
         "Column specified as groupA (`{groupA}`) could not be found in meta ",
@@ -524,7 +550,7 @@ calculateTableAB <- function(
     )
   }
 
-  if ( groupB %in% colnames(table) == FALSE ) {
+  if (groupB %in% colnames(table) == FALSE) {
     stop(
       glue::glue(
         "Column specified as groupB (`{groupB}`) could not be found in meta ",
@@ -535,22 +561,30 @@ calculateTableAB <- function(
   }
 
   ## subset columns
-  table <- table[,c(groupA, groupB)]
+  table <- table[, c(groupA, groupB)]
 
   ## factorize group columns A if not already a factor
-  if ( is.character(table[[groupA]]) ) {
+  if (is.character(table[[groupA]])) {
     levels_groupA <- table[[groupA]] %>% unique() %>% sort()
-    table[,groupA] <- factor(table[[groupA]], levels = levels_groupA, exclude = NULL)
+    table[, groupA] <- factor(
+      table[[groupA]],
+      levels = levels_groupA,
+      exclude = NULL
+    )
   } else {
-    levels_groupA <- levels(table[,groupA])
+    levels_groupA <- levels(table[, groupA])
   }
 
   ## factorize group columns B if not already a factor
-  if ( is.character(table[[groupB]]) ) {
+  if (is.character(table[[groupB]])) {
     levels_groupB <- table[[groupB]] %>% unique() %>% sort()
-    table[,groupB] <- factor(table[[groupB]], levels = levels_groupB, exclude = NULL)
+    table[, groupB] <- factor(
+      table[[groupB]],
+      levels = levels_groupB,
+      exclude = NULL
+    )
   } else {
-    levels_groupB <- levels(table[,groupB])
+    levels_groupB <- levels(table[, groupB])
   }
 
   ## prepare table in long format
@@ -563,7 +597,7 @@ calculateTableAB <- function(
     dplyr::ungroup()
 
   ## convert counts to percent
-  if ( percent == TRUE ) {
+  if (percent == TRUE) {
     table <- table %>%
       dplyr::mutate(count = count / total_cell_count) %>%
       dplyr::select(
@@ -572,8 +606,7 @@ calculateTableAB <- function(
   }
 
   ## bring table into wide format
-  if ( mode == "wide" ) {
-
+  if (mode == "wide") {
     table <- table %>%
       tidyr::pivot_wider(
         id_cols = tidyselect::all_of(c(groupA, "total_cell_count")),
@@ -582,15 +615,17 @@ calculateTableAB <- function(
         values_fill = 0
       ) %>%
       dplyr::select(
-        tidyselect::all_of(groupA), 'total_cell_count',
+        tidyselect::all_of(groupA),
+        'total_cell_count',
         tidyselect::any_of(levels_groupB)
       )
 
     ## fix order of columns if cell cycle info was chosen as second group
     if (
-      'G1' %in% colnames(table) &&
-      'G2M' %in% colnames(table) &&
-      'S' %in% colnames(table)
+      'G1' %in%
+        colnames(table) &&
+        'G2M' %in% colnames(table) &&
+        'S' %in% colnames(table)
     ) {
       table <- table %>%
         dplyr::select(
@@ -614,41 +649,36 @@ calculateTableAB <- function(
 ## The return value is a named vector.
 ##----------------------------------------------------------------------------##
 assignColorsToGroups <- function(table, grouping_variable) {
-
   ## check if colors are already assigned in reactive_colors()
   ## ... already assigned
-  if ( grouping_variable %in% names(reactive_colors()) ) {
-
+  if (grouping_variable %in% names(reactive_colors())) {
     ## take colors from reactive_colors()
-    colors_for_groups <- reactive_colors()[[ grouping_variable ]]
+    colors_for_groups <- reactive_colors()[[grouping_variable]]
 
-  ## ... not assigned but values are either factors or characters
+    ## ... not assigned but values are either factors or characters
   } else if (
-    is.factor(table[[ grouping_variable ]]) ||
-    is.character(table[[ grouping_variable ]])
+    is.factor(table[[grouping_variable]]) ||
+      is.character(table[[grouping_variable]])
   ) {
-
     ## check type of values
     ## ... factors
-    if ( is.factor(table[[ grouping_variable ]]) ) {
-
+    if (is.factor(table[[grouping_variable]])) {
       ## get factor levels and assign colors
       colors_for_groups <- setNames(
-        default_colorset[seq_along(levels(table[[ grouping_variable ]]))],
-        levels(table[[ grouping_variable ]])
+        default_colorset[seq_along(levels(table[[grouping_variable]]))],
+        levels(table[[grouping_variable]])
       )
 
-    ## ... characters
-    } else if ( is.character(table[[ grouping_variable ]]) ) {
-
+      ## ... characters
+    } else if (is.character(table[[grouping_variable]])) {
       ## get unique values and assign colors
       colors_for_groups <- setNames(
-        default_colorset[seq_along(unique(table[[ grouping_variable ]]))],
-        unique(table[[ grouping_variable ]])
+        default_colorset[seq_along(unique(table[[grouping_variable]]))],
+        unique(table[[grouping_variable]])
       )
     }
 
-  ## ... none of the above (e.g. numeric values)
+    ## ... none of the above (e.g. numeric values)
   } else {
     colors_for_groups <- NULL
   }
@@ -668,7 +698,7 @@ buildHoverInfoForProjections <- function(table) {
     "<b>Expressed genes</b>: {formatC(table[[ 'nGene' ]], format = 'f', big.mark = ',', digits = 0)}"
   )
   ## add info for known grouping variables
-  for ( group in getGroups() ) {
+  for (group in getGroups()) {
     hover_info <- glue::glue(
       "{hover_info}<br>",
       "<b>{group}</b>: {table[[ group ]]}"
@@ -683,16 +713,16 @@ buildHoverInfoForProjections <- function(table) {
 randomlySubsetCells <- function(table, percentage) {
   ## check if subsetting is necessary
   ## ... percentage is less than 100
-  if ( percentage < 100 ) {
+  if (percentage < 100) {
     ## calculate how many cells should be left after subsetting
     size_of_subset <- ceiling(percentage / 100 * nrow(table))
     ## get IDs of all cells
     cell_ids <- rownames(table)
     ## subset cell IDs
-    subset_of_cell_ids <- cell_ids[ sample(seq_along(cell_ids), size_of_subset) ]
+    subset_of_cell_ids <- cell_ids[sample(seq_along(cell_ids), size_of_subset)]
     ## subset table and return
-    return(table[subset_of_cell_ids,])
-  ## ... percentage is 100 -> no subsetting needed
+    return(table[subset_of_cell_ids, ])
+    ## ... percentage is 100 -> no subsetting needed
   } else {
     ## return original table
     return(table)
@@ -705,12 +735,24 @@ randomlySubsetCells <- function(table, percentage) {
 getXYranges <- function(table) {
   ranges <- list(
     x = list(
-      min = table[,1] %>% min(na.rm=TRUE) %>% "*"(ifelse(.<0, 1.1, 0.9)) %>% round(),
-      max = table[,1] %>% max(na.rm=TRUE) %>% "*"(ifelse(.<0, 0.9, 1.1)) %>% round()
+      min = table[, 1] %>%
+        min(na.rm = TRUE) %>%
+        "*"(ifelse(. < 0, 1.1, 0.9)) %>%
+        round(),
+      max = table[, 1] %>%
+        max(na.rm = TRUE) %>%
+        "*"(ifelse(. < 0, 0.9, 1.1)) %>%
+        round()
     ),
     y = list(
-      min = table[,2] %>% min(na.rm=TRUE) %>% "*"(ifelse(.<0, 1.1, 0.9)) %>% round(),
-      max = table[,2] %>% max(na.rm=TRUE) %>% "*"(ifelse(.<0, 0.9, 1.1)) %>% round()
+      min = table[, 2] %>%
+        min(na.rm = TRUE) %>%
+        "*"(ifelse(. < 0, 1.1, 0.9)) %>%
+        round(),
+      max = table[, 2] %>%
+        max(na.rm = TRUE) %>%
+        "*"(ifelse(. < 0, 0.9, 1.1)) %>%
+        round()
     )
   )
   return(ranges)
@@ -720,15 +762,14 @@ getXYranges <- function(table) {
 ## Function to get genes for selected gene set.
 ##----------------------------------------------------------------------------##
 getGenesForGeneSet <- function(gene_set) {
-
   if (
     !is.null(getExperiment()$organism) &&
-    getExperiment()$organism == "mm"
+      getExperiment()$organism == "mm"
   ) {
     species <- "Mus musculus"
   } else if (
     !is.null(getExperiment()$organism) &&
-    getExperiment()$organism == "hg"
+      getExperiment()$organism == "hg"
   ) {
     species <- "Homo sapiens"
   } else {
@@ -742,23 +783,23 @@ getGenesForGeneSet <- function(gene_set) {
   ## - convert gene symbols to vector
   ## - only keep unique gene symbols
   ## - sort genes
-  msigdbr:::msigdbr_genesets[,1:2] %>%
-  dplyr::filter(.data$gs_name == gene_set) %>%
-  dplyr::inner_join(
-    .,
-    msigdbr:::msigdbr_genes,
-    by = "gs_id"
-  ) %>%
-  dplyr::inner_join(
-    .,
-    msigdbr:::msigdbr_orthologs %>%
-      dplyr::filter(.data$species_name == species) %>%
-      dplyr::select(human_entrez_gene, gene_symbol),
-    by = "human_entrez_gene"
-  ) %>%
-  dplyr::pull(gene_symbol) %>%
-  unique() %>%
-  sort()
+  msigdbr:::msigdbr_genesets[, 1:2] %>%
+    dplyr::filter(.data$gs_name == gene_set) %>%
+    dplyr::inner_join(
+      .,
+      msigdbr:::msigdbr_genes,
+      by = "gs_id"
+    ) %>%
+    dplyr::inner_join(
+      .,
+      msigdbr:::msigdbr_orthologs %>%
+        dplyr::filter(.data$species_name == species) %>%
+        dplyr::select(human_entrez_gene, gene_symbol),
+      by = "human_entrez_gene"
+    ) %>%
+    dplyr::pull(gene_symbol) %>%
+    unique() %>%
+    sort()
 }
 
 ##----------------------------------------------------------------------------##
@@ -767,39 +808,39 @@ getGenesForGeneSet <- function(gene_set) {
 centerOfGroups <- function(coordinates, df, n_dimensions, group) {
   ## check number of dimenions in projection
   ## ... 2 dimensions
-  if ( n_dimensions == 2 ) {
+  if (n_dimensions == 2) {
     ## calculate center for groups and return
     tidyr::tibble(
       x = coordinates[[1]],
       y = coordinates[[2]],
-      group = df[[ group ]]
+      group = df[[group]]
     ) %>%
-    dplyr::group_by(group) %>%
-    dplyr::summarise(
-      x_median = median(x),
-      y_median = median(y),
-      .groups = 'drop_last'
-    ) %>%
-    dplyr::ungroup() %>%
-    return()
-  ## ... 3 dimensions
-  } else if ( n_dimensions == 3 && is.numeric(coordinates[,3]) ) {
+      dplyr::group_by(group) %>%
+      dplyr::summarise(
+        x_median = median(x),
+        y_median = median(y),
+        .groups = 'drop_last'
+      ) %>%
+      dplyr::ungroup() %>%
+      return()
+    ## ... 3 dimensions
+  } else if (n_dimensions == 3 && is.numeric(coordinates[, 3])) {
     ## calculate center for groups and return
     tidyr::tibble(
       x = coordinates[[1]],
       y = coordinates[[2]],
       z = coordinates[[3]],
-      group = df[[ group ]]
+      group = df[[group]]
     ) %>%
-    dplyr::group_by(group) %>%
-    dplyr::summarise(
-      x_median = median(x),
-      y_median = median(y),
-      z_median = median(z),
-      .groups = 'drop_last'
-    ) %>%
-    dplyr::ungroup() %>%
-    return()
+      dplyr::group_by(group) %>%
+      dplyr::summarise(
+        x_median = median(x),
+        y_median = median(y),
+        z_median = median(z),
+        .groups = 'drop_last'
+      ) %>%
+      dplyr::ungroup() %>%
+      return()
   }
 }
 
@@ -807,9 +848,9 @@ centerOfGroups <- function(coordinates, df, n_dimensions, group) {
 ## Set order of rows in data frame.
 ##----------------------------------------------------------------------------##
 setRowOrder <- function(df, order) {
-  if ( order == 'Random' ) {
-    return(df[ sample(1:nrow(df)) , ])
-  } else if ( order == "Highest expression on top" ) {
+  if (order == 'Random') {
+    return(df[sample(1:nrow(df)), ])
+  } else if (order == "Highest expression on top") {
     return(dplyr::arrange(df, level))
   } else {
     return(df)
@@ -822,152 +863,152 @@ setRowOrder <- function(df, order) {
 ## Never directly interact with data set: data_set()
 ##----------------------------------------------------------------------------##
 getExperiment <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getExperiment())
   }
 }
 getParameters <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getParameters())
   }
 }
 getTechnicalInfo <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getTechnicalInfo())
   }
 }
 getGeneLists <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGeneLists())
   }
 }
 getGeneNames <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGeneNames())
   }
 }
 getGroups <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGroups())
   }
 }
 getGroupLevels <- function(group) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGroupLevels(group))
   }
 }
 getCellCycle <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getCellCycle())
   }
 }
 getMetaData <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMetaData())
   }
 }
 availableProjections <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$availableProjections())
   }
 }
 getProjection <- function(name) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getProjection(name))
   }
 }
 getTree <- function(group) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getTree(group))
   }
 }
 getGroupsWithMostExpressedGenes <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGroupsWithMostExpressedGenes())
   }
 }
 getMostExpressedGenes <- function(group) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMostExpressedGenes(group))
   }
 }
 getMethodsForMarkerGenes <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMethodsForMarkerGenes())
   }
 }
 getGroupsWithMarkerGenes <- function(method) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGroupsWithMarkerGenes(method))
   }
 }
 getMarkerGenes <- function(method, group) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMarkerGenes(method, group))
   }
 }
 getMethodsForEnrichedPathways <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMethodsForEnrichedPathways())
   }
 }
 getGroupsWithEnrichedPathways <- function(method) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getGroupsWithEnrichedPathways(method))
   }
 }
 getEnrichedPathways <- function(method, group) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getEnrichedPathways(method, group))
   }
 }
 getMethodsForTrajectories <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getMethodsForTrajectories())
   }
 }
 getNamesOfTrajectories <- function(method) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getNamesOfTrajectories(method))
   }
 }
 getTrajectory <- function(method, name) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getTrajectory(method, name))
   }
 }
 getExtraMaterialCategories <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getExtraMaterialCategories())
   }
 }
 checkForExtraTables <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$checkForExtraTables())
   }
 }
 getNamesOfExtraTables <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getNamesOfExtraTables())
   }
 }
 getExtraTable <- function(name) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getExtraTable(name))
   }
 }
 checkForExtraPlots <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$checkForExtraPlots())
   }
 }
 getNamesOfExtraPlots <- function() {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getNamesOfExtraPlots())
   }
 }
 getExtraPlot <- function(name) {
-  if ( 'Cerebro_v1.3' %in% class(data_set()) ) {
+  if ('Cerebro_v1.3' %in% class(data_set())) {
     return(data_set()$getExtraPlot(name))
   }
 }

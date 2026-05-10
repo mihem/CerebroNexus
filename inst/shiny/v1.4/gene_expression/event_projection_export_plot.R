@@ -34,22 +34,23 @@ observeEvent(input[["expression_projection_export"]], {
   ## extract specified file path
   save_file_path <- as.character(save_file_input$datapath[1])
   ## bring cells in order, either random or highest expression on top
-  if (plot_parameters[['plot_order']]=='Random') {
+  if (plot_parameters[['plot_order']] == 'Random') {
     cell_order <- sample(1:length(expression_levels))
-    cells_df <- cells_df[cell_order,]
-  } else if (plot_parameters[['plot_order']]=='Highest expression on top') {
+    cells_df <- cells_df[cell_order, ]
+  } else if (plot_parameters[['plot_order']] == 'Highest expression on top') {
     cell_order <- order(expression_levels)
-    cells_df <- cells_df[cell_order,]
+    cells_df <- cells_df[cell_order, ]
   }
   ##
   if (
     is.list(expression_levels) ||
-    ncol(coordinates) == 3
+      ncol(coordinates) == 3
   ) {
     shinyWidgets::sendSweetAlert(
       session = session,
       title = "Sorry!",
-      text = HTML("
+      text = HTML(
+        "
         The plot could not be exported to a PDF file.<br>
         Possible reasons:
         <ul>
@@ -64,11 +65,11 @@ observeEvent(input[["expression_projection_export"]], {
   } else {
     ## check if projection or trajectory should be shown
     ## ... projection
-    if ( plot_parameters[["projection"]] %in% availableProjections() ) {
+    if (plot_parameters[["projection"]] %in% availableProjections()) {
       ## ... separate panels requested and "gene" column present
       if (
         input[["expression_projection_genes_in_separate_panels"]] == TRUE &&
-        "gene" %in% colnames(cells_df) == TRUE
+          "gene" %in% colnames(cells_df) == TRUE
       ) {
         ## prepare plot
         plot <- pltExpProj2DMultPanExp(
@@ -94,7 +95,7 @@ observeEvent(input[["expression_projection_export"]], {
           y_range = plot_parameters[["y_range"]]
         )
       }
-    ## ... trajectory
+      ## ... trajectory
     } else {
       ## prepare plot
       plot <- pltExpTrj2DSglPanExp(
@@ -116,7 +117,7 @@ observeEvent(input[["expression_projection_export"]], {
     ggsave(save_file_path, plot, height = 8, width = 11)
     ## check if file was succesfully saved
     ## ... successful
-    if ( file.exists(save_file_path) ) {
+    if (file.exists(save_file_path)) {
       ## give positive message
       shinyWidgets::sendSweetAlert(
         session = session,
@@ -124,7 +125,7 @@ observeEvent(input[["expression_projection_export"]], {
         text = paste0("Plot saved successfully as: ", save_file_path),
         type = "success"
       )
-    ## ... failed
+      ## ... failed
     } else {
       ## give negative message
       shinyWidgets::sendSweetAlert(

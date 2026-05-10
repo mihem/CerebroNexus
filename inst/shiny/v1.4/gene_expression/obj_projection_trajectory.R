@@ -9,7 +9,7 @@ expression_projection_trajectory <- reactive({
   # message('--> trigger "expression_projection_trajectory"')
   parameters <- expression_projection_parameters_plot()
   cells_to_show <- expression_projection_cells_to_show()
-  if ( parameters[["projection"]] %in% availableProjections()) {
+  if (parameters[["projection"]] %in% availableProjections()) {
     trajectory_data <- list()
   } else {
     ## split selection into method and name
@@ -24,8 +24,8 @@ expression_projection_trajectory <- reactive({
       selection[1],
       selection[2]
     )
-    trajectory_data[['meta']] <- trajectory_data[['meta']][cells_to_show,]
+    trajectory_data[['meta']] <- trajectory_data[['meta']][cells_to_show, ]
   }
-#   message(str(trajectory_data))
+  #   message(str(trajectory_data))
   return(trajectory_data)
 })

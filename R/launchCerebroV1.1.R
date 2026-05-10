@@ -34,14 +34,13 @@
 launchCerebroV1.1 <- function(
   maxFileSize = 800,
   ...
-){
-
+) {
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
   ## check if ggtree package is installed
-  if ( !requireNamespace("ggtree", quietly = TRUE) ) {
+  if (!requireNamespace("ggtree", quietly = TRUE)) {
     stop(
       "The 'ggtree' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -49,7 +48,7 @@ launchCerebroV1.1 <- function(
   }
 
   ## check if formattable package is installed
-  if ( !requireNamespace("formattable", quietly = TRUE) ) {
+  if (!requireNamespace("formattable", quietly = TRUE)) {
     stop(
       "The 'formattable' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -57,7 +56,7 @@ launchCerebroV1.1 <- function(
   }
 
   ## check if reshape2 package is installed
-  if ( !requireNamespace("reshape2", quietly = TRUE) ) {
+  if (!requireNamespace("reshape2", quietly = TRUE)) {
     stop(
       "The 'reshape2' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -67,14 +66,11 @@ launchCerebroV1.1 <- function(
   ##--------------------------------------------------------------------------##
   ## define path to export plots to
   ##--------------------------------------------------------------------------##
-  if ( grepl(tolower(Sys.info()["sysname"]), pattern = "^win") )
-  {
+  if (grepl(tolower(Sys.info()["sysname"]), pattern = "^win")) {
     plot_export_path <- paste0(Sys.getenv("USERPROFILE"), "\\Desktop\\")
-  } else if ( "DOCKER" %in% names(Sys.getenv()) )
-  {
+  } else if ("DOCKER" %in% names(Sys.getenv())) {
     plot_export_path <- "/plots"
-  } else if ( grepl(tolower(Sys.info()["sysname"]), pattern = "darwin") )
-  {
+  } else if (grepl(tolower(Sys.info()["sysname"]), pattern = "darwin")) {
     plot_export_path <- "~/Desktop/"
   }
 

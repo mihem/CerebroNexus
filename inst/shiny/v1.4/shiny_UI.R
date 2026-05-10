@@ -39,7 +39,8 @@ boxTitle <- function(title) {
 
 timeoutSeconds <- 600
 
-inactivity <- sprintf("function idleTimer() {
+inactivity <- sprintf(
+  "function idleTimer() {
 var t = setTimeout(logout, %s);
 window.onmousemove = resetTimer; // catches mouse movements
 window.onmousedown = resetTimer; // catches mouse movements
@@ -56,20 +57,54 @@ clearTimeout(t);
 t = setTimeout(logout, %s);  // time is in milliseconds (1000 is 1 second)
 }
 }
-idleTimer();", timeoutSeconds*1000, timeoutSeconds, timeoutSeconds*1000)
+idleTimer();",
+  timeoutSeconds * 1000,
+  timeoutSeconds,
+  timeoutSeconds * 1000
+)
 
 
 ##----------------------------------------------------------------------------##
 ## Load UI content for each tab.
 ##----------------------------------------------------------------------------##
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/load_data/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/overview/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/groups/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/marker_genes/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/gene_expression/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/gene_id_conversion/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/color_management/UI.R"), local = TRUE)
-source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/about/UI.R"), local = TRUE)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/load_data/UI.R"),
+  local = TRUE
+)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/overview/UI.R"),
+  local = TRUE
+)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/groups/UI.R"),
+  local = TRUE
+)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/marker_genes/UI.R"),
+  local = TRUE
+)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/gene_expression/UI.R"),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/gene_id_conversion/UI.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/color_management/UI.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/about/UI.R"),
+  local = TRUE
+)
 
 ##----------------------------------------------------------------------------##
 ## Create dashboard with different tabs.
@@ -77,19 +112,43 @@ source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/about/UI.R"), loca
 ui <- dashboardPage(
   title = "Cerebro",
   dashboardHeader(
-    title = span("Cerebro ", style = "color: white; font-size: 28px; font-weight: bold")
+    title = span(
+      "Cerebro ",
+      style = "color: white; font-size: 28px; font-weight: bold"
+    )
   ),
   dashboardSidebar(
     tags$head(tags$style(HTML(".content-wrapper {overflow-x: scroll;}"))),
     sidebarMenu(
       id = "sidebar",
-      menuItem("Data info", tabName = "loadData", icon = icon("info"), selected = TRUE),
+      menuItem(
+        "Data info",
+        tabName = "loadData",
+        icon = icon("info"),
+        selected = TRUE
+      ),
       menuItem("Main", tabName = "overview", icon = icon("home")),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
-      menuItem("Marker genes", tabName = "markerGenes", icon = icon("list-alt")),
-      menuItem("Gene expression", tabName = "geneExpression", icon = icon("signal")),
-      menuItem("Gene ID conversion", tabName = "geneIdConversion", icon = icon("barcode")),
-      menuItem("Color management", tabName = "color_management", icon = icon("palette")),
+      menuItem(
+        "Marker genes",
+        tabName = "markerGenes",
+        icon = icon("list-alt")
+      ),
+      menuItem(
+        "Gene expression",
+        tabName = "geneExpression",
+        icon = icon("signal")
+      ),
+      menuItem(
+        "Gene ID conversion",
+        tabName = "geneIdConversion",
+        icon = icon("barcode")
+      ),
+      menuItem(
+        "Color management",
+        tabName = "color_management",
+        icon = icon("palette")
+      ),
       menuItem("About", tabName = "about", icon = icon("at"))
     )
   ),
@@ -109,4 +168,3 @@ ui <- dashboardPage(
     tags$script(inactivity)
   )
 )
-

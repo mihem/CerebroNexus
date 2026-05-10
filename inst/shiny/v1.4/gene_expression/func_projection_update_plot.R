@@ -12,11 +12,11 @@ expression_projection_update_plot <- function(input) {
   separate_panels <- input[['separate_panels']]
   ## sort cells based on expression (if applicable)
   if (
-    plot_parameters[['plot_order']]=='Highest expression on top' &&
-    separate_panels == FALSE
+    plot_parameters[['plot_order']] == 'Highest expression on top' &&
+      separate_panels == FALSE
   ) {
     cell_order <- order(expression_levels)
-    coordinates <- coordinates[cell_order,]
+    coordinates <- coordinates[cell_order, ]
     hover_info <- hover_info[cell_order]
     if (is.list(expression_levels)) {
       for (i in 1:length(expression_levels)) {
@@ -38,7 +38,7 @@ expression_projection_update_plot <- function(input) {
     y_range = plot_parameters[["y_range"]],
     reset_axes = reset_axes
   )
-  if ( plot_parameters[["draw_border"]] ) {
+  if (plot_parameters[["draw_border"]]) {
     output_data[['point_line']] <- list(
       color = "rgb(196,196,196)",
       width = 1
@@ -54,7 +54,7 @@ expression_projection_update_plot <- function(input) {
     hoverinfo = ifelse(plot_parameters[["hover_info"]], 'text', 'skip'),
     text = 'empty'
   )
-  if ( plot_parameters[["hover_info"]] ) {
+  if (plot_parameters[["hover_info"]]) {
     output_hover[['text']] <- unname(hover_info)
   }
   ## process trajectory data
@@ -62,10 +62,10 @@ expression_projection_update_plot <- function(input) {
   if (plot_parameters[['is_trajectory']]) {
     ## fix order of trajectory meta data if cells are sorted by expression
     if (
-      plot_parameters[['plot_order']]=='Highest expression on top' &&
-      separate_panels == FALSE
+      plot_parameters[['plot_order']] == 'Highest expression on top' &&
+        separate_panels == FALSE
     ) {
-      trajectory[['meta']] <- trajectory[['meta']][cell_order,]
+      trajectory[['meta']] <- trajectory[['meta']][cell_order, ]
     }
     ## add additional info to hover info
     if (plot_parameters[['hover_info']]) {
@@ -77,7 +77,7 @@ expression_projection_update_plot <- function(input) {
     }
     ## convert edges of trajectory into list format to plot with plotly
     trajectory_edges <- trajectory[['edges']]
-    for (i in 1:nrow(trajectory_edges) ) {
+    for (i in 1:nrow(trajectory_edges)) {
       line = list(
         type = "line",
         line = list(color = "black", width = 1),
@@ -127,7 +127,7 @@ expression_projection_update_plot <- function(input) {
   ## call JavaScript functions to update plot
   if (
     plot_parameters[['n_dimensions']] == 2 &&
-    is.list(input[['expression_levels']]) == FALSE
+      is.list(input[['expression_levels']]) == FALSE
   ) {
     shinyjs::js$expressionProjectionUpdatePlot2D(
       output_data,
@@ -137,8 +137,8 @@ expression_projection_update_plot <- function(input) {
     )
   } else if (
     plot_parameters[['n_dimensions']] == 2 &&
-    separate_panels == TRUE &&
-    is.list(input[['expression_levels']]) == TRUE
+      separate_panels == TRUE &&
+      is.list(input[['expression_levels']]) == TRUE
   ) {
     shinyjs::js$expressionProjectionUpdatePlot2DMultiPanel(
       output_data,
@@ -146,7 +146,7 @@ expression_projection_update_plot <- function(input) {
       output_color,
       trajectory_lines
     )
-  } else if ( plot_parameters[['n_dimensions']] == 3 ) {
+  } else if (plot_parameters[['n_dimensions']] == 3) {
     output_data[['z']] <- coordinates[[3]]
     shinyjs::js$expressionProjectionUpdatePlot3D(
       output_data,

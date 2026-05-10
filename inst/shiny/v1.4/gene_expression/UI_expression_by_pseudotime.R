@@ -7,10 +7,14 @@
 ##----------------------------------------------------------------------------##
 output[["expression_by_pseudotime_UI"]] <- renderUI({
   req(
-    input[["expression_projection_to_display"]] %in% availableProjections() == FALSE
+    input[["expression_projection_to_display"]] %in% availableProjections() ==
+      FALSE
   )
   ## split selection into method and name
-  selection <- strsplit(input[["expression_projection_to_display"]], split = ' // ')[[1]]
+  selection <- strsplit(
+    input[["expression_projection_to_display"]],
+    split = ' // '
+  )[[1]]
   ## check if method and name exist and don't proceed if not
   req(
     selection[1] %in% getMethodsForTrajectories(),
@@ -89,9 +93,9 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
   )
   ## check selected color scale
   ## ... selected color scale is "viridis"
-  if ( input[["expression_projection_color_scale"]] == 'viridis' ) {
+  if (input[["expression_projection_color_scale"]] == 'viridis') {
     color_scale <- 'Viridis'
-  ## ... selected color scale is anything else than "viridis"
+    ## ... selected color scale is anything else than "viridis"
   } else {
     color_scale <- input[["expression_projection_color_scale"]]
   }
@@ -146,7 +150,7 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
       )
     )
   ## add trend line if activated
-  if ( input[["expression_by_pseudotime_show_trend_line"]] == TRUE ) {
+  if (input[["expression_by_pseudotime_show_trend_line"]] == TRUE) {
     ## calculate smoothened trend line
     trend_line = stats::ksmooth(
       cells_df$pseudotime,
@@ -169,7 +173,7 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
       ),
       name = "Trend line",
       hoverinfo = "text",
-      text = ~glue::glue(
+      text = ~ glue::glue(
         "<b>Trend line</b>
         <b>Pseudotime:</b> {formatC(trend_line$x, format = 'f', digits = 2)}
         <b>Expression:</b> {formatC(trend_line$y, format = 'f', digits = 3)}"
@@ -178,7 +182,7 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
     )
   }
   ## if set in options, return plot with WebGL
-  if ( preferences$use_webgl == TRUE ) {
+  if (preferences$use_webgl == TRUE) {
     plotly::toWebGL(plot)
   } else {
     plot
@@ -205,8 +209,10 @@ observeEvent(input[["expression_by_pseudotime_info"]], {
 ##----------------------------------------------------------------------------##
 expression_by_pseudotime_info <- list(
   title = "Expression levels by pseudotime",
-  text = HTML("
+  text = HTML(
+    "
     Shown in this plot are the expression levels along pseudotime. This can help to judge whether genes or gene sets might play a role in the process represented by the trajectory. By default, a trend line will be added. It can be deactivated using the checkbox in the dropdown menu behind the gear icon in the title of the panel. There, you will also find elements to control the line width and the bandwidth parameter, which determines how local the trend line should be. Lower bandwidth values will results in a more local curve than larger values.
     <em>This panel is only visible when a trajectory is selected that contains a 'pseudotime' column.</em><br>
-  ")
+  "
+  )
 )

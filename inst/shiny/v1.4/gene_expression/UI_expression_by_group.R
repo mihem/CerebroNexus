@@ -45,49 +45,54 @@ output[["expression_by_group"]] <- plotly::renderPlotly({
   ##     because cells are plotted once per gene
   cells_df <- expression_projection_data()
   if (is.list(expression_projection_expression_levels())) {
-    cells_df$level <- do.call(cbind, expression_projection_expression_levels()) %>%
+    cells_df$level <- do.call(
+      cbind,
+      expression_projection_expression_levels()
+    ) %>%
       Matrix::rowMeans()
   } else {
     cells_df$level <- expression_projection_expression_levels()
   }
   ## prepare plot
   cells_df %>%
-  plotly::plot_ly(
-    x = ~.[[ input[["expression_by_group_selected_group"]] ]],
-    y = ~level,
-    type = "violin",
-    box = list(
-      visible = TRUE
-    ),
-    meanline = list(
-      visible = TRUE
-    ),
-    color = ~.[[ input[["expression_by_group_selected_group"]] ]],
-    colors = reactive_colors()[[ input[["expression_by_group_selected_group"]] ]],
-    source = "subset",
-    showlegend = FALSE,
-    hoverinfo = "y",
-    marker = list(
-      size = 5
-    )
-  ) %>%
-  plotly::layout(
-    title = "",
-    xaxis = list(
+    plotly::plot_ly(
+      x = ~ .[[input[["expression_by_group_selected_group"]]]],
+      y = ~level,
+      type = "violin",
+      box = list(
+        visible = TRUE
+      ),
+      meanline = list(
+        visible = TRUE
+      ),
+      color = ~ .[[input[["expression_by_group_selected_group"]]]],
+      colors = reactive_colors()[[input[[
+        "expression_by_group_selected_group"
+      ]]]],
+      source = "subset",
+      showlegend = FALSE,
+      hoverinfo = "y",
+      marker = list(
+        size = 5
+      )
+    ) %>%
+    plotly::layout(
       title = "",
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    yaxis = list(
-      title = "Expression level",
-      range = c(0, max(cells_df$level, na.rm = TRUE) * 1.2),
-      hoverformat = ".2f",
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    dragmode = "select",
-    hovermode = "compare"
-  )
+      xaxis = list(
+        title = "",
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      yaxis = list(
+        title = "Expression level",
+        range = c(0, max(cells_df$level, na.rm = TRUE) * 1.2),
+        hoverformat = ".2f",
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      dragmode = "select",
+      hovermode = "compare"
+    )
 })
 
 ##----------------------------------------------------------------------------##
@@ -110,5 +115,7 @@ observeEvent(input[["expression_by_group_info"]], {
 ##----------------------------------------------------------------------------##
 expression_by_group_info <- list(
   title = "Expression levels by group",
-  text = p("Log-normalised expression of genes inserted above by group If more than 1 gene was provided, this reflects the average across all cells of each group")
+  text = p(
+    "Log-normalised expression of genes inserted above by group If more than 1 gene was provided, this reflects the average across all cells of each group"
+  )
 )

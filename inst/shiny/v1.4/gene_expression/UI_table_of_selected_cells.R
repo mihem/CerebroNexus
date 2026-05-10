@@ -46,19 +46,22 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
   selected_cells <- expression_projection_selected_cells()
   ## check selection
   ## ... selection has not been made or there is no cell in it
-  if ( is.null(selected_cells) ) {
+  if (is.null(selected_cells)) {
     ## prepare empty table
     getMetaData() %>%
-    dplyr::slice(0) %>%
-    prepareEmptyTable()
-  ## ... selection has been made and at least 1 cell is in it
+      dplyr::slice(0) %>%
+      prepareEmptyTable()
+    ## ... selection has been made and at least 1 cell is in it
   } else {
     cells_df <- bind_cols(
       expression_projection_coordinates(),
       expression_projection_data()
     )
     if (is.list(expression_projection_expression_levels())) {
-      cells_df$level <- do.call(cbind, expression_projection_expression_levels()) %>%
+      cells_df$level <- do.call(
+        cbind,
+        expression_projection_expression_levels()
+      ) %>%
         Matrix::rowMeans()
     } else {
       cells_df$level <- expression_projection_expression_levels()
@@ -74,12 +77,12 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
       dplyr::select(cell_barcode, expression_level, everything())
     ## check how many cells are left after filtering
     ## ... no cells are left
-    if ( nrow(cells_df) == 0 ) {
+    if (nrow(cells_df) == 0) {
       ## prepare empty table
       getMetaData() %>%
-      dplyr::slice(0) %>%
-      prepareEmptyTable()
-    ## ... at least 1 cell is left
+        dplyr::slice(0) %>%
+        prepareEmptyTable()
+      ## ... at least 1 cell is left
     } else {
       ## prepare proper table
       prettifyTable(
@@ -87,8 +90,12 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
         filter = list(position = "top", clear = TRUE),
         dom = "Brtlip",
         show_buttons = TRUE,
-        number_formatting = input[["expression_details_selected_cells_number_formatting"]],
-        color_highlighting = input[["expression_details_selected_cells_color_highlighting"]],
+        number_formatting = input[[
+          "expression_details_selected_cells_number_formatting"
+        ]],
+        color_highlighting = input[[
+          "expression_details_selected_cells_color_highlighting"
+        ]],
         hide_long_columns = TRUE,
         download_file_name = "expression_details_of_selected_cells"
       )
@@ -116,7 +123,8 @@ observeEvent(input[["expression_details_selected_cells_info"]], {
 ##----------------------------------------------------------------------------##
 expression_details_selected_cells_info <- list(
   title = "Details of selected cells",
-  text = HTML("
+  text = HTML(
+    "
     Table containing (average) expression values of selected genes as well as selected meta data (sample, cluster, number of transcripts, number of expressed genes) for cells selected in the plot using the box or lasso selection tool. If you want the table to contain all cells in the data set, you must select all cells in the plot. The table can be saved to disk in CSV or Excel format for further analysis.
     <h4>Options</h4>
     <b>Automatically format numbers</b><br>

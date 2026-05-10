@@ -20,11 +20,11 @@ output[["expression_projection_color_range_UI"]] <- renderUI({
   ## ... there is no range (from 0 to 0)
   if (
     expression_range[1] == 0 &&
-    expression_range[2] == 0
+      expression_range[2] == 0
   ) {
     ## set range to 0-1
     expression_range[2] <- 1
-  ## ... otherwise
+    ## ... otherwise
   } else {
     ## round min and max values to 2 digits
     expression_range <- round(expression_range, digits = 2)
@@ -65,7 +65,8 @@ observeEvent(input[["expression_projection_color_scale_info"]], {
 ##----------------------------------------------------------------------------##
 expression_projection_color_scale_info <- list(
   title = "Color scale for gene (set) expression",
-  text = HTML("
+  text = HTML(
+    "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
       <li><b>Color scale:</b> Choose your prefered color scale.</li>

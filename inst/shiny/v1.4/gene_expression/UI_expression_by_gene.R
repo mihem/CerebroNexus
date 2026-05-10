@@ -24,30 +24,36 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
   req(input[["expression_projection_color_scale"]])
   ## prepare expression levels, depending on genes provided by user
   ## ... if no genes are available
-  if ( length(expression_selected_genes()$genes_to_display_present) == 0 ) {
+  if (length(expression_selected_genes()$genes_to_display_present) == 0) {
     ## manually prepare empty data frame
     expression_levels <- data.frame(
       "gene" = character(),
       "expression" = integer()
     )
-  ## ... if at least 1 gene has been provided
-  } else if ( length(expression_selected_genes()$genes_to_display_present) >= 1 ) {
+    ## ... if at least 1 gene has been provided
+  } else if (
+    length(expression_selected_genes()$genes_to_display_present) >= 1
+  ) {
     ## - calculate mean expression for every gene across all cells
     ## - sort genes by mean expression from high to low
     ## - show only first 50 genes if more are available
-    expression_levels <- data_set()$expression[expression_selected_genes()$genes_to_display_present, , drop=FALSE]
+    expression_levels <- data_set()$expression[
+      expression_selected_genes()$genes_to_display_present,
+      ,
+      drop = FALSE
+    ]
     expression_levels <- Matrix::rowMeans(expression_levels)
     expression_levels <- data.frame(
-        gene = expression_selected_genes()$genes_to_display_present,
-        expression = expression_levels
-      ) %>%
+      gene = expression_selected_genes()$genes_to_display_present,
+      expression = expression_levels
+    ) %>%
       dplyr::slice_max(expression, n = 50)
   }
   ## prepare color scale, either "viridis" or other
   ## ...
-  if ( input[["expression_projection_color_scale"]] == 'viridis' ) {
+  if (input[["expression_projection_color_scale"]] == 'viridis') {
     color_scale <- 'Viridis'
-  ## ...
+    ## ...
   } else {
     color_scale <- input[["expression_projection_color_scale"]]
   }
@@ -56,8 +62,9 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
     expression_levels,
     x = ~gene,
     y = ~expression,
-    text = ~paste0(
-      expression_levels$gene, ': ',
+    text = ~ paste0(
+      expression_levels$gene,
+      ': ',
       format(expression_levels$expression, digits = 3)
     ),
     type = "bar",
@@ -73,24 +80,24 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
     hoverinfo = "text",
     showlegend = FALSE
   ) %>%
-  plotly::layout(
-    title = "",
-    xaxis = list(
+    plotly::layout(
       title = "",
-      type = "category",
-      categoryorder = "array",
-      categoryarray = expression_levels$gene,
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    yaxis = list(
-      title = "Expression level",
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    dragmode = "select",
-    hovermode = "compare"
-  )
+      xaxis = list(
+        title = "",
+        type = "category",
+        categoryorder = "array",
+        categoryarray = expression_levels$gene,
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      yaxis = list(
+        title = "Expression level",
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      dragmode = "select",
+      hovermode = "compare"
+    )
 })
 
 ##----------------------------------------------------------------------------##
@@ -113,5 +120,7 @@ observeEvent(input[["expression_by_gene_info"]], {
 ##----------------------------------------------------------------------------##
 expression_by_gene_info <- list(
   title = "Expression levels by gene",
-  text = p("Log-normalised expression of 50 highest expressed genes inserted above. Shows mean across all cells.")
+  text = p(
+    "Log-normalised expression of 50 highest expressed genes inserted above. Shows mean across all cells."
+  )
 )

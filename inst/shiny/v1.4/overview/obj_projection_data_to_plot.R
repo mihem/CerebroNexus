@@ -8,11 +8,13 @@ overview_projection_data_to_plot_raw <- reactive({
     overview_projection_parameters_plot(),
     reactive_colors(),
     overview_projection_hover_info(),
-    nrow(overview_projection_data()) == length(overview_projection_hover_info()) || overview_projection_hover_info() == "none"
+    nrow(overview_projection_data()) ==
+      length(overview_projection_hover_info()) ||
+      overview_projection_hover_info() == "none"
   )
   # message('--> trigger "overview_projection_data_to_plot"')
   ## get colors for groups (if applicable)
-  if ( is.numeric(overview_projection_parameters_plot()[['color_variable']]) ) {
+  if (is.numeric(overview_projection_parameters_plot()[['color_variable']])) {
     color_assignments <- NA
   } else {
     color_assignments <- assignColorsToGroups(
@@ -55,4 +57,7 @@ overview_projection_data_to_plot_raw <- reactive({
   return(to_return)
 })
 
-overview_projection_data_to_plot <- debounce(overview_projection_data_to_plot_raw, 150)
+overview_projection_data_to_plot <- debounce(
+  overview_projection_data_to_plot_raw,
+  150
+)

@@ -3,7 +3,8 @@
 ##----------------------------------------------------------------------------##
 tab_marker_genes <- tabItem(
   tabName = "markerGenes",
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #marker_genes_table .table th {
       text-align: center;
     }

@@ -30,17 +30,19 @@ output[["marker_genes_table_or_text_UI"]] <- renderUI({
   req(
     input[["marker_genes_selected_method"]],
     input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
+    input[["marker_genes_selected_table"]] %in%
+      getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
   )
   ## fetch results
   results_type <- getMarkerGenes(
     input[["marker_genes_selected_method"]],
     input[["marker_genes_selected_table"]]
   )
-  if ( length(results_type) > 0 ) {
-    if ( is.data.frame(results_type) ) {
+  if (length(results_type) > 0) {
+    if (is.data.frame(results_type)) {
       fluidRow(
-        column(12,
+        column(
+          12,
           shinyWidgets::materialSwitch(
             inputId = "marker_genes_table_filter_switch",
             label = "Show results for all subgroups (no pre-filtering):",
@@ -63,16 +65,12 @@ output[["marker_genes_table_or_text_UI"]] <- renderUI({
             inline = TRUE
           )
         ),
-        column(12,
-          uiOutput("marker_genes_filter_subgroups_UI")
-        ),
-        column(12,
-          DT::dataTableOutput("marker_genes_table")
-        )
+        column(12, uiOutput("marker_genes_filter_subgroups_UI")),
+        column(12, DT::dataTableOutput("marker_genes_table"))
       )
     } else if (
       is.character(results_type) &&
-      results_type == "no_markers_found"
+        results_type == "no_markers_found"
     ) {
       textOutput("marker_genes_table_no_markers_found")
     }
@@ -88,7 +86,8 @@ output[["marker_genes_filter_subgroups_UI"]] <- renderUI({
   req(
     input[["marker_genes_selected_method"]],
     input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]]),
+    input[["marker_genes_selected_table"]] %in%
+      getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]]),
     !is.null(input[["marker_genes_table_filter_switch"]])
   )
   ## fetch results
@@ -103,21 +102,22 @@ output[["marker_genes_filter_subgroups_UI"]] <- renderUI({
   ## ... it's not
   if (
     input[["marker_genes_table_filter_switch"]] == TRUE ||
-    colnames(results_df)[1] %in% getGroups() == FALSE
+      colnames(results_df)[1] %in% getGroups() == FALSE
   ) {
     ## return nothing (empty row)
     fluidRow()
-  ## ... it is
+    ## ... it is
   } else {
     ## check for which groups results exist
-    if ( is.character(results_df[[1]]) ) {
+    if (is.character(results_df[[1]])) {
       available_groups <- unique(results_df[[1]])
-    } else if ( is.factor(results_df[[1]]) ) {
+    } else if (is.factor(results_df[[1]])) {
       available_groups <- levels(results_df[[1]])
     }
     ## create input selection for available groups
     fluidRow(
-      column(12,
+      column(
+        12,
         selectInput(
           "marker_genes_table_select_group_level",
           label = "Filter results for subgroup:",
@@ -135,7 +135,8 @@ output[["marker_genes_table"]] <- DT::renderDataTable({
   req(
     input[["marker_genes_selected_method"]],
     input[["marker_genes_selected_table"]],
-    input[["marker_genes_selected_table"]] %in% getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
+    input[["marker_genes_selected_table"]] %in%
+      getGroupsWithMarkerGenes(input[["marker_genes_selected_method"]])
   )
   ## fetch results
   results_df <- getMarkerGenes(
@@ -148,22 +149,26 @@ output[["marker_genes_table"]] <- DT::renderDataTable({
   ## (otherwise show all results)
   if (
     input[["marker_genes_table_filter_switch"]] == FALSE &&
-    colnames(results_df)[1] %in% getGroups() == TRUE
+      colnames(results_df)[1] %in% getGroups() == TRUE
   ) {
     ## don't proceed if selection of subgroup is not available
     req(input[["marker_genes_table_select_group_level"]])
     ## filter table
-    results_df <- results_df[ which(results_df[[1]] == input[["marker_genes_table_select_group_level"]]) , ]
+    results_df <- results_df[
+      which(
+        results_df[[1]] == input[["marker_genes_table_select_group_level"]]
+      ),
+    ]
   }
   ## if the table is empty, e.g. because the filtering of results for a specific
   ## subgroup did not work properly, skip the processing and show and empty
   ## table (otherwise the procedure would result in an error)
-  if ( nrow(results_df) == 0 ) {
+  if (nrow(results_df) == 0) {
     results_df %>%
-    as.data.frame() %>%
-    dplyr::slice(0) %>%
-    prepareEmptyTable()
-  ## if there is at least 1 row, create proper table
+      as.data.frame() %>%
+      dplyr::slice(0) %>%
+      prepareEmptyTable()
+    ## if there is at least 1 row, create proper table
   } else {
     prettifyTable(
       results_df,
@@ -175,7 +180,8 @@ output[["marker_genes_table"]] <- DT::renderDataTable({
       hide_long_columns = TRUE,
       download_file_name = paste0(
         "marker_genes_by_",
-        input[["marker_genes_selected_method"]], "_",
+        input[["marker_genes_selected_method"]],
+        "_",
         input[["marker_genes_selected_table"]]
       ),
       page_length_default = 20,
@@ -218,7 +224,8 @@ observeEvent(input[["marker_genes_info"]], {
 ##----------------------------------------------------------------------------##
 marker_genes_info <- list(
   title = "Marker genes",
-  text = HTML("
+  text = HTML(
+    "
     Shown here are the marker genes identified for each group - resembling bulk RNA-seq. These genes should help to functionally interpret the role of a given group of cells or find new markers to purify it.<br>
     Cerebro performs this analysis with the 'FindAllMarkers()' function by Seurat, which compares each group to all other groups combined. Only genes that pass thresholds for log-fold change, the percentage of cells that express the gene, p-value, and adjusted p-values are reported. Statistical analysis can be done using different tests Finally, if data is available, the last column reports for each gene if it is associated with gene ontology term GO:0009986 which is an indicator that the respective gene is present on the cell surface (which could make it more interesting to purify a given population).<br>
     Results from other methods and tools can be manually added to the Cerebro object in which case the description above might not be applicable.

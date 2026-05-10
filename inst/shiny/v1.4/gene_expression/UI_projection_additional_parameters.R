@@ -28,10 +28,18 @@ output[["expression_projection_additional_parameters_UI"]] <- renderUI({
     sliderInput(
       "expression_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][["min"]],
-      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][["max"]],
-      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][["step"]],
-      value = preferences[["gene_expression_plot_percentage_cells_to_show"]][["default"]]
+      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+        "min"
+      ]],
+      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+        "max"
+      ]],
+      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+        "step"
+      ]],
+      value = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+        "default"
+      ]]
     )
   )
 })
@@ -64,7 +72,8 @@ observeEvent(input[["expression_projection_additional_parameters_info"]], {
 ##----------------------------------------------------------------------------##
 expression_projection_additional_parameters_info <- list(
   title = "Additional parameters for gene (set) expression",
-  text = HTML("
+  text = HTML(
+    "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
       <li><b>Plotting order:</b> Cells can be plotted in random order or so that cells with highest expression are on top.</li>

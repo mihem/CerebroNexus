@@ -2,13 +2,17 @@
 ## Tab: Gene (set) expression
 ##----------------------------------------------------------------------------##
 js_code_gene_expression_projection <- readr::read_file(
-  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/gene_expression/js_projection_update_plot.js")
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/gene_expression/js_projection_update_plot.js"
+  )
 )
 
 tab_gene_expression <- tabItem(
   tabName = "geneExpression",
   ## necessary to ensure alignment of table headers and content
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #expression_details_selected_cells .table th {
       text-align: center;
     }
@@ -29,6 +33,6 @@ tab_gene_expression <- tabItem(
   uiOutput("expression_details_selected_cells_UI"),
   uiOutput("expression_in_selected_cells_UI"),
   uiOutput("expression_by_group_UI"),
-  uiOutput("expression_by_gene_UI")#,
+  uiOutput("expression_by_gene_UI") #,
   # uiOutput("expression_by_pseudotime_UI")
 )

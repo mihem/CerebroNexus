@@ -6,7 +6,7 @@ output[["expression_projection_scales_UI"]] <- renderUI({
   req(input[["expression_projection_to_display"]])
   if (
     is.null(input[["expression_projection_to_display"]]) ||
-    is.na(input[["expression_projection_to_display"]])
+      is.na(input[["expression_projection_to_display"]])
   ) {
     projection_to_display <- availableProjections()[1]
   } else {
@@ -14,12 +14,17 @@ output[["expression_projection_scales_UI"]] <- renderUI({
   }
   ## check if projection or trajectory should be shown
   ## ... projection
-  if ( input[["expression_projection_to_display"]] %in% availableProjections() ) {
-    XYranges <- getXYranges(getProjection(input[["expression_projection_to_display"]]))
-  ## ... trajectory
+  if (input[["expression_projection_to_display"]] %in% availableProjections()) {
+    XYranges <- getXYranges(getProjection(input[[
+      "expression_projection_to_display"
+    ]]))
+    ## ... trajectory
   } else {
     ## split selection into method and name
-    selection <- strsplit(input[["expression_projection_to_display"]], split = ' // ')[[1]]
+    selection <- strsplit(
+      input[["expression_projection_to_display"]],
+      split = ' // '
+    )[[1]]
     ## check if method and name exist and don't proceed if not
     req(
       selection[1] %in% getMethodsForTrajectories(),

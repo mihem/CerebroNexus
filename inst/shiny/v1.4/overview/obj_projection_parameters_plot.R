@@ -18,7 +18,9 @@ overview_projection_parameters_plot_raw <- reactive({
   # message('--> trigger "overview_projection_parameters_plot"')
   parameters <- list(
     projection = input[["overview_projection_to_display"]],
-    n_dimensions = ncol(getProjection(input[["overview_projection_to_display"]])),
+    n_dimensions = ncol(getProjection(input[[
+      "overview_projection_to_display"
+    ]])),
     color_variable = input[["overview_projection_point_color"]],
     point_size = input[["overview_projection_point_size"]],
     point_opacity = input[["overview_projection_point_opacity"]],
@@ -33,7 +35,10 @@ overview_projection_parameters_plot_raw <- reactive({
   return(parameters)
 })
 
-overview_projection_parameters_plot <- debounce(overview_projection_parameters_plot_raw, 150)
+overview_projection_parameters_plot <- debounce(
+  overview_projection_parameters_plot_raw,
+  150
+)
 
 ##
 overview_projection_parameters_other <- reactiveValues(

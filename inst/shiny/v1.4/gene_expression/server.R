@@ -7,6 +7,6 @@ files_to_load <- list.files(
   full.names = TRUE
 )
 
-for ( i in files_to_load ) {
+for (i in files_to_load) {
   source(i, local = TRUE)
 }

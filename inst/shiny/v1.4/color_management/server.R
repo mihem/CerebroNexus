@@ -11,8 +11,8 @@ output[["color_assignments_UI"]] <- renderUI({
   fluidRow(
     tagList({
       group_list <- list()
-      for ( group_name in getGroups() ) {
-        group_list[[ group_name ]] <- box(
+      for (group_name in getGroups()) {
+        group_list[[group_name]] <- box(
           title = tagList(
             boxTitle(group_name),
             cerebroInfoButton("color_assignments_info")
@@ -23,11 +23,16 @@ output[["color_assignments_UI"]] <- renderUI({
           collapsible = TRUE,
           tagList({
             color_list <- list()
-            for ( group_level in getGroupLevels(group_name) ) {
-              color_list[[ group_level ]] <- colourpicker::colourInput(
-                inputId = paste0('color_', group_name, '_', gsub(group_level, pattern = '[^[:alnum:]]', replacement = '_')),
+            for (group_level in getGroupLevels(group_name)) {
+              color_list[[group_level]] <- colourpicker::colourInput(
+                inputId = paste0(
+                  'color_',
+                  group_name,
+                  '_',
+                  gsub(group_level, pattern = '[^[:alnum:]]', replacement = '_')
+                ),
                 label = group_level,
-                value = reactive_colors()[[ group_name ]][ group_level ]
+                value = reactive_colors()[[group_name]][group_level]
               )
             }
             color_list
@@ -37,9 +42,9 @@ output[["color_assignments_UI"]] <- renderUI({
 
       ## if there are columns with cell cycle info, add color selection elements
       ## also for those
-      if ( length(getCellCycle()) > 0 ) {
-        for ( column in getCellCycle() ) {
-          group_list[[ column ]] <- box(
+      if (length(getCellCycle()) > 0) {
+        for (column in getCellCycle()) {
+          group_list[[column]] <- box(
             title = tagList(
               boxTitle(column),
               cerebroInfoButton("color_assignments_info")
@@ -50,11 +55,16 @@ output[["color_assignments_UI"]] <- renderUI({
             collapsible = TRUE,
             tagList({
               color_list <- list()
-              for ( state in unique(as.character(getMetaData()[[ column ]])) ) {
-                color_list[[ state ]] <- colourpicker::colourInput(
-                  inputId = paste0('color_', column, '_', gsub(state, pattern = '[^[:alnum:]]', replacement = '_')),
+              for (state in unique(as.character(getMetaData()[[column]]))) {
+                color_list[[state]] <- colourpicker::colourInput(
+                  inputId = paste0(
+                    'color_',
+                    column,
+                    '_',
+                    gsub(state, pattern = '[^[:alnum:]]', replacement = '_')
+                  ),
                   label = state,
-                  value = reactive_colors()[[ column ]][ state ]
+                  value = reactive_colors()[[column]][state]
                 )
               }
               color_list
@@ -66,7 +76,6 @@ output[["color_assignments_UI"]] <- renderUI({
       group_list
     })
   )
-
 })
 
 ##----------------------------------------------------------------------------##
@@ -91,5 +100,7 @@ observeEvent(input[["color_assignments_info"]], {
 
 color_assignments_info <- list(
   title = "Colors for groups",
-  text = p("Using this interface, you can assign new colors to each of the groups which will then be used across all tabs in Cerebro.")
+  text = p(
+    "Using this interface, you can assign new colors to each of the groups which will then be used across all tabs in Cerebro."
+  )
 )

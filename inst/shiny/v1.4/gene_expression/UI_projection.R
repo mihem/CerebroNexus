@@ -4,7 +4,9 @@
 output[["expression_projection_UI"]] <- renderUI({
   fluidRow(
     column(
-      width = 3, offset = 0, style = "padding: 0px;",
+      width = 3,
+      offset = 0,
+      style = "padding: 0px;",
       tagList(
         cerebroBox(
           title = tagList(
@@ -20,12 +22,12 @@ output[["expression_projection_UI"]] <- renderUI({
           ),
           tagList(
             shinyWidgets::radioGroupButtons(
-               inputId = "expression_analysis_mode",
-               label = NULL,
-               choices = c("Gene(s)"),
-               status = "primary",
-               justified = TRUE,
-               width = "100%"
+              inputId = "expression_analysis_mode",
+              label = NULL,
+              choices = c("Gene(s)"),
+              status = "primary",
+              justified = TRUE,
+              width = "100%"
             ),
             uiOutput("expression_projection_input_type_UI"),
             uiOutput("expression_projection_select_projection_UI")
@@ -82,7 +84,9 @@ output[["expression_projection_UI"]] <- renderUI({
       )
     ),
     column(
-      width = 9, offset = 0, style = "padding: 0px;",
+      width = 9,
+      offset = 0,
+      style = "padding: 0px;",
       cerebroBox(
         title = tagList(
           boxTitle("Dimensional reduction"),
@@ -163,7 +167,8 @@ observeEvent(input[["expression_projection_main_parameters_info"]], {
 ##----------------------------------------------------------------------------##
 expression_projection_main_parameters_info <- list(
   title = "Main parameters for gene (set) expression",
-  text = HTML("
+  text = HTML(
+    "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
       <li><b>Gene(s)</b> In the case of 'Gene(s)', you can select one or multiple genes from the input field below. If you select multiple genes, the mean expression across the selected genes will be calculated for each cell. A list of which genes are present or missing in the data set can be found below the projection.</li>

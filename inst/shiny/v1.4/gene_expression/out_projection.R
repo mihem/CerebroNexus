@@ -2,21 +2,25 @@
 ## Plot of projection.
 ##----------------------------------------------------------------------------##
 output[["expression_projection"]] <- plotly::renderPlotly({
-  plotly::plot_ly(type = 'scattergl', mode = 'markers', source = "expression_projection") %>%
-  plotly::layout(
-    xaxis = list(
-      autorange = TRUE,
-      mirror = TRUE,
-      showline = TRUE,
-      zeroline = FALSE
-    ),
-    yaxis = list(
-      autorange = TRUE,
-      mirror = TRUE,
-      showline = TRUE,
-      zeroline = FALSE
+  plotly::plot_ly(
+    type = 'scattergl',
+    mode = 'markers',
+    source = "expression_projection"
+  ) %>%
+    plotly::layout(
+      xaxis = list(
+        autorange = TRUE,
+        mirror = TRUE,
+        showline = TRUE,
+        zeroline = FALSE
+      ),
+      yaxis = list(
+        autorange = TRUE,
+        mirror = TRUE,
+        showline = TRUE,
+        zeroline = FALSE
+      )
     )
-  )
 })
 
 ##----------------------------------------------------------------------------##
@@ -39,7 +43,8 @@ observeEvent(input[["expression_projection_info"]], {
 ##----------------------------------------------------------------------------##
 expression_projection_info <- list(
   title = "Dimensional reduction",
-  text = HTML("
+  text = HTML(
+    "
     Interactive projection of cells into two- or three-dimensional space based on their expression profile.<br>
     <ul>
       <li>Both tSNE and UMAP are frequently used algorithms for dimensional reduction in single cell transcriptomics. While they generally allow to make similar conclusions, some differences exist between the two (please refer to Google and/or literature, such as Becht E. et al., Dimensionality reduction for visualizing single-cell data using UMAP. Nature Biotechnology, 2018, 37, 38-44).</li>

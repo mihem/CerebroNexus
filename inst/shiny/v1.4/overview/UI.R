@@ -2,13 +2,17 @@
 ## Tab: Overview
 ##----------------------------------------------------------------------------##
 js_code_overview_projection <- readr::read_file(
-  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/overview/js_projection_update_plot.js")
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/overview/js_projection_update_plot.js"
+  )
 )
 
 tab_overview <- tabItem(
   tabName = "overview",
   ## necessary to ensure alignment of table headers and content
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #overview_details_selected_cells_table .table th {
       text-align: center;
     }

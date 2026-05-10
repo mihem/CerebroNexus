@@ -3,17 +3,19 @@
 ##----------------------------------------------------------------------------##
 output[["expression_projection_input_type_UI"]] <- renderUI({
   req(input[["expression_analysis_mode"]])
-  if ( input[["expression_analysis_mode"]] == "Gene(s)" ) {
+  if (input[["expression_analysis_mode"]] == "Gene(s)") {
     selectizeInput(
       'expression_genes_input',
       label = 'Gene(s)',
-      choices = data.table::as.data.table(data.frame("Genes" = list_of_genes())),
+      choices = data.table::as.data.table(data.frame(
+        "Genes" = list_of_genes()
+      )),
       multiple = TRUE,
       options = list(
         create = TRUE
       )
     )
-  } else if ( input[["expression_analysis_mode"]] == "Gene set" ) {
+  } else if (input[["expression_analysis_mode"]] == "Gene set") {
     selectizeInput(
       'expression_select_gene_set',
       label = 'Gene set',

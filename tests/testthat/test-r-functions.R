@@ -17,11 +17,11 @@ test_that("Cerebro_v1.3: addGroup / getGroups round-trip", {
   obj <- Cerebro_v1.3$new()
   # addGroup checks that the column exists in meta_data first
   obj$setMetaData(data.frame(
-    sample  = c("rep1", "rep2"),
+    sample = c("rep1", "rep2"),
     cluster = c("0", "1"),
     stringsAsFactors = FALSE
   ))
-  obj$addGroup("sample",  c("rep1", "rep2", "rep3"))
+  obj$addGroup("sample", c("rep1", "rep2", "rep3"))
   obj$addGroup("cluster", c("0", "1", "2"))
 
   groups <- obj$getGroups()
@@ -117,8 +117,8 @@ test_that("Cerebro_v1.3: setExpression / getExpressionMatrix round-trip", {
     cells = c("cell1", "cell2"),
     genes = c("GeneA", "GeneB")
   )
-  expect_equal(nrow(result), 2L)  # 2 genes
-  expect_equal(ncol(result), 2L)  # 2 cells
+  expect_equal(nrow(result), 2L) # 2 genes
+  expect_equal(ncol(result), 2L) # 2 cells
 })
 
 test_that("Cerebro_v1.3: getMeanExpressionForGenes returns numeric vector", {
@@ -135,8 +135,16 @@ test_that("Cerebro_v1.3: getMeanExpressionForGenes returns numeric vector", {
   expect_equal(nrow(result), 2L)
   expect_true(is.numeric(result$expression))
   # GeneA: row 1 = c(0, 4, 1) → mean 5/3; GeneB: row 2 = c(2, 6, 3) → mean 11/3
-  expect_equal(result$expression[result$gene == "GeneA"], mean(c(0, 4, 1)), tolerance = 1e-6)
-  expect_equal(result$expression[result$gene == "GeneB"], mean(c(2, 6, 3)), tolerance = 1e-6)
+  expect_equal(
+    result$expression[result$gene == "GeneA"],
+    mean(c(0, 4, 1)),
+    tolerance = 1e-6
+  )
+  expect_equal(
+    result$expression[result$gene == "GeneB"],
+    mean(c(2, 6, 3)),
+    tolerance = 1e-6
+  )
 })
 
 test_that("Cerebro_v1.3: addGeneList / getGeneLists round-trip", {
@@ -155,8 +163,8 @@ test_that("Cerebro_v1.3: addExperiment / getExperiment round-trip", {
   obj <- Cerebro_v1.3$new()
   # addExperiment(field, content) — two separate arguments, call once per field
   obj$addExperiment("experiment_name", "PBMC test")
-  obj$addExperiment("organism",        "hg")
-  obj$addExperiment("date_of_export",  "2024-01-01")
+  obj$addExperiment("organism", "hg")
+  obj$addExperiment("date_of_export", "2024-01-01")
 
   exp <- obj$getExperiment()
   expect_equal(exp$experiment_name, "PBMC test")
@@ -227,7 +235,11 @@ test_that("example.h5 file exists and is non-empty", {
 test_that("calculatePercentGenes stops if Seurat is not installed or object is wrong class", {
   # passing a non-Seurat object should give a clear error
   expect_error(
-    calculatePercentGenes(object = list(), assay = "RNA", genes = list(g = "GeneA")),
+    calculatePercentGenes(
+      object = list(),
+      assay = "RNA",
+      genes = list(g = "GeneA")
+    ),
     regexp = "Seurat"
   )
 })
@@ -240,7 +252,11 @@ test_that("addPercentMtRibo rejects unsupported organism", {
   # needs Seurat object check first, but organism check fires after that
   # so we just verify the function at least checks for Seurat first
   expect_error(
-    addPercentMtRibo(object = list(), organism = "zebrafish", gene_nomenclature = "name"),
+    addPercentMtRibo(
+      object = list(),
+      organism = "zebrafish",
+      gene_nomenclature = "name"
+    ),
     regexp = "Seurat"
   )
 })
@@ -248,7 +264,11 @@ test_that("addPercentMtRibo rejects unsupported organism", {
 test_that("addPercentMtRibo rejects unsupported gene_nomenclature", {
   # same pattern — Seurat check fires first, which is still informative
   expect_error(
-    addPercentMtRibo(object = list(), organism = "hg", gene_nomenclature = "unknown_format"),
+    addPercentMtRibo(
+      object = list(),
+      organism = "hg",
+      gene_nomenclature = "unknown_format"
+    ),
     regexp = "Seurat"
   )
 })

@@ -32,18 +32,21 @@ output[["expression_in_selected_cells"]] <- plotly::renderPlotly({
     expression_projection_data()
   )
   if (is.list(expression_projection_expression_levels())) {
-    cells_df$level <- do.call(cbind, expression_projection_expression_levels()) %>%
+    cells_df$level <- do.call(
+      cbind,
+      expression_projection_expression_levels()
+    ) %>%
       Matrix::rowMeans()
   } else {
     cells_df$level <- expression_projection_expression_levels()
   }
   ## prepare data to be plotted
   ## ... if no selection was made or no cells are in selection
-  if ( is.null(selected_cells) ) {
+  if (is.null(selected_cells)) {
     ## assign all cells to "not selected" group
     cells_df <- cells_df %>%
       dplyr::mutate(group = 'not selected')
-  ## ... if at least 1 cell was selected
+    ## ... if at least 1 cell was selected
   } else {
     ## - get data to plot
     ## - assign cells to either "selected" or "not selected" based on their name
@@ -52,7 +55,11 @@ output[["expression_in_selected_cells"]] <- plotly::renderPlotly({
       dplyr::rename(X1 = 1, X2 = 2) %>%
       dplyr::mutate(
         identifier = paste0(X1, '-', X2),
-        group = ifelse(identifier %in% selected_cells$identifier, 'selected', 'not selected'),
+        group = ifelse(
+          identifier %in% selected_cells$identifier,
+          'selected',
+          'not selected'
+        ),
         group = factor(group, levels = c('selected', 'not selected'))
       ) %>%
       dplyr::select(group, level)
@@ -71,7 +78,7 @@ output[["expression_in_selected_cells"]] <- plotly::renderPlotly({
     ),
     color = ~group,
     colors = setNames(
-      c('#e74c3c','#7f8c8d'),
+      c('#e74c3c', '#7f8c8d'),
       c('selected', 'not selected')
     ),
     source = "subset",
@@ -81,23 +88,23 @@ output[["expression_in_selected_cells"]] <- plotly::renderPlotly({
       size = 5
     )
   ) %>%
-  plotly::layout(
-    title = "",
-    xaxis = list(
+    plotly::layout(
       title = "",
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    yaxis = list(
-      title = "Expression level",
-      range = c(0, max(cells_df$level, na.rm = TRUE) * 1.2),
-      hoverformat = ".2f",
-      mirror = TRUE,
-      showline = TRUE
-    ),
-    dragmode = "select",
-    hovermode = "compare"
-  )
+      xaxis = list(
+        title = "",
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      yaxis = list(
+        title = "Expression level",
+        range = c(0, max(cells_df$level, na.rm = TRUE) * 1.2),
+        hoverformat = ".2f",
+        mirror = TRUE,
+        showline = TRUE
+      ),
+      dragmode = "select",
+      hovermode = "compare"
+    )
 })
 
 ##----------------------------------------------------------------------------##
@@ -120,5 +127,7 @@ observeEvent(input[["expression_in_selected_cells_info"]], {
 ##----------------------------------------------------------------------------##
 expression_in_selected_cells_info <- list(
   title = "Expression levels in selected cells",
-  text = p("This plot shows the log-normalised expression of selected genes for cells grouped by whether they were selected using the box or lasso selection tool. If more than 1 gene was provided, this reflects the average across all cells of each sample.")
+  text = p(
+    "This plot shows the log-normalised expression of selected genes for cells grouped by whether they were selected using the box or lasso selection tool. If more than 1 gene was provided, this reflects the average across all cells of each sample."
+  )
 )

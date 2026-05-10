@@ -4,7 +4,10 @@
 output[["overview_projection_UI"]] <- renderUI({
   fluidRow(
     ## selections and parameters
-    column(width = 3, offset = 0, style = "padding: 0px;",
+    column(
+      width = 3,
+      offset = 0,
+      style = "padding: 0px;",
       cerebroBox(
         title = tagList(
           "Main parameters",
@@ -51,7 +54,10 @@ output[["overview_projection_UI"]] <- renderUI({
       )
     ),
     ## plot
-    column(width = 9, offset = 0, style = "padding: 0px;",
+    column(
+      width = 9,
+      offset = 0,
+      style = "padding: 0px;",
       cerebroBox(
         title = tagList(
           boxTitle("Dimensional reduction"),
@@ -64,13 +70,13 @@ output[["overview_projection_UI"]] <- renderUI({
             style = "margin-right: 3px"
           ),
           #shinyFiles::shinySaveButton(
-           # "overview_projection_export",
-            #label = "export to PDF",
-            #title = "Export dimensional reduction to PDF file.",
-            #filetype = "pdf",
-            #viewtype = "icon",
-            #class = "btn-xs",
-            #style = "margin-right: 3px"
+          # "overview_projection_export",
+          #label = "export to PDF",
+          #title = "Export dimensional reduction to PDF file.",
+          #filetype = "pdf",
+          #viewtype = "icon",
+          #class = "btn-xs",
+          #style = "margin-right: 3px"
           #),
           shinyWidgets::dropdownButton(
             inputId = "overview_projection_settings_dropdown",

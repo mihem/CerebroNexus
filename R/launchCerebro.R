@@ -30,17 +30,16 @@
 launchCerebro <- function(
   version = "v1.4",
   ...
-){
-
+) {
   ##--------------------------------------------------------------------------##
   ## Check input parameters.
   ##--------------------------------------------------------------------------##
-  available_versions <- c("v1.0","v1.1","v1.2","v1.3", "v1.4")
+  available_versions <- c("v1.0", "v1.1", "v1.2", "v1.3", "v1.4")
 
-  if ( (version %in% available_versions == FALSE ) )
-  {
+  if ((version %in% available_versions == FALSE)) {
     stop(
-      'Version must be one of: ', paste0(available_versions, collapse = ', '),
+      'Version must be one of: ',
+      paste0(available_versions, collapse = ', '),
       call. = FALSE
     )
   }
@@ -48,15 +47,15 @@ launchCerebro <- function(
   ##--------------------------------------------------------------------------##
   ## Launch Cerebro.
   ##--------------------------------------------------------------------------##
-  if ( version == "v1.0" ) {
+  if (version == "v1.0") {
     launchCerebroV1.0(...)
-  } else if ( version == "v1.1" ) {
+  } else if (version == "v1.1") {
     launchCerebroV1.1(...)
-  } else if ( version == "v1.2" ) {
+  } else if (version == "v1.2") {
     launchCerebroV1.2(...)
-  } else if ( version == "v1.3" ) {
+  } else if (version == "v1.3") {
     launchCerebroV1.3(...)
-  } else if ( version == "v1.4" ) {
+  } else if (version == "v1.4") {
     launchCerebroV1.4(...)
-    }
+  }
 }

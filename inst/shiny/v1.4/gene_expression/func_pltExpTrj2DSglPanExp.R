@@ -13,7 +13,7 @@ pltExpTrj2DSglPanExp <- function(
   y_range
 ) {
   ##
-  if ( point_border == TRUE ) {
+  if (point_border == TRUE) {
     stroke <- 0.2
   } else {
     stroke <- 0
@@ -28,7 +28,7 @@ pltExpTrj2DSglPanExp <- function(
         fill = as.name("level")
       ),
       shape = 21,
-      size = point_size/3,
+      size = point_size / 3,
       stroke = stroke,
       color = "#c4c4c4",
       alpha = point_opacity
@@ -41,12 +41,14 @@ pltExpTrj2DSglPanExp <- function(
         xend = target_dim_1,
         yend = target_dim_2
       ),
-      size = 0.75, linetype = "solid", na.rm = TRUE
+      size = 0.75,
+      linetype = "solid",
+      na.rm = TRUE
     ) +
     theme_bw()
   ## check if selected color scale
   ## ... selected color scale is "Viridis"
-  if ( tolower(color_scale) == 'viridis' ) {
+  if (tolower(color_scale) == 'viridis') {
     ## add color scale to plot
     plot <- plot +
       viridis::scale_fill_viridis(
@@ -58,7 +60,7 @@ pltExpTrj2DSglPanExp <- function(
         guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")
       )
 
-  ## ... selected color scale is anything else than "Viridis"
+    ## ... selected color scale is anything else than "Viridis"
   } else {
     ## add color scale to plot
     plot <- plot +

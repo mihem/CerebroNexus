@@ -8,17 +8,11 @@
 #
 output[["load_data_sample_info_UI"]] <- renderUI({
   tagList(
-      h3("Sample information"),
+    h3("Sample information"),
     fluidRow(
-        column(width = 10,
-      valueBoxOutput("load_data_number_of_cells")
-      ),
-      column(width = 10,
-       valueBoxOutput("load_data_organism")
-       ),
-      column(width = 10,
-       valueBoxOutput("load_data_date_of_export")
-       )
+      column(width = 10, valueBoxOutput("load_data_number_of_cells")),
+      column(width = 10, valueBoxOutput("load_data_organism")),
+      column(width = 10, valueBoxOutput("load_data_date_of_export"))
     )
   )
 })
@@ -33,7 +27,12 @@ output[["load_data_sample_info_UI"]] <- renderUI({
 ##number of cells
 output[["load_data_number_of_cells"]] <- renderValueBox({
   valueBox(
-    value = formatC(nrow(data_set()$meta_data), format = "f", big.mark = ",", digits = 0),
+    value = formatC(
+      nrow(data_set()$meta_data),
+      format = "f",
+      big.mark = ",",
+      digits = 0
+    ),
     subtitle = "Cells",
     color = "light-blue",
     icon = icon("list"),
@@ -49,32 +48,31 @@ output[["load_data_number_of_cells"]] <- renderValueBox({
 ##   )
 ## })
 
-
 ## organism
 output[["load_data_organism"]] <- renderValueBox({
-if(getExperiment()$organism == "hg"){
-  valueBox(
-    value = ifelse(
-    !is.null(getExperiment()$organism),
-    getExperiment()$organism,
-    "not available"
-    ),
-    subtitle = "Organism",
-    color = "yellow",
-    icon = icon("user")
+  if (getExperiment()$organism == "hg") {
+    valueBox(
+      value = ifelse(
+        !is.null(getExperiment()$organism),
+        getExperiment()$organism,
+        "not available"
+      ),
+      subtitle = "Organism",
+      color = "yellow",
+      icon = icon("user")
     )
-} else {
-  valueBox(
-    value = ifelse(
-    !is.null(getExperiment()$organism),
-    getExperiment()$organism,
-    "not available"
-    ),
-    subtitle = "Organism",
-    color = "yellow",
-    icon = icon("paw")
-  )
-}
+  } else {
+    valueBox(
+      value = ifelse(
+        !is.null(getExperiment()$organism),
+        getExperiment()$organism,
+        "not available"
+      ),
+      subtitle = "Organism",
+      color = "yellow",
+      icon = icon("paw")
+    )
+  }
 })
 
 ## date of export
@@ -82,11 +80,12 @@ if(getExperiment()$organism == "hg"){
 output[["load_data_date_of_export"]] <- renderValueBox({
   valueBox(
     value = ifelse(
-        !is.null(getExperiment()$date_of_export), as.character(getExperiment()$date_of_export), "not available"
+      !is.null(getExperiment()$date_of_export),
+      as.character(getExperiment()$date_of_export),
+      "not available"
     ),
     subtitle = "Date",
     color = "green",
     icon = icon("calendar-day")
   )
 })
-

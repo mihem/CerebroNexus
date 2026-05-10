@@ -12,23 +12,23 @@ pltExpProj2DSglPanExp <- function(
   y_range
 ) {
   ##
-  if ( point_border == TRUE ) {
+  if (point_border == TRUE) {
     stroke <- 0.2
   } else {
     stroke <- 0
   }
   ## prepare plot
   plot <- ggplot(
-      df,
-      aes_q(
-        x = as.name(colnames(df)[1]),
-        y = as.name(colnames(df)[2]),
-        fill = as.name("level")
-      )
-    ) +
+    df,
+    aes_q(
+      x = as.name(colnames(df)[1]),
+      y = as.name(colnames(df)[2]),
+      fill = as.name("level")
+    )
+  ) +
     geom_point(
       shape = 21,
-      size = point_size/3,
+      size = point_size / 3,
       stroke = stroke,
       color = "#c4c4c4",
       alpha = point_opacity
@@ -37,7 +37,7 @@ pltExpProj2DSglPanExp <- function(
     theme_bw()
   ## check if selected color scale
   ## ... selected color scale is "Viridis"
-  if ( tolower(color_scale) == 'viridis' ) {
+  if (tolower(color_scale) == 'viridis') {
     ## add color scale to plot
     plot <- plot +
       viridis::scale_fill_viridis(
@@ -48,7 +48,7 @@ pltExpProj2DSglPanExp <- function(
         name = "Log-normalised\nexpression",
         guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")
       )
-  ## ... selected color scale is anything else than "Viridis"
+    ## ... selected color scale is anything else than "Viridis"
   } else {
     ## add color scale to plot
     plot <- plot +

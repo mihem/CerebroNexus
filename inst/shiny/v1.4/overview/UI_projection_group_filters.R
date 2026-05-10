@@ -3,7 +3,7 @@
 ##----------------------------------------------------------------------------##
 output[["overview_projection_group_filters_UI"]] <- renderUI({
   group_filters <- list()
-  for ( i in getGroups() ) {
+  for (i in getGroups()) {
     group_filters[[i]] <- shinyWidgets::pickerInput(
       paste0("overview_projection_group_filter_", i),
       label = i,
@@ -45,7 +45,8 @@ observeEvent(input[["overview_projection_group_filters_info"]], {
 ##----------------------------------------------------------------------------##
 overview_projection_group_filters_info <- list(
   title = "Group filters for projection",
-  text = HTML("
+  text = HTML(
+    "
     The elements in this panel allow you to select which cells should be plotted based on the group(s) they belong to. For each grouping variable, you can activate or deactivate group levels. Only cells that are pass all filters (for each grouping variable) are shown in the projection.
     "
   )

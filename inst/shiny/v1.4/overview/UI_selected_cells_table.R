@@ -49,7 +49,8 @@ observeEvent(input[["overview_details_selected_cells_table_info"]], {
 ##----------------------------------------------------------------------------##
 overview_details_selected_cells_table_info <- list(
   title = "Details of selected cells",
-  text = HTML("
+  text = HTML(
+    "
     Table containing meta data (some columns may be hidden, check the 'Column visibility' button) for cells selected in the plot using the box or lasso selection tool. If you want the table to contain all cells in the data set, you must select all cells in the plot. The table can be saved to disk in CSV or Excel format for further analysis.
     <h4>Options</h4>
     <b>Automatically format numbers</b><br>
