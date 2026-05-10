@@ -10,7 +10,7 @@ template:
 
 navbar:
   structure:
-    left: [home, reference, articles, changelog]
+    left: [home, reference, articles, news]
     right: [search, github, homepage, lightswitch]
   components:
     github:
