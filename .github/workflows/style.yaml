@@ -3,6 +3,15 @@ name: Style with air
 on:
   pull_request:
     branches: [master, dev]
+    # Only run when R files are changed.
+    # This also prevents an infinite loop: when the bot pushes styled commits
+    # back to the PR branch, it would normally re-trigger this workflow.
+    # Since air produces already-formatted code on the second run, no R files
+    # are changed, so the paths filter prevents the workflow from running again.
+    paths:
+      - '**.R'
+      - '**.r'
+      - '**.Rmd'
 
 permissions: write-all
 
@@ -14,6 +23,9 @@ jobs:
       GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
 
     steps:
+      # Use PAT_TOKEN instead of GITHUB_TOKEN so the push back to the PR branch
+      # is authenticated as your user account, which has bypass rights on the
+      # branch protection ruleset. GITHUB_TOKEN (the bot) does not have bypass.
       - uses: actions/checkout@v6
         with:
           token: ${{ secrets.PAT_TOKEN }}
@@ -36,7 +48,13 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git add \*.R \*.Rmd
+
+          # Use git ls-files with case-insensitive grep instead of glob *.R
+          # because R files can have lowercase .r extension (e.g. send_enrichr_query.r)
+          # and shell globs are case-sensitive on Linux.
+          # The || true prevents failure if no R files are found at all.
+          git add $(git ls-files --modified --others --exclude-standard | grep -iE '\.(R|Rmd)$') || true
+
           if git diff-index --quiet HEAD; then
             echo "No changes to commit"
           else
