@@ -4,8 +4,13 @@
 
 library(rix)
 
+# Auto-fetch latest BPCells commit SHA from GitHub
+bpcells_sha <- jsonlite::fromJSON(
+  "https://api.github.com/repos/bnprks/BPCells/commits/main"
+)$sha
+
 rix(
-  r_ver = "latest-upstream",
+  r_ver = "bleeding-edge",
   r_pkgs = c(
     # package development
     "devtools",
@@ -58,7 +63,7 @@ rix(
     list(
       package_name = "BPCells",
       repo_url = "https://github.com/bnprks/BPCells/r",
-      commit = "16faeade0a26b392637217b0caf5d7017c5bdf9b"
+      commit = bpcells_sha
     )
   ),
   ide = "none",
