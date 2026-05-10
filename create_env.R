@@ -10,6 +10,7 @@ rix(
     # package development
     "devtools",
     "testthat",
+    "pkgdown",
     "shinytest2",
     "formattable",
     "stringr",
