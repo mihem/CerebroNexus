@@ -1,8 +1,14 @@
 library(shinytest2)
 
+## Locate inst/ whether running via devtools::test() or R CMD check
+inst_dir <- system.file(package = "cerebroAppLite")
+if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
+  inst_dir <- testthat::test_path("../../inst")
+}
+
 test_that("{shinytest2} recording: overview", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "overview", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "overview", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   ## Data Info tab: verify key values from the loaded example.crb
@@ -20,8 +26,8 @@ test_that("{shinytest2} recording: overview", {
 
 
 test_that("{shinytest2} recording: main", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "main", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "main", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "overview")
@@ -62,8 +68,8 @@ test_that("{shinytest2} recording: main", {
 
 
 test_that("{shinytest2} recording: groups", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "groups", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "groups", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "groups")
@@ -97,8 +103,8 @@ test_that("{shinytest2} recording: groups", {
 })
 
 test_that("{shinytest2} recording: marker_genes", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "marker_genes", height = 950,
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "marker_genes", height = 950,
       width = 1619)
   app$wait_for_idle(timeout = 20000)
 
@@ -139,8 +145,8 @@ test_that("{shinytest2} recording: marker_genes", {
 
 
 test_that("{shinytest2} recording: gene_expression", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "gene_expression", height = 950,
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "gene_expression", height = 950,
       width = 1619)
   app$wait_for_idle(timeout = 20000)
 
@@ -172,8 +178,8 @@ test_that("{shinytest2} recording: gene_expression", {
 })
 
 test_that("{shinytest2} recording: gene_id_conversion", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "gene_id_conversion", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "gene_id_conversion", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "geneIdConversion")
@@ -186,8 +192,8 @@ test_that("{shinytest2} recording: gene_id_conversion", {
 })
 
 test_that("{shinytest2} recording: color_management", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "color_management", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "color_management", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "color_management")
@@ -200,8 +206,8 @@ test_that("{shinytest2} recording: color_management", {
 })
 
 test_that("{shinytest2} recording: about", {
-  local_app_support(test_path("../../inst"))
-  app <- AppDriver$new(test_path("../../inst"), name = "about", height = 950, width = 1619)
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "about", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "about")

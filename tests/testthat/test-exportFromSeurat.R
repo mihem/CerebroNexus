@@ -9,8 +9,11 @@ skip_if_not_installed("Seurat")
 ## Load and prepare the shared object once for the whole file
 ## ---------------------------------------------------------------------------
 
-pbmc_path <- testthat::test_path("../../inst/extdata/v1.4/pbmc_seurat.rds")
-obj_raw   <- readRDS(pbmc_path)
+pbmc_path <- system.file("extdata/v1.4/pbmc_seurat.rds", package = "cerebroAppLite")
+if (!nzchar(pbmc_path)) {
+  pbmc_path <- testthat::test_path("../../inst/extdata/v1.4/pbmc_seurat.rds")
+}
+obj_raw <- readRDS(pbmc_path)
 
 ## Convenience: shared valid call args (no file — added per test)
 valid_args <- list(
