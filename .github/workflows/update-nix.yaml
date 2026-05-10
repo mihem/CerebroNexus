@@ -36,10 +36,6 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: cachix/cachix-action@v17
-        with:
-          name: rstats-on-nix
-
       - name: Regenerate default.nix via rix
         run: nix-shell -p rPackages.rix R --run "Rscript create_env.R"
 
