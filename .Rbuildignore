@@ -2,5 +2,12 @@
 .git
 .gitignore
 .Rhistory
-LICENSE
+.envrc
+.direnv
+LICENSE.md
 TODO.md
+^create_env\.R$
+^default\.nix$
+^other_documents$
+^pkgdown$
+^result$
