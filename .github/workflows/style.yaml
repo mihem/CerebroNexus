@@ -3,6 +3,11 @@ name: Style with air
 on:
   push:
     branches: [master]
+       # Only run when R files are changed.
+       # This also prevents an infinite loop: when the bot pushes styled commits
+       # back to the PR branch, it would normally re-trigger this workflow.
+       # Since air produces already-formatted code on the second run, no R files
+       # are changed, so the paths filter prevents the workflow from running again.
     paths:
       - '**.R'
       - '**.r'
