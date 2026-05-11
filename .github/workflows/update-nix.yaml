@@ -2,7 +2,7 @@ name: Update default.nix
 
 on:
   schedule:
-    - cron: "0 22 * * 0"  # every Sunday at 22:00 UTC (1h before R-tests at 23:00)
+    - cron: "0 3 * * 0"  # every Sunday at 03:00 UTC
   workflow_dispatch:
     inputs:
       reason:
