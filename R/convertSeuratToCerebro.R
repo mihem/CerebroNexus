@@ -197,7 +197,7 @@
 #' for visualization.
 #'
 #' @param seurat_file Character string specifying the path to the Seurat object
-#'   file. Supported formats: \code{.qs} and \code{.rds}.
+#'   file. Supported format: \code{.rds}.
 #' @param result_dir Character string specifying the directory where the Cerebro
 #'   output file (.crb) will be saved.
 #' @param assay Character string specifying which assay to use from the Seurat
@@ -216,16 +216,12 @@
 #' @param max_group_levels Numeric value specifying the maximum number of unique
 #'   levels allowed in a grouping variable. Groups with more unique values than
 #'   this threshold will be excluded; default: \code{100}.
-#' @param main_group Character string specifying the main grouping variable,
-#'   must be one of the variables in \code{groups}; default: \code{NULL}.
 #' @param nUMI Character string specifying the column name in metadata containing
 #'   the number of UMIs per cell; default: \code{"nCount_RNA"}.
 #' @param nGene Character string specifying the column name in metadata containing
 #'   the number of expressed genes per cell; default: \code{"nFeature_RNA"}.
 #' @param add_all_meta_data Logical indicating whether to include all metadata
 #'   columns in the export; default: \code{TRUE}.
-#' @param format Format of output file. Can be either \code{"qs"} or
-#' \code{"rds"}. Defaults to \code{"qs"}.
 #' @param use_delayed_array Logical indicating whether to convert expression
 #'   data to DelayedArray format for memory efficiency; default: \code{FALSE}.
 #'   Ignored when \code{expression_matrix_mode} is set to an external backend.
@@ -246,8 +242,8 @@
 #' @param cell_cycle Character vector of column names in metadata containing
 #'   cell cycle phase assignments; default: \code{NULL}.
 #' @param marker_file Character string specifying the path to a marker gene
-#'   table file. Supported formats: .xls, .xlsx, .csv, .tsv, .txt, .tab;
-#'   default: \code{NULL}.
+#'   table file. Supported formats: .csv, .tsv, .txt, .tab; default:
+#'   \code{NULL}.
 #' @param marker_method Character string specifying the name of the method used
 #'   to identify marker genes (will be used as a label in Cerebro); default:
 #'   \code{"Diff. Expression"}.
@@ -258,11 +254,11 @@
 #'   list of data.frames. If list elements are unnamed, they will be assigned
 #'   names like "unknown1", "unknown2", etc.; default: \code{NULL}.
 #' @param bcr_file Character string specifying the path to a BCR data file
-#'   (.qs format). The data will be merged into the unified
+#'   (.rds format). The data will be merged into the unified
 #'   \code{immune_repertoire} slot of the Seurat object before export;
 #'   default: \code{NULL}.
 #' @param tcr_file Character string specifying the path to a TCR data file
-#'   (.qs format). The data will be merged into the unified
+#'   (.rds format). The data will be merged into the unified
 #'   \code{immune_repertoire} slot of the Seurat object before export;
 #'   default: \code{NULL}.
 #'
@@ -291,18 +287,17 @@
 #' \dontrun{
 #' # Basic usage
 #' convertSeuratToCerebro(
-#'   seurat_file = "path/to/seurat_object.qs",
+#'   seurat_file = "path/to/seurat_object.rds",
 #'   result_dir = "path/to/output"
 #' )
 #'
 #' # With custom grouping and renaming
 #' convertSeuratToCerebro(
-#'   seurat_file = "seurat_object.qs",
+#'   seurat_file = "seurat_object.rds",
 #'   result_dir = "output",
 #'   groups = c("cluster", "sample", "celltype"),
 #'   groups_naming = list("cluster" = "Cluster", "celltype" = "Cell Type"),
-#'   main_group = "Cell Type",
-#'   marker_file = "markers.xlsx"
+#'   marker_file = "markers.csv"
 #' )
 #' }
 #'
@@ -330,8 +325,7 @@ convertSeuratToCerebro <- function(seurat_file,
                                     add_most_expressed_genes = TRUE,
                                     most_expressed_genes = NULL,
                                     bcr_file = NULL,
-                                    tcr_file = NULL,
-                                    format = "rds") {
+                                    tcr_file = NULL) {
   expression_matrix_mode <- match.arg(expression_matrix_mode)
   if (!file.exists(seurat_file)) {
     stop("seurat_file not found: ", seurat_file, call. = FALSE)
@@ -662,8 +656,7 @@ convertSeuratToCerebro <- function(seurat_file,
       cell_cycle = cell_cycle,
       verbose = verbose,
       use_delayed_array = use_delayed_array,
-      expression_matrix_mode = expression_matrix_mode,
-      format = format
+      expression_matrix_mode = expression_matrix_mode
     )
     cat("Successfully exported:", file_name, "\n")
   }, error = function(e) {

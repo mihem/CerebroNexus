@@ -119,7 +119,11 @@
       "Suggestions:\n",
       "  1. Verify that the assay contains data\n",
       "  2. Check the assay structure using: ",
-      ifelse(is_seurat_v5, "Layers(seurat[[\"", assay, "\"]])", "names(seurat@assays$", assay, "@layers)"), "\n",
+      if (is_seurat_v5) {
+        paste0('Layers(seurat[["', assay, '"]])')
+      } else {
+        paste0("names(seurat@assays$", assay, "@layers)")
+      }, "\n",
       "  3. Try using a different assay or slot"
     )
   }
@@ -147,7 +151,11 @@
       "Suggestions:\n",
       "  1. Check the assay structure in your Seurat object\n",
       "  2. Verify the data type using: class(GetAssayData(seurat, assay = \"", assay, "\"",
-      ifelse(is_seurat_v5, ", layer = \"", slot, "\")", ", slot = \"", slot, "\")"), ")"
+      if (is_seurat_v5) {
+        paste0(', layer = "', slot, '"))')
+      } else {
+        paste0(', slot = "', slot, '"))')
+      }
     )
   }
 

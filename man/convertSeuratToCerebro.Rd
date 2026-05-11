@@ -26,13 +26,12 @@ convertSeuratToCerebro(
   add_most_expressed_genes = TRUE,
   most_expressed_genes = NULL,
   bcr_file = NULL,
-  tcr_file = NULL,
-  format = "rds"
+  tcr_file = NULL
 )
 }
 \arguments{
 \item{seurat_file}{Character string specifying the path to the Seurat object
-file. Supported formats: \code{.qs} and \code{.rds}.}
+file. Supported format: \code{.rds}.}
 
 \item{result_dir}{Character string specifying the directory where the Cerebro
 output file (.crb) will be saved.}
@@ -93,8 +92,8 @@ directory, so packaging the \code{.crb} and its sibling
 cell cycle phase assignments; default: \code{NULL}.}
 
 \item{marker_file}{Character string specifying the path to a marker gene
-table file. Supported formats: .xls, .xlsx, .csv, .tsv, .txt, .tab;
-default: \code{NULL}.}
+table file. Supported formats: .csv, .tsv, .txt, .tab; default:
+\code{NULL}.}
 
 \item{marker_method}{Character string specifying the name of the method used
 to identify marker genes (will be used as a label in Cerebro); default:
@@ -109,20 +108,14 @@ list of data.frames. If list elements are unnamed, they will be assigned
 names like "unknown1", "unknown2", etc.; default: \code{NULL}.}
 
 \item{bcr_file}{Character string specifying the path to a BCR data file
-(.qs format). The data will be merged into the unified
+(.rds format). The data will be merged into the unified
 \code{immune_repertoire} slot of the Seurat object before export;
 default: \code{NULL}.}
 
 \item{tcr_file}{Character string specifying the path to a TCR data file
-(.qs format). The data will be merged into the unified
+(.rds format). The data will be merged into the unified
 \code{immune_repertoire} slot of the Seurat object before export;
 default: \code{NULL}.}
-
-\item{format}{Format of output file. Can be either \code{"qs"} or
-\code{"rds"}. Defaults to \code{"qs"}.}
-
-\item{main_group}{Character string specifying the main grouping variable,
-must be one of the variables in \code{groups}; default: \code{NULL}.}
 }
 \value{
 This function does not return a value. It saves a Cerebro object (.crb file)
@@ -154,18 +147,17 @@ The function performs the following steps:
 \dontrun{
 # Basic usage
 convertSeuratToCerebro(
-  seurat_file = "path/to/seurat_object.qs",
+  seurat_file = "path/to/seurat_object.rds",
   result_dir = "path/to/output"
 )
 
 # With custom grouping and renaming
 convertSeuratToCerebro(
-  seurat_file = "seurat_object.qs",
+  seurat_file = "seurat_object.rds",
   result_dir = "output",
   groups = c("cluster", "sample", "celltype"),
   groups_naming = list("cluster" = "Cluster", "celltype" = "Cell Type"),
-  main_group = "Cell Type",
-  marker_file = "markers.xlsx"
+  marker_file = "markers.csv"
 )
 }
 

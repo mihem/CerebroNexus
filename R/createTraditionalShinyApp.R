@@ -48,7 +48,7 @@ dedent <- function(string) {
 #' those switches as the corresponding modules land.
 #'
 #' @param cerebro_data Named character vector or list of \code{.crb} (or
-#'   \code{.rds} / \code{.qs}) file paths. Names are used as dataset labels.
+#'   \code{.rds}) file paths. Names are used as dataset labels.
 #' @param result_dir Output directory.
 #' @param max_request_size Max upload size in MB; defaults to 8000.
 #' @param port Port the generated app listens on; defaults to 1337.
@@ -69,6 +69,7 @@ dedent <- function(string) {
 #' @param variable_to_compare Forwarded to \code{Cerebro.options}.
 #'
 #' @return Invisibly returns \code{result_dir}.
+#' @importFrom stats setNames
 #' @export
 createTraditionalShinyApp <- function(cerebro_data,
                                       result_dir = NULL,
@@ -95,8 +96,8 @@ createTraditionalShinyApp <- function(cerebro_data,
     stop("Cerebro data file(s) not found: ", paste(missing, collapse = ", "), call. = FALSE)
   }
 
-  if (!all(grepl("\\.(crb|rds|qs)$", cerebro_data, ignore.case = TRUE))) {
-    warning("Some input files do not have .crb, .rds or .qs extension. Make sure they are valid Cerebro files.")
+  if (!all(grepl("\\.(crb|rds)$", cerebro_data, ignore.case = TRUE))) {
+    warning("Some input files do not have .crb or .rds extension. Make sure they are valid Cerebro files.")
   }
 
   if (is.null(names(cerebro_data)) || any(names(cerebro_data) == "")) {

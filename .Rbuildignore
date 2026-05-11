@@ -13,3 +13,4 @@ TODO.md
 ^result$
 ^_pkgdown\.yml$
 ^docs$
+^tests/testthis$

@@ -26,7 +26,7 @@ createTraditionalShinyApp(
 }
 \arguments{
 \item{cerebro_data}{Named character vector or list of \code{.crb} (or
-\code{.rds} / \code{.qs}) file paths. Names are used as dataset labels.}
+\code{.rds}) file paths. Names are used as dataset labels.}
 
 \item{result_dir}{Output directory.}
 
