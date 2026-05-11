@@ -3,8 +3,6 @@ name: R tests
 on:
   pull_request:
     branches: [master, dev]
-  schedule:
-    - cron: "0 23 * * 0"  # every Sunday at 23:00 UTC
   workflow_dispatch: # This adds the manual trigger
     inputs:
       reason:
