@@ -1,7 +1,7 @@
 name: Style with air
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [master]
     # Only run when R files are changed.
     # This also prevents an infinite loop: when the bot pushes styled commits
@@ -23,10 +23,15 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
+      # pull_request_target gives us secrets even for fork PRs.
+      # We explicitly check out the PR head (potentially from a fork) so air
+      # formats the actual PR code. This is safe because air is a pure
+      # formatter — it never executes untrusted code or sees the token value.
       - uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
 
       - name: Create folder to silence Nix warning
         run: mkdir -p ~/.nix-defexpr/channels
@@ -56,5 +61,7 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "style: format code via air"
-            git push origin HEAD:${{ github.head_ref }}
+            # For fork PRs the remote is the fork repo; push to the PR head branch.
+            git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.event.pull_request.head.repo.full_name }}.git"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
