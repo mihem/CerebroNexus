@@ -185,17 +185,20 @@ test_that("exportFromSeurat: h5 backend writes a sibling .h5 with the
   ## round-trip via the runtime reader logic (mirrors
   ## .attachExternalExpression's h5 branch): on-disk is cells x genes,
   ## internal layout is genes x cells.
-  data    <- as.numeric(rhdf5::h5read(h5_path, "/expression/data"))
+  data <- as.numeric(rhdf5::h5read(h5_path, "/expression/data"))
   indices <- as.integer(rhdf5::h5read(h5_path, "/expression/indices"))
-  indptr  <- as.integer(rhdf5::h5read(h5_path, "/expression/indptr"))
-  shape   <- as.integer(rhdf5::h5read(h5_path, "/expression/shape"))
-  gns     <- as.character(rhdf5::h5read(h5_path, "/expression/genes"))
-  bcs     <- as.character(rhdf5::h5read(h5_path, "/expression/barcodes"))
+  indptr <- as.integer(rhdf5::h5read(h5_path, "/expression/indptr"))
+  shape <- as.integer(rhdf5::h5read(h5_path, "/expression/shape"))
+  gns <- as.character(rhdf5::h5read(h5_path, "/expression/genes"))
+  bcs <- as.character(rhdf5::h5read(h5_path, "/expression/barcodes"))
   rhdf5::H5close()
 
   m_disk <- Matrix::sparseMatrix(
-    i = indices + 1L, p = indptr, x = data,
-    dims = c(shape[1], shape[2]), index1 = TRUE
+    i = indices + 1L,
+    p = indptr,
+    x = data,
+    dims = c(shape[1], shape[2]),
+    index1 = TRUE
   )
   m_int <- methods::as(Matrix::t(m_disk), "CsparseMatrix")
   rownames(m_int) <- bcs

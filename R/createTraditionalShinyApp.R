@@ -18,19 +18,31 @@ dedent <- function(string) {
   while (length(lines) > 0 && grepl("^\\s*$", lines[length(lines)])) {
     lines <- lines[-length(lines)]
   }
-  if (length(lines) == 0) return("")
+  if (length(lines) == 0) {
+    return("")
+  }
   non_empty_lines <- lines[!grepl("^\\s*$", lines)]
-  if (length(non_empty_lines) == 0) return("")
-  lead_spaces <- vapply(non_empty_lines, function(line) {
-    m <- regmatches(line, regexpr("^\\s*", line))
-    nchar(m)
-  }, integer(1))
+  if (length(non_empty_lines) == 0) {
+    return("")
+  }
+  lead_spaces <- vapply(
+    non_empty_lines,
+    function(line) {
+      m <- regmatches(line, regexpr("^\\s*", line))
+      nchar(m)
+    },
+    integer(1)
+  )
   min_indent <- min(lead_spaces)
   if (min_indent > 0) {
     pat <- paste0("^\\s{", min_indent, "}")
-    lines <- vapply(lines, function(line) {
-      if (grepl("^\\s*$", line)) line else sub(pat, "", line)
-    }, character(1))
+    lines <- vapply(
+      lines,
+      function(line) {
+        if (grepl("^\\s*$", line)) line else sub(pat, "", line)
+      },
+      character(1)
+    )
   }
   paste(lines, collapse = "\n")
 }
@@ -72,38 +84,49 @@ dedent <- function(string) {
 #' @return Invisibly returns \code{result_dir}.
 #' @importFrom stats setNames
 #' @export
-createTraditionalShinyApp <- function(cerebro_data,
-                                      result_dir = NULL,
-                                      max_request_size = 8000,
-                                      port = 1337,
-                                      host = "127.0.0.1",
-                                      launch_browser = TRUE,
-                                      quiet = FALSE,
-                                      display_mode = "normal",
-                                      colors = NULL,
-                                      cerebro_options = list(exclude_trivial_metadata = TRUE),
-                                      overwrite = TRUE,
-                                      verbose = TRUE,
-                                      crb_pick_smallest_file = TRUE,
-                                      show_upload_ui = TRUE,
-                                      welcome_message = "Welcome to Cerebro App!",
-                                      point_size = list(
-                                        overview_projection_point_size = NULL),
-                                      variable_to_compare = NULL,
-                                      ...) {
-
+createTraditionalShinyApp <- function(
+  cerebro_data,
+  result_dir = NULL,
+  max_request_size = 8000,
+  port = 1337,
+  host = "127.0.0.1",
+  launch_browser = TRUE,
+  quiet = FALSE,
+  display_mode = "normal",
+  colors = NULL,
+  cerebro_options = list(exclude_trivial_metadata = TRUE),
+  overwrite = TRUE,
+  verbose = TRUE,
+  crb_pick_smallest_file = TRUE,
+  show_upload_ui = TRUE,
+  welcome_message = "Welcome to Cerebro App!",
+  point_size = list(
+    overview_projection_point_size = NULL
+  ),
+  variable_to_compare = NULL,
+  ...
+) {
   # Validate inputs ----------------------------------------------------------##
   if (!all(file.exists(cerebro_data))) {
     missing <- cerebro_data[!file.exists(cerebro_data)]
-    stop("Cerebro data file(s) not found: ", paste(missing, collapse = ", "), call. = FALSE)
+    stop(
+      "Cerebro data file(s) not found: ",
+      paste(missing, collapse = ", "),
+      call. = FALSE
+    )
   }
 
   if (!all(grepl("\\.(crb|rds)$", cerebro_data, ignore.case = TRUE))) {
-    warning("Some input files do not have .crb or .rds extension. Make sure they are valid Cerebro files.")
+    warning(
+      "Some input files do not have .crb or .rds extension. Make sure they are valid Cerebro files."
+    )
   }
 
   if (is.null(names(cerebro_data)) || any(names(cerebro_data) == "")) {
-    stop("cerebro_data must be a named list or vector, and every element must have a name.", call. = FALSE)
+    stop(
+      "cerebro_data must be a named list or vector, and every element must have a name.",
+      call. = FALSE
+    )
   }
 
   if (!is.null(colors)) {
@@ -111,25 +134,42 @@ createTraditionalShinyApp <- function(cerebro_data,
       stop("colors must be a named list or vector.", call. = FALSE)
     }
     if (length(intersect(names(colors), names(cerebro_data))) == 0) {
-      warning("Colors and cerebro_data do not match, random colors will be used.", call. = FALSE)
+      warning(
+        "Colors and cerebro_data do not match, random colors will be used.",
+        call. = FALSE
+      )
       colors <- NULL
     }
   }
 
   if (!is.null(variable_to_compare) && !is.logical(variable_to_compare)) {
-    if ((is.list(variable_to_compare) || is.vector(variable_to_compare)) && !is.null(names(variable_to_compare))) {
-      if (length(intersect(names(variable_to_compare), names(cerebro_data))) == 0) {
-        warning("No matching names found between variable_to_compare and cerebro_data. Ignoring.", call. = FALSE)
+    if (
+      (is.list(variable_to_compare) || is.vector(variable_to_compare)) &&
+        !is.null(names(variable_to_compare))
+    ) {
+      if (
+        length(intersect(names(variable_to_compare), names(cerebro_data))) == 0
+      ) {
+        warning(
+          "No matching names found between variable_to_compare and cerebro_data. Ignoring.",
+          call. = FALSE
+        )
         variable_to_compare <- NULL
       }
     } else {
-      warning("variable_to_compare must be NULL, a single boolean, or a named list/vector. Ignoring.", call. = FALSE)
+      warning(
+        "variable_to_compare must be NULL, a single boolean, or a named list/vector. Ignoring.",
+        call. = FALSE
+      )
       variable_to_compare <- NULL
     }
   }
 
   if (!requireNamespace("cerebroAppLite", quietly = TRUE)) {
-    stop("Package 'cerebroAppLite' is required but not installed.", call. = FALSE)
+    stop(
+      "Package 'cerebroAppLite' is required but not installed.",
+      call. = FALSE
+    )
   }
 
   if (is.null(result_dir)) {
@@ -141,29 +181,42 @@ createTraditionalShinyApp <- function(cerebro_data,
   app_file <- file.path(result_dir, "app.R")
 
   if (overwrite && dir.exists(result_dir)) {
-    if (verbose) cat("Removing existing directory:", result_dir, "\n")
+    if (verbose) {
+      cat("Removing existing directory:", result_dir, "\n")
+    }
     unlink(result_dir, recursive = TRUE, force = TRUE)
   }
 
-  if (verbose) cat("Creating directory structure...\n")
+  if (verbose) {
+    cat("Creating directory structure...\n")
+  }
   dir.create(result_dir, recursive = TRUE, showWarnings = FALSE)
   dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
   # Copy Shiny source --------------------------------------------------------##
   shiny_source <- system.file("shiny", package = "cerebroAppLite")
   if (!dir.exists(shiny_source)) {
-    stop("Shiny source files not found in cerebroAppLite package.", call. = FALSE)
+    stop(
+      "Shiny source files not found in cerebroAppLite package.",
+      call. = FALSE
+    )
   }
 
-  if (verbose) cat("Copying Shiny source files...\n")
+  if (verbose) {
+    cat("Copying Shiny source files...\n")
+  }
   if (!file.copy(shiny_source, result_dir, recursive = TRUE)) {
     stop("Failed to copy Shiny source files.", call. = FALSE)
   }
 
   # Copy Cerebro data file(s) -----------------------------------------------##
-  if (verbose) cat("Copying Cerebro data file(s)...\n")
+  if (verbose) {
+    cat("Copying Cerebro data file(s)...\n")
+  }
   for (file in cerebro_data) {
-    if (verbose) cat("  -", basename(file), "\n")
+    if (verbose) {
+      cat("  -", basename(file), "\n")
+    }
     if (!file.copy(file, data_dir, recursive = TRUE)) {
       stop("Failed to copy Cerebro data file: ", basename(file), call. = FALSE)
     }
@@ -171,36 +224,53 @@ createTraditionalShinyApp <- function(cerebro_data,
     ## lives in a sibling file/dir resolved relative to the crb at runtime.
     ## Copy the sibling alongside so the bundle stays portable.
     crb_stem <- tools::file_path_sans_ext(basename(file))
-    bpc_src  <- file.path(dirname(file), paste0(crb_stem, ".bpcells"))
+    bpc_src <- file.path(dirname(file), paste0(crb_stem, ".bpcells"))
     if (dir.exists(bpc_src)) {
-      if (verbose) cat("  -", basename(bpc_src), "(bpcells sibling)\n")
+      if (verbose) {
+        cat("  -", basename(bpc_src), "(bpcells sibling)\n")
+      }
       if (!file.copy(bpc_src, data_dir, recursive = TRUE)) {
-        stop("Failed to copy bpcells sibling directory: ", basename(bpc_src),
-             call. = FALSE)
+        stop(
+          "Failed to copy bpcells sibling directory: ",
+          basename(bpc_src),
+          call. = FALSE
+        )
       }
     }
     h5_src <- file.path(dirname(file), paste0(crb_stem, ".h5"))
     if (file.exists(h5_src)) {
-      if (verbose) cat("  -", basename(h5_src), "(h5 sibling)\n")
+      if (verbose) {
+        cat("  -", basename(h5_src), "(h5 sibling)\n")
+      }
       if (!file.copy(h5_src, data_dir, overwrite = TRUE)) {
-        stop("Failed to copy h5 sibling file: ", basename(h5_src),
-             call. = FALSE)
+        stop(
+          "Failed to copy h5 sibling file: ",
+          basename(h5_src),
+          call. = FALSE
+        )
       }
     }
   }
 
   # Copy extdata -------------------------------------------------------------##
-  if (verbose) cat("Copying extdata files...\n")
+  if (verbose) {
+    cat("Copying extdata files...\n")
+  }
   extdata_source <- system.file("extdata", package = "cerebroAppLite")
   if (!dir.exists(extdata_source)) {
-    stop("extdata source files not found in cerebroAppLite package.", call. = FALSE)
+    stop(
+      "extdata source files not found in cerebroAppLite package.",
+      call. = FALSE
+    )
   }
   if (!file.copy(extdata_source, result_dir, recursive = TRUE)) {
     stop("Failed to copy extdata files.", call. = FALSE)
   }
 
   # Build Cerebro.options ----------------------------------------------------##
-  if (verbose) cat("Generating app.R file...\n")
+  if (verbose) {
+    cat("Generating app.R file...\n")
+  }
 
   crb_files <- setNames(
     paste0("data/", basename(cerebro_data)),
@@ -210,17 +280,30 @@ createTraditionalShinyApp <- function(cerebro_data,
   cerebro_options[["mode"]] <- "open"
   cerebro_options[["crb_file_to_load"]] <- crb_files
   cerebro_options[["cerebro_root"]] <- "."
-  if (!is.null(crb_pick_smallest_file)) cerebro_options[["crb_pick_smallest_file"]] <- crb_pick_smallest_file
-  if (!is.null(show_upload_ui)) cerebro_options[["show_upload_ui"]] <- show_upload_ui
-  if (!is.null(point_size)) cerebro_options[["point_size"]] <- point_size
-  if (!is.null(colors)) cerebro_options[["colors"]] <- colors
-  if (!is.null(welcome_message)) cerebro_options[["welcome_message"]] <- welcome_message
-  if (!is.null(variable_to_compare)) cerebro_options[["variable_to_compare"]] <- variable_to_compare
+  if (!is.null(crb_pick_smallest_file)) {
+    cerebro_options[["crb_pick_smallest_file"]] <- crb_pick_smallest_file
+  }
+  if (!is.null(show_upload_ui)) {
+    cerebro_options[["show_upload_ui"]] <- show_upload_ui
+  }
+  if (!is.null(point_size)) {
+    cerebro_options[["point_size"]] <- point_size
+  }
+  if (!is.null(colors)) {
+    cerebro_options[["colors"]] <- colors
+  }
+  if (!is.null(welcome_message)) {
+    cerebro_options[["welcome_message"]] <- welcome_message
+  }
+  if (!is.null(variable_to_compare)) {
+    cerebro_options[["variable_to_compare"]] <- variable_to_compare
+  }
 
   saveRDS(cerebro_options, file.path(result_dir, "cerebro_config.rds"))
 
   # Generate app.R -----------------------------------------------------------##
-  app_content <- glue::glue('
+  app_content <- glue::glue(
+    '
     library(dplyr)
     library(DT)
     library(plotly)

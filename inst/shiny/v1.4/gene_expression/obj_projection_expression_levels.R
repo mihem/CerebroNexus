@@ -39,9 +39,12 @@ expression_projection_expression_levels <- reactive({
     ## still holds them and getExpressionMatrix(genes=) below would crash
     ## with vctrs::vec_slice "Element X doesn't exist". Re-filter against
     ## the current dataset's gene names every time this reactive fires.
-    genes_present <- intersect(genes_data$genes_to_display_present, getGeneNames())
+    genes_present <- intersect(
+      genes_data$genes_to_display_present,
+      getGeneNames()
+    )
 
-    if ( length(genes_present) == 0 ) {
+    if (length(genes_present) == 0) {
       expression_levels <- rep(0, n_cells)
     } else {
       req(expression_projection_coordinates())
@@ -55,26 +58,37 @@ expression_projection_expression_levels <- reactive({
       ## so the former IterableMatrix special case is no longer needed.
       if (
         ncol(expression_projection_coordinates()) == 2 &&
-        input[["expression_projection_genes_in_separate_panels"]] == TRUE &&
-        length(genes_present) >= 2 &&
-        length(genes_present) <= 9
+          input[["expression_projection_genes_in_separate_panels"]] == TRUE &&
+          length(genes_present) >= 2 &&
+          length(genes_present) <= 9
       ) {
         incProgress(0.3, detail = "Extracting matrix for multiple panels...")
-        expression_matrix <- data_set()$getExpressionMatrix(cells = cells_to_show_bc, genes = genes_present)
+        expression_matrix <- data_set()$getExpressionMatrix(
+          cells = cells_to_show_bc,
+          genes = genes_present
+        )
         expression_matrix <- Matrix::t(expression_matrix)
         expression_levels <- list()
         for (i in 1:ncol(expression_matrix)) {
-          expression_levels[[colnames(expression_matrix)[i]]] <- as.vector(expression_matrix[, i])
+          expression_levels[[colnames(expression_matrix)[
+            i
+          ]]] <- as.vector(expression_matrix[, i])
         }
       } else if (length(genes_present) == 1) {
         incProgress(0.3, detail = "Extracting single gene expression...")
-        expression_matrix <- data_set()$getExpressionMatrix(cells = cells_to_show_bc, genes = genes_present)
+        expression_matrix <- data_set()$getExpressionMatrix(
+          cells = cells_to_show_bc,
+          genes = genes_present
+        )
         expression_levels <- unname(as.numeric(expression_matrix))
       } else if (length(genes_present) >= 2) {
         incProgress(0.3, detail = "Calculating mean expression...")
         ## Per-cell mean across the requested genes, restricted to cells_to_show.
         expression_levels <- unname(
-          data_set()$getMeanExpressionForCells(cells = cells_to_show_bc, genes = genes_present)
+          data_set()$getMeanExpressionForCells(
+            cells = cells_to_show_bc,
+            genes = genes_present
+          )
         )
       }
     }

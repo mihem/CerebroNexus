@@ -111,15 +111,15 @@ exportFromSeurat <- function(
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
   verbose = FALSE
 ) {
-
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
-
   expression_matrix_mode <- match.arg(expression_matrix_mode)
-  if (expression_matrix_mode == "h5" &&
-      !requireNamespace("rhdf5", quietly = TRUE)) {
+  if (
+    expression_matrix_mode == "h5" &&
+      !requireNamespace("rhdf5", quietly = TRUE)
+  ) {
     stop(
       "expression_matrix_mode = \"h5\" requires the rhdf5 package (a hard ",
       "dependency of HDF5Array). Install it via ",
@@ -128,8 +128,10 @@ exportFromSeurat <- function(
       call. = FALSE
     )
   }
-  if (expression_matrix_mode == "bpcells" &&
-      !requireNamespace("BPCells", quietly = TRUE)) {
+  if (
+    expression_matrix_mode == "bpcells" &&
+      !requireNamespace("BPCells", quietly = TRUE)
+  ) {
     stop(
       "expression_matrix_mode = \"bpcells\" requires the BPCells package. ",
       "Install it and re-run, or switch to expression_matrix_mode = \"embedded\".",
@@ -139,14 +141,15 @@ exportFromSeurat <- function(
   if (expression_matrix_mode != "embedded" && use_delayed_array) {
     if (verbose) {
       message(
-        "expression_matrix_mode = \"", expression_matrix_mode,
+        "expression_matrix_mode = \"",
+        expression_matrix_mode,
         "\" supersedes use_delayed_array; the RleArray conversion is skipped."
       )
     }
   }
 
   ## check if Seurat is installed
-  if ( !requireNamespace("Seurat", quietly = TRUE) ) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop(
       "The 'Seurat' package is needed for this function to work. Please install it.",
       call. = FALSE
@@ -159,17 +162,20 @@ exportFromSeurat <- function(
     stop(
       paste0(
         "The installed Seurat package is of version `",
-                seurat_version, "`, but at least v3.0 is required."
+        seurat_version,
+        "`, but at least v3.0 is required."
       ),
       call. = FALSE
     )
   }
 
   ## check if provided object is of class "Seurat"
-  if ( !inherits(object, "Seurat") ) {
+  if (!inherits(object, "Seurat")) {
     stop(
       paste0(
-        "Provided object is of class `", paste(class(object), collapse = ", "), "` but must be of class 'Seurat'."
+        "Provided object is of class `",
+        paste(class(object), collapse = ", "),
+        "` but must be of class 'Seurat'."
       ),
       call. = FALSE
     )
@@ -180,14 +186,16 @@ exportFromSeurat <- function(
   if (utils::compareVersion(obj_version, "3.0.0") < 0) {
     stop(
       paste0(
-        "Provided Seurat object has version `", obj_version, "` but must be at least 3.0."
+        "Provided Seurat object has version `",
+        obj_version,
+        "` but must be at least 3.0."
       ),
       call. = FALSE
     )
   }
 
   ## `groups`
-  if ( any(groups %in% names(object@meta.data) == FALSE ) ) {
+  if (any(groups %in% names(object@meta.data) == FALSE)) {
     stop(
       paste0(
         'Some group columns could not be found in meta data: ',
@@ -201,21 +209,25 @@ exportFromSeurat <- function(
   }
 
   ## `main_group`
-  if ( !is.null(main_group) && !(main_group %in% groups) ) {
+  if (!is.null(main_group) && !(main_group %in% groups)) {
     stop(
       paste0(
-        'Specified main_group `', main_group, '` is not in the list of groups. ',
-        'Valid options are: ', paste(groups, collapse = ', ')
+        'Specified main_group `',
+        main_group,
+        '` is not in the list of groups. ',
+        'Valid options are: ',
+        paste(groups, collapse = ', ')
       ),
       call. = FALSE
     )
   }
 
   ## `nUMI`
-  if ( ( nUMI %in% names(object@meta.data) == FALSE ) ) {
+  if ((nUMI %in% names(object@meta.data) == FALSE)) {
     stop(
       paste0(
-        'Column with number of transcripts per cell (`', nUMI,
+        'Column with number of transcripts per cell (`',
+        nUMI,
         '`) not found in meta data.'
       ),
       call. = FALSE
@@ -223,10 +235,11 @@ exportFromSeurat <- function(
   }
 
   ## `nGene`
-  if ( (nGene %in% names(object@meta.data) == FALSE ) ) {
+  if ((nGene %in% names(object@meta.data) == FALSE)) {
     stop(
       paste0(
-        'Column with number of expressed genes per cell (`', nGene,
+        'Column with number of expressed genes per cell (`',
+        nGene,
         '`) not found in meta data.'
       ),
       call. = FALSE
@@ -234,7 +247,7 @@ exportFromSeurat <- function(
   }
 
   ## `cell_cycle`
-  if ( any(cell_cycle %in% names(object@meta.data) == FALSE ) ) {
+  if (any(cell_cycle %in% names(object@meta.data) == FALSE)) {
     stop(
       paste0(
         'Some cell cycle columns could not be found in meta data: ',
@@ -248,10 +261,12 @@ exportFromSeurat <- function(
   }
 
   ## check if provided assay exists
-  if ( (assay %in% names(object@assays) == FALSE ) ) {
+  if ((assay %in% names(object@assays) == FALSE)) {
     stop(
       paste0(
-        'Specified assay `', assay, '` could not be found in provided Seurat ',
+        'Specified assay `',
+        assay,
+        '` could not be found in provided Seurat ',
         'object.'
       ),
       call. = FALSE
@@ -261,16 +276,20 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## initialize Cerebro object
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Initializing Cerebro object...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Initializing Cerebro object...'
       )
     )
   } else {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Start collecting data...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Start collecting data...'
       )
     )
   }
@@ -305,13 +324,15 @@ exportFromSeurat <- function(
     ## "matrix" format, and if the "DelayedArray" package is available
     if (
       use_delayed_array == TRUE &&
-      inherits(expression_data, c('matrix','dgCMatrix')) &&
-      requireNamespace("DelayedArray", quietly = TRUE)
+        inherits(expression_data, c('matrix', 'dgCMatrix')) &&
+        requireNamespace("DelayedArray", quietly = TRUE)
     ) {
-      if ( verbose ) {
+      if (verbose) {
         message(
           paste0(
-            '[', format(Sys.time(), '%H:%M:%S'), '] Storing expression data as ',
+            '[',
+            format(Sys.time(), '%H:%M:%S'),
+            '] Storing expression data as ',
             'DelayedArray...'
           )
         )
@@ -323,11 +344,12 @@ exportFromSeurat <- function(
     ## add expression data
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Adding expression data (embedded)...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Adding expression data (embedded)...'
       )
     )
     export$setExpression(expression_data)
-
   } else if (expression_matrix_mode == "bpcells") {
     ## Write the expression matrix to a BPCells on-disk directory sitting next
     ## to the target .crb. Keep a BPCells IterableMatrix handle on the object
@@ -336,14 +358,18 @@ exportFromSeurat <- function(
     ## will additionally re-resolve the relative location when the crb has
     ## been moved to a different machine or layout.
     crb_dir <- dirname(file)
-    if (!nzchar(crb_dir) || crb_dir == "") crb_dir <- "."
+    if (!nzchar(crb_dir) || crb_dir == "") {
+      crb_dir <- "."
+    }
     crb_stem <- tools::file_path_sans_ext(basename(file))
     bpc_dirname <- paste0(crb_stem, ".bpcells")
     bpc_abs <- file.path(crb_dir, bpc_dirname)
 
     ## BPCells writes an error if the directory already exists; clean first
     ## so the exporter is idempotent.
-    if (dir.exists(bpc_abs)) unlink(bpc_abs, recursive = TRUE)
+    if (dir.exists(bpc_abs)) {
+      unlink(bpc_abs, recursive = TRUE)
+    }
 
     ## Sparse dgCMatrix is BPCells' native input; dense matrices have to be
     ## coerced once. Everything else (RleMatrix, DelayedMatrix) is rare enough
@@ -353,7 +379,8 @@ exportFromSeurat <- function(
         expression_data <- methods::as(expression_data, "CsparseMatrix")
       } else if (inherits(expression_data, c("RleMatrix", "DelayedMatrix"))) {
         expression_data <- methods::as(
-          as.matrix(expression_data), "CsparseMatrix"
+          as.matrix(expression_data),
+          "CsparseMatrix"
         )
       }
     }
@@ -361,7 +388,8 @@ exportFromSeurat <- function(
     if (verbose) {
       message(sprintf(
         "[%s] Writing expression matrix to BPCells directory: %s",
-        format(Sys.time(), "%H:%M:%S"), bpc_abs
+        format(Sys.time(), "%H:%M:%S"),
+        bpc_abs
       ))
     }
     BPCells::write_matrix_dir(
@@ -375,7 +403,6 @@ exportFromSeurat <- function(
     ## 7.3's attach reads the tag, not @dir, so the crb stays portable.
     export$setExpression(mat_handle, backend = "external")
     export$setExpressionBackend(type = "bpcells", location = bpc_dirname)
-
   } else if (expression_matrix_mode == "h5") {
     ## Write the expression matrix to a 10X-style sparse HDF5 file sitting next
     ## to the target .crb. The on-disk orientation is cells x genes (to match
@@ -383,7 +410,9 @@ exportFromSeurat <- function(
     ## matrix internally as genes x cells, so the writer transposes once on
     ## the way out and the runtime attach transposes again on the way in.
     crb_dir <- dirname(file)
-    if (!nzchar(crb_dir) || crb_dir == "") crb_dir <- "."
+    if (!nzchar(crb_dir) || crb_dir == "") {
+      crb_dir <- "."
+    }
     crb_stem <- tools::file_path_sans_ext(basename(file))
     h5_filename <- paste0(crb_stem, ".h5")
     h5_abs <- file.path(crb_dir, h5_filename)
@@ -393,7 +422,8 @@ exportFromSeurat <- function(
         expression_data <- methods::as(expression_data, "CsparseMatrix")
       } else if (inherits(expression_data, c("RleMatrix", "DelayedMatrix"))) {
         expression_data <- methods::as(
-          as.matrix(expression_data), "CsparseMatrix"
+          as.matrix(expression_data),
+          "CsparseMatrix"
         )
       }
     }
@@ -404,24 +434,30 @@ exportFromSeurat <- function(
     if (verbose) {
       message(sprintf(
         "[%s] Writing expression matrix to HDF5 file: %s",
-        format(Sys.time(), "%H:%M:%S"), h5_abs
+        format(Sys.time(), "%H:%M:%S"),
+        h5_abs
       ))
     }
 
-    if (file.exists(h5_abs)) file.remove(h5_abs)
+    if (file.exists(h5_abs)) {
+      file.remove(h5_abs)
+    }
     rhdf5::h5createFile(h5_abs)
     rhdf5::h5createGroup(h5_abs, "expression")
-    rhdf5::h5write(as.numeric(m_disk@x),                h5_abs, "expression/data")
-    rhdf5::h5write(as.integer(m_disk@i),                h5_abs, "expression/indices")
-    rhdf5::h5write(as.integer(m_disk@p),                h5_abs, "expression/indptr")
-    rhdf5::h5write(as.integer(c(nrow(m_disk), ncol(m_disk))),
-                                                        h5_abs, "expression/shape")
+    rhdf5::h5write(as.numeric(m_disk@x), h5_abs, "expression/data")
+    rhdf5::h5write(as.integer(m_disk@i), h5_abs, "expression/indices")
+    rhdf5::h5write(as.integer(m_disk@p), h5_abs, "expression/indptr")
+    rhdf5::h5write(
+      as.integer(c(nrow(m_disk), ncol(m_disk))),
+      h5_abs,
+      "expression/shape"
+    )
     ## /genes labels the on-disk row axis (length = ncells) -> cell barcodes.
     ## /barcodes labels the on-disk col axis (length = ngenes) -> gene names.
     ## (Field names follow example.h5 verbatim even though their content is
     ##  flipped relative to a strict 10X reading.)
-    rhdf5::h5write(rownames(m_disk),                    h5_abs, "expression/genes")
-    rhdf5::h5write(colnames(m_disk),                    h5_abs, "expression/barcodes")
+    rhdf5::h5write(rownames(m_disk), h5_abs, "expression/genes")
+    rhdf5::h5write(colnames(m_disk), h5_abs, "expression/barcodes")
     rhdf5::H5close()
 
     ## Keep the original genes x cells dgCMatrix on the in-memory object so
@@ -437,16 +473,19 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
 
   ## date of analysis
-  if ( !is.null(object@misc$experiment$date_of_analysis) ) {
-    export$addExperiment('date_of_analysis', object@misc$experiment$date_of_analysis)
+  if (!is.null(object@misc$experiment$date_of_analysis)) {
+    export$addExperiment(
+      'date_of_analysis',
+      object@misc$experiment$date_of_analysis
+    )
   }
 
   ## date of export
   export$addExperiment('date_of_export', Sys.Date())
 
   ## `parameters`
-  if ( !is.null(object@misc$parameters) ) {
-    for ( i in seq_along(object@misc$parameters) ) {
+  if (!is.null(object@misc$parameters)) {
+    for (i in seq_along(object@misc$parameters)) {
       name <- names(object@misc$parameters)[i]
       export$addParameters(
         name,
@@ -456,8 +495,8 @@ exportFromSeurat <- function(
   }
 
   ## `technical_info`
-  if ( !is.null(object@misc$technical_info) ) {
-    for ( i in seq_along(object@misc$technical_info) ) {
+  if (!is.null(object@misc$technical_info)) {
+    for (i in seq_along(object@misc$technical_info)) {
       export$addTechnicalInfo(
         names(object@misc$technical_info)[i],
         object@misc$technical_info[[i]]
@@ -466,8 +505,8 @@ exportFromSeurat <- function(
   }
 
   ## `gene_lists`
-  if ( !is.null(object@misc$gene_lists) ) {
-    for ( i in seq_along(object@misc$gene_lists) ) {
+  if (!is.null(object@misc$gene_lists)) {
+    for (i in seq_along(object@misc$gene_lists)) {
       export$addGeneList(
         names(object@misc$gene_lists)[i],
         object@misc$gene_lists[[i]]
@@ -478,10 +517,12 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## prepare meta data
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Collecting available meta data...'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Collecting available meta data...'
       )
     )
   }
@@ -497,22 +538,20 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
 
   ## go through grouping variables
-  for ( i in groups ) {
-
+  for (i in groups) {
     ## check content of column in meta data
     ## ... content not factorized
     if (
       !is.factor(object@meta.data[[i]]) &&
-      is.character(object@meta.data[[i]])
+        is.character(object@meta.data[[i]])
     ) {
-
       ## get all values and unique values (sorted, which removes NA)
       values <- object@meta.data[[i]]
       levels <- sort(unique(values), na.last = NA)
 
       ## check if there are NA values; if so, change NA values to 'N/A' and add
       ## 'N/A' to levels
-      if ( any(is.na(values)) ) {
+      if (any(is.na(values))) {
         values[is.na(values)] <- 'N/A'
         levels <- c(levels, 'N/A')
       }
@@ -520,16 +559,15 @@ exportFromSeurat <- function(
       ## factorize values
       temp_meta_data[[i]] <- factor(values, levels = levels)
 
-    ## ... content is factorized but there are NA values and NA is not among the
-    ##     factor levels
+      ## ... content is factorized but there are NA values and NA is not among the
+      ##     factor levels
     } else if (
       is.factor(object@meta.data[[i]]) &&
-      any(is.na(object@meta.data[[i]])) &&
-      'NA' %in% levels(object@meta.data[[i]]) == FALSE
+        any(is.na(object@meta.data[[i]])) &&
+        'NA' %in% levels(object@meta.data[[i]]) == FALSE
     ) {
-
       ## print log message
-      if ( verbose ) {
+      if (verbose) {
         message(
           glue::glue(
             '[{format(Sys.time(), "%H:%M:%S")}] Adding `NA` to factor levels ',
@@ -545,9 +583,8 @@ exportFromSeurat <- function(
       values <- factor(values, levels = c(levels, 'N/A'))
       temp_meta_data[[i]] <- values
 
-    ## ... none of the above
+      ## ... none of the above
     } else {
-
       ## copy content to meta data
       temp_meta_data[[i]] <- object@meta.data[[i]]
     }
@@ -568,10 +605,10 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   if (
     !is.null(cell_cycle) &&
-    length(cell_cycle) > 0
+      length(cell_cycle) > 0
   ) {
-    for ( i in cell_cycle ) {
-      if ( is.factor(object@meta.data[[i]]) ) {
+    for (i in cell_cycle) {
+      if (is.factor(object@meta.data[[i]])) {
         tmp_names <- levels(object@meta.data[[i]])
       } else {
         tmp_names <- unique(object@meta.data[[i]])
@@ -579,22 +616,25 @@ exportFromSeurat <- function(
       # colData(export$expression)[[i]] <- factor(object@meta.data[[i]], levels = tmp_names)
       temp_meta_data[[i]] <- factor(object@meta.data[[i]], levels = tmp_names)
     }
-    meta_data_columns <- meta_data_columns[-which(meta_data_columns %in% cell_cycle)]
+    meta_data_columns <- meta_data_columns[
+      -which(meta_data_columns %in% cell_cycle)
+    ]
   }
 
   ##--------------------------------------------------------------------------##
   ## add all other meta data if specified
   ##--------------------------------------------------------------------------##
-  if ( add_all_meta_data == TRUE ) {
-    if ( verbose ) {
+  if (add_all_meta_data == TRUE) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting all meta data columns...'
         )
       )
     }
-    for ( i in meta_data_columns ) {
+    for (i in meta_data_columns) {
       # colData(export$expression)[[i]] <- object@meta.data[[i]]
       temp_meta_data[[i]] <- object@meta.data[[i]]
     }
@@ -612,18 +652,18 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## add grouping variables and cell cycle columns
   ##--------------------------------------------------------------------------##
-  for ( i in groups ) {
+  for (i in groups) {
     export$addGroup(i, levels(temp_meta_data[[i]]))
   }
 
   ## set main group if specified
-  if ( !is.null(main_group) ) {
+  if (!is.null(main_group)) {
     export$addParameters('main_group', main_group)
   }
 
   if (
     !is.null(cell_cycle) &&
-    length(cell_cycle) > 0
+      length(cell_cycle) > 0
   ) {
     export$setCellCycle(cell_cycle)
   }
@@ -631,10 +671,11 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## projections
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'),
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
         '] Extracting dimensional reductions...'
       )
     )
@@ -642,17 +683,23 @@ exportFromSeurat <- function(
   projections <- list()
   projections_available <- names(object@reductions)
   projections_available_pca <- projections_available[grep(
-    projections_available, pattern = 'pca', ignore.case = TRUE, invert = FALSE
+    projections_available,
+    pattern = 'pca',
+    ignore.case = TRUE,
+    invert = FALSE
   )]
   projections_available_non_pca <- projections_available[grep(
-    projections_available, pattern = 'pca', ignore.case = TRUE, invert = TRUE
+    projections_available,
+    pattern = 'pca',
+    ignore.case = TRUE,
+    invert = TRUE
   )]
-  if ( length(projections_available) == 0 ) {
+  if (length(projections_available) == 0) {
     stop('No dimensional reductions available.', call. = FALSE)
   } else if (
     length(projections_available) == 1 &&
-    length(projections_available_pca) == 1 )
-  {
+      length(projections_available_pca) == 1
+  ) {
     # SingleCellExperiment::reducedDims(export$expression)[[projections_available]] <- as.data.frame(
     #   object@reductions[[projections_available]]@cell.embeddings
     # )
@@ -667,17 +714,19 @@ exportFromSeurat <- function(
         'UMAP instead.'
       )
     )
-  } else if ( length(projections_available_non_pca) >= 1 ) {
-    if ( verbose ) {
+  } else if (length(projections_available_non_pca) >= 1) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] ',
           'Will export the following dimensional reductions: ',
           paste(projections_available_non_pca, collapse = ', ')
         )
       )
     }
-    for ( projection in projections_available_non_pca ) {
+    for (projection in projections_available_non_pca) {
       # SingleCellExperiment::reducedDims(export$expression)[[projection]] <- as.data.frame(
       #   object@reductions[[projection]]@cell.embeddings
       # )
@@ -691,10 +740,11 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## spatial data
   ##--------------------------------------------------------------------------##
-  if ( verbose ) {
+  if (verbose) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'),
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
         '] Checking for spatial data...'
       )
     )
@@ -703,91 +753,119 @@ exportFromSeurat <- function(
   seurat_version <- as.character(utils::packageVersion("Seurat"))
   is_seurat_v5 <- utils::compareVersion(seurat_version, "5.0.0") >= 0
 
-  if ( is_seurat_v5 && !is.null(object@images) && length(object@images) > 0 ) {
-    if ( verbose ) {
+  if (is_seurat_v5 && !is.null(object@images) && length(object@images) > 0) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] ',
           'Spatial data found. Extracting spatial coordinates...'
         )
       )
     }
 
-    for ( image_name in names(object@images) ) {
-      tryCatch({
-        # Extract spatial data (coordinates + expression)
-        # Using .getSpatialData helper which handles Visium, FOV/Xenium, etc.
-        spatial_data <- .getSpatialData(object, image = image_name, layer = "data", assay = assay)
+    for (image_name in names(object@images)) {
+      tryCatch(
+        {
+          # Extract spatial data (coordinates + expression)
+          # Using .getSpatialData helper which handles Visium, FOV/Xenium, etc.
+          spatial_data <- .getSpatialData(
+            object,
+            image = image_name,
+            layer = "data",
+            assay = assay
+          )
 
-        # Also add coordinates as a projection for compatibility with existing visualization functions
-        coords_df <- spatial_data$coordinates
+          # Also add coordinates as a projection for compatibility with existing visualization functions
+          coords_df <- spatial_data$coordinates
 
-        # Identify coordinate columns to use for projection (2D)
-        proj_cols <- character(0)
+          # Identify coordinate columns to use for projection (2D)
+          proj_cols <- character(0)
 
-        # Standard Visium
-        if ( all(c("imagerow", "imagecol") %in% colnames(coords_df)) ) {
-          proj_cols <- c("imagerow", "imagecol")
-        } else if ( all(c("x", "y") %in% colnames(coords_df)) ) {
-          # Standard FOV/Xenium/Other
-          proj_cols <- c("x", "y")
-        } else if ( ncol(coords_df) >= 2 ) {
-          # Fallback: use first two columns
-          proj_cols <- colnames(coords_df)[1:2]
-        }
+          # Standard Visium
+          if (all(c("imagerow", "imagecol") %in% colnames(coords_df))) {
+            proj_cols <- c("imagerow", "imagecol")
+          } else if (all(c("x", "y") %in% colnames(coords_df))) {
+            # Standard FOV/Xenium/Other
+            proj_cols <- c("x", "y")
+          } else if (ncol(coords_df) >= 2) {
+            # Fallback: use first two columns
+            proj_cols <- colnames(coords_df)[1:2]
+          }
 
-        if ( length(proj_cols) == 2 ) {
-          coords_df <- coords_df[, proj_cols, drop = FALSE]
-          if ( verbose ) {
-            message(paste0('[', format(Sys.time(), '%H:%M:%S'), '] ', 'Added spatial projection: ', image_name))
+          if (length(proj_cols) == 2) {
+            coords_df <- coords_df[, proj_cols, drop = FALSE]
+            if (verbose) {
+              message(paste0(
+                '[',
+                format(Sys.time(), '%H:%M:%S'),
+                '] ',
+                'Added spatial projection: ',
+                image_name
+              ))
+            }
+          }
+          spatial_data$coordinates <- coords_df
+
+          # Add to Cerebro object
+          export$addSpatialData(image_name, spatial_data)
+
+          if (verbose) {
+            message(
+              paste0(
+                '[',
+                format(Sys.time(), '%H:%M:%S'),
+                '] ',
+                'Added spatial data: ',
+                image_name,
+                ' (',
+                nrow(spatial_data$coordinates),
+                ' cells)'
+              )
+            )
+          }
+        },
+        error = function(e) {
+          if (verbose) {
+            message(
+              paste0(
+                '[',
+                format(Sys.time(), '%H:%M:%S'),
+                '] ',
+                'Could not extract spatial data for image `',
+                image_name,
+                '`: ',
+                e$message
+              )
+            )
           }
         }
-        spatial_data$coordinates <- coords_df
-
-        # Add to Cerebro object
-        export$addSpatialData(image_name, spatial_data)
-
-        if ( verbose ) {
-          message(
-            paste0(
-              '[', format(Sys.time(), '%H:%M:%S'), '] ',
-              'Added spatial data: ', image_name,
-              ' (', nrow(spatial_data$coordinates), ' cells)'
-            )
-          )
-        }
-      }, error = function(e) {
-        if ( verbose ) {
-          message(
-            paste0(
-              '[', format(Sys.time(), '%H:%M:%S'), '] ',
-              'Could not extract spatial data for image `', image_name, '`: ', e$message
-            )
-          )
-        }
-      })
+      )
     }
   }
 
   ##--------------------------------------------------------------------------##
   ## group trees
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$trees) ) {
+  if (!is.null(object@misc$trees)) {
     ## check if it's a list
-    if ( !is.list(object@misc$trees) ) {
+    if (!is.list(object@misc$trees)) {
       stop(
         '`object@misc$trees` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] Extracting trees...'
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] Extracting trees...'
         )
       )
     }
-    for ( i in seq_along(object@misc$trees) ) {
+    for (i in seq_along(object@misc$trees)) {
       export$addTree(
         names(object@misc$trees)[i],
         object@misc$trees[[i]]
@@ -798,26 +876,27 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## most expressed genes
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$most_expressed_genes) ) {
+  if (!is.null(object@misc$most_expressed_genes)) {
     ## check if it's a list
-    if ( !is.list(object@misc$most_expressed_genes) ) {
+    if (!is.list(object@misc$most_expressed_genes)) {
       stop(
         '`object@misc$most_expressed_genes` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of most expressed genes...'
         )
       )
     }
 
-    for ( i in seq_along(object@misc$most_expressed_genes) ) {
+    for (i in seq_along(object@misc$most_expressed_genes)) {
       group <- names(object@misc$most_expressed_genes)[i]
-      if ( group %in% groups ) {
+      if (group %in% groups) {
         export$addMostExpressedGenes(
           group,
           object@misc$most_expressed_genes[[i]]
@@ -829,26 +908,27 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## mean expression
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$mean_expression) ) {
+  if (!is.null(object@misc$mean_expression)) {
     ## check if it's a list
-    if ( !is.list(object@misc$mean_expression) ) {
+    if (!is.list(object@misc$mean_expression)) {
       stop(
         '`object@misc$mean_expression` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of mean expression...'
         )
       )
     }
 
-    for ( i in seq_along(object@misc$mean_expression) ) {
+    for (i in seq_along(object@misc$mean_expression)) {
       group <- names(object@misc$mean_expression)[i]
-      if ( group %in% groups ) {
+      if (group %in% groups) {
         export$addMeanExpression(
           group,
           object@misc$mean_expression[[i]]
@@ -860,15 +940,19 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## Immune repertoire data (unified)
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$immune_repertoire) &&
-       is.list(object@misc$immune_repertoire) &&
-       length(object@misc$immune_repertoire) > 0 ) {
-    if ( verbose ) {
+  if (
+    !is.null(object@misc$immune_repertoire) &&
+      is.list(object@misc$immune_repertoire) &&
+      length(object@misc$immune_repertoire) > 0
+  ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting immune repertoire data (',
-          length(object@misc$immune_repertoire), ' samples)...'
+          length(object@misc$immune_repertoire),
+          ' samples)...'
         )
       )
     }
@@ -878,18 +962,19 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## BCR data (legacy)
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$bcr_data) ) {
+  if (!is.null(object@misc$bcr_data)) {
     ## check if it's a list
-    if ( !is.list(object@misc$bcr_data) ) {
+    if (!is.list(object@misc$bcr_data)) {
       stop(
         '`object@misc$bcr_data` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of BCR data...'
         )
       )
@@ -900,18 +985,19 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## TCR data (legacy)
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$tcr_data) ) {
+  if (!is.null(object@misc$tcr_data)) {
     ## check if it's a list
-    if ( !is.list(object@misc$tcr_data) ) {
+    if (!is.list(object@misc$tcr_data)) {
       stop(
         '`object@misc$tcr_data` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting tables of TCR data...'
         )
       )
@@ -922,11 +1008,12 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## marker genes
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$marker_genes) ) {
-    if ( verbose ) {
+  if (!is.null(object@misc$marker_genes)) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting marker genes table...'
         )
       )
@@ -934,13 +1021,13 @@ exportFromSeurat <- function(
     ## marker_genes is a nested list: list(method = list(group = data.frame))
     ## (mischko's existing shiny consumers depend on the nested layout; the
     ## flat-data.frame simplification is deferred until H6 lands).
-    if ( !is.list(object@misc$marker_genes) ) {
+    if (!is.list(object@misc$marker_genes)) {
       stop('`object@misc$marker_genes` is not a list.', call. = FALSE)
     }
-    for ( i in seq_along(object@misc$marker_genes) ) {
+    for (i in seq_along(object@misc$marker_genes)) {
       method <- names(object@misc$marker_genes)[i]
-      for ( j in seq_along(object@misc$marker_genes[[method]]) ) {
-        if ( is.list(object@misc$marker_genes[[method]][j]) ) {
+      for (j in seq_along(object@misc$marker_genes[[method]])) {
+        if (is.list(object@misc$marker_genes[[method]][j])) {
           group <- names(object@misc$marker_genes[[method]])[j]
           export$addMarkerGenes(
             method,
@@ -955,32 +1042,33 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## enriched pathways
   ##--------------------------------------------------------------------------##
-  if ( !is.null(object@misc$enriched_pathways) ) {
+  if (!is.null(object@misc$enriched_pathways)) {
     ## check if it's a list
-    if ( !is.list(object@misc$enriched_pathways) ) {
+    if (!is.list(object@misc$enriched_pathways)) {
       stop(
         '`object@misc$enriched_pathways` is not a list.',
         call. = FALSE
       )
     }
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'),
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
           '] Extracting pathway enrichment results...'
         )
       )
     }
     ## for each method
-    for ( i in seq_along(object@misc$enriched_pathways) ) {
+    for (i in seq_along(object@misc$enriched_pathways)) {
       method <- names(object@misc$enriched_pathways)[i]
       ## for each group
-      for ( j in seq_along(object@misc$enriched_pathways[[method]]) ) {
-        if ( is.list(object@misc$enriched_pathways[[method]][j]) ) {
+      for (j in seq_along(object@misc$enriched_pathways[[method]])) {
+        if (is.list(object@misc$enriched_pathways[[method]][j])) {
           group <- names(object@misc$enriched_pathways[[method]])[j]
 
           ## only add enriched pathways if group is present in `groups`
-          if ( group %in% groups ) {
+          if (group %in% groups) {
             export$addEnrichedPathways(
               method,
               group,
@@ -995,19 +1083,23 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## trajectories
   ##--------------------------------------------------------------------------##
-  if ( length(object@misc$trajectories) == 0 ) {
-    if ( verbose ) {
+  if (length(object@misc$trajectories) == 0) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] No trajectories to extract...'
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] No trajectories to extract...'
         )
       )
     }
   } else {
-    if ( verbose ) {
+    if (verbose) {
       message(
         paste0(
-          '[', format(Sys.time(), '%H:%M:%S'), '] ',
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] ',
           # 'Extracting trajectories...'
           'Will export the following trajectories: ',
           paste(names(object@misc$trajectories$monocle2), collapse = ', ')
@@ -1015,11 +1107,11 @@ exportFromSeurat <- function(
       )
     }
     ## for each method
-    for ( i in seq_along(object@misc$trajectories) ) {
+    for (i in seq_along(object@misc$trajectories)) {
       method <- names(object@misc$trajectories)[i]
-      if ( method == 'monocle2' ) {
+      if (method == 'monocle2') {
         ## for each trajectory
-        for ( j in seq_along(object@misc$trajectories[[i]]) ) {
+        for (j in seq_along(object@misc$trajectories[[i]])) {
           export$addTrajectory(
             method,
             names(object@misc$trajectories[[i]])[j],
@@ -1029,7 +1121,9 @@ exportFromSeurat <- function(
       } else {
         warning(
           paste0(
-            'Warning: Skipping trajectories of method `', method, '`. At the ',
+            'Warning: Skipping trajectories of method `',
+            method,
+            '`. At the ',
             'moment, only trajectories generated with Monocle 2 (`monocle2`) ',
             'are supported.'
           )
@@ -1051,11 +1145,10 @@ exportFromSeurat <- function(
   ## list is not empty
   if (
     !is.null(object@misc$extra_material) &&
-    is.list(object@misc$extra_material) &&
-    length(object@misc$extra_material) > 0
+      is.list(object@misc$extra_material) &&
+      length(object@misc$extra_material) > 0
   ) {
-
-    if ( verbose ) {
+    if (verbose) {
       message(
         glue::glue(
           '[{format(Sys.time(), "%H:%M:%S")}] Found extra material to export...'
@@ -1064,14 +1157,11 @@ exportFromSeurat <- function(
     }
 
     ## go through categories in `extra_material` slot
-    for ( category in names(object@misc$extra_material) ) {
-
+    for (category in names(object@misc$extra_material)) {
       ## do this if category is `tables`
-      if ( category == 'tables' ) {
-
+      if (category == 'tables') {
         ## go through tables
-        for ( i in seq_along(object@misc$extra_material$tables) ) {
-
+        for (i in seq_along(object@misc$extra_material$tables)) {
           ## export table
           export$addExtraMaterial(
             category = 'tables',
@@ -1080,12 +1170,10 @@ exportFromSeurat <- function(
           )
         }
 
-      ## do this if category is `plots`
-      } else if ( category == 'plots' ) {
-
+        ## do this if category is `plots`
+      } else if (category == 'plots') {
         ## go through tables
-        for ( i in seq_along(object@misc$extra_material$plots) ) {
-
+        for (i in seq_along(object@misc$extra_material$plots)) {
           ## export table
           export$addExtraMaterial(
             category = 'plots',
@@ -1102,7 +1190,9 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   message(
     paste0(
-      '[', format(Sys.time(), '%H:%M:%S'), '] ',
+      '[',
+      format(Sys.time(), '%H:%M:%S'),
+      '] ',
       'Overview of Cerebro object:\n'
     )
   )
@@ -1115,10 +1205,11 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
 
   ## check if output directory exists and create it if not
-  if ( !file.exists(dirname(file)) ) {
+  if (!file.exists(dirname(file))) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'),
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
         '] Creating output directory...'
       )
     )
@@ -1128,7 +1219,10 @@ exportFromSeurat <- function(
   ## log message
   message(
     paste0(
-      '[', format(Sys.time(), '%H:%M:%S'), '] Saving Cerebro object to: ', file
+      '[',
+      format(Sys.time(), '%H:%M:%S'),
+      '] Saving Cerebro object to: ',
+      file
     )
   )
 
@@ -1137,17 +1231,21 @@ exportFromSeurat <- function(
 
   ## log message
   ## ... writing to file was successful
-  if ( file.exists(file) ) {
+  if (file.exists(file)) {
     message(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Done!'
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Done!'
       )
     )
-  ## ... target file doesn't exist
+    ## ... target file doesn't exist
   } else {
     stop(
       paste0(
-        '[', format(Sys.time(), '%H:%M:%S'), '] Something went wrong while ',
+        '[',
+        format(Sys.time(), '%H:%M:%S'),
+        '] Something went wrong while ',
         'saving the file.'
       ),
       .call = FALSE

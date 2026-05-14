@@ -19,7 +19,6 @@ Cerebro_v1.3 <- R6::R6Class(
 
   ## public fields and methods
   public = list(
-
     #' @field version cerebroApp version that was used to create the object.
     version = c(),
 
@@ -163,7 +162,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #'
     #' @param group_name Group name to be tested
     checkIfGroupExists = function(group_name) {
-      if ( group_name %in% names(self$groups) == FALSE ) {
+      if (group_name %in% names(self$groups) == FALSE) {
         stop(
           glue::glue('Group `{group_name}` not present in `groups` attribute.'),
           call. = FALSE
@@ -177,7 +176,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #'
     #' @param group_name Group name to be tested.
     checkIfColumnExistsInMetadata = function(group_name) {
-      if ( group_name %in% colnames(self$meta_data) == FALSE ) {
+      if (group_name %in% colnames(self$meta_data) == FALSE) {
         stop(
           glue::glue('Group `{group_name}` not present in meta data.'),
           call. = FALSE
@@ -281,11 +280,15 @@ Cerebro_v1.3 <- R6::R6Class(
       if (!is.data.frame(table) && !inherits(table, "DFrame")) {
         stop("Meta data must be a data frame or DFrame.")
       }
-      if (inherits(table, "DFrame")) table <- as.data.frame(table)
+      if (inherits(table, "DFrame")) {
+        table <- as.data.frame(table)
+      }
 
       if (!is.null(self$expression)) {
         if (nrow(table) != ncol(self$expression)) {
-           stop(glue::glue("Number of rows in meta data ({nrow(table)}) must match number of columns in expression matrix ({ncol(self$expression)})."))
+          stop(glue::glue(
+            "Number of rows in meta data ({nrow(table)}) must match number of columns in expression matrix ({ncol(self$expression)})."
+          ))
         }
       }
       self$meta_data <- table
@@ -330,13 +333,27 @@ Cerebro_v1.3 <- R6::R6Class(
     #' pass \code{setExpressionBackend()} directly instead of relying on this
     #' default.
     setExpression = function(counts, backend = NULL) {
-      if ( !inherits(counts, c("matrix", "dgCMatrix", "RleMatrix",
-                               "DelayedMatrix", "IterableMatrix")) ) {
-        warning("Expression data should ideally be a matrix-like object (matrix, dgCMatrix, RleMatrix, IterableMatrix, etc).")
+      if (
+        !inherits(
+          counts,
+          c(
+            "matrix",
+            "dgCMatrix",
+            "RleMatrix",
+            "DelayedMatrix",
+            "IterableMatrix"
+          )
+        )
+      ) {
+        warning(
+          "Expression data should ideally be a matrix-like object (matrix, dgCMatrix, RleMatrix, IterableMatrix, etc)."
+        )
       }
       if (!is.null(self$meta_data) && nrow(self$meta_data) > 0) {
         if (ncol(counts) != nrow(self$meta_data)) {
-          stop(glue::glue("Number of columns in expression matrix ({ncol(counts)}) must match number of rows in meta data ({nrow(self$meta_data)})."))
+          stop(glue::glue(
+            "Number of columns in expression matrix ({ncol(counts)}) must match number of rows in meta data ({nrow(self$meta_data)})."
+          ))
         }
       }
       self$expression <- counts
@@ -365,13 +382,15 @@ Cerebro_v1.3 <- R6::R6Class(
       allowed <- c("embedded", "h5", "bpcells")
       if (length(type) != 1L || !is.character(type) || !(type %in% allowed)) {
         stop(
-          "`type` must be one of: ", paste(allowed, collapse = ", "),
+          "`type` must be one of: ",
+          paste(allowed, collapse = ", "),
           call. = FALSE
         )
       }
       if (type != "embedded" && is.null(location)) {
         stop(
-          "External expression backends (type = '", type,
+          "External expression backends (type = '",
+          type,
           "') require a non-NULL `location`.",
           call. = FALSE
         )
@@ -416,7 +435,6 @@ Cerebro_v1.3 <- R6::R6Class(
       return(rownames(self$expression))
     },
 
-
     #' @description
     #' Retrieve mean expression across all cells in the data set for a set of
     #' genes.
@@ -427,14 +445,17 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{data.frame} containing specified gene names and their respective
     #' mean expression across all cells in the data set.
     getMeanExpressionForGenes = function(genes) {
-
       ## Keep the expression block in the backend's native representation
       ## instead of routing through extractExpression(), which intentionally
       ## returns a dense base matrix for backward compatibility.
       mat <- self$getExpressionBlock(genes = genes, cells = NULL)
 
       ## calculate mean expression per gene with the backend-aware rowMeans
-      if (inherits(mat, "DelayedArray") || inherits(mat, "DelayedMatrix") || inherits(mat, "RleMatrix")) {
+      if (
+        inherits(mat, "DelayedArray") ||
+          inherits(mat, "DelayedMatrix") ||
+          inherits(mat, "RleMatrix")
+      ) {
         mean_expression <- DelayedArray::rowMeans(mat)
       } else if (inherits(mat, "IterableMatrix")) {
         mean_expression <- BPCells::rowMeans(mat)
@@ -464,7 +485,6 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{vector} containing (mean) expression across all specified genes in
     #' each specified cell.
     getMeanExpressionForCells = function(cells = NULL, genes = NULL) {
-
       ## extract dense matrix using helper
       mat <- private$extractExpression(cells = cells, genes = genes)
 
@@ -502,19 +522,31 @@ Cerebro_v1.3 <- R6::R6Class(
       if (length(gene) != 1L || is.na(gene) || !is.character(gene)) {
         stop("`gene` must be a single non-NA character value.", call. = FALSE)
       }
-      if (is.null(cells)) cells <- colnames(self$expression)
+      if (is.null(cells)) {
+        cells <- colnames(self$expression)
+      }
       if (!is.character(cells) || anyNA(cells)) {
-        stop("`cells` must be a character vector of non-NA cell names/barcodes.", call. = FALSE)
+        stop(
+          "`cells` must be a character vector of non-NA cell names/barcodes.",
+          call. = FALSE
+        )
       }
 
       ## DelayedArray family (incl. RleMatrix): extract_array with indices
       ## avoids touching cells outside the requested subset.
-      if (inherits(self$expression, "DelayedArray") ||
+      if (
+        inherits(self$expression, "DelayedArray") ||
           inherits(self$expression, "DelayedMatrix") ||
-          inherits(self$expression, "RleMatrix")) {
+          inherits(self$expression, "RleMatrix")
+      ) {
         gene_idx <- match(gene, rownames(self$expression))
         if (is.na(gene_idx)) {
-          stop("Gene '", gene, "' not found in expression matrix.", call. = FALSE)
+          stop(
+            "Gene '",
+            gene,
+            "' not found in expression matrix.",
+            call. = FALSE
+          )
         }
         cell_idx <- match(cells, colnames(self$expression))
         missing_cells <- cells[is.na(cell_idx)]
@@ -527,7 +559,8 @@ Cerebro_v1.3 <- R6::R6Class(
           )
         }
         mat <- DelayedArray::extract_array(
-          self$expression, list(gene_idx, cell_idx)
+          self$expression,
+          list(gene_idx, cell_idx)
         )
         out <- as.numeric(mat)
         names(out) <- cells
@@ -568,11 +601,19 @@ Cerebro_v1.3 <- R6::R6Class(
         stop("`genes` must be a non-empty character vector.", call. = FALSE)
       }
       if (!is.character(genes) || anyNA(genes)) {
-        stop("`genes` must be a character vector of non-NA gene names.", call. = FALSE)
+        stop(
+          "`genes` must be a character vector of non-NA gene names.",
+          call. = FALSE
+        )
       }
-      if (is.null(cells)) cells <- colnames(self$expression)
+      if (is.null(cells)) {
+        cells <- colnames(self$expression)
+      }
       if (!is.character(cells) || anyNA(cells)) {
-        stop("`cells` must be a character vector of non-NA cell names/barcodes.", call. = FALSE)
+        stop(
+          "`cells` must be a character vector of non-NA cell names/barcodes.",
+          call. = FALSE
+        )
       }
 
       gene_idx <- match(genes, rownames(self$expression))
@@ -598,9 +639,11 @@ Cerebro_v1.3 <- R6::R6Class(
 
       ## DelayedArray subsetting by integer indices preserves laziness and
       ## avoids relying on every delayed backend supporting character subscripts.
-      if (inherits(self$expression, "DelayedArray") ||
+      if (
+        inherits(self$expression, "DelayedArray") ||
           inherits(self$expression, "DelayedMatrix") ||
-          inherits(self$expression, "RleMatrix")) {
+          inherits(self$expression, "RleMatrix")
+      ) {
         return(self$expression[gene_idx, cell_idx, drop = FALSE])
       }
 
@@ -616,11 +659,11 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @param cols \code{vector} of columns names containing cell cycle
     #' assignments.
     setCellCycle = function(cols) {
-      if ( length(cols) == 1 ) {
+      if (length(cols) == 1) {
         self$checkIfColumnExistsInMetadata(cols)
         self$cell_cycle <- cols
       } else {
-        for ( i in seq_along(cols) ) {
+        for (i in seq_along(cols)) {
           self$checkIfColumnExistsInMetadata(cols[i])
           self$cell_cycle <- c(self$cell_cycle, cols[i])
         }
@@ -644,7 +687,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' projection.
     addProjection = function(name, projection) {
       ## check if projection with same name already exists
-      if ( name %in% names(self$projections) ) {
+      if (name %in% names(self$projections)) {
         stop(
           glue::glue(
             'A projection with the name `{name}` already exists. ',
@@ -654,7 +697,7 @@ Cerebro_v1.3 <- R6::R6Class(
         )
       }
       ## check if provided projection is a data frame
-      if ( !is.data.frame(projection) ) {
+      if (!is.data.frame(projection)) {
         stop(
           glue::glue(
             'Provided projection is of type `{class(projection)}` but should ',
@@ -664,8 +707,12 @@ Cerebro_v1.3 <- R6::R6Class(
         )
       }
       ## check dimensions
-      if ( !is.null(self$expression) && nrow(projection) != ncol(self$expression) ) {
-         stop(glue::glue("Number of rows in projection ({nrow(projection)}) must match number of cells ({ncol(self$expression)})."))
+      if (
+        !is.null(self$expression) && nrow(projection) != ncol(self$expression)
+      ) {
+        stop(glue::glue(
+          "Number of rows in projection ({nrow(projection)}) must match number of cells ({ncol(self$expression)})."
+        ))
       }
       self$projections[[name]] <- projection
     },
@@ -687,7 +734,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' \code{data.frame} containing the positions of cells in the projection.
     getProjection = function(name) {
-      if ( name %in% self$availableProjections() == FALSE ) {
+      if (name %in% self$availableProjections() == FALSE) {
         stop(glue::glue('Projection `{name}` is not available.'), call. = FALSE)
       } else {
         return(self$projections[[name]])
@@ -801,7 +848,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{sample}.
     #' @param table \code{data.frame} that contains the marker genes.
     addMarkerGenes = function(method, name, table) {
-      if ( method %in% names(self$marker_genes) == FALSE ) {
+      if (method %in% names(self$marker_genes) == FALSE) {
         self$marker_genes[[method]] <- list()
       }
       self$marker_genes[[method]][[name]] <- table
@@ -840,11 +887,19 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{data.frame} that contains marker genes for the specified
     #' combination of method and grouping variable.
     getMarkerGenes = function(method, name) {
-      if ( method %in% names(self$marker_genes) == FALSE ) {
-        stop(glue::glue('Method `{method}` is not available for marker genes.'), call. = FALSE)
+      if (method %in% names(self$marker_genes) == FALSE) {
+        stop(
+          glue::glue('Method `{method}` is not available for marker genes.'),
+          call. = FALSE
+        )
       }
-      if ( name %in% names(self$marker_genes[[method]]) == FALSE ) {
-        stop(glue::glue('A marker gene table with name `{name}` is not available for method `{method}`.'), call. = FALSE)
+      if (name %in% names(self$marker_genes[[method]]) == FALSE) {
+        stop(
+          glue::glue(
+            'A marker gene table with name `{name}` is not available for method `{method}`.'
+          ),
+          call. = FALSE
+        )
       }
       return(self$marker_genes[[method]][[name]])
     },
@@ -882,7 +937,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{vector} of grouping variables for which enriched pathways are
     #' available.
     getGroupsWithEnrichedPathways = function(method) {
-      if ( method %in% self$getMethodsWithEnrichedPathways() == FALSE ) {
+      if (method %in% self$getMethodsWithEnrichedPathways() == FALSE) {
         stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
       } else {
         return(names(self$enriched_pathways[[method]]))
@@ -900,12 +955,16 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' \code{data.frame} containing the enriched pathways.
     getEnrichedPathways = function(method, group_name) {
-      if ( method %in% self$getMethodsWithEnrichedPathways() == FALSE ) {
+      if (method %in% self$getMethodsWithEnrichedPathways() == FALSE) {
         stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
       } else {
-        if ( group_name %in% self$getGroupsWithEnrichedPathways(method) == FALSE ) {
+        if (
+          group_name %in% self$getGroupsWithEnrichedPathways(method) == FALSE
+        ) {
           stop(
-            glue::glue('Group `{group_name}` is not available for method `{method}`.'),
+            glue::glue(
+              'Group `{group_name}` is not available for method `{method}`.'
+            ),
             call. = FALSE
           )
         } else {
@@ -941,7 +1000,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' \code{vector} of trajectories for the specified method.
     getNamesOfTrajectories = function(method) {
-      if ( method %in% self$getMethodsForTrajectories() == FALSE ) {
+      if (method %in% self$getMethodsForTrajectories() == FALSE) {
         stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
       } else {
         return(names(self$trajectories[[method]]))
@@ -957,12 +1016,14 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' Trajectory data as \code{data.frame} or \code{list}.
     getTrajectory = function(method, trajectory_name) {
-      if ( method %in% self$getMethodsForTrajectories() == FALSE ) {
+      if (method %in% self$getMethodsForTrajectories() == FALSE) {
         stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
       } else {
-        if ( trajectory_name %in% self$getTrajectories(method) == FALSE ) {
+        if (trajectory_name %in% self$getTrajectories(method) == FALSE) {
           stop(
-            glue::glue('Trajectory `{trajectory_name}` is not available for method `{method}`.'),
+            glue::glue(
+              'Trajectory `{trajectory_name}` is not available for method `{method}`.'
+            ),
             call. = FALSE
           )
         } else {
@@ -1035,8 +1096,12 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @param name Name of the spatial data entry (e.g. image name).
     #' @param data \code{list} containing 'coordinates' (data.frame) and 'expression' (sparse matrix).
     addSpatialData = function(name, data) {
-      if ( !is.list(data) || !all(c("coordinates", "expression") %in% names(data)) ) {
-        stop("Spatial data must be a list containing 'coordinates' and 'expression'.")
+      if (
+        !is.list(data) || !all(c("coordinates", "expression") %in% names(data))
+      ) {
+        stop(
+          "Spatial data must be a list containing 'coordinates' and 'expression'."
+        )
       }
       self$spatial[[name]] <- data
     },
@@ -1049,8 +1114,11 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' \code{list} containing 'coordinates' and 'expression'.
     getSpatialData = function(name) {
-      if ( name %in% names(self$spatial) == FALSE ) {
-        stop(glue::glue('Spatial data `{name}` is not available.'), call. = FALSE)
+      if (name %in% names(self$spatial) == FALSE) {
+        stop(
+          glue::glue('Spatial data `{name}` is not available.'),
+          call. = FALSE
+        )
       }
       return(self$spatial[[name]])
     },
@@ -1073,12 +1141,11 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @param name Name of material, will be used to select it in Cerebro.
     #' @param content Data that should be added.
     addExtraMaterial = function(category, name, content) {
-
       ## valid categories
-      valid_categories <- c('tables','plots')
+      valid_categories <- c('tables', 'plots')
 
       ## proceed only if specified category is valid
-      if ( category %in% valid_categories == FALSE ) {
+      if (category %in% valid_categories == FALSE) {
         stop(
           glue::glue(
             'Category `{category}` is not one of the valid categories ',
@@ -1089,12 +1156,12 @@ Cerebro_v1.3 <- R6::R6Class(
       }
 
       ## call function to add table
-      if ( category == 'tables' ) {
+      if (category == 'tables') {
         self$addExtraTable(name, content)
       }
 
       ## call function to add table
-      if ( category == 'plots' ) {
+      if (category == 'plots') {
         self$addExtraPlot(name, content)
       }
     },
@@ -1105,10 +1172,9 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @param name Name of material, will be used to select it in Cerebro.
     #' @param table Table that should be added, must be \code{data.frame}.
     addExtraTable = function(name, table) {
-
       ## stop if table is not a data frame
-      if ( !is.data.frame(table) ) {
-        if ( 'DFrame' %in% class(table) ) {
+      if (!is.data.frame(table)) {
+        if ('DFrame' %in% class(table)) {
           table <- as.data.frame(table)
         } else {
           stop(
@@ -1123,9 +1189,9 @@ Cerebro_v1.3 <- R6::R6Class(
       ## stop if `name` is already used
       if (
         !is.null(self$extra_material) &&
-        !is.null(self$extra_material$tables) &&
-        is.list(self$extra_material$tables) &&
-        name %in% names(self$extra_material$tables)
+          !is.null(self$extra_material$tables) &&
+          is.list(self$extra_material$tables) &&
+          name %in% names(self$extra_material$tables)
       ) {
         stop(
           glue::glue(
@@ -1134,9 +1200,9 @@ Cerebro_v1.3 <- R6::R6Class(
           call. = FALSE
         )
 
-      ## add table
+        ## add table
       } else {
-        self$extra_material$tables[[ name ]] <- table
+        self$extra_material$tables[[name]] <- table
       }
     },
 
@@ -1147,9 +1213,8 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @param plot Plot that should be added, must be created with
     #' \code{ggplot2} (class: \code{ggplot}).
     addExtraPlot = function(name, plot) {
-
       ## stop if table is not a data frame
-      if ( "ggplot" %in% class(plot) == FALSE ) {
+      if ("ggplot" %in% class(plot) == FALSE) {
         stop(
           glue::glue(
             'Cannot add plot `{name}` because it is not of class "ggplot".'
@@ -1161,9 +1226,9 @@ Cerebro_v1.3 <- R6::R6Class(
       ## stop if `name` is already used
       if (
         !is.null(self$extra_material) &&
-        !is.null(self$extra_material$plots) &&
-        is.list(self$extra_material$plots) &&
-        name %in% names(self$extra_material$plots)
+          !is.null(self$extra_material$plots) &&
+          is.list(self$extra_material$plots) &&
+          name %in% names(self$extra_material$plots)
       ) {
         stop(
           glue::glue(
@@ -1172,9 +1237,9 @@ Cerebro_v1.3 <- R6::R6Class(
           call. = FALSE
         )
 
-      ## add table
+        ## add table
       } else {
-        self$extra_material$plots[[ name ]] <- plot
+        self$extra_material$plots[[name]] <- plot
       }
     },
 
@@ -1223,7 +1288,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' Requested table in \code{data.frame} format.
     getExtraTable = function(name) {
-      return(self$extra_material$table[[ name ]])
+      return(self$extra_material$table[[name]])
     },
 
     #' @description
@@ -1253,7 +1318,7 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @return
     #' Requested plot made with \code{ggplot2}.
     getExtraPlot = function(name) {
-      return(self$extra_material$plots[[ name ]])
+      return(self$extra_material$plots[[name]])
     },
 
     #' @description
@@ -1261,30 +1326,70 @@ Cerebro_v1.3 <- R6::R6Class(
     print = function() {
       message(
         paste0(
-          'class: Cerebro_v1.3', '\n',
-          'cerebroApp version: ', self$getVersion(), '\n',
-          'experiment name: ', self$getExperiment()$experiment_name, '\n',
-          'organism: ', self$getExperiment()$organism, '\n',
-          'date of analysis: ', self$getExperiment()$date_of_analysis, '\n',
-          'date of export: ', self$getExperiment()$date_of_export, '\n',
-          'number of cells: ', format(ncol(self$expression), big.mark = ','), '\n',
-          'number of genes: ', format(nrow(self$expression), big.mark = ','), '\n',
-          'grouping variables (', length(self$getGroups()), '): ',
-            paste0(self$getGroups(), collapse = ', '), '\n',
-          'cell cycle variables (', length(self$cell_cycle), '): ',
-            paste0(self$cell_cycle, collapse = ', '), '\n',
-          'projections (', length(self$availableProjections()),'): ',
-            paste0(self$availableProjections(), collapse = ', '), '\n',
-          'trees (', length(self$trees),'): ',
-            paste0(names(self$trees), collapse = ', '), '\n',
+          'class: Cerebro_v1.3',
+          '\n',
+          'cerebroApp version: ',
+          self$getVersion(),
+          '\n',
+          'experiment name: ',
+          self$getExperiment()$experiment_name,
+          '\n',
+          'organism: ',
+          self$getExperiment()$organism,
+          '\n',
+          'date of analysis: ',
+          self$getExperiment()$date_of_analysis,
+          '\n',
+          'date of export: ',
+          self$getExperiment()$date_of_export,
+          '\n',
+          'number of cells: ',
+          format(ncol(self$expression), big.mark = ','),
+          '\n',
+          'number of genes: ',
+          format(nrow(self$expression), big.mark = ','),
+          '\n',
+          'grouping variables (',
+          length(self$getGroups()),
+          '): ',
+          paste0(self$getGroups(), collapse = ', '),
+          '\n',
+          'cell cycle variables (',
+          length(self$cell_cycle),
+          '): ',
+          paste0(self$cell_cycle, collapse = ', '),
+          '\n',
+          'projections (',
+          length(self$availableProjections()),
+          '): ',
+          paste0(self$availableProjections(), collapse = ', '),
+          '\n',
+          'trees (',
+          length(self$trees),
+          '): ',
+          paste0(names(self$trees), collapse = ', '),
+          '\n',
           'most expressed genes: ',
-            paste0(names(self$most_expressed_genes), collapse = ', '), '\n',
-          'marker genes:', private$showMarkerGenes(), '\n',
-          'enriched pathways:', private$showEnrichedPathways(), '\n',
-          'trajectories:', private$showTrajectories(), '\n',
-          'extra material:', private$showExtraMaterial(), '\n',
-          'Immune repertoire:', paste0(names(self$getImmuneRepertoire()), collapse = ', '), '\n',
-          'Spatial data:', names(self$spatial), '\n'
+          paste0(names(self$most_expressed_genes), collapse = ', '),
+          '\n',
+          'marker genes:',
+          private$showMarkerGenes(),
+          '\n',
+          'enriched pathways:',
+          private$showEnrichedPathways(),
+          '\n',
+          'trajectories:',
+          private$showTrajectories(),
+          '\n',
+          'extra material:',
+          private$showExtraMaterial(),
+          '\n',
+          'Immune repertoire:',
+          paste0(names(self$getImmuneRepertoire()), collapse = ', '),
+          '\n',
+          'Spatial data:',
+          names(self$spatial),
+          '\n'
         )
       )
     }
@@ -1292,19 +1397,16 @@ Cerebro_v1.3 <- R6::R6Class(
 
   ## private fields and methods
   private = list(
-
     ## Extract expression matrix (helper)
     ##   cells  Names/barcodes of cells to extract; NULL for all.
     ##   genes  Names of genes to extract; NULL for all.
     ## Returns a dense matrix.
     extractExpression = function(cells = NULL, genes = NULL) {
-
       ## check what kind of matrix the transcription counts are stored as
       ## ... DelayedArray / RleMatrix
-      if ( inherits(self$expression, 'RleMatrix') ) {
-
+      if (inherits(self$expression, 'RleMatrix')) {
         ## resolve cell indices
-        if ( !is.null(cells) ) {
+        if (!is.null(cells)) {
           cell_indices <- match(cells, colnames(self$expression))
         } else {
           cell_indices <- NULL
@@ -1312,7 +1414,7 @@ Cerebro_v1.3 <- R6::R6Class(
         }
 
         ## resolve gene indices
-        if ( !is.null(genes) ) {
+        if (!is.null(genes)) {
           gene_indices <- match(genes, rownames(self$expression))
         } else {
           gene_indices <- NULL
@@ -1332,12 +1434,14 @@ Cerebro_v1.3 <- R6::R6Class(
         rownames(mat) <- genes
 
         return(mat)
-
       } else {
-
         ## standard matrix logic
-        if ( is.null(cells) ) cells <- colnames(self$expression)
-        if ( is.null(genes) ) genes <- rownames(self$expression)
+        if (is.null(cells)) {
+          cells <- colnames(self$expression)
+        }
+        if (is.null(genes)) {
+          genes <- rownames(self$expression)
+        }
 
         return(
           as.matrix(self$expression[genes, cells, drop = FALSE])
@@ -1349,9 +1453,13 @@ Cerebro_v1.3 <- R6::R6Class(
     #' function.
     showMarkerGenes = function() {
       text <- list()
-      for ( method in names(self$marker_genes) ) {
+      for (method in names(self$marker_genes)) {
         text[[method]] <- paste0(
-          '\n  - ', method, ' (', length(names(self$marker_genes[[method]])), '): ',
+          '\n  - ',
+          method,
+          ' (',
+          length(names(self$marker_genes[[method]])),
+          '): ',
           paste0(names(self$marker_genes[[method]]), collapse = ', ')
         )
       }
@@ -1362,9 +1470,13 @@ Cerebro_v1.3 <- R6::R6Class(
     #' \code{self$print()} function.
     showEnrichedPathways = function() {
       text <- list()
-      for ( method in names(self$enriched_pathways) ) {
+      for (method in names(self$enriched_pathways)) {
         text[[method]] <- paste0(
-          '\n  - ', method, ' (', length(names(self$enriched_pathways[[method]])), '): ',
+          '\n  - ',
+          method,
+          ' (',
+          length(names(self$enriched_pathways[[method]])),
+          '): ',
           paste0(names(self$enriched_pathways[[method]]), collapse = ', ')
         )
       }
@@ -1374,9 +1486,13 @@ Cerebro_v1.3 <- R6::R6Class(
     #' Print overview of available trajectories for \code{self$print()} function.
     showTrajectories = function() {
       text <- list()
-      for ( method in names(self$trajectories) ) {
+      for (method in names(self$trajectories)) {
         text[[method]] <- paste0(
-          '\n  - ', method, ' (', length(names(self$trajectories[[method]])), '): ',
+          '\n  - ',
+          method,
+          ' (',
+          length(names(self$trajectories[[method]])),
+          '): ',
           paste0(names(self$trajectories[[method]]), collapse = ', ')
         )
       }
@@ -1386,9 +1502,13 @@ Cerebro_v1.3 <- R6::R6Class(
     #' Print overview of extra material for \code{self$print()} function.
     showExtraMaterial = function() {
       text <- list()
-      for ( category in names(self$extra_material) ) {
+      for (category in names(self$extra_material)) {
         text[[category]] <- paste0(
-          '\n  - ', category, ' (', length(names(self$extra_material[[category]])), '): ',
+          '\n  - ',
+          category,
+          ' (',
+          length(names(self$extra_material[[category]])),
+          '): ',
           paste0(names(self$extra_material[[category]]), collapse = ', ')
         )
       }

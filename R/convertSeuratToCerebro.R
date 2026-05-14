@@ -9,7 +9,10 @@
 
   if (!file.exists(file_path)) {
     stop(
-      data_type_upper, " file not found: ", file_path, "\n",
+      data_type_upper,
+      " file not found: ",
+      file_path,
+      "\n",
       "Suggestions:\n",
       "  1. Check if the file path is correct\n",
       "  2. Verify the file extension is .rds\n",
@@ -17,22 +20,36 @@
     )
   }
 
-  data <- tryCatch({
-    readRDS(file_path)
-  }, error = function(e) {
-    stop(
-      "Failed to read ", data_type_upper, " data from: ", file_path, "\n",
-      "  Error: ", e$message, "\n",
-      "Suggestions:\n",
-      "  1. Verify the file is a valid .rds file\n",
-      "  2. Check if the file was created using saveRDS()\n",
-      "  3. Try reading the file directly: readRDS('", file_path, "')"
-    )
-  })
+  data <- tryCatch(
+    {
+      readRDS(file_path)
+    },
+    error = function(e) {
+      stop(
+        "Failed to read ",
+        data_type_upper,
+        " data from: ",
+        file_path,
+        "\n",
+        "  Error: ",
+        e$message,
+        "\n",
+        "Suggestions:\n",
+        "  1. Verify the file is a valid .rds file\n",
+        "  2. Check if the file was created using saveRDS()\n",
+        "  3. Try reading the file directly: readRDS('",
+        file_path,
+        "')"
+      )
+    }
+  )
 
   if (is.null(data)) {
     stop(
-      data_type_upper, " data is NULL after reading from: ", file_path, "\n",
+      data_type_upper,
+      " data is NULL after reading from: ",
+      file_path,
+      "\n",
       "Suggestions:\n",
       "  1. Check if the source file contains valid data\n",
       "  2. Verify the file was not corrupted\n",
@@ -42,9 +59,14 @@
 
   if (!is.list(data) || length(data) == 0) {
     stop(
-      data_type_upper, " data is not a valid list or is empty.\n",
+      data_type_upper,
+      " data is not a valid list or is empty.\n",
       "  Expected: A list of contig annotations\n",
-      "  Received: ", class(data)[1], " with length ", length(data), "\n",
+      "  Received: ",
+      class(data)[1],
+      " with length ",
+      length(data),
+      "\n",
       "Suggestions:\n",
       "  1. Verify the data structure matches scRepertoire format\n",
       "  2. Check if the data was properly saved using saveRDS()\n",
@@ -54,7 +76,13 @@
 
   if (verbose) {
     message("[INFO] Loaded ", data_type_upper, " data from: ", file_path)
-    message("[INFO] ", data_type_upper, " data contains ", length(data), " samples")
+    message(
+      "[INFO] ",
+      data_type_upper,
+      " data contains ",
+      length(data),
+      " samples"
+    )
   }
 
   return(data)
@@ -77,40 +105,55 @@
 #'   repertoire data is found.
 #' @keywords internal
 #' @noRd
-.extractRepertoireFromMetadata <- function(seurat,
-                                           groups = NULL,
-                                           sample_col = "orig.ident",
-                                           verbose = TRUE) {
+.extractRepertoireFromMetadata <- function(
+  seurat,
+  groups = NULL,
+  sample_col = "orig.ident",
+  verbose = TRUE
+) {
   core_cols <- c("CTgene", "CTnt", "CTaa", "CTstrict")
   meta_names <- names(seurat@meta.data)
   present_core <- core_cols[core_cols %in% meta_names]
 
   if (length(present_core) == 0) {
     if (verbose) {
-      message("[INFO] No scRepertoire columns found in metadata, ",
-              "skipping repertoire extraction.")
+      message(
+        "[INFO] No scRepertoire columns found in metadata, ",
+        "skipping repertoire extraction."
+      )
     }
     return(NULL)
   }
 
   if (verbose) {
-    message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                   "] Found scRepertoire columns in metadata: ",
-                   paste(present_core, collapse = ", ")))
+    message(paste0(
+      "[",
+      format(Sys.time(), "%H:%M:%S"),
+      "] Found scRepertoire columns in metadata: ",
+      paste(present_core, collapse = ", ")
+    ))
   }
 
   # Additional scRepertoire columns to preserve
-  optional_cols <- c("clonalProportion", "clonalFrequency", "cloneSize",
-                     "Frequency", "frequency", "cloneType")
+  optional_cols <- c(
+    "clonalProportion",
+    "clonalFrequency",
+    "cloneSize",
+    "Frequency",
+    "frequency",
+    "cloneType"
+  )
   present_optional <- optional_cols[optional_cols %in% meta_names]
 
   # Identify cells with non-NA repertoire data
   primary_col <- if ("CTgene" %in% present_core) "CTgene" else present_core[1]
   has_data <- !is.na(seurat@meta.data[[primary_col]]) &
-              nzchar(as.character(seurat@meta.data[[primary_col]]))
+    nzchar(as.character(seurat@meta.data[[primary_col]]))
 
   if (sum(has_data) == 0) {
-    if (verbose) message("[INFO] No cells with non-NA repertoire data found.")
+    if (verbose) {
+      message("[INFO] No cells with non-NA repertoire data found.")
+    }
     return(NULL)
   }
 
@@ -142,19 +185,33 @@
 
   # Split by sample into list-of-data.frames
   result <- split(rep_df, rep_df$.sample_id)
-  result <- lapply(result, function(x) { x$.sample_id <- NULL; x })
+  result <- lapply(result, function(x) {
+    x$.sample_id <- NULL
+    x
+  })
 
   if (verbose) {
     # Detect data types present
     types <- character(0)
     if ("CTgene" %in% names(rep_df)) {
       ct <- as.character(rep_df$CTgene)
-      if (any(grepl("TR[ABDG]", ct))) types <- c(types, "TCR")
+      if (any(grepl("TR[ABDG]", ct))) {
+        types <- c(types, "TCR")
+      }
       if (any(grepl("IG[HKL]", ct))) types <- c(types, "BCR")
     }
-    message(paste0("[INFO] Extracted immune repertoire: ", sum(has_data),
-                   " cells in ", length(result), " sample(s)",
-                   if (length(types) > 0) paste0(" [", paste(types, collapse = "+"), "]") else ""))
+    message(paste0(
+      "[INFO] Extracted immune repertoire: ",
+      sum(has_data),
+      " cells in ",
+      length(result),
+      " sample(s)",
+      if (length(types) > 0) {
+        paste0(" [", paste(types, collapse = "+"), "]")
+      } else {
+        ""
+      }
+    ))
   }
 
   return(result)
@@ -168,12 +225,25 @@
 
   # Read file based on extension
   if (ext == "csv") {
-    markers_df <- utils::read.csv(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
+    markers_df <- utils::read.csv(
+      marker_file,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
   } else if (ext %in% c("tsv", "txt", "tab")) {
-    markers_df <- utils::read.delim(marker_file, stringsAsFactors = FALSE, check.names = FALSE)
+    markers_df <- utils::read.delim(
+      marker_file,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
   } else {
-    stop("Unsupported marker_file format: .", ext, ". Supported: csv, tsv, txt, tab. ",
-         "For Excel input, export to CSV first.", call. = FALSE)
+    stop(
+      "Unsupported marker_file format: .",
+      ext,
+      ". Supported: csv, tsv, txt, tab. ",
+      "For Excel input, export to CSV first.",
+      call. = FALSE
+    )
   }
 
   if (is.null(markers_df) || nrow(markers_df) == 0) {
@@ -181,8 +251,13 @@
   }
 
   if (verbose) {
-    message(paste0("[", format(Sys.time(), "%H:%M:%S"), "] Loaded marker_file (",
-                   nrow(markers_df), " rows)."))
+    message(paste0(
+      "[",
+      format(Sys.time(), "%H:%M:%S"),
+      "] Loaded marker_file (",
+      nrow(markers_df),
+      " rows)."
+    ))
   }
 
   return(markers_df)
@@ -304,28 +379,30 @@
 #' @seealso \code{\link{exportFromSeurat}}
 #'
 #' @export
-convertSeuratToCerebro <- function(seurat_file,
-                                    result_dir,
-                                    assay = "RNA",
-                                    slot = "data",
-                                    experiment_name = "Dura Mater - All Cells",
-                                    organism = "Human",
-                                    groups = c("seurat_clusters", "orig.ident", "cell_type_final"),
-                                    groups_naming = NULL,
-                                    max_group_levels = 100,
-                                    nUMI = "nCount_RNA",
-                                    nGene = "nFeature_RNA",
-                                    add_all_meta_data = TRUE,
-                                    use_delayed_array = FALSE,
-                                    expression_matrix_mode = c("embedded", "bpcells", "h5"),
-                                    verbose = TRUE,
-                                    cell_cycle = NULL,
-                                    marker_file = NULL,
-                                    marker_method = "Diff. Expression",
-                                    add_most_expressed_genes = TRUE,
-                                    most_expressed_genes = NULL,
-                                    bcr_file = NULL,
-                                    tcr_file = NULL) {
+convertSeuratToCerebro <- function(
+  seurat_file,
+  result_dir,
+  assay = "RNA",
+  slot = "data",
+  experiment_name = "Dura Mater - All Cells",
+  organism = "Human",
+  groups = c("seurat_clusters", "orig.ident", "cell_type_final"),
+  groups_naming = NULL,
+  max_group_levels = 100,
+  nUMI = "nCount_RNA",
+  nGene = "nFeature_RNA",
+  add_all_meta_data = TRUE,
+  use_delayed_array = FALSE,
+  expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  verbose = TRUE,
+  cell_cycle = NULL,
+  marker_file = NULL,
+  marker_method = "Diff. Expression",
+  add_most_expressed_genes = TRUE,
+  most_expressed_genes = NULL,
+  bcr_file = NULL,
+  tcr_file = NULL
+) {
   expression_matrix_mode <- match.arg(expression_matrix_mode)
   if (inherits(seurat_file, "Seurat")) {
     seurat <- seurat_file
@@ -334,13 +411,17 @@ convertSeuratToCerebro <- function(seurat_file,
       stop("seurat_file not found: ", seurat_file, call. = FALSE)
     }
     ext <- tolower(tools::file_ext(seurat_file))
-    seurat <- switch(ext,
+    seurat <- switch(
+      ext,
       rds = readRDS(seurat_file),
-      stop("Unsupported seurat_file format: .", ext,
-           ". Use .rds (saved with saveRDS).", call. = FALSE)
+      stop(
+        "Unsupported seurat_file format: .",
+        ext,
+        ". Use .rds (saved with saveRDS).",
+        call. = FALSE
+      )
     )
   }
-
 
   # Validate groups exist in metadata ----------------------------------------##
   missing_groups <- groups[!groups %in% names(seurat@meta.data)]
@@ -348,37 +429,56 @@ convertSeuratToCerebro <- function(seurat_file,
   if (length(missing_groups) > 0) {
     if (length(missing_groups) == length(groups)) {
       # All groups are missing - stop execution
-      stop(paste0("All specified groups are missing from metadata: ",
-                  paste(missing_groups, collapse = ", "),
-                  "\nAvailable columns: ",
-                  paste(names(seurat@meta.data), collapse = ", ")),
-        call. = FALSE)
+      stop(
+        paste0(
+          "All specified groups are missing from metadata: ",
+          paste(missing_groups, collapse = ", "),
+          "\nAvailable columns: ",
+          paste(names(seurat@meta.data), collapse = ", ")
+        ),
+        call. = FALSE
+      )
     } else {
       # Some groups are missing - warn user
-      warning(paste0("Some specified groups are missing from metadata and will be skipped: ", paste(missing_groups, collapse = ", ")), call. = FALSE)
+      warning(
+        paste0(
+          "Some specified groups are missing from metadata and will be skipped: ",
+          paste(missing_groups, collapse = ", ")
+        ),
+        call. = FALSE
+      )
       # Remove missing groups from the groups vector
       groups <- groups[groups %in% names(seurat@meta.data)]
     }
   }
-
 
   # Convert group values to character and check level counts ----------------##
   groups_to_remove <- character(0)
 
   for (group_name in groups) {
     # Convert to character
-    seurat@meta.data[[group_name]] <- as.character(seurat@meta.data[[group_name]])
+    seurat@meta.data[[group_name]] <- as.character(seurat@meta.data[[
+      group_name
+    ]])
 
     # Count unique levels (excluding NA)
-    unique_levels <- unique(seurat@meta.data[[group_name]][!is.na(seurat@meta.data[[group_name]])])
+    unique_levels <- unique(seurat@meta.data[[group_name]][
+      !is.na(seurat@meta.data[[group_name]])
+    ])
     n_levels <- length(unique_levels)
 
     # Check if exceeds maximum
     if (n_levels > max_group_levels) {
       if (verbose) {
-        message(paste0("[WARNING] Group '", group_name, "' has ", n_levels,
-                       " unique levels (> ", max_group_levels,
-                       "), will be excluded."))
+        message(paste0(
+          "[WARNING] Group '",
+          group_name,
+          "' has ",
+          n_levels,
+          " unique levels (> ",
+          max_group_levels,
+          "), will be excluded."
+        ))
       }
       groups_to_remove <- c(groups_to_remove, group_name)
     }
@@ -390,41 +490,60 @@ convertSeuratToCerebro <- function(seurat_file,
 
     # Check if any groups remain
     if (length(groups) == 0) {
-      stop(paste0("All groups have been excluded due to exceeding max_group_levels (",
-                  max_group_levels, "). Consider increasing max_group_levels or ",
-                  "using different grouping variables."),
-           call. = FALSE)
+      stop(
+        paste0(
+          "All groups have been excluded due to exceeding max_group_levels (",
+          max_group_levels,
+          "). Consider increasing max_group_levels or ",
+          "using different grouping variables."
+        ),
+        call. = FALSE
+      )
     }
 
     if (verbose) {
-      message(paste0("[INFO] Remaining groups: ", paste(groups, collapse = ", ")))
+      message(paste0(
+        "[INFO] Remaining groups: ",
+        paste(groups, collapse = ", ")
+      ))
     }
   }
-
 
   # Rename group columns according to groups_naming
   if (!is.null(groups_naming) && length(groups_naming) > 0) {
     # Validate groups_naming structure
     if (is.null(names(groups_naming)) || length(names(groups_naming)) == 0) {
-      stop("groups_naming must be a named list/vector with names corresponding to existing group names.",
-           call. = FALSE)
+      stop(
+        "groups_naming must be a named list/vector with names corresponding to existing group names.",
+        call. = FALSE
+      )
     }
 
     # Check if at least one name in groups_naming exists in groups
     valid_names <- names(groups_naming)[names(groups_naming) %in% groups]
 
     if (length(valid_names) < length(names(groups_naming))) {
-      warning(paste0("Some names in groups_naming do not exist in the specified groups and will be ignored: ",
-                     paste(setdiff(names(groups_naming), valid_names), collapse = ", ")),
-              call. = FALSE)
+      warning(
+        paste0(
+          "Some names in groups_naming do not exist in the specified groups and will be ignored: ",
+          paste(setdiff(names(groups_naming), valid_names), collapse = ", ")
+        ),
+        call. = FALSE
+      )
     }
 
-
     if (length(valid_names) == 0) {
-      stop(paste0("None of the names in groups_naming exist in the specified groups.\n",
-                  "groups_naming names: ", paste(names(groups_naming), collapse = ", "), "\n",
-                  "Available groups: ", paste(groups, collapse = ", ")),
-           call. = FALSE)
+      stop(
+        paste0(
+          "None of the names in groups_naming exist in the specified groups.\n",
+          "groups_naming names: ",
+          paste(names(groups_naming), collapse = ", "),
+          "\n",
+          "Available groups: ",
+          paste(groups, collapse = ", ")
+        ),
+        call. = FALSE
+      )
     }
 
     for (old_name in valid_names) {
@@ -471,7 +590,9 @@ convertSeuratToCerebro <- function(seurat_file,
       # Convert data.frame to list
       most_expressed_genes <- list(unknown = most_expressed_genes)
       if (verbose) {
-        message("[INFO] Converted most_expressed_genes from data.frame to list(unknown = ...)")
+        message(
+          "[INFO] Converted most_expressed_genes from data.frame to list(unknown = ...)"
+        )
       }
     } else if (is.list(most_expressed_genes)) {
       # Check if list elements are data.frames and handle unnamed elements
@@ -479,36 +600,62 @@ convertSeuratToCerebro <- function(seurat_file,
       for (i in seq_along(most_expressed_genes)) {
         # Check if element is a data.frame
         if (!is.data.frame(most_expressed_genes[[i]])) {
-          warning(paste0("Element ", i, " in most_expressed_genes is not a data.frame and will be skipped."))
+          warning(paste0(
+            "Element ",
+            i,
+            " in most_expressed_genes is not a data.frame and will be skipped."
+          ))
           most_expressed_genes[[i]] <- NULL
           next
         }
 
         # Handle unnamed elements
-        if (is.null(names(most_expressed_genes)[i]) || names(most_expressed_genes)[i] == "") {
+        if (
+          is.null(names(most_expressed_genes)[i]) ||
+            names(most_expressed_genes)[i] == ""
+        ) {
           unnamed_count <- unnamed_count + 1
           names(most_expressed_genes)[i] <- paste0("unknown", unnamed_count)
           if (verbose) {
-            message(paste0("[INFO] Assigned name 'unknown", unnamed_count, "' to unnamed element ", i))
+            message(paste0(
+              "[INFO] Assigned name 'unknown",
+              unnamed_count,
+              "' to unnamed element ",
+              i
+            ))
           }
         }
       }
       # Remove NULL elements (those that weren't data.frames)
-      most_expressed_genes <- most_expressed_genes[!sapply(most_expressed_genes, is.null)]
+      most_expressed_genes <- most_expressed_genes[
+        !sapply(most_expressed_genes, is.null)
+      ]
     } else {
-      stop("most_expressed_genes must be either a data.frame or a list of data.frames.", call. = FALSE)
+      stop(
+        "most_expressed_genes must be either a data.frame or a list of data.frames.",
+        call. = FALSE
+      )
     }
 
     # Assign to seurat object
     if (length(most_expressed_genes) > 0) {
-      if (is.null(seurat@misc$most_expressed_genes) || !is.list(seurat@misc$most_expressed_genes)) {
+      if (
+        is.null(seurat@misc$most_expressed_genes) ||
+          !is.list(seurat@misc$most_expressed_genes)
+      ) {
         seurat@misc$most_expressed_genes <- list()
       }
-      seurat@misc$most_expressed_genes <- c(seurat@misc$most_expressed_genes, most_expressed_genes)
+      seurat@misc$most_expressed_genes <- c(
+        seurat@misc$most_expressed_genes,
+        most_expressed_genes
+      )
       if (verbose) {
-        message(paste0("[INFO] Added ", length(most_expressed_genes),
-                       " most_expressed_genes group(s): ",
-                       paste(names(most_expressed_genes), collapse = ", ")))
+        message(paste0(
+          "[INFO] Added ",
+          length(most_expressed_genes),
+          " most_expressed_genes group(s): ",
+          paste(names(most_expressed_genes), collapse = ", ")
+        ))
       }
     }
 
@@ -519,26 +666,44 @@ convertSeuratToCerebro <- function(seurat_file,
   # Calculate most expressed genes and mean expression from Seurat object ---##
   if (add_most_expressed_genes) {
     if (verbose) {
-      message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                     "] Calculating most expressed genes and mean expression for each group..."))
+      message(paste0(
+        "[",
+        format(Sys.time(), "%H:%M:%S"),
+        "] Calculating most expressed genes and mean expression for each group..."
+      ))
     }
 
     # Get expression matrix
-    expr_matrix <- .getExpressionMatrix(seurat, assay = assay, slot = slot, join_samples = TRUE)
+    expr_matrix <- .getExpressionMatrix(
+      seurat,
+      assay = assay,
+      slot = slot,
+      join_samples = TRUE
+    )
 
     # Initialize list structures
-    if (is.null(seurat@misc$most_expressed_genes) || !is.list(seurat@misc$most_expressed_genes)) {
+    if (
+      is.null(seurat@misc$most_expressed_genes) ||
+        !is.list(seurat@misc$most_expressed_genes)
+    ) {
       seurat@misc$most_expressed_genes <- list()
     }
-    if (is.null(seurat@misc$mean_expression) || !is.list(seurat@misc$mean_expression)) {
+    if (
+      is.null(seurat@misc$mean_expression) ||
+        !is.list(seurat@misc$mean_expression)
+    ) {
       seurat@misc$mean_expression <- list()
     }
 
     # Calculate for each group
     for (group_name in groups) {
       if (verbose) {
-        message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                       "] Processing group: ", group_name))
+        message(paste0(
+          "[",
+          format(Sys.time(), "%H:%M:%S"),
+          "] Processing group: ",
+          group_name
+        ))
       }
 
       group_values <- unique(seurat@meta.data[[group_name]])
@@ -549,17 +714,25 @@ convertSeuratToCerebro <- function(seurat_file,
 
       for (group_value in group_values) {
         # Get cells belonging to this group value using cell names (more robust)
-        cells_in_group <- rownames(seurat@meta.data)[seurat@meta.data[[group_name]] == group_value]
+        cells_in_group <- rownames(seurat@meta.data)[
+          seurat@meta.data[[group_name]] == group_value
+        ]
         # Filter to cells that exist in the expression matrix
-        cells_in_group <- cells_in_group[cells_in_group %in% colnames(expr_matrix)]
+        cells_in_group <- cells_in_group[
+          cells_in_group %in% colnames(expr_matrix)
+        ]
 
-        if (length(cells_in_group) == 0) next
+        if (length(cells_in_group) == 0) {
+          next
+        }
 
         # Get expression subset for this group
         expr_subset <- expr_matrix[, cells_in_group, drop = FALSE]
 
         # Calculate percentage of cells expressing each gene
-        gene_pct <- Matrix::rowSums(expr_subset > 0) / length(cells_in_group) * 100
+        gene_pct <- Matrix::rowSums(expr_subset > 0) /
+          length(cells_in_group) *
+          100
 
         # Calculate mean expression per gene
         gene_mean <- Matrix::rowMeans(expr_subset)
@@ -592,7 +765,10 @@ convertSeuratToCerebro <- function(seurat_file,
       if (length(pct_results) > 0) {
         pct_results_df <- do.call(rbind, pct_results)
         rownames(pct_results_df) <- NULL
-        pct_results_df <- pct_results_df[, c("cluster", setdiff(names(pct_results_df), "cluster"))]
+        pct_results_df <- pct_results_df[, c(
+          "cluster",
+          setdiff(names(pct_results_df), "cluster")
+        )]
         seurat@misc$most_expressed_genes[[group_name]] <- pct_results_df
       } else {
         seurat@misc$most_expressed_genes[[group_name]] <- data.frame()
@@ -601,7 +777,10 @@ convertSeuratToCerebro <- function(seurat_file,
       if (length(expr_results) > 0) {
         expr_results_df <- do.call(rbind, expr_results)
         rownames(expr_results_df) <- NULL
-        expr_results_df <- expr_results_df[, c("cluster", setdiff(names(expr_results_df), "cluster"))]
+        expr_results_df <- expr_results_df[, c(
+          "cluster",
+          setdiff(names(expr_results_df), "cluster")
+        )]
         seurat@misc$mean_expression[[group_name]] <- expr_results_df
       } else {
         seurat@misc$mean_expression[[group_name]] <- data.frame()
@@ -609,11 +788,13 @@ convertSeuratToCerebro <- function(seurat_file,
     }
 
     if (verbose) {
-      message(paste0("[", format(Sys.time(), "%H:%M:%S"),
-                     "] Most expressed genes and mean expression calculation completed."))
+      message(paste0(
+        "[",
+        format(Sys.time(), "%H:%M:%S"),
+        "] Most expressed genes and mean expression calculation completed."
+      ))
     }
   }
-
 
   # Immune repertoire data --------------------------------------------------##
   # Priority: external files (bcr_file/tcr_file) > metadata extraction
@@ -631,9 +812,14 @@ convertSeuratToCerebro <- function(seurat_file,
   }
 
   # Fallback: extract from Seurat metadata (scRepertoire columns)
-  if (is.null(seurat@misc$immune_repertoire) || length(seurat@misc$immune_repertoire) == 0) {
+  if (
+    is.null(seurat@misc$immune_repertoire) ||
+      length(seurat@misc$immune_repertoire) == 0
+  ) {
     rep_data <- .extractRepertoireFromMetadata(
-      seurat, groups = groups, verbose = verbose
+      seurat,
+      groups = groups,
+      verbose = verbose
     )
     if (!is.null(rep_data) && length(rep_data) > 0) {
       seurat@misc$immune_repertoire <- rep_data
@@ -649,29 +835,32 @@ convertSeuratToCerebro <- function(seurat_file,
   file_name <- paste0("cerebro_", base_name, ".crb")
 
   # Export to cerebro format
-  tryCatch({
-    exportFromSeurat(
-      seurat,
-      assay = assay,
-      slot = slot,
-      file = file.path(result_dir, file_name),
-      experiment_name = experiment_name,
-      organism = organism,
-      groups = groups,
-      nUMI = nUMI,
-      nGene = nGene,
-      add_all_meta_data = add_all_meta_data,
-      cell_cycle = cell_cycle,
-      verbose = verbose,
-      use_delayed_array = use_delayed_array,
-      expression_matrix_mode = expression_matrix_mode
-    )
-    cat("Successfully exported:", file_name, "\n")
-  }, error = function(e) {
-    cat("Error processing", basename(seurat_file), ":", e$message, "\n")
-  })
+  tryCatch(
+    {
+      exportFromSeurat(
+        seurat,
+        assay = assay,
+        slot = slot,
+        file = file.path(result_dir, file_name),
+        experiment_name = experiment_name,
+        organism = organism,
+        groups = groups,
+        nUMI = nUMI,
+        nGene = nGene,
+        add_all_meta_data = add_all_meta_data,
+        cell_cycle = cell_cycle,
+        verbose = verbose,
+        use_delayed_array = use_delayed_array,
+        expression_matrix_mode = expression_matrix_mode
+      )
+      cat("Successfully exported:", file_name, "\n")
+    },
+    error = function(e) {
+      cat("Error processing", basename(seurat_file), ":", e$message, "\n")
+    }
+  )
 
   # Clean up the Seurat object to save memory
   rm(seurat)
-  gc()  # Call garbage collector
+  gc() # Call garbage collector
 }
