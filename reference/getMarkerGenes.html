@@ -166,23 +166,21 @@ stored in <code>object@misc$marker_genes</code>.</p>
 <span class="r-in"><span>  test <span class="op">=</span> <span class="st">'wilcox'</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Error in req_perform(html_request) : Failed to perform HTTP request.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Caused by error in `curl::curl_fetch_memory()`:</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Timeout was reached [www.ensembl.org]:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Operation timed out after 10002 milliseconds with 0 bytes received</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Error in req_perform(html_request) : Failed to perform HTTP request.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Caused by error in `curl::curl_fetch_memory()`:</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Timeout was reached [www.ensembl.org]:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Operation timed out after 10002 milliseconds with 0 bytes received</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Error in req_perform(html_request) : Failed to perform HTTP request.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Caused by error in `curl::curl_fetch_memory()`:</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Timeout was reached [www.ensembl.org]:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Operation timed out after 10002 milliseconds with 0 bytes received</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Error in req_perform(html_request) : Failed to perform HTTP request.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Caused by error in `curl::curl_fetch_memory()`:</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> Timeout was reached [www.ensembl.org]:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Operation timed out after 10002 milliseconds with 0 bytes received</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:03:30] Get marker genes for 2 groups in `sample`...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error in checkDataset(dataset = dataset, mart = mart) : </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   The given dataset: hsapiens_gene_ensembl, is not valid.  Correct dataset names can be obtained with the listDatasets() function.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Look at ?useEnsembl for details on how to try a mirror site.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [06:47:49] Get marker genes for 2 groups in `sample`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster pbmc_1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> (default method for FindMarkers) please install the presto package</span>
@@ -194,7 +192,7 @@ stored in <code>object@misc$marker_genes</code>.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> efficient implementation (no further action necessary).</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This message will be shown once per session</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster pbmc_2</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:03:31] Get marker genes for 2 groups in `seurat_clusters`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [06:47:49] Get marker genes for 2 groups in `seurat_clusters`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster 0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster 1</span>
 <span class="r-in"><span></span></span>
