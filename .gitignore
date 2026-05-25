@@ -9,5 +9,7 @@ vignettes/*.crb
 docs
 .Rproj.user
 *.Rproj
-tests/smoke/
+tests/smoke/data/
+tests/smoke/data_private_backup_*/
+tests/smoke/result/
 .playwright-mcp/
