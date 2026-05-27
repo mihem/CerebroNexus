@@ -77,27 +77,16 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-1-7-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-7-0"></a></h3>
-<ul><li>Fixed all errors and warnings identified by R CMD CHECK, making the package ready for CRAN submission</li>
-<li>Fixed Seurat v5 API: replaced deprecated slot access (<code>@counts</code>, <code>@data</code>) with <code><a href="https://satijalab.github.io/seurat-object/reference/AssayData.html" class="external-link">GetAssayData()</a></code> across multiple functions</li>
-<li>Fixed <code>addPercentMtRibo</code>, <code>calculatePercentGenes</code>, <code>getMostExpressedGenes</code>, <code>performGeneSetEnrichmentAnalysis</code>, <code>getMarkerGenes</code>, <code>getEnrichedPathways</code>, <code>exportFromSCE</code>, <code>exportFromSeurat</code>
-</li>
-<li>Fixed GSVA v2.x API compatibility: now uses <code>gsvaParam()</code> with version check for backward compatibility</li>
-<li>Fixed <code>class(x) == "..."</code> checks replaced with <code><a href="https://rdrr.io/r/base/class.html" class="external-link">inherits()</a></code> across all relevant functions</li>
-<li>Fixed <code><a href="https://rdrr.io/r/base/library.html" class="external-link">require()</a></code> replaced with <code><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace()</a></code> throughout</li>
-<li>Fixed cross-references and examples in documentation</li>
-<li>Fixed <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> projections: <code>reducedDims()</code> output is now coerced to <code>data.frame</code> before <code>addProjection()</code>, matching the Seurat path and clearing a latent runtime error for SCE inputs with non-PCA reductions</li>
+<ul><li>Fixed <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> projections: <code>reducedDims()</code> output is now coerced to <code>data.frame</code> before <code>addProjection()</code>, matching the Seurat path and clearing a latent runtime error for SCE inputs with non-PCA reductions</li>
 <li>Fixed <code>.attachExternalExpression</code> crashing on legacy <code>.crb</code> objects that predate the <code>getExpressionBackend()</code> method; such objects are now treated as embedded backend and skip the attach step</li>
 <li>Fixed “method not found” errors on the trajectory tab by renaming the corresponding <code>Cerebro_v1.3</code> methods to the names the Shiny server already calls (<code>getMethodsForTrajectories</code>, <code>getNamesOfTrajectories</code>)</li>
 <li>Fixed gene_expression plot chain freezing on gene picker changes: removed a stale <code><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate()</a></code> wrapper and a reference to a non-existent <code>expression_projection_update_button</code> input; the existing 250 ms debounce on the data-to-plot reactive still throttles bursts</li>
 </ul></div>
 <div class="section level3">
 <h3 id="testing-1-7-0">Testing<a class="anchor" aria-label="anchor" href="#testing-1-7-0"></a></h3>
-<ul><li>Added unit tests for all core R functions</li>
-<li>Added shinytest2 integration tests for the full Cerebro interface, covering gene expression, group/marker genes, color management, and more</li>
+<ul><li>Extended testing</li>
 <li>Added an h5 round-trip test in <code>test-exportFromSeurat.R</code> verifying writer/reader bit-identity for the new HDF5 backend, plus an attach-level test asserting the runtime returns a lazy <code>DelayedMatrix</code> (not an in-memory <code>dgCMatrix</code>)</li>
 <li>Added <code>tests/README.md</code> documenting the layout (testthat unit, testthat shinytest2, smoke)</li>
-<li>Routed <code>tests/smoke/</code> artifacts through <code>.Rbuildignore</code> and <code>.gitignore</code> so they no longer leak into the package tarball or git history</li>
-<li>Tests run in a reproducible Nix environment via GitHub Actions</li>
 </ul></div>
 <div class="section level3">
 <h3 id="dependencies-1-7-0">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies-1-7-0"></a></h3>
@@ -106,6 +95,30 @@
 </ul></div>
 <div class="section level3">
 <h3 id="cicd-1-7-0">CI/CD<a class="anchor" aria-label="anchor" href="#cicd-1-7-0"></a></h3>
+<ul><li>Switched Nix environment to <code>fixed-date</code> to avoid constant rebuilding</li>
+<li>simplified workflow by removing <code>dev</code> and <code>sync-dev</code>
+</li>
+</ul><p># cerebroAppLite 1.6.0</p>
+</div>
+<div class="section level3">
+<h3 id="bug-fixes-1-7-0-1">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-7-0-1"></a></h3>
+<ul><li>Fixed all errors and warnings identified by R CMD CHECK, making the package ready for CRAN submission</li>
+<li>Fixed Seurat v5 API: replaced deprecated slot access (<code>@counts</code>, <code>@data</code>) with <code><a href="https://satijalab.github.io/seurat-object/reference/AssayData.html" class="external-link">GetAssayData()</a></code> across multiple functions</li>
+<li>Fixed <code>addPercentMtRibo</code>, <code>calculatePercentGenes</code>, <code>getMostExpressedGenes</code>, <code>performGeneSetEnrichmentAnalysis</code>, <code>getMarkerGenes</code>, <code>getEnrichedPathways</code>, <code>exportFromSCE</code>, <code>exportFromSeurat</code>
+</li>
+<li>Fixed GSVA v2.x API compatibility: now uses <code>gsvaParam()</code> with version check for backward compatibility</li>
+<li>Fixed <code>class(x) == "..."</code> checks replaced with <code><a href="https://rdrr.io/r/base/class.html" class="external-link">inherits()</a></code> across all relevant functions</li>
+<li>Fixed <code><a href="https://rdrr.io/r/base/library.html" class="external-link">require()</a></code> replaced with <code><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace()</a></code> throughout</li>
+<li>Fixed cross-references and examples in documentation</li>
+</ul></div>
+<div class="section level3">
+<h3 id="testing-1-7-0-1">Testing<a class="anchor" aria-label="anchor" href="#testing-1-7-0-1"></a></h3>
+<ul><li>Added unit tests for all core R functions</li>
+<li>Added shinytest2 integration tests for the full Cerebro interface, covering gene expression, group/marker genes, color management, and more</li>
+<li>Tests run in a reproducible Nix environment via GitHub Actions</li>
+</ul></div>
+<div class="section level3">
+<h3 id="cicd-1-7-0-1">CI/CD<a class="anchor" aria-label="anchor" href="#cicd-1-7-0-1"></a></h3>
 <ul><li>Added Nix-based GitHub Actions workflows for R CMD CHECK, R tests, pkgdown, code style, and automatic <code>default.nix</code> updates</li>
 <li>Added <code>update-nix</code> workflow: regenerates <code>default.nix</code> weekly via <code>create_env.R</code> and opens a PR automatically; BPCells commit SHA is now auto-fetched from GitHub</li>
 <li>Added <code>style</code> workflow: formats R code via <a href="https://github.com/posit-dev/air" class="external-link">air</a> on every PR</li>

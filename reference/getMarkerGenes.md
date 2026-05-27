@@ -101,7 +101,427 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-#> [12:26:14] Get marker genes for 2 groups in `sample`...
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> Error : Your query has been redirected to https://status.ensembl.org indicating this Ensembl service is currently unavailable.
+#> Look at ?useEnsembl for details on how to try a mirror site.
+#> [15:45:05] Get marker genes for 2 groups in `sample`...
 #> Calculating cluster pbmc_1
 #> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
 #> (default method for FindMarkers) please install the presto package
@@ -113,7 +533,7 @@ pbmc <- getMarkerGenes(
 #> efficient implementation (no further action necessary).
 #> This message will be shown once per session
 #> Calculating cluster pbmc_2
-#> [12:26:14] Get marker genes for 2 groups in `seurat_clusters`...
+#> [15:45:05] Get marker genes for 2 groups in `seurat_clusters`...
 #> Calculating cluster 0
 #> Calculating cluster 1
 ```
