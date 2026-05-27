@@ -87,7 +87,7 @@
 - Switched Nix environment to `fixed-date` to avoid constant rebuilding
 - simplified workflow by removing `dev` and `sync-dev`
 
-\# cerebroAppLite 1.6.0
+## cerebroAppLite 1.6.0
 
 ### Bug fixes
 
