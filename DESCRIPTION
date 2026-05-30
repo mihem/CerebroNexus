@@ -3,8 +3,11 @@ Title: Interactive visualization of single cell transcriptomics
 Version: 1.7.0
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
-  person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut"))
+  person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
+  person("Xuesong", "Wang", email = "wangxuesong29@gmail.com", role = c("aut"))
   )
+Author: Michael Heming, Roman Hillje, Xuesong Wang
+Maintainer: Michael Heming <mihem@mailbox.org>
 Description: cerebroAppLite is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.
 URL: https://mihem.github.io/cerebroAppLite/, https://github.com/mihem/cerebroAppLite
 BugReports: https://github.com/mihem/cerebroAppLite/issues
