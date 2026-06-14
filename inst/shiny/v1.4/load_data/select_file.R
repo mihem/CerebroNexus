@@ -77,5 +77,3 @@ output[["load_data_mode_closed"]] <- renderText({
     )
   }
 })
-
-

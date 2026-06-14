@@ -58,5 +58,3 @@ overview_projection_group_filters_info <- list(
 ## it because it creates a new dependency and isn't as aesthetically pleasing as
 ## the existing solution
 ##----------------------------------------------------------------------------##
-
-
