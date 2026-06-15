@@ -163,6 +163,8 @@ local({
 
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/data.R"), local = TRUE)
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/settings.R"), local = TRUE)
+  source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/tabs.R"), local = TRUE)
+  source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/help.R"), local = TRUE)
   source(paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/visualizations.R"), local = TRUE)
 
 })
