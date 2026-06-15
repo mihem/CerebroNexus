@@ -1,3 +1,15 @@
+# cerebroAppLite 1.7.2
+
+## Enhanced modules
+
+- Added a Most expressed genes tab for exploring per-group gene expression
+  summaries exported with `.crb` files.
+- Added an Enriched pathways tab for browsing pathway enrichment results.
+- Added an Extra material tab for exported tables and plots.
+- Added utility wrappers for exporting most expressed genes, enriched pathways,
+  extra tables, and extra plots.
+- Added tests and vignettes covering the new Shiny modules and export helpers.
+
 # cerebroAppLite 1.7.1
 
 This maintenance release cleans up the package surface introduced by the

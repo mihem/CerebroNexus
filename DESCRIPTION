@@ -1,6 +1,6 @@
 Package: cerebroAppLite
 Title: Interactive visualization of single cell transcriptomics
-Version: 1.7.1
+Version: 1.7.2
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
