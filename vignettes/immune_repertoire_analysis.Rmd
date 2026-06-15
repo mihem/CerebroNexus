@@ -1,0 +1,108 @@
+---
+title: "Immune Repertoire Analysis in cerebroAppLite"
+author: "Xuesong Wang"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    self_contained: yes
+    mode: selfcontained
+vignette: >
+  %\VignetteIndexEntry{Immune Repertoire Analysis in cerebroAppLite}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Overview
+
+cerebroAppLite v1.4 introduces a comprehensive **Immune Repertoire** module for
+interactive exploration of T-cell and B-cell receptor clonotype data. The module
+leverages the `scRepertoire` package and supports 19 visualization methods covering
+clonal abundance, diversity, CDR3 properties, gene usage, and cross-sample
+comparisons.
+
+The Immune Repertoire tab appears **conditionally** in the sidebar — only when
+the loaded `.crb` file contains TCR or BCR clonotype annotations.
+
+# Preparing immune repertoire data
+
+Immune repertoire data must be embedded in the `.crb` file during export. Use
+the `immune_repertoire` parameter in `exportFromSeurat()`:
+
+```{r, eval = FALSE}
+library(cerebroAppLite)
+
+# Immune repertoire data should be a named list of data.frames
+# with columns: barcode, CTgene, CTnt, CTaa, CTstrict, chain
+ir_data <- list(
+  sample1 = tcr_clonotypes_df,
+  sample2 = bcr_clonotypes_df
+)
+
+exportFromSeurat(
+  seurat_object,
+  file = "my_data.crb",
+  immune_repertoire = ir_data
+)
+```
+
+Each data.frame must contain at minimum: `barcode`, `CTgene`, and `chain`
+columns. barcodes should match those in the Seurat object's metadata.
+
+# Module interface
+
+## Settings panel
+
+The settings panel provides three controls:
+
+- **Clone call**: which clonotype identifier to use for analysis
+  (`gene`, `nt`, `aa`, or `strict`)
+- **Group by**: a metadata grouping variable for faceted comparisons
+- **Chain**: filter to TCR chains (TRA, TRB, TRG, TRD), BCR chains
+  (IGH, IGK, IGL), or all (`both`)
+
+When multiple samples are present, additional controls appear for scatter
+plot sample selection and multi-sample comparison.
+
+## Visualization tabs
+
+The module provides 19 tabbed visualizations. Each includes a contextual help
+panel explaining the biological interpretation with example guidance.
+
+### Basic repertoire metrics
+
+- **Abundance**: ranks clonotypes by cell count; steep drop-off indicates
+  oligoclonal dominance
+- **Diversity**: Shannon entropy with bootstrap confidence intervals
+- **Homeostasis**: categorizes clonotypes into size classes from Rare to
+  Hyperexpanded
+- **Proportion**: cumulative fraction of the repertoire occupied by top-ranked
+  clonotypes
+
+### Sequence properties
+
+- **Length**: CDR3 length distribution; shifts suggest antigen-driven selection
+- **AA %**: positional amino acid composition at each CDR3 position
+- **Entropy**: Shannon entropy at each CDR3 position
+- **Property**: physicochemical profiles (Atchley, Kidera, and other scales)
+- **K-mer**: top recurring short amino acid motifs
+
+### Gene usage
+
+- **Gene usage / vizGenes / percentGenes**: V(D)J gene segment usage
+  frequencies
+- **percentVJ**: V-J gene pairing frequencies
+
+### Cross-sample analysis
+
+When >= 2 samples are present, additional tabs become available:
+- **Compare**: alluvial diagram tracking clonotypes across samples
+- **Overlap**: pairwise clonotype sharing heatmap
+- **Scatter**: clone frequency comparison between two samples
+- **SizeDist**: hierarchical clustering of samples by clone size distribution
+
+### Quality control
+
+- **Quant**: total unique clonotype count per sample
+- **Rarefaction**: clonotype discovery curves for sequencing saturation assessment
