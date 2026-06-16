@@ -1,12 +1,25 @@
 # test-immune_repertoire.R — Tests for immune repertoire module
 
 shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
-example_crb <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
-tcr_crb    <- system.file("extdata/v1.4/example_tcr.crb", package = "cerebroAppLite")
+example_crb <- system.file(
+  "extdata/v1.4/example.crb",
+  package = "cerebroAppLite"
+)
+tcr_crb <- system.file(
+  "extdata/v1.4/example_tcr.crb",
+  package = "cerebroAppLite"
+)
 
 test_that("immune_repertoire module files parse without errors", {
-  mod_files <- c("UI.R", "server.R", "data.R", "settings.R",
-                 "tabs.R", "help.R", "visualizations.R")
+  mod_files <- c(
+    "UI.R",
+    "server.R",
+    "data.R",
+    "settings.R",
+    "tabs.R",
+    "help.R",
+    "visualizations.R"
+  )
   for (f in mod_files) {
     fpath <- file.path(shiny_root, "immune_repertoire", f)
     skip_if_not(file.exists(fpath), message = paste("Missing:", f))

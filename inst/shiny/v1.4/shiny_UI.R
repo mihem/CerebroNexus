@@ -126,7 +126,10 @@ source(
   local = TRUE
 )
 source(
-  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/immune_repertoire/UI.R"),
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/UI.R"
+  ),
   local = TRUE
 )
 
