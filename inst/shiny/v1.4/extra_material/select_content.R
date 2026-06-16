@@ -27,11 +27,14 @@ output[["extra_material_select_category_and_content_UI"]] <- renderUI({
 output[["extra_material_selected_category_UI"]] <- renderUI({
   tagList(
     div(
-      HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a category:</strong></h2>')
+      HTML(
+        '<h3 style="text-align: center; margin-top: 0"><strong>Choose a category:</strong></h2>'
+      )
     ),
     fluidRow(
       column(2),
-      column(8,
+      column(
+        8,
         selectInput(
           "extra_material_selected_category",
           label = NULL,
@@ -52,16 +55,19 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
   ## if selected category is `tables`
   if (
     input[["extra_material_selected_category"]] == 'tables' &&
-    checkForExtraTables() == TRUE
+      checkForExtraTables() == TRUE
   ) {
     ##
     tagList(
       div(
-        HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>')
+        HTML(
+          '<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>'
+        )
       ),
       fluidRow(
         column(2),
-        column(8,
+        column(
+          8,
           selectInput(
             "extra_material_selected_content",
             label = NULL,
@@ -72,19 +78,22 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
         column(2)
       )
     )
-  ## if selected category is `plots`
+    ## if selected category is `plots`
   } else if (
     input[["extra_material_selected_category"]] == 'plots' &&
-    checkForExtraPlots() == TRUE
+      checkForExtraPlots() == TRUE
   ) {
     ##
     tagList(
       div(
-        HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a plot:</strong></h2>')
+        HTML(
+          '<h3 style="text-align: center; margin-top: 0"><strong>Choose a plot:</strong></h2>'
+        )
       ),
       fluidRow(
         column(2),
-        column(8,
+        column(
+          8,
           selectInput(
             "extra_material_selected_content",
             label = NULL,

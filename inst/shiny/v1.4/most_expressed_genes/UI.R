@@ -3,7 +3,8 @@
 ##----------------------------------------------------------------------------##
 tab_most_expressed_genes <- tabItem(
   tabName = "mostExpressedGenes",
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #most_expressed_genes_table .table th {
       text-align: center;
     }

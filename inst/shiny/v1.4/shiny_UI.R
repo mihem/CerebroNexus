@@ -108,11 +108,17 @@ source(
 
 ## Enhanced module UIs.
 source(
-  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/most_expressed_genes/UI.R"),
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/most_expressed_genes/UI.R"
+  ),
   local = TRUE
 )
 source(
-  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/enriched_pathways/UI.R"),
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/enriched_pathways/UI.R"
+  ),
   local = TRUE
 )
 source(

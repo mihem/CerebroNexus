@@ -4,7 +4,8 @@
 
 tab_enriched_pathways <- tabItem(
   tabName = "enrichedPathways",
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #enriched_pathways_table .table th {
       text-align: center;
     }

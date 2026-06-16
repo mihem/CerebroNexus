@@ -9,14 +9,21 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
 
 test_that("most_expressed_genes tab navigates and renders table", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "most_expressed_genes", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "most_expressed_genes",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "mostExpressedGenes")
   app$wait_for_idle(timeout = 10000)
 
   # Group selector renders with expected options
-  select_html <- app$get_value(output = "most_expressed_genes_select_group_UI")$html
+  select_html <- app$get_value(
+    output = "most_expressed_genes_select_group_UI"
+  )$html
   expect_true(grepl("seurat_clusters", select_html))
 
   # Table renders without error
@@ -29,7 +36,12 @@ test_that("most_expressed_genes tab navigates and renders table", {
 
 test_that("enriched_pathways tab content exists in DOM", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "enriched_pathways", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "enriched_pathways",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   # Output container exists in the DOM
@@ -44,7 +56,12 @@ test_that("enriched_pathways tab content exists in DOM", {
 
 test_that("extra_material tab content exists in DOM", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "extra_material", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "extra_material",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   # Output container exists in the DOM
@@ -59,7 +76,12 @@ test_that("extra_material tab content exists in DOM", {
 
 test_that("all three new tabs are visible in sidebar after data load", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "new_tabs_sidebar", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "new_tabs_sidebar",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   most_expressed <- app$get_js(
@@ -86,14 +108,23 @@ test_that("insertConditionalTab is defined and wired to conditional tabs", {
   content <- paste(readLines(server_file), collapse = "\n")
 
   # Function is defined with all required parameters
-  expect_match(content,
+  expect_match(
+    content,
     "insertConditionalTab\\s*<-\\s*function\\s*\\(\\s*tab_label\\s*,\\s*tab_name\\s*,\\s*icon_name\\s*,\\s*check_fn",
     perl = TRUE
   )
 
   # Calls are present for enriched pathways and extra material
-  expect_match(content, 'insertConditionalTab\\(\\"Enriched pathways\\"', perl = TRUE)
-  expect_match(content, 'insertConditionalTab\\(\\"Extra material\\"', perl = TRUE)
+  expect_match(
+    content,
+    'insertConditionalTab\\(\\"Enriched pathways\\"',
+    perl = TRUE
+  )
+  expect_match(
+    content,
+    'insertConditionalTab\\(\\"Extra material\\"',
+    perl = TRUE
+  )
 })
 
 test_that("conditional tab placeholders exist in UI source", {
@@ -102,6 +133,10 @@ test_that("conditional tab placeholders exist in UI source", {
   content <- paste(readLines(ui_file), collapse = "\n")
 
   # Placeholder divs for the two conditional tabs
-  expect_match(content, 'sidebar_item_enriched_pathways_placeholder', perl = TRUE)
+  expect_match(
+    content,
+    'sidebar_item_enriched_pathways_placeholder',
+    perl = TRUE
+  )
   expect_match(content, 'sidebar_item_extra_material_placeholder', perl = TRUE)
 })

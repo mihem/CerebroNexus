@@ -11,7 +11,7 @@
 output[["enriched_pathways_select_method_and_table_UI"]] <- renderUI({
   if (
     !is.null(getMethodsForEnrichedPathways()) &&
-    length(getMethodsForEnrichedPathways()) > 0
+      length(getMethodsForEnrichedPathways()) > 0
   ) {
     tagList(
       fluidRow(
@@ -34,11 +34,14 @@ output[["enriched_pathways_select_method_and_table_UI"]] <- renderUI({
 output[["enriched_pathways_selected_method_UI"]] <- renderUI({
   tagList(
     div(
-      HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a method:</strong></h2>')
+      HTML(
+        '<h3 style="text-align: center; margin-top: 0"><strong>Choose a method:</strong></h2>'
+      )
     ),
     fluidRow(
       column(2),
-      column(8,
+      column(
+        8,
         selectInput(
           "enriched_pathways_selected_method",
           label = NULL,
@@ -58,15 +61,20 @@ output[["enriched_pathways_selected_table_UI"]] <- renderUI({
   req(input[["enriched_pathways_selected_method"]])
   tagList(
     div(
-      HTML('<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>')
+      HTML(
+        '<h3 style="text-align: center; margin-top: 0"><strong>Choose a table:</strong></h2>'
+      )
     ),
     fluidRow(
       column(2),
-      column(8,
+      column(
+        8,
         selectInput(
           "enriched_pathways_selected_table",
           label = NULL,
-          choices = getGroupsWithEnrichedPathways(input[["enriched_pathways_selected_method"]]),
+          choices = getGroupsWithEnrichedPathways(input[[
+            "enriched_pathways_selected_method"
+          ]]),
           width = "100%"
         )
       ),
