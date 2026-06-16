@@ -1,7 +1,10 @@
 # test-extra_material.R — Tests for extra material module
 
 shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
-example_crb <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+example_crb <- system.file(
+  "extdata/v1.4/example.crb",
+  package = "cerebroAppLite"
+)
 
 fresh_extra_material_crb <- function(include_plots = FALSE) {
   crb <- Cerebro_v1.3$new()

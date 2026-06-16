@@ -3,7 +3,8 @@
 ##----------------------------------------------------------------------------##
 tab_extra_material <- tabItem(
   tabName = "extra_material",
-  shinyjs::inlineCSS("
+  shinyjs::inlineCSS(
+    "
     #extra_material_table .table th {
       text-align: center;
     }

@@ -1103,7 +1103,9 @@ getMeanExpression <- function(group_name) {
 }
 getGroupsWithMeanExpression <- function() {
   ds <- data_set()
-  if (!any(grepl("Cerebro", class(ds)))) return(character(0))
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(character(0))
+  }
   tryCatch(ds$getGroupsWithMeanExpression(), error = function(e) character(0))
 }
 getGroupsWithMostExpressedGenes <- function() {

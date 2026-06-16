@@ -1,7 +1,10 @@
 # test-enriched_pathways.R — Tests for enriched pathways module
 
 shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
-example_crb <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+example_crb <- system.file(
+  "extdata/v1.4/example.crb",
+  package = "cerebroAppLite"
+)
 
 test_that("enriched_pathways module files parse without errors", {
   mod_files <- c("UI.R", "server.R", "table.R", "select_content.R")
@@ -42,6 +45,6 @@ test_that("getMethodsWithEnrichedPathways class method exists", {
   skip_if_not(file.exists(example_crb))
   crb <- readRDS(example_crb)
   has_with <- is.function(crb$getMethodsWithEnrichedPathways)
-  has_for  <- is.function(crb$getMethodsForEnrichedPathways)
+  has_for <- is.function(crb$getMethodsForEnrichedPathways)
   expect_true(has_with || has_for)
 })

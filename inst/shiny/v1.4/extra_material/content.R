@@ -8,7 +8,7 @@
 output[["extra_material_content_UI"]] <- renderUI({
   req(input[["extra_material_selected_category"]])
   ## if selected category is `tables`
-  if ( input[["extra_material_selected_category"]] == 'tables' ) {
+  if (input[["extra_material_selected_category"]] == 'tables') {
     ##
     fluidRow(
       cerebroBox(
@@ -17,7 +17,8 @@ output[["extra_material_content_UI"]] <- renderUI({
           cerebroInfoButton("extra_material_info")
         ),
         fluidRow(
-          column(12,
+          column(
+            12,
             shinyWidgets::materialSwitch(
               inputId = "extra_material_table_number_formatting",
               label = "Automatically format numbers:",
@@ -33,14 +34,12 @@ output[["extra_material_content_UI"]] <- renderUI({
               inline = TRUE
             )
           ),
-          column(12,
-            DT::dataTableOutput("extra_material_table")
-          )
+          column(12, DT::dataTableOutput("extra_material_table"))
         )
       )
     )
-  ## if selected category is `plots`
-  } else if ( input[["extra_material_selected_category"]] == 'plots' ) {
+    ## if selected category is `plots`
+  } else if (input[["extra_material_selected_category"]] == 'plots') {
     ##
     fluidRow(
       cerebroBox(
@@ -49,7 +48,8 @@ output[["extra_material_content_UI"]] <- renderUI({
           cerebroInfoButton("extra_material_info")
         ),
         fluidRow(
-          column(12,
+          column(
+            12,
             shinyWidgets::materialSwitch(
               inputId = "extra_material_plot_interactive_switch",
               label = "Make plot interactive:",
@@ -58,9 +58,7 @@ output[["extra_material_content_UI"]] <- renderUI({
               inline = TRUE
             )
           ),
-          column(12,
-            uiOutput("extra_material_plot_UI")
-          )
+          column(12, uiOutput("extra_material_plot_UI"))
         )
       )
     )
@@ -81,12 +79,12 @@ output[["extra_material_table"]] <- DT::renderDataTable({
   req(is.data.frame(results_df))
   ## if the table is empty, skip the processing and show and empty table
   ## (otherwise the procedure would result in an error)
-  if ( nrow(results_df) == 0 ) {
+  if (nrow(results_df) == 0) {
     results_df %>%
-    as.data.frame() %>%
-    dplyr::slice(0) %>%
-    prepareEmptyTable()
-  ## if there is at least 1 row, create proper table
+      as.data.frame() %>%
+      dplyr::slice(0) %>%
+      prepareEmptyTable()
+    ## if there is at least 1 row, create proper table
   } else {
     prettifyTable(
       results_df,
@@ -98,7 +96,8 @@ output[["extra_material_table"]] <- DT::renderDataTable({
       hide_long_columns = TRUE,
       download_file_name = paste0(
         "extra_material_",
-        input[["extra_material_selected_category"]], "_",
+        input[["extra_material_selected_category"]],
+        "_",
         input[["extra_material_selected_content"]]
       ),
       page_length_default = 20,
@@ -117,7 +116,7 @@ output[["extra_material_table"]] <- DT::renderDataTable({
 ##----------------------------------------------------------------------------##
 output[["extra_material_plot_UI"]] <- renderUI({
   req(!is.null(input[["extra_material_plot_interactive_switch"]]))
-  if ( input[["extra_material_plot_interactive_switch"]] == TRUE ) {
+  if (input[["extra_material_plot_interactive_switch"]] == TRUE) {
     plotly::plotlyOutput(
       "extra_material_plot_interactive",
       width = "auto",
@@ -147,7 +146,7 @@ output[["extra_material_plot_interactive"]] <- plotly::renderPlotly({
   ## convert to plotly
   plot <- plotly::ggplotly(plot)
   ## return plot either with WebGL or without, depending on setting
-  if ( preferences$use_webgl == TRUE ) {
+  if (preferences$use_webgl == TRUE) {
     plot %>% plotly::toWebGL()
   } else {
     plot
@@ -189,7 +188,8 @@ observeEvent(input[["extra_material_info"]], {
 ##----------------------------------------------------------------------------##
 extra_material_info <- list(
   title = "Extra material",
-  text = HTML("
+  text = HTML(
+    "
     Here, additional material related to the data set can be stored. At the moment, only tables and plots made with ggplot2 are supported, but depending on user requests, support for others types of content can be added in the future.<br>
     <br>
     For an explanation of the specific content, please refer to the person who exported this data set."
