@@ -2,8 +2,7 @@
 ## Tab: Immune Repertoire server — entry point
 ##----------------------------------------------------------------------------##
 
-local({
-  has_scRepertoire <- function() {
+has_scRepertoire <- function() {
     requireNamespace("scRepertoire", quietly = TRUE)
   }
 
@@ -27,7 +26,7 @@ local({
 
   ## ---- BCR-specific helper: extract isotype ------------------------------- ##
   bcr_extract_isotype <- function(combined_BCR) {
-    purrr::map_dfr(combined_BCR, function(df) {
+    dplyr::bind_rows(lapply(combined_BCR, function(df) {
       if (is.null(df) || !"CTgene" %in% colnames(df)) {
         return(NULL)
       }
@@ -50,7 +49,7 @@ local({
       )
       isotype <- ifelse(grepl("^IGH[ADEGM]", isotype), isotype, NA_character_)
       tibble::add_column(tibble::as_tibble(df), isotype = isotype)
-    })
+    }))
   }
 
   ## ---- BCR-specific: isotype distribution plot ---------------------------- ##
@@ -118,7 +117,7 @@ local({
     group_col = "sample",
     clone_call_col = "CTstrict"
   ) {
-    diversity <- purrr::map_dfr(combined_BCR, function(df) {
+    diversity <- dplyr::bind_rows(lapply(combined_BCR, function(df) {
       needed <- c(clone_call_col, "CTnt", group_col)
       if (is.null(df) || !all(needed %in% colnames(df))) {
         return(NULL)
@@ -154,7 +153,7 @@ local({
           .groups = "drop"
         ) %>%
         dplyr::filter(n_cells >= 2L)
-    })
+    }))
 
     if (is.null(diversity) || nrow(diversity) == 0L) {
       return(NULL)
@@ -262,6 +261,18 @@ local({
     chains
   }
 
+  ## ---- bindCache fallback for Shiny < 1.6.0 ---------------------------- ##
+  ## cache = "session" ensures caches are NOT shared across users/sessions.
+  ## data_to_load$path is appended to every key so switching datasets
+  ## invalidates the cache (prevents stale plots from the previous dataset).
+  ir_bindCache <- function(x, ..., cache = "session") {
+    if (utils::packageVersion("shiny") >= "1.6.0") {
+      shiny::bindCache(x, ..., data_to_load$path, cache = cache)
+    } else {
+      x
+    }
+  }
+
   source(
     paste0(
       Cerebro.options[["cerebro_root"]],
@@ -297,4 +308,3 @@ local({
     ),
     local = TRUE
   )
-})

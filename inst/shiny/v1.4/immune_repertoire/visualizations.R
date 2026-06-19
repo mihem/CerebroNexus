@@ -41,10 +41,7 @@ output$ir_visualizations_UI <- renderUI({
       ),
       tabPanel(
         "Diversity",
-        shinycssloaders::withSpinner(plotOutput(
-          "ir_plot_clonalDiversity",
-          height = 450
-        ))
+        uiOutput("ir_ui_clonalDiversity")
       ),
       tabPanel(
         "Homeostasis",
@@ -107,7 +104,18 @@ output$ir_visualizations_UI <- renderUI({
       ))
     ),
     tabPanel("Property", uiOutput("ir_ui_positionalProperty")),
-    tabPanel("K-mer", uiOutput("ir_ui_percentKmer"))
+    tabPanel(
+      "K-mer",
+      sliderInput(
+        "ir_kmer_top_motifs",
+        "Top motifs:",
+        min = 10,
+        max = 100,
+        value = 30,
+        step = 5
+      ),
+      uiOutput("ir_ui_percentKmer")
+    )
   )
 
   ## Tabs requiring >= 2 samples
@@ -172,7 +180,13 @@ output$ir_plot_isotype <- renderPlot({
     },
     "isotype"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_shmProxy <- renderPlot({
   data <- ir_data()
@@ -196,7 +210,13 @@ output$ir_plot_shmProxy <- renderPlot({
     },
     "shmProxy"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 ## ---- Paired Scatter (generic) ------------------------------------------- ##
 ir_sample_meta <- reactive({
@@ -378,7 +398,15 @@ output$ir_plot_pairedScatter <- renderPlot({
     },
     "pairedScatter"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    input$ir_pair_compare,
+    input$ir_pair_facet
+  )
 
 output$ir_plot_clonalAbundance <- renderPlot({
   req(has_scRepertoire())
@@ -393,7 +421,13 @@ output$ir_plot_clonalAbundance <- renderPlot({
     ),
     "clonalAbundance"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_clonalCompare <- renderPlot({
   req(has_scRepertoire())
@@ -418,6 +452,30 @@ output$ir_plot_clonalCompare <- renderPlot({
     ),
     "clonalCompare"
   )
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    input$ir_compare_samples
+  )
+
+output$ir_ui_clonalDiversity <- renderUI({
+  tagList(
+    sliderInput(
+      "ir_diversity_boots",
+      "Bootstrap iterations:",
+      min = 3,
+      max = 100,
+      value = 20,
+      step = 5
+    ),
+    shinycssloaders::withSpinner(plotOutput(
+      "ir_plot_clonalDiversity",
+      height = 450
+    ))
+  )
 })
 
 output$ir_plot_clonalDiversity <- renderPlot({
@@ -425,6 +483,10 @@ output$ir_plot_clonalDiversity <- renderPlot({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
+  n_boots <- ir_diversity_boots_d()
+  if (is.null(n_boots)) {
+    n_boots <- 20
+  }
   safeRenderPlot(
     scRepertoire::clonalDiversity(
       data,
@@ -432,13 +494,20 @@ output$ir_plot_clonalDiversity <- renderPlot({
       chain = pars$chain,
       group.by = pars$groupBy,
       metric = "shannon",
-      n.boots = 100,
+      n.boots = n_boots,
       exportTable = FALSE,
       palette = "inferno"
     ),
     "clonalDiversity"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    ir_diversity_boots_d()
+  )
 
 output$ir_plot_clonalHomeostasis <- renderPlot({
   req(has_scRepertoire())
@@ -456,7 +525,13 @@ output$ir_plot_clonalHomeostasis <- renderPlot({
     ),
     "clonalHomeostasis"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_clonalLength <- renderPlot({
   req(has_scRepertoire())
@@ -474,7 +549,13 @@ output$ir_plot_clonalLength <- renderPlot({
     ),
     "clonalLength"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_clonalOverlap <- renderPlot({
   req(has_scRepertoire())
@@ -493,7 +574,13 @@ output$ir_plot_clonalOverlap <- renderPlot({
     ),
     "clonalOverlap"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_clonalProportion <- renderPlot({
   req(has_scRepertoire())
@@ -512,7 +599,13 @@ output$ir_plot_clonalProportion <- renderPlot({
     ),
     "clonalProportion"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_clonalQuant <- renderPlot({
   req(has_scRepertoire())
@@ -531,20 +624,22 @@ output$ir_plot_clonalQuant <- renderPlot({
     ),
     "clonalQuant"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_clonalRarefaction <- renderUI({
-  n_boots <- input$ir_rarefaction_boots
-  if (is.null(n_boots)) {
-    n_boots <- 5
-  }
   tagList(
     sliderInput(
       "ir_rarefaction_boots",
       "Bootstrap iterations:",
       min = 3,
       max = 50,
-      value = n_boots,
+      value = 5,
       step = 1
     ),
     plotOutput("ir_plot_clonalRarefaction", height = "450px")
@@ -556,7 +651,7 @@ output$ir_plot_clonalRarefaction <- renderPlot({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
-  n_boots <- input$ir_rarefaction_boots
+  n_boots <- ir_rarefaction_boots_d()
   if (is.null(n_boots)) {
     n_boots <- 5
   }
@@ -574,7 +669,14 @@ output$ir_plot_clonalRarefaction <- renderPlot({
     ),
     "clonalRarefaction"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    ir_rarefaction_boots_d()
+  )
 
 output$ir_plot_clonalScatter <- renderPlot({
   req(has_scRepertoire())
@@ -597,7 +699,15 @@ output$ir_plot_clonalScatter <- renderPlot({
     ),
     "clonalScatter"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    input$ir_scatter_x,
+    input$ir_scatter_y
+  )
 
 output$ir_plot_clonalSizeDistribution <- renderPlot({
   req(has_scRepertoire())
@@ -614,7 +724,13 @@ output$ir_plot_clonalSizeDistribution <- renderPlot({
     ),
     "clonalSizeDistribution"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_percentGeneUsage <- renderUI({
   h <- ir_plot_height("none")
@@ -642,7 +758,13 @@ output$ir_plot_percentGeneUsage <- renderPlot({
     ),
     "percentGeneUsage"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_vizGenes <- renderUI({
   h <- ir_plot_height("none")
@@ -670,7 +792,13 @@ output$ir_plot_vizGenes <- renderPlot({
     ),
     "vizGenes"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_percentGenes <- renderUI({
   h <- ir_plot_height("none")
@@ -697,7 +825,13 @@ output$ir_plot_percentGenes <- renderPlot({
     ),
     "percentGenes"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_percentVJ <- renderUI({
   h <- ir_plot_height("wrap")
@@ -723,7 +857,13 @@ output$ir_plot_percentVJ <- renderPlot({
     ),
     "percentVJ"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_ui_percentAA <- renderUI({
   ng <- n_groups()
@@ -751,7 +891,13 @@ output$ir_plot_percentAA <- renderPlot({
     ),
     "percentAA"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 output$ir_plot_positionalEntropy <- renderPlot({
   req(has_scRepertoire())
@@ -770,7 +916,13 @@ output$ir_plot_positionalEntropy <- renderPlot({
     ),
     "positionalEntropy"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol
+  )
 
 ## ---- Positional Property: facet count per method ---------------------- ##
 ## Requires immApex; most methods also need the Peptides package.
@@ -844,7 +996,7 @@ output$ir_plot_positionalProperty <- renderPlot({
   pars <- ir_params()
   method <- input$ir_property_method
   if (is.null(method)) {
-    method <- "atchleyFactors"
+    method <- names(available_property_methods())[1]
   }
   safeRenderPlot(
     scRepertoire::positionalProperty(
@@ -857,28 +1009,25 @@ output$ir_plot_positionalProperty <- renderPlot({
     ),
     "positionalProperty"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    input$ir_property_method
+  )
 
 output$ir_ui_percentKmer <- renderUI({
-  top_m <- input$ir_kmer_top_motifs
+  top_m <- ir_kmer_top_motifs_d()
   if (is.null(top_m)) {
     top_m <- 30
   }
   h <- max(450, top_m * 20)
-  tagList(
-    sliderInput(
-      "ir_kmer_top_motifs",
-      "Top motifs:",
-      min = 10,
-      max = 100,
-      value = top_m,
-      step = 5
-    ),
-    shinycssloaders::withSpinner(plotOutput(
-      "ir_plot_percentKmer",
-      height = paste0(h, "px")
-    ))
-  )
+  shinycssloaders::withSpinner(plotOutput(
+    "ir_plot_percentKmer",
+    height = paste0(h, "px")
+  ))
 })
 
 output$ir_plot_percentKmer <- renderPlot({
@@ -886,7 +1035,7 @@ output$ir_plot_percentKmer <- renderPlot({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
-  top_m <- input$ir_kmer_top_motifs
+  top_m <- ir_kmer_top_motifs_d()
   if (is.null(top_m)) {
     top_m <- 30
   }
@@ -904,4 +1053,11 @@ output$ir_plot_percentKmer <- renderPlot({
     ),
     "percentKmer"
   )
-})
+}) %>%
+  ir_bindCache(
+    input$ir_cloneCall,
+    input$ir_chain,
+    input$ir_groupBy,
+    input$ir_sampleCol,
+    ir_kmer_top_motifs_d()
+  )

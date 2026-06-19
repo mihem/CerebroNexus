@@ -54,6 +54,18 @@ test_that("example_tcr.crb loads and contains immune repertoire data", {
   }
 })
 
+test_that("ir_bindCache injects dataset identity into cache key", {
+  # data_to_load$path in every cache key prevents stale plots when switching
+  # datasets; cache = "session" prevents cross-user/session cache leakage.
+  # Static source check — guards a production bug that behaviour tests can't
+  # reach (needs a second dataset, which the single-dataset fixtures lack).
+  srv <- file.path(shiny_root, "immune_repertoire", "server.R")
+  skip_if_not(file.exists(srv))
+  content <- paste(readLines(srv), collapse = "\n")
+  expect_match(content, "data_to_load\\$path")
+  expect_match(content, 'cache\\s*=\\s*"session"')
+})
+
 test_that("example_tcr.crb preserves original data fields", {
   skip_if_not(file.exists(tcr_crb))
   crb <- readRDS(tcr_crb)

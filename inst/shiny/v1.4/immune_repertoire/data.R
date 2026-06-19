@@ -51,14 +51,11 @@ ir_data <- reactive({
   if (is.null(col) || col == "" || col == "(original)") {
     return(data)
   }
-  merged <- do.call(
-    rbind,
-    lapply(names(data), function(nm) {
-      df <- data[[nm]]
-      df$.orig_sample <- nm
-      df
-    })
-  )
+  merged <- dplyr::bind_rows(lapply(names(data), function(nm) {
+    df <- data[[nm]]
+    df$.orig_sample <- nm
+    df
+  }))
   if (is.null(merged) || nrow(merged) == 0) {
     return(data)
   }
@@ -83,7 +80,13 @@ ir_params <- reactive({
     chain = input$ir_chain,
     groupBy = gb
   )
-})
+}) %>%
+  debounce(500)
+
+## ---- Debounced slider values (avoid recompute on every drag tick) ----- ##
+ir_diversity_boots_d <- debounce(reactive(input$ir_diversity_boots), 400)
+ir_rarefaction_boots_d <- debounce(reactive(input$ir_rarefaction_boots), 400)
+ir_kmer_top_motifs_d <- debounce(reactive(input$ir_kmer_top_motifs), 400)
 
 ## ---- Reactive: number of groups for faceted plots --------------------- ##
 n_groups <- reactive({
