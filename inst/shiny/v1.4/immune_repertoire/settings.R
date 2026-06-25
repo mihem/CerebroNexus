@@ -20,9 +20,14 @@ output$ir_settings_UI <- renderUI({
     chain_choices[["BCR"]] <- as.list(setNames(bcr_present, bcr_present))
   }
 
-  all_groups <- getGroups()
-  data_cols <- names(raw[[1]])
-  available_groups <- c(NULL, intersect(all_groups, data_cols))
+  # Grouping options come from the data set's declared grouping variables
+  # joined onto the IR data by barcode (see ir_data_annotated), so users can
+  # group by ANY metadata column (sample, condition, treatment, cell type, ...)
+  # rather than only columns embedded in the IR table itself.
+  annotated <- ir_data_annotated()
+  data_cols <- if (!is.null(annotated)) names(annotated[[1]]) else names(raw[[1]])
+  groups <- tryCatch(getGroups(), error = function(e) character(0))
+  available_groups <- intersect(groups, data_cols)
 
   sample_col_opts <- c("(original)" = "(original)", ir_sample_col_choices())
 

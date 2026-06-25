@@ -217,9 +217,9 @@ test_that("example.crb sample levels are as expected", {
   data <- readRDS(path)
 
   lvls <- data$getGroupLevels("sample")
-  expect_true(length(lvls) >= 1)
-  # example data has 3 PBMC replicates
-  expect_true(any(grepl("pbmc", lvls, ignore.case = TRUE)))
+  # example data is split into multiple pseudo-samples (donor_1/2/3)
+  expect_true(length(lvls) >= 2)
+  expect_true(is.character(lvls))
 })
 
 test_that("example.h5 file exists and is non-empty", {

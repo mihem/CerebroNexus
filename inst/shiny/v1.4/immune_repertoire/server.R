@@ -12,6 +12,13 @@ has_scRepertoire <- function() {
         expr
       },
       error = function(e) {
+        # validate()/need()/req() raise a "shiny.silent.error"; re-raise it so
+        # Shiny renders the usual grey placeholder instead of our error plot.
+        # (Using a single handler avoids the re-raised condition being caught by
+        # a sibling error handler in the same tryCatch.)
+        if (inherits(e, "shiny.silent.error")) {
+          stop(e)
+        }
         message("[IR ERROR] Plot '", plot_name, "' failed: ", e$message)
         plot.new()
         text(

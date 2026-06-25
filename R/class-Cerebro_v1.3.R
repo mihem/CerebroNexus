@@ -925,6 +925,16 @@ Cerebro_v1.3 <- R6::R6Class(
     },
 
     #' @description
+    #' Alias of \code{getMethodsWithEnrichedPathways()}, kept for backwards
+    #' compatibility with the Shiny app, which calls this name.
+    #'
+    #' @return
+    #' \code{vector} of methods for which enriched pathways are available.
+    getMethodsForEnrichedPathways = function() {
+      return(self$getMethodsWithEnrichedPathways())
+    },
+
+    #' @description
     #' Retrieve names of grouping variables for which enriched pathways are
     #' available for a specific method.
     #'

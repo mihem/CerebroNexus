@@ -8,31 +8,85 @@ ir_data_raw <- reactive({
   data
 })
 
-## ---- Candidate columns for sample splitting --------------------------- ##
-ir_sample_col_choices <- reactive({
+## ---- Standard scRepertoire columns (not usable as grouping) ----------- ##
+ir_scr_cols <- c(
+  "barcode",
+  "CTgene",
+  "CTnt",
+  "CTaa",
+  "CTstrict",
+  "clonalProportion",
+  "clonalFrequency",
+  "cloneSize",
+  "Frequency",
+  "frequency",
+  "cloneType"
+)
+
+## ---- Join cell metadata onto every IR row by barcode ------------------ ##
+## The IR data.frames carry only scRepertoire columns (barcode, CT*). Any
+## biological grouping (sample, condition, treatment, cell type, ...) lives in
+## the data set's cell metadata. We attach it here by `cell_barcode` so the
+## module can group/split by ANY metadata column, not just whatever columns a
+## data producer happened to embed in the IR table.
+ir_data_annotated <- reactive({
   data <- ir_data_raw()
+  if (is.null(data)) {
+    return(NULL)
+  }
+  md <- tryCatch(getMetaData(), error = function(e) NULL)
+  if (is.null(md) || !("cell_barcode" %in% colnames(md))) {
+    return(data) # nothing to join; fall back to raw IR data
+  }
+  # metadata columns that don't already exist in the IR tables
+  meta_cols <- setdiff(colnames(md), "cell_barcode")
+  lapply(data, function(df) {
+    if (is.null(df) || !("barcode" %in% colnames(df))) {
+      return(df)
+    }
+    add <- setdiff(meta_cols, colnames(df))
+    if (length(add) == 0) {
+      return(df)
+    }
+    idx <- match(df$barcode, md$cell_barcode)
+    n_miss <- sum(is.na(idx))
+    if (n_miss > 0) {
+      warning(sprintf(
+        paste0(
+          "[IR] %d / %d clonotype barcodes not found in cell metadata; ",
+          "grouping/splitting by metadata columns may be incomplete. ",
+          "Check that IR barcodes match the cell barcodes (e.g. the '-1' suffix)."
+        ),
+        n_miss, length(idx)
+      ))
+    }
+    for (col in add) df[[col]] <- md[[col]][idx]
+    df
+  })
+})
+
+## ---- Candidate columns for sample splitting --------------------------- ##
+## Prefer the data set's declared grouping variables (getGroups()); fall back
+## to any shared non-standard column present in the (annotated) IR tables.
+ir_sample_col_choices <- reactive({
+  data <- ir_data_annotated()
   if (is.null(data)) {
     return(character(0))
   }
   shared <- Reduce(intersect, lapply(data, colnames))
-  scr_cols <- c(
-    "barcode",
-    "CTgene",
-    "CTnt",
-    "CTaa",
-    "CTstrict",
-    "clonalProportion",
-    "clonalFrequency",
-    "cloneSize",
-    "Frequency",
-    "frequency",
-    "cloneType"
-  )
-  candidates <- setdiff(shared, scr_cols)
+
+  groups <- tryCatch(getGroups(), error = function(e) character(0))
+  candidates <- intersect(groups, shared)
+  if (length(candidates) == 0) {
+    # fall back: any shared column that isn't a standard scRepertoire field
+    candidates <- setdiff(shared, ir_scr_cols)
+  }
+
   ok <- vapply(
     candidates,
     function(col) {
       vals <- unique(unlist(lapply(data, function(df) unique(df[[col]]))))
+      vals <- vals[!is.na(vals)]
       n <- length(vals)
       n >= 2L && n <= 200L
     },
@@ -43,7 +97,7 @@ ir_sample_col_choices <- reactive({
 
 ## ---- Reactive: repertoire data (re-split by user-chosen column) ------- ##
 ir_data <- reactive({
-  data <- ir_data_raw()
+  data <- ir_data_annotated()
   if (is.null(data)) {
     return(NULL)
   }

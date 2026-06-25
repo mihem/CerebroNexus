@@ -13,13 +13,13 @@ test_that("{shinytest2} recording: overview", {
 
   ## Data Info tab: verify key values from the loaded example.crb
   cells_box <- app$get_value(output = "load_data_number_of_cells")
-  expect_true(grepl("501", cells_box$html))
+  expect_true(grepl("1,?476", cells_box$html))
 
   organism_box <- app$get_value(output = "load_data_organism")
   expect_true(grepl("hg", organism_box$html))
 
   date_box <- app$get_value(output = "load_data_date_of_export")
-  expect_true(grepl("2020-09-21", date_box$html))
+  expect_true(grepl("[0-9]{4}-[0-9]{2}-[0-9]{2}", date_box$html))
 
   app$stop()
 })
@@ -129,7 +129,7 @@ test_that("{shinytest2} recording: marker_genes", {
   for (col in c(
     "gene",
     "p_val",
-    "avg_logFC",
+    "avg_log2FC",
     "pct.1",
     "pct.2",
     "p_val_adj",
@@ -269,7 +269,7 @@ test_that("createShinyApp bundles a working app", {
   app$wait_for_idle(timeout = 20000)
 
   cells <- app$get_value(output = "load_data_number_of_cells")
-  expect_true(grepl("501", cells$html))
+  expect_true(grepl("1,?476", cells$html))
 
   app$stop()
 })

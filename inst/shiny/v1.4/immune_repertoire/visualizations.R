@@ -17,6 +17,11 @@ output$ir_visualizations_UI <- renderUI({
       list(
         tabPanel(
           "Scatter",
+          helpText(
+            "Compares clonotype proportions between the two samples selected",
+            "below (defined by the 'Sample column' control). The 'Group by'",
+            "setting does not apply to this plot."
+          ),
           shinycssloaders::withSpinner(plotOutput(
             "ir_plot_clonalScatter",
             height = 450
@@ -680,18 +685,36 @@ output$ir_plot_clonalRarefaction <- renderPlot({
 
 output$ir_plot_clonalScatter <- renderPlot({
   req(has_scRepertoire())
-  req(!is.null(input$ir_scatter_x) && !is.null(input$ir_scatter_y))
   data <- ir_data()
   req(!is.null(data))
+  # clonalScatter compares two elements of the data list (x.axis / y.axis are
+  # sample names, not metadata levels). It must NOT receive group.by — that
+  # re-grouping conflicts with x.axis/y.axis ("undefined columns selected").
+  # Need at least two distinct samples to compare.
+  x <- input$ir_scatter_x
+  y <- input$ir_scatter_y
+  # The scatter x/y selectors live in a dynamic renderUI, so on first paint the
+  # inputs are not yet registered (NULL). req() silently halts the render until
+  # they exist — more reliable than validate() for the first-paint race.
+  req(x, y)
   pars <- ir_params()
+  chain <- pars$chain
+  if (is.null(chain) || !nzchar(chain)) {
+    chain <- "both"
+  }
+  validate(
+    need(length(data) >= 2, "Clonal scatter needs at least 2 samples to compare. Use the 'Sample column' control to split the data into >= 2 groups."),
+    need(!is.null(x) && !is.null(y) && nzchar(x) && nzchar(y), "Select two samples to compare."),
+    need(x %in% names(data) && y %in% names(data), "Selected samples are not available in the current split."),
+    need(x != y, "Select two different samples for the scatter comparison.")
+  )
   safeRenderPlot(
     scRepertoire::clonalScatter(
       data,
       cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      x.axis = input$ir_scatter_x,
-      y.axis = input$ir_scatter_y,
+      chain = chain,
+      x.axis = x,
+      y.axis = y,
       dot.size = "total",
       graph = "proportion",
       exportTable = FALSE,

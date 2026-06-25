@@ -23,32 +23,61 @@ clonal abundance, diversity, CDR3 properties, gene usage, and cross-sample
 comparisons.
 
 The Immune Repertoire tab appears **conditionally** in the sidebar — only when
-the loaded `.crb` file contains TCR or BCR clonotype annotations.
+the loaded `.crb` file contains TCR or BCR clonotype annotations. The bundled
+`example.crb` ships with real 10x immune-repertoire data (the
+`sc5p_v2_hs_PBMC_10k` dataset, with 5' gene expression, TCR, and BCR from the
+same experiment), so the tab — including TCR, BCR (isotype/SHM), and
+cross-sample comparisons — is available out of the box. (This single 10x donor
+is randomly split into three demo samples so cross-sample features have data;
+the sample labels are not distinct biological donors.)
+
+Grouping and sample-splitting in the module work for **any** grouping variable
+present in the data set's cell metadata (sample, condition, cell type, etc.).
+The clonotype tables themselves only need the standard scRepertoire columns;
+the module joins metadata onto them by barcode at runtime.
 
 # Preparing immune repertoire data
 
-Immune repertoire data must be embedded in the `.crb` file during export. Use
-the `immune_repertoire` parameter in `exportFromSeurat()`:
+Immune repertoire data is embedded in the `.crb` file during export. Attach a
+named list of data.frames (one per sample) to the Seurat object's
+`@misc$immune_repertoire` slot before calling `exportFromSeurat()`, which picks
+it up automatically:
 
 ```{r, eval = FALSE}
 library(cerebroAppLite)
+library(scRepertoire)
 
-# Immune repertoire data should be a named list of data.frames
-# with columns: barcode, CTgene, CTnt, CTaa, CTstrict, chain
+# Combine 10x contigs and map them onto the Seurat object
+combined <- combineTCR(contig_list, samples = sample_names)
+seurat_object <- combineExpression(combined, seurat_object)
+
+# Build a named list of data.frames with the scRepertoire clonotype columns:
+# barcode, CTgene, CTnt, CTaa, CTstrict
+md <- seurat_object@meta.data
 ir_data <- list(
-  sample1 = tcr_clonotypes_df,
-  sample2 = bcr_clonotypes_df
+  sample1 = data.frame(
+    barcode  = rownames(md),
+    CTgene   = md$CTgene,
+    CTnt     = md$CTnt,
+    CTaa     = md$CTaa,
+    CTstrict = md$CTstrict
+  )
 )
+seurat_object@misc$immune_repertoire <- ir_data
 
 exportFromSeurat(
   seurat_object,
   file = "my_data.crb",
-  immune_repertoire = ir_data
+  experiment_name = "my_experiment",
+  organism = "hg",
+  groups = c("sample", "seurat_clusters")
 )
 ```
 
-Each data.frame must contain at minimum: `barcode`, `CTgene`, and `chain`
-columns. barcodes should match those in the Seurat object's metadata.
+Each data.frame must contain the scRepertoire clonotype columns `barcode`,
+`CTgene`, `CTnt`, `CTaa`, and `CTstrict`. The `barcode` values should match
+the cell barcodes in the Seurat object's metadata. Chains (e.g. TRA/TRB) are
+detected automatically from `CTgene`.
 
 # Module interface
 
