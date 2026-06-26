@@ -72,6 +72,7 @@ Suggests:
   monocle,
   reshape2,
   rmarkdown,
+  scRepertoire (>= 2.0.0),
   Seurat (>= 3.0.0),
   SeuratObject,
   SingleCellExperiment,
