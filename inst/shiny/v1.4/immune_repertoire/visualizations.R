@@ -268,7 +268,8 @@ output$ir_ui_pairedScatter <- renderUI({
           "ir_pair_compare",
           "Compare (2-level column):",
           choices = compare_candidates,
-          selected = compare_candidates[1]
+          selected = compare_candidates[1],
+          selectize = FALSE
         )
       ),
       column(6, {
@@ -292,7 +293,8 @@ output$ir_ui_pairedScatter <- renderUI({
           "ir_pair_facet",
           "Facet by:",
           choices = c("(none)" = "", facet_candidates),
-          selected = default_facet
+          selected = default_facet,
+          selectize = FALSE
         )
       })
     ),
@@ -513,9 +515,15 @@ ir_plot_clonal_diversity <- function(
     need(group_col %in% colnames(output_df), "Selected grouping is not available.")
   )
 
-  x_levels <- unique(unlist(lapply(plot_data, function(df) {
+  # Build x-axis levels from the original data. scRepertoire internally sorts
+  # categorical x.axis values alphabetically and assigns numeric positions
+  # 1, 2, 3, ... in that order. We sort x_levels to match this ordering so the
+  # factor levels align with scRepertoire's implicit numeric positions in the
+  # returned bootstrap table. If scRepertoire ever changes its sort order, the
+  # ggplot factor levels here must be adjusted accordingly.
+  x_levels <- sort(unique(unlist(lapply(plot_data, function(df) {
     if (x_axis %in% colnames(df)) as.character(df[[x_axis]]) else character(0)
-  }), use.names = FALSE))
+  }), use.names = FALSE)))
   x_levels <- x_levels[!is.na(x_levels)]
   if (length(x_levels) == 0) {
     x_levels <- unique(as.character(output_df[[x_axis]]))

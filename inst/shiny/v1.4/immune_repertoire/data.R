@@ -68,8 +68,22 @@ ir_data_annotated <- reactive({
 ## ---- Reactive: repertoire data --------------------------------------- ##
 ## Returns the metadata-annotated repertoire list as stored (one element per
 ## sample). Grouping is handled by scRepertoire's native `group.by` (and
-## `x.axis` for the functions that support it), not by re-splitting the list —
-## a re-split duplicated what group.by already does and was removed.
+## `x.axis` for the functions that support it), not by re-splitting the list — a
+## re-split duplicated what group.by already does and was removed.
+##
+## Rationale for removal (was: ir_sampleCol / "Split data by"):
+##   The split-by-column control broke the original data.list into a new list
+##   keyed by that column's levels. While this let the user re-split on any
+##   dimension, scRepertoire's group.by already merges all list elements into
+##   a single table and groups internally, so the two mechanisms competed for
+##   the same axis. In every common scenario, group.by alone suffices.
+##
+##   The one scenario the split did support that group.by alone cannot: using
+##   different split and group dimensions simultaneously (e.g. split by
+##   "condition" while grouping by "cell_type" to see per-condition cell-type
+##   breakdowns). If this scenario is ever needed, a cleaner approach is to
+##   use clonalDiversity's x.axis parameter (condition on x, cell_type as
+##   group.by colour) or clonalScatter's x.axis/y.axis pair.
 ir_data <- reactive({
   ir_data_annotated()
 })

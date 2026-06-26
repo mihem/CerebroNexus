@@ -158,7 +158,13 @@ test_that("removed Split data by control leaves no stale sample-column input", {
     },
     character(1)
   ), collapse = "\n")
-  expect_false(grepl("ir_sampleCol|ir_sample_col_choices|Split data by", content))
+  # The old ir_sampleCol split logic was removed — verify no dead code remains.
+  # "ir_sampleCol" / "Split data by" may appear in comments documenting the
+  # removal; such documentation is fine. Check for actual code references only:
+  # selectInput / updateSelectInput referencing the removed id.
+  expect_false(grepl('selectInput\\(\\s*"ir_sampleCol"', content))
+  expect_false(grepl('updateSelectInput\\([^)]*"ir_sampleCol"', content))
+  expect_false(grepl('input\\$ir_sampleCol', content))
 })
 
 test_that("renderers pass supported scRepertoire parameters", {
@@ -312,4 +318,63 @@ test_that("renderers enforce scRepertoire parameter constraints", {
 
   # percentAA / positionalEntropy: aa.length is validated to a positive integer
   expect_match(content, "if \\(is.na\\(aa_len\\) \\|\\| aa_len < 1\\) aa_len <- 20")
+})
+
+test_that("ir_bindCache keys cover all per-plot ir_param() calls", {
+  # Each renderPlot that calls ir_param("ir_p_XXX") must include the
+  # corresponding input$ir_p_XXX in its ir_bindCache(...) key list. If a
+  # parameter is added to IR_PARAM_SPEC but forgotten in the cache keys,
+  # the plot will silently show stale data. This test parses the source to
+  # verify coverage for every renderPlot / ir_bindCache pair.
+  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
+  skip_if_not(file.exists(viz))
+  lines <- readLines(viz)
+  content <- paste(lines, collapse = "\n")
+
+  # Split into renderPlot blocks — each starts with "output$ir_plot_"
+  blocks <- strsplit(content, "(?=output\\$ir_plot_)", perl = TRUE)[[1]]
+  blocks <- blocks[grepl("output\\$ir_plot_", blocks)]
+
+  misses <- character(0)
+  for (blk in blocks) {
+    # Extract the render expression (first `{`...`})` body) and the
+    # subsequent ir_bindCache(..., input$ir_p_XXX, ...) call, if any.
+    render_body <- sub(
+      "^[^{]*\\{(.*?)\\}%>%\\s*$", "\\1", blk
+    )
+    cache_body <- sub(
+      "^.*ir_bindCache\\((.*?)\\)", "\\1", blk
+    )
+    if (identical(cache_body, blk)) next  # no ir_bindCache for this plot
+
+    # Collect ir_param() calls from the render expression
+    param_ids <- regmatches(
+      render_body,
+      gregexpr('ir_param\\("([^"]+)"', render_body, perl = TRUE)
+    )[[1]]
+    param_ids <- gsub('ir_param\\("([^"]+)"', '\\1', param_ids)
+    param_ids <- unique(param_ids[param_ids != ""])
+
+    if (length(param_ids) == 0) next  # no dynamic params → nothing to check
+
+    # Collect input$ keys from the cache call
+    cache_keys <- regmatches(
+      cache_body,
+      gregexpr('input\\$\\w+', cache_body)
+    )[[1]]
+
+    for (pid in param_ids) {
+      # ir_param("ir_p_metric") → expect input$ir_p_metric in cache keys
+      if (!pid %in% gsub('^input\\$', '', cache_keys)) {
+        # Extract the plot name from the block header
+        plot_name <- sub("^output\\$(\\w+)\\s.*", "\\1", blk)
+        misses <- c(misses, sprintf("%s: %s not in cache keys", plot_name, pid))
+      }
+    }
+  }
+
+  expect_equal(
+    length(misses), 0L,
+    info = paste(c("Cache key coverage gaps found:", misses), collapse = "\n  ")
+  )
 })

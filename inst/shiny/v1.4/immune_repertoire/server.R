@@ -32,10 +32,24 @@ has_scRepertoire <- function() {
           msg,
           ignore.case = TRUE
         )
+        # clonalSizeDistribution MLE fitting fails on gene/nt/aa clone calls
+        # (the distribution is too noisy for log-normal MLE); the error reads
+        # "initial parameter values are invalid" or "NA/NaN ... sigmau".
+        is_mle_failure <- grepl(
+          "initial parameter|NA/NaN.*sigmau|non-finite|optimization failed",
+          msg,
+          ignore.case = TRUE
+        )
         label <- if (is_empty_selection) {
           paste0(
             "No data to display for the current selection.\n",
             "Try a different Chain, Clone call, or Group by."
+          )
+        } else if (is_mle_failure) {
+          paste0(
+            "Clone size distribution fitting failed.\n",
+            "The strict clone definition is required for this plot.\n",
+            "No action needed — strict is already enforced."
           )
         } else {
           paste0("Could not render this plot:\n", msg)
