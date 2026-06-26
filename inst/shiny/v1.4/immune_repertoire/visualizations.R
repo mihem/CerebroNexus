@@ -540,7 +540,7 @@ ir_plot_clonal_diversity <- function(
   fills <- grDevices::hcl.colors(length(levels(output_df[[group_col]])), palette)
   names(fills) <- levels(output_df[[group_col]])
 
-  p <- ggplot2::ggplot(
+  ggplot2::ggplot(
     output_df,
     ggplot2::aes(
       x = .data[[x_axis]],
@@ -552,25 +552,15 @@ ir_plot_clonal_diversity <- function(
       outlier.alpha = 0,
       fill = "white",
       colour = "#666666"
-    )
-
-  # Jitter overlay shows the bootstrap replicates. When group.by and x.axis
-  # are the same column, every x-axis position has exactly one group — the
-  # jitter is just bootstrapping noise of a single group and adds visual
-  # clutter. Skip jitter in that case; the boxplot alone conveys the
-  # bootstrap distribution (median, IQR, range).
-  if (!identical(group_by, x_axis)) {
-    p <- p + ggplot2::geom_jitter(
+    ) +
+    ggplot2::geom_jitter(
       ggplot2::aes(fill = .data[[group_col]]),
       width = 0.18,
       size = 3,
       shape = 21,
       stroke = 0.25,
       colour = "black"
-    )
-  }
-
-  p +
+    ) +
     ggplot2::scale_fill_manual(values = fills, name = "Group") +
     ggplot2::labs(
       x = x_axis,
