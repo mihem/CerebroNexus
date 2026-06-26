@@ -525,6 +525,69 @@ ir_demo_data <- reactiveVal(NULL)
   )
 }
 
+## ---- BCR demo data (synthetic — scRepertoire has no built-in BCR) ---- ##
+## The Isotype and SHM Proxy tabs require BCR (IGH) data. We generate a
+## realistic synthetic dataset with two samples: Pre-vaccination (mostly
+## IgM/IgD, naive B cells) and Post-vaccination (class-switched to IgG/IgA).
+ir_bcr_demo_data <- reactiveVal(NULL)
+
+.get_bcr_demo_data <- function() {
+  if (!is.null(ir_bcr_demo_data())) {
+    return(ir_bcr_demo_data())
+  }
+  set.seed(42)
+  n <- 200L
+
+  make_ctgene <- function(iso) {
+    v <- sample(c("IGHV1-2", "IGHV1-18", "IGHV3-23", "IGHV3-30", "IGHV4-34"), 1L)
+    d <- sample(c("IGHD2-2", "IGHD3-10", "IGHD6-13"), 1L)
+    j <- sample(c("IGHJ4", "IGHJ5", "IGHJ6"), 1L)
+    paste(v, d, j, iso, sep = "_")
+  }
+
+  make_nt <- function() {
+    paste(sample(c("A", "T", "G", "C"), 300L, replace = TRUE), collapse = "")
+  }
+
+  make_bc <- function(i, prefix) {
+    paste0(prefix, "_BCR_", sprintf("%04d", i))
+  }
+
+  make_df <- function(prefix, iso_probs) {
+    isos <- sample(names(iso_probs), n, replace = TRUE, prob = iso_probs)
+    clones <- sample(1L:40L, n, replace = TRUE)
+    data.frame(
+      barcode    = vapply(seq_len(n), function(i) make_bc(i, prefix), ""),
+      CTgene     = vapply(isos, make_ctgene, ""),
+      CTnt       = vapply(seq_len(n), function(i) make_nt(), ""),
+      CTaa       = paste0(
+        "C", vapply(seq_len(n), function(i) {
+          paste(sample(
+            strsplit("ARNDCQEGHILKMFPSTWYV", "")[[1]],
+            15L, replace = TRUE
+          ), collapse = "")
+        }, "")
+      ),
+      CTstrict   = vapply(clones, function(c) sprintf("IGH_clone_%03d", c), ""),
+      sample     = prefix,
+      cloneSize  = sample(1L:8L, n, replace = TRUE),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  demo <- list(
+    "Pre-vaccination" = make_df("Pre-vaccination", c(
+      IGHM = 0.60, IGHD = 0.20, IGHG1 = 0.10, IGHG2 = 0.05, IGHA1 = 0.05
+    )),
+    "Post-vaccination" = make_df("Post-vaccination", c(
+      IGHM = 0.20, IGHD = 0.05, IGHG1 = 0.30, IGHG2 = 0.15,
+      IGHG3 = 0.10, IGHA1 = 0.15, IGHE = 0.05
+    ))
+  )
+  ir_bcr_demo_data(demo)
+  demo
+}
+
 ## ---- Example modal ---------------------------------------------------- ##
 observeEvent(input$ir_help_example_btn, {
   tab <- input$ir_tabs
@@ -561,8 +624,16 @@ observeEvent(input$ir_help_example_btn, {
 output$ir_demo_plot <- renderPlot({
   req_plot_space("ir_demo_plot")
   tab <- input$ir_tabs
-  demo <- .get_demo_data()
-  if (is.null(demo) || is.null(tab)) {
+  if (is.null(tab)) {
+    plot.new()
+    text(0.5, 0.5, "Demo data unavailable", cex = 1.2)
+    return()
+  }
+  # BCR-specific tabs use synthetic BCR data; all others use scRepertoire's
+  # built-in TCR demo.
+  is_bcr_tab <- tab %in% c("Isotype", "SHM Proxy")
+  demo <- if (is_bcr_tab) .get_bcr_demo_data() else .get_demo_data()
+  if (is.null(demo)) {
     plot.new()
     text(0.5, 0.5, "Demo data unavailable", cex = 1.2)
     return()
@@ -694,6 +765,8 @@ output$ir_demo_plot <- renderPlot({
           cloneCall = "gene",
           method = "ward.D2"
         ),
+        "Isotype" = bcr_isotype_plot(demo, group_col = "sample"),
+        "SHM Proxy" = bcr_shm_proxy_plot(demo, group_col = "sample"),
         {
           plot.new()
           text(0.5, 0.5, paste("No example available for:", tab), cex = 1.2)
