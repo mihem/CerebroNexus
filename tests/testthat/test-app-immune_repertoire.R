@@ -18,6 +18,14 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
   inst_dir <- testthat::test_path("../../inst")
 }
 
+# scRepertoire (GitHub-only, not in nix) is required for the immune repertoire
+# module to render any UI: the module guards every output with
+# req(has_scRepertoire()), so without the package the settings/plot controls
+# never reach the DOM and every shinytest2 assertion that looks for them fails.
+# Skip the whole file when scRepertoire is absent (e.g. the nix CI environment)
+# so CI stays green; the tests still run locally where scRepertoire is present.
+skip_if_not_installed("scRepertoire")
+
 test_that("immune_repertoire tab is present with example data (has TCR)", {
   local_app_support(inst_dir)
   app <- AppDriver$new(inst_dir, name = "ir_present", height = 950, width = 1619)
