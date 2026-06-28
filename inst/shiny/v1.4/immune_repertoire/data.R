@@ -140,6 +140,47 @@ ir_param <- function(id, default = NULL) {
   if (is.null(v)) default else v
 }
 
+## ---- Resolve the generic "Order groups" (order.by) value -------------- ##
+## Maps the ir_p_order_by control to scRepertoire's order.by argument: the
+## empty default becomes NULL (scRepertoire's own ordering), otherwise the
+## chosen value (e.g. "alphanumeric") is passed through.
+ir_order_by <- function() {
+  v <- input[["ir_p_order_by"]]
+  if (is.null(v) || !nzchar(v)) NULL else v
+}
+
+## ---- Parse the Homeostasis clone-size thresholds ---------------------- ##
+## clonalHomeostasis' cloneSize is a *named* numeric vector of upper bounds
+## (Rare < Small < ... < Hyperexpanded). The UI takes them as a comma-separated
+## list of 5 increasing numbers; this builds the named vector. Returns NULL on
+## anything malformed so scRepertoire falls back to its own default.
+IR_CLONE_SIZE_NAMES <- c(
+  "Rare",
+  "Small",
+  "Medium",
+  "Large",
+  "Hyperexpanded"
+)
+IR_CLONE_SIZE_DEFAULT <- setNames(
+  c(1e-04, 0.001, 0.01, 0.1, 1),
+  IR_CLONE_SIZE_NAMES
+)
+ir_clone_size <- function() {
+  v <- input[["ir_p_clone_size"]]
+  if (is.null(v) || !nzchar(v)) {
+    return(IR_CLONE_SIZE_DEFAULT)
+  }
+  nums <- suppressWarnings(as.numeric(trimws(strsplit(v, ",")[[1]])))
+  if (
+    length(nums) != length(IR_CLONE_SIZE_NAMES) ||
+      any(is.na(nums)) ||
+      is.unsorted(nums, strictly = TRUE)
+  ) {
+    return(IR_CLONE_SIZE_DEFAULT)
+  }
+  setNames(nums, IR_CLONE_SIZE_NAMES)
+}
+
 ## ---- Comparable groups for Scatter / Compare ------------------------- ##
 ## clonalScatter (x.axis/y.axis) and clonalCompare (samples) operate on the
 ## *names of the groups that group.by produces*. With group.by = None the

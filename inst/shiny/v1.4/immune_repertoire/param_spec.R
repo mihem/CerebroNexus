@@ -179,6 +179,15 @@ IR_PARAM_SPEC <- list(
     )
   ),
 
+  "Homeostasis" = list(
+    list(
+      id = "ir_p_clone_size",
+      label = "Clone size thresholds:",
+      type = "text",
+      value = "0.0001, 0.001, 0.01, 0.1, 1"
+    )
+  ),
+
   ## ---- scale-only plots -------------------------------------------------
   "Abundance" = list(
     list(
@@ -429,7 +438,7 @@ IR_DISPLAY_BASE <- list(
   list(
     id = "ir_d_base_size",
     label = "Font size:",
-    type = "numeric",
+    type = "slider",
     value = 12,
     min = 6,
     max = 30,
@@ -447,7 +456,7 @@ IR_DISPLAY_SCATTER <- list(
   list(
     id = "ir_d_point_size",
     label = "Point size:",
-    type = "numeric",
+    type = "slider",
     value = 1,
     min = 0.1,
     max = 6,
@@ -456,7 +465,7 @@ IR_DISPLAY_SCATTER <- list(
   list(
     id = "ir_d_alpha",
     label = "Point opacity:",
-    type = "numeric",
+    type = "slider",
     value = 0.8,
     min = 0.1,
     max = 1,
@@ -466,6 +475,38 @@ IR_DISPLAY_SCATTER <- list(
 
 ## Tabs whose plots are point clouds (scatter-type): get the scatter extras.
 IR_SCATTER_TABS <- c("Clonal UMAP", "Scatter", "Paired Scatter")
+
+## ---------------------------------------------------------------------------
+## order.by — a generic "Order groups" control, reused across every tab whose
+## scRepertoire function accepts order.by. Declared once here and appended to
+## the analysis params of the applicable tabs (see ir_param_panel). Default
+## (empty) keeps scRepertoire's own ordering; "alphanumeric" sorts the group
+## axis. Low-risk: NULL/"" maps to the API default, so nothing changes unless
+## the user opts in.
+## ---------------------------------------------------------------------------
+IR_ORDER_BY_PARAM <- list(
+  id = "ir_p_order_by",
+  label = "Order groups:",
+  type = "select",
+  choices = c("Default" = "", "Alphanumeric" = "alphanumeric"),
+  value = ""
+)
+
+## Tabs whose scRepertoire function accepts order.by.
+IR_ORDER_BY_TABS <- c(
+  "Abundance",
+  "Length",
+  "Diversity",
+  "Homeostasis",
+  "Compare",
+  "vizGenes",
+  "Gene usage",
+  "percentGenes",
+  "percentVJ",
+  "AA %",
+  "Entropy",
+  "Property"
+)
 
 ## Assemble the display params applicable to a given tab.
 ir_display_params_for <- function(tab) {
@@ -555,5 +596,11 @@ IR_PARAM_DESC <- list(
   ir_d_base_size = "Base font size for the plot's text (axis labels, legend, title).",
   ir_d_title = "A custom title shown above the plot. Leave blank for none.",
   ir_d_point_size = "Diameter of the scatter points.",
-  ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily."
+  ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily.",
+
+  ## ---- Homeostasis ----
+  ir_p_clone_size = "The upper bounds (as a fraction of the repertoire) that bin clones into Rare / Small / Medium / Large / Hyperexpanded. Five increasing numbers, comma-separated. Leave as-is for scRepertoire's defaults.",
+
+  ## ---- Generic ----
+  ir_p_order_by = "The order the groups appear along the axis. Default keeps scRepertoire's own ordering; Alphanumeric sorts them by name."
 )

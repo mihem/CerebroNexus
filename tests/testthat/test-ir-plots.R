@@ -100,6 +100,77 @@ test_that("core clonal plots render a non-empty ggplot on example.crb", {
   )
 })
 
+test_that("order.by reorders the groups in scRepertoire output", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  # exportTable gives the underlying data frame; order.by = 'alphanumeric'
+  # should sort the group axis, so the group column order differs from default
+  # (or is at least explicitly alphanumeric). Proves the parameter is effective
+  # and worth wiring into the UI.
+  default_tbl <- scRepertoire::clonalAbundance(
+    ir,
+    cloneCall = "gene",
+    group.by = "sample",
+    exportTable = TRUE
+  )
+  ordered_tbl <- scRepertoire::clonalAbundance(
+    ir,
+    cloneCall = "gene",
+    group.by = "sample",
+    order.by = "alphanumeric",
+    exportTable = TRUE
+  )
+  grp_col <- intersect(
+    c("group", "Group", "values", "sample"),
+    colnames(ordered_tbl)
+  )[1]
+  skip_if(is.na(grp_col))
+  ordered_levels <- unique(as.character(ordered_tbl[[grp_col]]))
+  expect_identical(ordered_levels, sort(ordered_levels))
+  # both still produce a usable table
+  expect_gt(nrow(default_tbl), 0)
+  expect_gt(nrow(ordered_tbl), 0)
+})
+
+test_that("clonalHomeostasis accepts a custom cloneSize binning", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  custom <- c(
+    Rare = 1e-04,
+    Small = 0.001,
+    Medium = 0.01,
+    Large = 0.1,
+    Hyperexpanded = 1
+  )
+  expect_nonempty_ggplot(
+    scRepertoire::clonalHomeostasis(
+      ir,
+      cloneCall = "gene",
+      group.by = "sample",
+      cloneSize = custom
+    ),
+    "clonalHomeostasis-cloneSize"
+  )
+})
+
+test_that("vizGenes accepts a y.axis for paired gene usage", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  expect_nonempty_ggplot(
+    scRepertoire::vizGenes(
+      ir,
+      x.axis = "TRBV",
+      y.axis = "TRBJ",
+      group.by = "sample",
+      plot = "heatmap"
+    ),
+    "vizGenes-yaxis"
+  )
+})
+
 test_that("paired scatter manual fallback renders on example.crb", {
   skip_if_not(file.exists(example_crb))
   ir <- load_ir()

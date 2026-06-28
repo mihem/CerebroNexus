@@ -23,14 +23,19 @@ ir_scRepertoire_missing_ui <- function() {
   )
 }
 
-## ---- Container width guard: prevent "figure margins too large" during
-## ---- tab switches when the output container has zero width. req() silently
-## ---- halts rendering; Shiny re-triggers once the container has real space.
-req_plot_space <- function(output_id, min_width = 24L) {
-  w <- shiny::getDefaultReactiveDomain()$clientData[[
-    paste0("output_", output_id, "_width")
-  ]]
-  shiny::req(isTRUE(w >= min_width))
+## ---- Container size guard: prevent "figure margins too large" during
+## ---- tab switches when the output container has zero/tiny dimensions. req()
+## ---- silently halts rendering; Shiny re-triggers once the container has real
+## ---- space. Both width AND height must clear the floor: base-graphics and
+## ---- grid prints (e.g. clonalRarefaction via ggiNEXT) call plot.new(), which
+## ---- throws "figure margins too large" when either dimension leaves no room
+## ---- for the fixed margins (~1 inch). 72px ≈ 1 inch at the default device
+## ---- resolution, so require a comfortable margin above that.
+req_plot_space <- function(output_id, min_px = 80L) {
+  cd <- shiny::getDefaultReactiveDomain()$clientData
+  w <- cd[[paste0("output_", output_id, "_width")]]
+  h <- cd[[paste0("output_", output_id, "_height")]]
+  shiny::req(isTRUE(w >= min_px), isTRUE(h >= min_px))
 }
 
 ## ---- Apply generic display options to a ggplot ------------------------ ##
@@ -57,6 +62,30 @@ ir_apply_display <- function(p, params = NULL) {
   p
 }
 
+## ---- Muffle known-harmless upstream warnings -------------------------- ##
+## scRepertoire::clonalRarefaction delegates bootstrapping to iNEXT, whose
+## internals (iNEXT:::invChat -> matrix(apply(Abun.Mat, 2, ...))) emit
+## "data length [N] is not a sub-multiple or multiple of the number of rows"
+## whenever bootstrap resamples yield unequal qD vector lengths. This is benign
+## iNEXT noise we cannot fix at source, and it floods the console. Muffle ONLY
+## these specific patterns; every other warning still propagates so real issues
+## stay visible.
+IR_NOISE_WARNINGS <- paste(
+  "is not a sub-multiple or multiple of the number of rows",
+  "aes_string\\(\\) was deprecated",
+  sep = "|"
+)
+ir_quiet_inext <- function(expr) {
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      if (grepl(IR_NOISE_WARNINGS, conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
 safeRenderPlot <- function(expr, plot_name = "unknown") {
   tryCatch(
     {
@@ -75,6 +104,18 @@ safeRenderPlot <- function(expr, plot_name = "unknown") {
       # a sibling error handler in the same tryCatch.)
       if (inherits(e, "shiny.silent.error")) {
         stop(e)
+      }
+      # "figure margins too large" / "plot region too large" come from base
+      # graphics plot.new() when Shiny opens a near-zero PNG device — which
+      # happens for a plotOutput on a hidden/not-yet-laid-out tab (the browser
+      # reports a CSS height to clientData that does not match the tiny device
+      # Shiny actually opens, so the upstream width/height guard can't catch
+      # it). This is a transient layout state, not a real failure: swallow it
+      # silently (Shiny shows its grey placeholder and re-renders once the
+      # container has real space) instead of dumping a scary stack trace to the
+      # console on every tab switch.
+      if (grepl("figure margins too large|plot region too large", e$message)) {
+        shiny::req(FALSE)
       }
       message("[IR ERROR] Plot '", plot_name, "' failed: ", e$message)
 
@@ -382,6 +423,8 @@ ir_bindCache <- function(x, ..., cache = "session") {
       input$ir_d_title,
       input$ir_d_point_size,
       input$ir_d_alpha,
+      input$ir_p_order_by,
+      input$ir_p_clone_size,
       data_to_load$path,
       cache = cache
     )
@@ -429,6 +472,13 @@ source(
   paste0(
     Cerebro.options[["cerebro_root"]],
     "/shiny/v1.4/immune_repertoire/paired_scatter_helpers.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/length_helpers.R"
   ),
   local = TRUE
 )

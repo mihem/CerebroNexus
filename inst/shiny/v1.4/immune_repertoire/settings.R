@@ -193,6 +193,27 @@ ir_flow_controls <- function(controls) {
   do.call(tagList, rows)
 }
 
+## ---- Helper: lay controls out side-by-side, wrapping only when needed -- ##
+## For the wide right-hand visualization area (not the narrow left column):
+## controls sit in one row and share the width, wrapping to the next line only
+## when they no longer fit. Each item has a sensible minimum width.
+ir_flow_controls_inline <- function(controls, min_width = "160px") {
+  controls <- Filter(Negate(is.null), controls)
+  if (length(controls) == 0) {
+    return(NULL)
+  }
+  items <- lapply(controls, function(ctrl) {
+    div(
+      style = sprintf("flex: 1 1 %s; min-width: %s;", min_width, min_width),
+      ctrl
+    )
+  })
+  div(
+    style = "display: flex; flex-wrap: wrap; gap: 0 12px; align-items: flex-end;",
+    do.call(tagList, items)
+  )
+}
+
 ## ---- Scatter sample selectors (Scatter tab only) --------------------- ##
 output$ir_scatter_settings <- renderUI({
   available_samples <- ir_compare_groups()
@@ -297,6 +318,16 @@ output$ir_param_panel <- renderUI({
   }
   spec <- IR_PARAM_SPEC[[tab]]
 
+  # Append the generic "Order groups" control on tabs whose scRepertoire
+  # function accepts order.by (declared once in param_spec.R).
+  if (
+    exists("IR_ORDER_BY_TABS") &&
+      exists("IR_ORDER_BY_PARAM") &&
+      tab %in% IR_ORDER_BY_TABS
+  ) {
+    spec <- c(spec, list(IR_ORDER_BY_PARAM))
+  }
+
   groups <- tryCatch(getGroups(), error = function(e) character(0))
   genes <- ir_gene_families()
 
@@ -379,6 +410,16 @@ output$ir_display_panel <- renderUI({
   }
 
   controls <- lapply(spec, function(p) {
+    if (identical(p$type, "slider")) {
+      return(sliderInput(
+        p$id,
+        p$label,
+        min = p$min,
+        max = p$max,
+        step = p$step,
+        value = p$value
+      ))
+    }
     if (identical(p$type, "numeric")) {
       return(numericInput(
         p$id,

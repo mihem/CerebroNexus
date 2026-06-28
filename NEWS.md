@@ -19,6 +19,13 @@
   explaining, in plain language, exactly the controls shown on the current tab.
 - Clone call is no longer shown on the Clonal UMAP tab, where it only adds
   noise.
+- **More scRepertoire parameters wired up**: a generic "Order groups" control
+  (Default / Alphanumeric) now reaches every plot whose scRepertoire function
+  accepts `order.by`, and clonalHomeostasis gains a "Clone size thresholds"
+  control (`cloneSize`). Both previously had no UI and were never passed.
+- **Paired Scatter** now uses "Compare by" to choose where the X/Y candidates
+  come from (original samples, or a metadata column's levels), and no longer
+  exposes the redundant "Comparison units" control.
 
 # cerebroAppLite 1.7.3
 

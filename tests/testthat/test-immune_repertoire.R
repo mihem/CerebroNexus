@@ -436,3 +436,40 @@ test_that("ir_bindCache keys cover all per-plot ir_param() calls", {
     info = paste(c("Cache key coverage gaps found:", misses), collapse = "\n  ")
   )
 })
+
+test_that("renderers pass order.by to scRepertoire functions that support it", {
+  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
+  skip_if_not(file.exists(viz))
+  content <- paste(readLines(viz), collapse = "\n")
+  # order.by must reach the plotting calls, not just exist as an input.
+  expect_match(
+    content,
+    "order\\.by\\s*=",
+    info = "order.by not passed to any renderer"
+  )
+})
+
+test_that("clonalHomeostasis renderer passes a cloneSize binning", {
+  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
+  skip_if_not(file.exists(viz))
+  content <- paste(readLines(viz), collapse = "\n")
+  expect_match(
+    content,
+    "cloneSize\\s*=",
+    info = "cloneSize not passed to clonalHomeostasis"
+  )
+})
+
+test_that("vizGenes renderer passes a y.axis", {
+  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
+  skip_if_not(file.exists(viz))
+  content <- paste(readLines(viz), collapse = "\n")
+  expect_match(content, "y\\.axis\\s*=", info = "y.axis not passed to vizGenes")
+})
+
+test_that("order.by control is declared in param_spec", {
+  ps <- file.path(shiny_root, "immune_repertoire", "param_spec.R")
+  skip_if_not(file.exists(ps))
+  content <- paste(readLines(ps), collapse = "\n")
+  expect_match(content, "ir_p_order_by", info = "no order.by control declared")
+})
