@@ -487,6 +487,43 @@ IR_DISPLAY_SCATTER <- list(
   )
 )
 
+## Legend controls — applicable to every plot (each has a legend). Font size and
+## key/point size apply on both the ggplot and plotly paths; position also lets
+## the legend be hidden.
+IR_DISPLAY_LEGEND <- list(
+  list(
+    id = "ir_d_legend_size",
+    label = "Legend font size:",
+    type = "slider",
+    value = 12,
+    min = 6,
+    max = 30,
+    step = 1
+  ),
+  list(
+    id = "ir_d_legend_key",
+    label = "Legend point size:",
+    type = "slider",
+    value = 3,
+    min = 1,
+    max = 12,
+    step = 0.5
+  ),
+  list(
+    id = "ir_d_legend_pos",
+    label = "Legend position:",
+    type = "select",
+    choices = c(
+      "Right" = "right",
+      "Bottom" = "bottom",
+      "Top" = "top",
+      "Left" = "left",
+      "Hidden" = "none"
+    ),
+    value = "right"
+  )
+)
+
 ## Tabs whose plots are point clouds (scatter-type): get the scatter extras.
 IR_SCATTER_TABS <- c("Clonal UMAP", "Scatter", "Paired Scatter")
 
@@ -528,6 +565,8 @@ ir_display_params_for <- function(tab) {
   if (!is.null(tab) && tab %in% IR_SCATTER_TABS) {
     params <- c(params, IR_DISPLAY_SCATTER)
   }
+  # Every plot has a legend, so the legend controls apply to all tabs.
+  params <- c(params, IR_DISPLAY_LEGEND)
   params
 }
 
@@ -614,6 +653,9 @@ IR_PARAM_DESC <- list(
   ir_d_title = "A custom title shown above the plot. Leave blank for none.",
   ir_d_point_size = "Diameter of the scatter points.",
   ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily.",
+  ir_d_legend_size = "Font size of the legend text.",
+  ir_d_legend_key = "Size of the point/marker shown for each legend entry.",
+  ir_d_legend_pos = "Where to place the legend, or hide it.",
 
   ## ---- Homeostasis ----
   ir_p_clone_size = "The upper bounds (as a fraction of the repertoire) that bin clones into Rare / Small / Medium / Large / Hyperexpanded. Five increasing numbers, comma-separated. Leave as-is for scRepertoire's defaults.",

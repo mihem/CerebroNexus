@@ -59,6 +59,30 @@ ir_apply_display <- function(p, params = NULL) {
   if (is.character(title) && length(title) == 1 && nzchar(title)) {
     p <- p + ggplot2::labs(title = title)
   }
+  # Legend: font size, key/point size and position (or hidden).
+  legend_size <- suppressWarnings(as.numeric(params[["ir_d_legend_size"]]))
+  if (length(legend_size) == 1 && !is.na(legend_size) && legend_size > 0) {
+    p <- p +
+      ggplot2::theme(legend.text = ggplot2::element_text(size = legend_size))
+  }
+  legend_key <- suppressWarnings(as.numeric(params[["ir_d_legend_key"]]))
+  if (length(legend_key) == 1 && !is.na(legend_key) && legend_key > 0) {
+    p <- p +
+      ggplot2::guides(
+        colour = ggplot2::guide_legend(
+          override.aes = list(size = legend_key)
+        ),
+        fill = ggplot2::guide_legend(
+          override.aes = list(size = legend_key)
+        )
+      )
+  }
+  legend_pos <- params[["ir_d_legend_pos"]]
+  if (
+    is.character(legend_pos) && length(legend_pos) == 1 && nzchar(legend_pos)
+  ) {
+    p <- p + ggplot2::theme(legend.position = legend_pos)
+  }
   p
 }
 
@@ -410,6 +434,9 @@ ir_bindCache <- function(x, ..., cache = "session") {
       ...,
       input$ir_d_base_size,
       input$ir_d_title,
+      input$ir_d_legend_size,
+      input$ir_d_legend_key,
+      input$ir_d_legend_pos,
       data_to_load$path,
       cache = cache
     )

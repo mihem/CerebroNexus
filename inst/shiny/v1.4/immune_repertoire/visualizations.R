@@ -1,8 +1,12 @@
 ## ---- Plot-panel height helpers ----------------------------------------- ##
 ## One place controls the height of every IR tab body, instead of repeating a
-## `height = 450` literal in each tabPanel. `IR_PLOT_HEIGHT` is the shared
-## default for the single-plot tabs.
-IR_PLOT_HEIGHT <- 450
+## `height = 450` literal in each tabPanel. `IR_PLOT_HEIGHT` fills the viewport
+## minus the fixed chrome above the plot (top bar, box title, tab strip, help
+## panel) and leaves a small gap at the bottom. Using a viewport-relative height
+## (rather than a flex `100%` chain) fills the screen while staying safe for both
+## plotly and static plotOutput — a percentage height on a flex item with no
+## resolved parent height collapses a static plot to zero.
+IR_PLOT_HEIGHT <- "calc(100vh - 250px)"
 
 ## Static single plot tab body. `plotly = TRUE` emits an interactive
 ## plotlyOutput (zoom/pan/hover) instead of a static plotOutput.
@@ -54,19 +58,19 @@ output$ir_visualizations_UI <- renderUI({
     ),
     tabPanel(
       "Abundance",
-      ir_fill_plot("ir_plot_clonalAbundance")
+      ir_fill_plot("ir_plot_clonalAbundance", plotly = TRUE)
     ),
     tabPanel(
       "Diversity",
-      ir_fill_wrap(uiOutput("ir_ui_clonalDiversity"))
+      ir_fill_plot("ir_plot_clonalDiversity")
     ),
     tabPanel(
       "Homeostasis",
-      ir_fill_plot("ir_plot_clonalHomeostasis")
+      ir_fill_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
     ),
     tabPanel(
       "Isotype",
-      ir_fill_plot("ir_plot_isotype")
+      ir_fill_plot("ir_plot_isotype", plotly = TRUE)
     ),
     # Hidden per review (kept available; renderer/help/param_spec retained).
     # tabPanel(
@@ -199,7 +203,20 @@ ir_render_ggplotly <- function(expr, plot_name) {
     return(ir_empty_plotly("This plot is not available for the current view."))
   }
   tryCatch(
-    plotly::toWebGL(plotly::ggplotly(p)),
+    {
+      # ggplotly() needs an open graphics device to measure text/layout. In the
+      # renderPlotly context Shiny has not opened one, so on macOS the default
+      # quartz device is requested with a zero size and errors with
+      # "invalid quartz() device size". Open a throwaway null PDF device (no
+      # platform device, no file) for the duration of the conversion.
+      grDevices::pdf(NULL)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      # No toWebGL() here: these are bar plots, which have no WebGL trace
+      # equivalent — converting them only emits "don't have a WebGL equivalent"
+      # and "'scattergl' object don't have 'hoveron'" warnings. WebGL is only
+      # worth it for the large point cloud in the Clonal UMAP.
+      plotly::ggplotly(p)
+    },
     error = function(e) {
       ir_empty_plotly(paste("Plot conversion error:", conditionMessage(e)))
     }
@@ -314,14 +331,42 @@ output$ir_plot_clonalUMAP <- plotly::renderPlotly({
           }
         }
         title <- dp[["ir_d_title"]]
+        legend_size <- suppressWarnings(as.numeric(dp[["ir_d_legend_size"]]))
+        if (
+          length(legend_size) != 1 || is.na(legend_size) || legend_size <= 0
+        ) {
+          legend_size <- 12
+        }
+        legend_pos <- dp[["ir_d_legend_pos"]]
+        if (!is.character(legend_pos) || length(legend_pos) != 1) {
+          legend_pos <- "right"
+        }
+        # Map the shared position choices onto plotly's legend orientation/anchor.
+        show_legend <- legend_pos != "none"
+        legend_cfg <- list(
+          itemsizing = "constant",
+          font = list(size = legend_size),
+          title = list(text = "Clonotype")
+        )
+        if (legend_pos == "bottom") {
+          legend_cfg <- c(
+            legend_cfg,
+            list(orientation = "h", x = 0, y = -0.15)
+          )
+        } else if (legend_pos == "top") {
+          legend_cfg <- c(
+            legend_cfg,
+            list(orientation = "h", x = 0, y = 1.1)
+          )
+        } else if (legend_pos == "left") {
+          legend_cfg <- c(legend_cfg, list(x = -0.2))
+        }
         plotly::layout(
           p,
           xaxis = list(title = "UMAP_1", zeroline = FALSE),
           yaxis = list(title = "UMAP_2", zeroline = FALSE),
-          legend = list(
-            itemsizing = "constant",
-            title = list(text = "Clonotype")
-          ),
+          showlegend = show_legend,
+          legend = legend_cfg,
           title = if (is.character(title) && nzchar(title)) title else NULL
         )
       }
@@ -337,8 +382,7 @@ output$ir_plot_clonalUMAP <- plotly::renderPlotly({
     input$ir_p_umap_projection,
     input$ir_p_umap_show_all,
     input$ir_d_point_size,
-    input$ir_d_alpha,
-    input$ir_d_title
+    input$ir_d_alpha
   )
 
 ## ---- BCR-specific renderers --------------------------------------------- ##
@@ -686,15 +730,6 @@ output$ir_plot_clonalCompare <- renderPlot({
     input$ir_p_compare_prop,
     input$ir_p_order_by
   )
-
-output$ir_ui_clonalDiversity <- renderUI({
-  # Bootstrap iterations now come from the function-specific param panel
-  # (ir_p_n_boots, see IR_PARAM_SPEC).
-  shinycssloaders::withSpinner(plotOutput(
-    "ir_plot_clonalDiversity",
-    height = 450
-  ))
-})
 
 ir_plot_clonal_diversity <- function(
   data,
