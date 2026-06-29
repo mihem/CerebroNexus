@@ -14,18 +14,14 @@ const expression_projection_layout_2D = {
     mirror: true,
     showline: true,
     zeroline: false,
-    range: [],
-    constrain: 'domain'
+    range: []
   },
   yaxis: {
     autorange: true,
     mirror: true,
     showline: true,
     zeroline: false,
-    range: [],
-    scaleanchor: 'x',
-    scaleratio: 1,
-    constrain: 'domain'
+    range: []
   },
   hoverlabel: {
     font: {
@@ -251,8 +247,7 @@ shinyjs.expressionProjectionUpdatePlot2DMultiPanel = function(params) {
       showline: true,
       zeroline: false,
       range: [],
-      anchor: x_anchor,
-      constrain: 'domain'
+      anchor: x_anchor
     }
     layout_here[y_axis] = {
       autorange: true,
@@ -260,10 +255,7 @@ shinyjs.expressionProjectionUpdatePlot2DMultiPanel = function(params) {
       showline: true,
       zeroline: false,
       range: [],
-      anchor: y_anchor,
-      scaleanchor: x_anchor,
-      scaleratio: 1,
-      constrain: 'domain'
+      anchor: y_anchor
     }
     if (params.data.reset_axes) {
       layout_here[x_axis]['autorange'] = true;

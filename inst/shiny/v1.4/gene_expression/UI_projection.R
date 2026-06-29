@@ -129,18 +129,10 @@ output[["expression_projection_UI"]] <- renderUI({
         ),
         tagList(
           shinycssloaders::withSpinner(
-            tags$div(
-              style = paste(
-                "width: 100%;",
-                "max-width: 85vh;",
-                "aspect-ratio: 1 / 1;",
-                "margin: 0 auto;"
-              ),
-              plotly::plotlyOutput(
-                "expression_projection",
-                width = "100%",
-                height = "100%"
-              )
+            plotly::plotlyOutput(
+              "expression_projection",
+              width = "auto",
+              height = "85vh"
             ),
             type = 8,
             hide.ui = FALSE

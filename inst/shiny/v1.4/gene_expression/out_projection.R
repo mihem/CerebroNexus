@@ -12,17 +12,13 @@ output[["expression_projection"]] <- plotly::renderPlotly({
         autorange = TRUE,
         mirror = TRUE,
         showline = TRUE,
-        zeroline = FALSE,
-        constrain = "domain"
+        zeroline = FALSE
       ),
       yaxis = list(
         autorange = TRUE,
         mirror = TRUE,
         showline = TRUE,
-        zeroline = FALSE,
-        scaleanchor = "x",
-        scaleratio = 1,
-        constrain = "domain"
+        zeroline = FALSE
       )
     )
 })

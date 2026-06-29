@@ -17,18 +17,14 @@ const overview_projection_layout_2D = {
     mirror: true,
     showline: true,
     zeroline: false,
-    range: [],
-    constrain: 'domain'
+    range: []
   },
   yaxis: {
     autorange: true,
     mirror: true,
     showline: true,
     zeroline: false,
-    range: [],
-    scaleanchor: 'x',
-    scaleratio: 1,
-    constrain: 'domain'
+    range: []
   },
   hoverlabel: {
     font: {
@@ -228,6 +224,7 @@ shinyjs.updatePlot2DCategorical = function(params) {
           size: 16
         },
         hoverinfo: 'skip',
+        showlegend: false,
         inherit: false
       }
     );
@@ -289,6 +286,7 @@ shinyjs.updatePlot3DCategorical = function(params) {
           size: 16
         },
         hoverinfo: 'skip',
+        showlegend: false,
         inherit: false
       }
     );
