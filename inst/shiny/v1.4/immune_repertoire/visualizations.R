@@ -1,3 +1,24 @@
+## ---- Plot-panel height helpers ----------------------------------------- ##
+## One place controls the height of every IR tab body, instead of repeating a
+## `height = 450` literal in each tabPanel. `IR_PLOT_HEIGHT` is the shared
+## default for the single-plot tabs.
+IR_PLOT_HEIGHT <- 450
+
+## Static single plot tab body.
+ir_fill_plot <- function(id, spinner = TRUE, height = IR_PLOT_HEIGHT) {
+  plot <- plotOutput(id, height = height)
+  if (spinner) {
+    plot <- shinycssloaders::withSpinner(plot)
+  }
+  plot
+}
+
+## Wrap an already-built output (e.g. a uiOutput whose server side computes a
+## facet-aware pixel height) — passed through unchanged for now.
+ir_fill_wrap <- function(output) {
+  output
+}
+
 ## ---- Visualizations UI ------------------------------------------------ ##
 output$ir_visualizations_UI <- renderUI({
   if (!has_scRepertoire()) {
@@ -19,46 +40,33 @@ output$ir_visualizations_UI <- renderUI({
       # Clonal expansion overlaid on the cell UMAP — the default landing tab,
       # so the first thing the user sees is where expanded clones sit.
       "Clonal UMAP",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalUMAP",
-        height = 500
-      ))
+      ir_fill_plot("ir_plot_clonalUMAP")
     ),
     tabPanel(
       "Abundance",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalAbundance",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalAbundance")
     ),
     tabPanel(
       "Diversity",
-      uiOutput("ir_ui_clonalDiversity")
+      ir_fill_wrap(uiOutput("ir_ui_clonalDiversity"))
     ),
     tabPanel(
       "Homeostasis",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalHomeostasis",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalHomeostasis")
     ),
     tabPanel(
       "Isotype",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_isotype",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_isotype")
     ),
     tabPanel(
       "SHM Proxy",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_shmProxy",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_shmProxy")
     ),
     tabPanel(
       "Paired Scatter",
-      shinycssloaders::withSpinner(uiOutput("ir_ui_pairedScatter"))
+      ir_fill_wrap(shinycssloaders::withSpinner(uiOutput(
+        "ir_ui_pairedScatter"
+      )))
     )
   )
 
@@ -66,43 +74,31 @@ output$ir_visualizations_UI <- renderUI({
   other_tabs <- list(
     tabPanel(
       "Length",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalLength",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalLength")
     ),
     tabPanel(
       "Proportion",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalProportion",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalProportion")
     ),
     tabPanel(
       "Quant",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalQuant",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalQuant")
     ),
-    tabPanel("Rarefaction", uiOutput("ir_ui_clonalRarefaction")),
-    tabPanel("Gene usage", uiOutput("ir_ui_percentGeneUsage")),
-    tabPanel("vizGenes", uiOutput("ir_ui_vizGenes")),
-    tabPanel("percentGenes", uiOutput("ir_ui_percentGenes")),
-    tabPanel("percentVJ", uiOutput("ir_ui_percentVJ")),
-    tabPanel("AA %", uiOutput("ir_ui_percentAA")),
+    tabPanel("Rarefaction", ir_fill_wrap(uiOutput("ir_ui_clonalRarefaction"))),
+    tabPanel("Gene usage", ir_fill_wrap(uiOutput("ir_ui_percentGeneUsage"))),
+    tabPanel("vizGenes", ir_fill_wrap(uiOutput("ir_ui_vizGenes"))),
+    tabPanel("percentGenes", ir_fill_wrap(uiOutput("ir_ui_percentGenes"))),
+    tabPanel("percentVJ", ir_fill_wrap(uiOutput("ir_ui_percentVJ"))),
+    tabPanel("AA %", ir_fill_wrap(uiOutput("ir_ui_percentAA"))),
     tabPanel(
       "Entropy",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_positionalEntropy",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_positionalEntropy")
     ),
-    tabPanel("Property", uiOutput("ir_ui_positionalProperty")),
+    tabPanel("Property", ir_fill_wrap(uiOutput("ir_ui_positionalProperty"))),
     tabPanel(
       # Top motifs now lives in the settings panel (IR_PARAM_SPEC "K-mer").
       "K-mer",
-      uiOutput("ir_ui_percentKmer")
+      ir_fill_wrap(uiOutput("ir_ui_percentKmer"))
     )
   )
 
@@ -118,31 +114,19 @@ output$ir_visualizations_UI <- renderUI({
             "below. Use 'Group by' to choose the grouping; the X/Y selectors",
             "then pick which two groups to compare."
           ),
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalScatter",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalScatter")
         ),
         tabPanel(
           "Compare",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalCompare",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalCompare")
         ),
         tabPanel(
           "Overlap",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalOverlap",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalOverlap")
         ),
         tabPanel(
           "SizeDist",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalSizeDistribution",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalSizeDistribution")
         )
       )
     )
@@ -257,6 +241,7 @@ output$ir_plot_clonalUMAP <- renderPlot({
             name = "Clonotype"
           ) +
           ggplot2::labs(x = "UMAP_1", y = "UMAP_2") +
+          ggplot2::coord_fixed() +
           ggplot2::theme_classic() +
           ggplot2::guides(
             colour = ggplot2::guide_legend(override.aes = list(size = 3))
