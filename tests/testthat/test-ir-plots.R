@@ -39,6 +39,33 @@ load_ir <- function() {
   })
 }
 
+split_ir_by <- function(ir, col) {
+  merged <- do.call(
+    rbind,
+    lapply(names(ir), function(nm) {
+      df <- ir[[nm]]
+      df$.orig_sample <- nm
+      df
+    })
+  )
+  keep <- col %in%
+    colnames(merged) &&
+    any(!is.na(merged[[col]]) & nzchar(as.character(merged[[col]])))
+  if (!keep) {
+    return(ir)
+  }
+  merged <- merged[
+    !is.na(merged[[col]]) & nzchar(as.character(merged[[col]])),
+    ,
+    drop = FALSE
+  ]
+  out <- split(merged, merged[[col]])
+  lapply(out, function(df) {
+    df$.orig_sample <- NULL
+    df
+  })
+}
+
 # A real, non-empty ggplot: is a ggplot and its first layer has rows.
 expect_nonempty_ggplot <- function(p, label) {
   expect_s3_class(p, "ggplot")
@@ -46,6 +73,97 @@ expect_nonempty_ggplot <- function(p, label) {
   n <- sum(vapply(built$data, nrow, integer(1)))
   expect_gt(n, 0)
 }
+
+# Source the (reactive-free) length helper so its pure plot builder is testable.
+length_helpers <- file.path(
+  local_inst,
+  "shiny/v1.4/immune_repertoire/length_helpers.R"
+)
+if (is.na(local_inst)) {
+  length_helpers <- system.file(
+    "shiny/v1.4/immune_repertoire/length_helpers.R",
+    package = "cerebroAppLite"
+  )
+}
+
+test_that("ir_length_facet_plot draws one panel per group", {
+  skip_if_not(file.exists(example_crb))
+  source(length_helpers, local = TRUE)
+  ir <- load_ir()
+
+  tbl <- scRepertoire::clonalLength(
+    ir,
+    cloneCall = "aa",
+    group.by = "sample",
+    exportTable = TRUE
+  )
+  n_groups <- length(unique(as.character(tbl$values)))
+  expect_gt(n_groups, 1)
+
+  p <- ir_length_facet_plot(tbl, scale = FALSE)
+  expect_nonempty_ggplot(p, "ir_length_facet_plot")
+
+  # One facet panel per group (the whole point: separate plots per sample).
+  built <- ggplot2::ggplot_build(p)
+  expect_equal(nrow(built$layout$layout), n_groups)
+})
+
+test_that("ir_length_facet_plot scale=TRUE yields within-group proportions", {
+  skip_if_not(file.exists(example_crb))
+  source(length_helpers, local = TRUE)
+  ir <- load_ir()
+
+  tbl <- scRepertoire::clonalLength(
+    ir,
+    cloneCall = "aa",
+    group.by = "sample",
+    exportTable = TRUE
+  )
+  p <- ir_length_facet_plot(tbl, scale = TRUE)
+  built <- ggplot2::ggplot_build(p)
+  # Proportions: every bar height is within [0, 1].
+  ys <- unlist(lapply(built$data, function(d) d$y[!is.na(d$y)]))
+  expect_true(all(ys >= 0 & ys <= 1))
+})
+
+test_that("ir_length_facet_plot preserves export table group order", {
+  source(length_helpers, local = TRUE)
+  tbl <- data.frame(
+    length = c(10, 11, 10, 12),
+    values = factor(
+      c("zeta", "zeta", "alpha", "alpha"),
+      levels = c("zeta", "alpha")
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  p <- ir_length_facet_plot(tbl, scale = FALSE)
+
+  expect_identical(levels(p$data$group), c("zeta", "alpha"))
+})
+
+test_that("ir_length_facet_plot can facet by the selected group column", {
+  source(length_helpers, local = TRUE)
+  tbl <- data.frame(
+    length = c(10, 11, 12, 13),
+    values = c("sample_1", "sample_1", "sample_2", "sample_2"),
+    cell_type = c("T cells", "Monocytes", "T cells", "Monocytes"),
+    stringsAsFactors = FALSE
+  )
+
+  p <- ir_length_facet_plot(
+    tbl,
+    scale = FALSE,
+    group_col = "cell_type",
+    group_levels = c("Monocytes", "T cells")
+  )
+
+  expect_identical(levels(p$data$group), c("Monocytes", "T cells"))
+  expect_identical(
+    as.character(ggplot2::ggplot_build(p)$layout$layout$group),
+    c("Monocytes", "T cells")
+  )
+})
 
 test_that("core clonal plots render a non-empty ggplot on example.crb", {
   skip_if_not(file.exists(example_crb))
@@ -70,6 +188,119 @@ test_that("core clonal plots render a non-empty ggplot on example.crb", {
   expect_nonempty_ggplot(
     scRepertoire::clonalProportion(ir, cloneCall = "gene", group.by = "sample"),
     "clonalProportion"
+  )
+})
+
+test_that("order.by reorders the groups in scRepertoire output", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  # exportTable gives the underlying data frame; order.by = 'alphanumeric'
+  # should sort the group axis, so the group column order differs from default
+  # (or is at least explicitly alphanumeric). Proves the parameter is effective
+  # and worth wiring into the UI.
+  default_tbl <- scRepertoire::clonalAbundance(
+    ir,
+    cloneCall = "gene",
+    group.by = "sample",
+    exportTable = TRUE
+  )
+  ordered_tbl <- scRepertoire::clonalAbundance(
+    ir,
+    cloneCall = "gene",
+    group.by = "sample",
+    order.by = "alphanumeric",
+    exportTable = TRUE
+  )
+  grp_col <- intersect(
+    c("group", "Group", "values", "sample"),
+    colnames(ordered_tbl)
+  )[1]
+  skip_if(is.na(grp_col))
+  ordered_levels <- unique(as.character(ordered_tbl[[grp_col]]))
+  expect_identical(ordered_levels, sort(ordered_levels))
+  # both still produce a usable table
+  expect_gt(nrow(default_tbl), 0)
+  expect_gt(nrow(ordered_tbl), 0)
+})
+
+test_that("clonalHomeostasis accepts a custom cloneSize binning", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  custom <- c(
+    Rare = 1e-04,
+    Small = 0.001,
+    Medium = 0.01,
+    Large = 0.1,
+    Hyperexpanded = 1
+  )
+  expect_nonempty_ggplot(
+    scRepertoire::clonalHomeostasis(
+      ir,
+      cloneCall = "gene",
+      group.by = "sample",
+      cloneSize = custom
+    ),
+    "clonalHomeostasis-cloneSize"
+  )
+})
+
+test_that("vizGenes accepts a y.axis for paired gene usage", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+
+  expect_nonempty_ggplot(
+    scRepertoire::vizGenes(
+      ir,
+      x.axis = "TRBV",
+      y.axis = "TRBJ",
+      group.by = "sample",
+      plot = "heatmap"
+    ),
+    "vizGenes-yaxis"
+  )
+})
+
+test_that("paired scatter manual fallback renders on example.crb", {
+  skip_if_not(file.exists(example_crb))
+  ir <- load_ir()
+  skip_if_not(length(ir) >= 2)
+
+  expect_nonempty_ggplot(
+    scRepertoire::clonalScatter(
+      ir,
+      cloneCall = "gene",
+      chain = "both",
+      x.axis = names(ir)[1],
+      y.axis = names(ir)[2],
+      dot.size = "total",
+      graph = "proportion",
+      exportTable = FALSE,
+      palette = "inferno"
+    ),
+    "pairedScatter"
+  )
+})
+
+test_that("paired scatter renders after splitting by a metadata category", {
+  skip_if_not(file.exists(example_crb))
+  ir <- split_ir_by(load_ir(), "cell_type")
+  skip_if_not(length(ir) >= 2)
+
+  expect_nonempty_ggplot(
+    scRepertoire::clonalScatter(
+      ir,
+      cloneCall = "gene",
+      chain = "both",
+      x.axis = names(ir)[1],
+      y.axis = names(ir)[2],
+      dot.size = "total",
+      graph = "proportion",
+      exportTable = FALSE,
+      palette = "inferno"
+    ),
+    "pairedScatterCellType"
   )
 })
 

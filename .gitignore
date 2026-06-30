@@ -12,3 +12,6 @@ docs
 tests/smoke/
 vignettes/expression_backend_benchmark*
 .playwright-mcp/
+
+# shinytest2 snapshot comparison artifacts
+tests/testthat/_snaps/**/*.new.png

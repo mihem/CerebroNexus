@@ -142,6 +142,10 @@ panel explaining the biological interpretation with example guidance.
 
 - **Abundance**: ranks clonotypes by cell count; steep drop-off indicates
   oligoclonal dominance
+- **Clonal UMAP**: overlays clone-expansion level
+  (Single/Small/Medium/Large/Hyperexpanded) on the cell projection, reusing the
+  dataset's UMAP/tSNE coordinates; a Receptor (TCR/BCR) and Projection selector
+  drive it
 - **Diversity**: Shannon entropy with bootstrap confidence intervals
 - **Homeostasis**: categorizes clonotypes into size classes from Rare to
   Hyperexpanded

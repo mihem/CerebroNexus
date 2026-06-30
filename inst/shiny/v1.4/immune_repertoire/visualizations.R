@@ -1,3 +1,38 @@
+## ---- Plot-panel height helpers ----------------------------------------- ##
+## One place controls the height of every IR tab body, instead of repeating a
+## `height = 450` literal in each tabPanel. `IR_PLOT_HEIGHT` fills the viewport
+## minus the fixed chrome above the plot (top bar, box title, tab strip, help
+## panel) and leaves a small gap at the bottom. Using a viewport-relative height
+## (rather than a flex `100%` chain) fills the screen while staying safe for both
+## plotly and static plotOutput — a percentage height on a flex item with no
+## resolved parent height collapses a static plot to zero.
+IR_PLOT_HEIGHT <- "calc(100vh - 250px)"
+
+## Static single plot tab body. `plotly = TRUE` emits an interactive
+## plotlyOutput (zoom/pan/hover) instead of a static plotOutput.
+ir_fill_plot <- function(
+  id,
+  spinner = TRUE,
+  height = IR_PLOT_HEIGHT,
+  plotly = FALSE
+) {
+  plot <- if (plotly) {
+    plotly::plotlyOutput(id, height = height)
+  } else {
+    plotOutput(id, height = height)
+  }
+  if (spinner) {
+    plot <- shinycssloaders::withSpinner(plot)
+  }
+  plot
+}
+
+## Wrap an already-built output (e.g. a uiOutput whose server side computes a
+## facet-aware pixel height) — passed through unchanged for now.
+ir_fill_wrap <- function(output) {
+  output
+}
+
 ## ---- Visualizations UI ------------------------------------------------ ##
 output$ir_visualizations_UI <- renderUI({
   if (!has_scRepertoire()) {
@@ -16,85 +51,72 @@ output$ir_visualizations_UI <- renderUI({
   ## which is moved in with the other multi-sample tabs below.
   priority_tabs <- list(
     tabPanel(
+      # Clonal expansion overlaid on the cell UMAP — the default landing tab,
+      # so the first thing the user sees is where expanded clones sit.
+      "Clonal UMAP",
+      ir_fill_plot("ir_plot_clonalUMAP", plotly = TRUE)
+    ),
+    tabPanel(
       "Abundance",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalAbundance",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalAbundance", plotly = TRUE)
     ),
     tabPanel(
       "Diversity",
-      uiOutput("ir_ui_clonalDiversity")
+      ir_fill_plot("ir_plot_clonalDiversity")
     ),
     tabPanel(
       "Homeostasis",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalHomeostasis",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
     ),
     tabPanel(
       "Isotype",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_isotype",
-        height = 450
-      ))
+      ir_fill_plot("ir_plot_isotype", plotly = TRUE)
     ),
-    tabPanel(
-      "SHM Proxy",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_shmProxy",
-        height = 450
-      ))
-    ),
+    # Hidden per review (kept available; renderer/help/param_spec retained).
+    # tabPanel(
+    #   "SHM Proxy",
+    #   ir_fill_plot("ir_plot_shmProxy")
+    # ),
     tabPanel(
       "Paired Scatter",
-      shinycssloaders::withSpinner(uiOutput("ir_ui_pairedScatter"))
+      ir_fill_wrap(shinycssloaders::withSpinner(uiOutput(
+        "ir_ui_pairedScatter"
+      )))
     )
   )
 
-  ## Remaining tabs (Abundance now leads in priority_tabs above)
+  ## Remaining tabs. Most are hidden per review to keep the tab strip focused
+  ## on the commonly used plots; their renderers, help, and param_spec entries
+  ## are retained so any of them can be re-enabled by uncommenting its tabPanel.
   other_tabs <- list(
-    tabPanel(
-      "Length",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalLength",
-        height = 450
-      ))
-    ),
-    tabPanel(
-      "Proportion",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalProportion",
-        height = 450
-      ))
-    ),
-    tabPanel(
-      "Quant",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_clonalQuant",
-        height = 450
-      ))
-    ),
-    tabPanel("Rarefaction", uiOutput("ir_ui_clonalRarefaction")),
-    tabPanel("Gene usage", uiOutput("ir_ui_percentGeneUsage")),
-    tabPanel("vizGenes", uiOutput("ir_ui_vizGenes")),
-    tabPanel("percentGenes", uiOutput("ir_ui_percentGenes")),
-    tabPanel("percentVJ", uiOutput("ir_ui_percentVJ")),
-    tabPanel("AA %", uiOutput("ir_ui_percentAA")),
-    tabPanel(
-      "Entropy",
-      shinycssloaders::withSpinner(plotOutput(
-        "ir_plot_positionalEntropy",
-        height = 450
-      ))
-    ),
-    tabPanel("Property", uiOutput("ir_ui_positionalProperty")),
-    tabPanel(
-      # Top motifs now lives in the settings panel (IR_PARAM_SPEC "K-mer").
-      "K-mer",
-      uiOutput("ir_ui_percentKmer")
-    )
+    # tabPanel(
+    #   "Length",
+    #   ir_fill_plot("ir_plot_clonalLength")
+    # ),
+    # tabPanel(
+    #   "Proportion",
+    #   ir_fill_plot("ir_plot_clonalProportion")
+    # ),
+    # tabPanel(
+    #   "Quant",
+    #   ir_fill_plot("ir_plot_clonalQuant")
+    # ),
+    # tabPanel("Rarefaction", ir_fill_wrap(uiOutput("ir_ui_clonalRarefaction"))),
+    # tabPanel("Gene usage", ir_fill_wrap(uiOutput("ir_ui_percentGeneUsage"))),
+    # tabPanel("vizGenes", ir_fill_wrap(uiOutput("ir_ui_vizGenes"))),
+    # tabPanel("percentGenes", ir_fill_wrap(uiOutput("ir_ui_percentGenes"))),
+    # tabPanel("percentVJ", ir_fill_wrap(uiOutput("ir_ui_percentVJ"))),
+    # tabPanel("AA %", ir_fill_wrap(uiOutput("ir_ui_percentAA"))),
+    # tabPanel(
+    #   "Entropy",
+    #   ir_fill_plot("ir_plot_positionalEntropy")
+    # ),
+    # tabPanel("Property", ir_fill_wrap(uiOutput("ir_ui_positionalProperty"))),
+    # tabPanel(
+    #   # Top motifs now lives in the settings panel (IR_PARAM_SPEC "K-mer").
+    #   "K-mer",
+    #   ir_fill_wrap(uiOutput("ir_ui_percentKmer"))
+    # )
   )
 
   ## Tabs requiring >= 2 samples
@@ -102,38 +124,26 @@ output$ir_visualizations_UI <- renderUI({
     other_tabs <- c(
       other_tabs,
       list(
-        tabPanel(
-          "Scatter",
-          helpText(
-            "Compares clonotype proportions between the two groups selected",
-            "below. Use 'Group by' to choose the grouping; the X/Y selectors",
-            "then pick which two groups to compare."
-          ),
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalScatter",
-            height = 450
-          ))
-        ),
+        # tabPanel(
+        #   "Scatter",
+        #   helpText(
+        #     "Compares clonotype proportions between the two groups selected",
+        #     "below. Use 'Group by' to choose the grouping; the X/Y selectors",
+        #     "then pick which two groups to compare."
+        #   ),
+        #   ir_fill_plot("ir_plot_clonalScatter")
+        # ),
         tabPanel(
           "Compare",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalCompare",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalCompare")
         ),
-        tabPanel(
-          "Overlap",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalOverlap",
-            height = 450
-          ))
-        ),
+        # tabPanel(
+        #   "Overlap",
+        #   ir_fill_plot("ir_plot_clonalOverlap")
+        # ),
         tabPanel(
           "SizeDist",
-          shinycssloaders::withSpinner(plotOutput(
-            "ir_plot_clonalSizeDistribution",
-            height = 450
-          ))
+          ir_fill_plot("ir_plot_clonalSizeDistribution")
         )
       )
     )
@@ -162,30 +172,233 @@ output$ir_visualizations_UI <- renderUI({
 ## Plot renderers
 ##------------------------------------------------------------------------##
 
+## ---- Clonal UMAP -------------------------------------------------------- ##
+## Overlays clone expansion level on the cell projection (UMAP/tSNE). Data is
+## built in data.R (ir_clonal_umap_data); here we draw the coloured scatter.
+## Point size / opacity come from the generic display options; font size and
+## title are applied by safeRenderPlot via ir_apply_display.
+## Expansion-level colours: turbo runs cool -> warm, so larger (more expanded)
+## clones read as warmer, which matches the ordering. Keys must match the
+## factor levels produced in data.R (IR_CLONE_LABELS).
+IR_EXPANSION_COLORS <- stats::setNames(
+  viridis::turbo(5, begin = 0.05, end = 0.95),
+  c(
+    "Single (0 < X <= 1)",
+    "Small (1 < X <= 5)",
+    "Medium (5 < X <= 20)",
+    "Large (20 < X <= 100)",
+    "Hyperexpanded (100 < X)"
+  )
+)
+
+## Render a scRepertoire ggplot as an interactive plotly figure. safeRenderPlot
+## still does the heavy lifting (display options, empty-state and error plots,
+## silent-error re-raise); we just convert its ggplot result with ggplotly and
+## fall back to a plotly message if conversion itself fails. Used by the simple
+## bar/point tabs; plots that ggplotly cannot represent well (alluvial, custom
+## facet/bootstrap renderers) keep renderPlot.
+ir_render_ggplotly <- function(expr, plot_name) {
+  p <- safeRenderPlot(expr, plot_name)
+  if (!inherits(p, "ggplot")) {
+    return(ir_empty_plotly("This plot is not available for the current view."))
+  }
+  tryCatch(
+    {
+      # ggplotly() needs an open graphics device to measure text/layout. In the
+      # renderPlotly context Shiny has not opened one, so on macOS the default
+      # quartz device is requested with a zero size and errors with
+      # "invalid quartz() device size". Open a throwaway null PDF device (no
+      # platform device, no file) for the duration of the conversion.
+      grDevices::pdf(NULL)
+      on.exit(grDevices::dev.off(), add = TRUE)
+      # No toWebGL() here: these are bar plots, which have no WebGL trace
+      # equivalent — converting them only emits "don't have a WebGL equivalent"
+      # and "'scattergl' object don't have 'hoveron'" warnings. WebGL is only
+      # worth it for the large point cloud in the Clonal UMAP.
+      plotly::ggplotly(p)
+    },
+    error = function(e) {
+      ir_empty_plotly(paste("Plot conversion error:", conditionMessage(e)))
+    }
+  )
+}
+
+## Empty-state plotly figure with a centred message (used when there is nothing
+## to draw), so the tab still shows an interactive canvas like the other UMAPs.
+ir_empty_plotly <- function(msg) {
+  plotly::plotly_empty(type = "scatter", mode = "markers") %>%
+    plotly::layout(
+      annotations = list(
+        text = msg,
+        showarrow = FALSE,
+        font = list(size = 14, color = "#666666")
+      )
+    )
+}
+
+output$ir_plot_clonalUMAP <- plotly::renderPlotly({
+  req_plot_space("ir_plot_clonalUMAP")
+  receptor <- ir_param("ir_p_umap_receptor")
+  projection <- ir_param("ir_p_umap_projection")
+  clone_call <- "gene"
+  show_all <- isTRUE(ir_param("ir_p_umap_show_all", TRUE))
+  cells <- ir_umap_cells_to_show()
+  df <- ir_clonal_umap_data(
+    projection,
+    receptor,
+    clone_call,
+    show_all = show_all,
+    cells = cells
+  )
+
+  fig <- tryCatch(
+    {
+      if (is.null(df) || nrow(df) == 0) {
+        ir_empty_plotly(paste0(
+          "No clonal UMAP to display. Needs a cell projection and ",
+          if (is.null(receptor)) "TCR/BCR" else receptor,
+          " clonotypes whose barcodes match the cells."
+        ))
+      } else {
+        dp <- tryCatch(ir_display_params(), error = function(e) list())
+        point_size <- suppressWarnings(as.numeric(dp[["ir_d_point_size"]]))
+        if (length(point_size) != 1 || is.na(point_size)) {
+          point_size <- 1
+        }
+        alpha <- suppressWarnings(as.numeric(dp[["ir_d_alpha"]]))
+        if (length(alpha) != 1 || is.na(alpha)) {
+          alpha <- 0.8
+        }
+        # plotly marker sizes read larger than ggplot's; scale up so the points
+        # are comparable to the other UMAPs.
+        marker_size <- point_size * 5
+
+        # Grey background = cells without the selected receptor (expansion = NA);
+        # coloured foreground = receptor cells with an expansion level.
+        bg <- df[is.na(df$expansion), , drop = FALSE]
+        fg <- df[!is.na(df$expansion), , drop = FALSE]
+
+        p <- plotly::plot_ly(source = "ir_plot_clonalUMAP")
+        if (nrow(bg) > 0) {
+          p <- plotly::add_trace(
+            p,
+            x = bg$x,
+            y = bg$y,
+            type = "scattergl",
+            mode = "markers",
+            marker = list(
+              size = marker_size,
+              color = "#D9D9D9",
+              opacity = alpha
+            ),
+            name = "Other cells",
+            hoverinfo = "skip",
+            showlegend = TRUE
+          )
+        }
+        if (nrow(fg) > 0) {
+          # One trace per expansion level so the legend is clickable and each
+          # gets its turbo colour; keep the canonical level order.
+          for (lvl in names(IR_EXPANSION_COLORS)) {
+            sub <- fg[
+              !is.na(fg$expansion) & as.character(fg$expansion) == lvl,
+              ,
+              drop = FALSE
+            ]
+            if (nrow(sub) == 0) {
+              next
+            }
+            p <- plotly::add_trace(
+              p,
+              x = sub$x,
+              y = sub$y,
+              type = "scattergl",
+              mode = "markers",
+              marker = list(
+                size = marker_size,
+                color = IR_EXPANSION_COLORS[[lvl]],
+                opacity = alpha
+              ),
+              name = lvl,
+              text = sub$barcode,
+              hovertemplate = paste0(
+                "%{text}<br>",
+                lvl,
+                "<br>UMAP_1: %{x:.2f}<br>UMAP_2: %{y:.2f}<extra></extra>"
+              ),
+              showlegend = TRUE
+            )
+          }
+        }
+        title <- dp[["ir_d_title"]]
+        legend_size <- suppressWarnings(as.numeric(dp[["ir_d_legend_size"]]))
+        if (
+          length(legend_size) != 1 || is.na(legend_size) || legend_size <= 0
+        ) {
+          legend_size <- 12
+        }
+        legend_pos <- dp[["ir_d_legend_pos"]]
+        if (!is.character(legend_pos) || length(legend_pos) != 1) {
+          legend_pos <- "right"
+        }
+        # Map the shared position choices onto plotly's legend orientation/anchor.
+        show_legend <- legend_pos != "none"
+        legend_cfg <- list(
+          itemsizing = "constant",
+          font = list(size = legend_size),
+          title = list(text = "Clonotype")
+        )
+        if (legend_pos == "bottom") {
+          legend_cfg <- c(
+            legend_cfg,
+            list(orientation = "h", x = 0, y = -0.15)
+          )
+        } else if (legend_pos == "top") {
+          legend_cfg <- c(
+            legend_cfg,
+            list(orientation = "h", x = 0, y = 1.1)
+          )
+        } else if (legend_pos == "left") {
+          legend_cfg <- c(legend_cfg, list(x = -0.2))
+        }
+        plotly::layout(
+          p,
+          xaxis = list(title = "UMAP_1", zeroline = FALSE),
+          yaxis = list(title = "UMAP_2", zeroline = FALSE),
+          showlegend = show_legend,
+          legend = legend_cfg,
+          title = if (is.character(title) && nzchar(title)) title else NULL
+        )
+      }
+    },
+    error = function(e) {
+      ir_empty_plotly(paste("Clonal UMAP error:", conditionMessage(e)))
+    }
+  )
+  plotly::toWebGL(fig)
+}) %>%
+  ir_bindCache(
+    input$ir_p_umap_receptor,
+    input$ir_p_umap_projection,
+    input$ir_p_umap_show_all,
+    input$ir_d_point_size,
+    input$ir_d_alpha
+  )
+
 ## ---- BCR-specific renderers --------------------------------------------- ##
-output$ir_plot_isotype <- renderPlot({
+output$ir_plot_isotype <- plotly::renderPlotly({
   req_plot_space("ir_plot_isotype")
   data <- ir_data()
   req(!is.null(data))
   gb <- ir_params()$groupBy
   group_col <- if (is.null(gb)) "sample" else gb
-  safeRenderPlot(
-    {
-      p <- bcr_isotype_plot(data, group_col = group_col)
-      if (is.null(p)) {
-        plot.new()
-        text(
-          0.5,
-          0.5,
-          "No BCR isotype data available.\nRequires BCR data with CTgene column.",
-          cex = 0.9
-        )
-      } else {
-        print(p)
-      }
-    },
-    "isotype"
-  )
+  p <- bcr_isotype_plot(data, group_col = group_col)
+  if (is.null(p)) {
+    return(ir_empty_plotly(
+      "No BCR isotype data available. Requires BCR data with CTgene column."
+    ))
+  }
+  ir_render_ggplotly(p, "isotype")
 }) %>%
   ir_bindCache(
     input$ir_cloneCall,
@@ -211,7 +424,10 @@ output$ir_plot_shmProxy <- renderPlot({
           cex = 0.9
         )
       } else {
-        print(p)
+        # Return the ggplot (not print()) so safeRenderPlot can apply display
+        # options and renderPlot prints it once. Printing here too would render
+        # twice.
+        p
       }
     },
     "shmProxy"
@@ -225,7 +441,7 @@ output$ir_plot_shmProxy <- renderPlot({
 
 ## ---- Paired Scatter (generic) ------------------------------------------- ##
 ir_sample_meta <- reactive({
-  data <- ir_data()
+  data <- ir_data_annotated()
   if (is.null(data) || length(data) < 2) {
     return(NULL)
   }
@@ -233,75 +449,80 @@ ir_sample_meta <- reactive({
 })
 
 output$ir_ui_pairedScatter <- renderUI({
-  meta <- ir_sample_meta()
-  if (is.null(meta) || nrow(meta) < 2) {
+  groups <- ir_compare_groups()
+  if (length(groups) < 2) {
     return(div(
       class = "alert alert-info",
-      "Paired scatter requires >= 2 samples with shared metadata columns."
+      "Paired scatter requires at least two groups to compare. Use Compare by to choose a metadata column with multiple levels."
     ))
   }
-  meta_cols <- setdiff(colnames(meta), ".sample_name")
-  compare_candidates <- meta_cols[vapply(
-    meta_cols,
-    function(col) {
-      length(unique(meta[[col]])) == 2L
-    },
-    logical(1)
-  )]
-  facet_candidates <- meta_cols[vapply(
-    meta_cols,
-    function(col) {
-      length(unique(meta[[col]])) >= 2L
-    },
-    logical(1)
-  )]
-  if (length(compare_candidates) == 0L) {
-    return(div(
-      class = "alert alert-info",
-      "No metadata column with exactly 2 levels found for paired comparison.",
-      tags$br(),
-      "Available sample-level columns: ",
-      paste(meta_cols, collapse = ", ")
-    ))
+  meta <- ir_sample_meta()
+  choices <- ir_paired_scatter_choices(meta)
+  pair_choices <- c("Manual group comparison" = "", choices$compare_candidates)
+  pair_mode <- input$ir_pair_compare
+  if (is.null(pair_mode) || !(pair_mode %in% pair_choices)) {
+    pair_mode <- ""
+  }
+  x <- input$ir_pair_x_group
+  y <- input$ir_pair_y_group
+  if (is.null(x) || !(x %in% groups)) {
+    x <- groups[1]
+  }
+  if (is.null(y) || !(y %in% groups) || identical(y, x)) {
+    y <- groups[min(2L, length(groups))]
+  }
+
+  controls <- list(
+    selectInput(
+      "ir_pair_compare",
+      "Pair by:",
+      choices = pair_choices,
+      selected = pair_mode,
+      selectize = FALSE
+    )
+  )
+  if (identical(pair_mode, "")) {
+    controls <- c(
+      controls,
+      list(
+        selectInput(
+          "ir_pair_x_group",
+          "X group:",
+          choices = groups,
+          selected = x,
+          selectize = FALSE
+        ),
+        selectInput(
+          "ir_pair_y_group",
+          "Y group:",
+          choices = groups,
+          selected = y,
+          selectize = FALSE
+        )
+      )
+    )
+  } else {
+    facet_candidates <- choices$facet_candidates
+    default_facet <- ir_paired_scatter_default_facet(
+      meta,
+      pair_mode,
+      facet_candidates
+    )
+    controls <- c(
+      controls,
+      list(selectInput(
+        "ir_pair_facet",
+        "Facet by:",
+        choices = c("(none)" = "", facet_candidates),
+        selected = default_facet,
+        selectize = FALSE
+      ))
+    )
   }
   tagList(
-    fluidRow(
-      column(
-        6,
-        selectInput(
-          "ir_pair_compare",
-          "Compare (2-level column):",
-          choices = compare_candidates,
-          selected = compare_candidates[1],
-          selectize = FALSE
-        )
-      ),
-      column(6, {
-        default_facet <- ""
-        cmp1 <- compare_candidates[1]
-        for (fc in facet_candidates[facet_candidates != cmp1]) {
-          ok <- all(vapply(
-            unique(meta[[fc]]),
-            function(lv) {
-              subs <- meta[meta[[fc]] == lv, , drop = FALSE]
-              length(unique(subs[[cmp1]])) >= 2L
-            },
-            logical(1)
-          ))
-          if (ok) {
-            default_facet <- fc
-            break
-          }
-        }
-        selectInput(
-          "ir_pair_facet",
-          "Facet by:",
-          choices = c("(none)" = "", facet_candidates),
-          selected = default_facet,
-          selectize = FALSE
-        )
-      })
-    ),
+    # Side-by-side (Pair by / X group / Y group [/ Facet by]); wraps only when
+    # the row is too narrow. This panel sits in the wide right-hand column.
+    ir_flow_controls_inline(controls),
     shinycssloaders::withSpinner(
       uiOutput("ir_ui_pairedScatter_plot")
     )
@@ -309,10 +530,12 @@ output$ir_ui_pairedScatter <- renderUI({
 })
 
 output$ir_ui_pairedScatter_plot <- renderUI({
+  pair_mode <- input$ir_pair_compare
+  if (is.null(pair_mode) || !nzchar(pair_mode)) {
+    return(plotOutput("ir_plot_pairedScatter", height = "500px"))
+  }
   meta <- ir_sample_meta()
   req(!is.null(meta))
-  compare_col <- input$ir_pair_compare
-  req(!is.null(compare_col))
   facet_col <- input$ir_pair_facet
   if (is.null(facet_col) || facet_col == "") {
     h <- 500
@@ -328,79 +551,105 @@ output$ir_ui_pairedScatter_plot <- renderUI({
 output$ir_plot_pairedScatter <- renderPlot({
   req(has_scRepertoire())
   req_plot_space("ir_plot_pairedScatter")
-  data <- ir_data()
+  data <- ir_data_annotated()
   req(!is.null(data))
   meta <- ir_sample_meta()
-  req(!is.null(meta))
   pars <- ir_params()
-  compare_col <- input$ir_pair_compare
-  req(!is.null(compare_col))
+  groups <- ir_compare_groups()
+  req(length(groups) >= 2)
+  pair_mode <- input$ir_pair_compare
   facet_col <- input$ir_pair_facet
-
-  lvls <- sort(unique(meta[[compare_col]]))
-  req(length(lvls) == 2L)
 
   safeRenderPlot(
     {
-      if (is.null(facet_col) || facet_col == "") {
-        s_a <- meta$.sample_name[meta[[compare_col]] == lvls[1]][1]
-        s_b <- meta$.sample_name[meta[[compare_col]] == lvls[2]][1]
+      if (is.null(pair_mode) || !nzchar(pair_mode)) {
+        x <- input$ir_pair_x_group
+        y <- input$ir_pair_y_group
+        validate(
+          need(x %in% groups, "Select an X group."),
+          need(y %in% groups, "Select a Y group."),
+          need(x != y, "Select two different groups.")
+        )
         p <- scRepertoire::clonalScatter(
           data,
           cloneCall = pars$cloneCall,
           chain = pars$chain,
-          x.axis = s_a,
-          y.axis = s_b,
-          dot.size = "total",
-          graph = "proportion",
+          group.by = pars$groupBy,
+          x.axis = x,
+          y.axis = y,
+          dot.size = ir_param("ir_p_dot_size", "total"),
+          graph = ir_param("ir_p_graph", "proportion"),
           exportTable = FALSE,
           palette = "inferno"
         )
-        p <- p + ggplot2::ggtitle(paste(lvls[1], "vs", lvls[2]))
-        print(p)
+        p <- p + ggplot2::ggtitle(paste(x, "vs", y))
+        p
       } else {
-        facet_lvls <- unique(meta[[facet_col]])
-        panels <- list()
-        for (fl in facet_lvls) {
-          rows <- meta[meta[[facet_col]] == fl, , drop = FALSE]
-          s_a <- rows$.sample_name[rows[[compare_col]] == lvls[1]]
-          s_b <- rows$.sample_name[rows[[compare_col]] == lvls[2]]
-          if (length(s_a) == 0L || length(s_b) == 0L) {
-            next
-          }
-          tryCatch(
-            {
-              p <- scRepertoire::clonalScatter(
-                data,
-                cloneCall = pars$cloneCall,
-                chain = pars$chain,
-                x.axis = s_a[1],
-                y.axis = s_b[1],
-                dot.size = "total",
-                graph = "proportion",
-                exportTable = FALSE,
-                palette = "inferno"
-              )
-              p <- p +
-                ggplot2::ggtitle(paste0(fl, ": ", lvls[1], " vs ", lvls[2]))
-              panels[[length(panels) + 1L]] <- p
-            },
-            error = function(e) {
-              message("[IR] Paired scatter for ", fl, " failed: ", e$message)
+        req(!is.null(meta))
+        compare_col <- pair_mode
+        req(!is.null(compare_col))
+        lvls <- sort(unique(meta[[compare_col]]))
+        req(length(lvls) == 2L)
+        if (!is.null(facet_col) && nzchar(facet_col)) {
+          facet_lvls <- unique(meta[[facet_col]])
+          panels <- list()
+          for (fl in facet_lvls) {
+            rows <- meta[meta[[facet_col]] == fl, , drop = FALSE]
+            s_a <- rows$.sample_name[rows[[compare_col]] == lvls[1]]
+            s_b <- rows$.sample_name[rows[[compare_col]] == lvls[2]]
+            if (length(s_a) == 0L || length(s_b) == 0L) {
+              next
             }
-          )
-        }
-        if (length(panels) == 0L) {
-          plot.new()
-          text(
-            0.5,
-            0.5,
-            "No valid pairs found for the selected columns.",
-            cex = 0.9
-          )
+            tryCatch(
+              {
+                p <- scRepertoire::clonalScatter(
+                  data,
+                  cloneCall = pars$cloneCall,
+                  chain = pars$chain,
+                  x.axis = s_a[1],
+                  y.axis = s_b[1],
+                  dot.size = ir_param("ir_p_dot_size", "total"),
+                  graph = ir_param("ir_p_graph", "proportion"),
+                  exportTable = FALSE,
+                  palette = "inferno"
+                )
+                p <- p +
+                  ggplot2::ggtitle(paste0(fl, ": ", lvls[1], " vs ", lvls[2]))
+                panels[[length(panels) + 1L]] <- p
+              },
+              error = function(e) {
+                message("[IR] Paired scatter for ", fl, " failed: ", e$message)
+              }
+            )
+          }
+          if (length(panels) == 0L) {
+            plot.new()
+            text(
+              0.5,
+              0.5,
+              "No valid pairs found for the selected columns.",
+              cex = 0.9
+            )
+          } else {
+            ncol_p <- min(4L, length(panels))
+            patchwork::wrap_plots(panels, ncol = ncol_p)
+          }
         } else {
-          ncol_p <- min(4L, length(panels))
-          print(patchwork::wrap_plots(panels, ncol = ncol_p))
+          s_a <- meta$.sample_name[meta[[compare_col]] == lvls[1]][1]
+          s_b <- meta$.sample_name[meta[[compare_col]] == lvls[2]][1]
+          p <- scRepertoire::clonalScatter(
+            data,
+            cloneCall = pars$cloneCall,
+            chain = pars$chain,
+            x.axis = s_a,
+            y.axis = s_b,
+            dot.size = ir_param("ir_p_dot_size", "total"),
+            graph = ir_param("ir_p_graph", "proportion"),
+            exportTable = FALSE,
+            palette = "inferno"
+          )
+          p <- p + ggplot2::ggtitle(paste(lvls[1], "vs", lvls[2]))
+          p
         }
       }
     },
@@ -412,21 +661,26 @@ output$ir_plot_pairedScatter <- renderPlot({
     input$ir_chain,
     input$ir_groupBy,
     input$ir_pair_compare,
-    input$ir_pair_facet
+    input$ir_pair_facet,
+    input$ir_pair_x_group,
+    input$ir_pair_y_group,
+    input$ir_p_graph,
+    input$ir_p_dot_size
   )
 
-output$ir_plot_clonalAbundance <- renderPlot({
+output$ir_plot_clonalAbundance <- plotly::renderPlotly({
   req(has_scRepertoire())
   req_plot_space("ir_plot_clonalAbundance")
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
-  safeRenderPlot(
+  ir_render_ggplotly(
     scRepertoire::clonalAbundance(
       data,
       cloneCall = pars$cloneCall,
       chain = pars$chain,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       scale = isTRUE(ir_param("ir_p_scale", FALSE))
     ),
     "clonalAbundance"
@@ -436,7 +690,8 @@ output$ir_plot_clonalAbundance <- renderPlot({
     input$ir_cloneCall,
     input$ir_chain,
     input$ir_groupBy,
-    input$ir_p_scale
+    input$ir_p_scale,
+    input$ir_p_order_by
   )
 
 output$ir_plot_clonalCompare <- renderPlot({
@@ -454,6 +709,7 @@ output$ir_plot_clonalCompare <- renderPlot({
       cloneCall = pars$cloneCall,
       chain = pars$chain,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       samples = input$ir_compare_samples,
       top.clones = as.numeric(ir_param("ir_p_top_clones", 10)),
       graph = ir_param("ir_p_compare_graph", "alluvial"),
@@ -471,17 +727,9 @@ output$ir_plot_clonalCompare <- renderPlot({
     input$ir_compare_samples,
     input$ir_p_top_clones,
     input$ir_p_compare_graph,
-    input$ir_p_compare_prop
+    input$ir_p_compare_prop,
+    input$ir_p_order_by
   )
-
-output$ir_ui_clonalDiversity <- renderUI({
-  # Bootstrap iterations now come from the function-specific param panel
-  # (ir_p_n_boots, see IR_PARAM_SPEC).
-  shinycssloaders::withSpinner(plotOutput(
-    "ir_plot_clonalDiversity",
-    height = 450
-  ))
-})
 
 ir_plot_clonal_diversity <- function(
   data,
@@ -522,6 +770,10 @@ ir_plot_clonal_diversity <- function(
   )
   if (!is.null(x_axis)) {
     scr_args[["x.axis"]] <- x_axis
+  }
+  ob <- ir_order_by()
+  if (!is.null(ob)) {
+    scr_args[["order.by"]] <- ob
   }
   output_df <- do.call(scRepertoire::clonalDiversity, scr_args)
 
@@ -651,21 +903,24 @@ output$ir_plot_clonalDiversity <- renderPlot({
     input$ir_groupBy,
     input$ir_p_metric,
     input$ir_p_x_axis,
-    input$ir_p_n_boots
+    input$ir_p_n_boots,
+    input$ir_p_order_by
   )
 
-output$ir_plot_clonalHomeostasis <- renderPlot({
+output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
   req(has_scRepertoire())
   req_plot_space("ir_plot_clonalHomeostasis")
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
-  safeRenderPlot(
+  ir_render_ggplotly(
     scRepertoire::clonalHomeostasis(
       data,
       cloneCall = pars$cloneCall,
       chain = pars$chain,
+      cloneSize = ir_clone_size(),
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       exportTable = FALSE,
       palette = "inferno"
     ),
@@ -675,7 +930,9 @@ output$ir_plot_clonalHomeostasis <- renderPlot({
   ir_bindCache(
     input$ir_cloneCall,
     input$ir_chain,
-    input$ir_groupBy
+    input$ir_groupBy,
+    input$ir_p_clone_size,
+    input$ir_p_order_by
   )
 
 output$ir_plot_clonalLength <- renderPlot({
@@ -694,24 +951,56 @@ output$ir_plot_clonalLength <- renderPlot({
   } else {
     "aa"
   }
-  safeRenderPlot(
-    scRepertoire::clonalLength(
+  scale_on <- isTRUE(ir_param("ir_p_scale", FALSE))
+  if (is.null(pars$groupBy)) {
+    # No grouping (Group results by = None): a single combined panel with each
+    # loaded sample overlaid by colour, i.e. scRepertoire's native plot. Do NOT
+    # facet — the export table still carries the list-element (sample) names in
+    # `values`, but those are not a user-chosen grouping.
+    safeRenderPlot(
+      scRepertoire::clonalLength(
+        data,
+        cloneCall = clone_call,
+        chain = pars$chain,
+        group.by = NULL,
+        order.by = ir_order_by(),
+        scale = scale_on,
+        exportTable = FALSE,
+        palette = "inferno"
+      ),
+      "clonalLength"
+    )
+  } else {
+    # A grouping is selected: scRepertoire overlays the groups in one panel, so
+    # take its per-clonotype table and redraw with facet_wrap to give each
+    # selected group its own length-distribution panel on a shared axis.
+    order_by <- ir_order_by()
+    tbl <- scRepertoire::clonalLength(
       data,
       cloneCall = clone_call,
       chain = pars$chain,
       group.by = pars$groupBy,
-      scale = isTRUE(ir_param("ir_p_scale", FALSE)),
-      exportTable = FALSE,
+      order.by = order_by,
+      exportTable = TRUE,
       palette = "inferno"
-    ),
-    "clonalLength"
-  )
+    )
+    safeRenderPlot(
+      ir_length_facet_plot(
+        tbl,
+        scale = scale_on,
+        group_col = pars$groupBy,
+        group_levels = ir_length_group_levels(tbl, pars$groupBy, order_by)
+      ),
+      "clonalLength"
+    )
+  }
 }) %>%
   ir_bindCache(
     input$ir_cloneCall,
     input$ir_chain,
     input$ir_groupBy,
-    input$ir_p_scale
+    input$ir_p_scale,
+    input$ir_p_order_by
   )
 
 output$ir_plot_clonalOverlap <- renderPlot({
@@ -820,16 +1109,18 @@ output$ir_plot_clonalRarefaction <- renderPlot({
     n_boots <- 20
   }
   safeRenderPlot(
-    scRepertoire::clonalRarefaction(
-      data,
-      cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      plot.type = as.numeric(ir_param("ir_p_rare_plot_type", 1)),
-      hill.numbers = as.numeric(ir_param("ir_p_hill_numbers", 0)),
-      n.boots = n_boots,
-      exportTable = FALSE,
-      palette = "inferno"
+    ir_quiet_inext(
+      scRepertoire::clonalRarefaction(
+        data,
+        cloneCall = pars$cloneCall,
+        chain = pars$chain,
+        group.by = pars$groupBy,
+        plot.type = as.numeric(ir_param("ir_p_rare_plot_type", 1)),
+        hill.numbers = as.numeric(ir_param("ir_p_hill_numbers", 0)),
+        n.boots = n_boots,
+        exportTable = FALSE,
+        palette = "inferno"
+      )
     ),
     "clonalRarefaction"
   )
@@ -963,6 +1254,7 @@ output$ir_plot_percentGeneUsage <- renderPlot({
         if (is.null(g) || !nzchar(g)) default_gene_family() else g
       })(),
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       summary.fun = ir_param("ir_p_gu_summary", "percent"),
       plot.type = ir_param("ir_p_gu_plot_type", "heatmap"),
       exportTable = FALSE,
@@ -977,7 +1269,8 @@ output$ir_plot_percentGeneUsage <- renderPlot({
     input$ir_groupBy,
     input$ir_p_gu_genes,
     input$ir_p_gu_plot_type,
-    input$ir_p_gu_summary
+    input$ir_p_gu_summary,
+    input$ir_p_order_by
   )
 
 output$ir_ui_vizGenes <- renderUI({
@@ -1004,6 +1297,7 @@ output$ir_plot_vizGenes <- renderPlot({
       x.axis = vg_x,
       y.axis = NULL,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       plot = ir_param("ir_p_vg_plot", "heatmap"),
       summary.fun = ir_param("ir_p_vg_summary", "percent"),
       exportTable = FALSE,
@@ -1018,7 +1312,8 @@ output$ir_plot_vizGenes <- renderPlot({
     input$ir_groupBy,
     input$ir_p_vg_x_axis,
     input$ir_p_vg_plot,
-    input$ir_p_vg_summary
+    input$ir_p_vg_summary,
+    input$ir_p_order_by
   )
 
 output$ir_ui_percentGenes <- renderUI({
@@ -1041,6 +1336,7 @@ output$ir_plot_percentGenes <- renderPlot({
       chain = specific_chain(),
       gene = ir_param("ir_p_pg_gene", "Vgene"),
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       summary.fun = ir_param("ir_p_pg_summary", "percent"),
       exportTable = FALSE,
       palette = "inferno"
@@ -1053,7 +1349,8 @@ output$ir_plot_percentGenes <- renderPlot({
     input$ir_chain,
     input$ir_groupBy,
     input$ir_p_pg_gene,
-    input$ir_p_pg_summary
+    input$ir_p_pg_summary,
+    input$ir_p_order_by
   )
 
 output$ir_ui_percentVJ <- renderUI({
@@ -1075,6 +1372,7 @@ output$ir_plot_percentVJ <- renderPlot({
       data,
       chain = specific_chain(),
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       summary.fun = ir_param("ir_p_vj_summary", "percent"),
       exportTable = FALSE,
       palette = "inferno"
@@ -1086,7 +1384,8 @@ output$ir_plot_percentVJ <- renderPlot({
     input$ir_cloneCall,
     input$ir_chain,
     input$ir_groupBy,
-    input$ir_p_vj_summary
+    input$ir_p_vj_summary,
+    input$ir_p_order_by
   )
 
 output$ir_ui_percentAA <- renderUI({
@@ -1116,6 +1415,7 @@ output$ir_plot_percentAA <- renderPlot({
       data,
       chain = pars$chain,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       aa.length = aa_len,
       exportTable = FALSE,
       palette = "inferno"
@@ -1127,7 +1427,8 @@ output$ir_plot_percentAA <- renderPlot({
     input$ir_cloneCall,
     input$ir_chain,
     input$ir_groupBy,
-    input$ir_p_aa_length
+    input$ir_p_aa_length,
+    input$ir_p_order_by
   )
 
 output$ir_plot_positionalEntropy <- renderPlot({
@@ -1146,6 +1447,7 @@ output$ir_plot_positionalEntropy <- renderPlot({
       data,
       chain = pars$chain,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       aa.length = aa_len,
       method = ir_param("ir_p_pe_method", "norm.entropy"),
       exportTable = FALSE,
@@ -1159,7 +1461,8 @@ output$ir_plot_positionalEntropy <- renderPlot({
     input$ir_chain,
     input$ir_groupBy,
     input$ir_p_pe_aa_length,
-    input$ir_p_pe_method
+    input$ir_p_pe_method,
+    input$ir_p_order_by
   )
 
 ## ---- Positional Property: facet count per method ---------------------- ##
@@ -1235,6 +1538,7 @@ output$ir_plot_positionalProperty <- renderPlot({
       data,
       chain = pars$chain,
       group.by = pars$groupBy,
+      order.by = ir_order_by(),
       method = method,
       aa.length = as.numeric(ir_param("ir_p_pp_aa_length", 20)),
       exportTable = FALSE,
@@ -1248,7 +1552,8 @@ output$ir_plot_positionalProperty <- renderPlot({
     input$ir_chain,
     input$ir_groupBy,
     input$ir_property_method,
-    input$ir_p_pp_aa_length
+    input$ir_p_pp_aa_length,
+    input$ir_p_order_by
   )
 
 output$ir_ui_percentKmer <- renderUI({

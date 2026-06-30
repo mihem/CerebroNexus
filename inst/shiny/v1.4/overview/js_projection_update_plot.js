@@ -224,6 +224,7 @@ shinyjs.updatePlot2DCategorical = function(params) {
           size: 16
         },
         hoverinfo: 'skip',
+        showlegend: false,
         inherit: false
       }
     );
@@ -285,6 +286,7 @@ shinyjs.updatePlot3DCategorical = function(params) {
           size: 16
         },
         hoverinfo: 'skip',
+        showlegend: false,
         inherit: false
       }
     );

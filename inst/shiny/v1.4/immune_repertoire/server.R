@@ -23,20 +23,103 @@ ir_scRepertoire_missing_ui <- function() {
   )
 }
 
-## ---- Container width guard: prevent "figure margins too large" during
-## ---- tab switches when the output container has zero width. req() silently
-## ---- halts rendering; Shiny re-triggers once the container has real space.
-req_plot_space <- function(output_id, min_width = 24L) {
-  w <- shiny::getDefaultReactiveDomain()$clientData[[
-    paste0("output_", output_id, "_width")
-  ]]
-  shiny::req(isTRUE(w >= min_width))
+## ---- Container size guard: prevent "figure margins too large" during
+## ---- tab switches when the output container has zero/tiny dimensions. req()
+## ---- silently halts rendering; Shiny re-triggers once the container has real
+## ---- space. Both width AND height must clear the floor: base-graphics and
+## ---- grid prints (e.g. clonalRarefaction via ggiNEXT) call plot.new(), which
+## ---- throws "figure margins too large" when either dimension leaves no room
+## ---- for the fixed margins (~1 inch). 72px ≈ 1 inch at the default device
+## ---- resolution, so require a comfortable margin above that.
+req_plot_space <- function(output_id, min_px = 80L) {
+  cd <- shiny::getDefaultReactiveDomain()$clientData
+  w <- cd[[paste0("output_", output_id, "_width")]]
+  h <- cd[[paste0("output_", output_id, "_height")]]
+  shiny::req(isTRUE(w >= min_px), isTRUE(h >= min_px))
+}
+
+## ---- Apply generic display options to a ggplot ------------------------ ##
+## Reads the IR_DISPLAY_SPEC values (see ir_display_params()) and applies the
+## tab-agnostic ones — font size and title — to a ggplot. Point size / opacity
+## are scatter-specific and handled directly by the scatter renderers (so we
+## don't reach into ggplot layer internals here). Non-ggplot input (base-R
+## plots) is returned unchanged.
+ir_apply_display <- function(p, params = NULL) {
+  if (!inherits(p, "ggplot")) {
+    return(p)
+  }
+  if (is.null(params)) {
+    params <- tryCatch(ir_display_params(), error = function(e) list())
+  }
+  base_size <- suppressWarnings(as.numeric(params[["ir_d_base_size"]]))
+  if (length(base_size) == 1 && !is.na(base_size) && base_size > 0) {
+    p <- p + ggplot2::theme(text = ggplot2::element_text(size = base_size))
+  }
+  title <- params[["ir_d_title"]]
+  if (is.character(title) && length(title) == 1 && nzchar(title)) {
+    p <- p + ggplot2::labs(title = title)
+  }
+  # Legend: font size, key/point size and position (or hidden).
+  legend_size <- suppressWarnings(as.numeric(params[["ir_d_legend_size"]]))
+  if (length(legend_size) == 1 && !is.na(legend_size) && legend_size > 0) {
+    p <- p +
+      ggplot2::theme(legend.text = ggplot2::element_text(size = legend_size))
+  }
+  legend_key <- suppressWarnings(as.numeric(params[["ir_d_legend_key"]]))
+  if (length(legend_key) == 1 && !is.na(legend_key) && legend_key > 0) {
+    p <- p +
+      ggplot2::guides(
+        colour = ggplot2::guide_legend(
+          override.aes = list(size = legend_key)
+        ),
+        fill = ggplot2::guide_legend(
+          override.aes = list(size = legend_key)
+        )
+      )
+  }
+  legend_pos <- params[["ir_d_legend_pos"]]
+  if (
+    is.character(legend_pos) && length(legend_pos) == 1 && nzchar(legend_pos)
+  ) {
+    p <- p + ggplot2::theme(legend.position = legend_pos)
+  }
+  p
+}
+
+## ---- Muffle known-harmless upstream warnings -------------------------- ##
+## scRepertoire::clonalRarefaction delegates bootstrapping to iNEXT, whose
+## internals (iNEXT:::invChat -> matrix(apply(Abun.Mat, 2, ...))) emit
+## "data length [N] is not a sub-multiple or multiple of the number of rows"
+## whenever bootstrap resamples yield unequal qD vector lengths. This is benign
+## iNEXT noise we cannot fix at source, and it floods the console. Muffle ONLY
+## these specific patterns; every other warning still propagates so real issues
+## stay visible.
+IR_NOISE_WARNINGS <- paste(
+  "is not a sub-multiple or multiple of the number of rows",
+  "aes_string\\(\\) was deprecated",
+  sep = "|"
+)
+ir_quiet_inext <- function(expr) {
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      if (grepl(IR_NOISE_WARNINGS, conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
 }
 
 safeRenderPlot <- function(expr, plot_name = "unknown") {
   tryCatch(
     {
-      expr
+      # Evaluate the plot expression, then apply the generic display options
+      # (font size / title) to any ggplot it produced. This single hook covers
+      # every renderer that funnels through safeRenderPlot, so individual
+      # renderers don't each need to call ir_apply_display(). Non-ggplot
+      # results (base-R plots) pass through unchanged.
+      result <- force(expr)
+      ir_apply_display(result)
     },
     error = function(e) {
       # validate()/need()/req() raise a "shiny.silent.error"; re-raise it so
@@ -45,6 +128,18 @@ safeRenderPlot <- function(expr, plot_name = "unknown") {
       # a sibling error handler in the same tryCatch.)
       if (inherits(e, "shiny.silent.error")) {
         stop(e)
+      }
+      # "figure margins too large" / "plot region too large" come from base
+      # graphics plot.new() when Shiny opens a near-zero PNG device — which
+      # happens for a plotOutput on a hidden/not-yet-laid-out tab (the browser
+      # reports a CSS height to clientData that does not match the tiny device
+      # Shiny actually opens, so the upstream width/height guard can't catch
+      # it). This is a transient layout state, not a real failure: swallow it
+      # silently (Shiny shows its grey placeholder and re-renders once the
+      # container has real space) instead of dumping a scary stack trace to the
+      # console on every tab switch.
+      if (grepl("figure margins too large|plot region too large", e$message)) {
+        shiny::req(FALSE)
       }
       message("[IR ERROR] Plot '", plot_name, "' failed: ", e$message)
 
@@ -260,18 +355,8 @@ bcr_shm_proxy_plot <- function(
 
 ## ---- Helper: per-sample metadata (columns constant within each sample) -- ##
 sample_level_meta <- function(data) {
-  scr_cols <- c(
-    "barcode",
-    "CTgene",
-    "CTnt",
-    "CTaa",
-    "CTstrict",
-    "clonalProportion",
-    "clonalFrequency",
-    "cloneSize"
-  )
   shared_cols <- Reduce(intersect, lapply(data, colnames))
-  meta_cols <- setdiff(shared_cols, scr_cols)
+  meta_cols <- setdiff(shared_cols, ir_scr_cols)
   constant <- vapply(
     meta_cols,
     function(col) {
@@ -342,7 +427,19 @@ detect_chains <- function(data) {
 ## invalidates the cache (prevents stale plots from the previous dataset).
 ir_bindCache <- function(x, ..., cache = "session") {
   if (utils::packageVersion("shiny") >= "1.6.0") {
-    shiny::bindCache(x, ..., data_to_load$path, cache = cache)
+    # Keep only truly global plot state here. Plot-specific parameters belong
+    # in each renderer's own bindCache call.
+    shiny::bindCache(
+      x,
+      ...,
+      input$ir_d_base_size,
+      input$ir_d_title,
+      input$ir_d_legend_size,
+      input$ir_d_legend_key,
+      input$ir_d_legend_pos,
+      data_to_load$path,
+      cache = cache
+    )
   } else {
     x
   }
@@ -380,6 +477,20 @@ source(
   paste0(
     Cerebro.options[["cerebro_root"]],
     "/shiny/v1.4/immune_repertoire/help.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/paired_scatter_helpers.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/length_helpers.R"
   ),
   local = TRUE
 )

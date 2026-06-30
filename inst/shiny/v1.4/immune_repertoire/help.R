@@ -107,6 +107,29 @@ ir_tab_help <- list(
       sep = "\n"
     )
   ),
+  "Clonal UMAP" = list(
+    short = "Clonal expansion on the cell UMAP",
+    summary = "Overlays each cell's clone-expansion level onto the existing cell projection (UMAP/tSNE), so you can see where expanded T/B clones sit.",
+    detail = paste(
+      "This reuses the cell projection you already computed (the same UMAP as the other tabs) and colours each cell by how large its clonotype is.",
+      "",
+      "Clones are binned into expansion levels by the number of cells sharing them:",
+      "• Single (0 < X <= 1)      — the clonotype appears in one cell",
+      "• Small (1 < X <= 5)",
+      "• Medium (5 < X <= 20)",
+      "• Large (20 < X <= 100)",
+      "• Hyperexpanded (100 < X) — strongly expanded clones",
+      "",
+      "Controls:",
+      "• Receptor: choose TCR or BCR (only the types present in your data are offered).",
+      "• Projection: which dimensional reduction to plot on.",
+      "• Clone call: how clonotype identity is defined (gene/nt/aa/strict).",
+      "• Display options: point size and opacity (and font/title) for the scatter.",
+      "",
+      "What to look for: expanded (orange/gold) cells clustering in a region suggest a localized clonal response — e.g. an activated/effector population.",
+      sep = "\n"
+    )
+  ),
   Diversity = list(
     short = "Repertoire diversity",
     summary = "Quantifies clonotype richness and evenness using Shannon entropy. Higher values reflect broader, more balanced repertoires.",
@@ -457,19 +480,19 @@ ir_tab_help <- list(
     )
   ),
   `Paired Scatter` = list(
-    short = "Per-subject Pre vs Post clone scatter",
-    summary = "Faceted scatter comparing clonotype frequencies between Pre and Post timepoints for each subject. Off-diagonal clones expanded or contracted.",
+    short = "Paired or manual clone scatter",
+    summary = "Compares clonotype frequencies between two comparison units, such as samples, conditions, or cell types. Off-diagonal clones expanded or contracted.",
     detail = paste(
-      "Each panel shows one subject. Every dot is a clonotype; X = frequency in Pre, Y = frequency in Post.",
-      "This directly answers whether treatment changed the clonal structure.",
+      "Every dot is a clonotype; X and Y are the selected comparison units.",
+      "Use Compare by to decide what the selectable X/Y groups are. None uses the original repertoire samples; sample, condition, cell type, or treatment use that metadata column's levels.",
+      "If a 2-level sample-level metadata column is available, Pair by can compare those paired levels and optionally facet by another sample-level column.",
       "",
       "What to look for:",
       "\u2022 Dots on the diagonal \u2014 stable clones, unchanged by treatment.",
-      "\u2022 Dots above the diagonal \u2014 clones that expanded after treatment.",
-      "\u2022 Dots below the diagonal \u2014 clones that contracted after treatment.",
-      "\u2022 Dots along only one axis \u2014 clones unique to Pre or Post (appeared or disappeared).",
-      "\u2022 Compare patterns across subjects: consistent shifts suggest a shared treatment effect.",
-      "\u2022 Requires paired Pre/Post samples from the same subject_id in the data.",
+      "\u2022 Dots above the diagonal \u2014 clones enriched in the Y selection.",
+      "\u2022 Dots below the diagonal \u2014 clones enriched in the X selection.",
+      "\u2022 Dots along only one axis \u2014 clones unique to one side of the comparison.",
+      "\u2022 With paired Pre/Post data, facet by subject_id to compare subjects side by side.",
       sep = "\n"
     )
   )

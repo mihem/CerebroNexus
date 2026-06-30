@@ -1,3 +1,48 @@
+# cerebroAppLite 1.7.4
+
+## Immune repertoire
+
+- **Clonal UMAP**: new first tab overlaying clone-expansion level
+  (Single/Small/Medium/Large/Hyperexpanded) on the existing cell projection,
+  reusing the dataset's UMAP/tSNE coordinates. A Receptor selector (TCR/BCR,
+  only the classes present in the data) and a Projection selector drive it.
+  A "Show all cells" option (on by default) draws cells without the selected
+  receptor as a grey background, so expanded clones are shown in context.
+  Group filters subset which cells appear by any metadata column.
+- **Generic display options**: font size and title for every IR plot, plus
+  point size and opacity for the scatter-type plots (Clonal UMAP, Scatter),
+  in an "Additional parameters" box. Changing them re-renders the plot.
+- **Reworked layout**: the immune repertoire page now uses the same
+  left-parameters / right-visualization layout as the main projection tab, with
+  Main parameters, Additional parameters, and Group filters boxes on the left.
+- **Parameter help**: the info button on each parameter box opens a dialog
+  explaining, in plain language, exactly the controls shown on the current tab.
+- Clone call is no longer shown on the Clonal UMAP tab, where it only adds
+  noise.
+- **More scRepertoire parameters wired up**: a generic "Order groups" control
+  (Default / Alphanumeric) now reaches every plot whose scRepertoire function
+  accepts `order.by`, and clonalHomeostasis gains a "Clone size thresholds"
+  control (`cloneSize`). Both previously had no UI and were never passed.
+- **CDR3 length is now faceted, not overlaid.** The Length tab previously
+  passed `group.by` straight to `scRepertoire::clonalLength`, which draws every
+  group as coloured bars in a single panel. It now takes that function's export
+  table and redraws it with `facet_wrap`, so each group (sample, or the chosen
+  metadata column's levels) gets its own length-distribution panel on a shared
+  axis — "Group results by: sample" produces one plot per sample instead of a
+  single mixed plot.
+- **Grouping unified on a single control.** The separate "Comparison units"
+  selector has been removed from every tab: it re-split the repertoire list,
+  which only duplicated — with a narrower, sample-only column set — what
+  scRepertoire's own `group.by` already does (it rbinds the list and re-splits
+  on the chosen column). Comparison units are now defined solely by "Group
+  results by" ("Compare by" on Scatter / Compare / Paired Scatter): None
+  compares the loaded samples; a metadata column compares that column's levels.
+  This removes the case where setting one control had no visible effect because
+  the other already expressed the same split.
+- **Unified plot heights**: the immune repertoire tabs now share a single plot
+  height (`ir_fill_plot` / `ir_fill_wrap` helpers) instead of repeating a
+  per-tab pixel value.
+
 # cerebroAppLite 1.7.3
 
 ## Immune repertoire
@@ -83,7 +128,6 @@ previous releases and refreshes documentation for the current codebase.
 - Switched Nix environment to `fixed-date` to avoid constant rebuilding
 - simplified workflow by removing `dev` and `sync-dev`
 
-
 # cerebroAppLite 1.6.0
 
 ## Bug fixes
@@ -115,7 +159,6 @@ previous releases and refreshes documentation for the current codebase.
 
 - Added pkgdown site at <https://mihem.github.io/cerebroAppLite/> with light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to master
-
 
 # cerebroAppLite 1.5.3
 
