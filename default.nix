@@ -17,6 +17,7 @@
 #  > "DT",
 #  > "future.apply",
 #  > "ggplot2",
+#  > "ggraph",
 #  > "glue",
 #  > "GSVA",
 #  > "HDF5Array",
@@ -38,10 +39,12 @@
 #  > "shinyFiles",
 #  > "shinyjs",
 #  > "shinyWidgets",
+#  > "stringdist",
 #  > "tibble",
 #  > "tidyr",
 #  > "tidyselect",
-#  > "viridis"),
+#  > "viridis",
+#  > "visNetwork"),
 #  >      system_pkgs = c("chromium",
 #  > "pandoc"),
 #  > git_pkgs = list(list(package_name = "BPCells",
@@ -69,6 +72,7 @@ let
       formattable
       future_apply
       ggplot2
+      ggraph
       glue
       GSVA
       HDF5Array
@@ -95,12 +99,14 @@ let
       shinytest2
       shinyvalidate
       shinyWidgets
+      stringdist
       stringr
       testthat
       tibble
       tidyr
       tidyselect
-      viridis;
+      viridis
+      visNetwork;
   };
  
     BPCells-src = pkgs.fetchgit {
