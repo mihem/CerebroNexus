@@ -265,7 +265,15 @@ test_that("createShinyApp bundles a working app", {
     verbose = FALSE
   )
 
-  app <- AppDriver$new(app_dir, height = 950, width = 1619)
+  # Freshly bundled createShinyApp app loads demo.crb at startup, so it is the
+  # heaviest to initialise; the default 15s load_timeout is too tight on slow CI
+  # runners. Give it 30s (other tabs use pre-built inst apps and idle faster).
+  app <- AppDriver$new(
+    app_dir,
+    height = 950,
+    width = 1619,
+    load_timeout = 30000
+  )
   app$wait_for_idle(timeout = 20000)
 
   cells <- app$get_value(output = "load_data_number_of_cells")
