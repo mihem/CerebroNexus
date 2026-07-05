@@ -116,6 +116,9 @@ Cerebro_v1.3 <- R6::R6Class(
     #'   compatibility with older .crb files).
     tcr_data = list(),
 
+    #' @field spatial \code{list} that contains spatial data (coordinates and expression).
+    spatial = list(),
+
     ##------------------------------------------------------------------------##
     ## methods to interact with the object
     ##------------------------------------------------------------------------##
@@ -1098,6 +1101,48 @@ Cerebro_v1.3 <- R6::R6Class(
     },
 
     #' @description
+    #' Add spatial data.
+    #'
+    #' @param name Name of the spatial data entry (e.g. image name).
+    #' @param data \code{list} containing 'coordinates' (data.frame) and 'expression' (sparse matrix).
+    addSpatialData = function(name, data) {
+      if (
+        !is.list(data) || !all(c("coordinates", "expression") %in% names(data))
+      ) {
+        stop(
+          "Spatial data must be a list containing 'coordinates' and 'expression'."
+        )
+      }
+      self$spatial[[name]] <- data
+    },
+
+    #' @description
+    #' Retrieve spatial data.
+    #'
+    #' @param name Name of the spatial data entry.
+    #'
+    #' @return
+    #' \code{list} containing 'coordinates' and 'expression'.
+    getSpatialData = function(name) {
+      if (name %in% names(self$spatial) == FALSE) {
+        stop(
+          glue::glue('Spatial data `{name}` is not available.'),
+          call. = FALSE
+        )
+      }
+      return(self$spatial[[name]])
+    },
+
+    #' @description
+    #' Get list of available spatial data entries.
+    #'
+    #' @return
+    #' \code{vector} of spatial data entries that are available.
+    availableSpatial = function() {
+      return(names(self$spatial))
+    },
+
+    #' @description
     #' Add content to extra material field.
     #'
     #' @param category Name of category. At the moment, only \code{tables} and
@@ -1351,6 +1396,9 @@ Cerebro_v1.3 <- R6::R6Class(
           '\n',
           'Immune repertoire:',
           paste0(names(self$getImmuneRepertoire()), collapse = ', '),
+          '\n',
+          'Spatial data:',
+          paste0(self$availableSpatial(), collapse = ', '),
           '\n'
         )
       )

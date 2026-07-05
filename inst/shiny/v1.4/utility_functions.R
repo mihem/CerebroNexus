@@ -1390,3 +1390,31 @@ getImmuneRepertoire <- function() {
   }
   tryCatch(ds$getImmuneRepertoire(), error = function(e) list())
 }
+
+## Wrappers for spatial module.
+availableSpatial <- function() {
+  ds <- data_set()
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(character(0))
+  }
+  tryCatch(ds$availableSpatial(), error = function(e) character(0))
+}
+getSpatialData <- function(name) {
+  ds <- data_set()
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(NULL)
+  }
+  tryCatch(ds$getSpatialData(name), error = function(e) NULL)
+}
+serverSideGeneSelector <- function(session, input_id, extra_triggers = NULL) {
+  observe({
+    req(data_set())
+    genes <- sort(rownames(data_set()$expression))
+    updateSelectizeInput(
+      session,
+      input_id,
+      choices = genes,
+      server = TRUE
+    )
+  })
+}

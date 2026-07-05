@@ -16,6 +16,21 @@
   separate `demo_trajectory.crb`, so one demo shows TCR + BCR + trajectory. The
   trajectory is reproducible via `data-raw/build_trajectory_demo.R`.
 
+## Spatial transcriptomics (backend)
+
+- **Spatial data layer**: the `Cerebro_v1.3` class gains a `spatial` field with
+  `addSpatialData()`, `getSpatialData()`, and `availableSpatial()` accessors.
+- **Export support**: `exportFromSeurat()` now extracts spatial coordinates and
+  expression from Seurat v5 image slots (Visium / Xenium / FOV) via the internal
+  `.getSpatialData()` helper, storing them per image in the exported `.crb`.
+- **Utility wrappers**: added `availableSpatial()`, `getSpatialData()`, and
+  `serverSideGeneSelector()` in the Shiny utility layer.
+- **Demo dataset**: bundled a synthetic Xenium spatial demo
+  (`demo_spatial.crb`, 1,000 cells) as a fifth demo dataset.
+
+Note: the interactive Spatial tab (Shiny module) is not yet wired up; this
+release ports only the backend data layer.
+
 # cerebroAppLite 1.7.7
 
 ## Multiple data sets (multi-crb)

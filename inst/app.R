@@ -27,7 +27,8 @@ Cerebro.options <<- list(
   "crb_file_to_load" = c(
     "PBMC - Full (T+B)" = "extdata/v1.4/demo_full_tcr_bcr.crb",
     "PBMC - Healthy (T/NK)" = "extdata/v1.4/demo_healthy_t.crb",
-    "PBMC - B-cell rich" = "extdata/v1.4/demo_bcell_rich.crb"
+    "PBMC - B-cell rich" = "extdata/v1.4/demo_bcell_rich.crb",
+    "Xenium - Spatial" = "extdata/v1.4/demo_spatial.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
   "cerebro_root" = ".",
