@@ -15,16 +15,20 @@ library(dplyr)
 custom_welcome_message <- "Welcome to Cerebro! This is a custom welcome message. You can change it in the app options."
 Cerebro.options <<- list(
   "mode" = "closed",
-  ## This bundled app ships three distinct demo data sets so the sidebar
+  ## This bundled app ships four distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
-  ## the UMAP, the cell-type composition and the Immune Repertoire tab. They
+  ## the UMAP, the cell-type composition, and the conditional tabs (Immune
+  ## Repertoire on the three PBMC sets, Trajectory on the monocle2 set). They
   ## are embedded-backend .crb files, so no h5 matrix is configured. The
   ## richest data set (Full, T+B) is listed first and loaded by default
   ## (crb_pick_smallest_file = FALSE) so the app opens on its fullest state.
+  ## The Monocle2 set carries trajectory data, which surfaces the Trajectory
+  ## tab (dynamically inserted by insertConditionalTab).
   "crb_file_to_load" = c(
     "PBMC - Full (T+B)" = "extdata/v1.4/demo_full_tcr_bcr.crb",
     "PBMC - Healthy (T/NK)" = "extdata/v1.4/demo_healthy_t.crb",
-    "PBMC - B-cell rich" = "extdata/v1.4/demo_bcell_rich.crb"
+    "PBMC - B-cell rich" = "extdata/v1.4/demo_bcell_rich.crb",
+    "PBMC - Monocle2 trajectory" = "extdata/v1.4/demo_trajectory.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
   "cerebro_root" = ".",

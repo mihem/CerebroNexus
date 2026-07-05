@@ -559,6 +559,12 @@ server <- function(input, output, session) {
       getImmuneRepertoire()
     }
   )
+  insertConditionalTab(
+    "Trajectory",
+    "trajectory",
+    "route",
+    function() getMethodsForTrajectories()
+  )
 
   ## Cleanup snapshot artifacts that may have been left by test runs.
   snapshot_dir <- file.path(
@@ -590,6 +596,13 @@ server <- function(input, output, session) {
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/shiny/v1.4/immune_repertoire/server.R"
+    ),
+    local = TRUE
+  )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/trajectory/server.R"
     ),
     local = TRUE
   )
