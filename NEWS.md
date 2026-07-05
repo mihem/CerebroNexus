@@ -1,3 +1,21 @@
+# cerebroAppLite 1.8.0
+
+## Spatial transcriptomics (interactive tab + histology overlay)
+
+- **Spatial tab**: the interactive Spatial projection is now wired into the app.
+  It mounts conditionally (via `insertConditionalTab()`) whenever the loaded
+  dataset carries spatial data, with plotly-based coloring, group filters, and
+  box/lasso cell selection.
+- **Histology background overlay**: `createShinyApp()` gains `spatial_images`
+  plus per-dataset `spatial_images_flip_x`, `spatial_images_flip_y`,
+  `spatial_images_scale_x`, `spatial_images_scale_y`, and `spatial_plot_rotation`
+  parameters. Matched images are copied into the app bundle and shown behind the
+  cells, controlled by a **Background image** dropdown and an **Image opacity**
+  slider. Unmatched entries are ignored with a warning rather than an error.
+- **Bundled demo**: the "Xenium - Spatial" demo ships a synthetic (non-patient)
+  histology placeholder so the overlay is demonstrable out of the box.
+- **Documentation**: added the `vignette("spatial_analysis")` guide.
+
 # cerebroAppLite 1.7.8
 
 ## Trajectory tab

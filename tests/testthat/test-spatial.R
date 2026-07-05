@@ -158,3 +158,171 @@ test_that("Spatial tab is wired into the app UI and server", {
     perl = TRUE
   )
 })
+
+##----------------------------------------------------------------------------##
+## Spatial background image: createShinyApp production channel + demo wiring.
+##----------------------------------------------------------------------------##
+
+test_that("createShinyApp accepts the spatial_images parameters", {
+  # Guard the production API surface: all five spatial_images* args must be
+  # part of the formals so downstream users can pass histology backgrounds.
+  args <- names(formals(createShinyApp))
+  for (a in c(
+    "spatial_images",
+    "spatial_images_flip_x",
+    "spatial_images_flip_y",
+    "spatial_images_scale_x",
+    "spatial_images_scale_y",
+    "spatial_plot_rotation"
+  )) {
+    expect_true(a %in% args, info = a)
+  }
+})
+
+test_that("createShinyApp bundles a spatial image and writes the option", {
+  # End-to-end exercise of the new side-copy + option-write path: a matched
+  # spatial image must be copied into the bundle and its stored path rewritten
+  # to the portable data/<file> form inside cerebro_config.rds.
+  skip_if_not(file.exists(spatial_crb))
+  img <- tempfile(fileext = ".png")
+  # 1x1 transparent PNG is enough; the copy path does not decode the image.
+  writeBin(
+    as.raw(c(
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+      0x00,
+      0x00,
+      0x00,
+      0x0d,
+      0x49,
+      0x48,
+      0x44,
+      0x52,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x08,
+      0x06,
+      0x00,
+      0x00,
+      0x00,
+      0x1f,
+      0x15,
+      0xc4,
+      0x89,
+      0x00,
+      0x00,
+      0x00,
+      0x0a,
+      0x49,
+      0x44,
+      0x41,
+      0x54,
+      0x78,
+      0x9c,
+      0x63,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x05,
+      0x00,
+      0x01,
+      0x0d,
+      0x0a,
+      0x2d,
+      0xb4,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x49,
+      0x45,
+      0x4e,
+      0x44,
+      0xae,
+      0x42,
+      0x60,
+      0x82
+    )),
+    img
+  )
+  out_dir <- file.path(tempdir(), paste0("cerebro_spatial_", Sys.getpid()))
+  on.exit(unlink(out_dir, recursive = TRUE), add = TRUE)
+
+  suppressWarnings(suppressMessages(
+    createShinyApp(
+      cerebro_data = c("Xenium demo" = spatial_crb),
+      result_dir = out_dir,
+      spatial_images = c("Xenium demo" = img),
+      launch_browser = FALSE,
+      verbose = FALSE
+    )
+  ))
+
+  cfg_path <- file.path(out_dir, "cerebro_config.rds")
+  expect_true(file.exists(cfg_path))
+  cfg <- readRDS(cfg_path)
+  expect_true(!is.null(cfg[["spatial_images"]]))
+  # path rewritten to bundle-relative data/<file>
+  stored <- cfg[["spatial_images"]][["Xenium demo"]]
+  expect_match(stored, "^data/", perl = TRUE)
+  # and the image really landed in the bundle
+  expect_true(file.exists(file.path(out_dir, stored)))
+})
+
+test_that("createShinyApp drops unmatched spatial_images with a warning", {
+  # A spatial_images entry whose name matches no dataset must be ignored (not
+  # errored) so a typo never blocks app generation.
+  skip_if_not(file.exists(spatial_crb))
+  img <- tempfile(fileext = ".png")
+  writeBin(as.raw(c(0x89, 0x50, 0x4e, 0x47)), img)
+  out_dir <- file.path(
+    tempdir(),
+    paste0("cerebro_spatial_unmatched_", Sys.getpid())
+  )
+  on.exit(unlink(out_dir, recursive = TRUE), add = TRUE)
+
+  expect_warning(
+    suppressMessages(
+      createShinyApp(
+        cerebro_data = c("Xenium demo" = spatial_crb),
+        result_dir = out_dir,
+        spatial_images = c("no_such_dataset" = img),
+        launch_browser = FALSE,
+        verbose = FALSE
+      )
+    ),
+    "No matching names"
+  )
+  cfg <- readRDS(file.path(out_dir, "cerebro_config.rds"))
+  expect_null(cfg[["spatial_images"]])
+})
+
+test_that("bundled demo wires a spatial background image", {
+  # The bundled app must pair a (synthetic) histology background with the
+  # Xenium demo so the overlay feature is demonstrable out of the box.
+  app_src <- paste(
+    readLines(system.file("app.R", package = "cerebroAppLite")),
+    collapse = "\n"
+  )
+  expect_match(app_src, "spatial_images")
+  expect_match(app_src, "demo_spatial_histology\\.png")
+
+  img <- system.file(
+    "extdata/v1.4/demo_spatial_histology.png",
+    package = "cerebroAppLite"
+  )
+  expect_true(nzchar(img) && file.exists(img))
+})

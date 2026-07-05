@@ -88,6 +88,8 @@ compatibility with older .crb files).}
 
 \item{\code{tcr_data}}{\code{list} that contains TCR data (kept for backward
 compatibility with older .crb files).}
+
+\item{\code{spatial}}{\code{list} that contains spatial data (coordinates and expression).}
 }
 \if{html}{\out{</div>}}
 }
@@ -154,6 +156,9 @@ compatibility with older .crb files).}
 \item \href{#method-Cerebro_v1.3-addTCRData}{\code{Cerebro_v1.3$addTCRData()}}
 \item \href{#method-Cerebro_v1.3-getImmuneRepertoire}{\code{Cerebro_v1.3$getImmuneRepertoire()}}
 \item \href{#method-Cerebro_v1.3-addImmuneRepertoire}{\code{Cerebro_v1.3$addImmuneRepertoire()}}
+\item \href{#method-Cerebro_v1.3-addSpatialData}{\code{Cerebro_v1.3$addSpatialData()}}
+\item \href{#method-Cerebro_v1.3-getSpatialData}{\code{Cerebro_v1.3$getSpatialData()}}
+\item \href{#method-Cerebro_v1.3-availableSpatial}{\code{Cerebro_v1.3$availableSpatial()}}
 \item \href{#method-Cerebro_v1.3-addExtraMaterial}{\code{Cerebro_v1.3$addExtraMaterial()}}
 \item \href{#method-Cerebro_v1.3-addExtraTable}{\code{Cerebro_v1.3$addExtraTable()}}
 \item \href{#method-Cerebro_v1.3-addExtraPlot}{\code{Cerebro_v1.3$addExtraPlot()}}
@@ -1263,6 +1268,58 @@ Set immune repertoire data.
 scRepertoire columns.}
 }
 \if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Cerebro_v1.3-addSpatialData"></a>}}
+\if{latex}{\out{\hypertarget{method-Cerebro_v1.3-addSpatialData}{}}}
+\subsection{Method \code{addSpatialData()}}{
+Add spatial data.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Cerebro_v1.3$addSpatialData(name, data)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{name}}{Name of the spatial data entry (e.g. image name).}
+
+\item{\code{data}}{\code{list} containing 'coordinates' (data.frame) and 'expression' (sparse matrix).}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Cerebro_v1.3-getSpatialData"></a>}}
+\if{latex}{\out{\hypertarget{method-Cerebro_v1.3-getSpatialData}{}}}
+\subsection{Method \code{getSpatialData()}}{
+Retrieve spatial data.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Cerebro_v1.3$getSpatialData(name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{name}}{Name of the spatial data entry.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+\code{list} containing 'coordinates' and 'expression'.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Cerebro_v1.3-availableSpatial"></a>}}
+\if{latex}{\out{\hypertarget{method-Cerebro_v1.3-availableSpatial}{}}}
+\subsection{Method \code{availableSpatial()}}{
+Get list of available spatial data entries.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Cerebro_v1.3$availableSpatial()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+\code{vector} of spatial data entries that are available.
 }
 }
 \if{html}{\out{<hr>}}

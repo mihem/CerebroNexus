@@ -3,6 +3,13 @@
 ##----------------------------------------------------------------------------##
 output[["spatial_projection_main_parameters_UI"]] <- renderUI({
   req(data_set())
+  ## This output is evaluated even while the Spatial tab is hidden
+  ## (suspendWhenHidden = FALSE below). For a data set without spatial data
+  ## there is nothing to configure, so bail out early instead of building the
+  ## full control set (and, when spatial_images is set, the background-image
+  ## picker) on every app start — that extra startup work otherwise competes
+  ## with other tabs' first render.
+  req(length(availableSpatial()) > 0)
   ## determine which metadata columns to include based on exclude_trivial_metadata
   exclude_trivial <- FALSE
   if (

@@ -31,6 +31,12 @@ Cerebro.options <<- list(
     "Xenium - Spatial" = "extdata/v1.4/demo_spatial.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
+  ## Synthetic (NOT real) tissue-like placeholder that demonstrates the Spatial
+  ## tab's histology-background overlay. The name matches the crb_file_to_load
+  ## key so the Spatial tab pairs it with the Xenium demo dataset.
+  "spatial_images" = c(
+    "Xenium - Spatial" = "extdata/v1.4/demo_spatial_histology.png"
+  ),
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,
   "overview_default_point_size" = 1,

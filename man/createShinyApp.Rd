@@ -22,6 +22,12 @@ createShinyApp(
   welcome_message = "Welcome to Cerebro App!",
   point_size = list(overview_projection_point_size = NULL),
   variable_to_compare = NULL,
+  spatial_images = NULL,
+  spatial_images_flip_x = NULL,
+  spatial_images_flip_y = NULL,
+  spatial_images_scale_x = NULL,
+  spatial_images_scale_y = NULL,
+  spatial_plot_rotation = NULL,
   ...
 )
 }
@@ -62,6 +68,25 @@ the generated app.}
 (and optionally other keys) forwarded to \code{Cerebro.options}.}
 
 \item{variable_to_compare}{Forwarded to \code{Cerebro.options}.}
+
+\item{spatial_images}{Named list/vector of paths to spatial background images
+(e.g. tissue histology) shown behind the Spatial tab projection. Names must
+match \code{cerebro_data}. Images are copied into the app bundle.}
+
+\item{spatial_images_flip_x}{Named list/vector; whether to flip the spatial
+background image horizontally. Names must match \code{cerebro_data}.}
+
+\item{spatial_images_flip_y}{Named list/vector; whether to flip the spatial
+background image vertically. Names must match \code{cerebro_data}.}
+
+\item{spatial_images_scale_x}{Named list/vector; scaling factor for the X
+axis of the spatial background image. Names must match \code{cerebro_data}.}
+
+\item{spatial_images_scale_y}{Named list/vector; scaling factor for the Y
+axis of the spatial background image. Names must match \code{cerebro_data}.}
+
+\item{spatial_plot_rotation}{Named list/vector; initial rotation (degrees)
+applied to spatial cell coordinates. Names must match \code{cerebro_data}.}
 
 \item{...}{Currently unused; reserved for future arguments.}
 }

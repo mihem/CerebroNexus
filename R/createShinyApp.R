@@ -81,6 +81,19 @@ dedent <- function(string) {
 #' @param point_size Named list with \code{overview_projection_point_size}
 #'   (and optionally other keys) forwarded to \code{Cerebro.options}.
 #' @param variable_to_compare Forwarded to \code{Cerebro.options}.
+#' @param spatial_images Named list/vector of paths to spatial background images
+#'   (e.g. tissue histology) shown behind the Spatial tab projection. Names must
+#'   match \code{cerebro_data}. Images are copied into the app bundle.
+#' @param spatial_images_flip_x Named list/vector; whether to flip the spatial
+#'   background image horizontally. Names must match \code{cerebro_data}.
+#' @param spatial_images_flip_y Named list/vector; whether to flip the spatial
+#'   background image vertically. Names must match \code{cerebro_data}.
+#' @param spatial_images_scale_x Named list/vector; scaling factor for the X
+#'   axis of the spatial background image. Names must match \code{cerebro_data}.
+#' @param spatial_images_scale_y Named list/vector; scaling factor for the Y
+#'   axis of the spatial background image. Names must match \code{cerebro_data}.
+#' @param spatial_plot_rotation Named list/vector; initial rotation (degrees)
+#'   applied to spatial cell coordinates. Names must match \code{cerebro_data}.
 #' @param ... Currently unused; reserved for future arguments.
 #'
 #' @return Invisibly returns \code{result_dir}.
@@ -106,6 +119,12 @@ createShinyApp <- function(
     overview_projection_point_size = NULL
   ),
   variable_to_compare = NULL,
+  spatial_images = NULL,
+  spatial_images_flip_x = NULL,
+  spatial_images_flip_y = NULL,
+  spatial_images_scale_x = NULL,
+  spatial_images_scale_y = NULL,
+  spatial_plot_rotation = NULL,
   ...
 ) {
   # Validate inputs ----------------------------------------------------------##
@@ -166,6 +185,57 @@ createShinyApp <- function(
       variable_to_compare <- NULL
     }
   }
+
+  ## Spatial background images (and their per-dataset transforms) must be named
+  ## to match cerebro_data; drop with a warning if malformed rather than error,
+  ## so a bad image spec never blocks app generation.
+  validate_named_against_data <- function(x, arg_name) {
+    if (is.null(x)) {
+      return(NULL)
+    }
+    if (is.null(names(x)) || any(names(x) == "")) {
+      warning(
+        arg_name,
+        " must be a named list or vector. Ignoring.",
+        call. = FALSE
+      )
+      return(NULL)
+    }
+    if (length(intersect(names(x), names(cerebro_data))) == 0) {
+      warning(
+        "No matching names found between ",
+        arg_name,
+        " and cerebro_data. Ignoring.",
+        call. = FALSE
+      )
+      return(NULL)
+    }
+    x
+  }
+  spatial_images <- validate_named_against_data(
+    spatial_images,
+    "spatial_images"
+  )
+  spatial_images_flip_x <- validate_named_against_data(
+    spatial_images_flip_x,
+    "spatial_images_flip_x"
+  )
+  spatial_images_flip_y <- validate_named_against_data(
+    spatial_images_flip_y,
+    "spatial_images_flip_y"
+  )
+  spatial_images_scale_x <- validate_named_against_data(
+    spatial_images_scale_x,
+    "spatial_images_scale_x"
+  )
+  spatial_images_scale_y <- validate_named_against_data(
+    spatial_images_scale_y,
+    "spatial_images_scale_y"
+  )
+  spatial_plot_rotation <- validate_named_against_data(
+    spatial_plot_rotation,
+    "spatial_plot_rotation"
+  )
 
   if (!requireNamespace("cerebroAppLite", quietly = TRUE)) {
     stop(
@@ -254,6 +324,37 @@ createShinyApp <- function(
     }
   }
 
+  # Copy spatial images ------------------------------------------------------##
+  ## Side-copy each background image into data_dir and rewrite the stored path
+  ## to the bundle-relative "data/<file>" so the generated app is portable.
+  if (!is.null(spatial_images) && length(spatial_images) > 0) {
+    if (verbose) {
+      cat("Copying spatial images...\n")
+    }
+    for (nm in names(spatial_images)) {
+      img_paths <- spatial_images[[nm]]
+      copied_paths <- character(0)
+      for (img in img_paths) {
+        if (file.exists(img)) {
+          dest <- file.path(data_dir, basename(img))
+          if (!file.copy(img, dest, overwrite = TRUE)) {
+            warning("Failed to copy spatial image: ", img, call. = FALSE)
+            copied_paths <- c(copied_paths, img)
+          } else {
+            if (verbose) {
+              cat("  -", basename(img), "\n")
+            }
+            copied_paths <- c(copied_paths, file.path("data", basename(img)))
+          }
+        } else {
+          warning("Spatial image not found: ", img, call. = FALSE)
+          copied_paths <- c(copied_paths, img)
+        }
+      }
+      spatial_images[[nm]] <- copied_paths
+    }
+  }
+
   # Copy extdata -------------------------------------------------------------##
   if (verbose) {
     cat("Copying extdata files...\n")
@@ -299,6 +400,24 @@ createShinyApp <- function(
   }
   if (!is.null(variable_to_compare)) {
     cerebro_options[["variable_to_compare"]] <- variable_to_compare
+  }
+  if (!is.null(spatial_images)) {
+    cerebro_options[["spatial_images"]] <- spatial_images
+  }
+  if (!is.null(spatial_images_flip_x)) {
+    cerebro_options[["spatial_images_flip_x"]] <- spatial_images_flip_x
+  }
+  if (!is.null(spatial_images_flip_y)) {
+    cerebro_options[["spatial_images_flip_y"]] <- spatial_images_flip_y
+  }
+  if (!is.null(spatial_images_scale_x)) {
+    cerebro_options[["spatial_images_scale_x"]] <- spatial_images_scale_x
+  }
+  if (!is.null(spatial_images_scale_y)) {
+    cerebro_options[["spatial_images_scale_y"]] <- spatial_images_scale_y
+  }
+  if (!is.null(spatial_plot_rotation)) {
+    cerebro_options[["spatial_plot_rotation"]] <- spatial_plot_rotation
   }
 
   saveRDS(cerebro_options, file.path(result_dir, "cerebro_config.rds"))
