@@ -827,6 +827,16 @@ ir_build_sharing_plot <- function(data, chain, unit_col, group_by = NULL) {
     IR_SHARING_DISPLAY_LABELS[as.character(counts$sharing)],
     levels = IR_SHARING_DISPLAY_LABELS[levels(counts$sharing)]
   )
+  # Clean, human-readable hover text. ggplotly otherwise derives the tooltip
+  # from the raw aes names (display, Freq) and repeats `display` because both
+  # the bar fill and the geom_text label map it — so we supply an explicit
+  # `text` aes and pass tooltip = "text" to ggplotly (see visualizations.R).
+  counts$tooltip <- sprintf(
+    "%s\n%d clonotypes (%.1f%%)",
+    as.character(counts$display),
+    counts$Freq,
+    counts$pct
+  )
   same_col <- !is.null(group_by) &&
     nzchar(group_by) &&
     identical(group_by, unit_col)
@@ -850,18 +860,30 @@ ir_build_sharing_plot <- function(data, chain, unit_col, group_by = NULL) {
   if (ir_is_bcr_chain(chain)) {
     subtitle <- paste(subtitle, IR_BCR_SHM_CAVEAT, sep = "\n")
   }
+  counts$label <- sprintf("%d (%.1f%%)", counts$Freq, counts$pct)
+  # Lift the labels a fixed fraction of the tallest bar above each bar top, so
+  # they clear the bar edge and a zero-height (Freq == 0) bar's label is not
+  # clamped onto the axis. vjust = 0 anchors the label bottom at that y.
+  label_lift <- 0.04 * max(counts$Freq, 1)
   ggplot2::ggplot(
     counts,
     ggplot2::aes(x = display, y = Freq, fill = display)
   ) +
-    ggplot2::geom_col(width = 0.6) +
+    # `text` is not a ggplot aesthetic (ggplot warns and ignores it on static
+    # render); it exists purely to feed ggplotly's hover tooltip. Suppress the
+    # known, harmless "unknown aesthetics: text" warning so it doesn't noise up
+    # test output.
+    suppressWarnings(ggplot2::geom_col(
+      ggplot2::aes(text = tooltip),
+      width = 0.6
+    )) +
     ggplot2::geom_text(
-      ggplot2::aes(label = sprintf("%d (%.1f%%)", Freq, pct)),
-      vjust = -0.3,
+      ggplot2::aes(label = label, y = Freq + label_lift),
+      vjust = 0,
       size = 3.2
     ) +
     ggplot2::scale_y_continuous(
-      expand = ggplot2::expansion(mult = c(0, 0.15))
+      expand = ggplot2::expansion(mult = c(0, 0.2))
     ) +
     ggplot2::labs(
       x = NULL,

@@ -216,7 +216,7 @@ IR_EXPANSION_COLORS <- stats::setNames(
 ## fall back to a plotly message if conversion itself fails. Used by the simple
 ## bar/point tabs; plots that ggplotly cannot represent well (alluvial, custom
 ## facet/bootstrap renderers) keep renderPlot.
-ir_render_ggplotly <- function(expr, plot_name) {
+ir_render_ggplotly <- function(expr, plot_name, tooltip = NULL) {
   p <- safeRenderPlot(expr, plot_name)
   if (!inherits(p, "ggplot")) {
     return(ir_empty_plotly("This plot is not available for the current view."))
@@ -234,7 +234,15 @@ ir_render_ggplotly <- function(expr, plot_name) {
       # equivalent — converting them only emits "don't have a WebGL equivalent"
       # and "'scattergl' object don't have 'hoveron'" warnings. WebGL is only
       # worth it for the large point cloud in the Clonal UMAP.
-      plotly::ggplotly(p)
+      #
+      # `tooltip` restricts the hover to a specific aes (e.g. "text"): without
+      # it ggplotly derives the tooltip from every mapped aes, which repeats the
+      # fill variable and exposes raw column names (display, Freq).
+      if (is.null(tooltip)) {
+        plotly::ggplotly(p)
+      } else {
+        plotly::ggplotly(p, tooltip = tooltip)
+      }
     },
     error = function(e) {
       ir_empty_plotly(paste("Plot conversion error:", conditionMessage(e)))
@@ -1934,15 +1942,27 @@ output$ir_plot_cloneDefinition <- plotly::renderPlotly({
 output$ir_plot_cloneSharing <- plotly::renderPlotly({
   req(has_scRepertoire())
   req_plot_space("ir_plot_cloneSharing")
-  ir_render_ggplotly(
+  fig <- ir_render_ggplotly(
     ir_build_sharing_plot(
       ir_data_annotated(),
       specific_chain(),
       ir_param("ir_sharing_unit", "sample"),
       ir_params()$groupBy
     ),
-    "ir_plot_cloneSharing"
+    "ir_plot_cloneSharing",
+    tooltip = "text"
   )
+  # The on-bar count labels come through as their own text-mode traces; stop
+  # them showing a second (redundant) tooltip on hover, so only the bars react.
+  if (inherits(fig, "plotly") && !is.null(fig$x$data)) {
+    fig$x$data <- lapply(fig$x$data, function(tr) {
+      if (identical(tr$mode, "text")) {
+        tr$hoverinfo <- "skip"
+      }
+      tr
+    })
+  }
+  fig
 }) %>%
   ir_bindCache(
     input$ir_chain,
