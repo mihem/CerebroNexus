@@ -31,16 +31,21 @@ Cerebro.options <<- list(
     "Xenium - Spatial" = "extdata/v1.4/demo_spatial.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
-  ## Synthetic (NOT real) tissue-like placeholder that demonstrates the Spatial
-  ## tab's histology-background overlay. The name matches the crb_file_to_load
-  ## key so the Spatial tab pairs it with the Xenium demo dataset.
+  ## Synthetic (NOT real) H&E cerebral-cortex section (SVG) demonstrating the
+  ## Spatial tab's histology-background overlay. Its cortical layer bands are
+  ## aligned with the demo cells' cortical-depth coordinates, so cell types
+  ## stratify across the layers. The name matches the crb_file_to_load key so
+  ## the Spatial tab pairs it with the Xenium demo dataset.
   "spatial_images" = c(
-    "Xenium - Spatial" = "extdata/v1.4/demo_spatial_histology.png"
+    "Xenium - Spatial" = "extdata/v1.4/demo_spatial_histology.svg"
   ),
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,
   "overview_default_point_size" = 1,
   "gene_expression_default_point_size" = 2,
+  ## Larger default spatial points so cell-type layering reads clearly against
+  ## the histology background in the demo.
+  "point_size" = list("spatial_projection_point_size" = 5),
   "overview_default_point_opacity" = 0.3,
   "gene_expression_default_point_opacity" = 0.5,
   "overview_default_percentage_cells_to_show" = 100,

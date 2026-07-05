@@ -318,10 +318,10 @@ test_that("bundled demo wires a spatial background image", {
     collapse = "\n"
   )
   expect_match(app_src, "spatial_images")
-  expect_match(app_src, "demo_spatial_histology\\.png")
+  expect_match(app_src, "demo_spatial_histology\\.svg")
 
   img <- system.file(
-    "extdata/v1.4/demo_spatial_histology.png",
+    "extdata/v1.4/demo_spatial_histology.svg",
     package = "cerebroAppLite"
   )
   expect_true(nzchar(img) && file.exists(img))

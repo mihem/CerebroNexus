@@ -126,12 +126,14 @@ spatial_projection_update_plot <- function(input) {
         img_height = if (!is.null(img_dims)) img_dims[1] else 0
       )
 
-      # Encode image
+      # Encode image. SVG carries no raster header, so img_dims stays NULL and
+      # the JS side stretches it to the plot bounds via the CSS-background path.
       mime_type <- switch(
         ext,
         "jpg" = "image/jpeg",
         "jpeg" = "image/jpeg",
         "png" = "image/png",
+        "svg" = "image/svg+xml",
         "image/jpeg"
       )
 
