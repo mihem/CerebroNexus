@@ -363,8 +363,18 @@ output$ir_plot_clonalUMAP <- plotly::renderPlotly({
         }
         plotly::layout(
           p,
-          xaxis = list(title = "UMAP_1", zeroline = FALSE),
-          yaxis = list(title = "UMAP_2", zeroline = FALSE),
+          xaxis = list(
+            autorange = TRUE,
+            mirror = TRUE,
+            showline = TRUE,
+            zeroline = FALSE
+          ),
+          yaxis = list(
+            autorange = TRUE,
+            mirror = TRUE,
+            showline = TRUE,
+            zeroline = FALSE
+          ),
           showlegend = show_legend,
           legend = legend_cfg,
           title = if (is.character(title) && nzchar(title)) title else NULL

@@ -1,3 +1,11 @@
+# cerebroAppLite 1.7.5
+
+## Immune repertoire
+
+- **Clonal UMAP**: axes now match the main projection style — `UMAP_1`/`UMAP_2`
+  titles removed, with boxed/mirrored axes (showline + mirror) and autorange,
+  so the Clonal UMAP sits visually consistent with the main projection tab.
+
 # cerebroAppLite 1.7.4
 
 ## Immune repertoire
