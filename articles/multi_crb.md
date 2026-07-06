@@ -1,0 +1,98 @@
+# Loading multiple data sets (multi-crb) with a dataset switcher
+
+## Overview
+
+cerebroAppLite can load **multiple `.crb` files** in a single app. When
+more than one file is supplied to
+[`createShinyApp()`](https://mihem.github.io/cerebroAppLite/reference/createShinyApp.md),
+a **“Select dataset:”** switcher appears in the sidebar so users can
+move between data sets without restarting the app. Each data set keeps
+its own expression data, metadata, and module-specific slots — including
+the immune repertoire — so conditional tabs (such as *Immune
+Repertoire*) appear or disappear as you switch.
+
+## Quick start
+
+### Single file (unchanged)
+
+Passing a single path behaves exactly as before — no switcher is shown:
+
+``` r
+createShinyApp(
+  result_dir = file.path(tempdir(), "cerebro_app_single"),
+  cerebro_data = c(demo = system.file(
+    "extdata/v1.4/example.crb",
+    package = "cerebroAppLite"
+  ))
+)
+```
+
+### Multiple files
+
+Pass a **named vector** of `.crb` paths. The three demo data sets
+shipped with the package are genuinely different samples — they differ
+in cell composition, so the UMAP and cell-type mix change as you switch
+— and each carries a biologically plausible immune repertoire (TCR on T
+cells, BCR on B cells):
+
+``` r
+createShinyApp(
+  result_dir = file.path(tempdir(), "cerebro_app_multi"),
+  cerebro_data = c(
+    "PBMC - Full (T+B)"     = system.file("extdata/v1.4/demo_full_tcr_bcr.crb", package = "cerebroAppLite"),
+    "PBMC - Healthy (T/NK)" = system.file("extdata/v1.4/demo_healthy_t.crb",    package = "cerebroAppLite"),
+    "PBMC - B-cell rich"    = system.file("extdata/v1.4/demo_bcell_rich.crb",   package = "cerebroAppLite")
+  )
+)
+```
+
+| Data set              | Cells                    | Immune repertoire |
+|-----------------------|--------------------------|-------------------|
+| PBMC - Full (T+B)     | all cells (T + B + Mono) | TCR **and** BCR   |
+| PBMC - Healthy (T/NK) | T + Monocytes            | TCR only          |
+| PBMC - B-cell rich    | B + a few T cells        | BCR only          |
+
+When the app starts, the sidebar shows a dropdown with these three
+samples. Switching changes the whole data set — the UMAP, the cell-type
+composition, and the *Immune Repertoire* tab (present whenever the
+sample carries clonotypes).
+
+The three demo data sets are derived from the public 10x Genomics
+`vdj_v1_hs_pbmc3` dataset (see `data-raw/README.md` in the package
+source for the full, reproducible build).
+
+## Default file selection
+
+By default the **smallest `.crb` file** (by size on disk) is loaded
+first. Set `crb_pick_smallest_file = FALSE` to load the first file in
+the vector instead:
+
+``` r
+createShinyApp(
+  result_dir = file.path(tempdir(), "cerebro_app_order"),
+  cerebro_data = c(
+    a = "file_a.crb",
+    b = "file_b.crb"
+  ),
+  crb_pick_smallest_file = FALSE # loads file_a.crb
+)
+```
+
+Once a file is chosen from the dropdown, that selection persists until
+the user switches again.
+
+## Linking to a specific data set via URL
+
+When the app is deployed, a data set can be selected directly from the
+URL, so you can share a link that opens straight into one sample. Both a
+query string and a path segment are supported:
+
+    https://your-host/app/?dataset=TCR
+    https://your-host/app/TCR
+
+The token is the **last path segment** (so it works even when the app is
+mounted under a sub-path such as `/app/`), or the value of the `dataset`
+query parameter. It is matched against the **names** you gave in
+`cerebro_data` first, then against the file basename (with or without
+the `.crb` extension). If no match is found, the smallest-file default
+applies.
