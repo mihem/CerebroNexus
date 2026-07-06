@@ -15,9 +15,18 @@ library(dplyr)
 custom_welcome_message <- "Welcome to Cerebro! This is a custom welcome message. You can change it in the app options."
 Cerebro.options <<- list(
   "mode" = "closed",
-  "crb_file_to_load" = "extdata/v1.4/example.crb",
-  "expression_matrix_mode" = "h5",
-  "expression_matrix_h5" = "extdata/v1.4/example.h5",
+  ## This bundled app ships three distinct demo data sets so the sidebar
+  ## "Select dataset:" switcher is visible out of the box: switching changes
+  ## the UMAP, the cell-type composition and the Immune Repertoire tab. They
+  ## are embedded-backend .crb files, so no h5 matrix is configured. The
+  ## richest data set (Full, T+B) is listed first and loaded by default
+  ## (crb_pick_smallest_file = FALSE) so the app opens on its fullest state.
+  "crb_file_to_load" = c(
+    "PBMC - Full (T+B)" = "extdata/v1.4/demo_full_tcr_bcr.crb",
+    "PBMC - Healthy (T/NK)" = "extdata/v1.4/demo_healthy_t.crb",
+    "PBMC - B-cell rich" = "extdata/v1.4/demo_bcell_rich.crb"
+  ),
+  "crb_pick_smallest_file" = FALSE,
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,
   "overview_default_point_size" = 1,

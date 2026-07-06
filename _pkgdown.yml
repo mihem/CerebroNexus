@@ -55,6 +55,7 @@ articles:
       - create_a_self_contained_shiny_app
       - create_expression_matrix_in_h5_format
       - launch_cerebro_with_pre-loaded_data_set
+      - multi_crb
       - export_and_visualize_custom_tables_and_plots
       - control_access_to_cerebro_with_a_login_page
       - host_cerebro_on_shinyapps

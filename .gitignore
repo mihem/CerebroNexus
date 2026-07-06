@@ -12,6 +12,10 @@ docs
 tests/smoke/
 vignettes/expression_backend_benchmark*
 .playwright-mcp/
+tmp/
 
 # shinytest2 snapshot comparison artifacts
 tests/testthat/_snaps/**/*.new.png
+
+# large public 10x contig CSVs — reproducible via data-raw/README.md, not tracked
+data-raw/vdj_10x/*.csv

@@ -117,8 +117,15 @@ server <- function(input, output, session) {
   ## Load data set.
   ##--------------------------------------------------------------------------##
 
-  ## reactive value holding path to file of data set to load
-  data_to_load <- reactiveValues(path = NULL)
+  ## reactive values holding available .crb files and the current selection.
+  ## In single-file mode only 'selected' is used; when >1 files are provided via
+  ## Cerebro.options$crb_file_to_load, 'files'/'names' drive the sidebar dataset
+  ## switcher rendered below.
+  available_crb_files <- reactiveValues(
+    files = NULL,
+    selected = NULL,
+    names = NULL
+  )
 
   ## listen to selected 'input_file', initialize before UI element is loaded
   observeEvent(input[['input_file']], ignoreNULL = FALSE, {
@@ -130,16 +137,107 @@ server <- function(input, output, session) {
         file.exists(input[["input_file"]]$datapath)
     ) {
       path_to_load <- input[["input_file"]]$datapath
+      ## an uploaded file replaces the pre-configured data sets, so clear the
+      ## switcher state — otherwise the dropdown keeps offering the old data
+      ## sets, which no longer match what is loaded.
+      available_crb_files$files <- NULL
+      available_crb_files$names <- NULL
       ## take path or object from 'Cerebro.options' if it is set and points to an
       ## existing file or object
     } else if (
       exists('Cerebro.options') &&
-        !is.null(Cerebro.options[["crb_file_to_load"]]) &&
-        length(Cerebro.options[["crb_file_to_load"]]) > 0
+        !is.null(Cerebro.options[["crb_file_to_load"]])
     ) {
       file_to_load <- Cerebro.options[["crb_file_to_load"]]
-      if (any(file.exists(file_to_load)) || any(exists(file_to_load))) {
-        path_to_load <- .GlobalEnv$Cerebro.options$crb_file_to_load
+      ## multiple files (or a single named file) -> enable dataset switcher
+      if (length(file_to_load) > 1 || !is.null(names(file_to_load))) {
+        available_crb_files$files <- file_to_load
+        file_names <- names(file_to_load)
+        if (
+          !is.null(file_names) &&
+            length(file_names) == length(file_to_load)
+        ) {
+          available_crb_files$names <- file_names
+        } else {
+          available_crb_files$names <- NULL
+        }
+
+        ##--------------------------------------------------------------------##
+        ## Check for a dataset specified in the URL (query string or path),
+        ## e.g. '?dataset=sampleA' or '/sampleA'.
+        ##--------------------------------------------------------------------##
+        url_dataset <- NULL
+
+        ## 1. query string (?dataset=...)
+        query <- parseQueryString(session$clientData$url_search)
+        if (!is.null(query$dataset)) {
+          url_dataset <- query$dataset
+        }
+
+        ## 2. pathname (e.g. /dataset_name or /app/dataset_name). Use only the
+        ## LAST path segment as the token, so the app still resolves it when
+        ## mounted under a sub-path (e.g. shiny-server at /app/TCR -> "TCR").
+        if (
+          is.null(url_dataset) &&
+            !is.null(session$clientData$url_pathname)
+        ) {
+          path_val <- session$clientData$url_pathname
+          path_val <- gsub("/$", "", path_val) # drop trailing slash
+          segments <- strsplit(path_val, "/", fixed = TRUE)[[1]]
+          segments <- segments[nzchar(segments)]
+          if (length(segments) > 0) {
+            ## URL-decode so links with encoded names (e.g. %20) still match
+            url_dataset <- utils::URLdecode(segments[length(segments)])
+          }
+        }
+
+        ## try to match url_dataset against available files
+        if (!is.null(url_dataset)) {
+          path_to_load <- match_dataset_by_url(
+            url_dataset,
+            available_crb_files$files,
+            available_crb_files$names
+          )
+          if (path_to_load != '') {
+            print(glue::glue(
+              "[{Sys.time()}] Dataset selected via URL: {url_dataset} -> {path_to_load}"
+            ))
+          }
+        }
+
+        ## if not chosen via URL: keep current selection, else pick default.
+        ## crb_pick_smallest_file TRUE/NULL -> smallest file; FALSE -> first.
+        if (path_to_load != '') {
+          ## already set by URL logic
+        } else if (!is.null(available_crb_files$selected)) {
+          path_to_load <- available_crb_files$selected
+        } else {
+          pick_smallest <- TRUE
+          if (!is.null(Cerebro.options[["crb_pick_smallest_file"]])) {
+            pick_smallest <- as.logical(
+              Cerebro.options[["crb_pick_smallest_file"]]
+            )
+          }
+          if (isTRUE(pick_smallest)) {
+            file_sizes <- sapply(file_to_load, function(f) {
+              if (file.exists(f)) {
+                file.size(f)
+              } else {
+                Inf ## variable/object -> infinite size, skipped
+              }
+            })
+            path_to_load <- file_to_load[which.min(file_sizes)]
+          } else {
+            path_to_load <- file_to_load[1]
+          }
+        }
+      } else {
+        ## single unnamed file
+        available_crb_files$files <- NULL
+        available_crb_files$names <- NULL
+        if (file.exists(file_to_load) || exists(file_to_load)) {
+          path_to_load <- file_to_load
+        }
       }
     }
     ## assign path to example file if none of the above apply
@@ -149,14 +247,64 @@ server <- function(input, output, session) {
         package = "cerebroAppLite"
       )
     }
-    ## set reactive value to new file path
-    data_to_load$path <- path_to_load
+    ## set reactive value to selected file path
+    if (
+      is.null(available_crb_files$selected) ||
+        available_crb_files$selected != path_to_load
+    ) {
+      available_crb_files$selected <- path_to_load
+    }
+  })
+
+  ## renderUI for the dataset switcher; shown only when >1 .crb files are
+  ## available, inert (returns NULL) in single-file mode.
+  output[["crb_file_selector_UI"]] <- renderUI({
+    if (
+      !is.null(available_crb_files$files) &&
+        length(available_crb_files$files) > 1
+    ) {
+      choices <- available_crb_files$files
+      names(choices) <- if (!is.null(available_crb_files$names)) {
+        available_crb_files$names
+      } else {
+        basename(available_crb_files$files)
+      }
+      selected <- available_crb_files$selected
+      if (is.null(selected)) {
+        selected <- choices[1]
+      }
+      tagList(
+        titlePanel("Select sample dataset"),
+        selectInput(
+          inputId = "crb_file_selector",
+          label = "Select from available datasets:",
+          choices = choices,
+          selected = selected,
+          width = '350px'
+        )
+      )
+    }
+  })
+
+  ## listen to the dataset switcher and update the current selection
+  observeEvent(input[['crb_file_selector']], {
+    if (
+      !is.null(input[['crb_file_selector']]) &&
+        !is.null(available_crb_files$files)
+    ) {
+      if (
+        is.null(available_crb_files$selected) ||
+          available_crb_files$selected != input[['crb_file_selector']]
+      ) {
+        available_crb_files$selected <- input[['crb_file_selector']]
+      }
+    }
   })
 
   ## create reactive value holding the current data set
   data_set <- reactive({
-    req(data_to_load$path)
-    dataset_to_load <- data_to_load$path
+    req(!is.null(available_crb_files$selected))
+    dataset_to_load <- available_crb_files$selected
     if (exists(dataset_to_load)) {
       print(glue::glue(
         "[{Sys.time()}] Load data set from variable: {dataset_to_load}"

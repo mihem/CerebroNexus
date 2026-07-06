@@ -328,12 +328,12 @@ test_that("paired scatter falls back to manual sample selection", {
 })
 
 test_that("ir_bindCache injects dataset identity into cache key", {
-  # data_to_load$path in every cache key prevents stale plots when switching
-  # datasets; cache = "session" prevents cross-user/session cache leakage.
+  # available_crb_files$selected in every cache key prevents stale plots when
+  # switching datasets; cache = "session" prevents cross-user/session leakage.
   srv <- file.path(shiny_root, "immune_repertoire", "server.R")
   skip_if_not(file.exists(srv))
   content <- paste(readLines(srv), collapse = "\n")
-  expect_match(content, "data_to_load\\$path")
+  expect_match(content, "available_crb_files\\$selected")
   expect_match(content, 'cache\\s*=\\s*"session"')
 })
 
@@ -359,7 +359,7 @@ test_that("ir_bindCache keeps only global cache keys centralized", {
   )
   expect_match(helper, "ir_d_base_size")
   expect_match(helper, "ir_d_title")
-  expect_match(helper, "data_to_load\\$path")
+  expect_match(helper, "available_crb_files\\$selected")
 })
 
 test_that("example.crb preserves core data fields", {

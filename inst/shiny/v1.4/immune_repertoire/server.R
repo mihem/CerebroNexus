@@ -423,7 +423,7 @@ detect_chains <- function(data) {
 
 ## ---- bindCache fallback for Shiny < 1.6.0 ---------------------------- ##
 ## cache = "session" ensures caches are NOT shared across users/sessions.
-## data_to_load$path is appended to every key so switching datasets
+## available_crb_files$selected is appended to every key so switching datasets
 ## invalidates the cache (prevents stale plots from the previous dataset).
 ir_bindCache <- function(x, ..., cache = "session") {
   if (utils::packageVersion("shiny") >= "1.6.0") {
@@ -437,7 +437,7 @@ ir_bindCache <- function(x, ..., cache = "session") {
       input$ir_d_legend_size,
       input$ir_d_legend_key,
       input$ir_d_legend_pos,
-      data_to_load$path,
+      available_crb_files$selected,
       cache = cache
     )
   } else {

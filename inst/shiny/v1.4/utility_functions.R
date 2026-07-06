@@ -827,6 +827,30 @@ centerOfGroups <- function(coordinates, df, n_dimensions, group) {
 }
 
 ##----------------------------------------------------------------------------##
+## Helper: match a URL dataset token against available .crb files.
+##
+## Returns the matched file path or '' if no match.
+##----------------------------------------------------------------------------##
+match_dataset_by_url <- function(url_dataset, files, file_names = NULL) {
+  ## Case A: Match by Name (if names exist)
+  if (!is.null(file_names) && url_dataset %in% file_names) {
+    return(files[[url_dataset]])
+  }
+  ## Case B: Match by Filename (basename)
+  basenames <- basename(files)
+  idx <- which(basenames == url_dataset)
+  if (length(idx) == 0) {
+    basenames_no_ext <- tools::file_path_sans_ext(basenames)
+    idx <- which(basenames_no_ext == url_dataset)
+  }
+  if (length(idx) > 0) {
+    return(files[[idx[1]]])
+  }
+  ## No match
+  return('')
+}
+
+##----------------------------------------------------------------------------##
 ## Functions to interact with data set.
 ##
 ## Never directly interact with data set: data_set()

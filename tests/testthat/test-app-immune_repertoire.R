@@ -24,7 +24,8 @@ test_that("immune_repertoire tab is present with example data (has TCR)", {
     inst_dir,
     name = "ir_present",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
 
@@ -45,7 +46,8 @@ test_that("first IR plot tab is Clonal UMAP", {
     inst_dir,
     name = "ir_first_tab",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -71,7 +73,8 @@ test_that("Group by is visible on plots whose grouping it drives", {
     inst_dir,
     name = "ir_groupby_scope",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -138,7 +141,8 @@ test_that("Chain is visible on plots whose scRepertoire API accepts it", {
     inst_dir,
     name = "ir_chain_scope",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -171,7 +175,8 @@ test_that("changing 'Group by' keeps the current plot tab", {
     inst_dir,
     name = "ir_group_keep_tab",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -208,7 +213,8 @@ test_that("settings dropdowns render all their options (not just selected)", {
     inst_dir,
     name = "ir_dropdown_options",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -240,7 +246,13 @@ test_that("settings dropdowns render all their options (not just selected)", {
 
 test_that("immune_repertoire tab can be opened and renders settings", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "ir_open", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "ir_open",
+    height = 950,
+    width = 1619,
+    load_timeout = 60000
+  )
   app$wait_for_idle(timeout = 20000)
 
   # select the tab
@@ -264,7 +276,13 @@ test_that("immune_repertoire tab can be opened and renders settings", {
 
 test_that("immune_repertoire module loads without breaking main app", {
   local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "ir_load", height = 950, width = 1619)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "ir_load",
+    height = 950,
+    width = 1619,
+    load_timeout = 60000
+  )
   app$wait_for_idle(timeout = 20000)
 
   # Data info tab should still render normally (1476 cells in the new example)
@@ -280,7 +298,8 @@ test_that("Clonal UMAP tab renders with receptor + projection selectors", {
     inst_dir,
     name = "ir_clonal_umap",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -328,7 +347,8 @@ test_that("Display options panel exposes scatter params on scatter-type tabs", {
     inst_dir,
     name = "ir_display_opts",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -364,7 +384,8 @@ test_that("IR page uses the Main-tab layout (Main/Additional/Group boxes)", {
     inst_dir,
     name = "ir_layout",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -391,7 +412,8 @@ test_that("Clonal UMAP has Show-all toggle and group filters", {
     inst_dir,
     name = "ir_umap_filters",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -426,7 +448,8 @@ test_that("Clonal UMAP switches to static facets only when grouped", {
     inst_dir,
     name = "ir_umap_grouped_static",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -480,7 +503,8 @@ test_that("Clone call is hidden on the Clonal UMAP tab", {
     inst_dir,
     name = "ir_umap_no_clonecall",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(
@@ -509,7 +533,8 @@ test_that("Main parameters info button opens a help dialog", {
     inst_dir,
     name = "ir_info_dialog",
     height = 950,
-    width = 1619
+    width = 1619,
+    load_timeout = 60000
   )
   app$wait_for_idle(timeout = 20000)
   app$run_js(

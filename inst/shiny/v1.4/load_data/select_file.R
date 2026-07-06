@@ -30,13 +30,24 @@ output[["load_data_select_file_UI"]] <- renderUI({
             width = '350px',
             buttonLabel = "Browse...",
             placeholder = "No file selected"
-          )
+          ),
+          ## dataset switcher; renders only when >1 .crb files are loaded
+          uiOutput("crb_file_selector_UI")
         )
       )
     )
   } else {
-    fluidRow(
-      htmlOutput("load_data_mode_closed")
+    tagList(
+      fluidRow(
+        htmlOutput("load_data_mode_closed")
+      ),
+      fluidRow(
+        column(
+          12,
+          ## dataset switcher; renders only when >1 .crb files are loaded
+          uiOutput("crb_file_selector_UI")
+        )
+      )
     )
   }
 })

@@ -14,3 +14,4 @@ TODO.md
 ^_pkgdown\.yml$
 ^docs$
 ^tests/smoke$
+^data-raw$

@@ -61,7 +61,15 @@ output$ir_visualizations_UI <- renderUI({
       # Clonal expansion overlaid on the cell UMAP — the default landing tab,
       # so the first thing the user sees is where expanded clones sit.
       "Clonal UMAP",
-      shinycssloaders::withSpinner(uiOutput("ir_ui_clonalUMAP"))
+      # Reserve the final plot height for the spinner placeholder so the
+      # container does not collapse to the ~400px default and snap back up
+      # when the plot arrives (that height jump reflows the whole page and
+      # reads as a "flicker" on dataset switch). IR_PLOT_HEIGHT matches the
+      # ungrouped plotly height returned by ir_ui_clonalUMAP.
+      shinycssloaders::withSpinner(
+        uiOutput("ir_ui_clonalUMAP"),
+        proxy.height = IR_PLOT_HEIGHT
+      )
     ),
     tabPanel(
       "Abundance",
@@ -444,7 +452,11 @@ output$ir_ui_clonalUMAP <- renderUI({
 })
 
 output$ir_plot_clonalUMAP <- plotly::renderPlotly({
-  req_plot_space("ir_plot_clonalUMAP")
+  ## No req_plot_space() here: plotly sizes itself client-side, and gating on
+  ## server-reported pixel dimensions caused a blank plot when the output div is
+  ## created at tab-open (e.g. arriving via the Main tab) — the renderer would
+  ## run once before the browser reported the new div's size and never re-fire.
+  ## req_plot_space is only needed for base-R/grid plots (see req_plot_space).
   receptor <- ir_param("ir_p_umap_receptor")
   projection <- ir_param("ir_p_umap_projection")
   clone_call <- "gene"
