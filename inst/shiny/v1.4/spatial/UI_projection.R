@@ -96,7 +96,10 @@ output[["spatial_projection_UI"]] <- renderUI({
             plotly::plotlyOutput(
               "spatial_projection",
               width = "auto",
-              height = "calc(100vh - 200px)"
+              ## Leave room below the plot for the selected-cells count and the
+              ## Clear-selection button; the previous 200px offset was too small
+              ## so the plot overflowed onto the button on shorter screens.
+              height = "calc(100vh - 300px)"
             ),
             type = 8,
             hide.ui = FALSE

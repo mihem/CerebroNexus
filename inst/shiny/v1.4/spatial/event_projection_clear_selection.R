@@ -11,20 +11,12 @@ observeEvent(input[["spatial_projection_clear_selection"]], {
 ##----------------------------------------------------------------------------##
 ## Toggle visibility of clear selection button.
 ##----------------------------------------------------------------------------##
+## Follows the persistent selection (not Plotly's volatile plotly_selected
+## event), so the button stays visible across plot parameter changes and is
+## hidden only when the selection is actually cleared.
 observe({
-  req(spatial_projection_data_to_plot())
-
-  if (
-    !is.null(plotly::event_data(
-      "plotly_selected",
-      source = "spatial_projection"
-    )) &&
-      length(plotly::event_data(
-        "plotly_selected",
-        source = "spatial_projection"
-      )) >
-        0
-  ) {
+  selected <- spatial_projection_selected_cells()
+  if (!is.null(selected) && nrow(selected) > 0) {
     shinyjs::show("spatial_projection_clear_selection")
   } else {
     shinyjs::hide("spatial_projection_clear_selection")

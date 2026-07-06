@@ -85,25 +85,21 @@ shinyjs.hideScrollDownIndicator = function () {
 };
 
 shinyjs.detachModebar = function () {
+  // The Plotly modebar is disabled at the source (displayModeBar: false in the
+  // Plotly.react config), so there are no toolbar buttons to relocate. Plotly
+  // still emits an empty .modebar-container div, and earlier renders may have
+  // left a detached copy in the parent; remove both so no stray element lingers
+  // in the top-left of the plot.
   const plotContainer = document.getElementById('spatial_projection');
   if (!plotContainer) return;
 
   const parent = plotContainer.parentElement;
-  if (getComputedStyle(parent).position === 'static') {
-    parent.style.position = 'relative';
-  }
-
-  // Find the modebar inside the plot container
-  const modebar = plotContainer.querySelector('.modebar-container') || plotContainer.querySelector('.modebar');
-
-  if (modebar) {
-    // Remove stale detached modebars
-    const staleModebars = parent.querySelectorAll('.detached-modebar');
-    staleModebars.forEach((el) => el.remove());
-
-    parent.appendChild(modebar);
-    modebar.classList.add('detached-modebar');
-  }
+  parent
+    .querySelectorAll('.detached-modebar')
+    .forEach((el) => el.remove());
+  plotContainer
+    .querySelectorAll('.modebar-container, .modebar')
+    .forEach((el) => el.remove());
 };
 
 shinyjs.applySpatialBackground = function () {
@@ -654,6 +650,10 @@ const spatial_projection_default_params = {
 shinyjs.updatePlot2DContinuousSpatial = function (params) {
   params = shinyjs.getParams(params, spatial_projection_default_params);
 
+  // Preserve an existing selection (dimming + outline) across the re-render.
+  const selectedKeys = harvestSpatialSelection();
+  const selectionOutline = harvestSelectionOutline();
+
   shinyjs.removeCustomLegend();
   shinyjs.removeContinuousLegend();
   const data = [];
@@ -686,10 +686,15 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
     },
     hoverinfo: params.hover.hoverinfo,
   });
+  // Keep the prior selection: selected cells stay solid, the rest dim.
+  applySpatialSelection(data, selectedKeys);
   shinyjs.createContinuousLegend(params.meta.color_variable, colorMin, colorMax, colorscale);
 
   // Use deep clone to avoid mutating global layout
   const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_2D));
+
+  // Carry the dashed selection outline across the re-render.
+  if (selectionOutline) layout_here.selections = selectionOutline;
 
   if (params.data.reset_axes) {
     layout_here.xaxis['autorange'] = true;
@@ -711,7 +716,10 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
     }
   }
 
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
+  Plotly.react('spatial_projection', data, layout_here, {
+    displayModeBar: false,
+    displaylogo: false
+  }).then(() => {
     // Re-attach selection debug listeners
     if (typeof shinyjs.setupSelectionDebug === 'function') {
       shinyjs.setupSelectionDebug();
@@ -733,6 +741,7 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
 // update 3D projection with continuous coloring
 shinyjs.updatePlot3DContinuousSpatial = function (params) {
   params = shinyjs.getParams(params, spatial_projection_default_params);
+  const selectedKeys = harvestSpatialSelection();
   shinyjs.removeCustomLegend();
   shinyjs.removeContinuousLegend();
   const data = [];
@@ -767,6 +776,7 @@ shinyjs.updatePlot3DContinuousSpatial = function (params) {
     },
     showlegend: false,
   });
+  applySpatialSelection(data, selectedKeys);
   shinyjs.createContinuousLegend(params.meta.color_variable, colorMin, colorMax, colorscale);
 
   // Use deep clone
@@ -782,7 +792,10 @@ shinyjs.updatePlot3DContinuousSpatial = function (params) {
       layout_here.height = plotContainer.parentElement.clientHeight;
     }
   }
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
+  Plotly.react('spatial_projection', data, layout_here, {
+    displayModeBar: false,
+    displaylogo: false
+  }).then(() => {
     shinyjs.syncSpatialBackground(null, false, false, 1, 1, 1, null);
     shinyjs.detachModebar();
   });
@@ -800,9 +813,97 @@ shinyjs.getContainerDimensions = function () {
   return { width: 0, height: 0 };
 };
 
+// Persistent selection, decoupled from every plot parameter. Selection is keyed
+// on cell position (x-y), so it survives changes to the colouring variable,
+// point size, opacity, "show % of cells", background, etc. It is populated only
+// by an actual box/lasso selection (plotly_selected) and cleared only by
+// plotly_deselect or the Clear-selection action (button / Esc / Delete). Every
+// re-render re-applies it, so no plot parameter can drop or corrupt it.
+//
+// This is also the single source of truth for the R side: whenever it changes
+// we push the selected coordinates to a Shiny input, so the selected-cells
+// table/count and the Clear button follow the persistent selection instead of
+// Plotly's volatile plotly_selected event (which a re-render wipes).
+let spatialSelectionKeys = null;
+
+// Push the current selection to Shiny as {x: [...], y: [...]} (or null). R
+// rebuilds its "x-y" identifiers from these, matching how the table keys cells.
+function syncSpatialSelectionToShiny() {
+  if (typeof Shiny === 'undefined' || !Shiny.setInputValue) return;
+  let payload = null;
+  if (spatialSelectionKeys && spatialSelectionKeys.size) {
+    const x = [];
+    const y = [];
+    spatialSelectionKeys.forEach((k) => {
+      const sep = k.indexOf('|');
+      x.push(parseFloat(k.slice(0, sep)));
+      y.push(parseFloat(k.slice(sep + 1)));
+    });
+    payload = { x: x, y: y };
+  }
+  // No {priority:'event'}: this is persistent selection STATE that must remain
+  // readable across later reactive invalidations (e.g. a colour change
+  // re-running the selected-cells reactive). An event-priority input resets to
+  // null after one flush, which would drop the selection on the next re-render.
+  Shiny.setInputValue('spatial_persistent_selection', payload);
+}
+
+// Record a fresh selection from a plotly_selected event.
+function setSpatialSelectionFromEvent(eventData) {
+  if (!eventData || !eventData.points || !eventData.points.length) {
+    spatialSelectionKeys = null;
+  } else {
+    const keys = new Set();
+    eventData.points.forEach((p) => {
+      keys.add(p.x + '|' + p.y);
+    });
+    spatialSelectionKeys = keys;
+  }
+  syncSpatialSelectionToShiny();
+}
+
+// Return the persistent selection (or null when nothing is selected).
+function harvestSpatialSelection() {
+  return spatialSelectionKeys && spatialSelectionKeys.size
+    ? spatialSelectionKeys
+    : null;
+}
+
+// Re-apply a harvested selection to freshly built traces: for each trace, mark
+// the points whose x-y is in the set as selectedpoints so Plotly keeps them at
+// full opacity and dims the rest. No-op when there is no active selection.
+function applySpatialSelection(traces, selectedKeys) {
+  if (!selectedKeys || selectedKeys.size === 0) return;
+  traces.forEach((trace) => {
+    if (!trace.x || trace.mode === 'text') return;
+    const picked = [];
+    for (let i = 0; i < trace.x.length; i++) {
+      if (selectedKeys.has(trace.x[i] + '|' + trace.y[i])) picked.push(i);
+    }
+    if (picked.length) trace.selectedpoints = picked;
+  });
+}
+
+// The dashed selection outline lives in layout.selections and is a layout-level
+// state that Plotly.react drops when it swaps in a fresh layout. Grab it from
+// the live plot so it can be carried into the new layout, but only while a
+// selection is active (cleared selection must not resurrect the outline).
+function harvestSelectionOutline() {
+  if (!spatialSelectionKeys || !spatialSelectionKeys.size) return null;
+  const pc = document.getElementById('spatial_projection');
+  if (pc && pc.layout && pc.layout.selections && pc.layout.selections.length) {
+    return pc.layout.selections;
+  }
+  return null;
+}
+
 // update 2D projection with categorical coloring
 shinyjs.updatePlot2DCategoricalSpatial = function (params) {
   params = shinyjs.getParams(params, spatial_projection_default_params);
+
+  // Preserve an existing selection (dimming + outline) across the re-render.
+  const selectedKeys = harvestSpatialSelection();
+  const selectionOutline = harvestSelectionOutline();
 
   shinyjs.removeContinuousLegend();
   shinyjs.createCustomLegend(params.meta.traces, params.data.color);
@@ -853,8 +954,14 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
     });
   }
 
+  // Keep the prior selection: selected cells stay solid, the rest dim.
+  applySpatialSelection(data, selectedKeys);
+
   // Use deep clone
   const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_2D));
+
+  // Carry the dashed selection outline across the re-render.
+  if (selectionOutline) layout_here.selections = selectionOutline;
 
   if (params.data.reset_axes) {
     layout_here.xaxis.autorange = true;
@@ -878,7 +985,10 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
     }
   }
 
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
+  Plotly.react('spatial_projection', data, layout_here, {
+    displayModeBar: false,
+    displaylogo: false
+  }).then(() => {
     // Re-attach selection debug listeners
     if (typeof shinyjs.setupSelectionDebug === 'function') {
       shinyjs.setupSelectionDebug();
@@ -899,6 +1009,7 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
 // update 3D projection with categorical coloring
 shinyjs.updatePlot3DCategoricalSpatial = function (params) {
   params = shinyjs.getParams(params, spatial_projection_default_params);
+  const selectedKeys = harvestSpatialSelection();
   shinyjs.removeContinuousLegend();
   shinyjs.createCustomLegend(params.meta.traces, params.data.color);
 
@@ -950,6 +1061,9 @@ shinyjs.updatePlot3DCategoricalSpatial = function (params) {
     });
   }
 
+  // Keep the prior selection: selected cells stay solid, the rest dim.
+  applySpatialSelection(data, selectedKeys);
+
   // Use deep clone
   const layout_here = JSON.parse(JSON.stringify(spatial_projection_layout_3D));
 
@@ -963,7 +1077,10 @@ shinyjs.updatePlot3DCategoricalSpatial = function (params) {
       layout_here.height = plotContainer.parentElement.clientHeight;
     }
   }
-  Plotly.react('spatial_projection', data, layout_here).then(() => {
+  Plotly.react('spatial_projection', data, layout_here, {
+    displayModeBar: false,
+    displaylogo: false
+  }).then(() => {
     shinyjs.syncSpatialBackground(null, false, false, 1, 1, 1, null);
     shinyjs.detachModebar();
   });
@@ -987,17 +1104,16 @@ shinyjs.setupSelectionDebug = function () {
     return;
   }
 
-  // Monitor plotly_selected event
+  // Capture a real box/lasso selection (points present). We deliberately do NOT
+  // clear the selection on plotly_deselect: Plotly fires deselect during every
+  // re-render (colour/point-size change swaps the trace set), which would wipe a
+  // selection the user never touched. Per the desired UX, the selection is
+  // cleared ONLY by the Clear-selection action (button / Esc / Delete); an empty
+  // selection event (no points) also clears it.
   plotContainer.on('plotly_selected', function (eventData) {
-    // Check if Shiny is available
-    if (typeof Shiny !== 'undefined') {
-      // Event will be sent to Shiny automatically via plotly input binding
+    if (eventData && eventData.points && eventData.points.length) {
+      setSpatialSelectionFromEvent(eventData);
     }
-  });
-
-  // Monitor plotly_deselect event
-  plotContainer.on('plotly_deselect', function () {
-    // Selection cleared
   });
 };
 
@@ -1027,10 +1143,42 @@ $(document).ready(function () {
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
+
+  // Keyboard shortcut: Delete / Backspace / Escape clears the current spatial
+  // selection, mirroring the Clear-selection button. Only acts when the Spatial
+  // tab is visible and a selection exists (its button is shown), and never while
+  // the user is typing in an input/textarea/select.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Delete' && e.key !== 'Backspace' && e.key !== 'Escape') {
+      return;
+    }
+    const tab = document.getElementById('shiny-tab-spatial');
+    if (!tab || tab.offsetParent === null) return; // tab not active/visible
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (
+      tag === 'input' ||
+      tag === 'textarea' ||
+      tag === 'select' ||
+      e.target.isContentEditable
+    ) {
+      return;
+    }
+    const btn = document.getElementById('spatial_projection_clear_selection');
+    // btn is wrapped in shinyjs::hidden() until a selection exists; offsetParent
+    // is null while hidden, so this is a no-op when there is nothing to clear.
+    if (btn && btn.offsetParent !== null) {
+      e.preventDefault();
+      btn.click();
+    }
+  });
 });
 
 // Clear selection on the spatial projection plot
 shinyjs.spatialClearSelection = function () {
+  // Forget the persistent selection so subsequent re-renders don't re-apply it,
+  // and tell R so the count/table/button reset too.
+  spatialSelectionKeys = null;
+  syncSpatialSelectionToShiny();
   const plotContainer = document.getElementById('spatial_projection');
   if (plotContainer && plotContainer.data) {
     // Use Plotly.update to reset both data selection and layout in one call

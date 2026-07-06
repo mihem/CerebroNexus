@@ -7,28 +7,20 @@ spatial_projection_selected_cells <- reactive({
   ## generated
   req(spatial_projection_data_to_plot())
 
-  ## check selection
-  ## ... selection has not been made or there is no cell in it
-  if (
-    is.null(plotly::event_data(
-      "plotly_selected",
-      source = "spatial_projection"
-    )) ||
-      length(plotly::event_data(
-        "plotly_selected",
-        source = "spatial_projection"
-      )) ==
-        0
-  ) {
+  ## The selection is held persistently on the JS side (see
+  ## js_projection_update_plot.js) and pushed here as {x, y} so it survives plot
+  ## parameter changes. Plotly's own plotly_selected event is NOT used, because a
+  ## re-render (e.g. changing "Color cells by") wipes it while the selection must
+  ## stay. The identifier is built the same way the table keys cells (paste0 with
+  ## '-'), so downstream filtering is unchanged.
+  sel <- input[["spatial_persistent_selection"]]
+  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
     return(NULL)
-    ## ... selection has been made and at least 1 cell is in it
-  } else {
-    ## get number of selected cells
-    result <- plotly::event_data(
-      "plotly_selected",
-      source = "spatial_projection"
-    ) %>%
-      dplyr::mutate(identifier = paste0(x, '-', y))
-    return(result)
   }
+  data.frame(
+    x = as.numeric(sel[["x"]]),
+    y = as.numeric(sel[["y"]]),
+    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
+    stringsAsFactors = FALSE
+  )
 })
