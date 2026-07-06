@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">cerebroAppLite</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.7.6</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,7 +92,7 @@ Wang</h4>
             
             <h4 data-toc-skip class="date">06 July, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/cerebroAppLite/blob/v1.7.5/vignettes/immune_repertoire_analysis.Rmd" class="external-link"><code>vignettes/immune_repertoire_analysis.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/cerebroAppLite/blob/master/vignettes/immune_repertoire_analysis.Rmd" class="external-link"><code>vignettes/immune_repertoire_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>immune_repertoire_analysis.Rmd</code></div>
     </div>
 
@@ -232,7 +232,7 @@ scatter plot sample selection and multi-sample comparison.</p>
 <div class="section level3">
 <h3 id="visualization-tabs">Visualization tabs<a class="anchor" aria-label="anchor" href="#visualization-tabs"></a>
 </h3>
-<p>The module provides 19 tabbed visualizations. Each includes a
+<p>The module provides 21 tabbed visualizations. Each includes a
 contextual help panel explaining the biological interpretation with
 example guidance.</p>
 <div class="section level4">
@@ -297,6 +297,24 @@ samples - <strong>Overlap</strong>: pairwise clonotype sharing heatmap -
 <strong>Scatter</strong>: clone frequency comparison between two samples
 - <strong>SizeDist</strong>: hierarchical clustering of samples by clone
 size distribution</p>
+</div>
+<div class="section level4">
+<h4 id="repertoire-structure-and-sharing">Repertoire structure and sharing<a class="anchor" aria-label="anchor" href="#repertoire-structure-and-sharing"></a>
+</h4>
+<ul>
+<li>
+<strong>Definition</strong>: a clone-definition resolution waterfall
+counting unique entities at each level (cells, V, J, V+J, CDR3, V+CDR3,
+V+J+CDR3); the drop from cells to V+J+CDR3 shows how much a stricter
+definition collapses the repertoire. Optionally faceted by the active
+group column. For BCR chains a caveat notes that CDR3 is not collapsed
+by somatic hypermutation</li>
+<li>
+<strong>Clone Sharing</strong>: classifies each clonotype as Private
+(in a single unit), Public within-group, or Public cross-group, using a
+configurable sharing unit (default <code>sample</code>); with no group
+selected it degrades to Private / Shared</li>
+</ul>
 </div>
 <div class="section level4">
 <h4 id="quality-control">Quality control<a class="anchor" aria-label="anchor" href="#quality-control"></a>

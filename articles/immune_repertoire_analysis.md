@@ -129,7 +129,7 @@ scatter plot sample selection and multi-sample comparison.
 
 ### Visualization tabs
 
-The module provides 19 tabbed visualizations. Each includes a contextual
+The module provides 21 tabbed visualizations. Each includes a contextual
 help panel explaining the biological interpretation with example
 guidance.
 
@@ -170,6 +170,19 @@ When \>= 2 samples are present, additional tabs become available: -
 **Overlap**: pairwise clonotype sharing heatmap - **Scatter**: clone
 frequency comparison between two samples - **SizeDist**: hierarchical
 clustering of samples by clone size distribution
+
+#### Repertoire structure and sharing
+
+- **Definition**: a clone-definition resolution waterfall counting
+  unique entities at each level (cells, V, J, V+J, CDR3, V+CDR3,
+  V+J+CDR3); the drop from cells to V+J+CDR3 shows how much a stricter
+  definition collapses the repertoire. Optionally faceted by the active
+  group column. For BCR chains a caveat notes that CDR3 is not collapsed
+  by somatic hypermutation
+- **Clone Sharing**: classifies each clonotype as Private (in a single
+  unit), Public within-group, or Public cross-group, using a
+  configurable sharing unit (default `sample`); with no group selected
+  it degrades to Private / Shared
 
 #### Quality control
 

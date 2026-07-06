@@ -1,5 +1,21 @@
 # Changelog
 
+## cerebroAppLite 1.7.6
+
+### Immune repertoire
+
+- **Clone Sharing tab**: classifies every clonotype (V+J+CDR3 of the
+  active chain) as Private (in a single unit), Public within-group, or
+  Public cross-group, using a configurable “sharing unit” (any
+  categorical metadata column, default `sample`) and the active group
+  column. With no group selected it degrades to Private / Shared.
+  Interactive plotly bars with on-bar count/percentage labels and a
+  clean hover tooltip (one class per bar, no raw aesthetic names).
+- **Definition** (clone-definition resolution waterfall) is available
+  but hidden from the default tab strip: it is an exploratory check for
+  choosing a clone-call resolution rather than a reader-facing figure.
+  Uncomment its `tabPanel` to re-enable.
+
 ## cerebroAppLite 1.7.5
 
 ### Immune repertoire
