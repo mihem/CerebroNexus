@@ -21,7 +21,8 @@ biologically plausible rather than random noise.
 donor, Chromium 5' V(D)J, Cell Ranger 3.1.0. No de-identification is involved:
 the data is public, and the only identity handling is a neutral sample name.
 
-Download the filtered contig annotations (already vendored under `vdj_10x/`):
+Download the filtered contig annotations into `vdj_10x/` (these CSVs are not
+tracked in git — the built `.crb` demos are what ships):
 
 ```bash
 mkdir -p data-raw/vdj_10x

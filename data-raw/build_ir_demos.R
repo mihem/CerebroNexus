@@ -93,9 +93,46 @@ old <- readRDS(src_crb)
 full_meta <- old$getMetaData()
 stopifnot("cell_type" %in% colnames(full_meta))
 
-## Rebuild a fresh Cerebro_v1.3 restricted to the given cell barcodes. The
-## per-cell slots (expression columns, meta rows, projection rows) are filtered
-## consistently; pre-computed group-level analyses are carried over as-is.
+## Filter the pre-computed group-level analyses (marker genes, most-expressed
+## genes, enriched pathways) so they only reference groups that still exist in
+## the subset. These slots are nested lists whose leaves are data.frames keyed
+## by a grouping column (`cell_type`, `seurat_clusters`, `sample`, ...) held in
+## the first column. `allowed` maps each grouping column to the values kept in
+## the subset's meta_data; any leaf row whose group is absent is dropped, and
+## emptied leaves/branches are pruned. Without this, a T/Mono subset would still
+## advertise B-cell marker/expression rows it no longer contains.
+filter_group_slot <- function(x, allowed) {
+  if (is.data.frame(x)) {
+    grp <- names(x)[1]
+    if (!is.null(grp) && grp %in% names(allowed)) {
+      x <- x[as.character(x[[grp]]) %in% allowed[[grp]], , drop = FALSE]
+      ## drop unused factor levels so stale groups don't linger in dropdowns
+      for (col in names(x)) {
+        if (is.factor(x[[col]])) x[[col]] <- droplevels(x[[col]])
+      }
+    }
+    if (nrow(x) == 0) {
+      return(NULL)
+    }
+    return(x)
+  }
+  if (is.list(x)) {
+    x <- lapply(x, filter_group_slot, allowed = allowed)
+    x <- x[!vapply(x, is.null, logical(1))]
+    if (length(x) == 0) {
+      return(NULL)
+    }
+    return(x)
+  }
+  x
+}
+
+## Rebuild a fresh Cerebro_v1.3 restricted to the given cell barcodes. Per-cell
+## slots (expression columns, meta rows, projection rows) are filtered by
+## barcode; group-level analyses are filtered by the groups that survive in the
+## subset (see filter_group_slot) so the demo is internally consistent.
+group_slots <- c("marker_genes", "most_expressed_genes", "enriched_pathways")
+
 subset_cerebro <- function(keep_barcodes, experiment_name) {
   new <- Cerebro_v1.3$new()
   for (f in data_fields) {
@@ -109,14 +146,45 @@ subset_cerebro <- function(keep_barcodes, experiment_name) {
   if (!is.null(new$expression)) {
     new$expression <- old$expression[, keep, drop = FALSE]
   }
-  ## meta_data: one row per cell
+  ## meta_data: one row per cell; drop now-empty factor levels so stale groups
+  ## (e.g. a cell type no longer present) don't linger in the app's dropdowns
   new$meta_data <- old$meta_data[keep, , drop = FALSE]
+  for (col in colnames(new$meta_data)) {
+    if (is.factor(new$meta_data[[col]])) {
+      new$meta_data[[col]] <- droplevels(new$meta_data[[col]])
+    }
+  }
   ## projections: one row per cell, keyed by barcode
   if (!is.null(old$projections)) {
     new$projections <- lapply(old$projections, function(p) {
       p[keep, , drop = FALSE]
     })
   }
+
+  ## group-level slots: keep only groups present in the subset's meta_data
+  meta_sub <- new$meta_data
+  allowed <- list()
+  for (grp in c("cell_type", "seurat_clusters", "sample")) {
+    if (grp %in% colnames(meta_sub)) {
+      allowed[[grp]] <- unique(as.character(meta_sub[[grp]]))
+    }
+  }
+  for (f in group_slots) {
+    if (!is.null(new[[f]])) {
+      new[[f]] <- filter_group_slot(new[[f]], allowed)
+    }
+  }
+
+  ## groups slot: list(dim -> character vector of group values). This drives the
+  ## app's group dropdowns, so prune values absent from the subset.
+  if (!is.null(new$groups)) {
+    for (grp in names(new$groups)) {
+      if (grp %in% names(allowed)) {
+        new$groups[[grp]] <- intersect(new$groups[[grp]], allowed[[grp]])
+      }
+    }
+  }
+
   ## stamp a descriptive experiment name if the slot supports it
   if (!is.null(new$experiment) && is.list(new$experiment)) {
     new$experiment$experiment_name <- experiment_name
@@ -228,7 +296,7 @@ verify <- function(path) {
     basename(path),
     file.size(path) / 1024,
     nrow(m),
-    paste(names(table(m$cell_type)), collapse = "/"),
+    paste(sort(unique(as.character(m$cell_type))), collapse = "/"),
     paste(chains, collapse = "+"),
     nrow(ir_df),
     tcr_on_t,

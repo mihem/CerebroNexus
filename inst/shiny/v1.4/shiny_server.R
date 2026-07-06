@@ -137,6 +137,11 @@ server <- function(input, output, session) {
         file.exists(input[["input_file"]]$datapath)
     ) {
       path_to_load <- input[["input_file"]]$datapath
+      ## an uploaded file replaces the pre-configured data sets, so clear the
+      ## switcher state — otherwise the dropdown keeps offering the old data
+      ## sets, which no longer match what is loaded.
+      available_crb_files$files <- NULL
+      available_crb_files$names <- NULL
       ## take path or object from 'Cerebro.options' if it is set and points to an
       ## existing file or object
     } else if (
@@ -169,18 +174,20 @@ server <- function(input, output, session) {
           url_dataset <- query$dataset
         }
 
-        ## 2. pathname (e.g. /dataset_name), only if not found in query string
+        ## 2. pathname (e.g. /dataset_name or /app/dataset_name). Use only the
+        ## LAST path segment as the token, so the app still resolves it when
+        ## mounted under a sub-path (e.g. shiny-server at /app/TCR -> "TCR").
         if (
           is.null(url_dataset) &&
             !is.null(session$clientData$url_pathname)
         ) {
           path_val <- session$clientData$url_pathname
-          if (nchar(path_val) > 1) {
-            path_val <- substring(path_val, 2)
-            path_val <- gsub("/$", "", path_val)
-            if (nchar(path_val) > 0) {
-              url_dataset <- path_val
-            }
+          path_val <- gsub("/$", "", path_val) # drop trailing slash
+          segments <- strsplit(path_val, "/", fixed = TRUE)[[1]]
+          segments <- segments[nzchar(segments)]
+          if (length(segments) > 0) {
+            ## URL-decode so links with encoded names (e.g. %20) still match
+            url_dataset <- utils::URLdecode(segments[length(segments)])
           }
         }
 

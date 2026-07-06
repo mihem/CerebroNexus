@@ -1,4 +1,4 @@
-# cerebroAppLite 1.7.6
+# cerebroAppLite 1.7.7
 
 ## Multiple data sets (multi-crb)
 
@@ -9,18 +9,31 @@
   (`crb_pick_smallest_file`, default `TRUE`).
 - **URL selection**: a data set can be opened directly via the URL, matched by
   the name given in `cerebro_data` or by file basename — either as a query
-  string (`?dataset=TCR`) or a path segment (`/TCR`).
+  string (`?dataset=TCR`) or as the last path segment (`/TCR`).
 - **Demo data sets**: three genuinely distinct demo `.crb` files ship in
   `inst/extdata/v1.4/` — `demo_full_tcr_bcr.crb` (all cells, TCR + BCR),
   `demo_healthy_t.crb` (T + monocytes, TCR) and `demo_bcell_rich.crb` (B-cell
   rich, BCR). They differ in cell composition, so the UMAP and cell-type mix
   change as you switch, and clonotypes are assigned by lineage (TCR to T cells,
-  BCR to B cells) rather than at random. Built from the public 10x Genomics
-  `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the reproducible
-  build. The bundled app (`shiny::runApp("inst")`) now opens on these three
-  data sets so the switcher is visible out of the box; pass a named vector to
-  `createShinyApp()` for your own data (see `vignette("multi_crb")`). New
-  vignette: *Loading multiple data sets (multi-crb) with a dataset switcher*.
+  BCR to B cells) rather than at random. Group-level analyses (marker genes,
+  most-expressed genes, enriched pathways) are filtered to the cell types kept
+  in each subset, so the demos are internally consistent. Built from the public
+  10x Genomics `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the
+  reproducible build. The bundled app (`shiny::runApp("inst")`) now opens on
+  these three data sets so the switcher is visible out of the box; pass a named
+  vector to `createShinyApp()` for your own data (see `vignette("multi_crb")`).
+  New vignette: *Loading multiple data sets (multi-crb) with a dataset
+  switcher*.
+
+## Immune repertoire
+
+- **Clonal UMAP** no longer renders blank when the Immune repertoire tab is
+  opened after visiting another tab (e.g. Main). The plotly renderer was gated
+  on server-reported plot dimensions, which are not yet available when its
+  output element is created on tab switch; plotly sizes itself client-side, so
+  that gate was removed.
+
+# cerebroAppLite 1.7.6
 
 ## Immune repertoire
 
@@ -35,11 +48,6 @@
   from the default tab strip: it is an exploratory check for choosing a
   clone-call resolution rather than a reader-facing figure. Uncomment its
   `tabPanel` to re-enable.
-- **Clonal UMAP** no longer renders blank when the Immune repertoire tab is
-  opened after visiting another tab (e.g. Main). The plotly renderer was gated
-  on server-reported plot dimensions, which are not yet available when its
-  output element is created on tab switch; plotly sizes itself client-side, so
-  that gate was removed.
 
 # cerebroAppLite 1.7.5
 
