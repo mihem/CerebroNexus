@@ -4,28 +4,6 @@ const spatial_projection_layout_2D = window.cerebroProjectionLayout.make2D({
   uirevision: 'true',
 });
 
-// When a real embedded histology image backs the plot, constrain the x/y axes
-// to equal data-unit scaling (scaleanchor) so the plot drawing area keeps the
-// image's aspect ratio. The background image is stretched to fill that area, so
-// without this a non-square image (e.g. the tall MERFISH DAPI mosaic) is
-// squashed and the points drift off the tissue. No-op for every other case, so
-// ordinary projections (UMAP etc.) are unaffected.
-function applyEmbeddedAspectLock(layout_here, params) {
-  const meta = params && params.meta ? params.meta : {};
-  const b = meta.image_bounds;
-  const isEmbedded = meta.is_embedded === true && b &&
-    isFinite(b.xmin) && isFinite(b.xmax) &&
-    isFinite(b.ymin) && isFinite(b.ymax) &&
-    (b.xmax - b.xmin) > 0 && (b.ymax - b.ymin) > 0;
-  if (!isEmbedded) return;
-  // scaleratio = 1 → one x data-unit and one y data-unit occupy the same number
-  // of pixels, so the drawing area's width:height equals (xmax-xmin):(ymax-ymin),
-  // i.e. the image's W:H (bounds are the image extent in coordinate units).
-  layout_here.yaxis = layout_here.yaxis || {};
-  layout_here.yaxis.scaleanchor = 'x';
-  layout_here.yaxis.scaleratio = 1;
-}
-
 // Inject CSS for spatial projection
 // CSS for plot widgets (legends, modebar, drag tip, scroll-down,
 // spatial bg) is now in inst/shiny/www/custom.css. The runtime <style>
@@ -124,6 +102,41 @@ shinyjs.detachModebar = function () {
     .forEach((el) => el.remove());
 };
 
+// Map the background image's data-space extent (image_bounds) onto the plot in
+// PIXELS, so the image sits in the cells' fixed coordinate system instead of the
+// axes bending to fit the image. Returns a rect relative to the wrapper, or null
+// when bounds/axes are unavailable (caller then falls back to filling the area).
+//
+// This is the core of the decoupling: the scatter plot's axes are owned by the
+// cell coordinates alone; the image is a passenger placed via l2p (data→pixel).
+// An image larger than the spot bbox simply overflows the plot area and is
+// clipped by the wrapper's overflow:hidden — the points never move.
+function spatialBgRectFromBounds(plotContainer) {
+  const fl = plotContainer._fullLayout;
+  if (!fl || !fl._size || !fl.xaxis || !fl.yaxis) return null;
+  if (typeof fl.xaxis.l2p !== 'function' || typeof fl.yaxis.l2p !== 'function') {
+    return null;
+  }
+  const bg = document.getElementById('spatial_projection_background');
+  const xmin = parseFloat(bg.dataset.boundsXmin);
+  const xmax = parseFloat(bg.dataset.boundsXmax);
+  const ymin = parseFloat(bg.dataset.boundsYmin);
+  const ymax = parseFloat(bg.dataset.boundsYmax);
+  if (![xmin, xmax, ymin, ymax].every(isFinite) || xmax <= xmin || ymax <= ymin) {
+    return null;
+  }
+  const s = fl._size;
+  // l2p returns pixels relative to the plot-area origin (s.l, s.t).
+  const px = (v) => s.l + fl.xaxis.l2p(v);
+  const py = (v) => s.t + fl.yaxis.l2p(v);
+  const left = px(xmin);
+  const right = px(xmax);
+  // y axis points up, so ymax is the top edge of the image in screen space.
+  const top = py(ymax);
+  const bottom = py(ymin);
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 shinyjs.applySpatialBackground = function () {
   const plotContainer = document.getElementById('spatial_projection');
   const bg = document.getElementById('spatial_projection_background');
@@ -146,19 +159,36 @@ shinyjs.applySpatialBackground = function () {
     const scaleX = parseFloat(bg.dataset.scaleX) || 1;
     const scaleY = parseFloat(bg.dataset.scaleY) || 1;
     const opacity = parseFloat(bg.dataset.opacity);
-    const imgW = parseInt(bg.dataset.imgWidth)  || 0;
+    const imgW = parseInt(bg.dataset.imgWidth) || 0;
     const imgH = parseInt(bg.dataset.imgHeight) || 0;
 
+    // flip is a mirror on top of the placement; scale is an extra user nudge.
     const finalScaleX = (flipX ? -1 : 1) * scaleX;
     const finalScaleY = (flipY ? -1 : 1) * scaleY;
 
-    const size = plotContainer._fullLayout && plotContainer._fullLayout._size ? plotContainer._fullLayout._size : null;
-    if (size) {
-      const plotW = size.w * Math.abs(finalScaleX);
-      const plotH = size.h * Math.abs(finalScaleY);
+    const size =
+      plotContainer._fullLayout && plotContainer._fullLayout._size
+        ? plotContainer._fullLayout._size
+        : null;
+    // Primary path: place the image by mapping its data-space bounds to pixels,
+    // so it aligns to the cells in their own (unchanged) coordinate system.
+    const rect = size ? spatialBgRectFromBounds(plotContainer) : null;
 
+    if (rect) {
+      // Position the div at the mapped rect. flip/scale are applied as a CSS
+      // transform about the rect centre so they mirror in place without moving
+      // the image off its mapped location.
+      bg.style.left = rect.left + 'px';
+      bg.style.top = rect.top + 'px';
+      bg.style.width = rect.width + 'px';
+      bg.style.height = rect.height + 'px';
+      bg.style.transformOrigin = '50% 50%';
+      bg.style.transform =
+        finalScaleX === 1 && finalScaleY === 1
+          ? ''
+          : `scale(${finalScaleX}, ${finalScaleY})`;
       if (imgW > 0 && imgH > 0) {
-        // Render at native resolution via <img> for maximum sharpness
+        // native-resolution <img>, stretched to the mapped rect
         if (!bg._imgEl) {
           const img = document.createElement('img');
           img.style.width = '100%';
@@ -169,81 +199,52 @@ shinyjs.applySpatialBackground = function () {
           bg._imgEl = img;
         }
         bg._imgEl.src = backgroundImage;
-        bg.style.width  = imgW + 'px';
-        bg.style.height = imgH + 'px';
-        bg.style.left   = size.l + 'px';
-        bg.style.top    = size.t + 'px';
-        bg.style.transformOrigin = '0 0';
-        bg.style.transform = `scale(${plotW / imgW}, ${plotH / imgH})`;
+        bg.style.backgroundImage = '';
       } else {
-        // Fallback: CSS background
+        // SVG / dimensionless raster → CSS background stretched to the rect
+        if (bg._imgEl) bg._imgEl.src = '';
         bg.style.backgroundImage = `url("${backgroundImage}")`;
         bg.style.backgroundSize = '100% 100%';
         bg.style.backgroundRepeat = 'no-repeat';
-        bg.style.left   = size.l + 'px';
-        bg.style.top    = size.t + 'px';
-        bg.style.width  = size.w + 'px';
-        bg.style.height = size.h + 'px';
-        // Centre the transform origin so a -1 scale (vertical flip) mirrors the
-        // image in place rather than translating it off the plot area.
-        bg.style.transformOrigin = '50% 50%';
-        bg.style.transform = `scale(${finalScaleX}, ${finalScaleY})`;
       }
       bg.style.opacity = isNaN(opacity) ? 1 : opacity;
 
-      // Create label if it doesn't exist
       if (!label) {
         label = document.createElement('div');
         label.id = 'spatial_background_label';
         label.innerText = 'Towards brain';
         parent.insertBefore(label, bg.nextSibling);
       }
-      // Position label at top center of the background image area
+      // Label sits at the top-centre of the plot drawing area (not the image),
+      // so it stays put regardless of how far the image overflows.
       label.style.display = 'block';
       label.style.left = size.l + size.w / 2 + 'px';
       label.style.top = size.t + 8 + 'px';
       label.style.transform = 'translateX(-50%)';
     } else {
-      // Fallback: no Plotly size info available
+      // Fallback: no bounds or no Plotly geometry yet — fill the wrapper so the
+      // image is at least visible; it will snap to the mapped rect on the next
+      // afterplot once geometry is available.
       const parentW = parent.clientWidth;
       const parentH = parent.clientHeight;
-      if (imgW > 0 && imgH > 0) {
-        if (!bg._imgEl) {
-          const img = document.createElement('img');
-          img.style.width = '100%';
-          img.style.height = '100%';
-          img.style.display = 'block';
-          img.draggable = false;
-          bg.appendChild(img);
-          bg._imgEl = img;
-        }
-        bg._imgEl.src = backgroundImage;
-        bg.style.width  = imgW + 'px';
-        bg.style.height = imgH + 'px';
-        bg.style.left   = '0px';
-        bg.style.top    = '0px';
-        bg.style.transformOrigin = '0 0';
-        bg.style.transform = `scale(${parentW / imgW}, ${parentH / imgH})`;
-      } else {
-        bg.style.backgroundImage = `url("${backgroundImage}")`;
-        bg.style.backgroundSize = '100% 100%';
-        bg.style.backgroundRepeat = 'no-repeat';
-        bg.style.left = '0px';
-        bg.style.top = '0px';
-        bg.style.width = parentW + 'px';
-        bg.style.height = parentH + 'px';
-        bg.style.transform = `scale(${finalScaleX}, ${finalScaleY})`;
-      }
+      if (bg._imgEl) bg._imgEl.src = '';
+      bg.style.backgroundImage = `url("${backgroundImage}")`;
+      bg.style.backgroundSize = '100% 100%';
+      bg.style.backgroundRepeat = 'no-repeat';
+      bg.style.left = '0px';
+      bg.style.top = '0px';
+      bg.style.width = parentW + 'px';
+      bg.style.height = parentH + 'px';
+      bg.style.transformOrigin = '50% 50%';
+      bg.style.transform = `scale(${finalScaleX}, ${finalScaleY})`;
       bg.style.opacity = isNaN(opacity) ? 1 : opacity;
 
-      // Create label if it doesn't exist
       if (!label) {
         label = document.createElement('div');
         label.id = 'spatial_background_label';
         label.innerText = 'Towards brain';
         parent.insertBefore(label, bg.nextSibling);
       }
-      // Position label at top center
       label.style.display = 'block';
       label.style.left = '50%';
       label.style.top = '8px';
@@ -293,9 +294,28 @@ shinyjs.syncSpatialBackground = function (backgroundImage, flipX, flipY, scaleX,
   if (scaleX !== undefined) bg.dataset.scaleX = String(scaleX || 1);
   if (scaleY !== undefined) bg.dataset.scaleY = String(scaleY || 1);
   if (opacity !== undefined) bg.dataset.opacity = String(opacity === null ? 1 : opacity);
-  if (imageBounds !== undefined) {
-    bg.dataset.imgWidth  = String(imageBounds.img_width  || 0);
+  if (imageBounds !== undefined && imageBounds) {
+    bg.dataset.imgWidth = String(imageBounds.img_width || 0);
     bg.dataset.imgHeight = String(imageBounds.img_height || 0);
+    // Data-space extent of the image, used to place it in the cells' coordinate
+    // system (see spatialBgRectFromBounds). Absent/empty → cleared so the rect
+    // helper returns null and the fill-the-area fallback runs.
+    if (
+      imageBounds.xmin !== undefined &&
+      imageBounds.xmax !== undefined &&
+      imageBounds.ymin !== undefined &&
+      imageBounds.ymax !== undefined
+    ) {
+      bg.dataset.boundsXmin = String(imageBounds.xmin);
+      bg.dataset.boundsXmax = String(imageBounds.xmax);
+      bg.dataset.boundsYmin = String(imageBounds.ymin);
+      bg.dataset.boundsYmax = String(imageBounds.ymax);
+    } else {
+      delete bg.dataset.boundsXmin;
+      delete bg.dataset.boundsXmax;
+      delete bg.dataset.boundsYmin;
+      delete bg.dataset.boundsYmax;
+    }
   }
 
   shinyjs.applySpatialBackground();
@@ -730,12 +750,6 @@ shinyjs.updatePlot2DContinuousSpatial = function (params) {
     layout_here.yaxis['autorange'] = false;
     layout_here.yaxis['range'] = params.data.y_range;
   }
-  // When a real embedded histology image is the background, lock the plot's
-  // x/y scales to equal data units (scaleanchor) so the drawing area keeps the
-  // image's aspect ratio. Otherwise the background div — which is stretched to
-  // fill the drawing area — is squashed for non-square images (e.g. the tall
-  // MERFISH DAPI mosaic), pulling points off the tissue.
-  applyEmbeddedAspectLock(layout_here, params);
   if (params.container && params.container.width && params.container.height) {
     layout_here.width = params.container.width;
     layout_here.height = params.container.height;
@@ -1005,9 +1019,6 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
     layout_here.yaxis.autorange = false;
     layout_here.yaxis.range = [...params.data.y_range];
   }
-  // See note above: lock aspect to the embedded image so the stretched-to-fill
-  // background is not distorted for non-square images.
-  applyEmbeddedAspectLock(layout_here, params);
   if (params.container && params.container.width && params.container.height) {
     layout_here.width = params.container.width;
     layout_here.height = params.container.height;
@@ -1034,7 +1045,8 @@ shinyjs.updatePlot2DCategoricalSpatial = function (params) {
       params.meta.background_flip_y,
       params.meta.background_scale_x,
       params.meta.background_scale_y,
-      params.meta.background_opacity
+      params.meta.background_opacity,
+      params.meta.image_bounds
     );
     shinyjs.detachModebar();
   });

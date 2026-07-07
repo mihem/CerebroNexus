@@ -208,15 +208,14 @@ spatial_projection_update_plot <- function(input) {
     }
   }
 
-  ## Axis ranges. The JS stretches the background image to fill the whole plot
-  ## drawing area, so for the embedded real image to align with the cells the
-  ## axes must span the image's extent (not the spot bounding box). Override the
-  ## ranges with the embedded bounds when that image is active. The y-axis stays
-  ## in its natural (ascending) orientation: any top/bottom mismatch between the
-  ## raster and the points is corrected at BUILD time by flipping the stored
-  ## image (see encode_raster_png's `flip_y`), so no runtime reversal is needed —
-  ## and a runtime reversal would be silently dropped on the initial render
-  ## anyway, since `reset_axes` forces autorange there.
+  ## Axis ranges are a property of the CELLS only — never the background image.
+  ## The scatter plot's coordinate system is fixed by the point bounding box (or
+  ## the user's manual range); the background is a passenger that the JS maps into
+  ## that fixed system via its stored `image_bounds` (data-space extent → pixels).
+  ## So we do NOT widen the axes to the image extent here: doing that squashed the
+  ## points (the image is larger than the spot bbox, and — combined with the old
+  ## scaleanchor lock — it blew the y-axis out to negative values). Selecting a
+  ## background must not change the axes at all.
   x_range_out <- plot_parameters[["x_range"]]
   y_range_out <- plot_parameters[["y_range"]]
   using_embedded <-
@@ -230,8 +229,6 @@ spatial_projection_update_plot <- function(input) {
   ## their own `background_flip_y`.
   background_flip_y <- plot_parameters[["background_flip_y"]]
   if (using_embedded) {
-    x_range_out <- c(image_bounds[["xmin"]], image_bounds[["xmax"]])
-    y_range_out <- c(image_bounds[["ymin"]], image_bounds[["ymax"]])
     background_flip_y <- isTRUE(plot_parameters[["embedded_flip_y"]])
   }
 
