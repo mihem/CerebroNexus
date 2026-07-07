@@ -99,27 +99,35 @@ cds <- reduceDimension(
 # via assignInNamespace() on the two affected internal functions only.
 patch_extract_ddrtree_ordering <- function() {
   f <- monocle:::extract_ddrtree_ordering
-  src <- deparse(body(f))
+  orig <- deparse(body(f))
   src <- gsub(
     "graph.dfs(dp_mst, root = root_cell, neimode = \"all\", ",
     "igraph::dfs(dp_mst, root = root_cell, mode = \"all\", ",
-    src,
+    orig,
     fixed = TRUE
   )
   src <- gsub("father = TRUE)", "parent = TRUE)", src, fixed = TRUE)
+  # Fail loudly if the target source ever stops matching (different monocle
+  # build, whitespace change) so the patch can never become a silent no-op.
+  stopifnot(!identical(orig, src))
+  stopifnot(!any(grepl("neimode", src, fixed = TRUE)))
   body(f) <- parse(text = src)[[1]]
   assignInNamespace("extract_ddrtree_ordering", f, ns = "monocle")
 }
 
 patch_project2MST <- function() {
   f <- monocle:::project2MST
-  src <- deparse(body(f))
+  orig <- deparse(body(f))
   src <- gsub(
     "nei(closest_vertex_names[i], ",
     ".nei(closest_vertex_names[i], ",
-    src,
+    orig,
     fixed = TRUE
   )
+  # Fail loudly if the substitution missed, and assert no bare `nei(` remains
+  # (the perl lookbehind allows the intended `.nei(` but rejects `nei(`).
+  stopifnot(!identical(orig, src))
+  stopifnot(!any(grepl("(?<![.])nei\\(", src, perl = TRUE)))
   body(f) <- parse(text = src)[[1]]
   assignInNamespace("project2MST", f, ns = "monocle")
 }
@@ -151,6 +159,14 @@ edges <- data.frame(
   target_dim_1 = Y[edges_list[, 2], 1],
   target_dim_2 = Y[edges_list[, 2], 2],
   stringsAsFactors = FALSE
+)
+
+## Fail loudly if a future re-run silently produces a degenerate trajectory.
+stopifnot(
+  nrow(meta) == length(b_idx),
+  !anyNA(meta$pseudotime),
+  nrow(edges) > 0,
+  all(c("DR_1", "DR_2", "pseudotime", "state") %in% colnames(meta))
 )
 
 crb$addTrajectory(
