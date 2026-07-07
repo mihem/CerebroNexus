@@ -43,8 +43,23 @@ output[["trajectory_projection"]] <- plotly::renderPlotly({
       input[["trajectory_percentage_cells_to_show"]]
     )
 
+    ## Empty-state guard: if group filters removed every cell, `1:nrow` would be
+    ## `1:0` = c(1, 0) and sample() would emit an NA row that crashes the plot.
+    if (nrow(cells_df) == 0) {
+      return(
+        plotly::plotly_empty(type = "scatter", mode = "markers") %>%
+          plotly::layout(
+            title = list(
+              text = "No cells match the current filters.",
+              x = 0.5,
+              y = 0.5
+            )
+          )
+      )
+    }
+
     ## put rows in random order
-    cells_df <- cells_df[sample(1:nrow(cells_df)), ]
+    cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
 
     incProgress(0.4, detail = "Preparing trajectory lines...")
 
