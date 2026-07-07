@@ -712,6 +712,26 @@ randomlySubsetCells <- function(table, percentage) {
 }
 
 ##----------------------------------------------------------------------------##
+## Merge a trajectory's per-cell meta data (DR_1/DR_2/pseudotime/state) with the
+## data set's full meta data, aligned BY CELL BARCODE.
+##
+## A trajectory may cover only a SUBSET of cells (e.g. a monocle2 trajectory
+## computed on B cells only). The trajectory meta data frame therefore has fewer
+## rows than getMetaData(), and its rownames are the covered cells' barcodes. A
+## positional `cbind()` would crash ("differing number of rows") or, worse,
+## silently mis-align cells. This joins on the barcode so every cell keeps its
+## own coordinates and cells outside the trajectory get NA pseudotime (which the
+## callers then drop via `filter(!is.na(pseudotime))`). The full meta data is the
+## left side, so the result has one row per cell in getMetaData() order.
+##----------------------------------------------------------------------------##
+mergeTrajectoryWithMetaData <- function(trajectory_data) {
+  trajectory_meta <- trajectory_data[["meta"]]
+  trajectory_meta[["cell_barcode"]] <- rownames(trajectory_meta)
+  getMetaData() %>%
+    dplyr::left_join(trajectory_meta, by = "cell_barcode")
+}
+
+##----------------------------------------------------------------------------##
 ## Calculate X-Y ranges for projections.
 ##----------------------------------------------------------------------------##
 getXYranges <- function(table) {

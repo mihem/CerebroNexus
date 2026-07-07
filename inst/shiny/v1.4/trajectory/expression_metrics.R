@@ -117,7 +117,7 @@ output[["trajectory_states_nUMI_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = cbind(trajectory_data, getMetaData()),
+    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
     metric = "nUMI",
     coloring_variable = "state",
     colors = state_colors,
@@ -164,7 +164,7 @@ output[["trajectory_states_nGene_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = cbind(trajectory_data, getMetaData()),
+    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
     metric = "nGene",
     coloring_variable = "state",
     colors = state_colors,
@@ -214,7 +214,7 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = cbind(trajectory_data, getMetaData()),
+    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
     metric = mito_col,
     coloring_variable = "state",
     colors = state_colors,
@@ -264,7 +264,7 @@ output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = cbind(trajectory_data, getMetaData()),
+    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
     metric = ribo_col,
     coloring_variable = "state",
     colors = state_colors,
@@ -314,7 +314,7 @@ output[["trajectory_states_percent_ery_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = cbind(trajectory_data, getMetaData()),
+    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
     metric = ery_col,
     coloring_variable = "state",
     colors = state_colors,

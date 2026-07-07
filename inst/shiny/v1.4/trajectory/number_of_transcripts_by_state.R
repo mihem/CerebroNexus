@@ -49,10 +49,7 @@ output[["states_nUMI_plot"]] <- plotly::renderPlotly({
   )
 
   ##
-  cbind(
-    trajectory_data[["meta"]],
-    getMetaData()
-  ) %>%
+  mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime)) %>%
     plotly::plot_ly(
       x = ~state,

@@ -70,7 +70,7 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   selected_cells <- trajectory_projection_selected_cells()
 
   ## extract cells for table
-  cells_df <- cbind(trajectory_data[["meta"]], getMetaData()) %>%
+  cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime))
 
   ## filter out non-selected cells with X-Y identifier

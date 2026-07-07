@@ -47,7 +47,7 @@ observeEvent(input[["trajectory_projection_export"]], {
     )
 
     ## build data frame with data
-    cells_df <- cbind(trajectory_data[["meta"]], getMetaData()) %>%
+    cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
       dplyr::filter(!is.na(pseudotime))
 
     ## randomly remove cells (if necessary)

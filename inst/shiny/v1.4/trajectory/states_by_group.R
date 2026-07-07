@@ -102,7 +102,7 @@ output[["states_by_group_plot"]] <- plotly::renderPlotly({
   )
 
   ## merge trajectory data with meta data
-  cells_df <- cbind(trajectory_data[["meta"]], getMetaData())
+  cells_df <- mergeTrajectoryWithMetaData(trajectory_data)
 
   ##
   grouping_variable <- input[["states_by_group_select_other_group"]]
@@ -179,7 +179,7 @@ output[["states_by_group_table"]] <- DT::renderDataTable({
   )
 
   ## merge trajectory data with meta data
-  cells_df <- cbind(trajectory_data[["meta"]], getMetaData())
+  cells_df <- mergeTrajectoryWithMetaData(trajectory_data)
 
   ##
   grouping_variable <- input[["states_by_group_select_other_group"]]

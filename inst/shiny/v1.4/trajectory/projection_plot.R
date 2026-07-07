@@ -14,7 +14,7 @@ output[["trajectory_projection"]] <- plotly::renderPlotly({
     trajectory_data <- trajectory_data_reactive()
 
     ## build data frame with data
-    cells_df <- cbind(trajectory_data[["meta"]], getMetaData()) %>%
+    cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
       dplyr::filter(!is.na(pseudotime))
 
     incProgress(0.2, detail = "Filtering cells...")
