@@ -143,7 +143,11 @@ shinyjs.applySpatialBackground = function () {
   if (!plotContainer || !bg) return;
 
   const backgroundImage = bg.dataset.backgroundImage;
-  const parent = bg.parentElement;
+  // The label must live in the WRAPPER, not in the clip layer (which is
+  // overflow:hidden and would cut it off). bg.parentElement becomes the clip
+  // layer after the first placement, so resolve the wrapper explicitly.
+  const parent =
+    document.getElementById('spatial_projection_wrapper') || bg.parentElement;
 
   // Get or create the label element
   let label = document.getElementById('spatial_background_label');
@@ -185,11 +189,35 @@ shinyjs.applySpatialBackground = function () {
     const rect = size ? spatialBgRectFromBounds(plotContainer) : null;
 
     if (rect) {
-      // Position the div at the mapped rect. The interactive move/flip/scale/
+      // Clip layer: a box sized to exactly the plot DRAWING AREA (inside the
+      // axes), with overflow:hidden. The background div lives inside it, so any
+      // part of the image that falls outside the axes — however it was moved,
+      // scaled or flipped — is simply hidden, and the axis ticks/frame stay
+      // visible. This layer carries no transform of its own, so the image's CSS
+      // transform can't drag the clip box around.
+      const size2 = plotContainer._fullLayout._size;
+      let clip = document.getElementById('spatial_projection_clip');
+      if (!clip) {
+        clip = document.createElement('div');
+        clip.id = 'spatial_projection_clip';
+        clip.style.position = 'absolute';
+        clip.style.overflow = 'hidden';
+        clip.style.pointerEvents = 'none';
+        clip.style.zIndex = '0';
+        bg.parentElement.insertBefore(clip, bg);
+      }
+      if (bg.parentElement !== clip) clip.appendChild(bg);
+      clip.style.left = size2.l + 'px';
+      clip.style.top = size2.t + 'px';
+      clip.style.width = size2.w + 'px';
+      clip.style.height = size2.h + 'px';
+
+      // Position the div at the mapped rect, now expressed RELATIVE to the clip
+      // layer (subtract the clip's own origin). The interactive move/flip/scale/
       // rotate are then applied as ONE CSS transform about the rect centre, so
       // they shift/mirror/spin the image in place without moving the points.
-      bg.style.left = rect.left + 'px';
-      bg.style.top = rect.top + 'px';
+      bg.style.left = rect.left - size2.l + 'px';
+      bg.style.top = rect.top - size2.t + 'px';
       bg.style.width = rect.width + 'px';
       bg.style.height = rect.height + 'px';
       bg.style.transformOrigin = '50% 50%';
@@ -261,7 +289,7 @@ shinyjs.applySpatialBackground = function () {
         label = document.createElement('div');
         label.id = 'spatial_background_label';
         label.innerText = 'Towards brain';
-        parent.insertBefore(label, bg.nextSibling);
+        parent.appendChild(label);
       }
       // Label sits at the top-centre of the plot drawing area (not the image),
       // so it stays put regardless of how far the image overflows.
@@ -295,7 +323,7 @@ shinyjs.applySpatialBackground = function () {
         label = document.createElement('div');
         label.id = 'spatial_background_label';
         label.innerText = 'Towards brain';
-        parent.insertBefore(label, bg.nextSibling);
+        parent.appendChild(label);
       }
       label.style.display = 'block';
       label.style.left = '50%';
