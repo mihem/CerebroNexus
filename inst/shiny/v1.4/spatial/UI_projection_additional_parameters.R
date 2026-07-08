@@ -104,9 +104,12 @@ output[["spatial_projection_additional_parameters_UI"]] <- renderUI({
         "input.spatial_projection_background_image && ",
         "input.spatial_projection_background_image !== 'No Background'"
       ),
-      tags$hr(style = "margin: 12px 0 8px;"),
+      tags$hr(style = "margin: 16px 0 10px; border-top: 2px solid #ccc;"),
       tags$div(
-        style = "font-weight: 600; margin-bottom: 6px;",
+        style = paste0(
+          "font-size: 15px; font-weight: 700; margin-bottom: 8px; ",
+          "text-transform: uppercase; letter-spacing: 0.04em; color: #337ab7;"
+        ),
         "Background image"
       ),
       sliderInput(
