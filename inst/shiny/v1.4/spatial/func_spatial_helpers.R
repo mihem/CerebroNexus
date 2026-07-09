@@ -1,12 +1,10 @@
 ##----------------------------------------------------------------------------##
 ## Spatial helper functions, sourced into the app so the Spatial tab works in a
-## plain `runApp("inst")` session WITHOUT the package installed.
+## plain `runApp("inst")` session without the package installed.
 ##
-## These are byte-for-byte the same functions as R/spatial-helpers.R. That file
-## is the package-API copy (tested via cerebroAppLite:::), reachable only when
-## the package is installed; this copy is what the tab actually calls at runtime
-## (bare names, resolved from the sourced server scope like utility_functions.R).
-## Keep the two in sync — see R/spatial-helpers.R for the full roxygen docs.
+## This file is the single implementation used by the Shiny runtime and the
+## unit tests. Keep runtime-only helpers here instead of duplicating them under
+## R/.
 ##
 ## External calls stay namespaced (ape::Moran.I, grDevices::chull, stats::*), so
 ## only the host packages need to be installed, not cerebroAppLite itself.
