@@ -190,18 +190,27 @@ serverSideGeneSelector(
 ## Co-expression channel gene pickers. Same server-side population + active gate
 ## as the feature selector, so their later:: callbacks don't leak into other
 ## tabs' tests when no spatial data is present.
-for (channel_id in c(
-  "spatial_projection_coexpr_r",
-  "spatial_projection_coexpr_g",
-  "spatial_projection_coexpr_b"
-)) {
-  serverSideGeneSelector(
-    session,
-    channel_id,
-    extra_triggers = function() input[["spatial_projection_plot_type"]],
-    active = function() length(availableSpatial()) > 0
-  )
-}
+##
+## Use lapply, NOT a for loop: serverSideGeneSelector references the input id
+## lazily, and a for loop's index variable is a single shared binding — all
+## three registrations would capture its final value ("...coexpr_b"), so only
+## the blue channel would get a working server-side search. lapply gives each
+## iteration its own `channel_id` argument, so each selector binds correctly.
+lapply(
+  c(
+    "spatial_projection_coexpr_r",
+    "spatial_projection_coexpr_g",
+    "spatial_projection_coexpr_b"
+  ),
+  function(channel_id) {
+    serverSideGeneSelector(
+      session,
+      channel_id,
+      extra_triggers = function() input[["spatial_projection_plot_type"]],
+      active = function() length(availableSpatial()) > 0
+    )
+  }
+)
 
 ## Render even when tab is hidden so that input values are available for
 ## programmatic access (e.g. shinytest2) without waiting for tab activation.
