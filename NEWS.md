@@ -1,3 +1,29 @@
+# cerebroAppLite 2.0.0
+
+## Spatial analysis and overlay improvements
+
+- **Multi-gene co-expression**: a new "Co-expression (RGB)" plot type maps up to
+  three genes onto the red / green / blue channels, so each cell's colour blends
+  the genes it expresses and spatial co-localisation reads as a mixed hue.
+- **Spatial autocorrelation**: ImageFeaturePlot now reports the displayed gene's
+  Moran's I — how spatially clustered its expression is (large slides are
+  down-sampled for a responsive, stable score).
+- **Region outlines**: an opt-in toggle outlines each colour group's spatial
+  region with its convex hull.
+- **Copy alignment as preset**: after hand-aligning a histology overlay, a button
+  emits the matching `spatial_images_*` `Cerebro.options` lines to paste into an
+  app so the dataset ships pre-aligned.
+- **Honest single-source overlay scale**: the background scale is now applied
+  once (a squared-scale bug is fixed), the image is clipped to the plot area so
+  it no longer covers the axes, and the default view is evenly framed.
+- **Overlay controls UX**: interacting with any Additional-parameters control
+  collapses the Main-parameters box, and the Additional panel scrolls internally
+  (hidden scrollbar with soft top/bottom fades), so the plot stays visible while
+  adjusting Move/Rotate.
+- **Fixes**: switching from an image-bearing platform to a bead-only one
+  (Slide-seq) no longer leaves a stale tissue image behind, and the embedded-image
+  option is offered only for datasets that actually carry one.
+
 # cerebroAppLite 1.8.0
 
 ## Spatial transcriptomics (interactive tab + histology overlay)
