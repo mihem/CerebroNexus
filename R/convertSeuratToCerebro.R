@@ -675,12 +675,16 @@ convertSeuratToCerebro <- function(
       ))
     }
 
-    # Get expression matrix
+    # Get expression matrix. Top-level conversion entry point: opt into legacy
+    # cross-semantic layer fallback so a Seurat v5 counts-only assay requested
+    # at the default slot = "data" still converts (as it did on master) instead
+    # of hard-stopping. The fallback warns, so it is never silent.
     expr_matrix <- .getExpressionMatrix(
       seurat,
       assay = assay,
       slot = slot,
-      join_samples = TRUE
+      join_samples = TRUE,
+      allow_cross_semantic_fallback = TRUE
     )
 
     # Initialize list structures

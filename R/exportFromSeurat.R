@@ -312,12 +312,19 @@ exportFromSeurat <- function(
   ## add transcript counts
   ##--------------------------------------------------------------------------##
 
-  ## get expression data using shared utility function
+  ## get expression data using shared utility function. This is a top-level,
+  ## user-facing export entry point whose job is to get the object out to a
+  ## .crb, so it opts into legacy cross-semantic layer fallback (e.g. a
+  ## Seurat v5 RNA assay with only a `counts` layer, requested at the default
+  ## slot = "data"). Without this the export would hard-stop here — before even
+  ## reaching the spatial block — on objects that exported fine on master. The
+  ## fallback itself warns, so the substitution is never silent.
   expression_data <- .getExpressionMatrix(
     seurat = object,
     assay = assay,
     slot = slot,
     join_samples = FALSE,
+    allow_cross_semantic_fallback = TRUE,
     verbose = verbose
   )
 

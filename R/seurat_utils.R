@@ -113,11 +113,23 @@
     available_layers <- SeuratObject::Layers(seurat[[assay]])
 
     expression_data <- try(
-      Seurat::GetAssayData(seurat, assay = assay, layer = layer_name),
+      suppressWarnings(
+        Seurat::GetAssayData(seurat, assay = assay, layer = layer_name)
+      ),
       silent = TRUE
     )
 
-    if (inherits(expression_data, "try-error")) {
+    ## Seurat v5 does NOT error on a missing layer: GetAssayData(layer = "data")
+    ## on a counts-only assay returns an EMPTY matrix (0 rows/cols) plus a
+    ## warning. Treat that the same as a hard failure so the fallback path runs;
+    ## otherwise the empty matrix sails through to the downstream emptiness stop
+    ## and the object can never be exported (the counts-only v5 regression).
+    layer_unavailable <- inherits(expression_data, "try-error") ||
+      is.null(expression_data) ||
+      nrow(expression_data) == 0 ||
+      ncol(expression_data) == 0
+
+    if (layer_unavailable) {
       if (verbose) {
         message(
           "[",
@@ -140,8 +152,30 @@
         allow_cross_semantic = allow_cross_semantic_fallback
       )
       fallback_candidates <- setdiff(fallback_candidates, layer_name)
+      ## semantic root = layer name without a split-layer numeric suffix, matching
+      ## .filter_same_semantic_layers (e.g. "data.1" -> "data").
+      semantic_root <- function(x) sub("\\.[0-9]+$", "", x)
       for (fallback_layer in fallback_candidates) {
-        if (verbose) {
+        if (semantic_root(fallback_layer) != semantic_root(layer_name)) {
+          ## A cross-semantic substitution (e.g. requested `data`, served
+          ## `counts`) changes what the numbers MEAN, so surface it
+          ## unconditionally — a verbose-only message would let a
+          ## normalised-vs-raw swap pass unnoticed.
+          warning(
+            "Requested layer `",
+            layer_name,
+            "` not found in `",
+            assay,
+            "` assay; falling back to `",
+            fallback_layer,
+            "`. Values now reflect `",
+            fallback_layer,
+            "`, not `",
+            layer_name,
+            "`.",
+            call. = FALSE
+          )
+        } else if (verbose) {
           message(
             "[",
             format(Sys.time(), "%H:%M:%S"),
@@ -150,15 +184,25 @@
             "`"
           )
         }
-        expression_data <- Seurat::GetAssayData(
-          seurat,
-          assay = assay,
-          layer = fallback_layer
+        expression_data <- suppressWarnings(
+          Seurat::GetAssayData(
+            seurat,
+            assay = assay,
+            layer = fallback_layer
+          )
         )
         break
       }
 
-      if (inherits(expression_data, "try-error")) {
+      ## Still unavailable if no candidate was tried (empty fallback set) or the
+      ## chosen layer came back empty — mirror the layer_unavailable test above
+      ## so an empty matrix can never masquerade as a successful fallback.
+      still_unavailable <- inherits(expression_data, "try-error") ||
+        is.null(expression_data) ||
+        nrow(expression_data) == 0 ||
+        ncol(expression_data) == 0
+
+      if (still_unavailable) {
         stop(
           paste0(
             "Layer `",
