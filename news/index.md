@@ -1,5 +1,27 @@
 # Changelog
 
+## cerebroAppLite 2.0.1
+
+### Robustness, performance, and deprecation cleanup
+
+- **Fixes**: table rendering no longer errors on selected-cell slices
+  whose `percent_mt` / `percent_ribo` columns are all `NA`, and the
+  details table tolerates the transient `NULL` / `NA` a `materialSwitch`
+  can emit while its UI re-renders; the group-centre helper returns an
+  empty result instead of crashing when its grouping column is missing.
+- **Plot caching**: projection hover-info, the groups and trajectory
+  expression-metric violins, the groups composition bar/Sankey plot, and
+  the Moran’s I score are now cached per dataset (session-scoped,
+  invalidated on dataset switch), so switching genes or re-rendering no
+  longer recomputes them. The pseudotime plot selects `scattergl`
+  up-front instead of converting the whole figure afterwards.
+- **Deprecations**: replaced
+  [`aes_string()`](https://ggplot2.tidyverse.org/reference/aes_.html)
+  with the `.data[[ ]]` pronoun and wrapped tidy-select group variables
+  in [`all_of()`](https://tidyselect.r-lib.org/reference/all_of.html),
+  which also removes the per-call warning and roughly halves the
+  composition cross-tabulation on large tables.
+
 ## cerebroAppLite 2.0.0
 
 ### Spatial analysis and overlay improvements

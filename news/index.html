@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">cerebroAppLite</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,6 +68,18 @@
       <small>Source: <a href="https://github.com/mihem/cerebroAppLite/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="2.0.1" id="cerebroapplite-201">cerebroAppLite 2.0.1<a class="anchor" aria-label="anchor" href="#cerebroapplite-201"></a></h2>
+<div class="section level3">
+<h3 id="robustness-performance-and-deprecation-cleanup-2-0-1">Robustness, performance, and deprecation cleanup<a class="anchor" aria-label="anchor" href="#robustness-performance-and-deprecation-cleanup-2-0-1"></a></h3>
+<ul><li>
+<strong>Fixes</strong>: table rendering no longer errors on selected-cell slices whose <code>percent_mt</code> / <code>percent_ribo</code> columns are all <code>NA</code>, and the details table tolerates the transient <code>NULL</code> / <code>NA</code> a <code>materialSwitch</code> can emit while its UI re-renders; the group-centre helper returns an empty result instead of crashing when its grouping column is missing.</li>
+<li>
+<strong>Plot caching</strong>: projection hover-info, the groups and trajectory expression-metric violins, the groups composition bar/Sankey plot, and the Moran’s I score are now cached per dataset (session-scoped, invalidated on dataset switch), so switching genes or re-rendering no longer recomputes them. The pseudotime plot selects <code>scattergl</code> up-front instead of converting the whole figure afterwards.</li>
+<li>
+<strong>Deprecations</strong>: replaced <code><a href="https://ggplot2.tidyverse.org/reference/aes_.html" class="external-link">aes_string()</a></code> with the <code>.data[[ ]]</code> pronoun and wrapped tidy-select group variables in <code><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of()</a></code>, which also removes the per-call warning and roughly halves the composition cross-tabulation on large tables.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="2.0.0" id="cerebroapplite-200">cerebroAppLite 2.0.0<a class="anchor" aria-label="anchor" href="#cerebroapplite-200"></a></h2>
 <div class="section level3">
