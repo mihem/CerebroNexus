@@ -827,6 +827,18 @@ getGenesForGeneSet <- function(gene_set) {
 ## Function to calculate center of groups in projections/trajectories.
 ##----------------------------------------------------------------------------##
 centerOfGroups <- function(coordinates, df, n_dimensions, group) {
+  ## Guard against a missing grouping column: callers occasionally pass a
+  ## group that isn't present in df (e.g. a metadata column dropped for a
+  ## selected-cells slice), which would otherwise make df[[group]] NULL and
+  ## crash the tibble construction. Return a typed empty result instead.
+  if (is.null(group) || !group %in% colnames(df)) {
+    return(tidyr::tibble(
+      group = character(),
+      x_median = numeric(),
+      y_median = numeric(),
+      z_median = numeric()
+    ))
+  }
   ## check number of dimenions in projection
   ## ... 2 dimensions
   if (n_dimensions == 2) {
@@ -836,7 +848,7 @@ centerOfGroups <- function(coordinates, df, n_dimensions, group) {
       y = coordinates[[2]],
       group = df[[group]]
     ) %>%
-      dplyr::group_by(group) %>%
+      dplyr::group_by(.data$group) %>%
       dplyr::summarise(
         x_median = median(x),
         y_median = median(y),
@@ -853,7 +865,7 @@ centerOfGroups <- function(coordinates, df, n_dimensions, group) {
       z = coordinates[[3]],
       group = df[[group]]
     ) %>%
-      dplyr::group_by(group) %>%
+      dplyr::group_by(.data$group) %>%
       dplyr::summarise(
         x_median = median(x),
         y_median = median(y),
