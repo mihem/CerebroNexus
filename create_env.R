@@ -71,6 +71,7 @@ rix(
     "HDF5Array",
     "httr",
     "igraph",
+    "later",
     "Matrix",
     "msigdbr",
     "pbapply",
