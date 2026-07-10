@@ -63,10 +63,10 @@ observeEvent(input[["trajectory_projection_export"]], {
     plot <- ggplot() +
       geom_point(
         data = cells_df,
-        aes_string(
-          x = colnames(cells_df)[1],
-          y = colnames(cells_df)[2],
-          fill = input[["trajectory_point_color"]]
+        aes(
+          x = .data[[colnames(cells_df)[1]]],
+          y = .data[[colnames(cells_df)[2]]],
+          fill = .data[[input[["trajectory_point_color"]]]]
         ),
         shape = 21,
         size = input[["trajectory_point_size"]] / 3,

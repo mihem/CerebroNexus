@@ -22,10 +22,10 @@ pltExpTrj2DSglPanExp <- function(
   plot <- ggplot() +
     geom_point(
       data = df,
-      aes_string(
-        x = colnames(df)[1],
-        y = colnames(df)[2],
-        fill = as.name("level")
+      aes(
+        x = .data[[colnames(df)[1]]],
+        y = .data[[colnames(df)[2]]],
+        fill = .data[["level"]]
       ),
       shape = 21,
       size = point_size / 3,
