@@ -24,8 +24,6 @@
   (Slide-seq) no longer leaves a stale tissue image behind, and the embedded-image
   option is offered only for datasets that actually carry one.
 
-# cerebroAppLite 1.8.0
-
 ## Spatial transcriptomics (interactive tab + histology overlay)
 
 - **Spatial tab**: the interactive Spatial projection is now wired into the app.
@@ -52,6 +50,18 @@
   `demo_bcell_rich.crb`) are no longer shipped — the Full set is their superset;
   `data-raw/build_ir_demos.R` can still rebuild them for a multi-sample demo.
 
+## Spatial transcriptomics (backend)
+
+- **Spatial data layer**: the `Cerebro_v1.3` class gains a `spatial` field with
+  `addSpatialData()`, `getSpatialData()`, and `availableSpatial()` accessors.
+- **Export support**: `exportFromSeurat()` now extracts spatial coordinates and
+  expression from Seurat v5 image slots (Visium / Xenium / FOV) via the internal
+  `.getSpatialData()` helper, storing them per image in the exported `.crb`.
+- **Utility wrappers**: added `availableSpatial()`, `getSpatialData()`, and
+  `serverSideGeneSelector()` in the Shiny utility layer.
+- **Demo dataset**: bundled a synthetic Xenium spatial demo
+  (`demo_spatial.crb`, 1,000 cells) as a fifth demo dataset.
+
 # cerebroAppLite 1.7.8
 
 ## Trajectory tab
@@ -69,21 +79,6 @@
   `demo_full_tcr_bcr.crb` demo (computed on its B-cell subset) instead of a
   separate `demo_trajectory.crb`, so one demo shows TCR + BCR + trajectory. The
   trajectory is reproducible via `data-raw/build_trajectory_demo.R`.
-
-## Spatial transcriptomics (backend)
-
-- **Spatial data layer**: the `Cerebro_v1.3` class gains a `spatial` field with
-  `addSpatialData()`, `getSpatialData()`, and `availableSpatial()` accessors.
-- **Export support**: `exportFromSeurat()` now extracts spatial coordinates and
-  expression from Seurat v5 image slots (Visium / Xenium / FOV) via the internal
-  `.getSpatialData()` helper, storing them per image in the exported `.crb`.
-- **Utility wrappers**: added `availableSpatial()`, `getSpatialData()`, and
-  `serverSideGeneSelector()` in the Shiny utility layer.
-- **Demo dataset**: bundled a synthetic Xenium spatial demo
-  (`demo_spatial.crb`, 1,000 cells) as a fifth demo dataset.
-
-Note: the interactive Spatial tab (Shiny module) is not yet wired up; this
-release ports only the backend data layer.
 
 # cerebroAppLite 1.7.7
 
