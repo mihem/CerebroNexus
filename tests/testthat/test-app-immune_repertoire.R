@@ -85,9 +85,11 @@ test_that("Group by is visible on plots whose grouping it drives", {
   # Global controls are now rendered server-side per tab (no conditionalPanel),
   # so visibility = the control element exists and is laid out.
   groupby_visible <- function() {
-    app$get_js(
-      "(function(){var e=document.querySelector('#ir_groupBy');return e!==null && e.offsetParent!==null;})();"
+    app$wait_for_js(
+      "(function(){var e=document.querySelector('#ir_groupBy');return !!e && e.offsetParent!==null;})()",
+      timeout = 15000
     )
+    TRUE
   }
   n_options <- function(id) {
     app$get_js(sprintf(
@@ -159,9 +161,11 @@ test_that("Chain is visible on plots whose scRepertoire API accepts it", {
   app$wait_for_idle(timeout = 20000)
 
   chain_visible <- function() {
-    app$get_js(
-      "(function(){var e=document.querySelector('#ir_chain');return e!==null && e.offsetParent!==null;})();"
+    app$wait_for_js(
+      "(function(){var e=document.querySelector('#ir_chain');return !!e && e.offsetParent!==null;})()",
+      timeout = 15000
     )
+    TRUE
   }
 
   app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
@@ -231,6 +235,13 @@ test_that("settings dropdowns render all their options (not just selected)", {
   app$wait_for_idle(timeout = 20000)
 
   n_options <- function(id) {
+    app$wait_for_js(
+      sprintf(
+        "(function(){var e=document.querySelector('#%s');return !!e && e.querySelectorAll('option').length>0;})()",
+        id
+      ),
+      timeout = 15000
+    )
     app$get_js(sprintf(
       "(function(){var e=document.querySelector('#%s');return e?e.querySelectorAll('option').length:0;})();",
       id
@@ -272,6 +283,10 @@ test_that("immune_repertoire tab can be opened and renders settings", {
   # Chain is hidden on the default Clonal UMAP tab; move to one that shows it.
   app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
   app$wait_for_idle(timeout = 15000)
+  app$wait_for_js(
+    'document.querySelector("#ir_chain") !== null',
+    timeout = 15000
+  )
 
   # the chain selector (a core settings control) should be populated
   chain_present <- app$get_js(
@@ -332,6 +347,13 @@ test_that("Clonal UMAP tab renders with receptor + projection selectors", {
   app$wait_for_idle(timeout = 20000)
 
   n_options <- function(id) {
+    app$wait_for_js(
+      sprintf(
+        "(function(){var e=document.querySelector('#%s');return !!e && e.querySelectorAll('option').length>0;})()",
+        id
+      ),
+      timeout = 15000
+    )
     app$get_js(sprintf(
       "(function(){var e=document.querySelector('#%s');return e?e.querySelectorAll('option').length:0;})();",
       id
@@ -343,6 +365,10 @@ test_that("Clonal UMAP tab renders with receptor + projection selectors", {
   # The interactive plotly UMAP should render a plotly canvas (not an R error).
   # Non-faceted Clonal UMAP now renders through the shared projection engine, so
   # the plotly host is #ir_clonalUMAP_projection (not the old #ir_plot_clonalUMAP).
+  app$wait_for_js(
+    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
+    timeout = 20000
+  )
   has_plotly <- app$get_js(
     "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null;"
   )
@@ -376,6 +402,10 @@ test_that("Display options panel exposes scatter params on scatter-type tabs", {
   # Abundance (non-scatter): base display params present, scatter ones absent.
   app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
   app$wait_for_idle(timeout = 15000)
+  app$wait_for_js(
+    "document.querySelector('#ir_d_base_size') !== null && document.querySelector('#ir_d_point_size') === null",
+    timeout = 15000
+  )
   expect_true(isTRUE(control_exists("ir_d_base_size")))
   expect_false(isTRUE(control_exists("ir_d_point_size")))
 
@@ -449,6 +479,10 @@ test_that("Clonal UMAP has Show-all toggle and group filters", {
 
   # The interactive plotly UMAP should render a plotly canvas (not an R error).
   # Non-faceted host is the shared projection engine's #ir_clonalUMAP_projection.
+  app$wait_for_js(
+    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
+    timeout = 20000
+  )
   has_plotly <- app$get_js(
     "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null;"
   )
@@ -478,6 +512,10 @@ test_that("Clonal UMAP switches to static facets only when grouped", {
 
   # Ungrouped: the non-faceted host renders through the shared projection engine
   # (#ir_clonalUMAP_projection); grouping swaps in the static faceted ggplot.
+  app$wait_for_js(
+    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
+    timeout = 20000
+  )
   expect_true(isTRUE(exists_el("#ir_p_umap_group_by")))
   expect_true(isTRUE(exists_el("#ir_clonalUMAP_projection .plotly")))
   expect_false(isTRUE(exists_el("#ir_plot_clonalUMAP_static img")))
@@ -539,6 +577,10 @@ test_that("Clone call is hidden on the Clonal UMAP tab", {
   # On Abundance it should be back.
   app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
   app$wait_for_idle(timeout = 15000)
+  app$wait_for_js(
+    "document.querySelector('#ir_cloneCall') !== null",
+    timeout = 15000
+  )
   expect_true(isTRUE(exists_el("#ir_cloneCall")))
 
   app$stop()
