@@ -73,12 +73,13 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime))
 
-  ## filter out non-selected cells with X-Y identifier
+  ## filter out non-selected cells with X-Y identifier. The projection plots the
+  ## DR_1 / DR_2 coordinates, and the persistent selection keys cells on those
+  ## same coordinates, so the identifier here must be built from DR_1 / DR_2 too.
   cells_df <- cells_df %>%
-    dplyr::rename(X1 = 1, X2 = 2) %>%
-    dplyr::mutate(identifier = paste0(X1, '-', X2)) %>%
+    dplyr::mutate(identifier = paste0(DR_1, '-', DR_2)) %>%
     dplyr::filter(identifier %in% selected_cells$identifier) %>%
-    dplyr::select(-c(X1, X2, identifier)) %>%
+    dplyr::select(-identifier) %>%
     dplyr::select(cell_barcode, everything())
 
   ## check how many cells are left after filtering

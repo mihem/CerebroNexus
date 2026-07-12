@@ -123,53 +123,31 @@ code, pre {
 pre { padding: 12px; border: 1px solid var(--c-border); }
 
 /* -------------------------------------------------------------------------
-   Header (topbar) — clean white bar, hairline bottom border
+   Header (topbar) — REMOVED. DeepSeek-style: no top bar, no hamburger. The
+   brand moves into the sidebar and the content lifts up to fill the space.
    ------------------------------------------------------------------------- */
-/* White header surface. The bottom hairline lives ONLY on .main-header — the
-   inner .logo and .navbar are 1-3px shorter, so bordering them too stacked
-   two or three parallel lines. Keep the border on the outer bar only. */
-body.skin-blue .main-header,
-body.skin-blue .main-header .navbar,
-body.skin-blue .main-header .logo {
-  background: var(--c-white) !important;
-  color: var(--c-text) !important;
-  border-bottom: none !important;
+/* Collapse the whole top bar (navbar + sidebar-toggle) to zero height so it
+   holds no space and cuts no seam between sidebar and content. */
+body.skin-blue .main-header {
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
   box-shadow: none !important;
 }
-body.skin-blue .main-header {
-  border-bottom: 1px solid var(--c-border) !important;
+body.skin-blue .main-header .navbar,
+body.skin-blue .main-header .logo,
+body.skin-blue .main-header .sidebar-toggle {
+  display: none !important;
 }
-body.skin-blue .main-header .logo {
-  font-family: var(--font-sans) !important;
-  font-weight: 700 !important;
-  font-size: 18px !important;
-  letter-spacing: -0.02em !important;
-  color: var(--c-text) !important;
-}
-/* R-side stuffs an inline white-colored <span> into .logo; force it visible. */
-body.skin-blue .main-header .logo > span[style] {
-  color: var(--c-text) !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
-}
-body.skin-blue .main-header .logo:hover { background: var(--c-surface-2) !important; }
-body.skin-blue .main-header .navbar .sidebar-toggle {
-  color: var(--c-text-2) !important;
-  background: transparent !important;
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
-}
-body.skin-blue .main-header .navbar .sidebar-toggle:hover {
-  color: var(--c-text) !important;
-  background: var(--c-surface-2) !important;
-}
-body.skin-blue .main-header .navbar-custom-menu > .navbar-nav > li > a {
-  color: var(--c-text-2) !important;
-  background: transparent !important;
-}
-body.skin-blue .main-header .navbar-custom-menu > .navbar-nav > li > a:hover {
-  color: var(--c-text) !important;
-  background: var(--c-surface-2) !important;
-}
+/* AdminLTE's `fixed` layout offsets both the sidebar and the content by the
+   50px header height — via `padding-top: 50px` (NOT margin). With the header
+   gone, zero it. Sidebar goes fully flush; the content-wrapper's own top inset
+   (18px) is reasserted with !important in the wrapper rule below so content
+   keeps a little breathing room but loses the phantom 50px band. */
+body.skin-blue .main-sidebar,
+body.skin-blue .left-side { padding-top: 0 !important; }
+body.skin-blue .main-footer { margin-top: 0 !important; }
 
 /* -------------------------------------------------------------------------
    Sidebar — white nav rail, rounded items, warm active pill
@@ -179,7 +157,17 @@ body.skin-blue .main-sidebar {
   border-right: 1px solid var(--c-border) !important;
   box-shadow: none !important;
 }
-body.skin-blue .sidebar { padding-top: 8px; }
+body.skin-blue .sidebar { padding-top: 4px; }
+/* Brand block at the top of the sidebar — replaces the old top-bar logo. */
+body.skin-blue .sidebar .cerebro-brand {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--c-text) !important;
+  padding: 18px 20px 12px;
+  margin-bottom: 2px;
+}
 body.skin-blue .sidebar-menu > li { position: relative; }
 body.skin-blue .sidebar-menu > li > a {
   color: var(--c-text) !important;
@@ -232,14 +220,152 @@ body.skin-blue .sidebar-menu > li.header {
   font-weight: 700;
 }
 
-/* Content wrapper */
+/* Content wrapper. The `!important` on padding is deliberate: AdminLTE's fixed
+   skin sets `.content-wrapper { padding-top: 50px }` to clear the (now removed)
+   header, and it loads after us — without !important that 50px band survives and
+   pushes every page down, reading like a phantom header. */
 body .content-wrapper, body .right-side {
   background: var(--c-bg) !important;
   min-height: 100vh;
-  padding: 18px 26px;
+  padding: 18px 26px !important;
 }
 .content-header { padding: 6px 0 16px; }
 .content-header > h1 { font-size: 22px; font-weight: 650; margin: 0; }
+
+/* -------------------------------------------------------------------------
+   Responsive layout — the visualization is the star.
+   The viz tabs (overview / gene expression / spatial / trajectory / IR) split
+   into a parameter column + a plot column, historically a fixed Bootstrap 3/9
+   grid that made the param panel balloon on wide screens. We switch that row to
+   flexbox: the param column is pinned to a comfortable width band (never so
+   narrow its "<title> info" wraps, never wider than needed), and the plot
+   column absorbs ALL the slack — shrinking or growing takes it, not the chrome.
+   ------------------------------------------------------------------------- */
+/* AdminLTE nests two padded containers: .content-wrapper (our 26px) AND an
+   inner section.content (a further 15px each side). Stacked, they inset every
+   page by 41px and left a dead band on both sides of the viz split
+   (sidebar→params, plot→edge). Drop the redundant inner 15px so the single
+   26px content-wrapper padding is the only page margin. */
+body .content { padding-left: 0 !important; padding-right: 0 !important; }
+
+.cerebro-viz-row {
+  display: flex !important;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  /* No flex `gap`: it was inserting 16px BEFORE the first column too, pushing the
+     param panel off the left edge (and symmetrically the plot off the right).
+     The single inter-panel space is a right margin on the param column instead,
+     so both outer edges sit flush against the content padding. */
+  margin: 0 !important;
+  width: auto !important;
+}
+/* cerebroBox wraps its content in an inner .col-sm-12 that carries Bootstrap's
+   15px side padding. Stacked with our column gap and the column's own edges,
+   that pushed the param panel and the plot far apart (a fat empty channel).
+   Zero that inner padding so each box hugs its column edge — the flex `gap`
+   above is then the ONLY space between the two panels. */
+.cerebro-viz-row > .cerebro-param-col > .col-sm-12,
+.cerebro-viz-row > .cerebro-viz-col > .col-sm-12 {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Param column: fixed comfortable width, no grow/shrink. min keeps the heading +
+   info button on one line; max caps it so wide screens don't bloat it. */
+.cerebro-viz-row > .cerebro-param-col {
+  flex: 0 0 clamp(300px, 23%, 360px);
+  width: auto !important;        /* override Bootstrap .col-sm-3 width */
+  max-width: 360px;
+  min-width: 300px;
+  padding: 0 !important;         /* kill Bootstrap col gutter */
+  margin-right: 16px;            /* the ONLY space between the two panels */
+}
+/* Plot column: takes every remaining pixel. min-width:0 lets Plotly shrink
+   below its content size instead of forcing overflow. */
+.cerebro-viz-row > .cerebro-viz-col {
+  flex: 1 1 0;
+  width: auto !important;        /* override Bootstrap .col-sm-9 width */
+  min-width: 0;
+  padding: 0 !important;         /* kill Bootstrap col gutter */
+}
+/* Narrow viewports: stack the param panel above the plot rather than crushing
+   both. Below this width a side-by-side split isn't comfortable anyway. */
+@media (max-width: 900px) {
+  .cerebro-viz-row { flex-wrap: wrap; }
+  .cerebro-viz-row > .cerebro-param-col {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+/* Sidebar rail: hold a stable, comfortable width so long menu labels
+   ("Most expressed genes") never wrap; it is chrome, not content, so it does
+   not stretch with the window. */
+body.skin-blue .main-sidebar,
+body.skin-blue .left-side { min-width: 230px; }
+
+/* -------------------------------------------------------------------------
+   Data info page — welcome hero + de-emphasised advanced settings.
+   With the top bar removed, the welcome message becomes a real page header:
+   it spans the freed-up top strip (pulled out to the content-wrapper edges via
+   negative margins) so that space is used, not left blank.
+   ------------------------------------------------------------------------- */
+.cerebro-welcome {
+  margin: -18px -26px 22px;          /* cancel content padding → flush to top */
+  padding: 30px 26px 26px;
+  background: linear-gradient(180deg, var(--c-white), var(--c-bg));
+  border-bottom: 1px solid var(--c-border);
+}
+.cerebro-welcome h3,
+.cerebro-welcome > :first-child {
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  color: var(--c-text) !important;
+  margin: 0 0 4px !important;
+  text-align: left !important;
+}
+/* The default welcome copy is a <p>; give it a calm subheading treatment. */
+.cerebro-welcome p {
+  font-size: 15px;
+  color: var(--c-text-2);
+  margin: 0;
+  text-align: left !important;
+  max-width: 720px;
+}
+
+/* Advanced settings block (Preferences) — sunk to the bottom, visually quieter
+   so novices read it as "optional, safe to ignore". Lighter text, a divider
+   above it, and a muted "advanced" tag on the heading. */
+.cerebro-advanced {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--c-border-2);
+  opacity: 0.78;
+  transition: opacity var(--dur) var(--ease);
+}
+.cerebro-advanced:hover { opacity: 1; }
+.cerebro-advanced h3 {
+  color: var(--c-text-2) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+.cerebro-advanced-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-3);
+  background: var(--c-surface-2);
+  border-radius: var(--r-pill);
+  vertical-align: middle;
+}
+.cerebro-advanced-hint {
+  margin: 2px 0 12px;
+  font-size: 12.5px;
+  color: var(--c-text-3);
+}
 
 /* -------------------------------------------------------------------------
    Boxes — Console card: white, large radius, soft layered shadow
@@ -918,4 +1044,86 @@ body .btn:active { transform: translateY(0.5px); }
    ------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Shared projection legend (all projection tabs)
+
+   The projection-scatter renderer (www/projection_scatter.js) builds a custom
+   HTML legend as a horizontal bar ABOVE the plot, in its own band, so it never
+   covers data points and switching categorical <-> continuous never shifts the
+   scatter. Every tab's legend container gets the class .cerebro-projection-legend
+   (its id is <plot_id>_legend); these styles were formerly inline in
+   spatial/UI.R and are now shared so overview / gene_expression / trajectory /
+   immune_repertoire render an identical legend.
+   ------------------------------------------------------------------------- */
+.cerebro-projection-legend {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+  padding: 5px 10px;
+  margin: 0 0 6px 0;
+  font-family: inherit;
+  user-select: none;
+}
+.cerebro-projection-legend .legend-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.cerebro-projection-legend.is-continuous .legend-header {
+  margin: 0 8px 0 0;
+}
+.cerebro-projection-legend .legend-title-text {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+.cerebro-projection-legend .custom-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.cerebro-projection-legend .custom-legend-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.cerebro-projection-legend .legend-color-box {
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.cerebro-projection-legend .legend-text {
+  color: #333;
+  white-space: nowrap;
+}
+.cerebro-projection-legend .legend-item-hidden {
+  opacity: 0.35;
+}
+.cerebro-projection-legend .legend-item-hidden .legend-text {
+  text-decoration: line-through;
+}
+.cerebro-projection-legend .continuous-legend-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.cerebro-projection-legend .continuous-legend-gradient {
+  width: 120px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.cerebro-projection-legend .continuous-legend-label {
+  font-size: 11px;
+  color: #333;
 }

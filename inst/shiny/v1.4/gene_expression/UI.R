@@ -1,11 +1,29 @@
 ##----------------------------------------------------------------------------##
 ## Tab: Gene (set) expression
 ##----------------------------------------------------------------------------##
-js_code_gene_expression_projection <- readr::read_file(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/shiny/v1.4/gene_expression/js_projection_update_plot.js"
-  )
+## Prepend the shared plotly layout factory and the shared projection-scatter
+## renderer, then gene_expression's wrappers — all in ONE extendShinyjs() text
+## so they share a global scope (same pattern as spatial/UI.R).
+js_code_gene_expression_projection <- paste(
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/www/projection_layouts.js"
+    )
+  ),
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/www/projection_scatter.js"
+    )
+  ),
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/gene_expression/js_projection_update_plot.js"
+    )
+  ),
+  sep = "\n"
 )
 
 tab_gene_expression <- tabItem(

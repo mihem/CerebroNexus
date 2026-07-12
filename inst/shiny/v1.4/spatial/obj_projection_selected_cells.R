@@ -13,7 +13,9 @@ spatial_projection_selected_cells <- reactive({
   ## re-render (e.g. changing "Color cells by") wipes it while the selection must
   ## stay. The identifier is built the same way the table keys cells (paste0 with
   ## '-'), so downstream filtering is unchanged.
-  sel <- input[["spatial_persistent_selection"]]
+  ## The shared renderer pushes the persistent selection under
+  ## <plot_id>_persistent_selection; the spatial plot id is 'spatial_projection'.
+  sel <- input[["spatial_projection_persistent_selection"]]
   if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
     return(NULL)
   }

@@ -1,5 +1,46 @@
+##----------------------------------------------------------------------------##
+## Tab: Trajectory — projection plot.
+##
+## Rendered through the SHARED projection-scatter system (the empty-skeleton +
+## JS-observer model spatial/overview/gene_expression use), so the trajectory
+## projection gets the same custom top legend, persistent x|y selection,
+## group labels and modebar-off look. The trajectory path itself is drawn as a
+## layout `shapes` overlay (black line segments), passed as the tab-specific
+## `extra.shapes`. Colouring is categorical (state / metadata) or continuous
+## (pseudotime / numeric).
+##----------------------------------------------------------------------------##
+
+##----------------------------------------------------------------------------##
+## Empty plotly skeleton; the shared JS observer fills it via Plotly.react.
+##----------------------------------------------------------------------------##
 output[["trajectory_projection"]] <- plotly::renderPlotly({
-  ## don't do anything before these inputs are selected
+  plotly::plot_ly(
+    type = "scattergl",
+    mode = "markers",
+    source = "trajectory_projection"
+  ) %>%
+    plotly::layout(
+      xaxis = list(
+        autorange = TRUE,
+        mirror = TRUE,
+        showline = TRUE,
+        zeroline = FALSE
+      ),
+      yaxis = list(
+        autorange = TRUE,
+        mirror = TRUE,
+        showline = TRUE,
+        zeroline = FALSE
+      )
+    )
+})
+
+##----------------------------------------------------------------------------##
+## Reactive that prepares the cells + trajectory-line data for the current
+## parameters (filtering, subsetting, hover, colours). One source of truth so
+## the coordinates sent to the plot match those used for selection and hover.
+##----------------------------------------------------------------------------##
+trajectory_projection_prepared <- reactive({
   req(
     input[["trajectory_selected_method"]],
     input[["trajectory_selected_name"]],
@@ -9,193 +50,193 @@ output[["trajectory_projection"]] <- plotly::renderPlotly({
     input[["trajectory_point_opacity"]]
   )
 
-  withProgress(message = "Generating trajectory projection...", value = 0, {
-    ## collect trajectory data
-    trajectory_data <- trajectory_data_reactive()
+  trajectory_data <- trajectory_data_reactive()
 
-    ## build data frame with data
-    cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
-      dplyr::filter(!is.na(pseudotime))
+  ## build data frame with data
+  cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
+    dplyr::filter(!is.na(pseudotime))
 
-    incProgress(0.2, detail = "Filtering cells...")
+  ## available group filters
+  group_filters <- names(input)[grepl(
+    names(input),
+    pattern = "trajectory_projection_group_filter_"
+  )]
 
-    ## available group filters
-    group_filters <- names(input)[grepl(
-      names(input),
-      pattern = 'trajectory_projection_group_filter_'
-    )]
-
-    ## remove cells based on group filters
-    keep_cells <- rep(TRUE, nrow(cells_df))
-    for (i in group_filters) {
-      group <- strsplit(i, split = 'trajectory_projection_group_filter_')[[1]][
-        2
-      ]
-      if (group %in% colnames(cells_df)) {
-        keep_cells <- keep_cells & (cells_df[[group]] %in% input[[i]])
-      }
+  ## remove cells based on group filters
+  keep_cells <- rep(TRUE, nrow(cells_df))
+  for (i in group_filters) {
+    group <- strsplit(i, split = "trajectory_projection_group_filter_")[[1]][2]
+    if (group %in% colnames(cells_df)) {
+      keep_cells <- keep_cells & (cells_df[[group]] %in% input[[i]])
     }
-    cells_df <- cells_df[keep_cells, ]
+  }
+  cells_df <- cells_df[keep_cells, ]
 
-    ## randomly remove cells (if necessary)
-    cells_df <- randomlySubsetCells(
-      cells_df,
-      input[["trajectory_percentage_cells_to_show"]]
+  ## randomly remove cells (if necessary)
+  cells_df <- randomlySubsetCells(
+    cells_df,
+    input[["trajectory_percentage_cells_to_show"]]
+  )
+
+  ## Empty-state guard: no cells after filtering.
+  if (nrow(cells_df) == 0) {
+    return(NULL)
+  }
+
+  ## put rows in random order (so no group is drawn systematically on top)
+  cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
+
+  ## trajectory path as line-segment shapes (black), drawn under the points
+  trajectory_edges <- trajectory_data[["edges"]]
+  trajectory_lines <- lapply(seq_len(nrow(trajectory_edges)), function(i) {
+    list(
+      type = "line",
+      line = list(color = "black", width = 1),
+      xref = "x",
+      yref = "y",
+      x0 = trajectory_edges$source_dim_1[i],
+      y0 = trajectory_edges$source_dim_2[i],
+      x1 = trajectory_edges$target_dim_1[i],
+      y1 = trajectory_edges$target_dim_2[i]
     )
-
-    ## Empty-state guard: if group filters removed every cell, `1:nrow` would be
-    ## `1:0` = c(1, 0) and sample() would emit an NA row that crashes the plot.
-    if (nrow(cells_df) == 0) {
-      return(
-        plotly::plotly_empty(type = "scatter", mode = "markers") %>%
-          plotly::layout(
-            title = list(
-              text = "No cells match the current filters.",
-              x = 0.5,
-              y = 0.5
-            )
-          )
-      )
-    }
-
-    ## put rows in random order
-    cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
-
-    incProgress(0.4, detail = "Preparing trajectory lines...")
-
-    ## convert edges of trajectory into list format to plot with plotly
-    trajectory_edges <- trajectory_data[["edges"]]
-
-    trajectory_lines <- lapply(seq_len(nrow(trajectory_edges)), function(i) {
-      list(
-        type = "line",
-        line = list(color = "black"),
-        xref = "x",
-        yref = "y",
-        x0 = trajectory_edges$source_dim_1[i],
-        y0 = trajectory_edges$source_dim_2[i],
-        x1 = trajectory_edges$target_dim_1[i],
-        y1 = trajectory_edges$target_dim_2[i]
-      )
-    })
-
-    incProgress(0.6, detail = "Building plot...")
-
-    ## prepare hover info
-    hover_info <- buildHoverInfoForProjections(cells_df)
-
-    ## add expression levels to hover info
-    hover_info <- glue::glue(
-      "{hover_info}
-    <b>State</b>: {cells_df$state}
-    <b>Pseudotime</b>: {formatC(cells_df$pseudotime, format = 'f', digits = 2)}"
-    )
-
-    ##
-    if (
-      is.factor(cells_df[[input[["trajectory_point_color"]]]]) ||
-        is.character(cells_df[[input[["trajectory_point_color"]]]])
-    ) {
-      ## get colors for groups
-      colors_for_groups <- assignColorsToGroups(
-        cells_df,
-        input[["trajectory_point_color"]]
-      )
-
-      ## Native scattergl when WebGL is enabled; SVG scatter otherwise.
-      ## Replaces the former plotly::toWebGL() post-processing so the trace
-      ## type is decided up-front, avoiding the trace-rewrite pass.
-      scatter_type <- if (isTRUE(preferences$use_webgl)) {
-        "scattergl"
-      } else {
-        "scatter"
-      }
-
-      plot <- plotly::plot_ly(
-        cells_df,
-        x = ~DR_1,
-        y = ~DR_2,
-        color = ~ cells_df[[input[["trajectory_point_color"]]]],
-        colors = colors_for_groups,
-        type = scatter_type,
-        mode = "markers",
-        marker = list(
-          opacity = input[["trajectory_point_opacity"]],
-          line = list(
-            color = "rgb(196,196,196)",
-            width = 1
-          ),
-          size = input[["trajectory_point_size"]]
-        ),
-        hoverinfo = "text",
-        text = ~hover_info,
-        source = "trajectory_projection"
-      )
-
-      ##
-    } else {
-      scatter_type <- if (isTRUE(preferences$use_webgl)) {
-        "scattergl"
-      } else {
-        "scatter"
-      }
-
-      plot <- plotly::plot_ly(
-        data = cells_df,
-        x = ~DR_1,
-        y = ~DR_2,
-        type = scatter_type,
-        mode = "markers",
-        marker = list(
-          colorbar = list(
-            title = colnames(cells_df)[which(
-              colnames(cells_df) == input[["trajectory_point_color"]]
-            )]
-          ),
-          color = ~ cells_df[[input[["trajectory_point_color"]]]],
-          opacity = input[["trajectory_point_opacity"]],
-          colorscale = "Blues",
-          reversescale = FALSE,
-          line = list(
-            color = "rgb(196,196,196)",
-            width = 1
-          ),
-          size = input[["trajectory_point_size"]]
-        ),
-        hoverinfo = "text",
-        text = ~hover_info,
-        source = "trajectory_projection"
-      )
-    }
-
-    ## add layout to plot
-    plot <- plot %>%
-      plotly::layout(
-        shapes = trajectory_lines,
-        xaxis = list(
-          mirror = TRUE,
-          showline = TRUE,
-          zeroline = FALSE,
-          range = range(cells_df$DR_1) * 1.1
-        ),
-        yaxis = list(
-          mirror = TRUE,
-          showline = TRUE,
-          zeroline = FALSE,
-          range = range(cells_df$DR_2) * 1.1
-        ),
-        hoverlabel = list(
-          font = list(
-            size = 11
-          ),
-          align = 'left'
-        )
-      )
-
-    ## scatter trace type already picked based on preferences$use_webgl at
-    ## construction time, no post-processing needed.
-    plot
   })
+
+  ## hover info: cell + metadata + state + pseudotime
+  hover_info <- buildHoverInfoForProjections(cells_df)
+  hover_info <- glue::glue(
+    "{hover_info}<br>",
+    "<b>State</b>: {cells_df$state}<br>",
+    "<b>Pseudotime</b>: {formatC(cells_df$pseudotime, format = 'f', digits = 2)}"
+  )
+
+  list(
+    cells_df = cells_df,
+    trajectory_lines = trajectory_lines,
+    hover_info = as.character(hover_info),
+    color_variable = input[["trajectory_point_color"]],
+    point_size = input[["trajectory_point_size"]],
+    point_opacity = input[["trajectory_point_opacity"]]
+  )
+})
+
+##----------------------------------------------------------------------------##
+## Observer that pushes the prepared data to the shared JS renderer.
+##----------------------------------------------------------------------------##
+observeEvent(trajectory_projection_prepared(), {
+  prepared <- trajectory_projection_prepared()
+  req(prepared)
+
+  cells_df <- prepared[["cells_df"]]
+  color_variable <- prepared[["color_variable"]]
+  ## The projection coordinates are the DR_1 / DR_2 columns contributed by the
+  ## trajectory meta (mergeTrajectoryWithMetaData appends them after the cell
+  ## metadata, so they are NOT columns 1/2).
+  coordinates <- list(cells_df[["DR_1"]], cells_df[["DR_2"]])
+  color_input <- cells_df[[color_variable]]
+
+  container_dimensions <- shinyjs::js$trajectoryGetContainerDimensions()
+  container_info <- list(
+    width = container_dimensions[["width"]],
+    height = container_dimensions[["height"]]
+  )
+
+  point_line <- list(color = "rgb(196,196,196)", width = 1)
+
+  ## continuous colouring (pseudotime / numeric metadata)
+  if (is.numeric(color_input)) {
+    output_meta <- list(
+      color_type = "continuous",
+      traces = color_variable,
+      color_variable = color_variable
+    )
+    output_data <- list(
+      x = coordinates[[1]],
+      y = coordinates[[2]],
+      color = color_input,
+      point_size = prepared[["point_size"]],
+      point_opacity = prepared[["point_opacity"]],
+      point_line = point_line,
+      x_range = list(),
+      y_range = list(),
+      reset_axes = TRUE
+    )
+    output_hover <- list(hoverinfo = "text", text = prepared[["hover_info"]])
+    shinyjs::js$trajectoryUpdatePlot2DContinuous(
+      output_meta,
+      output_data,
+      output_hover,
+      list(),
+      container_info,
+      prepared[["trajectory_lines"]]
+    )
+
+    ## categorical colouring (state / character/factor metadata)
+  } else {
+    color_assignments <- assignColorsToGroups(cells_df, color_variable)
+    ## Fall back to the default colourset if the variable is not pre-assigned.
+    if (is.null(color_assignments)) {
+      levels_here <- unique(as.character(color_input))
+      color_assignments <- stats::setNames(
+        default_colorset[seq_along(levels_here)],
+        levels_here
+      )
+    }
+
+    output_meta <- list(
+      color_type = "categorical",
+      traces = list(),
+      color_variable = color_variable
+    )
+    output_data <- list(
+      x = list(),
+      y = list(),
+      z = list(),
+      color = list(),
+      point_size = prepared[["point_size"]],
+      point_opacity = prepared[["point_opacity"]],
+      point_line = point_line,
+      x_range = list(),
+      y_range = list(),
+      reset_axes = TRUE
+    )
+    output_hover <- list(hoverinfo = "text", text = list())
+
+    cells_by_group <- split(seq_along(color_input), as.character(color_input))
+    i <- 1
+    for (j in names(color_assignments)) {
+      cells_to_extract <- cells_by_group[[j]]
+      if (is.null(cells_to_extract)) {
+        next
+      }
+      output_meta[["traces"]][[i]] <- j
+      output_data[["x"]][[i]] <- coordinates[[1]][cells_to_extract]
+      output_data[["y"]][[i]] <- coordinates[[2]][cells_to_extract]
+      output_data[["color"]][[i]] <- unname(color_assignments[[j]])
+      output_hover[["text"]][[i]] <- prepared[["hover_info"]][cells_to_extract]
+      i <- i + 1
+    }
+
+    ## group-centre labels
+    coords_df <- data.frame(
+      x = coordinates[[1]],
+      y = coordinates[[2]]
+    )
+    group_centers_df <- centerOfGroups(coords_df, cells_df, 2, color_variable)
+    output_group_centers <- list(
+      group = group_centers_df[["group"]],
+      x = group_centers_df[["x_median"]],
+      y = group_centers_df[["y_median"]]
+    )
+
+    shinyjs::js$trajectoryUpdatePlot2DCategorical(
+      output_meta,
+      output_data,
+      output_hover,
+      output_group_centers,
+      container_info,
+      prepared[["trajectory_lines"]]
+    )
+  }
 })
 
 ##----------------------------------------------------------------------------##
@@ -226,42 +267,29 @@ trajectory_projection_info <- list(
 )
 
 ##----------------------------------------------------------------------------##
-## Reactive that holds IDs of selected cells (ID is built from position in
-## projection).
+## Reactive that holds IDs of selected cells (from the persistent selection).
 ##----------------------------------------------------------------------------##
 trajectory_projection_selected_cells <- reactive({
-  ## make sure plot parameters are set because it means that the plot can be
-  ## generated
   req(
     input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    input[["trajectory_percentage_cells_to_show"]],
-    input[["trajectory_point_color"]],
-    input[["trajectory_point_size"]],
-    input[["trajectory_point_opacity"]]
+    input[["trajectory_selected_name"]]
   )
 
-  ## check selection
-  ## ... selection has not been made or there is no cell in it
-  if (
-    is.null(plotly::event_data(
-      "plotly_selected",
-      source = "trajectory_projection"
-    )) ||
-      length(plotly::event_data(
-        "plotly_selected",
-        source = "trajectory_projection"
-      )) ==
-        0
-  ) {
+  ## The selection is held persistently on the JS side (shared
+  ## projection_scatter.js) and pushed here as {x, y} under
+  ## <plot_id>_persistent_selection, so it survives plot-parameter changes.
+  ## The identifier matches how the selected-cells table keys cells
+  ## (paste0 of the two projection coordinates with '-').
+  sel <- input[["trajectory_projection_persistent_selection"]]
+  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
     return(NULL)
-    ## ... selection has been made and at least 1 cell is in it
-  } else {
-    ## get number of selected cells
-    plotly::event_data("plotly_selected", source = "trajectory_projection") %>%
-      dplyr::mutate(identifier = paste0(x, '-', y)) %>%
-      return()
   }
+  data.frame(
+    x = as.numeric(sel[["x"]]),
+    y = as.numeric(sel[["y"]]),
+    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
+    stringsAsFactors = FALSE
+  )
 })
 
 ##----------------------------------------------------------------------------##
@@ -269,15 +297,9 @@ trajectory_projection_selected_cells <- reactive({
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_number_of_selected_cells"]] <- renderText({
-  ## check selection
-  ## ... selection has not been made or there is no cell in it
   if (is.null(trajectory_projection_selected_cells())) {
-    ## manually set counter to 0
     number_of_selected_cells <- 0
-
-    ## ... selection has been made and at least 1 cell is in it
   } else {
-    ## get number of selected cells
     number_of_selected_cells <- formatC(
       nrow(trajectory_projection_selected_cells()),
       format = "f",
@@ -285,8 +307,6 @@ output[["trajectory_number_of_selected_cells"]] <- renderText({
       digits = 0
     )
   }
-
-  ## prepare string to show
   paste0("<b>Number of selected cells</b>: ", number_of_selected_cells)
 })
 

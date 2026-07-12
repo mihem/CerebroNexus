@@ -36,6 +36,7 @@ source(utils_file, local = utils_env)
 prettifyTable <- utils_env$prettifyTable
 centerOfGroups <- utils_env$centerOfGroups
 cachePlot <- utils_env$cachePlot
+dynamicPointSize <- utils_env$dynamicPointSize
 
 ## ---------------------------------------------------------------------------
 ## centerOfGroups
@@ -188,4 +189,48 @@ test_that("cachePlot caches by key and invalidates on key or dataset change", {
     expect_equal(cached(), "nUMI datasetB")
     expect_equal(compute_count, first + 2)
   })
+})
+
+## ---------------------------------------------------------------------------
+## dynamicPointSize: default marker size from point count (+ optional canvas)
+## ---------------------------------------------------------------------------
+
+test_that("dynamicPointSize shrinks as the point count grows", {
+  ## More points -> smaller default, monotonically non-increasing.
+  sizes <- vapply(
+    c(100, 1000, 10000, 100000, 1e6),
+    function(n) dynamicPointSize(n),
+    numeric(1)
+  )
+  expect_true(all(diff(sizes) <= 0))
+  ## A small dataset should be clearly larger than a huge one.
+  expect_gt(dynamicPointSize(100), dynamicPointSize(200000))
+})
+
+test_that("dynamicPointSize stays within [min, max] and snaps to step", {
+  vals <- vapply(
+    c(1, 10, 500, 5000, 5e5, 1e7),
+    function(n) dynamicPointSize(n, min = 1, max = 20, step = 1),
+    numeric(1)
+  )
+  expect_true(all(vals >= 1 & vals <= 20))
+  expect_true(all(vals == round(vals))) # step = 1 -> integers
+})
+
+test_that("dynamicPointSize returns the fallback for missing/invalid counts", {
+  expect_equal(dynamicPointSize(NULL, fallback = 3), 3)
+  expect_equal(dynamicPointSize(NA, fallback = 3), 3)
+  expect_equal(dynamicPointSize(0, fallback = 3), 3)
+  expect_equal(dynamicPointSize(-5, fallback = 3), 3)
+})
+
+test_that("dynamicPointSize lets a larger canvas carry larger points", {
+  small <- dynamicPointSize(5000, plot_width_px = 500, plot_height_px = 400)
+  big <- dynamicPointSize(5000, plot_width_px = 1600, plot_height_px = 1100)
+  expect_gte(big, small)
+  ## The canvas correction only nudges — it never flips the point-count order.
+  expect_gt(
+    dynamicPointSize(200, plot_width_px = 500, plot_height_px = 400),
+    dynamicPointSize(100000, plot_width_px = 1600, plot_height_px = 1100)
+  )
 })

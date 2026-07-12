@@ -146,14 +146,13 @@ source(
 ##----------------------------------------------------------------------------##
 ui <- dashboardPage(
   title = "Cerebro",
-  dashboardHeader(
-    title = span(
-      "Cerebro ",
-      style = "color: white; font-size: 28px; font-weight: bold"
-    )
-  ),
+  ## Header is collapsed to zero height by the Console theme (see www/custom.css);
+  ## the brand now lives at the top of the sidebar, DeepSeek-style. We keep an
+  ## empty dashboardHeader() because shinydashboard requires one for layout.
+  dashboardHeader(title = NULL),
   dashboardSidebar(
     tags$head(tags$style(HTML(".content-wrapper {overflow-x: scroll;}"))),
+    div(class = "cerebro-brand", "Cerebro"),
     sidebarMenu(
       id = "sidebar",
       menuItem(

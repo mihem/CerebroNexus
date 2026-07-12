@@ -2,9 +2,28 @@
 ## UI elements to set additional parameters for the projection.
 ##----------------------------------------------------------------------------##
 output[["spatial_projection_additional_parameters_UI"]] <- renderUI({
-  default_point_size <- preferences[["gene_expression_plot_point_size"]][[
-    "default"
-  ]]
+  ## Start from a dynamic default sized to the spot count + canvas, falling back
+  ## to the fixed default if that can't be computed. A dataset-specific preset
+  ## (below) still takes precedence over this when one is configured.
+  default_point_size <- tryCatch(
+    dynamicPointSize(
+      n_points = tryCatch(
+        nrow(
+          getSpatialData(input[["spatial_projection_to_display"]])$coordinates
+        ),
+        error = function(e) nrow(getMetaData())
+      ),
+      plot_width_px = session$clientData[["output_spatial_projection_width"]],
+      plot_height_px = session$clientData[["output_spatial_projection_height"]],
+      min = preferences[["gene_expression_plot_point_size"]][["min"]],
+      max = preferences[["gene_expression_plot_point_size"]][["max"]],
+      step = preferences[["gene_expression_plot_point_size"]][["step"]],
+      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
+    ),
+    error = function(e) {
+      preferences[["gene_expression_plot_point_size"]][["default"]]
+    }
+  )
 
   if (
     exists("Cerebro.options") &&

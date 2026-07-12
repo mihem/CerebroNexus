@@ -15,7 +15,8 @@ output[["load_data_select_file_UI"]] <- renderUI({
       Cerebro.options[["mode"]] != "closed"
   ) {
     tagList(
-      fluidRow(
+      div(
+        class = "cerebro-welcome",
         htmlOutput("load_data_mode_open")
       ),
       fluidRow(
@@ -38,7 +39,8 @@ output[["load_data_select_file_UI"]] <- renderUI({
     )
   } else {
     tagList(
-      fluidRow(
+      div(
+        class = "cerebro-welcome",
         htmlOutput("load_data_mode_closed")
       ),
       fluidRow(

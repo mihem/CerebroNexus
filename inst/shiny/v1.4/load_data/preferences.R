@@ -5,7 +5,14 @@
 ##
 output[["preferences_options"]] <- renderUI({
   tagList(
-    h3("Preferences"),
+    h3(
+      "Preferences",
+      tags$span(class = "cerebro-advanced-tag", "advanced")
+    ),
+    tags$p(
+      class = "cerebro-advanced-hint",
+      "Optional performance settings — the defaults work well for most users."
+    ),
     shinyWidgets::prettySwitch(
       "webgl_checkbox",
       label = "Switch on WebGL for better performance. Note that this might not be compatible with every browser.",

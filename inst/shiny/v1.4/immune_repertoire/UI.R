@@ -9,10 +9,12 @@
 tab_immune_repertoire <- tabItem(
   tabName = "immune_repertoire",
   fluidRow(
+    class = "cerebro-viz-row",
     ## ---- Left column: parameter boxes ---------------------------------- ##
     column(
       width = 3,
       offset = 0,
+      class = "cerebro-param-col",
       style = "padding: 0px;",
       tagList(
         cerebroBox(
@@ -65,6 +67,7 @@ tab_immune_repertoire <- tabItem(
     column(
       width = 9,
       offset = 0,
+      class = "cerebro-viz-col",
       style = "padding: 0px;",
       cerebroBox(
         title = boxTitle("Immune Repertoire visualizations"),

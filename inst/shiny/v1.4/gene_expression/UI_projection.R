@@ -3,9 +3,11 @@
 ##----------------------------------------------------------------------------##
 output[["expression_projection_UI"]] <- renderUI({
   fluidRow(
+    class = "cerebro-viz-row",
     column(
       width = 3,
       offset = 0,
+      class = "cerebro-param-col",
       style = "padding: 0px;",
       tagList(
         cerebroBox(
@@ -86,6 +88,7 @@ output[["expression_projection_UI"]] <- renderUI({
     column(
       width = 9,
       offset = 0,
+      class = "cerebro-viz-col",
       style = "padding: 0px;",
       cerebroBox(
         title = tagList(

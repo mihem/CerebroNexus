@@ -6,25 +6,22 @@ overview_projection_selected_cells <- reactive({
   ## make sure plot parameters are set because it means that the plot can be
   ## generated
   req(overview_projection_data_to_plot())
-  ## check selection
-  ## ... selection has not been made or there is no cell in it
-  if (
-    is.null(plotly::event_data(
-      "plotly_selected",
-      source = "overview_projection"
-    )) ||
-      length(plotly::event_data(
-        "plotly_selected",
-        source = "overview_projection"
-      )) ==
-        0
-  ) {
+
+  ## The selection is held persistently on the JS side (shared
+  ## projection_scatter.js) and pushed here as {x, y} under
+  ## <plot_id>_persistent_selection, so it survives plot-parameter changes
+  ## (colour / point size / % of cells). Plotly's volatile plotly_selected event
+  ## is NOT used, because a re-render would wipe it. The identifier is built the
+  ## same way the table keys cells (paste0 with '-'), so downstream filtering is
+  ## unchanged.
+  sel <- input[["overview_projection_persistent_selection"]]
+  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
     return(NULL)
-    ## ... selection has been made and at least 1 cell is in it
-  } else {
-    ## get number of selected cells
-    plotly::event_data("plotly_selected", source = "overview_projection") %>%
-      dplyr::mutate(identifier = paste0(x, '-', y)) %>%
-      return()
   }
+  data.frame(
+    x = as.numeric(sel[["x"]]),
+    y = as.numeric(sel[["y"]]),
+    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
+    stringsAsFactors = FALSE
+  )
 })

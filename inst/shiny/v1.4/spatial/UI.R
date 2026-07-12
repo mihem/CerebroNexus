@@ -1,12 +1,23 @@
 ##----------------------------------------------------------------------------##
 ## Tab: Spatial
 ##----------------------------------------------------------------------------##
-## Prepend the shared plotly layout factory; see overview/UI.R for context.
+## Prepend the shared plotly layout factory, then the shared projection-scatter
+## renderer, then the spatial background layer, then spatial's thin wrappers —
+## all concatenated into the SAME extendShinyjs() text so they share one global
+## scope. The shared renderer (projection_scatter.js) is what every projection
+## tab now delegates to; spatial's js_projection_update_plot.js only adds the
+## plot-id-tagged wrappers + spatial-only page chrome.
 js_code_spatial_projection <- paste(
   readr::read_file(
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/shiny/v1.4/www/projection_layouts.js"
+    )
+  ),
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/www/projection_scatter.js"
     )
   ),
   ## Background-overlay layer, split out of js_projection_update_plot.js but
@@ -39,123 +50,8 @@ tab_spatial <- tabItem(
       vertical-align: middle;
     }
 
-    /* ---- Custom draggable legend for the spatial projection --------------- */
-    /* The JS builds these elements but ships no styles (the upstream CSS was
-       never committed), so define them here. The categorical legend and the
-       continuous legend now render inside ONE shared container
-       (#spatial_projection_legend); the continuous variant is marked with the
-       .is-continuous class. */
-    /* The legend is a fixed horizontal bar ABOVE the plot area (not a floating
-       overlay), so it never covers data points and uses the otherwise-empty
-       band between the box header and the plot. Categorical items flow
-       left-to-right and wrap onto new lines when there are many groups; the
-       continuous variant shows a single gradient bar with min/max labels. */
-    /* Both the categorical and the continuous legend render inside THIS single
-       shared container, so they occupy the exact same flex bar above the plot
-       and push the plot down by the identical amount. Switching colour type
-       never shifts the scatter/background alignment. */
-    #spatial_projection_legend {
-      position: static;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 4px 12px;
-      background: rgba(255, 255, 255, 0.6);
-      border-radius: 6px;
-      padding: 5px 10px;
-      margin: 0 0 6px 0;
-      font-family: inherit;
-      user-select: none;
-    }
-    /* Legend title sits inline at the start of the bar. */
-    #spatial_projection_legend .legend-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin: 0;
-    }
-    /* Continuous variant: give the title a little right margin so it doesn't
-       hug the gradient block. */
-    #spatial_projection_legend.is-continuous .legend-header {
-      margin: 0 8px 0 0;
-    }
-    #spatial_projection_legend .legend-title-text {
-      font-weight: 600;
-      font-size: 13px;
-      color: #333;
-    }
-    /* six-dot drag handle */
-    #spatial_projection_legend .legend-drag-handle {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    #spatial_projection_legend .legend-drag-handle-dots {
-      display: flex;
-      gap: 2px;
-    }
-    #spatial_projection_legend .legend-drag-handle-dot {
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: #b0b0b0;
-    }
-    /* one legend row: swatch + label */
-    #spatial_projection_legend .custom-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      cursor: pointer;
-      border-radius: 3px;
-    }
-    #spatial_projection_legend .custom-legend-item:hover {
-      background: rgba(0, 0, 0, 0.05);
-    }
-    /* colour swatch rendered as a filled circle */
-    #spatial_projection_legend .legend-color-box {
-      display: inline-block;
-      flex: 0 0 auto;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-    }
-    #spatial_projection_legend .legend-text {
-      color: #333;
-      white-space: nowrap;
-    }
-    /* clicked-to-hide state */
-    #spatial_projection_legend .legend-item-hidden {
-      opacity: 0.35;
-    }
-    #spatial_projection_legend .legend-item-hidden .legend-text {
-      text-decoration: line-through;
-    }
-    /* first-time drag hint */
-    #spatial_projection_legend .legend-drag-tip {
-      font-size: 11px;
-      color: #888;
-      margin-top: 4px;
-      font-style: italic;
-    }
-    /* continuous colour legend: a flat HORIZONTAL bar — min label, gradient,
-       max label all on one line — so it stays short and doesn't eat vertical
-       space above the plot. */
-    #spatial_projection_legend .continuous-legend-content {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 6px;
-    }
-    #spatial_projection_legend .continuous-legend-gradient {
-      width: 120px;
-      height: 12px;
-      flex: 0 0 auto;
-      border-radius: 3px;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-    }
-    #spatial_projection_legend .continuous-legend-label {
-      font-size: 11px;
-      color: #333;
-    }
+    /* The projection legend styles now live in www/custom.css under the shared
+       .cerebro-projection-legend class (used by every projection tab). */
 
     /* ---- Additional-parameters panel: internal scroll ------------------- */
     /* The background-image controls are tall; on shorter screens adjusting

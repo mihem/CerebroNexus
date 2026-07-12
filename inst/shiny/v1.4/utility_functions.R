@@ -29,6 +29,64 @@ cachePlot <- function(x, ...) {
 }
 
 ##----------------------------------------------------------------------------##
+## Dynamic default point size for scatter/projection plots.
+##
+## Picks a sensible default marker size from how many points are drawn and how
+## big the plot canvas is, so a dataset of 2k cells and one of 500k cells each
+## start out readable instead of both defaulting to a fixed value that is too
+## fat for the large one (a solid blob) or too thin for the small one (sparse).
+##
+##   - Point count (primary): size decreases logarithmically as points grow, so
+##     dense plots don't smear into one mass and sparse plots stay visible.
+##     Tuned so ~100 pts -> ~9, ~2.7k -> ~6, ~10k -> ~5, ~50k -> ~4, ~200k -> ~2
+##     on the reference canvas.
+##   - Canvas area (secondary): a larger plot can carry slightly larger points
+##     (fills the space), a smaller one shrinks them. Correction is clamped so
+##     it only nudges, never dominates.
+##
+## Returns a value already clamped to [min, max] and rounded to `step`. When the
+## point count is unknown/invalid it returns `fallback` so callers can keep the
+## old fixed default. Canvas dimensions are optional; omit them (NULL) to size
+## on point count alone.
+##----------------------------------------------------------------------------##
+dynamicPointSize <- function(
+  n_points,
+  plot_width_px = NULL,
+  plot_height_px = NULL,
+  min = 1,
+  max = 20,
+  step = 1,
+  fallback = 2
+) {
+  if (is.null(n_points) || !is.finite(n_points) || n_points < 1) {
+    return(fallback)
+  }
+
+  ## primary: logarithmic falloff with point count
+  base <- 13 - 2.0 * log10(n_points)
+
+  ## secondary: gentle canvas-area correction relative to a ~900x700 reference
+  scale <- 1
+  if (
+    !is.null(plot_width_px) &&
+      !is.null(plot_height_px) &&
+      is.finite(plot_width_px) &&
+      is.finite(plot_height_px) &&
+      plot_width_px > 0 &&
+      plot_height_px > 0
+  ) {
+    ref_area <- 900 * 700
+    area <- plot_width_px * plot_height_px
+    scale <- sqrt(area / ref_area)
+    scale <- max(0.75, min(1.35, scale))
+  }
+
+  sz <- base * scale
+  sz <- max(min, min(max, sz))
+  round(sz / step) * step
+}
+
+##----------------------------------------------------------------------------##
 ## Functions to find columns of specific type (for automatic formatting).
 ##----------------------------------------------------------------------------##
 findColumnsInteger <- function(df, columns_to_test) {

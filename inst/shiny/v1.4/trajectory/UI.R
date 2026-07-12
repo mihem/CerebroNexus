@@ -2,6 +2,31 @@
 ## Tab: Trajectory
 ##----------------------------------------------------------------------------##
 
+## Prepend the shared plotly layout factory and the shared projection-scatter
+## renderer, then trajectory's thin wrappers — all in ONE extendShinyjs() text
+## so they share a global scope (same pattern as spatial/UI.R).
+js_code_trajectory_projection <- paste(
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/www/projection_layouts.js"
+    )
+  ),
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/www/projection_scatter.js"
+    )
+  ),
+  readr::read_file(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/shiny/v1.4/trajectory/js_projection_update_plot.js"
+    )
+  ),
+  sep = "\n"
+)
+
 tab_trajectory <- tabItem(
   tabName = "trajectory",
   shinyjs::inlineCSS(
@@ -13,6 +38,14 @@ tab_trajectory <- tabItem(
       text-align: center;
     }
     "
+  ),
+  shinyjs::extendShinyjs(
+    text = js_code_trajectory_projection,
+    functions = c(
+      "trajectoryUpdatePlot2DContinuous",
+      "trajectoryUpdatePlot2DCategorical",
+      "trajectoryGetContainerDimensions"
+    )
   ),
   uiOutput("trajectory_select_method_and_name_UI"),
   uiOutput("trajectory_projection_UI"),

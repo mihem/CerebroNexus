@@ -2,6 +2,23 @@
 ## UI elements to set additional parameters for the projection.
 ##----------------------------------------------------------------------------##
 output[["overview_projection_additional_parameters_UI"]] <- renderUI({
+  ## Dynamic default point size from cell count + canvas size, falling back to
+  ## the configured fixed default if either is unavailable.
+  point_size_default <- tryCatch(
+    dynamicPointSize(
+      n_points = nrow(getMetaData()),
+      plot_width_px = session$clientData[["output_overview_projection_width"]],
+      plot_height_px = session$clientData[[
+        "output_overview_projection_height"
+      ]],
+      min = preferences[["overview_plot_point_size"]][["min"]],
+      max = preferences[["overview_plot_point_size"]][["max"]],
+      step = preferences[["overview_plot_point_size"]][["step"]],
+      fallback = preferences[["overview_plot_point_size"]][["default"]]
+    ),
+    error = function(e) preferences[["overview_plot_point_size"]][["default"]]
+  )
+
   tagList(
     sliderInput(
       "overview_projection_point_size",
@@ -9,7 +26,7 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
       min = preferences[["overview_plot_point_size"]][["min"]],
       max = preferences[["overview_plot_point_size"]][["max"]],
       step = preferences[["overview_plot_point_size"]][["step"]],
-      value = preferences[["overview_plot_point_size"]][["default"]]
+      value = point_size_default
     ),
     sliderInput(
       "overview_projection_point_opacity",

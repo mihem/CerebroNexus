@@ -16,9 +16,11 @@ output[["trajectory_projection_UI"]] <- renderUI({
 
   tagList(
     fluidRow(
+      class = "cerebro-viz-row",
       column(
         width = 3,
         offset = 0,
+        class = "cerebro-param-col",
         style = "padding: 0px;",
         cerebroBox(
           title = tagList(
@@ -68,6 +70,7 @@ output[["trajectory_projection_UI"]] <- renderUI({
       column(
         width = 9,
         offset = 0,
+        class = "cerebro-viz-col",
         style = "padding: 0px;",
         cerebroBox(
           title = tagList(
@@ -177,9 +180,27 @@ trajectory_projection_main_parameters_info <- list(
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
-  default_point_size <- preferences[["gene_expression_plot_point_size"]][[
-    "default"
-  ]]
+  ## Start from a dynamic default sized to the cell count + canvas, falling back
+  ## to the fixed default if that can't be computed. A configured preset (below)
+  ## still takes precedence over this when one is set.
+  default_point_size <- tryCatch(
+    dynamicPointSize(
+      n_points = nrow(getMetaData()),
+      plot_width_px = session$clientData[[
+        "output_trajectory_projection_width"
+      ]],
+      plot_height_px = session$clientData[[
+        "output_trajectory_projection_height"
+      ]],
+      min = preferences[["gene_expression_plot_point_size"]][["min"]],
+      max = preferences[["gene_expression_plot_point_size"]][["max"]],
+      step = preferences[["gene_expression_plot_point_size"]][["step"]],
+      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
+    ),
+    error = function(e) {
+      preferences[["gene_expression_plot_point_size"]][["default"]]
+    }
+  )
 
   if (
     exists("Cerebro.options") &&
