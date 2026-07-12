@@ -553,6 +553,20 @@ server <- function(input, output, session) {
   }
 
   insertConditionalTab(
+    "Marker genes",
+    "markerGenes",
+    "list-alt",
+    function() getMethodsForMarkerGenes(),
+    placeholder_id = "marker_genes"
+  )
+  insertConditionalTab(
+    "Most expressed genes",
+    "mostExpressedGenes",
+    "bullhorn",
+    function() getGroupsWithMostExpressedGenes(),
+    placeholder_id = "most_expressed_genes"
+  )
+  insertConditionalTab(
     "Enriched pathways",
     "enrichedPathways",
     "project-diagram",

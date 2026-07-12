@@ -203,16 +203,14 @@ ui <- dashboardPage(
       ),
       menuItem("Projection", tabName = "overview", icon = icon("home")),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
-      menuItem(
-        "Marker genes",
-        tabName = "markerGenes",
-        icon = icon("list-alt")
-      ),
-      menuItem(
-        "Most expressed genes",
-        tabName = "mostExpressedGenes",
-        icon = icon("bullhorn")
-      ),
+      ## Marker genes and Most expressed genes are inserted conditionally (see
+      ## insertConditionalTab in shiny_server.R): a data set that carries neither
+      ## — e.g. the spatial demos — no longer shows a sidebar item that opens to
+      ## an empty table. Their tab bodies stay registered in tabItems(); without
+      ## a menuItem there is simply no way to navigate to them, matching how the
+      ## enriched-pathways / trajectory / spatial tabs already behave.
+      div(id = "sidebar_item_marker_genes_placeholder"),
+      div(id = "sidebar_item_most_expressed_genes_placeholder"),
       div(id = "sidebar_item_enriched_pathways_placeholder"),
       div(id = "sidebar_item_extra_material_placeholder"),
       div(id = "sidebar_item_immune_repertoire_placeholder"),
