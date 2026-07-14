@@ -1,5 +1,40 @@
 # Changelog
 
+## cerebroAppLite 2.1.0
+
+### Projection overhaul, unified interface, and cross-tab selection
+
+- **Shared projection renderer**: the Overview, Gene expression,
+  Trajectory and Clonal UMAP scatterplots now share one WebGL renderer
+  instead of per-tab copies, so sizing, legend, hover and selection
+  behave consistently across tabs. Each projection sizes itself to the
+  available viewport and no longer flashes at the wrong size on first
+  paint.
+- **Cell selection**: box- and lasso-select persist across parameter
+  changes, with a Clear button and a zoom-to-selection toggle on every
+  projection tab. Hiding a group in the legend also excludes it from
+  selected-cell counts, and the plot toolbar (lasso / box-select / zoom
+  / pan / reset / PNG download) is available again.
+- **Interactive Clonal Diversity**: the Clonal Diversity plot is now an
+  interactive figure — hovering a point shows that group’s bootstrap
+  value.
+- **Interface**: a lighter “Console” visual language with coloured
+  sidebar icons, one warm palette shared by every chart (plotly and
+  ggplot), and a fluid projection layout that reclaims the space freed
+  by the removed top bar. A floating menu button keeps the sidebar
+  reachable on phone-sized screens.
+- **Render feedback**: a parameter change dims the projection while the
+  new render is in flight, and the sliders are debounced so dragging no
+  longer fires a render per step.
+- **Fewer empty tabs**: the Marker genes and Most expressed genes
+  sidebar items appear only for datasets that carry them (e.g. hidden
+  for the spatial demos).
+- **Fixes**: the spatial histology background is no longer cleared when
+  another tab renders; the Clonal UMAP host reveals correctly after
+  faceting is toggled; gene-expression multi-panel selection is
+  restored; hidden-group state stays in sync with the server across
+  re-renders; and the trajectory projection keeps its view on redraw.
+
 ## cerebroAppLite 2.0.1
 
 ### Robustness, performance, and deprecation cleanup

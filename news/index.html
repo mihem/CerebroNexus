@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">cerebroAppLite</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,9 +65,29 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/mihem/cerebroAppLite/blob/v2.0.1/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/mihem/cerebroAppLite/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="2.1.0" id="cerebroapplite-210">cerebroAppLite 2.1.0<a class="anchor" aria-label="anchor" href="#cerebroapplite-210"></a></h2>
+<div class="section level3">
+<h3 id="projection-overhaul-unified-interface-and-cross-tab-selection-2-1-0">Projection overhaul, unified interface, and cross-tab selection<a class="anchor" aria-label="anchor" href="#projection-overhaul-unified-interface-and-cross-tab-selection-2-1-0"></a></h3>
+<ul><li>
+<strong>Shared projection renderer</strong>: the Overview, Gene expression, Trajectory and Clonal UMAP scatterplots now share one WebGL renderer instead of per-tab copies, so sizing, legend, hover and selection behave consistently across tabs. Each projection sizes itself to the available viewport and no longer flashes at the wrong size on first paint.</li>
+<li>
+<strong>Cell selection</strong>: box- and lasso-select persist across parameter changes, with a Clear button and a zoom-to-selection toggle on every projection tab. Hiding a group in the legend also excludes it from selected-cell counts, and the plot toolbar (lasso / box-select / zoom / pan / reset / PNG download) is available again.</li>
+<li>
+<strong>Interactive Clonal Diversity</strong>: the Clonal Diversity plot is now an interactive figure — hovering a point shows that group’s bootstrap value.</li>
+<li>
+<strong>Interface</strong>: a lighter “Console” visual language with coloured sidebar icons, one warm palette shared by every chart (plotly and ggplot), and a fluid projection layout that reclaims the space freed by the removed top bar. A floating menu button keeps the sidebar reachable on phone-sized screens.</li>
+<li>
+<strong>Render feedback</strong>: a parameter change dims the projection while the new render is in flight, and the sliders are debounced so dragging no longer fires a render per step.</li>
+<li>
+<strong>Fewer empty tabs</strong>: the Marker genes and Most expressed genes sidebar items appear only for datasets that carry them (e.g. hidden for the spatial demos).</li>
+<li>
+<strong>Fixes</strong>: the spatial histology background is no longer cleared when another tab renders; the Clonal UMAP host reveals correctly after faceting is toggled; gene-expression multi-panel selection is restored; hidden-group state stays in sync with the server across re-renders; and the trajectory projection keeps its view on redraw.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="2.0.1" id="cerebroapplite-201">cerebroAppLite 2.0.1<a class="anchor" aria-label="anchor" href="#cerebroapplite-201"></a></h2>
 <div class="section level3">
