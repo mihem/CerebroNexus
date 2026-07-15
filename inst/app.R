@@ -26,11 +26,15 @@ Cerebro.options <<- list(
   ## tabs (dynamically inserted by insertConditionalTab).
   "crb_file_to_load" = c(
     "PBMC - Full (T+B)" = "extdata/v1.4/demo_full_tcr_bcr.crb",
-    ## Real expression and real receptor sequences, but the TCR-to-cell linkage
-    ## is synthetic (lineage-constrained random assignment); HLA is synthetic too.
-    ## This data set exercises software flow only, not biological association.
+    ## A FULLY FABRICATED fixture: simulated expression, projection, cell types,
+    ## CDR3 sequences and donor HLA genotypes. It exists because real unselected
+    ## repertoires are sparse in CDR3 space and render a near-empty motif network
+    ## (the real-sequence predecessor gave 4 nodes), so the motif families and
+    ## their HLA associations are designed in. 30 donors x 167 cells; declares
+    ## technical_info$tcr_selection = "synthetic", the page's hardest disclosure.
+    ## Use it to see the page work, never to read biology off it.
     ## Rebuild with data-raw/build_hla_tcr_demo.R.
-    "PBMC - HLA & TCR (synthetic TCR linkage + HLA)" = "extdata/v1.4/demo_hla_tcr.crb",
+    "Synthetic cohort - HLA & TCR motifs (fixture)" = "extdata/v1.4/demo_hla_tcr.crb",
     ## The real-HLA counterpart: real public TCRb chains, real donor-to-TCR
     ## occurrence, and each donor's REAL HLA genotype (Emerson 2017 cohort).
     ## Bulk, so it has no cells, no expression and no projection: each row is a

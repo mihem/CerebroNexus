@@ -47,6 +47,7 @@ tab_hla_tcr_motifs <- tabItem(
       cerebroBox(
         title = tagList(
           "HLA & TCR Motifs",
+          cerebroInfoButton("hla_visualizations_info"),
           tags$span(
             style = "font-size: 12px; font-weight: normal; color: #888;",
             "Exploratory HLA context and association — not inferred restriction."

@@ -57,3 +57,10 @@ source(
   ),
   local = TRUE
 )
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/hla_tcr_motifs/help_guide.R"
+  ),
+  local = TRUE
+)

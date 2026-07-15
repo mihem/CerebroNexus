@@ -210,19 +210,22 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
 
 ### demo_hla_tcr.crb
 - **type**: immune_repertoire
-- **technology**: 10x Chromium 5' V(D)J (scRNA-seq + TCR/BCR), re-annotated for HLA context
-- **dropdown label**: `PBMC - HLA & TCR (synthetic TCR linkage + HLA)`
-- **organism / tissue**: human (hg) / PBMC, healthy donor
-- **source**: derived entirely from `demo_full_tcr_bcr.crb`; no new download. Expression values and receptor sequences come from real public data, but cell↔receptor and sample↔receptor assignments are synthetic because `build_ir_demos.R::assign_ir()` reassigns sampled clonotypes to expression barcodes.
-- **acquire**: none — built from the shipped `demo_full_tcr_bcr.crb`.
-- **object type**: `Cerebro_v1.3` (rebuilt via the current generator so the `hla_typing` slot + methods are present).
-- **sampling**: same 1,476 expression cells as `demo_full_tcr_bcr.crb`, with **synthetic receptor-to-cell linkage**. Two additions: (1) `cell_type_fine` — an explicitly heuristic T-cell label (**CD8 T / CD4 T / Treg / T (unassigned)**) derived from CD8A/CD8B vs CD4/IL7R vs FOXP3 expression; it is not a validated annotation. (2) a **SYNTHETIC** per-sample HLA typing table (HLA-A/B/C/DRB1, two alleles each), `set.seed(42)`.
-- **cell-type field**: `cell_type_fine` (fine lineage) — the coarse `cell_type` is also kept.
+- **technology**: none — **fully synthetic**; simulates a 5' V(D)J + scRNA-seq cohort, measures nothing
+- **dropdown label**: `Synthetic cohort - HLA & TCR motifs (fixture)`
+- **organism / tissue**: human gene symbols / notional PBMC T-cell cohort. No organism was sampled.
+- **source**: **no source — every value is fabricated** by `data-raw/build_hla_tcr_demo.R`. Reused as vocabulary only, not as measurement: gene symbols (from `demo_full_tcr_bcr.crb`, so the Gene expression tab is searchable), IMGT V/J gene names, and European HLA allele frequency ranges.
+- **acquire**: none — no download; the generator is self-contained.
+- **object type**: `Cerebro_v1.3`, built from the current generator (`hla_typing` slot + methods present).
+- **sampling**: **30 donors × 167 cells = 5,010 cells**, `set.seed(20260715)`. Composition: CD8 T 2,000 / CD4 T 1,750 / Treg 500 / B 500 / Monocytes 260; only T cells carry a receptor (TRB in 95%, TRA in 90%). Measured with the package's own motif core: **TRB 2,913 unique CDR3 → 440 nodes in 20 motifs (sizes 5–64, diameter 3–6)**; TRA 3,330 → 184 nodes in 10 motifs. ~1,200 genes.
+- **why synthetic**: the predecessor carried REAL CDR3s and rendered a **4-node** network (TRB: 456 unique CDR3 → 2 Hamming-1 pairs; TRA: 395 → 32 pairs). That is not a sample-size accident — an unselected polyclonal repertoire is sparse in CDR3 space, pair count grows ~n², and 5,000 cells only extrapolates to ~150 pairs. Dense motif networks in real data come from **selection** (public/antigen-conditioned receptors converge), not scale, so the families here are designed in: a branching walk in sequence space, one V/J per family, verified isolated at Hamming ≥ 2 from every other family and from the ~2,470 background singletons.
+- **HLA design**: 30 synthetic genotypes over HLA-A/B/C/DRB1 only (the loci `HLA_MVP_LOCI` enforces). Carrier counts for anchor alleles are fixed, not drawn, so the allele picker opens on **HLA-A*02:01 — 15 carrier / 15 non-carrier**. Families are tiered: 6 **strong** (members appear only in carriers ⇒ solid "Carrier" islands), 8 **weak** (carrier-enriched, leaks ⇒ Carrier + Mixed), 6 **none** (random donors ⇒ Mixed). The four largest families are concentrated on `HLA-A*02:01`, because one strong family per allele lights a single island and washes the rest to "Mixed". Class I anchors live in CD8 T, class II in CD4 T / Treg, so lineage MHC context stays coherent.
+- **cell-type field**: `cell_type_fine` (CD8 T / CD4 T / Treg / B cells / Monocytes); coarse `cell_type` also kept.
 - **embedded image**: none (n/a for immune repertoire)
-- **HLA typing**: **synthetic**, stored with `source_type = "synthetic"` in the `hla_typing` slot. Together with the synthetic receptor linkage, it exists only to exercise the HLA & TCR Motifs workflow; it is not evidence of a biological TCR–HLA association. Real paired GEX+VDJ and donor HLA are required for that use.
-- **license**: 10x Genomics public dataset terms (expression/TCR); synthetic HLA has no external source.
-- **build**: `data-raw/build_hla_tcr_demo.R`
-- **output**: `inst/extdata/v1.4/demo_hla_tcr.crb` (~1.0 MB)
+- **HLA typing**: **synthetic** (`source_type = "synthetic"`).
+- **declared contracts**: `observation_unit = "cell"`, `receptor_key = "v_gene+cdr3"`, `tcr_selection = "synthetic"` — the page's hardest disclosure. It is strictly stronger than the bulk demo's `association-conditioned`: a positive control has real sequences and real genotypes and only its *selection* is circular, whereas here the sequences AND the association are constructed. Any carrier/non-carrier contrast this data set shows was put there on purpose and is not evidence.
+- **license**: none applicable — no third-party data is embedded.
+- **build**: `data-raw/build_hla_tcr_demo.R` (self-verifying: it asserts the recovered motif sizes match the design exactly, that the allele picker opens on the anchor, and that whole islands score "Carrier" — a build that drifts fails rather than shipping)
+- **output**: `inst/extdata/v1.4/demo_hla_tcr.crb` (~4.0 MB)
 
 ### demo_hla_tcr_bulk.crb
 - **type**: immune_repertoire
