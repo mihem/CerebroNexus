@@ -31,6 +31,13 @@ Cerebro.options <<- list(
     ## This data set exercises software flow only, not biological association.
     ## Rebuild with data-raw/build_hla_tcr_demo.R.
     "PBMC - HLA & TCR (synthetic TCR linkage + HLA)" = "extdata/v1.4/demo_hla_tcr.crb",
+    ## The real-HLA counterpart: real public TCRb chains, real donor-to-TCR
+    ## occurrence, and each donor's REAL HLA genotype (Emerson 2017 cohort).
+    ## Bulk, so it has no cells, no expression and no projection: each row is a
+    ## (donor, clonotype) analysis unit, and the lineage MHC context is Unknown
+    ## by design. Use it for HLA Associations on genuine genotypes.
+    ## Rebuild with data-raw/build_hla_tcr_bulk_demo.R.
+    "TCRb cohort - real donor HLA (bulk)" = "extdata/v1.4/demo_hla_tcr_bulk.crb",
     ## REAL public spatial data, one per technology (down-sampled). The bracketed
     ## label states the platform. All four flow through the same platform-
     ## agnostic .getSpatialData extraction, spanning spot / bead / in-situ-imaging

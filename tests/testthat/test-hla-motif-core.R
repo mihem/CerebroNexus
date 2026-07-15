@@ -25,6 +25,40 @@ make_ir_list <- function(cdr3s, samples = NULL, cell_types = NULL) {
   split(df, df$sample)
 }
 
+## ---- J gene is optional (bulk sources give V family + CDR3 only) ------- ##
+
+test_that("rows with a V gene but no J gene are kept, with J as NA", {
+  # A bulk repertoire source (e.g. Adaptive/pubtcrs) reports only a V family
+  # and the CDR3. Those rows must survive: V + CDR3 define the node.
+  df <- data.frame(
+    barcode = c("a", "b"),
+    CTgene = c("TRBV02", "TRBV02"),
+    CTaa = c("CASSL", "CASSF"),
+    sample = "s1",
+    stringsAsFactors = FALSE
+  )
+  seg <- hla_parse_ir_segments(list(s1 = df), "TRB")
+  expect_false(is.null(seg))
+  expect_equal(nrow(seg), 2L)
+  expect_true(all(is.na(seg$j_gene)))
+  expect_equal(seg$v_gene, c("TRBV02", "TRBV02"))
+  # The graph still builds from such rows.
+  g <- hla_build_motif_graph(seg, min_nodes = 2L)
+  expect_true(hla_motif_graph_ok(g))
+  expect_equal(igraph::vcount(g), 2L)
+})
+
+test_that("rows without a V gene are still dropped", {
+  df <- data.frame(
+    barcode = "a",
+    CTgene = "NA",
+    CTaa = "CASSL",
+    sample = "s1",
+    stringsAsFactors = FALSE
+  )
+  expect_null(hla_parse_ir_segments(list(s1 = df), "TRB"))
+})
+
 ## ---- hla_detect_chains ------------------------------------------------ ##
 
 test_that("hla_detect_chains reports chains present in CTgene", {

@@ -25,3 +25,4 @@ tests/testthat/_snaps/**/*.new.png
 data-raw/vdj_10x/*.csv
 data-raw/slidetags/
 data-raw/xenium/
+data-raw/pubtcrs/

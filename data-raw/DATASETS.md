@@ -224,6 +224,32 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
 - **build**: `data-raw/build_hla_tcr_demo.R`
 - **output**: `inst/extdata/v1.4/demo_hla_tcr.crb` (~1.0 MB)
 
+### demo_hla_tcr_bulk.crb
+- **type**: immune_repertoire
+- **technology**: bulk TCR-beta immunosequencing (Adaptive immunoSEQ). **Not single cell** — see *sampling*.
+- **dropdown label**: `TCRb cohort - real donor HLA (bulk)`
+- **organism / tissue**: human (hg) / peripheral blood, 666-donor cohort
+- **source**: Emerson et al., *Nat Genet* 2017 (cohort + HLA typing), as cleaned and published by DeWitt et al., *eLife* 2018. Distributed as `pubtcrs_data_v1.tgz` on Zenodo record [1248193](https://zenodo.org/records/1248193). Tools: [phbradley/pubtcrs](https://github.com/phbradley/pubtcrs).
+- **acquire**: the build script downloads it on demand; or manually:
+  ```bash
+  mkdir -p data-raw/pubtcrs
+  curl -fL -o data-raw/pubtcrs/pubtcrs_data_v1.tgz \
+    "https://zenodo.org/api/records/1248193/files/pubtcrs_data_v1.tgz/content"
+  tar xzf data-raw/pubtcrs/pubtcrs_data_v1.tgz -C data-raw/pubtcrs
+  ```
+  The 349 MB archive is **not tracked** (`.gitignore`); only the built `.crb` ships.
+- **object type**: `Cerebro_v1.3` built from scratch (no source `.crb`).
+- **sampling**: **everything is real measured data; nothing is synthesised.** TCRs are the paper's real HLA-associated public TCR-beta chains (V family + CDR3 aa) for six single alleles (`HLA-A*02:01`, `A*01:01`, `B*07:02`, `B*08:01`, `DRB1*04:01`, `DRB1*07:01`); donor↔TCR linkage is the real observed occurrence pattern; HLA is each donor's real genotype. Donors: the first 100 by donor index among those with HLA typing that carry ≥ 1 demo TCR (deterministic, *not* chosen to flatter any association). Restricted to single alleles because the canonical HLA table stores one allele per locus × copy, so the source's DR/DQ haplotype triples and DQ/DP α-β pairs cannot be represented. Restricted to HLA-associated TCRs to stay inside the motif size guards and so the page's descriptive overlap can be checked against the paper's own association table.
+- **bulk → `.crb` mapping**: each row is one **(donor, TCR clonotype) analysis unit, not a sequenced cell**. Consequences, all intended: **no expression matrix** (a real 0-gene × N-unit matrix — bulk measures no transcriptome) and **no projection**, so the Projection / Gene expression tabs have nothing to show for this data set; `cell_type` is `T cell (bulk TCRb)` for every row, so the lineage MHC context is **Unknown by design** — this assay cannot distinguish CD4 from CD8 and the page must not pretend otherwise; `sample` = `donor_id` = the donor, which is the correct unit for HLA carrier counts.
+- **cell-type field**: `cell_type` (single level, `T cell (bulk TCRb)`)
+- **embedded image**: none (n/a)
+- **HLA typing**: **real**, stored with `source_type = "genotyped"` in the `hla_typing` slot. This is the demo that exercises HLA Associations on genuine donor genotypes; `demo_hla_tcr.crb` is its single-cell counterpart with synthetic HLA.
+- **license**: CC-BY 4.0 (Zenodo record 1248193)
+- **build**: `data-raw/build_hla_tcr_bulk_demo.R` (caches the 11M-line occurrence scan to `data-raw/pubtcrs/tcr_donors_cache.rds`)
+- **output**: `inst/extdata/v1.4/demo_hla_tcr_bulk.crb`
+
+> The two HLA demos are complementary and neither is sufficient alone: `demo_hla_tcr.crb` has real single cells but synthetic HLA + synthetic receptor linkage; `demo_hla_tcr_bulk.crb` has real HLA and real donor↔TCR linkage but no cells. A data set with real paired single-cell VDJ **and** real donor HLA would supersede both; none is currently public (the pan-disease scTCR reference's HLA is in controlled-access sub-studies).
+
 ---
 
 ## Trajectory

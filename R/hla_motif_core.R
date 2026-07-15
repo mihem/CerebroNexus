@@ -131,7 +131,12 @@ hla_parse_ir_segments <- function(data, chain) {
     }
     v_gene <- pull_token("V")
     j_gene <- pull_token("J")
-    keep <- !is.na(v_gene) & !is.na(j_gene) & !is.na(cdr3) & nzchar(cdr3)
+    # V + CDR3 are required (they define the node key and the optional V split);
+    # J is OPTIONAL. Requiring it is a paired-single-cell assumption: bulk
+    # repertoire sources routinely report only a V family and the CDR3, and
+    # dropping those rows would discard the whole sample. A missing J stays NA
+    # and simply shows as NA in the J distribution / tooltip.
+    keep <- !is.na(v_gene) & !is.na(cdr3) & nzchar(cdr3)
     if (!any(keep)) {
       return(NULL)
     }
