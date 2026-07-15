@@ -862,6 +862,35 @@ exportFromSeurat <- function(
   }
 
   ##--------------------------------------------------------------------------##
+  ## HLA typing (optional; parallel to immune_repertoire)
+  ##--------------------------------------------------------------------------##
+  ## Accepts a canonical long data.frame, a wide sample x locus table, or a
+  ## named list (sample -> allele vector). Provenance is read from an optional
+  ## `object@misc$hla_typing_source_type` (default "unknown") so an uploaded or
+  ## imputed genotype is never silently treated as directly typed.
+  if (
+    !is.null(object@misc$hla_typing) &&
+      (is.data.frame(object@misc$hla_typing) ||
+        (is.list(object@misc$hla_typing) &&
+          length(object@misc$hla_typing) > 0))
+  ) {
+    if (verbose) {
+      message(
+        paste0(
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] Extracting HLA typing...'
+        )
+      )
+    }
+    st <- object@misc$hla_typing_source_type
+    if (is.null(st) || !nzchar(st)) {
+      st <- 'unknown'
+    }
+    export$addHLATyping(object@misc$hla_typing, source_type = st)
+  }
+
+  ##--------------------------------------------------------------------------##
   ## BCR data (legacy)
   ##--------------------------------------------------------------------------##
   if (!is.null(object@misc$bcr_data)) {

@@ -108,6 +108,12 @@ Cerebro_v1.3 <- R6::R6Class(
     #'   containing scRepertoire columns (CTgene, CTnt, CTaa, CTstrict, etc.).
     immune_repertoire = list(),
 
+    #' @field hla_typing canonical HLA typing \code{data.frame} (long: one row
+    #'   per sample x locus x copy) with data provenance, or NULL. Consumed by
+    #'   the HLA & TCR Motifs page for donor-level HLA context. Optional; older
+    #'   .crb files simply lack it.
+    hla_typing = NULL,
+
     #' @field bcr_data \code{list} that contains BCR data (kept for backward
     #'   compatibility with older .crb files).
     bcr_data = list(),
@@ -1101,6 +1107,50 @@ Cerebro_v1.3 <- R6::R6Class(
     },
 
     #' @description
+    #' Get HLA typing data (canonical long \code{data.frame}), or an empty
+    #' table when none is stored. Safe on older objects that predate the field.
+    #'
+    #' @return A canonical HLA typing \code{data.frame} (possibly zero-row).
+    getHLATyping = function() {
+      # `hla_typing` may be absent on objects deserialized from older .crb
+      # files; guard with a tryCatch so the getter never errors.
+      ht <- tryCatch(self$hla_typing, error = function(e) NULL)
+      if (is.null(ht)) {
+        return(hla_normalize_typing(list(), source_type = "unknown"))
+      }
+      ht
+    },
+
+    #' @description
+    #' Set HLA typing data. Accepts a canonical long \code{data.frame}, a wide
+    #' \code{data.frame} (sample + HLA-*_1/_2 columns), or a named \code{list}
+    #' (sample -> allele vector); non-canonical inputs are normalized.
+    #'
+    #' @param data HLA typing in any accepted form.
+    #' @param source_type Provenance of the genotype: one of "genotyped",
+    #'   "imputed", "synthetic", "unknown".
+    #' @param typing_method Optional assay/software string.
+    #' @param source_reference Optional traceable reference (file/cohort/model).
+    addHLATyping = function(
+      data,
+      source_type = "unknown",
+      typing_method = NA_character_,
+      source_reference = NA_character_
+    ) {
+      if (hla_is_typing_table(data)) {
+        self$hla_typing <- data
+      } else {
+        self$hla_typing <- hla_normalize_typing(
+          data,
+          source_type = source_type,
+          typing_method = typing_method,
+          source_reference = source_reference
+        )
+      }
+      invisible(self)
+    },
+
+    #' @description
     #' Add spatial data.
     #'
     #' @param name Name of the spatial data entry (e.g. image name).
@@ -1401,6 +1451,23 @@ Cerebro_v1.3 <- R6::R6Class(
           '\n',
           'Immune repertoire:',
           paste0(names(self$getImmuneRepertoire()), collapse = ', '),
+          '\n',
+          'HLA typing: ',
+          {
+            ht <- self$getHLATyping()
+            if (is.data.frame(ht) && nrow(ht) > 0) {
+              paste0(
+                length(unique(ht$sample)),
+                ' sample(s), ',
+                length(unique(ht$allele)),
+                ' allele(s) [',
+                paste0(unique(ht$source_type), collapse = ', '),
+                ']'
+              )
+            } else {
+              'none'
+            }
+          },
           '\n',
           'Spatial data:',
           paste0(self$availableSpatial(), collapse = ', '),

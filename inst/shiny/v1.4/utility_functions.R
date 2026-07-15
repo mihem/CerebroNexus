@@ -1522,6 +1522,21 @@ getImmuneRepertoire <- function() {
   tryCatch(ds$getImmuneRepertoire(), error = function(e) list())
 }
 
+## Wrapper for the HLA & TCR Motifs module. Older .crb objects predate the
+## getHLATyping() method / hla_typing field, so the wrapper checks the method
+## exists and falls back to an empty canonical table, never erroring.
+getHLATyping <- function() {
+  ds <- data_set()
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(hla_normalize_typing(list(), source_type = "unknown"))
+  }
+  empty <- hla_normalize_typing(list(), source_type = "unknown")
+  if (!is.function(ds$getHLATyping)) {
+    return(empty)
+  }
+  tryCatch(ds$getHLATyping(), error = function(e) empty)
+}
+
 ## Wrappers for spatial module.
 availableSpatial <- function() {
   ds <- data_set()

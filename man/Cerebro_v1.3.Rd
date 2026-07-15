@@ -83,6 +83,11 @@ format in a named \code{list} called `tables`}
 \item{\code{immune_repertoire}}{\code{list} of data.frames (one per sample)
 containing scRepertoire columns (CTgene, CTnt, CTaa, CTstrict, etc.).}
 
+\item{\code{hla_typing}}{canonical HLA typing \code{data.frame} (long: one row
+per sample x locus x copy) with data provenance, or NULL. Consumed by
+the HLA & TCR Motifs page for donor-level HLA context. Optional; older
+.crb files simply lack it.}
+
 \item{\code{bcr_data}}{\code{list} that contains BCR data (kept for backward
 compatibility with older .crb files).}
 
@@ -156,6 +161,8 @@ compatibility with older .crb files).}
 \item \href{#method-Cerebro_v1.3-addTCRData}{\code{Cerebro_v1.3$addTCRData()}}
 \item \href{#method-Cerebro_v1.3-getImmuneRepertoire}{\code{Cerebro_v1.3$getImmuneRepertoire()}}
 \item \href{#method-Cerebro_v1.3-addImmuneRepertoire}{\code{Cerebro_v1.3$addImmuneRepertoire()}}
+\item \href{#method-Cerebro_v1.3-getHLATyping}{\code{Cerebro_v1.3$getHLATyping()}}
+\item \href{#method-Cerebro_v1.3-addHLATyping}{\code{Cerebro_v1.3$addHLATyping()}}
 \item \href{#method-Cerebro_v1.3-addSpatialData}{\code{Cerebro_v1.3$addSpatialData()}}
 \item \href{#method-Cerebro_v1.3-getSpatialData}{\code{Cerebro_v1.3$getSpatialData()}}
 \item \href{#method-Cerebro_v1.3-availableSpatial}{\code{Cerebro_v1.3$availableSpatial()}}
@@ -1266,6 +1273,51 @@ Set immune repertoire data.
 \describe{
 \item{\code{data}}{Named list of data.frames (one per sample) containing
 scRepertoire columns.}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Cerebro_v1.3-getHLATyping"></a>}}
+\if{latex}{\out{\hypertarget{method-Cerebro_v1.3-getHLATyping}{}}}
+\subsection{Method \code{getHLATyping()}}{
+Get HLA typing data (canonical long \code{data.frame}), or an empty
+table when none is stored. Safe on older objects that predate the field.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Cerebro_v1.3$getHLATyping()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A canonical HLA typing \code{data.frame} (possibly zero-row).
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Cerebro_v1.3-addHLATyping"></a>}}
+\if{latex}{\out{\hypertarget{method-Cerebro_v1.3-addHLATyping}{}}}
+\subsection{Method \code{addHLATyping()}}{
+Set HLA typing data. Accepts a canonical long \code{data.frame}, a wide
+\code{data.frame} (sample + HLA-*_1/_2 columns), or a named \code{list}
+(sample -> allele vector); non-canonical inputs are normalized.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Cerebro_v1.3$addHLATyping(
+  data,
+  source_type = "unknown",
+  typing_method = NA_character_,
+  source_reference = NA_character_
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{data}}{HLA typing in any accepted form.}
+
+\item{\code{source_type}}{Provenance of the genotype: one of "genotyped",
+"imputed", "synthetic", "unknown".}
+
+\item{\code{typing_method}}{Optional assay/software string.}
+
+\item{\code{source_reference}}{Optional traceable reference (file/cohort/model).}
 }
 \if{html}{\out{</div>}}
 }
