@@ -20,6 +20,18 @@
 # they are installed, unit-testable, and shared by the Shiny module.
 # ============================================================================
 
+#' visNetwork import anchor
+#'
+#' `visNetwork` is a hard dependency of the HLA & TCR Motifs page, but the
+#' renderer lives in `inst/shiny` (runtime), not in `R/`. This roxygen anchor
+#' imports a symbol so `R CMD check` sees the Imports entry as used. It defines
+#' no runtime behaviour.
+#'
+#' @importFrom visNetwork renderVisNetwork
+#' @keywords internal
+#' @name hla_visnetwork_import
+NULL
+
 ## ---- Chains that define each receptor class --------------------------- ##
 HLA_TCR_CHAINS <- c("TRA", "TRB", "TRG", "TRD")
 HLA_BCR_CHAINS <- c("IGH", "IGK", "IGL")
