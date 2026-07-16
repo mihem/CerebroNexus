@@ -6,19 +6,68 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
   inst_dir <- testthat::test_path("../../inst")
 }
 
+## shinytest2's wait_for_idle() tracks server reactivity, NOT the async
+## client-side projection renderer (www/projection_scatter.js). After it returns,
+## a projection output can still be mid-paint and a renderUI-created input can be
+## unbound, so reading a value or setting such an input the instant wait_for_idle
+## returns races the render and intermittently fails (a 500 on the value URL, a
+## NULL output, or "input binding not found"). These helpers poll for the
+## condition instead of reading once, which is what de-flakes these recordings.
+
+## Poll get_value(...) until it returns a non-NULL result or the timeout expires.
+## A query that errors (server 500 while the output is still rendering) is treated
+## the same as not-ready and retried.
+retry_get_value <- function(app, ..., timeout = 20000, interval = 300) {
+  deadline <- Sys.time() + timeout / 1000
+  repeat {
+    val <- tryCatch(app$get_value(...), error = function(e) NULL)
+    if (!is.null(val)) {
+      return(val)
+    }
+    if (Sys.time() > deadline) {
+      return(val)
+    }
+    Sys.sleep(interval / 1000)
+  }
+}
+
+## Wait until an input element exists in the DOM (its Shiny binding is registered)
+## before set_inputs — a renderUI-created selectize is not present the instant
+## wait_for_idle returns.
+wait_for_input <- function(app, id, timeout = 20000) {
+  app$wait_for_js(
+    sprintf("document.getElementById('%s') !== null", id),
+    timeout = timeout
+  )
+}
+
+## Activate a sidebar tab that is inserted CONDITIONALLY and ASYNCHRONOUSLY
+## (insertConditionalTab in shiny_server.R): Projection ("overview"), Gene
+## expression, Marker genes, etc. are no longer static menuItems, so navigating
+## with set_inputs(sidebar = ...) before the item is inserted silently no-ops and
+## the tab's outputs never render. Wait for the menu link, then click it.
+activate_tab <- function(app, tab_name, timeout = 20000) {
+  selector <- sprintf("a[href=\"#shiny-tab-%s\"]", tab_name)
+  app$wait_for_js(
+    sprintf("document.querySelector('%s') !== null", selector),
+    timeout = timeout
+  )
+  app$run_js(sprintf("document.querySelector('%s').click();", selector))
+}
+
 test_that("{shinytest2} recording: overview", {
   local_app_support(inst_dir)
   app <- AppDriver$new(inst_dir, name = "overview", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
   ## Data Info tab: verify key values from the loaded example.crb
-  cells_box <- app$get_value(output = "load_data_number_of_cells")
+  cells_box <- retry_get_value(app, output = "load_data_number_of_cells")
   expect_true(grepl("1,?476", cells_box$html))
 
-  organism_box <- app$get_value(output = "load_data_organism")
+  organism_box <- retry_get_value(app, output = "load_data_organism")
   expect_true(grepl("hg", organism_box$html))
 
-  date_box <- app$get_value(output = "load_data_date_of_export")
+  date_box <- retry_get_value(app, output = "load_data_date_of_export")
   expect_true(grepl("[0-9]{4}-[0-9]{2}-[0-9]{2}", date_box$html))
 
   app$stop()
@@ -30,21 +79,21 @@ test_that("{shinytest2} recording: main", {
   app <- AppDriver$new(inst_dir, name = "main", height = 950, width = 1619)
   app$wait_for_idle(timeout = 20000)
 
-  app$set_inputs(sidebar = "overview")
+  activate_tab(app, "overview")
   app$wait_for_idle(timeout = 10000)
 
   ## verify the projection renders
-  plot_val <- app$get_value(output = "overview_projection")
+  plot_val <- retry_get_value(app, output = "overview_projection")
   expect_false(is.null(plot_val))
 
   ## get unfiltered cell count
-  cells_all <- app$get_value(export = "overview_cells_to_show")
+  cells_all <- retry_get_value(app, export = "overview_cells_to_show")
   expect_true(length(cells_all) > 0)
 
   ## filter to cluster 0 only and verify fewer cells are shown
   app$set_inputs(overview_projection_group_filter_seurat_clusters = "0")
   app$wait_for_idle(timeout = 10000)
-  cells_filtered <- app$get_value(export = "overview_cells_to_show")
+  cells_filtered <- retry_get_value(app, export = "overview_cells_to_show")
   expect_true(length(cells_filtered) < length(cells_all))
 
   ## verify input parameters are applied
@@ -76,19 +125,19 @@ test_that("{shinytest2} recording: groups", {
   app$wait_for_idle(timeout = 10000)
 
   ## composition plot renders
-  plot_val <- app$get_value(output = "groups_by_other_group_plot")
+  plot_val <- retry_get_value(app, output = "groups_by_other_group_plot")
   expect_false(is.null(plot_val))
 
   ## switch to percent view
   app$set_inputs(groups_by_other_group_show_as_percent = TRUE)
   app$wait_for_idle(timeout = 10000)
-  plot_pct <- app$get_value(output = "groups_by_other_group_plot")
+  plot_pct <- retry_get_value(app, output = "groups_by_other_group_plot")
   expect_false(is.null(plot_pct))
 
   ## show table
   app$set_inputs(groups_by_other_group_show_table = TRUE)
   app$wait_for_idle(timeout = 10000)
-  table_val <- app$get_value(output = "groups_by_other_group_table")
+  table_val <- retry_get_value(app, output = "groups_by_other_group_table")
   expect_false(is.null(table_val))
 
   app$expect_values(
@@ -112,16 +161,10 @@ test_that("{shinytest2} recording: marker_genes", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  # Marker genes is now a conditionally + asynchronously inserted sidebar item
-  # (insertConditionalTab). Wait for its menu link to appear, then click it, so
-  # the tab activates on a slow CI runner instead of navigating before it exists.
-  app$wait_for_js(
-    "document.querySelector('a[href=\"#shiny-tab-markerGenes\"]') !== null",
-    timeout = 20000
-  )
-  app$run_js(
-    'document.querySelector(\'a[href="#shiny-tab-markerGenes"]\').click();'
-  )
+  # Marker genes is a conditionally + asynchronously inserted sidebar item
+  # (insertConditionalTab): wait for it, then click, so it activates on a slow
+  # runner instead of navigating before it exists.
+  activate_tab(app, "markerGenes")
   app$wait_for_idle(timeout = 10000)
 
   ## select seurat_clusters (only group with actual marker genes)
@@ -129,7 +172,7 @@ test_that("{shinytest2} recording: marker_genes", {
   app$wait_for_idle(timeout = 10000)
 
   ## table renders
-  table_val <- app$get_value(output = "marker_genes_table")
+  table_val <- retry_get_value(app, output = "marker_genes_table")
   expect_false(is.null(table_val))
 
   ## verify expected columns are present in the table header
@@ -152,7 +195,7 @@ test_that("{shinytest2} recording: marker_genes", {
 
   ## "no markers found" and "no data" messages should not be shown —
   ## table_or_text_UI should contain the table, not a text message
-  ui_val <- app$get_value(output = "marker_genes_table_or_text_UI")
+  ui_val <- retry_get_value(app, output = "marker_genes_table_or_text_UI")
   expect_false(grepl("no_markers_found|no_data", ui_val$html, fixed = FALSE))
 
   app$expect_values(
@@ -178,27 +221,32 @@ test_that("{shinytest2} recording: gene_expression", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  app$set_inputs(sidebar = "geneExpression")
+  activate_tab(app, "geneExpression")
   app$wait_for_idle(timeout = 10000)
 
   ## projection UI renders without any gene selected
-  proj_ui <- app$get_value(output = "expression_projection_UI")
+  proj_ui <- retry_get_value(app, output = "expression_projection_UI")
   expect_false(is.null(proj_ui))
+
+  ## The gene selectize lives in a renderUI, so it is not bound the instant the
+  ## tab goes idle. Wait for its element before set_inputs, or the input binding
+  ## is "not found" and no gene is ever selected.
+  wait_for_input(app, "expression_genes_input")
 
   ## select MS4A1 and verify it is found in the data set
   app$set_inputs(expression_genes_input = "MS4A1", wait_ = FALSE)
   app$wait_for_idle(timeout = 15000)
 
-  genes_text <- app$get_value(output = "expression_genes_displayed")
+  genes_text <- retry_get_value(app, output = "expression_genes_displayed")
   expect_true(grepl("MS4A1", genes_text))
   expect_true(grepl("0 gene(s) are not in data set", genes_text, fixed = TRUE))
 
   ## projection plot renders after gene selection
-  proj_val <- app$get_value(output = "expression_projection")
+  proj_val <- retry_get_value(app, output = "expression_projection")
   expect_false(is.null(proj_val))
 
   ## verify expression levels have some non-zero values (cells with color)
-  expr_levels <- app$get_value(export = "expression_levels")
+  expr_levels <- retry_get_value(app, export = "expression_levels")
   expect_true(length(expr_levels) > 0)
   expect_true(any(expr_levels > 0))
 
@@ -218,7 +266,7 @@ test_that("{shinytest2} recording: gene_id_conversion", {
   app$set_inputs(sidebar = "geneIdConversion")
   app$wait_for_idle(timeout = 10000)
 
-  table_val <- app$get_value(output = "gene_info")
+  table_val <- retry_get_value(app, output = "gene_info")
   expect_false(is.null(table_val))
 
   app$stop()
@@ -237,7 +285,7 @@ test_that("{shinytest2} recording: color_management", {
   app$set_inputs(sidebar = "color_management")
   app$wait_for_idle(timeout = 10000)
 
-  ui_val <- app$get_value(output = "color_assignments_UI")
+  ui_val <- retry_get_value(app, output = "color_assignments_UI")
   expect_false(is.null(ui_val))
 
   app$stop()
@@ -251,7 +299,7 @@ test_that("{shinytest2} recording: about", {
   app$set_inputs(sidebar = "about")
   app$wait_for_idle(timeout = 10000)
 
-  about_text <- app$get_value(output = "about")
+  about_text <- retry_get_value(app, output = "about")
   expect_false(is.null(about_text))
   expect_true(nchar(about_text) > 0)
 
@@ -285,7 +333,7 @@ test_that("createShinyApp bundles a working app", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  cells <- app$get_value(output = "load_data_number_of_cells")
+  cells <- retry_get_value(app, output = "load_data_number_of_cells")
   expect_true(grepl("1,?476", cells$html))
 
   app$stop()
