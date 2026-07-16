@@ -485,8 +485,15 @@ hla_guide_svg_shared <- hla_guide_svg(
 ## The numbers shown are arithmetically consistent: 11/15 = 73%, 3/15 = 20%.
 hla_guide_svg_assoc <- hla_guide_svg(
   paste0(
-    "<text class='hg-lbl' x='14' y='18'>Freeze one motif, then count units</text>",
-    # the frozen feature
+    "<text class='hg-lbl' x='14' y='18'>Lock one motif, then count units</text>",
+    # Ground the word the table is read on: "units" is the app's generic noun
+    # for the thing that has an HLA genotype (Analysis units in the live table),
+    # which is a donor, or a sample when donor mapping is incomplete - never a
+    # single cell. Named here because the row labels below use "units" while the
+    # prose beneath uses "donors", and nothing said they were the same thing.
+    "<text class='hg-sub' x='14' y='33'>each row = one HLA-status group; ",
+    "&#8216;units&#8217; = donors typed for HLA</text>",
+    # the locked feature
     "<line class='hg-edge' x1='62' y1='72' x2='104' y2='58'/>",
     "<line class='hg-edge' x1='62' y1='72' x2='104' y2='92'/>",
     "<circle class='hg-node' cx='62' cy='72' r='9' fill='",
@@ -500,29 +507,48 @@ hla_guide_svg_assoc <- hla_guide_svg(
     "'/>",
     "<rect x='40' y='40' width='88' height='66' fill='none' ",
     "stroke='#c2410c' stroke-dasharray='4 3' rx='4'/>",
-    "<text class='hg-ann' x='40' y='124'>frozen motif</text>",
+    "<text class='hg-ann' x='40' y='124'>locked motif</text>",
     "<path class='hg-arrow' d='M136,72 L178,72'/>",
-    # the table it produces
-    "<rect x='192' y='40' width='240' height='22' fill='#f4f4f5' stroke='#ddd'/>",
-    "<text class='hg-sub' x='198' y='55'>HLA status</text>",
-    "<text class='hg-sub' x='288' y='55'>units</text>",
-    "<text class='hg-sub' x='330' y='55'>with it</text>",
-    "<text class='hg-sub' x='386' y='55'>prevalence</text>",
-    "<rect x='192' y='62' width='240' height='22' fill='#fff' stroke='#ddd'/>",
-    "<text class='hg-sub' x='198' y='77'>carrier</text>",
-    "<text class='hg-sub' x='288' y='77'>15</text>",
-    "<text class='hg-sub' x='330' y='77'>11</text>",
-    "<text class='hg-sub' x='386' y='77'>73%</text>",
-    "<rect x='192' y='84' width='240' height='22' fill='#fff' stroke='#ddd'/>",
-    "<text class='hg-sub' x='198' y='99'>non-carrier</text>",
-    "<text class='hg-sub' x='288' y='99'>15</text>",
-    "<text class='hg-sub' x='330' y='99'>3</text>",
-    "<text class='hg-sub' x='386' y='99'>20%</text>",
-    "<rect x='192' y='106' width='240' height='22' fill='#fff' stroke='#ddd'/>",
-    "<text class='hg-sub' x='198' y='121'>untyped</text>",
-    "<text class='hg-sub' x='288' y='121'>0</text>",
-    "<text class='hg-sub' x='330' y='121'>&#8212;</text>",
-    "<text class='hg-sub' x='386' y='121'>&#8212;</text>",
+    "<text class='hg-sub' x='150' y='66'>count</text>",
+    # The table it produces. Widened from 240 to 256 and the prevalence column
+    # is right-ANCHORED (text-anchor:end), so the header word can no longer spill
+    # past its cell whatever width the browser resolves for it.
+    "<rect x='192' y='40' width='256' height='22' fill='#f4f4f5' stroke='#ddd'/>",
+    "<text class='hg-sub' x='214' y='55'>HLA status</text>",
+    "<text class='hg-sub' x='300' y='55'>units</text>",
+    "<text class='hg-sub' x='344' y='55'>with it</text>",
+    "<text class='hg-sub' text-anchor='end' x='442' y='55'>prevalence</text>",
+    # The carrier/non-carrier colour goes on the UNIT being counted, not on the
+    # motif. The three motif nodes above stay neutral on purpose: carrier status
+    # is a property of a DONOR, and a CDR3 can be borne by carriers and
+    # non-carriers at once (that is the "Mixed" node in the Colour tab). Painting
+    # the motif carrier-red would state the one thing this page refuses - that a
+    # receptor belongs to a carrier. The dots below are the exact carrier hues
+    # the live network uses, on the rows the table actually splits donors into.
+    "<rect x='192' y='62' width='256' height='22' fill='#fff' stroke='#ddd'/>",
+    "<circle cx='202' cy='73' r='4' stroke='#333' stroke-width='0.8' fill='",
+    HLA_GUIDE_CARRIER,
+    "'/>",
+    "<text class='hg-sub' x='214' y='77'>carrier</text>",
+    "<text class='hg-sub' x='300' y='77'>15</text>",
+    "<text class='hg-sub' x='346' y='77'>11</text>",
+    "<text class='hg-sub' text-anchor='end' x='442' y='77'>73%</text>",
+    "<rect x='192' y='84' width='256' height='22' fill='#fff' stroke='#ddd'/>",
+    "<circle cx='202' cy='95' r='4' stroke='#333' stroke-width='0.8' fill='",
+    HLA_GUIDE_NONCARRIER,
+    "'/>",
+    "<text class='hg-sub' x='214' y='99'>non-carrier</text>",
+    "<text class='hg-sub' x='300' y='99'>15</text>",
+    "<text class='hg-sub' x='348' y='99'>3</text>",
+    "<text class='hg-sub' text-anchor='end' x='442' y='99'>20%</text>",
+    "<rect x='192' y='106' width='256' height='22' fill='#fff' stroke='#ddd'/>",
+    "<circle cx='202' cy='117' r='4' stroke='#333' stroke-width='0.8' fill='",
+    HLA_GUIDE_UNTYPED,
+    "'/>",
+    "<text class='hg-sub' x='214' y='121'>untyped</text>",
+    "<text class='hg-sub' x='300' y='121'>0</text>",
+    "<text class='hg-sub' x='346' y='121'>&#8212;</text>",
+    "<text class='hg-sub' text-anchor='end' x='442' y='121'>&#8212;</text>",
     # THE trap
     "<rect x='14' y='142' width='432' height='48' rx='5' fill='#fdeae0' ",
     "stroke='#e0a58a'/>",
@@ -744,7 +770,7 @@ hla_guide_content <- list(
       tagList(
         tags$b("Node area"),
         " - proportional to the number of analysis units carrying it, so twice",
-        "the area means twice the cells. It is the AREA that carries the number,",
+        "the area means twice the count. It is the AREA that carries the number,",
         "not the width: radius grows as the square root of the count. Very large",
         "clones hit a size cap and stop growing - the tooltip always gives the",
         "exact count."
@@ -1004,7 +1030,7 @@ hla_guide_content <- list(
   ),
   "HLA Associations" = list(
     svg = hla_guide_svg_assoc,
-    summary = "Descriptive overlap for one frozen motif or node. No test is run.",
+    summary = "Descriptive overlap for one locked motif or node. No test is run.",
     detail = tagList(
       hla_guide_h("What it does"),
       hla_guide_p(
@@ -1070,7 +1096,7 @@ hla_guide_content <- list(
       tagList(
         tags$b("Prevalence"),
         " - ACROSS units: the proportion of units of that HLA status in which the",
-        "frozen feature appears at all."
+        "locked feature appears at all."
       ),
       tagList(
         tags$b("Per-unit fraction"),

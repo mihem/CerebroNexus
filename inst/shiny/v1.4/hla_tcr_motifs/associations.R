@@ -1,7 +1,7 @@
 ##----------------------------------------------------------------------------##
 ## HLA & TCR Motifs — descriptive feature x HLA overlap
 ##
-## This tab freezes one node or motif from the already-built graph, then reports
+## This tab locks one node or motif from the already-built graph, then reports
 ## observed donor/sample overlap with one allele. It performs no enrichment test
 ## and never labels co-occurrence as restriction.
 ##----------------------------------------------------------------------------##
@@ -64,7 +64,7 @@ output$hla_feature_selector_ui <- renderUI({
     labels <- sprintf("%s (%d CDR3)", groups, as.integer(sizes[groups]))
     choices <- stats::setNames(groups, labels)
   }
-  selectInput("hla_feature_id", "Frozen feature:", choices = choices)
+  selectInput("hla_feature_id", "Locked feature:", choices = choices)
 })
 
 hla_overlap_table <- reactive({
@@ -128,7 +128,7 @@ output$hla_associations_ui <- renderUI({
       style = "font-size: 13px;",
       tags$b("Descriptive overlap only."),
       paste(
-        "The selected node/motif is frozen from the Hamming-1 graph over ALL",
+        "The selected node/motif is locked to the Hamming-1 graph over ALL",
         "cells, whatever the network scope. Counts are donor-level only with",
         "complete donor mapping, otherwise sample-level. No p-value or",
         "restriction claim is produced."
