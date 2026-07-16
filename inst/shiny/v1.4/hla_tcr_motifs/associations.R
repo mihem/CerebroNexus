@@ -32,14 +32,22 @@ hla_selected_feature_members <- reactive({
   }
   feature_type <- hla_param("hla_feature_type", "motif")
   feature_id <- input$hla_feature_id
-  if (is.null(feature_id) || !nzchar(feature_id)) {
-    return(NULL)
-  }
-  if (identical(feature_type, "node")) {
+  ## req(), not return(NULL): switching Feature type rebuilds the feature
+  ## selectInput (it lives in a renderUI), so for one reactive cycle
+  ## input$hla_feature_id still holds the OLD type's id while feature_type has
+  ## already flipped to the new one. Selecting on the new type's column then
+  ## matches nothing, and the three tables rendered a degenerate "all-absent"
+  ## intermediate before the id caught up -- the visible flicker. Holding here
+  ## until id and type agree (a non-empty match) lets the tables render once,
+  ## straight to the final result. A genuinely empty catalog returned NULL above.
+  req(feature_id, nzchar(feature_id))
+  members <- if (identical(feature_type, "node")) {
     catalog[catalog$node_id == feature_id, , drop = FALSE]
   } else {
     catalog[catalog$motif_group == feature_id, , drop = FALSE]
   }
+  req(nrow(members) > 0)
+  members
 })
 
 output$hla_feature_selector_ui <- renderUI({
@@ -236,13 +244,31 @@ output$hla_associations_ui <- renderUI({
   )
 })
 
-output$hla_overlap_summary <- DT::renderDataTable({
+## The two overlap tables update on every Feature-type/feature switch. Rendering
+## them the normal (reactive) way tore the whole DataTable down and rebuilt it
+## each time -- an abrupt full redraw. Instead each table is rendered ONCE from a
+## constant empty skeleton (so the widget always exists with the right columns)
+## and every data change is pushed through DT::replaceData() on a proxy, which
+## swaps the rows in place without rebuilding the widget. Their dimensions are
+## stable (summary = 3 status rows; breadth = one row per analysis unit), so
+## replaceData is always a clean row-for-row swap.
+
+## ---- Observed overlap summary ---------------------------------------------- ##
+hla_overlap_summary_data <- reactive({
+  empty <- data.frame(
+    "HLA status" = character(),
+    "Analysis units" = integer(),
+    "Units with feature" = integer(),
+    "Observed feature prevalence" = character(),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
   df <- hla_overlap_table()
   if (is.null(df) || nrow(df) == 0) {
-    return(NULL)
+    return(empty)
   }
   statuses <- c("carrier", "non-carrier", "untyped")
-  show <- do.call(
+  do.call(
     rbind,
     lapply(statuses, function(status) {
       d <- df[df$hla_status == status, , drop = FALSE]
@@ -260,38 +286,90 @@ output$hla_overlap_summary <- DT::renderDataTable({
       )
     })
   )
+})
+
+output$hla_overlap_summary <- DT::renderDataTable(
   # scrollX: this table grows a column per carrier status and its headers are
   # named after the data set's own unit, so its width is not something this
   # layout can assume. Without it the table pushes the page sideways.
   DT::datatable(
-    show,
+    data.frame(
+      "HLA status" = character(),
+      "Analysis units" = integer(),
+      "Units with feature" = integer(),
+      "Observed feature prevalence" = character(),
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    ),
     rownames = FALSE,
     class = "display nowrap",
     options = list(dom = "t", scrollX = TRUE)
   )
+)
+hla_overlap_summary_proxy <- DT::dataTableProxy("hla_overlap_summary")
+observeEvent(hla_overlap_summary_data(), {
+  DT::replaceData(
+    hla_overlap_summary_proxy,
+    hla_overlap_summary_data(),
+    resetPaging = FALSE,
+    rownames = FALSE
+  )
+})
+
+## ---- Per-unit breadth and cell fraction ------------------------------------ ##
+## Empty skeleton mirrors the columns hla_descriptive_feature_overlap() returns,
+## in order, so replaceData() lines up row values with the rendered header.
+hla_overlap_breadth_skeleton <- function() {
+  data.frame(
+    analysis_unit = character(),
+    unit_type = character(),
+    hla_status = character(),
+    feature_present = logical(),
+    n_cells = integer(),
+    n_feature_cells = integer(),
+    n_unique_clonotypes = integer(),
+    n_feature_clonotypes = integer(),
+    unique_clonotype_fraction = numeric(),
+    cell_fraction = numeric(),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+}
+
+hla_overlap_breadth_data <- reactive({
+  df <- hla_overlap_table()
+  if (is.null(df) || nrow(df) == 0) {
+    return(hla_overlap_breadth_skeleton())
+  }
+  df$unique_clonotype_fraction <- round(df$unique_clonotype_fraction, 4)
+  df$cell_fraction <- round(df$cell_fraction, 4)
+  df
 })
 
 output$hla_overlap_table <- DT::renderDataTable({
-  df <- hla_overlap_table()
-  if (is.null(df) || nrow(df) == 0) {
-    return(NULL)
-  }
-  show <- df
-  show$unique_clonotype_fraction <- round(show$unique_clonotype_fraction, 4)
-  show$cell_fraction <- round(show$cell_fraction, 4)
   # The core keeps neutral column names; the header names them for what this
-  # data set actually holds, so bulk rows are never presented as cells.
+  # data set actually holds, so bulk rows are never presented as cells. noun is
+  # stable per data set, so this render fires once, not on Feature-type switches.
   noun <- hla_unit_noun()
-  headers <- colnames(show)
+  headers <- colnames(hla_overlap_breadth_skeleton())
   headers[headers == "n_cells"] <- sprintf("n_%ss", noun)
   headers[headers == "n_feature_cells"] <- sprintf("n_feature_%ss", noun)
   headers[headers == "cell_fraction"] <- sprintf("%s_fraction", noun)
   DT::datatable(
-    show,
+    hla_overlap_breadth_skeleton(),
     rownames = FALSE,
     colnames = headers,
     class = "display nowrap",
     options = list(pageLength = 15, dom = "tip", scrollX = TRUE)
+  )
+})
+hla_overlap_table_proxy <- DT::dataTableProxy("hla_overlap_table")
+observeEvent(hla_overlap_breadth_data(), {
+  DT::replaceData(
+    hla_overlap_table_proxy,
+    hla_overlap_breadth_data(),
+    resetPaging = FALSE,
+    rownames = FALSE
   )
 })
 
