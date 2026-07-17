@@ -7,7 +7,7 @@ output[["about"]] <- renderText({
   ## Version is set by hand here: the app can run from this inst/ folder without
   ## the package installed, and any installed copy may be a different version, so
   ## reading packageVersion() would be unreliable. Update this string on release.
-  version <- "2.1.0"
+  version <- "2.2.0"
   paste0(
     '<b>Version of cerebroAppLite</b><br>
     v',
