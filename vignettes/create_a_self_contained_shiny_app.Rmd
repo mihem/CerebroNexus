@@ -58,7 +58,7 @@ After this call, `out_dir` contains the generated `app.R`, a copy of the Shiny s
 
 Launch it locally:
 
-```{r}
+```{r, purl=FALSE}
 shiny::runApp(out_dir)
 ```
 
@@ -130,13 +130,13 @@ createShinyApp(
 )
 ```
 
-`mode`, `crb_file_to_load`, and `cerebro_root` are filled in by the function itself — anything you supply for those keys will be overwritten.
+`mode`, `cerebro_version`, `crb_file_to_load`, and `cerebro_root` are filled in by the function itself — anything you supply for those keys will be overwritten.
 
 # Deploying the bundle
 
 The output directory is self-contained: shipping the folder is all that's required. Three common targets:
 
-```{r}
+```{r, purl=FALSE}
 # 1. Local
 shiny::runApp(out_dir)
 

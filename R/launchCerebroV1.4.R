@@ -156,6 +156,9 @@ launchCerebroV1.4 <- function(
   ## --------------------------------------------------------------------------##
   Cerebro.options <<- list(
     "mode" = mode,
+    "cerebro_version" = as.character(
+      utils::packageVersion("cerebroAppLite")
+    ),
     "expression_matrix_mode" = expression_matrix_mode,
     "crb_file_to_load" = crb_file_to_load,
     "expression_matrix_h5" = expression_matrix_h5,

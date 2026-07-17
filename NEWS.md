@@ -1,3 +1,28 @@
+# cerebroAppLite 2.1.1
+
+## Robustness and interface
+
+- **Plots fill the viewport.** Projection and other plot panels grow to fit the
+  available height through a single shared mechanism, so tall screens no longer
+  leave large empty bands.
+- **Unified info buttons and tidier styling.** The per-tab info buttons were
+  consolidated onto one shared component and assorted inline CSS moved into the
+  stylesheet.
+
+## Fixes
+
+- **Spatial axis sliders.** Guard against empty coordinate ranges so the axis
+  range sliders no longer emit `Inf`/`-Inf` warnings on data sets without
+  spatial coordinates.
+
+## Testing / CI
+
+- Raise the default shinytest2 `load_timeout` to 60s and wait for
+  asynchronously inserted tabs before navigating, de-flaking the app tests on
+  slower runners.
+- Preserve the last shinytest2 output error when a retry times out, so failures
+  report their original cause instead of an unexplained `NULL` value.
+
 # cerebroAppLite 2.1.0
 
 ## Projection overhaul, unified interface, and cross-tab selection

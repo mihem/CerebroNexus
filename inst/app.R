@@ -15,6 +15,10 @@ library(dplyr)
 custom_welcome_message <- "Welcome to Cerebro! This is a custom welcome message. You can change it in the app options."
 Cerebro.options <<- list(
   "mode" = "closed",
+  ## Keep the source demo runnable directly from inst/ without requiring an
+  ## installed cerebroAppLite package. Exported apps receive this value in
+  ## cerebro_config.rds when createShinyApp() builds them.
+  "cerebro_version" = "2.1.1",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune

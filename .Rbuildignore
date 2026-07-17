@@ -4,6 +4,11 @@
 .Rhistory
 .envrc
 .direnv
+^\.claude$
+^\.loci$
+^\.playwright-mcp$
+^\.sisyphus$
+^\.superpowers$
 LICENSE.md
 TODO.md
 ^create_env\.R$
@@ -15,3 +20,5 @@ TODO.md
 ^docs$
 ^tests/smoke$
 ^data-raw$
+^tmp$
+^tmp/

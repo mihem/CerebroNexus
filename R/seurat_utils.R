@@ -634,7 +634,6 @@
     }
 
     if (length(other_cols) > 0) {
-      idx_first <- ave(seq_len(nrow(df)), f, FUN = function(i) i[1])
       first_rows <- !duplicated(f)
       other_summary <- df[first_rows, other_cols, drop = FALSE]
       rownames(other_summary) <- as.character(f[first_rows])

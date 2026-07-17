@@ -83,6 +83,10 @@ test_that("multi-crb config lists both datasets by name", {
   app <- build_smoke_app()
   cfg <- readRDS(file.path(app$app_dir, "cerebro_config.rds"))
 
+  expect_identical(
+    cfg[["cerebro_version"]],
+    as.character(utils::packageVersion("cerebroAppLite"))
+  )
   expect_setequal(
     names(cfg[["crb_file_to_load"]]),
     c("Dataset A", "Dataset B")
@@ -206,6 +210,11 @@ test_that("the generated app remains self-contained at runtime", {
   expect_false(grepl("cerebroAppLite::", bundled_source, fixed = TRUE))
   expect_false(grepl(
     "asNamespace(\"cerebroAppLite\"",
+    bundled_source,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    'packageVersion("cerebroAppLite")',
     bundled_source,
     fixed = TRUE
   ))

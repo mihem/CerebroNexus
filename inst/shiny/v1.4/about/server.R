@@ -4,10 +4,20 @@
 
 ##
 output[["about"]] <- renderText({
-  ## Version is set by hand here: the app can run from this inst/ folder without
-  ## the package installed, and any installed copy may be a different version, so
-  ## reading packageVersion() would be unreliable. Update this string on release.
-  version <- "2.1.1"
+  ## The launcher or exporter records the version in app configuration while
+  ## cerebroAppLite is available. Standalone bundles therefore render this page
+  ## without querying (or requiring) the package at runtime.
+  version <- Cerebro.options[["cerebro_version"]]
+  if (
+    is.null(version) ||
+      !length(version) ||
+      is.na(version[[1]]) ||
+      !nzchar(as.character(version[[1]]))
+  ) {
+    version <- "unknown"
+  } else {
+    version <- as.character(version[[1]])
+  }
   paste0(
     '<b>Version of cerebroAppLite</b><br>
     v',

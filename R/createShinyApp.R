@@ -103,6 +103,7 @@ dedent <- function(string) {
 #' @param ... Currently unused; reserved for future arguments.
 #'
 #' @return Invisibly returns \code{result_dir}.
+#' @importFrom later later
 #' @importFrom stats setNames
 #' @export
 createShinyApp <- function(
@@ -397,6 +398,12 @@ createShinyApp <- function(
   )
 
   cerebro_options[["mode"]] <- "open"
+  ## Resolve the version while the package is present, then serialize it into
+  ## the generated app. The standalone bundle never needs cerebroAppLite at
+  ## runtime merely to render its About page.
+  cerebro_options[["cerebro_version"]] <- as.character(
+    utils::packageVersion("cerebroAppLite")
+  )
   cerebro_options[["crb_file_to_load"]] <- crb_files
   cerebro_options[["cerebro_root"]] <- "."
   if (!is.null(crb_pick_smallest_file)) {
