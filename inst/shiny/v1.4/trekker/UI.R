@@ -56,6 +56,7 @@ tab_trekker <- tabItem(
       cerebroBox(
         title = tagList(
           "Physical space and transcriptome space",
+          cerebroInfoButton("trekker_viz_info"),
           tags$span(
             class = "tk-note",
             id = "tk-vnote",
@@ -109,8 +110,13 @@ tab_trekker <- tabItem(
             tags$span(id = "tk-cb0", "0"),
             div(class = "tk-grad", id = "tk-grad"),
             tags$span(id = "tk-cb1", "1"),
-            tags$span(class = "tk-cbar-note", "SCT normalized")
+            tags$span(
+              class = "tk-cbar-note",
+              id = "tk-cbar-note",
+              "SCT normalized"
+            )
           ),
+          div(class = "tk-fieldsummary", id = "tk-fieldsummary"),
           div(
             class = "tk-hint",
             HTML(
@@ -121,7 +127,10 @@ tab_trekker <- tabItem(
         )
       ),
       cerebroBox(
-        title = "Cell inspector",
+        title = tagList(
+          "Cell inspector",
+          cerebroInfoButton("trekker_inspector_info")
+        ),
         content = div(
           class = "trekker-page",
           div(
@@ -167,7 +176,10 @@ tab_trekker <- tabItem(
         )
       ),
       cerebroBox(
-        title = "Positioning evidence",
+        title = tagList(
+          "Positioning evidence",
+          cerebroInfoButton("trekker_evidence_info")
+        ),
         content = div(
           class = "trekker-page",
           div(class = "tk-exgrid", id = "tk-exgrid"),

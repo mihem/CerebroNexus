@@ -17,6 +17,18 @@
   cloud plus a UMI knee plot) for the sampled nuclei, and a Cell inspector reports
   each nucleus's identity together with the **real** physical-neighbour cell-type
   counts within a chosen radius (not a deconvolution estimate).
+- **Colour the physical map by any per-cell value — analysis, not just a view.**
+  Beyond cell type / cluster / gene, the page colours by **cross-space metrics**
+  computed on the full positioned set — spatial-neighbourhood purity and
+  expression-vs-physical neighbourhood concordance (who forms tight anatomical
+  domains vs. who is dispersed or infiltrating, with a per-cell-type summary and
+  the honest reminder that in a healthy brain low microglial purity is baseline
+  tiling, not activation) — and by **any numeric per-cell meta column** the object
+  carries (pseudotime, a signature/module score, velocity magnitude, a signaling
+  score), so an existing single-cell analysis result gains a physical-space
+  projection with no page change. The demo ships a myelination signature score as
+  a worked example. Only Trekker can do this: it needs true single-cell identity
+  and true physical position for the same nuclei.
 - **Three coordinate orientations, made visible.** The vendor's Location CSV is the
   canonical coordinate authority; the `@images` slot (what the generic extractor
   reads) is axis-transposed, and the `SPATIAL` reduction is y-mirrored. A control
