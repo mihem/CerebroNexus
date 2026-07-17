@@ -19,6 +19,7 @@
   var view = "pair", src = "csv", mode = "celltype", gene = null;
   var ps = 2.2, nr = 250, showEv = true, morphT = 0;
   var sel = null, pick = null;
+  var confThresh = -1; // >=0 when the confidence dissolve filter is active
   var hidden = new Set();
   var U_SP = null, U_UM = null;
   var P = null;
@@ -114,9 +115,46 @@
     });
     drawAll();
   }
+  // A "continuous" mode is a gene (server-served) or any per-nucleus field
+  // carried in the slot (the cross-space metrics, and later analysis outputs).
+  // This is the substrate: adding a field to the slot makes it a colouring here
+  // with no code change.
+  function isCont() {
+    return mode === "gene" || mode === "meta" ||
+      (D && D.fields && Object.prototype.hasOwnProperty.call(D.fields, mode));
+  }
+  function curField() {
+    if (mode === "gene") return D.genes[gene];
+    if (mode === "meta") return D.servedMeta;
+    return D.fields ? D.fields[mode] : null;
+  }
+  function curLabel() {
+    if (mode === "gene") return gene;
+    var f = curField();
+    return f ? f.label : mode;
+  }
+  // Decode a field's displayed value at nucleus i from its 0-255 quantisation,
+  // honouring a min (min-max scaled fields; 0 for unit-scaled ones).
+  function fieldValue(f, i) {
+    var lo = f.min != null ? f.min : 0;
+    return lo + (f.v[i] / 255) * (f.max - lo);
+  }
+  // Per-nucleus positioning-confidence values (0-255), if the field is present.
+  function cfVals() {
+    return D && D.fields && D.fields.position_confidence
+      ? D.fields.position_confidence.v : null;
+  }
+  // "Dissolve least-confident (pct%)": set the confidence value below which
+  // nuclei fade out, from the pct-th percentile of the confidence distribution.
+  function setConfPct(pct) {
+    var arr = cfVals();
+    if (!arr || pct <= 0) { confThresh = -1; return; }
+    var s = Array.prototype.slice.call(arr).sort(function (a, b) { return a - b; });
+    confThresh = s[Math.floor(pct / 100 * (s.length - 1))];
+  }
   function baseColor(i) {
-    if (mode === "gene") {
-      var g = D.genes[gene];
+    if (isCont()) {
+      var g = curField();
       if (!g) return "#d0d0d3";
       var c = viridis(g.v[i] / 255);
       return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
@@ -133,8 +171,9 @@
     if (!p.sx || !p.W) return; // not projected yet (e.g. tab still hidden)
     var c = p.ctx; c.clearRect(0, 0, p.W, p.H);
     var order = null, j, i, pass;
-    if (mode === "gene" && D.genes[gene]) {
-      var gv = D.genes[gene].v;
+    var cf = confThresh >= 0 ? cfVals() : null; // confidence dissolve filter
+    if (isCont() && curField()) {
+      var gv = curField().v;
       order = Array.from({ length: N }, function (_, k) { return k; })
         .sort(function (a, b) { return gv[a] - gv[b]; });
     }
@@ -144,7 +183,9 @@
         if (!visible(i)) continue;
         var inSel = !sel || sel.has(i);
         if (pass === 0 ? inSel : !inSel) continue;
-        c.globalAlpha = sel ? (inSel ? 0.95 : 0.06) : 0.85;
+        var a = sel ? (inSel ? 0.95 : 0.06) : 0.85;
+        if (cf && cf[i] < confThresh) a *= 0.05; // dissolve low-confidence nuclei
+        c.globalAlpha = a;
         c.fillStyle = baseColor(i);
         c.beginPath(); c.arc(p.sx[i], p.sy[i], ps, 0, 6.2832); c.fill();
       }
@@ -223,9 +264,9 @@
       h += p.kind === "sp"
         ? "<br>x " + SRC[src].x[i].toFixed(0) + " · y " + SRC[src].y[i].toFixed(0) + " µm"
         : "<br>UMAP " + D.ux[i].toFixed(1) + " , " + D.uy[i].toFixed(1);
-      if (mode === "gene" && D.genes[gene]) {
-        var g = D.genes[gene];
-        h += "<br>" + gene + " <b>" + (g.v[i] / 255 * g.max).toFixed(2) + "</b>";
+      if (isCont() && curField()) {
+        var g = curField();
+        h += "<br>" + curLabel() + " <b>" + fieldValue(g, i).toFixed(2) + "</b>";
       }
       if (EV.has(i)) h += "<br><b>Has positioning evidence</b> · click to view";
       p.tip.innerHTML = h; p.tip.style.opacity = 1;
@@ -295,8 +336,15 @@
       : "<div class=\"tk-empty\">This nucleus has no official positioning-evidence image.<br>" +
         "<span class=\"tk-muted\">The vendor ships 50 per class; only ringed nuclei have one.</span></div>";
 
-    var g = mode === "gene" && D.genes[gene]
-      ? "<dt>" + gene + "</dt><dd>" + (D.genes[gene].v[i] / 255 * D.genes[gene].max).toFixed(2) + "</dd>"
+    var cf = curField();
+    var g = isCont() && cf
+      ? "<dt>" + curLabel() + "</dt><dd>" + fieldValue(cf, i).toFixed(2) + "</dd>"
+      : "";
+    var cs = D.conf;
+    var confRows = cs
+      ? "<dt>Position conf.</dt><dd>" + (cs.prop_top[i] * 100).toFixed(1) + "%</dd>" +
+        "<dt>Bead noise</dt><dd>" + (cs.prop_noise[i] * 100).toFixed(0) + "%</dd>" +
+        "<dt>Spatial barcodes</dt><dd>" + fmt(cs.sb_total[i]) + "</dd>"
       : "";
     el.innerHTML = "<div class=\"tk-insp\"><div>" +
       "<h4 class=\"tk-sub-h\">Identity</h4>" +
@@ -304,7 +352,7 @@
       "<dt>Cluster</dt><dd>" + D.clusters[i] + "</dd>" +
       "<dt>x</dt><dd>" + D.x[i].toFixed(0) + " µm</dd>" +
       "<dt>y</dt><dd>" + D.y[i].toFixed(0) + " µm</dd>" +
-      "<dt>UMAP</dt><dd>" + D.ux[i].toFixed(1) + ", " + D.uy[i].toFixed(1) + "</dd>" + g + "</dl>" +
+      "<dt>UMAP</dt><dd>" + D.ux[i].toFixed(1) + ", " + D.uy[i].toFixed(1) + "</dd>" + g + confRows + "</dl>" +
       "<div class=\"tk-hint\" style=\"word-break:break-all\">" + (ev ? ev.bc : "") + "</div></div>" +
       "<div><h4 class=\"tk-sub-h\">Physical neighbourhood " +
       "<span class=\"tk-muted\">r = " + nr + " µm · n = " + n + "</span></h4>" +
@@ -315,13 +363,43 @@
     drawAll();
   }
 
+  // Per-cell-type summary for a field that carries one (spatial purity): the
+  // at-a-glance "who forms domains, who disperses" readout, plus the field's
+  // honest description.
+  function renderFieldSummary() {
+    var el = $("tk-fieldsummary"); if (!el) return;
+    var f = mode === "gene" ? null : curField();
+    if (!f) { el.innerHTML = ""; return; }
+    var html = f.desc ? "<div class=\"tk-hint\" style=\"margin-top:8px\">" + f.desc + "</div>" : "";
+    if (f.by_type && f.by_type.length) {
+      var mx = Math.max.apply(null, f.by_type.map(function (b) { return b.median; })) || 1;
+      var rows = f.by_type.slice().sort(function (a, b) { return b.median - a.median; })
+        .map(function (b) {
+          return "<div class=\"tk-bar\"><span class=\"tk-nm\" style=\"color:" + (CT_COL[b.type] || "#666") +
+            "\">" + b.type + "</span><span class=\"tk-tr\"><span class=\"tk-fl\" style=\"width:" +
+            (b.median / mx * 100) + "%;background:" + (CT_COL[b.type] || "#999") + "\"></span></span>" +
+            "<span class=\"tk-ct\">" + b.median.toFixed(2) + "</span></div>";
+        }).join("");
+      html += "<div class=\"tk-sub-h\" style=\"margin-top:10px\">Median by cell type — who forms domains, who disperses</div>" +
+        "<div class=\"tk-bars\">" + rows + "</div>";
+    }
+    el.innerHTML = html;
+  }
+
   function renderLegend() {
+    renderFieldSummary();
     var L = $("tk-legend"), C = $("tk-cbar");
-    if (mode === "gene") {
+    if (isCont()) {
       L.style.display = "none"; C.style.display = "flex";
-      var g = D.genes[gene];
-      $("tk-cb0").textContent = "0";
+      var g = curField();
+      $("tk-cb0").textContent = g && g.min != null ? g.min.toFixed(1) : "0";
       $("tk-cb1").textContent = g ? g.max.toFixed(1) : "—";
+      var nEl = $("tk-cbar-note");
+      if (nEl) {
+        nEl.textContent = mode === "gene"
+          ? "SCT normalized"
+          : (mode === "meta" ? "" : "0–1");
+      }
       var st = [];
       for (var i = 0; i <= 10; i++) {
         var c = viridis(i / 10);
@@ -354,6 +432,9 @@
 
   function applyGene(g) {
     gene = g; renderLegend(); drawAll(); if (pick != null) renderInspector();
+  }
+  function applyServed() {
+    renderLegend(); drawAll(); if (pick != null) renderInspector();
   }
 
   /* ---- header / QC / evidence / moran (static per dataset) --------------- */
@@ -483,6 +564,7 @@
         morphT = +value; if (P) { project(P.sp); draw(P.sp); }
         break;
       case "trekker_evtoggle": showEv = !!value; drawAll(); break;
+      case "trekker_conf": setConfPct(+value); drawAll(); break;
       default: break;
     }
   }
@@ -497,6 +579,14 @@
       if (!D || !mmsg.ok) return;
       D.genes[mmsg.gene] = { v: mmsg.v, max: mmsg.max };
       if (mode === "gene") applyGene(mmsg.gene);
+    });
+    Shiny.addCustomMessageHandler("trekker_served", function (mmsg) {
+      if (!D || !mmsg.ok) return;
+      D.servedMeta = {
+        v: mmsg.v, min: mmsg.min, max: mmsg.max,
+        label: mmsg.label, desc: mmsg.desc
+      };
+      if (mode === "meta") applyServed();
     });
     var jq = window.jQuery;
     if (jq) {

@@ -44,8 +44,10 @@
 ##     Rscript data-raw/build_trekker_demo.R
 ##
 ## data-raw/ is excluded from the built package via .Rbuildignore; it lives in
-## the repo for reproducibility only. The `magick` package is a build-only
-## dependency used to down-scale the evidence JPEGs; it is not a package Import.
+## the repo for reproducibility only. Build-only dependencies (not package
+## Imports): `magick` (down-scale the evidence JPEGs), `FNN` (fast kNN for the
+## cross-space metrics), `base64enc` (embed images). Seurat's AddModuleScore
+## provides the demo's myelination signature meta column.
 ##----------------------------------------------------------------------------##
 
 suppressPackageStartupMessages({
@@ -153,6 +155,99 @@ um <- Embeddings(so, "umap")
 ## 0-based cluster id per nucleus
 clab <- as.integer(as.character(so@meta.data$seurat_clusters))
 stopifnot(max(clab) < length(CELLTYPE_BY_CLUSTER))
+
+##----------------------------------------------------------------------------##
+## Cross-space metrics (Trekker differentiator: analysis, not a view).
+##
+## Computed on the FULL positioned set, because neighbourhood structure is
+## DENSITY-DEPENDENT -- computing it on the down-sampled subset would distort it.
+## Only the retained nuclei's values are shipped (subset in the slot below).
+##
+##   spatial_purity[i]  = of nucleus i's K nearest PHYSICAL neighbours, the
+##                        fraction that share its cell type. Low = dispersed /
+##                        tiled / infiltrating; high = tight anatomical domain.
+##   xspace_concord[i]  = overlap between i's K nearest neighbours in EXPRESSION
+##                        space (PCA) and in PHYSICAL space. High = transcriptomic
+##                        neighbours are also physical neighbours (organized);
+##                        low = identity is spatially mixed. Decoupled from the
+##                        cell-type calling that spatial_purity depends on.
+##
+## Only Trekker can compute these: they need TRUE single-cell transcriptomic
+## identity AND true physical position for the SAME nuclei.
+##----------------------------------------------------------------------------##
+K_XSPACE <- 15L
+ct_full <- CELLTYPE_BY_CLUSTER[clab + 1L]
+sp_nn <- FNN::get.knn(cbind(cx, cy), k = K_XSPACE)$nn.index
+ex_nn <- FNN::get.knn(Embeddings(so, "pca"), k = K_XSPACE)$nn.index
+spatial_purity <- vapply(
+  seq_len(n_all),
+  function(i) mean(ct_full[sp_nn[i, ]] == ct_full[i]),
+  numeric(1)
+)
+xspace_concord <- vapply(
+  seq_len(n_all),
+  function(i) length(intersect(sp_nn[i, ], ex_nn[i, ])) / K_XSPACE,
+  numeric(1)
+)
+## per-cell-type median purity + dispersed fraction (purity < 0.3) on the FULL
+## set, for the page's at-a-glance "who forms domains, who infiltrates" readout.
+purity_by_type <- lapply(sort(unique(ct_full)), function(t) {
+  p <- spatial_purity[ct_full == t]
+  list(
+    type = t,
+    n = length(p),
+    median = round(stats::median(p), 3),
+    dispersed = round(mean(p < 0.3), 3)
+  )
+})
+
+##----------------------------------------------------------------------------##
+## An EXISTING single-cell analysis, spatialized (differentiator 3): a per-cell
+## signature score (Seurat::AddModuleScore) becomes a meta column the object
+## carries, so the page can colour the physical map by it -- no page change, it
+## just shows up under "Colour by" like any other per-cell value. We use a
+## myelination signature: it reads as a clean white-matter gradient in tissue and
+## is honestly interpretable across the section. Any per-cell analysis output
+## (pseudotime, velocity magnitude, CellChat signaling score) rides the same
+## mechanism once it is a meta column.
+##----------------------------------------------------------------------------##
+myelin_genes <- intersect(
+  c("Plp1", "Mbp", "Mog", "Mag", "Mobp", "Cldn11"),
+  rownames(so)
+)
+so <- Seurat::AddModuleScore(
+  so,
+  features = list(myelin_genes),
+  name = "Myelination",
+  assay = "SCT"
+)
+
+##----------------------------------------------------------------------------##
+## Per-nucleus positioning confidence (differentiator 1: position uncertainty as
+## an interactive axis). From the vendor bead statistics (coords_<sample>.txt),
+## `proportion_SB_UMI_top_cluster` = the share of a nucleus's spatial-barcode UMI
+## mass that falls in its ADOPTED position's cluster. Higher = the position is
+## well supported; lower = it rests on a small sliver of a noisy bead cloud. No
+## other spatial platform has a per-cell position confidence (Visium / Xenium
+## positions are given, not inferred). Shipped as a colour field + the bead stats
+## for the inspector; the page then dissolves the least-confident nuclei with a
+## slider.
+##
+## The competing candidate positions of 2+-ambiguous nuclei are deliberately NOT
+## shown: those nuclei are excluded from ConfPositioned (not in this .crb), and
+## their candidate centroids are in no vendor table -- recovering them would mean
+## re-running the bead clustering, which the app must not do.
+##----------------------------------------------------------------------------##
+coords <- read.table(
+  file.path(BASE, paste0("coords_", SAMPLE, ".txt")),
+  header = TRUE,
+  stringsAsFactors = FALSE
+)
+ci <- match(bc_all, paste0(coords$cell_bc, "-1"))
+conf_prop_top <- coords$proportion_SB_UMI_top_cluster[ci]
+conf_sb_total <- coords$SB_total[ci]
+conf_sb_umi_top <- coords$SB_UMI_top_cluster[ci]
+conf_prop_noise <- coords$proportion_SB_UMI_noise[ci]
 
 ##----------------------------------------------------------------------------##
 ## positioning QC (keep the vendor's ORIGINAL field names; missing stays missing)
@@ -271,6 +366,10 @@ sub$celltype <- CELLTYPE_BY_CLUSTER[
 sub$cluster <- factor(as.integer(as.character(sub$seurat_clusters)))
 sub$nUMI <- sub$nCount_SCT
 sub$nGene <- sub$nFeature_SCT
+## AddModuleScore names the column <name>1; expose it plainly as a per-cell meta
+## value the app can colour the physical map by (differentiator 3).
+sub$Myelination <- sub$Myelination1
+sub$Myelination1 <- NULL
 ## keep only the SCT assay + UMAP; drop the dense SCT scale.data and pca/SPATIAL
 ## reductions so the exported object is lean and Overview shows the UMAP.
 sub <- DietSeurat(sub, assays = "SCT", dimreducs = "umap")
@@ -325,6 +424,38 @@ qc_examples <- lapply(c(0L, 2L, 3L), function(cl) {
 })
 qc_examples <- Filter(Negate(is.null), qc_examples)
 
+## A colour field = a per-nucleus continuous value quantised to 0-255 for the
+## client. `scale = "unit"` keeps the natural 0-1 scale (fractions); `"minmax"`
+## stretches [min, max] across the palette and records the real range for the
+## colorbar. Subset to the retained nuclei; values were computed on the full set.
+mk_field <- function(v, label, desc, by_type = NULL, scale = "unit") {
+  vi <- v[idx]
+  if (scale == "minmax") {
+    mn <- min(vi, na.rm = TRUE)
+    mx <- max(vi, na.rm = TRUE)
+    rng <- if (mx > mn) mx - mn else 1
+    out <- list(
+      v = as.integer(round((vi - mn) / rng * 255)),
+      min = round(mn, 3),
+      max = round(mx, 3),
+      label = label,
+      desc = desc
+    )
+  } else {
+    vv <- pmin(pmax(vi, 0), 1)
+    out <- list(
+      v = as.integer(round(vv * 255)),
+      max = 1,
+      label = label,
+      desc = desc
+    )
+  }
+  if (!is.null(by_type)) {
+    out$by_type <- by_type
+  }
+  out
+}
+
 trekker <- list(
   meta = list(
     n_cells_full = n_all,
@@ -353,6 +484,54 @@ trekker <- list(
   uy = unname(round(um[idx, 2], 3)),
   clusters = unname(clab[idx]),
   celltype = CELLTYPE_BY_CLUSTER,
+  ## continuous colour fields (differentiator 2): cross-space discordance,
+  ## computed on the full positioned set. The page's "Colour by" is data-driven
+  ## off this list, so adding a field here (or, later, a per-cell meta value)
+  ## makes it a physical-map colouring with no UI change.
+  fields = list(
+    spatial_purity = mk_field(
+      spatial_purity,
+      "Spatial purity",
+      paste0(
+        "Fraction of each nucleus's 15 nearest physical neighbours that share ",
+        "its cell type (computed on the full positioned set). Low = dispersed / ",
+        "tiled / infiltrating; high = tight anatomical domain. In this HEALTHY ",
+        "brain, low microglial / astrocyte purity is baseline tiling, not ",
+        "activation."
+      ),
+      by_type = purity_by_type
+    ),
+    xspace_concordance = mk_field(
+      xspace_concord,
+      "Cross-space concordance",
+      paste0(
+        "Overlap between a nucleus's 15 nearest neighbours in expression space ",
+        "(PCA) and in physical space. High = its transcriptomic neighbours are ",
+        "also its physical neighbours (organized domain); low = its identity is ",
+        "spatially mixed."
+      )
+    ),
+    position_confidence = mk_field(
+      conf_prop_top,
+      "Position confidence",
+      paste0(
+        "Share of this nucleus's spatial-barcode UMI mass that falls in its ",
+        "adopted position's bead cluster (vendor statistic). Higher = the ",
+        "position is well supported; lower = it rests on a small sliver of a ",
+        "noisy bead cloud. A per-cell position confidence no other spatial ",
+        "platform has -- Visium / Xenium positions are given, not inferred. Use ",
+        "the confidence slider to dissolve the least-confident nuclei."
+      ),
+      scale = "minmax"
+    )
+  ),
+  ## per-nucleus bead statistics behind the confidence (for the Cell inspector)
+  conf = list(
+    prop_top = unname(round(conf_prop_top[idx], 3)),
+    prop_noise = unname(round(conf_prop_noise[idx], 3)),
+    sb_total = unname(conf_sb_total[idx]),
+    sb_umi_top = unname(conf_sb_umi_top[idx])
+  ),
   moran = moran,
   evidence = evidence,
   qc_examples = qc_examples
