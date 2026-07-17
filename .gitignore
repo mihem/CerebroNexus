@@ -25,3 +25,8 @@ tests/testthat/_snaps/**/*.new.png
 data-raw/vdj_10x/*.csv
 data-raw/slidetags/
 data-raw/xenium/
+
+# R's default graphics-device dump, produced by tests/vignettes that plot; a
+# stray artifact, never source
+Rplots.pdf
+**/Rplots.pdf
