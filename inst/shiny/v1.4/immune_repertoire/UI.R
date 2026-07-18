@@ -81,15 +81,21 @@ tab_immune_repertoire <- tabItem(
       width = 9,
       offset = 0,
       class = "cerebro-viz-col",
-      cerebroBox(
-        title = tagList(
-          boxTitle("Immune Repertoire visualizations"),
-          cerebroInfoButton("ir_visualizations_info")
+      shiny::tagAppendAttributes(
+        cerebroBox(
+          title = tagList(
+            boxTitle("Immune Repertoire visualizations"),
+            cerebroInfoButton("ir_visualizations_info")
+          ),
+          content = tagList(
+            uiOutput("ir_help_panel"),
+            tags$div(
+              class = "cerebro-viewport-source",
+              uiOutput("ir_visualizations_UI")
+            )
+          )
         ),
-        content = tagList(
-          uiOutput("ir_help_panel"),
-          uiOutput("ir_visualizations_UI")
-        )
+        class = "cerebro-viewport-gate"
       )
     )
   )

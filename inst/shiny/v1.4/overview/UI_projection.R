@@ -107,7 +107,7 @@ output[["overview_projection_UI"]] <- renderUI({
             ),
           )
         ),
-        class = "cerebro-projection-gate"
+        class = "cerebro-viewport-gate"
       )
     )
   )

@@ -110,6 +110,19 @@ test_that("{shinytest2} recording: main", {
   ## verify the projection renders
   plot_val <- retry_get_value(app, output = "overview_projection")
   expect_false(is.null(plot_val))
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const plot = document.getElementById('overview_projection');",
+      "const gate = plot && plot.closest('.cerebro-viewport-gate');",
+      "return !!plot && !!plot._fullLayout && !!gate && ",
+      "gate.classList.contains('is-sized') && ",
+      "getComputedStyle(gate).visibility === 'visible' && ",
+      "getComputedStyle(plot).visibility === 'visible';",
+      "})()"
+    ),
+    timeout = 30000
+  )
 
   ## get unfiltered cell count
   cells_all <- retry_get_value(app, export = "overview_cells_to_show")

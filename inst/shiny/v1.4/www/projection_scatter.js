@@ -25,8 +25,16 @@
 // is idempotent: the IIFE assigns to window, safe to run once per tab.
 // =============================================================================
 
-(function () {
+(function initializeProjection() {
   if (window.cerebroProjection && window.cerebroProjection.__ready) {
+    return;
+  }
+  if (!window.cerebroViewport) {
+    window.addEventListener(
+      'cerebro:viewport-ready',
+      initializeProjection,
+      { once: true }
+    );
     return;
   }
 
@@ -82,28 +90,10 @@
   }
 
   // --- viewport sizing -------------------------------------------------------
-  // Projection legends and footers are ordinary HTML outside Plotly's fixed-
-  // height widget. Their height is only known after layout (and categorical
-  // legends may wrap), so fixed `100vh - Npx` formulas cannot fit both sparse
-  // and dense legends. Measure the real chrome and give Plotly exactly what is
-  // left in the viewport instead.
-  const projectionResizeState = new Map(); // plotId -> controller state
-  const PROJECTION_MIN_HEIGHT = 240;
-  const PROJECTION_BOTTOM_GAP = 18;
-  let projectionWindowResizeBound = false;
-
-  function projectionTargetHeight(
-    viewportHeight,
-    wrapperTop,
-    contentBelow,
-    bottomGap,
-    minimumHeight
-  ) {
-    const available = Math.floor(
-      viewportHeight - wrapperTop - contentBelow - bottomGap
-    );
-    return Math.max(minimumHeight, available);
-  }
+  // The shared controller owns frame scheduling, scoped observation, target-
+  // height maths and the two-equal-measurement reveal gate. This adapter keeps
+  // only Plotly-specific DOM measurement and relayout work.
+  const viewport = window.cerebroViewport;
 
   // withSpinner() adds one wrapper whose bounds are exactly the output bounds.
   // Without a spinner, Plotly itself is the sizing element; its parent is the
@@ -122,8 +112,8 @@
     return plot;
   }
 
-  function projectionElements(plotId) {
-    const plot = document.getElementById(plotId);
+  function projectionElements(plot) {
+    if (typeof plot === 'string') plot = document.getElementById(plot);
     if (!plot) return null;
     const wrapper = projectionSizingElement(plot);
     const box = typeof plot.closest === 'function' ? plot.closest('.box') : null;
@@ -134,246 +124,122 @@
       plot: plot,
       wrapper: wrapper,
       box: box,
-      host: wrapper.parentElement || wrapper,
-      legend: document.getElementById(plotId + '_legend'),
+      legend: document.getElementById(plot.id + '_legend'),
     };
   }
 
-  // First-paint flash suppression. The output ships at a fixed 60vh placeholder
-  // height, then the data arrives from the server and the measured viewport
-  // height replaces it a frame later — so on first open the empty placeholder
-  // paints and the user sees the plot jump from one size to the settled size.
-  //
-  // The hide must beat the very first paint, which happens the instant Shiny
-  // inserts the output — before registerPlot has a plot to touch and long before
-  // any render() runs (render waits on the server round trip). Only CSS in the
-  // initial stylesheet is early enough. A class cannot ride on the plotly output
-  // itself: the htmlwidget rewrites className on its own .js-plotly-plot div and
-  // drops it. So each output is wrapped in a plain <div class="cerebro-
-  // projection-gate"> (Shiny renders it, plotly never reconstructs it) and
-  // custom.css hides `.cerebro-projection-gate .js-plotly-plot` from first paint.
-  // This JS only REVEALS: add `is-sized` to the gate once the measured height
-  // has STABILISED on a plot that already holds data, so the settled size is the
-  // first thing the user sees. Keyed per plot id so a re-render never re-hides.
-  //
-  // "Stabilised" matters: the first measurement after data lands is not final.
-  // The custom HTML legend lays out a frame later and its height feeds back into
-  // the measurement (via the legend ResizeObserver), so the height steps once
-  // more (e.g. 775 -> 754). Revealing on the first measurement would show 775
-  // and then visibly shrink 21px. Reveal only when a measurement equals the
-  // previous one (two equal frames = the legend has settled), so the user's
-  // first visible frame is already the final height with zero jump.
-  const PROJECTION_GATE_CLASS = 'cerebro-projection-gate';
+  // CSS visibility on the stable gate must remain the first-paint mechanism:
+  // Plotly writes its own inline visibility and htmlwidgets may rebuild the plot
+  // node. Reading the CURRENT gate class also makes a rebuilt Clonal UMAP host
+  // go through reveal again instead of inheriting stale plot-id state.
+  const PROJECTION_GATE_CLASS = 'cerebro-viewport-gate';
   const PROJECTION_SIZED_CLASS = 'is-sized';
   function shouldRevealProjection(fullLayoutPresent, height, settledHeight) {
-    return Boolean(fullLayoutPresent) && height === settledHeight;
+    return Boolean(fullLayoutPresent) &&
+      viewport._shouldReveal(settledHeight, height);
+  }
+  function projectionGate(plot) {
+    return plot && typeof plot.closest === 'function'
+      ? plot.closest('.' + PROJECTION_GATE_CLASS)
+      : null;
   }
   function revealProjectionHost(plot) {
-    const gate =
-      plot && typeof plot.closest === 'function'
-        ? plot.closest('.' + PROJECTION_GATE_CLASS)
-        : null;
+    const gate = projectionGate(plot);
     if (gate && gate.classList) gate.classList.add(PROJECTION_SIZED_CLASS);
   }
 
-  function resizeProjectionToViewport(plotId) {
-    const elements = projectionElements(plotId);
-    if (!elements || typeof window.innerHeight !== 'number') return;
+  function hideProjectionHost(plot) {
+    const gate = projectionGate(plot);
+    if (gate && gate.classList) gate.classList.remove(PROJECTION_SIZED_CLASS);
+  }
 
-    const wrapperRect = elements.wrapper.getBoundingClientRect();
-    const boxRect = elements.box.getBoundingClientRect();
-    // Everything below Plotly (selected-cell footer, buttons, box padding) is
-    // measured from the live DOM. Legend height is already represented by the
-    // wrapper's top coordinate because the legend is its preceding sibling.
-    const contentBelow = Math.max(0, boxRect.bottom - wrapperRect.bottom);
-    const height = projectionTargetHeight(
-      window.innerHeight,
-      wrapperRect.top,
-      contentBelow,
-      PROJECTION_BOTTOM_GAP,
-      PROJECTION_MIN_HEIGHT
+  function plotlySizeMatches(plot, height, width) {
+    const layout = plot && plot._fullLayout;
+    return Boolean(
+      layout &&
+      Math.abs(layout.height - height) <= 1 &&
+      Math.abs(layout.width - width) <= 1
     );
-    const width = Math.floor(wrapperRect.width);
-    const fullLayout = elements.plot._fullLayout;
-    const plotlySizeMatches =
-      fullLayout &&
-      Math.abs(fullLayout.height - height) <= 1 &&
-      Math.abs(fullLayout.width - width) <= 1;
+  }
 
-    const state = projectionResizeState.get(plotId);
+  const projectionViewportAdapter = {
+    gap: 18,
+    minimum: 240,
+    hide: hideProjectionHost,
+    measure: function (plot) {
+      const elements = projectionElements(plot);
+      if (!elements) return null;
+      const wrapperRect = elements.wrapper.getBoundingClientRect();
+      const boxRect = elements.box.getBoundingClientRect();
+      return {
+        top: wrapperRect.top,
+        contentBelow: Math.max(0, boxRect.bottom - wrapperRect.bottom),
+        width: wrapperRect.width,
+      };
+    },
+    matches: plotlySizeMatches,
+    apply: function (plot, height, width, state, done) {
+      const elements = projectionElements(plot);
+      if (!elements) return;
+      elements.wrapper.style.height = height + 'px';
+      plot.style.height = height + 'px';
 
-    // Reveal gate — evaluated BEFORE the size-matches short-circuit below, so a
-    // plot that is stable-but-still-hidden (its size already matches, so the
-    // short-circuit would return early) still gets revealed on this frame.
-    //
-    // Reveal only once the measured height has stabilised on a plot that holds
-    // data (see shouldRevealProjection): the first post-data measurement is not
-    // final because the legend lays out a frame later and nudges the height, so
-    // revealing then would show one size and visibly shrink to the next. When
-    // this measurement is not yet stable, record it and force one more resize so
-    // a confirming frame is guaranteed even without any external trigger.
-    //
-    // Why state-driven, not a timer: do NOT "simplify" this into
-    // setTimeout(reveal, N) / a debounce. The number of settling frames is not a
-    // fixed duration — it depends on legend wrap, font load and viewport — so any
-    // constant N either flashes (too short) or stalls visibly blank (too long) on
-    // some machine. Revealing on two equal measurements is deterministic: it
-    // fires exactly when layout has actually settled, on every machine, with no
-    // magic number to tune.
-    // Reveal only when (a) height has settled across two frames AND (b) no
-    // relayout repaint is still in flight. (b) is the fix for the trajectory
-    // "jump": Plotly's scattergl (WebGL) repaint after a size relayout lands a
-    // frame or two later, so revealing on height-settle alone showed the plot
-    // at the old canvas size and it visibly rescaled. Waiting for
-    // relayoutPending to clear ties reveal to the actual repaint. Condition (b)
-    // never blocks the first-frame-already-correct case because relayoutPending
-    // starts false and is only set when a relayout is actually issued.
-    // plotlySizeMatches guards the same-frame race: this reveal check runs
-    // BEFORE the relayout below, so if Plotly's canvas is not yet at the target
-    // size a relayout is about to be issued this very frame — revealing now
-    // would show the old size for one frame. Requiring plotlySizeMatches (and
-    // !relayoutPending for the in-flight case) defers reveal to a frame where
-    // the canvas is confirmed at the settled size.
-    // Key the "already revealed" state to the CURRENT gate element, not the
-    // plotId: the IR Clonal UMAP host is removed when faceting is enabled and
-    // recreated when it is cleared, so a plotId-keyed flag would leave the fresh
-    // gate permanently visibility:hidden. Reading the gate's own is-sized class
-    // makes a replaced host reveal again while an already-sized gate is skipped.
-    const gate =
-      elements.plot && typeof elements.plot.closest === 'function'
-        ? elements.plot.closest('.' + PROJECTION_GATE_CLASS)
-        : null;
-    if (
-      state &&
-      fullLayout &&
-      gate &&
-      !gate.classList.contains(PROJECTION_SIZED_CLASS)
-    ) {
+      const fullLayout = plot._fullLayout;
       if (
-        !state.relayoutPending &&
-        plotlySizeMatches &&
-        shouldRevealProjection(fullLayout, height, state.settledHeight)
+        typeof Plotly !== 'undefined' &&
+        fullLayout &&
+        typeof Plotly.relayout === 'function' &&
+        !plotlySizeMatches(plot, height, width)
       ) {
-        revealProjectionHost(elements.plot);
-      } else {
-        state.settledHeight = height;
-        scheduleProjectionResize(plotId);
-      }
-    }
-
-    if (
-      state &&
-      state.height === height &&
-      state.width === width &&
-      plotlySizeMatches
-    ) {
-      return;
-    }
-    if (state) {
-      state.height = height;
-      state.width = width;
-    }
-
-    elements.wrapper.style.height = height + 'px';
-    elements.plot.style.height = height + 'px';
-    // Plotly.react receives an explicit width/height from the Shiny round trip.
-    // Merely changing CSS and calling Plots.resize does not replace those layout
-    // values, leaving the internal SVG at its old size and letting axis labels
-    // overflow into the footer. Synchronise Plotly's layout itself whenever it
-    // disagrees with the measured DOM target; keep resize as the pre-init/fallback
-    // path for outputs that do not have a full layout yet.
-    if (
-      typeof Plotly !== 'undefined' &&
-      fullLayout &&
-      typeof Plotly.relayout === 'function' &&
-      !plotlySizeMatches
-    ) {
-      // transition duration 0: the size change must be instantaneous, never an
-      // animated tween (which would itself read as a slow rescale on the SVG
-      // layer). Mark a relayout in flight so reveal waits for its repaint, then
-      // clear it and reschedule so the confirming frame re-checks the gate.
-      state && (state.relayoutPending = true);
-      const relayoutDone = Plotly.relayout(elements.plot, {
-        width: width,
-        height: height,
-        'transition.duration': 0,
-      });
-      if (relayoutDone && typeof relayoutDone.then === 'function') {
-        relayoutDone.then(function () {
-          if (state) state.relayoutPending = false;
-          scheduleProjectionResize(plotId);
+        // scattergl redraw is asynchronous. The controller must not reveal the
+        // gate until this promise settles and the live Plotly layout matches.
+        if (state.relayoutPending) return;
+        state.relayoutPending = true;
+        const finish = function () {
+          state.relayoutPending = false;
+          done();
+        };
+        const relayout = Plotly.relayout(plot, {
+          width: width,
+          height: height,
+          'transition.duration': 0,
         });
-      } else {
-        // relayout did not return a thenable (older Plotly): fall back to the
-        // frame-settle path so reveal is not blocked forever.
-        if (state) state.relayoutPending = false;
-        scheduleProjectionResize(plotId);
+        if (relayout && typeof relayout.then === 'function') {
+          relayout.then(finish, finish);
+        } else {
+          finish();
+        }
+      } else if (
+        typeof Plotly !== 'undefined' &&
+        Plotly.Plots &&
+        Plotly.Plots.resize
+      ) {
+        Plotly.Plots.resize(plot);
       }
-    } else if (
-      typeof Plotly !== 'undefined' &&
-      Plotly.Plots &&
-      Plotly.Plots.resize
-    ) {
-      // No full layout yet (pre-init) — resize returns no promise; reveal keeps
-      // using the two-frame-settle path, which is correct here because there is
-      // no data-bearing relayout to wait on.
-      Plotly.Plots.resize(elements.plot);
-    }
-  }
-
-  function observeProjectionElements(plotId) {
-    const state = projectionResizeState.get(plotId);
-    const elements = projectionElements(plotId);
-    if (!state || !elements || typeof ResizeObserver === 'undefined') return;
-
-    if (!state.observer) {
-      state.observer = new ResizeObserver(function () {
-        scheduleProjectionResize(plotId);
-      });
-      state.observer.observe(elements.box);
-    }
-    if (elements.legend && state.legend !== elements.legend) {
-      if (state.legend) state.observer.unobserve(state.legend);
-      state.legend = elements.legend;
-      state.observer.observe(elements.legend);
-    }
-  }
+    },
+    ready: function (plot, height, width, state) {
+      return Boolean(
+        plot._fullLayout &&
+        !state.relayoutPending &&
+        plotlySizeMatches(plot, height, width)
+      );
+    },
+    isRevealed: function (plot) {
+      const gate = projectionGate(plot);
+      return Boolean(
+        gate && gate.classList.contains(PROJECTION_SIZED_CLASS)
+      );
+    },
+    reveal: revealProjectionHost,
+    observeTargets: function (plot) {
+      const elements = projectionElements(plot);
+      return elements ? [elements.box, elements.legend].filter(Boolean) : [];
+    },
+  };
 
   function scheduleProjectionResize(plotId) {
-    let state = projectionResizeState.get(plotId);
-    if (!state) {
-      state = {
-        frame: null,
-        height: null,
-        width: null,
-        settledHeight: null,
-        observer: null,
-        legend: null,
-        // true while a Plotly.relayout(width/height) is in flight but its
-        // WebGL/DOM repaint has not resolved yet. Reveal waits for this to
-        // clear so the host is not shown at the pre-relayout size (the visible
-        // "jump"). Starts false: a plot whose first measured size already
-        // matches never calls relayout, so it must still be revealable.
-        relayoutPending: false,
-      };
-      projectionResizeState.set(plotId, state);
-    }
-    if (state.frame !== null) return;
-    state.frame = window.requestAnimationFrame(function () {
-      state.frame = null;
-      observeProjectionElements(plotId);
-      resizeProjectionToViewport(plotId);
-    });
-  }
-
-  function bindProjectionWindowResize() {
-    if (projectionWindowResizeBound) return;
-    projectionWindowResizeBound = true;
-    window.addEventListener('resize', function () {
-      projectionResizeState.forEach(function (_state, plotId) {
-        scheduleProjectionResize(plotId);
-      });
-    });
+    const plot = document.getElementById(plotId);
+    if (plot && viewport) viewport.register(plot, projectionViewportAdapter);
   }
 
   function getSelection(plotId) {
@@ -1544,12 +1410,12 @@
     registerPlot: function (plotId) {
       registeredPlots.add(plotId);
       bindKeyHandler();
-      bindProjectionWindowResize();
       scheduleProjectionResize(plotId);
     },
     _finiteExtent: finiteExtent,
-    _projectionTargetHeight: projectionTargetHeight,
+    _projectionTargetHeight: viewport._targetHeight,
     _projectionSizingElement: projectionSizingElement,
+    _viewportAdapter: projectionViewportAdapter,
     _revealProjectionHost: revealProjectionHost,
     _shouldRevealProjection: shouldRevealProjection,
     _projectionGateClass: PROJECTION_GATE_CLASS,

@@ -953,7 +953,7 @@ test_that("Compare renderer is interactive plotly and drops the area graph param
   # UI output is a plotly output.
   expect_match(
     content,
-    "ir_fill_plot\\(\"ir_plot_clonalCompare\",\\s*plotly\\s*=\\s*TRUE\\)",
+    "ir_viewport_plot\\(\"ir_plot_clonalCompare\",\\s*plotly\\s*=\\s*TRUE\\)",
     perl = TRUE
   )
   # The removed graph selector must not linger.

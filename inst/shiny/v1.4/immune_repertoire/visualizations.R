@@ -1,47 +1,35 @@
-## ---- Plot-panel height --------------------------------------------------- ##
-## Every single-panel IR plot fills the viewport through the shared
-## `.cerebro-fill` mechanism (www/fill_height.js), the same one the HLA network
-## and the projection pages use — no per-plot height constant to keep in sync
-## with the chrome above it. The two hand-measured `calc(100vh - Npx)` constants
-## that used to live here are gone. Faceted variants stay on an explicit pixel
-## height because they are deliberately tall and meant to scroll.
-
-## Static single plot tab body. `plotly = TRUE` emits an interactive
-## plotlyOutput (zoom/pan/hover) instead of a static plotOutput.
-##
-## Height comes from the app-wide fill mechanism (www/fill_height.js), the SAME
-## one the HLA network uses: the `.cerebro-fill` wrapper is sized to the viewport
-## minus its live top offset, and the plot renders at height:100% inside it.
-## This replaces the old `calc(100vh - 250px)` — a hand-measured chrome constant
-## that over-reserved height (so the panel ballooned past the screen on first
-## paint, then snapped smaller). One mechanism now, one behaviour, no magic
-## number to keep in sync with the chrome.
-ir_fill_plot <- function(
+## ---- Shared viewport stage ----------------------------------------------- ##
+## The tabset is the only element that owns a viewport height. Every ordinary
+## tab body fills that stable stage; individual plots never measure or animate
+## their own height. Faceted outputs opt out with `cerebro-viewport-natural`
+## and retain their explicit, scrollable pixel height.
+ir_viewport_plot <- function(
   id,
   spinner = TRUE,
   plotly = FALSE,
   height = NULL
 ) {
-  # height = NULL (the common case) -> fill the viewport via the shared
-  # `.cerebro-fill` mechanism. An explicit height is for the faceted plots that
-  # are DELIBERATELY tall (one panel per sample) and meant to scroll; those are
-  # rendered as-is, never fill'd.
-  fill <- is.null(height)
+  viewport <- is.null(height)
   plot <- if (plotly) {
-    plotly::plotlyOutput(id, height = if (fill) "100%" else height)
+    plotly::plotlyOutput(id, height = if (viewport) "100%" else height)
   } else {
-    plotOutput(id, height = if (fill) "100%" else height)
+    plotOutput(id, height = if (viewport) "100%" else height)
   }
   if (spinner) {
     plot <- shinycssloaders::withSpinner(plot)
   }
-  if (fill) tags$div(class = "cerebro-fill", plot) else plot
+  tags$div(
+    class = if (viewport) {
+      "cerebro-viewport-fill"
+    } else {
+      "cerebro-viewport-natural"
+    },
+    plot
+  )
 }
 
-## Wrap an already-built output (e.g. a uiOutput whose server side computes a
-## facet-aware pixel height) — passed through unchanged for now.
-ir_fill_wrap <- function(output) {
-  output
+ir_viewport_wrap <- function(output) {
+  tags$div(class = "cerebro-viewport-fill", output)
 }
 
 ## ---- Visualizations UI ------------------------------------------------ ##
@@ -57,50 +45,40 @@ output$ir_visualizations_UI <- renderUI({
     ))
   }
 
-  ## Priority tabs (per performance-notes order). Abundance leads so the first
-  ## view is a common overview plot rather than the sample-comparison Scatter,
-  ## which is moved in with the other multi-sample tabs below.
+  ## Priority tabs (per performance-notes order). Clonal UMAP leads so the first
+  ## view shows expanded clones in their cellular context; the multi-sample
+  ## comparison tabs stay grouped below.
   priority_tabs <- list(
     tabPanel(
       # Clonal expansion overlaid on the cell UMAP — the default landing tab,
       # so the first thing the user sees is where expanded clones sit.
       "Clonal UMAP",
-      # Reserve a viewport-proportional placeholder for the spinner so the
-      # container does not collapse to the ~400px default and snap up when the
-      # plot arrives. 60vh matches the non-faceted plotly's own placeholder (and
-      # the projection pages'), so the placeholder and the settled height are
-      # close — no visible jump on first open.
-      shinycssloaders::withSpinner(
-        uiOutput("ir_ui_clonalUMAP"),
-        proxy.height = "60vh"
-      )
+      ir_viewport_wrap(uiOutput("ir_ui_clonalUMAP"))
     ),
     tabPanel(
       "Abundance",
-      ir_fill_plot("ir_plot_clonalAbundance", plotly = TRUE)
+      ir_viewport_plot("ir_plot_clonalAbundance", plotly = TRUE)
     ),
     tabPanel(
       "Diversity",
-      ir_fill_plot("ir_plot_clonalDiversity", plotly = TRUE)
+      ir_viewport_plot("ir_plot_clonalDiversity", plotly = TRUE)
     ),
     tabPanel(
       "Homeostasis",
-      ir_fill_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
+      ir_viewport_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
     ),
     tabPanel(
       "Isotype",
-      ir_fill_plot("ir_plot_isotype", plotly = TRUE)
+      ir_viewport_plot("ir_plot_isotype", plotly = TRUE)
     ),
     # Hidden by default (kept available; renderer/help/param_spec retained).
     # tabPanel(
     #   "SHM Proxy",
-    #   ir_fill_plot("ir_plot_shmProxy")
+    #   ir_viewport_plot("ir_plot_shmProxy")
     # ),
     tabPanel(
       "Paired Scatter",
-      ir_fill_wrap(shinycssloaders::withSpinner(uiOutput(
-        "ir_ui_pairedScatter"
-      )))
+      ir_viewport_wrap(uiOutput("ir_ui_pairedScatter"))
     ),
     # Hidden by default (kept available; renderer/help/param_spec retained).
     # The clone-definition waterfall is an exploratory tool for choosing a
@@ -108,11 +86,11 @@ output$ir_visualizations_UI <- renderUI({
     # in the default tab strip; uncomment to re-enable.
     # tabPanel(
     #   "Definition",
-    #   ir_fill_plot("ir_plot_cloneDefinition", plotly = TRUE)
+    #   ir_viewport_plot("ir_plot_cloneDefinition", plotly = TRUE)
     # ),
     tabPanel(
       "Clone Sharing",
-      ir_fill_plot("ir_plot_cloneSharing", plotly = TRUE)
+      ir_viewport_plot("ir_plot_cloneSharing", plotly = TRUE)
     )
   )
 
@@ -122,31 +100,31 @@ output$ir_visualizations_UI <- renderUI({
   other_tabs <- list(
     # tabPanel(
     #   "Length",
-    #   ir_fill_plot("ir_plot_clonalLength")
+    #   ir_viewport_plot("ir_plot_clonalLength")
     # ),
     # tabPanel(
     #   "Proportion",
-    #   ir_fill_plot("ir_plot_clonalProportion")
+    #   ir_viewport_plot("ir_plot_clonalProportion")
     # ),
     # tabPanel(
     #   "Quant",
-    #   ir_fill_plot("ir_plot_clonalQuant")
+    #   ir_viewport_plot("ir_plot_clonalQuant")
     # ),
-    # tabPanel("Rarefaction", ir_fill_wrap(uiOutput("ir_ui_clonalRarefaction"))),
-    # tabPanel("Gene usage", ir_fill_wrap(uiOutput("ir_ui_percentGeneUsage"))),
-    # tabPanel("vizGenes", ir_fill_wrap(uiOutput("ir_ui_vizGenes"))),
-    # tabPanel("percentGenes", ir_fill_wrap(uiOutput("ir_ui_percentGenes"))),
-    # tabPanel("percentVJ", ir_fill_wrap(uiOutput("ir_ui_percentVJ"))),
-    # tabPanel("AA %", ir_fill_wrap(uiOutput("ir_ui_percentAA"))),
+    # tabPanel("Rarefaction", ir_viewport_wrap(uiOutput("ir_ui_clonalRarefaction"))),
+    # tabPanel("Gene usage", ir_viewport_wrap(uiOutput("ir_ui_percentGeneUsage"))),
+    # tabPanel("vizGenes", ir_viewport_wrap(uiOutput("ir_ui_vizGenes"))),
+    # tabPanel("percentGenes", ir_viewport_wrap(uiOutput("ir_ui_percentGenes"))),
+    # tabPanel("percentVJ", ir_viewport_wrap(uiOutput("ir_ui_percentVJ"))),
+    # tabPanel("AA %", ir_viewport_wrap(uiOutput("ir_ui_percentAA"))),
     # tabPanel(
     #   "Entropy",
-    #   ir_fill_plot("ir_plot_positionalEntropy")
+    #   ir_viewport_plot("ir_plot_positionalEntropy")
     # ),
-    # tabPanel("Property", ir_fill_wrap(uiOutput("ir_ui_positionalProperty"))),
+    # tabPanel("Property", ir_viewport_wrap(uiOutput("ir_ui_positionalProperty"))),
     # tabPanel(
     #   # Top motifs now lives in the settings panel (IR_PARAM_SPEC "K-mer").
     #   "K-mer",
-    #   ir_fill_wrap(uiOutput("ir_ui_percentKmer"))
+    #   ir_viewport_wrap(uiOutput("ir_ui_percentKmer"))
     # )
   )
 
@@ -162,19 +140,19 @@ output$ir_visualizations_UI <- renderUI({
         #     "below. Use 'Group by' to choose the grouping; the X/Y selectors",
         #     "then pick which two groups to compare."
         #   ),
-        #   ir_fill_plot("ir_plot_clonalScatter")
+        #   ir_viewport_plot("ir_plot_clonalScatter")
         # ),
         tabPanel(
           "Compare",
-          ir_fill_plot("ir_plot_clonalCompare", plotly = TRUE)
+          ir_viewport_plot("ir_plot_clonalCompare", plotly = TRUE)
         ),
         # tabPanel(
         #   "Overlap",
-        #   ir_fill_plot("ir_plot_clonalOverlap")
+        #   ir_viewport_plot("ir_plot_clonalOverlap")
         # ),
         tabPanel(
           "SizeDist",
-          ir_fill_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
+          ir_viewport_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
         )
       )
     )
@@ -184,7 +162,7 @@ output$ir_visualizations_UI <- renderUI({
 
   # Preserve the user's current tab across rebuilds (when this renderUI
   # re-runs). Without `selected`, the rebuilt tabsetPanel would reset to the
-  # first tab (Abundance).
+  # first tab (Clonal UMAP).
   tab_names <- vapply(tabs, function(t) t$attribs$`data-value`, character(1))
   last_tab <- isolate(ir_last_tab())
   selected_tab <- if (!is.null(last_tab) && last_tab %in% tab_names) {
@@ -193,9 +171,12 @@ output$ir_visualizations_UI <- renderUI({
     NULL
   }
 
-  do.call(
-    tabsetPanel,
-    c(list(id = "ir_tabs", selected = selected_tab), tabs)
+  shiny::tagAppendAttributes(
+    do.call(
+      tabsetPanel,
+      c(list(id = "ir_tabs", selected = selected_tab), tabs)
+    ),
+    class = "cerebro-viewport-host"
   )
 })
 
@@ -496,7 +477,7 @@ output$ir_ui_clonalUMAP <- renderUI({
   ## Faceted: a group_by column is chosen. Faceting needs a multi-panel ggplot,
   ## which the single-canvas shared renderer cannot express, so this variant
   ## stays on the static plotOutput.
-  ir_fill_plot(
+  ir_viewport_plot(
     "ir_plot_clonalUMAP_static",
     spinner = FALSE,
     height = paste0(ir_umap_split_output_height(group_by), "px")
@@ -509,17 +490,12 @@ output$ir_ui_clonalUMAP <- renderUI({
 ir_clonalUMAP_projection_ui <- function() {
   tagList(
     div(
-      class = "cerebro-projection-gate",
+      class = "cerebro-projection-host",
       shinycssloaders::withSpinner(
         plotly::plotlyOutput(
           "ir_clonalUMAP_projection",
           width = "auto",
-          # 60vh placeholder, same as the overview projection: the shared
-          # renderer measures and resizes to the real viewport height, and the
-          # projection reveal gate keeps it hidden until then. A placeholder
-          # close to the settled height means no visible jump on reveal (the old
-          # calc(100vh - 250px) started ~125px too tall and shrank in view).
-          height = "60vh"
+          height = "100%"
         ),
         type = 8,
         hide.ui = FALSE
@@ -980,20 +956,21 @@ output$ir_ui_pairedScatter <- renderUI({
     # Side-by-side (Pair by / X group / Y group [/ Facet by]); wraps only when
     # the row is too narrow. This panel sits in the wide right-hand column.
     ir_flow_controls_inline(controls),
-    shinycssloaders::withSpinner(
-      uiOutput("ir_ui_pairedScatter_plot")
-    )
+    # The renderer below already owns its spinner. Making this dynamic output
+    # the fill stage directly avoids a redundant spinner wrapper whose
+    # auto-height collapses to zero before Plotly can report its client size.
+    uiOutput("ir_ui_pairedScatter_plot", class = "cerebro-viewport-fill")
   )
 })
 
 ## Single-panel paired scatter is interactive (plotly); the faceted variant is a
 ## patchwork grid that plotly cannot lay out cleanly, so it stays a static
 ## ggplot. The renderUI returns the matching output type for the current mode.
-## The single panel fills the viewport through the shared `.cerebro-fill`
-## mechanism, same as every other single IR plot — no per-plot height constant.
+## The single panel fills the tabset's shared viewport stage. The faceted
+## variant opts out of that stage and keeps its explicit scrollable height.
 ir_paired_plotly_output <- function() {
   tags$div(
-    class = "cerebro-fill",
+    class = "cerebro-viewport-fill",
     shinycssloaders::withSpinner(
       plotly::plotlyOutput(
         "ir_plot_pairedScatter",
@@ -1027,7 +1004,10 @@ output$ir_ui_pairedScatter_plot <- renderUI({
   ncol_p <- min(4L, n_facets)
   nrow_p <- ceiling(n_facets / ncol_p)
   h <- max(450, nrow_p * 420)
-  plotOutput("ir_plot_pairedScatter_facet", height = paste0(h, "px"))
+  tags$div(
+    class = "cerebro-viewport-natural",
+    plotOutput("ir_plot_pairedScatter_facet", height = paste0(h, "px"))
+  )
 })
 
 ## Build one clonalScatter panel. clonalScatter returns a table with a Var1

@@ -519,6 +519,24 @@ test_that("Clonal UMAP switches to static facets only when grouped", {
   expect_gte(as.numeric(static_size$h), 300)
   expect_gte(as.numeric(static_size$imgW), as.numeric(static_size$w) * 0.9)
   expect_gte(as.numeric(static_size$imgH), 300)
+
+  # Switching back rebuilds the non-faceted projection host. Reveal state must
+  # come from this new gate element, not stale plot-id state from the first host.
+  app$set_inputs(ir_p_umap_group_by = "", wait_ = FALSE)
+  app$wait_for_idle(timeout = 20000)
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const plot = document.getElementById('ir_clonalUMAP_projection');",
+      "const gate = plot && plot.closest('.cerebro-viewport-gate');",
+      "return !!plot && !!plot._fullLayout && !!gate && ",
+      "gate.classList.contains('is-sized') && ",
+      "getComputedStyle(gate).visibility === 'visible' && ",
+      "getComputedStyle(plot).visibility === 'visible';",
+      "})()"
+    ),
+    timeout = 30000
+  )
 })
 
 test_that("Clone call is hidden on the Clonal UMAP tab", {

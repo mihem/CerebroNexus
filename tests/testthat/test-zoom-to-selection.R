@@ -26,6 +26,13 @@ repo_file <- function(...) {
 
 run_node <- function(body) {
   testthat::skip_if(Sys.which("node") == "", "node not on PATH")
+  viewport_path <- repo_file(
+    "inst",
+    "shiny",
+    "v1.4",
+    "www",
+    "viewport.js"
+  )
   js_path <- repo_file(
     "inst",
     "shiny",
@@ -38,8 +45,22 @@ run_node <- function(body) {
   writeLines(
     c(
       "const fs = require('fs');",
-      "global.window = {};",
-      "global.document = { addEventListener: function () {} };",
+      "global.Event = function (type) { this.type = type; };",
+      "global.window = {",
+      "  addEventListener: function () {},",
+      "  dispatchEvent: function () {},",
+      "  requestAnimationFrame: function () { return 1; }",
+      "};",
+      "global.document = {",
+      "  addEventListener: function () {},",
+      "  getElementsByClassName: function () { return []; },",
+      "  getElementById: function () { return null; },",
+      "  body: null, documentElement: null",
+      "};",
+      sprintf(
+        "eval(fs.readFileSync(%s, 'utf8'));",
+        encodeString(viewport_path, quote = "\"")
+      ),
       sprintf(
         "eval(fs.readFileSync(%s, 'utf8'));",
         encodeString(js_path, quote = "\"")

@@ -141,7 +141,7 @@ output[["expression_projection_UI"]] <- renderUI({
             htmlOutput("expression_genes_displayed")
           )
         ),
-        class = "cerebro-projection-gate"
+        class = "cerebro-viewport-gate"
       )
     )
   )

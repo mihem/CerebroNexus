@@ -78,7 +78,9 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
       "document.getElementById('trajectory_selected_method') != null && ",
       "document.getElementById('trajectory_selected_name') != null && ",
       "document.querySelector('#trajectory_projection .main-svg') != null && ",
-      "document.getElementById('trajectory_number_of_selected_cells') != null"
+      "document.getElementById('trajectory_number_of_selected_cells') != null && ",
+      "document.getElementById('trajectory_projection').closest(",
+      "'.cerebro-viewport-gate').classList.contains('is-sized')"
     ),
     timeout = 30000
   )
@@ -107,6 +109,7 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
     "const box = plot.closest('.box');",
     "const footer = document.getElementById(",
     "'trajectory_number_of_selected_cells');",
+    "const gate = plot.closest('.cerebro-viewport-gate');",
     "const svg = plot.querySelector('.main-svg');",
     "const ticks = Array.from(plot.querySelectorAll(",
     "'.xaxislayer-above .xtick text, .yaxislayer-above .ytick text'));",
@@ -115,6 +118,8 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
     "return {",
     "viewport: window.innerHeight,",
     "plotHeight: plot.getBoundingClientRect().height,",
+    "gateVisibility: getComputedStyle(gate).visibility,",
+    "plotVisibility: getComputedStyle(plot).visibility,",
     "plotBottom: plot.getBoundingClientRect().bottom,",
     "svgBottom: svg.getBoundingClientRect().bottom,",
     "tickBottom: tickBottom,",
@@ -126,6 +131,8 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
   ))
 
   expect_gte(geometry$plotHeight, 240)
+  expect_identical(geometry$gateVisibility, "visible")
+  expect_identical(geometry$plotVisibility, "visible")
   expect_lte(geometry$svgBottom, geometry$plotBottom + 1)
   expect_lte(geometry$tickBottom, geometry$plotBottom + 1)
   expect_lt(geometry$tickBottom, geometry$footerTop)

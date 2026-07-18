@@ -53,9 +53,13 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   )
   app$wait_for_js(
     paste0(
-      "Array.from(document.querySelectorAll(",
-      "'#shiny-tab-immune_repertoire .cerebro-fill.is-filled'))",
-      ".some(el => el.getClientRects().length > 0)"
+      "(() => {",
+      "const gate = document.querySelector(",
+      "'#shiny-tab-immune_repertoire .cerebro-viewport-gate.is-sized');",
+      "const host = document.querySelector(",
+      "'#shiny-tab-immune_repertoire .cerebro-viewport-host');",
+      "return !!gate && !!host && host.getClientRects().length > 0;",
+      "})()"
     ),
     timeout = 30000
   )
@@ -63,7 +67,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   geometry_js <- paste0(
     "(() => {",
     "const tab = document.getElementById('shiny-tab-immune_repertoire');",
-    "const fill = Array.from(tab.querySelectorAll('.cerebro-fill'))",
+    "const fill = Array.from(tab.querySelectorAll('.cerebro-viewport-fill'))",
     ".find(el => el.getClientRects().length > 0);",
     "const row = fill.closest('.cerebro-viz-row');",
     "const param = row.querySelector('.cerebro-param-col');",
@@ -90,6 +94,39 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   expect_identical(desktop$fillOverflow, "visible")
   expect_lt(desktop$paramLeft, desktop$vizLeft)
   expect_lt(abs(desktop$paramTop - desktop$vizTop), 1)
+
+  ## Paired Scatter builds one extra renderUI layer. Its direct viewport-fill
+  ## wrapper is the regression case that used to collapse to zero height when
+  ## a redundant spinner owned the outer dynamic output.
+  app$set_inputs(ir_tabs = "Paired Scatter", wait_ = FALSE)
+  app$wait_for_idle(timeout = 20000)
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const output = document.getElementById('ir_ui_pairedScatter_plot');",
+      "const plot = document.getElementById('ir_plot_pairedScatter');",
+      "return !!output && output.getBoundingClientRect().height >= 240 && ",
+      "!!plot && !!plot.querySelector('.main-svg');",
+      "})()"
+    ),
+    timeout = 30000
+  )
+  paired_height <- app$get_js(
+    "document.getElementById('ir_ui_pairedScatter_plot').getBoundingClientRect().height"
+  )
+  expect_gte(as.numeric(paired_height), 240)
+
+  app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
+  app$wait_for_idle(timeout = 20000)
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const active = document.querySelector('#ir_tabs li.active a');",
+      "return active && active.textContent.trim() === 'Abundance';",
+      "})()"
+    ),
+    timeout = 10000
+  )
 
   app$get_chromote_session()$set_viewport_size(width = 800, height = 800)
   app$wait_for_js(

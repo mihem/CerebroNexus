@@ -168,11 +168,9 @@ body.skin-blue .main-header .logo,
 body.skin-blue .main-header .sidebar-toggle {
   display: none !important;
 }
-/* AdminLTE's `fixed` layout offsets both the sidebar and the content by the
-   50px header height — via `padding-top: 50px` (NOT margin). With the header
-   gone, zero it. Sidebar goes fully flush; the content-wrapper's own top inset
-   (18px) is reasserted with !important in the wrapper rule below so content
-   keeps a little breathing room but loses the phantom 50px band. */
+/* Keep the sidebar flush with the removed header. The content-wrapper's own top
+   inset (18px) is reasserted below, so content retains breathing room without a
+   phantom 50px band. */
 body.skin-blue .main-sidebar,
 body.skin-blue .left-side { padding-top: 0 !important; }
 body.skin-blue .main-footer { margin-top: 0 !important; }
@@ -181,6 +179,16 @@ body.skin-blue .main-footer { margin-top: 0 !important; }
    Sidebar — white nav rail, rounded items, warm active pill
    ------------------------------------------------------------------------- */
 body.skin-blue .main-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: auto;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0 !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   background: var(--c-white) !important;
   border-right: 1px solid var(--c-border) !important;
   box-shadow: none !important;
@@ -372,68 +380,101 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   .cerebro-viz-row > .cerebro-param-col {
     flex: 1 1 100%;
     max-width: none;
+    margin-right: 0;
     /* Drop the 300px floor once stacked: on a phone (or with the sidebar open
        on a narrow screen) the content area can be < 300px, and a hard min-width
        would push the panel wider than its container and scroll the page
        sideways. Full-width-but-shrinkable is the correct stacked behaviour. */
     min-width: 0;
   }
+  .cerebro-viz-row > .cerebro-viz-col {
+    flex: 1 1 100%;
+  }
+  /* Keep the visualization tabs to one compact row. Wrapping four or five
+     rows consumed the stage's entire minimum height on phones, leaving only a
+     few pixels for the actual plot. Local horizontal scrolling preserves every
+     label without making the document itself scroll sideways. */
+  .cerebro-viewport-host > .nav-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .cerebro-viewport-host > .nav-tabs > li {
+    float: none;
+    flex: 0 0 auto;
+  }
 }
 
 /* -------------------------------------------------------------------------
-   Fill-to-viewport height. www/fill_height.js sets an explicit pixel height on
-   every `.cerebro-fill` element (viewport - its live top - a bottom gap). This
-   makes that element a flex column so whatever it wraps — a shinycssloaders
-   spinner container, then the html-widget/plot output at height:100% — inherits
-   the measured height without needing its own resolved-height chain (a bare
-   height:100% on a flex item with no resolved parent collapses to zero; the JS
-   px height on this wrapper IS that resolved parent).
+   Shared viewport stage.
+
+   One `.cerebro-viewport-host` owns the available height for an entire tabset.
+   Every ordinary tab body fills that stage; individual plots never carry a
+   placeholder height or reveal transition. A faceted output marks itself
+   `.cerebro-viewport-natural`, which lets the host grow and the page scroll.
    ------------------------------------------------------------------------- */
-.cerebro-fill {
+.cerebro-viewport-host {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* Placeholder height for the first paint, BEFORE fill_height.js measures. A
-     viewport-proportional value (not a pixel guess) so the box reserves a
-     sensible amount of space on every screen and the JS only nudges it, rather
-     than starting collapsed (and snapping up) or over-reserved (and snapping
-     down). The inline px height the JS sets overrides this immediately. */
   height: 60vh;
-  /* Hidden until the JS has applied a measured height (adds .is-filled), so the
-     one intermediate frame at the placeholder/pre-settle size is never seen. */
-  opacity: 0;
+  height: 60dvh;
 }
-.cerebro-fill.is-filled {
-  opacity: 1;
-  /* Fade in ONLY. Never transition `height`: the element is revealed only after
-     fill_height.js has measured a settled height (two equal frames), so the
-     first visible frame is already final. A height transition would instead
-     animate the placeholder (60vh) up/down to that final height — the visible
-     "short-then-tall" grow the projection tabs never had, because their gate
-     reveals via `visibility` with no height tween. Later re-measures (resize,
-     legend wrap) also apply in one frame, matching the projection engine. */
-  transition: opacity 0.12s ease;
+.cerebro-viewport-host > .nav-tabs {
+  flex: 0 0 auto;
 }
-/* The spinner wrapper (or the output directly) fills the sized wrapper. */
-.cerebro-fill > .shiny-spinner-output-container,
-.cerebro-fill > .html-widget-output,
-.cerebro-fill > .shiny-plot-output,
-.cerebro-fill > .plotly.html-widget {
+.cerebro-viewport-host > .tab-content {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.cerebro-viewport-host > .tab-content > .tab-pane.active {
+  height: 100%;
+}
+.cerebro-viewport-host.is-natural,
+.cerebro-viewport-host.is-natural > .tab-content,
+.cerebro-viewport-host.is-natural > .tab-content > .tab-pane.active,
+.cerebro-viewport-host.is-natural .cerebro-viewport-fill {
+  height: auto !important;
+}
+.cerebro-viewport-host.is-natural > .tab-content,
+.cerebro-viewport-host.is-natural .cerebro-viewport-fill > .shiny-html-output,
+.cerebro-viewport-host.is-natural .cerebro-viewport-fill .shiny-spinner-output-container {
+  flex: 0 0 auto;
+  height: auto !important;
+}
+
+.cerebro-viewport-fill,
+.cerebro-projection-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.cerebro-viewport-fill > .shiny-spinner-output-container,
+.cerebro-viewport-fill > .shiny-bound-output,
+.cerebro-viewport-fill > .html-widget-output,
+.cerebro-viewport-fill > .shiny-plot-output,
+.cerebro-viewport-fill > .plotly.html-widget,
+.cerebro-projection-host > .shiny-spinner-output-container {
   flex: 1 1 0;
   min-height: 0;
   height: 100% !important;
 }
-/* The spinner container wraps the real output. Overlay the output on it with
-   absolute positioning (the container is position:relative) so the widget
-   exactly fills the measured height — a plain height:100% left the widget in
-   normal flow, where a stray 20px offset pushed its bottom past the wrapper.
-   This is htmlwidgets' own fill idiom. */
-.cerebro-fill > .shiny-spinner-output-container {
+.cerebro-viewport-fill > .shiny-html-output {
+  display: flex;
+  flex-direction: column;
+}
+.cerebro-viewport-fill > .shiny-spinner-output-container,
+.cerebro-projection-host > .shiny-spinner-output-container {
   position: relative;
 }
-.cerebro-fill > .shiny-spinner-output-container > .html-widget-output,
-.cerebro-fill > .shiny-spinner-output-container > .shiny-plot-output,
-.cerebro-fill > .shiny-spinner-output-container > .plotly.html-widget {
+.cerebro-viewport-fill > .shiny-spinner-output-container > .html-widget-output,
+.cerebro-viewport-fill > .shiny-spinner-output-container > .shiny-plot-output,
+.cerebro-viewport-fill > .shiny-spinner-output-container > .plotly.html-widget,
+.cerebro-projection-host > .shiny-spinner-output-container > .html-widget-output {
   position: absolute;
   top: 0;
   left: 0;
@@ -1236,8 +1277,8 @@ body .btn:active { transform: translateY(0.5px); }
 /* -------------------------------------------------------------------------
    Projection first-paint flash suppression (all projection tabs)
 
-   Each projection output is wrapped in a plain <div class="cerebro-projection-
-   gate"> that Shiny renders and the plotly htmlwidget never reconstructs (the
+   Each viewport output is wrapped in a stable `.cerebro-viewport-gate` that
+   Shiny renders and the plotly htmlwidget never reconstructs (the
    widget rewrites className on its OWN .js-plotly-plot div, so a class put
    directly on the output is lost — the gate wrapper survives). This rule hides
    the plotly plot inside the gate the instant Shiny inserts it, before any JS
@@ -1254,20 +1295,20 @@ body .btn:active { transform: translateY(0.5px); }
    so hiding the ancestor gate makes the plot inherit `hidden` regardless — and
    `is-sized` flips the gate back to visible.
    ------------------------------------------------------------------------- */
-.cerebro-projection-gate {
+.cerebro-viewport-gate {
   visibility: hidden;
 }
-.cerebro-projection-gate.is-sized {
+.cerebro-viewport-gate.is-sized {
   visibility: visible;
 }
 /* Plotly writes `visibility: visible` as an INLINE style on its own
    `.js-plotly-plot` div, which beats the container's inherited `hidden` and
    lets the canvas flash at the pre-sized size before the JS reveal gate opens.
    Override that inline value at the child level until the gate is sized. */
-.cerebro-projection-gate .js-plotly-plot {
+.cerebro-viewport-gate .js-plotly-plot {
   visibility: hidden !important;
 }
-.cerebro-projection-gate.is-sized .js-plotly-plot {
+.cerebro-viewport-gate.is-sized .js-plotly-plot {
   visibility: visible !important;
 }
 
@@ -1288,10 +1329,10 @@ body .btn:active { transform: translateY(0.5px); }
    is only armed after a 100ms delay (JS side), so fast renders never flash.
    Respects prefers-reduced-motion via the global reset above (which zeroes all
    transition durations), so reduced-motion users get an instant swap. */
-.cerebro-projection-gate .js-plotly-plot {
+.cerebro-viewport-gate .js-plotly-plot {
   transition: opacity 0.18s ease;
 }
-.cerebro-projection-gate .js-plotly-plot.cerebro-plot-loading {
+.cerebro-viewport-gate .js-plotly-plot.cerebro-plot-loading {
   opacity: 0.55;
 }
 
