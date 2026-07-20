@@ -118,6 +118,9 @@ test_that("motif network exposes a stable selected-node detail panel", {
 
 test_that("core shim binds locally without polluting globalenv", {
   local_env <- new.env(parent = globalenv())
+  # The shim reads Cerebro.options[["cerebro_root"]] to locate its bundled core/
+  # directory; supply it so the source path resolves in this isolated env.
+  local_env$Cerebro.options <- list(cerebro_root = hla_inst_file())
   global_names <- c("hla_detect_chains", "hla_descriptive_feature_overlap")
   for (nm in global_names) {
     if (exists(nm, envir = .GlobalEnv, inherits = FALSE)) {
@@ -148,17 +151,18 @@ test_that("core shim binds locally without polluting globalenv", {
   ))
 })
 
-test_that("source-tree core shim does not require a freshly installed package", {
+test_that("bundled core shim resolves without an installed package", {
   repo_root <- normalizePath(testthat::test_path("../.."), mustWork = TRUE)
   app_root <- file.path(repo_root, "inst")
   shim_path <- file.path(
     app_root,
     "shiny/v1.4/hla_tcr_motifs/core_shim.R"
   )
-  # This test asserts a SOURCE-TREE property (the shim runs without a fresh
-  # install). Under R CMD check the package is copied into <pkg>.Rcheck and the
-  # source `inst/` tree is not at this path, so there is nothing to test -- skip
-  # rather than fail on the missing file.
+  # The shim sources its bundled core/ copies with no package on the search
+  # path -- the exact condition of a createShinyApp bundle. Run it in a --vanilla
+  # subprocess to prove no cerebroAppLite install is needed. Under R CMD check
+  # the source `inst/` tree is not at this path, so there is nothing to test --
+  # skip rather than fail on the missing file.
   testthat::skip_if_not(
     file.exists(shim_path),
     "source tree not present (installed-package layout)"
@@ -292,6 +296,17 @@ test_that("bulk demo HLA is real, and measures no genes", {
   expect_equal(ncol(crb$expression), nrow(crb$meta_data))
 })
 
+test_that("the bulk demo ships its CC-BY attribution beside the data", {
+  # data-raw/DATASETS.md holds the provenance but is .Rbuildignore'd, so an
+  # installed user would otherwise receive the CC-BY data with no licensing
+  # record. The attribution file lives in extdata so it installs with the demo.
+  att <- hla_inst_file("extdata/v1.4/demo_hla_tcr_bulk.ATTRIBUTION.md")
+  expect_true(file.exists(att))
+  txt <- paste(readLines(att, warn = FALSE), collapse = "\n")
+  expect_match(txt, "CC-BY", fixed = TRUE)
+  expect_match(txt, "1248193", fixed = TRUE) # the Zenodo record id
+})
+
 ## ---- node colours must not be handed to vis-network's group palette --- ##
 
 test_that("motif network nodes carry no group column", {
@@ -325,12 +340,14 @@ test_that("motif network nodes carry no group column", {
   }
 })
 
-## ---- core_shim covers every core file and symbol ---------------------- ##
-## The shim has TWO paths: a repository launch sys.source()s a hardcoded file
-## list, while an installed launch pulls names from the namespace. A gap in
-## either one is invisible to unit tests (which load the whole package) and
-## only shows up as "could not find function" in a running app, on one launch
-## mode. Pin both.
+## ---- core_shim sources every core file, byte-for-byte ------------------ ##
+## The shim sys.source()s a hardcoded list of the bundled core/ files -- no
+## namespace fallback, so the bundle never names cerebroAppLite. A core file
+## present in R/ but missing from that list is never sourced, so its functions
+## surface as "could not find function" in a running app while unit tests (which
+## reach R/ directly) stay green. Pin the file list here, and pin the bundled
+## copies byte-for-byte against R/ in the next test -- together they guarantee
+## every R/hla_*.R function is reachable at runtime, in every launch mode.
 
 test_that("core_shim sources every R/hla_*.R core file", {
   shim <- paste(
@@ -356,40 +373,45 @@ test_that("core_shim sources every R/hla_*.R core file", {
   expect_equal(missing, character(0))
 })
 
-test_that("core_shim binds every package function the module calls", {
-  mod_dir <- hla_inst_file("shiny/v1.4/hla_tcr_motifs")
-  mod <- list.files(mod_dir, pattern = "[.]R$", full.names = TRUE)
-  src <- unlist(lapply(mod, readLines, warn = FALSE))
-  called <- unique(unlist(regmatches(
-    src,
-    gregexpr("hla_[a-zA-Z0-9_]+(?=[(])", src, perl = TRUE)
-  )))
-
-  pkg_files <- list.files(
-    testthat::test_path("../../R"),
-    pattern = "^hla_.*[.]R$",
-    full.names = TRUE
+test_that("bundled HLA core/ is byte-identical to the R/ source", {
+  r_dir <- testthat::test_path("../../R")
+  core_dir <- hla_inst_file("shiny/v1.4/hla_tcr_motifs/core")
+  # The shim sources these copies at runtime; they exist only so the module is
+  # self-contained in a createShinyApp bundle (no R/, no package). If they drift
+  # from R/, the bundle silently runs stale core code. This guard needs the
+  # package R/ source tree, absent under the installed-package test layout --
+  # skip there rather than fail.
+  testthat::skip_if_not(
+    dir.exists(r_dir) &&
+      length(list.files(r_dir, pattern = "^hla_.*[.]R$")) > 0,
+    "R/ source tree not present (installed-package layout)"
   )
-  pkg <- unlist(lapply(pkg_files, readLines, warn = FALSE))
-  defined <- unique(sub(
-    "^([a-zA-Z0-9_.]+) <- function.*$",
-    "\\1",
-    grep("^hla_[a-zA-Z0-9_.]+ <- function", pkg, value = TRUE)
-  ))
-
-  shim <- paste(
-    readLines(file.path(mod_dir, "core_shim.R"), warn = FALSE),
-    collapse = "\n"
+  core_files <- c(
+    "hla_typing.R",
+    "hla_motif_core.R",
+    "hla_association_core.R",
+    "hla_visual_helpers.R",
+    "hla_export.R"
   )
-  need <- intersect(called, defined)
-  missing <- need[
-    !vapply(
-      need,
-      function(f) grepl(paste0('"', f, '"'), shim, fixed = TRUE),
-      logical(1)
+  for (f in core_files) {
+    inst_copy <- file.path(core_dir, f)
+    r_src <- file.path(r_dir, f)
+    expect_true(
+      file.exists(inst_copy),
+      info = paste("missing bundled core copy:", f)
     )
-  ]
-  expect_equal(missing, character(0))
+    expect_identical(
+      readLines(inst_copy, warn = FALSE),
+      readLines(r_src, warn = FALSE),
+      info = paste0(
+        "inst/shiny/v1.4/hla_tcr_motifs/core/",
+        f,
+        " drifted from R/",
+        f,
+        " -- re-copy R/hla_*.R into the module's core/ directory."
+      )
+    )
+  }
 })
 
 ## ---- illustrated guide ------------------------------------------------- ##
@@ -700,11 +722,18 @@ test_that("node colouring is offered from the declared groupings", {
     "hla_color_meta_cols <- reactive\\(\\{[\\s\\S]{0,300}getGroups\\(\\)",
     perl = TRUE
   )
-  # The lineage column must NOT be gated on the declared groupings: MHC context
-  # is a question about the data, not about curation.
+  # A data set may DECLARE any column as its lineage column, so the declared
+  # check still reads from all available columns. But INFERENCE is limited to
+  # the declared groupings: scoring every column let an identifier value like
+  # "CD8_case" be taken for a lineage and silently reshape HLA scope filtering.
   expect_match(
     src,
     "hla_celltype_col <- reactive\\(\\{[\\s\\S]{0,60}hla_available_cols\\(\\)",
+    perl = TRUE
+  )
+  expect_match(
+    src,
+    "hla_celltype_col <- reactive\\(\\{[\\s\\S]{0,1400}candidates <- hla_color_meta_cols\\(\\)",
     perl = TRUE
   )
 })

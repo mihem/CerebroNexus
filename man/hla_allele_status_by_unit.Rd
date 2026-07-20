@@ -4,7 +4,7 @@
 \alias{hla_allele_status_by_unit}
 \title{Classify each analysis unit for one HLA allele}
 \usage{
-hla_allele_status_by_unit(typing, samples, allele)
+hla_allele_status_by_unit(typing, samples, allele, unit_map = NULL)
 }
 \arguments{
 \item{typing}{Canonical HLA typing table.}
@@ -12,12 +12,19 @@ hla_allele_status_by_unit(typing, samples, allele)
 \item{samples}{In-scope immune-repertoire sample names.}
 
 \item{allele}{Canonical or normalizable HLA allele.}
+
+\item{unit_map}{Optional precomputed [hla_analysis_unit_map()] for the same
+`typing` and `samples`. It is allele-independent, so a caller looping over
+many alleles (e.g. hla_allele_carrier_summary) can build it once and pass it
+in instead of rebuilding it per allele. Computed here when `NULL`.}
 }
 \value{
 data.frame(analysis_unit, unit_type, hla_status).
 }
 \description{
-Non-carrier means the allele's locus was typed and the allele was absent.
-Missing locus typing is always reported separately as untyped.
+Non-carrier means the allele's locus was typed at BOTH copies and the allele
+was absent from both. Anything short of that -- no typing at the locus, only
+one copy called, or typing too coarse to decide -- is untyped: no information
+either way, and excluded from both groups rather than assumed negative.
 }
 \keyword{internal}

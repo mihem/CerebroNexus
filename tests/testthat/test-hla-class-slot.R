@@ -35,6 +35,35 @@ test_that("addHLATyping accepts a pre-normalized canonical table unchanged", {
   expect_equal(t$source_type, "synthetic")
 })
 
+test_that("addHLATyping validates a canonical-looking table, not stores it raw", {
+  crb <- make_minimal_cerebro()
+  # Has the canonical columns (so hla_is_typing_table() passes) but junk values:
+  # an unrecognisable allele, a locus contradicting its allele, an out-of-range
+  # copy, and an invalid provenance. None must reach downstream analysis.
+  dirty <- data.frame(
+    sample = c("s1", "s1", "s2"),
+    donor_id = NA_character_,
+    locus = c("HLA-A", "HLA-B", "HLA-A"), # row 2 locus contradicts its allele
+    copy = c(1L, 9L, 1L), # 9 is not a diploid copy
+    allele = c("HLA-A*02:01", "HLA-A*11:01", "NOT-AN-ALLELE"),
+    resolution = NA_character_,
+    source_type = c("genotyped", "wishful", "genotyped"), # 'wishful' invalid
+    typing_method = NA_character_,
+    source_reference = NA_character_,
+    confidence = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  crb$addHLATyping(dirty)
+  t <- crb$getHLATyping()
+
+  expect_equal(nrow(t), 2L) # the unrecognisable allele row is dropped
+  expect_false("NOT-AN-ALLELE" %in% t$allele)
+  expect_setequal(t$locus, "HLA-A") # locus re-derived from the allele
+  expect_true(any(is.na(t$copy))) # the out-of-range copy became NA
+  expect_true("unknown" %in% t$source_type) # invalid provenance coerced
+  expect_false("wishful" %in% t$source_type)
+})
+
 test_that("getHLATyping returns an empty canonical table when none is set", {
   crb <- make_minimal_cerebro()
   t <- crb$getHLATyping()

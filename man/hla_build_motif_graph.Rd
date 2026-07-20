@@ -10,7 +10,8 @@ hla_build_motif_graph(
   min_nodes = 2L,
   show_isolated = FALSE,
   meta_cols = character(0),
-  context_col = NULL
+  context_col = NULL,
+  context_summary = hla_context_summary
 )
 }
 \arguments{
@@ -24,8 +25,11 @@ hla_build_motif_graph(
 
 \item{meta_cols}{Metadata columns to carry as node distributions.}
 
-\item{context_col}{Optional per-cell MHC-context column; the node gets a
-[hla_context_summary()] value (single class / "Mixed" / "Unknown").}
+\item{context_col}{Optional per-cell context column; the node gets a
+`context_summary` value rather than a mode.}
+
+\item{context_summary}{Collapse function for `context_col`; see
+[hla_aggregate_cdr3_nodes()].}
 }
 \value{
 An igraph object (with a per-node `cluster` attribute and a

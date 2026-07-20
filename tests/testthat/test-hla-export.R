@@ -44,6 +44,57 @@ test_that("manifest records the parameters needed to recompute the view", {
   expect_match(val("edge_rule"), "Hamming distance == 1")
 })
 
+test_that("manifest records the scope, pair alleles and lineage column", {
+  # Without these, a carrier-only or pair-scoped graph -- a SUBSET of the global
+  # graph -- cannot be reconstructed from the manifest.
+  m <- hla_build_manifest(
+    dataset = "demo",
+    chain = "TRB",
+    input_channel = "stored .crb",
+    hla_source_type = "genotyped",
+    unit_type = "donor",
+    observation_unit = "cell",
+    n_units = 10,
+    n_nodes = 5,
+    n_edges = 4,
+    n_motifs = 2,
+    min_nodes = 3,
+    split_by_v = TRUE,
+    show_isolated = FALSE,
+    allele = "HLA-A*02:01",
+    scope = "pair",
+    allele_i = "HLA-A*02:01",
+    allele_ii = "HLA-DRB1*15:01",
+    lineage_column = "cell_type"
+  )
+  val <- function(f) m$value[m$field == f]
+  expect_equal(val("network_scope"), "pair")
+  expect_equal(val("pair_allele_i"), "HLA-A*02:01")
+  expect_equal(val("pair_allele_ii"), "HLA-DRB1*15:01")
+  expect_equal(val("lineage_column"), "cell_type")
+})
+
+test_that("scope fields fall back to (none) when not supplied", {
+  m <- hla_build_manifest(
+    dataset = "d",
+    chain = "TRB",
+    input_channel = "none",
+    hla_source_type = NA_character_,
+    unit_type = "sample",
+    observation_unit = "cell",
+    n_units = 1,
+    n_nodes = 1,
+    n_edges = 0,
+    n_motifs = 0,
+    min_nodes = 2,
+    split_by_v = FALSE,
+    show_isolated = FALSE
+  )
+  val <- function(f) m$value[m$field == f]
+  expect_equal(val("pair_allele_i"), "(none)")
+  expect_equal(val("lineage_column"), "(none)")
+})
+
 test_that("manifest states the evidence ceiling and the denominator", {
   m <- hla_build_manifest(
     dataset = "d",

@@ -73,6 +73,16 @@
 #' object via \code{addImmuneRepertoire()}.  Legacy \code{bcr_data} /
 #' \code{tcr_data} slots are also supported as a fallback.
 #'
+#' @section HLA typing:
+#' If \code{object@misc$hla_typing} holds an HLA genotype table -- a canonical
+#' long \code{data.frame}, a wide \code{sample} + \code{HLA-*_1/_2}
+#' \code{data.frame}, or a named list (sample -> allele vector) -- it is
+#' exported via \code{addHLATyping()}, parallel to the immune repertoire. The
+#' provenance in \code{object@misc$hla_typing_source_type} (one of
+#' \code{"genotyped"}, \code{"imputed"}, \code{"synthetic"}, \code{"unknown"};
+#' default \code{"unknown"}) is carried through, so a predicted or fabricated
+#' genotype is never mistaken for a directly typed one.
+#'
 #' @return
 #' No data returned.
 #'

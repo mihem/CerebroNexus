@@ -632,6 +632,19 @@ output$hla_export_analysis <- downloadHandler(
       split_by_v = isTRUE(hla_param("hla_by_v", hla_by_v_default())),
       show_isolated = isTRUE(hla_param("hla_show_isolated", FALSE)),
       allele = hla_color_allele() %||% NA_character_,
+      scope = tryCatch(hla_scope_mode(), error = function(e) NA_character_),
+      allele_i = tryCatch(
+        hla_pair_allele_i() %||% NA_character_,
+        error = function(e) NA_character_
+      ),
+      allele_ii = tryCatch(
+        hla_pair_allele_ii() %||% NA_character_,
+        error = function(e) NA_character_
+      ),
+      lineage_column = tryCatch(
+        hla_celltype_col() %||% NA_character_,
+        error = function(e) NA_character_
+      ),
       tcr_selection = tryCatch(
         data_set()$technical_info$tcr_selection %||% NA_character_,
         error = function(e) NA_character_
@@ -649,9 +662,14 @@ output$hla_export_analysis <- downloadHandler(
       )
     )
 
-    tmp <- file.path(tempdir(), "hla_export")
-    unlink(tmp, recursive = TRUE)
+    # A unique staging directory per download. Concurrent user sessions share
+    # one R process, so a fixed tempdir()/hla_export path lets one download's
+    # cleanup delete or mix another's files mid-write (corrupt archives, and a
+    # cross-session leak). tempfile() is unique per call; on.exit removes the
+    # directory once the archive has been written.
+    tmp <- tempfile("hla_export_")
     dir.create(tmp, showWarnings = FALSE, recursive = TRUE)
+    on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
     utils::write.csv(
       manifest,
       file.path(tmp, "manifest.csv"),

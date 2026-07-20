@@ -359,3 +359,96 @@ test_that("a bundled dataset deserializes and works without cerebroAppLite", {
   expect_gt(result$n_genes, 0)
   expect_gt(result$n_projections, 0)
 })
+
+## Regression guard for a class of bug we have hit repeatedly: bundle code that
+## silently depends on cerebroAppLite being installed. The static grep above and
+## the deserialize test above each cover one half; this covers the runtime half
+## for module code that loads package-authored helpers. The HLA module is the
+## worst offender -- its pure core lives in R/ (not copied into a bundle) and it
+## used to reach the installed namespace via core_shim. That resolved under
+## R CMD check (package installed) but NOT in an exported bundle, so it passed
+## every check except a user actually running the exported app.
+##
+## The only faithful test is the production condition: build the bundle, then
+## load its module code in a process whose library path genuinely lacks
+## cerebroAppLite -- exactly what a user who never installed the package has.
+## If the core files were not copied into the bundle, or core_shim reached for
+## the namespace, or a core file dropped off its source list, the functions the
+## module calls by bare name go unbound here and this fails loudly.
+test_that("an exported bundle resolves the HLA core with no cerebroAppLite installed", {
+  skip_if_not_installed("callr")
+  skip_on_cran()
+  skip_on_os("windows") # the hermetic library is built with symlinks
+
+  app <- build_smoke_app()
+  shim <- file.path(app$app_dir, "shiny/v1.4/hla_tcr_motifs/core_shim.R")
+  skip_if_not(file.exists(shim), "HLA module not present in bundle")
+
+  ## Mirror the current library MINUS cerebroAppLite, so the child genuinely
+  ## cannot resolve the package even if the bundle tried to.
+  hermetic_lib <- withr::local_tempdir()
+  linked_any <- FALSE
+  for (lib in .libPaths()) {
+    for (pkg in list.dirs(lib, recursive = FALSE, full.names = FALSE)) {
+      if (identical(pkg, "cerebroAppLite")) {
+        next
+      }
+      dest <- file.path(hermetic_lib, pkg)
+      if (!file.exists(dest)) {
+        ok <- tryCatch(
+          file.symlink(file.path(lib, pkg), dest),
+          error = function(e) FALSE
+        )
+        linked_any <- linked_any || isTRUE(ok)
+      }
+    }
+  }
+  skip_if_not(linked_any, "could not build a hermetic library via symlinks")
+
+  result <- callr::r(
+    function(app_dir) {
+      ## Prove the package really is unreachable before we trust the result.
+      if (requireNamespace("cerebroAppLite", quietly = TRUE)) {
+        stop("cerebroAppLite is reachable; the library is not hermetic")
+      }
+      ## Reproduce how the bundled app loads the HLA module: cerebro_root is the
+      ## bundle root, and core_shim is sourced into the app-server scope.
+      e <- new.env(parent = globalenv())
+      e$Cerebro.options <- list(cerebro_root = app_dir)
+      sys.source(
+        file.path(app_dir, "shiny/v1.4/hla_tcr_motifs/core_shim.R"),
+        envir = e
+      )
+      ## One representative function per core file, so a whole file dropping off
+      ## the shim's source list is caught, plus the exact call that used to 500.
+      need <- c(
+        "hla_normalize_typing", # hla_typing.R
+        "hla_build_motif_graph", # hla_motif_core.R
+        "hla_descriptive_feature_overlap", # hla_association_core.R
+        "hla_distinct_colors", # hla_visual_helpers.R
+        "hla_build_manifest" # hla_export.R
+      )
+      bound <- vapply(
+        need,
+        function(n) exists(n, envir = e, inherits = FALSE),
+        logical(1)
+      )
+      empty <- get("hla_normalize_typing", envir = e)(
+        list(),
+        source_type = "unknown"
+      )
+      list(bound = bound, empty_ok = is.data.frame(empty))
+    },
+    args = list(app_dir = app$app_dir),
+    libpath = hermetic_lib
+  )
+
+  expect_true(
+    all(result$bound),
+    info = paste(
+      "bundled HLA core unresolved without the package:",
+      paste(names(result$bound)[!result$bound], collapse = ", ")
+    )
+  )
+  expect_true(result$empty_ok)
+})

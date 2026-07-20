@@ -18,9 +18,12 @@ data.frame(allele, locus, mhc_class, n_carrier, n_noncarrier,
   the function reports sample-level counts.
 }
 \description{
-For each allele in the typing table, count carriers, locus-typed non-carriers
-and units without typing at that locus. Complete donor mappings are collapsed
-to donor; otherwise the units remain samples. This is strictly descriptive:
-it performs no enrichment test and reports no p-value.
+For each allele in the typing table, count carriers, non-carriers and untyped
+units. Every call is derived from [hla_allele_status_by_unit()] so the counts
+match the association tables and network colours exactly: comparison is
+resolution-aware, and only a completely-typed locus can be a non-carrier -- a
+one-copy call is untyped, not assumed negative. Complete donor mappings are
+collapsed to donor; otherwise the units remain samples. This is strictly
+descriptive: it performs no enrichment test and reports no p-value.
 }
 \keyword{internal}

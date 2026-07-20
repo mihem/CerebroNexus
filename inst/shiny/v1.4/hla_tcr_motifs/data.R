@@ -365,10 +365,12 @@ hla_unit_noun <- reactive({
 ##
 ##   1. the data set DECLARES it in `technical_info$lineage_column`, the same
 ##      contract style as observation_unit / receptor_key;
-##   2. failing that, ASK THE VALUES. hla_lineage_context() already matches on
-##      the label itself (CD8 / CD4 / Treg), never on the column name, so the
-##      column that resolves the most cells to a real lineage is the lineage
-##      column, whatever it is called.
+##   2. failing that, ASK THE VALUES -- but only of the DECLARED grouping
+##      variables. hla_lineage_context() matches on the label itself (CD8 / CD4
+##      / Treg), never on the column name, so the declared group that resolves
+##      the most cells to a real lineage is the lineage column. Restricting to
+##      declared groups is what stops an identifier (a `sample` value of
+##      "CD8_case") or a covariate ("anti-CD4") from being taken for biology.
 ##
 ## What this deliberately no longer does is match names: `cell_type_fine` then
 ## `cell_type` worked for the bundled demos and quietly produced "Unknown" for
@@ -396,8 +398,17 @@ hla_celltype_col <- reactive({
     return(declared[1])
   }
 
+  # Inference is limited to the data set's DECLARED grouping variables. Scoring
+  # every available column let an identifier -- a `sample` value like "CD8_case",
+  # or a treatment such as "anti-CD4" -- win the lineage role and silently change
+  # HLA scope filtering. A grouping variable is the user's own "this is biology";
+  # an id or a covariate is not, so it is never a candidate here.
+  candidates <- hla_color_meta_cols()
+  if (length(candidates) == 0) {
+    return(NA_character_)
+  }
   score <- vapply(
-    cols,
+    candidates,
     function(col) {
       v <- unlist(lapply(data, function(df) {
         if (col %in% colnames(df)) as.character(df[[col]]) else character(0)
@@ -413,7 +424,7 @@ hla_celltype_col <- reactive({
   if (max(score) == 0) {
     return(NA_character_)
   }
-  best <- cols[score == max(score)]
+  best <- candidates[score == max(score)]
   if (length(best) == 1) {
     return(best)
   }

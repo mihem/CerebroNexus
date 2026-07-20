@@ -1132,7 +1132,11 @@ Cerebro_v1.3 <- R6::R6Class(
     #' @description
     #' Set HLA typing data. Accepts a canonical long \code{data.frame}, a wide
     #' \code{data.frame} (sample + HLA-*_1/_2 columns), or a named \code{list}
-    #' (sample -> allele vector); non-canonical inputs are normalized.
+    #' (sample -> allele vector). Non-canonical inputs are normalized; a table
+    #' that already has the canonical columns is validated (unrecognisable
+    #' alleles dropped, locus re-derived, copy and provenance coerced) rather
+    #' than stored verbatim, so a canonical-looking table cannot smuggle invalid
+    #' values into downstream analysis.
     #'
     #' @param data HLA typing in any accepted form.
     #' @param source_type Provenance of the genotype: one of "genotyped",
@@ -1146,7 +1150,7 @@ Cerebro_v1.3 <- R6::R6Class(
       source_reference = NA_character_
     ) {
       if (hla_is_typing_table(data)) {
-        self$hla_typing <- data
+        self$hla_typing <- hla_validate_typing(data)
       } else {
         self$hla_typing <- hla_normalize_typing(
           data,

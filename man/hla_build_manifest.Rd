@@ -19,6 +19,10 @@ hla_build_manifest(
   split_by_v,
   show_isolated,
   allele = NA_character_,
+  scope = NA_character_,
+  allele_i = NA_character_,
+  allele_ii = NA_character_,
+  lineage_column = NA_character_,
   tcr_selection = NA_character_,
   qc_warnings = character(0),
   app_version = NA_character_
@@ -45,6 +49,16 @@ synthetic / unknown).}
 \item{min_nodes, split_by_v, show_isolated}{Motif build parameters.}
 
 \item{allele}{Allele the view was coloured / summarised by, if any.}
+
+\item{scope}{Network scope in effect ("all" / "allele" / "pair"); with "all"
+the whole graph is shown and the allele only re-colours it, so the scope is
+needed to know whether the exported nodes are a subset.}
+
+\item{allele_i, allele_ii}{The two alleles when `scope` is a Class I x II pair,
+otherwise NA.}
+
+\item{lineage_column}{Metadata column the CD4/CD8 lineage was read from, if
+any; it determines the class filter that allele / pair scope applied.}
 
 \item{tcr_selection}{Declared receptor-selection provenance, if any.}
 

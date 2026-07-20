@@ -1,44 +1,37 @@
 ##----------------------------------------------------------------------------##
 ## HLA & TCR Motifs — core function shim
 ##
-## The pure motif / HLA-typing core lives in the package R/ directory so it is
-## installed and unit-tested. The Shiny app, however, is also commonly launched
-## straight from the repository with runApp("inst"). In that mode the installed
-## package can legitimately be older than the checked-out source tree.
+## The pure motif / HLA-typing core is authored in the package R/ directory so it
+## is exported (only hla_normalize_typing), roxygen-documented and unit-tested.
+## The Shiny app, however, must run in three modes:
 ##
-## This file is sourced with local = TRUE into the module server scope, so the
-## assignments below land in that scope and every other module file can call the
-## core functions by bare name. A repository launch sources the current core R
-## files first; an installed-app launch falls back to the package namespace. We
-## use getFromNamespace() — an explicit, documented API — NOT the ::: operator
-## that the project bans in runtime code.
+##   1. repository launch  — runApp("inst")           (package maybe absent/old)
+##   2. installed launch   — package attached normally (package present)
+##   3. standalone bundle  — createShinyApp() output   (package NEVER loaded)
+##
+## Mode 3 is the strict one: the generated bundle is self-contained and must not
+## name cerebroAppLite anywhere in its source (see R/createShinyApp.R and
+## tests/testthat/test-smoke-production.R). So the shim cannot reach into the
+## namespace — not getFromNamespace(), not requireNamespace().
+##
+## Instead the core files are shipped as byte-identical copies under this
+## module's core/ directory. That directory lives inside inst/, so it survives
+## package installation AND is copied verbatim into every createShinyApp bundle.
+## It is therefore present in all three modes, and sourcing it needs no package
+## on the search path. A drift guard in tests/testthat/test-hla-app-contract.R
+## keeps core/ byte-identical to R/.
+##
+## This file is sourced with local = TRUE into the module server scope (which is
+## itself the app server scope), so the definitions below land there and every
+## other module file — and the getHLATyping() wrapper in utility_functions.R —
+## resolves the core functions by bare name.
 ##----------------------------------------------------------------------------##
 
-## Prefer the checked-out package source when this app is launched from <repo>/
-## inst. This keeps runApp("inst") coherent even when the user has an older
-## cerebroAppLite installed in their library. Installed packages do not retain
-## these R/*.R source files, so production launches naturally take the namespace
-## path below.
-.hla_app_root <- NULL
-.hla_options <- NULL
-if (exists("Cerebro.options", inherits = TRUE)) {
-  .hla_options <- get("Cerebro.options", inherits = TRUE)
-  if (!is.null(.hla_options[["cerebro_root"]])) {
-    .hla_app_root <- tryCatch(
-      normalizePath(.hla_options[["cerebro_root"]], mustWork = TRUE),
-      error = function(e) NULL
-    )
-  }
-}
-.hla_source_root <- if (!is.null(.hla_app_root)) {
-  normalizePath(file.path(.hla_app_root, ".."), mustWork = FALSE)
-} else {
-  NULL
-}
-## Every core file the module calls into. A file missing here fails ONLY on a
-## repository launch (the namespace path below sees the whole package), so the
-## omission survives unit tests and surfaces as "could not find function" in a
-## running app. tests/testthat/test-hla-app-contract.R pins both lists.
+## Every core file the module (and the getHLATyping wrapper) calls into, in
+## dependency order. A file present in R/ but missing here is never sourced, so
+## its functions surface as "could not find function" in a running app while unit
+## tests (which reach R/ directly) stay green. test-hla-app-contract.R pins this
+## list against R/ and pins the copies byte-for-byte.
 .hla_source_files <- c(
   "hla_typing.R",
   "hla_motif_core.R",
@@ -46,96 +39,17 @@ if (exists("Cerebro.options", inherits = TRUE)) {
   "hla_visual_helpers.R",
   "hla_export.R"
 )
-.hla_source_paths <- if (!is.null(.hla_source_root)) {
-  file.path(.hla_source_root, "R", .hla_source_files)
-} else {
-  character(0)
-}
-.hla_has_source_tree <-
-  !is.null(.hla_source_root) &&
-  file.exists(file.path(.hla_source_root, "DESCRIPTION")) &&
-  length(.hla_source_paths) == length(.hla_source_files) &&
-  all(file.exists(.hla_source_paths))
 
-if (.hla_has_source_tree) {
-  for (.hla_source_path in .hla_source_paths) {
-    sys.source(.hla_source_path, envir = environment())
-  }
-  rm(.hla_source_path)
-} else if (requireNamespace("cerebroAppLite", quietly = TRUE)) {
-  ## requireNamespace() loads (not attaches) the installed package if needed.
-  ## This path supports a normal installed-app launch, where package code and
-  ## app resources come from the same installed build.
-  for (.hla_fn in c(
-    "hla_detect_chains",
-    "hla_parse_ir_segments",
-    "hla_make_consensus",
-    "hla_motif_variable_aa",
-    "hla_build_motif_graph",
-    "hla_motif_graph_ok",
-    "hla_motif_layout",
-    "HLA_LAYOUT_SEED",
-    "HLA_MOTIF_MAX_RENDER",
-    "hla_lineage_context",
-    "hla_context_summary",
-    "hla_normalize_typing",
-    "hla_read_typing_file",
-    "hla_normalize_allele",
-    "hla_allele_resolution",
-    "hla_allele_locus",
-    "hla_locus_class",
-    "hla_is_typing_table",
-    "hla_carrier_index",
-    "hla_allele_compare",
-    "hla_carriers_of",
-    "hla_pair_class_summary",
-    "HLA_PAIR_MIXED_LABEL",
-    "hla_scope_segments_by_allele_pair",
-    "HLA_CLASS_II_LOCI",
-    "hla_allele_carrier_summary",
-    "hla_node_carrier_status",
-    "hla_node_carrier_counts",
-    "hla_node_sample_origin",
-    "hla_scope_segments_by_allele",
-    "hla_build_manifest",
-    "hla_graph_tables",
-    "hla_motif_summary",
-    "hla_analysis_unit_map",
-    "hla_allele_status_by_unit",
-    "hla_descriptive_feature_overlap",
-    "hla_unit_allele_matrix",
-    "hla_coverage_by_sample",
-    "hla_distinct_colors",
-    "hla_node_radius",
-    "HLA_TYPING_COLUMNS",
-    "HLA_SOURCE_TYPES",
-    "HLA_MVP_LOCI",
-    "HLA_CLASS_I_LOCI",
-    "HLA_CLASS_II_LOCI",
-    "HLA_SHARED_LABEL",
-    "HLA_NODE_R_MIN",
-    "HLA_NODE_R_MAX",
-    "HLA_NODE_MAX_EXACT"
-  )) {
-    .hla_obj <- tryCatch(
-      utils::getFromNamespace(.hla_fn, "cerebroAppLite"),
-      error = function(e) NULL
-    )
-    if (!is.null(.hla_obj)) {
-      # This file is sourced with local = TRUE into the app-server evaluation
-      # environment. Bind there so sibling module files resolve the names while
-      # parallel app sessions and the process global environment remain clean.
-      assign(.hla_fn, .hla_obj, envir = environment())
-    }
-  }
-  rm(.hla_fn, .hla_obj)
-}
-
-rm(
-  .hla_app_root,
-  .hla_options,
-  .hla_source_root,
-  .hla_source_files,
-  .hla_source_paths,
-  .hla_has_source_tree
+.hla_core_dir <- paste0(
+  Cerebro.options[["cerebro_root"]],
+  "/shiny/v1.4/hla_tcr_motifs/core"
 )
+
+for (.hla_core_file in .hla_source_files) {
+  sys.source(
+    file.path(.hla_core_dir, .hla_core_file),
+    envir = environment()
+  )
+}
+
+rm(.hla_source_files, .hla_core_dir, .hla_core_file)
