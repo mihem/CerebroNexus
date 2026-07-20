@@ -33,3 +33,22 @@
 .hla-mb-btn--off:hover {
   opacity: .3; cursor: default; color: var(--c-text-3); background: none;
 }
+
+/* HLA Associations: each result table sits in its own card, so the three read
+ * as distinct blocks instead of one continuous stack. Same surface/border/radius
+ * system as the app's panels, just lighter for a nested block. */
+.hla-result-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  padding: 12px 16px 4px;
+  margin-bottom: 16px;
+}
+.hla-result-card > h4:first-child {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+.hla-result-card > p.text-muted {
+  margin-bottom: 10px;
+}

@@ -240,35 +240,44 @@ output$hla_associations_ui <- renderUI({
       ),
       column(5, uiOutput("hla_feature_selector_ui"))
     ),
-    tags$h4("Observed overlap summary"),
-    DT::dataTableOutput("hla_overlap_summary"),
-    tags$h4(sprintf(
-      "Per-unit breadth and %s fraction",
-      hla_unit_noun()
-    )),
-    # State the denominator. These are fractions of what this data set contains,
-    # which is not the donor's repertoire whenever the receptors were selected
-    # (see the positive-control notice above).
-    tags$p(
-      class = "text-muted",
-      style = "font-size: 12px;",
-      sprintf(
-        paste(
-          "Fractions are of the %ss and clonotypes present IN THIS DATA SET",
-          "for each unit%s - not of the unit's full repertoire."
-        ),
-        hla_unit_noun(),
-        hla_selection_caveat()$subset_phrase %||% ""
-      )
+    tags$div(
+      class = "hla-result-card",
+      tags$h4("Observed overlap summary"),
+      DT::dataTableOutput("hla_overlap_summary")
     ),
-    DT::dataTableOutput("hla_overlap_table"),
-    tags$h4("Analysis-unit × HLA allele matrix"),
-    tags$p(
-      class = "text-muted",
-      style = "font-size: 12px;",
-      "1 = carrier, 0 = locus-typed non-carrier, blank = locus untyped."
+    tags$div(
+      class = "hla-result-card",
+      tags$h4(sprintf(
+        "Per-unit breadth and %s fraction",
+        hla_unit_noun()
+      )),
+      # State the denominator. These are fractions of what this data set
+      # contains, which is not the donor's repertoire whenever the receptors
+      # were selected (see the positive-control notice above).
+      tags$p(
+        class = "text-muted",
+        style = "font-size: 12px;",
+        sprintf(
+          paste(
+            "Fractions are of the %ss and clonotypes present IN THIS DATA SET",
+            "for each unit%s - not of the unit's full repertoire."
+          ),
+          hla_unit_noun(),
+          hla_selection_caveat()$subset_phrase %||% ""
+        )
+      ),
+      DT::dataTableOutput("hla_overlap_table")
     ),
-    DT::dataTableOutput("hla_allele_matrix")
+    tags$div(
+      class = "hla-result-card",
+      tags$h4("Analysis-unit × HLA allele matrix"),
+      tags$p(
+        class = "text-muted",
+        style = "font-size: 12px;",
+        "1 = carrier, 0 = locus-typed non-carrier, blank = locus untyped."
+      ),
+      DT::dataTableOutput("hla_allele_matrix")
+    )
   )
 })
 
