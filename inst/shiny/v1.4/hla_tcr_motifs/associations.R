@@ -248,14 +248,23 @@ output$hla_associations_ui <- renderUI({
     ),
     tags$div(
       class = "hla-result-card",
-      tags$h4("Observed overlap summary"),
+      tags$h4(hla_label_hint(
+        "Observed overlap summary",
+        paste(
+          "Carriers vs non-carriers of the selected allele, and the share of",
+          "each group whose repertoire contains the locked feature."
+        )
+      )),
       DT::dataTableOutput("hla_overlap_summary")
     ),
     tags$div(
       class = "hla-result-card",
-      tags$h4(sprintf(
-        "Per-unit breadth and %s fraction",
-        hla_unit_noun()
+      tags$h4(hla_label_hint(
+        sprintf("Per-unit breadth and %s fraction", hla_unit_noun()),
+        paste(
+          "One row per analysis unit: how much of its repertoire in this data",
+          "set - cells and clonotypes - the locked feature covers."
+        )
       )),
       # State the denominator. These are fractions of what this data set
       # contains, which is not the donor's repertoire whenever the receptors
@@ -276,7 +285,10 @@ output$hla_associations_ui <- renderUI({
     ),
     tags$div(
       class = "hla-result-card",
-      tags$h4("Analysis-unit × HLA allele matrix"),
+      tags$h4(hla_label_hint(
+        "Analysis-unit × HLA allele matrix",
+        "Which analysis units carry which HLA alleles - the full carrier map behind the counts above."
+      )),
       tags$p(
         class = "text-muted",
         style = "font-size: 12px;",
