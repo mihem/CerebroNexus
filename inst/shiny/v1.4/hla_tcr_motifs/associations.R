@@ -12,14 +12,12 @@
 hla_label_hint <- function(label, hint) {
   tagList(
     label,
+    # data-tip (not title): a CSS bubble in hla_motifs.css shows it instantly on
+    # hover, instead of the browser's slow ~1s native title tooltip.
     tags$span(
       icon("info-circle"),
-      class = "text-muted",
-      title = hint,
-      style = paste(
-        "cursor: help; margin-left: 5px;",
-        "font-size: 11px; font-weight: normal;"
-      )
+      class = "hla-hint",
+      `data-tip` = hint
     )
   )
 }
@@ -90,13 +88,17 @@ output$hla_feature_selector_ui <- renderUI({
     labels <- sprintf("%s (%d CDR3)", groups, as.integer(sizes[groups]))
     choices <- stats::setNames(groups, labels)
   }
-  selectInput(
+  selectizeInput(
     "hla_feature_id",
     hla_label_hint(
       "Locked feature:",
-      "The specific motif or CDR3 the comparison below is run on."
+      paste(
+        "The one motif family or CDR3 that the tables below compare between",
+        "carriers and non-carriers of the chosen HLA allele. Type to search."
+      )
     ),
-    choices = choices
+    choices = choices,
+    options = list(placeholder = "Type to search a motif or CDR3...")
   )
 })
 
@@ -231,7 +233,11 @@ output$hla_associations_ui <- renderUI({
           "hla_feature_type",
           hla_label_hint(
             "Feature type:",
-            "Test HLA links against a whole motif family, or a single CDR3."
+            paste(
+              "What the HLA comparison is run on: a whole motif family (a group",
+              "of near-identical CDR3s that cluster together), or one single",
+              "CDR3 sequence on its own."
+            )
           ),
           choices = c("Motif component" = "motif", "CDR3 node" = "node"),
           selected = "motif",

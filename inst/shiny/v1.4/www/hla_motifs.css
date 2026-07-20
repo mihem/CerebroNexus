@@ -48,7 +48,67 @@
 .hla-result-card > h4:first-child {
   margin-top: 4px;
   margin-bottom: 8px;
+  color: var(--c-amber-700);
+  font-weight: 600;
 }
 .hla-result-card > p.text-muted {
   margin-bottom: 10px;
+}
+
+/* Fast, readable hover hint for a control label. Replaces the native title
+ * tooltip (which the browser delays ~1s before showing) with a CSS bubble that
+ * appears at once and can hold a longer, plain-language line. */
+.hla-hint {
+  position: relative;
+  display: inline-block;
+  margin-left: 5px;
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: normal;
+  cursor: help;
+}
+.hla-hint > svg,
+.hla-hint > i {
+  pointer-events: none;
+}
+.hla-hint::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 250px;
+  white-space: normal;
+  text-align: left;
+  background: var(--c-text);
+  color: var(--c-white);
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: var(--shadow-3);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease;
+  z-index: 2000;
+  pointer-events: none;
+}
+.hla-hint::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--c-text);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease;
+  z-index: 2000;
+}
+.hla-hint:hover::after,
+.hla-hint:hover::before {
+  opacity: 1;
+  visibility: visible;
 }
