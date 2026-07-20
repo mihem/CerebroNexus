@@ -451,6 +451,31 @@ hla_visnet <- reactive({
   )
 })
 
+## Live read-out for the min-size slider: how many clusters / nodes the current
+## threshold keeps. Reads the same finalized graph the network draws, so it
+## always agrees with what is on screen and updates when the slider settles.
+output$hla_motif_readout <- renderUI({
+  req(hla_ready_latch())
+  g <- hla_motif_graph_cached()
+  if (!hla_motif_graph_ok(g)) {
+    return(NULL)
+  }
+  n_nodes <- igraph::vcount(g)
+  cl <- tryCatch(igraph::vertex_attr(g, "cluster"), error = function(e) NULL)
+  n_clusters <- if (is.null(cl)) 0L else length(unique(cl))
+  tags$div(
+    class = "text-muted",
+    style = "font-size: 11px; margin: -2px 0 8px;",
+    sprintf(
+      "%d cluster%s · %d node%s shown",
+      n_clusters,
+      if (n_clusters == 1) "" else "s",
+      n_nodes,
+      if (n_nodes == 1) "" else "s"
+    )
+  )
+})
+
 output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
   # Re-render only on a STRUCTURE change. Gate on the readiness latch rather than
   # the colour-reading hla_params_ready() gate, depend on the cached graph for

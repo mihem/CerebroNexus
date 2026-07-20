@@ -121,6 +121,9 @@ output$hla_parameters_ui <- renderUI({
       value = hla_default_min_nodes(),
       step = 1
     ),
+    # Live read-out of what the current threshold actually shows, so the effect
+    # of moving the slider is visible without guessing.
+    uiOutput("hla_motif_readout"),
     checkboxInput(
       "hla_by_v",
       "Split motifs by V gene",

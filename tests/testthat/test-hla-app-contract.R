@@ -810,21 +810,20 @@ test_that("scope guards test for 'all', never for one scope's name", {
     collapse = "\n"
   )
 
-  # The guard lives in the CACHED reactive: hla_global_motif_graph itself is now
-  # a thin uncached wrapper that only gates on hla_params_ready(), because a
-  # req() stop inside a bindCache body would be cached under the current key.
-  # The scope test being asserted here is unchanged — it just moved one layer in
-  # with the build it guards.
+  # The scope guard lives on the RAW build (hla_global_motif_graph_raw_cached):
+  # it is the expensive, allele-independent build that must come from unscoped
+  # segments, and the cheap min-size filter downstream inherits that. The scope
+  # test itself is unchanged — it just sits on the raw reactive now.
   expect_match(
     data_src,
-    "hla_global_motif_graph_cached <- reactive\\(\\{[\\s\\S]{0,200}identical\\(hla_scope_mode\\(\\), \"all\"\\)",
+    "hla_global_motif_graph_raw_cached <- reactive\\(\\{[\\s\\S]{0,200}identical\\(hla_scope_mode\\(\\), \"all\"\\)",
     perl = TRUE
   )
   # Pinned against the name the logic actually lives under, so this cannot pass
   # by matching a wrapper that never mentions a scope at all.
   expect_no_match(
     data_src,
-    "hla_global_motif_graph_cached <- reactive\\(\\{[\\s\\S]{0,200}!identical\\(hla_scope_mode\\(\\), \"allele\"\\)",
+    "hla_global_motif_graph_raw_cached <- reactive\\(\\{[\\s\\S]{0,200}!identical\\(hla_scope_mode\\(\\), \"allele\"\\)",
     perl = TRUE
   )
   expect_match(
@@ -848,8 +847,14 @@ test_that("the parameter gate stays OUTSIDE the cached graph reactives", {
     readLines(hla_inst_file("shiny/v1.4/hla_tcr_motifs/data.R"), warn = FALSE),
     collapse = "\n"
   )
-  # Each cached reactive is bindCache'd and must not gate.
-  for (nm in c("hla_motif_graph_cached", "hla_global_motif_graph_cached")) {
+  # Each cached reactive is bindCache'd and must not gate. Both the expensive raw
+  # builds and the cheap finalize layers are cached, so all four are pinned.
+  for (nm in c(
+    "hla_motif_graph_raw_cached",
+    "hla_motif_graph_cached",
+    "hla_global_motif_graph_raw_cached",
+    "hla_global_motif_graph_cached"
+  )) {
     expect_match(
       data_src,
       paste0(nm, " <- reactive\\(\\{[\\s\\S]{0,400}hla_bindCache\\("),

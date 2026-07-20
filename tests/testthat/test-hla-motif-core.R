@@ -292,6 +292,57 @@ test_that("the layout is deterministic for the same graph", {
   expect_equal(igraph::V(a)$layout_y, igraph::V(b)$layout_y)
 })
 
+## ---- split build: raw (cached) + finalize (cheap) ---------------------- ##
+
+test_that("raw build keeps every node; finalize applies the min-size filter", {
+  # CQQQQ shares no Hamming-1 neighbour with the others, so it is isolated.
+  seg <- hla_parse_ir_segments(
+    make_ir_list(c("CASSL", "CASSF", "CASST", "CWWWL", "CWWWF", "CQQQQ")),
+    "TRB"
+  )
+  raw <- hla_build_motif_graph_raw(seg)
+  expect_true(hla_motif_graph_ok(raw))
+  expect_equal(igraph::vcount(raw), 6L)
+  # Default finalize drops the isolated singleton (min size 2, no isolated).
+  g <- hla_finalize_motif_graph(raw, min_nodes = 2L, show_isolated = FALSE)
+  expect_true(hla_motif_graph_ok(g))
+  expect_equal(igraph::vcount(g), 5L)
+})
+
+test_that("split build matches the wrapper across thresholds", {
+  seg <- hla_parse_ir_segments(
+    make_ir_list(c("CASSL", "CASSF", "CASST", "CWWWL", "CWWWF")),
+    "TRB"
+  )
+  raw <- hla_build_motif_graph_raw(seg)
+  for (mn in 2:3) {
+    a <- hla_finalize_motif_graph(raw, min_nodes = mn)
+    b <- hla_build_motif_graph(seg, min_nodes = mn)
+    expect_setequal(igraph::V(a)$name, igraph::V(b)$name)
+    expect_equal(igraph::ecount(a), igraph::ecount(b))
+  }
+})
+
+test_that("raising the threshold keeps surviving clusters in place", {
+  # A size-3 cluster (length 6) and a size-2 cluster (length 5, a different
+  # bin). Raising min_nodes past 2 drops the small one; the big one's nodes must
+  # keep the exact coordinates they had -- that is the whole point of laying the
+  # core out once and only filtering afterwards.
+  seg <- hla_parse_ir_segments(
+    make_ir_list(c("CASSLL", "CASSFL", "CASSTL", "CWWWL", "CWWWF")),
+    "TRB"
+  )
+  raw <- hla_build_motif_graph_raw(seg)
+  g2 <- hla_finalize_motif_graph(raw, min_nodes = 2L)
+  g3 <- hla_finalize_motif_graph(raw, min_nodes = 3L)
+  common <- intersect(igraph::V(g2)$name, igraph::V(g3)$name)
+  expect_true(length(common) >= 3)
+  i2 <- match(common, igraph::V(g2)$name)
+  i3 <- match(common, igraph::V(g3)$name)
+  expect_equal(igraph::V(g2)$layout_x[i2], igraph::V(g3)$layout_x[i3])
+  expect_equal(igraph::V(g2)$layout_y[i2], igraph::V(g3)$layout_y[i3])
+})
+
 test_that("computing the layout leaves the caller's RNG stream alone", {
   # hla_motif_layout seeds itself so the picture is reproducible. Doing that
   # without restoring would re-seed the whole Shiny session from a render call:

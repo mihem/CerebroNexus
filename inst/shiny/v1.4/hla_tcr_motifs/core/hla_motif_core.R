@@ -665,6 +665,38 @@ hla_build_motif_graph <- function(
   context_col = NULL,
   context_summary = hla_context_summary
 ) {
+  # Thin wrapper over the two halves below, kept so existing callers and tests
+  # see one function with the full signature. The split matters for the Shiny
+  # layer, which caches the expensive raw build on the build parameters ALONE
+  # and re-runs only the cheap finalize when min_nodes / show_isolated change.
+  hla_finalize_motif_graph(
+    hla_build_motif_graph_raw(
+      seg,
+      by_v = by_v,
+      meta_cols = meta_cols,
+      context_col = context_col,
+      context_summary = context_summary
+    ),
+    min_nodes = min_nodes,
+    show_isolated = show_isolated
+  )
+}
+
+# The EXPENSIVE half. Builds the full motif graph -- every unique CDR3 as a
+# node, Hamming-distance-1 edges -- and lays out its connected core. The
+# per-length-bin distance matrix lives here, and this depends only on the
+# sequences and the build options (by_v / metadata / context), NOT on min_nodes
+# or show_isolated. Callers cache it on those build parameters alone, so sweeping
+# the minimum-size threshold never rebuilds the distance matrix. Returns an
+# igraph carrying ALL nodes (including isolated ones), NA with a "guard"
+# attribute when a size guard trips, or NULL when there is nothing to build.
+hla_build_motif_graph_raw <- function(
+  seg,
+  by_v = FALSE,
+  meta_cols = character(0),
+  context_col = NULL,
+  context_summary = hla_context_summary
+) {
   # A guard trip returns NA (not NULL) carrying a message attribute, because an
   # attribute cannot be set on NULL. Callers treat is.null() OR a "guard" attr
   # as "no graph"; hla_motif_graph_ok() below is the single predicate for that.
@@ -714,9 +746,6 @@ hla_build_motif_graph <- function(
   res <- hla_build_motif_groups(agg, by_v = by_v)
   edges <- res$edges
   has_edges <- !is.null(edges) && nrow(edges) > 0
-  if (!has_edges && !isTRUE(show_isolated)) {
-    return(NULL)
-  }
 
   vertices <- res$motif_df
   vertices$name <- vertices$node_id
@@ -731,7 +760,48 @@ hla_build_motif_graph <- function(
     vertices = vertices,
     directed = FALSE
   )
+  # Denominator for a node's clone-size fraction shown in tooltips.
+  g <- igraph::set_graph_attr(g, "total_cells", nrow(seg))
 
+  # Lay out the connected CORE (degree > 0) ONCE, here. That core is exactly the
+  # set the minimum-size threshold filters within: every survivor of any
+  # min_nodes >= 2 is one of these nodes. Computing the layout independently of
+  # the threshold lets finalize drop small clusters WITHOUT reshuffling the ones
+  # that remain. Isolated nodes get no coordinate here; finalize places them only
+  # if show_isolated keeps them. Coordinates travel WITH the graph so a colour
+  # change never re-arranges the network.
+  core_idx <- which(igraph::degree(g) > 0)
+  lx <- rep(NA_real_, igraph::vcount(g))
+  ly <- lx
+  if (length(core_idx) > 0) {
+    core <- igraph::induced_subgraph(g, igraph::V(g)[core_idx])
+    xy <- hla_motif_layout(core)
+    if (!is.null(xy)) {
+      lx[core_idx] <- xy[, 1]
+      ly[core_idx] <- xy[, 2]
+    }
+  }
+  igraph::V(g)$layout_x <- lx
+  igraph::V(g)$layout_y <- ly
+  g
+}
+
+# The CHEAP half. From the cached full graph, drop connected components smaller
+# than `min_nodes` (and, unless show_isolated, the isolated nodes), then relabel
+# clusters on what remains. Connected survivors keep the coordinates laid out
+# once on the full core, so raising the threshold removes small clusters without
+# moving the rest. Only nodes still missing a coordinate -- isolated nodes kept
+# by show_isolated -- are laid out, and only then. A guard/NULL raw passes
+# straight through.
+hla_finalize_motif_graph <- function(
+  raw,
+  min_nodes = 2L,
+  show_isolated = FALSE
+) {
+  if (!hla_motif_graph_ok(raw)) {
+    return(raw)
+  }
+  g <- raw
   if (!isTRUE(show_isolated)) {
     g <- igraph::induced_subgraph(g, igraph::V(g)[igraph::degree(g) > 0])
     if (igraph::vcount(g) == 0) {
@@ -754,17 +824,18 @@ hla_build_motif_graph <- function(
     return(NULL)
   }
   igraph::V(g)$cluster <- igraph::components(g)$membership
-  # Denominator for a node's clone-size fraction shown in tooltips.
-  g <- igraph::set_graph_attr(g, "total_cells", nrow(seg))
-  # Draw coordinates travel WITH the graph, deliberately. The layout is a
-  # function of the graph's structure alone, so it belongs to the thing the
-  # caller caches on the build parameters. Computing it at render time instead
-  # would redo it on every colour change — and, worse, a colour change would
-  # then be free to re-arrange the network, which is not a colour change.
-  xy <- hla_motif_layout(g)
-  if (!is.null(xy)) {
-    igraph::V(g)$layout_x <- xy[, 1]
-    igraph::V(g)$layout_y <- xy[, 2]
+  # Connected survivors already carry coordinates from the cached core layout;
+  # fill in only what is still missing (isolated nodes shown by show_isolated)
+  # rather than re-laying-out everything, which would move the clusters that did
+  # not change.
+  lx <- igraph::V(g)$layout_x
+  ly <- igraph::V(g)$layout_y
+  if (is.null(lx) || is.null(ly) || anyNA(lx) || anyNA(ly)) {
+    xy <- hla_motif_layout(g)
+    if (!is.null(xy)) {
+      igraph::V(g)$layout_x <- xy[, 1]
+      igraph::V(g)$layout_y <- xy[, 2]
+    }
   }
   g
 }

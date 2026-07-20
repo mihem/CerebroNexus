@@ -791,7 +791,7 @@ observe({
 ## ---- The motif graph (heavy; keyed on build parameters) --------------- ##
 ## Only build parameters (chain, min_nodes, split-by-V, show-isolated, scope)
 ## and the dataset re-trigger this; colour is applied downstream in the renderer.
-hla_build_graph_from <- function(seg) {
+hla_build_graph_raw_from <- function(seg) {
   if (!hla_has_deps() || is.null(seg) || nrow(seg) == 0) {
     return(NULL)
   }
@@ -806,30 +806,60 @@ hla_build_graph_from <- function(seg) {
     ctx_col <- if ("mhc_context" %in% colnames(seg)) "mhc_context" else NULL
     ctx_summary <- hla_context_summary
   }
-  hla_build_motif_graph(
+  # Builds the EXPENSIVE full graph only (distance matrix + core layout). The
+  # min_nodes / show_isolated filter is applied later by hla_finalize_motif_graph
+  # so that sweeping those never rebuilds this.
+  hla_build_motif_graph_raw(
     seg,
     by_v = isTRUE(hla_param("hla_by_v", hla_by_v_default())),
-    min_nodes = as.integer(hla_param("hla_min_nodes", hla_default_min_nodes())),
-    show_isolated = isTRUE(hla_param("hla_show_isolated", FALSE)),
     meta_cols = hla_node_meta_cols(),
     context_col = ctx_col,
     context_summary = ctx_summary
   )
 }
 
-## The gate lives in an UNCACHED wrapper, never inside the cached reactive: a
-## req() stop inside a bindCache body would be a value the cache is entitled to
-## store under the current key, and every later hit on that key would replay the
-## stop instead of building the graph. Keeping the two apart means the cached
-## reactive is only ever reached with real parameters, and every existing caller
-## of hla_motif_graph() is gated without knowing it.
-hla_motif_graph_cached <- reactive({
-  hla_build_graph_from(hla_scoped_segments())
+## Debounce the minimum-size slider. Dragging it emits a stream of intermediate
+## values; without this each one would trigger a finalize. Only the value the
+## slider settles on recomputes. show_isolated is a checkbox (one event), so it
+## needs no debounce.
+hla_min_nodes_debounced <- shiny::debounce(
+  reactive({
+    as.integer(hla_param("hla_min_nodes", hla_default_min_nodes()))
+  }),
+  millis = 250
+)
+
+## The EXPENSIVE half, cached on the BUILD parameters alone (chain, by_v,
+## metadata, scope, dataset) and NOT on min_nodes / show_isolated. Sweeping the
+## threshold therefore never rebuilds the Hamming distance matrix or the layout:
+## it reuses this cached full graph. The gate lives in an UNCACHED wrapper
+## (hla_motif_graph below), never inside a bindCache body, because a req() stop
+## there would be a value the cache stores under the current key and replays.
+hla_motif_graph_raw_cached <- reactive({
+  hla_build_graph_raw_from(hla_scoped_segments())
 }) %>%
   hla_bindCache(
     hla_active_chain(),
     hla_param("hla_by_v", hla_by_v_default()),
-    hla_param("hla_min_nodes", hla_default_min_nodes()),
+    paste(hla_node_meta_cols(), collapse = ","),
+    hla_scope_key(),
+    available_crb_files$selected
+  )
+
+## The CHEAP half: filter the cached full graph by minimum size / isolated and
+## relabel clusters. Cached on those two so returning to a value is instant; on a
+## new value the raw build above is a cache hit and only this cheap step runs.
+hla_motif_graph_cached <- reactive({
+  hla_finalize_motif_graph(
+    hla_motif_graph_raw_cached(),
+    min_nodes = hla_min_nodes_debounced(),
+    show_isolated = isTRUE(hla_param("hla_show_isolated", FALSE))
+  )
+}) %>%
+  hla_bindCache(
+    hla_active_chain(),
+    hla_param("hla_by_v", hla_by_v_default()),
+    hla_min_nodes_debounced(),
     hla_param("hla_show_isolated", FALSE),
     paste(hla_node_meta_cols(), collapse = ","),
     hla_scope_key(),
@@ -862,16 +892,36 @@ hla_motif_graph <- reactive({
 ## Same split as hla_motif_graph above, and for the same reason: the gate must
 ## stay outside the cache. Associations reads this, so without the gate the page
 ## would build the allele-independent graph on the fallback parameters too.
-hla_global_motif_graph_cached <- reactive({
+## The scope decision — build from UNSCOPED segments unless the scope is already
+## "all" (where the drawn graph is allele-independent and is reused) — lives on
+## the RAW build, so it is the raw graph that stays allele-independent. Cached on
+## the build parameters alone, mirroring hla_motif_graph_raw_cached.
+hla_global_motif_graph_raw_cached <- reactive({
   if (identical(hla_scope_mode(), "all")) {
-    return(hla_motif_graph_cached())
+    return(hla_motif_graph_raw_cached())
   }
-  hla_build_graph_from(hla_segments())
+  hla_build_graph_raw_from(hla_segments())
 }) %>%
   hla_bindCache(
     hla_active_chain(),
     hla_param("hla_by_v", hla_by_v_default()),
-    hla_param("hla_min_nodes", hla_default_min_nodes()),
+    paste(hla_node_meta_cols(), collapse = ","),
+    "all",
+    available_crb_files$selected
+  )
+
+## Filtered to the same minimum size / isolated rule as the drawn graph.
+hla_global_motif_graph_cached <- reactive({
+  hla_finalize_motif_graph(
+    hla_global_motif_graph_raw_cached(),
+    min_nodes = hla_min_nodes_debounced(),
+    show_isolated = isTRUE(hla_param("hla_show_isolated", FALSE))
+  )
+}) %>%
+  hla_bindCache(
+    hla_active_chain(),
+    hla_param("hla_by_v", hla_by_v_default()),
+    hla_min_nodes_debounced(),
     hla_param("hla_show_isolated", FALSE),
     paste(hla_node_meta_cols(), collapse = ","),
     "all",
