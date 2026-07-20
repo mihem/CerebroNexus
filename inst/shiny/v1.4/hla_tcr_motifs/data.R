@@ -464,13 +464,20 @@ hla_node_meta_cols <- reactive({
   # `sample` is always carried: every HLA join on this page is by sample, and
   # hla_ir_annotated() guarantees the column from the repertoire's own list
   # names. The lineage column comes from hla_celltype_col(), which finds it in
-  # the data rather than assuming what it is called. The colour choice is added
-  # on top and is necessarily one of the declared groupings.
+  # the data rather than assuming what it is called.
+  #
+  # EVERY colourable column is carried, not just the one currently selected. The
+  # graph is cached on this set, so making it independent of hla_color_by means a
+  # colour switch never re-keys the cache: the column is already on the node, and
+  # the renderer recolours it in place instead of rebuilding (see the
+  # visNetworkProxy observer in visualizations.R).
   ct <- hla_celltype_col()
-  base <- c("sample", if (!is.na(ct)) ct else character(0))
-  cb <- hla_param("hla_color_by", "")
-  extra <- if (nzchar(cb) && cb %in% hla_color_meta_cols()) cb else character(0)
-  unique(intersect(c(base, extra), hla_available_cols()))
+  cols <- c(
+    "sample",
+    if (!is.na(ct)) ct else character(0),
+    hla_color_meta_cols()
+  )
+  unique(intersect(cols, hla_available_cols()))
 })
 
 ## ---- Colour-by choices (scope-aware) ---------------------------------- ##
@@ -764,6 +771,21 @@ hla_params_ready <- reactive({
     return(FALSE)
   }
   TRUE
+})
+
+## ---- One-way readiness latch ------------------------------------------ ##
+## hla_params_ready() reads input$hla_color_by (to wait for it to register), so
+## it invalidates on EVERY colour change even though its answer stays TRUE. The
+## renderer must not re-run on a colour change, so it gates on this latch
+## instead: it flips FALSE -> TRUE once params are ready and, being a
+## reactiveVal, never notifies its readers again when set to the value it already
+## holds. Structure changes reach the renderer through hla_motif_graph_cached(),
+## not through here.
+hla_ready_latch <- reactiveVal(FALSE)
+observe({
+  if (isTRUE(hla_params_ready())) {
+    hla_ready_latch(TRUE)
+  }
 })
 
 ## ---- The motif graph (heavy; keyed on build parameters) --------------- ##

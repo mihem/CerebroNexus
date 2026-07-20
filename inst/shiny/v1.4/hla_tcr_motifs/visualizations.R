@@ -452,7 +452,14 @@ hla_visnet <- reactive({
 })
 
 output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
-  vn <- hla_visnet()
+  # Re-render only on a STRUCTURE change. Gate on the readiness latch rather than
+  # the colour-reading hla_params_ready() gate, depend on the cached graph for
+  # structure, and read the coloured visnet ISOLATED so a colour-only change does
+  # NOT re-render -- no spinner, no re-fit, no flash. That path recolours the
+  # existing network in place via the visNetworkProxy observer below.
+  req(hla_ready_latch())
+  hla_motif_graph_cached()
+  vn <- isolate(hla_visnet())
   if (is.null(vn)) {
     return(NULL)
   }
@@ -488,6 +495,7 @@ output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
       net,
       layout = "layout.norm",
       layoutMatrix = vn$layout,
+      type = "full",
       physics = FALSE
     )
   } else {
@@ -504,10 +512,12 @@ output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
     hover = TRUE,
     tooltipDelay = 100,
     # visNetwork's own green navigation buttons clash with the app's plotly
-    # modebar. Turn them off and keep scroll-to-zoom + drag-to-pan (plotly's core
-    # interaction); a matching modebar is drawn over the plot by www/hla_motifs.js.
+    # modebar; turn them off and let a matching modebar (www/hla_motifs.js) drive
+    # zoom via its buttons. Drag-to-pan stays on; zoom-by-scroll is off (below).
     navigationButtons = FALSE,
-    zoomView = TRUE,
+    # Zoom is button-only: scroll-to-zoom would let the graph shrink into empty
+    # canvas past the opening fit. Pan (drag) stays on.
+    zoomView = FALSE,
     dragView = TRUE
   )
   net <- visNetwork::visEvents(
@@ -517,12 +527,54 @@ output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
     ),
     deselectNode = htmlwidgets::JS(
       "function() { Shiny.setInputValue('hla_selected_node_id', null, {priority: 'event'}); }"
+    ),
+    # The opening view (igraph coords, fitted to the canvas) is the smallest the
+    # network may get. Zoom is button-only (zoomView = FALSE), so the floor is
+    # enforced by www/hla_motifs.js's zoom-out button; here we just capture that
+    # floor and grey the button out once the network sits at it. vis-network
+    # binds `this` to the emitter, not the network, so the instance is looked up
+    # via HTMLWidgets (the same handle www/hla_motifs.js uses).
+    afterDrawing = htmlwidgets::JS(
+      "function() {",
+      "  var w = HTMLWidgets.find('#hla_plot_motifNetwork');",
+      "  var net = w && w.network; if (!net) { return; }",
+      "  var s = net.getScale();",
+      "  if (!(s > 0)) { return; }",
+      # The opening fit settles over a few draws (scale keeps shrinking to fit
+      # the graph), so track the smallest scale seen rather than the first: that
+      # converges to the true fit floor. Zoom-IN only raises it, never lowers.
+      "  net.hlaMinScale = (net.hlaMinScale == null)",
+      "    ? s : Math.min(net.hlaMinScale, s);",
+      # Grey the zoom-out button when the network is already at that floor.
+      "  var b = document.querySelector('#hla-modebar [data-act=\"zoomout\"]');",
+      "  if (b) { b.classList.toggle('hla-mb-btn--off', s <= net.hlaMinScale + 1e-6); }",
+      "}"
     )
   )
   # No visLegend: it can only sit left or right, it cannot wrap, and it eats 15%
   # of the canvas width. The legend is drawn above the plot as flowing HTML
   # instead (output$hla_legend_ui), which wraps to as many rows as it needs.
   net
+})
+
+## ---- Recolour in place ------------------------------------------------ ##
+## When only the colour layer changes (colour-by, the allele under the "all"
+## scope, or the legend mode), the graph is identical -- every node carries every
+## colourable column -- so push the new node colours and tooltips onto the
+## existing network via a proxy instead of re-rendering it. This is what makes a
+## colour switch instant: no spinner, no re-fit, no flash. Structure changes go
+## through the renderer above (which rebuilds); ignoreInit skips the first fire,
+## which the initial render already painted.
+observeEvent(hla_visnet(), ignoreInit = TRUE, {
+  vn <- hla_visnet()
+  if (is.null(vn)) {
+    return()
+  }
+  proxy <- visNetwork::visNetworkProxy("hla_plot_motifNetwork")
+  visNetwork::visUpdateNodes(
+    proxy,
+    nodes = vn$nodes[, c("id", "color", "title")]
+  )
 })
 
 ## ---- Stable details for the selected node ----------------------------- ##

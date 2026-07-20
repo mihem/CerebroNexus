@@ -4,8 +4,9 @@
  * visNetwork's own green navigation buttons clash with the app's plotly modebar,
  * so they are turned off (hla_tcr_motifs/visualizations.R) and replaced here by a
  * toolbar with the same plotly icons and top-right placement, wired to the
- * vis.Network API. Zoom / pan by scroll + drag stay on (plotly's core
- * interaction); the buttons add zoom in / out, reset (fit), and PNG export.
+ * vis.Network API. Drag-to-pan stays on; zoom is button-only (scroll-to-zoom is
+ * off in visualizations.R, so the graph cannot shrink past the opening fit). The
+ * buttons do zoom in / out, reset (fit), and PNG export.
  *
  * The network re-renders whenever a parameter changes (a new vis.Network
  * instance), so each button looks the instance up fresh via HTMLWidgets rather
@@ -36,8 +37,11 @@
   function zoomBy(f) {
     var n = net();
     if (!n || typeof n.getScale !== "function") return;
+    // The initial fit is the floor (set by visEvents in visualizations.R): the
+    // zoom-out button can only return to it, never below.
+    var lo = (typeof n.hlaMinScale === "number") ? n.hlaMinScale : 0.02;
     n.moveTo({
-      scale: Math.max(0.02, Math.min(6, n.getScale() * f)),
+      scale: Math.max(lo, Math.min(6, n.getScale() * f)),
       animation: { duration: 200 }
     });
   }

@@ -28,6 +28,15 @@
    custom.css makes `.cerebro-fill` a flex column whose child fills it, so the
    output (and any spinner wrapper between) inherits the measured height without
    needing its own resolved-height chain.
+
+   TWO ENGINES, ON PURPOSE (why a fill page and a projection scatter can differ
+   by a few dozen px on the same screen): the projection scatter pages were never
+   migrated here -- they keep projectionTargetHeight in projection_scatter.js.
+   Both use the SAME formula (viewport - top - contentBelow - gap), but this
+   file's contentBelow() also reserves the content-wrapper's bottom padding,
+   which projection_scatter's does not. So e.g. the HLA network (a fill page)
+   sits slightly shorter than the projection scatter. That is the two engines,
+   not a bug; unifying them touches every viz page and is deliberately deferred.
    ========================================================================== */
 (function () {
   "use strict";

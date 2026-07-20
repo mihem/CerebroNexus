@@ -69,24 +69,31 @@ tab_hla_tcr_motifs <- tabItem(
           tabPanel(
             "Motif Network",
             br(),
-            uiOutput("hla_legend_ui"),
-            # Fill the viewport instead of a hardcoded 640px: the wrapper is
-            # sized to (viewport - its live top - a bottom gap) by fill_height.js,
-            # and the network renders at height:100% inside it. The legend above
-            # is a sibling, so when it wraps the wrapper's top moves and the
-            # height re-measures itself. See www/fill_height.js + .cerebro-fill.
-            # A modebar matching the app's plotly one is drawn top-right over the
-            # network by www/hla_motifs.js (visNetwork's own green nav buttons are
-            # turned off in visualizations.R for consistency).
+            # The legend and the network share one positioning context so the
+            # modebar can float at its top-right: it lands on the legend's row
+            # when a legend is shown (reclaiming that otherwise-empty right side),
+            # and at the plot's top-right when the legend is hidden (the legend
+            # collapses to zero height). A modebar matching the app's plotly one
+            # is drawn by www/hla_motifs.js (visNetwork's own green nav buttons
+            # are turned off in visualizations.R for consistency).
             tags$div(
-              class = "hla-plot-wrap",
+              class = "hla-motif-tab",
               tags$div(class = "hla-modebar", id = "hla-modebar"),
+              uiOutput("hla_legend_ui"),
+              # Fill the viewport instead of a hardcoded 640px: the wrapper is
+              # sized to (viewport - its live top - a bottom gap) by
+              # fill_height.js, and the network renders at height:100% inside it.
+              # The legend above is a sibling, so when it wraps the wrapper's top
+              # moves and the height re-measures itself. See www/fill_height.js.
               tags$div(
-                class = "cerebro-fill",
-                shinycssloaders::withSpinner(
-                  visNetwork::visNetworkOutput(
-                    "hla_plot_motifNetwork",
-                    height = "100%"
+                class = "hla-plot-wrap",
+                tags$div(
+                  class = "cerebro-fill",
+                  shinycssloaders::withSpinner(
+                    visNetwork::visNetworkOutput(
+                      "hla_plot_motifNetwork",
+                      height = "100%"
+                    )
                   )
                 )
               )

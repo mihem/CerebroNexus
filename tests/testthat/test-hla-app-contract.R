@@ -1143,6 +1143,62 @@ test_that("the network table renders and downloads the current view", {
   )
 })
 
+test_that("the motif network cannot zoom out below its initial fit", {
+  vis_src <- paste(
+    readLines(
+      hla_inst_file("shiny/v1.4/hla_tcr_motifs/visualizations.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  js_src <- paste(
+    readLines(hla_inst_file("shiny/v1.4/www/hla_motifs.js"), warn = FALSE),
+    collapse = "\n"
+  )
+  # zoom is button-only -- scroll/pinch zoom is off, so nothing shrinks the
+  # network past the opening fit
+  expect_match(vis_src, "zoomView = FALSE", perl = TRUE)
+  # the render captures the initial (fit) scale as the floor and greys the
+  # zoom-out button out once the network sits at it
+  expect_match(vis_src, "hlaMinScale", perl = TRUE)
+  expect_match(vis_src, "hla-mb-btn--off", perl = TRUE)
+  # the modebar zoom-out button respects the same floor
+  expect_match(js_src, "hlaMinScale", perl = TRUE)
+  # the layout fills the whole (wide) plot area, not a centred square
+  expect_match(vis_src, "type = \"full\"", perl = TRUE)
+})
+
+test_that("a colour change recolours in place, without re-rendering", {
+  data_src <- paste(
+    readLines(hla_inst_file("shiny/v1.4/hla_tcr_motifs/data.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  vis_src <- paste(
+    readLines(
+      hla_inst_file("shiny/v1.4/hla_tcr_motifs/visualizations.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  # (d) the nodes carry EVERY colourable column, so a colour switch never re-keys
+  # the graph cache -- the column is already on the node.
+  expect_match(
+    data_src,
+    "hla_node_meta_cols <- reactive\\(\\{[\\s\\S]{0,900}hla_color_meta_cols\\(\\)",
+    perl = TRUE
+  )
+  # (a) a one-way readiness latch, so the renderer does not depend on the
+  # colour-reading hla_params_ready() gate.
+  expect_match(data_src, "hla_ready_latch <- reactiveVal\\(", perl = TRUE)
+  # (b) the renderer gates on the latch and reads the coloured visnet ISOLATED,
+  # so a colour change does not invalidate it.
+  expect_match(vis_src, "req\\(hla_ready_latch\\(\\)\\)", perl = TRUE)
+  expect_match(vis_src, "isolate\\(hla_visnet\\(\\)\\)", perl = TRUE)
+  # (c) colour is pushed onto the existing network in place via a proxy.
+  expect_match(vis_src, "visNetworkProxy\\(", perl = TRUE)
+  expect_match(vis_src, "visUpdateNodes\\(", perl = TRUE)
+})
+
 test_that("the network table is nowrap-scrollable and truncates samples on hover", {
   src <- paste(
     readLines(
