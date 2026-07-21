@@ -9,9 +9,14 @@
 ## reactives, so the table cannot drift from the graph.
 ##----------------------------------------------------------------------------##
 
-## Desired columns -> display names, per grain. Columns absent from a given
-## dataset/scope are dropped (intersect with what the data actually carries),
-## the same defensive pattern as hla_node_meta_cols().
+## STRUCTURAL columns -> display names, per grain: the ones this page computes
+## itself, which every data set has in common. What a data set means -- its own
+## annotations -- is NOT listed here; it is carried dynamically by
+## hla_network_table_meta_cols() below, so a demo whose point is a per-cell
+## antigen or presenting allele shows those columns without this file naming
+## them. Columns absent from a given dataset/scope are dropped (intersect with
+## what the data actually carries), the same defensive pattern as
+## hla_node_meta_cols().
 HLA_NETWORK_TABLE_NODE_COLS <- c(
   cdr3 = "CDR3",
   v_gene = "V",
@@ -21,20 +26,37 @@ HLA_NETWORK_TABLE_NODE_COLS <- c(
   clone_count = "observations",
   cluster = "motif cluster",
   pair_allele = "allele side",
-  mhc_context = "MHC context",
+  mhc_context = "MHC context"
+)
+## Appended after the declared metadata, so the wide "samples" list stays at the
+## right edge of the table rather than pushing the annotations off screen.
+HLA_NETWORK_TABLE_NODE_TAIL_COLS <- c(
   samples_all = "samples",
   sample_origin = "sample origin"
 )
 HLA_NETWORK_TABLE_CELL_COLS <- c(
   sample = "sample",
-  cell_type = "cell_type",
-  cell_type_fine = "cell_type_fine",
   cdr3 = "CDR3",
   v_gene = "V",
   j_gene = "J",
   pair_allele = "allele side",
   mhc_context = "MHC context"
 )
+
+## The data set's OWN annotations, in the object's declared order. This is the
+## same set the network already carries onto its nodes and colours by
+## (hla_node_meta_cols()), so the table shows exactly what the picture can show,
+## and a new annotation column needs no change here.
+##
+## `sample` is excluded because both grains already report it: the node grain
+## through `samples_all` / `sample_origin`, the cell grain as a structural
+## column. The per-column `_dist` companions the aggregation adds are left out
+## too -- they are packed distribution strings meant for tooltips, not cells in
+## a table.
+hla_network_table_meta_cols <- reactive({
+  cols <- setdiff(hla_node_meta_cols(), "sample")
+  stats::setNames(cols, cols)
+})
 
 hla_network_table_grain <- reactive({
   g <- input$hla_table_grain
@@ -106,15 +128,22 @@ hla_network_table_data <- reactive({
       seg$cdr3
     }
     df <- seg[seg_key %in% igraph::V(g)$name, , drop = FALSE]
-    map <- HLA_NETWORK_TABLE_CELL_COLS
+    map <- c(HLA_NETWORK_TABLE_CELL_COLS, hla_network_table_meta_cols())
   } else {
     df <- igraph::as_data_frame(g, what = "vertices")
-    map <- HLA_NETWORK_TABLE_NODE_COLS
+    map <- c(
+      HLA_NETWORK_TABLE_NODE_COLS,
+      hla_network_table_meta_cols(),
+      HLA_NETWORK_TABLE_NODE_TAIL_COLS
+    )
     # clone_count counts whatever the data set declares as its observation unit.
     # Hard-coding "cells" mislabels a bulk repertoire, whose rows are analysis
     # units, not cells -- the same reason hla_unit_noun() exists.
     map[["clone_count"]] <- getObservationUnit()$plural
   }
+  # A declared annotation that collides with a structural name (a `cdr3` column
+  # in the metadata, say) must not produce two columns of the same name.
+  map <- map[!duplicated(names(map))]
   if (is.null(df) || nrow(df) == 0) {
     return(NULL)
   }

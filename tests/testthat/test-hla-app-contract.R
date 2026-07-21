@@ -1192,6 +1192,46 @@ test_that("the network table reads the graph and the segments, not the render ca
   expect_match(server_src, "network_table\\.R", perl = TRUE)
 })
 
+test_that("the network table carries the data set's own annotations", {
+  # A fixed column whitelist showed only what this file happened to name, so a
+  # demo whose whole point is a per-cell antigen / presenting allele had those
+  # columns silently dropped -- while the vignette said the table contained
+  # them. Both grains must append the DECLARED metadata columns, which is the
+  # same set the network already colours by, so a new annotation column needs
+  # no edit here.
+  src <- paste(
+    readLines(
+      hla_inst_file("shiny/v1.4/hla_tcr_motifs/network_table.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  expect_match(
+    src,
+    "hla_network_table_meta_cols <- reactive\\([\\s\\S]{0,200}hla_node_meta_cols\\(\\)",
+    perl = TRUE
+  )
+  # both grains, not just the node view
+  expect_match(
+    src,
+    "HLA_NETWORK_TABLE_CELL_COLS,[\\s\\S]{0,40}hla_network_table_meta_cols\\(\\)",
+    perl = TRUE
+  )
+  expect_match(
+    src,
+    "HLA_NETWORK_TABLE_NODE_COLS,[\\s\\S]{0,40}hla_network_table_meta_cols\\(\\)",
+    perl = TRUE
+  )
+  # the annotations must not be able to duplicate a structural column
+  expect_match(src, "!duplicated\\(names\\(map\\)\\)", perl = TRUE)
+  # the wide sample list stays at the right edge, after the annotations
+  expect_match(
+    src,
+    "hla_network_table_meta_cols\\(\\),[\\s\\S]{0,60}HLA_NETWORK_TABLE_NODE_TAIL_COLS",
+    perl = TRUE
+  )
+})
+
 test_that("the network table renders and downloads the current view", {
   src <- paste(
     readLines(
