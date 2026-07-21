@@ -1072,11 +1072,30 @@ test_that("the Network data tab exposes grain radio, table and download", {
     collapse = "\n"
   )
   expect_match(ui_src, "tabPanel\\([\\s\\S]{0,40}\"Network data\"", perl = TRUE)
+  # The grain radio is rendered SERVER-side so its second label can follow the
+  # declared observation unit: a bulk repertoire's rows are analysis units, not
+  # cells. UI.R only carries the placeholder.
   expect_match(
     ui_src,
+    "uiOutput\\([\\s\\S]{0,20}\"hla_table_grain_ui\"",
+    perl = TRUE
+  )
+  tbl_src <- paste(
+    readLines(
+      hla_inst_file("shiny/v1.4/hla_tcr_motifs/network_table.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  expect_match(
+    tbl_src,
     "radioButtons\\([\\s\\S]{0,40}\"hla_table_grain\"",
     perl = TRUE
   )
+  # both the row label and the count column come from the declared unit
+  expect_match(tbl_src, "getObservationUnit\\(\\)\\$singular", perl = TRUE)
+  expect_match(tbl_src, "getObservationUnit\\(\\)\\$plural", perl = TRUE)
+  expect_no_match(tbl_src, "clone_count = \"cells\"", fixed = TRUE)
   expect_match(
     ui_src,
     "dataTableOutput\\([\\s\\S]{0,20}\"hla_network_table\"",
@@ -1218,5 +1237,34 @@ test_that("the network table is nowrap-scrollable and truncates samples on hover
   # the multi-value samples column is truncated to the first value in DISPLAY
   # only (a DataTables render), so search / sort / CSV keep the full list
   expect_match(src, "columnDefs", perl = TRUE)
-  expect_match(src, "parts\\[0\\]", perl = TRUE)
+  expect_match(src, "split\\(','\\)\\[0\\]", perl = TRUE)
+})
+
+test_that("the samples column cannot inject HTML", {
+  # DataTables escaping is deliberately OFF for the samples column so the render
+  # can emit a <span>. A sample name is arbitrary .crb data, so if the cell were
+  # assembled by string concatenation a value like
+  #   <img src=x onerror=alert(document.domain)>
+  # would run in the app's origin. The render must therefore build DOM nodes and
+  # let the browser escape both the text and the title attribute.
+  src <- paste(
+    readLines(
+      hla_inst_file("shiny/v1.4/hla_tcr_motifs/network_table.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  # built as DOM, escaped by the browser
+  expect_match(src, "document\\.createElement\\('span'\\)", perl = TRUE)
+  expect_match(src, "\\.textContent =", perl = TRUE)
+  expect_match(src, "\\.title = full", perl = TRUE)
+  expect_match(src, "return span\\.outerHTML", perl = TRUE)
+  # and NOT by pasting the value into an HTML string, in either branch
+  expect_no_match(src, "'<span title=", fixed = TRUE)
+  expect_no_match(src, "&quot;", fixed = TRUE)
+  expect_no_match(
+    src,
+    "if \\(parts\\.length <= 1\\) \\{ return data; \\}",
+    perl = TRUE
+  )
 })

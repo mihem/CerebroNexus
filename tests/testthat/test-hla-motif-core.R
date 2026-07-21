@@ -343,6 +343,31 @@ test_that("raising the threshold keeps surviving clusters in place", {
   expect_equal(igraph::V(g2)$layout_y[i2], igraph::V(g3)$layout_y[i3])
 })
 
+test_that("positions also hold when isolated CDR3s are shown", {
+  # Same graph plus an isolated CDR3 (CQQQQQ shares no Hamming-1 neighbour).
+  # Keeping it on screen must not re-run the layout: filling in the isolate has
+  # to leave every connected survivor on the exact coordinates it already had.
+  seg <- hla_parse_ir_segments(
+    make_ir_list(c("CASSLL", "CASSFL", "CASSTL", "CWWWL", "CWWWF", "CQQQQQ")),
+    "TRB"
+  )
+  raw <- hla_build_motif_graph_raw(seg)
+  g2 <- hla_finalize_motif_graph(raw, min_nodes = 2L, show_isolated = TRUE)
+  g3 <- hla_finalize_motif_graph(raw, min_nodes = 3L, show_isolated = TRUE)
+  # size-3 cluster + size-2 cluster + the isolate, then the size-2 one drops out
+  expect_equal(igraph::vcount(g2), 6L)
+  expect_equal(igraph::vcount(g3), 4L)
+  # every shown node has a coordinate, including the isolate
+  expect_false(anyNA(igraph::V(g2)$layout_x))
+  expect_false(anyNA(igraph::V(g3)$layout_x))
+  common <- intersect(igraph::V(g2)$name, igraph::V(g3)$name)
+  expect_equal(length(common), 4L)
+  i2 <- match(common, igraph::V(g2)$name)
+  i3 <- match(common, igraph::V(g3)$name)
+  expect_equal(igraph::V(g2)$layout_x[i2], igraph::V(g3)$layout_x[i3])
+  expect_equal(igraph::V(g2)$layout_y[i2], igraph::V(g3)$layout_y[i3])
+})
+
 test_that("computing the layout leaves the caller's RNG stream alone", {
   # hla_motif_layout seeds itself so the picture is reproducible. Doing that
   # without restoring would re-seed the whole Shiny session from a render call:

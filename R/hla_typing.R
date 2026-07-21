@@ -450,12 +450,25 @@ hla_validate_typing <- function(typing) {
   # locus can never contradict its allele.
   out$locus <- vapply(out$allele, hla_allele_locus, character(1))
   out$resolution <- vapply(out$allele, hla_allele_resolution, character(1))
+  # Any of these can arrive as a FACTOR (a stringsAsFactors frame, or a
+  # read.csv import). Everything below must therefore go through character
+  # first: as.integer() on a factor returns the level INDEX, not the value, so
+  # copy "2" could silently become 1; and assigning a string into a factor
+  # column that has no such level yields NA, so an invalid provenance would
+  # vanish instead of becoming "unknown".
+  for (col in c("sample", "donor_id", "typing_method", "source_reference")) {
+    out[[col]] <- as.character(out[[col]])
+  }
+  if (is.factor(out$confidence)) {
+    out$confidence <- suppressWarnings(as.numeric(as.character(out$confidence)))
+  }
   # A diploid locus has copies 1 and 2; anything else is unknown, not kept as a
   # bogus copy id.
-  out$copy <- suppressWarnings(as.integer(out$copy))
+  out$copy <- suppressWarnings(as.integer(as.character(out$copy)))
   out$copy[!out$copy %in% c(1L, 2L)] <- NA_integer_
   # Provenance must be one of the declared source types; unknown/NA is treated
   # as "unknown" rather than silently accepted as evidence.
+  out$source_type <- as.character(out$source_type)
   out$source_type[
     is.na(out$source_type) | !out$source_type %in% HLA_SOURCE_TYPES
   ] <- "unknown"

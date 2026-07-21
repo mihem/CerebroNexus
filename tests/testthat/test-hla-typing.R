@@ -401,3 +401,35 @@ test_that("carrier summary is empty, not an error, when no sample matches", {
   expect_true(is.data.frame(summ))
   expect_equal(nrow(summ), 0L)
 })
+
+test_that("validation survives factor-valued canonical columns", {
+  # A factor's integer code is its LEVEL INDEX, not its value: with levels
+  # c("2", "1") the value "2" has code 1, so as.integer() on the factor would
+  # silently turn copy 2 into 1. And "unknown" cannot be assigned into a factor
+  # that has no such level -- it becomes NA, so an invalid provenance would
+  # vanish instead of being downgraded. Both must go through character first.
+  tbl <- data.frame(
+    sample = factor(c("s1", "s2")),
+    donor_id = factor(c("d1", "d2")),
+    locus = c("A", "A"),
+    copy = factor(c("2", "1"), levels = c("2", "1")),
+    allele = c("HLA-A*02:01", "HLA-A*01:01"),
+    resolution = c("two-field", "two-field"),
+    source_type = factor(c("genotyped", "not-a-source-type")),
+    typing_method = factor(c("m", "m")),
+    source_reference = factor(c("r", "r")),
+    confidence = c(1, 1),
+    stringsAsFactors = FALSE
+  )
+  out <- hla_validate_typing(tbl)
+  expect_true(hla_is_typing_table(out))
+  # the VALUES, not the level codes
+  expect_equal(out$copy, c(2L, 1L))
+  # downgraded to "unknown", not silently NA
+  expect_equal(out$source_type, c("genotyped", "unknown"))
+  # canonical table is character-typed, whatever came in
+  expect_true(is.character(out$sample))
+  expect_true(is.character(out$donor_id))
+  expect_true(is.character(out$typing_method))
+  expect_true(is.character(out$source_reference))
+})

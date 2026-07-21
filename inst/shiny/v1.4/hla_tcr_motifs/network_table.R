@@ -16,7 +16,9 @@ HLA_NETWORK_TABLE_NODE_COLS <- c(
   cdr3 = "CDR3",
   v_gene = "V",
   j_gene = "J",
-  clone_count = "cells",
+  # Replaced per data set with the declared observation unit (see below); never
+  # hard-coded to "cells", which is wrong for a bulk repertoire.
+  clone_count = "observations",
   cluster = "motif cluster",
   pair_allele = "allele side",
   mhc_context = "MHC context",
@@ -37,6 +39,41 @@ HLA_NETWORK_TABLE_CELL_COLS <- c(
 hla_network_table_grain <- reactive({
   g <- input$hla_table_grain
   if (is.null(g) || !nzchar(g)) "node" else g
+})
+
+## The grain picker lives here, not in UI.R, because the second grain is one row
+## per OBSERVATION UNIT -- a cell only when the data set declares it so. For the
+## bulk repertoire those rows are analysis units, and calling them cells would
+## contradict the unit noun used everywhere else on the page. The stored VALUE
+## stays "cell" so the reactives and the CSV name are unchanged; only the label
+## follows the declared unit.
+output$hla_table_grain_ui <- renderUI({
+  unit <- getObservationUnit()$singular
+  tagList(
+    radioButtons(
+      "hla_table_grain",
+      "Rows:",
+      choices = stats::setNames(
+        c("node", "cell"),
+        c("By motif (node)", paste0("By ", unit))
+      ),
+      selected = isolate(hla_network_table_grain()),
+      inline = TRUE
+    ),
+    tags$p(
+      class = "text-muted",
+      style = "font-size: 12px;",
+      sprintf(
+        paste(
+          "The rows behind the network shown on Motif Network, under the",
+          "current chain / scope / allele / min-size filters. 'By motif' is",
+          "one row per CDR3 node; 'By %s' is one row per %s."
+        ),
+        unit,
+        unit
+      )
+    )
+  )
 })
 
 ## The data frame currently shown, already column-selected and renamed. NULL
@@ -73,6 +110,10 @@ hla_network_table_data <- reactive({
   } else {
     df <- igraph::as_data_frame(g, what = "vertices")
     map <- HLA_NETWORK_TABLE_NODE_COLS
+    # clone_count counts whatever the data set declares as its observation unit.
+    # Hard-coding "cells" mislabels a bulk repertoire, whose rows are analysis
+    # units, not cells -- the same reason hla_unit_noun() exists.
+    map[["clone_count"]] <- getObservationUnit()$plural
   }
   if (is.null(df) || nrow(df) == 0) {
     return(NULL)
@@ -95,6 +136,13 @@ output$hla_network_table <- DT::renderDataTable({
   # DataTables type, so search / sort and the CSV export keep the full list.
   # Only that column is left un-escaped (it emits a <span>); every other column
   # stays HTML-escaped.
+  #
+  # Because DataTables escaping is off for this column, the cell is built as DOM
+  # nodes and never by string concatenation. A sample name is arbitrary data
+  # coming from the .crb, so a value like `<img src=x onerror=...>` pasted into
+  # an HTML string would execute in the app's origin. Assigning to .textContent
+  # and .title makes the browser escape both the text and the attribute for us,
+  # which is why outerHTML is safe to return here.
   s_idx <- which(colnames(df) == "samples")
   col_defs <- list()
   escape_cols <- seq_len(ncol(df))
@@ -105,11 +153,15 @@ output$hla_network_table <- DT::renderDataTable({
       render = DT::JS(
         "function(data, type, row) {",
         "  if (type !== 'display' || data === null) { return data; }",
-        "  var parts = String(data).split(',');",
-        "  if (parts.length <= 1) { return data; }",
-        "  var full = String(data).replace(/\"/g, '&quot;');",
-        "  return '<span title=\"' + full + '\">' +",
-        "    parts[0] + '\\u2026</span>';",
+        "  var full = String(data);",
+        "  var span = document.createElement('span');",
+        "  if (full.indexOf(',') === -1) {",
+        "    span.textContent = full;",
+        "  } else {",
+        "    span.title = full;",
+        "    span.textContent = full.split(',')[0] + '\\u2026';",
+        "  }",
+        "  return span.outerHTML;",
         "}"
       )
     ))

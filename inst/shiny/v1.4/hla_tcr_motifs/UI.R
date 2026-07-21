@@ -111,25 +111,11 @@ tab_hla_tcr_motifs <- tabItem(
           tabPanel(
             "Network data",
             br(),
-            radioButtons(
-              "hla_table_grain",
-              "Rows:",
-              choices = c(
-                "By motif (node)" = "node",
-                "By cell" = "cell"
-              ),
-              selected = "node",
-              inline = TRUE
-            ),
-            tags$p(
-              class = "text-muted",
-              style = "font-size: 12px;",
-              paste(
-                "The rows behind the network shown on Motif Network, under the",
-                "current chain / scope / allele / min-size filters. 'By motif' is",
-                "one row per CDR3 node; 'By cell' is one row per cell."
-              )
-            ),
+            # Rendered server-side: the second grain is one row per OBSERVATION
+            # UNIT, which is a cell only when the data set says so. A bulk
+            # repertoire's rows are analysis units, so the label has to follow
+            # the declared unit rather than being hard-coded here.
+            uiOutput("hla_table_grain_ui"),
             DT::dataTableOutput("hla_network_table"),
             br(),
             downloadButton(

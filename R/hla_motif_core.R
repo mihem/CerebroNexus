@@ -767,9 +767,8 @@ hla_build_motif_graph_raw <- function(
   # set the minimum-size threshold filters within: every survivor of any
   # min_nodes >= 2 is one of these nodes. Computing the layout independently of
   # the threshold lets finalize drop small clusters WITHOUT reshuffling the ones
-  # that remain. Isolated nodes get no coordinate here; finalize places them only
-  # if show_isolated keeps them. Coordinates travel WITH the graph so a colour
-  # change never re-arranges the network.
+  # that remain. Coordinates travel WITH the graph so a colour change never
+  # re-arranges the network.
   core_idx <- which(igraph::degree(g) > 0)
   lx <- rep(NA_real_, igraph::vcount(g))
   ly <- lx
@@ -781,9 +780,41 @@ hla_build_motif_graph_raw <- function(
       ly[core_idx] <- xy[, 2]
     }
   }
-  igraph::V(g)$layout_x <- lx
-  igraph::V(g)$layout_y <- ly
+  # Isolated nodes take no part in a force layout -- they are singletons -- but
+  # they get their coordinates HERE as well, on a cheap deterministic grid. That
+  # way finalize never has to lay anything out even when show_isolated keeps
+  # them: if it did, changing the threshold would re-run the layout and move the
+  # connected clusters that did not change.
+  placed <- .hla_place_isolated(lx, ly, which(igraph::degree(g) == 0))
+  igraph::V(g)$layout_x <- placed$x
+  igraph::V(g)$layout_y <- placed$y
   g
+}
+
+# Deterministic grid placement for vertices that take no part in the force
+# layout. They are parked under the bounding box of the vertices that DO have
+# coordinates, in vertex order, so the result depends only on how many there are
+# -- never on the minimum-size threshold -- and adding or dropping them cannot
+# move anything else. Returns the completed coordinate vectors.
+.hla_place_isolated <- function(lx, ly, idx) {
+  if (length(idx) == 0) {
+    return(list(x = lx, y = ly))
+  }
+  ok <- which(!is.na(lx) & !is.na(ly))
+  per_row <- max(1L, ceiling(sqrt(length(idx))))
+  if (length(ok) > 0) {
+    x0 <- min(lx[ok])
+    step <- max((max(lx[ok]) - x0) / per_row, 1)
+    y0 <- min(ly[ok])
+  } else {
+    x0 <- 0
+    step <- 1
+    y0 <- 0
+  }
+  k <- seq_along(idx) - 1L
+  lx[idx] <- x0 + (k %% per_row) * step
+  ly[idx] <- y0 - step - (k %/% per_row) * step
+  list(x = lx, y = ly)
 }
 
 # The CHEAP half. From the cached full graph, drop connected components smaller
@@ -824,18 +855,24 @@ hla_finalize_motif_graph <- function(
     return(NULL)
   }
   igraph::V(g)$cluster <- igraph::components(g)$membership
-  # Connected survivors already carry coordinates from the cached core layout;
-  # fill in only what is still missing (isolated nodes shown by show_isolated)
-  # rather than re-laying-out everything, which would move the clusters that did
-  # not change.
+  # Every survivor already carries a coordinate from the cached raw layout --
+  # connected nodes from the force layout, isolated ones from the grid -- so
+  # nothing is laid out here and the clusters that survive keep their exact
+  # positions, whatever show_isolated is. Only a graph from an older cache could
+  # be missing coordinates; fill in JUST those vertices, never the whole graph,
+  # because re-running the layout would move the clusters that did not change.
   lx <- igraph::V(g)$layout_x
   ly <- igraph::V(g)$layout_y
-  if (is.null(lx) || is.null(ly) || anyNA(lx) || anyNA(ly)) {
+  if (is.null(lx) || is.null(ly)) {
     xy <- hla_motif_layout(g)
     if (!is.null(xy)) {
       igraph::V(g)$layout_x <- xy[, 1]
       igraph::V(g)$layout_y <- xy[, 2]
     }
+  } else if (anyNA(lx) || anyNA(ly)) {
+    placed <- .hla_place_isolated(lx, ly, which(is.na(lx) | is.na(ly)))
+    igraph::V(g)$layout_x <- placed$x
+    igraph::V(g)$layout_y <- placed$y
   }
   g
 }
