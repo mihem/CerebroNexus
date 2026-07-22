@@ -165,21 +165,15 @@ ui <- dashboardPage(
       HTML(
         paste0(
           '<svg class="cerebro-logo" xmlns="http://www.w3.org/2000/svg" ',
-          'viewBox="0 0 300 38" role="img" aria-labelledby="cb-logo-title">',
-          '<title id="cb-logo-title">CerebroNexus — single cell</title>',
+          'viewBox="0 0 210 38" role="img" aria-labelledby="cb-logo-title">',
+          '<title id="cb-logo-title">CerebroNexus</title>',
           '<text x="0" y="27" fill="currentColor" ',
           'font-family="var(--font-sans),system-ui,sans-serif" ',
           'font-size="27" font-weight="650" letter-spacing="-0.6">Cerebro</text>',
           '<text x="104" y="27" fill="#337ab7" ',
           'font-family="var(--font-sans),system-ui,sans-serif" ',
           'font-size="27" font-weight="750" letter-spacing="-0.6">Nexus</text>',
-          '<g transform="translate(219,11)">',
-          '<rect x="0" y="0" width="63" height="17" rx="0" fill="#16171a"></rect>',
-          '<text x="31.5" y="12.2" text-anchor="middle" ',
-          'font-family="var(--font-sans),system-ui,sans-serif" ',
-          'font-size="10.5" font-weight="600" letter-spacing="0.2" ',
-          'fill="#ffffff">single cell</text>',
-          '</g></svg>'
+          '</svg>'
         )
       )
     ),
