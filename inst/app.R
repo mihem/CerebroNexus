@@ -18,7 +18,7 @@ Cerebro.options <<- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed cerebroAppLite package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "2.2.0",
+  "cerebro_version" = "2.3.0",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -53,7 +53,24 @@ Cerebro.options <<- list(
     ## `trekker` slot (three coordinate orientations, positioning QC, upstream
     ## Moran's I, embedded per-nucleus positioning-evidence images).
     ## Rebuild with data-raw/build_trekker_demo.R (see data-raw/trekker.md).
-    "Mouse brain (Trekker)" = "extdata/v1.4/demo_trekker.crb"
+    "Mouse brain (Trekker)" = "extdata/v1.4/demo_trekker.crb",
+    ## The HLA & TCR demo: REAL single cells with REAL paired TCR, from 10x's
+    ## dextramer cohort. The repertoire is ANTIGEN-SELECTED (cells were sorted
+    ## for binding a pMHC dextramer), which is precisely why its motif network is
+    ## legible where an unselected repertoire's is not -- 12,000 cells give 169
+    ## TRB nodes in 39 motifs on measured sequences. Donor genotypes are the
+    ## PUBLISHED ones (table S1 of the source paper), measured independently of
+    ## these cells, so the carrier contrasts are real; the repertoire is still
+    ## antigen-selected and says so, since the reagent panel decided which
+    ## receptors are present. Class I only (sorted CD8+ T cells), so the
+    ## Class I x Class II pair scope stays hidden here -- it appears when a data
+    ## set carries Class II typing and a lineage column.
+    ## The per-cell dextramer_* columns are 10x's RAW BINDER CALLS for a reagent,
+    ## NOT validated peptide specificity: staining is heavily cross-reactive
+    ## here, which is what the restriction_in_genotype column makes visible.
+    ## Nothing on the Associations tab uses them.
+    ## Rebuild with data-raw/build_hla_tcr_dextramer_demo.R.
+    "HLA & TCR" = "extdata/v1.4/demo_hla_tcr_dextramer.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
   ## Visium loads its real H&E background from an EXTERNAL image file (rather than

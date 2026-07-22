@@ -52,6 +52,9 @@ rix(
     "testthat",
     "pkgdown",
     "shinytest2",
+    "callr",
+    "png",
+    "withr",
     "formattable",
     "stringr",
     "shinyvalidate",
@@ -69,6 +72,7 @@ rix(
     "glue",
     "GSVA",
     "HDF5Array",
+    "htmlwidgets",
     "httr",
     "igraph",
     "later",
@@ -91,7 +95,9 @@ rix(
     "tibble",
     "tidyr",
     "tidyselect",
-    "viridis"
+    "viridis",
+    "stringdist",
+    "visNetwork"
   ),
   system_pkgs = c(
     "chromium", # headless browser for shinytest2

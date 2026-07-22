@@ -9,6 +9,18 @@ Everything here is produced by [`build_trekker_demo.R`](build_trekker_demo.R).
 The raw bundle is gitignored and **not redistributable**; only the derived,
 down-sampled `.crb` ships.
 
+## Contents
+
+1. [What Trekker is](#1-what-trekker-is)
+2. [Download (registration required)](#2-download-registration-required)
+3. [What is inside the bundle](#3-what-is-inside-the-bundle)
+   - [The three coordinate orientations](#the-three-coordinate-orientations-measured-not-assumed)
+4. [Extraction (which files, why)](#4-extraction-which-files-why)
+5. [Sub-sampling (whole genes, fewer nuclei)](#5-sub-sampling-whole-genes-fewer-nuclei)
+6. [How `demo_trekker.crb` is generated](#6-how-demo_trekkercrb-is-generated)
+7. [Honesty the page enforces](#7-honesty-the-page-enforces)
+8. [Registry](#8-registry)
+
 ---
 
 ## 1. What Trekker is
@@ -110,7 +122,7 @@ verified by reading the real object:
 The existing generic `.getSpatialData()` extractor reads `@images` and would
 **silently draw the brain transposed 90°** — no error, just wrong. So the
 builder takes coordinates from the **Location CSV only**, and the Trekker page's
-"坐标来源" switch shows all three so the hazard is visible, not hidden.
+"Coordinate source" switch offers all three so the hazard is visible, not hidden.
 
 ---
 
@@ -154,6 +166,26 @@ we keep **all 21,374 genes** and down-sample **nuclei** instead:
 - expression is the `SCT` `data` (normalised) layer; the dense `scale.data` and
   the `pca`/`SPATIAL` reductions are dropped (`DietSeurat`) so only UMAP + `data`
   are exported.
+
+```r
+strat <- integer(0)
+for (lv in sort(unique(clab))) {                 # proportional within each cluster
+  w <- which(clab == lv)
+  k <- max(1L, round(N_CELLS * length(w) / n_all))   # max(1L,...): never drop a cluster
+  strat <- c(strat, sample(w, min(k, length(w))))
+}
+force_idx <- match(ev_bc, bc_all)                # the evidence nuclei, unconditionally
+idx <- sort(unique(c(strat, force_idx)))         # union -> 2,532, slightly over N_CELLS
+
+sub <- subset(so, cells = bc_all[idx])
+sub$celltype <- CELLTYPE_BY_CLUSTER[as.integer(as.character(sub$seurat_clusters)) + 1L]
+sub$nUMI <- sub$nCount_SCT;  sub$nGene <- sub$nFeature_SCT
+sub <- DietSeurat(sub, assays = "SCT", dimreducs = "umap")
+```
+
+The union with `force_idx` is why the shipped count is 2,532 rather than a round
+`N_CELLS` — a stratified draw would not reliably include all 50 evidence nuclei,
+and without them the page's drill-down would break on a rebuild.
 
 ### Cell types
 
@@ -203,9 +235,24 @@ trekker = list(
 ```
 
 All arrays are `unname()`d: a *named* R vector serialises to a JSON **object**
-(barcode → value), but the client indexes them **positionally** as arrays. The
-`barcodes` field lets the server pull a gene's expression aligned to these exact
-points regardless of the expression matrix's internal column order
+(barcode → value), but the client indexes them **positionally** as arrays. Miss
+one and that field silently arrives as `{}` on the client.
+
+```r
+trekker <- list(
+  barcodes = unname(sub_bc),                  # the alignment key
+  x  = unname(round(cx[idx], 2)),             # canonical um, from the Location CSV
+  y  = unname(round(cy[idx], 2)),
+  ux = unname(round(um[idx, 1], 3)),          # UMAP
+  uy = unname(round(um[idx, 2], 3)),
+  clusters = unname(clab[idx]),
+  ...
+)
+crb$addTrekker(trekker)
+```
+
+The `barcodes` field lets the server pull a gene's expression aligned to these
+exact points regardless of the expression matrix's internal column order
 (`getExpressionMatrix(cells = barcodes, genes = g)` honours the requested order).
 
 Evidence JPEGs are down-scaled (`magick`, 620 px long edge, quality 68) and

@@ -1522,6 +1522,56 @@ getImmuneRepertoire <- function() {
   tryCatch(ds$getImmuneRepertoire(), error = function(e) list())
 }
 
+## ---- What one row of this data set is ---------------------------------- ##
+## Almost every .crb is single-cell, so a row is a cell and the app says so.
+## That is not universal: a bulk repertoire data set maps a (donor, clonotype)
+## pair onto a row, and calling those "cells" states a measurement that was
+## never made.
+##
+## This is a DECLARED contract, not an inference. A .crb states it in
+## `technical_info$observation_unit` (e.g. "analysis unit"); anything that does
+## not declare one is single-cell, which is the safe default for every existing
+## file. Deriving it instead (say, from an empty expression matrix) would be a
+## proxy: it would quietly relabel any data set that merely lacks expression.
+##
+## Returns a list(singular, plural, title) so callers do not re-derive plurals.
+getObservationUnit <- function() {
+  ds <- tryCatch(data_set(), error = function(e) NULL)
+  ti <- tryCatch(ds$technical_info, error = function(e) NULL)
+  unit <- if (is.list(ti) && is.character(ti$observation_unit)) {
+    ti$observation_unit[1]
+  } else {
+    "cell"
+  }
+  if (!nzchar(unit) || is.na(unit)) {
+    unit <- "cell"
+  }
+  list(
+    singular = unit,
+    plural = paste0(unit, "s"),
+    title = paste0(
+      toupper(substring(unit, 1, 1)),
+      substring(unit, 2),
+      "s"
+    )
+  )
+}
+
+## Wrapper for the HLA & TCR Motifs module. Older .crb objects predate the
+## getHLATyping() method / hla_typing field, so the wrapper checks the method
+## exists and falls back to an empty canonical table, never erroring.
+getHLATyping <- function() {
+  ds <- data_set()
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(hla_normalize_typing(list(), source_type = "unknown"))
+  }
+  empty <- hla_normalize_typing(list(), source_type = "unknown")
+  if (!is.function(ds$getHLATyping)) {
+    return(empty)
+  }
+  tryCatch(ds$getHLATyping(), error = function(e) empty)
+}
+
 ## Wrappers for spatial module.
 availableSpatial <- function() {
   ds <- data_set()

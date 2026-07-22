@@ -144,6 +144,10 @@ source(
   paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/trekker/UI.R"),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/hla_tcr_motifs/UI.R"),
+  local = TRUE
+)
 
 ##----------------------------------------------------------------------------##
 ## Create dashboard with different tabs.
@@ -221,6 +225,7 @@ ui <- dashboardPage(
       div(id = "sidebar_item_trajectory_placeholder"),
       div(id = "sidebar_item_spatial_placeholder"),
       div(id = "sidebar_item_trekker_placeholder"),
+      div(id = "sidebar_item_hla_tcr_motifs_placeholder"),
       menuItem(
         "Gene expression",
         tabName = "geneExpression",
@@ -266,6 +271,20 @@ ui <- dashboardPage(
     includeScript(
       file.path(Cerebro.options[["cerebro_root"]], "shiny/v1.4/www/trekker.js")
     ),
+    ## HLA & TCR Motifs modebar (draws a plotly-style toolbar over the visNetwork
+    ## motif network; visNetwork's own nav buttons are turned off for consistency).
+    includeCSS(
+      file.path(
+        Cerebro.options[["cerebro_root"]],
+        "shiny/v1.4/www/hla_motifs.css"
+      )
+    ),
+    includeScript(
+      file.path(
+        Cerebro.options[["cerebro_root"]],
+        "shiny/v1.4/www/hla_motifs.js"
+      )
+    ),
     tags$script(HTML('$("body").addClass("fixed");')),
     tabItems(
       tab_load_data,
@@ -279,6 +298,7 @@ ui <- dashboardPage(
       tab_trajectory,
       tab_spatial,
       tab_trekker,
+      tab_hla_tcr_motifs,
       tab_gene_expression,
       tab_gene_id_conversion,
       tab_color_management,

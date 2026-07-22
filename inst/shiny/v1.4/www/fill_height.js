@@ -28,6 +28,15 @@
    custom.css makes `.cerebro-fill` a flex column whose child fills it, so the
    output (and any spinner wrapper between) inherits the measured height without
    needing its own resolved-height chain.
+
+   TWO ENGINES, ON PURPOSE (why a fill page and a projection scatter can differ
+   by a few dozen px on the same screen): the projection scatter pages were never
+   migrated here -- they keep projectionTargetHeight in projection_scatter.js.
+   Both use the SAME formula (viewport - top - contentBelow - gap), but this
+   file's contentBelow() also reserves the content-wrapper's bottom padding,
+   which projection_scatter's does not. So e.g. the HLA network (a fill page)
+   sits slightly shorter than the projection scatter. That is the two engines,
+   not a bug; unifying them touches every viz page and is deliberately deferred.
    ========================================================================== */
 (function () {
   "use strict";
@@ -108,15 +117,28 @@
      so the result stays stable. The wrapper's bottom padding lives outside the
      section.content scroll height and is therefore added once. */
   function contentBelow(el) {
+    /* Measure within the fill's OWN plot column (.cerebro-viz-col) when it has
+       one, so a TALLER sibling column — a long parameter / legend / evidence
+       panel beside the plot — cannot inflate `remaining` and squeeze the fill to
+       its minimum. `content.scrollHeight` is the height of the tallest column, so
+       using it lets a tall left column shrink the plot on the right. Fall back to
+       section.content for any fill that is not inside a plot column (behaviour
+       unchanged there). For a well-behaved page whose plot column is the tallest,
+       both frames give the same result. */
     var content = ancestorWithClass(el, "content");
-    if (!content || typeof content.getBoundingClientRect !== "function") {
+    var frame = el.closest && el.closest(".cerebro-viz-col");
+    if (!frame) {
+      frame = content;
+    }
+    if (!frame || typeof frame.getBoundingClientRect !== "function") {
       return 0;
     }
-    var wrapper = ancestorWithClass(content.parentElement, "content-wrapper");
-    var contentRect = content.getBoundingClientRect();
+    var wrapper = content ?
+      ancestorWithClass(content.parentElement, "content-wrapper") : null;
+    var frameRect = frame.getBoundingClientRect();
     var fillRect = el.getBoundingClientRect();
-    var fillBottom = fillRect.bottom - contentRect.top + (content.scrollTop || 0);
-    var remaining = Math.max(0, (content.scrollHeight || 0) - fillBottom);
+    var fillBottom = fillRect.bottom - frameRect.top + (frame.scrollTop || 0);
+    var remaining = Math.max(0, (frame.scrollHeight || 0) - fillBottom);
     var wrapperPadding = wrapper ?
       px(window.getComputedStyle(wrapper).paddingBottom) : 0;
     return remaining + wrapperPadding;

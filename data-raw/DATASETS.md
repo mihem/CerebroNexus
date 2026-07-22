@@ -208,6 +208,96 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
 
 > `build_ir_demos.R` can also emit two narrower subsets — `demo_healthy_t.crb` (T + Mono, TCR only) and `demo_bcell_rich.crb` (B + few T, BCR only) — as a multi-sample switcher demo. They are **not shipped** by default; the Full set is their superset.
 
+### demo_hla_tcr_synthetic.crb  — REMOVED 2026-07-21, no longer shipped
+> Removed from `inst/extdata/v1.4/`: cerebroAppLite is a single-cell application and this fixture was fabricated end to end. It existed only because real repertoires were thought too sparse to draw a network; `demo_hla_tcr_dextramer.crb` disproves that on measured sequences. The build script is kept and still runs — `data-raw/` is `.Rbuildignore`d, so it adds nothing to the installed package. Entry retained for provenance.
+
+- **type**: immune_repertoire
+- **technology**: none — **fully synthetic**; simulates a 5' V(D)J + scRNA-seq cohort, measures nothing
+- **dropdown label**: `HLA & TCR - SYNTHETIC fixture (fabricated, not measurement)`
+- **organism / tissue**: human gene symbols / notional PBMC T-cell cohort. No organism was sampled.
+- **source**: **no source — every value is fabricated** by `data-raw/build_hla_tcr_demo.R`. Reused as vocabulary only, not as measurement: gene symbols (from `demo_full_tcr_bcr.crb`, so the Gene expression tab is searchable), IMGT V/J gene names, and European HLA allele frequency ranges.
+- **acquire**: none — no download; the generator is self-contained.
+- **object type**: `Cerebro_v1.3`, built from the current generator (`hla_typing` slot + methods present).
+- **sampling**: **30 donors × 167 cells = 5,010 cells**, `set.seed(20260715)`. Composition: CD8 T 2,000 / CD4 T 1,750 / Treg 500 / B 500 / Monocytes 260; only T cells carry a receptor (TRB in 95%, TRA in 90%). Measured with the package's own motif core: **TRB 2,913 unique CDR3 → 440 nodes in 20 motifs (sizes 5–64, diameter 3–6)**; TRA 3,330 → 184 nodes in 10 motifs. ~1,200 genes.
+- **why synthetic**: the predecessor carried REAL CDR3s and rendered a **4-node** network (TRB: 456 unique CDR3 → 2 Hamming-1 pairs; TRA: 395 → 32 pairs). That is not a sample-size accident — an unselected polyclonal repertoire is sparse in CDR3 space, pair count grows ~n², and 5,000 cells only extrapolates to ~150 pairs. Dense motif networks in real data come from **selection** (public/antigen-conditioned receptors converge), not scale, so the families here are designed in: a branching walk in sequence space, one V/J per family, verified isolated at Hamming ≥ 2 from every other family and from the ~2,470 background singletons.
+- **HLA design**: 30 synthetic genotypes over HLA-A/B/C/DRB1 only (the loci `HLA_MVP_LOCI` enforces). Carrier counts for anchor alleles are fixed, not drawn, so the allele picker opens on **HLA-A*02:01 — 15 carrier / 15 non-carrier**. Families are tiered: 6 **strong** (members appear only in carriers ⇒ solid "Carrier" islands), 8 **weak** (carrier-enriched, leaks ⇒ Carrier + Mixed), 6 **none** (random donors ⇒ Mixed). The four largest families are concentrated on `HLA-A*02:01`, because one strong family per allele lights a single island and washes the rest to "Mixed". Class I anchors live in CD8 T, class II in CD4 T / Treg, so lineage MHC context stays coherent.
+- **cell-type field**: `cell_type_fine` (CD8 T / CD4 T / Treg / B cells / Monocytes); coarse `cell_type` also kept.
+- **embedded image**: none (n/a for immune repertoire)
+- **HLA typing**: **synthetic** (`source_type = "synthetic"`).
+- **declared contracts**: `observation_unit = "cell"`, `receptor_key = "v_gene+cdr3"`, `tcr_selection = "synthetic"` — the page's hardest disclosure. It is strictly stronger than the bulk demo's `association-conditioned`: a positive control has real sequences and real genotypes and only its *selection* is circular, whereas here the sequences AND the association are constructed. Any carrier/non-carrier contrast this data set shows was put there on purpose and is not evidence.
+- **license**: none applicable — no third-party data is embedded.
+- **build**: `data-raw/build_hla_tcr_demo.R` (self-verifying: it asserts the recovered motif sizes match the design exactly, that the allele picker opens on the anchor, and that whole islands score "Carrier" — a build that drifts fails rather than shipping)
+- **output**: `inst/extdata/v1.4/demo_hla_tcr_synthetic.crb` (~4.0 MB)
+
+### demo_hla_tcr_bulk.crb  — REMOVED 2026-07-21, no longer shipped
+> Removed from `inst/extdata/v1.4/`: real data, but bulk — no cells, no transcriptome — in a single-cell application. Its workflow now lives in the *HLA Associations on bulk TCRβ* vignette as a bring-your-own-cohort guide, and the build script is kept and still runs. Entry retained for provenance.
+
+- **type**: immune_repertoire
+- **technology**: bulk TCR-beta immunosequencing (Adaptive immunoSEQ). **Not single cell** — see *sampling*.
+- **dropdown label**: `HLA & TCR - real bulk TCRb + real donor HLA`
+- **organism / tissue**: human (hg) / peripheral blood, 666-donor cohort
+- **source**: Emerson et al., *Nat Genet* 2017 (cohort + HLA typing), as cleaned and published by DeWitt et al., *eLife* 2018. Distributed as `pubtcrs_data_v1.tgz` on Zenodo record [1248193](https://zenodo.org/records/1248193). Tools: [phbradley/pubtcrs](https://github.com/phbradley/pubtcrs).
+- **acquire**: the build script downloads it on demand; or manually:
+  ```bash
+  mkdir -p data-raw/pubtcrs
+  curl -fL -o data-raw/pubtcrs/pubtcrs_data_v1.tgz \
+    "https://zenodo.org/api/records/1248193/files/pubtcrs_data_v1.tgz/content"
+  tar xzf data-raw/pubtcrs/pubtcrs_data_v1.tgz -C data-raw/pubtcrs
+  ```
+  The 349 MB archive is **not tracked** (`.gitignore`); only the built `.crb` ships.
+- **object type**: `Cerebro_v1.3` built from scratch (no source `.crb`).
+- **sampling**: **everything is real measured data; nothing is synthesised.** TCRs are the paper's real HLA-associated public TCR-beta chains (V family + CDR3 aa) for six single alleles (`HLA-A*02:01`, `A*01:01`, `B*07:02`, `B*08:01`, `DRB1*04:01`, `DRB1*07:01`); donor↔TCR linkage is the real observed occurrence pattern; HLA is each donor's real genotype. Donors: the first 100 by donor index among those with HLA typing that carry ≥ 1 demo TCR (deterministic, *not* chosen to flatter any association). Restricted to single alleles because the canonical HLA table stores one allele per locus × copy, so the source's DR/DQ haplotype triples and DQ/DP α-β pairs cannot be represented.
+- **⚠️ association-conditioned (positive control, NOT independent evidence)**: the receptor set was chosen **using** the published HLA association, and donors were then kept only if they carry one of those receptors. **Any carrier / non-carrier contrast the page shows is put there by that selection**, and re-computing overlap on the same cohort the association was derived from is not independent replication. This is a positive control for the workflow. The `.crb` declares it in `technical_info$tcr_selection = "association-conditioned"`, and the app surfaces it as a warning above the Associations tables. The paper's p/q values are **not** stored in the `.crb` — only the TCRs that its association selected.
+- **receptor key**: this source identifies a receptor by (V family, CDR3), not CDR3 alone — 22 of its CDR3s occur on more than one V family. Declared as `technical_info$receptor_key = "v_gene+cdr3"`, which makes split-by-V the app's default so nodes match the source's own receptor identity.
+- **statistical unit**: one donor = one sample, and `donor_id` is written into the canonical HLA long table, so the app counts at **donor** level. (Passing a named list instead would silently leave `donor_id` NA and demote counting to sample level.)
+- **observation unit**: declared as `technical_info$observation_unit = "analysis unit"`, read app-wide (see `getObservationUnit()`), so the front page reports `21,119 Analysis units` rather than claiming cells that were never sequenced. A data set that declares nothing is treated as single-cell, which is correct for every other `.crb`.
+- **absent tabs**: with no projection and no genes, the Projection and Gene expression tabs are not offered for this data set (same conditional mechanism as Marker genes / Spatial / Trajectory) instead of opening blank.
+- **bulk → `.crb` mapping**: each row is one **(donor, TCR clonotype) analysis unit, not a sequenced cell**. Consequences, all intended: **no expression matrix** (a real 0-gene × N-unit matrix — bulk measures no transcriptome) and **no projection**, so the Projection / Gene expression tabs have nothing to show for this data set; `cell_type` is `T cell (bulk TCRb)` for every row, so the lineage MHC context is **Unknown by design** — this assay cannot distinguish CD4 from CD8 and the page must not pretend otherwise; `sample` = `donor_id` = the donor, which is the correct unit for HLA carrier counts.
+- **cell-type field**: `cell_type` (single level, `T cell (bulk TCRb)`)
+- **embedded image**: none (n/a)
+- **HLA typing**: **real**, stored with `source_type = "genotyped"` in the `hla_typing` slot. Genuine donor genotypes, and single-copy calls — which makes this the only build that exercises the loose-vs-strict carrier distinction.
+- **license**: CC-BY 4.0 (Zenodo record 1248193)
+- **build**: `data-raw/build_hla_tcr_bulk_demo.R` (caches the 11M-line occurrence scan to `data-raw/pubtcrs/tcr_donors_cache.rds`)
+- **output**: `inst/extdata/v1.4/demo_hla_tcr_bulk.crb`
+
+### demo_hla_tcr_dextramer.crb
+- **type**: immune_repertoire
+- **technology**: 10x Genomics 5′ Single Cell Immune Profiling — paired αβ V(D)J + 3′ gene expression + TotalSeq-C surface protein + dCODE pMHC dextramers. **Real single cells.**
+- **dropdown label**: `HLA & TCR` (the qualifiers were dropped once this became the only HLA demo: everything in it is real and single-cell, so the label had nothing left to disambiguate)
+- **organism / tissue**: human (hg) / peripheral blood CD8+ T cells, four healthy donors
+- **source**: 10x Genomics, *CD8+ T cells of Healthy Donor 1–4* (2019), published as Zhang W *et al.*, **Sci Adv** 7(20):eabf5835 (2021), doi:10.1126/sciadv.abf5835.
+- **acquire**: the build script downloads on demand (~1.6 GB, cached in `data-raw/vdj_10x_dextramer/`, gitignored); or manually, all four donors:
+  ```bash
+  base=https://cf.10xgenomics.com/samples/cell-vdj/3.0.2
+  cache=data-raw/vdj_10x_dextramer
+  mkdir -p "$cache"
+  for d in 1 2 3 4; do
+    stem="vdj_v1_hs_aggregated_donor${d}"
+    for f in _all_contig_annotations.csv _binarized_matrix.csv _filtered_feature_bc_matrix.tar.gz; do
+      curl -fL --retry 5 -C - -o "${cache}/${stem}${f}" "${base}/${stem}/${stem}${f}"
+    done
+    mkdir -p "${cache}/${stem}_gex"
+    tar xzf "${cache}/${stem}_filtered_feature_bc_matrix.tar.gz" -C "${cache}/${stem}_gex"
+  done
+  ```
+  `-C -` resumes a partial transfer: the expression matrices are ~283 MB each. The donor genotypes are **not** in these files — see the HLA typing entry below.
+- **object type**: `Cerebro_v1.3` built from scratch (Seurat used only for normalisation/PCA/UMAP).
+- **sampling**: **everything is real measured data.** Cells are kept only if they carry a clonotype with **both** chains resolved **and** bound exactly **one** dextramer (multi-binders are dropped, not guessed at). The paired test is stricter than "has a `CTaa`": `combineTCR()` writes the literal string `NA` on a side it could not resolve, so an earlier build shipped 1,493 single-chain cells under a "paired" label. Deterministically subsampled to **3,000 cells per donor = 12,000 cells**, `set.seed(20260721)`, **after** the expression join so the balance is exact; matrix cut to the 2,000 most variable genes and kept **sparse** (`dgCMatrix`, like every other demo here — densifying it cost 184 MiB of memory and 4.5 MiB of installed package). Measured with the package's own motif core on the shipped object: **TRB 3,270 unique CDR3 → 169 nodes in 39 motifs (largest 30, 3,112 isolated); TRA 3,189 → 396 nodes in 141 motifs**.
+- **why this data set exists**: it answers the fair objection that the motif network is only legible on synthetic data. A CDR3 Hamming-1 network needs an **antigen-selected** repertoire; an unselected one is sparse in CDR3 space and no amount of cells fixes it. Measured on this same source: all cells unselected = 26,449 unique CDR3 → trips the size guard; dextramer-binding cells = 2,910 → 308 nodes in 75 motifs; the single Flu-MP `GILGFVFTL` epitope = 267 → **121 nodes in 7 motifs**, i.e. 45 % of the CDR3s against one immunodominant epitope collapse into seven families. That is measured convergence, not a designed fixture.
+- **cell-type field**: `cell_type` (single level, `CD8 T` — the cells were sorted CD8+). Declared via `technical_info$lineage_column`, so the app never has to infer it.
+- **embedded image**: none (n/a for immune repertoire)
+- **HLA typing**: **real, `source_type = "genotyped"`** — the donors' published haplotypes, transcribed from **table S1** of the paper's supplementary PDF and kept inline in the build script as `DONOR_HLA`. Donor 1 A\*02:01/A\*11:01, B\*35:01 · Donor 2 A\*02:01/A\*01:01, B\*08:01 · Donor 3 A\*24:02/A\*29:02, B\*35:02/B\*44:03 · Donor 4 A\*03:01 homozygous, B\*07:02/B\*57:01. Because they were measured independently of these cells, the carrier / non-carrier contrasts here are real comparisons, not artefacts of the sorting. The PDF is not committed; the link printed inside the paper is dead (the `advances.sciencemag.org` domain was retired), the working one is `https://www.science.org/doi/suppl/10.1126/sciadv.abf5835/suppl_file/abf5835_sm.pdf` — **open it in a browser, not `curl`**: science.org is behind Cloudflare and 403s every command-line client (verified). It is not needed to rebuild, since the values are inline in the build script.
+- **⚠️ antigen-selected, so not an unbiased repertoire**: cells were sorted for dextramer binding, so which receptors are present was decided by the reagent panel. Declared in `technical_info$tcr_selection = "antigen-selected"`; the app prints the detail above the Associations tables. This is a statement about how the cells were chosen, not about the genotypes — but it is not a free pass either. Independent genotypes remove *circularity*; they do not remove **ascertainment**. The repertoire being compared was captured by the panel, the panel's reagents are restricted by particular alleles, and there are four donors, so donor and panel stay confounded with genotype. A carrier contrast here is suggestive, not a test, and the caveat above the tables says so. (Until this round `"antigen-selected"` was not a recognised key in `HLA_SELECTION_CAVEATS`, so the object declared a selection and the page showed nothing.)
+- **inference was tried and rejected**: an earlier build derived the genotypes from binding and was wrong — donor3 has 25,674 cells (92.8 % of its specific cells) binding A\*03:01-restricted dextramers and carries no A\*03:01. See [`hla.md` §4.1](hla.md#41-inferring-the-genotypes-from-binding-was-wrong).
+- **⚠️ the `dextramer_*` columns are raw binder calls, not specificity**: 10x's binarized flags say a cell was *called a binder of a reagent* — not that it is specific for that peptide, nor that the reagent's allele presents it in that donor. The same cross-reactivity that sank the genotype inference applies per cell: for a majority of the shipped cells the bound reagent's restriction is **not** among the alleles that donor carries — measured on what ships: **6,654 off-genotype and 75 undecidable of 12,000 cells**, i.e. only 5,271 (44 %) bound a reagent restricted by an allele their donor actually has. Per donor (yes / no / unknown of 3,000): donor1 2,046 / 879 / 75 · donor2 2,532 / 468 / 0 · donor3 3 / 2,997 / 0 · donor4 690 / 2,310 / 0. Donor 1's 75 undecidable calls are all `HLA-B*08:01`, at the locus table S1 leaves half-called. Hence the deliberately reagent-flavoured names `dextramer_antigen` / `dextramer_peptide` / `dextramer_allele` (never `antigen` / `restricting_allele`), plus a `restriction_in_genotype` column shipped as a declared group so the noise is colourable in the app instead of living in a footnote. That column has **three** states, because absence from the published table is only evidence of absence when the locus was called completely: `yes` = the reagent's restriction is one of the donor's published alleles; `no` = it is not, and that locus has both copies published; `unknown` = it is not listed but the locus was published at one copy only, so the second copy could be it. Table S1 gives donors 1 and 2 a single HLA-B allele, so their B-restricted binder calls are undecidable rather than off-genotype — collapsing them into `no` would manufacture a confirmed negative out of missing data, the same false-negative bias `hla_allele_status_by_unit()` refuses when building carrier groups. The rule is the package's own (`hla_locus_call_state()`: complete at two copies). **No HLA-association claim rests on these calls** — the contrasts use the published genotypes.
+- **declared contracts**: `observation_unit = "cell"`, `receptor_key = "v_gene+cdr3"`, `tcr_selection = "antigen-selected"`, `lineage_column = "cell_type"`.
+- **license**: CC BY 4.0 (10x Genomics datasets)
+- **build**: `data-raw/build_hla_tcr_dextramer_demo.R`. The verification block is a **gate, not a report**: the object is written to a staging path, re-read, re-measured with the package's own motif core, and every number asserted (donor balance, all-paired, sparse block, projection alignment, motif thresholds, genotypes equal to table S1, provenance, and the honesty columns) before `file.rename()` publishes it. A drifted input therefore stops the script and leaves the shipped `.crb` untouched, instead of replacing it and exiting 0.
+- **output**: `inst/extdata/v1.4/demo_hla_tcr_dextramer.crb` (~5.2 MB; it was 7.9 MB before the expression block was kept sparse)
+- **walkthrough**: `vignettes/hla_tcr_antigen_selected.Rmd` records the download, every processing step, and what changes at each one — with the TCR and HLA transformations spelled out.
+
+> **One HLA demo ships**: `demo_hla_tcr_dextramer.crb` — real single cells, real paired TCR, real published genotypes, and a motif network that is legible because the repertoire is antigen-selected. That selection is also its limitation: the reagent panel decided which receptors are present, and every cell is a sorted CD8+ T cell, so the typing is Class I only and the Class I × Class II pair scope stays hidden (`hla_pair_available()` gates it). Two earlier demos were removed rather than kept for coverage — a fabricated fixture and a real bulk cohort — because neither is both real and single-cell; their build scripts remain in `data-raw/`. A data set with real paired single-cell VDJ, independently measured donor HLA **and** an unselected repertoire spanning both MHC classes would supersede what ships today; none is currently public (the pan-disease scTCR reference's HLA is in controlled-access sub-studies).
+
 ---
 
 ## Trajectory

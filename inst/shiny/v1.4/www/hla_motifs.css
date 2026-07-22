@@ -1,0 +1,114 @@
+/*----------------------------------------------------------------------------*
+ * HLA & TCR Motifs — modebar over the visNetwork motif network.
+ *
+ * Same look and placement as the app's plotly modebar (see www/trekker.css
+ * .tk-modebar): faint grey icons top-right, always visible (brighter on hover),
+ * using the global design tokens from custom.css so it stays in lock-step with
+ * the theme.
+ *----------------------------------------------------------------------------*/
+/* The modebar is absolute inside .hla-motif-tab (which wraps legend + plot), so
+ * it floats at the top-right of the legend row when a legend is shown and at the
+ * plot's top-right when it is hidden. */
+.hla-motif-tab { position: relative; }
+.hla-plot-wrap { position: relative; }
+.hla-modebar {
+  position: absolute; top: 3px; right: 4px; z-index: 6;
+  display: flex; align-items: center; gap: 1px; padding: 2px 3px;
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); box-shadow: 0 1px 4px rgba(0, 0, 0, .10);
+  opacity: .92; transition: opacity .15s;
+}
+.hla-plot-wrap:hover .hla-modebar { opacity: 1; }
+.hla-mb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; cursor: pointer; border-radius: var(--r-xs);
+  color: var(--c-text-3);
+}
+.hla-mb-btn svg { fill: currentColor; }
+.hla-mb-btn:hover { color: var(--c-text); background: var(--c-surface-2); }
+/* At the opening fit (the minimum zoom) the zoom-out button greys out and stops
+ * responding -- the network can only be zoomed IN. Toggled by visEvents'
+ * afterDrawing in hla_tcr_motifs/visualizations.R. */
+.hla-mb-btn--off,
+.hla-mb-btn--off:hover {
+  opacity: .3; cursor: default; color: var(--c-text-3); background: none;
+}
+
+/* HLA Associations: each result table sits in its own card, so the three read
+ * as distinct blocks instead of one continuous stack. Same surface/border/radius
+ * system as the app's panels, just lighter for a nested block. */
+.hla-result-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  padding: 12px 16px 4px;
+  margin-bottom: 16px;
+}
+.hla-result-card > h4:first-child {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  color: var(--c-amber-700);
+  font-weight: 600;
+}
+.hla-result-card > p.text-muted {
+  margin-bottom: 10px;
+}
+
+/* Fast, readable hover hint for a control label. Replaces the native title
+ * tooltip (which the browser delays ~1s before showing) with a CSS bubble that
+ * appears at once and can hold a longer, plain-language line. */
+.hla-hint {
+  position: relative;
+  display: inline-block;
+  margin-left: 5px;
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: normal;
+  cursor: help;
+}
+.hla-hint > svg,
+.hla-hint > i {
+  pointer-events: none;
+}
+.hla-hint::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 250px;
+  white-space: normal;
+  text-align: left;
+  background: var(--c-text);
+  color: var(--c-white);
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: var(--shadow-3);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease;
+  z-index: 2000;
+  pointer-events: none;
+}
+.hla-hint::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--c-text);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease;
+  z-index: 2000;
+}
+.hla-hint:hover::after,
+.hla-hint:hover::before {
+  opacity: 1;
+  visibility: visible;
+}

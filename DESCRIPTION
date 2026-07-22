@@ -1,6 +1,6 @@
 Package: cerebroAppLite
 Title: Interactive visualization of single cell transcriptomics
-Version: 2.2.0
+Version: 2.3.0
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
@@ -15,7 +15,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.3
-Depends: R (>= 3.5.1)
+Depends: R (>= 3.6.0)
 biocViews:
   FeatureExtraction,
   GeneExpression,
@@ -36,6 +36,7 @@ Imports:
   ggplot2 (>= 3.2.1),
   glue (>= 1.4.0),
   GSVA (>= 1.30.0),
+  htmlwidgets,
   httr (>= 1.4.0),
   igraph,
   later,
@@ -58,12 +59,15 @@ Imports:
   stats,
   tibble (>= 3.0.0),
   tidyr (>= 1.1.0),
+  stringdist,
   stringr,
   tidyselect(>= 1.1.0),
   utils,
-  viridis (>= 0.5.1)
+  viridis (>= 0.5.1),
+  visNetwork
 Suggests:
   BPCells,
+  callr,
   DelayedArray,
   formattable (>= 0.2.0.1),
   ggtree,
@@ -71,6 +75,7 @@ Suggests:
   jsonlite,
   knitr,
   monocle,
+  png,
   reshape2,
   rmarkdown,
   scRepertoire (>= 2.0.0),
@@ -79,7 +84,8 @@ Suggests:
   SingleCellExperiment,
   SummarizedExperiment,
   testthat (>= 3.0.0),
-  shinytest2 (>= 0.2.0)
+  shinytest2 (>= 0.2.0),
+  withr
 Remotes:
   bnprks/BPCells/r
 VignetteBuilder: knitr
