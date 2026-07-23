@@ -23,7 +23,7 @@ local_inst <- inst_candidates[
 data_r <- if (!is.na(local_inst)) {
   file.path(local_inst, rel_data_r)
 } else {
-  system.file(rel_data_r, package = "cerebroAppLite")
+  system.file(rel_data_r, package = "CerebroNexus")
 }
 testthat::skip_if_not(
   nzchar(data_r) && file.exists(data_r),
@@ -38,7 +38,7 @@ ir_env$reactiveVal <- function(...) function(...) NULL
 ir_env$req <- function(...) invisible(NULL)
 ir_env$observeEvent <- function(...) invisible(NULL)
 ir_env$`%||%` <- function(a, b) if (is.null(a)) b else a
-# Stub out cerebroAppLite package functions referenced at top-level in data.R
+# Stub out CerebroNexus package functions referenced at top-level in data.R
 ir_env$getImmuneRepertoire <- function(...) NULL
 ir_env$getMetaData <- function(...) NULL
 ir_env$availableProjections <- function(...) character(0)

@@ -1,5 +1,5 @@
 hla_inst_file <- function(...) {
-  installed <- system.file(..., package = "cerebroAppLite")
+  installed <- system.file(..., package = "CerebroNexus")
   if (nzchar(installed) && file.exists(installed)) {
     return(installed)
   }
@@ -160,7 +160,7 @@ test_that("bundled core shim resolves without an installed package", {
   )
   # The shim sources its bundled core/ copies with no package on the search
   # path -- the exact condition of a createShinyApp bundle. Run it in a --vanilla
-  # subprocess to prove no cerebroAppLite install is needed. Under R CMD check
+  # subprocess to prove no CerebroNexus install is needed. Under R CMD check
   # the source `inst/` tree is not at this path, so there is nothing to test --
   # skip rather than fail on the missing file.
   testthat::skip_if_not(
@@ -437,7 +437,7 @@ test_that("motif network nodes carry no group column", {
 
 ## ---- core_shim sources every core file, byte-for-byte ------------------ ##
 ## The shim sys.source()s a hardcoded list of the bundled core/ files -- no
-## namespace fallback, so the bundle never names cerebroAppLite. A core file
+## namespace fallback, so the bundle never names CerebroNexus. A core file
 ## present in R/ but missing from that list is never sourced, so its functions
 ## surface as "could not find function" in a running app while unit tests (which
 ## reach R/ directly) stay green. Pin the file list here, and pin the bundled

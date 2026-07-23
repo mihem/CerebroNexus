@@ -50,7 +50,7 @@ Consequences that shape the demo:
 - the expression matrix is whole-transcriptome and large, so it cannot be
   embedded the way a tiny synthetic fixture is.
 
-cerebroAppLite only **ingests and displays** the vendor pipeline's output. It
+CerebroNexus only **ingests and displays** the vendor pipeline's output. It
 never runs the vendor Primary Analysis Pipeline (that needs an HPC/cloud run far
 larger than a Shiny session).
 

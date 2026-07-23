@@ -336,7 +336,7 @@ enriched_pathways_info <- list(
   title = "Enriched pathways",
   text = HTML(
     "
-    At the moment, Cerebro supports two different ways to perform pathway enrichment analysis (Enrichr, GSVA). However, in principle results from any method or tool can be added to the Cerebro object.<br>
+    At the moment, CerebroNexus supports two different ways to perform pathway enrichment analysis (Enrichr, GSVA). However, in principle results from any method or tool can be added to the Cerebro object.<br>
     <br>
     <b>Enrichr</b><br>
     Using all marker genes identified for a respective group of cells, gene list enrichment analysis is performed using the Enrichr API, including gene ontology terms, KEGG and Wiki Pathways, BioCarta and many others. Terms are sorted based on the combined score. By default, the genes that overlap between the marker gene list and a term are not shown (for better visibility) but the column can be added using the 'Column visibility' button. For the details on the combined score is calculated, please refer to the <a target='_blank' href='http://amp.pharm.mssm.edu/Enrichr/'>Enrichr website</a> and publication.<br>
@@ -350,7 +350,7 @@ enriched_pathways_info <- list(
     When active, columns in the table that contain different types of numeric values will be formatted based on what they <u>seem</u> to be. The algorithm will look for integers (no decimal values), percentages, p-values, log-fold changes and apply different formatting schemes to each of them. Importantly, this process does that always work perfectly. If it fails and hinders working with the table, automatic formatting can be deactivated.<br>
     <em>This feature does not work on columns that contain 'NA' values.</em><br>
     <b>Highlight values with colors</b><br>
-    Similar to the automatic formatting option, when active, Cerebro will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colors and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colors and/or the identification does not work properly, you can simply deactivate this feature.<br>
+    Similar to the automatic formatting option, when active, CerebroNexus will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colors and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colors and/or the identification does not work properly, you can simply deactivate this feature.<br>
     <em>This feature does not work on columns that contain 'NA' values.</em><br>
     <br>
     <em>Columns can be re-ordered by dragging their respective header.</em>"

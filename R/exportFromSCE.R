@@ -41,7 +41,7 @@
 #'
 #' @examples
 #' pbmc <- readRDS(system.file("extdata/v1.4/pbmc_SCE.rds",
-#'   package = "cerebroAppLite"))
+#'   package = "CerebroNexus"))
 #' exportFromSCE(
 #'   object = pbmc,
 #'   file = file.path(tempdir(), 'pbmc_SCE.crb'),
@@ -198,7 +198,7 @@ exportFromSCE <- function(
   export$addExperiment('organism', organism)
 
   ## add cerebroApp version
-  export$setVersion(utils::packageVersion('cerebroAppLite'))
+  export$setVersion(utils::packageVersion('CerebroNexus'))
 
   ##--------------------------------------------------------------------------##
   ## add transcript counts

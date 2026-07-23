@@ -740,7 +740,7 @@ output$hla_export_analysis <- downloadHandler(
         character(0)
       },
       # The app version comes from the runtime config, not from the installed
-      # cerebroAppLite package: an exported app must not reference the package at
+      # CerebroNexus package: an exported app must not reference the package at
       # runtime (see the self-containment check in test-smoke-production.R).
       app_version = as.character(
         Cerebro.options[["cerebro_version"]] %||% "unknown"

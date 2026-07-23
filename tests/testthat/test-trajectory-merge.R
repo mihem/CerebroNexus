@@ -13,7 +13,7 @@
 util_file <- testthat::test_path("../../inst/shiny/v1.4/utility_functions.R")
 if (!file.exists(util_file)) {
   util_file <- file.path(
-    system.file(package = "cerebroAppLite"),
+    system.file(package = "CerebroNexus"),
     "shiny",
     "v1.4",
     "utility_functions.R"

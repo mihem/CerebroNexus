@@ -20,7 +20,7 @@
 set.seed(42)
 
 suppressMessages({
-  library(cerebroAppLite)
+  library(CerebroNexus)
   library(monocle)
   library(Matrix)
 })

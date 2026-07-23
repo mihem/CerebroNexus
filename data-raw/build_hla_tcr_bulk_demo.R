@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ============================================================================
 # NOT SHIPPED (since 2026-07-21). This script still runs and is maintained, but
-# the .crb it writes is no longer tracked or installed: cerebroAppLite is a
+# the .crb it writes is no longer tracked or installed: CerebroNexus is a
 # single-cell application and this cohort is bulk. Kept because it is the
 # reference pipeline for bringing a bulk cohort in (see the "HLA Associations on
 # bulk TCRb" vignette), and because its single-copy HLA calls are the only thing
@@ -60,7 +60,7 @@
 #   Rscript data-raw/build_hla_tcr_bulk_demo.R
 # ============================================================================
 
-suppressMessages(library(cerebroAppLite))
+suppressMessages(library(CerebroNexus))
 
 set.seed(42)
 

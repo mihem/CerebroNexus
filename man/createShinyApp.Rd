@@ -19,7 +19,7 @@ createShinyApp(
   verbose = TRUE,
   crb_pick_smallest_file = TRUE,
   show_upload_ui = TRUE,
-  welcome_message = "Welcome to Cerebro App!",
+  welcome_message = "Welcome to CerebroNexus!",
   point_size = list(overview_projection_point_size = NULL),
   variable_to_compare = NULL,
   spatial_images = NULL,

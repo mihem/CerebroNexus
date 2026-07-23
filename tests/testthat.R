@@ -1,4 +1,4 @@
 library(testthat)
-library(cerebroAppLite)
+library(CerebroNexus)
 
-test_check("cerebroAppLite")
+test_check("CerebroNexus")

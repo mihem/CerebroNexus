@@ -397,7 +397,7 @@ observeEvent(input[["trekker_moran_info"]], {
     HTML(
       "Spatial autocorrelation from the upstream Trekker pipeline
       (<code>..._variable_features_spatial_moransi.txt</code>). It is computed
-      differently from Cerebro's own Moran's I (Euclidean 6-NN), so the two are
+      differently from CerebroNexus's own Moran's I (Euclidean 6-NN), so the two are
       labelled separately and are not interchangeable."
     )
   ))

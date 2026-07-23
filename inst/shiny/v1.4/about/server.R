@@ -5,7 +5,7 @@
 ##
 output[["about"]] <- renderText({
   ## The launcher or exporter records the version in app configuration while
-  ## cerebroAppLite is available. Standalone bundles therefore render this page
+  ## CerebroNexus is available. Standalone bundles therefore render this page
   ## without querying (or requiring) the package at runtime.
   version <- Cerebro.options[["cerebro_version"]]
   if (
@@ -19,7 +19,7 @@ output[["about"]] <- renderText({
     version <- as.character(version[[1]])
   }
   paste0(
-    '<b>Version of cerebroAppLite</b><br>
+    '<b>Version of CerebroNexus</b><br>
     v',
     version,
     '<br>
@@ -31,17 +31,17 @@ output[["about"]] <- renderText({
     <br>
     <b>Links</b><br>
     <ul>
-      <li><a href=https://github.com/mihem/cerebroAppLite title="Continuation and extension of cerebroApp (Michael Heming)" target="_blank"><b>Continuation and extension of cerebroApp (Michael Heming)</b></a></li>
+      <li><a href=https://github.com/mihem/CerebroNexus title="CerebroNexus on GitHub" target="_blank"><b>CerebroNexus on GitHub</b></a></li>
       <li><a href=https://github.com/romanhaa/Cerebro title="Discontinued Cerebro repository on GitHub (Roman Hillje)" target="_blank"><b>Discontinued Cerebro repository on GitHub (Roman Hillje)</b></a></li>
     </ul>
     <br>
     <b>Citation</b><br>
-    If you used Cerebro for your research, please cite the following publication:
+    If you used CerebroNexus for your research, please cite the original Cerebro publication:
     <br>
     Roman Hillje, Pier Giuseppe Pelicci, Lucilla Luzi, Cerebro: Interactive visualization of scRNA-seq data, Bioinformatics, btz877, <a href=https://doi.org/10.1093/bioinformatics/btz877 title="DOI" target="_blank">https://doi.org/10.1093/bioinformatics/btz877</a><br>
     <br>
     <b>License</b><br>
-    cerebroAppLite is distributed under the terms of the <a href=https://github.com/mihem/cerebroAppLite/blob/master/LICENSE.md title="MIT license" target="_blank">MIT license.</a><br>
+    CerebroNexus is distributed under the terms of the <a href=https://github.com/mihem/CerebroNexus/blob/master/LICENSE.md title="MIT license" target="_blank">MIT license.</a><br>
     <br>
     <b>Credit where credit is due</b><br>
     <ul>

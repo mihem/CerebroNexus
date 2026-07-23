@@ -72,7 +72,7 @@ hla_build_manifest <- function(
   }
   fields <- list(
     "generated_at" = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
-    "cerebroAppLite_version" = na_blank(app_version),
+    "CerebroNexus_version" = na_blank(app_version),
     "dataset" = na_blank(dataset),
     "chain" = na_blank(chain),
     "observation_unit" = na_blank(observation_unit),

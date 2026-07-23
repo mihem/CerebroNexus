@@ -17,7 +17,7 @@ repo_file <- function(...) {
   if (length(stripped)) {
     p <- system.file(
       do.call(file.path, as.list(stripped)),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     )
     if (nzchar(p)) {
       return(p)

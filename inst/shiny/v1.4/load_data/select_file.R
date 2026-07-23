@@ -55,7 +55,7 @@ output[["load_data_select_file_UI"]] <- renderUI({
 })
 
 ##----------------------------------------------------------------------------##
-## Text message if Cerebro was launched in "open" mode.
+## Text message if CerebroNexus was launched in "open" mode.
 ##----------------------------------------------------------------------------##
 
 output[["load_data_mode_open"]] <- renderText({
@@ -66,14 +66,14 @@ output[["load_data_mode_open"]] <- renderText({
     HTML(Cerebro.options[["welcome_message"]])
   } else {
     HTML(
-      "<h3 style='text-align: center; margin-top: 0px'><strong>Welcome to Cerebro!</strong></h3>
+      "<h3 style='text-align: center; margin-top: 0px'><strong>Welcome to CerebroNexus!</strong></h3>
       <p style='text-align: center'>Please load your data set or take a look at the pre-loaded data.</p>"
     )
   }
 })
 
 ##----------------------------------------------------------------------------##
-## Text message if Cerebro was launched in "closed" mode.
+## Text message if CerebroNexus was launched in "closed" mode.
 ##----------------------------------------------------------------------------##
 
 output[["load_data_mode_closed"]] <- renderText({
@@ -84,8 +84,8 @@ output[["load_data_mode_closed"]] <- renderText({
     HTML(Cerebro.options[["welcome_message"]])
   } else {
     HTML(
-      "<h3 style='text-align: center; margin-top: 0px'><strong>Welcome to Cerebro!</strong></h3>
-      <p style='text-align: center'>Cerebro was launched in 'closed' mode, which means you cannot load your own data set. Instead, take a look at the pre-loaded data.</p>
+      "<h3 style='text-align: center; margin-top: 0px'><strong>Welcome to CerebroNexus!</strong></h3>
+      <p style='text-align: center'>CerebroNexus was launched in 'closed' mode, which means you cannot load your own data set. Instead, take a look at the pre-loaded data.</p>
       <br>"
     )
   }

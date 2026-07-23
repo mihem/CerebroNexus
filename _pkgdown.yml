@@ -1,4 +1,4 @@
-url: https://mihem.github.io/cerebroAppLite/
+url: https://mihem.github.io/CerebroNexus/
 
 template:
   bootstrap: 5
@@ -11,9 +11,11 @@ navbar:
   components:
     github:
       icon: fab fa-github
-      href: https://github.com/mihem/cerebroAppLite
+      aria-label: GitHub repository
+      href: https://github.com/mihem/CerebroNexus
     homepage:
       icon: fas fa-globe
+      aria-label: Maintainer website
       href: https://mheming.com/
 
 reference:

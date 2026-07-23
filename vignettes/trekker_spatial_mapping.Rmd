@@ -68,7 +68,7 @@ Three ideas shape the page:
    the Trekker `.crb` carries no histology raster. That is correct, not an
    omission.
 
-cerebroAppLite only **ingests and displays** the vendor pipeline's output; it
+CerebroNexus only **ingests and displays** the vendor pipeline's output; it
 never runs the vendor Primary Analysis Pipeline (that is an HPC/cloud job far
 larger than a Shiny session).
 
@@ -129,7 +129,7 @@ you switch between all three so the discrepancy is visible rather than hidden.
 
 The rest of this section is `data-raw/build_trekker_demo.R`, narrated. It needs
 `Seurat`, `Matrix`, the `magick` and `base64enc` packages (build-time only), and
-the in-tree cerebroAppLite (for the new `trekker` slot on `Cerebro_v1.3`).
+the in-tree CerebroNexus (for the new `trekker` slot on `Cerebro_v1.3`).
 
 ## Setup
 
@@ -307,7 +307,7 @@ The whole build is one command:
 The bundled app already lists the demo, so it is one dropdown click:
 
 ```{r, eval = FALSE}
-shiny::runApp(system.file("app.R", package = "cerebroAppLite"))
+shiny::runApp(system.file("app.R", package = "CerebroNexus"))
 # choose "Mouse brain (Trekker)" in the "Select dataset:" switcher
 ```
 

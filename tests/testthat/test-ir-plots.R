@@ -19,7 +19,7 @@ local_inst <- inst_candidates[
 example_crb <- if (!is.na(local_inst)) {
   file.path(local_inst, "extdata/v1.4/example.crb")
 } else {
-  system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+  system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
 }
 
 # Annotate the IR list with cell metadata by barcode (mirrors ir_data_annotated
@@ -82,7 +82,7 @@ length_helpers <- file.path(
 if (is.na(local_inst)) {
   length_helpers <- system.file(
     "shiny/v1.4/immune_repertoire/length_helpers.R",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
 }
 
@@ -337,7 +337,7 @@ test_that("BCR isotype/SHM helpers produce a plot for the bundled BCR data", {
   shiny_root <- if (!is.na(local_inst)) {
     file.path(local_inst, "shiny/v1.4")
   } else {
-    system.file("shiny/v1.4", package = "cerebroAppLite")
+    system.file("shiny/v1.4", package = "CerebroNexus")
   }
   # source the BCR helpers in an environment with the needed deps
   helper_src <- file.path(shiny_root, "immune_repertoire", "server.R")

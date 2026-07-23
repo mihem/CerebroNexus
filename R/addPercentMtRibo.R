@@ -19,7 +19,7 @@
 #'
 #' @examples
 #' pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-#'   package = "cerebroAppLite"))
+#'   package = "CerebroNexus"))
 #' pbmc <- addPercentMtRibo(
 #'   object = pbmc,
 #'   assay = 'RNA',
@@ -125,7 +125,7 @@ addPercentMtRibo <- function(
         gene_nomenclature,
         '.tsv.gz'
       ),
-      package = 'cerebroAppLite'
+      package = 'CerebroNexus'
     ),
     col_types = readr::cols(),
     col_names = FALSE
@@ -142,7 +142,7 @@ addPercentMtRibo <- function(
         gene_nomenclature,
         '.tsv.gz'
       ),
-      package = 'cerebroAppLite'
+      package = 'CerebroNexus'
     ),
     col_types = readr::cols(),
     col_names = FALSE
@@ -232,7 +232,7 @@ addPercentMtRibo <- function(
         ' mitochondrial transcript(s) present in the data set...'
       )
     )
-    values_mt <- cerebroAppLite::calculatePercentGenes(
+    values_mt <- CerebroNexus::calculatePercentGenes(
       object,
       assay = assay,
       list('genes_mt' = genes_mt_here)
@@ -264,7 +264,7 @@ addPercentMtRibo <- function(
         ' ribosomal transcript(s) present in the data set...'
       )
     )
-    values_ribo <- cerebroAppLite::calculatePercentGenes(
+    values_ribo <- CerebroNexus::calculatePercentGenes(
       object,
       assay = assay,
       list('genes_ribo' = genes_ribo_here)

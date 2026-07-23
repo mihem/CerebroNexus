@@ -11,7 +11,7 @@ skip_if_not_installed("Seurat")
 
 pbmc_path <- system.file(
   "extdata/v1.4/pbmc_seurat.rds",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 if (!nzchar(pbmc_path)) {
   pbmc_path <- testthat::test_path("../../inst/extdata/v1.4/pbmc_seurat.rds")
@@ -214,7 +214,7 @@ test_that("h5 attach is lazy: .attachExternalExpression returns a DelayedMatrix
   ## not part of the package namespace
   inst_util <- system.file(
     "shiny/v1.4/utility_functions.R",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   if (!nzchar(inst_util)) {
     inst_util <- testthat::test_path(

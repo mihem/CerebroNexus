@@ -157,14 +157,14 @@ launchCerebroV1.4 <- function(
   Cerebro.options <<- list(
     "mode" = mode,
     "cerebro_version" = as.character(
-      utils::packageVersion("cerebroAppLite")
+      utils::packageVersion("CerebroNexus")
     ),
     "expression_matrix_mode" = expression_matrix_mode,
     "crb_file_to_load" = crb_file_to_load,
     "expression_matrix_h5" = expression_matrix_h5,
     "expression_matrix_BPCells" = expression_matrix_BPCells,
     "welcome_message" = welcome_message,
-    "cerebro_root" = system.file(package = "cerebroAppLite"),
+    "cerebro_root" = system.file(package = "CerebroNexus"),
     "overview_default_point_size" = overview_default_point_size,
     "overview_default_point_opacity" = overview_default_point_opacity,
     "overview_default_percentage_cells_to_show" = overview_default_percentage_cells_to_show,
@@ -185,14 +185,14 @@ launchCerebroV1.4 <- function(
   source(
     system.file(
       paste0("shiny/v1.4/shiny_UI.R"),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     ),
     local = TRUE
   )
   source(
     system.file(
       paste0("shiny/v1.4/shiny_server.R"),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     ),
     local = TRUE
   )

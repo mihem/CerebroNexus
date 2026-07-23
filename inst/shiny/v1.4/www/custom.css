@@ -186,10 +186,8 @@ body.skin-blue .main-sidebar {
   box-shadow: none !important;
 }
 body.skin-blue .sidebar { padding-top: 4px; }
-/* Brand block at the top of the sidebar — an inline SVG wordmark (a lowercase
-   geometric wordmark + a dark "single cell" chip). The wordmark
-   text uses currentColor so it inherits the sidebar's text colour; the chip is a
-   fixed dark pill. */
+/* Brand block at the top of the sidebar. The inline SVG wordmark inherits the
+   sidebar text colour, with an accent on "Nexus". */
 body.skin-blue .sidebar .cerebro-brand {
   color: var(--c-text) !important;
   padding: 18px 20px 12px;

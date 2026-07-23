@@ -1,7 +1,7 @@
 library(shinytest2)
 
 ## Locate inst/ whether running via devtools::test() or R CMD check
-inst_dir <- system.file(package = "cerebroAppLite")
+inst_dir <- system.file(package = "CerebroNexus")
 if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
   inst_dir <- testthat::test_path("../../inst")
 }
@@ -332,7 +332,7 @@ test_that("{shinytest2} recording: about", {
 })
 
 test_that("createShinyApp bundles a working app", {
-  example <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+  example <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
   skip_if_not(nzchar(example), "example.crb not found")
 
   tmp <- file.path(tempdir(), "demo.crb")

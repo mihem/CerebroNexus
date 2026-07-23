@@ -10,7 +10,7 @@
 ##   3. standalone bundle  — createShinyApp() output   (package NEVER loaded)
 ##
 ## Mode 3 is the strict one: the generated bundle is self-contained and must not
-## name cerebroAppLite anywhere in its source (see R/createShinyApp.R and
+## name CerebroNexus anywhere in its source (see R/createShinyApp.R and
 ## tests/testthat/test-smoke-production.R). So the shim cannot reach into the
 ## namespace — not getFromNamespace(), not requireNamespace().
 ##

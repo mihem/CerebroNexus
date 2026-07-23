@@ -32,11 +32,11 @@ log fold-change values on a diverging colour scale.
 # Quick start
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 launchCerebroV1.4()
 ```
 
-1. Launch cerebroAppLite and load a `.crb` file with enrichment results
+1. Launch CerebroNexus and load a `.crb` file with enrichment results
 2. If enrichment data is present, **Enriched pathways** appears in the sidebar
 3. Choose an enrichment method (e.g., `cerebro_seurat_enrichr`)
 4. Choose a grouping variable (e.g., `seurat_clusters`)

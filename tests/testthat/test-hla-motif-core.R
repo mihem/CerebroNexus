@@ -612,7 +612,7 @@ test_that("no user-facing string calls the max mismatch a diameter", {
     readLines(
       system.file(
         "shiny/v1.4/hla_tcr_motifs/visualizations.R",
-        package = "cerebroAppLite"
+        package = "CerebroNexus"
       ),
       warn = FALSE
     ),

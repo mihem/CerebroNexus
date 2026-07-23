@@ -35,11 +35,11 @@ extra content is needed.
 # Quick start
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 launchCerebroV1.4()
 ```
 
-1. Launch cerebroAppLite and load a `.crb` file with extra material
+1. Launch CerebroNexus and load a `.crb` file with extra material
 2. If extra material is present, **Extra material** appears in the sidebar
 3. Select a category (`tables` or `plots`)
 4. Choose a specific table or plot to view

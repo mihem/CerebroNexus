@@ -1132,7 +1132,7 @@ Cerebro_v1.3 <- R6::R6Class(
       # This must NOT call a package-internal helper (e.g. hla_normalize_typing)
       # to synthesise the empty table. A .crb is an R6 object whose methods are
       # serialized with an enclosing environment that references the
-      # cerebroAppLite namespace; a createShinyApp() bundle never loads that
+      # CerebroNexus namespace; a createShinyApp() bundle never loads that
       # namespace, so a method reaching into it fails at runtime with
       # "could not find function". The object's own print() calls this getter,
       # so the failure cascades and the app never reaches a stable state.

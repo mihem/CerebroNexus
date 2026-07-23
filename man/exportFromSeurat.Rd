@@ -128,7 +128,7 @@ genotype is never mistaken for a directly typed one.
 
 \examples{
 pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-  package = "cerebroAppLite"))
+  package = "CerebroNexus"))
 exportFromSeurat(
   object = pbmc,
   file = file.path(tempdir(), 'pbmc_Seurat.crb'),

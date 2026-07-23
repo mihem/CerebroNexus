@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 
 # Overview
 
-`createShinyApp()` bundles a Cerebro v1.4 Shiny app into a single output directory. It copies the Shiny sources shipped under `inst/shiny/v1.4/`, the requested `.crb` (or `.rds`) data file(s), and the `inst/extdata/` reference files, and writes an `app.R` that wires everything together with a pre-built `Cerebro.options` list. The result is a directory you can serve directly with `shiny-server`, drop behind `rsconnect`/Posit Connect, or launch locally with `shiny::runApp()` — no further calls into `cerebroAppLite` are required at runtime.
+`createShinyApp()` bundles a Cerebro v1.4 Shiny app into a single output directory. It copies the Shiny sources shipped under `inst/shiny/v1.4/`, the requested `.crb` (or `.rds`) data file(s), and the `inst/extdata/` reference files, and writes an `app.R` that wires everything together with a pre-built `Cerebro.options` list. The result is a directory you can serve directly with `shiny-server`, drop behind `rsconnect`/Posit Connect, or launch locally with `shiny::runApp()` — no further calls into `CerebroNexus` are required at runtime.
 
 This is the recommended path when you want to hand a colleague a runnable copy of Cerebro pre-loaded with a specific data set without making them install the package themselves, pin the Shiny sources at a known revision alongside the data, or deploy to a host that doesn't run R interactively (`shinyapps.io`, Docker images, etc.).
 
@@ -33,9 +33,9 @@ This is the recommended path when you want to hand a colleague a runnable copy o
 The package ships an example `.crb` (and its sibling `.h5`) in `inst/extdata/v1.4/`, which we use throughout this vignette.
 
 ```{r}
-library(cerebroAppLite)
+library(CerebroNexus)
 
-crb <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+crb <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
 file.exists(crb)
 #> [1] TRUE
 ```
@@ -83,7 +83,7 @@ shiny::runApp(out_dir)
 The names of `cerebro_data` are what the user picks from inside Cerebro. You can also supply matching `colors` so each dataset gets a deterministic palette.
 
 ```{r}
-crb_pbmc <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+crb_pbmc <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
 # crb_other <- "/path/to/another_dataset.crb"
 
 createShinyApp(
@@ -108,7 +108,7 @@ If your `.crb` was exported with an external expression backend (`expression_mat
 
 ```{r}
 # example.crb ships with example.h5 in the same folder; both are bundled
-crb <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+crb <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
 file.exists(file.path(dirname(crb), "example.h5"))
 #> [1] TRUE
 ```

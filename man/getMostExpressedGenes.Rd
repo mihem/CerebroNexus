@@ -24,7 +24,7 @@ grouping variables in the meta data of the provided Seurat object.
 }
 \examples{
 pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-  package = "cerebroAppLite"))
+  package = "CerebroNexus"))
 pbmc <- getMostExpressedGenes(
   object = pbmc,
   assay = 'RNA',

@@ -38,7 +38,7 @@ Every command is meant to be copy-pasted and run from the package root; nothing 
 |---|---|---|---|---|
 | `demo_hla_tcr_dextramer.crb` | **real** | **real** | **real** | `build_hla_tcr_dextramer_demo.R` |
 
-Two earlier demos were **removed from the package** (2026-07-21). cerebroAppLite
+Two earlier demos were **removed from the package** (2026-07-21). CerebroNexus
 is a single-cell application, and a demo that is neither real nor single-cell
 earns its place only while nothing better exists:
 
@@ -361,7 +361,7 @@ A `.crb` is an R6 `Cerebro_v1.3` object written with `saveRDS()`. Building one f
 # absence when the LOCUS was called completely. Table S1 gives donors 1 and 2 a
 # single HLA-B allele, so a B-restricted binder call there is undecidable. The
 # rule is the package's own (hla_locus_call_state: complete at two copies).
-donor_typing_canonical <- cerebroAppLite:::hla_normalize_typing(donor_typing)
+donor_typing_canonical <- CerebroNexus:::hla_normalize_typing(donor_typing)
 genotype_key <- paste(donor_typing_canonical$sample, donor_typing_canonical$allele)
 # ... locus_complete built per (sample, locus) from hla_locus_call_state ...
 restriction_in_genotype <- ifelse(

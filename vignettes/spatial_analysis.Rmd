@@ -34,7 +34,7 @@ loaded. To also show a histological image behind the cells, pass its path
 through `createShinyApp()`:
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 
 createShinyApp(
   cerebro_data = c("My spatial sample" = "path/to/sample_spatial.crb"),
@@ -100,7 +100,7 @@ Spatial data must be embedded in the `.crb` file by the export pipeline.
 expression — no special flag is required.
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 
 seurat_obj <- qs::qread("path/to/seurat_object.qs")
 

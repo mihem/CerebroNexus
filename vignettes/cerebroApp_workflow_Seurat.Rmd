@@ -321,7 +321,7 @@ On top of querying the databases of the [Enrichr](https://amp.pharm.mssm.edu/Enr
 The `performGeneSetEnrichmentAnalysis()` function uses the [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html) method in combination with additional statistics as published by [Diaz-Mejia et. al.](https://f1000research.com/articles/8-296).
 
 ```{r performGeneSetEnrichmentAnalysis, eval=FALSE}
-example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "cerebroAppLite)
+example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "CerebroNexus")
 
 seurat <- performGeneSetEnrichmentAnalysis(
   seurat,

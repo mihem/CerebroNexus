@@ -1,4 +1,4 @@
-## Unit tests for cerebroAppLite R package functions
+## Unit tests for CerebroNexus R package functions
 ## These tests do NOT require a running Shiny app or Seurat.
 ## They test pure R logic: the Cerebro_v1.3 R6 class, data loading,
 ## and input validation in functions that can be tested without Seurat.
@@ -182,7 +182,7 @@ test_that("Cerebro_v1.3: version can be set and retrieved", {
 ## ---------------------------------------------------------------------------
 
 test_that("example.crb loads successfully and has correct structure", {
-  path <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+  path <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
   expect_true(file.exists(path))
 
   data <- readRDS(path)
@@ -202,7 +202,7 @@ test_that("example.crb loads successfully and has correct structure", {
 })
 
 test_that("example.crb contains expected groups and projections", {
-  path <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+  path <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
   data <- readRDS(path)
 
   expect_true("sample" %in% data$getGroups())
@@ -213,7 +213,7 @@ test_that("example.crb contains expected groups and projections", {
 })
 
 test_that("example.crb sample levels are as expected", {
-  path <- system.file("extdata/v1.4/example.crb", package = "cerebroAppLite")
+  path <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
   data <- readRDS(path)
 
   lvls <- data$getGroupLevels("sample")
@@ -223,7 +223,7 @@ test_that("example.crb sample levels are as expected", {
 })
 
 test_that("example.h5 file exists and is non-empty", {
-  path <- system.file("extdata/v1.4/example.h5", package = "cerebroAppLite")
+  path <- system.file("extdata/v1.4/example.h5", package = "CerebroNexus")
   expect_true(file.exists(path))
   expect_gt(file.size(path), 0)
 })

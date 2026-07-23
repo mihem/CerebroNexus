@@ -153,7 +153,7 @@ source(
 ## Create dashboard with different tabs.
 ##----------------------------------------------------------------------------##
 ui <- dashboardPage(
-  title = "Cerebro",
+  title = "CerebroNexus",
   ## Header is collapsed to zero height by the theme (see www/custom.css); the
   ## brand now lives at the top of the sidebar. We keep an empty
   ## dashboardHeader() because shinydashboard requires one for layout.
@@ -165,39 +165,15 @@ ui <- dashboardPage(
       HTML(
         paste0(
           '<svg class="cerebro-logo" xmlns="http://www.w3.org/2000/svg" ',
-          'viewBox="0 0 230 34" role="img" aria-labelledby="cb-logo-title">',
-          '<title id="cb-logo-title">cerebro — single cell</title>',
-          # Wordmark: rounded stroked geometric lowercase, font-independent.
-          # Round bowls are drawn with generous, well-separated
-          # geometry so glyphs never overlap. x-height band y=12..28, radius 7,
-          # advance ~21px, stroke 4, round caps/joins.
-          '<g fill="none" stroke="currentColor" stroke-width="4" ',
-          'stroke-linecap="round" stroke-linejoin="round">',
-          # c : open circle, gap on the right
-          '<path d="M17.9 15.05 A7 7 0 1 0 17.9 24.95"/>',
-          # e : bar across the middle + open arc (gap lower-right)
-          '<path d="M31 20 H45 A7 7 0 1 0 43.1 24.95"/>',
-          # r : stem + small shoulder
-          '<path d="M54 13 V28 M54 19 A6 6 0 0 1 63 16.2"/>',
-          # e
-          '<path d="M69 20 H83 A7 7 0 1 0 81.1 24.95"/>',
-          # b : tall stem + full round bowl (separate circle, no overlap)
-          '<path d="M92 4 V28"/><circle cx="99" cy="21" r="7"/>',
-          # r
-          '<path d="M113 13 V28 M113 19 A6 6 0 0 1 122 16.2"/>',
-          # o : full circle
-          '<circle cx="135" cy="21" r="7"/>',
-          '</g>',
-          # Dark "single cell" chip — smaller than the wordmark so the wordmark
-          # clearly reads as the primary mark, with the chip as a secondary tag.
-          # Square corners (rx=0), tight to the text.
-          '<g transform="translate(150,14)">',
-          '<rect x="0" y="0" width="63" height="17" rx="0" fill="#16171a"></rect>',
-          '<text x="31.5" y="12.2" text-anchor="middle" ',
+          'viewBox="0 0 210 38" role="img" aria-labelledby="cb-logo-title">',
+          '<title id="cb-logo-title">CerebroNexus</title>',
+          '<text x="0" y="27" fill="currentColor" ',
           'font-family="var(--font-sans),system-ui,sans-serif" ',
-          'font-size="10.5" font-weight="600" letter-spacing="0.2" ',
-          'fill="#ffffff">single cell</text>',
-          '</g></svg>'
+          'font-size="27" font-weight="650" letter-spacing="-0.6">Cerebro</text>',
+          '<text x="104" y="27" fill="#337ab7" ',
+          'font-family="var(--font-sans),system-ui,sans-serif" ',
+          'font-size="27" font-weight="750" letter-spacing="-0.6">Nexus</text>',
+          '</svg>'
         )
       )
     ),

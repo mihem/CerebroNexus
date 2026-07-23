@@ -9,7 +9,7 @@
 ir_utils_candidates <- c(
   testthat::test_path("../../inst/shiny/v1.4/utility_functions.R"),
   file.path(
-    system.file(package = "cerebroAppLite"),
+    system.file(package = "CerebroNexus"),
     "shiny",
     "v1.4",
     "utility_functions.R"

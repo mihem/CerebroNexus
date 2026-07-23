@@ -7,7 +7,7 @@ inst_candidates <- c(
 )
 inst_dir <- inst_candidates[file.exists(file.path(inst_candidates, "app.R"))][1]
 if (is.na(inst_dir)) {
-  inst_dir <- system.file(package = "cerebroAppLite")
+  inst_dir <- system.file(package = "CerebroNexus")
 }
 
 test_that("IR fill layout survives tab activation and responsive resize", {

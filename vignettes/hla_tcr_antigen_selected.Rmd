@@ -45,7 +45,7 @@ One HLA demo ships, and everything in it is measured:
 | HLA | **real** — the donors' published genotypes (table S1), measured independently of these cells |
 
 Earlier iterations shipped two others — a fully fabricated fixture and a real
-bulk TCRβ cohort. Both are gone: cerebroAppLite is a single-cell application, and
+bulk TCRβ cohort. Both are gone: CerebroNexus is a single-cell application, and
 a demo that is neither real nor single-cell earns its place only if nothing
 better exists. This one is both, so it replaces them. Their build pipelines
 remain in `data-raw/` (see `data-raw/hla.md`) if you want to reproduce them, and

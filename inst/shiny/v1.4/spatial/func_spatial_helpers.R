@@ -7,7 +7,7 @@
 ## R/.
 ##
 ## External calls stay namespaced (ape::Moran.I, grDevices::chull, stats::*), so
-## only the host packages need to be installed, not cerebroAppLite itself.
+## only the host packages need to be installed, not CerebroNexus itself.
 ##----------------------------------------------------------------------------##
 
 resolve_spatial_image_preset <- function(

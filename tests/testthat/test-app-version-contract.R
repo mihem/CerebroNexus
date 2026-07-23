@@ -1,5 +1,5 @@
 repo_file <- function(...) {
-  installed <- system.file(..., package = "cerebroAppLite")
+  installed <- system.file(..., package = "CerebroNexus")
   if (nzchar(installed)) {
     return(installed)
   }
@@ -26,7 +26,7 @@ test_that("the source demo supplies its version without a package lookup", {
     readLines(repo_file("app.R"), warn = FALSE),
     collapse = "\n"
   )
-  expected_version <- as.character(utils::packageVersion("cerebroAppLite"))
+  expected_version <- as.character(utils::packageVersion("CerebroNexus"))
 
   expect_match(
     app_source,

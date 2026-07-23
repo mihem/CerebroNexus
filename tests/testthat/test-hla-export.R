@@ -38,7 +38,7 @@ test_that("manifest records the parameters needed to recompute the view", {
   expect_equal(val("hla_source_type"), "genotyped")
   expect_equal(val("minimum_motif_nodes"), "3")
   expect_equal(val("node_key"), "V gene + CDR3")
-  expect_equal(val("cerebroAppLite_version"), "9.9.9")
+  expect_equal(val("CerebroNexus_version"), "9.9.9")
   # The edge rule is fixed, and the export must say so rather than leave a
   # reader to assume some other distance was used.
   expect_match(val("edge_rule"), "Hamming distance == 1")

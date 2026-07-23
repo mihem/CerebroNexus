@@ -1,9 +1,9 @@
 # test-extra_material.R — Tests for extra material module
 
-shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
+shiny_root <- system.file("shiny/v1.4", package = "CerebroNexus")
 example_crb <- system.file(
   "extdata/v1.4/example.crb",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 
 fresh_extra_material_crb <- function(include_plots = FALSE) {

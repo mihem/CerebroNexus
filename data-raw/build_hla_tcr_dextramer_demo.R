@@ -5,7 +5,7 @@
 # ============================================================================
 # This is the ONLY HLA demo the package ships. It replaced two earlier ones
 # (2026-07-21): a fully fabricated fixture and a real BULK TCRb cohort. Neither
-# was both real and single-cell, and cerebroAppLite is a single-cell app. Their
+# was both real and single-cell, and CerebroNexus is a single-cell app. Their
 # build scripts are kept in data-raw/ as the reproducibility record --
 # build_hla_tcr_demo.R and build_hla_tcr_bulk_demo.R -- but what they write into
 # inst/extdata/v1.4/ is no longer tracked or installed. See data-raw/hla.md S1.
@@ -522,7 +522,7 @@ cat("== 6. assemble .crb ==\n")
 ## false-negative bias hla_allele_status_by_unit() refuses to take. The rule
 ## used here is the package's own (hla_locus_call_state: a locus is complete at
 ## two copies), applied to the canonical form of the same table the object ships.
-donor_typing_canonical <- cerebroAppLite:::hla_normalize_typing(donor_typing)
+donor_typing_canonical <- CerebroNexus:::hla_normalize_typing(donor_typing)
 genotype_key <- paste(
   donor_typing_canonical$sample,
   donor_typing_canonical$allele
@@ -531,7 +531,7 @@ donor_samples <- unique(donor_typing_canonical$sample)
 locus_complete <- do.call(
   rbind,
   lapply(unique(donor_typing_canonical$locus), function(lc) {
-    st <- cerebroAppLite:::hla_locus_call_state(
+    st <- CerebroNexus:::hla_locus_call_state(
       donor_typing_canonical,
       donor_samples,
       lc
@@ -548,7 +548,7 @@ locus_complete <- do.call(
 # it is mapped rather than handed the column.
 sel_locus <- vapply(
   sel$dextramer_allele,
-  cerebroAppLite:::hla_allele_locus,
+  CerebroNexus:::hla_allele_locus,
   character(1),
   USE.NAMES = FALSE
 )
@@ -749,7 +749,7 @@ stopifnot(
   "repertoire lost or gained observations" = length(ctaa) == nrow(m),
   "not every observation is paired alpha/beta" = all(is_paired(ctaa))
 )
-chains <- cerebroAppLite:::hla_detect_chains(ir)
+chains <- CerebroNexus:::hla_detect_chains(ir)
 stopifnot(
   "both TRA and TRB must be detectable" = all(c("TRA", "TRB") %in% chains)
 )
@@ -762,10 +762,10 @@ cat(sprintf(
 ## -- the motif network must actually be worth drawing
 motif_counts <- list()
 for (ch in c("TRB", "TRA")) {
-  seg <- cerebroAppLite:::hla_parse_ir_segments(ir, ch)
+  seg <- CerebroNexus:::hla_parse_ir_segments(ir, ch)
   stopifnot("no segments parsed" = !is.null(seg) && nrow(seg) > 0)
-  g <- cerebroAppLite:::hla_build_motif_graph(seg, by_v = TRUE, min_nodes = 2L)
-  stopifnot("no usable motif graph" = cerebroAppLite:::hla_motif_graph_ok(g))
+  g <- CerebroNexus:::hla_build_motif_graph(seg, by_v = TRUE, min_nodes = 2L)
+  stopifnot("no usable motif graph" = CerebroNexus:::hla_motif_graph_ok(g))
   motif_counts[[ch]] <- c(
     nodes = igraph::vcount(g),
     motifs = length(unique(igraph::V(g)$cluster))

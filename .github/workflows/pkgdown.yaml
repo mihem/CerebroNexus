@@ -38,7 +38,7 @@ jobs:
       - name: Install R package dependencies
         run: nix-shell default.nix --run "echo 'R package dependencies installed'"
 
-      - name: Install cerebroAppLite
+      - name: Install CerebroNexus
         run: |
           nix-shell default.nix --run "Rscript -e \"
             lib <- Sys.getenv('R_LIBS_USER')
@@ -56,6 +56,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
         with:
-          clean: false
+          clean: true
           branch: gh-pages
           folder: docs

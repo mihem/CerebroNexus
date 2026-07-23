@@ -71,7 +71,7 @@ object to visualize in Cerebro.
 }
 \examples{
 pbmc <- readRDS(system.file("extdata/v1.4/pbmc_SCE.rds",
-  package = "cerebroAppLite"))
+  package = "CerebroNexus"))
 exportFromSCE(
   object = pbmc,
   file = file.path(tempdir(), 'pbmc_SCE.crb'),

@@ -175,11 +175,11 @@ These are peripheral-blood B cells, not a bone-marrow developmental lineage. The
 # 4. Try it
 
 ```r
-library(cerebroAppLite)
+library(CerebroNexus)
 createShinyApp(
   cerebro_data = c(
     "PBMC - Full (T+B)" = system.file("extdata/v1.4/demo_full_tcr_bcr.crb",
-                                      package = "cerebroAppLite")
+                                      package = "CerebroNexus")
   )
 )
 ```

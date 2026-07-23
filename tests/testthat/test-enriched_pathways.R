@@ -1,9 +1,9 @@
 # test-enriched_pathways.R — Tests for enriched pathways module
 
-shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
+shiny_root <- system.file("shiny/v1.4", package = "CerebroNexus")
 example_crb <- system.file(
   "extdata/v1.4/example.crb",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 
 test_that("enriched_pathways module files parse without errors", {

@@ -121,7 +121,7 @@ createShinyApp <- function(
   verbose = TRUE,
   crb_pick_smallest_file = TRUE,
   show_upload_ui = TRUE,
-  welcome_message = "Welcome to Cerebro App!",
+  welcome_message = "Welcome to CerebroNexus!",
   point_size = list(
     overview_projection_point_size = NULL
   ),
@@ -254,9 +254,9 @@ createShinyApp <- function(
     "spatial_plot_rotation"
   )
 
-  if (!requireNamespace("cerebroAppLite", quietly = TRUE)) {
+  if (!requireNamespace("CerebroNexus", quietly = TRUE)) {
     stop(
-      "Package 'cerebroAppLite' is required but not installed.",
+      "Package 'CerebroNexus' is required but not installed.",
       call. = FALSE
     )
   }
@@ -283,10 +283,10 @@ createShinyApp <- function(
   dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
   # Copy Shiny source --------------------------------------------------------##
-  shiny_source <- system.file("shiny", package = "cerebroAppLite")
+  shiny_source <- system.file("shiny", package = "CerebroNexus")
   if (!dir.exists(shiny_source)) {
     stop(
-      "Shiny source files not found in cerebroAppLite package.",
+      "Shiny source files not found in CerebroNexus package.",
       call. = FALSE
     )
   }
@@ -376,10 +376,10 @@ createShinyApp <- function(
   if (verbose) {
     cat("Copying extdata files...\n")
   }
-  extdata_source <- system.file("extdata", package = "cerebroAppLite")
+  extdata_source <- system.file("extdata", package = "CerebroNexus")
   if (!dir.exists(extdata_source)) {
     stop(
-      "extdata source files not found in cerebroAppLite package.",
+      "extdata source files not found in CerebroNexus package.",
       call. = FALSE
     )
   }
@@ -399,10 +399,10 @@ createShinyApp <- function(
 
   cerebro_options[["mode"]] <- "open"
   ## Resolve the version while the package is present, then serialize it into
-  ## the generated app. The standalone bundle never needs cerebroAppLite at
+  ## the generated app. The standalone bundle never needs CerebroNexus at
   ## runtime merely to render its About page.
   cerebro_options[["cerebro_version"]] <- as.character(
-    utils::packageVersion("cerebroAppLite")
+    utils::packageVersion("CerebroNexus")
   )
   cerebro_options[["crb_file_to_load"]] <- crb_files
   cerebro_options[["cerebro_root"]] <- "."

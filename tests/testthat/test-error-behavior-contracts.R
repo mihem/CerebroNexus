@@ -1,5 +1,5 @@
 read_bundled_source <- function(...) {
-  path <- system.file(..., package = "cerebroAppLite")
+  path <- system.file(..., package = "CerebroNexus")
   if (!nzchar(path)) {
     path <- testthat::test_path("..", "..", "inst", ...)
   }

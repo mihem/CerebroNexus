@@ -23,7 +23,7 @@
 #' matching lineage -> injected into a fresh Cerebro_v1.3 subset of example.crb.
 
 suppressMessages({
-  library(cerebroAppLite)
+  library(CerebroNexus)
   library(scRepertoire)
 })
 

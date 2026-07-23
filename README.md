@@ -1,14 +1,14 @@
-[![R-CMD-check (upstream)](https://github.com/mihem/cerebroAppLite/actions/workflows/R-cmd-check.yaml/badge.svg)](https://github.com/mihem/cerebroAppLite/actions/workflows/R-cmd-check.yaml)
+[![R-CMD-check (upstream)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 
 
 
-# cerebroAppLite
+# CerebroNexus
 
 Interactive visualization of single-cell RNA-seq data, built on top of [Shiny](https://shiny.posit.co/).
 
-cerebroAppLite supports loading pre-processed single-cell data, exploring projections and gene expression, browsing marker genes and enriched pathways, and inspecting group compositions — all through an interactive web interface. The sections below cover the key features.
+CerebroNexus supports loading pre-processed single-cell data, exploring projections and gene expression, browsing marker genes and enriched pathways, and inspecting group compositions — all through an interactive web interface. The sections below cover the key features.
 
 For the original feature set and data preparation workflows, refer to the upstream cerebroApp documentation at <https://romanhaa.github.io/cerebroApp/> — everything described there works the same way here.
 
@@ -33,7 +33,7 @@ For the original feature set and data preparation workflows, refer to the upstre
 ## 1. Installation
 
 ```r
-remotes::install_github('mihem/cerebroAppLite')
+remotes::install_github('mihem/CerebroNexus')
 ```
 
 ## 2. Features
@@ -43,7 +43,7 @@ remotes::install_github('mihem/cerebroAppLite')
 `convertSeuratToCerebro()` handles the entire export process in a single call: reading the Seurat object (`.rds` on disk, or one already loaded in memory), renaming grouping variables, loading marker gene tables, calculating most-expressed genes, and saving a `.crb` file.
 
 ```r
-library(cerebroAppLite)
+library(CerebroNexus)
 
 convertSeuratToCerebro(
   seurat_file     = "my_seurat.rds",     # or an in-memory Seurat object
@@ -175,7 +175,7 @@ Run it before pushing. CI air-formats **before** testing, so running the steps o
 
 ### 3.4 Self-containment of exported apps
 
-Apps built by `createShinyApp()` must stay **self-contained** — they run with no `cerebroAppLite` installed. `test-smoke-production.R` enforces this with a static source check, a hermetic `.crb` deserialize, and a hermetic bundle boot (each in a process whose library path lacks the package), so a bundle that reaches back into `cerebroAppLite` fails a test rather than a user. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the rule and where runtime code must live.
+Apps built by `createShinyApp()` must stay **self-contained** — they run with no `CerebroNexus` installed. `test-smoke-production.R` enforces this with a static source check, a hermetic `.crb` deserialize, and a hermetic bundle boot (each in a process whose library path lacks the package), so a bundle that reaches back into `CerebroNexus` fails a test rather than a user. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the rule and where runtime code must live.
 
 ### 3.5 Snapshots and further reading
 
@@ -185,4 +185,4 @@ See [`tests/README.md`](tests/README.md) for the full layout, the `inst_dir` res
 
 ## 4. License
 
-MIT — see [LICENSE.md](LICENSE.md). Original cerebroApp © Roman Hillje; cerebroAppLite fork by [mihem](https://github.com/mihem).
+MIT — see [LICENSE.md](LICENSE.md). Original cerebroApp © Roman Hillje; CerebroNexus fork by [mihem](https://github.com/mihem).

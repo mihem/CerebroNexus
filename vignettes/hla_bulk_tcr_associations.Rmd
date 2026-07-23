@@ -26,14 +26,14 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 # What this guide does
 
-cerebroAppLite is a single-cell application, and the demo it ships is single-cell: real cells, real paired TCR, real donor genotypes.
+CerebroNexus is a single-cell application, and the demo it ships is single-cell: real cells, real paired TCR, real donor genotypes.
 But the **HLA Associations** tab also accepts an input that has no cells at all — **bulk TCRβ immunosequencing paired with real donor HLA genotypes** — and this guide is how you bring your own.
 
 Nothing here is shipped with the package: there is no bundled bulk demo to open.
 Instead this guide shows you how to build one, either from a real public cohort ([Option A](#option-a-the-real-public-cohort-pubtcrs-emerson-2017)) or as a small synthetic object you can run in the next five minutes ([Option B](#option-b-a-small-synthetic-bulk-crb-you-can-run-now)).
 
 If you have not read the main guide, skim its "two ideas" section first — this one assumes you know what a CDR3, a motif, and an HLA allele are.
-As before, every code block runs on its own (base R + `Matrix` + `cerebroAppLite`, no downloads), and we print each object as we build it.
+As before, every code block runs on its own (base R + `Matrix` + `CerebroNexus`, no downloads), and we print each object as we build it.
 
 ## How bulk data is different
 
@@ -132,7 +132,7 @@ There is no Seurat object here (no cells), so we build the `Cerebro_v1.3` object
 
 ```{r, eval = FALSE}
 library(Matrix)
-library(cerebroAppLite)
+library(CerebroNexus)
 
 set.seed(7)
 donors <- sprintf("donor_%03d", 1:30)
@@ -385,8 +385,8 @@ Bulk immunoSEQ reports only the V family and the CDR3; the parser leaves `j_gene
 
 # Getting help
 
-- Questions and bug reports: <https://github.com/mihem/cerebroAppLite/issues>.
-- Function reference and other articles: <https://mihem.github.io/cerebroAppLite/>.
+- Questions and bug reports: <https://github.com/mihem/CerebroNexus/issues>.
+- Function reference and other articles: <https://mihem.github.io/CerebroNexus/>.
 - Provenance of every shipped demo data set: `data-raw/DATASETS.md`.
 
 # Session info

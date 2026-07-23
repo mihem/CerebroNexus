@@ -1,6 +1,6 @@
 .DS_Store
-cerebroApp.Rcheck
-cerebroApp_*.tar.gz
+CerebroNexus.Rcheck
+CerebroNexus_*.tar.gz
 .direnv
 .Rhistory
 .Rprofile

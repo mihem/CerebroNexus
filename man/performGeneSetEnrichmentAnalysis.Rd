@@ -51,9 +51,9 @@ al., F1000Research (2019).
 }
 \examples{
 pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-  package = "cerebroAppLite"))
+  package = "CerebroNexus"))
 example_gene_set <- system.file("extdata/example_gene_set.gmt",
-  package = "cerebroAppLite")
+  package = "CerebroNexus")
 pbmc <- performGeneSetEnrichmentAnalysis(
   object = pbmc,
   GMT_file = example_gene_set,

@@ -317,13 +317,13 @@ The bead scatter therefore **is** the complete spatial view.
 # 6. Try it
 
 ```r
-library(cerebroAppLite)
+library(CerebroNexus)
 createShinyApp(
   cerebro_data = c(
-    "Mouse brain (Visium)"             = system.file("extdata/v1.4/demo_spatial_visium.crb",   package = "cerebroAppLite"),
-    "Mouse hippocampus (Slide-seq v2)" = system.file("extdata/v1.4/demo_spatial_slideseq.crb", package = "cerebroAppLite"),
-    "Mouse ileum (MERFISH)"            = system.file("extdata/v1.4/demo_spatial_merfish.crb",  package = "cerebroAppLite"),
-    "Mouse brain (Xenium)"             = system.file("extdata/v1.4/demo_spatial_xenium.crb",   package = "cerebroAppLite")
+    "Mouse brain (Visium)"             = system.file("extdata/v1.4/demo_spatial_visium.crb",   package = "CerebroNexus"),
+    "Mouse hippocampus (Slide-seq v2)" = system.file("extdata/v1.4/demo_spatial_slideseq.crb", package = "CerebroNexus"),
+    "Mouse ileum (MERFISH)"            = system.file("extdata/v1.4/demo_spatial_merfish.crb",  package = "CerebroNexus"),
+    "Mouse brain (Xenium)"             = system.file("extdata/v1.4/demo_spatial_xenium.crb",   package = "CerebroNexus")
   )
 )
 ```

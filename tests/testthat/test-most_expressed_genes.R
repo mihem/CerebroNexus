@@ -1,9 +1,9 @@
 # test-most_expressed_genes.R — Tests for most expressed genes module
 
-shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
+shiny_root <- system.file("shiny/v1.4", package = "CerebroNexus")
 example_crb <- system.file(
   "extdata/v1.4/example.crb",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 
 test_that("most_expressed_genes module files parse without errors", {

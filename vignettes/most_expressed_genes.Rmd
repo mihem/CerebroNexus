@@ -31,11 +31,11 @@ in every `.crb` file.
 # Quick start
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 launchCerebroV1.4()
 ```
 
-1. Launch cerebroAppLite and load a `.crb` file
+1. Launch CerebroNexus and load a `.crb` file
 2. Click **Most expressed genes** in the sidebar
 3. Select a grouping variable (e.g., `seurat_clusters`, `sample`)
 4. The table shows, for each group, the gene name, mean expression, and

@@ -17,7 +17,7 @@ utils_file <- system.file(
   "shiny",
   "v1.4",
   "utility_functions.R",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 if (!nzchar(utils_file) || !file.exists(utils_file)) {
   utils_file <- testthat::test_path(

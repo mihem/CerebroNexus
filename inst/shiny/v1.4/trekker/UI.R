@@ -197,7 +197,7 @@ tab_trekker <- tabItem(
             class = "tk-hint",
             HTML(
               "Source: <code>..._variable_features_spatial_moransi.txt</code> (the upstream, ",
-              "vendor pipeline value). Cerebro's own Moran's I uses Euclidean 6-NN — a ",
+              "vendor pipeline value). CerebroNexus's own Moran's I uses Euclidean 6-NN — a ",
               "different algorithm — so the two are labelled separately and never mixed."
             )
           )

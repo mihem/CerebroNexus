@@ -58,7 +58,7 @@
 #   Rscript data-raw/build_hla_tcr_demo.R
 # ============================================================================
 
-suppressMessages(library(cerebroAppLite))
+suppressMessages(library(CerebroNexus))
 suppressMessages(library(Matrix))
 suppressMessages(library(stringdist))
 
@@ -1109,16 +1109,16 @@ cat("\nMeasured with the package motif core (NOT design parameters):\n")
 cat(
   "  chains detected:",
   paste(
-    cerebroAppLite:::hla_detect_chains(ir_check),
+    CerebroNexus:::hla_detect_chains(ir_check),
     collapse = ", "
   ),
   "\n"
 )
 
 for (ch in c("TRB", "TRA")) {
-  seg <- cerebroAppLite:::hla_parse_ir_segments(ir_check, ch)
-  nodes <- cerebroAppLite:::hla_aggregate_cdr3_nodes(seg, by_v = TRUE)
-  built <- cerebroAppLite:::hla_build_motif_groups(nodes, by_v = TRUE)
+  seg <- CerebroNexus:::hla_parse_ir_segments(ir_check, ch)
+  nodes <- CerebroNexus:::hla_aggregate_cdr3_nodes(seg, by_v = TRUE)
+  built <- CerebroNexus:::hla_build_motif_groups(nodes, by_v = TRUE)
   m <- built$motif_df
   sizes <- tapply(m$motif_size, m$motif_group, function(x) x[1])
   in_motif <- m[m$motif_size >= 2L, ]
@@ -1165,7 +1165,7 @@ stopifnot(
 ## Only the four loci the page enforces may be present.
 stopifnot(all(typing$locus %in% c("HLA-A", "HLA-B", "HLA-C", "HLA-DRB1")))
 
-summ <- cerebroAppLite:::hla_allele_carrier_summary(typing, samples = DONORS)
+summ <- CerebroNexus:::hla_allele_carrier_summary(typing, samples = DONORS)
 summ$contrast <- pmin(summ$n_carrier, summ$n_noncarrier)
 ranked <- summ[order(-summ$contrast, -summ$n_carrier, summ$allele), ]
 cat("\nAllele picker will lead with:\n")
@@ -1199,15 +1199,15 @@ ir_annot <- lapply(ir_check, function(df) {
   }
   df
 })
-seg <- cerebroAppLite:::hla_parse_ir_segments(ir_annot, "TRB")
-nodes <- cerebroAppLite:::hla_aggregate_cdr3_nodes(
+seg <- CerebroNexus:::hla_parse_ir_segments(ir_annot, "TRB")
+nodes <- CerebroNexus:::hla_aggregate_cdr3_nodes(
   seg,
   meta_cols = c("sample", "cell_type_fine"),
   by_v = TRUE
 )
-m <- cerebroAppLite:::hla_build_motif_groups(nodes, by_v = TRUE)$motif_df
+m <- CerebroNexus:::hla_build_motif_groups(nodes, by_v = TRUE)$motif_df
 m <- m[m$motif_size >= 2L, ]
-st <- cerebroAppLite:::hla_node_carrier_status(
+st <- CerebroNexus:::hla_node_carrier_status(
   m$samples_all,
   typing,
   names(ir_annot),
@@ -1230,11 +1230,11 @@ cat(sprintf(
 ## there is no contrast to see.
 stopifnot(sum(pure) >= 2L, mean(st == "Carrier") < 0.75)
 
-origin <- cerebroAppLite:::hla_node_sample_origin(m$samples_all)
-shared_rate <- mean(origin == cerebroAppLite:::HLA_SHARED_LABEL, na.rm = TRUE)
+origin <- CerebroNexus:::hla_node_sample_origin(m$samples_all)
+shared_rate <- mean(origin == CerebroNexus:::HLA_SHARED_LABEL, na.rm = TRUE)
 cat(sprintf(
   "Sample origin: %d of %d motif nodes Shared (%.0f%%)\n",
-  sum(origin == cerebroAppLite:::HLA_SHARED_LABEL, na.rm = TRUE),
+  sum(origin == CerebroNexus:::HLA_SHARED_LABEL, na.rm = TRUE),
   length(origin),
   100 * shared_rate
 ))

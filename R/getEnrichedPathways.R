@@ -28,7 +28,7 @@
 #' @examples
 #' if (interactive()) {
 #'   pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-#'     package = "cerebroAppLite"))
+#'     package = "CerebroNexus"))
 #'   pbmc <- getEnrichedPathways(
 #'     object = pbmc,
 #'     marker_genes_input = 'cerebro_seurat',

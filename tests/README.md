@@ -86,8 +86,8 @@ Inside an `R CMD check` run, the suite is invoked through `tests/testthat.R`, wh
 
 ```r
 library(testthat)
-library(cerebroAppLite)
-test_check("cerebroAppLite")
+library(CerebroNexus)
+test_check("CerebroNexus")
 ```
 
 ### Picking the right entry point
@@ -95,7 +95,7 @@ test_check("cerebroAppLite")
 | Entry point | Requires the package to be installed? | `R/` source loaded from | `inst/` files read from |
 |---|---|---|---|
 | `devtools::test()` | no | dev source (via `pkgload::load_all`) | local `inst/` (`system.file()` is redirected by `load_all`) |
-| `Rscript tests/testthat.R` | yes (`library(cerebroAppLite)` aborts otherwise) | installed package | installed package |
+| `Rscript tests/testthat.R` | yes (`library(CerebroNexus)` aborts otherwise) | installed package | installed package |
 | `testthat::test_dir("tests/testthat")` | yes (same reason) | installed package | installed package |
 | `R CMD check` / CI | self-installs into a temp library | that temp install | that temp install |
 
@@ -106,18 +106,18 @@ While iterating on the package, use `devtools::test()` — it picks up edits to 
 ### How `inst_dir` is resolved in `test-app-inst.R`
 
 ```r
-inst_dir <- system.file(package = "cerebroAppLite")
+inst_dir <- system.file(package = "CerebroNexus")
 if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
   inst_dir <- testthat::test_path("../../inst")
 }
 ```
 
-In practice `system.file(package = "cerebroAppLite")` always resolves to something with `app.R` at its root:
+In practice `system.file(package = "CerebroNexus")` always resolves to something with `app.R` at its root:
 
 - Under `devtools::test()`, `pkgload::load_all()` redirects `system.file()` to `<project>/inst/` (the source tree itself acts as the "installed root").
-- Under `Rscript tests/testthat.R` or `testthat::test_dir()`, `library(cerebroAppLite)` has already loaded the installed package, so `system.file()` returns its install location.
+- Under `Rscript tests/testthat.R` or `testthat::test_dir()`, `library(CerebroNexus)` has already loaded the installed package, so `system.file()` returns its install location.
 
-The fallback to `testthat::test_path("../../inst")` is effectively dead code — none of the supported entry points reach it. (`library(cerebroAppLite)` aborts before the test file is sourced when the package is not installed; under `devtools::test()` the first branch already succeeds.)
+The fallback to `testthat::test_path("../../inst")` is effectively dead code — none of the supported entry points reach it. (`library(CerebroNexus)` aborts before the test file is sourced when the package is not installed; under `devtools::test()` the first branch already succeeds.)
 
 If you edit `inst/` and want the change reflected:
 

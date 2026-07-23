@@ -1,6 +1,6 @@
-Package: cerebroAppLite
+Package: CerebroNexus
 Title: Interactive visualization of single cell transcriptomics
-Version: 2.3.0
+Version: 3.0.0
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
@@ -8,9 +8,9 @@ Authors@R: c(
   )
 Author: Michael Heming, Roman Hillje, Xuesong Wang
 Maintainer: Michael Heming <mihem@mailbox.org>
-Description: cerebroAppLite is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.
-URL: https://mihem.github.io/cerebroAppLite/, https://github.com/mihem/cerebroAppLite
-BugReports: https://github.com/mihem/cerebroAppLite/issues
+Description: CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.
+URL: https://mihem.github.io/CerebroNexus/, https://github.com/mihem/CerebroNexus
+BugReports: https://github.com/mihem/CerebroNexus/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true

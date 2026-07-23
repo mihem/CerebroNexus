@@ -11,7 +11,7 @@
 ##   sequencing. Unlike Visium (spots) or Xenium/MERFISH (gene panels) it gives
 ##   REAL single nuclei x WHOLE transcriptome, usually WITHOUT a matched
 ##   histology image. The vendor pipeline outputs a Seurat RDS + several CSV/MTX
-##   companion files; cerebroAppLite only INGESTS and DISPLAYS that output, it
+##   companion files; CerebroNexus only INGESTS and DISPLAYS that output, it
 ##   never runs the vendor pipeline.
 ##
 ## DATA SOURCE (registration required, not redistributable here)

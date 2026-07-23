@@ -88,7 +88,7 @@
 #'
 #' @examples
 #' pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
-#'   package = "cerebroAppLite"))
+#'   package = "CerebroNexus"))
 #' exportFromSeurat(
 #'   object = pbmc,
 #'   file = file.path(tempdir(), 'pbmc_Seurat.crb'),
@@ -316,7 +316,7 @@ exportFromSeurat <- function(
   export$addExperiment('organism', organism)
 
   ## add cerebroApp version
-  export$setVersion(utils::packageVersion('cerebroAppLite'))
+  export$setVersion(utils::packageVersion('CerebroNexus'))
 
   ##--------------------------------------------------------------------------##
   ## add transcript counts

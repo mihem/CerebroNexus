@@ -29,11 +29,11 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 # What this guide does
 
-cerebroAppLite ships a standalone **HLA & TCR Motifs** page.
+CerebroNexus ships a standalone **HLA & TCR Motifs** page.
 This guide takes you all the way from *nothing* to *a running app on that page*: we invent a small immune data set from scratch, save it in Cerebro's file format, launch an app on it, and tour the page.
 
 You will build the data set step by step, and after each step we print the object you just made so you can see exactly what changed.
-Every code block runs on its own — the only packages you need are base R plus `Matrix`, `Seurat`, and `cerebroAppLite`, and nothing is downloaded.
+Every code block runs on its own — the only packages you need are base R plus `Matrix`, `Seurat`, and `CerebroNexus`, and nothing is downloaded.
 
 If your data is **bulk** TCR sequencing rather than single cells, read the companion guide *"HLA Associations on bulk TCRβ with real donor HLA"* instead; it uses real genotypes and a slightly different object.
 
@@ -108,7 +108,7 @@ We build them one at a time.
 ```{r, eval = FALSE}
 library(Matrix)
 library(Seurat)
-library(cerebroAppLite)
+library(CerebroNexus)
 
 set.seed(1) # makes every random step below reproducible
 ```
@@ -398,8 +398,8 @@ Notice `A*02:01` came back as `HLA-A*02:01`: the app normalises whatever spellin
 And the receptors really do form a network:
 
 ```{r, eval = FALSE}
-seg <- cerebroAppLite:::hla_parse_ir_segments(crb$immune_repertoire, "TRB")
-g <- cerebroAppLite:::hla_build_motif_graph(seg, by_v = TRUE, min_nodes = 6)
+seg <- CerebroNexus:::hla_parse_ir_segments(crb$immune_repertoire, "TRB")
+g <- CerebroNexus:::hla_build_motif_graph(seg, by_v = TRUE, min_nodes = 6)
 c(nodes = igraph::gorder(g), edges = igraph::gsize(g), families = igraph::components(g)$no)
 ```
 ```
@@ -611,13 +611,13 @@ Cells from one donor share that genotype, so they are not independent observatio
 
 - **Introduction to the cerebroApp workflow (Seurat)** — the general Seurat → `.crb` export basics, if this is your first Cerebro export; the HLA slots above just ride along with it.
 - **HLA Associations on bulk TCRβ with real donor HLA** — the companion workflow for bulk immunosequencing: real genotypes, no single cells, and the positive-control caveat that comes with them.
-- **Immune Repertoire Analysis in cerebroAppLite** — the scRepertoire-based module that produces the same `@misc$immune_repertoire` slot from real 10x data.
+- **Immune Repertoire Analysis in CerebroNexus** — the scRepertoire-based module that produces the same `@misc$immune_repertoire` slot from real 10x data.
 - `?exportFromSeurat`, `?createShinyApp`, and `?Cerebro_v1.3` (see `addHLATyping` / `getHLATyping`).
 
 # Getting help
 
-- Questions and bug reports: <https://github.com/mihem/cerebroAppLite/issues>.
-- Function reference and other articles: <https://mihem.github.io/cerebroAppLite/>.
+- Questions and bug reports: <https://github.com/mihem/CerebroNexus/issues>.
+- Function reference and other articles: <https://mihem.github.io/CerebroNexus/>.
 - Provenance of every shipped demo data set: `data-raw/DATASETS.md`.
 
 # Session info

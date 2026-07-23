@@ -85,7 +85,7 @@ test_that("multi-crb config lists both datasets by name", {
 
   expect_identical(
     cfg[["cerebro_version"]],
-    as.character(utils::packageVersion("cerebroAppLite"))
+    as.character(utils::packageVersion("CerebroNexus"))
   )
   expect_setequal(
     names(cfg[["crb_file_to_load"]]),
@@ -120,15 +120,15 @@ test_that("each dataset keeps its own background image + alignment params", {
 build_real_app <- function() {
   visium_crb <- system.file(
     "extdata/v1.4/demo_spatial_visium.crb",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   xenium_crb <- system.file(
     "extdata/v1.4/demo_spatial_xenium.crb",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   visium_png <- system.file(
     "extdata/v1.4/demo_spatial_visium_he.png",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   if (!all(nzchar(c(visium_crb, xenium_crb, visium_png)))) {
     return(NULL)
@@ -203,30 +203,30 @@ test_that("the generated app remains self-contained at runtime", {
   ## createShinyApp() copies the complete UI/server implementation. The bundle
   ## must therefore boot without resolving the package that created it.
   expect_false(grepl(
-    'requireNamespace("cerebroAppLite"',
+    'requireNamespace("CerebroNexus"',
     app_source,
     fixed = TRUE
   ))
-  expect_false(grepl("cerebroAppLite::", bundled_source, fixed = TRUE))
+  expect_false(grepl("CerebroNexus::", bundled_source, fixed = TRUE))
   expect_false(grepl(
-    "asNamespace(\"cerebroAppLite\"",
+    "asNamespace(\"CerebroNexus\"",
     bundled_source,
     fixed = TRUE
   ))
   expect_false(grepl(
-    'packageVersion("cerebroAppLite")',
+    'packageVersion("CerebroNexus")',
     bundled_source,
     fixed = TRUE
   ))
-  ## system.file(package = "cerebroAppLite") resolves to "" once the package is
+  ## system.file(package = "CerebroNexus") resolves to "" once the package is
   ## gone, silently breaking whatever resource it points at. The bundle must
   ## locate its own resources relative to cerebro_root, never via the package.
   expect_false(grepl(
-    'package = "cerebroAppLite"',
+    'package = "CerebroNexus"',
     bundled_source,
     fixed = TRUE
   ))
-  expect_false(grepl("library(cerebroAppLite", bundled_source, fixed = TRUE))
+  expect_false(grepl("library(CerebroNexus", bundled_source, fixed = TRUE))
 })
 
 test_that("the generated real-data app boots with the Spatial tab", {
@@ -300,10 +300,10 @@ test_that("the generated multi-crb app boots and switches datasets", {
 ## The static self-contained test above proves the BUNDLE SOURCE never names the
 ## package. This one proves the harder half: the .crb data itself. A .crb is an
 ## R6 object whose class lives in R/ (not in the copied bundle), so if any of its
-## methods reached into the cerebroAppLite namespace, readRDS would carry a
+## methods reached into the CerebroNexus namespace, readRDS would carry a
 ## namespace reference and fail once the package is gone. Load it in a child
-## process whose library path genuinely lacks cerebroAppLite and use it.
-test_that("a bundled dataset deserializes and works without cerebroAppLite", {
+## process whose library path genuinely lacks CerebroNexus and use it.
+test_that("a bundled dataset deserializes and works without CerebroNexus", {
   skip_if_not_installed("callr")
   skip_on_cran()
   skip_on_os("windows") # the hermetic library is built with symlinks
@@ -313,13 +313,13 @@ test_that("a bundled dataset deserializes and works without cerebroAppLite", {
   first_crb <- file.path(app$app_dir, cfg[["crb_file_to_load"]][[1]])
   expect_true(file.exists(first_crb))
 
-  ## Mirror the current library MINUS cerebroAppLite, so the child cannot resolve
-  ## the package that generated the app even if it tried to.
+  ## Exclude the package so serialized fixtures cannot conceal a namespace
+  ## dependency in a standalone bundle.
   hermetic_lib <- withr::local_tempdir()
   linked_any <- FALSE
   for (lib in .libPaths()) {
     for (pkg in list.dirs(lib, recursive = FALSE, full.names = FALSE)) {
-      if (identical(pkg, "cerebroAppLite")) {
+      if (identical(pkg, "CerebroNexus")) {
         next
       }
       dest <- file.path(hermetic_lib, pkg)
@@ -337,8 +337,8 @@ test_that("a bundled dataset deserializes and works without cerebroAppLite", {
   result <- callr::r(
     function(crb) {
       ## Prove the package really is unreachable before we rely on the result.
-      if (requireNamespace("cerebroAppLite", quietly = TRUE)) {
-        stop("cerebroAppLite is reachable; the library is not hermetic")
+      if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+        stop("CerebroNexus is reachable; the library is not hermetic")
       }
       obj <- readRDS(crb)
       list(
@@ -361,7 +361,7 @@ test_that("a bundled dataset deserializes and works without cerebroAppLite", {
 })
 
 ## Regression guard for a class of bug we have hit repeatedly: bundle code that
-## silently depends on cerebroAppLite being installed. The static grep above and
+## silently depends on CerebroNexus being installed. The static grep above and
 ## the deserialize test above each cover one half; this covers the runtime half
 ## for module code that loads package-authored helpers. The HLA module is the
 ## worst offender -- its pure core lives in R/ (not copied into a bundle) and it
@@ -371,11 +371,11 @@ test_that("a bundled dataset deserializes and works without cerebroAppLite", {
 ##
 ## The only faithful test is the production condition: build the bundle, then
 ## load its module code in a process whose library path genuinely lacks
-## cerebroAppLite -- exactly what a user who never installed the package has.
+## CerebroNexus -- exactly what a user who never installed the package has.
 ## If the core files were not copied into the bundle, or core_shim reached for
 ## the namespace, or a core file dropped off its source list, the functions the
 ## module calls by bare name go unbound here and this fails loudly.
-test_that("an exported bundle resolves the HLA core with no cerebroAppLite installed", {
+test_that("an exported bundle resolves the HLA core with no CerebroNexus installed", {
   skip_if_not_installed("callr")
   skip_on_cran()
   skip_on_os("windows") # the hermetic library is built with symlinks
@@ -384,13 +384,13 @@ test_that("an exported bundle resolves the HLA core with no cerebroAppLite insta
   shim <- file.path(app$app_dir, "shiny/v1.4/hla_tcr_motifs/core_shim.R")
   skip_if_not(file.exists(shim), "HLA module not present in bundle")
 
-  ## Mirror the current library MINUS cerebroAppLite, so the child genuinely
-  ## cannot resolve the package even if the bundle tried to.
+  ## Exclude the package so it cannot conceal a namespace dependency in a
+  ## bundle or serialized object.
   hermetic_lib <- withr::local_tempdir()
   linked_any <- FALSE
   for (lib in .libPaths()) {
     for (pkg in list.dirs(lib, recursive = FALSE, full.names = FALSE)) {
-      if (identical(pkg, "cerebroAppLite")) {
+      if (identical(pkg, "CerebroNexus")) {
         next
       }
       dest <- file.path(hermetic_lib, pkg)
@@ -408,8 +408,8 @@ test_that("an exported bundle resolves the HLA core with no cerebroAppLite insta
   result <- callr::r(
     function(app_dir) {
       ## Prove the package really is unreachable before we trust the result.
-      if (requireNamespace("cerebroAppLite", quietly = TRUE)) {
-        stop("cerebroAppLite is reachable; the library is not hermetic")
+      if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+        stop("CerebroNexus is reachable; the library is not hermetic")
       }
       ## Reproduce how the bundled app loads the HLA module: cerebro_root is the
       ## bundle root, and core_shim is sourced into the app-server scope.

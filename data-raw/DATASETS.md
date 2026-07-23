@@ -209,7 +209,7 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
 > `build_ir_demos.R` can also emit two narrower subsets — `demo_healthy_t.crb` (T + Mono, TCR only) and `demo_bcell_rich.crb` (B + few T, BCR only) — as a multi-sample switcher demo. They are **not shipped** by default; the Full set is their superset.
 
 ### demo_hla_tcr_synthetic.crb  — REMOVED 2026-07-21, no longer shipped
-> Removed from `inst/extdata/v1.4/`: cerebroAppLite is a single-cell application and this fixture was fabricated end to end. It existed only because real repertoires were thought too sparse to draw a network; `demo_hla_tcr_dextramer.crb` disproves that on measured sequences. The build script is kept and still runs — `data-raw/` is `.Rbuildignore`d, so it adds nothing to the installed package. Entry retained for provenance.
+> Removed from `inst/extdata/v1.4/`: CerebroNexus is a single-cell application and this fixture was fabricated end to end. It existed only because real repertoires were thought too sparse to draw a network; `demo_hla_tcr_dextramer.crb` disproves that on measured sequences. The build script is kept and still runs — `data-raw/` is `.Rbuildignore`d, so it adds nothing to the installed package. Entry retained for provenance.
 
 - **type**: immune_repertoire
 - **technology**: none — **fully synthetic**; simulates a 5' V(D)J + scRNA-seq cohort, measures nothing

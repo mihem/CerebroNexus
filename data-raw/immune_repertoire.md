@@ -74,7 +74,7 @@ The other input, `inst/extdata/v1.4/example.crb`, is already in the repository.
 Rscript data-raw/build_ir_demos.R
 ```
 
-Needs `cerebroAppLite` and `scRepertoire` (≥ 2.0) installed. Paths are overridable for a dry run into a scratch directory:
+Needs `CerebroNexus` and `scRepertoire` (≥ 2.0) installed. Paths are overridable for a dry run into a scratch directory:
 
 ```bash
 OUT_FULL=/tmp/full.crb OUT_HEALTHY=/tmp/h.crb OUT_BCELL=/tmp/b.crb \
@@ -205,11 +205,11 @@ Worth stating because "too many datasets" comes up periodically: the objection i
 # 5. Try it
 
 ```r
-library(cerebroAppLite)
+library(CerebroNexus)
 createShinyApp(
   cerebro_data = c(
     "PBMC - Full (T+B)" = system.file("extdata/v1.4/demo_full_tcr_bcr.crb",
-                                      package = "cerebroAppLite")
+                                      package = "CerebroNexus")
   )
 )
 ```

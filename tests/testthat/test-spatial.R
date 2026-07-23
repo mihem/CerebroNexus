@@ -4,12 +4,12 @@
 # tab wiring (Session B). Backend contract tests come first; the module-parse
 # and UI/server wiring guards follow.
 
-shiny_root <- system.file("shiny/v1.4", package = "cerebroAppLite")
+shiny_root <- system.file("shiny/v1.4", package = "CerebroNexus")
 # demo_spatial.crb is the synthetic Xenium demo that carries spatial data;
 # the other bundled demos (PBMC sets, trajectory) have no spatial field.
 spatial_crb <- system.file(
   "extdata/v1.4/demo_spatial.crb",
-  package = "cerebroAppLite"
+  package = "CerebroNexus"
 )
 
 test_that("demo_spatial.crb exposes spatial data via class methods", {
@@ -374,14 +374,14 @@ test_that("Visium ships its H&E as an EXTERNAL image, not embedded", {
   # spatial_images code path as a live example.
   png <- system.file(
     "extdata/v1.4/demo_spatial_visium_he.png",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   skip_if(png == "" || !file.exists(png), message = "visium H&E png missing")
   expect_gt(file.info(png)$size, 0)
 
   crb_path <- system.file(
     "extdata/v1.4/demo_spatial_visium.crb",
-    package = "cerebroAppLite"
+    package = "CerebroNexus"
   )
   skip_if(
     crb_path == "" || !file.exists(crb_path),
@@ -393,7 +393,7 @@ test_that("Visium ships its H&E as an EXTERNAL image, not embedded", {
 
   # app.R must wire the external image via spatial_images for the Visium dataset
   app_src <- paste(
-    readLines(system.file("app.R", package = "cerebroAppLite")),
+    readLines(system.file("app.R", package = "CerebroNexus")),
     collapse = "\n"
   )
   expect_match(app_src, "spatial_images", fixed = TRUE)
@@ -411,7 +411,7 @@ test_that("bundled real demos embed a genuine tissue image in the .crb", {
   )) {
     path <- system.file(
       file.path("extdata/v1.4", paste0(f, ".crb")),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
     crb <- readRDS(path)
@@ -450,7 +450,7 @@ real_spatial_demos <- c(
 
 test_that("each real spatial demo exposes coordinates with x/y", {
   for (nm in names(real_spatial_demos)) {
-    path <- system.file(real_spatial_demos[[nm]], package = "cerebroAppLite")
+    path <- system.file(real_spatial_demos[[nm]], package = "CerebroNexus")
     skip_if(
       path == "" || !file.exists(path),
       message = paste0(nm, " demo missing")
@@ -477,7 +477,7 @@ test_that("real spatial demos are wired into the bundled dropdown", {
   # The three technology-labelled demos must appear in app.R's crb_file_to_load
   # so the switcher offers them. Cross-line-tolerant per project convention.
   app_src <- paste(
-    readLines(system.file("app.R", package = "cerebroAppLite")),
+    readLines(system.file("app.R", package = "CerebroNexus")),
     collapse = "\n"
   )
   for (f in real_spatial_demos) {
@@ -500,7 +500,7 @@ test_that("image-free demo (Slide-seq) carries no histology image", {
   for (f in c("demo_spatial_slideseq")) {
     path <- system.file(
       file.path("extdata/v1.4", paste0(f, ".crb")),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
     crb <- readRDS(path)
@@ -516,7 +516,7 @@ test_that("embedded image demos store the image natively with no flip flag", {
   for (f in c("demo_spatial_xenium", "demo_spatial_merfish")) {
     path <- system.file(
       file.path("extdata/v1.4", paste0(f, ".crb")),
-      package = "cerebroAppLite"
+      package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
     crb <- readRDS(path)
@@ -532,7 +532,7 @@ test_that("app.R ships the Visium H&E overlay pre-aligned", {
   # sets the per-dataset alignment presets (move + scale + a vertical flip that
   # this dataset needs); the Spatial tab still lets users adjust or Reset.
   app_src <- paste(
-    readLines(system.file("app.R", package = "cerebroAppLite")),
+    readLines(system.file("app.R", package = "CerebroNexus")),
     collapse = "\n"
   )
   expect_match(app_src, "\"spatial_images_flip_y\"", fixed = TRUE)
@@ -567,7 +567,7 @@ test_that(".getSpatialData tolerates a real Slide-seq object (NA-named coord col
   tc <- Seurat::GetTissueCoordinates(obj)
   expect_true(any(is.na(colnames(tc))))
 
-  extractor <- getFromNamespace(".getSpatialData", "cerebroAppLite")
+  extractor <- getFromNamespace(".getSpatialData", "CerebroNexus")
   res <- extractor(obj, image = "image", layer = "counts", assay = "Spatial")
   expect_true(all(c("x", "y") %in% colnames(res$coordinates)))
   expect_true(nrow(res$coordinates) > 0)

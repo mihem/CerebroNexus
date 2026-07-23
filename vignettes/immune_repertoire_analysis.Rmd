@@ -1,5 +1,5 @@
 ---
-title: "Immune Repertoire Analysis in cerebroAppLite"
+title: "Immune Repertoire Analysis in CerebroNexus"
 author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -9,14 +9,14 @@ output:
     self_contained: yes
     mode: selfcontained
 vignette: >
-  %\VignetteIndexEntry{Immune Repertoire Analysis in cerebroAppLite}
+  %\VignetteIndexEntry{Immune Repertoire Analysis in CerebroNexus}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 # Overview
 
-cerebroAppLite v1.4 introduces a comprehensive **Immune Repertoire** module for
+CerebroNexus v1.4 introduces a comprehensive **Immune Repertoire** module for
 interactive exploration of T-cell and B-cell receptor clonotype data. The module
 leverages the `scRepertoire` package and supports 19 visualization methods covering
 clonal abundance, diversity, CDR3 properties, gene usage, and cross-sample
@@ -43,7 +43,7 @@ the module joins metadata onto them by barcode at runtime.
 The immune repertoire module is built on the
 [scRepertoire](https://www.borch.dev/uploads/screpertoire/) package (≥ 2.0),
 which is the standard tool for turning 10x Cell Ranger V(D)J output into
-per-cell clonotype annotations. cerebroAppLite lists it under `Suggests`, so
+per-cell clonotype annotations. CerebroNexus lists it under `Suggests`, so
 install it once before preparing data:
 
 ```{r, eval = FALSE}
@@ -54,7 +54,7 @@ BiocManager::install("scRepertoire")
 The full scRepertoire workflow is documented in its vignettes —
 [Loading data](https://www.borch.dev/uploads/screpertoire/articles/loading) and
 [Combining contigs](https://www.borch.dev/uploads/screpertoire/articles/combining_contigs).
-The steps below summarise just what cerebroAppLite needs.
+The steps below summarise just what CerebroNexus needs.
 
 ## Step 1 — load the V(D)J contigs
 
@@ -90,7 +90,7 @@ clonotypes per sample (cells are mutually exclusive — a cell has a TCR *or* a
 BCR):
 
 ```{r, eval = FALSE}
-library(cerebroAppLite)
+library(CerebroNexus)
 
 ir_cols <- c("barcode", "CTgene", "CTnt", "CTaa", "CTstrict")
 to_df <- function(x) x[, ir_cols, drop = FALSE]

@@ -6,15 +6,14 @@ tab_about <- tabItem(
   tabName = "about",
   tagList(
     fluidRow(
-      column(12, titlePanel("About Cerebro")),
+      column(12, titlePanel("About CerebroNexus")),
       column(
-        8,
+        12,
         htmlOutput("about"),
         #        uiOutput("preferences"),
         actionButton("browser", "browser"),
         tags$script("$('#browser').hide();")
-      ),
-      column(4, imageOutput("logo_Cerebro"))
+      )
     ),
     fluidRow(
       htmlOutput("about_footer")

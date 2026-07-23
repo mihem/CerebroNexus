@@ -52,7 +52,7 @@ Assuming that you have already exported your data set to a `.crb` file using the
 Here, we use the example data set in the `cerebroApp` package:
 
 ```{r}
-crb_input <- system.file('extdata', 'v1.4', 'example.crb', package = 'cerebroAppLite')
+crb_input <- system.file('extdata', 'v1.4', 'example.crb', package = 'CerebroNexus')
 crb <- readRDS(crb_input)
 ```
 
