@@ -24,7 +24,11 @@ test_that("development-only directories are excluded from package builds", {
 })
 
 test_that("package and exported-app branding use the current identity", {
-  description <- read.dcf(source_file("DESCRIPTION"))
+  description_path <- source_file("DESCRIPTION")
+  if (!file.exists(description_path)) {
+    description_path <- system.file("DESCRIPTION", package = "CerebroNexus")
+  }
+  description <- read.dcf(description_path)
 
   expect_identical(unname(description[1, "Package"]), "CerebroNexus")
   expect_match(description[1, "URL"], "mihem/CerebroNexus", fixed = TRUE)
