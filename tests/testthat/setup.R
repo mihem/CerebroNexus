@@ -16,11 +16,13 @@ local_app_support <- function(app_dir, envir = rlang::caller_env()) {
   withCallingHandlers(
     shinytest2::local_app_support(app_dir, envir = envir),
     warning = function(warning) {
-      if (grepl(
-        "Loading R/ subdirectory for Shiny application",
-        conditionMessage(warning),
-        fixed = TRUE
-      )) {
+      if (
+        grepl(
+          "Loading R/ subdirectory for Shiny application",
+          conditionMessage(warning),
+          fixed = TRUE
+        )
+      ) {
         invokeRestart("muffleWarning")
       }
     }
