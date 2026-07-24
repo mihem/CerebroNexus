@@ -2,11 +2,9 @@
 # produce a plot (not just that the module loads). This addresses the review
 # point that tests should confirm the expected visualization is shown.
 #
-# These run scRepertoire directly on the bundled example.crb IR data, mirroring
-# how the Shiny renderers call it, and assert a non-empty ggplot is returned.
-# Guarded by scRepertoire availability (a Suggests dependency).
-
-skip_if_not_installed("scRepertoire")
+# These run the native irn_* metrics directly on the bundled example.crb IR
+# data, mirroring how the Shiny renderers call them, and assert a non-empty
+# ggplot (or a sensible export table) is returned. No external dependency.
 
 inst_candidates <- c(
   normalizePath("inst", mustWork = FALSE),
@@ -86,12 +84,27 @@ if (is.na(local_inst)) {
   )
 }
 
+# Source the native metrics (irn_*) — the dependency-free repertoire
+# computations the module calls. Loaded into this file's environment so every
+# test_that() below can reach them.
+native_metrics <- file.path(
+  local_inst,
+  "shiny/v1.4/immune_repertoire/native_metrics.R"
+)
+if (is.na(local_inst)) {
+  native_metrics <- system.file(
+    "shiny/v1.4/immune_repertoire/native_metrics.R",
+    package = "CerebroNexus"
+  )
+}
+source(native_metrics, local = TRUE)
+
 test_that("ir_length_facet_plot draws one panel per group", {
   skip_if_not(file.exists(example_crb))
   source(length_helpers, local = TRUE)
   ir <- load_ir()
 
-  tbl <- scRepertoire::clonalLength(
+  tbl <- irn_clonalLength(
     ir,
     cloneCall = "aa",
     group.by = "sample",
@@ -113,7 +126,7 @@ test_that("ir_length_facet_plot scale=TRUE yields within-group proportions", {
   source(length_helpers, local = TRUE)
   ir <- load_ir()
 
-  tbl <- scRepertoire::clonalLength(
+  tbl <- irn_clonalLength(
     ir,
     cloneCall = "aa",
     group.by = "sample",
@@ -170,11 +183,11 @@ test_that("core clonal plots render a non-empty ggplot on example.crb", {
   ir <- load_ir()
 
   expect_nonempty_ggplot(
-    scRepertoire::clonalAbundance(ir, cloneCall = "gene", group.by = "sample"),
+    irn_clonalAbundance(ir, cloneCall = "gene", group.by = "sample"),
     "clonalAbundance"
   )
   expect_nonempty_ggplot(
-    scRepertoire::clonalHomeostasis(
+    irn_clonalHomeostasis(
       ir,
       cloneCall = "gene",
       group.by = "sample"
@@ -182,16 +195,16 @@ test_that("core clonal plots render a non-empty ggplot on example.crb", {
     "clonalHomeostasis"
   )
   expect_nonempty_ggplot(
-    scRepertoire::clonalLength(ir, cloneCall = "aa", group.by = "sample"),
+    irn_clonalLength(ir, cloneCall = "aa", group.by = "sample"),
     "clonalLength"
   )
   expect_nonempty_ggplot(
-    scRepertoire::clonalProportion(ir, cloneCall = "gene", group.by = "sample"),
+    irn_clonalProportion(ir, cloneCall = "gene", group.by = "sample"),
     "clonalProportion"
   )
 })
 
-test_that("order.by reorders the groups in scRepertoire output", {
+test_that("order.by reorders the groups in the native output", {
   skip_if_not(file.exists(example_crb))
   ir <- load_ir()
 
@@ -199,13 +212,13 @@ test_that("order.by reorders the groups in scRepertoire output", {
   # should sort the group axis, so the group column order differs from default
   # (or is at least explicitly alphanumeric). Proves the parameter is effective
   # and worth wiring into the UI.
-  default_tbl <- scRepertoire::clonalAbundance(
+  default_tbl <- irn_clonalAbundance(
     ir,
     cloneCall = "gene",
     group.by = "sample",
     exportTable = TRUE
   )
-  ordered_tbl <- scRepertoire::clonalAbundance(
+  ordered_tbl <- irn_clonalAbundance(
     ir,
     cloneCall = "gene",
     group.by = "sample",
@@ -236,7 +249,7 @@ test_that("clonalHomeostasis accepts a custom cloneSize binning", {
     Hyperexpanded = 1
   )
   expect_nonempty_ggplot(
-    scRepertoire::clonalHomeostasis(
+    irn_clonalHomeostasis(
       ir,
       cloneCall = "gene",
       group.by = "sample",
@@ -251,7 +264,7 @@ test_that("vizGenes accepts a y.axis for paired gene usage", {
   ir <- load_ir()
 
   expect_nonempty_ggplot(
-    scRepertoire::vizGenes(
+    irn_vizGenes(
       ir,
       x.axis = "TRBV",
       y.axis = "TRBJ",
@@ -268,7 +281,7 @@ test_that("paired scatter manual fallback renders on example.crb", {
   skip_if_not(length(ir) >= 2)
 
   expect_nonempty_ggplot(
-    scRepertoire::clonalScatter(
+    irn_clonalScatter(
       ir,
       cloneCall = "gene",
       chain = "both",
@@ -289,7 +302,7 @@ test_that("paired scatter renders after splitting by a metadata category", {
   skip_if_not(length(ir) >= 2)
 
   expect_nonempty_ggplot(
-    scRepertoire::clonalScatter(
+    irn_clonalScatter(
       ir,
       cloneCall = "gene",
       chain = "both",
@@ -309,7 +322,7 @@ test_that("gene-usage and CDR3 plots render on example.crb", {
   ir <- load_ir()
 
   expect_nonempty_ggplot(
-    scRepertoire::percentAA(
+    irn_percentAA(
       ir,
       chain = "TRB",
       aa.length = 20,
@@ -318,7 +331,7 @@ test_that("gene-usage and CDR3 plots render on example.crb", {
     "percentAA"
   )
   expect_nonempty_ggplot(
-    scRepertoire::percentGenes(
+    irn_percentGenes(
       ir,
       chain = "TRB",
       gene = "Vgene",
@@ -327,7 +340,7 @@ test_that("gene-usage and CDR3 plots render on example.crb", {
     "percentGenes"
   )
   expect_nonempty_ggplot(
-    scRepertoire::percentVJ(ir, chain = "TRB", group.by = "sample"),
+    irn_percentVJ(ir, chain = "TRB", group.by = "sample"),
     "percentVJ"
   )
 })

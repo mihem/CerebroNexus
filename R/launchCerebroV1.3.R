@@ -54,7 +54,6 @@
 #'   )
 #' }
 #'
-#' @importFrom ape plot.phylo
 #' @importFrom colourpicker colourInput
 #' @import dplyr
 #' @importFrom DT datatable formatPercentage formatRound formatSignif
@@ -74,7 +73,6 @@
 #' @importFrom shinyjs inlineCSS
 #' @importFrom shinyWidgets awesomeCheckbox dropdownButton materialSwitch
 #' radioGroupButtons sendSweetAlert
-#' @importFrom viridis scale_fill_viridis
 #'
 #' @export
 #'

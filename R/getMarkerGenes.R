@@ -46,7 +46,6 @@
 #'   verbose = TRUE
 #' )
 #'
-#' @importFrom biomaRt getBM useMart
 #' @import dplyr
 #' @importFrom rlang .data :=
 #' @importFrom tidyselect all_of any_of
@@ -178,6 +177,14 @@ getMarkerGenes <- function(
     } else if (organism == 'mm' || organism == 'mouse') {
       temp_attributes <- 'external_gene_name'
       temp_dataset <- 'mmusculus_gene_ensembl'
+    }
+
+    ## check that biomaRt is installed before querying Ensembl
+    if (!requireNamespace("biomaRt", quietly = TRUE)) {
+      stop(
+        "Package 'biomaRt' is required for this function. Install it with install.packages(\"biomaRt\") (or BiocManager::install(\"biomaRt\") for Bioconductor packages: biomaRt, GSVA, qvalue).",
+        call. = FALSE
+      )
     }
 
     ## try up to 3 times to retrieve genes in "cell surface" GO term

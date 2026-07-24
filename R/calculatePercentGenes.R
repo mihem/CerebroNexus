@@ -24,7 +24,6 @@
 #' )
 #'
 #' @importFrom Matrix colSums
-#' @importFrom pbapply pblapply
 #'
 #' @export
 #'
@@ -113,19 +112,21 @@ calculatePercentGenes <- function(
   ## data set and calculate the percentage of transcripts that they account for
   ##--------------------------------------------------------------------------##
 
-  result <- pbapply::pblapply(
-    genes,
-    function(x) {
-      genes_here <- intersect(x, rownames(counts_matrix))
-      if (length(genes_here) == 1) {
-        counts_matrix[genes_here, ] /
-          Matrix::colSums(counts_matrix)
-      } else {
-        Matrix::colSums(counts_matrix[genes_here, ]) /
-          Matrix::colSums(counts_matrix)
-      }
+  pct_fun <- function(x) {
+    genes_here <- intersect(x, rownames(counts_matrix))
+    if (length(genes_here) == 1) {
+      counts_matrix[genes_here, ] /
+        Matrix::colSums(counts_matrix)
+    } else {
+      Matrix::colSums(counts_matrix[genes_here, ]) /
+        Matrix::colSums(counts_matrix)
     }
-  )
+  }
+  result <- if (requireNamespace("pbapply", quietly = TRUE)) {
+    pbapply::pblapply(genes, pct_fun)
+  } else {
+    lapply(genes, pct_fun)
+  }
 
   ##--------------------------------------------------------------------------##
   ## return list with results

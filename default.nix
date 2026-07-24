@@ -13,7 +13,6 @@
 #  > "shinyvalidate",
 #  > "Seurat",
 #  > "SeuratObject",
-#  > "ape",
 #  > "biomaRt",
 #  > "colourpicker",
 #  > "dplyr",
@@ -33,10 +32,8 @@
 #  > "plotly",
 #  > "qvalue",
 #  > "R6",
-#  > "readr",
 #  > "rlang",
 #  > "scales",
-#  > "scRepertoire",
 #  > "shiny",
 #  > "shinycssloaders",
 #  > "shinydashboard",
@@ -46,7 +43,6 @@
 #  >      "tibble",
 #  > "tidyr",
 #  > "tidyselect",
-#  > "viridis",
 #  > "stringdist",
 #  > "visNetwork"),
 #  > system_pkgs = c("chromium",
@@ -67,7 +63,6 @@ let
  
   rpkgs = builtins.attrValues {
     inherit (pkgs.rPackages) 
-      ape
       biomaRt
       callr
       colourpicker
@@ -92,10 +87,8 @@ let
       png
       qvalue
       R6
-      readr
       rlang
       scales
-      scRepertoire
       Seurat
       SeuratObject
       shiny
@@ -112,7 +105,6 @@ let
       tibble
       tidyr
       tidyselect
-      viridis
       visNetwork
       withr;
   };

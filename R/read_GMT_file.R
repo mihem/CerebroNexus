@@ -19,12 +19,11 @@
   file
 ) {
   ## read provided file
-  gmt <- readr::read_delim(
-    file,
-    delim = ';',
-    col_names = c('X1'),
-    col_types = readr::cols()
-  )
+  ## The original parser used ';' as the delimiter — a character GMT files do
+  ## not contain — so every row collapsed into a single column `X1` holding the
+  ## whole line. readLines reproduces that exactly (one line per element) while
+  ## faithfully preserving the ragged, tab-separated rows split below.
+  gmt <- data.frame(X1 = readLines(file), stringsAsFactors = FALSE)
 
   ## prepare empty list for results
   gene_set_genes <- list()

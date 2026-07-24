@@ -40,7 +40,6 @@
 #' }
 #'
 #' @import dplyr
-#' @importFrom future.apply future_sapply
 #' @importFrom rlang .data
 #' @importFrom tidyselect all_of
 #'
@@ -254,109 +253,119 @@ getEnrichedPathways <- function(
       }
 
       ## get results
-      results <- future.apply::future_sapply(
-        group_levels,
-        USE.NAMES = TRUE,
-        simplify = FALSE,
-        future.globals = FALSE,
-        function(x) {
-          ## create empty list
-          data_from_enrichr <- list()
+      enrichr_group_fun <- function(x) {
+        ## create empty list
+        data_from_enrichr <- list()
 
-          ## try max 3 times to get results from server
-          attempt <- 1
-          # 'Adjusted.P.value' %in% names(data_from_enrichr) == FALSE &&
-          while (
-            databases[1] %in% names(data_from_enrichr) == FALSE &&
-              attempt <= 3
-          ) {
-            ## filter marker genes table for current group level
-            marker_genes_current_group_level <- current_marker_genes[
-              current_marker_genes[[current_group]] == x,
-            ]
+        ## try max 3 times to get results from server
+        attempt <- 1
+        # 'Adjusted.P.value' %in% names(data_from_enrichr) == FALSE &&
+        while (
+          databases[1] %in% names(data_from_enrichr) == FALSE &&
+            attempt <= 3
+        ) {
+          ## filter marker genes table for current group level
+          marker_genes_current_group_level <- current_marker_genes[
+            current_marker_genes[[current_group]] == x,
+          ]
 
-            ## send request to server
-            try(
-              data_from_enrichr <- .send_enrichr_query(
-                marker_genes_current_group_level$gene,
-                databases = databases,
-                URL_API = URL_API
-              )
+          ## send request to server
+          try(
+            data_from_enrichr <- .send_enrichr_query(
+              marker_genes_current_group_level$gene,
+              databases = databases,
+              URL_API = URL_API
             )
+          )
 
-            ## bump attempt counter
-            attempt <- attempt + 1
-          }
-
-          ## check data from enrichr
-          ## ... data is not a list, doesn't contain first database, or
-          ##     'Adjusted.P.value' column is missing from first list entry
-          if (
-            !is.list(data_from_enrichr) ||
-              databases[1] %in% names(data_from_enrichr) == FALSE ||
-              'Adjusted.P.value' %in% colnames(data_from_enrichr[[1]]) == FALSE
-          ) {
-            message(
-              paste0(
-                '[',
-                format(Sys.time(), '%H:%M:%S'),
-                '] Data returned by Enrichr for subgroup `',
-                x,
-                '` of group `',
-                current_group,
-                '`, does not appear to be in the right format. ',
-                'Will proceed with next subgroup.'
-              )
-            )
-
-            ## ... data is in expected format
-          } else {
-            ## filter results from each database
-            data_from_enrichr_merged <- sapply(
-              names(data_from_enrichr),
-              USE.NAMES = TRUE,
-              simplify = FALSE,
-              function(x) {
-                ## apply cut-off of adj. p-value and add database info as column
-                table_filtered <- data_from_enrichr[[x]] %>%
-                  dplyr::filter(.data$Adjusted.P.value <= adj_p_cutoff) %>%
-                  dplyr::mutate(db = x)
-
-                ## check if too many entries were received
-                ## ... more entries than set in "max_terms" were found
-                if (nrow(table_filtered) > max_terms) {
-                  ## sort terms by adj. p-value and take top "max_terms" terms
-                  table_filtered <- dplyr::slice_min(
-                    table_filtered,
-                    n = max_terms,
-                    order_by = .data$Adjusted.P.value
-                  )
-
-                  ## ... no entries left after filtering
-                } else if (nrow(table_filtered) == 0) {
-                  table_filtered <- NULL
-                }
-
-                ## return results
-                return(table_filtered)
-              }
-            )
-
-            ## remove databases without any enriched entries
-            for (i in names(data_from_enrichr_merged)) {
-              if (is.null(data_from_enrichr_merged[[i]])) {
-                data_from_enrichr_merged[[i]] <- NULL
-              }
-            }
-
-            ## merge results from different databases
-            data_from_enrichr_merged <- do.call(rbind, data_from_enrichr_merged)
-
-            ## return results
-            return(data_from_enrichr_merged)
-          }
+          ## bump attempt counter
+          attempt <- attempt + 1
         }
-      )
+
+        ## check data from enrichr
+        ## ... data is not a list, doesn't contain first database, or
+        ##     'Adjusted.P.value' column is missing from first list entry
+        if (
+          !is.list(data_from_enrichr) ||
+            databases[1] %in% names(data_from_enrichr) == FALSE ||
+            'Adjusted.P.value' %in% colnames(data_from_enrichr[[1]]) == FALSE
+        ) {
+          message(
+            paste0(
+              '[',
+              format(Sys.time(), '%H:%M:%S'),
+              '] Data returned by Enrichr for subgroup `',
+              x,
+              '` of group `',
+              current_group,
+              '`, does not appear to be in the right format. ',
+              'Will proceed with next subgroup.'
+            )
+          )
+
+          ## ... data is in expected format
+        } else {
+          ## filter results from each database
+          data_from_enrichr_merged <- sapply(
+            names(data_from_enrichr),
+            USE.NAMES = TRUE,
+            simplify = FALSE,
+            function(x) {
+              ## apply cut-off of adj. p-value and add database info as column
+              table_filtered <- data_from_enrichr[[x]] %>%
+                dplyr::filter(.data$Adjusted.P.value <= adj_p_cutoff) %>%
+                dplyr::mutate(db = x)
+
+              ## check if too many entries were received
+              ## ... more entries than set in "max_terms" were found
+              if (nrow(table_filtered) > max_terms) {
+                ## sort terms by adj. p-value and take top "max_terms" terms
+                table_filtered <- dplyr::slice_min(
+                  table_filtered,
+                  n = max_terms,
+                  order_by = .data$Adjusted.P.value
+                )
+
+                ## ... no entries left after filtering
+              } else if (nrow(table_filtered) == 0) {
+                table_filtered <- NULL
+              }
+
+              ## return results
+              return(table_filtered)
+            }
+          )
+
+          ## remove databases without any enriched entries
+          for (i in names(data_from_enrichr_merged)) {
+            if (is.null(data_from_enrichr_merged[[i]])) {
+              data_from_enrichr_merged[[i]] <- NULL
+            }
+          }
+
+          ## merge results from different databases
+          data_from_enrichr_merged <- do.call(rbind, data_from_enrichr_merged)
+
+          ## return results
+          return(data_from_enrichr_merged)
+        }
+      }
+      results <- if (requireNamespace("future.apply", quietly = TRUE)) {
+        future.apply::future_sapply(
+          group_levels,
+          enrichr_group_fun,
+          USE.NAMES = TRUE,
+          simplify = FALSE,
+          future.globals = FALSE
+        )
+      } else {
+        sapply(
+          group_levels,
+          enrichr_group_fun,
+          USE.NAMES = TRUE,
+          simplify = FALSE
+        )
+      }
 
       ## remove group levels without any enriched entry in any database
       for (i in names(results)) {

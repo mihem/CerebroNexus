@@ -2,8 +2,11 @@
 ## Tab: Immune Repertoire server — entry point
 ##----------------------------------------------------------------------------##
 
+## The immune-repertoire analytics are now computed natively (native_metrics.R),
+## so scRepertoire is no longer required at runtime. Kept as a function (always
+## TRUE) so the existing req()/guard call sites need no change.
 has_scRepertoire <- function() {
-  requireNamespace("scRepertoire", quietly = TRUE)
+  TRUE
 }
 
 ## ---- Missing-dependency notice ---------------------------------------- ##
@@ -511,6 +514,20 @@ source(
   paste0(
     Cerebro.options[["cerebro_root"]],
     "/shiny/v1.4/immune_repertoire/compare_helpers.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/native_metrics.R"
+  ),
+  local = TRUE
+)
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/precomputed.R"
   ),
   local = TRUE
 )

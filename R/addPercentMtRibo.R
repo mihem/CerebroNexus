@@ -28,7 +28,7 @@
 #' )
 #'
 #' @import dplyr
-#' @importFrom readr cols read_tsv
+#' @importFrom utils read.delim
 #'
 #' @export
 #'
@@ -116,7 +116,7 @@ addPercentMtRibo <- function(
   ## load mitochondrial and ribosomal gene lists from extdata
   ##--------------------------------------------------------------------------##
 
-  genes_mt <- readr::read_tsv(
+  genes_mt <- utils::read.delim(
     system.file(
       paste0(
         'extdata/genes_mt_',
@@ -127,13 +127,14 @@ addPercentMtRibo <- function(
       ),
       package = 'CerebroNexus'
     ),
-    col_types = readr::cols(),
-    col_names = FALSE
+    sep = "\t",
+    header = FALSE,
+    stringsAsFactors = FALSE
   ) %>%
     dplyr::select(1) %>%
     t() %>%
     as.vector()
-  genes_ribo <- readr::read_tsv(
+  genes_ribo <- utils::read.delim(
     system.file(
       paste0(
         'extdata/genes_ribo_',
@@ -144,8 +145,9 @@ addPercentMtRibo <- function(
       ),
       package = 'CerebroNexus'
     ),
-    col_types = readr::cols(),
-    col_names = FALSE
+    sep = "\t",
+    header = FALSE,
+    stringsAsFactors = FALSE
   ) %>%
     dplyr::select(1) %>%
     t() %>%

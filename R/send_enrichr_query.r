@@ -13,8 +13,6 @@
 #' @return
 #' Returns a data frame of enrichment terms, p-values, ...
 #'
-#' @importFrom httr GET POST
-#'
 #' @author Wajid Jawaid, modified by Roman Hillje
 #'
 .send_enrichr_query <- function(
@@ -22,6 +20,14 @@
   databases = NULL,
   URL_API = NULL
 ) {
+  ## check that httr is installed before contacting the Enrichr API
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop(
+      "Package 'httr' is required for this function. Install it with install.packages(\"httr\").",
+      call. = FALSE
+    )
+  }
+
   ## check input format
   ## ... input is a vector with length > 0 and not all empty genes
   if (
@@ -67,43 +73,53 @@
   options()
 
   ##
-  result <- future.apply::future_sapply(
-    databases,
-    USE.NAMES = TRUE,
-    simplify = FALSE,
-    function(x) {
-      ##
-      r <- httr::GET(
-        url = paste0(URL_API, "/export"),
-        query = list(
-          file = 'API',
-          backgroundType = x
-        )
+  enrichr_export_fun <- function(x) {
+    ##
+    r <- httr::GET(
+      url = paste0(URL_API, "/export"),
+      query = list(
+        file = 'API',
+        backgroundType = x
       )
+    )
 
-      ##
-      r <- gsub('&#39;', "'", intToUtf8(r$content))
+    ##
+    r <- gsub('&#39;', "'", intToUtf8(r$content))
 
-      ##
-      tc <- textConnection(r)
+    ##
+    tc <- textConnection(r)
 
-      ##
-      r <- utils::read.table(
-        tc,
-        sep = '\t',
-        header = TRUE,
-        quote = '',
-        comment.char = '',
-        stringsAsFactors = FALSE
-      )
+    ##
+    r <- utils::read.table(
+      tc,
+      sep = '\t',
+      header = TRUE,
+      quote = '',
+      comment.char = '',
+      stringsAsFactors = FALSE
+    )
 
-      ##
-      close(tc)
+    ##
+    close(tc)
 
-      ##
-      return(r)
-    }
-  )
+    ##
+    return(r)
+  }
+  result <- if (requireNamespace("future.apply", quietly = TRUE)) {
+    future.apply::future_sapply(
+      databases,
+      enrichr_export_fun,
+      USE.NAMES = TRUE,
+      simplify = FALSE
+    )
+  } else {
+    sapply(
+      databases,
+      enrichr_export_fun,
+      USE.NAMES = TRUE,
+      simplify = FALSE
+    )
+  }
 
   ##
   return(result)

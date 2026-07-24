@@ -28,7 +28,6 @@
 #' @import shiny
 #' @import shinydashboard
 #' @import shinyWidgets
-#' @importFrom viridis scale_fill_viridis
 #'
 #' @export
 #'

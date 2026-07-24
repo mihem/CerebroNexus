@@ -1041,7 +1041,7 @@ ir_paired_scatter_panel <- function(
   title,
   show_title = TRUE
 ) {
-  p <- scRepertoire::clonalScatter(
+  p <- irn_clonalScatter(
     data,
     cloneCall = pars$cloneCall,
     chain = pars$chain,
@@ -1209,7 +1209,7 @@ output$ir_plot_clonalAbundance <- plotly::renderPlotly({
   req(!is.null(data))
   pars <- ir_params()
   ir_render_ggplotly(
-    scRepertoire::clonalAbundance(
+    irn_clonalAbundance(
       data,
       cloneCall = pars$cloneCall,
       chain = pars$chain,
@@ -1246,7 +1246,7 @@ output$ir_plot_clonalCompare <- plotly::renderPlotly({
 
   tryCatch(
     {
-      tab <- scRepertoire::clonalCompare(
+      tab <- irn_clonalCompare(
         data,
         cloneCall = pars$cloneCall,
         chain = pars$chain,
@@ -1341,7 +1341,7 @@ ir_plot_clonal_diversity <- function(
   if (!is.null(ob)) {
     scr_args[["order.by"]] <- ob
   }
-  output_df <- do.call(scRepertoire::clonalDiversity, scr_args)
+  output_df <- do.call(irn_clonalDiversity, scr_args)
 
   group_col <- if (is.null(group_by)) "Group" else group_by
 
@@ -1479,17 +1479,30 @@ output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
+  ## Precomputed scRepertoire table for the by-sample, default-bin view; native
+  ## fallback for grouped views, custom bins, or a .crb without precompute.
+  pt <- if (
+    is.null(pars$groupBy) && identical(ir_clone_size(), IR_CLONE_SIZE_DEFAULT)
+  ) {
+    ir_pc_lookup("clonalHomeostasis", pars$cloneCall, pars$chain)
+  } else {
+    NULL
+  }
   ir_render_ggplotly(
-    scRepertoire::clonalHomeostasis(
-      data,
-      cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      cloneSize = ir_clone_size(),
-      group.by = pars$groupBy,
-      order.by = ir_order_by(),
-      exportTable = FALSE,
-      palette = IR_PALETTE
-    ),
+    if (!is.null(pt)) {
+      ir_pc_plot_homeostasis(pt)
+    } else {
+      irn_clonalHomeostasis(
+        data,
+        cloneCall = pars$cloneCall,
+        chain = pars$chain,
+        cloneSize = ir_clone_size(),
+        group.by = pars$groupBy,
+        order.by = ir_order_by(),
+        exportTable = FALSE,
+        palette = IR_PALETTE
+      )
+    },
     "clonalHomeostasis"
   )
 }) %>%
@@ -1523,17 +1536,22 @@ output$ir_plot_clonalLength <- renderPlot({
     # loaded sample overlaid by colour, i.e. scRepertoire's native plot. Do NOT
     # facet — the export table still carries the list-element (sample) names in
     # `values`, but those are not a user-chosen grouping.
+    pt <- ir_pc_lookup("clonalLength", clone_call, pars$chain)
     safeRenderPlot(
-      scRepertoire::clonalLength(
-        data,
-        cloneCall = clone_call,
-        chain = pars$chain,
-        group.by = NULL,
-        order.by = ir_order_by(),
-        scale = scale_on,
-        exportTable = FALSE,
-        palette = IR_PALETTE
-      ),
+      if (!is.null(pt)) {
+        ir_pc_plot_length(pt, scale = scale_on)
+      } else {
+        irn_clonalLength(
+          data,
+          cloneCall = clone_call,
+          chain = pars$chain,
+          group.by = NULL,
+          order.by = ir_order_by(),
+          scale = scale_on,
+          exportTable = FALSE,
+          palette = IR_PALETTE
+        )
+      },
       "clonalLength"
     )
   } else {
@@ -1541,7 +1559,7 @@ output$ir_plot_clonalLength <- renderPlot({
     # take its per-clonotype table and redraw with facet_wrap to give each
     # selected group its own length-distribution panel on a shared axis.
     order_by <- ir_order_by()
-    tbl <- scRepertoire::clonalLength(
+    tbl <- irn_clonalLength(
       data,
       cloneCall = clone_call,
       chain = pars$chain,
@@ -1575,16 +1593,26 @@ output$ir_plot_clonalOverlap <- renderPlot({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
+  ov_method <- ir_param("ir_p_overlap_method", "overlap")
+  pt <- if (is.null(pars$groupBy)) {
+    ir_pc_lookup("clonalOverlap", pars$cloneCall, pars$chain, ov_method)
+  } else {
+    NULL
+  }
   safeRenderPlot(
-    scRepertoire::clonalOverlap(
-      data,
-      cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      method = ir_param("ir_p_overlap_method", "overlap"),
-      exportTable = FALSE,
-      palette = IR_PALETTE
-    ),
+    if (!is.null(pt)) {
+      ir_pc_plot_overlap(pt)
+    } else {
+      irn_clonalOverlap(
+        data,
+        cloneCall = pars$cloneCall,
+        chain = pars$chain,
+        group.by = pars$groupBy,
+        method = ov_method,
+        exportTable = FALSE,
+        palette = IR_PALETTE
+      )
+    },
     "clonalOverlap"
   )
 }) %>%
@@ -1609,16 +1637,28 @@ output$ir_plot_clonalProportion <- renderPlot({
   if (length(csplit) == 0) {
     csplit <- c(10, 100, 1000, 10000, 30000, 1e+05)
   }
+  ## Precompute used scRepertoire's default rank bins; use it only when the user
+  ## has not customised the split (else the stored bins would not match).
+  default_split <- identical(csplit, c(10, 100, 1000, 10000, 30000, 1e+05))
+  pt <- if (is.null(pars$groupBy) && default_split) {
+    ir_pc_lookup("clonalProportion", pars$cloneCall, pars$chain)
+  } else {
+    NULL
+  }
   safeRenderPlot(
-    scRepertoire::clonalProportion(
-      data,
-      cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      clonalSplit = csplit,
-      exportTable = FALSE,
-      palette = IR_PALETTE
-    ),
+    if (!is.null(pt)) {
+      ir_pc_plot_proportion(pt)
+    } else {
+      irn_clonalProportion(
+        data,
+        cloneCall = pars$cloneCall,
+        chain = pars$chain,
+        group.by = pars$groupBy,
+        clonalSplit = csplit,
+        exportTable = FALSE,
+        palette = IR_PALETTE
+      )
+    },
     "clonalProportion"
   )
 }) %>%
@@ -1635,16 +1675,26 @@ output$ir_plot_clonalQuant <- renderPlot({
   data <- ir_data()
   req(!is.null(data))
   pars <- ir_params()
+  quant_scale <- isTRUE(ir_param("ir_p_scale", FALSE))
+  pt <- if (is.null(pars$groupBy)) {
+    ir_pc_lookup("clonalQuant", pars$cloneCall, pars$chain)
+  } else {
+    NULL
+  }
   safeRenderPlot(
-    scRepertoire::clonalQuant(
-      data,
-      cloneCall = pars$cloneCall,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      scale = isTRUE(ir_param("ir_p_scale", FALSE)),
-      exportTable = FALSE,
-      palette = IR_PALETTE
-    ),
+    if (!is.null(pt)) {
+      ir_pc_plot_quant(pt, scale = quant_scale)
+    } else {
+      irn_clonalQuant(
+        data,
+        cloneCall = pars$cloneCall,
+        chain = pars$chain,
+        group.by = pars$groupBy,
+        scale = quant_scale,
+        exportTable = FALSE,
+        palette = IR_PALETTE
+      )
+    },
     "clonalQuant"
   )
 }) %>%
@@ -1676,7 +1726,7 @@ output$ir_plot_clonalRarefaction <- renderPlot({
   }
   safeRenderPlot(
     ir_quiet_inext(
-      scRepertoire::clonalRarefaction(
+      irn_clonalRarefaction(
         data,
         cloneCall = pars$cloneCall,
         chain = pars$chain,
@@ -1737,7 +1787,7 @@ output$ir_plot_clonalScatter <- renderPlot({
     need(x != y, "Select two different groups for the scatter comparison.")
   )
   safeRenderPlot(
-    scRepertoire::clonalScatter(
+    irn_clonalScatter(
       data,
       cloneCall = pars$cloneCall,
       chain = chain,
@@ -1778,7 +1828,7 @@ output$ir_plot_clonalSizeDistribution <- plotly::renderPlotly({
   }
   ir_render_ggplotly(
     {
-      p <- scRepertoire::clonalSizeDistribution(
+      p <- irn_clonalSizeDistribution(
         data,
         cloneCall = "strict",
         chain = pars$chain,
@@ -1818,7 +1868,7 @@ output$ir_plot_percentGeneUsage <- renderPlot({
   req(!is.null(data))
   pars <- ir_params()
   safeRenderPlot(
-    scRepertoire::percentGeneUsage(
+    irn_percentGeneUsage(
       data,
       chain = pars$chain,
       genes = (function() {
@@ -1864,7 +1914,7 @@ output$ir_plot_vizGenes <- renderPlot({
     vg_x <- default_gene_family()
   }
   safeRenderPlot(
-    scRepertoire::vizGenes(
+    irn_vizGenes(
       data,
       x.axis = vg_x,
       y.axis = NULL,
@@ -1903,7 +1953,7 @@ output$ir_plot_percentGenes <- renderPlot({
   req(!is.null(data))
   pars <- ir_params()
   safeRenderPlot(
-    scRepertoire::percentGenes(
+    irn_percentGenes(
       data,
       chain = specific_chain(),
       gene = ir_param("ir_p_pg_gene", "Vgene"),
@@ -1940,7 +1990,7 @@ output$ir_plot_percentVJ <- renderPlot({
   req(!is.null(data))
   pars <- ir_params()
   safeRenderPlot(
-    scRepertoire::percentVJ(
+    irn_percentVJ(
       data,
       chain = specific_chain(),
       group.by = pars$groupBy,
@@ -1982,16 +2032,25 @@ output$ir_plot_percentAA <- renderPlot({
   if (is.na(aa_len) || aa_len < 1) {
     aa_len <- 20
   }
+  pt <- if (is.null(pars$groupBy) && aa_len == 20) {
+    ir_pc_lookup("percentAA", pars$chain)
+  } else {
+    NULL
+  }
   safeRenderPlot(
-    scRepertoire::percentAA(
-      data,
-      chain = pars$chain,
-      group.by = pars$groupBy,
-      order.by = ir_order_by(),
-      aa.length = aa_len,
-      exportTable = FALSE,
-      palette = IR_PALETTE
-    ),
+    if (!is.null(pt)) {
+      ir_pc_plot_percentAA(pt)
+    } else {
+      irn_percentAA(
+        data,
+        chain = pars$chain,
+        group.by = pars$groupBy,
+        order.by = ir_order_by(),
+        aa.length = aa_len,
+        exportTable = FALSE,
+        palette = IR_PALETTE
+      )
+    },
     "percentAA"
   )
 }) %>%
@@ -2015,7 +2074,7 @@ output$ir_plot_positionalEntropy <- renderPlot({
     aa_len <- 20
   }
   safeRenderPlot(
-    scRepertoire::positionalEntropy(
+    irn_positionalEntropy(
       data,
       chain = pars$chain,
       group.by = pars$groupBy,
@@ -2106,7 +2165,7 @@ output$ir_plot_positionalProperty <- renderPlot({
     method <- names(available_property_methods())[1]
   }
   safeRenderPlot(
-    scRepertoire::positionalProperty(
+    irn_positionalProperty(
       data,
       chain = pars$chain,
       group.by = pars$groupBy,
@@ -2152,7 +2211,7 @@ output$ir_plot_percentKmer <- renderPlot({
     top_m <- 30
   }
   safeRenderPlot(
-    scRepertoire::percentKmer(
+    irn_percentKmer(
       data,
       chain = pars$chain,
       cloneCall = pars$cloneCall,
@@ -2222,6 +2281,19 @@ output$ir_plot_cloneSharing <- plotly::renderPlotly({
       }
       tr
     })
+    # ggplotly ignores the ggplot `legend.position` and drops a horizontal
+    # legend along the TOP, where it collided with the plot title. Move it below
+    # the plot so the title sits cleanly on its own row.
+    fig <- plotly::layout(
+      fig,
+      legend = list(
+        orientation = "h",
+        x = 0.5,
+        xanchor = "center",
+        y = -0.14,
+        yanchor = "top"
+      )
+    )
   }
   fig
 }) %>%

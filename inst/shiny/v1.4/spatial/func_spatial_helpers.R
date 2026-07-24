@@ -165,6 +165,10 @@ morans_i <- function(x, y, values, k = 6) {
   row_sums <- rowSums(weight)
   row_sums[row_sums == 0] <- 1 # avoid 0/0 for isolated cells
   weight <- weight / row_sums
-  res <- ape::Moran.I(values, weight)
-  res$observed
+  ## Moran's I observed statistic, computed natively (matches ape::Moran.I()
+  ## $observed to floating-point precision) so the viewer needs no ape dependency:
+  ##   I = (n / W) * sum_ij w_ij (x_i - xbar)(x_j - xbar) / sum_i (x_i - xbar)^2
+  z <- values - mean(values)
+  W <- sum(weight)
+  (n / W) * sum(weight * outer(z, z)) / sum(z^2)
 }

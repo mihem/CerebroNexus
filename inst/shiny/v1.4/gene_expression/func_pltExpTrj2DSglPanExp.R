@@ -51,7 +51,7 @@ pltExpTrj2DSglPanExp <- function(
   if (tolower(color_scale) == 'viridis') {
     ## add color scale to plot
     plot <- plot +
-      viridis::scale_fill_viridis(
+      ggplot2::scale_fill_viridis_c(
         option = "viridis",
         limits = color_range,
         oob = scales::squish,

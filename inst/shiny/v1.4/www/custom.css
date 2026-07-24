@@ -1169,6 +1169,13 @@ body .fa-spinner { color: var(--c-amber) !important; }
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* A `.cerebro-fill` plot has its OWN reveal gate (hidden until fill_height.js
+   measures a settled height, then shown). The tab-content fade-in above would
+   re-run that opacity 0->1 animation every time its sub-tab is shown — an
+   already-rendered plot visibly fading in again on each switch (the IR "flash").
+   Exempt fills; their gate is the single source of truth. Higher specificity
+   than `.tab-pane.active > *` so it wins. */
+.tab-pane.active > .cerebro-fill { animation: none; }
 
 /* Primary buttons press in slightly for tactile feedback. Stat cards already
    lift on hover (see .small-box); content/parameter boxes deliberately do NOT

@@ -568,22 +568,104 @@ output$ir_help_panel <- renderUI({
 ## ---- Demo data (lazy, cached) ----------------------------------------- ##
 ir_demo_data <- reactiveVal(NULL)
 
+## Synthetic paired-TCR demo (two samples), so the help gallery needs no
+## external package. Each cell carries a TRA and TRB rearrangement in the
+## standard "<TRA>_<TRB>" CT* packing the module parses.
 .get_demo_data <- function() {
   if (!is.null(ir_demo_data())) {
     return(ir_demo_data())
   }
-  tryCatch(
+  demo <- tryCatch(
     {
-      data("contig_list", package = "scRepertoire", envir = environment())
-      demo <- scRepertoire::combineTCR(
-        contig_list[1:2],
-        samples = c("Healthy", "Disease")
+      old <- .Random.seed
+      on.exit(
+        if (exists(".Random.seed")) {
+          assign(".Random.seed", old, envir = globalenv())
+        },
+        add = TRUE
       )
-      ir_demo_data(demo)
-      demo
+      set.seed(7)
+      trbv <- c(
+        "TRBV6-2",
+        "TRBV18",
+        "TRBV14",
+        "TRBV4-1",
+        "TRBV6-6",
+        "TRBV19",
+        "TRBV28"
+      )
+      trbj <- c("TRBJ2-6", "TRBJ2-5", "TRBJ2-3", "TRBJ1-1", "TRBJ2-1")
+      trav <- c("TRAV8-6", "TRAV12-1", "TRAV1-2", "TRAV17", "TRAV21")
+      traj <- c("TRAJ8", "TRAJ33", "TRAJ42", "TRAJ12", "TRAJ23")
+      aa <- strsplit("ARNDCQEGHILKMFPSTWYV", "")[[1]]
+      make_df <- function(prefix, n, n_clones) {
+        clone <- sample(seq_len(n_clones), n, replace = TRUE)
+        cdr3 <- function(len) {
+          paste0(
+            "C",
+            vapply(
+              seq_len(n),
+              function(i) {
+                paste(sample(aa, len, replace = TRUE), collapse = "")
+              },
+              ""
+            ),
+            "F"
+          )
+        }
+        ka <- clone %% length(trav) + 1L
+        kb <- clone %% length(trbv) + 1L
+        data.frame(
+          barcode = sprintf("%s_%04d", prefix, seq_len(n)),
+          CTgene = paste0(
+            trav[ka],
+            ".",
+            traj[(clone %% length(traj)) + 1L],
+            ".TRAC",
+            "_",
+            trbv[kb],
+            "..",
+            trbj[(clone %% length(trbj)) + 1L],
+            ".TRBC2"
+          ),
+          CTnt = paste0(
+            vapply(
+              seq_len(n),
+              function(i) {
+                paste(
+                  sample(c("A", "T", "G", "C"), 45, replace = TRUE),
+                  collapse = ""
+                )
+              },
+              ""
+            ),
+            "_",
+            vapply(
+              seq_len(n),
+              function(i) {
+                paste(
+                  sample(c("A", "T", "G", "C"), 45, replace = TRUE),
+                  collapse = ""
+                )
+              },
+              ""
+            )
+          ),
+          CTaa = paste0(cdr3(11), "_", cdr3(13)),
+          CTstrict = sprintf("clone_%03d", clone),
+          sample = prefix,
+          stringsAsFactors = FALSE
+        )
+      }
+      list(
+        "Healthy" = make_df("Healthy", 220L, 90L),
+        "Disease" = make_df("Disease", 200L, 45L)
+      )
     },
     error = function(e) NULL
   )
+  ir_demo_data(demo)
+  demo
 }
 
 ## ---- BCR demo data (synthetic — scRepertoire has no built-in BCR) ---- ##
@@ -703,7 +785,7 @@ observeEvent(input$ir_help_example_btn, {
         if (tab %in% c("Isotype", "SHM Proxy")) {
           "Generated from a synthetic BCR demo (2 samples: Pre- vs Post-vaccination)."
         } else {
-          "Generated from scRepertoire built-in demo data (2 TCR samples: Healthy vs Disease)."
+          "Generated from a synthetic paired-TCR demo (2 samples: Healthy vs Disease)."
         }
       ),
       plotOutput("ir_demo_plot", height = "450px")
@@ -734,7 +816,7 @@ output$ir_demo_plot <- renderPlot({
     {
       p <- switch(
         tab,
-        "Abundance" = scRepertoire::clonalAbundance(demo, cloneCall = "gene"),
+        "Abundance" = irn_clonalAbundance(demo, cloneCall = "gene"),
         "Diversity" = ir_plot_clonal_diversity(
           data = demo,
           clone_call = "gene",
@@ -745,82 +827,82 @@ output$ir_demo_plot <- renderPlot({
           n_boots = 20,
           palette = "inferno"
         ),
-        "Homeostasis" = scRepertoire::clonalHomeostasis(
+        "Homeostasis" = irn_clonalHomeostasis(
           demo,
           cloneCall = "gene",
           chain = "TRB",
           palette = "inferno"
         ),
-        "Length" = scRepertoire::clonalLength(
+        "Length" = irn_clonalLength(
           demo,
           cloneCall = "aa",
           chain = "TRB",
           palette = "inferno"
         ),
-        "Proportion" = scRepertoire::clonalProportion(
+        "Proportion" = irn_clonalProportion(
           demo,
           cloneCall = "gene",
           chain = "TRB",
           palette = "inferno"
         ),
-        "Quant" = scRepertoire::clonalQuant(
+        "Quant" = irn_clonalQuant(
           demo,
           cloneCall = "gene",
           chain = "TRB",
           scale = FALSE,
           palette = "inferno"
         ),
-        "Rarefaction" = scRepertoire::clonalRarefaction(
+        "Rarefaction" = irn_clonalRarefaction(
           demo,
           cloneCall = "gene",
           chain = "TRB",
           n.boots = 3,
           palette = "inferno"
         ),
-        "Gene usage" = scRepertoire::percentGeneUsage(
+        "Gene usage" = irn_percentGeneUsage(
           demo,
           chain = "TRB",
           gene = "TRBV",
           plot.type = "heatmap",
           palette = "inferno"
         ),
-        "vizGenes" = scRepertoire::vizGenes(
+        "vizGenes" = irn_vizGenes(
           demo,
           x.axis = "TRBV",
           y.axis = NULL,
           plot = "heatmap",
           palette = "inferno"
         ),
-        "percentGenes" = scRepertoire::percentGenes(
+        "percentGenes" = irn_percentGenes(
           demo,
           chain = "TRB",
           gene = "Vgene",
           palette = "inferno"
         ),
-        "percentVJ" = scRepertoire::percentVJ(
+        "percentVJ" = irn_percentVJ(
           demo,
           chain = "TRB",
           palette = "inferno"
         ),
-        "AA %" = scRepertoire::percentAA(
-          demo,
-          chain = "TRB",
-          aa.length = 20,
-          palette = "inferno"
-        ),
-        "Entropy" = scRepertoire::positionalEntropy(
+        "AA %" = irn_percentAA(
           demo,
           chain = "TRB",
           aa.length = 20,
           palette = "inferno"
         ),
-        "Property" = scRepertoire::positionalProperty(
+        "Entropy" = irn_positionalEntropy(
+          demo,
+          chain = "TRB",
+          aa.length = 20,
+          palette = "inferno"
+        ),
+        "Property" = irn_positionalProperty(
           demo,
           chain = "TRB",
           method = "atchleyFactors",
           palette = "inferno"
         ),
-        "K-mer" = scRepertoire::percentKmer(
+        "K-mer" = irn_percentKmer(
           demo,
           chain = "TRB",
           cloneCall = "aa",
@@ -828,7 +910,7 @@ output$ir_demo_plot <- renderPlot({
           top.motifs = 15,
           palette = "inferno"
         ),
-        "Compare" = scRepertoire::clonalCompare(
+        "Compare" = irn_clonalCompare(
           demo,
           cloneCall = "gene",
           chain = "TRB",
@@ -837,14 +919,14 @@ output$ir_demo_plot <- renderPlot({
           graph = "alluvial",
           palette = "inferno"
         ),
-        "Overlap" = scRepertoire::clonalOverlap(
+        "Overlap" = irn_clonalOverlap(
           demo,
           cloneCall = "gene",
           chain = "TRB",
           method = "overlap",
           palette = "inferno"
         ),
-        "Scatter" = scRepertoire::clonalScatter(
+        "Scatter" = irn_clonalScatter(
           demo,
           cloneCall = "gene",
           chain = "TRB",
@@ -852,7 +934,7 @@ output$ir_demo_plot <- renderPlot({
           y.axis = names(demo)[2],
           palette = "inferno"
         ),
-        "SizeDist" = scRepertoire::clonalSizeDistribution(
+        "SizeDist" = irn_clonalSizeDistribution(
           demo,
           cloneCall = "gene",
           method = "ward.D2"

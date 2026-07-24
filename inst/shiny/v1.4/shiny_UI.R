@@ -33,6 +33,38 @@ boxTitle <- function(title) {
   p(title, style = "padding-right: 5px; display: inline")
 }
 
+## Read an entire file into a single string. Used to inline .js/.svg/.html
+## assets into the UI. readChar reads `size` bytes (the file's byte count) and
+## stops at EOF, which faithfully covers ASCII/UTF-8 assets. Defined here,
+## before the per-tab UI.R files are sourced with local = TRUE, so it is in
+## scope for every one of them.
+cerebro_read_file <- function(path) {
+  readChar(path, file.info(path)$size)
+}
+
+## Register the www/ directory as a cacheable static resource path, so the app's
+## own CSS/JS are delivered as <link>/<script src> (browser-cached, downloaded in
+## parallel, deferred) instead of being inlined into every page's HTML on every
+## connection. Runs once when this file is sourced — by inst/app.R and by
+## exported apps alike (both source shiny_UI.R with Cerebro.options already set).
+## cerebro_asset() returns the served URL for a www file, or NULL when the path
+## could not be registered (then the caller falls back to inlining).
+local({
+  www_dir <- file.path(
+    Cerebro.options[["cerebro_root"]],
+    "shiny/v1.4/www"
+  )
+  if (dir.exists(www_dir)) {
+    tryCatch(
+      shiny::addResourcePath("cerebro_www", normalizePath(www_dir)),
+      error = function(e) NULL
+    )
+  }
+})
+cerebro_asset <- function(file) {
+  paste0("cerebro_www/", file)
+}
+
 ##----------------------------------------------------------------------------##
 ## timeout function
 ##----------------------------------------------------------------------------##
@@ -222,44 +254,43 @@ ui <- dashboardPage(
   ),
   dashboardBody(
     shinyjs::useShinyjs(),
-    ## Console design language — see www/custom.css. Loaded here so the theme
-    ## overrides AdminLTE 2 / shinydashboard chrome across every tab.
-    includeCSS(
-      file.path(Cerebro.options[["cerebro_root"]], "shiny/v1.4/www/custom.css")
-    ),
-    ## Fill-to-viewport height, app-wide. Any element with class "cerebro-fill"
-    ## is sized to (viewport - its live top offset - a bottom gap), so a plot
-    ## fills the screen without a hardcoded height and re-measures itself when the
-    ## chrome above it changes. See www/fill_height.js.
-    includeScript(
-      file.path(
-        Cerebro.options[["cerebro_root"]],
-        "shiny/v1.4/www/fill_height.js"
-      )
-    ),
-    ## Trekker page assets (scoped under .trekker-page / tk- ids so they do not
-    ## affect any other tab). Loaded app-wide like the theme above so the tab —
-    ## which is registered in tabItems() but conditionally shown — is styled and
-    ## wired whenever a Trekker .crb is loaded.
-    includeCSS(
-      file.path(Cerebro.options[["cerebro_root"]], "shiny/v1.4/www/trekker.css")
-    ),
-    includeScript(
-      file.path(Cerebro.options[["cerebro_root"]], "shiny/v1.4/www/trekker.js")
-    ),
-    ## HLA & TCR Motifs modebar (draws a plotly-style toolbar over the visNetwork
-    ## motif network; visNetwork's own nav buttons are turned off for consistency).
-    includeCSS(
-      file.path(
-        Cerebro.options[["cerebro_root"]],
-        "shiny/v1.4/www/hla_motifs.css"
-      )
-    ),
-    includeScript(
-      file.path(
-        Cerebro.options[["cerebro_root"]],
-        "shiny/v1.4/www/hla_motifs.js"
-      )
+    ## App CSS/JS as cacheable static resources (served from the cerebro_www
+    ## resource path registered above) instead of inlined into every page. The
+    ## browser caches them across connections and downloads them in parallel;
+    ## scripts are deferred so they run after the document parses (each is a
+    ## self-contained IIFE with its own Shiny-readiness retry, so order-safe).
+    ##  - custom.css      : Console design language; overrides AdminLTE 2 chrome.
+    ##  - fill_height.js  : sizes any .cerebro-fill element to the live viewport.
+    ##  - trekker.*       : Trekker page assets (scoped under .trekker-page / tk-).
+    ##  - hla_motifs.*    : modebar over the visNetwork motif network.
+    tags$head(
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = cerebro_asset("custom.css")
+      ),
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = cerebro_asset("trekker.css")
+      ),
+      tags$link(
+        rel = "stylesheet",
+        type = "text/css",
+        href = cerebro_asset("hla_motifs.css")
+      ),
+      tags$script(defer = NA, src = cerebro_asset("fill_height.js")),
+      tags$script(defer = NA, src = cerebro_asset("trekker.js")),
+      tags$script(defer = NA, src = cerebro_asset("hla_motifs.js")),
+      ## Shared projection-scatter engine, loaded ONCE here instead of being
+      ## inlined into all five projection tabs' extendShinyjs() (~69KB x5). Both
+      ## files expose only window globals (window.cerebroProjectionLayout /
+      ## window.cerebroProjection); each tab's thin js_projection_update_plot.js
+      ## (still inlined via extendShinyjs) calls those globals. These are NOT
+      ## deferred so the globals exist before the tab scripts' registerPlot()
+      ## runs; layouts before scatter since scatter builds on the layout helpers.
+      tags$script(src = cerebro_asset("projection_layouts.js")),
+      tags$script(src = cerebro_asset("projection_scatter.js"))
     ),
     tags$script(HTML('$("body").addClass("fixed");')),
     tabItems(

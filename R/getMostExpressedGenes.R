@@ -25,7 +25,6 @@
 #'
 #' @import dplyr
 #' @importFrom Matrix rowSums
-#' @importFrom pbapply pblapply
 #' @importFrom rlang .data :=
 #' @importFrom tibble tibble
 #'
@@ -248,7 +247,7 @@ getMostExpressedGenes <- function(
       )
 
       ##
-      results <- pbapply::pblapply(group_levels, function(x) {
+      mostexpr_fun <- function(x) {
         ## get names of cells belonging to current group level
         cells_of_current_group_level <- rownames(object@meta.data)[which(
           object@meta.data[[current_group]] == x
@@ -291,7 +290,12 @@ getMostExpressedGenes <- function(
           gene = names(transcripts_percent_per_gene)[1:100],
           pct = transcripts_percent_per_gene[1:100]
         )
-      })
+      }
+      results <- if (requireNamespace("pbapply", quietly = TRUE)) {
+        pbapply::pblapply(group_levels, mostexpr_fun)
+      } else {
+        lapply(group_levels, mostexpr_fun)
+      }
 
       ## merge tables with results and factorize group levels
       most_expressed_genes <- do.call(rbind, results) %>%

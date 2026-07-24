@@ -7,29 +7,21 @@
 ## scope. The shared renderer (projection_scatter.js) is what every projection
 ## tab now delegates to; spatial's js_projection_update_plot.js only adds the
 ## plot-id-tagged wrappers + spatial-only page chrome.
+## Shared projection engine (projection_layouts.js + projection_scatter.js) is
+## loaded once app-wide as static scripts (see shiny_UI.R) and exposes window
+## globals. Spatial's own two scripts stay concatenated into one extendShinyjs()
+## text so its background-overlay layer and plot wrappers share one scope.
 js_code_spatial_projection <- paste(
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_layouts.js"
-    )
-  ),
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_scatter.js"
-    )
-  ),
   ## Background-overlay layer, split out of js_projection_update_plot.js but
   ## concatenated back into the SAME extendShinyjs() text, so all functions
   ## still share one global scope (see the header in js_spatial_background.js).
-  readr::read_file(
+  cerebro_read_file(
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/shiny/v1.4/spatial/js_spatial_background.js"
     )
   ),
-  readr::read_file(
+  cerebro_read_file(
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/shiny/v1.4/spatial/js_projection_update_plot.js"

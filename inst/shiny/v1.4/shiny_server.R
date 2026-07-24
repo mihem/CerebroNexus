@@ -1,19 +1,29 @@
 ##----------------------------------------------------------------------------##
 ## Server function for Cerebro.
 ##----------------------------------------------------------------------------##
+
+## plotting_functions.R holds only pure plot-builder functions (no reactive /
+## input / output / session references), so source it ONCE at process startup
+## instead of re-evaluating every definition on every new browser session. It
+## lands in this file's environment (which encloses server()), so the server
+## reactives still reach the functions by lexical scope. color_setup.R and
+## utility_functions.R stay inside server(): the former defines a top-level
+## reactive (reactive_colors); the latter's helpers close over session-scope
+## reactives (data_set(), preferences, ...).
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/plotting_functions.R"
+  ),
+  local = TRUE
+)
+
 server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
-  ## Load color setup, plotting and utility functions.
+  ## Load color setup and utility functions.
   ##--------------------------------------------------------------------------##
   source(
     paste0(Cerebro.options[["cerebro_root"]], "/shiny/v1.4/color_setup.R"),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/plotting_functions.R"
-    ),
     local = TRUE
   )
   source(

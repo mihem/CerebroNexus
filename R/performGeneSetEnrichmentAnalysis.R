@@ -41,9 +41,7 @@
 #' )
 #'
 #' @import dplyr
-#' @importFrom GSVA gsva gsvaParam
 #' @importFrom Matrix colMeans colSums rowSums t
-#' @importFrom qvalue qvalue
 #' @importFrom rlang .data :=
 #' @importFrom tibble tibble
 #'
@@ -62,6 +60,22 @@ performGeneSetEnrichmentAnalysis <- function(
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
+
+  ## check if GSVA is installed
+  if (!requireNamespace("GSVA", quietly = TRUE)) {
+    stop(
+      "Package 'GSVA' is required for this function. Install it with install.packages(\"GSVA\") (or BiocManager::install(\"GSVA\") for Bioconductor packages: biomaRt, GSVA, qvalue).",
+      call. = FALSE
+    )
+  }
+
+  ## check if qvalue is installed
+  if (!requireNamespace("qvalue", quietly = TRUE)) {
+    stop(
+      "Package 'qvalue' is required for this function. Install it with install.packages(\"qvalue\") (or BiocManager::install(\"qvalue\") for Bioconductor packages: biomaRt, GSVA, qvalue).",
+      call. = FALSE
+    )
+  }
 
   ## check if Seurat is installed
   if (!requireNamespace("Seurat", quietly = TRUE)) {
@@ -316,28 +330,40 @@ performGeneSetEnrichmentAnalysis <- function(
       ## ... more than 1 group level is available
     } else if (length(group_levels) > 1) {
       ## get results
-      matrix_mean_by_group <- future.apply::future_sapply(
-        group_levels,
-        USE.NAMES = TRUE,
-        simplify = TRUE,
-        future.globals = FALSE,
-        function(x) {
-          ## get indices of cells in this group level
-          cells_in_this_group <- which(object@meta.data[[current_group]] == x)
+      group_mean_fun <- function(x) {
+        ## get indices of cells in this group level
+        cells_in_this_group <- which(object@meta.data[[current_group]] == x)
 
-          ## check how many cells are in the group level
-          ## ... only 1 cell
-          if (length(cells_in_this_group) == 1) {
-            ## return expression values from the single cell
-            matrix_full[, cells_in_this_group]
+        ## check how many cells are in the group level
+        ## ... only 1 cell
+        if (length(cells_in_this_group) == 1) {
+          ## return expression values from the single cell
+          matrix_full[, cells_in_this_group]
 
-            ## ... at least 2 cells
-          } else {
-            ## calculate mean expression for each gene across cells
-            Matrix::rowMeans(matrix_full[, cells_in_this_group])
-          }
+          ## ... at least 2 cells
+        } else {
+          ## calculate mean expression for each gene across cells
+          Matrix::rowMeans(matrix_full[, cells_in_this_group])
         }
-      )
+      }
+      matrix_mean_by_group <- if (
+        requireNamespace("future.apply", quietly = TRUE)
+      ) {
+        future.apply::future_sapply(
+          group_levels,
+          group_mean_fun,
+          USE.NAMES = TRUE,
+          simplify = TRUE,
+          future.globals = FALSE
+        )
+      } else {
+        sapply(
+          group_levels,
+          group_mean_fun,
+          USE.NAMES = TRUE,
+          simplify = TRUE
+        )
+      }
 
       ## get enrichment score for each gene set in every cell group
       ## GSVA >= 2.0 uses a param-object API; fall back to old API for older versions

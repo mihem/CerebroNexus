@@ -4,26 +4,13 @@
 ## Prepend the shared plotly layout factory and the shared projection-scatter
 ## renderer, then gene_expression's wrappers — all in ONE extendShinyjs() text
 ## so they share a global scope (same pattern as spatial/UI.R).
-js_code_gene_expression_projection <- paste(
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_layouts.js"
-    )
-  ),
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_scatter.js"
-    )
-  ),
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/gene_expression/js_projection_update_plot.js"
-    )
-  ),
-  sep = "\n"
+## Shared projection engine loaded once app-wide (see shiny_UI.R); inline only
+## this tab's thin wrappers over the window globals it exposes.
+js_code_gene_expression_projection <- cerebro_read_file(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/gene_expression/js_projection_update_plot.js"
+  )
 )
 
 tab_gene_expression <- tabItem(
