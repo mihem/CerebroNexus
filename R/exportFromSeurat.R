@@ -869,6 +869,18 @@ exportFromSeurat <- function(
       )
     }
     export$addImmuneRepertoire(object@misc$immune_repertoire)
+
+    ## Precompute the metric tables the viewer draws, using scRepertoire when
+    ## available so the stored figures match scRepertoire exactly and the app
+    ## needs neither scRepertoire nor a runtime recompute. No-op (empty) when
+    ## scRepertoire is not installed; the app then falls back to native metrics.
+    precomputed <- computeRepertoireMetrics(
+      object@misc$immune_repertoire,
+      verbose = verbose
+    )
+    if (length(precomputed) > 0) {
+      export$addImmuneRepertoirePrecomputed(precomputed)
+    }
   }
 
   ##--------------------------------------------------------------------------##

@@ -108,6 +108,13 @@ Cerebro_v1.3 <- R6::R6Class(
     #'   containing scRepertoire columns (CTgene, CTnt, CTaa, CTstrict, etc.).
     immune_repertoire = list(),
 
+    #' @field immune_repertoire_precomputed optional \code{list} of repertoire
+    #'   metric tables computed at export time (see \code{addImmuneRepertoire\-}
+    #'   \code{Precomputed}). Lets the viewer draw scRepertoire-identical figures
+    #'   without recomputing (or depending on) the metrics at runtime. Older
+    #'   .crb files simply lack it.
+    immune_repertoire_precomputed = list(),
+
     #' @field hla_typing canonical HLA typing \code{data.frame} (long: one row
     #'   per sample x locus x copy) with data provenance, or NULL. Consumed by
     #'   the HLA & TCR Motifs page for donor-level HLA context. Optional; older
@@ -1112,6 +1119,28 @@ Cerebro_v1.3 <- R6::R6Class(
     #'   scRepertoire columns.
     addImmuneRepertoire = function(data) {
       self$immune_repertoire <- data
+    },
+
+    #' @description
+    #' Get precomputed immune repertoire metric tables (or an empty list when
+    #' the .crb was built without them).
+    #'
+    #' @return Named \code{list} of metric tables, or empty list.
+    getImmuneRepertoirePrecomputed = function() {
+      if (length(self$immune_repertoire_precomputed) > 0) {
+        return(self$immune_repertoire_precomputed)
+      }
+      list()
+    },
+
+    #' @description
+    #' Store precomputed immune repertoire metric tables. These are computed at
+    #' export time (optionally with scRepertoire) so the viewer can render
+    #' identical figures without recomputing the metrics.
+    #'
+    #' @param tables Named \code{list} of metric tables.
+    addImmuneRepertoirePrecomputed = function(tables) {
+      self$immune_repertoire_precomputed <- tables
     },
 
     #' @description

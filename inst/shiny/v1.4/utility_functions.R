@@ -1522,6 +1522,25 @@ getImmuneRepertoire <- function() {
   tryCatch(ds$getImmuneRepertoire(), error = function(e) list())
 }
 
+## Precomputed repertoire metric tables (present only when the .crb was built
+## with computeRepertoireMetrics()). Empty list otherwise.
+getImmuneRepertoirePrecomputed <- function() {
+  ds <- data_set()
+  if (!any(grepl("Cerebro", class(ds)))) {
+    return(list())
+  }
+  tryCatch(
+    {
+      if (is.function(ds$getImmuneRepertoirePrecomputed)) {
+        ds$getImmuneRepertoirePrecomputed()
+      } else {
+        list()
+      }
+    },
+    error = function(e) list()
+  )
+}
+
 ## ---- What one row of this data set is ---------------------------------- ##
 ## Almost every .crb is single-cell, so a row is a cell and the app says so.
 ## That is not universal: a bulk repertoire data set maps a (donor, clonotype)

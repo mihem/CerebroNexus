@@ -32,7 +32,16 @@ irn_clone_col <- function(cloneCall) {
 
 ## Per row (cell), the clonotype string for the requested chain, or NA when the
 ## cell has no rearrangement for that chain. "both"/NULL keeps the combined
-## string. TRA/IGH = slot 1, TRB/TRG/IGL/IGK = slot 2 of the "_"-joined value.
+## string. In scRepertoire's combined format the "_"-joined value has the
+## alpha/heavy chain in slot 1 (TRA / TRG / IGH) and the beta/light chain in
+## slot 2 (TRB / TRD / IGK / IGL).
+##
+## A single-chain request must be masked by the chain FAMILY, not just the slot
+## position: on a mixed TCR+BCR object slot 1 holds TRA for T cells but IGH for
+## B cells, so chain = "TRA" must reject the IGH cells. The family is only
+## legible in CTgene (CTnt / CTaa carry no chain prefix), so we always read the
+## mask from CTgene and apply it to whichever cloneCall column was requested.
+## This matches scRepertoire, which filters cells to the requested chain first.
 irn_extract <- function(df, cloneCall = "gene", chain = "TRB") {
   col <- irn_clone_col(cloneCall)
   v <- df[[col]]
@@ -44,15 +53,48 @@ irn_extract <- function(df, cloneCall = "gene", chain = "TRB") {
     v[v %in% c("NA", "NA_NA") | !nzchar(v)] <- NA
     return(v)
   }
-  slot <- if (chain %in% c("TRA", "IGH")) 1L else 2L
-  parts <- strsplit(v, "_", fixed = TRUE)
-  out <- vapply(
-    parts,
-    function(p) if (length(p) >= slot) p[slot] else NA_character_,
-    character(1)
-  )
-  out[is.na(out) | out == "NA" | !nzchar(out)] <- NA
+  slot <- if (chain %in% c("TRA", "TRG", "IGH")) 1L else 2L
+  slot_of <- function(x) {
+    parts <- strsplit(as.character(x), "_", fixed = TRUE)
+    vapply(
+      parts,
+      function(p) if (length(p) >= slot) p[slot] else NA_character_,
+      character(1)
+    )
+  }
+  out <- slot_of(v)
+  ## Family mask: the leading receptor family of this slot (e.g.
+  ## "TRAV8-6.TRAJ8.TRAC" -> "TRA", "IGHV3-23..." -> "IGH"). CTgene and CTstrict
+  ## carry the V-gene prefix, so read the family straight from the requested
+  ## column; CTnt / CTaa do not, so fall back to CTgene for those.
+  fam_source <- if (cloneCall %in% c("gene", "strict")) {
+    out
+  } else {
+    slot_of(df[["CTgene"]])
+  }
+  fam <- substr(fam_source, 1L, 3L)
+  drop <- is.na(out) |
+    out == "NA" |
+    !nzchar(out) |
+    is.na(fam) |
+    fam != chain
+  out[drop] <- NA
   out
+}
+
+## CDR3 length, matching scRepertoire's .lengthDF. For "both" the two chains'
+## CDR3s are concatenated with the "_" separator and missing-chain markers
+## dropped, then counted; for a single chain only the first ";"-separated contig
+## is measured (scRepertoire takes contig 1, it does not sum multiple contigs).
+irn_cdr3_length <- function(x, chain = "TRB") {
+  x <- as.character(x)
+  if (is.null(chain) || identical(chain, "both") || !nzchar(chain)) {
+    x <- gsub("_NA", "", x)
+    x <- gsub("NA_", "", x)
+    nchar(gsub("_", "", x))
+  } else {
+    nchar(sub(";.*", "", x))
+  }
 }
 
 ## Long (group, clonotype) frame over all cells that carry the chain.
@@ -399,7 +441,7 @@ irn_clonalLength <- function(
   ## length is measured on the CDR3 sequence (nt or aa)
   cc <- if (tolower(cloneCall) %in% c("nt", "aa")) tolower(cloneCall) else "aa"
   long <- irn_long(data, cc, chain, group.by)
-  long$length <- nchar(long$clonotype)
+  long$length <- irn_cdr3_length(long$clonotype, chain)
   long <- long[long$length > 0, , drop = FALSE]
   groups <- irn_group_levels(long, order.by)
   if (isTRUE(exportTable)) {
@@ -578,16 +620,20 @@ irn_overlap_pair <- function(xa, xb, method = "overlap") {
     jaccard = inter / length(union(a, b)),
     raw = inter,
     morisita = {
+      ## Morisita-Horn index, matching scRepertoire's .morisitaCalc:
+      ##   2*sum(x*y) / ((sum(x^2)/X^2 + sum(y^2)/Y^2) * X * Y)
+      ## (not the classic unbiased Morisita, which divides by N(N-1) and blows
+      ## up to Inf for a singleton clone.)
       keys <- union(a, b)
       va <- as.numeric(xa[keys])
       va[is.na(va)] <- 0
       vb <- as.numeric(xb[keys])
       vb[is.na(vb)] <- 0
-      Na <- sum(va)
-      Nb <- sum(vb)
-      da <- sum(va * (va - 1)) / (Na * (Na - 1))
-      db <- sum(vb * (vb - 1)) / (Nb * (Nb - 1))
-      (2 * sum(va * vb)) / ((da + db) * Na * Nb)
+      X <- sum(va)
+      Y <- sum(vb)
+      num <- 2 * sum(va * vb)
+      den <- ((sum(va^2) / X^2) + (sum(vb^2) / Y^2)) * X * Y
+      num / den
     },
     inter / min(length(a), length(b))
   )
@@ -882,15 +928,17 @@ irn_position_matrix <- function(
   order.by = NULL
 ) {
   long <- irn_long(data, "aa", chain, group.by)
-  long <- long[
-    nchar(long$clonotype) > 0 & !grepl("[^A-Z]", long$clonotype),
-    ,
-    drop = FALSE
-  ]
   groups <- irn_group_levels(long, order.by)
   out <- list()
   for (g in groups) {
-    seqs <- long$clonotype[long$group == g]
+    ## Match scRepertoire/immApex calculateFrequency: multi-contig strings are
+    ## split on ";" into separate sequences, sequences LONGER than aa.length are
+    ## dropped (not truncated), and shorter ones are padded with a gap — so the
+    ## denominator is the sequence count, constant across positions.
+    raw <- long$clonotype[long$group == g]
+    seqs <- unlist(strsplit(raw, ";", fixed = TRUE))
+    seqs <- seqs[!is.na(seqs) & nzchar(seqs) & seqs != "NA"]
+    seqs <- seqs[nchar(seqs) <= aa.length]
     counts <- matrix(
       0,
       nrow = aa.length,
@@ -898,12 +946,13 @@ irn_position_matrix <- function(
       dimnames = list(NULL, IRN_AA)
     )
     for (s in seqs) {
-      chars <- utils::head(strsplit(s, "", fixed = TRUE)[[1]], aa.length)
+      chars <- strsplit(s, "", fixed = TRUE)[[1]]
       for (p in seq_along(chars)) {
         aa <- chars[p]
         if (aa %in% IRN_AA) counts[p, aa] <- counts[p, aa] + 1
       }
     }
+    attr(counts, "n_seq") <- length(seqs)
     out[[g]] <- counts
   }
   list(counts = out, groups = groups)
@@ -927,8 +976,11 @@ irn_percentAA <- function(
     rbind,
     lapply(pm$groups, function(g) {
       m <- pm$counts[[g]]
-      rs <- rowSums(m)
-      freq <- sweep(m, 1, ifelse(rs > 0, rs, 1), "/")
+      ## Frequencies are over ALL sequences in the group (shorter CDR3s padded
+      ## with a gap), matching scRepertoire: divide every position by the same
+      ## sequence count rather than by the per-position residue total.
+      n_seq <- attr(m, "n_seq")
+      freq <- if (!is.null(n_seq) && n_seq > 0) m / n_seq else m
       d <- as.data.frame(as.table(freq))
       colnames(d) <- c("Position", "AA", "Frequency")
       d$Position <- as.integer(d$Position)

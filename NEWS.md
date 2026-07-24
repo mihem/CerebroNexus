@@ -26,6 +26,34 @@
   `default.nix`) was updated to match.
 - **Static assets are cached and the projection engine loads once**, reducing
   redundant work on repeated projection renders.
+- **Immune Repertoire plots no longer flash when switching sub-tabs.** The
+  console theme's tab-content fade-in was re-running on every activation, fading
+  an already-rendered plot back in each time; `.cerebro-fill` plots (which have
+  their own reveal gate) are now exempt from it.
+- **Native metrics brought into line with scRepertoire.** Several native
+  computations now match scRepertoire exactly: single-chain extraction on mixed
+  TCR+BCR objects masks by chain family (`chain = "TRA"` no longer picks up the
+  IGH slot of B cells); `clonalOverlap`'s `morisita` method uses scRepertoire's
+  Morisita-Horn formula (removing the `Inf` it produced for singleton clones);
+  `clonalLength` measures the CDR3 the same way (concatenated chains without the
+  separator for "both", first contig for a single chain) instead of counting the
+  raw joined string; and `percentAA` normalises each position by the sequence
+  count with multi-contig strings split, matching scRepertoire's positional
+  frequencies. The one remaining difference is the `strict` clone definition on a
+  single chain, where scRepertoire counts chain-missing cells as an `"NA;NA"`
+  clonotype and the native code drops them; the precompute path reproduces
+  scRepertoire's numbers there when exact parity is required.
+- **Repertoire metrics can be precomputed into the `.crb`.** `exportFromSeurat()`
+  stores scRepertoire-computed metric tables in the object (a new
+  `immune_repertoire_precomputed` slot on `Cerebro_v1.3`, filled by
+  `computeRepertoireMetrics()` when scRepertoire is installed). The tables are
+  keyed by clone definition and chain, covering clonal homeostasis, proportion,
+  quant, overlap, length and amino-acid composition. When a `.crb` carries them,
+  the Immune Repertoire tab draws these figures straight from the stored tables
+  — scRepertoire's own numbers, no runtime metric computation — so a figure can
+  match a published scRepertoire result exactly. Grouped views, customised bins
+  and clone-definition/chain combinations outside the stored grid, as well as
+  older `.crb` files without the slot, fall back to the native metrics.
 
 # Version 2.3.0
 
