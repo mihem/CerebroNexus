@@ -11,26 +11,13 @@
 ## text so they share a global scope (same pattern as overview/spatial UI.R).
 ## Only the NON-FACETED Clonal UMAP renders through the shared renderer; the
 ## faceted variant stays on the static ggplot renderPlot (see visualizations.R).
-js_code_ir_projection <- paste(
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_layouts.js"
-    )
-  ),
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/www/projection_scatter.js"
-    )
-  ),
-  readr::read_file(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/shiny/v1.4/immune_repertoire/js_projection_update_plot.js"
-    )
-  ),
-  sep = "\n"
+## Shared projection engine loaded once app-wide (see shiny_UI.R); inline only
+## this tab's thin wrappers over the window globals it exposes.
+js_code_ir_projection <- cerebro_read_file(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/shiny/v1.4/immune_repertoire/js_projection_update_plot.js"
+  )
 )
 
 tab_immune_repertoire <- tabItem(
