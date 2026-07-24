@@ -2281,6 +2281,19 @@ output$ir_plot_cloneSharing <- plotly::renderPlotly({
       }
       tr
     })
+    # ggplotly ignores the ggplot `legend.position` and drops a horizontal
+    # legend along the TOP, where it collided with the plot title. Move it below
+    # the plot so the title sits cleanly on its own row.
+    fig <- plotly::layout(
+      fig,
+      legend = list(
+        orientation = "h",
+        x = 0.5,
+        xanchor = "center",
+        y = -0.14,
+        yanchor = "top"
+      )
+    )
   }
   fig
 }) %>%
