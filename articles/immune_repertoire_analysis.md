@@ -31,13 +31,28 @@ runtime.
 The immune repertoire module is built on the
 [scRepertoire](https://www.borch.dev/uploads/screpertoire/) package (≥
 2.0), which is the standard tool for turning 10x Cell Ranger V(D)J
-output into per-cell clonotype annotations. CerebroNexus lists it under
-`Suggests`, so install it once before preparing data:
+output into per-cell clonotype annotations. CerebroNexus depends on it
+as a mandatory `Imports`, so a standard install already provides it (via
+Bioconductor):
 
 ``` r
 # Bioconductor
 BiocManager::install("scRepertoire")
 ```
+
+Because loading `scRepertoire`’s namespace pulls in a large dependency
+tree (~90 packages and several seconds of `lazyLoadDBfetch`),
+CerebroNexus does **not** load it at app startup. Availability is probed
+cheaply with [`system.file()`](https://rdrr.io/r/base/system.file.html),
+and the namespace is loaded lazily on the first *scRepertoire-backed*
+plot — self-made plots (Clone Sharing, Definition) and the default
+Clonal UMAP do not need it and never trigger the load. That first
+scRepertoire plot therefore pays a one-time load of several seconds;
+because a namespace is process-wide, every plot afterwards is warm for
+every session sharing that R worker (and that first load briefly blocks
+those other sessions). There is no background prewarm — it cannot be
+made non-blocking on Shiny’s single R thread. Repertoire figures are
+still computed by `scRepertoire`; only the timing of the load changed.
 
 The full scRepertoire workflow is documented in its vignettes — [Loading
 data](https://www.borch.dev/uploads/screpertoire/articles/loading) and

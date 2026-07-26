@@ -97,7 +97,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">23 July, 2026</h4>
+            <h4 data-toc-skip class="date">26 July, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/immune_repertoire_analysis.Rmd" class="external-link"><code>vignettes/immune_repertoire_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>immune_repertoire_analysis.Rmd</code></div>
@@ -138,12 +138,26 @@ metadata onto them by barcode at runtime.</p>
 </h3>
 <p>The immune repertoire module is built on the <a href="https://www.borch.dev/uploads/screpertoire/" class="external-link">scRepertoire</a>
 package (≥ 2.0), which is the standard tool for turning 10x Cell Ranger
-V(D)J output into per-cell clonotype annotations. CerebroNexus lists it
-under <code>Suggests</code>, so install it once before preparing
-data:</p>
+V(D)J output into per-cell clonotype annotations. CerebroNexus depends
+on it as a mandatory <code>Imports</code>, so a standard install already
+provides it (via Bioconductor):</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Bioconductor</span></span>
 <span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span><span class="st">"scRepertoire"</span><span class="op">)</span></span></code></pre></div>
+<p>Because loading <code>scRepertoire</code>’s namespace pulls in a
+large dependency tree (~90 packages and several seconds of
+<code>lazyLoadDBfetch</code>), CerebroNexus does <strong>not</strong>
+load it at app startup. Availability is probed cheaply with
+<code><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file()</a></code>, and the namespace is loaded lazily on the
+first <em>scRepertoire-backed</em> plot — self-made plots (Clone
+Sharing, Definition) and the default Clonal UMAP do not need it and
+never trigger the load. That first scRepertoire plot therefore pays a
+one-time load of several seconds; because a namespace is process-wide,
+every plot afterwards is warm for every session sharing that R worker
+(and that first load briefly blocks those other sessions). There is no
+background prewarm — it cannot be made non-blocking on Shiny’s single R
+thread. Repertoire figures are still computed by
+<code>scRepertoire</code>; only the timing of the load changed.</p>
 <p>The full scRepertoire workflow is documented in its vignettes — <a href="https://www.borch.dev/uploads/screpertoire/articles/loading" class="external-link">Loading
 data</a> and <a href="https://www.borch.dev/uploads/screpertoire/articles/combining_contigs" class="external-link">Combining
 contigs</a>. The steps below summarise just what CerebroNexus needs.</p>

@@ -101,6 +101,7 @@ No data returned.
 ``` r
 pbmc <- readRDS(system.file("extdata/v1.4/pbmc_SCE.rds",
   package = "CerebroNexus"))
+#> Loading required namespace: SingleCellExperiment
 exportFromSCE(
   object = pbmc,
   file = file.path(tempdir(), 'pbmc_SCE.crb'),
@@ -112,19 +113,19 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [20:30:34] Initializing Cerebro object...
-#> [20:30:34] Collecting available meta data...
-#> [20:30:34] Extracting all meta data columns...
-#> [20:30:34] Extracting dimensional reductions...
-#> [20:30:34] Will export the following dimensional reductions: UMAP
-#> [20:30:34] No trajectories to extract...
-#> [20:30:34] Overview of Cerebro object:
+#> [19:08:29] Initializing Cerebro object...
+#> [19:08:29] Collecting available meta data...
+#> [19:08:29] Extracting all meta data columns...
+#> [19:08:29] Extracting dimensional reductions...
+#> [19:08:29] Will export the following dimensional reductions: UMAP
+#> [19:08:29] No trajectories to extract...
+#> [19:08:29] Overview of Cerebro object:
 #> class: Cerebro_v1.3
 #> cerebroApp version: 3.0.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-07-23
+#> date of export: 2026-07-26
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, cluster
@@ -139,6 +140,6 @@ exportFromSCE(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [20:30:34] Saving Cerebro object to: /tmp/nix-shell-4352-2418115977/RtmpTda02c/pbmc_SCE.crb
-#> [20:30:34] Done!
+#> [19:08:29] Saving Cerebro object to: /tmp/nix-shell-4319-2176940472/RtmpC9ksh8/pbmc_SCE.crb
+#> [19:08:29] Done!
 ```
