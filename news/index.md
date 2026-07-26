@@ -1,19 +1,6 @@
 # Changelog
 
-## CerebroNexus 3.0.0
-
-### Renamed package and application
-
-- Unified the R package, Shiny application, and GitHub repository under
-  the `CerebroNexus` name. Install from `mihem/CerebroNexus` and load
-  the package with
-  [`library(CerebroNexus)`](https://mihem.github.io/CerebroNexus/).
-- Kept the established Cerebro data model and public API, including
-  `.crb` files, `Cerebro_v1.3`, `Cerebro.options`,
-  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
-  and
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md).
-- Updated the HLA export metadata field to `CerebroNexus_version`.
+## CerebroNexus 3.0.1
 
 ### Faster startup
 
@@ -68,6 +55,21 @@
 - **No more Immune Repertoire plot flashing** when switching between the
   tab’s sub-tabs (the theme fade-in animation no longer re-runs on
   already-rendered plots).
+
+## CerebroNexus 3.0.0
+
+### Renamed package and application
+
+- Unified the R package, Shiny application, and GitHub repository under
+  the `CerebroNexus` name. Install from `mihem/CerebroNexus` and load
+  the package with
+  [`library(CerebroNexus)`](https://mihem.github.io/CerebroNexus/).
+- Kept the established Cerebro data model and public API, including
+  `.crb` files, `Cerebro_v1.3`, `Cerebro.options`,
+  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  and
+  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md).
+- Updated the HLA export metadata field to `CerebroNexus_version`.
 
 ## Version 2.3.0
 
