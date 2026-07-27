@@ -1,5 +1,3 @@
-# CerebroNexus
-
 ![CerebroNexus](reference/figures/logo.svg)
 
 [![R-CMD-check
