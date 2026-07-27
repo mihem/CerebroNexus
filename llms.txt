@@ -1,5 +1,14 @@
 # CerebroNexus
 
+![CerebroNexus](reference/figures/logo.svg)
+
+[![R-CMD-check
+(upstream)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Lifecycle:
+stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
+
 Interactive visualization of single-cell RNA-seq data, built on top of
 [Shiny](https://shiny.posit.co/).
 
@@ -18,7 +27,8 @@ works the same way here.
 
 *A community fork of
 [cerebroApp](https://github.com/romanhaa/cerebroApp) by Roman Hillje,
-developed and maintained by [mihem](https://github.com/mihem).*
+developed by [mihem](https://github.com/mihem) and [Xuesong
+Wang](https://github.com/duocang). Maintained by mihem.*
 
 ## Contents
 
@@ -28,7 +38,8 @@ developed and maintained by [mihem](https://github.com/mihem).*
   - [2.2 createShinyApp()](#id_22-createshinyapp)
   - [2.3 Choosing an expression
     backend](#id_23-choosing-an-expression-backend)
-  - [2.4 Other improvements](#id_24-other-improvements)
+  - [2.4 Analysis modules](#id_24-analysis-modules)
+  - [2.5 Other improvements](#id_25-other-improvements)
 - [3. Testing](#id_3-testing)
   - [3.1 Install the test tooling](#id_31-install-the-test-tooling)
   - [3.2 Run the tests](#id_32-run-the-tests)
@@ -192,7 +203,42 @@ them next to the bundled `.crb`. The Shiny runtime re-resolves the
 sibling location on load via `getExpressionBackend()$location` relative
 to the `.crb`’s parent directory, so the bundle stays portable.
 
-### 2.4 Other improvements
+### 2.4 Analysis modules
+
+Beyond the projection, marker-gene and pathway views inherited from
+cerebroApp, the app registers a set of analysis modules. Each one is
+**conditional**: its tab appears only when the loaded `.crb` actually
+carries the data it needs, so an app built from a plain RNA-only data
+set shows none of them.
+
+| Module | Tab appears when the data set carries | Guide |
+|----|----|----|
+| **Immune repertoire** | TCR/BCR clonotypes | [Immune repertoire analysis](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.html) |
+| **Spatial** | one or more spatial data sets (Visium, Xenium, MERFISH, Slide-seq) | [Spatial transcriptomics analysis](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html) |
+| **Trekker** | a `trekker` slot | [Trekker spatial mapping](https://mihem.github.io/CerebroNexus/articles/trekker_spatial_mapping.html) |
+| **HLA & TCR Motifs** | a TCR (TRA/TRB); HLA typing is optional and can be added in-app | [HLA & TCR motifs](https://mihem.github.io/CerebroNexus/articles/hla_tcr_motifs.html) |
+| **Trajectory** | a Monocle 2 trajectory | [Trajectory analysis](https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.html) |
+
+**Immune repertoire** groups its plots into clonal expansion and
+abundance, diversity, repertoire overlap, V/J gene usage, CDR3 length
+and amino-acid properties, plus a clonotype-coloured UMAP.
+`scRepertoire` backs the plots that need it and is loaded on first use,
+so it costs nothing until the tab is opened.
+
+**HLA & TCR Motifs** also accepts input with no single cells at all:
+bulk TCRβ immunosequencing paired with donor HLA genotypes — see [HLA
+associations on bulk
+TCRβ](https://mihem.github.io/CerebroNexus/articles/hla_bulk_tcr_associations.html).
+[A real antigen-selected single-cell TCR
+demo](https://mihem.github.io/CerebroNexus/articles/hla_tcr_antigen_selected.html)
+walks through building such a data set end to end from public 10x
+Genomics data.
+
+One app can serve **several data sets** behind a switcher; see [Loading
+multiple data
+sets](https://mihem.github.io/CerebroNexus/articles/multi_crb.html).
+
+### 2.5 Other improvements
 
 - **Seurat v5** support throughout (`GetAssayData()`-based slot access)
 - Loading spinners on all plot outputs
@@ -292,8 +338,9 @@ changes (a stale fixture surfaces as a misleading
 ## 4. License
 
 MIT — see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
-Original cerebroApp © Roman Hillje; CerebroNexus fork by
-[mihem](https://github.com/mihem).
+Original cerebroApp © Roman Hillje; CerebroNexus by
+[mihem](https://github.com/mihem) and [Xuesong
+Wang](https://github.com/duocang).
 
 # Package index
 

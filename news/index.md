@@ -1,5 +1,23 @@
 # Changelog
 
+## CerebroNexus 3.0.2
+
+### Interface and documentation
+
+- **The wordmark renders identically on every machine.** The sidebar
+  logo was an SVG built from `<text>` elements carrying a `font-family`
+  list, so the browser substituted whatever font it happened to have and
+  the mark changed width and weight from one machine to the next. It is
+  now vector outlines (Fredoka, SIL OFL) kept in
+  `inst/shiny/v1.4/www/cerebronexus.svg`, so it no longer depends on any
+  installed font. The `Nexus` half also moves from the old Bootstrap
+  blue to the amber accent used throughout the rest of the interface.
+- **The README documents the analysis modules.** Its feature section
+  previously covered only the export API, so Immune repertoire, Spatial,
+  Trekker, HLA & TCR Motifs and Trajectory went unmentioned. Each now
+  states what a `.crb` must carry for its tab to appear, with a link to
+  the corresponding guide.
+
 ## CerebroNexus 3.0.1
 
 ### Faster startup

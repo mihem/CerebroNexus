@@ -12,6 +12,7 @@
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Interactive visualization of single cell transcriptomics">
 <meta name="description" content="CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.">
 <meta property="og:description" content="CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.">
+<meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -21,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -89,15 +90,19 @@
   </div>
 </nav><div class="container template-home">
 <div class="row">
-  <main id="main" class="col-md-9">
+  <main id="main" class="col-md-9"><p align="center">
+<picture><source media="(prefers-color-scheme: dark)" srcset="reference/figures/logo-dark.svg"><img src="reference/figures/logo.svg" alt="CerebroNexus" width="380"></picture></p>
+<p><a href="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml" class="external-link"><img src="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg" alt="R-CMD-check (upstream)"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a> <img src="https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg" alt="Lifecycle: stable"></p>
 <div class="section level1">
-<div class="page-header"><h1 id="cerebronexus">CerebroNexus<a class="anchor" aria-label="anchor" href="#cerebronexus"></a>
-</h1></div>
+<div class="page-header">
+<img src="logo.svg" class="logo" alt=""><h1 id="cerebronexus">CerebroNexus<a class="anchor" aria-label="anchor" href="#cerebronexus"></a>
+</h1>
+</div>
 <p>Interactive visualization of single-cell RNA-seq data, built on top of <a href="https://shiny.posit.co/" class="external-link">Shiny</a>.</p>
 <p>CerebroNexus supports loading pre-processed single-cell data, exploring projections and gene expression, browsing marker genes and enriched pathways, and inspecting group compositions — all through an interactive web interface. The sections below cover the key features.</p>
 <p>A live demo is available at <a href="https://osmzhlab.uni-muenster.de/shiny/demo/" class="external-link uri">https://osmzhlab.uni-muenster.de/shiny/demo/</a>.</p>
 <p>For the original feature set and data preparation workflows, refer to the upstream cerebroApp documentation at <a href="https://romanhaa.github.io/cerebroApp/" class="external-link uri">https://romanhaa.github.io/cerebroApp/</a> — everything described there works the same way here.</p>
-<p><em>A community fork of <a href="https://github.com/romanhaa/cerebroApp" class="external-link">cerebroApp</a> by Roman Hillje, developed and maintained by <a href="https://github.com/mihem" class="external-link">mihem</a>.</em></p>
+<p><em>A community fork of <a href="https://github.com/romanhaa/cerebroApp" class="external-link">cerebroApp</a> by Roman Hillje, developed by <a href="https://github.com/mihem" class="external-link">mihem</a> and <a href="https://github.com/duocang" class="external-link">Xuesong Wang</a>. Maintained by mihem.</em></p>
 <div class="section level2">
 <h2 id="contents">Contents<a class="anchor" aria-label="anchor" href="#contents"></a>
 </h2>
@@ -109,7 +114,8 @@
 <li><a href="#id_21-convertseurattocerebro">2.1 convertSeuratToCerebro()</a></li>
 <li><a href="#id_22-createshinyapp">2.2 createShinyApp()</a></li>
 <li><a href="#id_23-choosing-an-expression-backend">2.3 Choosing an expression backend</a></li>
-<li><a href="#id_24-other-improvements">2.4 Other improvements</a></li>
+<li><a href="#id_24-analysis-modules">2.4 Analysis modules</a></li>
+<li><a href="#id_25-other-improvements">2.5 Other improvements</a></li>
 </ul>
 </li>
 <li>
@@ -289,7 +295,54 @@
 <p><code><a href="reference/createShinyApp.html">createShinyApp()</a></code> already knows about both <code>&lt;stem&gt;.bpcells/</code> and <code>&lt;stem&gt;.h5</code> and copies them next to the bundled <code>.crb</code>. The Shiny runtime re-resolves the sibling location on load via <code>getExpressionBackend()$location</code> relative to the <code>.crb</code>’s parent directory, so the bundle stays portable.</p>
 </div>
 <div class="section level3">
-<h3 id="id_24-other-improvements">2.4 Other improvements<a class="anchor" aria-label="anchor" href="#id_24-other-improvements"></a>
+<h3 id="id_24-analysis-modules">2.4 Analysis modules<a class="anchor" aria-label="anchor" href="#id_24-analysis-modules"></a>
+</h3>
+<p>Beyond the projection, marker-gene and pathway views inherited from cerebroApp, the app registers a set of analysis modules. Each one is <strong>conditional</strong>: its tab appears only when the loaded <code>.crb</code> actually carries the data it needs, so an app built from a plain RNA-only data set shows none of them.</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr>
+<th>Module</th>
+<th>Tab appears when the data set carries</th>
+<th>Guide</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>Immune repertoire</strong></td>
+<td>TCR/BCR clonotypes</td>
+<td><a href="https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.html">Immune repertoire analysis</a></td>
+</tr>
+<tr>
+<td><strong>Spatial</strong></td>
+<td>one or more spatial data sets (Visium, Xenium, MERFISH, Slide-seq)</td>
+<td><a href="https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html">Spatial transcriptomics analysis</a></td>
+</tr>
+<tr>
+<td><strong>Trekker</strong></td>
+<td>a <code>trekker</code> slot</td>
+<td><a href="https://mihem.github.io/CerebroNexus/articles/trekker_spatial_mapping.html">Trekker spatial mapping</a></td>
+</tr>
+<tr>
+<td><strong>HLA &amp; TCR Motifs</strong></td>
+<td>a TCR (TRA/TRB); HLA typing is optional and can be added in-app</td>
+<td><a href="https://mihem.github.io/CerebroNexus/articles/hla_tcr_motifs.html">HLA &amp; TCR motifs</a></td>
+</tr>
+<tr>
+<td><strong>Trajectory</strong></td>
+<td>a Monocle 2 trajectory</td>
+<td><a href="https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.html">Trajectory analysis</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Immune repertoire</strong> groups its plots into clonal expansion and abundance, diversity, repertoire overlap, V/J gene usage, CDR3 length and amino-acid properties, plus a clonotype-coloured UMAP. <code>scRepertoire</code> backs the plots that need it and is loaded on first use, so it costs nothing until the tab is opened.</p>
+<p><strong>HLA &amp; TCR Motifs</strong> also accepts input with no single cells at all: bulk TCRβ immunosequencing paired with donor HLA genotypes — see <a href="https://mihem.github.io/CerebroNexus/articles/hla_bulk_tcr_associations.html">HLA associations on bulk TCRβ</a>. <a href="https://mihem.github.io/CerebroNexus/articles/hla_tcr_antigen_selected.html">A real antigen-selected single-cell TCR demo</a> walks through building such a data set end to end from public 10x Genomics data.</p>
+<p>One app can serve <strong>several data sets</strong> behind a switcher; see <a href="https://mihem.github.io/CerebroNexus/articles/multi_crb.html">Loading multiple data sets</a>.</p>
+</div>
+<div class="section level3">
+<h3 id="id_25-other-improvements">2.5 Other improvements<a class="anchor" aria-label="anchor" href="#id_25-other-improvements"></a>
 </h3>
 <ul>
 <li>
@@ -354,7 +407,7 @@
 <div class="section level2">
 <h2 id="id_4-license">4. License<a class="anchor" aria-label="anchor" href="#id_4-license"></a>
 </h2>
-<p>MIT — see <a href="LICENSE.html">LICENSE.md</a>. Original cerebroApp © Roman Hillje; CerebroNexus fork by <a href="https://github.com/mihem" class="external-link">mihem</a>.</p>
+<p>MIT — see <a href="LICENSE.html">LICENSE.md</a>. Original cerebroApp © Roman Hillje; CerebroNexus by <a href="https://github.com/mihem" class="external-link">mihem</a> and <a href="https://github.com/duocang" class="external-link">Xuesong Wang</a>.</p>
 </div>
 </div>
 
@@ -391,13 +444,7 @@
 </ul>
 </div>
 
-<div class="dev-status">
-<h2 data-toc-skip>Dev status</h2>
-<ul class="list-unstyled">
-<li><a href="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml" class="external-link"><img src="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg" alt="R-CMD-check (upstream)"></a></li>
-<li><a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></li>
-</ul>
-</div>
+
 
   </aside>
 </div>
