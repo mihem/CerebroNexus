@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,6 +29,7 @@
     <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
@@ -93,7 +94,8 @@
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"bpcells"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  .expression_resolution <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -204,6 +206,12 @@ such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored whe
 <dd><p>Set this to <code>TRUE</code> if you want additional log messages;
 defaults to <code>FALSE</code>.</p></dd>
 
+
+<dt id="arg--expression-resolution">.expression_resolution<a class="anchor" aria-label="anchor" href="#arg--expression-resolution"></a></dt>
+<dd><p>Internal handoff used by
+<code><a href="convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> to reuse a matrix that has already been
+resolved and validated. Users should leave this as <code>NULL</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -248,22 +256,22 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro_v1.3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 3.0.2</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 3.0.3</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-07-27</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-07-29</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of cells: 80</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of genes: 230</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> grouping variables (2): sample, seurat_clusters</span>
@@ -279,8 +287,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Saving Cerebro object to: /tmp/nix-shell-4295-2685040021/RtmpbU6REy/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:39:13] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Saving Cerebro object to: /tmp/nix-shell-4230-2947096087/RtmpGNdOiK/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:37:59] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

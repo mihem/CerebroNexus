@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+  <title id="title">Cell membership separates real split layers from custom layers</title>
+  <desc id="desc">Two genuine sample layers cover disjoint halves of twelve cells and together cover every cell. A full custom imputed layer and a partial overlapping custom layer share the same data prefix but are not selected. Names provide candidates; cell membership proves the partition.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#17324d" flood-opacity=".13"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#49677f"/>
+    </marker>
+    <style>
+      .title { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #15324a; }
+      .subtitle { font: 500 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #567086; }
+      .card-title { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17324d; }
+      .row-label { font: 650 15px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #26465f; }
+      .body { font: 500 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #345168; }
+      .small { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #587083; }
+      .cell { font: 650 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536b7d; }
+      .badge { font: 700 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: white; letter-spacing: .4px; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="790" fill="#f7fbfe"/>
+  <text x="60" y="58" class="title">Names find candidates. Cell membership proves the partition.</text>
+  <text x="60" y="88" class="subtitle">All four layers match Seurat’s “data” prefix; only two form one complete, disjoint cover.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="55" y="125" width="1090" height="460" rx="24" fill="white" stroke="#c3d9e7" stroke-width="2"/>
+  </g>
+
+  <text x="77" y="164" class="card-title">Prefix candidates from Layers(assay, search = "data")</text>
+
+  <g>
+    <text x="370" y="205" text-anchor="middle" class="cell">c1</text>
+    <text x="425" y="205" text-anchor="middle" class="cell">c2</text>
+    <text x="480" y="205" text-anchor="middle" class="cell">c3</text>
+    <text x="535" y="205" text-anchor="middle" class="cell">c4</text>
+    <text x="590" y="205" text-anchor="middle" class="cell">c5</text>
+    <text x="645" y="205" text-anchor="middle" class="cell">c6</text>
+    <text x="700" y="205" text-anchor="middle" class="cell">c7</text>
+    <text x="755" y="205" text-anchor="middle" class="cell">c8</text>
+    <text x="810" y="205" text-anchor="middle" class="cell">c9</text>
+    <text x="865" y="205" text-anchor="middle" class="cell">c10</text>
+    <text x="920" y="205" text-anchor="middle" class="cell">c11</text>
+    <text x="975" y="205" text-anchor="middle" class="cell">c12</text>
+  </g>
+
+  <rect x="75" y="226" width="1035" height="67" rx="14" fill="#ecf8ff" stroke="#2d9bc8" stroke-width="2"/>
+  <text x="96" y="253" class="row-label">data.sample_a</text>
+  <text x="96" y="276" class="small">genuine split layer</text>
+  <g fill="#2698c7">
+    <circle cx="370" cy="259" r="13"/><circle cx="425" cy="259" r="13"/>
+    <circle cx="480" cy="259" r="13"/><circle cx="535" cy="259" r="13"/>
+    <circle cx="590" cy="259" r="13"/><circle cx="645" cy="259" r="13"/>
+  </g>
+  <rect x="995" y="243" width="91" height="28" rx="14" fill="#238bb6"/>
+  <text x="1040" y="262" text-anchor="middle" class="badge">SELECT</text>
+
+  <rect x="75" y="305" width="1035" height="67" rx="14" fill="#edf9f1" stroke="#43a865" stroke-width="2"/>
+  <text x="96" y="332" class="row-label">data.sample_b</text>
+  <text x="96" y="355" class="small">genuine split layer</text>
+  <g fill="#3aa75d">
+    <circle cx="700" cy="338" r="13"/><circle cx="755" cy="338" r="13"/>
+    <circle cx="810" cy="338" r="13"/><circle cx="865" cy="338" r="13"/>
+    <circle cx="920" cy="338" r="13"/><circle cx="975" cy="338" r="13"/>
+  </g>
+  <rect x="995" y="322" width="91" height="28" rx="14" fill="#318d50"/>
+  <text x="1040" y="341" text-anchor="middle" class="badge">SELECT</text>
+
+  <rect x="75" y="384" width="1035" height="67" rx="14" fill="#fff6e7" stroke="#df9c2f" stroke-width="2"/>
+  <text x="96" y="411" class="row-label">data.imputed</text>
+  <text x="96" y="434" class="small">full-cell custom layer</text>
+  <g fill="#e3a13a">
+    <circle cx="370" cy="417" r="11"/><circle cx="425" cy="417" r="11"/>
+    <circle cx="480" cy="417" r="11"/><circle cx="535" cy="417" r="11"/>
+    <circle cx="590" cy="417" r="11"/><circle cx="645" cy="417" r="11"/>
+    <circle cx="700" cy="417" r="11"/><circle cx="755" cy="417" r="11"/>
+    <circle cx="810" cy="417" r="11"/><circle cx="865" cy="417" r="11"/>
+    <circle cx="920" cy="417" r="11"/><circle cx="975" cy="417" r="11"/>
+  </g>
+  <rect x="995" y="401" width="91" height="28" rx="14" fill="#c47e18"/>
+  <text x="1040" y="420" text-anchor="middle" class="badge">ISOLATE</text>
+
+  <rect x="75" y="463" width="1035" height="67" rx="14" fill="#f4efff" stroke="#8069cd" stroke-width="2"/>
+  <text x="96" y="490" class="row-label">data.corrected</text>
+  <text x="96" y="513" class="small">partial overlapping custom layer</text>
+  <g fill="#8069cd">
+    <circle cx="425" cy="496" r="11"/><circle cx="480" cy="496" r="11"/>
+    <circle cx="755" cy="496" r="11"/><circle cx="810" cy="496" r="11"/>
+  </g>
+  <rect x="995" y="480" width="91" height="28" rx="14" fill="#6c56b9"/>
+  <text x="1040" y="499" text-anchor="middle" class="badge">ISOLATE</text>
+
+  <path d="M 600 585 L 600 625" stroke="#49677f" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="55" y="625" width="530" height="115" rx="20" fill="#eaf8f3" stroke="#42a47b" stroke-width="2"/>
+  </g>
+  <text x="80" y="661" class="card-title">Unique exact cover</text>
+  <text x="80" y="688" class="body">sample_a ∩ sample_b = ∅</text>
+  <text x="80" y="714" class="body">sample_a ∪ sample_b = all assay cells</text>
+
+  <g filter="url(#shadow)">
+    <rect x="615" y="625" width="530" height="115" rx="20" fill="#fff4e9" stroke="#db8a38" stroke-width="2"/>
+  </g>
+  <text x="640" y="661" class="card-title">Join safety rule</text>
+  <text x="640" y="688" class="body">Temporarily remove every prefix candidate not in</text>
+  <text x="640" y="714" class="body">the selected partition, then join on a local object.</text>
+</svg>

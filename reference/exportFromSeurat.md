@@ -20,7 +20,8 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
-  verbose = FALSE
+  verbose = FALSE,
+  .expression_resolution = NULL
 )
 ```
 
@@ -133,6 +134,13 @@ exportFromSeurat(
   Set this to `TRUE` if you want additional log messages; defaults to
   `FALSE`.
 
+- .expression_resolution:
+
+  Internal handoff used by
+  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  to reuse a matrix that has already been resolved and validated. Users
+  should leave this as `NULL`.
+
 ## Value
 
 No data returned.
@@ -172,22 +180,22 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [14:39:13] Initializing Cerebro object...
-#> [14:39:13] Adding expression data (embedded)...
-#> [14:39:13] Collecting available meta data...
-#> [14:39:13] Extracting all meta data columns...
-#> [14:39:13] Extracting dimensional reductions...
-#> [14:39:13] Will export the following dimensional reductions: umap
-#> [14:39:13] Extracting marker genes table...
-#> [14:39:13] No trajectories to extract...
-#> [14:39:13] Checking for spatial data...
-#> [14:39:13] Overview of Cerebro object:
+#> [20:37:59] Initializing Cerebro object...
+#> [20:37:59] Adding expression data (embedded)...
+#> [20:37:59] Collecting available meta data...
+#> [20:37:59] Extracting all meta data columns...
+#> [20:37:59] Extracting dimensional reductions...
+#> [20:37:59] Will export the following dimensional reductions: umap
+#> [20:37:59] Extracting marker genes table...
+#> [20:37:59] No trajectories to extract...
+#> [20:37:59] Checking for spatial data...
+#> [20:37:59] Overview of Cerebro object:
 #> class: Cerebro_v1.3
-#> cerebroApp version: 3.0.2
+#> cerebroApp version: 3.0.3
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-07-27
+#> date of export: 2026-07-29
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, seurat_clusters
@@ -203,6 +211,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [14:39:13] Saving Cerebro object to: /tmp/nix-shell-4295-2685040021/RtmpbU6REy/pbmc_Seurat.crb
-#> [14:39:13] Done!
+#> [20:37:59] Saving Cerebro object to: /tmp/nix-shell-4230-2947096087/RtmpGNdOiK/pbmc_Seurat.crb
+#> [20:37:59] Done!
 ```

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,6 +29,7 @@
     <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
@@ -71,6 +72,26 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="3.0.3" id="cerebronexus-303">CerebroNexus 3.0.3<a class="anchor" aria-label="anchor" href="#cerebronexus-303"></a></h2>
+<div class="section level3">
+<h3 id="export-3-0-3">Export<a class="anchor" aria-label="anchor" href="#export-3-0-3"></a></h3>
+<ul><li>
+<strong>Split Seurat v5 objects no longer export a single sample.</strong> <code><a href="https://rdrr.io/r/base/split.html" class="external-link">split()</a></code> names an assay’s layers <code>&lt;root&gt;.&lt;level&gt;</code>, but the old fallback accepted the first readable layer and could pair one sample’s matrix with every sample’s metadata. Resolution is now driven by the requested layer: an exact physical name remains authoritative, otherwise candidate cell memberships must prove one unique complete partition before CerebroNexus joins it on a local copy. This works for sample names and arbitrary roots, ignores unrelated overlapping layers, protects every custom layer matched by Seurat’s own prefix search, and reports ambiguous or incomplete covers instead of guessing. Incomplete requested-prefix noise is returned as a structured resolution failure, so it cannot short-circuit an explicitly enabled, complete compatibility fallback.</li>
+<li>
+<strong>Every complete-matrix consumer shares the same coverage contract.</strong> <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>, <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code>, <code><a href="../reference/calculatePercentGenes.html">calculatePercentGenes()</a></code>, <code><a href="../reference/getMostExpressedGenes.html">getMostExpressedGenes()</a></code>, <code><a href="../reference/addPercentMtRibo.html">addPercentMtRibo()</a></code>, and <code><a href="../reference/performGeneSetEnrichmentAnalysis.html">performGeneSetEnrichmentAnalysis()</a></code> now resolve layered assays through one gateway. The resulting matrix must contain exactly the object’s cells and is reordered once before analysis or storage. <code>embedded</code>, <code>h5</code>, and <code>bpcells</code> therefore fail identically on partial data, and conversion errors are propagated rather than printed and swallowed.</li>
+<li>
+<strong>Spatial export reuses the validated expression resolution.</strong> Each image intersects coordinates with the already-resolved matrix instead of resolving and joining the assay again. Spatial payloads keep the requested and physical layer names separately, so a warned <code>data</code> to <code>counts</code> compatibility fallback cannot serialize counts while labelling them as normalized data.</li>
+<li>
+<strong>A disk-backed source assay says so when it is refused.</strong> Reading a Seurat object whose layers are BPCells or DelayedArray matrices is still not supported. Every selected partition member is inspected, the refusal names the disk-backed layer, shows how to bring every layer into memory, and points out that this is unrelated to <code>expression_matrix_mode</code>, which controls how the exported <code>.crb</code> stores its matrix rather than how the source object holds it.</li>
+<li>
+<strong>A new layered-assay vignette documents the full contract.</strong> It includes troubleshooting, storage guidance, custom-root examples, and four colour diagrams covering the original failure, membership-based partition proof, resolver decisions, and public entry points.</li>
+<li>
+<strong>Prefix protection and partition proof are separate.</strong> Seurat’s broad <code>Layers(search = "^root")</code> result remains the authority for everything <code><a href="https://satijalab.github.io/seurat-object/reference/SplitLayers.html" class="external-link">JoinLayers()</a></code> might consume, but only <code>&lt;root&gt;.*</code> layers may prove the requested partition. A complete nested custom root such as <code>data.imputed.s1/s2</code> is semantically ambiguous when <code>data</code> is requested and now fails closed instead of becoming normalized data silently.</li>
+<li>
+<strong>Pathological exact-cover search has deterministic resource budgets.</strong> Conflict indexing, visited nodes, and recursion depth are bounded independently. Highly overlapping prefix noise now stops before exhausting memory or R’s call stack, and the diagnostic asks the user to rename noise or join the intended layers. <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> also hands its already validated resolution to <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>, avoiding a second joined matrix and the corresponding peak-memory duplication.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="3.0.2" id="cerebronexus-302">CerebroNexus 3.0.2<a class="anchor" aria-label="anchor" href="#cerebronexus-302"></a></h2>
 <div class="section level3">

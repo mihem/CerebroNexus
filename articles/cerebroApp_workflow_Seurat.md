@@ -425,6 +425,14 @@ The Cerebro use interface can be launched using the
 [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
 function.
 
+## See also
+
+If your Seurat v5 assay is split into one layer per sample, see [Seurat
+v5 layered assays: complete and safe expression
+matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md)
+for the automatic resolution rules, custom-layer safeguards, and
+troubleshooting steps.
+
 ## Session info
 
 ``` r

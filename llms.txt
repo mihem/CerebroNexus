@@ -449,6 +449,8 @@ Wang](https://github.com/duocang).
 
 ### How-to guides
 
+- [Seurat v5 layered assays: complete and safe expression
+  matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md):
 - [Create a self-contained Shiny app from a Cerebro data
   file](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md):
 - [Create expression matrix in h5

@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">How a partial Seurat v5 layer becomes an inconsistent export</title>
+  <desc id="desc">A split assay contains two sample layers. An unsafe first-layer fallback selects only sample A while metadata still contains both samples. Embedded storage may catch the mismatch late, while external storage can preserve the inconsistency unless validation happens before the backends diverge.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#17324d" flood-opacity=".14"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#41627e"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c43d4b"/>
+    </marker>
+    <style>
+      .title { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #15324a; }
+      .subtitle { font: 500 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #567086; }
+      .card-title { font: 700 19px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #17324d; }
+      .body { font: 500 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #29475f; }
+      .small { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4c6579; }
+      .label { font: 700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: white; letter-spacing: .5px; }
+      .arrow { fill: none; stroke: #41627e; stroke-width: 3; marker-end: url(#arrow); }
+      .arrow-red { fill: none; stroke: #c43d4b; stroke-width: 3.5; marker-end: url(#arrow-red); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="760" fill="#f7fbfe"/>
+  <text x="60" y="58" class="title">The dangerous path: one sample’s matrix, every sample’s metadata</text>
+  <text x="60" y="88" class="subtitle">The failure is a cell-coverage mismatch, not merely a layer-name mismatch.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="55" y="135" width="285" height="330" rx="22" fill="white" stroke="#bdd8e8" stroke-width="2"/>
+  </g>
+  <rect x="76" y="155" width="118" height="27" rx="13" fill="#277da1"/>
+  <text x="135" y="174" text-anchor="middle" class="label">SEURAT v5</text>
+  <text x="78" y="215" class="card-title">Split Assay5</text>
+  <text x="78" y="242" class="body">One logical layer is stored</text>
+  <text x="78" y="263" class="body">as a physical layer per sample.</text>
+
+  <rect x="78" y="292" width="238" height="60" rx="12" fill="#e1f4fb" stroke="#3e9ec4"/>
+  <circle cx="101" cy="322" r="9" fill="#2296c7"/>
+  <text x="120" y="318" class="body">data.sample_a</text>
+  <text x="120" y="339" class="small">10 cells</text>
+
+  <rect x="78" y="365" width="238" height="60" rx="12" fill="#e8f7ed" stroke="#4cab6c"/>
+  <circle cx="101" cy="395" r="9" fill="#39a75d"/>
+  <text x="120" y="391" class="body">data.sample_b</text>
+  <text x="120" y="412" class="small">10 cells</text>
+
+  <path d="M 342 300 C 380 300, 385 300, 420 300" class="arrow-red"/>
+  <g filter="url(#shadow)">
+    <rect x="420" y="206" width="300" height="188" rx="22" fill="#fff8e6" stroke="#e5a93f" stroke-width="2"/>
+  </g>
+  <rect x="441" y="226" width="128" height="27" rx="13" fill="#e08a1e"/>
+  <text x="505" y="245" text-anchor="middle" class="label">OLD FALLBACK</text>
+  <text x="444" y="285" class="card-title">Accept first non-empty layer</text>
+  <text x="444" y="317" class="body">Returns data.sample_a</text>
+  <text x="444" y="341" class="body">and stops searching.</text>
+  <rect x="443" y="357" width="183" height="23" rx="11" fill="#ffe0b2"/>
+  <text x="535" y="374" text-anchor="middle" class="small">matrix: 10 cells</text>
+
+  <path d="M 720 300 C 760 300, 770 300, 805 300" class="arrow-red"/>
+  <g filter="url(#shadow)">
+    <rect x="805" y="135" width="340" height="330" rx="22" fill="white" stroke="#efb6bb" stroke-width="2"/>
+  </g>
+  <rect x="827" y="155" width="142" height="27" rx="13" fill="#c43d4b"/>
+  <text x="898" y="174" text-anchor="middle" class="label">INCONSISTENT</text>
+  <text x="828" y="215" class="card-title">Object assembled from two truths</text>
+
+  <rect x="828" y="247" width="294" height="68" rx="12" fill="#fff0f1" stroke="#d75964"/>
+  <text x="848" y="275" class="body">Expression matrix</text>
+  <text x="1098" y="275" text-anchor="end" class="card-title" fill="#b32f3b">10 cells</text>
+  <text x="848" y="298" class="small">sample A only</text>
+
+  <rect x="828" y="328" width="294" height="68" rx="12" fill="#eff8ff" stroke="#5c9dcc"/>
+  <text x="848" y="356" class="body">Metadata + views</text>
+  <text x="1098" y="356" text-anchor="end" class="card-title" fill="#236f9f">20 cells</text>
+  <text x="848" y="379" class="small">samples A and B</text>
+
+  <text x="828" y="430" class="body">A valid file cannot describe both.</text>
+
+  <path d="M 975 466 L 975 515" class="arrow-red"/>
+  <g filter="url(#shadow)">
+    <rect x="565" y="515" width="580" height="175" rx="22" fill="#ffffff" stroke="#9cc6dc" stroke-width="2"/>
+  </g>
+  <text x="590" y="552" class="card-title">Why the guard must run before storage modes diverge</text>
+
+  <rect x="590" y="574" width="165" height="80" rx="14" fill="#eaf7ef" stroke="#5aad76"/>
+  <text x="672" y="603" text-anchor="middle" class="card-title">embedded</text>
+  <text x="672" y="627" text-anchor="middle" class="small">may fail later</text>
+
+  <rect x="773" y="574" width="165" height="80" rx="14" fill="#f0edff" stroke="#8775d5"/>
+  <text x="855" y="603" text-anchor="middle" class="card-title">HDF5</text>
+  <text x="855" y="627" text-anchor="middle" class="small">matrix lives outside .crb</text>
+
+  <rect x="956" y="574" width="165" height="80" rx="14" fill="#fff4df" stroke="#d99a32"/>
+  <text x="1038" y="603" text-anchor="middle" class="card-title">BPCells</text>
+  <text x="1038" y="627" text-anchor="middle" class="small">matrix lives outside .crb</text>
+
+  <g filter="url(#shadow)">
+    <rect x="55" y="515" width="465" height="175" rx="22" fill="#eaf8f3" stroke="#43a57e" stroke-width="2"/>
+  </g>
+  <rect x="77" y="535" width="122" height="27" rx="13" fill="#238b68"/>
+  <text x="138" y="554" text-anchor="middle" class="label">SAFE POINT</text>
+  <text x="78" y="598" class="card-title">Validate one resolved matrix</text>
+  <text x="78" y="626" class="body">Compare its column names with every object cell,</text>
+  <text x="78" y="649" class="body">then reorder once and only then choose a backend.</text>
+  <path d="M 520 614 L 560 614" class="arrow"/>
+</svg>
