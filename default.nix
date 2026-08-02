@@ -54,13 +54,13 @@
 #  > ide = "none",
 #  > project_path = ".",
 #  > overwrite = TRUE,
-#  > r_ver = "4.6.0")
+#  > r_ver = "4.6.1")
 # It uses the `rstats-on-nix` fork of `nixpkgs` which provides improved
 # compatibility with older R versions and R packages for Linux/WSL and
 # Apple Silicon computers.
 # Report any issues to https://github.com/ropensci/rix
 let
- pkgs = import (fetchTarball "https://github.com/rstats-on-nix/nixpkgs/archive/2026-06-22.tar.gz") {};
+ pkgs = import (fetchTarball "https://github.com/rstats-on-nix/nixpkgs/archive/2026-07-27.tar.gz") {};
  
   rpkgs = builtins.attrValues {
     inherit (pkgs.rPackages) 
@@ -113,8 +113,8 @@ let
  
     BPCells-src = pkgs.fetchgit {
       url = "https://github.com/bnprks/BPCells";
-      rev = "adc4a3c30f60a03522f58947d733d7d77a6eb2cf";
-      sha256 = "sha256-7VRa1iADZ3Btcke8IHqCF97O2HhE184dZ1cH1i66Uhc=";
+      rev = "016296413cd7a5725c8b35816df02365d7def853";
+      sha256 = "sha256-fWNql/rTi63WND4WtzgH4x0AP2nb4+C4eGvFwzpz8XQ=";
     };
 
     BPCells = (pkgs.rPackages.buildRPackage {
