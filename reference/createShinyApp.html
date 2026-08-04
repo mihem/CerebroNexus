@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,7 +39,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -126,36 +126,45 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 
 
 <dl><dt id="arg-cerebro-data">cerebro_data<a class="anchor" aria-label="anchor" href="#arg-cerebro-data"></a></dt>
-<dd><p>Named character vector or list of <code>.crb</code> (or
-<code>.rds</code>) file paths. Names are used as dataset labels.</p></dd>
+<dd><p>Non-empty named character vector or list of <code>.crb</code>
+(or <code>.rds</code>) file paths. Names must be non-missing and unique and are
+used as dataset labels. Every path must resolve to a distinct canonical
+source file.</p></dd>
 
 
 <dt id="arg-result-dir">result_dir<a class="anchor" aria-label="anchor" href="#arg-result-dir"></a></dt>
-<dd><p>Output directory.</p></dd>
+<dd><p>Output directory. Its basename must be portable, its path
+must not use the reserved build-lock namespace, and its final target must
+not be a symbolic link or unresolved filesystem entry.</p></dd>
 
 
 <dt id="arg-max-request-size">max_request_size<a class="anchor" aria-label="anchor" href="#arg-max-request-size"></a></dt>
-<dd><p>Max upload size in MB; defaults to 8000.</p></dd>
+<dd><p>One finite positive numeric upload limit in MB;
+defaults to 8000.</p></dd>
 
 
 <dt id="arg-port">port<a class="anchor" aria-label="anchor" href="#arg-port"></a></dt>
-<dd><p>Port the generated app listens on; defaults to 1337.</p></dd>
+<dd><p>One whole-number port from 1 through 65535; defaults to 8080.</p></dd>
 
 
 <dt id="arg-host">host<a class="anchor" aria-label="anchor" href="#arg-host"></a></dt>
-<dd><p>Host the generated app binds to; defaults to "127.0.0.1".</p></dd>
+<dd><p>One non-empty character value that the generated app binds to;
+defaults to "127.0.0.1".</p></dd>
 
 
 <dt id="arg-launch-browser">launch_browser<a class="anchor" aria-label="anchor" href="#arg-launch-browser"></a></dt>
-<dd><p>Whether to launch a browser; defaults to TRUE.</p></dd>
+<dd><p>One non-missing logical controlling whether to launch a
+browser; defaults to TRUE.</p></dd>
 
 
 <dt id="arg-quiet">quiet<a class="anchor" aria-label="anchor" href="#arg-quiet"></a></dt>
-<dd><p>Passed to <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp</a></code>; defaults to FALSE.</p></dd>
+<dd><p>One non-missing logical passed to <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp</a></code>; defaults
+to FALSE.</p></dd>
 
 
 <dt id="arg-display-mode">display_mode<a class="anchor" aria-label="anchor" href="#arg-display-mode"></a></dt>
-<dd><p><code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp</a></code> display mode; defaults to "normal".</p></dd>
+<dd><p>Exactly one of <code>"auto"</code>, <code>"normal"</code>, or
+<code>"showcase"</code>; defaults to <code>"normal"</code>.</p></dd>
 
 
 <dt id="arg-colors">colors<a class="anchor" aria-label="anchor" href="#arg-colors"></a></dt>
@@ -164,11 +173,20 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 
 <dt id="arg-cerebro-options">cerebro_options<a class="anchor" aria-label="anchor" href="#arg-cerebro-options"></a></dt>
 <dd><p>Extra entries merged into <code>Cerebro.options</code> in
-the generated app.</p></dd>
+the generated app. Matrix overrides must be absolute host paths and make
+the resulting app host-dependent. Native paths must resolve outside
+<code>result_dir</code>; non-native paths cannot be compared with the local app
+tree during the build. Duplicate internal entries are removed, and the
+keys <code>.bundle_backend_plan</code> and <code>.bundle_run_options</code> are written
+by the function.</p></dd>
 
 
 <dt id="arg-overwrite">overwrite<a class="anchor" aria-label="anchor" href="#arg-overwrite"></a></dt>
-<dd><p>If <code>TRUE</code> (default), wipe <code>result_dir</code> first.</p></dd>
+<dd><p>If <code>TRUE</code> (default), replace <code>result_dir</code> only
+after a complete staged build succeeds. Publication failures attempt to
+restore the previous app and preserve its backup if restoration fails. If
+<code>FALSE</code>, <code>result_dir</code> must be absent or empty; a non-empty
+directory is rejected before any files are written.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -199,7 +217,9 @@ the generated app.</p></dd>
 <dt id="arg-spatial-images">spatial_images<a class="anchor" aria-label="anchor" href="#arg-spatial-images"></a></dt>
 <dd><p>Named list/vector of paths to spatial background images
 (e.g. tissue histology) shown behind the Spatial tab projection. Names must
-match <code>cerebro_data</code>. Images are copied into the app bundle.</p></dd>
+match <code>cerebro_data</code>. Supplied files are copied verbatim into the
+app's <code>spatial-assets/</code> directory. The server-side renderer reads and
+embeds them as data URIs. Missing files are omitted with a warning.</p></dd>
 
 
 <dt id="arg-spatial-images-flip-x">spatial_images_flip_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-x"></a></dt>
@@ -245,15 +265,70 @@ applied to spatial cell coordinates. Names must match <code>cerebro_data</code>.
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Invisibly returns <code>result_dir</code>.</p>
+    <p>Invisibly returns <code>result_dir</code>. If that path changes resolution
+  during the build, warns and returns the frozen absolute publication path.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Supports external expression backends (<code>bpcells</code>, <code>h5</code>) in
-addition to the embedded mode. When <code>cerebro_data</code> points to a
-<code>.crb</code> with an external backend, the sibling <code>.bpcells/</code>
-directory or <code>.h5</code> file is detected and copied into the bundle
-alongside the <code>.crb</code>.</p>
+addition to the embedded mode. Each <code>.crb</code> descriptor names a portable
+relative file or directory, which is copied to the same private location
+under <code>private-data/</code>. The historical <code>data/</code> name is deliberately
+not reused: a still-running older generated app may retain its former
+<code>/data</code> HTTP resource mapping during an in-place replacement. Raw
+<code>.crb</code>, H5, and BPCells artifacts are not registered as HTTP resources.
+Spatial background images are the deliberate exception: files explicitly
+supplied through <code>spatial_images</code> are copied verbatim under
+<code>spatial-assets/</code>. The server-side renderer reads these files and embeds
+them as data URIs; the directory is not registered as an HTTP resource.
+Callers must provide trusted image files. Preflight requires a minimum
+stable runtime API and reads the ordinary <code>expression_backend</code> field
+without invoking serialized methods or its getter. The generated
+configuration stores the effective per-CRB attachment plan after applying
+any deployment override, and configured CRBs consume that exact plan at
+runtime. Direct launches and uploads also read and validate the ordinary
+field without invoking the getter. A historical CRB may omit both field and
+getter; an object containing only one is rejected as an unsupported mixed
+format.
+Dataset labels and canonical CRB sources are both unique: two labels cannot
+select the same resolved input file.
+Generated bundles follow the standard deployment model of one app per R
+process; process-global <code>Cerebro.options</code> does not provide same-process
+isolation between separately sourced apps.</p>
+<p>Launch settings are validated and frozen in a typed internal manifest before
+target preparation. The generated <code>app.R</code> reads that manifest instead of
+interpolating user values into source, and the staged source is parsed before
+publication. The upload limit is installed as
+<code>shiny.maxRequestSize</code> while the app is running and the previous process
+option is restored when the app stops.</p>
+<p>A configured runtime matrix override keeps its existing precedence and skips
+the descriptor sidecar copy. It must be an absolute path. Native paths are
+resolved component by component and rejected if they resolve inside
+<code>result_dir</code>. Unresolved filesystem entries, unsafe Windows aliases,
+and Windows device namespaces fail closed; a truly absent ordinary target is
+allowed for later provisioning. Non-native absolute paths intended for
+another host are preserved lexically and cannot be compared with that host's
+app tree. Such a bundle depends on that host-managed path and is therefore
+not self-contained. Treat
+input <code>.crb</code>/<code>.rds</code> files as trusted serialized R objects;
+structural validation is not a sandbox for untrusted RDS input.</p>
+<p>One atomic sibling lock directory, <code>.&lt;basename&gt;-build.lock</code>, serializes
+builds for each target. An existing lock stops the build and is never removed
+automatically as "stale". Required inputs and targets are validated before
+the app is assembled in a private sibling stage. Preflight and stage-build
+failures leave an existing deployment in place. Publication first renames the
+old app to a unique backup; if the final rename fails, restoration is
+attempted. A failed restoration keeps the backup and reports its exact path.
+Abrupt process death between the two publication renames is not recovered
+automatically and can leave <code>result_dir</code> temporarily absent. After
+confirming that the lock owner is no longer running, verify and restore the
+correct backup before removing any leftover stage and lock.
+On POSIX systems, the stage is mode <code>0700</code> while data is copied, and
+replacement retains the existing deployment root's permission bits.
+Platform-specific ACLs, ownership changes, and security labels remain the
+deployment system's responsibility. All CRBs, descriptor sidecars, spatial
+images and their source-path ancestors must remain trusted and unchanged
+while the build is running; the target build lock does not protect inputs.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

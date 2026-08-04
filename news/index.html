@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,7 +31,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -72,6 +72,24 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="3.0.4" id="cerebronexus-304">CerebroNexus 3.0.4<a class="anchor" aria-label="anchor" href="#cerebronexus-304"></a></h2>
+<div class="section level3">
+<h3 id="export-3-0-4">Export<a class="anchor" aria-label="anchor" href="#export-3-0-4"></a></h3>
+<ul><li>
+<strong><code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> now follows each <code>.crb</code> backend descriptor.</strong> H5 files and BPCells directories are copied from the recorded portable relative location rather than guessed from the current <code>.crb</code> name, so renamed data files remain portable. Missing sidecars, trailing-slash H5 locations, symbolic links, case-folded or parent/child target collisions, duplicate labels or data sources that resolve to the same canonical CRB, unsupported serialized objects and unsafe multi-dataset overrides now fail during preflight. Validation requires the minimum stable runtime API on a locked R6 structure without invoking serialized methods, getter, active or lazy bindings; <code>.crb</code>/<code>.rds</code> inputs nevertheless remain trusted serialized R objects, not sandboxed content.</li>
+<li>
+<strong>Configured CRBs now use the exact backend decision validated at build time.</strong> <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> derives a versioned per-CRB attachment plan from the ordinary <code>expression_backend</code> field and the deployment override, then stores it in the generated configuration. The standalone runtime consumes that plan instead of calling a serialized getter. Direct launches and uploads likewise read and validate the ordinary field without invoking the getter; partially upgraded objects that contain only the field or only the getter fail closed.</li>
+<li>
+<strong>Bundle publication now has an explicit private/public boundary and recovery protocol.</strong> Raw <code>.crb</code>, H5 and BPCells artifacts stay in the non-HTTP <code>private-data/</code> tree; the historical <code>data/</code> name is not reused because a still-running older app may retain its former <code>/data</code> HTTP mapping. Files explicitly supplied through <code>spatial_images</code> are copied to <code>spatial-assets/</code>, read by the server-side renderer and embedded as data URIs; the directory is not registered as an HTTP resource. Client-selected backgrounds must match the current dataset’s configured allowlist and resolve canonically inside <code>spatial-assets/</code> before the renderer reads them. Each canonical target has one atomic build lock covering preflight through cleanup. Builds use a private sibling stage, retain the existing root mode, fail closed on unreadable destinations, never delete a foreign target, restore a previous app after a failed final rename when possible, and retain the exact backup path when restoration fails. CRBs, sidecars, spatial images and their source-path ancestors must remain unchanged during a build. Abrupt process death is not crash-atomic; recovery requires verifying and restoring the previous backup before stale stage/lock cleanup.</li>
+<li>
+<strong>Generated app launch settings now fail closed before publication.</strong> Upload size, port, host, browser, quiet and display-mode values are strictly validated and frozen in a typed configuration rather than interpolated into R source. The staged <code>app.R</code> is parsed before it can replace an existing app. The upload limit now actually applies through <code>shiny.maxRequestSize</code> for the app lifetime and restores the process option when the app stops; previous bundles documented this limit but did not apply it.</li>
+<li>
+<strong>Host-managed matrix overrides are explicit exceptions to self-contained bundles.</strong> They must be absolute and serve only one effective CRB consumer. Native paths are resolved component by component and rejected inside <code>result_dir</code>; unresolved filesystem entries, unsafe Windows aliases, and device namespaces fail closed. Non-native paths for another host are preserved lexically and cannot be compared with the local app tree. Overrides are not copied, and absent ordinary targets are not rejected, so the deployment host must provide them.</li>
+<li>
+<strong>The H5 guide now starts with the one-step export workflow.</strong> <code>exportFromSeurat(..., expression_matrix_mode = "h5")</code> creates the <code>.crb</code> and its H5 sidecar together. The manual conversion now writes an H5 backend descriptor before saving, producing the same portable, self-describing pair.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="3.0.3" id="cerebronexus-303">CerebroNexus 3.0.3<a class="anchor" aria-label="anchor" href="#cerebronexus-303"></a></h2>
 <div class="section level3">

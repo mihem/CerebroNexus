@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Create expression matrix in h5 format • CerebroNexus</title>
+<title>Store the expression matrix in H5 format • CerebroNexus</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Create expression matrix in h5 format">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Store the expression matrix in H5 format">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -93,11 +93,11 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Create expression matrix in h5 format</h1>
-                        <h4 data-toc-skip class="author">Roman
-Hillje</h4>
+      <img src="../logo.svg" class="logo" alt=""><h1>Store the expression matrix in H5 format</h1>
+                        <h4 data-toc-skip class="author">Roman Hillje
+and Xuesong Wang</h4>
             
-            <h4 data-toc-skip class="date">02 August, 2026</h4>
+            <h4 data-toc-skip class="date">04 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/create_expression_matrix_in_h5_format.Rmd" class="external-link"><code>vignettes/create_expression_matrix_in_h5_format.Rmd</code></a></small>
       <div class="d-none name"><code>create_expression_matrix_in_h5_format.Rmd</code></div>
@@ -108,115 +108,179 @@ Hillje</h4>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>In this vignette, I explain how you can save the expression matrix of
-your data set in <code>.h5</code>/<code>TENxMatrix</code> format and use
-it in Cerebro. Using the <code>.h5</code>/<code>TENxMatrix</code> format
-results in a very low memory footprint of the application because
-expression values for specific genes are directly read from disk instead
-of having to load the entire matrix into memory. Moreover, depending on
-its size, the time it takes to load your data set into Cerebro may be
-greatly reduced because only meta data and tables must be loaded, which
-are usually very small compared to the expression matrix. The catch:
-Reading data from the disk tends to be slower than reading it from
-memory, but this is not always noticeable and may be a compromise worth
-making.</p>
+<p>CerebroNexus can store a data set’s expression matrix in a sibling H5
+file instead of embedding it in the <code>.crb</code>. The app then
+reads individual genes from disk without loading the complete matrix
+into memory. This usually reduces startup time and memory use for large
+data sets, although disk access can be slower than reading an already
+loaded in-memory matrix.</p>
+<p>The recommended workflow is a single call to
+<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> with
+<code>expression_matrix_mode = "h5"</code>. The Seurat object does
+<strong>not</strong> need to contain an H5-backed matrix:
+<code>h5</code> describes the export format, not the source storage used
+by Seurat.</p>
+<p>The exporter writes two files:</p>
+<pre class="text"><code><span><span class="va">pbmc.crb</span></span>
+<span><span class="va">pbmc.h5</span></span></code></pre>
+<p>The <code>.crb</code> records the H5 filename in its
+expression-backend descriptor. Keep both files together when moving,
+sharing, or deploying the data set.</p>
 </div>
 <div class="section level2">
 <h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
 </h2>
-<p>Make sure that the <code>Matrix</code>, <code>HDF5Array</code> and
-<code>cerebroApp</code> packages are installed.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span> <span class="st">'Matrix'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'Matrix'</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span> <span class="st">'HDF5Array'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'HDF5Array'</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span> <span class="st">'cerebroApp'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'cerebroApp'</span><span class="op">)</span></span>
+<p>Install CerebroNexus and the Bioconductor package
+<code>HDF5Array</code>. The latter provides the TENx HDF5 writer and the
+lazy matrix reader used at runtime.</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"BiocManager"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span><span class="st">"HDF5Array"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://bioconductor.org/packages/HDF5Array" class="external-link">HDF5Array</a></span><span class="op">)</span></span></code></pre></div>
-<p>For this example, we will store the output in a temporary
-directory.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(HDF5Array)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>output_dir <span class="ot">&lt;-</span> <span class="fu">tempdir</span>()</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="st">```</span><span class="at"># Load existing </span><span class="st">`</span>.crb<span class="st">`</span><span class="at"> file</span></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="at">Assuming that you have already exported your data set to a </span><span class="st">`</span>.crb<span class="st">`</span><span class="at"> file using the </span><span class="st">`</span><span class="fu">exportFromSeurat</span>()<span class="st">`</span><span class="at"> or </span><span class="st">`</span><span class="fu">exportFromSCE</span>()<span class="st">`</span><span class="at"> functions, we are first going to load that file.</span></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="at">Here, we use the example data set in the </span><span class="st">`</span>cerebroApp<span class="st">`</span><span class="at"> package:</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="recommended-export-directly-from-seurat">Recommended: export directly from Seurat<a class="anchor" aria-label="anchor" href="#recommended-export-directly-from-seurat"></a>
+</h2>
+<p>Choose the assay and layer (called <code>slot</code> for
+compatibility with older Seurat versions) exactly as you would for an
+embedded export. Adding <code>expression_matrix_mode = "h5"</code> makes
+CerebroNexus write the selected matrix to a sibling H5 file and store
+only its relative location in the <code>.crb</code>.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">crb_input</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">'extdata'</span>, <span class="st">'v1.4'</span>, <span class="st">'example.crb'</span>, package <span class="op">=</span> <span class="st">'CerebroNexus'</span><span class="op">)</span></span>
-<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">crb_input</span><span class="op">)</span></span></code></pre></div>
-<p>The expression matrix should look similar to this:</p>
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
+<span>    <span class="st">"extdata/v1.4/pbmc_seurat.rds"</span>,</span>
+<span>    package <span class="op">=</span> <span class="st">"CerebroNexus"</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">output_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro-h5-example"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">output_dir</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span>, showWarnings <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">crb_output</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir</span>, <span class="st">"pbmc.crb"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
+<span>  object <span class="op">=</span> <span class="va">seurat</span>,</span>
+<span>  assay <span class="op">=</span> <span class="st">"RNA"</span>,</span>
+<span>  slot <span class="op">=</span> <span class="st">"data"</span>,</span>
+<span>  file <span class="op">=</span> <span class="va">crb_output</span>,</span>
+<span>  experiment_name <span class="op">=</span> <span class="st">"PBMC"</span>,</span>
+<span>  organism <span class="op">=</span> <span class="st">"hg"</span>,</span>
+<span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"seurat_clusters"</span><span class="op">)</span>,</span>
+<span>  nUMI <span class="op">=</span> <span class="st">"nCount_RNA"</span>,</span>
+<span>  nGene <span class="op">=</span> <span class="st">"nFeature_RNA"</span>,</span>
+<span>  expression_matrix_mode <span class="op">=</span> <span class="st">"h5"</span>,</span>
+<span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The H5 filename uses the same stem as the <code>.crb</code>:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">h5_output</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir</span>, <span class="st">"pbmc.h5"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">crb_output</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">h5_output</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">crb_output</span><span class="op">)</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">getExpressionBackend</span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $type</span></span>
+<span><span class="co">#&gt; [1] "h5"</span></span>
+<span><span class="co">#&gt;</span></span>
+<span><span class="co">#&gt; $location</span></span>
+<span><span class="co">#&gt; [1] "pbmc.h5"</span></span></code></pre></div>
+<p><code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> stores the on-disk matrix
+as cells by genes in the <code>/expression</code> group. CerebroNexus
+reconnects it lazily and exposes the usual genes-by-cells matrix to the
+application.</p>
 </div>
 <div class="section level2">
-<h2 id="create--h5-file">Create <code>.h5</code> file<a class="anchor" aria-label="anchor" href="#create--h5-file"></a>
+<h2 id="launch-or-bundle-the-result">Launch or bundle the result<a class="anchor" aria-label="anchor" href="#launch-or-bundle-the-result"></a>
 </h2>
-<p>Instead of storing the matrix in its current (conventional) format
-with rows representing genes and columns representing cells, we will
-first have to transpose it. That means, rows (genes) become columns, and
-columns (cells) become rows. We do this because the way that the matrix
-is indexed greatly favors the extraction of columns rather than rows. In
-Cerebro, all we do is extract expression values of genes, which is why
-we should rotate the matrix. Importantly, Cerebro expects to find the
-matrix in the <code>expression</code> group of the <code>.h5</code>
-file, so make sure to specify that in the call to the
-<code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> function.</p>
+<p>For normal interactive use, keep the <code>.crb</code> and
+<code>.h5</code> together and launch the <code>.crb</code>. Its
+descriptor tells CerebroNexus where to find the matrix, so no separate
+H5 argument is needed.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">writeTENxMatrix</a></span><span class="op">(</span></span>
-<span>  <span class="fu">Matrix</span><span class="fu">::</span><span class="fu">t</span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span><span class="op">)</span>,</span>
-<span>  <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{output_dir}/example_expression.h5'</span><span class="op">)</span>,</span>
-<span>  group <span class="op">=</span> <span class="st">'expression'</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="va">crb_output</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Creating a connection to the file is as easy as this:</p>
+<p>For deployment, pass the <code>.crb</code> to
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>. It reads the same descriptor and copies
+the referenced H5 sidecar into the self-contained app bundle. The H5
+file is stored under the app’s private <code>private-data/</code> tree
+and is not registered as a browser-downloadable HTTP resource.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">h5_output</span> <span class="op">&lt;-</span> <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{output_dir}/example_expression.h5'</span><span class="op">)</span></span>
-<span><span class="va">expression_matrix_h5</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/HDF5Array/man/TENxMatrix-class.html" class="external-link">TENxMatrix</a></span><span class="op">(</span><span class="va">h5_output</span>, group<span class="op">=</span><span class="st">'expression'</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">expression_matrix_h5</span><span class="op">)</span></span></code></pre></div>
-<p>Looks very similar to the matrix that we started with.</p>
-</div>
-<div class="section level2">
-<h2 id="remove-matrix-from--crb-object">Remove matrix from <code>.crb</code> object<a class="anchor" aria-label="anchor" href="#remove-matrix-from--crb-object"></a>
-</h2>
-<p>To actually gain any benefit from using the
-<code>.h5</code>/<code>TENxMatrix</code> format, we need to remove the
-original matrix from the <code>.crb</code> object. Otherwise, the
-attached matrix will be loaded into memory anyway.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span><span class="va">crb_output</span> <span class="op">&lt;-</span> <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{output_dir}/example.crb'</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="va">crb_output</span><span class="op">)</span></span></code></pre></div>
-<p>You can compare the size of the <code>.crb</code> before and after
-removing the expression matrix like this:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">"crb input file: {file.info(crb_input)$size/1000} KB"</span><span class="op">)</span></span>
-<span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">"crb output file: {file.info(crb_output)$size/1000} KB"</span><span class="op">)</span></span>
-<span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">"h5 output file: {file.info(h5_output)$size/1000} KB"</span><span class="op">)</span></span></code></pre></div>
-<p>Since this is a very small data set, the difference between the input
-and output <code>.crb</code> files is not large and irrelevant in
-practice. For larger data sets, however, this can reduce the size by a
-factor of 100. Notably, the <code>.h5</code> file is larger than the
-original matrix we created it from, explaining why the new total size of
-the data set (<code>.crb</code> without expression matrix +
-<code>.h5</code> file) is (significantly) larger than the initial
-<code>.crb</code> file.</p>
-</div>
-<div class="section level2">
-<h2 id="launch-cerebro">Launch Cerebro<a class="anchor" aria-label="anchor" href="#launch-cerebro"></a>
-</h2>
-<p>With the updated <code>.crb</code> file and <code>.h5</code> file in
-place, we can launch Cerebro and use it as with any other format of the
-expression matrix.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">cerebroApp</span><span class="fu">::</span><span class="fu">launchCerebroV1.3</span><span class="op">(</span></span>
-<span>  crb_file_to_load <span class="op">=</span> <span class="va">crb_output</span>,</span>
-<span>  expression_matrix_h5 <span class="op">=</span> <span class="va">h5_output</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC"</span> <span class="op">=</span> <span class="va">crb_output</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir</span>, <span class="st">"pbmc_app"</span><span class="op">)</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>If the <code>.crb</code> is renamed, do not guess a new H5 name. The
+descriptor remains authoritative. Use
+<code>crb$getExpressionBackend()</code> to see the sidecar that belongs
+to the file.</p>
+</div>
+<div class="section level2">
+<h2 id="legacy-alternative-convert-an-existing-embedded--crb">Legacy alternative: convert an existing embedded
+<code>.crb</code><a class="anchor" aria-label="anchor" href="#legacy-alternative-convert-an-existing-embedded--crb"></a>
+</h2>
+<p>The direct export above is preferred for new Seurat exports. The
+manual workflow remains useful when only an older embedded
+<code>.crb</code> is available, for example after an
+<code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> workflow, and the source object cannot be
+exported again.</p>
+<p>Load the existing <code>.crb</code>, transpose its conventional
+genes-by-cells expression matrix, and write it to the
+<code>/expression</code> group:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">crb_input</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
+<span>  <span class="st">"extdata/v1.4/example.crb"</span>,</span>
+<span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">crb_input</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">legacy_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro-legacy-h5"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">legacy_dir</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span>, showWarnings <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">h5_output</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">legacy_dir</span>, <span class="st">"example.h5"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">HDF5Array</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">writeTENxMatrix</a></span><span class="op">(</span></span>
+<span>  <span class="fu">Matrix</span><span class="fu">::</span><span class="fu">t</span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span><span class="op">)</span>,</span>
+<span>  <span class="va">h5_output</span>,</span>
+<span>  group <span class="op">=</span> <span class="st">"expression"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Remove the embedded matrix and record the sibling filename before
+saving the smaller <code>.crb</code>; otherwise the original matrix will
+still be loaded into memory, or the saved object will not know where its
+external matrix lives.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">setExpressionBackend</span><span class="op">(</span></span>
+<span>  type <span class="op">=</span> <span class="st">"h5"</span>,</span>
+<span>  location <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="va">h5_output</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">crb_output</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">legacy_dir</span>, <span class="st">"example.crb"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="va">crb_output</span><span class="op">)</span></span></code></pre></div>
+<p>The converted <code>.crb</code> is now self-describing. Keep it
+beside <code>example.h5</code> and launch it without a host-specific
+override:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="va">crb_output</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>If an older serialized object does not provide
+<code>setExpressionBackend()</code>, do not clear and resave it with no
+descriptor. Re-export it with a current CerebroNexus version instead.
+When the original Seurat object is available,
+<code>exportFromSeurat(..., expression_matrix_mode = "h5")</code>
+remains the preferred, less error-prone route.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>
 </h2>
 <ul>
-<li><a href="launch_cerebro_with_pre-loaded_data_set.html">Launch
-Cerebro with pre-loaded data set</a></li>
+<li><a href="create_a_self_contained_shiny_app.html">Create a
+self-contained Shiny app</a></li>
+<li><a href="cerebroApp_workflow_Seurat.html">Seurat workflow</a></li>
+<li><code><a href="../reference/exportFromSeurat.html">?exportFromSeurat</a></code></li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

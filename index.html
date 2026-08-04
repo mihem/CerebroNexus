@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,7 +48,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
+    <li><a class="dropdown-item" href="articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
     <li><a class="dropdown-item" href="articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -179,7 +179,7 @@
 <span>  overwrite        <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co"># → run with shiny::runApp("my_app/") or deploy to Shiny Server</span></span></code></pre></div>
-<p><code>cerebro_data</code> is required and must be a <em>named</em> vector / list of <code>.crb</code> (or <code>.rds</code>) paths — names become the dataset labels users switch between in the app. <code>result_dir</code> is optional. Sibling <code>&lt;stem&gt;.bpcells/</code> and <code>&lt;stem&gt;.h5</code> artefacts produced by the external backends are detected and copied into the bundle automatically (see §2.3). Other knobs available: <code>colors</code>, <code>cerebro_options</code>, <code>crb_pick_smallest_file</code>, <code>show_upload_ui</code>, <code>point_size</code>, <code>variable_to_compare</code> — run <code><a href="reference/createShinyApp.html">?createShinyApp</a></code> for the full list.</p>
+<p><code>cerebro_data</code> is required and must be a <em>named</em> vector / list of <code>.crb</code> (or <code>.rds</code>) paths — names must be non-missing and unique because they become the dataset labels users switch between in the app. <code>result_dir</code> is also required. External matrix locations are read from each <code>.crb</code> backend descriptor and copied into the bundle automatically (see §2.3), so renaming a <code>.crb</code> does not lose its matrix. Other knobs available: <code>colors</code>, <code>cerebro_options</code>, <code>crb_pick_smallest_file</code>, <code>show_upload_ui</code>, <code>point_size</code>, <code>variable_to_compare</code> — run <code><a href="reference/createShinyApp.html">?createShinyApp</a></code> for the full list.</p>
 </div>
 <div class="section level3">
 <h3 id="id_23-choosing-an-expression-backend">2.3 Choosing an expression backend<a class="anchor" aria-label="anchor" href="#id_23-choosing-an-expression-backend"></a>
@@ -288,7 +288,8 @@
 <strong><code>embedded</code></strong> — single-file convenience (no sibling to manage), or compatibility with very old <code>.crb</code> readers. ~14 s end-to-end and pins the full matrix into RAM per loaded copy. Best for small datasets or one-shot scripts.</li>
 </ul>
 <p>For reference, before the 1.7.0 lazy h5 refactor, h5 attach was eager (<code><a href="https://huber-group-embl.github.io/rhdf5/reference/h5_read.html" class="external-link">rhdf5::h5read</a></code> + full <code>dgCMatrix</code> reconstruction), giving ~33 s open-URL time, ~11 GB RSS, and ~0.45 s queries — i.e. lazy-h5 is the same backend with attach <strong>~263× faster, RAM ~10× smaller, queries ~45× faster, web load ~4× faster</strong>.</p>
-<p><code><a href="reference/createShinyApp.html">createShinyApp()</a></code> already knows about both <code>&lt;stem&gt;.bpcells/</code> and <code>&lt;stem&gt;.h5</code> and copies them next to the bundled <code>.crb</code>. The Shiny runtime re-resolves the sibling location on load via <code>getExpressionBackend()$location</code> relative to the <code>.crb</code>’s parent directory, so the bundle stays portable.</p>
+<p><code><a href="reference/createShinyApp.html">createShinyApp()</a></code> reads the ordinary <code>expression_backend</code> field and copies its exact file or directory to the same relative location beside the bundled <code>.crb</code>; it does not guess from the current <code>.crb</code> filename or execute the serialized getter. Invalid or missing locations, and two inputs that resolve to the same bundle target, stop the build with an error. The generated configuration freezes the resulting per-CRB attachment plan, including any host override, and the Shiny runtime consumes that plan directly. A global runtime override therefore retains its existing precedence and skips the sidecar copy, but one global override cannot serve several CRBs in the same app.</p>
+<p>All CRBs, external backends and bundle destinations are checked before copying starts. The app is then built in a private sibling directory and replaces <code>result_dir</code> only after the complete build succeeds, so a missing backend cannot destroy a working deployment. With <code>overwrite = FALSE</code>, <code>result_dir</code> must be absent or empty; non-empty destinations are rejected before any files are written. On POSIX systems, the stage is mode <code>0700</code> while data is copied, and replacement retains the existing deployment root’s permission bits. Target ancestors are resolved before the sibling lock and stage are created; the final target cannot be a symbolic link or unresolved filesystem entry. Platform-specific ACLs, ownership changes and security labels remain the deployment system’s responsibility. Do not modify input CRBs or backends while a build is running.</p>
 </div>
 <div class="section level3">
 <h3 id="id_24-analysis-modules">2.4 Analysis modules<a class="anchor" aria-label="anchor" href="#id_24-analysis-modules"></a>

@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
-    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Create expression matrix in h5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -97,7 +97,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">02 August, 2026</h4>
+            <h4 data-toc-skip class="date">04 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/hla_bulk_tcr_associations.Rmd" class="external-link"><code>vignettes/hla_bulk_tcr_associations.Rmd</code></a></small>
       <div class="d-none name"><code>hla_bulk_tcr_associations.Rmd</code></div>
@@ -379,8 +379,8 @@ under <code>technical_info</code>:</p>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">ir</span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addHLATyping</span><span class="op">(</span><span class="va">hla_long</span>, source_type <span class="op">=</span> <span class="st">"genotyped"</span>,</span>
 <span>                 typing_method <span class="op">=</span> <span class="st">"synthetic demo"</span>, source_reference <span class="op">=</span> <span class="st">"vignette toy"</span><span class="op">)</span></span>
-<span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"sample"</span>, <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"cell_type"</span>, <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">cell_type</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"sample"</span>, <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"cell_type"</span>, <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">cell_type</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span></code></pre></div>
 <p><strong>Confirm the contracts round-trip</strong> — reload and read
@@ -390,7 +390,7 @@ them back:</p>
 <span><span class="va">x</span><span class="op">$</span><span class="va">technical_info</span><span class="op">$</span><span class="va">observation_unit</span>      <span class="co"># what a "row" is</span></span>
 <span><span class="va">x</span><span class="op">$</span><span class="va">technical_info</span><span class="op">$</span><span class="va">tcr_selection</span>         <span class="co"># the positive-control flag</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="va">expression</span><span class="op">)</span>                     <span class="co"># number of genes</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="fu">getHLATyping</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">source_type</span><span class="op">)</span>   <span class="co"># provenance of the genotypes</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">x</span><span class="op">$</span><span class="fu">getHLATyping</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">source_type</span><span class="op">)</span>   <span class="co"># provenance of the genotypes</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt; [1] "analysis unit"</span></span>
 <span><span class="co">#&gt; [1] "association-conditioned"</span></span>
 <span><span class="co">#&gt; [1] 0</span></span>

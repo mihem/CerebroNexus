@@ -116,10 +116,11 @@ createShinyApp(
 ```
 
 `cerebro_data` is required and must be a *named* vector / list of `.crb`
-(or `.rds`) paths — names become the dataset labels users switch between
-in the app. `result_dir` is optional. Sibling `<stem>.bpcells/` and
-`<stem>.h5` artefacts produced by the external backends are detected and
-copied into the bundle automatically (see §2.3). Other knobs available:
+(or `.rds`) paths — names must be non-missing and unique because they
+become the dataset labels users switch between in the app. `result_dir`
+is also required. External matrix locations are read from each `.crb`
+backend descriptor and copied into the bundle automatically (see §2.3),
+so renaming a `.crb` does not lose its matrix. Other knobs available:
 `colors`, `cerebro_options`, `crb_pick_smallest_file`, `show_upload_ui`,
 `point_size`, `variable_to_compare` — run
 [`?createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
@@ -196,10 +197,30 @@ RSS, and ~0.45 s queries — i.e. lazy-h5 is the same backend with attach
 faster**.
 
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-already knows about both `<stem>.bpcells/` and `<stem>.h5` and copies
-them next to the bundled `.crb`. The Shiny runtime re-resolves the
-sibling location on load via `getExpressionBackend()$location` relative
-to the `.crb`’s parent directory, so the bundle stays portable.
+reads the ordinary `expression_backend` field and copies its exact file
+or directory to the same relative location beside the bundled `.crb`; it
+does not guess from the current `.crb` filename or execute the
+serialized getter. Invalid or missing locations, and two inputs that
+resolve to the same bundle target, stop the build with an error. The
+generated configuration freezes the resulting per-CRB attachment plan,
+including any host override, and the Shiny runtime consumes that plan
+directly. A global runtime override therefore retains its existing
+precedence and skips the sidecar copy, but one global override cannot
+serve several CRBs in the same app.
+
+All CRBs, external backends and bundle destinations are checked before
+copying starts. The app is then built in a private sibling directory and
+replaces `result_dir` only after the complete build succeeds, so a
+missing backend cannot destroy a working deployment. With
+`overwrite = FALSE`, `result_dir` must be absent or empty; non-empty
+destinations are rejected before any files are written. On POSIX
+systems, the stage is mode `0700` while data is copied, and replacement
+retains the existing deployment root’s permission bits. Target ancestors
+are resolved before the sibling lock and stage are created; the final
+target cannot be a symbolic link or unresolved filesystem entry.
+Platform-specific ACLs, ownership changes and security labels remain the
+deployment system’s responsibility. Do not modify input CRBs or backends
+while a build is running.
 
 ### 2.4 Analysis modules
 

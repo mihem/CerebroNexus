@@ -662,9 +662,9 @@ will produce objects tagged `"h5"` or `"bpcells"` with an external
 
 - `location`:
 
-  Optional character path (absolute or relative to the generated app
-  `data/` directory) where the external matrix lives. `NULL` when
-  `type == "embedded"`.
+  Optional character path (absolute or relative to the parent directory
+  of the serialized Cerebro object) where the external matrix lives.
+  `NULL` when `type == "embedded"`.
 
 ------------------------------------------------------------------------
 
