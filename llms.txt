@@ -408,6 +408,8 @@ Wang](https://github.com/duocang).
 - [`Cerebro_v1.3`](https://mihem.github.io/CerebroNexus/reference/Cerebro_v1.3.md)
   : R6 class in which data sets will be stored for visualization in
   Cerebro.
+- [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+  : Add immune repertoire data to a Seurat object
 - [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md)
   : Add percentage of mitochondrial and ribosomal transcripts.
 - [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md)
@@ -470,6 +472,8 @@ Wang](https://github.com/duocang).
 
 ### How-to guides
 
+- [Data integrity from Seurat to a self-contained Cerebro
+  app](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md):
 - [Seurat v5 layered assays: complete and safe expression
   matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md):
 - [Create a self-contained Shiny app from a Cerebro data

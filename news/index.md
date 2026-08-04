@@ -1,5 +1,46 @@
 # Changelog
 
+## CerebroNexus 3.1.0
+
+### Documentation
+
+- A new data-integrity guide explains the shared resolve/validate/stage
+  pattern used for layered assays, export replacement, and
+  immune-repertoire identity.
+
+### Export
+
+- [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+  now accepts scRepertoire lists, one `.rds`, explicitly named Cell
+  Ranger CSVs, or existing scRepertoire metadata.
+  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  delegates to the same API users can call before
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).
+  TCR and BCR rows are merged by sample rather than leaving duplicate
+  names that hide one receptor type.
+- Export now validates one named data.frame per sample, the five
+  required scRepertoire columns as one-dimensional row vectors, globally
+  unique non-empty barcodes, and barcode overlap with the Seurat cells.
+  Complete mismatch and ambiguous identity are errors. Valid partial
+  overlap is normalized before storage: orphan rows and samples are
+  removed with a warning, so they cannot inflate clone statistics. CSV
+  sample identities must be explicit, and an explicit `sample_col` no
+  longer falls back silently when misspelled.
+- A valid unified repertoire takes precedence over legacy `tcr_data` and
+  `bcr_data`. When only legacy slots exist, they are validated and
+  merged into the unified field while remaining available through
+  `getTCR()` / `getBCR()`. Existing serialized CRBs must be re-exported
+  to receive this migration.
+- CRBs and external H5/BPCells sidecars are staged with owner-only POSIX
+  modes, so late validation errors leave an existing export unchanged
+  and replacement preserves an existing CRB’s mode. An existing sidecar
+  is replaced only when the published CRB identifies it as its own
+  backend; otherwise the export stops without touching either file.
+  Backend switches remove the previous owned sidecar after commit.
+  Ordinary R errors use best-effort rollback. Readers must be stopped
+  before replacement; process termination and concurrent writers remain
+  outside the transaction guarantee.
+
 ## CerebroNexus 3.0.5
 
 ### Testing / CI

@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -43,6 +43,7 @@
     <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
@@ -99,7 +100,7 @@ Wang</h4>
             
             <h4 data-toc-skip class="date">04 August, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/hla_tcr_motifs.Rmd" class="external-link"><code>vignettes/hla_tcr_motifs.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/v3.1.0/vignettes/hla_tcr_motifs.Rmd" class="external-link"><code>vignettes/hla_tcr_motifs.Rmd</code></a></small>
       <div class="d-none name"><code>hla_tcr_motifs.Rmd</code></div>
     </div>
 
@@ -175,14 +176,14 @@ drive the buttons.</p>
 <h2 id="the-workflow-in-miniature">The workflow in miniature<a class="anchor" aria-label="anchor" href="#the-workflow-in-miniature"></a>
 </h2>
 <p>Before the step-by-step, here is the whole thing at a glance. Only
-<strong>three lines are cerebro-specific</strong> — the three
-<code>@misc</code> slots — and everything else is ordinary Seurat plus a
-little data-faking:</p>
+<strong>three lines are cerebro-specific</strong> — one checked
+repertoire call and two HLA fields — and everything else is ordinary
+Seurat plus a little data-faking:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># ... build an ordinary Seurat object `seurat` with cells + a UMAP   (Steps 1-3)</span></span>
 <span><span class="co"># ... build `ir_data` (receptors) and `hla_wide` (genotypes)         (Steps 1 &amp; 4)</span></span>
 <span></span>
-<span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">immune_repertoire</span>      <span class="op">&lt;-</span> <span class="va">ir_data</span>      <span class="co"># receptors  -&gt; motif network</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span><span class="va">seurat</span>, tcr <span class="op">=</span> <span class="va">ir_data</span><span class="op">)</span> <span class="co"># receptors -&gt; motif network</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing</span>             <span class="op">&lt;-</span> <span class="va">hla_wide</span>     <span class="co"># genotypes  -&gt; HLA context</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing_source_type</span> <span class="op">&lt;-</span> <span class="st">"synthetic"</span>  <span class="co"># provenance -&gt; honest labelling</span></span>
 <span></span>
@@ -499,10 +500,11 @@ will draw.</p>
 <div class="section level3">
 <h3 id="step-5-attach-the-contracts-and-export">Step 5 — attach the contracts and export<a class="anchor" aria-label="anchor" href="#step-5-attach-the-contracts-and-export"></a>
 </h3>
-<p>Attach the three <code>@misc</code> slots and export. This is the
-moment the plain Seurat object becomes an HLA-aware Cerebro file.</p>
+<p>Attach the repertoire through its checked API, add the two HLA
+fields, and export. This is the moment the plain Seurat object becomes
+an HLA-aware Cerebro file.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">immune_repertoire</span>      <span class="op">&lt;-</span> <span class="va">ir_data</span></span>
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span><span class="va">seurat</span>, tcr <span class="op">=</span> <span class="va">ir_data</span><span class="op">)</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing</span>             <span class="op">&lt;-</span> <span class="va">hla_wide</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing_source_type</span> <span class="op">&lt;-</span> <span class="st">"synthetic"</span>   <span class="co"># be honest about provenance</span></span>
 <span></span>
@@ -708,7 +710,8 @@ sample origin</td>
 with no downloads. In real work you already have these pieces from your
 own pipeline — you only need to reshape them into the three
 <code>@misc</code> slots and export. Nothing here is HLA-specific magic;
-it is the ordinary Cerebro export plus three assignments.</p>
+it is the ordinary Cerebro export plus the checked repertoire call and
+two HLA fields.</p>
 <p>You are typically starting from:</p>
 <table class="table">
 <colgroup>
@@ -778,15 +781,24 @@ the <code>immune_repertoire</code> slot, with no reshaping:</p>
 <span><span class="op">}</span><span class="op">)</span></span>
 <span><span class="va">combined</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html" class="external-link">combineTCR</a></span><span class="op">(</span><span class="va">contig_list</span>, samples <span class="op">=</span> <span class="va">donor_ids</span><span class="op">)</span> <span class="co"># a list named by donor</span></span>
 <span></span>
-<span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">immune_repertoire</span> <span class="op">&lt;-</span> <span class="va">combined</span></span></code></pre></div>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span><span class="va">seurat</span>, tcr <span class="op">=</span> <span class="va">combined</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> also takes the contig files
+directly, doing the <code><a href="https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html" class="external-link">combineTCR()</a></code> step for you:</p>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span></span>
+<span>  <span class="va">seurat</span>,</span>
+<span>  tcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">sample_dirs</span>, <span class="st">"filtered_contig_annotations.csv"</span><span class="op">)</span>,</span>
+<span>  sample_names <span class="op">=</span> <span class="va">donor_ids</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p>The page reads two things out of each row: the V gene (the first
 dot-separated token of <code>CTgene</code>) and the CDR3 amino acids
 (<code>CTaa</code>). Everything else is carried through untouched. Watch
 the barcodes: if <code>combineTCR(samples =)</code> prefixes them
 (<code>donorA_AACCTGA-1</code>), the same prefix must be on the
-<code>@meta.data</code> barcodes (via <code>RenameCells</code>) or the
-receptor–cell join silently misses. The companion <em>Immune Repertoire
-Analysis</em> vignette walks the full scRepertoire path.</p>
+<code>@meta.data</code> barcodes (via <code>RenameCells</code>).
+<code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> stops with that mismatch instead of
+storing an empty join. The companion <em>Immune Repertoire Analysis</em>
+vignette walks the full scRepertoire path.</p>
 </div>
 <div class="section level3">
 <h3 id="hla-typing-genotyped-or-imputed">3 — HLA typing: genotyped or imputed<a class="anchor" aria-label="anchor" href="#hla-typing-genotyped-or-imputed"></a>
@@ -809,7 +821,7 @@ result.</li>
 </ul>
 <p>The table can be the <strong>wide</strong> shape a spreadsheet
 exports (one row per donor, two columns per gene) …</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hla_wide</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="st">"my_hla_typing.csv"</span>, check.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span> <span class="co"># check.names is mandatory</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">hla_wide</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   sample HLA-A_1 HLA-A_2 HLA-B_1 HLA-B_2 HLA-C_1 HLA-C_2 HLA-DRB1_1 HLA-DRB1_2</span></span>
@@ -818,7 +830,7 @@ exports (one row per donor, two columns per gene) …</p>
 <p>… or the <strong>long</strong> shape (one row per donor × gene ×
 copy) if that is what your lab delivers. Either is accepted. Attach it
 and record where it came from:</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing</span>             <span class="op">&lt;-</span> <span class="va">hla_wide</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">hla_typing_source_type</span> <span class="op">&lt;-</span> <span class="st">"genotyped"</span> <span class="co"># or "imputed"</span></span></code></pre></div>
 <p><code>check.names = FALSE</code> is mandatory: R’s default renames
@@ -834,7 +846,7 @@ and <code>A0201</code>-style strings all resolve to the same allele.</p>
 <h3 id="export">4 — export<a class="anchor" aria-label="anchor" href="#export"></a>
 </h3>
 <p>The same call as any Cerebro export; the three slots ride along:</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  file            <span class="op">=</span> <span class="st">"my_study.crb"</span>,</span>
@@ -914,7 +926,7 @@ scRepertoire-based module that produces the same
 <div class="section level2">
 <h2 id="session-info">Session info<a class="anchor" aria-label="anchor" href="#session-info"></a>
 </h2>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/sessionInfo.html" class="external-link">sessionInfo</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; R version 4.6.1 (2026-06-24)</span></span>
 <span><span class="co">#&gt; Platform: x86_64-pc-linux-gnu</span></span>

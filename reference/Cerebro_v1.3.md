@@ -1428,7 +1428,7 @@ Named list of data.frames (one per sample), or empty list.
 
 ------------------------------------------------------------------------
 
-### Method `addImmuneRepertoire()`
+### Method [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
 
 Set immune repertoire data.
 

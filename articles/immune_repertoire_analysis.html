@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -43,6 +43,7 @@
     <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
@@ -99,7 +100,7 @@ Wang</h4>
             
             <h4 data-toc-skip class="date">04 August, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/immune_repertoire_analysis.Rmd" class="external-link"><code>vignettes/immune_repertoire_analysis.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/v3.1.0/vignettes/immune_repertoire_analysis.Rmd" class="external-link"><code>vignettes/immune_repertoire_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>immune_repertoire_analysis.Rmd</code></div>
     </div>
 
@@ -190,25 +191,24 @@ receptor type:</p>
 <div class="section level3">
 <h3 id="step-3-attach-to-the-seurat-object-and-export">Step 3 — attach to the Seurat object and export<a class="anchor" aria-label="anchor" href="#step-3-attach-to-the-seurat-object-and-export"></a>
 </h3>
-<p>Build a named list of data.frames (one element per sample) holding
-the scRepertoire clonotype columns, attach it to the Seurat object’s
-<code>@misc$immune_repertoire</code> slot, and export.
-<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> picks the slot up automatically. To
-include both receptor types, row-bind the T- and B-cell clonotypes per
-sample (cells are mutually exclusive — a cell has a TCR <em>or</em> a
-BCR):</p>
+<p>Hand both receptor types to <code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> and
+export. <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> picks the slot up automatically.
+A sample is one biological sample rather than one receptor type, so the
+T- and B-cell clonotypes of a given sample are row-bound into a single
+table — cells are mutually exclusive, a cell has a TCR <em>or</em> a
+BCR. <code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> does that for you and refuses a
+barcode present in both inputs (usually a doublet or an unresolved
+receptor assignment). It checks the result as it stores it, so a wrong
+shape or barcodes that reach no cell are reported here rather than
+turning into an empty Immune repertoire page later:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">ir_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"barcode"</span>, <span class="st">"CTgene"</span>, <span class="st">"CTnt"</span>, <span class="st">"CTaa"</span>, <span class="st">"CTstrict"</span><span class="op">)</span></span>
-<span><span class="va">to_df</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">[</span>, <span class="va">ir_cols</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
-<span></span>
-<span><span class="va">ir_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">sample_names</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu">to_df</span><span class="op">(</span><span class="va">combined_tcr</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>, <span class="fu">to_df</span><span class="op">(</span><span class="va">combined_bcr</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">ir_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">sample_names</span></span>
-<span></span>
-<span><span class="va">seurat_object</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">immune_repertoire</span> <span class="op">&lt;-</span> <span class="va">ir_data</span></span>
+<span><span class="va">seurat_object</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span></span>
+<span>  <span class="va">seurat_object</span>,</span>
+<span>  tcr <span class="op">=</span> <span class="va">combined_tcr</span>,</span>
+<span>  bcr <span class="op">=</span> <span class="va">combined_bcr</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat_object</span>,</span>
@@ -217,6 +217,28 @@ BCR):</p>
 <span>  organism <span class="op">=</span> <span class="st">"hg"</span>,</span>
 <span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"seurat_clusters"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>One thing to watch: <code>combineTCR(samples = )</code> and
+<code>combineBCR(samples = )</code> prefix every barcode with the sample
+name. The cell names have to carry the same prefix —
+<code><a href="https://satijalab.github.io/seurat-object/reference/RenameCells.html" class="external-link">SeuratObject::RenameCells()</a></code> — or no receptor can be tied to
+a cell. <code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> stops with that diagnosis
+rather than storing a repertoire that reaches nothing.</p>
+<p>If filtering the Seurat object removed only some repertoire cells,
+<code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> reports and removes those orphan rows
+before storage. They therefore cannot inflate clone abundance or
+diversity. A sample with no remaining cell is removed; a repertoire with
+no matching cell at all is an error.</p>
+<p>For Cell Ranger files you may name the path vector instead of sharing
+one <code>sample_names</code> vector between receptor types:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat_object</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire</a></span><span class="op">(</span></span>
+<span>  <span class="va">seurat_object</span>,</span>
+<span>  tcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>donorA <span class="op">=</span> <span class="va">tcr_a</span>, donorB <span class="op">=</span> <span class="va">tcr_b</span><span class="op">)</span>,</span>
+<span>  bcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>donorA <span class="op">=</span> <span class="va">bcr_a</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>CSV inputs require either a named path vector or an explicit
+<code>sample_names</code> argument. CerebroNexus does not guess
+biological sample identities from file or directory names.</p>
 <p>Each data.frame must contain the scRepertoire clonotype columns
 <code>barcode</code>, <code>CTgene</code>, <code>CTnt</code>,
 <code>CTaa</code>, and <code>CTstrict</code>. The <code>barcode</code>
@@ -225,6 +247,16 @@ Chains (e.g. TRA/TRB, IGH/IGK/IGL) are detected automatically from
 <code>CTgene</code>, and grouping variables (sample, condition, cell
 type, …) are read from the cell metadata at runtime — the clonotype
 tables themselves only need the five columns above.</p>
+<p>Each barcode may occur exactly once across the complete named list. A
+duplicate row would be counted as another cell by clone-size and
+diversity analyses; reusing one barcode in two list entries would also
+assign one cell to two samples. Both are export errors rather than
+warnings. Zero-row entries are treated as absent.</p>
+<p>When extracting these columns from <code>meta.data</code>, an
+explicit <code>sample_col</code> must exist. Use
+<code>sample_col = NULL</code> only when you want CerebroNexus to
+auto-detect <code>orig.ident</code>, <code>sample</code>, or
+<code>Sample</code>.</p>
 </div>
 </div>
 <div class="section level2">

@@ -18,6 +18,8 @@
 
 ### How-to guides
 
+- [Data integrity from Seurat to a self-contained Cerebro
+  app](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md):
 - [Seurat v5 layered assays: complete and safe expression
   matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md):
 - [Create a self-contained Shiny app from a Cerebro data

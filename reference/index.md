@@ -45,6 +45,8 @@
 - [`Cerebro_v1.3`](https://mihem.github.io/CerebroNexus/reference/Cerebro_v1.3.md)
   : R6 class in which data sets will be stored for visualization in
   Cerebro.
+- [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+  : Add immune repertoire data to a Seurat object
 - [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md)
   : Add percentage of mitochondrial and ribosomal transcripts.
 - [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md)

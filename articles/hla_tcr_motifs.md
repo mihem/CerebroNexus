@@ -61,14 +61,15 @@ measurement; it exists only to drive the buttons.
 ## The workflow in miniature
 
 Before the step-by-step, here is the whole thing at a glance. Only
-**three lines are cerebro-specific** — the three `@misc` slots — and
-everything else is ordinary Seurat plus a little data-faking:
+**three lines are cerebro-specific** — one checked repertoire call and
+two HLA fields — and everything else is ordinary Seurat plus a little
+data-faking:
 
 ``` r
 # ... build an ordinary Seurat object `seurat` with cells + a UMAP   (Steps 1-3)
 # ... build `ir_data` (receptors) and `hla_wide` (genotypes)         (Steps 1 & 4)
 
-seurat@misc$immune_repertoire      <- ir_data      # receptors  -> motif network
+seurat <- addImmuneRepertoire(seurat, tcr = ir_data) # receptors -> motif network
 seurat@misc$hla_typing             <- hla_wide     # genotypes  -> HLA context
 seurat@misc$hla_typing_source_type <- "synthetic"  # provenance -> honest labelling
 
@@ -380,11 +381,12 @@ draw.
 
 ### Step 5 — attach the contracts and export
 
-Attach the three `@misc` slots and export. This is the moment the plain
-Seurat object becomes an HLA-aware Cerebro file.
+Attach the repertoire through its checked API, add the two HLA fields,
+and export. This is the moment the plain Seurat object becomes an
+HLA-aware Cerebro file.
 
 ``` r
-seurat@misc$immune_repertoire      <- ir_data
+seurat <- addImmuneRepertoire(seurat, tcr = ir_data)
 seurat@misc$hla_typing             <- hla_wide
 seurat@misc$hla_typing_source_type <- "synthetic"   # be honest about provenance
 
@@ -562,7 +564,7 @@ The walkthrough above *invented* every input so it would run with no
 downloads. In real work you already have these pieces from your own
 pipeline — you only need to reshape them into the three `@misc` slots
 and export. Nothing here is HLA-specific magic; it is the ordinary
-Cerebro export plus three assignments.
+Cerebro export plus the checked repertoire call and two HLA fields.
 
 You are typically starting from:
 
@@ -607,16 +609,30 @@ contig_list <- lapply(sample_dirs, function(d) {
 })
 combined <- combineTCR(contig_list, samples = donor_ids) # a list named by donor
 
-seurat@misc$immune_repertoire <- combined
+seurat <- addImmuneRepertoire(seurat, tcr = combined)
+```
+
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+also takes the contig files directly, doing the
+[`combineTCR()`](https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html)
+step for you:
+
+``` r
+seurat <- addImmuneRepertoire(
+  seurat,
+  tcr = file.path(sample_dirs, "filtered_contig_annotations.csv"),
+  sample_names = donor_ids
+)
 ```
 
 The page reads two things out of each row: the V gene (the first
 dot-separated token of `CTgene`) and the CDR3 amino acids (`CTaa`).
 Everything else is carried through untouched. Watch the barcodes: if
 `combineTCR(samples =)` prefixes them (`donorA_AACCTGA-1`), the same
-prefix must be on the `@meta.data` barcodes (via `RenameCells`) or the
-receptor–cell join silently misses. The companion *Immune Repertoire
-Analysis* vignette walks the full scRepertoire path.
+prefix must be on the `@meta.data` barcodes (via `RenameCells`).
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+stops with that mismatch instead of storing an empty join. The companion
+*Immune Repertoire Analysis* vignette walks the full scRepertoire path.
 
 ### 3 — HLA typing: genotyped or imputed
 

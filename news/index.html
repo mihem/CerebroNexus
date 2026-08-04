@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,6 +29,7 @@
     <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
@@ -69,9 +70,24 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/v3.1.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="3.1.0" id="cerebronexus-310">CerebroNexus 3.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-310"></a></h2>
+<div class="section level3">
+<h3 id="documentation-3-1-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-3-1-0"></a></h3>
+<ul><li>A new data-integrity guide explains the shared resolve/validate/stage pattern used for layered assays, export replacement, and immune-repertoire identity.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="export-3-1-0">Export<a class="anchor" aria-label="anchor" href="#export-3-1-0"></a></h3>
+<ul><li>
+<code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code> now accepts scRepertoire lists, one <code>.rds</code>, explicitly named Cell Ranger CSVs, or existing scRepertoire metadata. <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> delegates to the same API users can call before <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>. TCR and BCR rows are merged by sample rather than leaving duplicate names that hide one receptor type.</li>
+<li>Export now validates one named data.frame per sample, the five required scRepertoire columns as one-dimensional row vectors, globally unique non-empty barcodes, and barcode overlap with the Seurat cells. Complete mismatch and ambiguous identity are errors. Valid partial overlap is normalized before storage: orphan rows and samples are removed with a warning, so they cannot inflate clone statistics. CSV sample identities must be explicit, and an explicit <code>sample_col</code> no longer falls back silently when misspelled.</li>
+<li>A valid unified repertoire takes precedence over legacy <code>tcr_data</code> and <code>bcr_data</code>. When only legacy slots exist, they are validated and merged into the unified field while remaining available through <code>getTCR()</code> / <code>getBCR()</code>. Existing serialized CRBs must be re-exported to receive this migration.</li>
+<li>CRBs and external H5/BPCells sidecars are staged with owner-only POSIX modes, so late validation errors leave an existing export unchanged and replacement preserves an existing CRB’s mode. An existing sidecar is replaced only when the published CRB identifies it as its own backend; otherwise the export stops without touching either file. Backend switches remove the previous owned sidecar after commit. Ordinary R errors use best-effort rollback. Readers must be stopped before replacement; process termination and concurrent writers remain outside the transaction guarantee.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="3.0.5" id="cerebronexus-305">CerebroNexus 3.0.5<a class="anchor" aria-label="anchor" href="#cerebronexus-305"></a></h2>
 <div class="section level3">

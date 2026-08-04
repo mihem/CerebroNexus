@@ -7,6 +7,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/enriched_pathways.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/export_a_data_set_in_SCE_format.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.html</loc></url>
@@ -34,6 +35,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_R_MAX.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_R_MIN.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_SCALE_MIN.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.html</loc></url>

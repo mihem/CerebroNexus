@@ -89,26 +89,29 @@ combined_bcr <- combineBCR(bcr_contigs, samples = sample_names)
 
 ### Step 3 — attach to the Seurat object and export
 
-Build a named list of data.frames (one element per sample) holding the
-scRepertoire clonotype columns, attach it to the Seurat object’s
-`@misc$immune_repertoire` slot, and export.
+Hand both receptor types to
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+and export.
 [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
-picks the slot up automatically. To include both receptor types,
-row-bind the T- and B-cell clonotypes per sample (cells are mutually
-exclusive — a cell has a TCR *or* a BCR):
+picks the slot up automatically. A sample is one biological sample
+rather than one receptor type, so the T- and B-cell clonotypes of a
+given sample are row-bound into a single table — cells are mutually
+exclusive, a cell has a TCR *or* a BCR.
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+does that for you and refuses a barcode present in both inputs (usually
+a doublet or an unresolved receptor assignment). It checks the result as
+it stores it, so a wrong shape or barcodes that reach no cell are
+reported here rather than turning into an empty Immune repertoire page
+later:
 
 ``` r
 library(CerebroNexus)
 
-ir_cols <- c("barcode", "CTgene", "CTnt", "CTaa", "CTstrict")
-to_df <- function(x) x[, ir_cols, drop = FALSE]
-
-ir_data <- lapply(sample_names, function(s) {
-  rbind(to_df(combined_tcr[[s]]), to_df(combined_bcr[[s]]))
-})
-names(ir_data) <- sample_names
-
-seurat_object@misc$immune_repertoire <- ir_data
+seurat_object <- addImmuneRepertoire(
+  seurat_object,
+  tcr = combined_tcr,
+  bcr = combined_bcr
+)
 
 exportFromSeurat(
   seurat_object,
@@ -119,6 +122,36 @@ exportFromSeurat(
 )
 ```
 
+One thing to watch: `combineTCR(samples = )` and
+`combineBCR(samples = )` prefix every barcode with the sample name. The
+cell names have to carry the same prefix —
+[`SeuratObject::RenameCells()`](https://satijalab.github.io/seurat-object/reference/RenameCells.html)
+— or no receptor can be tied to a cell.
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+stops with that diagnosis rather than storing a repertoire that reaches
+nothing.
+
+If filtering the Seurat object removed only some repertoire cells,
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+reports and removes those orphan rows before storage. They therefore
+cannot inflate clone abundance or diversity. A sample with no remaining
+cell is removed; a repertoire with no matching cell at all is an error.
+
+For Cell Ranger files you may name the path vector instead of sharing
+one `sample_names` vector between receptor types:
+
+``` r
+seurat_object <- addImmuneRepertoire(
+  seurat_object,
+  tcr = c(donorA = tcr_a, donorB = tcr_b),
+  bcr = c(donorA = bcr_a)
+)
+```
+
+CSV inputs require either a named path vector or an explicit
+`sample_names` argument. CerebroNexus does not guess biological sample
+identities from file or directory names.
+
 Each data.frame must contain the scRepertoire clonotype columns
 `barcode`, `CTgene`, `CTnt`, `CTaa`, and `CTstrict`. The `barcode`
 values should match the cell barcodes in the Seurat object’s metadata.
@@ -126,6 +159,16 @@ Chains (e.g. TRA/TRB, IGH/IGK/IGL) are detected automatically from
 `CTgene`, and grouping variables (sample, condition, cell type, …) are
 read from the cell metadata at runtime — the clonotype tables themselves
 only need the five columns above.
+
+Each barcode may occur exactly once across the complete named list. A
+duplicate row would be counted as another cell by clone-size and
+diversity analyses; reusing one barcode in two list entries would also
+assign one cell to two samples. Both are export errors rather than
+warnings. Zero-row entries are treated as absent.
+
+When extracting these columns from `meta.data`, an explicit `sample_col`
+must exist. Use `sample_col = NULL` only when you want CerebroNexus to
+auto-detect `orig.ident`, `sample`, or `Sample`.
 
 ## Module interface
 

@@ -44,7 +44,8 @@ exportFromSeurat(
 
 - file:
 
-  Where to save the output.
+  Where to save the output. External backends require a `.crb` filename
+  and store the matrix under a sibling name derived from the stem.
 
 - experiment_name:
 
@@ -129,6 +130,19 @@ exportFromSeurat(
     never materialised on attach, so RAM stays close to the `.crb`
     metadata size. Requires the HDF5Array package.
 
+  The CRB and any sidecar are built and validated in a private sibling
+  stage. On POSIX systems, new stages and external matrices are
+  owner-only; replacing a CRB preserves its existing mode. An existing
+  sidecar is replaced only when the current CRB identifies that exact
+  path as its backend; backend changes remove the previous owned sidecar
+  after the new CRB is committed. Stop all readers before replacing an
+  existing export, because a reader can otherwise observe the two-path
+  replacement between steps. Ordinary R errors trigger best-effort
+  restoration. Process termination and concurrent writers remain outside
+  this multi-path transaction guarantee. Only POSIX mode bits are set or
+  preserved; ownership, ACLs, extended attributes, and security labels
+  remain the deployment system's responsibility on every platform.
+
 - verbose:
 
   Set this to `TRUE` if you want additional log messages; defaults to
@@ -148,10 +162,11 @@ No data returned.
 ## Immune Repertoire
 
 If `object@misc$immune_repertoire` contains a named list of data.frames
-(one per sample, with scRepertoire columns such as CTgene, CTnt, CTaa,
-CTstrict), it will be automatically exported into the Cerebro object via
-`addImmuneRepertoire()`. Legacy `bcr_data` / `tcr_data` slots are also
-supported as a fallback.
+(one per sample, with `barcode`, `CTgene`, `CTnt`, `CTaa`, and
+`CTstrict`), it will be automatically exported into the Cerebro object
+via
+[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md).
+Legacy `bcr_data` / `tcr_data` slots are also supported as a fallback.
 
 ## HLA typing
 
@@ -180,18 +195,18 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [17:15:35] Initializing Cerebro object...
-#> [17:15:35] Adding expression data (embedded)...
-#> [17:15:35] Collecting available meta data...
-#> [17:15:35] Extracting all meta data columns...
-#> [17:15:35] Extracting dimensional reductions...
-#> [17:15:35] Will export the following dimensional reductions: umap
-#> [17:15:35] Extracting marker genes table...
-#> [17:15:35] No trajectories to extract...
-#> [17:15:35] Checking for spatial data...
-#> [17:15:35] Overview of Cerebro object:
+#> [18:22:05] Initializing Cerebro object...
+#> [18:22:05] Adding expression data (embedded)...
+#> [18:22:05] Collecting available meta data...
+#> [18:22:05] Extracting all meta data columns...
+#> [18:22:05] Extracting dimensional reductions...
+#> [18:22:05] Will export the following dimensional reductions: umap
+#> [18:22:05] Extracting marker genes table...
+#> [18:22:05] No trajectories to extract...
+#> [18:22:05] Checking for spatial data...
+#> [18:22:05] Overview of Cerebro object:
 #> class: Cerebro_v1.3
-#> cerebroApp version: 3.0.5
+#> cerebroApp version: 3.1.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
@@ -211,6 +226,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [17:15:35] Saving Cerebro object to: /tmp/nix-shell-4342-4068276037/Rtmp2EY2PA/pbmc_Seurat.crb
-#> [17:15:35] Done!
+#> [18:22:05] Saving Cerebro object to: /tmp/nix-shell-4490-710408922/Rtmp9qtLlC/pbmc_Seurat.crb
+#> [18:22:05] Done!
 ```
