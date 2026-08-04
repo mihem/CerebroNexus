@@ -1,5 +1,34 @@
 # Changelog
 
+## CerebroNexus 3.0.5
+
+### Testing / CI
+
+- **The app tests reuse one Shiny process where booting a fresh one buys
+  nothing.** Every `shinytest2` recording started its own app, and
+  starting the app cost far more than the assertions did: on a CI runner
+  roughly 88% of the suite’s wall clock went to cold starts rather than
+  to its ~8,600 assertions. Recordings that only navigate the plot
+  tabset and read the DOM now share one `AppDriver` per file without
+  changing a single assertion. Local timings estimate that this can save
+  about 1.5 minutes per CI run. The immune-repertoire file takes this
+  furthest: eleven of its sixteen tests share one driver, cutting that
+  file’s local runtime from roughly 170 seconds to 90–120 seconds across
+  measured runs.
+- Sharing is applied only where a reused app is still a fair test. These
+  keep their own driver deliberately: the `app$expect_values()`
+  snapshots, whose files are named after the driver; the scRepertoire
+  lazy-loading contracts and others that assert what a pristine app has
+  *not* loaded; tests that read an input’s initial value; and the one
+  that leaves a modal open. Tests that navigate the dashboard sidebar
+  and then read that tab’s output keep their own driver where the reused
+  output remains suspended and reads back `NULL`.
+- Production smoke tests now build each synthetic and real-data app
+  bundle once per test file instead of rebuilding identical artifacts
+  for every assertion. Consumers remain read-only and browser checks
+  still use independent Shiny sessions; locally this reduced the smoke
+  file from about 38 to 29 seconds.
+
 ## CerebroNexus 3.0.4
 
 ### Export
@@ -67,9 +96,7 @@
   `exportFromSeurat(..., expression_matrix_mode = "h5")` creates the
   `.crb` and its H5 sidecar together. The manual conversion now writes
   an H5 backend descriptor before saving, producing the same portable,
-  self-describing pair.
-
-## CerebroNexus 3.0.3
+  self-describing pair. \# CerebroNexus 3.0.3
 
 ### Export
 
