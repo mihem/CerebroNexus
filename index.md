@@ -7,47 +7,24 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 ![Lifecycle:
 stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 
-Interactive visualization of single-cell RNA-seq data, built on top of
-[Shiny](https://shiny.posit.co/).
+CerebroNexus is a [Shiny](https://shiny.posit.co/) platform for
+exploring and sharing single-cell and spatial transcriptomics data, with
+gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses.
+See the [full documentation](https://mihem.github.io/CerebroNexus/).
 
-CerebroNexus supports loading pre-processed single-cell data, exploring
-projections and gene expression, browsing marker genes and enriched
-pathways, and inspecting group compositions — all through an interactive
-web interface. The sections below cover the key features.
+[Try the live demo](https://osmzhlab.uni-muenster.de/shiny/demo/).
 
-A live demo is available at
-<https://osmzhlab.uni-muenster.de/shiny/demo/>.
+*CerebroNexus began as a fork of
+[cerebroApp](https://github.com/romanhaa/cerebroApp) by Roman Hillje and
+has since evolved with substantial new features and active development
+by [mihem](https://github.com/mihem) and [Xuesong
+Wang](https://github.com/duocang).*
 
-For the original feature set and data preparation workflows, refer to
-the upstream cerebroApp documentation at
-<https://romanhaa.github.io/cerebroApp/> — everything described there
-works the same way here.
+Automated tests run in a reproducible Nix environment.
 
-*A community fork of
-[cerebroApp](https://github.com/romanhaa/cerebroApp) by Roman Hillje,
-developed by [mihem](https://github.com/mihem) and [Xuesong
-Wang](https://github.com/duocang). Maintained by mihem.*
+![CerebroNexus spatial data view](reference/figures/featured.png)
 
-## Contents
-
-- [1. Installation](#id_1-installation)
-- [2. Features](#id_2-features)
-  - [2.1 convertSeuratToCerebro()](#id_21-convertseurattocerebro)
-  - [2.2 createShinyApp()](#id_22-createshinyapp)
-  - [2.3 Choosing an expression
-    backend](#id_23-choosing-an-expression-backend)
-  - [2.4 Analysis modules](#id_24-analysis-modules)
-  - [2.5 Other improvements](#id_25-other-improvements)
-- [3. Testing](#id_3-testing)
-  - [3.1 Install the test tooling](#id_31-install-the-test-tooling)
-  - [3.2 Run the tests](#id_32-run-the-tests)
-  - [3.3 precheck: the one-shot local
-    gate](#id_33-precheck-the-one-shot-local-gate)
-  - [3.4 Self-containment of exported
-    apps](#id_34-self-containment-of-exported-apps)
-  - [3.5 Snapshots and further
-    reading](#id_35-snapshots-and-further-reading)
-- [4. License](#id_4-license)
+CerebroNexus spatial data view
 
 ## 1. Installation
 
@@ -55,308 +32,23 @@ Wang](https://github.com/duocang). Maintained by mihem.*
 remotes::install_github('mihem/CerebroNexus')
 ```
 
-This pulls in every dependency, so all features work out of the box.
-Heavy packages (e.g. `scRepertoire`) are still **loaded on demand** —
-only when you first use the feature that needs them — so the app starts
-fast regardless.
-
-## 2. Features
-
-### 2.1 convertSeuratToCerebro()
-
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
-handles the entire export process in a single call: reading the Seurat
-object (`.rds` on disk, or one already loaded in memory), renaming
-grouping variables, loading marker gene tables, calculating
-most-expressed genes, and saving a `.crb` file.
+## 2. Quick Start
 
 ``` r
 library(CerebroNexus)
 
 convertSeuratToCerebro(
-  seurat_file     = "my_seurat.rds",     # or an in-memory Seurat object
-  result_dir      = "output/",
-  assay           = "RNA",
-  slot            = "data",
-  experiment_name = "My Experiment",
-  organism        = "Human",
-  groups          = c("sample_id", "condition", "cell_type"),
-  groups_naming   = list(
-    "sample_id" = "sample",
-    "cell_type" = "cluster"
-  ),
-  marker_file              = "markers.csv",   # optional: .csv/.tsv/.txt/.tab
-  expression_matrix_mode   = "h5"             # "embedded" | "bpcells" | "h5", see §2.3
+  seurat_file = "my_seurat.rds",
+  result_dir = "output",
+  groups = c("sample", "cluster")
 )
-# → saves output/cerebro_my_seurat.crb (+ sibling .h5 / .bpcells/ when applicable)
-```
 
-### 2.2 createShinyApp()
-
-Instead of running
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
-interactively, you can generate a self-contained Shiny app directory
-with all data and source files bundled. This is useful for deploying to
-a Shiny server or sharing with collaborators.
-
-``` r
 createShinyApp(
-  cerebro_data = c(
-    `snRNAseq` = "output/cerebro_snrnaseq.crb",
-    `Sample2`  = "output/cerebro_sample2.crb"
-  ),
-  result_dir       = "my_app/",
-  welcome_message  = "<h2>My Single-Cell Atlas</h2>",   # rendered via HTML()
-  port             = 8080,
-  host             = "127.0.0.1",
-  max_request_size = 8000,                              # MB
-  overwrite        = TRUE
+  cerebro_data = c("My dataset" = "output/cerebro_my_seurat.crb"),
+  result_dir = "my_app"
 )
-# → run with shiny::runApp("my_app/") or deploy to Shiny Server
 ```
 
-`cerebro_data` is required and must be a *named* vector / list of `.crb`
-(or `.rds`) paths — names must be non-missing and unique because they
-become the dataset labels users switch between in the app. `result_dir`
-is also required. External matrix locations are read from each `.crb`
-backend descriptor and copied into the bundle automatically (see §2.3),
-so renaming a `.crb` does not lose its matrix. Other knobs available:
-`colors`, `cerebro_options`, `crb_pick_smallest_file`, `show_upload_ui`,
-`point_size`, `variable_to_compare` — run
-[`?createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-for the full list.
+## License
 
-### 2.3 Choosing an expression backend
-
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
-(and
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md))
-accept `expression_matrix_mode = c("embedded", "bpcells", "h5")` for how
-the count matrix is persisted alongside the `.crb`:
-
-| Backend | Where the matrix lives | `.crb` size | Load behaviour | Extra packages | Portability |
-|----|----|----|----|----|----|
-| `embedded` | inside the `.crb` itself | full matrix included | always in memory after `readRDS` | — | single-file; works with any reader |
-| `bpcells` | sibling `<stem>.bpcells/` directory | tiny (handle only) | **lazy** — `IterableMatrix` reads on slice access | `BPCells` | `.crb` + sibling dir must travel together |
-| `h5` | sibling `<stem>.h5` file (TENx CSC) | tiny (tag only) | **lazy** — [`HDF5Array::TENxMatrix`](https://rdrr.io/pkg/HDF5Array/man/TENxMatrix-class.html) seed; queries stream from disk | `HDF5Array` | `.crb` + sibling `.h5` must travel together |
-
-Benchmark trade-offs on a PBMC fixture (38,606 genes × 147,756 cells):
-
-| metric                                   | embedded | bpcells |     **h5** |
-|------------------------------------------|---------:|--------:|-----------:|
-| total disk                               |   681 MB |  592 MB |     391 MB |
-| **open URL → dataset visible (browser)** |   14.3 s |   9.2 s |  **8.7 s** |
-| RAM (RSS) on the server after attach     |   4.5 GB |  1.2 GB | **1.1 GB** |
-| single-gene query, once loaded (cold)    |   0.51 s |  0.74 s | **0.01 s** |
-
-Browser-side TTFB / DOM-ready / `load` are within ~10 ms of each other
-across backends — all the divergence in the second row is server-side R
-work (`readRDS` + `.attachExternalExpression()`) plus a constant ~5 s
-Shiny session handshake.
-
-**Disk-size caveat — it depends on fixture size.** The 391 MB h5 total
-above is for a large fixture where HDF5’s default gzip filter on the
-TENx CSC layout compresses sparse counts well (~6× vs uncompressed). On
-small/dense fixtures the trade-off can flip — for example on Roman
-Hillje’s `inst/extdata/v1.4/example.h5` (1000 cells × 500 genes) the
-sibling `.h5` is actually *larger* than the equivalent embedded `.crb`
-would have been, because metadata + chunk overhead dominates over
-compressed payload. **The h5 win on RAM and load time is consistent
-across fixture sizes; the win on disk only emerges at scale.** Since
-1.7.0 the `bpcells` exporter automatically calls
-`BPCells::convert_matrix_type("uint32_t")` whenever the input values are
-losslessly representable as non-negative integers (the typical scRNA-seq
-counts case), which triggers BPCells’s bit-packed integer storage and
-shrinks the sibling by ~5× vs raw double; for normalised float values
-(`slot = "data"` / `"scale.data"`) the exporter falls back to raw
-storage to avoid silent precision loss.
-
-Picking one:
-
-- **`h5`** *(recommended default)* — fastest startup, lowest RAM,
-  fastest queries; smallest disk on large fixtures (subject to the
-  caveat above). The TENx CSC layout aligns with how Cerebro reads
-  expression (per-gene = single column slice), and HDF5 page-caching
-  makes repeated reads memory-fast without committing the whole matrix
-  to RAM. Requires the `HDF5Array` Bioconductor package on the host.
-- **`bpcells`** — RAM-constrained host with very large matrices, or
-  workloads dominated by chunk-level batched operations rather than
-  per-gene reads. Disk size is similar to h5 on integer counts
-  (bit-packed since 1.7.0); per-gene query is ~0.7 s, so chunk-level
-  batched ops benefit more than per-gene streaming.
-- **`embedded`** — single-file convenience (no sibling to manage), or
-  compatibility with very old `.crb` readers. ~14 s end-to-end and pins
-  the full matrix into RAM per loaded copy. Best for small datasets or
-  one-shot scripts.
-
-For reference, before the 1.7.0 lazy h5 refactor, h5 attach was eager
-([`rhdf5::h5read`](https://huber-group-embl.github.io/rhdf5/reference/h5_read.html) +
-full `dgCMatrix` reconstruction), giving ~33 s open-URL time, ~11 GB
-RSS, and ~0.45 s queries — i.e. lazy-h5 is the same backend with attach
-**~263× faster, RAM ~10× smaller, queries ~45× faster, web load ~4×
-faster**.
-
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-reads the ordinary `expression_backend` field and copies its exact file
-or directory to the same relative location beside the bundled `.crb`; it
-does not guess from the current `.crb` filename or execute the
-serialized getter. Invalid or missing locations, and two inputs that
-resolve to the same bundle target, stop the build with an error. The
-generated configuration freezes the resulting per-CRB attachment plan,
-including any host override, and the Shiny runtime consumes that plan
-directly. A global runtime override therefore retains its existing
-precedence and skips the sidecar copy, but one global override cannot
-serve several CRBs in the same app.
-
-All CRBs, external backends and bundle destinations are checked before
-copying starts. The app is then built in a private sibling directory and
-replaces `result_dir` only after the complete build succeeds, so a
-missing backend cannot destroy a working deployment. With
-`overwrite = FALSE`, `result_dir` must be absent or empty; non-empty
-destinations are rejected before any files are written. On POSIX
-systems, the stage is mode `0700` while data is copied, and replacement
-retains the existing deployment root’s permission bits. Target ancestors
-are resolved before the sibling lock and stage are created; the final
-target cannot be a symbolic link or unresolved filesystem entry.
-Platform-specific ACLs, ownership changes and security labels remain the
-deployment system’s responsibility. Do not modify input CRBs or backends
-while a build is running.
-
-### 2.4 Analysis modules
-
-Beyond the projection, marker-gene and pathway views inherited from
-cerebroApp, the app registers a set of analysis modules. Each one is
-**conditional**: its tab appears only when the loaded `.crb` actually
-carries the data it needs, so an app built from a plain RNA-only data
-set shows none of them.
-
-| Module | Tab appears when the data set carries | Guide |
-|----|----|----|
-| **Immune repertoire** | TCR/BCR clonotypes | [Immune repertoire analysis](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.html) |
-| **Spatial** | one or more spatial data sets (Visium, Xenium, MERFISH, Slide-seq) | [Spatial transcriptomics analysis](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html) |
-| **Trekker** | a `trekker` slot | [Trekker spatial mapping](https://mihem.github.io/CerebroNexus/articles/trekker_spatial_mapping.html) |
-| **HLA & TCR Motifs** | a TCR (TRA/TRB); HLA typing is optional and can be added in-app | [HLA & TCR motifs](https://mihem.github.io/CerebroNexus/articles/hla_tcr_motifs.html) |
-| **Trajectory** | a Monocle 2 trajectory | [Trajectory analysis](https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.html) |
-
-**Immune repertoire** groups its plots into clonal expansion and
-abundance, diversity, repertoire overlap, V/J gene usage, CDR3 length
-and amino-acid properties, plus a clonotype-coloured UMAP.
-`scRepertoire` backs the plots that need it and is loaded on first use,
-so it costs nothing until the tab is opened.
-
-**HLA & TCR Motifs** also accepts input with no single cells at all:
-bulk TCRβ immunosequencing paired with donor HLA genotypes — see [HLA
-associations on bulk
-TCRβ](https://mihem.github.io/CerebroNexus/articles/hla_bulk_tcr_associations.html).
-[A real antigen-selected single-cell TCR
-demo](https://mihem.github.io/CerebroNexus/articles/hla_tcr_antigen_selected.html)
-walks through building such a data set end to end from public 10x
-Genomics data.
-
-One app can serve **several data sets** behind a switcher; see [Loading
-multiple data
-sets](https://mihem.github.io/CerebroNexus/articles/multi_crb.html).
-
-### 2.5 Other improvements
-
-- **Seurat v5** support throughout (`GetAssayData()`-based slot access)
-- Loading spinners on all plot outputs
-
-## 3. Testing
-
-The package ships with a `testthat` + `shinytest2` suite under
-`tests/testthat/`. CI runs it on every PR
-(`.github/workflows/R-tests.yaml` and `R-cmd-check.yaml`); the sections
-below cover running it locally.
-
-### 3.1 Install the test tooling
-
-The shinytest2 suite drives a real headless Chrome via `chromote` and
-relies on `NOT_CRAN=true` (already set in `tests/testthat/setup.R`).
-Install the extras once:
-
-``` r
-install.packages(c("testthat", "shinytest2", "chromote"))
-# or pull the whole Suggests block:
-devtools::install_dev_deps()
-```
-
-### 3.2 Run the tests
-
-From R, loading the dev source via
-[`pkgload::load_all()`](https://pkgload.r-lib.org/reference/load_all.html)
-(this is what CI’s test job does too):
-
-``` r
-# whole suite
-devtools::test()
-
-# one file at a time
-devtools::test(filter = "app-inst")          # shinytest2 end-to-end smoke
-devtools::test(filter = "exportFromSeurat")  # exporter-only
-devtools::test(filter = "r-functions")       # plain unit tests
-```
-
-From the shell (CI / scripting):
-
-``` bash
-# every test_*.R, dev source loaded
-Rscript -e 'devtools::load_all("."); testthat::test_dir("tests/testthat")'
-
-# only the shinytest2 suite, with a verbose reporter
-NOT_CRAN=true Rscript -e 'devtools::test(filter = "app-inst", reporter = "summary")'
-```
-
-### 3.3 precheck: the one-shot local gate
-
-`scripts/precheck.sh` runs the same checks as CI, **on your machine, in
-the order CI runs them** (air-format → tests → `R CMD check` → pkgdown),
-so you catch failures before pushing:
-
-``` bash
-scripts/precheck.sh        # full: air-format + tests + R CMD check + pkgdown
-scripts/precheck.sh fast   # quick: air-format + tests only (day-to-day)
-scripts/precheck.sh air    # air-format only
-```
-
-Run it before pushing. CI air-formats **before** testing, so running the
-steps out of order lets format-sensitive tests pass locally and fail on
-CI. This is a local convenience, not CI itself — the authoritative gate
-is GitHub Actions, which runs on every push regardless of your OS. It
-needs `air` on `PATH` plus an R with the Suggests packages (from a
-native R install, or the repo’s `default.nix`).
-
-### 3.4 Self-containment of exported apps
-
-Apps built by
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-must stay **self-contained** — they run with no `CerebroNexus`
-installed. `test-smoke-production.R` enforces this with a static source
-check, a hermetic `.crb` deserialize, and a hermetic bundle boot (each
-in a process whose library path lacks the package), so a bundle that
-reaches back into `CerebroNexus` fails a test rather than a user. See
-[`CONTRIBUTING.md`](https://mihem.github.io/CerebroNexus/CONTRIBUTING.md)
-for the rule and where runtime code must live.
-
-### 3.5 Snapshots and further reading
-
-Snapshot diffs from `expect_snapshot()` land under
-`tests/testthat/_snaps/`; review them with
-[`testthat::snapshot_review()`](https://testthat.r-lib.org/reference/snapshot_accept.html)
-and accept with
-[`testthat::snapshot_accept()`](https://testthat.r-lib.org/reference/snapshot_accept.html)
-only after confirming the new output is correct.
-
-See
-[`tests/README.md`](https://mihem.github.io/CerebroNexus/tests/README.md)
-for the full layout, the `inst_dir` resolution rule, and the gotcha
-about regenerating `inst/extdata/v1.4/example.crb` after R6 method
-changes (a stale fixture surfaces as a misleading
-`Shiny app did not become stable in 15000ms` from shinytest2).
-
-## 4. License
-
-MIT — see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
-Original cerebroApp © Roman Hillje; CerebroNexus by
-[mihem](https://github.com/mihem) and [Xuesong
-Wang](https://github.com/duocang).
+MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).

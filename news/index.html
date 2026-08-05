@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,6 +33,7 @@
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
+    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Expression backend benchmark: embedded vs bpcells vs h5 at scale</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
@@ -73,6 +74,27 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="3.2.0" id="cerebronexus-320">CerebroNexus 3.2.0<a class="anchor" aria-label="anchor" href="#cerebronexus-320"></a></h2>
+<div class="section level3">
+<h3 id="documentation-3-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-3-2-0"></a></h3>
+<ul><li>
+<strong>Draft article: “Expression backend benchmark”.</strong> Introduces a protocol for comparing <code>embedded</code>, <code>bpcells</code>, and <code>h5</code> on two real public million-cell matrices. It reports independent-process medians and ranges, distinguishes a fresh-process first query from uncontrolled cold-disk access, and limits scale conclusions to the recorded host and source/tier points. A complete publication-profile run has not yet been performed on this development head.</li>
+<li>
+<strong>A complete methodology accompanies the results.</strong> It defines the experimental unit, balanced backend order, expression-density-stratified query panel, run profiles, correctness fingerprints, provenance, failure handling, and interpretation boundaries.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-3-2-0">Internal<a class="anchor" aria-label="anchor" href="#internal-3-2-0"></a></h3>
+<ul><li>
+<strong>A reproducible benchmark harness now lives in <code>tests/bench/</code>.</strong> It reads public HDF5 cell blocks through the <code>rhdf5</code> ROS3 driver, rotates backend order across repeated exports, validates row and block values against the source matrix, and records Git, dependency, host, and SHA-256 source provenance.</li>
+<li>
+<strong>Benchmark result publication is failure-safe.</strong> Runs are staged and validated before entering an immutable result directory; the <code>CURRENT</code> pointer changes last, so an interruption cannot erase the previous evidence.</li>
+<li>
+<strong>Benchmark plans are checked against the host before bulk transfer.</strong> The harness reports estimated peak memory, R’s vector limit, sparse-index capacity, and free-disk budget for every source/tier. Normal comparison profiles exclude deliberate memory-boundary tiers; those are isolated in the explicit <code>stress</code> profile.</li>
+<li>
+<code>rhdf5</code> is now listed in <code>Suggests</code> for the benchmark harness and its reader contract test.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="3.1.0" id="cerebronexus-310">CerebroNexus 3.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-310"></a></h2>
 <div class="section level3">

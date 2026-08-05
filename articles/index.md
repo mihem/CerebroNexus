@@ -26,6 +26,8 @@
   file](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md):
 - [Store the expression matrix in H5
   format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md):
+- [Expression backend benchmark: embedded vs bpcells vs h5 at
+  scale](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md):
 - [Launch Cerebro with pre-loaded data
   set](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md):
 - [Loading multiple data sets (multi-crb) with a dataset
