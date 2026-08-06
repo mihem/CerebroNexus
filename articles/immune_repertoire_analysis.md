@@ -2,11 +2,11 @@
 
 ## Overview
 
-CerebroNexus v1.4 introduces a comprehensive **Immune Repertoire**
-module for interactive exploration of T-cell and B-cell receptor
-clonotype data. The module leverages the `scRepertoire` package and
-supports 19 visualization methods covering clonal abundance, diversity,
-CDR3 properties, gene usage, and cross-sample comparisons.
+CerebroNexus includes a comprehensive **Immune Repertoire** module for
+interactive exploration of T-cell and B-cell receptor clonotype data.
+The module leverages the `scRepertoire` package and supports 19
+visualization methods covering clonal abundance, diversity, CDR3
+properties, gene usage, and cross-sample comparisons.
 
 The Immune Repertoire tab appears **conditionally** in the sidebar —
 only when the loaded `.crb` file contains TCR or BCR clonotype

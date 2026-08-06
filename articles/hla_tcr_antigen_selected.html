@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">05 August, 2026</h4>
+            <h4 data-toc-skip class="date">06 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/hla_tcr_antigen_selected.Rmd" class="external-link"><code>vignettes/hla_tcr_antigen_selected.Rmd</code></a></small>
       <div class="d-none name"><code>hla_tcr_antigen_selected.Rmd</code></div>
@@ -636,7 +636,7 @@ shipped.</p>
 <span>  lineage_column <span class="op">=</span> <span class="st">"cell_type"</span>   <span class="co"># declared, so the app never has to guess</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addHLATyping</span><span class="op">(</span><span class="va">donor_typing</span>, source_type <span class="op">=</span> <span class="st">"genotyped"</span>, <span class="va">...</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/v1.4/demo_hla_tcr_dextramer.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_hla_tcr_dextramer.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="the-declared-contracts-and-why-each-one">The declared contracts, and why each one<a class="anchor" aria-label="anchor" href="#the-declared-contracts-and-why-each-one"></a>
 </h3>
@@ -729,7 +729,7 @@ assumed.</p>
    TRA: 3189 unique CDR3 -&gt; 396 nodes in 141 motifs
    HLA: 4 donors, 12 alleles, source_type=genotyped
    binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
-   PUBLISHED inst/extdata/v1.4/demo_hla_tcr_dextramer.crb (5.2 MB)</code></pre>
+   PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)</code></pre>
 <p>12,000 dextramer-selected cells (3,000 per donor, every one paired
 αβ), 2,000 variable genes, <strong>5.2 MB</strong> — it was 7.9 MB while
 the expression block was stored dense.</p>

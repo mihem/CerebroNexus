@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,6 +74,18 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="4.0" id="cerebronexus-40">CerebroNexus 4.0<a class="anchor" aria-label="anchor" href="#cerebronexus-40"></a></h2>
+<div class="section level3">
+<h3 id="breaking-changes-4-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-4-0"></a></h3>
+<ul><li>
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> is now the single application launcher. The obsolete version selector and version-named <code>launchCerebroV1.x()</code> exports were removed because CerebroNexus ships one Viewer implementation.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-4-0">Internal<a class="anchor" aria-label="anchor" href="#internal-4-0"></a></h3>
+<ul><li>Viewer runtime sources now live under <code>inst/viewer/</code>, and bundled examples live under <code>inst/extdata/examples/</code>. Removing the historical Viewer version from internal paths does not change the application or data formats.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="3.2.0" id="cerebronexus-320">CerebroNexus 3.2.0<a class="anchor" aria-label="anchor" href="#cerebronexus-320"></a></h2>
 <div class="section level3">
@@ -451,7 +463,7 @@
 <ul><li>Fixed <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> projections: <code>reducedDims()</code> output is now coerced to <code>data.frame</code> before <code>addProjection()</code>, matching the Seurat path and clearing a latent runtime error for SCE inputs with non-PCA reductions</li>
 <li>Fixed <code>.attachExternalExpression</code> crashing on legacy <code>.crb</code> objects that predate the <code>getExpressionBackend()</code> method; such objects are now treated as embedded backend and skip the attach step</li>
 <li>Fixed “method not found” errors on the trajectory tab by renaming the corresponding <code>Cerebro_v1.3</code> methods to the names the Shiny server already calls (<code>getMethodsForTrajectories</code>, <code>getNamesOfTrajectories</code>)</li>
-<li>Fixed gene_expression plot chain freezing on gene picker changes: removed a stale <code><a href="https://rdrr.io/pkg/shiny/man/isolate.html" class="external-link">isolate()</a></code> wrapper and a reference to a non-existent <code>expression_projection_update_button</code> input; the existing 250 ms debounce on the data-to-plot reactive still throttles bursts</li>
+<li>Fixed gene_expression plot chain freezing on gene picker changes: removed a stale <code>isolate()</code> wrapper and a reference to a non-existent <code>expression_projection_update_button</code> input; the existing 250 ms debounce on the data-to-plot reactive still throttles bursts</li>
 </ul></div>
 <div class="section level3">
 <h3 id="testing-1-7-0">Testing<a class="anchor" aria-label="anchor" href="#testing-1-7-0"></a></h3>

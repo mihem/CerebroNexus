@@ -38,7 +38,7 @@ of mitochondrial and ribosomal gene expression for each cell.
 ## Examples
 
 ``` r
-pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
+pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 pbmc <- addPercentMtRibo(
   object = pbmc,
@@ -46,6 +46,6 @@ pbmc <- addPercentMtRibo(
   organism = 'hg',
   gene_nomenclature = 'name'
 )
-#> [19:33:42] No mitochondrial genes found in data set.
-#> [19:33:42] Calculate percentage of 1 ribosomal transcript(s) present in the data set...
+#> [14:13:06] No mitochondrial genes found in data set.
+#> [14:13:06] Calculate percentage of 1 ribosomal transcript(s) present in the data set...
 ```

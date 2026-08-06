@@ -415,7 +415,7 @@ crb$technical_info <- list(
   lineage_column = "cell_type"   # declared, so the app never has to guess
 )
 crb$addHLATyping(donor_typing, source_type = "genotyped", ...)
-saveRDS(crb, "inst/extdata/v1.4/demo_hla_tcr_dextramer.crb", compress = "xz")
+saveRDS(crb, "inst/extdata/examples/demo_hla_tcr_dextramer.crb", compress = "xz")
 ```
 
 ### The declared contracts, and why each one
@@ -476,7 +476,7 @@ On the shipped object the gate prints:
        TRA: 3189 unique CDR3 -> 396 nodes in 141 motifs
        HLA: 4 donors, 12 alleles, source_type=genotyped
        binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
-       PUBLISHED inst/extdata/v1.4/demo_hla_tcr_dextramer.crb (5.2 MB)
+       PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)
 
 12,000 dextramer-selected cells (3,000 per donor, every one paired αβ),
 2,000 variable genes, **5.2 MB** — it was 7.9 MB while the expression

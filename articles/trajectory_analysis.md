@@ -8,13 +8,13 @@ when the loaded `.crb` file contains trajectory data.
 
 This module restores functionality from the original cerebroApp v1.3.
 The code is the original implementation by Roman Hillje, restructured
-into the v1.4 sub-file layout with no functional changes.
+into the current Viewer sub-file layout with no functional changes.
 
 ## Quick start
 
 ``` r
 library(CerebroNexus)
-launchCerebroV1.4()
+launchCerebro()
 ```
 
 1.  Launch CerebroNexus and load a `.crb` file with trajectory data

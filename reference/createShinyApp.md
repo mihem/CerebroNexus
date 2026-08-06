@@ -1,7 +1,7 @@
-# Create a self-contained Shiny app folder for Cerebro v1.4
+# Create a self-contained CerebroNexus Shiny app folder
 
-Bundles a Cerebro v1.4 Shiny app into `result_dir`, copying the
-`inst/shiny/v1.4/` sources, the requested `.crb` data file(s), and
+Bundles a CerebroNexus Shiny app into `result_dir`, copying the
+`inst/viewer/` sources, the requested `.crb` data file(s), and
 `extdata/`, and writes an `app.R` that sources the bundled UI/server.
 The output directory can be served directly by shiny-server or run with
 `shiny::runApp(result_dir)`.

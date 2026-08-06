@@ -249,7 +249,7 @@ sub <- DietSeurat(sub, assays = "SCT", dimreducs = "umap")   # drop dense scale.
 
 exportFromSeurat(
   sub, assay = "SCT", slot = "data",
-  file = "inst/extdata/v1.4/demo_trekker.crb",
+  file = "inst/extdata/examples/demo_trekker.crb",
   experiment_name = "Trekker mouse brain (TrekkerU_C, demo)",
   organism = "mm",
   groups = c("cluster", "celltype"), main_group = "celltype",
@@ -279,16 +279,16 @@ trekker <- list(
   qc_examples = qc_examples                         # one image per excluded class
 )
 
-crb <- readRDS("inst/extdata/v1.4/demo_trekker.crb")
+crb <- readRDS("inst/extdata/examples/demo_trekker.crb")
 crb$addTrekker(trekker)
-saveRDS(crb, "inst/extdata/v1.4/demo_trekker.crb", compress = "xz")
+saveRDS(crb, "inst/extdata/examples/demo_trekker.crb", compress = "xz")
 ```
 
 The whole build is one command:
 
 ``` r
 # TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R
-# -> inst/extdata/v1.4/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,
+# -> inst/extdata/examples/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,
 #                                         50 embedded evidence images)
 ```
 

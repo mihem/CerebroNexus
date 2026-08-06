@@ -119,7 +119,7 @@ exportFromSeurat(
     [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
     to a TENx-format sparse HDF5 file next to the `.crb` (sibling
     `<stem>.h5`) and tags the backend with that relative location. The
-    on-disk layout matches `inst/extdata/v1.4/example.h5`: a single
+    on-disk layout matches `inst/extdata/examples/example.h5`: a single
     `/expression` group with `data`, `indices`, `indptr`, `shape`,
     `genes`, and `barcodes` datasets. The matrix is stored cells x genes
     (TENx column-favoured, optimised for per-gene reads); the Shiny
@@ -182,7 +182,7 @@ typed one.
 ## Examples
 
 ``` r
-pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
+pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 exportFromSeurat(
   object = pbmc,
@@ -195,22 +195,22 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [19:33:44] Initializing Cerebro object...
-#> [19:33:44] Adding expression data (embedded)...
-#> [19:33:44] Collecting available meta data...
-#> [19:33:44] Extracting all meta data columns...
-#> [19:33:44] Extracting dimensional reductions...
-#> [19:33:44] Will export the following dimensional reductions: umap
-#> [19:33:44] Extracting marker genes table...
-#> [19:33:44] No trajectories to extract...
-#> [19:33:44] Checking for spatial data...
-#> [19:33:44] Overview of Cerebro object:
+#> [14:13:08] Initializing Cerebro object...
+#> [14:13:08] Adding expression data (embedded)...
+#> [14:13:08] Collecting available meta data...
+#> [14:13:08] Extracting all meta data columns...
+#> [14:13:08] Extracting dimensional reductions...
+#> [14:13:08] Will export the following dimensional reductions: umap
+#> [14:13:08] Extracting marker genes table...
+#> [14:13:08] No trajectories to extract...
+#> [14:13:08] Checking for spatial data...
+#> [14:13:08] Overview of Cerebro object:
 #> class: Cerebro_v1.3
-#> cerebroApp version: 3.2.0
+#> cerebroApp version: 4.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-08-05
+#> date of export: 2026-08-06
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, seurat_clusters
@@ -226,6 +226,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [19:33:44] Saving Cerebro object to: /tmp/nix-shell-4284-3112206896/RtmpuZPOcF/pbmc_Seurat.crb
-#> [19:33:44] Done!
+#> [14:13:08] Saving Cerebro object to: /tmp/nix-shell-4162-395311635/Rtmp5bIEUH/pbmc_Seurat.crb
+#> [14:13:08] Done!
 ```

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -193,7 +193,7 @@ such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored whe
 <li><p><code>"h5"</code> writes the matrix via <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>
   to a TENx-format sparse HDF5 file next to the <code>.crb</code> (sibling
   <code>&lt;stem&gt;.h5</code>) and tags the backend with that relative location. The
-  on-disk layout matches <code>inst/extdata/v1.4/example.h5</code>: a single
+  on-disk layout matches <code>inst/extdata/examples/example.h5</code>: a single
   <code>/expression</code> group with <code>data</code>, <code>indices</code>, <code>indptr</code>,
   <code>shape</code>, <code>genes</code>, and <code>barcodes</code> datasets. The matrix is
   stored cells x genes (TENx column-favoured, optimised for per-gene
@@ -240,7 +240,8 @@ resolved and validated. Users should leave this as <code>NULL</code>.</p></dd>
 data.frames (one per sample, with <code>barcode</code>, <code>CTgene</code>,
 <code>CTnt</code>, <code>CTaa</code>, and <code>CTstrict</code>), it will be automatically
 exported into the Cerebro object via <code><a href="addImmuneRepertoire.html">addImmuneRepertoire()</a></code>. Legacy
-<code>bcr_data</code> / <code>tcr_data</code> slots are also supported as a fallback.</p>
+<code>bcr_data</code> /
+<code>tcr_data</code> slots are also supported as a fallback.</p>
     </div>
     <div class="section level2">
     <h2 id="hla-typing">HLA typing<a class="anchor" aria-label="anchor" href="#hla-typing"></a></h2>
@@ -258,7 +259,7 @@ genotype is never mistaken for a directly typed one.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/v1.4/pbmc_seurat.rds"</span>,</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/pbmc_seurat.rds"</span>,</span></span>
 <span class="r-in"><span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">exportFromSeurat</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  object <span class="op">=</span> <span class="va">pbmc</span>,</span></span>
@@ -271,22 +272,22 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro_v1.3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 3.2.0</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 4.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-08-05</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-08-06</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of cells: 80</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of genes: 230</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> grouping variables (2): sample, seurat_clusters</span>
@@ -302,8 +303,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Saving Cerebro object to: /tmp/nix-shell-4284-3112206896/RtmpuZPOcF/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:44] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Saving Cerebro object to: /tmp/nix-shell-4162-395311635/Rtmp5bIEUH/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

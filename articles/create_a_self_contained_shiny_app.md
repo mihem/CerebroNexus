@@ -3,8 +3,8 @@
 ## Overview
 
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-bundles a Cerebro v1.4 Shiny app into a single output directory. It
-copies the Shiny sources shipped under `inst/shiny/v1.4/`, the requested
+bundles a CerebroNexus Shiny app into a single output directory. It
+copies the Shiny sources shipped under `inst/viewer/`, the requested
 `.crb` (or `.rds`) data file(s), and the `inst/extdata/` reference
 files, and writes an `app.R` that wires everything together with a
 pre-built `Cerebro.options` list. The result is a directory you can
@@ -26,13 +26,13 @@ R interactively (`shinyapps.io`, Docker images, etc.).
 
 ## Setup
 
-The package ships an example `.crb` in `inst/extdata/v1.4/`, which we
-use throughout this vignette.
+The package ships an example `.crb` in `inst/extdata/examples/`, which
+we use throughout this vignette.
 
 ``` r
 library(CerebroNexus)
 
-crb <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
+crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
 file.exists(crb)
 #> [1] TRUE
 ```
@@ -90,7 +90,7 @@ You can also supply matching `colors` so each dataset gets a
 deterministic palette.
 
 ``` r
-crb_pbmc <- system.file("extdata/v1.4/example.crb", package = "CerebroNexus")
+crb_pbmc <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
 # crb_other <- "/path/to/another_dataset.crb"
 
 createShinyApp(

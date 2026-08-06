@@ -2,24 +2,20 @@
 
 ## Overview
 
-A new feature in cerebroApp v1.3 is to specify a `.crb` file when
-launching Cerebro and preventing the user from uploading their own data
-set. This is can be useful when you want to share your Cerebro data set
-on a web server, e.g. along with a publication, but don’t want users to
-use your web server to upload their own data sets.
+CerebroNexus can preload a `.crb` file and prevent users from uploading
+their own data sets. This can be useful when you want to share a Cerebro
+data set on a web server, for example alongside a publication, but don’t
+want users to upload data to that server.
 
 ## How to do it
 
-It’s very simple, all you have to do is provide some parameters to
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
-/
-[`launchCerebroV1.3()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.3.md).
+Provide the data path and closed mode to
+[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md).
 Let’s say your data set is stored here:
 `~/Cerebro/data_sets/pbmc_v3.crb`. Then, launch Cerebro as shown below:
 
 ``` r
 launchCerebro(
-  version = "v1.3",
   crb_file_to_load = "~/Cerebro/data_sets/pbmc_v3.crb",
   mode = "closed"
 )
@@ -34,8 +30,9 @@ data](launch_cerebro_with_pre-loaded_data_set_files/landing_page.png)](https://m
 
 If you would like to modify the message on the “Load data”/welcome page,
 e.g. to link to a publication or give an introduction to the data set,
-you can use the `welcome_message` parameter of `launchCerebroV1.3`. The
-provided string for that parameter can/should be written in HTML as
+you can use the `welcome_message` parameter of
+[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md).
+The provided string for that parameter can/should be written in HTML as
 shown below:
 
 ``` r
@@ -45,7 +42,6 @@ custom_welcome_message <- '<h3 style="text-align: center; margin-top: 0px"><stro
   Please contact us at ... if you have any questions.</p>'
 
 launchCerebro(
-  version = "v1.3"
   crb_file_to_load = "~/Cerebro/data_sets/pbmc_v3.crb",
   mode = "closed",
   welcome_message = custom_welcome_message

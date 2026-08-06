@@ -9,7 +9,7 @@ the meta data of the provided Seurat object."><meta property="og:image" content=
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -167,7 +167,7 @@ stored in <code>object@misc$marker_genes</code>.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/v1.4/pbmc_seurat.rds"</span>,</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/pbmc_seurat.rds"</span>,</span></span>
 <span class="r-in"><span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu">getMarkerGenes</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  object <span class="op">=</span> <span class="va">pbmc</span>,</span></span>
@@ -182,7 +182,7 @@ stored in <code>object@misc$marker_genes</code>.</p>
 <span class="r-in"><span>  test <span class="op">=</span> <span class="st">'wilcox'</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:56] Get marker genes for 2 groups in `sample`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:14:17] Get marker genes for 2 groups in `sample`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster pbmc_1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> (default method for FindMarkers) please install the presto package</span>
@@ -194,7 +194,7 @@ stored in <code>object@misc$marker_genes</code>.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> efficient implementation (no further action necessary).</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This message will be shown once per session</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster pbmc_2</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [19:33:56] Get marker genes for 2 groups in `seurat_clusters`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:14:17] Get marker genes for 2 groups in `seurat_clusters`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster 0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Calculating cluster 1</span>
 <span class="r-in"><span></span></span>

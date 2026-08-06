@@ -21,7 +21,7 @@ Passing a single path behaves exactly as before — no switcher is shown:
 createShinyApp(
   result_dir = file.path(tempdir(), "cerebro_app_single"),
   cerebro_data = c(demo = system.file(
-    "extdata/v1.4/example.crb",
+    "extdata/examples/example.crb",
     package = "CerebroNexus"
   ))
 )
@@ -39,11 +39,11 @@ conditional tabs all change as you switch:
 createShinyApp(
   result_dir = file.path(tempdir(), "cerebro_app_multi"),
   cerebro_data = c(
-    "PBMC - Full (T+B)"                = system.file("extdata/v1.4/demo_full_tcr_bcr.crb",   package = "CerebroNexus"),
-    "Mouse brain (Visium)"             = system.file("extdata/v1.4/demo_spatial_visium.crb",  package = "CerebroNexus"),
-    "Mouse hippocampus (Slide-seq v2)" = system.file("extdata/v1.4/demo_spatial_slideseq.crb", package = "CerebroNexus"),
-    "Mouse ileum (MERFISH)"            = system.file("extdata/v1.4/demo_spatial_merfish.crb", package = "CerebroNexus"),
-    "Mouse brain (Xenium)"             = system.file("extdata/v1.4/demo_spatial_xenium.crb",  package = "CerebroNexus")
+    "PBMC - Full (T+B)"                = system.file("extdata/examples/demo_full_tcr_bcr.crb",   package = "CerebroNexus"),
+    "Mouse brain (Visium)"             = system.file("extdata/examples/demo_spatial_visium.crb",  package = "CerebroNexus"),
+    "Mouse hippocampus (Slide-seq v2)" = system.file("extdata/examples/demo_spatial_slideseq.crb", package = "CerebroNexus"),
+    "Mouse ileum (MERFISH)"            = system.file("extdata/examples/demo_spatial_merfish.crb", package = "CerebroNexus"),
+    "Mouse brain (Xenium)"             = system.file("extdata/examples/demo_spatial_xenium.crb",  package = "CerebroNexus")
   )
 )
 ```

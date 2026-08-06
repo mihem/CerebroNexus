@@ -18,7 +18,7 @@ when no extra content is needed.
 
 ``` r
 library(CerebroNexus)
-launchCerebroV1.4()
+launchCerebro()
 ```
 
 1.  Launch CerebroNexus and load a `.crb` file with extra material

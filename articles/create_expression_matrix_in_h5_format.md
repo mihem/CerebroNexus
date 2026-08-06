@@ -52,7 +52,7 @@ matrix to a sibling H5 file and store only its relative location in the
 ``` r
 seurat <- readRDS(
   system.file(
-    "extdata/v1.4/pbmc_seurat.rds",
+    "extdata/examples/pbmc_seurat.rds",
     package = "CerebroNexus"
   )
 )
@@ -141,7 +141,7 @@ expression matrix, and write it to the `/expression` group:
 
 ``` r
 crb_input <- system.file(
-  "extdata/v1.4/example.crb",
+  "extdata/examples/example.crb",
   package = "CerebroNexus"
 )
 crb <- readRDS(crb_input)

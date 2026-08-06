@@ -14,7 +14,7 @@ present in every `.crb` file.
 
 ``` r
 library(CerebroNexus)
-launchCerebroV1.4()
+launchCerebro()
 ```
 
 1.  Launch CerebroNexus and load a `.crb` file

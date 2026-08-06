@@ -3,17 +3,7 @@
 ## Launch Cerebro
 
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
-  : Launch Cerebro interface.
-- [`launchCerebroV1.0()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.0.md)
-  : Launch Cerebro v1.0
-- [`launchCerebroV1.1()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.1.md)
-  : Launch Cerebro v1.1
-- [`launchCerebroV1.2()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.2.md)
-  : Launch Cerebro v1.2
-- [`launchCerebroV1.3()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.3.md)
-  : Launch Cerebro v1.3
-- [`launchCerebroV1.4()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.4.md)
-  : Launch Cerebro v1.4
+  : Launch CerebroNexus
 
 ## Export data
 
@@ -54,7 +44,7 @@
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-  : Create a self-contained Shiny app folder for Cerebro v1.4
+  : Create a self-contained CerebroNexus Shiny app folder
 - [`.read_GMT_file()`](https://mihem.github.io/CerebroNexus/reference/dot-read_GMT_file.md)
   : Read GMT file.
 - [`.send_enrichr_query()`](https://mihem.github.io/CerebroNexus/reference/dot-send_enrichr_query.md)
@@ -75,16 +65,6 @@
 - [`hla_normalize_typing()`](https://mihem.github.io/CerebroNexus/reference/hla_normalize_typing.md)
   : Normalize any accepted HLA input into the canonical long table
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
-  : Launch Cerebro interface.
-- [`launchCerebroV1.0()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.0.md)
-  : Launch Cerebro v1.0
-- [`launchCerebroV1.1()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.1.md)
-  : Launch Cerebro v1.1
-- [`launchCerebroV1.2()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.2.md)
-  : Launch Cerebro v1.2
-- [`launchCerebroV1.3()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.3.md)
-  : Launch Cerebro v1.3
-- [`launchCerebroV1.4()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroV1.4.md)
-  : Launch Cerebro v1.4
+  : Launch CerebroNexus
 - [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   : Perform gene set enrichment analysis with GSVA.

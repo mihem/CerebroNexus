@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
             
-            <h4 data-toc-skip class="date">05 August, 2026</h4>
+            <h4 data-toc-skip class="date">06 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/host_cerebro_on_shinyapps.Rmd" class="external-link"><code>vignettes/host_cerebro_on_shinyapps.Rmd</code></a></small>
       <div class="d-none name"><code>host_cerebro_on_shinyapps.Rmd</code></div>
@@ -122,14 +122,13 @@ figure out if this service fits your purpose.</p>
 <div class="section level2">
 <h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
 </h2>
-<p>To upload Cerebro to shinyapps.io, we will use the <a href="https://cran.r-project.org/web/packages/rsconnect/index.html" class="external-link"><code>rsconnect</code></a>
-package, therefore it needs to be installed first. Of course, we also
-need the cerebroApp package.</p>
+<p>To upload CerebroNexus to shinyapps.io, install
+<code>rsconnect</code> and CerebroNexus.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span> <span class="st">'rsconnect'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'rsconnect'</span><span class="op">)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span> <span class="st">'cerebroApp'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'romanhaa/cerebroApp'</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"remotes"</span>, <span class="st">"rsconnect"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"mihem/CerebroNexus"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rstudio.github.io/rsconnect/" class="external-link">rsconnect</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
 <p>Then, you need to provide <code>rsconnect</code> with your
 shinyapps.io account info. On the shinyapps.io website, in the left
 navigation bar, go to “Account” and then “Tokens”. A token should have
@@ -139,98 +138,36 @@ name, and run the command below.</p>
 <code class="sourceCode R"><span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">setAccountInfo</span><span class="op">(</span>name<span class="op">=</span><span class="st">"&lt;ACCOUNT&gt;"</span>, token<span class="op">=</span><span class="st">"&lt;TOKEN&gt;"</span>, secret<span class="op">=</span><span class="st">"&lt;SECRET&gt;"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="prepare-shiny-files">Prepare Shiny files<a class="anchor" aria-label="anchor" href="#prepare-shiny-files"></a>
+<h2 id="build-the-application">Build the application<a class="anchor" aria-label="anchor" href="#build-the-application"></a>
 </h2>
-<p>Next, we need to copy the Shiny files and some other data for Cerebro
-v1.3 to a dedicated directory, here
-<code>~/test_cerebro_shinyapps</code>. If you prefer to host a different
-version of Cerebro, adapt the code accordingly.</p>
+<p>Use <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> to build a deployable application
+directory. The example below uses the data bundled with CerebroNexus;
+replace <code>crb</code> with your own <code>.crb</code> path and choose
+a label that users will see in the application.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">app_directory</span> <span class="op">&lt;-</span> <span class="st">'~/test_cerebro_shinyapps'</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">app_directory</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{app_directory}/shiny'</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.copy</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">'extdata'</span>, package <span class="op">=</span> <span class="st">'cerebroApp'</span><span class="op">)</span>,</span>
-<span>  <span class="va">app_directory</span>,</span>
-<span>  recursive <span class="op">=</span> <span class="cn">TRUE</span></span>
+<code class="sourceCode R"><span><span class="va">app_directory</span> <span class="op">&lt;-</span> <span class="st">"~/test_cerebro_shinyapps"</span></span>
+<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
+<span>  <span class="st">"extdata/examples/example.crb"</span>,</span>
+<span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{app_directory}/extdata/v1.0'</span><span class="op">)</span>,</span>
-<span>    <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{app_directory}/extdata/v1.1'</span><span class="op">)</span>,</span>
-<span>    <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{app_directory}/extdata/v1.2'</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  recursive <span class="op">=</span> <span class="cn">TRUE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.copy</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">'shiny'</span>, <span class="st">'v1.3'</span>, package <span class="op">=</span> <span class="st">'cerebroApp'</span><span class="op">)</span>,</span>
-<span>  <span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">'{app_directory}/shiny'</span><span class="op">)</span>,</span>
-<span>  recursive <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="va">app_directory</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="prepare-app-r-file">Prepare <code>app.R</code> file<a class="anchor" aria-label="anchor" href="#prepare-app-r-file"></a>
-</h2>
-<p>Since we are not using the usual <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>
-function to start Cerebro, we have to prepare a dedicated
-<code>app.R</code> file that will do the same for us. Use your favorite
-text editor to open a new file, paste the code below into it, and save
-it as <code>~/test_cerebro_shinyapps/app.R</code>.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co">## load packages -------------------------------------------------------------##</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/rstudio/DT" class="external-link">DT</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://plotly-r.com" class="external-link">plotly</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://shiny.posit.co/" class="external-link">shiny</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://rstudio.github.io/shinydashboard/" class="external-link">shinydashboard</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/dreamRs/shinyWidgets" class="external-link">shinyWidgets</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="co">## set parameters ------------------------------------------------------------##</span></span>
-<span><span class="va">Cerebro.options</span> <span class="op">&lt;&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  <span class="st">"mode"</span> <span class="op">=</span> <span class="st">"open"</span>,</span>
-<span>  <span class="st">"crb_file_to_load"</span> <span class="op">=</span> <span class="st">"extdata/v1.3/example.crb"</span>,</span>
-<span>  <span class="st">"cerebro_root"</span> <span class="op">=</span> <span class="st">"."</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">shiny_options</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  maxRequestSize <span class="op">=</span> <span class="fl">800</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
-<span>  port <span class="op">=</span> <span class="fl">1337</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co">## load server and UI functions ----------------------------------------------##</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">"{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_UI.R"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="fu">glue</span><span class="fu">::</span><span class="fu"><a href="https://glue.tidyverse.org/reference/glue.html" class="external-link">glue</a></span><span class="op">(</span><span class="st">"{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_server.R"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co">## launch app ----------------------------------------------------------------##</span></span>
-<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/shinyApp.html" class="external-link">shinyApp</a></span><span class="op">(</span></span>
-<span>  ui <span class="op">=</span> <span class="va">ui</span>,</span>
-<span>  server <span class="op">=</span> <span class="va">server</span>,</span>
-<span>  options <span class="op">=</span> <span class="va">shiny_options</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<p>The generated directory contains <code>app.R</code>, the Viewer
+runtime, and the private data files needed by the deployed application.
+See <code><a href="../articles/create_a_self_contained_shiny_app.html">vignette("create_a_self_contained_shiny_app")</a></code> for
+deployment options and external expression-backend requirements.</p>
 </div>
 <div class="section level2">
 <h2 id="deploy-app">Deploy app<a class="anchor" aria-label="anchor" href="#deploy-app"></a>
 </h2>
-<p>Now, it is time to upload the app the shinyapps.io. With
-<code>rsconnect</code>, that can be quickly done using the code
-below.</p>
-<p>Since we have a dependency from <a href="http://bioconductor.org" class="external-link">Bioconductor</a>, we have to add the
-current release (3.11) to the repositories using the
-<code><a href="https://rdrr.io/r/utils/setRepositories.html" class="external-link">setRepositories()</a></code> command. When doing so, you will be asked
-which repositories should be used in this session. For what we are doing
-here, selecting <code>CRAN</code> and <code>BioC software</code> should
-be sufficient.</p>
-<p>When you run the <code>deployApp()</code> command, you might receive
-a warning about a hidden <code><a href="https://rdrr.io/r/base/browser.html" class="external-link">browser()</a></code> call in the
-<code>shiny/v1.3/about/server.R</code> file, but you can ignore that and
-proceed. Alternatively, you can simply comment out the respective
-line.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/setRepositories.html" class="external-link">setRepositories</a></span><span class="op">(</span>addURLs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>BioC <span class="op">=</span> <span class="st">"https://bioconductor.org/packages/3.11/bioc"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">deployApp</span><span class="op">(</span><span class="st">'~/test_cerebro_shinyapps/'</span>, appName <span class="op">=</span> <span class="st">'Cerebro'</span><span class="op">)</span></span></code></pre></div>
+<p>Upload the generated application directory with
+<code>rsconnect</code>:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">rsconnect</span><span class="fu">::</span><span class="fu">deployApp</span><span class="op">(</span><span class="va">app_directory</span>, appName <span class="op">=</span> <span class="st">"Cerebro"</span><span class="op">)</span></span></code></pre></div>
 <p>Uploading and preparing the app might take a few minutes, but once it
 finishes successfully, Cerebro should open in your browser. Using the
 shinyapps.io dashboard, you can manage the app, check usage metrics and

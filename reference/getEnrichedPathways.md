@@ -62,7 +62,7 @@ stored in `object@misc$enriched_pathways$<marker_genes_input>_enrichr`
 
 ``` r
 if (interactive()) {
-  pbmc <- readRDS(system.file("extdata/v1.4/pbmc_seurat.rds",
+  pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
     package = "CerebroNexus"))
   pbmc <- getEnrichedPathways(
     object = pbmc,

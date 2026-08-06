@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">05 August, 2026</h4>
+            <h4 data-toc-skip class="date">06 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/trekker_spatial_mapping.Rmd" class="external-link"><code>vignettes/trekker_spatial_mapping.Rmd</code></a></small>
       <div class="d-none name"><code>trekker_spatial_mapping.Rmd</code></div>
@@ -413,7 +413,7 @@ slot with everything else the bespoke page needs.</p>
 <span></span>
 <span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
 <span>  <span class="va">sub</span>, assay <span class="op">=</span> <span class="st">"SCT"</span>, slot <span class="op">=</span> <span class="st">"data"</span>,</span>
-<span>  file <span class="op">=</span> <span class="st">"inst/extdata/v1.4/demo_trekker.crb"</span>,</span>
+<span>  file <span class="op">=</span> <span class="st">"inst/extdata/examples/demo_trekker.crb"</span>,</span>
 <span>  experiment_name <span class="op">=</span> <span class="st">"Trekker mouse brain (TrekkerU_C, demo)"</span>,</span>
 <span>  organism <span class="op">=</span> <span class="st">"mm"</span>,</span>
 <span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cluster"</span>, <span class="st">"celltype"</span><span class="op">)</span>, main_group <span class="op">=</span> <span class="st">"celltype"</span>,</span>
@@ -440,13 +440,13 @@ matrix’s internal column order.</p>
 <span>  qc_examples <span class="op">=</span> <span class="va">qc_examples</span>                         <span class="co"># one image per excluded class</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="st">"inst/extdata/v1.4/demo_trekker.crb"</span><span class="op">)</span></span>
+<span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="st">"inst/extdata/examples/demo_trekker.crb"</span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addTrekker</span><span class="op">(</span><span class="va">trekker</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/v1.4/demo_trekker.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_trekker.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
 <p>The whole build is one command:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R</span></span>
-<span><span class="co"># -&gt; inst/extdata/v1.4/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,</span></span>
+<span><span class="co"># -&gt; inst/extdata/examples/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,</span></span>
 <span><span class="co">#                                         50 embedded evidence images)</span></span></code></pre></div>
 </div>
 </div>

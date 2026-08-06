@@ -1,5 +1,21 @@
 # Changelog
 
+## CerebroNexus 4.0
+
+### Breaking changes
+
+- [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
+  is now the single application launcher. The obsolete version selector
+  and version-named `launchCerebroV1.x()` exports were removed because
+  CerebroNexus ships one Viewer implementation.
+
+### Internal
+
+- Viewer runtime sources now live under `inst/viewer/`, and bundled
+  examples live under `inst/extdata/examples/`. Removing the historical
+  Viewer version from internal paths does not change the application or
+  data formats.
+
 ## CerebroNexus 3.2.0
 
 ### Documentation
@@ -864,11 +880,9 @@ previous releases and refreshes documentation for the current codebase.
   corresponding `Cerebro_v1.3` methods to the names the Shiny server
   already calls (`getMethodsForTrajectories`, `getNamesOfTrajectories`)
 - Fixed gene_expression plot chain freezing on gene picker changes:
-  removed a stale
-  [`isolate()`](https://rdrr.io/pkg/shiny/man/isolate.html) wrapper and
-  a reference to a non-existent `expression_projection_update_button`
-  input; the existing 250 ms debounce on the data-to-plot reactive still
-  throttles bursts
+  removed a stale `isolate()` wrapper and a reference to a non-existent
+  `expression_projection_update_button` input; the existing 250 ms
+  debounce on the data-to-plot reactive still throttles bursts
 
 ### Testing
 

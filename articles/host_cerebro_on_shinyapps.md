@@ -16,16 +16,14 @@ service fits your purpose.
 
 ## Setup
 
-To upload Cerebro to shinyapps.io, we will use the
-[`rsconnect`](https://cran.r-project.org/web/packages/rsconnect/index.html)
-package, therefore it needs to be installed first. Of course, we also
-need the cerebroApp package.
+To upload CerebroNexus to shinyapps.io, install `rsconnect` and
+CerebroNexus.
 
 ``` r
-if ( 'rsconnect' %in% installed.packages() == FALSE ) install.packages('rsconnect')
-if ( 'cerebroApp' %in% installed.packages() == FALSE ) install.packages('romanhaa/cerebroApp')
+install.packages(c("remotes", "rsconnect"))
+remotes::install_github("mihem/CerebroNexus")
 
-library(rsconnect)
+library(CerebroNexus)
 ```
 
 Then, you need to provide `rsconnect` with your shinyapps.io account
@@ -38,102 +36,39 @@ command below.
 rsconnect::setAccountInfo(name="<ACCOUNT>", token="<TOKEN>", secret="<SECRET>")
 ```
 
-## Prepare Shiny files
+## Build the application
 
-Next, we need to copy the Shiny files and some other data for Cerebro
-v1.3 to a dedicated directory, here `~/test_cerebro_shinyapps`. If you
-prefer to host a different version of Cerebro, adapt the code
-accordingly.
+Use
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+to build a deployable application directory. The example below uses the
+data bundled with CerebroNexus; replace `crb` with your own `.crb` path
+and choose a label that users will see in the application.
 
 ``` r
-app_directory <- '~/test_cerebro_shinyapps'
-
-dir.create(app_directory)
-dir.create(glue::glue('{app_directory}/shiny'))
-
-file.copy(
-  system.file('extdata', package = 'cerebroApp'),
-  app_directory,
-  recursive = TRUE
+app_directory <- "~/test_cerebro_shinyapps"
+crb <- system.file(
+  "extdata/examples/example.crb",
+  package = "CerebroNexus"
 )
 
-unlink(
-  c(glue::glue('{app_directory}/extdata/v1.0'),
-    glue::glue('{app_directory}/extdata/v1.1'),
-    glue::glue('{app_directory}/extdata/v1.2')),
-  recursive = TRUE
-)
-
-file.copy(
-  system.file('shiny', 'v1.3', package = 'cerebroApp'),
-  glue::glue('{app_directory}/shiny'),
-  recursive = TRUE
+createShinyApp(
+  cerebro_data = c("PBMC example" = crb),
+  result_dir = app_directory,
+  launch_browser = FALSE
 )
 ```
 
-## Prepare `app.R` file
-
-Since we are not using the usual
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
-function to start Cerebro, we have to prepare a dedicated `app.R` file
-that will do the same for us. Use your favorite text editor to open a
-new file, paste the code below into it, and save it as
-`~/test_cerebro_shinyapps/app.R`.
-
-``` r
-## load packages -------------------------------------------------------------##
-library(dplyr)
-library(DT)
-library(plotly)
-library(shiny)
-library(shinydashboard)
-library(shinyWidgets)
-
-## set parameters ------------------------------------------------------------##
-Cerebro.options <<- list(
-  "mode" = "open",
-  "crb_file_to_load" = "extdata/v1.3/example.crb",
-  "cerebro_root" = "."
-)
-
-shiny_options <- list(
-  maxRequestSize = 800 * 1024^2,
-  port = 1337
-)
-
-## load server and UI functions ----------------------------------------------##
-source(glue::glue("{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_UI.R"))
-source(glue::glue("{Cerebro.options$cerebro_root}/shiny/v1.3/shiny_server.R"))
-
-## launch app ----------------------------------------------------------------##
-shiny::shinyApp(
-  ui = ui,
-  server = server,
-  options = shiny_options
-)
-```
+The generated directory contains `app.R`, the Viewer runtime, and the
+private data files needed by the deployed application. See
+[`vignette("create_a_self_contained_shiny_app")`](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+for deployment options and external expression-backend requirements.
 
 ## Deploy app
 
-Now, it is time to upload the app the shinyapps.io. With `rsconnect`,
-that can be quickly done using the code below.
-
-Since we have a dependency from [Bioconductor](http://bioconductor.org),
-we have to add the current release (3.11) to the repositories using the
-[`setRepositories()`](https://rdrr.io/r/utils/setRepositories.html)
-command. When doing so, you will be asked which repositories should be
-used in this session. For what we are doing here, selecting `CRAN` and
-`BioC software` should be sufficient.
-
-When you run the `deployApp()` command, you might receive a warning
-about a hidden [`browser()`](https://rdrr.io/r/base/browser.html) call
-in the `shiny/v1.3/about/server.R` file, but you can ignore that and
-proceed. Alternatively, you can simply comment out the respective line.
+Upload the generated application directory with `rsconnect`:
 
 ``` r
-setRepositories(addURLs = c(BioC = "https://bioconductor.org/packages/3.11/bioc"))
-
-rsconnect::deployApp('~/test_cerebro_shinyapps/', appName = 'Cerebro')
+rsconnect::deployApp(app_directory, appName = "Cerebro")
 ```
 
 Uploading and preparing the app might take a few minutes, but once it

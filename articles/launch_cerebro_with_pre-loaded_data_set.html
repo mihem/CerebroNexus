@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
             
-            <h4 data-toc-skip class="date">05 August, 2026</h4>
+            <h4 data-toc-skip class="date">06 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/launch_cerebro_with_pre-loaded_data_set.Rmd" class="external-link"><code>vignettes/launch_cerebro_with_pre-loaded_data_set.Rmd</code></a></small>
       <div class="d-none name"><code>launch_cerebro_with_pre-loaded_data_set.Rmd</code></div>
@@ -110,23 +110,20 @@ Hillje</h4>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>A new feature in cerebroApp v1.3 is to specify a <code>.crb</code>
-file when launching Cerebro and preventing the user from uploading their
-own data set. This is can be useful when you want to share your Cerebro
-data set on a web server, e.g. along with a publication, but don’t want
-users to use your web server to upload their own data sets.</p>
+<p>CerebroNexus can preload a <code>.crb</code> file and prevent users
+from uploading their own data sets. This can be useful when you want to
+share a Cerebro data set on a web server, for example alongside a
+publication, but don’t want users to upload data to that server.</p>
 </div>
 <div class="section level2">
 <h2 id="how-to-do-it">How to do it<a class="anchor" aria-label="anchor" href="#how-to-do-it"></a>
 </h2>
-<p>It’s very simple, all you have to do is provide some parameters to
-<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> / <code><a href="../reference/launchCerebroV1.3.html">launchCerebroV1.3()</a></code>. Let’s
-say your data set is stored here:
+<p>Provide the data path and closed mode to
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>. Let’s say your data set is stored here:
 <code>~/Cerebro/data_sets/pbmc_v3.crb</code>. Then, launch Cerebro as
 shown below:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
-<span>  version <span class="op">=</span> <span class="st">"v1.3"</span>,</span>
 <span>  crb_file_to_load <span class="op">=</span> <span class="st">"~/Cerebro/data_sets/pbmc_v3.crb"</span>,</span>
 <span>  mode <span class="op">=</span> <span class="st">"closed"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -139,19 +136,19 @@ shown below:</p>
 <p>If you would like to modify the message on the “Load data”/welcome
 page, e.g. to link to a publication or give an introduction to the data
 set, you can use the <code>welcome_message</code> parameter of
-<code>launchCerebroV1.3</code>. The provided string for that parameter
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>. The provided string for that parameter
 can/should be written in HTML as shown below:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>custom_welcome_message <span class="ot">&lt;-</span> <span class="st">'&lt;h3 style="text-align: center; margin-top: 0px"&gt;&lt;strong&gt;This is a custom welcome message to Cerebro&lt;/strong&gt;&lt;/h3&gt;</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="st">  &lt;p style="margin-left: 10px;"&gt;This data set belongs to publication XY by Max Mustermann &lt;em&gt;et al.&lt;/em&gt;.&lt;br&gt;</span></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="st">  It contains the transcriptomic profiles of PBMC samples taken from mice undergoing treatment F.&lt;br&gt;</span></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="st">  Please contact us at ... if you have any questions.&lt;/p&gt;'</span></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">launchCerebro</span>(</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">version =</span> <span class="st">"v1.3"</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">crb_file_to_load =</span> <span class="st">"~/Cerebro/data_sets/pbmc_v3.crb"</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"closed"</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>  <span class="at">welcome_message =</span> custom_welcome_message</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">custom_welcome_message</span> <span class="op">&lt;-</span> <span class="st">'&lt;h3 style="text-align: center; margin-top: 0px"&gt;&lt;strong&gt;This is a custom welcome message to Cerebro&lt;/strong&gt;&lt;/h3&gt;</span></span>
+<span><span class="st">  &lt;p style="margin-left: 10px;"&gt;This data set belongs to publication XY by Max Mustermann &lt;em&gt;et al.&lt;/em&gt;.&lt;br&gt;</span></span>
+<span><span class="st">  It contains the transcriptomic profiles of PBMC samples taken from mice undergoing treatment F.&lt;br&gt;</span></span>
+<span><span class="st">  Please contact us at ... if you have any questions.&lt;/p&gt;'</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
+<span>  crb_file_to_load <span class="op">=</span> <span class="st">"~/Cerebro/data_sets/pbmc_v3.crb"</span>,</span>
+<span>  mode <span class="op">=</span> <span class="st">"closed"</span>,</span>
+<span>  welcome_message <span class="op">=</span> <span class="va">custom_welcome_message</span></span>
+<span><span class="op">)</span></span></code></pre></div>
 <p><a target="_blank" href="launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png"><img src="launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png" alt="Load data" width="100%" height="auto"></a></p>
 </div>
 <div class="section level2">
