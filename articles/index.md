@@ -34,7 +34,7 @@
   switcher](https://mihem.github.io/CerebroNexus/articles/multi_crb.md):
 - [Export and visualize custom tables and
   plots](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.md):
-- [Control access to Cerebro with a login
+- [Control access to CerebroNexus with a login
   page](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md):
 - [Host Cerebro on
   shinyapps.io](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md):

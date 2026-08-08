@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Control access to Cerebro with a login page • CerebroNexus</title>
+<title>Control access to CerebroNexus with a login page • CerebroNexus</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Control access to Cerebro with a login page">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Control access to CerebroNexus with a login page">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,7 +51,7 @@
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
-    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to Cerebro with a login page</a></li>
+    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
@@ -95,11 +95,13 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Control access to Cerebro with a login page</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Control access to CerebroNexus with a login page</h1>
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
+                        <h4 data-toc-skip class="author">Xuesong
+Wang</h4>
             
-            <h4 data-toc-skip class="date">06 August, 2026</h4>
+            <h4 data-toc-skip class="date">08 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
       <div class="d-none name"><code>control_access_to_cerebro_with_a_login_page.Rmd</code></div>
@@ -110,95 +112,201 @@ Hillje</h4>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>When hosting Cerebro on a web server, it can be useful to control who
-has access to it, especially, when it is pre-loaded with a data set (see
-<code><a href="../articles/launch_cerebro_with_pre-loaded_data_set.html">vignette('launch_cerebro_with_pre-loaded_data_set')</a></code>). This
-can be done with the <a href="https://cran.r-project.org/web/packages/shinymanager/index.html" class="external-link"><code>shinymanager</code></a>
-package, however some (minor) adjustments must be made to the source
-code of Cerebro.</p>
+<p>Apps generated by <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> are public by
+default. To require a login, provide an encrypted SQLite credentials
+database created by <a href="https://datastorm-open.github.io/shinymanager/" class="external-link"><code>shinymanager</code></a>
+and keep its passphrase in an environment variable.</p>
+<p>The generated App contains the encrypted database, not the
+passphrase. Every machine that runs the App must supply the same
+environment variable value. Transport security remains the deployment
+operator’s responsibility; serve a login-protected App over HTTPS.</p>
 </div>
 <div class="section level2">
-<h2 id="preparation">Preparation<a class="anchor" aria-label="anchor" href="#preparation"></a>
+<h2 id="install-the-optional-dependency">Install the optional dependency<a class="anchor" aria-label="anchor" href="#install-the-optional-dependency"></a>
 </h2>
-<div class="section level3">
-<h3 id="app-r">
-<code>app.R</code><a class="anchor" aria-label="anchor" href="#app-r"></a>
-</h3>
-<p>At the top of the <code>app.R</code> file, add the
-<code>shinymanager</code> package to be loaded alongside other packages
-that are required by Cerebro:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co">## load packages -------------------------------------------------------------##</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/datastorm-open/shinymanager" class="external-link">shinymanager</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/rstudio/DT" class="external-link">DT</a></span><span class="op">)</span></span>
-<span><span class="co"># ...</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="shiny_server-r">
-<code>shiny_server.R</code><a class="anchor" aria-label="anchor" href="#shiny_server-r"></a>
-</h3>
-<p>Add this to the top of the <code>shiny_server.R</code> file, before
-the definition of the <code>server</code> function starts:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">user_credentials</span> <span class="op">&lt;-</span> <span class="fu">tibble</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tribble.html" class="external-link">tribble</a></span><span class="op">(</span></span>
-<span>   <span class="op">~</span><span class="va">user</span>,              <span class="op">~</span><span class="va">password</span>,       <span class="op">~</span><span class="va">start</span>, <span class="op">~</span><span class="va">expire</span>, <span class="op">~</span><span class="va">admin</span>,</span>
-<span>  <span class="st">"user1"</span>, <span class="st">"reallygoodpassword1"</span>, <span class="st">"2020-08-01"</span>,      <span class="cn">NA</span>,  <span class="cn">FALSE</span>,</span>
-<span>  <span class="st">"user2"</span>, <span class="st">"reallygoodpassword2"</span>, <span class="st">"2020-09-01"</span>,      <span class="cn">NA</span>,  <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Within the definition of the <code>server</code> function, right at
-the top, add this:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res_auth</span> <span class="op">&lt;-</span> <span class="fu">shinymanager</span><span class="fu">::</span><span class="fu">secure_server</span><span class="op">(</span></span>
-<span>  check_credentials <span class="op">=</span> <span class="fu">shinymanager</span><span class="fu">::</span><span class="fu">check_credentials</span><span class="op">(</span><span class="va">user_credentials</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The head of the <code>shiny_server.R</code> file should now look
-similar to this:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="do">## define users that can access Cerebro --------------------------------------##</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>user_credentials <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">tribble</span>(</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>   <span class="sc">~</span>user,              <span class="sc">~</span>password,       <span class="sc">~</span>start, <span class="sc">~</span>expire, <span class="sc">~</span>admin,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="st">"user1"</span>, <span class="st">"reallygoodpassword1"</span>, <span class="st">"2020-08-01"</span>,      <span class="cn">NA</span>,  <span class="cn">FALSE</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="st">"user2"</span>, <span class="st">"reallygoodpassword2"</span>, <span class="st">"2020-09-01"</span>,      <span class="cn">NA</span>,  <span class="cn">FALSE</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>)</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="do">## server function -----------------------------------------------------------##</span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>  </span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  <span class="do">## check user authentication -----------------------------------------------##</span></span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  res_auth <span class="ot">&lt;-</span> <span class="fu">secure_server</span>(</span>
-<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>    <span class="at">check_credentials =</span> <span class="fu">check_credentials</span>(user_credentials)</span>
-<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>  )</span>
-<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co"># ...</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="shiny_ui-r">
-<code>shiny_UI.R</code><a class="anchor" aria-label="anchor" href="#shiny_ui-r"></a>
-</h3>
-<p>At the end of the file, after the definition of the <code>ui</code>
-function, add this:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">shinymanager</span><span class="fu">::</span><span class="fu">secure_app</span><span class="op">(</span><span class="va">ui</span><span class="op">)</span></span></code></pre></div>
-</div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"shinymanager"</span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
+<h2 id="create-a-multi-user-database">Create a multi-user database<a class="anchor" aria-label="anchor" href="#create-a-multi-user-database"></a>
 </h2>
-<p><a target="_blank" href="control_access_to_cerebro_with_a_login_page_files/login_screen.png"><img src="control_access_to_cerebro_with_a_login_page_files/login_screen.png" alt="Login screen" width="100%" height="auto"></a></p>
-<p>Now, when opening the Cerebro user interface, user have to
-authenticate themselves as one of the users in the
-<code>user_credentials</code> data frame. Of course, the use credentials
-can also be loaded from a file, which might be easier to manage.</p>
-<p>Thanks to Michael Heming from the University of Münster for pointing
-this possibility out and sharing his implementation.</p>
+<p>Create a small environment file outside the App directory. Replace
+the example value with a long random secret and restrict the file to its
+owner.</p>
+<p>For example, OpenSSL can generate a 32-byte random value:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="ex">openssl</span> rand <span class="at">-base64</span> 32</span></code></pre></div>
+<p>Paste that output after <code>CEREBRO_AUTH_PASSPHRASE=</code> below.
+CerebroNexus rejects passphrases shorter than 16 characters, but length
+alone is not a substitute for randomness.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">secret_file</span> <span class="op">&lt;-</span> <span class="st">"my_app.env"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">secret_file</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">old_umask</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">Sys.umask</a></span><span class="op">(</span><span class="st">"077"</span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/conditions.html" class="external-link">tryCatch</a></span><span class="op">(</span></span>
+<span>  <span class="op">{</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.create</a></span><span class="op">(</span><span class="va">secret_file</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span></span>
+<span>      <span class="st">"CEREBRO_AUTH_PASSPHRASE=replace-with-a-long-random-secret"</span>,</span>
+<span>      <span class="va">secret_file</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  finally <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">Sys.umask</a></span><span class="op">(</span><span class="va">old_umask</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">Sys.chmod</a></span><span class="op">(</span><span class="va">secret_file</span>, mode <span class="op">=</span> <span class="st">"0600"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="va">secret_file</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"CEREBRO_AUTH_PASSPHRASE"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>On Windows, POSIX file modes are not an access-control boundary.
+Store the environment file in a location protected by the account’s
+Windows ACLs, or use the deployment platform’s secret manager.</p>
+<p>Create any number of users in one data frame.
+<code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" class="external-link">shinymanager::create_db()</a></code> hashes the login passwords and
+encrypts the credentials tables with the passphrase.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">accounts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  user <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"alice"</span>, <span class="st">"bob"</span><span class="op">)</span>,</span>
+<span>  password <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"alice-login-password"</span>, <span class="st">"bob-login-password"</span><span class="op">)</span>,</span>
+<span>  admin <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">shinymanager</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" class="external-link">create_db</a></span><span class="op">(</span></span>
+<span>  credentials_data <span class="op">=</span> <span class="va">accounts</span>,</span>
+<span>  sqlite_path <span class="op">=</span> <span class="st">"credentials.sqlite"</span>,</span>
+<span>  passphrase <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"CEREBRO_AUTH_PASSPHRASE"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/rm.html" class="external-link">rm</a></span><span class="op">(</span><span class="va">accounts</span><span class="op">)</span></span></code></pre></div>
+<p><code>create_db()</code> hashes the passwords before storing them,
+and plaintext passwords are not written to the generated App. During
+database creation they still exist in the R data frame. Do not put real
+passwords in a committed script or retain them in command history.</p>
+</div>
+<div class="section level2">
+<h2 id="generate-the-app">Generate the App<a class="anchor" aria-label="anchor" href="#generate-the-app"></a>
+</h2>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My dataset"</span> <span class="op">=</span> <span class="st">"output/cerebro_my_dataset.crb"</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="st">"my_app"</span>,</span>
+<span>  auth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    credentials <span class="op">=</span> <span class="st">"credentials.sqlite"</span>,</span>
+<span>    passphrase_env <span class="op">=</span> <span class="st">"CEREBRO_AUTH_PASSPHRASE"</span>,</span>
+<span>    timeout_minutes <span class="op">=</span> <span class="fl">15</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> verifies the database and passphrase
+before changing <code>result_dir</code>, then copies only the encrypted
+database to
+<code>my_app/private-data/auth/credentials.sqlite</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="run-locally">Run locally<a class="anchor" aria-label="anchor" href="#run-locally"></a>
+</h2>
+<p>A new R process does not inherit variables that were set in an
+earlier R process. Load the environment file before starting the
+App:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="st">"my_app.env"</span><span class="op">)</span></span>
+<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="st">"my_app"</span><span class="op">)</span></span></code></pre></div>
+<p>Keep <code>my_app.env</code> outside <code>my_app</code>. Do not
+commit it or upload it with the App directory.</p>
+</div>
+<div class="section level2">
+<h2 id="limit-failed-sign-ins">Limit failed sign-ins<a class="anchor" aria-label="anchor" href="#limit-failed-sign-ins"></a>
+</h2>
+<p>Set a finite shinymanager failure policy in the R process that runs
+the App:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span><span class="st">"shinymanager.pwd_failure_limit"</span> <span class="op">=</span> <span class="fl">10L</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="st">"my_app.env"</span><span class="op">)</span></span>
+<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="st">"my_app"</span><span class="op">)</span></span></code></pre></div>
+<p>For Shiny Server, put the option in an <code>.Rprofile</code> read by
+its service account. For a container, set it in the R command before
+<code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code>. The counter is stored in the encrypted
+database and locks an account after the configured number of consecutive
+failures.</p>
+<p>Account locking is defense in depth, not the only control: an
+attacker can use it for targeted denial of service. Configure rate
+limiting at the reverse proxy or ingress as well, preferably per source
+address, and monitor repeated failures. Tune the proxy rule for Shiny’s
+HTTP and WebSocket traffic rather than applying an aggressive blanket
+limit to every Viewer request.</p>
+</div>
+<div class="section level2">
+<h2 id="shiny-server-and-systemd">Shiny Server and systemd<a class="anchor" aria-label="anchor" href="#shiny-server-and-systemd"></a>
+</h2>
+<p>Install the generated App under the Shiny Server application
+directory and put the secret in a root-managed file:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">sudo</span> install <span class="at">-d</span> <span class="at">-m</span> 0755 /srv/shiny-server/my_app</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">sudo</span> cp <span class="at">-R</span> my_app/. /srv/shiny-server/my_app/</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">sudo</span> install <span class="at">-d</span> <span class="at">-m</span> 0750 /etc/cerebronexus</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">sudo</span> install <span class="at">-o</span> root <span class="at">-g</span> shiny <span class="at">-m</span> 0640 my_app.env /etc/cerebronexus/my_app.env</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">sudo</span> chown <span class="at">-R</span> shiny:shiny /srv/shiny-server/my_app/private-data/auth</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">sudo</span> chmod 0700 /srv/shiny-server/my_app/private-data/auth</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">sudo</span> chmod 0600 /srv/shiny-server/my_app/private-data/auth/credentials.sqlite</span></code></pre></div>
+<p>If Shiny Server is managed by systemd, add a service drop-in with
+<code>sudo systemctl edit shiny-server</code>:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode ini"><code class="sourceCode ini"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="kw">[Service]</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="dt">EnvironmentFile</span><span class="ot">=</span><span class="st">/etc/cerebronexus/my_app.env</span></span></code></pre></div>
+<p>Then restart the service:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">sudo</span> systemctl daemon-reload</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">sudo</span> systemctl restart shiny-server</span></code></pre></div>
+<p>The service account needs read/write access to the bundled SQLite
+database and its containing directory because shinymanager writes login
+logs and SQLite journal files.</p>
+</div>
+<div class="section level2">
+<h2 id="docker-compose">Docker Compose<a class="anchor" aria-label="anchor" href="#docker-compose"></a>
+</h2>
+<p>A minimal image installs the runtime packages and copies the
+generated App:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode dockerfile"><code class="sourceCode dockerfile"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="kw">FROM</span> rocker/shiny:latest</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">R</span> <span class="at">-q</span> <span class="at">-e</span> <span class="st">'install.packages("remotes"); remotes::install_github("mihem/CerebroNexus", dependencies=TRUE); install.packages("shinymanager")'</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="kw">COPY</span> my_app /srv/shiny-server/my_app</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="kw">RUN</span> <span class="fu">chown</span> <span class="at">-R</span> shiny:shiny /srv/shiny-server/my_app</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="kw">USER</span> shiny</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="kw">CMD</span> [<span class="st">"R"</span>, <span class="st">"-q"</span>, <span class="st">"-e"</span>, <span class="st">"shiny::runApp('/srv/shiny-server/my_app', host='0.0.0.0', port=3838)"</span>]</span></code></pre></div>
+<p>Docker Compose can load the key without baking it into the image:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="fu">services</span><span class="kw">:</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="at">  </span><span class="fu">cerebro</span><span class="kw">:</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> .</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="at">    </span><span class="fu">env_file</span><span class="kw">:</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> ./my_app.env</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="at">    </span><span class="fu">ports</span><span class="kw">:</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">"3838:3838"</span></span></code></pre></div>
+<p>Keep <code>my_app.env</code> out of the Docker build context or
+exclude it in <code>.dockerignore</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="run-on-another-machine">Run on another machine<a class="anchor" aria-label="anchor" href="#run-on-another-machine"></a>
+</h2>
+<p>Copy the <code>my_app</code> directory and the secret through
+separate protected channels. On another machine, restore the same
+variable name and value before running the App:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="st">"/protected/path/my_app.env"</span><span class="op">)</span></span>
+<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="st">"/srv/cerebronexus/my_app"</span><span class="op">)</span></span></code></pre></div>
+<p>If the environment value does not match the database, the App stops
+instead of starting with an unusable login page.</p>
+</div>
+<div class="section level2">
+<h2 id="add-or-remove-users">Add or remove users<a class="anchor" aria-label="anchor" href="#add-or-remove-users"></a>
+</h2>
+<p>Update the source <code>credentials.sqlite</code> with shinymanager’s
+database tools, then run <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> again to publish
+a fresh encrypted copy. Keep the existing passphrase, or rotate the
+database and deployed environment value together.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>
 </h2>
 <ul>
-<li><a href="launch_cerebro_with_pre-loaded_data_set.html">Launch
-Cerebro with pre-loaded data set</a></li>
-<li><a href="host_cerebro_on_shinyapps.html">Host Cerebro on
+<li><a href="create_a_self_contained_shiny_app.html">Create a
+self-contained Shiny App</a></li>
+<li><a href="host_cerebro_on_shinyapps.html">Host CerebroNexus on
 shinyapps.io</a></li>
+<li><a href="https://datastorm-open.github.io/shinymanager/reference/create_db.html" class="external-link"><code>shinymanager::create_db()</code></a></li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

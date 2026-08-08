@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,7 +37,7 @@
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
-    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to Cerebro with a login page</a></li>
+    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
@@ -272,22 +272,22 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro_v1.3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 4.0</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 4.1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-08-06</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-08-08</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of cells: 80</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> number of genes: 230</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> grouping variables (2): sample, seurat_clusters</span>
@@ -303,8 +303,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Saving Cerebro object to: /tmp/nix-shell-4162-395311635/Rtmp5bIEUH/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [14:13:08] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Saving Cerebro object to: /tmp/nix-shell-4373-778117409/RtmpYWnchb/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:50:40] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

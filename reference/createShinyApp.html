@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +45,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
-    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to Cerebro with a login page</a></li>
+    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
@@ -119,6 +119,7 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  spatial_images_offset_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_offset_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_plot_rotation <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  auth <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -259,6 +260,15 @@ units) applied to move the spatial background image. Names must match
 <dt id="arg-spatial-plot-rotation">spatial_plot_rotation<a class="anchor" aria-label="anchor" href="#arg-spatial-plot-rotation"></a></dt>
 <dd><p>Named list/vector; initial rotation (degrees)
 applied to spatial cell coordinates. Names must match <code>cerebro_data</code>.</p></dd>
+
+
+<dt id="arg-auth">auth<a class="anchor" aria-label="anchor" href="#arg-auth"></a></dt>
+<dd><p>Optional authentication settings. <code>NULL</code>, the default,
+leaves the generated Viewer public. To require a login, provide a named
+list with <code>credentials</code>, the path to an encrypted SQLite database
+created by <code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" class="external-link">shinymanager::create_db()</a></code>, and <code>passphrase_env</code>,
+the name of the environment variable containing its passphrase. Optional
+<code>timeout_minutes</code> defaults to 15.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

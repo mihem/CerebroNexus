@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,7 +54,7 @@
     <li><a class="dropdown-item" href="articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
-    <li><a class="dropdown-item" href="articles/control_access_to_cerebro_with_a_login_page.html">Control access to Cerebro with a login page</a></li>
+    <li><a class="dropdown-item" href="articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
@@ -125,6 +125,21 @@
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My dataset"</span> <span class="op">=</span> <span class="st">"output/cerebro_my_seurat.crb"</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"my_app"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="optional-login">Optional login<a class="anchor" aria-label="anchor" href="#optional-login"></a>
+</h3>
+<p>To require a login, first create an encrypted database with <code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" class="external-link">shinymanager::create_db()</a></code>, set its passphrase in an environment variable, and pass the database to <code><a href="reference/createShinyApp.html">createShinyApp()</a></code>:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My dataset"</span> <span class="op">=</span> <span class="st">"output/cerebro_my_seurat.crb"</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="st">"my_app"</span>,</span>
+<span>  auth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    credentials <span class="op">=</span> <span class="st">"credentials.sqlite"</span>,</span>
+<span>    passphrase_env <span class="op">=</span> <span class="st">"CEREBRO_AUTH_PASSPHRASE"</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>See <a href="https://www.mheming.com/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html" class="external-link">Control access with a login page</a> for multi-user setup and deployment examples.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

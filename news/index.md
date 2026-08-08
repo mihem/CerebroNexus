@@ -1,5 +1,24 @@
 # Changelog
 
+## CerebroNexus 4.1
+
+### Viewer
+
+- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  can optionally protect a generated Viewer with an existing encrypted
+  shinymanager SQLite database and an environment-variable key. The
+  encrypted database is copied into the private app bundle; its
+  passphrase and plaintext login passwords are not. Apps remain public
+  when `auth` is omitted.
+- Authenticated Viewers use a responsive CerebroNexus login page with
+  accessible controls and mobile-friendly spacing.
+- Viewer sessions now close server-side on logout or authentication
+  timeout, and forced-password-change pages cannot start the protected
+  Viewer server.
+- Authentication preflight validates the complete shinymanager database,
+  requires a non-trivial database passphrase, and verifies private POSIX
+  modes.
+
 ## CerebroNexus 4.0
 
 ### Breaking changes

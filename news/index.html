@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,7 +37,7 @@
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
-    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to Cerebro with a login page</a></li>
+    <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
@@ -74,6 +74,17 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="4.1" id="cerebronexus-41">CerebroNexus 4.1<a class="anchor" aria-label="anchor" href="#cerebronexus-41"></a></h2>
+<div class="section level3">
+<h3 id="viewer-4-1">Viewer<a class="anchor" aria-label="anchor" href="#viewer-4-1"></a></h3>
+<ul><li>
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> can optionally protect a generated Viewer with an existing encrypted shinymanager SQLite database and an environment-variable key. The encrypted database is copied into the private app bundle; its passphrase and plaintext login passwords are not. Apps remain public when <code>auth</code> is omitted.</li>
+<li>Authenticated Viewers use a responsive CerebroNexus login page with accessible controls and mobile-friendly spacing.</li>
+<li>Viewer sessions now close server-side on logout or authentication timeout, and forced-password-change pages cannot start the protected Viewer server.</li>
+<li>Authentication preflight validates the complete shinymanager database, requires a non-trivial database passphrase, and verifies private POSIX modes.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="4.0" id="cerebronexus-40">CerebroNexus 4.0<a class="anchor" aria-label="anchor" href="#cerebronexus-40"></a></h2>
 <div class="section level3">

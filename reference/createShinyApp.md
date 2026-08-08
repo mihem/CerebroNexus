@@ -35,6 +35,7 @@ createShinyApp(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
+  auth = NULL,
   ...
 )
 ```
@@ -171,6 +172,15 @@ createShinyApp(
 
   Named list/vector; initial rotation (degrees) applied to spatial cell
   coordinates. Names must match `cerebro_data`.
+
+- auth:
+
+  Optional authentication settings. `NULL`, the default, leaves the
+  generated Viewer public. To require a login, provide a named list with
+  `credentials`, the path to an encrypted SQLite database created by
+  [`shinymanager::create_db()`](https://rdrr.io/pkg/shinymanager/man/create_db.html),
+  and `passphrase_env`, the name of the environment variable containing
+  its passphrase. Optional `timeout_minutes` defaults to 15.
 
 - ...:
 
