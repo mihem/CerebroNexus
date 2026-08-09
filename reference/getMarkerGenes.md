@@ -101,9 +101,7 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-#> Error in .getAttributes(mart, verbose = verbose) : 
-#>   biomaRt error: looks like we're connecting to incompatible version of BioMart.
-#> [14:28:33] Get marker genes for 2 groups in `sample`...
+#> [04:30:42] Get marker genes for 2 groups in `sample`...
 #> Calculating cluster pbmc_1
 #> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
 #> (default method for FindMarkers) please install the presto package
@@ -115,7 +113,7 @@ pbmc <- getMarkerGenes(
 #> efficient implementation (no further action necessary).
 #> This message will be shown once per session
 #> Calculating cluster pbmc_2
-#> [14:28:33] Get marker genes for 2 groups in `seurat_clusters`...
+#> [04:30:43] Get marker genes for 2 groups in `seurat_clusters`...
 #> Calculating cluster 0
 #> Calculating cluster 1
 ```
