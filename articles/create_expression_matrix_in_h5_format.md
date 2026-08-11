@@ -192,5 +192,5 @@ remains the preferred, less error-prone route.
 - [Create a self-contained Shiny
   app](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 - [Seurat
-  workflow](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md)
+  workflow](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
 - [`?exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)

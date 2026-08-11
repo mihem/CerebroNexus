@@ -32,7 +32,7 @@
 
 ## Internal
 
-- [`Cerebro_v1.3`](https://mihem.github.io/CerebroNexus/reference/Cerebro_v1.3.md)
+- [`Cerebro`](https://mihem.github.io/CerebroNexus/reference/Cerebro.md)
   : R6 class in which data sets will be stored for visualization in
   Cerebro.
 - [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)

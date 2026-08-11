@@ -1,17 +1,17 @@
 # R6 class in which data sets will be stored for visualization in Cerebro.
 
-A `Cerebro_v1.3` object is an R6 class that contains several types of
-data that can be visualized in Cerebro.
+A `Cerebro` object is an R6 class that contains several types of data
+that can be visualized in Cerebro.
 
 ## Value
 
-A new `Cerebro_v1.3` object.
+A new `Cerebro` object.
 
 ## Public fields
 
 - `version`:
 
-  cerebroApp version that was used to create the object.
+  Exporter package version that was used to create the object.
 
 - `experiment`:
 
@@ -151,189 +151,189 @@ A new `Cerebro_v1.3` object.
 
 ### Public methods
 
-- [`Cerebro_v1.3$new()`](#method-Cerebro_v1.3-new)
+- [`Cerebro$new()`](#method-Cerebro-initialize)
 
-- [`Cerebro_v1.3$setVersion()`](#method-Cerebro_v1.3-setVersion)
+- [`Cerebro$setVersion()`](#method-Cerebro-setVersion)
 
-- [`Cerebro_v1.3$getVersion()`](#method-Cerebro_v1.3-getVersion)
+- [`Cerebro$getVersion()`](#method-Cerebro-getVersion)
 
-- [`Cerebro_v1.3$checkIfGroupExists()`](#method-Cerebro_v1.3-checkIfGroupExists)
+- [`Cerebro$checkIfGroupExists()`](#method-Cerebro-checkIfGroupExists)
 
-- [`Cerebro_v1.3$checkIfColumnExistsInMetadata()`](#method-Cerebro_v1.3-checkIfColumnExistsInMetadata)
+- [`Cerebro$checkIfColumnExistsInMetadata()`](#method-Cerebro-checkIfColumnExistsInMetadata)
 
-- [`Cerebro_v1.3$addExperiment()`](#method-Cerebro_v1.3-addExperiment)
+- [`Cerebro$addExperiment()`](#method-Cerebro-addExperiment)
 
-- [`Cerebro_v1.3$getExperiment()`](#method-Cerebro_v1.3-getExperiment)
+- [`Cerebro$getExperiment()`](#method-Cerebro-getExperiment)
 
-- [`Cerebro_v1.3$addParameters()`](#method-Cerebro_v1.3-addParameters)
+- [`Cerebro$addParameters()`](#method-Cerebro-addParameters)
 
-- [`Cerebro_v1.3$getParameters()`](#method-Cerebro_v1.3-getParameters)
+- [`Cerebro$getParameters()`](#method-Cerebro-getParameters)
 
-- [`Cerebro_v1.3$addTechnicalInfo()`](#method-Cerebro_v1.3-addTechnicalInfo)
+- [`Cerebro$addTechnicalInfo()`](#method-Cerebro-addTechnicalInfo)
 
-- [`Cerebro_v1.3$getTechnicalInfo()`](#method-Cerebro_v1.3-getTechnicalInfo)
+- [`Cerebro$getTechnicalInfo()`](#method-Cerebro-getTechnicalInfo)
 
-- [`Cerebro_v1.3$addGroup()`](#method-Cerebro_v1.3-addGroup)
+- [`Cerebro$addGroup()`](#method-Cerebro-addGroup)
 
-- [`Cerebro_v1.3$getGroups()`](#method-Cerebro_v1.3-getGroups)
+- [`Cerebro$getGroups()`](#method-Cerebro-getGroups)
 
-- [`Cerebro_v1.3$getGroupLevels()`](#method-Cerebro_v1.3-getGroupLevels)
+- [`Cerebro$getGroupLevels()`](#method-Cerebro-getGroupLevels)
 
-- [`Cerebro_v1.3$setMetaData()`](#method-Cerebro_v1.3-setMetaData)
+- [`Cerebro$setMetaData()`](#method-Cerebro-setMetaData)
 
-- [`Cerebro_v1.3$getMetaData()`](#method-Cerebro_v1.3-getMetaData)
+- [`Cerebro$getMetaData()`](#method-Cerebro-getMetaData)
 
-- [`Cerebro_v1.3$addGeneList()`](#method-Cerebro_v1.3-addGeneList)
+- [`Cerebro$addGeneList()`](#method-Cerebro-addGeneList)
 
-- [`Cerebro_v1.3$getGeneLists()`](#method-Cerebro_v1.3-getGeneLists)
+- [`Cerebro$getGeneLists()`](#method-Cerebro-getGeneLists)
 
-- [`Cerebro_v1.3$setExpression()`](#method-Cerebro_v1.3-setExpression)
+- [`Cerebro$setExpression()`](#method-Cerebro-setExpression)
 
-- [`Cerebro_v1.3$setExpressionBackend()`](#method-Cerebro_v1.3-setExpressionBackend)
+- [`Cerebro$setExpressionBackend()`](#method-Cerebro-setExpressionBackend)
 
-- [`Cerebro_v1.3$getExpressionBackend()`](#method-Cerebro_v1.3-getExpressionBackend)
+- [`Cerebro$getExpressionBackend()`](#method-Cerebro-getExpressionBackend)
 
-- [`Cerebro_v1.3$getCellNames()`](#method-Cerebro_v1.3-getCellNames)
+- [`Cerebro$getCellNames()`](#method-Cerebro-getCellNames)
 
-- [`Cerebro_v1.3$getGeneNames()`](#method-Cerebro_v1.3-getGeneNames)
+- [`Cerebro$getGeneNames()`](#method-Cerebro-getGeneNames)
 
-- [`Cerebro_v1.3$getMeanExpressionForGenes()`](#method-Cerebro_v1.3-getMeanExpressionForGenes)
+- [`Cerebro$getMeanExpressionForGenes()`](#method-Cerebro-getMeanExpressionForGenes)
 
-- [`Cerebro_v1.3$getMeanExpressionForCells()`](#method-Cerebro_v1.3-getMeanExpressionForCells)
+- [`Cerebro$getMeanExpressionForCells()`](#method-Cerebro-getMeanExpressionForCells)
 
-- [`Cerebro_v1.3$getExpressionMatrix()`](#method-Cerebro_v1.3-getExpressionMatrix)
+- [`Cerebro$getExpressionMatrix()`](#method-Cerebro-getExpressionMatrix)
 
-- [`Cerebro_v1.3$getExpressionRow()`](#method-Cerebro_v1.3-getExpressionRow)
+- [`Cerebro$getExpressionRow()`](#method-Cerebro-getExpressionRow)
 
-- [`Cerebro_v1.3$getExpressionBlock()`](#method-Cerebro_v1.3-getExpressionBlock)
+- [`Cerebro$getExpressionBlock()`](#method-Cerebro-getExpressionBlock)
 
-- [`Cerebro_v1.3$setCellCycle()`](#method-Cerebro_v1.3-setCellCycle)
+- [`Cerebro$setCellCycle()`](#method-Cerebro-setCellCycle)
 
-- [`Cerebro_v1.3$getCellCycle()`](#method-Cerebro_v1.3-getCellCycle)
+- [`Cerebro$getCellCycle()`](#method-Cerebro-getCellCycle)
 
-- [`Cerebro_v1.3$addProjection()`](#method-Cerebro_v1.3-addProjection)
+- [`Cerebro$addProjection()`](#method-Cerebro-addProjection)
 
-- [`Cerebro_v1.3$availableProjections()`](#method-Cerebro_v1.3-availableProjections)
+- [`Cerebro$availableProjections()`](#method-Cerebro-availableProjections)
 
-- [`Cerebro_v1.3$getProjection()`](#method-Cerebro_v1.3-getProjection)
+- [`Cerebro$getProjection()`](#method-Cerebro-getProjection)
 
-- [`Cerebro_v1.3$addTree()`](#method-Cerebro_v1.3-addTree)
+- [`Cerebro$addTree()`](#method-Cerebro-addTree)
 
-- [`Cerebro_v1.3$getTree()`](#method-Cerebro_v1.3-getTree)
+- [`Cerebro$getTree()`](#method-Cerebro-getTree)
 
-- [`Cerebro_v1.3$addMostExpressedGenes()`](#method-Cerebro_v1.3-addMostExpressedGenes)
+- [`Cerebro$addMostExpressedGenes()`](#method-Cerebro-addMostExpressedGenes)
 
-- [`Cerebro_v1.3$getGroupsWithMostExpressedGenes()`](#method-Cerebro_v1.3-getGroupsWithMostExpressedGenes)
+- [`Cerebro$getGroupsWithMostExpressedGenes()`](#method-Cerebro-getGroupsWithMostExpressedGenes)
 
-- [`Cerebro_v1.3$getMostExpressedGenes()`](#method-Cerebro_v1.3-getMostExpressedGenes)
+- [`Cerebro$getMostExpressedGenes()`](#method-Cerebro-getMostExpressedGenes)
 
-- [`Cerebro_v1.3$addMeanExpression()`](#method-Cerebro_v1.3-addMeanExpression)
+- [`Cerebro$addMeanExpression()`](#method-Cerebro-addMeanExpression)
 
-- [`Cerebro_v1.3$getGroupsWithMeanExpression()`](#method-Cerebro_v1.3-getGroupsWithMeanExpression)
+- [`Cerebro$getGroupsWithMeanExpression()`](#method-Cerebro-getGroupsWithMeanExpression)
 
-- [`Cerebro_v1.3$getMeanExpression()`](#method-Cerebro_v1.3-getMeanExpression)
+- [`Cerebro$getMeanExpression()`](#method-Cerebro-getMeanExpression)
 
-- [`Cerebro_v1.3$addMarkerGenes()`](#method-Cerebro_v1.3-addMarkerGenes)
+- [`Cerebro$addMarkerGenes()`](#method-Cerebro-addMarkerGenes)
 
-- [`Cerebro_v1.3$getMethodsForMarkerGenes()`](#method-Cerebro_v1.3-getMethodsForMarkerGenes)
+- [`Cerebro$getMethodsForMarkerGenes()`](#method-Cerebro-getMethodsForMarkerGenes)
 
-- [`Cerebro_v1.3$getGroupsWithMarkerGenes()`](#method-Cerebro_v1.3-getGroupsWithMarkerGenes)
+- [`Cerebro$getGroupsWithMarkerGenes()`](#method-Cerebro-getGroupsWithMarkerGenes)
 
-- [`Cerebro_v1.3$getMarkerGenes()`](#method-Cerebro_v1.3-getMarkerGenes)
+- [`Cerebro$getMarkerGenes()`](#method-Cerebro-getMarkerGenes)
 
-- [`Cerebro_v1.3$addEnrichedPathways()`](#method-Cerebro_v1.3-addEnrichedPathways)
+- [`Cerebro$addEnrichedPathways()`](#method-Cerebro-addEnrichedPathways)
 
-- [`Cerebro_v1.3$getMethodsWithEnrichedPathways()`](#method-Cerebro_v1.3-getMethodsWithEnrichedPathways)
+- [`Cerebro$getMethodsWithEnrichedPathways()`](#method-Cerebro-getMethodsWithEnrichedPathways)
 
-- [`Cerebro_v1.3$getMethodsForEnrichedPathways()`](#method-Cerebro_v1.3-getMethodsForEnrichedPathways)
+- [`Cerebro$getMethodsForEnrichedPathways()`](#method-Cerebro-getMethodsForEnrichedPathways)
 
-- [`Cerebro_v1.3$getGroupsWithEnrichedPathways()`](#method-Cerebro_v1.3-getGroupsWithEnrichedPathways)
+- [`Cerebro$getGroupsWithEnrichedPathways()`](#method-Cerebro-getGroupsWithEnrichedPathways)
 
-- [`Cerebro_v1.3$getEnrichedPathways()`](#method-Cerebro_v1.3-getEnrichedPathways)
+- [`Cerebro$getEnrichedPathways()`](#method-Cerebro-getEnrichedPathways)
 
-- [`Cerebro_v1.3$addTrajectory()`](#method-Cerebro_v1.3-addTrajectory)
+- [`Cerebro$addTrajectory()`](#method-Cerebro-addTrajectory)
 
-- [`Cerebro_v1.3$getMethodsForTrajectories()`](#method-Cerebro_v1.3-getMethodsForTrajectories)
+- [`Cerebro$getMethodsForTrajectories()`](#method-Cerebro-getMethodsForTrajectories)
 
-- [`Cerebro_v1.3$getNamesOfTrajectories()`](#method-Cerebro_v1.3-getNamesOfTrajectories)
+- [`Cerebro$getNamesOfTrajectories()`](#method-Cerebro-getNamesOfTrajectories)
 
-- [`Cerebro_v1.3$getTrajectory()`](#method-Cerebro_v1.3-getTrajectory)
+- [`Cerebro$getTrajectory()`](#method-Cerebro-getTrajectory)
 
-- [`Cerebro_v1.3$getBCR()`](#method-Cerebro_v1.3-getBCR)
+- [`Cerebro$getBCR()`](#method-Cerebro-getBCR)
 
-- [`Cerebro_v1.3$getTCR()`](#method-Cerebro_v1.3-getTCR)
+- [`Cerebro$getTCR()`](#method-Cerebro-getTCR)
 
-- [`Cerebro_v1.3$addBCRData()`](#method-Cerebro_v1.3-addBCRData)
+- [`Cerebro$addBCRData()`](#method-Cerebro-addBCRData)
 
-- [`Cerebro_v1.3$addTCRData()`](#method-Cerebro_v1.3-addTCRData)
+- [`Cerebro$addTCRData()`](#method-Cerebro-addTCRData)
 
-- [`Cerebro_v1.3$getImmuneRepertoire()`](#method-Cerebro_v1.3-getImmuneRepertoire)
+- [`Cerebro$getImmuneRepertoire()`](#method-Cerebro-getImmuneRepertoire)
 
-- [`Cerebro_v1.3$addImmuneRepertoire()`](#method-Cerebro_v1.3-addImmuneRepertoire)
+- [`Cerebro$addImmuneRepertoire()`](#method-Cerebro-addImmuneRepertoire)
 
-- [`Cerebro_v1.3$getHLATyping()`](#method-Cerebro_v1.3-getHLATyping)
+- [`Cerebro$getHLATyping()`](#method-Cerebro-getHLATyping)
 
-- [`Cerebro_v1.3$addHLATyping()`](#method-Cerebro_v1.3-addHLATyping)
+- [`Cerebro$addHLATyping()`](#method-Cerebro-addHLATyping)
 
-- [`Cerebro_v1.3$addSpatialData()`](#method-Cerebro_v1.3-addSpatialData)
+- [`Cerebro$addSpatialData()`](#method-Cerebro-addSpatialData)
 
-- [`Cerebro_v1.3$getSpatialData()`](#method-Cerebro_v1.3-getSpatialData)
+- [`Cerebro$getSpatialData()`](#method-Cerebro-getSpatialData)
 
-- [`Cerebro_v1.3$availableSpatial()`](#method-Cerebro_v1.3-availableSpatial)
+- [`Cerebro$availableSpatial()`](#method-Cerebro-availableSpatial)
 
-- [`Cerebro_v1.3$getTrekker()`](#method-Cerebro_v1.3-getTrekker)
+- [`Cerebro$getTrekker()`](#method-Cerebro-getTrekker)
 
-- [`Cerebro_v1.3$addTrekker()`](#method-Cerebro_v1.3-addTrekker)
+- [`Cerebro$addTrekker()`](#method-Cerebro-addTrekker)
 
-- [`Cerebro_v1.3$addExtraMaterial()`](#method-Cerebro_v1.3-addExtraMaterial)
+- [`Cerebro$addExtraMaterial()`](#method-Cerebro-addExtraMaterial)
 
-- [`Cerebro_v1.3$addExtraTable()`](#method-Cerebro_v1.3-addExtraTable)
+- [`Cerebro$addExtraTable()`](#method-Cerebro-addExtraTable)
 
-- [`Cerebro_v1.3$addExtraPlot()`](#method-Cerebro_v1.3-addExtraPlot)
+- [`Cerebro$addExtraPlot()`](#method-Cerebro-addExtraPlot)
 
-- [`Cerebro_v1.3$getExtraMaterial()`](#method-Cerebro_v1.3-getExtraMaterial)
+- [`Cerebro$getExtraMaterial()`](#method-Cerebro-getExtraMaterial)
 
-- [`Cerebro_v1.3$getExtraMaterialCategories()`](#method-Cerebro_v1.3-getExtraMaterialCategories)
+- [`Cerebro$getExtraMaterialCategories()`](#method-Cerebro-getExtraMaterialCategories)
 
-- [`Cerebro_v1.3$checkForExtraTables()`](#method-Cerebro_v1.3-checkForExtraTables)
+- [`Cerebro$checkForExtraTables()`](#method-Cerebro-checkForExtraTables)
 
-- [`Cerebro_v1.3$getNamesOfExtraTables()`](#method-Cerebro_v1.3-getNamesOfExtraTables)
+- [`Cerebro$getNamesOfExtraTables()`](#method-Cerebro-getNamesOfExtraTables)
 
-- [`Cerebro_v1.3$getExtraTable()`](#method-Cerebro_v1.3-getExtraTable)
+- [`Cerebro$getExtraTable()`](#method-Cerebro-getExtraTable)
 
-- [`Cerebro_v1.3$checkForExtraPlots()`](#method-Cerebro_v1.3-checkForExtraPlots)
+- [`Cerebro$checkForExtraPlots()`](#method-Cerebro-checkForExtraPlots)
 
-- [`Cerebro_v1.3$getNamesOfExtraPlots()`](#method-Cerebro_v1.3-getNamesOfExtraPlots)
+- [`Cerebro$getNamesOfExtraPlots()`](#method-Cerebro-getNamesOfExtraPlots)
 
-- [`Cerebro_v1.3$getExtraPlot()`](#method-Cerebro_v1.3-getExtraPlot)
+- [`Cerebro$getExtraPlot()`](#method-Cerebro-getExtraPlot)
 
-- [`Cerebro_v1.3$print()`](#method-Cerebro_v1.3-print)
+- [`Cerebro$print()`](#method-Cerebro-print)
 
-- [`Cerebro_v1.3$clone()`](#method-Cerebro_v1.3-clone)
+- [`Cerebro$clone()`](#method-Cerebro-clone)
 
 ------------------------------------------------------------------------
 
-### Method `new()`
+### `Cerebro$new()`
 
-Create a new `Cerebro_v1.3` object.
+Create a new `Cerebro` object.
 
 #### Usage
 
-    Cerebro_v1.3$new()
+    Cerebro$new()
 
 #### Returns
 
-A new `Cerebro_v1.3` object.
+A new `Cerebro` object.
 
 ------------------------------------------------------------------------
 
-### Method `setVersion()`
+### `Cerebro$setVersion()`
 
-Set the version of `cerebroApp` that was used to generate this object.
+Set the exporter package version that was used to generate this object.
 
 #### Usage
 
-    Cerebro_v1.3$setVersion(version)
+    Cerebro$setVersion(version)
 
 #### Arguments
 
@@ -343,13 +343,13 @@ Set the version of `cerebroApp` that was used to generate this object.
 
 ------------------------------------------------------------------------
 
-### Method `getVersion()`
+### `Cerebro$getVersion()`
 
-Get the version of `cerebroApp` that was used to generate this object.
+Get the exporter package version that was used to generate this object.
 
 #### Usage
 
-    Cerebro_v1.3$getVersion()
+    Cerebro$getVersion()
 
 #### Returns
 
@@ -357,14 +357,14 @@ Version as `package_version` class.
 
 ------------------------------------------------------------------------
 
-### Method `checkIfGroupExists()`
+### `Cerebro$checkIfGroupExists()`
 
 Safety function that will check if a provided group name is present in
 the `groups` field.
 
 #### Usage
 
-    Cerebro_v1.3$checkIfGroupExists(group_name)
+    Cerebro$checkIfGroupExists(group_name)
 
 #### Arguments
 
@@ -374,14 +374,14 @@ the `groups` field.
 
 ------------------------------------------------------------------------
 
-### Method `checkIfColumnExistsInMetadata()`
+### `Cerebro$checkIfColumnExistsInMetadata()`
 
 Safety function that will check if a provided group name is present in
 the meta data.
 
 #### Usage
 
-    Cerebro_v1.3$checkIfColumnExistsInMetadata(group_name)
+    Cerebro$checkIfColumnExistsInMetadata(group_name)
 
 #### Arguments
 
@@ -391,13 +391,13 @@ the meta data.
 
 ------------------------------------------------------------------------
 
-### Method `addExperiment()`
+### `Cerebro$addExperiment()`
 
 Add information to `experiment` field.
 
 #### Usage
 
-    Cerebro_v1.3$addExperiment(field, content)
+    Cerebro$addExperiment(field, content)
 
 #### Arguments
 
@@ -411,13 +411,13 @@ Add information to `experiment` field.
 
 ------------------------------------------------------------------------
 
-### Method `getExperiment()`
+### `Cerebro$getExperiment()`
 
 Retrieve information from `experiment` field.
 
 #### Usage
 
-    Cerebro_v1.3$getExperiment()
+    Cerebro$getExperiment()
 
 #### Returns
 
@@ -425,13 +425,13 @@ Retrieve information from `experiment` field.
 
 ------------------------------------------------------------------------
 
-### Method `addParameters()`
+### `Cerebro$addParameters()`
 
 Add information to `parameters` field.
 
 #### Usage
 
-    Cerebro_v1.3$addParameters(field, content)
+    Cerebro$addParameters(field, content)
 
 #### Arguments
 
@@ -445,13 +445,13 @@ Add information to `parameters` field.
 
 ------------------------------------------------------------------------
 
-### Method `getParameters()`
+### `Cerebro$getParameters()`
 
 Retrieve information from `parameters` field.
 
 #### Usage
 
-    Cerebro_v1.3$getParameters()
+    Cerebro$getParameters()
 
 #### Returns
 
@@ -459,13 +459,13 @@ Retrieve information from `parameters` field.
 
 ------------------------------------------------------------------------
 
-### Method `addTechnicalInfo()`
+### `Cerebro$addTechnicalInfo()`
 
 Add information to `technical_info` field.
 
 #### Usage
 
-    Cerebro_v1.3$addTechnicalInfo(field, content)
+    Cerebro$addTechnicalInfo(field, content)
 
 #### Arguments
 
@@ -479,13 +479,13 @@ Add information to `technical_info` field.
 
 ------------------------------------------------------------------------
 
-### Method `getTechnicalInfo()`
+### `Cerebro$getTechnicalInfo()`
 
 Retrieve information from `technical_info` field.
 
 #### Usage
 
-    Cerebro_v1.3$getTechnicalInfo()
+    Cerebro$getTechnicalInfo()
 
 #### Returns
 
@@ -493,13 +493,13 @@ Retrieve information from `technical_info` field.
 
 ------------------------------------------------------------------------
 
-### Method `addGroup()`
+### `Cerebro$addGroup()`
 
 Add group to the groups registered in the `groups` field.
 
 #### Usage
 
-    Cerebro_v1.3$addGroup(group_name, levels)
+    Cerebro$addGroup(group_name, levels)
 
 #### Arguments
 
@@ -513,13 +513,13 @@ Add group to the groups registered in the `groups` field.
 
 ------------------------------------------------------------------------
 
-### Method `getGroups()`
+### `Cerebro$getGroups()`
 
 Retrieve all names in the `groups` field.
 
 #### Usage
 
-    Cerebro_v1.3$getGroups()
+    Cerebro$getGroups()
 
 #### Returns
 
@@ -527,13 +527,13 @@ Retrieve all names in the `groups` field.
 
 ------------------------------------------------------------------------
 
-### Method `getGroupLevels()`
+### `Cerebro$getGroupLevels()`
 
 Retrieve group levels for a group registered in the `groups` field.
 
 #### Usage
 
-    Cerebro_v1.3$getGroupLevels(group_name)
+    Cerebro$getGroupLevels(group_name)
 
 #### Arguments
 
@@ -547,13 +547,13 @@ Retrieve group levels for a group registered in the `groups` field.
 
 ------------------------------------------------------------------------
 
-### Method `setMetaData()`
+### `Cerebro$setMetaData()`
 
 Set meta data for cells.
 
 #### Usage
 
-    Cerebro_v1.3$setMetaData(table)
+    Cerebro$setMetaData(table)
 
 #### Arguments
 
@@ -565,13 +565,13 @@ Set meta data for cells.
 
 ------------------------------------------------------------------------
 
-### Method `getMetaData()`
+### `Cerebro$getMetaData()`
 
 Retrieve meta data for cells.
 
 #### Usage
 
-    Cerebro_v1.3$getMetaData()
+    Cerebro$getMetaData()
 
 #### Returns
 
@@ -579,13 +579,13 @@ Retrieve meta data for cells.
 
 ------------------------------------------------------------------------
 
-### Method `addGeneList()`
+### `Cerebro$addGeneList()`
 
 Add a gene list to the `gene_lists`.
 
 #### Usage
 
-    Cerebro_v1.3$addGeneList(name, genes)
+    Cerebro$addGeneList(name, genes)
 
 #### Arguments
 
@@ -599,13 +599,13 @@ Add a gene list to the `gene_lists`.
 
 ------------------------------------------------------------------------
 
-### Method `getGeneLists()`
+### `Cerebro$getGeneLists()`
 
 Retrieve gene lists from the `gene_lists`.
 
 #### Usage
 
-    Cerebro_v1.3$getGeneLists()
+    Cerebro$getGeneLists()
 
 #### Returns
 
@@ -613,13 +613,13 @@ Retrieve gene lists from the `gene_lists`.
 
 ------------------------------------------------------------------------
 
-### Method `setExpression()`
+### `Cerebro$setExpression()`
 
 Set transcript count matrix.
 
 #### Usage
 
-    Cerebro_v1.3$setExpression(counts, backend = NULL)
+    Cerebro$setExpression(counts, backend = NULL)
 
 #### Arguments
 
@@ -638,7 +638,7 @@ Set transcript count matrix.
 
 ------------------------------------------------------------------------
 
-### Method `setExpressionBackend()`
+### `Cerebro$setExpressionBackend()`
 
 Tag the object with information about how / where its expression matrix
 is stored. In step 7.1 every newly exported `.crb` is tagged
@@ -649,7 +649,7 @@ will produce objects tagged `"h5"` or `"bpcells"` with an external
 
 #### Usage
 
-    Cerebro_v1.3$setExpressionBackend(type = "embedded", location = NULL)
+    Cerebro$setExpressionBackend(type = "embedded", location = NULL)
 
 #### Arguments
 
@@ -668,7 +668,7 @@ will produce objects tagged `"h5"` or `"bpcells"` with an external
 
 ------------------------------------------------------------------------
 
-### Method `getExpressionBackend()`
+### `Cerebro$getExpressionBackend()`
 
 Read the expression backend tag. Returns a `list(type, location)`. For
 `.crb` files generated before the `expression_backend` field existed the
@@ -678,17 +678,17 @@ not need to special-case legacy objects.
 
 #### Usage
 
-    Cerebro_v1.3$getExpressionBackend()
+    Cerebro$getExpressionBackend()
 
 ------------------------------------------------------------------------
 
-### Method `getCellNames()`
+### `Cerebro$getCellNames()`
 
 Get names of all cells.
 
 #### Usage
 
-    Cerebro_v1.3$getCellNames()
+    Cerebro$getCellNames()
 
 #### Returns
 
@@ -696,13 +696,13 @@ Get names of all cells.
 
 ------------------------------------------------------------------------
 
-### Method `getGeneNames()`
+### `Cerebro$getGeneNames()`
 
 Get names of all genes in transcript count matrix.
 
 #### Usage
 
-    Cerebro_v1.3$getGeneNames()
+    Cerebro$getGeneNames()
 
 #### Returns
 
@@ -710,14 +710,14 @@ Get names of all genes in transcript count matrix.
 
 ------------------------------------------------------------------------
 
-### Method `getMeanExpressionForGenes()`
+### `Cerebro$getMeanExpressionForGenes()`
 
 Retrieve mean expression across all cells in the data set for a set of
 genes.
 
 #### Usage
 
-    Cerebro_v1.3$getMeanExpressionForGenes(genes)
+    Cerebro$getMeanExpressionForGenes(genes)
 
 #### Arguments
 
@@ -732,14 +732,14 @@ expression across all cells in the data set.
 
 ------------------------------------------------------------------------
 
-### Method `getMeanExpressionForCells()`
+### `Cerebro$getMeanExpressionForCells()`
 
 Retrieve (mean) expression for a single gene or a set of genes for a
 given set of cells.
 
 #### Usage
 
-    Cerebro_v1.3$getMeanExpressionForCells(cells = NULL, genes = NULL)
+    Cerebro$getMeanExpressionForCells(cells = NULL, genes = NULL)
 
 #### Arguments
 
@@ -760,13 +760,13 @@ specified cell.
 
 ------------------------------------------------------------------------
 
-### Method `getExpressionMatrix()`
+### `Cerebro$getExpressionMatrix()`
 
 Retrieve transcript count matrix.
 
 #### Usage
 
-    Cerebro_v1.3$getExpressionMatrix(cells = NULL, genes = NULL)
+    Cerebro$getExpressionMatrix(cells = NULL, genes = NULL)
 
 #### Arguments
 
@@ -786,7 +786,7 @@ Dense transcript count matrix for specified cells and genes.
 
 ------------------------------------------------------------------------
 
-### Method `getExpressionRow()`
+### `Cerebro$getExpressionRow()`
 
 Retrieve a single row of the expression matrix as a named numeric vector
 WITHOUT going through the dense helper. Prefer this over
@@ -795,7 +795,7 @@ materialising a 1 x N dense matrix first is wasteful.
 
 #### Usage
 
-    Cerebro_v1.3$getExpressionRow(gene, cells = NULL)
+    Cerebro$getExpressionRow(gene, cells = NULL)
 
 #### Arguments
 
@@ -813,7 +813,7 @@ Named `numeric` vector, one entry per requested cell.
 
 ------------------------------------------------------------------------
 
-### Method `getExpressionBlock()`
+### `Cerebro$getExpressionBlock()`
 
 Retrieve a genes x cells sub-matrix in the backend's NATIVE form (sparse
 / lazy). Callers that need a dense base matrix must apply
@@ -825,7 +825,7 @@ etc.) fast instead of densifying just to aggregate.
 
 #### Usage
 
-    Cerebro_v1.3$getExpressionBlock(genes, cells = NULL)
+    Cerebro$getExpressionBlock(genes, cells = NULL)
 
 #### Arguments
 
@@ -845,13 +845,13 @@ A sub-matrix of the same concrete class as `self$expression`:
 
 ------------------------------------------------------------------------
 
-### Method `setCellCycle()`
+### `Cerebro$setCellCycle()`
 
 Add columns containing cell cycle assignments to the `cell_cycle` field.
 
 #### Usage
 
-    Cerebro_v1.3$setCellCycle(cols)
+    Cerebro$setCellCycle(cols)
 
 #### Arguments
 
@@ -861,13 +861,13 @@ Add columns containing cell cycle assignments to the `cell_cycle` field.
 
 ------------------------------------------------------------------------
 
-### Method `getCellCycle()`
+### `Cerebro$getCellCycle()`
 
 Retrieve column names containing cell cycle assignments.
 
 #### Usage
 
-    Cerebro_v1.3$getCellCycle()
+    Cerebro$getCellCycle()
 
 #### Returns
 
@@ -875,13 +875,13 @@ Retrieve column names containing cell cycle assignments.
 
 ------------------------------------------------------------------------
 
-### Method `addProjection()`
+### `Cerebro$addProjection()`
 
 Add projections (dimensional reductions).
 
 #### Usage
 
-    Cerebro_v1.3$addProjection(name, projection)
+    Cerebro$addProjection(name, projection)
 
 #### Arguments
 
@@ -895,13 +895,13 @@ Add projections (dimensional reductions).
 
 ------------------------------------------------------------------------
 
-### Method `availableProjections()`
+### `Cerebro$availableProjections()`
 
 Get list of available projections (dimensional reductions).
 
 #### Usage
 
-    Cerebro_v1.3$availableProjections()
+    Cerebro$availableProjections()
 
 #### Returns
 
@@ -909,13 +909,13 @@ Get list of available projections (dimensional reductions).
 
 ------------------------------------------------------------------------
 
-### Method `getProjection()`
+### `Cerebro$getProjection()`
 
 Retrieve data for a specific projection.
 
 #### Usage
 
-    Cerebro_v1.3$getProjection(name)
+    Cerebro$getProjection(name)
 
 #### Arguments
 
@@ -929,13 +929,13 @@ Retrieve data for a specific projection.
 
 ------------------------------------------------------------------------
 
-### Method `addTree()`
+### `Cerebro$addTree()`
 
 Add phylogenetic tree to `trees` field.
 
 #### Usage
 
-    Cerebro_v1.3$addTree(group_name, tree)
+    Cerebro$addTree(group_name, tree)
 
 #### Arguments
 
@@ -949,13 +949,13 @@ Add phylogenetic tree to `trees` field.
 
 ------------------------------------------------------------------------
 
-### Method `getTree()`
+### `Cerebro$getTree()`
 
 Retrieve phylogenetic tree for a specific group.
 
 #### Usage
 
-    Cerebro_v1.3$getTree(group_name)
+    Cerebro$getTree(group_name)
 
 #### Arguments
 
@@ -969,13 +969,13 @@ Phylogenetic tree as `phylo` object.
 
 ------------------------------------------------------------------------
 
-### Method `addMostExpressedGenes()`
+### `Cerebro$addMostExpressedGenes()`
 
 Add table of most expressed genes.
 
 #### Usage
 
-    Cerebro_v1.3$addMostExpressedGenes(group_name, table)
+    Cerebro$addMostExpressedGenes(group_name, table)
 
 #### Arguments
 
@@ -990,14 +990,14 @@ Add table of most expressed genes.
 
 ------------------------------------------------------------------------
 
-### Method `getGroupsWithMostExpressedGenes()`
+### `Cerebro$getGroupsWithMostExpressedGenes()`
 
 Retrieve names of grouping variables for which most expressed genes are
 available.
 
 #### Usage
 
-    Cerebro_v1.3$getGroupsWithMostExpressedGenes()
+    Cerebro$getGroupsWithMostExpressedGenes()
 
 #### Returns
 
@@ -1006,13 +1006,13 @@ available.
 
 ------------------------------------------------------------------------
 
-### Method [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md)
+### `Cerebro$getMostExpressedGenes()`
 
 Retrieve table of most expressed genes for a specific grouping variable.
 
 #### Usage
 
-    Cerebro_v1.3$getMostExpressedGenes(group_name)
+    Cerebro$getMostExpressedGenes(group_name)
 
 #### Arguments
 
@@ -1026,13 +1026,13 @@ Retrieve table of most expressed genes for a specific grouping variable.
 
 ------------------------------------------------------------------------
 
-### Method `addMeanExpression()`
+### `Cerebro$addMeanExpression()`
 
 Add table of mean expression per gene.
 
 #### Usage
 
-    Cerebro_v1.3$addMeanExpression(group_name, table)
+    Cerebro$addMeanExpression(group_name, table)
 
 #### Arguments
 
@@ -1047,14 +1047,14 @@ Add table of mean expression per gene.
 
 ------------------------------------------------------------------------
 
-### Method `getGroupsWithMeanExpression()`
+### `Cerebro$getGroupsWithMeanExpression()`
 
 Retrieve names of grouping variables for which mean expression data is
 available.
 
 #### Usage
 
-    Cerebro_v1.3$getGroupsWithMeanExpression()
+    Cerebro$getGroupsWithMeanExpression()
 
 #### Returns
 
@@ -1062,13 +1062,13 @@ available.
 
 ------------------------------------------------------------------------
 
-### Method `getMeanExpression()`
+### `Cerebro$getMeanExpression()`
 
 Retrieve table of mean expression for a specific grouping variable.
 
 #### Usage
 
-    Cerebro_v1.3$getMeanExpression(group_name)
+    Cerebro$getMeanExpression(group_name)
 
 #### Arguments
 
@@ -1082,13 +1082,13 @@ Retrieve table of mean expression for a specific grouping variable.
 
 ------------------------------------------------------------------------
 
-### Method `addMarkerGenes()`
+### `Cerebro$addMarkerGenes()`
 
 Add table of marker genes.
 
 #### Usage
 
-    Cerebro_v1.3$addMarkerGenes(method, name, table)
+    Cerebro$addMarkerGenes(method, name, table)
 
 #### Arguments
 
@@ -1107,13 +1107,13 @@ Add table of marker genes.
 
 ------------------------------------------------------------------------
 
-### Method `getMethodsForMarkerGenes()`
+### `Cerebro$getMethodsForMarkerGenes()`
 
 Retrieve names of methods that were used to generate marker genes.
 
 #### Usage
 
-    Cerebro_v1.3$getMethodsForMarkerGenes()
+    Cerebro$getMethodsForMarkerGenes()
 
 #### Returns
 
@@ -1121,14 +1121,14 @@ Retrieve names of methods that were used to generate marker genes.
 
 ------------------------------------------------------------------------
 
-### Method `getGroupsWithMarkerGenes()`
+### `Cerebro$getGroupsWithMarkerGenes()`
 
 Retrieve grouping variables for which marker genes were generated using
 a specified method.
 
 #### Usage
 
-    Cerebro_v1.3$getGroupsWithMarkerGenes(method)
+    Cerebro$getGroupsWithMarkerGenes(method)
 
 #### Arguments
 
@@ -1143,14 +1143,14 @@ using the specified method.
 
 ------------------------------------------------------------------------
 
-### Method [`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
+### `Cerebro$getMarkerGenes()`
 
 Retrieve table of marker genes for specific method and grouping
 variable.
 
 #### Usage
 
-    Cerebro_v1.3$getMarkerGenes(method, name)
+    Cerebro$getMarkerGenes(method, name)
 
 #### Arguments
 
@@ -1169,13 +1169,13 @@ method and grouping variable.
 
 ------------------------------------------------------------------------
 
-### Method `addEnrichedPathways()`
+### `Cerebro$addEnrichedPathways()`
 
 Add table of enriched pathways.
 
 #### Usage
 
-    Cerebro_v1.3$addEnrichedPathways(method, group_name, table)
+    Cerebro$addEnrichedPathways(method, group_name, table)
 
 #### Arguments
 
@@ -1194,13 +1194,13 @@ Add table of enriched pathways.
 
 ------------------------------------------------------------------------
 
-### Method `getMethodsWithEnrichedPathways()`
+### `Cerebro$getMethodsWithEnrichedPathways()`
 
 Retrieve names of methods for which enriched pathways are available.
 
 #### Usage
 
-    Cerebro_v1.3$getMethodsWithEnrichedPathways()
+    Cerebro$getMethodsWithEnrichedPathways()
 
 #### Returns
 
@@ -1208,14 +1208,14 @@ Retrieve names of methods for which enriched pathways are available.
 
 ------------------------------------------------------------------------
 
-### Method `getMethodsForEnrichedPathways()`
+### `Cerebro$getMethodsForEnrichedPathways()`
 
 Alias of `getMethodsWithEnrichedPathways()`, kept for backwards
 compatibility with the Shiny app, which calls this name.
 
 #### Usage
 
-    Cerebro_v1.3$getMethodsForEnrichedPathways()
+    Cerebro$getMethodsForEnrichedPathways()
 
 #### Returns
 
@@ -1223,14 +1223,14 @@ compatibility with the Shiny app, which calls this name.
 
 ------------------------------------------------------------------------
 
-### Method `getGroupsWithEnrichedPathways()`
+### `Cerebro$getGroupsWithEnrichedPathways()`
 
 Retrieve names of grouping variables for which enriched pathways are
 available for a specific method.
 
 #### Usage
 
-    Cerebro_v1.3$getGroupsWithEnrichedPathways(method)
+    Cerebro$getGroupsWithEnrichedPathways(method)
 
 #### Arguments
 
@@ -1245,14 +1245,14 @@ available.
 
 ------------------------------------------------------------------------
 
-### Method [`getEnrichedPathways()`](https://mihem.github.io/CerebroNexus/reference/getEnrichedPathways.md)
+### `Cerebro$getEnrichedPathways()`
 
 Retrieve table of enriched pathways for a specific method and grouping
 variable.
 
 #### Usage
 
-    Cerebro_v1.3$getEnrichedPathways(method, group_name)
+    Cerebro$getEnrichedPathways(method, group_name)
 
 #### Arguments
 
@@ -1270,13 +1270,13 @@ variable.
 
 ------------------------------------------------------------------------
 
-### Method `addTrajectory()`
+### `Cerebro$addTrajectory()`
 
 Add trajectory to `trajectories` field.
 
 #### Usage
 
-    Cerebro_v1.3$addTrajectory(method, trajectory_name, trajectory)
+    Cerebro$addTrajectory(method, trajectory_name, trajectory)
 
 #### Arguments
 
@@ -1294,13 +1294,13 @@ Add trajectory to `trajectories` field.
 
 ------------------------------------------------------------------------
 
-### Method `getMethodsForTrajectories()`
+### `Cerebro$getMethodsForTrajectories()`
 
 Retrieve names of methods for which trajectories are available.
 
 #### Usage
 
-    Cerebro_v1.3$getMethodsForTrajectories()
+    Cerebro$getMethodsForTrajectories()
 
 #### Returns
 
@@ -1308,13 +1308,13 @@ Retrieve names of methods for which trajectories are available.
 
 ------------------------------------------------------------------------
 
-### Method `getNamesOfTrajectories()`
+### `Cerebro$getNamesOfTrajectories()`
 
 Retrieve names of trajectories for a specific method.
 
 #### Usage
 
-    Cerebro_v1.3$getNamesOfTrajectories(method)
+    Cerebro$getNamesOfTrajectories(method)
 
 #### Arguments
 
@@ -1328,13 +1328,13 @@ Retrieve names of trajectories for a specific method.
 
 ------------------------------------------------------------------------
 
-### Method `getTrajectory()`
+### `Cerebro$getTrajectory()`
 
 Retrieve trajectory data for a specific method and trajectory name.
 
 #### Usage
 
-    Cerebro_v1.3$getTrajectory(method, trajectory_name)
+    Cerebro$getTrajectory(method, trajectory_name)
 
 #### Arguments
 
@@ -1352,13 +1352,13 @@ Trajectory data as `data.frame` or `list`.
 
 ------------------------------------------------------------------------
 
-### Method `getBCR()`
+### `Cerebro$getBCR()`
 
 Retrieve BCR data
 
 #### Usage
 
-    Cerebro_v1.3$getBCR()
+    Cerebro$getBCR()
 
 #### Returns
 
@@ -1366,13 +1366,13 @@ BCR data stored in the object.
 
 ------------------------------------------------------------------------
 
-### Method `getTCR()`
+### `Cerebro$getTCR()`
 
 Retrieve TCR data
 
 #### Usage
 
-    Cerebro_v1.3$getTCR()
+    Cerebro$getTCR()
 
 #### Returns
 
@@ -1380,13 +1380,13 @@ TCR data stored in the object.
 
 ------------------------------------------------------------------------
 
-### Method `addBCRData()`
+### `Cerebro$addBCRData()`
 
 Add BCR data.
 
 #### Usage
 
-    Cerebro_v1.3$addBCRData(data)
+    Cerebro$addBCRData(data)
 
 #### Arguments
 
@@ -1396,13 +1396,13 @@ Add BCR data.
 
 ------------------------------------------------------------------------
 
-### Method `addTCRData()`
+### `Cerebro$addTCRData()`
 
 Add TCR data.
 
 #### Usage
 
-    Cerebro_v1.3$addTCRData(data)
+    Cerebro$addTCRData(data)
 
 #### Arguments
 
@@ -1412,7 +1412,7 @@ Add TCR data.
 
 ------------------------------------------------------------------------
 
-### Method `getImmuneRepertoire()`
+### `Cerebro$getImmuneRepertoire()`
 
 Get immune repertoire data. Returns the unified `immune_repertoire`
 field if available; otherwise falls back to merging legacy `bcr_data`
@@ -1420,7 +1420,7 @@ and `tcr_data`.
 
 #### Usage
 
-    Cerebro_v1.3$getImmuneRepertoire()
+    Cerebro$getImmuneRepertoire()
 
 #### Returns
 
@@ -1428,13 +1428,13 @@ Named list of data.frames (one per sample), or empty list.
 
 ------------------------------------------------------------------------
 
-### Method [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+### `Cerebro$addImmuneRepertoire()`
 
 Set immune repertoire data.
 
 #### Usage
 
-    Cerebro_v1.3$addImmuneRepertoire(data)
+    Cerebro$addImmuneRepertoire(data)
 
 #### Arguments
 
@@ -1445,14 +1445,14 @@ Set immune repertoire data.
 
 ------------------------------------------------------------------------
 
-### Method `getHLATyping()`
+### `Cerebro$getHLATyping()`
 
 Get HLA typing data (canonical long `data.frame`), or an empty table
 when none is stored. Safe on older objects that predate the field.
 
 #### Usage
 
-    Cerebro_v1.3$getHLATyping()
+    Cerebro$getHLATyping()
 
 #### Returns
 
@@ -1460,7 +1460,7 @@ A canonical HLA typing `data.frame` (possibly zero-row).
 
 ------------------------------------------------------------------------
 
-### Method `addHLATyping()`
+### `Cerebro$addHLATyping()`
 
 Set HLA typing data. Accepts a canonical long `data.frame`, a wide
 `data.frame` (sample + HLA-\*\_1/\_2 columns), or a named `list` (sample
@@ -1472,7 +1472,7 @@ values into downstream analysis.
 
 #### Usage
 
-    Cerebro_v1.3$addHLATyping(
+    Cerebro$addHLATyping(
       data,
       source_type = "unknown",
       typing_method = NA_character_,
@@ -1500,13 +1500,13 @@ values into downstream analysis.
 
 ------------------------------------------------------------------------
 
-### Method `addSpatialData()`
+### `Cerebro$addSpatialData()`
 
 Add spatial data.
 
 #### Usage
 
-    Cerebro_v1.3$addSpatialData(name, data)
+    Cerebro$addSpatialData(name, data)
 
 #### Arguments
 
@@ -1524,13 +1524,13 @@ Add spatial data.
 
 ------------------------------------------------------------------------
 
-### Method `getSpatialData()`
+### `Cerebro$getSpatialData()`
 
 Retrieve spatial data.
 
 #### Usage
 
-    Cerebro_v1.3$getSpatialData(name)
+    Cerebro$getSpatialData(name)
 
 #### Arguments
 
@@ -1544,13 +1544,13 @@ Retrieve spatial data.
 
 ------------------------------------------------------------------------
 
-### Method `availableSpatial()`
+### `Cerebro$availableSpatial()`
 
 Get list of available spatial data entries.
 
 #### Usage
 
-    Cerebro_v1.3$availableSpatial()
+    Cerebro$availableSpatial()
 
 #### Returns
 
@@ -1558,7 +1558,7 @@ Get list of available spatial data entries.
 
 ------------------------------------------------------------------------
 
-### Method `getTrekker()`
+### `Cerebro$getTrekker()`
 
 Get Trekker single-cell spatial-mapping data, or `NULL` when none is
 stored. Safe on older objects that predate the field (the slot is read
@@ -1566,7 +1566,7 @@ through a `tryCatch` so the getter never errors on a legacy .crb).
 
 #### Usage
 
-    Cerebro_v1.3$getTrekker()
+    Cerebro$getTrekker()
 
 #### Returns
 
@@ -1574,13 +1574,13 @@ A `list` with the Trekker page's content, or `NULL`.
 
 ------------------------------------------------------------------------
 
-### Method `addTrekker()`
+### `Cerebro$addTrekker()`
 
 Set Trekker single-cell spatial-mapping data.
 
 #### Usage
 
-    Cerebro_v1.3$addTrekker(data)
+    Cerebro$addTrekker(data)
 
 #### Arguments
 
@@ -1592,13 +1592,13 @@ Set Trekker single-cell spatial-mapping data.
 
 ------------------------------------------------------------------------
 
-### Method `addExtraMaterial()`
+### `Cerebro$addExtraMaterial()`
 
 Add content to extra material field.
 
 #### Usage
 
-    Cerebro_v1.3$addExtraMaterial(category, name, content)
+    Cerebro$addExtraMaterial(category, name, content)
 
 #### Arguments
 
@@ -1618,13 +1618,13 @@ Add content to extra material field.
 
 ------------------------------------------------------------------------
 
-### Method `addExtraTable()`
+### `Cerebro$addExtraTable()`
 
 Add table to \`extra_material\` slot.
 
 #### Usage
 
-    Cerebro_v1.3$addExtraTable(name, table)
+    Cerebro$addExtraTable(name, table)
 
 #### Arguments
 
@@ -1638,13 +1638,13 @@ Add table to \`extra_material\` slot.
 
 ------------------------------------------------------------------------
 
-### Method `addExtraPlot()`
+### `Cerebro$addExtraPlot()`
 
 Add plot to \`extra_material\` slot.
 
 #### Usage
 
-    Cerebro_v1.3$addExtraPlot(name, plot)
+    Cerebro$addExtraPlot(name, plot)
 
 #### Arguments
 
@@ -1659,13 +1659,13 @@ Add plot to \`extra_material\` slot.
 
 ------------------------------------------------------------------------
 
-### Method `getExtraMaterial()`
+### `Cerebro$getExtraMaterial()`
 
 Retrieve extra material from `extra_material` field.
 
 #### Usage
 
-    Cerebro_v1.3$getExtraMaterial()
+    Cerebro$getExtraMaterial()
 
 #### Returns
 
@@ -1673,13 +1673,13 @@ Retrieve extra material from `extra_material` field.
 
 ------------------------------------------------------------------------
 
-### Method `getExtraMaterialCategories()`
+### `Cerebro$getExtraMaterialCategories()`
 
 Get names of categories for which extra material is available.
 
 #### Usage
 
-    Cerebro_v1.3$getExtraMaterialCategories()
+    Cerebro$getExtraMaterialCategories()
 
 #### Returns
 
@@ -1687,13 +1687,13 @@ Get names of categories for which extra material is available.
 
 ------------------------------------------------------------------------
 
-### Method `checkForExtraTables()`
+### `Cerebro$checkForExtraTables()`
 
 Check whether there are tables in the extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$checkForExtraTables()
+    Cerebro$checkForExtraTables()
 
 #### Returns
 
@@ -1701,13 +1701,13 @@ Check whether there are tables in the extra materials.
 
 ------------------------------------------------------------------------
 
-### Method `getNamesOfExtraTables()`
+### `Cerebro$getNamesOfExtraTables()`
 
 Get names of tables in extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$getNamesOfExtraTables()
+    Cerebro$getNamesOfExtraTables()
 
 #### Returns
 
@@ -1715,13 +1715,13 @@ Get names of tables in extra materials.
 
 ------------------------------------------------------------------------
 
-### Method `getExtraTable()`
+### `Cerebro$getExtraTable()`
 
 Get table from extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$getExtraTable(name)
+    Cerebro$getExtraTable(name)
 
 #### Arguments
 
@@ -1735,13 +1735,13 @@ Requested table in `data.frame` format.
 
 ------------------------------------------------------------------------
 
-### Method `checkForExtraPlots()`
+### `Cerebro$checkForExtraPlots()`
 
 Check whether there are plots in the extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$checkForExtraPlots()
+    Cerebro$checkForExtraPlots()
 
 #### Returns
 
@@ -1749,13 +1749,13 @@ Check whether there are plots in the extra materials.
 
 ------------------------------------------------------------------------
 
-### Method `getNamesOfExtraPlots()`
+### `Cerebro$getNamesOfExtraPlots()`
 
 Get names of plots in extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$getNamesOfExtraPlots()
+    Cerebro$getNamesOfExtraPlots()
 
 #### Returns
 
@@ -1763,13 +1763,13 @@ Get names of plots in extra materials.
 
 ------------------------------------------------------------------------
 
-### Method `getExtraPlot()`
+### `Cerebro$getExtraPlot()`
 
 Get plot from extra materials.
 
 #### Usage
 
-    Cerebro_v1.3$getExtraPlot(name)
+    Cerebro$getExtraPlot(name)
 
 #### Arguments
 
@@ -1783,7 +1783,7 @@ Requested plot made with `ggplot2`.
 
 ------------------------------------------------------------------------
 
-### Method [`print()`](https://rdrr.io/r/base/print.html)
+### `Cerebro$print()`
 
 Show overview of object and the data it contains. Print overview of
 available marker gene results for `self$print()` function. Print
@@ -1793,17 +1793,17 @@ function. Print overview of extra material for `self$print()` function.
 
 #### Usage
 
-    Cerebro_v1.3$print()
+    Cerebro$print()
 
 ------------------------------------------------------------------------
 
-### Method `clone()`
+### `Cerebro$clone()`
 
 The objects of this class are cloneable with this method.
 
 #### Usage
 
-    Cerebro_v1.3$clone(deep = FALSE)
+    Cerebro$clone(deep = FALSE)
 
 #### Arguments
 

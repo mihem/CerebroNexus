@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,13 +34,11 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebroApp_workflow_Seurat.html">Introduction to the cerebroApp workflow (Seurat)</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/Cerebro_interface_v1.2.html">Introduction to the Cerebro interface (v1.2 and older)</a></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_v1.3_class.html">Overview of the Cerebro v1.3 class</a></li>
-    <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -280,7 +278,7 @@ hidden.</p>
 <code>Seurat</code>, <code>Matrix</code>, the <code>magick</code> and
 <code>base64enc</code> packages (build-time only), and the in-tree
 CerebroNexus (for the new <code>trekker</code> slot on
-<code>Cerebro_v1.3</code>).</p>
+<code>Cerebro</code>).</p>
 <div class="section level3">
 <h3 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
 </h3>
@@ -399,7 +397,7 @@ image</strong>, so the drill-down still works.</p>
 <h3 id="step-6-export-a-cerebro-object-and-attach-the-trekker-slot">Step 6 — export a Cerebro object and attach the <code>trekker</code>
 slot<a class="anchor" aria-label="anchor" href="#step-6-export-a-cerebro-object-and-attach-the-trekker-slot"></a>
 </h3>
-<p>We build an ordinary <code>Cerebro_v1.3</code> object with
+<p>We build an ordinary <code>Cerebro</code> object with
 <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> (whole- transcriptome expression + UMAP
 + <code>cluster</code>/<code>celltype</code> groups) — this is what
 powers gene colouring on the page. Then we attach a <code>trekker</code>

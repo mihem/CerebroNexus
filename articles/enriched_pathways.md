@@ -51,10 +51,10 @@ exportFromSeurat(seurat_object,
 ```
 
 See
-[`vignette("overview_of_cerebro_v1.3_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_v1.3_class.md)
+[`vignette("overview_of_cerebro_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md)
 for the expected format.
 
 ## See also
 
-[`vignette("overview_of_cerebro_v1.3_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_v1.3_class.md)
+[`vignette("overview_of_cerebro_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md)
 for the Cerebro data model.

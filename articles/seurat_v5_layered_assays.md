@@ -604,7 +604,7 @@ workflow discovers files by name alone.
 ## See also
 
 - [Introduction to the CerebroNexus workflow with
-  Seurat](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md)
+  Seurat](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
 - [Create an expression matrix in HDF5
   format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
 - [Create a self-contained Shiny

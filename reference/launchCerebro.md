@@ -61,7 +61,7 @@ launchCerebro(
   function). Saving the expression matrix in `TENxMatrix` format has the
   benefit of a low memory footprint since the expression values are
   directly read from disk. This is particularly useful when working with
-  very large data sets and/or when startup of the Cerebro app is a
+  very large data sets and/or when startup of the CerebroNexus app is a
   priority (which is shorter because only the rest of the data that
   needs to be loaded tends to be very small). By default, this value is
   set to `NULL`, meaning that the expression matrix is expected to be

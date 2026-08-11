@@ -115,7 +115,7 @@ discrepancy is visible rather than hidden.
 The rest of this section is `data-raw/build_trekker_demo.R`, narrated.
 It needs `Seurat`, `Matrix`, the `magick` and `base64enc` packages
 (build-time only), and the in-tree CerebroNexus (for the new `trekker`
-slot on `Cerebro_v1.3`).
+slot on `Cerebro`).
 
 ### Setup
 
@@ -234,7 +234,7 @@ sub_bc <- bc_all[idx]
 
 ### Step 6 — export a Cerebro object and attach the `trekker` slot
 
-We build an ordinary `Cerebro_v1.3` object with
+We build an ordinary `Cerebro` object with
 [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
 (whole- transcriptome expression + UMAP + `cluster`/`celltype` groups) —
 this is what powers gene colouring on the page. Then we attach a

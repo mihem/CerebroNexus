@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Introduction to the cerebroApp workflow (Seurat) • CerebroNexus</title>
+<title>Introduction to the CerebroNexus workflow (Seurat) • CerebroNexus</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Introduction to the cerebroApp workflow (Seurat)">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Introduction to the CerebroNexus workflow (Seurat)">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,13 +34,11 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebroApp_workflow_Seurat.html">Introduction to the cerebroApp workflow (Seurat)</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/Cerebro_interface_v1.2.html">Introduction to the Cerebro interface (v1.2 and older)</a></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_v1.3_class.html">Overview of the Cerebro v1.3 class</a></li>
-    <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -95,14 +93,14 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Introduction to the cerebroApp workflow (Seurat)</h1>
+      <img src="../logo.svg" class="logo" alt=""><h1>Introduction to the CerebroNexus workflow (Seurat)</h1>
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
             
             <h4 data-toc-skip class="date">11 August, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/cerebroApp_workflow_Seurat.Rmd" class="external-link"><code>vignettes/cerebroApp_workflow_Seurat.Rmd</code></a></small>
-      <div class="d-none name"><code>cerebroApp_workflow_Seurat.Rmd</code></div>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/cerebronexus_workflow_seurat.Rmd" class="external-link"><code>vignettes/cerebronexus_workflow_seurat.Rmd</code></a></small>
+      <div class="d-none name"><code>cerebronexus_workflow_seurat.Rmd</code></div>
     </div>
 
     
@@ -110,13 +108,13 @@ Hillje</h4>
 <div class="section level2">
 <h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p>The <code>cerebroApp</code> package has two main purposes: (1) Give
-access to the Cerebro user interface, and (2) provide a set of functions
-to pre-process and export scRNA-seq data for visualization in Cerebro.
-The Cerebro user interface was built using the Shiny framework and
-designed to provide numerous perspectives on a given data set that
-should facilitate data interpretation. This vignette will give you an
-example of how scRNA-seq data can be processed using the <a href="https://satijalab.org/seurat/" class="external-link">Seurat</a> toolkit and then
+<p>The <code>CerebroNexus</code> package has two main purposes: (1)
+provide access to the CerebroNexus user interface, and (2) provide
+functions to pre-process and export scRNA-seq data for visualization in
+CerebroNexus. The Cerebro user interface was built using the Shiny
+framework and designed to provide numerous perspectives on a given data
+set that should facilitate data interpretation. This vignette will give
+you an example of how scRNA-seq data can be processed using the <a href="https://satijalab.org/seurat/" class="external-link">Seurat</a> toolkit and then
 exported for visualization in Cerebro.</p>
 <p>Ket features that can be accessed through Cerebro:</p>
 <ul>
@@ -138,20 +136,19 @@ reductions can be exported to PDF.</li>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>Before starting the workflow, we need to install
-<code>cerebroApp</code>, as well as the <a href="https://satijalab.org/seurat/" class="external-link"><code>Seurat</code></a>, <a href="https://cole-trapnell-lab.github.io/monocle-release/" class="external-link"><code>monocle</code></a>
+<p>Before starting the workflow, install <code>CerebroNexus</code>, as
+well as the <a href="https://satijalab.org/seurat/" class="external-link"><code>Seurat</code></a>, <a href="https://cole-trapnell-lab.github.io/monocle-release/" class="external-link"><code>monocle</code></a>
 and <a href="https://www.bioconductor.org/packages/release/bioc/html/SingleR.html" class="external-link"><code>SingleR</code></a>
-packages, which are not installed as dependencies of cerebroApp because
-they are only necessary if you want/need to pre-process your scRNA-seq
-data. If you just want to launch the Cerebro user interface,
-e.g. because you already have the pre-processed data, you don’t need
-those packages.</p>
+packages. The latter packages are optional because they are only needed
+for pre-processing scRNA-seq data. If you just want to launch the
+Cerebro user interface, e.g. because you already have the pre-processed
+data, you don’t need those packages.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span> <span class="st">'BiocManager'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">'BiocManager'</span><span class="op">)</span></span>
 <span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://bioconductor.github.io/BiocManager/" class="external-link">BiocManager</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="kw">if</span> <span class="op">(</span> <span class="st">'cerebroApp'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu">install</span><span class="op">(</span><span class="st">'romanhaa/cerebroApp'</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span> <span class="op">!</span><span class="st">'CerebroNexus'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">)</span> <span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">'mihem/CerebroNexus'</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span> <span class="st">'Seurat'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu">install</span><span class="op">(</span><span class="st">'Seurat'</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span> <span class="st">'SingleR'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu">install</span><span class="op">(</span><span class="st">'SingleR'</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span> <span class="st">'monocle'</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">==</span> <span class="cn">FALSE</span> <span class="op">)</span> <span class="fu">install</span><span class="op">(</span><span class="st">'monocle'</span><span class="op">)</span></span></code></pre></div>
@@ -166,7 +163,7 @@ dplyr package and set a seed to make our analysis reproducible.</p>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">SingleR</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">monocle</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">cerebroApp</span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1234567</span><span class="op">)</span></span></code></pre></div>
@@ -300,7 +297,7 @@ collected for visualization in Cerebro.</p>
 <span>  genes_max <span class="op">=</span> <span class="cn">Inf</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">technical_info</span><span class="op">$</span><span class="va">cerebroApp_version</span> <span class="op">&lt;-</span> <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">'cerebroApp'</span><span class="op">)</span></span>
+<span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">technical_info</span><span class="op">$</span><span class="va">CerebroNexus_version</span> <span class="op">&lt;-</span> <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">'CerebroNexus'</span><span class="op">)</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">technical_info</span><span class="op">$</span><span class="va">Seurat</span> <span class="op">&lt;-</span> <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">'Seurat'</span><span class="op">)</span></span>
 <span><span class="va">seurat</span><span class="op">@</span><span class="va">misc</span><span class="op">$</span><span class="va">technical_info</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  <span class="st">'R'</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/utils/capture.output.html" class="external-link">capture.output</a></span><span class="op">(</span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://sessioninfo.r-lib.org/reference/session_info.html" class="external-link">session_info</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
@@ -371,10 +368,10 @@ later.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="cerebroapp-functions">cerebroApp functions<a class="anchor" aria-label="anchor" href="#cerebroapp-functions"></a>
+<h2 id="cerebronexus-functions">CerebroNexus functions<a class="anchor" aria-label="anchor" href="#cerebronexus-functions"></a>
 </h2>
-<p>Now we use a set of cerebroApp function to get more information about
-the data set and the contained clusters and cell types.</p>
+<p>Now we use CerebroNexus functions to obtain more information about
+the data set and its clusters and cell types.</p>
 <div class="section level3">
 <h3 id="calculate-percentage-of-mitochondrial-and-ribosomal-transcripts">Calculate percentage of mitochondrial and ribosomal transcripts<a class="anchor" aria-label="anchor" href="#calculate-percentage-of-mitochondrial-and-ribosomal-transcripts"></a>
 </h3>
@@ -464,9 +461,9 @@ al.</a>.</p>
 </h2>
 <p>Then, we perform trajectory analysis with <a href="https://cole-trapnell-lab.github.io/monocle-release/" class="external-link">Monocle
 v2</a> using the previously identified highly variable genes. We extract
-the trajectory from the generated Monocle object with the
-<code><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory()</a></code> function of cerebroApp and
-attach it to our Seurat object.</p>
+the trajectory from the generated Monocle object with the CerebroNexus
+<code><a href="../reference/extractMonocleTrajectory.html">extractMonocleTrajectory()</a></code> function and attach it to our
+Seurat object.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">monocle</span> <span class="op">&lt;-</span> <span class="fu">newCellDataSet</span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span><span class="op">@</span><span class="va">assays</span><span class="op">$</span><span class="va">RNA</span><span class="op">@</span><span class="va">counts</span>,</span>
@@ -487,9 +484,9 @@ attach it to our Seurat object.</p>
 <div class="section level2">
 <h2 id="export-to-cerebro-format">Export to Cerebro format<a class="anchor" aria-label="anchor" href="#export-to-cerebro-format"></a>
 </h2>
-<p>Finally, we use the <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> function of
-cerebroApp to export our Seurat object to a <code>.crb</code> file which
-can be loaded into Cerebro.</p>
+<p>Finally, we use CerebroNexus <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> to
+export our Seurat object to a <code>.crb</code> file which can be loaded
+into CerebroNexus.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>

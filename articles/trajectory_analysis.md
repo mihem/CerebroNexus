@@ -6,9 +6,10 @@ The **Trajectory** tab provides interactive exploration of pseudotime
 trajectories (e.g., from Monocle 2). It appears *conditionally* — only
 when the loaded `.crb` file contains trajectory data.
 
-This module restores functionality from the original cerebroApp v1.3.
-The code is the original implementation by Roman Hillje, restructured
-into the current Viewer sub-file layout with no functional changes.
+This module restores trajectory functionality from an earlier
+implementation. The code is the original implementation by Roman Hillje,
+restructured into the current Viewer sub-file layout with no functional
+changes.
 
 ## Quick start
 
@@ -79,5 +80,5 @@ exportFromSeurat(seurat_object,
 
 ## See also
 
-- [`vignette("cerebroApp_workflow_Seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for the complete export workflow

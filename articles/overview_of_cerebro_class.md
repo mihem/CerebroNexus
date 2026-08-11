@@ -1,9 +1,8 @@
 # Overview of the Cerebro v1.3 class
 
-The introduction of the `Cerebro_v1.3` class is an attempt to formalize
-the data structure and thereby provide stability in future releases,
-ultimately aiming to improve backwards compatibility between Cerebro
-version.
+The `Cerebro` data class formalizes the data structure to provide
+stability and improve backward compatibility across CerebroNexus
+releases.
 
 While the data is organized similar to how it was done before, now they
 live in their own class with setter and getter methods for the different
@@ -72,8 +71,8 @@ numbers, and lists that with you think are relevant to share.
 Calling the Cerebro object will give an overview of the information it
 currently contains:
 
-    class: Cerebro_v1.3
-    cerebroApp version: 1.3.0
+    class: Cerebro
+    exporter package version: 4.2
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -93,4 +92,4 @@ currently contains:
     trajectories:
       - monocle2 (1): highly_variable_genes
 
-For more details, please check the `Cerebro_v1.3` reference page.
+For more details, please check the `Cerebro` reference page.

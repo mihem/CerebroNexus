@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,13 +20,11 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebroApp_workflow_Seurat.html">Introduction to the cerebroApp workflow (Seurat)</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/Cerebro_interface_v1.2.html">Introduction to the Cerebro interface (v1.2 and older)</a></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_v1.3_class.html">Overview of the Cerebro v1.3 class</a></li>
-    <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -75,6 +73,13 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="4.2" id="cerebronexus-42">CerebroNexus 4.2<a class="anchor" aria-label="anchor" href="#cerebronexus-42"></a></h2>
+<div class="section level3">
+<h3 id="breaking-changes-4-2">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-4-2"></a></h3>
+<ul><li>The public R6 data-class constructor is now <code>Cerebro$new()</code>. The version-suffixed constructor was removed; existing <code>.crb</code> files remain readable and all bundled examples have been reserialized with the new class.</li>
+</ul></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="4.1" id="cerebronexus-41">CerebroNexus 4.1<a class="anchor" aria-label="anchor" href="#cerebronexus-41"></a></h2>
 <div class="section level3">
 <h3 id="viewer-4-1">Viewer<a class="anchor" aria-label="anchor" href="#viewer-4-1"></a></h3>
@@ -90,7 +95,7 @@
 <div class="section level3">
 <h3 id="breaking-changes-4-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-4-0"></a></h3>
 <ul><li>
-<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> is now the single application launcher. The obsolete version selector and version-named <code>launchCerebroV1.x()</code> exports were removed because CerebroNexus ships one Viewer implementation.</li>
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> is now the single application launcher. The obsolete version selector and deprecated version-specific launch exports were removed because CerebroNexus ships one Viewer implementation.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="internal-4-0">Internal<a class="anchor" aria-label="anchor" href="#internal-4-0"></a></h3>
@@ -209,7 +214,7 @@
 <div class="section level3">
 <h3 id="renamed-package-and-application-3-0-0">Renamed package and application<a class="anchor" aria-label="anchor" href="#renamed-package-and-application-3-0-0"></a></h3>
 <ul><li>Unified the R package, Shiny application, and GitHub repository under the <code>CerebroNexus</code> name. Install from <code>mihem/CerebroNexus</code> and load the package with <code><a href="https://mihem.github.io/CerebroNexus/">library(CerebroNexus)</a></code>.</li>
-<li>Kept the established Cerebro data model and public API, including <code>.crb</code> files, <code>Cerebro_v1.3</code>, <code>Cerebro.options</code>, <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, and <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code>.</li>
+<li>Kept the established Cerebro data model and public API, including <code>.crb</code> files, <code>Cerebro</code>, <code>Cerebro.options</code>, <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, and <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code>.</li>
 <li>Updated the HLA export metadata field to <code>CerebroNexus_version</code>.</li>
 </ul></div>
 </div>
@@ -220,7 +225,7 @@
 <ul><li>
 <strong>New page: HLA &amp; TCR Motifs.</strong> A standalone top-level tab (peer of Immune Repertoire) that draws a CDR3 motif network — every unique CDR3 is a node and an edge joins two equal-length CDR3s at Hamming distance 1 — alongside donor-level HLA context. It appears conditionally, only when the loaded <code>.crb</code> carries a TRA/TRB chain. Three sub-tabs: <strong>Motif Network</strong> (colour by motif cluster, cell type, MHC context, HLA carrier status, or sample of origin), <strong>HLA Associations</strong> (descriptive carrier vs. non-carrier overlap — no p-value, no restriction claim), and <strong>Data &amp; QC</strong> (coverage, normalized typing, and a session-only HLA upload).</li>
 <li>
-<strong>HLA typing on the data class.</strong> <code>Cerebro_v1.3</code> gained an optional <code>hla_typing</code> slot with <code>addHLATyping()</code> / <code>getHLATyping()</code>; the getter is backward-compatible with older <code>.crb</code> files. Typing accepts a canonical long table, a wide <code>sample</code> + <code>HLA-*_1/_2</code> table, or a named list, and carries provenance (<code>genotyped</code> / <code>imputed</code> / <code>synthetic</code> / <code>unknown</code>) so a synthetic or imputed genotype is never treated as directly typed.</li>
+<strong>HLA typing on the data class.</strong> <code>Cerebro</code> gained an optional <code>hla_typing</code> slot with <code>addHLATyping()</code> / <code>getHLATyping()</code>; the getter is backward-compatible with older <code>.crb</code> files. Typing accepts a canonical long table, a wide <code>sample</code> + <code>HLA-*_1/_2</code> table, or a named list, and carries provenance (<code>genotyped</code> / <code>imputed</code> / <code>synthetic</code> / <code>unknown</code>) so a synthetic or imputed genotype is never treated as directly typed.</li>
 <li>
 <strong>Export picks it up automatically.</strong> <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> now reads <code>object@misc$hla_typing</code> (with <code>object@misc$hla_typing_source_type</code>), parallel to the existing <code>immune_repertoire</code> slot.</li>
 <li>
@@ -248,7 +253,7 @@
 <li>
 <strong>Honest QC.</strong> Positioning QC is shown in the vendor’s own field names (a missing metric stays missing); “confidently positioned” is disclosed as including vendor-salvaged multi-location nuclei (labelled <code>vendor_confidently_positioned</code>); values below the vendor’s reference range are flagged without adjudicating sample usability; and Moran’s I is the upstream vendor value, labelled and never mixed with Cerebro’s own.</li>
 <li>
-<strong>Data class.</strong> <code>Cerebro_v1.3</code> gained an optional <code>trekker</code> slot with <code>addTrekker()</code> / <code>getTrekker()</code>; the getter is backward-compatible with older <code>.crb</code> files that predate the field.</li>
+<strong>Data class.</strong> <code>Cerebro</code> gained an optional <code>trekker</code> slot with <code>addTrekker()</code> / <code>getTrekker()</code>; the getter is backward-compatible with older <code>.crb</code> files that predate the field.</li>
 <li>
 <strong>Demo data and vignette.</strong> A real, down-sampled demo <code>.crb</code> (<code>demo_trekker.crb</code>, from the smallest official Trekker bundle: 2,532 nuclei × all 21,374 genes, with positioning-evidence images embedded) and a runnable vignette, <em>“Trekker single-cell spatial mapping: from a vendor bundle to an interactive app”</em>, covering the registration-gated download, the bundle contents, and the reproducible build (<code>data-raw/build_trekker_demo.R</code>).</li>
 </ul></div>
@@ -340,7 +345,7 @@
 <div class="section level3">
 <h3 id="spatial-transcriptomics-backend-2-0-0">Spatial transcriptomics (backend)<a class="anchor" aria-label="anchor" href="#spatial-transcriptomics-backend-2-0-0"></a></h3>
 <ul><li>
-<strong>Spatial data layer</strong>: the <code>Cerebro_v1.3</code> class gains a <code>spatial</code> field with <code>addSpatialData()</code>, <code>getSpatialData()</code>, and <code>availableSpatial()</code> accessors.</li>
+<strong>Spatial data layer</strong>: the <code>Cerebro</code> class gains a <code>spatial</code> field with <code>addSpatialData()</code>, <code>getSpatialData()</code>, and <code>availableSpatial()</code> accessors.</li>
 <li>
 <strong>Export support</strong>: <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> now extracts spatial coordinates and expression from Seurat v5 image slots (Visium / Xenium / FOV) via the internal <code>.getSpatialData()</code> helper, storing them per image in the exported <code>.crb</code>.</li>
 <li>
@@ -354,7 +359,7 @@
 <div class="section level3">
 <h3 id="trajectory-tab-1-7-8">Trajectory tab<a class="anchor" aria-label="anchor" href="#trajectory-tab-1-7-8"></a></h3>
 <ul><li>
-<strong>Trajectory module</strong>: restores the pseudotime trajectory explorer from the original cerebroApp v1.3 (projection coloured by state/pseudotime, states by group, expression metrics along pseudotime, per-state gene/transcript counts). The code is Roman Hillje’s original implementation, restructured into the v1.4 sub-file layout with no functional change.</li>
+<strong>Trajectory module</strong>: restores the pseudotime trajectory explorer from the original v1.3 implementation (projection coloured by state/pseudotime, states by group, expression metrics along pseudotime, per-state gene/transcript counts). The code is Roman Hillje’s original implementation, restructured into the v1.4 sub-file layout with no functional change.</li>
 <li>
 <strong>Conditional tab</strong>: the Trajectory tab is inserted dynamically (<code>insertConditionalTab</code>) only for data sets whose <code>.crb</code> carries trajectory data — the same content-driven sidebar mechanism used by the Immune Repertoire and Extra material tabs.</li>
 <li>
@@ -473,7 +478,7 @@
 <h3 id="bug-fixes-1-7-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-7-0"></a></h3>
 <ul><li>Fixed <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> projections: <code>reducedDims()</code> output is now coerced to <code>data.frame</code> before <code>addProjection()</code>, matching the Seurat path and clearing a latent runtime error for SCE inputs with non-PCA reductions</li>
 <li>Fixed <code>.attachExternalExpression</code> crashing on legacy <code>.crb</code> objects that predate the <code>getExpressionBackend()</code> method; such objects are now treated as embedded backend and skip the attach step</li>
-<li>Fixed “method not found” errors on the trajectory tab by renaming the corresponding <code>Cerebro_v1.3</code> methods to the names the Shiny server already calls (<code>getMethodsForTrajectories</code>, <code>getNamesOfTrajectories</code>)</li>
+<li>Fixed “method not found” errors on the trajectory tab by renaming the corresponding <code>Cerebro</code> methods to the names the Shiny server already calls (<code>getMethodsForTrajectories</code>, <code>getNamesOfTrajectories</code>)</li>
 <li>Fixed gene_expression plot chain freezing on gene picker changes: removed a stale <code>isolate()</code> wrapper and a reference to a non-existent <code>expression_projection_update_button</code> input; the existing 250 ms debounce on the data-to-plot reactive still throttles bursts</li>
 </ul></div>
 <div class="section level3">
@@ -551,7 +556,7 @@
 </ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.4.0" id="version-140">Version 1.4.0<a class="anchor" aria-label="anchor" href="#version-140"></a></h2>
-<p>This is the first update of this cerebroApp fork. Its aim is to continue a lightweight version of the excellent cerebroApp with only the main function as the cerebroApp by Roman Hillje is sadly discontinued.</p>
+<p>This was the first update of the lightweight fork that continued the main functionality after its predecessor was discontinued.</p>
 <div class="section level3">
 <h3 id="major-changes-1-4-0">Major changes<a class="anchor" aria-label="anchor" href="#major-changes-1-4-0"></a></h3>
 <ul><li>remove enriched pathways, extra material, most expressed genes and trajectory functions since the goal of this fork is to continue with a lightweight version</li>

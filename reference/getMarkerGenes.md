@@ -101,8 +101,8 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-#> [18:34:11] Genes in GO term "cell surface" (GO:0009986) could not be retrieved, possibly due to the server not being reachable at the moment.
-#> [18:34:11] Get marker genes for 2 groups in `sample`...
+#> [20:23:59] Genes in GO term "cell surface" (GO:0009986) could not be retrieved, possibly due to the server not being reachable at the moment.
+#> [20:23:59] Get marker genes for 2 groups in `sample`...
 #> Calculating cluster pbmc_1
 #> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
 #> (default method for FindMarkers) please install the presto package
@@ -114,7 +114,7 @@ pbmc <- getMarkerGenes(
 #> efficient implementation (no further action necessary).
 #> This message will be shown once per session
 #> Calculating cluster pbmc_2
-#> [18:34:12] Get marker genes for 2 groups in `seurat_clusters`...
+#> [20:24:00] Get marker genes for 2 groups in `seurat_clusters`...
 #> Calculating cluster 0
 #> Calculating cluster 1
 ```

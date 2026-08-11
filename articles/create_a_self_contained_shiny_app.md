@@ -285,7 +285,7 @@ rsconnect::deployApp(appDir = out_dir)
 ## Reference
 
 - [`?createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-- [`vignette("cerebroApp_workflow_Seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for end-to-end Seurat → `.crb` → app
 - [`vignette("host_cerebro_on_shinyapps")`](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
   for shinyapps.io specifics

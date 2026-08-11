@@ -2,8 +2,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/404.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/LICENSE-text.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/LICENSE.html</loc></url>
-<url><loc>https://mihem.github.io/CerebroNexus/articles/Cerebro_interface_v1.2.html</loc></url>
-<url><loc>https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.html</loc></url>
@@ -22,8 +21,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/most_expressed_genes.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/multi_crb.html</loc></url>
-<url><loc>https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_v1.3_class.html</loc></url>
-<url><loc>https://mihem.github.io/CerebroNexus/articles/release_notes_v1.3.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.html</loc></url>
@@ -31,7 +29,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/authors.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/index.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/news/index.html</loc></url>
-<url><loc>https://mihem.github.io/CerebroNexus/reference/Cerebro_v1.3.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/Cerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_MAX_EXACT.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_R_MAX.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_R_MIN.html</loc></url>

@@ -2,19 +2,15 @@
 
 ### Workflows
 
-- [Introduction to the cerebroApp workflow
-  (Seurat)](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md):
+- [Introduction to the CerebroNexus workflow
+  (Seurat)](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md):
 - [Export a data set in SCE
   format](https://mihem.github.io/CerebroNexus/articles/export_a_data_set_in_SCE_format.md):
 
-### Cerebro interface
+### Data model
 
-- [Introduction to the Cerebro interface (v1.2 and
-  older)](https://mihem.github.io/CerebroNexus/articles/Cerebro_interface_v1.2.md):
 - [Overview of the Cerebro v1.3
-  class](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_v1.3_class.md):
-- [Release notes: Cerebro/cerebroApp
-  v1.3](https://mihem.github.io/CerebroNexus/articles/release_notes_v1.3.md):
+  class](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md):
 
 ### How-to guides
 

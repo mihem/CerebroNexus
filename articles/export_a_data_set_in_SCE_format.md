@@ -15,15 +15,13 @@ process your data.
 
 ## Installation
 
-Before starting the workflow, we need to install `cerebroApp`, as well
-as the
+Before starting the workflow, install `CerebroNexus`, as well as the
 [`scran`](https://bioconductor.org/packages/release/bioc/html/scran.html),
 [`scater`](https://bioconductor.org/packages/3.11/bioc/html/scater.html)
 and
 [`SingleR`](https://www.bioconductor.org/packages/release/bioc/html/SingleR.html)
-packages, which are not installed as dependencies of cerebroApp because
-they are only necessary if you want/need to pre-process your scRNA-seq
-data. If you just want to launch the Cerebro user interface,
+packages. The latter packages are only needed for pre-processing
+scRNA-seq data. If you just want to launch the Cerebro user interface,
 e.g. because you already have the pre-processed data, you don’t need
 those packages.
 
@@ -32,7 +30,7 @@ if ( 'BiocManager' %in% installed.packages() == FALSE ) install.packages('BiocMa
 
 library(BiocManager)
 
-if ( 'cerebroApp' %in% installed.packages() == FALSE ) install('romanhaa/cerebroApp')
+if ( !'CerebroNexus' %in% rownames(installed.packages()) ) remotes::install_github('mihem/CerebroNexus')
 if ( 'scran' %in% installed.packages() == FALSE ) install('scran')
 if ( 'scater' %in% installed.packages() == FALSE ) install('scater')
 if ( 'SingleR' %in% installed.packages() == FALSE ) install('SingleR')
@@ -49,7 +47,7 @@ library(dplyr)
 library(scran)
 library(scater)
 library(SingleR)
-library(cerebroApp)
+library(CerebroNexus)
 
 options(width = 100)
 set.seed(1234567)
@@ -164,7 +162,7 @@ sce@metadata$parameters$filtering <- list(
   genes_max = Inf
 )
 
-sce@metadata$technical_info$cerebroApp_version <- utils::packageVersion('cerebroApp')
+sce@metadata$technical_info$CerebroNexus_version <- utils::packageVersion('CerebroNexus')
 sce@metadata$technical_info$scran <- utils::packageVersion('scran')
 sce@metadata$technical_info$scater <- utils::packageVersion('scater')
 sce@metadata$technical_info <- list(
@@ -273,10 +271,10 @@ marker_genes_cell_type %>% select(1:6) %>% head() %>% knitr::kable(booktabs = T)
 
 ## Export to Cerebro format
 
-Finally, we use the
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
-function of cerebroApp to export our Seurat object to a `.crb` file
-which can be loaded into Cerebro.
+Finally, we use CerebroNexus
+[`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+to export our SCE object to a `.crb` file which can be loaded into
+CerebroNexus.
 
 ``` r
 exportFromSCE(

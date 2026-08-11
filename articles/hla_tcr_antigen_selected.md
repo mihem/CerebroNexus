@@ -400,7 +400,7 @@ expression <- methods::as(expression, "CsparseMatrix")
 ## Assembling the `.crb`
 
 ``` r
-crb <- Cerebro_v1.3$new()
+crb <- Cerebro$new()
 crb$expression <- expression
 crb$setMetaData(meta)          # cell_barcode, sample, cell_type,
                                # dextramer_antigen, dextramer_peptide,

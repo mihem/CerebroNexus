@@ -2,30 +2,23 @@
 
 ## Overview
 
-cerebroApp v1.3 provides new possibilities to export and visualize
-custom data that you would like to share alongside with your scRNA-seq
-data. At the time of writing, you can attach tables and plots (made with
-ggplot2) to your data set. In this article, I will show you to do it.
+CerebroNexus lets you export and visualize custom data alongside
+scRNA-seq data. You can attach tables and plots (made with ggplot2) to a
+data set. This article shows how to do it.
 
 ## Tables
 
-In previous cerebroApp versions, a very specific format for tables
-containing marker genes and enriched pathways was expected, resulting in
-a severe limitation of which methods you can use to generate the
-results, or alternatively requiring manual modification of the table to
-fit the format. Since cerebroApp v1.3, it is possible to export and
-visualize tables of any format in Cerebro, as long as they are a
-`data.frame`. Due to dynamic column formatting and color highlighting,
-the table content can be visually enhanced anyway.
+CerebroNexus can export and visualize tables of any format as long as
+they are a `data.frame`. Dynamic column formatting and colour
+highlighting can further enhance the table content.
 
 ### Marker genes and enriched pathways
 
-Let’s assume you have a `Seurat` object but generated tables of
-differentially expressed genes and enriched pathways using other
-tools/methods than those built into cerebroApp. To export those tables,
-you just need to put it in the right place, following a “method” and
-“name” scheme. In this example, we assume you have a table of marker
-genes called `custom_table` that looks like this:
+Assume you have a `Seurat` object but generated tables of differentially
+expressed genes and enriched pathways using other tools or methods. To
+export those tables, place them according to a “method” and “name”
+scheme. In this example, we use a marker-gene table called
+`custom_table`:
 
 ``` r
 library(tibble)
@@ -69,8 +62,8 @@ exportFromSeurat(
     [15:28:21] Start collecting data...
     [15:28:21] Overview of Cerebro object:
 
-    class: Cerebro_v1.3
-    cerebroApp version: 1.3.0
+    class: Cerebro
+    exporter package version: 4.2
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -145,8 +138,8 @@ exportFromSeurat(
     [15:07:48] Start collecting data...
     [15:07:50] Overview of Cerebro object:
 
-    class: Cerebro_v1.3
-    cerebroApp version: 1.3.0
+    class: Cerebro
+    exporter package version: 4.2
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -224,8 +217,8 @@ exportFromSeurat(
     [11:54:33] Start collecting data...
     [11:54:33] Overview of Cerebro object:
 
-    class: Cerebro_v1.3
-    cerebroApp version: 1.3.0
+    class: Cerebro
+    exporter package version: 4.2
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -383,8 +376,8 @@ exportFromSeurat(
     [10:03:13] Start collecting data...
     [10:03:14] Overview of Cerebro object:
 
-    class: Cerebro_v1.3
-    cerebroApp version: 1.3.0
+    class: Cerebro
+    exporter package version: 4.2
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19

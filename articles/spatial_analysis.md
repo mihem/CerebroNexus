@@ -167,7 +167,7 @@ entries default to a no-op (no flip, scale 1.0, no rotation).
 
 ## See also
 
-- [`vignette("cerebroApp_workflow_Seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebroApp_workflow_Seurat.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for the complete export workflow.
 - [`vignette("create_a_self_contained_shiny_app")`](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
   for app bundling options.

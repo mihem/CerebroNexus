@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,13 +20,11 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
-    <li><a class="dropdown-item" href="../articles/cerebroApp_workflow_Seurat.html">Introduction to the cerebroApp workflow (Seurat)</a></li>
+    <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/Cerebro_interface_v1.2.html">Introduction to the Cerebro interface (v1.2 and older)</a></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_v1.3_class.html">Overview of the Cerebro v1.3 class</a></li>
-    <li><a class="dropdown-item" href="../articles/release_notes_v1.3.html">Release notes: Cerebro/cerebroApp v1.3</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -272,18 +270,18 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Overview of Cerebro object:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro_v1.3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> cerebroApp version: 4.1</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 4.2</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -303,8 +301,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Saving Cerebro object to: /tmp/nix-shell-4307-733353321/RtmpulypWd/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:34:07] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Saving Cerebro object to: /tmp/nix-shell-4488-4119583046/RtmpjIGjHr/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:23:56] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

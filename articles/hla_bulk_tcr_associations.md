@@ -59,7 +59,7 @@ matrix, then add the receptors and the real HLA**.
 ``` r
 # ... build `meta` (one row per analysis unit), `ir` (receptors), `hla_long` (genotypes)
 
-crb <- Cerebro_v1.3$new()
+crb <- Cerebro$new()
 crb$technical_info <- list(observation_unit = "analysis unit",   # a row is NOT a cell
                            receptor_key     = "v_gene+cdr3",
                            tcr_selection    = "association-conditioned")
@@ -139,8 +139,8 @@ object layout, the contracts, and the Associations tab behave the same.
 
 ### Option B — a small synthetic bulk `.crb` you can run now
 
-There is no Seurat object here (no cells), so we build the
-`Cerebro_v1.3` object **by hand**.
+There is no Seurat object here (no cells), so we build the `Cerebro`
+object **by hand**.
 
 #### Setup and donors
 
@@ -249,7 +249,7 @@ Now set the object’s slots directly, including the declared contracts
 under `technical_info`:
 
 ``` r
-crb <- Cerebro_v1.3$new()
+crb <- Cerebro$new()
 crb$experiment <- list(
   experiment_name = "Toy bulk TCRb cohort - synthetic HLA associations",
   organism = "hg", date_of_export = format(Sys.Date())
@@ -353,8 +353,7 @@ Provenance is separate from selection:
 Option B built `ir` and `hla_long` from random generators. With your own
 data you build the *same two objects* from real files, then run Option
 B’s assembly block unchanged — there is no Seurat object (bulk has no
-cells), so you set the `Cerebro_v1.3` slots by hand exactly as shown
-above.
+cells), so you set the `Cerebro` slots by hand exactly as shown above.
 
 ### Receptors from immunoSEQ / MiXCR
 
