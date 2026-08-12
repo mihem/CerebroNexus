@@ -1,6 +1,6 @@
 # Changelog
 
-## CerebroNexus 4.2
+## CerebroNexus 4.2.0
 
 ### Breaking changes
 
@@ -9,7 +9,7 @@
   readable and all bundled examples have been reserialized with the new
   class.
 
-## CerebroNexus 4.1
+## CerebroNexus 4.1.0
 
 ### Viewer
 
