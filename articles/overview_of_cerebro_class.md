@@ -1,4 +1,4 @@
-# Overview of the Cerebro v1.3 class
+# Overview of the Cerebro class
 
 The `Cerebro` data class formalizes the data structure to provide
 stability and improve backward compatibility across CerebroNexus
@@ -72,7 +72,7 @@ Calling the Cerebro object will give an overview of the information it
 currently contains:
 
     class: Cerebro
-    exporter package version: 4.2.0
+    exporter package version: 4.3.0
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19

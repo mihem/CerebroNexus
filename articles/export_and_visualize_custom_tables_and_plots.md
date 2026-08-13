@@ -63,7 +63,7 @@ exportFromSeurat(
     [15:28:21] Overview of Cerebro object:
 
     class: Cerebro
-    exporter package version: 4.2.0
+    exporter package version: 4.3.0
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -139,7 +139,7 @@ exportFromSeurat(
     [15:07:50] Overview of Cerebro object:
 
     class: Cerebro
-    exporter package version: 4.2.0
+    exporter package version: 4.3.0
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -218,7 +218,7 @@ exportFromSeurat(
     [11:54:33] Overview of Cerebro object:
 
     class: Cerebro
-    exporter package version: 4.2.0
+    exporter package version: 4.3.0
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19
@@ -377,7 +377,7 @@ exportFromSeurat(
     [10:03:14] Overview of Cerebro object:
 
     class: Cerebro
-    exporter package version: 4.2.0
+    exporter package version: 4.3.0
     experiment name: pbmc_Seurat
     organism: hg
     date of analysis: 2020-02-19

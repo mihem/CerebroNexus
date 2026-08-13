@@ -9,7 +9,7 @@ data that can be visualized in Cerebro."><meta property="og:image" content="http
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -26,7 +26,7 @@ data that can be visualized in Cerebro."><meta property="og:image" content="http
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -1431,15 +1431,18 @@ values into downstream analysis.</p><div class="section">
 </div><p></p><div class="section">
 <h4 id="arguments-39">Arguments<a class="anchor" aria-label="anchor" href="#arguments-39"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
-<dd><p>Name of the spatial data entry (e.g. image name).</p></dd>
+<dd><p>Name of the spatial data entry (for example a Seurat image or
+Cerebro spatial entry).</p></dd>
 
       <dt><code>data</code></dt>
 <dd><p><code>list</code> containing 'coordinates' (data.frame) and
-'expression' (sparse matrix). It may optionally carry an embedded
-histology image as 'image' (a base64 <code>data:</code> URI string) plus
-'image_bounds' (named list xmin/xmax/ymin/ymax in coordinate space)
-so the Spatial tab can render the real tissue background without an
-external file.</p></dd>
+'expression' (sparse matrix). Embedded backgrounds are stored in
+'histology_images', a uniquely named list of image payloads. Each
+payload contains 'histology_image' (a base64 <code>data:</code> URI) and
+'histology_image_bounds' (xmin/xmax/ymin/ymax in coordinate space).
+Bounds omitted from a payload are derived from the coordinates. Legacy
+singular image fields are accepted and normalized as 'Tissue
+background'.</p></dd>
 
 
 </dl><p></p></div>
@@ -1461,7 +1464,9 @@ external file.</p></dd>
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-38">Returns<a class="anchor" aria-label="anchor" href="#returns-38"></a></h4>
-<p><code>list</code> containing 'coordinates' and 'expression'.</p>
+<p>A canonical spatial-data <code>list</code> containing 'coordinates',
+'expression', and 'histology_images'. Legacy singular image fields are
+normalized on read.</p>
 </div>
 
 </div>

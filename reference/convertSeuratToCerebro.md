@@ -1,8 +1,8 @@
 # Convert Seurat Object to Cerebro Format
 
-This function reads a Seurat object from a file, optionally renames
-grouping variables, loads marker gene tables, and exports the data to
-Cerebro format for visualization.
+This function accepts a Seurat object or reads one from an RDS file,
+optionally renames grouping variables, loads marker gene tables, and
+exports the data to Cerebro format for visualization.
 
 ## Usage
 
@@ -22,6 +22,7 @@ convertSeuratToCerebro(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  spatial_images = NULL,
   verbose = TRUE,
   cell_cycle = NULL,
   marker_file = NULL,
@@ -37,8 +38,8 @@ convertSeuratToCerebro(
 
 - seurat_file:
 
-  Character string specifying the path to the Seurat object file.
-  Supported format: `.rds`.
+  A Seurat object in memory, or a character string specifying its `.rds`
+  file path.
 
 - result_dir:
 
@@ -118,6 +119,18 @@ convertSeuratToCerebro(
   directory, so packaging the `.crb` with its sibling `<stem>.bpcells/`
   or `<stem>.h5` together is enough for portable deployment.
 
+- spatial_images:
+
+  Optional manifest in `spatial entry -> image label -> path` form.
+  Spatial-entry names must match `SeuratObject::Images(seurat_file)`.
+  Each entry may contain one or more arbitrarily named PNG, JPEG/JPG, or
+  SVG files. A named character vector is path shorthand; a leaf may
+  instead be
+  `list(path = ..., bounds = c(xmin = ..., xmax = ..., ymin = ..., ymax = ...))`.
+  Missing bounds are derived from the exported coordinates. Supplied
+  images are embedded in the generated CRB; existing embedded images
+  declared by the Seurat object are retained.
+
 - verbose:
 
   Logical indicating whether to print progress messages; default:
@@ -191,6 +204,13 @@ The function performs the following steps:
 6.  Cleans up memory by removing the Seurat object and calling garbage
     collection
 
+Seurat uses the same named image collection for several
+platform-specific structures: a name can identify a Visium slice, Xenium
+or MERFISH field of view (FOV), Slide-seq puck, or another SpatialImage
+subclass. It is a structural spatial-entry key, not necessarily a donor
+or sample name. An entry can carry multiple user-named backgrounds, or
+coordinates only.
+
 ## See also
 
 [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
@@ -199,19 +219,19 @@ The function performs the following steps:
 
 ``` r
 if (FALSE) { # \dontrun{
-# Basic usage
-convertSeuratToCerebro(
-  seurat_file = "path/to/seurat_object.rds",
-  result_dir = "path/to/output"
-)
+library(CerebroNexus)
 
-# With custom grouping and renaming
+input_dir <- system.file("extdata/examples", package = "CerebroNexus")
 convertSeuratToCerebro(
-  seurat_file = "seurat_object.rds",
+  seurat_file = file.path(input_dir, "pbmc_seurat.rds"),
   result_dir = "output",
-  groups = c("cluster", "sample", "celltype"),
-  groups_naming = list("cluster" = "Cluster", "celltype" = "Cell Type"),
-  marker_file = "markers.csv"
+  assay = "RNA",
+  slot = "data",
+  experiment_name = "PBMC example",
+  organism = "Human",
+  groups = c("sample", "seurat_clusters"),
+  groups_naming = list("seurat_clusters" = "cluster")
 )
+# Creates output/cerebro_pbmc_seurat.crb.
 } # }
 ```

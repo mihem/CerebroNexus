@@ -9,7 +9,7 @@
 
 ### Data model
 
-- [Overview of the Cerebro v1.3
+- [Overview of the Cerebro
   class](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md):
 
 ### How-to guides

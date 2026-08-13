@@ -28,6 +28,7 @@ createShinyApp(
   point_size = list(overview_projection_point_size = NULL),
   variable_to_compare = NULL,
   spatial_images = NULL,
+  spatial_image_settings = NULL,
   spatial_images_flip_x = NULL,
   spatial_images_flip_y = NULL,
   spatial_images_scale_x = NULL,
@@ -132,41 +133,68 @@ createShinyApp(
 
 - spatial_images:
 
-  Named list/vector of paths to spatial background images (e.g. tissue
-  histology) shown behind the Spatial tab projection. Names must match
-  `cerebro_data`. Supplied files are copied verbatim into the app's
-  `spatial-assets/` directory. The server-side renderer reads and embeds
-  them as data URIs. Missing files are omitted with a warning.
+  Optional nested external-image manifest in
+  `dataset -> spatial entry -> image label -> path` form. Dataset names
+  must match `cerebro_data`; spatial names must match the corresponding
+  CRB's `availableSpatial()`, and image labels must be unique and
+  non-empty within an entry. A leaf may instead be a descriptor
+  containing `path` and optional coordinate `bounds`. Supplied files are
+  copied to opaque, safe relative paths under `spatial-assets/`. The
+  legacy `c(Dataset = path)` form is accepted only when that CRB has
+  exactly one spatial entry.
+
+- spatial_image_settings:
+
+  Optional nested settings in
+  `dataset -> spatial entry -> image label -> settings` form. Settings
+  may contain only `flip_x`, `flip_y`, `scale_x`, `scale_y`, `offset_x`,
+  `offset_y`, and `rotation`. A leaf may target an embedded or external
+  image available under that exact dataset and spatial entry. The image
+  label must exist in the union of the CRB's embedded images and this
+  call's `spatial_images`; unknown identities are rejected. Labels are
+  user-facing names, not protocol names.
 
 - spatial_images_flip_x:
 
-  Named list/vector; whether to flip the spatial background image
-  horizontally. Names must match `cerebro_data`.
+  Legacy named per-dataset horizontal flip values. Each dataset must
+  resolve to exactly one spatial image target, unless a legacy
+  multi-path `spatial_images` declaration was migrated; then the value
+  applies to every migrated external image.
 
 - spatial_images_flip_y:
 
-  Named list/vector; whether to flip the spatial background image
-  vertically. Names must match `cerebro_data`.
+  Legacy named per-dataset vertical flip values. Each dataset must
+  resolve to exactly one spatial image target, unless a legacy
+  multi-path `spatial_images` declaration was migrated; then the value
+  applies to every migrated external image.
 
 - spatial_images_scale_x:
 
-  Named list/vector; scaling factor for the X axis of the spatial
-  background image. Names must match `cerebro_data`.
+  Legacy named per-dataset X scale values. Each dataset must resolve to
+  exactly one spatial image target, unless a legacy multi-path
+  `spatial_images` declaration was migrated; then the value applies to
+  every migrated external image.
 
 - spatial_images_scale_y:
 
-  Named list/vector; scaling factor for the Y axis of the spatial
-  background image. Names must match `cerebro_data`.
+  Legacy named per-dataset Y scale values. Each dataset must resolve to
+  exactly one spatial image target, unless a legacy multi-path
+  `spatial_images` declaration was migrated; then the value applies to
+  every migrated external image.
 
 - spatial_images_offset_x:
 
-  Named list/vector; horizontal offset (in data units) applied to move
-  the spatial background image. Names must match `cerebro_data`.
+  Legacy named per-dataset horizontal offsets. Each dataset must resolve
+  to exactly one spatial image target, unless a legacy multi-path
+  `spatial_images` declaration was migrated; then the value applies to
+  every migrated external image.
 
 - spatial_images_offset_y:
 
-  Named list/vector; vertical offset (in data units) applied to move the
-  spatial background image. Names must match `cerebro_data`.
+  Legacy named per-dataset vertical offsets. Each dataset must resolve
+  to exactly one spatial image target, unless a legacy multi-path
+  `spatial_images` declaration was migrated; then the value applies to
+  every migrated external image.
 
 - spatial_plot_rotation:
 
@@ -255,3 +283,23 @@ security labels remain the deployment system's responsibility. All CRBs,
 descriptor sidecars, spatial images and their source-path ancestors must
 remain trusted and unchanged while the build is running; the target
 build lock does not protect inputs.
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+library(CerebroNexus)
+
+createShinyApp(
+  cerebro_data = c(
+    "PBMC example" = "output/cerebro_pbmc_seurat.crb"
+  ),
+  result_dir = "my_app",
+  port = 8080,
+  host = "127.0.0.1",
+  max_request_size = 8000,
+  overwrite = TRUE
+)
+# Run with shiny::runApp("my_app") or deploy my_app/ to Shiny Server.
+} # }
+```

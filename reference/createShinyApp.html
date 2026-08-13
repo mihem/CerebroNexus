@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,7 +32,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -110,6 +110,7 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  point_size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>overview_projection_point_size <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span>,</span>
 <span>  variable_to_compare <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_image_settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_flip_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_flip_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_scale_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -216,43 +217,68 @@ directory is rejected before any files are written.</p></dd>
 
 
 <dt id="arg-spatial-images">spatial_images<a class="anchor" aria-label="anchor" href="#arg-spatial-images"></a></dt>
-<dd><p>Named list/vector of paths to spatial background images
-(e.g. tissue histology) shown behind the Spatial tab projection. Names must
-match <code>cerebro_data</code>. Supplied files are copied verbatim into the
-app's <code>spatial-assets/</code> directory. The server-side renderer reads and
-embeds them as data URIs. Missing files are omitted with a warning.</p></dd>
+<dd><p>Optional nested external-image manifest in
+<code>dataset -&gt; spatial entry -&gt; image label -&gt; path</code> form. Dataset names
+must match <code>cerebro_data</code>; spatial names must match the corresponding
+CRB's <code>availableSpatial()</code>, and image labels must be unique and
+non-empty within an entry. A leaf may instead be a descriptor containing
+<code>path</code> and optional coordinate <code>bounds</code>. Supplied files are
+copied to opaque, safe relative paths under <code>spatial-assets/</code>. The
+legacy <code>c(Dataset = path)</code> form is accepted only
+when that CRB has exactly one spatial entry.</p></dd>
+
+
+<dt id="arg-spatial-image-settings">spatial_image_settings<a class="anchor" aria-label="anchor" href="#arg-spatial-image-settings"></a></dt>
+<dd><p>Optional nested settings in
+<code>dataset -&gt; spatial entry -&gt; image label -&gt; settings</code> form. Settings
+may contain only <code>flip_x</code>, <code>flip_y</code>, <code>scale_x</code>,
+<code>scale_y</code>, <code>offset_x</code>, <code>offset_y</code>, and <code>rotation</code>.
+A leaf may target an embedded or external image available under that exact
+dataset and spatial entry. The image label must exist in the union of the
+CRB's embedded images and this call's <code>spatial_images</code>; unknown
+identities are rejected. Labels are user-facing names, not protocol names.</p></dd>
 
 
 <dt id="arg-spatial-images-flip-x">spatial_images_flip_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-x"></a></dt>
-<dd><p>Named list/vector; whether to flip the spatial
-background image horizontally. Names must match <code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset horizontal flip values.
+Each dataset must resolve to exactly one spatial image target, unless a
+legacy multi-path <code>spatial_images</code> declaration was migrated; then the
+value applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-images-flip-y">spatial_images_flip_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-y"></a></dt>
-<dd><p>Named list/vector; whether to flip the spatial
-background image vertically. Names must match <code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset vertical flip values.
+Each dataset must resolve to exactly one spatial image target, unless a
+legacy multi-path <code>spatial_images</code> declaration was migrated; then the
+value applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-images-scale-x">spatial_images_scale_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-x"></a></dt>
-<dd><p>Named list/vector; scaling factor for the X
-axis of the spatial background image. Names must match <code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset X scale values. Each
+dataset must resolve to exactly one spatial image target, unless a legacy
+multi-path <code>spatial_images</code> declaration was migrated; then the value
+applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-images-scale-y">spatial_images_scale_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-y"></a></dt>
-<dd><p>Named list/vector; scaling factor for the Y
-axis of the spatial background image. Names must match <code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset Y scale values. Each
+dataset must resolve to exactly one spatial image target, unless a legacy
+multi-path <code>spatial_images</code> declaration was migrated; then the value
+applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-images-offset-x">spatial_images_offset_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-x"></a></dt>
-<dd><p>Named list/vector; horizontal offset (in data
-units) applied to move the spatial background image. Names must match
-<code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset horizontal offsets.
+Each dataset must resolve to exactly one spatial image target, unless a
+legacy multi-path <code>spatial_images</code> declaration was migrated; then the
+value applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-images-offset-y">spatial_images_offset_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-y"></a></dt>
-<dd><p>Named list/vector; vertical offset (in data
-units) applied to move the spatial background image. Names must match
-<code>cerebro_data</code>.</p></dd>
+<dd><p>Legacy named per-dataset vertical offsets.
+Each dataset must resolve to exactly one spatial image target, unless a
+legacy multi-path <code>spatial_images</code> declaration was migrated; then the
+value applies to every migrated external image.</p></dd>
 
 
 <dt id="arg-spatial-plot-rotation">spatial_plot_rotation<a class="anchor" aria-label="anchor" href="#arg-spatial-plot-rotation"></a></dt>
@@ -341,6 +367,26 @@ images and their source-path ancestors must remain trusted and unchanged
 while the build is running; the target build lock does not protect inputs.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="fu">createShinyApp</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="st">"PBMC example"</span> <span class="op">=</span> <span class="st">"output/cerebro_pbmc_seurat.crb"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  result_dir <span class="op">=</span> <span class="st">"my_app"</span>,</span></span>
+<span class="r-in"><span>  port <span class="op">=</span> <span class="fl">8080</span>,</span></span>
+<span class="r-in"><span>  host <span class="op">=</span> <span class="st">"127.0.0.1"</span>,</span></span>
+<span class="r-in"><span>  max_request_size <span class="op">=</span> <span class="fl">8000</span>,</span></span>
+<span class="r-in"><span>  overwrite <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Run with shiny::runApp("my_app") or deploy my_app/ to Shiny Server.</span></span></span>
+<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

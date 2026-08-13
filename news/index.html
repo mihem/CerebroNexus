@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,7 +24,7 @@
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
-    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro v1.3 class</a></li>
+    <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
@@ -72,6 +72,14 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="4.3.0" id="cerebronexus-430">CerebroNexus 4.3.0<a class="anchor" aria-label="anchor" href="#cerebronexus-430"></a></h2>
+<div class="section level3">
+<h3 id="data-and-conversion-4-3-0">Data and conversion<a class="anchor" aria-label="anchor" href="#data-and-conversion-4-3-0"></a></h3>
+<ul><li>Spatial backgrounds now use the public hierarchy <code>dataset -&gt; spatial entry -&gt; image label</code> in <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>, while conversion starts at <code>spatial entry -&gt; image label</code>. A spatial entry is a Seurat <code><a href="https://satijalab.github.io/seurat-object/reference/Images.html" class="external-link">Images()</a></code> name (for example a Visium slice, Xenium/MERFISH FOV, or Slide-seq puck), not a required donor field. Each entry may contain multiple arbitrarily named embedded and external PNG/JPEG/SVG backgrounds, or remain coordinates-only. Optional per-image bounds and display settings use the same stable keys; ambiguous legacy dataset-to-path calls now fail instead of guessing a spatial target.</li>
+<li>Existing pre-spatial <code>Cerebro_v1.3</code> files remain bundleable as coordinate-only datasets. Legacy per-dataset <code>spatial_images</code> vectors with one unambiguous spatial entry are migrated to separately labelled images; calls with zero or multiple spatial entries still fail rather than guessing.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="4.2.0" id="cerebronexus-420">CerebroNexus 4.2.0<a class="anchor" aria-label="anchor" href="#cerebronexus-420"></a></h2>
 <div class="section level3">

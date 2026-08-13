@@ -1512,15 +1512,18 @@ Add spatial data.
 
 - `name`:
 
-  Name of the spatial data entry (e.g. image name).
+  Name of the spatial data entry (for example a Seurat image or Cerebro
+  spatial entry).
 
 - `data`:
 
   `list` containing 'coordinates' (data.frame) and 'expression' (sparse
-  matrix). It may optionally carry an embedded histology image as
-  'image' (a base64 `data:` URI string) plus 'image_bounds' (named list
-  xmin/xmax/ymin/ymax in coordinate space) so the Spatial tab can render
-  the real tissue background without an external file.
+  matrix). Embedded backgrounds are stored in 'histology_images', a
+  uniquely named list of image payloads. Each payload contains
+  'histology_image' (a base64 `data:` URI) and 'histology_image_bounds'
+  (xmin/xmax/ymin/ymax in coordinate space). Bounds omitted from a
+  payload are derived from the coordinates. Legacy singular image fields
+  are accepted and normalized as 'Tissue background'.
 
 ------------------------------------------------------------------------
 
@@ -1540,7 +1543,9 @@ Retrieve spatial data.
 
 #### Returns
 
-`list` containing 'coordinates' and 'expression'.
+A canonical spatial-data `list` containing 'coordinates', 'expression',
+and 'histology_images'. Legacy singular image fields are normalized on
+read.
 
 ------------------------------------------------------------------------
 

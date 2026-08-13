@@ -1,5 +1,27 @@
 # Changelog
 
+## CerebroNexus 4.3.0
+
+### Data and conversion
+
+- Spatial backgrounds now use the public hierarchy
+  `dataset -> spatial entry -> image label` in
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+  while conversion starts at `spatial entry -> image label`. A spatial
+  entry is a Seurat
+  [`Images()`](https://satijalab.github.io/seurat-object/reference/Images.html)
+  name (for example a Visium slice, Xenium/MERFISH FOV, or Slide-seq
+  puck), not a required donor field. Each entry may contain multiple
+  arbitrarily named embedded and external PNG/JPEG/SVG backgrounds, or
+  remain coordinates-only. Optional per-image bounds and display
+  settings use the same stable keys; ambiguous legacy dataset-to-path
+  calls now fail instead of guessing a spatial target.
+- Existing pre-spatial `Cerebro_v1.3` files remain bundleable as
+  coordinate-only datasets. Legacy per-dataset `spatial_images` vectors
+  with one unambiguous spatial entry are migrated to separately labelled
+  images; calls with zero or multiple spatial entries still fail rather
+  than guessing.
+
 ## CerebroNexus 4.2.0
 
 ### Breaking changes
