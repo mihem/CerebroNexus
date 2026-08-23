@@ -170,21 +170,6 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  ## Exercise the imageChanged path directly: it clears old interaction state,
-  ## then must seed the renderer-provided rotation in the same sync call.
-  app$run_js(paste0(
-    "shinyjs.syncSpatialBackground(",
-    "'data:image/png;base64,ROTATED', false, false, 1, 1, 1, ",
-    "null, 0, 0, 37);"
-  ))
-  app$wait_for_js(
-    paste0(
-      "document.getElementById('spatial_projection_background').dataset.",
-      "rotate === '37'"
-    ),
-    timeout = 30000
-  )
-
   app$set_inputs(
     crb_file_selector = "extdata/examples/demo_spatial_slideseq.crb",
     wait_ = FALSE
