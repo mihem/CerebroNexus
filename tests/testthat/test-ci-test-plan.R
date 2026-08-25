@@ -107,3 +107,56 @@ test_that("the shard runner validates arguments and permits empty groups", {
     "Unknown argument"
   )
 })
+
+test_that("browser references stay in the explicit browser group", {
+  files <- list.files(
+    test_path(),
+    pattern = "^test-[[:alnum:]_.-]+[.]R$",
+    full.names = TRUE
+  )
+  files <- files[basename(files) != "test-ci-test-plan.R"]
+  browser_references <- basename(files[vapply(
+    files,
+    function(file) {
+      any(grepl("shinytest2|AppDriver", readLines(file, warn = FALSE)))
+    },
+    logical(1)
+  )])
+
+  expect_setequal(
+    browser_references,
+    ci_test_plan_api$ci_browser_test_files()
+  )
+})
+
+test_that("precheck isolates shards and reports every failure", {
+  precheck_path <- test_path("..", "..", "scripts", "precheck.sh")
+  expect_true(file.exists(precheck_path))
+  skip_if_not(file.exists(precheck_path))
+  precheck <- paste(readLines(precheck_path, warn = FALSE), collapse = "\n")
+
+  expect_match(precheck, "mktemp -d", fixed = TRUE)
+  expect_match(precheck, "export TMPDIR=", fixed = TRUE)
+  expect_match(precheck, "wait \"${shard_pids[$index]}\"", fixed = TRUE)
+  expect_match(precheck, "failures+=(", fixed = TRUE)
+  expect_match(precheck, "run_parallel_group process-sensitive 1", fixed = TRUE)
+  expect_match(precheck, "set -uo pipefail", fixed = TRUE)
+})
+
+test_that("docs validation is separate from full code precheck", {
+  precheck_path <- test_path("..", "..", "scripts", "precheck.sh")
+  expect_true(file.exists(precheck_path))
+  skip_if_not(file.exists(precheck_path))
+  precheck <- paste(readLines(precheck_path, warn = FALSE), collapse = "\n")
+  full_section <- sub(
+    "^[\\s\\S]*?  full\\)",
+    "",
+    precheck,
+    perl = TRUE
+  )
+  full_section <- sub("  docs\\)[\\s\\S]*$", "", full_section, perl = TRUE)
+  docs_section <- sub("^[\\s\\S]*?  docs\\)", "", precheck, perl = TRUE)
+
+  expect_false(grepl("pkgdown::", full_section, fixed = TRUE))
+  expect_match(docs_section, "pkgdown::build_site", fixed = TRUE)
+})
