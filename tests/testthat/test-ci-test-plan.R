@@ -158,7 +158,13 @@ test_that("docs validation is separate from full code precheck", {
   docs_section <- sub("^[\\s\\S]*?  docs\\)", "", precheck, perl = TRUE)
 
   expect_false(grepl("pkgdown::", full_section, fixed = TRUE))
-  expect_match(docs_section, "pkgdown::build_site", fixed = TRUE)
+  expect_match(
+    precheck,
+    "pkgdown::build_site_github_pages",
+    fixed = TRUE
+  )
+  expect_match(docs_section, "run_docs", fixed = TRUE)
+  expect_match(precheck, "CEREBRO_DOCS_SOURCE", fixed = TRUE)
 })
 
 test_that("CI executes the shared plan and waits for every matrix shard", {

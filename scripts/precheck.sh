@@ -87,6 +87,29 @@ run_parallel_group() {
   done
 }
 
+run_docs() {
+  local docs_source="$precheck_root/docs-source"
+  local docs_destination="$precheck_root/pkgdown-site"
+  local docs_files="$precheck_root/docs-files"
+  local copy_log="$logs_dir/docs-copy.log"
+
+  mkdir -p "$docs_source"
+  git ls-files --cached --others --exclude-standard -z >"$docs_files"
+  if ! rsync -a --from0 --files-from="$docs_files" ./ "$docs_source/" \
+    >"$copy_log" 2>&1; then
+    failures+=("docs-copy")
+    echo "[docs-copy] failed"
+    sed -n '1,240p' "$copy_log"
+    return
+  fi
+
+  run_logged_step docs env \
+    CEREBRO_DOCS_SOURCE="$docs_source" \
+    CEREBRO_DOCS_DESTINATION="$docs_destination" \
+    Rscript -e \
+    'pkgdown::build_site_github_pages(pkg = Sys.getenv("CEREBRO_DOCS_SOURCE"), new_process = FALSE, install = TRUE, dest_dir = Sys.getenv("CEREBRO_DOCS_DESTINATION"))'
+}
+
 require_positive_integer CEREBRO_PRECHECK_LOGIC_SHARDS "$logic_shards"
 require_positive_integer CEREBRO_PRECHECK_BROWSER_SHARDS "$browser_shards"
 
@@ -112,8 +135,7 @@ case "$precheck_mode" in
       "devtools::check(args = c('--no-tests'), vignettes = TRUE, error_on = 'warning')"
     ;;
   docs)
-    run_logged_step docs Rscript -e \
-      "pkgdown::build_site(new_process = FALSE, install = TRUE, dest_dir = 'pkgdown-site')"
+    run_docs
     ;;
   *)
     echo "Usage: scripts/precheck.sh [air|fast|full|docs]" >&2
