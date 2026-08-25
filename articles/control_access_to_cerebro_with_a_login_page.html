@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@ Hillje</h4>
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">23 August, 2026</h4>
+            <h4 data-toc-skip class="date">25 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
       <div class="d-none name"><code>control_access_to_cerebro_with_a_login_page.Rmd</code></div>
@@ -266,9 +266,9 @@ privileges:</p>
 </tr>
 </tbody>
 </table>
-<p>The runtime account needs write access to
-<code>private-data/auth/</code> because SQLite may create login-state
-sidecars.</p>
+<p>The runtime account needs only read access to the bundled database.
+Update accounts or passwords in the private source database, then
+rebuild and redeploy the App rather than modifying its runtime copy.</p>
 <div class="float">
 <img src="img/auth-deployment-boundary.svg" alt="The App and external passphrase travel separately and meet only in the trusted runtime process."><div class="figcaption">The App and external passphrase travel
 separately and meet only in the trusted runtime process.</div>
@@ -333,8 +333,8 @@ the real HTTPS App URL and test valid and invalid login.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Terminal — run these commands on the Shiny Server host.</span></span>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">sudo</span> cp <span class="at">-R</span> /srv/cerebro/apps/my_app /srv/shiny-server/</span>
 <span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">sudo</span> chown <span class="at">-R</span> shiny:shiny /srv/shiny-server/my_app/private-data/auth</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">sudo</span> chmod 0700 /srv/shiny-server/my_app/private-data/auth</span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">sudo</span> chmod 0600 /srv/shiny-server/my_app/private-data/auth/credentials.sqlite</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">sudo</span> chmod 0500 /srv/shiny-server/my_app/private-data/auth</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">sudo</span> chmod 0400 /srv/shiny-server/my_app/private-data/auth/credentials.sqlite</span>
 <span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
 <span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co"># Install the external secret at the exact path used by the systemd override.</span></span>
 <span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="fu">sudo</span> install <span class="at">-d</span> <span class="at">-m</span> 0750 /etc/cerebronexus</span>
@@ -497,9 +497,8 @@ deployed</td>
 <td>Inspect the service environment, not your shell</td>
 </tr>
 <tr class="odd">
-<td>SQLite write error</td>
-<td>Fix access only for <code>private-data/auth/</code>
-</td>
+<td>Database is not accessible</td>
+<td>Give the runtime account read and directory traversal access</td>
 </tr>
 <tr class="even">
 <td>Docker rebuild loses auth</td>
@@ -516,7 +515,7 @@ deployed</td>
 <li>Keep passwords, passphrase, and env file outside the App and
 Git.</li>
 <li>Pair each App release with exactly one matching secret.</li>
-<li>Verify valid login, invalid login, runtime write access, and
+<li>Verify valid login, invalid login, runtime read access, and
 rollback.</li>
 <li>Add monitoring and rate limiting.</li>
 </ul>

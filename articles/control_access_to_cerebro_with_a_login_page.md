@@ -136,8 +136,9 @@ Sys.unsetenv("CEREBRO_AUTH_PASSPHRASE")
 | Bundled encrypted database | `private-data/auth/` | Yes |
 | Plaintext account table | Trusted R memory only | **Never** |
 
-The runtime account needs write access to `private-data/auth/` because
-SQLite may create login-state sidecars.
+The runtime account needs only read access to the bundled database.
+Update accounts or passwords in the private source database, then
+rebuild and redeploy the App rather than modifying its runtime copy.
 
 ![The App and external passphrase travel separately and meet only in the
 trusted runtime process.](img/auth-deployment-boundary.svg)
@@ -208,8 +209,8 @@ Publish the App and secret separately:
 # Terminal — run these commands on the Shiny Server host.
 sudo cp -R /srv/cerebro/apps/my_app /srv/shiny-server/
 sudo chown -R shiny:shiny /srv/shiny-server/my_app/private-data/auth
-sudo chmod 0700 /srv/shiny-server/my_app/private-data/auth
-sudo chmod 0600 /srv/shiny-server/my_app/private-data/auth/credentials.sqlite
+sudo chmod 0500 /srv/shiny-server/my_app/private-data/auth
+sudo chmod 0400 /srv/shiny-server/my_app/private-data/auth/credentials.sqlite
 
 # Install the external secret at the exact path used by the systemd override.
 sudo install -d -m 0750 /etc/cerebronexus
@@ -393,7 +394,7 @@ rollback window.
 | Missing environment variable | Compare `passphrase_env` with the env-file name |
 | Database cannot decrypt | Load the secret paired with that database |
 | Deployed App stops | Inspect the service environment, not your shell |
-| SQLite write error | Fix access only for `private-data/auth/` |
+| Database is not accessible | Give the runtime account read and directory traversal access |
 | Docker rebuild loses auth | Inject the external file at runtime |
 
 ## Security checklist
@@ -401,7 +402,7 @@ rollback window.
 - Use HTTPS.
 - Keep passwords, passphrase, and env file outside the App and Git.
 - Pair each App release with exactly one matching secret.
-- Verify valid login, invalid login, runtime write access, and rollback.
+- Verify valid login, invalid login, runtime read access, and rollback.
 - Add monitoring and rate limiting.
 
 ## See also
