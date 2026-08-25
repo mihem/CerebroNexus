@@ -46,84 +46,6 @@
   }
 }
 
-.viewer_auth_stage_database <- function(database) {
-  runtime_directory <- tempfile("cerebro-auth-")
-  created <- dir.create(runtime_directory, mode = "0700")
-  cleanup <- function() {
-    if (dir.exists(runtime_directory)) {
-      unlink(runtime_directory, recursive = TRUE, force = TRUE)
-    }
-    invisible(NULL)
-  }
-  on.exit(cleanup(), add = TRUE)
-  if (!isTRUE(created)) {
-    .viewer_auth_error(
-      "Authentication runtime database could not be prepared."
-    )
-  }
-
-  runtime_database <- file.path(runtime_directory, "credentials.sqlite")
-  copied <- file.copy(database, runtime_database, copy.mode = FALSE)
-  if (!isTRUE(copied)) {
-    .viewer_auth_error(
-      "Authentication runtime database could not be prepared."
-    )
-  }
-  directory_mode_set <- Sys.chmod(runtime_directory, mode = "0700")
-  database_mode_set <- Sys.chmod(runtime_database, mode = "0600")
-  private_modes <- TRUE
-  if (!identical(.Platform$OS.type, "windows")) {
-    private_modes <- identical(
-      as.character(file.info(runtime_directory)$mode),
-      "700"
-    ) &&
-      identical(
-        as.character(file.info(runtime_database)$mode),
-        "600"
-      )
-  }
-  permissions <- isTRUE(unname(directory_mode_set)) &&
-    isTRUE(unname(database_mode_set)) &&
-    private_modes &&
-    isTRUE(file.access(runtime_database, mode = 6L) == 0L) &&
-    isTRUE(file.access(runtime_directory, mode = 3L) == 0L)
-  if (!permissions) {
-    .viewer_auth_error(
-      "Authentication runtime database could not be prepared."
-    )
-  }
-
-  on.exit(NULL, add = FALSE)
-  list(
-    database = runtime_database,
-    cleanup = cleanup
-  )
-}
-
-.viewer_auth_credentials_checker <- function(database, passphrase_env) {
-  function(user, password) {
-    passphrase <- Sys.getenv(passphrase_env, unset = NA_character_)
-    on.exit(passphrase <- NULL, add = TRUE)
-    checker <- suppressWarnings(suppressMessages(tryCatch(
-      shinymanager::check_credentials(
-        db = database,
-        passphrase = passphrase
-      ),
-      error = function(condition) NULL
-    )))
-    passphrase <- NULL
-    if (!is.function(checker)) {
-      return(list(
-        result = FALSE,
-        expired = FALSE,
-        authorized = FALSE,
-        user_info = NULL
-      ))
-    }
-    checker(user, password)
-  }
-}
-
 .viewer_auth_brand <- function(cerebro_root) {
   www <- file.path(cerebro_root, "viewer", "www")
   css <- file.path(www, "auth.css")
@@ -149,67 +71,6 @@
       "Protected access"
     )
   )
-}
-
-.viewer_auth_password_change_required <- function(
-  database,
-  passphrase_env,
-  user
-) {
-  passphrase <- Sys.getenv(passphrase_env, unset = NA_character_)
-  on.exit(passphrase <- NULL, add = TRUE)
-  policy <- if (
-    is.character(passphrase) &&
-      length(passphrase) == 1L &&
-      !is.na(passphrase) &&
-      nzchar(passphrase)
-  ) {
-    suppressWarnings(suppressMessages(tryCatch(
-      shinymanager::read_db_decrypt(
-        conn = database,
-        name = "pwd_mngt",
-        passphrase = passphrase
-      ),
-      error = function(condition) NULL
-    )))
-  } else {
-    NULL
-  }
-  passphrase <- NULL
-  row <- if (
-    is.data.frame(policy) &&
-      all(c("user", "must_change", "date_change") %in% names(policy)) &&
-      is.character(policy$user) &&
-      is.character(policy$must_change) &&
-      is.character(policy$date_change)
-  ) {
-    which(policy$user == user)
-  } else {
-    integer()
-  }
-  if (length(row) != 1L) {
-    return(TRUE)
-  }
-  if (!identical(policy$must_change[[row]], "FALSE")) {
-    return(TRUE)
-  }
-
-  validity <- suppressWarnings(as.numeric(
-    getOption("shinymanager.pwd_validity", Inf)
-  ))
-  if (length(validity) != 1L || is.na(validity)) {
-    return(TRUE)
-  }
-  if (identical(validity, Inf)) {
-    return(FALSE)
-  }
-  if (!is.finite(validity)) {
-    return(TRUE)
-  }
-  changed <- suppressWarnings(as.Date(policy$date_change[[row]]))
-  length(changed) != 1L ||
-    is.na(changed) ||
-    as.numeric(Sys.Date() - changed) > validity
 }
 
 viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
@@ -255,37 +116,30 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
   }
 
   .viewer_auth_require_provider()
-  staged <- .viewer_auth_stage_database(database)
-  cleanup <- staged$cleanup
-  keep_runtime_database <- FALSE
-  on.exit(
-    {
-      if (!keep_runtime_database) {
-        cleanup()
-      }
-    },
-    add = TRUE
-  )
-  database <- staged$database
-  valid_database <- suppressWarnings(suppressMessages(tryCatch(
-    shinymanager::check_credentials(
-      db = database,
+  credentials <- suppressWarnings(suppressMessages(tryCatch(
+    shinymanager::read_db_decrypt(
+      conn = database,
+      name = "credentials",
       passphrase = passphrase
     ),
     error = function(condition) NULL
   )))
+  checker <- if (is.data.frame(credentials)) {
+    suppressWarnings(suppressMessages(tryCatch(
+      shinymanager::check_credentials(credentials),
+      error = function(condition) NULL
+    )))
+  } else {
+    NULL
+  }
   passphrase <- NULL
-  if (!is.function(valid_database)) {
+  credentials <- NULL
+  if (!is.function(checker)) {
     .viewer_auth_error(
       "Authentication database or passphrase is invalid."
     )
   }
-  checker <- .viewer_auth_credentials_checker(
-    database,
-    config$passphrase_env
-  )
   brand <- .viewer_auth_brand(root)
-  shiny::onStop(cleanup)
 
   secured_server <- function(input, output, session) {
     auth <- shinymanager::secure_server(
@@ -318,12 +172,7 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
       authorized <- is.character(user) &&
         length(user) == 1L &&
         !is.na(user) &&
-        nzchar(user) &&
-        !.viewer_auth_password_change_required(
-          database,
-          config$passphrase_env,
-          user
-        )
+        nzchar(user)
       if (authorized && !started()) {
         started(TRUE)
         subject(user)
@@ -377,7 +226,6 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
     tags_top = brand$top,
     tags_bottom = brand$bottom
   )
-  keep_runtime_database <- TRUE
   list(
     ui = secured_ui,
     server = secured_server

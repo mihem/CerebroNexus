@@ -168,10 +168,14 @@ Sys.unsetenv("CEREBRO_AUTH_PASSPHRASE")
 | Plaintext account table | Trusted R memory only | **Never** |
 
 The runtime account needs only read access to the bundled database. At startup,
-the Viewer copies it into a private temporary directory for `shinymanager`
-login logs, failed-password counters, and password changes. That runtime state
-lasts only for the life of the Viewer process. Update durable accounts or
-passwords in the private source database, then rebuild and redeploy the App.
+the Viewer decrypts the credentials table once into trusted process memory and
+does not use SQLite as a writable runtime store. Update accounts or passwords
+in the private source database, then rebuild and redeploy the App.
+
+This administrator-managed mode intentionally has no in-App password changes,
+SQLite login history, or database-backed failed-attempt counters and locks.
+Configure source-aware rate limiting at the HTTPS reverse proxy before exposing
+the Viewer to untrusted networks.
 
 ![The App and external passphrase travel separately and meet only in the trusted
 runtime process.](img/auth-deployment-boundary.svg)
@@ -208,7 +212,6 @@ Every new R process must load the external secret:
 
 ```{r eval=FALSE}
 # R console — run this in every local App process.
-options("shinymanager.pwd_failure_limit" = 10L)
 readRenviron("/srv/cerebro/private/viewer-auth.env")
 shiny::runApp("/srv/cerebro/apps/my_app")
 ```
@@ -372,25 +375,20 @@ Validate login before retiring the old deployment.
 
 # Limit failed sign-ins
 
-**Run this as:** the person configuring the App startup process.
+**Run this as:** the reverse-proxy administrator.
 
-**Run it on:** every runtime host, in the R profile or startup command used by
-the actual service account.
+**Run it on:** the HTTPS reverse proxy in front of the Viewer.
 
-**What happens:** `shinymanager` locks an account after the configured number of
-consecutive failed passwords in the current Viewer process. Restarting or
-redeploying the process resets this counter from the bundled database.
+**What happens:** the proxy limits repeated login requests from the same source
+before they reach the Viewer.
 
-**Verify:** use a disposable test account to confirm the chosen policy, then
-check that the reverse proxy also performs source-aware rate limiting.
+**Verify:** use a disposable client to exceed the configured rate and confirm
+that the proxy rejects or delays subsequent requests.
 
-```{r eval=FALSE}
-# R console — place this in the real App startup process or its `.Rprofile`.
-options("shinymanager.pwd_failure_limit" = 10L)
-```
-
-Also configure source-aware rate limiting at the reverse proxy. Account locking
-alone can be abused for denial of service.
+`shinymanager.pwd_failure_limit` does not apply in this read-only, in-memory
+credentials mode. Reverse-proxy rate limiting is therefore required rather than
+an optional second layer. Use a source-aware policy to avoid turning a shared
+account lock into a denial-of-service mechanism.
 
 # Add, remove, or rotate users
 
@@ -424,7 +422,7 @@ matching secret. Keep the old pair only for the approved rollback window.
 - Keep passwords, passphrase, and env file outside the App and Git.
 - Pair each App release with exactly one matching secret.
 - Verify valid login, invalid login, runtime read access, and rollback.
-- Add monitoring and rate limiting.
+- Add monitoring and source-aware reverse-proxy rate limiting.
 
 # See also
 

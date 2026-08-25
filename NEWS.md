@@ -3,10 +3,11 @@
 ## Viewer
 
 - Generated Viewers no longer require write access to authentication databases
-  in the App bundle. Each Viewer process uses a private writable temporary copy
-  for login logs, failed-password counters, and password changes. Read-only
-  deployments can update durable accounts or passwords in the private source
-  database and deploy the change through a rebuilt Viewer.
+  in the App bundle. The Viewer decrypts the credentials table once into trusted
+  process memory and does not configure SQLite as a writable runtime store.
+  Accounts and passwords are administrator-managed and updated by rebuilding
+  the Viewer; in-App password changes, SQLite login logs, and database-backed
+  failed-attempt locks are intentionally unavailable.
 
 # CerebroNexus 4.3.0
 
