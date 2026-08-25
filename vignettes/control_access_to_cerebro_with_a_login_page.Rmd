@@ -167,9 +167,11 @@ Sys.unsetenv("CEREBRO_AUTH_PASSPHRASE")
 | Bundled encrypted database | `private-data/auth/` | Yes |
 | Plaintext account table | Trusted R memory only | **Never** |
 
-The runtime account needs only read access to the bundled database. Update
-accounts or passwords in the private source database, then rebuild and redeploy
-the App rather than modifying its runtime copy.
+The runtime account needs only read access to the bundled database. At startup,
+the Viewer copies it into a private temporary directory for `shinymanager`
+login logs, failed-password counters, and password changes. That runtime state
+lasts only for the life of the Viewer process. Update durable accounts or
+passwords in the private source database, then rebuild and redeploy the App.
 
 ![The App and external passphrase travel separately and meet only in the trusted
 runtime process.](img/auth-deployment-boundary.svg)
@@ -376,7 +378,8 @@ Validate login before retiring the old deployment.
 the actual service account.
 
 **What happens:** `shinymanager` locks an account after the configured number of
-consecutive failed passwords.
+consecutive failed passwords in the current Viewer process. Restarting or
+redeploying the process resets this counter from the bundled database.
 
 **Verify:** use a disposable test account to confirm the chosen policy, then
 check that the reverse proxy also performs source-aware rate limiting.
