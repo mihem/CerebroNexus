@@ -183,6 +183,17 @@ test_that("CI executes the shared plan and waits for every matrix shard", {
   expect_match(workflow, "--group \"${{ matrix.group }}\"", fixed = TRUE)
   expect_match(workflow, "needs: [tests]", fixed = TRUE)
   expect_match(workflow, "needs.tests.result", fixed = TRUE)
+  count_entries <- function(group) {
+    matches <- gregexpr(
+      paste0("- {group: ", group, ","),
+      workflow,
+      fixed = TRUE
+    )[[1L]]
+    if (identical(matches, -1L)) 0L else length(matches)
+  }
+  expect_identical(count_entries("logic"), 4L)
+  expect_identical(count_entries("process-sensitive"), 1L)
+  expect_identical(count_entries("browser"), 6L)
 })
 
 test_that("R CMD check does not execute the full test suite again", {
