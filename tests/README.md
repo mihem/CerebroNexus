@@ -1,6 +1,7 @@
 # Running tests locally
 
-This directory holds the package's automated tests. `R CMD check` and CI (`.github/workflows/R-tests.yaml`, `R-cmd-check.yaml`) run these on every PR.
+This directory holds the package's automated tests. CI runs the tests through the
+same deterministic plan used by the local precheck.
 
 ## Layout
 
@@ -48,6 +49,34 @@ Sys.setenv(CHROMOTE_CHROME = "/path/to/Chromium")
 ## Running tests
 
 From the package root.
+
+**Recommended precheck entry points**:
+
+```bash
+scripts/precheck.sh fast  # install + parallel logic tests
+scripts/precheck.sh full  # fast + browser tests + R CMD check
+scripts/precheck.sh docs  # pkgdown only; may require network access
+scripts/precheck.sh air   # formatting only
+```
+
+Tests belong to exactly one group: `logic`, `process-sensitive`, or `browser`.
+The runner assigns files to shards from a stable filename hash, so adding a test
+does not reshuffle the existing tests while the shard count stays the same.
+Process-sensitive tests run alone and never overlap the logic or browser groups.
+
+Local logic tests use four workers by default and browser tests use two. Override
+them when needed:
+
+```bash
+CEREBRO_PRECHECK_LOGIC_SHARDS=6 scripts/precheck.sh fast
+CEREBRO_PRECHECK_BROWSER_SHARDS=1 scripts/precheck.sh full
+```
+
+Every worker gets its own temporary, cache, and artifact directory. Precheck waits
+for every worker even after a failure, prints one combined failure list, and keeps
+the complete logs at the path shown in its final output. Successful runs remove
+their temporary files. Documentation validation is deliberately separate so a
+network failure cannot be reported as a code-test failure.
 
 **Interactive R session (RStudio / VS Code R console / `R`)**:
 
