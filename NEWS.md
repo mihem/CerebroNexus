@@ -3,8 +3,10 @@
 ## Viewer
 
 - Generated Viewers no longer require write access to authentication databases
-  at runtime. Read-only deployments can update accounts or passwords in the
-  private source database and deploy the change through a rebuilt Viewer.
+  in the App bundle. Each Viewer process uses a private writable temporary copy
+  for login logs, failed-password counters, and password changes. Read-only
+  deployments can update durable accounts or passwords in the private source
+  database and deploy the change through a rebuilt Viewer.
 
 # CerebroNexus 4.3.0
 
