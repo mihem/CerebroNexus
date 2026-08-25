@@ -160,3 +160,49 @@ test_that("docs validation is separate from full code precheck", {
   expect_false(grepl("pkgdown::", full_section, fixed = TRUE))
   expect_match(docs_section, "pkgdown::build_site", fixed = TRUE)
 })
+
+test_that("CI executes the shared plan and waits for every matrix shard", {
+  workflow_path <- test_path(
+    "..",
+    "..",
+    ".github",
+    "workflows",
+    "R-tests.yaml"
+  )
+  workflow <- paste(readLines(workflow_path, warn = FALSE), collapse = "\n")
+
+  expect_match(workflow, "fail-fast: false", fixed = TRUE)
+  expect_match(workflow, "group: process-sensitive", fixed = TRUE)
+  expect_match(workflow, "Rscript scripts/run-test-shard.R", fixed = TRUE)
+  expect_match(workflow, "--group \"${{ matrix.group }}\"", fixed = TRUE)
+  expect_match(workflow, "needs: [tests]", fixed = TRUE)
+  expect_match(workflow, "needs.tests.result", fixed = TRUE)
+})
+
+test_that("R CMD check does not execute the full test suite again", {
+  workflow <- paste(
+    readLines(
+      test_path("..", "..", ".github", "workflows", "R-cmd-check.yaml"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(workflow, "args = c('--no-tests')", fixed = TRUE)
+})
+
+test_that("pkgdown validates pull requests but deploys only master", {
+  workflow <- paste(
+    readLines(
+      test_path("..", "..", ".github", "workflows", "pkgdown.yaml"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(
+    workflow,
+    "if: github.event_name == 'push' && github.ref == 'refs/heads/master'",
+    fixed = TRUE
+  )
+})

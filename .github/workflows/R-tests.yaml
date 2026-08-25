@@ -3,28 +3,42 @@ name: R tests
 on:
   pull_request:
     branches: [master]
-  workflow_dispatch: # This adds the manual trigger
+  workflow_dispatch:
     inputs:
       reason:
-        description: 'Reason for manual run'
+        description: "Reason for manual run"
         required: false
-        default: 'Testing cache'
+        default: "Testing cache"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  tests:
     runs-on: ubuntu-latest
-
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: logic, shard: 1, shards: 4}
+          - {group: logic, shard: 2, shards: 4}
+          - {group: logic, shard: 3, shards: 4}
+          - {group: logic, shard: 4, shards: 4}
+          - {group: process-sensitive, shard: 1, shards: 1}
+          - {group: browser, shard: 1, shards: 6}
+          - {group: browser, shard: 2, shards: 6}
+          - {group: browser, shard: 3, shards: 6}
+          - {group: browser, shard: 4, shards: 6}
+          - {group: browser, shard: 5, shards: 6}
+          - {group: browser, shard: 6, shards: 6}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Create this folder to silence warning
+      - name: Create folder to silence Nix warning
         run: mkdir -p ~/.nix-defexpr/channels
 
       - name: Install Nix
@@ -33,29 +47,31 @@ jobs:
       - name: Configure osmzhlab Attic cache
         run: bash .github/scripts/setup-osmzhlab-cache.sh
 
-      # Install R package dependencies via nix-shell, using the default.nix file in the repository
       - name: Install R package dependencies
         run: nix-shell default.nix --run "echo 'R package dependencies installed'"
 
-      ## Run all tests — load package from source, then run every test_*.R.
-      - name: Run all unit/integration tests
+      - name: Run ${{ matrix.group }} shard ${{ matrix.shard }}
         run: |
-          nix-shell default.nix --run "Rscript -e \"
-            devtools::load_all('.')
-            testthat::test_dir(
-              path = 'tests/testthat',
-              reporter = testthat::default_reporter(),
-              stop_on_failure = TRUE
-            )
-          \""
+          if [[ "${{ matrix.group }}" == "browser" ]]; then
+            export CEREBRO_RUN_BROWSER_TESTS=true
+          fi
+          nix-shell default.nix --run 'Rscript scripts/run-test-shard.R --group "${{ matrix.group }}" --shard "${{ matrix.shard }}" --shards "${{ matrix.shards }}"'
 
-      ## Upload shinytest2 failure artifacts (PNG diffs, logs) — unit test failures are in the log
       - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: shinytest2-failures
+          name: test-${{ matrix.group }}-${{ matrix.shard }}
           path: |
             tests/testthat/_snaps/
             /tmp/shinytest2*
+          if-no-files-found: ignore
           retention-days: 14
+
+  test:
+    if: always()
+    needs: [tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test shard to pass
+        run: test "${{ needs.tests.result }}" = "success"
