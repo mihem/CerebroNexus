@@ -18,11 +18,11 @@ Cerebro.options <<- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "4.3.4",
+  "cerebro_version" = "4.4.0",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
-  ## the UMAP, the cell-type composition, and the conditional tabs (Immune
-  ## Repertoire / Trajectory on the PBMC set, Spatial on the spatial sets).
+  ## the linked workspace, cell-type composition, and conditional specialist
+  ## tabs (Immune Repertoire / Trajectory on the PBMC set).
   ## They are embedded-backend .crb files, so no h5 matrix is configured. The
   ## PBMC set (Full, T+B) is listed first and loaded by default
   ## (crb_pick_smallest_file = FALSE); it carries TCR + BCR and a monocle2
@@ -46,10 +46,10 @@ Cerebro.options <<- list(
     "Mouse ileum (MERFISH)" = "extdata/examples/demo_spatial_merfish.crb",
     "Mouse brain (Xenium)" = "extdata/examples/demo_spatial_xenium.crb",
     ## REAL Trekker single-cell spatial-mapping output (Curio / Takara), down-
-    ## sampled from the smallest official bundle (Mouse_Brain_TrekkerU_C). Unlike
-    ## the spatial demos above it drives the bespoke **Trekker** tab, not the
-    ## generic Spatial tab: real single nuclei x whole transcriptome, positions
-    ## inferred from bead spatial barcodes, no histology image. Carries a
+    ## sampled from the smallest official bundle (Mouse_Brain_TrekkerU_C): real
+    ## single nuclei x whole transcriptome, positions inferred from bead spatial
+    ## barcodes, no histology image. Its physical and transcriptome spaces appear
+    ## together in Linked views. Carries a
     ## `trekker` slot (three coordinate orientations, positioning QC, upstream
     ## Moran's I, embedded per-nucleus positioning-evidence images).
     ## Rebuild with data-raw/build_trekker_demo.R (see data-raw/trekker.md).
@@ -77,9 +77,9 @@ Cerebro.options <<- list(
   ## embedding it in the .crb) — this exercises the `spatial_images` code path.
   ## The key must match the dropdown label above. The other image demos embed
   ## their image inside the .crb.
-  ## Images default to NO flip; the Spatial tab's "Flip vertically/horizontally"
-  ## checkboxes let the user align it if a given dataset needs it (for this Visium
-  ## H&E that is a vertical flip, matching Seurat's own SpatialPlot).
+  ## Images default to no flip; Linked views exposes per-image alignment controls
+  ## when needed. Keep the full dataset -> spatial entry -> image label hierarchy
+  ## so one Spatial data set can carry multiple distinct images.
   "spatial_images" = list(
     "Mouse brain (Visium)" = list(
       "anterior1" = c(

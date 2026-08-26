@@ -167,13 +167,12 @@ test_that("spatial image payload validation rejects unusable coordinates", {
     ),
     "numeric.*x.*y"
   )
-  expect_error(
+  expect_no_error(
     .validateCerebroSpatialImage(
       payload,
       "spatial_fov",
       data.frame(x = 101, y = 10)
-    ),
-    "outside.*bounds"
+    )
   )
   expect_error(
     .validateCerebroSpatialImage(
@@ -304,20 +303,23 @@ test_that("convertSeuratToCerebro forwards spatial_images without mutation", {
     },
     .package = "CerebroNexus"
   )
+  withr::local_options(cerebro.quiet_runtime = TRUE)
 
-  convertSeuratToCerebro(
-    seurat_file = object,
-    result_dir = tempfile("spatial-wrapper-"),
-    assay = "Spatial",
-    slot = "data",
-    experiment_name = "Forward images",
-    organism = "mouse",
-    groups = c("seurat_clusters", "cell_type_final"),
-    nUMI = "nCount_Spatial",
-    nGene = "nFeature_Spatial",
-    add_most_expressed_genes = FALSE,
-    spatial_images = declared,
-    verbose = FALSE
+  expect_silent(
+    convertSeuratToCerebro(
+      seurat_file = object,
+      result_dir = tempfile("spatial-wrapper-"),
+      assay = "Spatial",
+      slot = "data",
+      experiment_name = "Forward images",
+      organism = "mouse",
+      groups = c("seurat_clusters", "cell_type_final"),
+      nUMI = "nCount_Spatial",
+      nGene = "nFeature_Spatial",
+      add_most_expressed_genes = FALSE,
+      spatial_images = declared,
+      verbose = FALSE
+    )
   )
 
   expect_identical(received$spatial_images, declared)

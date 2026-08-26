@@ -31,6 +31,8 @@ createShinyApp(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
+  initial_dataset = NULL,
+  initial_page = NULL,
   auth = NULL,
   ...
 )
@@ -62,7 +64,14 @@ to FALSE.}
 \item{display_mode}{Exactly one of \code{"auto"}, \code{"normal"}, or
 \code{"showcase"}; defaults to \code{"normal"}.}
 
-\item{colors}{Optional named list of colour palettes per dataset.}
+\item{colors}{Optional colour palettes, keyed by data set label, then by
+grouping variable, then by group level:
+\code{list("PBMC example" = list(sample = c(sample_1 = "#1f77b4")))}.
+The level names have to be the ones in the data. A palette may cover only
+some levels; the rest keep their default colour. Anything R cannot read as
+a colour, or a label that is not in \code{cerebro_data}, is reported here
+rather than ignored at runtime. Users can still override a colour in the
+Color management tab, which wins for that session.}
 
 \item{cerebro_options}{Extra entries merged into \code{Cerebro.options} in
 the generated app. Matrix overrides must be absolute host paths and make
@@ -143,6 +152,14 @@ value applies to every migrated external image.}
 
 \item{spatial_plot_rotation}{Named list/vector; initial rotation (degrees)
 applied to spatial cell coordinates. Names must match \code{cerebro_data}.}
+
+\item{initial_dataset}{Optional exact data set label to load initially. This
+does not change the order of \code{cerebro_data}. URL selection and a
+session's current selection take precedence.}
+
+\item{initial_page}{Optional stable Viewer page identifier to open after the
+initial data set loads. Defaults to the existing Data info start page when
+omitted and is applied only once per Viewer session.}
 
 \item{auth}{Optional authentication settings. \code{NULL}, the default,
 leaves the generated Viewer public. To require a login, provide a named

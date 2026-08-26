@@ -147,9 +147,8 @@ test_that("spatial image manifests reject malformed payloads", {
 
   outside <- spatial_manifest_payload()
   outside$histology_image_bounds[["xmax"]] <- 50
-  expect_error(
-    crb$addSpatialData("outside", spatial_manifest_data(list(DAPI = outside))),
-    "outside.*bounds"
+  expect_no_error(
+    crb$addSpatialData("outside", spatial_manifest_data(list(DAPI = outside)))
   )
 })
 

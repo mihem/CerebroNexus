@@ -339,6 +339,7 @@
     }
   }
 
+  export <- .stripCerebroSourceReferences(export)
   saveRDS(export, stage_crb)
   if (!file.exists(stage_crb)) {
     stop("Failed to serialise the staged Cerebro object.", call. = FALSE)
@@ -402,6 +403,22 @@
     }
   }
   invisible(final_file)
+}
+
+.spx_export_projection_coordinates <- function(coordinates) {
+  if (!is.data.frame(coordinates)) {
+    return(NULL)
+  }
+  coordinate_columns <- .spx_find_coordinate_columns(coordinates)
+  if (is.null(coordinate_columns)) {
+    return(NULL)
+  }
+  projection <- coordinates[,
+    c(coordinate_columns$x, coordinate_columns$y),
+    drop = FALSE
+  ]
+  names(projection) <- c("x", "y")
+  projection
 }
 
 #' @title
@@ -484,7 +501,7 @@
 #' attributes, and security labels remain the deployment system's
 #' responsibility on every platform.
 #' @param spatial_images Optional named list mapping Seurat image names to named
-#'   image paths or descriptors of the form code{list(path = ..., bounds = ...)}.
+#'   image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.
 #'   Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
 #'   derived from the exported x/y coordinate range.
 #' @param verbose Set this to \code{TRUE} if you want additional log messages;
@@ -492,6 +509,17 @@
 #' @param .expression_resolution Internal handoff used by
 #' \code{convertSeuratToCerebro()} to reuse a matrix that has already been
 #' resolved and validated. Users should leave this as \code{NULL}.
+#' @param projections Optional ordered names of dimensional reductions to
+#' export. When supplied, every named reduction is exported in that order,
+#' including PCA beside other projections. The default \code{NULL} preserves
+#' the legacy behavior that uses non-PCA reductions when they are available.
+#' @param spatial_coordinate_transforms Optional named list of coordinate
+#'   transforms keyed by exact Seurat spatial FOV/image name. Each entry may
+#'   specify \code{rotation_degrees} and positive uniform \code{scale}; the
+#'   pivot is the coordinate bounds center. The transform is applied once to
+#'   the exported spatial coordinates and its normalized provenance is stored
+#'   in the corresponding CRB spatial record. \code{NULL} preserves
+#'   coordinates exactly as extracted from Seurat.
 #'
 #' @section Immune Repertoire:
 #' If \code{object@misc$immune_repertoire} contains a named list of
@@ -552,7 +580,9 @@ exportFromSeurat <- function(
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
   spatial_images = NULL,
   verbose = FALSE,
-  .expression_resolution = NULL
+  .expression_resolution = NULL,
+  projections = NULL,
+  spatial_coordinate_transforms = NULL
 ) {
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
@@ -682,6 +712,21 @@ exportFromSeurat <- function(
         'Valid options are: ',
         paste(groups, collapse = ', ')
       ),
+      call. = FALSE
+    )
+  }
+
+  if (
+    !is.null(projections) &&
+      (!is.character(projections) ||
+        !length(projections) ||
+        anyNA(projections) ||
+        any(!nzchar(projections)) ||
+        anyDuplicated(projections) ||
+        any(!projections %in% names(object@reductions)))
+  ) {
+    stop(
+      "`projections` must name unique dimensional reductions in the object.",
       call. = FALSE
     )
   }
@@ -1204,8 +1249,12 @@ exportFromSeurat <- function(
       )
     )
   }
-  projections <- list()
-  projections_available <- names(object@reductions)
+  explicit_projections <- !is.null(projections)
+  projections_available <- if (explicit_projections) {
+    projections
+  } else {
+    names(object@reductions)
+  }
   projections_available_pca <- projections_available[grep(
     projections_available,
     pattern = 'pca',
@@ -1220,6 +1269,23 @@ exportFromSeurat <- function(
   )]
   if (length(projections_available) == 0) {
     stop('No dimensional reductions available.', call. = FALSE)
+  } else if (explicit_projections) {
+    if (verbose) {
+      message(
+        paste0(
+          '[',
+          format(Sys.time(), '%H:%M:%S'),
+          '] Will export the following dimensional reductions: ',
+          paste(projections_available, collapse = ', ')
+        )
+      )
+    }
+    for (projection in projections_available) {
+      export$addProjection(
+        projection,
+        as.data.frame(object@reductions[[projection]]@cell.embeddings)
+      )
+    }
   } else if (
     length(projections_available) == 1 &&
       length(projections_available_pca) == 1
@@ -1691,16 +1757,69 @@ exportFromSeurat <- function(
   has_images <- .spx_has_slot(object, "images") &&
     !is.null(object@images) &&
     length(object@images) > 0
+  spatial_names <- if (has_images) names(object@images) else character()
   misc_spatial_images <- .validateCerebroSpatialImages(
     object@misc$cerebro_spatial_images,
-    if (has_images) names(object@images) else character(0)
+    spatial_names
   )
   path_spatial_images <- .normalizeSpatialImagePaths(
     spatial_images,
-    if (has_images) names(object@images) else character(0),
+    spatial_names,
     "`spatial_images`"
   )
   .mergeSpatialImageDeclarations(misc_spatial_images, path_spatial_images)
+
+  ## Validate every requested transform before the per-FOV extraction loop.
+  ## That loop deliberately catches extraction failures to preserve a useful
+  ## export with warnings; malformed caller input must instead fail fast and
+  ## never be mistaken for a bad individual FOV.
+  spatial_coordinate_transform_specs <- list()
+  ## Builder's canonical no-op state is an empty list. Treat it exactly like
+  ## NULL at this public boundary so direct callers can use the same value.
+  if (
+    is.list(spatial_coordinate_transforms) &&
+      !is.object(spatial_coordinate_transforms) &&
+      !length(spatial_coordinate_transforms)
+  ) {
+    spatial_coordinate_transforms <- NULL
+  }
+  if (!is.null(spatial_coordinate_transforms)) {
+    transform_names <- names(spatial_coordinate_transforms)
+    if (
+      !is.list(spatial_coordinate_transforms) ||
+        is.object(spatial_coordinate_transforms) ||
+        is.null(transform_names) ||
+        !is.character(transform_names) ||
+        is.object(transform_names) ||
+        anyNA(transform_names) ||
+        any(!nzchar(transform_names)) ||
+        anyDuplicated(transform_names)
+    ) {
+      stop(
+        "`spatial_coordinate_transforms` must be an ordinary named list ",
+        "with unique non-blank FOV names.",
+        call. = FALSE
+      )
+    }
+    unknown_transforms <- setdiff(transform_names, spatial_names)
+    if (length(unknown_transforms)) {
+      stop(
+        "`spatial_coordinate_transforms` contains unknown FOV(s): ",
+        paste(unknown_transforms, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    spatial_coordinate_transform_specs <- lapply(
+      transform_names,
+      function(image_name) {
+        .spx_coordinate_transform_spec_normalize(
+          spatial_coordinate_transforms[[image_name]],
+          context = paste0("spatial_coordinate_transforms$", image_name)
+        )
+      }
+    )
+    names(spatial_coordinate_transform_specs) <- transform_names
+  }
 
   if (has_images) {
     if (verbose) {
@@ -1731,22 +1850,9 @@ exportFromSeurat <- function(
           # Also add coordinates as a projection for compatibility with existing visualization functions
           coords_df <- spatial_data$coordinates
 
-          # Identify coordinate columns to use for projection (2D)
-          proj_cols <- character(0)
-
-          # Standard Visium
-          if (all(c("imagerow", "imagecol") %in% colnames(coords_df))) {
-            proj_cols <- c("imagerow", "imagecol")
-          } else if (all(c("x", "y") %in% colnames(coords_df))) {
-            # Standard FOV/Xenium/Other
-            proj_cols <- c("x", "y")
-          } else if (ncol(coords_df) >= 2) {
-            # Fallback: use first two columns
-            proj_cols <- colnames(coords_df)[1:2]
-          }
-
-          if (length(proj_cols) == 2) {
-            coords_df <- coords_df[, proj_cols, drop = FALSE]
+          projection <- .spx_export_projection_coordinates(coords_df)
+          if (!is.null(projection)) {
+            coords_df <- projection
             if (verbose) {
               message(paste0(
                 '[',
@@ -1757,10 +1863,38 @@ exportFromSeurat <- function(
               ))
             }
           }
+          transform_spec <- spatial_coordinate_transform_specs[[image_name]]
+          if (!is.null(transform_spec)) {
+            source_coordinate_fingerprint <-
+              .spx_coordinate_transform_fingerprint(coords_df)
+            coordinate_transform <- .spx_coordinate_transform_normalize(
+              spatial_coordinate_transforms[[image_name]],
+              coords_df,
+              context = paste0("spatial_coordinate_transforms$", image_name)
+            )
+            coords_df <- .spx_apply_coordinate_transform(
+              coords_df,
+              spatial_coordinate_transforms[[image_name]]
+            )
+            coordinate_transform$transformed_coordinate_fingerprint <-
+              .spx_coordinate_transform_fingerprint(coords_df)
+            coordinate_transform$source_coordinate_fingerprint <-
+              source_coordinate_fingerprint
+            spatial_data$coordinate_transform <- coordinate_transform
+          }
           spatial_data$coordinates <- coords_df
           spatial_data
         },
         error = function(e) {
+          if (!is.null(spatial_coordinate_transform_specs[[image_name]])) {
+            stop(
+              "Could not apply spatial coordinate transform for FOV `",
+              image_name,
+              "`: ",
+              conditionMessage(e),
+              call. = FALSE
+            )
+          }
           ## Never drop a spatial image silently: an object that clearly has
           ## `@images` but whose extraction fails (e.g. requested layer=slot is
           ## absent) would otherwise export "successfully" with no Spatial tab

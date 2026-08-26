@@ -21,7 +21,9 @@ exportFromSeurat(
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
   spatial_images = NULL,
   verbose = FALSE,
-  .expression_resolution = NULL
+  .expression_resolution = NULL,
+  projections = NULL,
+  spatial_coordinate_transforms = NULL
 )
 }
 \arguments{
@@ -123,6 +125,17 @@ defaults to \code{FALSE}.}
 \item{.expression_resolution}{Internal handoff used by
 \code{convertSeuratToCerebro()} to reuse a matrix that has already been
 resolved and validated. Users should leave this as \code{NULL}.}
+
+\item{projections}{Optional ordered names of dimensional reductions to
+export. When supplied, every named reduction is exported in that order,
+including PCA beside other projections. The default \code{NULL} preserves
+the legacy behavior that uses non-PCA reductions when they are available.}
+
+\item{spatial_coordinate_transforms}{Optional named list of coordinate
+transforms keyed by exact Seurat spatial FOV/image name. Each entry may
+specify \code{rotation_degrees} and positive uniform \code{scale}; the pivot
+is the coordinate bounds center. Normalized provenance is stored with the
+transformed CRB spatial record.}
 }
 \value{
 No data returned.

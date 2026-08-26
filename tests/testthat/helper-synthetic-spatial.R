@@ -170,3 +170,78 @@ write_dummy_png <- function(path, width = 4, height = 4) {
   png::writePNG(arr, path)
   invisible(path)
 }
+
+## Build a synthetic object holding SEVERAL tissue sections, the way a real
+## experiment does: sections cut from the same block share a sequencing sample,
+## and each section occupies its own patch of coordinate space.
+##
+## Nothing else in the suite produces one. Every shipped demo `.crb` has exactly
+## one spatial entry, which is how a builder that wrote one image into every
+## section, and a viewer that could not reach any section but the first, both
+## survived unnoticed.
+##
+## `sections` is a named list of cell counts; names become the @images entries.
+## `samples` maps each section to its sequencing sample.
+make_synthetic_multisection_seurat <- function(
+  sections = c(sectionA1 = 30, sectionA2 = 30, sectionB1 = 40),
+  samples = c(sectionA1 = "donorA", sectionA2 = "donorA", sectionB1 = "donorB"),
+  n_genes = 30,
+  seed = 11
+) {
+  set.seed(seed)
+  n_cells <- sum(sections)
+  cells <- paste0("Cell", seq_len(n_cells))
+  counts <- matrix(
+    stats::rpois(n_genes * n_cells, lambda = 3),
+    nrow = n_genes,
+    dimnames = list(paste0("Gene", seq_len(n_genes)), cells)
+  )
+  counts <- methods::as(counts, "CsparseMatrix")
+  obj <- SeuratObject::CreateSeuratObject(counts = counts, assay = "Spatial")
+  obj <- Seurat::NormalizeData(obj, verbose = FALSE)
+
+  ## Which cells belong to which section, in order.
+  ends <- cumsum(sections)
+  starts <- c(1L, utils::head(ends, -1L) + 1L)
+  names(starts) <- names(sections)
+
+  obj$sample <- rep(unname(samples[names(sections)]), times = sections)
+  obj$section <- rep(names(sections), times = sections)
+  obj$seurat_clusters <- factor(
+    sample(c("C1", "C2"), n_cells, replace = TRUE)
+  )
+  obj$cell_type_final <- obj$seurat_clusters
+
+  ## Each section sits 500 units further along x, so a section drawn with the
+  ## wrong coordinates is unmistakable rather than subtly off.
+  for (i in seq_along(sections)) {
+    nm <- names(sections)[i]
+    idx <- starts[[nm]]:ends[[i]]
+    coords <- data.frame(
+      x = stats::runif(length(idx), 0, 100) + (i - 1L) * 500,
+      y = stats::runif(length(idx), 0, 80),
+      cell = cells[idx]
+    )
+    ## CreateCentroids first: handing CreateFOV a bare coordinate frame drops
+    ## the cell names and the assignment fails.
+    ## Each FOV needs its own key, or Seurat invents one and warns per section.
+    obj[[nm]] <- SeuratObject::CreateFOV(
+      coords = list(centroids = SeuratObject::CreateCentroids(coords)),
+      type = "centroids",
+      assay = "Spatial",
+      key = paste0(tolower(nm), "_")
+    )
+  }
+
+  emb <- matrix(
+    stats::rnorm(n_cells * 2),
+    nrow = n_cells,
+    dimnames = list(cells, c("UMAP_1", "UMAP_2"))
+  )
+  obj[["umap"]] <- SeuratObject::CreateDimReducObject(
+    embeddings = emb,
+    key = "UMAP_",
+    assay = "Spatial"
+  )
+  obj
+}

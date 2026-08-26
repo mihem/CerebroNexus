@@ -55,18 +55,6 @@
     stop(context, " requires ymin to be less than ymax.", call. = FALSE)
   }
 
-  outside <- coordinates[["x"]] < bounds[["xmin"]] |
-    coordinates[["x"]] > bounds[["xmax"]] |
-    coordinates[["y"]] < bounds[["ymin"]] |
-    coordinates[["y"]] > bounds[["ymax"]]
-  if (any(outside)) {
-    stop(
-      context,
-      " has coordinates outside its declared bounds.",
-      call. = FALSE
-    )
-  }
-
   bounds
 }
 
@@ -152,7 +140,11 @@
     label <- image_names[[i]]
     payload <- images[[i]]
     payload_context <- paste0(context, " image `", label, "`")
-    valid_fields <- c("histology_image", "histology_image_bounds")
+    valid_fields <- c(
+      "histology_image",
+      "histology_image_bounds",
+      "histology_alignment"
+    )
     if (
       !is.list(payload) ||
         is.null(names(payload)) ||
@@ -163,7 +155,7 @@
       stop(
         payload_context,
         " must contain `histology_image` and optional ",
-        "`histology_image_bounds`.",
+        "`histology_image_bounds` / `histology_alignment`.",
         call. = FALSE
       )
     }
@@ -184,7 +176,29 @@
       )
     }
 
-    list(
+    alignment <- payload[["histology_alignment"]]
+    valid_alignment <- is.null(alignment) ||
+      (is.list(alignment) &&
+        !is.object(alignment) &&
+        !is.null(names(alignment)) &&
+        !anyNA(names(alignment)) &&
+        all(nzchar(names(alignment))) &&
+        !anyDuplicated(names(alignment)) &&
+        all(vapply(
+          alignment,
+          function(value) {
+            is.atomic(value) && length(value) == 1L && !is.na(value)
+          },
+          logical(1)
+        )))
+    if (!valid_alignment) {
+      stop(
+        payload_context,
+        " `histology_alignment` must be a named list of scalar values.",
+        call. = FALSE
+      )
+    }
+    normalized_payload <- list(
       histology_image = image,
       histology_image_bounds = .spatialImageBounds(
         payload[["histology_image_bounds"]],
@@ -192,6 +206,10 @@
         payload_context
       )
     )
+    if (!is.null(alignment)) {
+      normalized_payload$histology_alignment <- alignment
+    }
+    normalized_payload
   })
   names(normalized) <- image_names
   normalized
@@ -658,7 +676,10 @@
     "scale_y",
     "offset_x",
     "offset_y",
-    "rotation"
+    "rotation",
+    "image_opacity",
+    "point_opacity",
+    "point_size"
   )
   logical_fields <- c("flip_x", "flip_y")
 
@@ -781,6 +802,26 @@
               "` must be one ",
               type,
               " scalar.",
+              call. = FALSE
+            )
+          }
+          if (
+            field %in%
+              c("image_opacity", "point_opacity") &&
+              (value < 0 || value > 1)
+          ) {
+            stop(
+              context,
+              " setting `",
+              field,
+              "` must be between 0 and 1.",
+              call. = FALSE
+            )
+          }
+          if (identical(field, "point_size") && value <= 0) {
+            stop(
+              context,
+              " setting `point_size` must be greater than 0.",
               call. = FALSE
             )
           }

@@ -30,6 +30,38 @@ valid_args <- list(
   nGene = "nFeature_RNA"
 )
 
+test_that("export spatial projections use x and y axis semantics", {
+  expect_true(exists(".spx_export_projection_coordinates", mode = "function"))
+  if (!exists(".spx_export_projection_coordinates", mode = "function")) {
+    return(invisible())
+  }
+
+  cells <- c("cell-b", "cell-a")
+  visium <- data.frame(
+    imagerow = c(200, 100),
+    imagecol = c(20, 10),
+    row.names = cells
+  )
+  projection <- .spx_export_projection_coordinates(visium)
+  expect_identical(names(projection), c("x", "y"))
+  expect_identical(projection$x, visium$imagecol)
+  expect_identical(projection$y, visium$imagerow)
+  expect_identical(rownames(projection), cells)
+
+  standardized <- data.frame(
+    x = visium$imagecol,
+    y = visium$imagerow,
+    imagerow = visium$imagerow,
+    imagecol = visium$imagecol,
+    row.names = cells
+  )
+  expect_identical(
+    .spx_export_projection_coordinates(standardized),
+    standardized[, c("x", "y"), drop = FALSE]
+  )
+  expect_null(.spx_export_projection_coordinates(data.frame(foo = 1, bar = 2)))
+})
+
 ## ---------------------------------------------------------------------------
 ## Input validation
 ## ---------------------------------------------------------------------------

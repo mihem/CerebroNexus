@@ -577,8 +577,12 @@ test_that("stage cleanup completes before the lock is released", {
   crb <- lock_test_crb(root)
   result <- file.path(root, "app")
   build_ops <- .bundleBuildOps()
-  build_ops$write_lines <- function(text, connection) {
-    stop("injected stage failure")
+  original_copy <- build_ops$copy
+  build_ops$copy <- function(from, to, ...) {
+    if (identical(basename(from), "_bundle_app.R")) {
+      stop("injected stage failure")
+    }
+    original_copy(from, to, ...)
   }
   release_lock <- .releaseBundleLock
   stages_seen_at_release <- NA_integer_
@@ -605,8 +609,12 @@ test_that("stage cleanup errors cannot strand the build lock", {
   crb <- lock_test_crb(root)
   result <- file.path(root, "app")
   build_ops <- .bundleBuildOps()
-  build_ops$write_lines <- function(text, connection) {
-    stop("injected build failure")
+  original_copy <- build_ops$copy
+  build_ops$copy <- function(from, to, ...) {
+    if (identical(basename(from), "_bundle_app.R")) {
+      stop("injected build failure")
+    }
+    original_copy(from, to, ...)
   }
   testthat::local_mocked_bindings(
     .bundleBuildOps = function() build_ops,
@@ -642,10 +650,23 @@ test_that("the bundle lock excludes a second R process", {
     "R",
     "createShinyApp.R"
   )
+  path_contract_source <- test_path(
+    "..",
+    "..",
+    "R",
+    "bundle_path_contract.R"
+  )
   worker <- callr::r_bg(
-    function(implementation_source, result, ready, release) {
+    function(
+      implementation_source,
+      path_contract_source,
+      result,
+      ready,
+      release
+    ) {
       implementation <- if (file.exists(implementation_source)) {
         environment <- new.env(parent = globalenv())
+        sys.source(path_contract_source, envir = environment)
         sys.source(implementation_source, envir = environment)
         environment
       } else {
@@ -665,7 +686,13 @@ test_that("the bundle lock excludes a second R process", {
       }
       invisible(TRUE)
     },
-    args = list(implementation_source, result, ready, release),
+    args = list(
+      implementation_source,
+      path_contract_source,
+      result,
+      ready,
+      release
+    ),
     libpath = .libPaths(),
     supervise = TRUE
   )
