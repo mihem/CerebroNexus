@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,7 +97,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">25 August, 2026</h4>
+            <h4 data-toc-skip class="date">26 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/hla_tcr_motifs.Rmd" class="external-link"><code>vignettes/hla_tcr_motifs.Rmd</code></a></small>
       <div class="d-none name"><code>hla_tcr_motifs.Rmd</code></div>
@@ -534,7 +534,7 @@ really do form a network:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seg</span> <span class="op">&lt;-</span> <span class="fu">CerebroNexus</span><span class="fu">:::</span><span class="fu"><a href="../reference/hla_parse_ir_segments.html">hla_parse_ir_segments</a></span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">immune_repertoire</span>, <span class="st">"TRB"</span><span class="op">)</span></span>
 <span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu">CerebroNexus</span><span class="fu">:::</span><span class="fu"><a href="../reference/hla_build_motif_graph.html">hla_build_motif_graph</a></span><span class="op">(</span><span class="va">seg</span>, by_v <span class="op">=</span> <span class="cn">TRUE</span>, min_nodes <span class="op">=</span> <span class="fl">6</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nodes <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/igraph/man/gorder.html" class="external-link">gorder</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span>, edges <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/igraph/man/gsize.html" class="external-link">gsize</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span>, families <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/igraph/man/components.html" class="external-link">components</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span><span class="op">$</span><span class="va">no</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nodes <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://r.igraph.org/reference/gorder.html" class="external-link">gorder</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span>, edges <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://r.igraph.org/reference/gsize.html" class="external-link">gsize</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span>, families <span class="op">=</span> <span class="fu">igraph</span><span class="fu">::</span><span class="fu"><a href="https://r.igraph.org/reference/components.html" class="external-link">components</a></span><span class="op">(</span><span class="va">g</span><span class="op">)</span><span class="op">$</span><span class="va">no</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">#&gt;    nodes    edges families</span></span>
 <span><span class="co">#&gt;       54       49        6</span></span></code></pre>
 <p>Fifty-four CDR3s, forty-nine one-edit links, six families — the six

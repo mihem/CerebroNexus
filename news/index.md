@@ -1,5 +1,14 @@
 # Changelog
 
+## CerebroNexus 4.3.2
+
+### Viewer
+
+- Generated Viewers decrypt hashed credentials into memory and no longer
+  require write access to authentication databases at runtime. Account
+  and password changes remain administrator-managed through rebuilt
+  deployments.
+
 ## CerebroNexus 4.3.1
 
 ### Viewer

@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@ Hillje</h4>
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">25 August, 2026</h4>
+            <h4 data-toc-skip class="date">26 August, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
       <div class="d-none name"><code>control_access_to_cerebro_with_a_login_page.Rmd</code></div>
@@ -267,8 +267,11 @@ privileges:</p>
 </tbody>
 </table>
 <p>The runtime account needs only read access to the bundled database.
-Update accounts or passwords in the private source database, then
-rebuild and redeploy the App rather than modifying its runtime copy.</p>
+The Viewer decrypts its hashed credentials into memory and does not use
+SQLite for runtime state. Login history, database-backed account
+locking, and in-App password changes are intentionally disabled. Update
+accounts or passwords in the private source database, then rebuild and
+redeploy the App.</p>
 <div class="float">
 <img src="img/auth-deployment-boundary.svg" alt="The App and external passphrase travel separately and meet only in the trusted runtime process."><div class="figcaption">The App and external passphrase travel
 separately and meet only in the trusted runtime process.</div>
@@ -311,7 +314,6 @@ and an invalid login fails, then stop the R process with Ctrl+C.</p>
 <p>Every new R process must load the external secret:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># R console — run this in every local App process.</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span><span class="st">"shinymanager.pwd_failure_limit"</span> <span class="op">=</span> <span class="fl">10L</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="st">"/srv/cerebro/private/viewer-auth.env"</span><span class="op">)</span></span>
 <span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="st">"/srv/cerebro/apps/my_app"</span><span class="op">)</span></span></code></pre></div>
 <p>Check one valid and one invalid login in a private browser window.
@@ -434,20 +436,17 @@ then:</p>
 <div class="section level2">
 <h2 id="limit-failed-sign-ins">Limit failed sign-ins<a class="anchor" aria-label="anchor" href="#limit-failed-sign-ins"></a>
 </h2>
-<p><strong>Run this as:</strong> the person configuring the App startup
-process.</p>
-<p><strong>Run it on:</strong> every runtime host, in the R profile or
-startup command used by the actual service account.</p>
-<p><strong>What happens:</strong> <code>shinymanager</code> locks an
-account after the configured number of consecutive failed passwords.</p>
-<p><strong>Verify:</strong> use a disposable test account to confirm the
-chosen policy, then check that the reverse proxy also performs
-source-aware rate limiting.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># R console — place this in the real App startup process or its `.Rprofile`.</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span><span class="st">"shinymanager.pwd_failure_limit"</span> <span class="op">=</span> <span class="fl">10L</span><span class="op">)</span></span></code></pre></div>
-<p>Also configure source-aware rate limiting at the reverse proxy.
-Account locking alone can be abused for denial of service.</p>
+<p><strong>Run this as:</strong> the reverse-proxy administrator.</p>
+<p><strong>Run it on:</strong> the reverse proxy in front of the
+Viewer.</p>
+<p><strong>What happens:</strong> the proxy limits repeated
+authentication requests by source before they reach Shiny.</p>
+<p><strong>Verify:</strong> exceed the configured request limit from a
+test client and confirm that the proxy rejects further attempts
+temporarily.</p>
+<p>Configure source-aware rate limiting at the reverse proxy. The
+read-only Viewer does not persist failed-login counters or account
+locks.</p>
 </div>
 <div class="section level2">
 <h2 id="add-remove-or-rotate-users">Add, remove, or rotate users<a class="anchor" aria-label="anchor" href="#add-remove-or-rotate-users"></a>
