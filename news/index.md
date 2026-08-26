@@ -1,5 +1,15 @@
 # Changelog
 
+## CerebroNexus 4.3.3
+
+### Viewer
+
+- Generated Viewers now disable user data uploads by default. Set
+  `show_upload_ui = TRUE` in
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  to opt in. Closed Viewers also ignore upload input submitted outside
+  the rendered UI.
+
 ## CerebroNexus 4.3.2
 
 ### Viewer

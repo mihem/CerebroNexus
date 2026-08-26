@@ -23,7 +23,7 @@ createShinyApp(
   overwrite = TRUE,
   verbose = TRUE,
   crb_pick_smallest_file = TRUE,
-  show_upload_ui = TRUE,
+  show_upload_ui = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
   point_size = list(overview_projection_point_size = NULL),
   variable_to_compare = NULL,
@@ -116,7 +116,8 @@ createShinyApp(
 
 - show_upload_ui:
 
-  Forwarded to `Cerebro.options`.
+  One non-missing logical controlling whether users may upload their own
+  data; defaults to `FALSE`.
 
 - welcome_message:
 

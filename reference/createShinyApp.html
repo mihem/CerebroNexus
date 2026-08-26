@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -105,7 +105,7 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  overwrite <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  crb_pick_smallest_file <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  show_upload_ui <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  show_upload_ui <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  welcome_message <span class="op">=</span> <span class="st">"Welcome to CerebroNexus!"</span>,</span>
 <span>  point_size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>overview_projection_point_size <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span>,</span>
 <span>  variable_to_compare <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -200,7 +200,8 @@ directory is rejected before any files are written.</p></dd>
 
 
 <dt id="arg-show-upload-ui">show_upload_ui<a class="anchor" aria-label="anchor" href="#arg-show-upload-ui"></a></dt>
-<dd><p>Forwarded to <code>Cerebro.options</code>.</p></dd>
+<dd><p>One non-missing logical controlling whether users may
+upload their own data; defaults to <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>

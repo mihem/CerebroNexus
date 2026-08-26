@@ -80,7 +80,8 @@ shiny::runApp(out_dir)
 | `welcome_message` | text shown in the Load Data tab |
 | `colors` | optional named list of palettes (one entry per dataset name) |
 | `cerebro_options` | extra entries merged into `Cerebro.options`; matrix overrides must be absolute host paths (native paths must resolve outside `result_dir`) |
-| `crb_pick_smallest_file`, `show_upload_ui` | forwarded into `Cerebro.options` |
+| `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
+| `show_upload_ui` | allow users to upload their own data; defaults to `FALSE` for generated apps |
 | `point_size`, `variable_to_compare` | forwarded into `Cerebro.options` |
 
 ## Bundling multiple datasets (available since 2.0.0)
