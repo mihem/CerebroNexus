@@ -790,6 +790,7 @@ exportFromSCE <- function(
   )
 
   ## save file
+  export <- .stripCerebroSourceReferences(export)
   saveRDS(export, file)
 
   ## log message

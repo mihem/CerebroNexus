@@ -1318,151 +1318,16 @@
     sanitize_cols(out)
   }
 
-  clean_name <- function(x) tolower(gsub("[^a-z0-9]+", "", x))
-
-  find_col <- function(df, candidates) {
-    nms <- colnames(df)
-    if (is.null(nms) || length(nms) == 0) {
-      return(NULL)
-    }
-    idx <- match(clean_name(candidates), clean_name(nms), nomatch = 0)
-    idx <- idx[idx > 0]
-    if (length(idx) > 0) nms[idx[1]] else NULL
-  }
-
-  X_CANDIDATES <- c(
-    "x",
-    "X",
-    "coord_x",
-    "coordinate_x",
-    "spatial_x",
-    "spatial_1",
-    "sdimx",
-    "center_x",
-    "centroid_x",
-    "x_centroid",
-    "x_center",
-    "global_x",
-    "x_global",
-    "aligned_x",
-    "x_aligned",
-    "cell_x",
-    "cell.global.x",
-    "cell_global_x",
-    "nucleus_x",
-    "nucleus.global.x",
-    "nucleus_global_x",
-    "CenterX_global_px",
-    "CenterX_local_px",
-    "CenterX_global_mm",
-    "xcoord",
-    "x_coord",
-    "imagecol",
-    "image_col",
-    "pxl_col_in_fullres",
-    "pixel_col",
-    "col",
-    "column"
-  )
-  Y_CANDIDATES <- c(
-    "y",
-    "Y",
-    "coord_y",
-    "coordinate_y",
-    "spatial_y",
-    "spatial_2",
-    "sdimy",
-    "center_y",
-    "centroid_y",
-    "y_centroid",
-    "y_center",
-    "global_y",
-    "y_global",
-    "aligned_y",
-    "y_aligned",
-    "cell_y",
-    "cell.global.y",
-    "cell_global_y",
-    "nucleus_y",
-    "nucleus.global.y",
-    "nucleus_global_y",
-    "CenterY_global_px",
-    "CenterY_local_px",
-    "CenterY_global_mm",
-    "ycoord",
-    "y_coord",
-    "imagerow",
-    "image_row",
-    "pxl_row_in_fullres",
-    "pixel_row",
-    "row"
-  )
-
   find_xy_cols <- function(df, user_cols = NULL, hard_error = FALSE) {
-    if (!is.null(user_cols)) {
-      if (length(user_cols) != 2) {
-        if (hard_error) {
-          stop("`coord_cols` must be length 2.", call. = FALSE)
-        }
-        return(NULL)
-      }
-      if (!all(user_cols %in% colnames(df))) {
-        if (hard_error) {
-          stop(
-            "`coord_cols` not found: ",
-            paste(setdiff(user_cols, colnames(df)), collapse = ", "),
-            call. = FALSE
-          )
-        }
-        return(NULL)
-      }
-      return(list(x = user_cols[1], y = user_cols[2]))
-    }
-    x_col <- find_col(df, X_CANDIDATES)
-    y_col <- find_col(df, Y_CANDIDATES)
-    if (is.null(x_col) || is.null(y_col)) {
-      return(NULL)
-    }
-    list(x = x_col, y = y_col)
+    .spx_find_coordinate_columns(
+      df,
+      coord_cols = user_cols,
+      hard_error = hard_error
+    )
   }
 
   find_best_cell_col <- function(df, valid_cells) {
-    if (is.null(valid_cells) || length(valid_cells) == 0) {
-      return(NULL)
-    }
-    cell_name_candidates <- c(
-      "cell",
-      "cells",
-      "cell_id",
-      "cellid",
-      "cell.id",
-      "barcode",
-      "barcodes",
-      "Barcode",
-      "CELL",
-      "Cell",
-      "object",
-      "object_id",
-      "ObjectID",
-      "ID",
-      "id",
-      "name"
-    )
-    cand <- intersect(cell_name_candidates, colnames(df))
-    if (length(cand) == 0) {
-      return(NULL)
-    }
-    overlaps <- vapply(
-      cand,
-      function(cc) {
-        sum(as.character(df[[cc]]) %in% valid_cells, na.rm = TRUE)
-      },
-      numeric(1)
-    )
-    if (max(overlaps, na.rm = TRUE) == 0) {
-      return(NULL)
-    }
-    cand[which.max(overlaps)]
+    .spx_find_barcode_column(df, valid_cells)
   }
 
   summarise_duplicate_cells <- function(df) {

@@ -133,593 +133,6 @@ dedent <- function(string) {
   )
 }
 
-# Portable bundle paths ----------------------------------------------------
-
-.windowsPathSegmentInvalid <- function(parts) {
-  grepl("[[:cntrl:]<>:\"|?*]", parts) |
-    grepl("[. ]$", parts) |
-    grepl(
-      "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])($|\\.)",
-      parts,
-      ignore.case = TRUE
-    )
-}
-
-.portableBundlePath <- function(path, subject) {
-  valid <- is.character(path) &&
-    length(path) == 1L &&
-    !is.na(path) &&
-    nzchar(path) &&
-    !grepl("/$", path) &&
-    !grepl("\\\\", path) &&
-    !grepl("^(/|~|[A-Za-z]:)", path)
-  parts <- if (valid) {
-    strsplit(path, "/", fixed = TRUE)[[1L]]
-  } else {
-    character()
-  }
-  windows_invalid <- length(parts) > 0L &&
-    any(.windowsPathSegmentInvalid(parts))
-  if (
-    !valid ||
-      length(parts) == 0L ||
-      any(!nzchar(parts)) ||
-      any(parts %in% c(".", "..")) ||
-      windows_invalid
-  ) {
-    stop(
-      subject,
-      " must be one portable relative path using forward slashes, without ",
-      "empty, '.', '..', or Windows-incompatible segments.",
-      call. = FALSE
-    )
-  }
-  paste(parts, collapse = "/")
-}
-
-# Native path resolution ---------------------------------------------------
-
-.absolutePathStyle <- function(path, os_type = .Platform$OS.type) {
-  slash_path <- gsub("\\", "/", path, fixed = TRUE)
-  if (grepl("^//[?.]/", slash_path)) {
-    return("windows-device")
-  }
-  if (grepl("^[A-Za-z]:/", slash_path)) {
-    return("drive")
-  }
-  if (startsWith(slash_path, "//")) {
-    if (grepl("^//[^/]+/[^/]+($|/)", slash_path)) {
-      return("unc")
-    }
-    if (identical(os_type, "windows")) {
-      return("windows-malformed")
-    }
-    return(NA_character_)
-  }
-  if (identical(os_type, "windows") && startsWith(slash_path, "/")) {
-    return("windows-root")
-  }
-  if (startsWith(path, "/")) {
-    return("posix")
-  }
-  NA_character_
-}
-
-.nativeAbsolutePath <- function(
-  path,
-  style = .absolutePathStyle(path),
-  os_type = .Platform$OS.type
-) {
-  if (is.na(style)) {
-    return(FALSE)
-  }
-  if (identical(os_type, "windows")) {
-    return(TRUE)
-  }
-  identical(style, "posix")
-}
-
-.nativeFilesystemStyle <- function(
-  path,
-  style = .absolutePathStyle(path),
-  os_type = .Platform$OS.type
-) {
-  if (
-    !identical(os_type, "windows") &&
-      startsWith(path, "/")
-  ) {
-    return("posix")
-  }
-  style
-}
-
-.lexicalAbsolutePath <- function(
-  path,
-  style = .absolutePathStyle(path),
-  os_type = .Platform$OS.type
-) {
-  slash_path <- if (
-    identical(style, "posix") &&
-      !identical(os_type, "windows")
-  ) {
-    path
-  } else {
-    gsub("\\", "/", path, fixed = TRUE)
-  }
-  if (identical(style, "drive")) {
-    prefix <- paste0(substr(slash_path, 1L, 2L), "/")
-    remainder <- sub("^[A-Za-z]:/+", "", slash_path)
-  } else if (identical(style, "unc")) {
-    unc_parts <- strsplit(sub("^/+", "", slash_path), "/", fixed = TRUE)[[1L]]
-    prefix <- paste0("//", unc_parts[[1L]], "/", unc_parts[[2L]])
-    remainder <- paste(unc_parts[-seq_len(2L)], collapse = "/")
-  } else {
-    prefix <- "/"
-    remainder <- sub("^/+", "", slash_path)
-  }
-
-  parts <- strsplit(remainder, "/", fixed = TRUE)[[1L]]
-  normalized <- character()
-  for (part in parts) {
-    if (!nzchar(part) || identical(part, ".")) {
-      next
-    }
-    if (identical(part, "..")) {
-      if (length(normalized) > 0L) {
-        normalized <- normalized[-length(normalized)]
-      }
-      next
-    }
-    normalized <- c(normalized, part)
-  }
-  if (length(normalized) == 0L) {
-    return(prefix)
-  }
-  paste0(
-    prefix,
-    if (endsWith(prefix, "/")) "" else "/",
-    paste(
-      normalized,
-      collapse = "/"
-    )
-  )
-}
-
-.absolutePathComponents <- function(
-  path,
-  style = .absolutePathStyle(path),
-  os_type = .Platform$OS.type
-) {
-  slash_path <- if (
-    identical(style, "posix") &&
-      !identical(os_type, "windows")
-  ) {
-    path
-  } else {
-    gsub("\\", "/", path, fixed = TRUE)
-  }
-  if (identical(style, "drive")) {
-    root <- paste0(substr(slash_path, 1L, 2L), "/")
-    remainder <- sub("^[A-Za-z]:/+", "", slash_path)
-  } else if (identical(style, "unc")) {
-    unc_parts <- strsplit(
-      sub("^/+", "", slash_path),
-      "/",
-      fixed = TRUE
-    )[[1L]]
-    root <- paste0("//", unc_parts[[1L]], "/", unc_parts[[2L]])
-    remainder <- paste(unc_parts[-seq_len(2L)], collapse = "/")
-  } else {
-    root <- "/"
-    remainder <- sub("^/+", "", slash_path)
-  }
-  parts <- if (nzchar(remainder)) {
-    strsplit(remainder, "/", fixed = TRUE)[[1L]]
-  } else {
-    character()
-  }
-  list(root = root, parts = parts)
-}
-
-.composeAbsolutePath <- function(root, parts) {
-  if (length(parts) == 0L) {
-    return(root)
-  }
-  paste0(
-    root,
-    if (endsWith(root, "/")) "" else "/",
-    paste(parts, collapse = "/")
-  )
-}
-
-.relativeLinkComponents <- function(path, os_type = .Platform$OS.type) {
-  if (identical(os_type, "windows")) {
-    path <- gsub("\\", "/", path, fixed = TRUE)
-  }
-  strsplit(path, "/", fixed = TRUE)[[1L]]
-}
-
-.nativePathExists <- function(path) {
-  file.exists(path) || dir.exists(path)
-}
-
-.readNativeLink <- function(
-  path,
-  os_type = .Platform$OS.type,
-  is_link = function(candidate) fs::is_link(candidate),
-  link_path = function(candidate) fs::link_path(candidate)
-) {
-  if (identical(os_type, "windows")) {
-    linked <- is_link(path)
-    if (length(linked) != 1L || is.na(linked) || !isTRUE(unname(linked))) {
-      return("")
-    }
-    return(as.character(link_path(path))[[1L]])
-  }
-  Sys.readlink(path)
-}
-
-.normalizeExistingPath <- function(
-  path,
-  os_type = .Platform$OS.type,
-  path_real = function(candidate) fs::path_real(candidate)
-) {
-  if (identical(os_type, "windows")) {
-    return(as.character(path_real(path))[[1L]])
-  }
-  normalizePath(path, winslash = "/", mustWork = TRUE)
-}
-
-.pathDirectoryEntryExists <- function(
-  path,
-  os_type = .Platform$OS.type,
-  dir_exists = dir.exists,
-  access_parent = function(parent) file.access(parent, mode = 5L),
-  list_entries = function(parent) {
-    list.files(parent, all.files = TRUE, no.. = TRUE)
-  }
-) {
-  parent <- dirname(path)
-  if (!isTRUE(dir_exists(parent))) {
-    return(FALSE)
-  }
-
-  inspection_error <- NULL
-  access_status <- tryCatch(
-    access_parent(parent),
-    error = function(error_condition) {
-      inspection_error <<- conditionMessage(error_condition)
-      NULL
-    }
-  )
-  if (
-    !is.null(inspection_error) ||
-      length(access_status) != 1L ||
-      is.na(access_status) ||
-      access_status != 0L
-  ) {
-    stop(
-      "The path cannot be resolved safely because the parent directory ",
-      "could not be inspected.",
-      call. = FALSE
-    )
-  }
-
-  entries <- tryCatch(
-    withCallingHandlers(
-      list_entries(parent),
-      warning = function(warning_condition) {
-        inspection_error <<- conditionMessage(warning_condition)
-        invokeRestart("muffleWarning")
-      }
-    ),
-    error = function(error_condition) {
-      inspection_error <<- conditionMessage(error_condition)
-      NULL
-    }
-  )
-  if (!is.null(inspection_error) || !is.character(entries)) {
-    stop(
-      "The path cannot be resolved safely because the parent directory ",
-      "could not be inspected.",
-      call. = FALSE
-    )
-  }
-
-  needle <- basename(path)
-  if (identical(os_type, "windows")) {
-    needle <- tolower(needle)
-    entries <- tolower(entries)
-  }
-  any(entries == needle)
-}
-
-## Resolve each component so intermediate symbolic links are reflected in the
-## canonical path and callers can detect escape from an allowed root.
-## Uninspectable filesystem entries fail closed.
-.resolveNativeSymbolicLinks <- function(
-  path,
-  style = .absolutePathStyle(path),
-  max_links = 64L,
-  os_type = .Platform$OS.type,
-  read_link = function(candidate) {
-    .readNativeLink(candidate, os_type = os_type)
-  },
-  path_exists = .nativePathExists,
-  normalize_existing = function(candidate) {
-    .normalizeExistingPath(candidate, os_type = os_type)
-  },
-  entry_exists = function(candidate) {
-    .pathDirectoryEntryExists(candidate, os_type = os_type)
-  }
-) {
-  if (style %in% c("windows-device", "windows-malformed")) {
-    detail <- if (identical(style, "windows-device")) {
-      "device or extended-length"
-    } else {
-      "malformed Windows"
-    }
-    stop(
-      "Windows ",
-      detail,
-      " path namespaces are not supported.",
-      call. = FALSE
-    )
-  }
-  parsed <- .absolutePathComponents(path, style, os_type = os_type)
-  if (identical(os_type, "windows") && identical(style, "unc")) {
-    unc_root_parts <- strsplit(
-      sub("^/+", "", parsed$root),
-      "/",
-      fixed = TRUE
-    )[[1L]]
-    if (any(.windowsPathSegmentInvalid(unc_root_parts))) {
-      stop(
-        "Native Windows paths cannot contain Windows-incompatible segments.",
-        call. = FALSE
-      )
-    }
-  }
-  root <- parsed$root
-  resolved <- character()
-  pending <- parsed$parts
-  links_followed <- 0L
-
-  if (isTRUE(path_exists(root))) {
-    physical_root <- normalize_existing(root)
-    physical_style <- .absolutePathStyle(physical_root, os_type = os_type)
-    physical_style <- .nativeFilesystemStyle(
-      physical_root,
-      physical_style,
-      os_type = os_type
-    )
-    physical_root <- .absolutePathComponents(
-      physical_root,
-      physical_style,
-      os_type = os_type
-    )
-    root <- physical_root$root
-    resolved <- physical_root$parts
-  }
-
-  while (length(pending) > 0L) {
-    part <- pending[[1L]]
-    pending <- pending[-1L]
-    if (!nzchar(part) || identical(part, ".")) {
-      next
-    }
-    if (identical(part, "..")) {
-      if (length(resolved) > 0L) {
-        resolved <- resolved[-length(resolved)]
-      }
-      next
-    }
-    if (
-      identical(os_type, "windows") &&
-        .windowsPathSegmentInvalid(part)
-    ) {
-      stop(
-        "Native Windows paths cannot contain Windows-incompatible segments.",
-        call. = FALSE
-      )
-    }
-
-    candidate <- .composeAbsolutePath(root, c(resolved, part))
-    link <- read_link(candidate)
-    if (!is.na(link) && nzchar(link)) {
-      links_followed <- links_followed + 1L
-      if (links_followed > max_links) {
-        stop(
-          "Could not resolve the path because it contains too many ",
-          "symbolic links.",
-          call. = FALSE
-        )
-      }
-      link_style <- .absolutePathStyle(link, os_type = os_type)
-      native_absolute <- if (identical(os_type, "windows")) {
-        !is.na(link_style)
-      } else {
-        startsWith(link, "/")
-      }
-      if (native_absolute) {
-        if (!identical(os_type, "windows")) {
-          link_style <- "posix"
-        }
-        link_parts <- .absolutePathComponents(
-          link,
-          link_style,
-          os_type = os_type
-        )
-        root <- link_parts$root
-        resolved <- character()
-        pending <- c(link_parts$parts, pending)
-      } else {
-        pending <- c(
-          .relativeLinkComponents(link, os_type = os_type),
-          pending
-        )
-      }
-      next
-    }
-
-    if (isTRUE(path_exists(candidate))) {
-      physical <- normalize_existing(candidate)
-      physical_style <- .absolutePathStyle(physical, os_type = os_type)
-      physical_style <- .nativeFilesystemStyle(
-        physical,
-        physical_style,
-        os_type = os_type
-      )
-      if (is.na(physical_style)) {
-        stop(
-          "The path cannot be resolved safely to an absolute native path.",
-          call. = FALSE
-        )
-      }
-      physical <- .absolutePathComponents(
-        physical,
-        physical_style,
-        os_type = os_type
-      )
-      root <- physical$root
-      resolved <- physical$parts
-      next
-    }
-    if (isTRUE(entry_exists(candidate))) {
-      stop(
-        "The path cannot be resolved safely because it contains an ",
-        "unresolved filesystem entry.",
-        call. = FALSE
-      )
-    }
-    resolved <- c(resolved, part)
-  }
-
-  .composeAbsolutePath(root, resolved)
-}
-
-.canonicalTargetPath <- function(path, os_type = .Platform$OS.type) {
-  style <- .absolutePathStyle(path, os_type = os_type)
-  if (style %in% c("windows-device", "windows-malformed")) {
-    detail <- if (identical(style, "windows-device")) {
-      "device or extended-length"
-    } else {
-      "malformed Windows"
-    }
-    stop(
-      "Windows ",
-      detail,
-      " path namespaces are not supported.",
-      call. = FALSE
-    )
-  }
-  style <- .nativeFilesystemStyle(path, style, os_type = os_type)
-  if (is.na(style)) {
-    path <- file.path(getwd(), path)
-    style <- .absolutePathStyle(path, os_type = os_type)
-    style <- .nativeFilesystemStyle(path, style, os_type = os_type)
-  }
-  if (!.nativeAbsolutePath(path, style, os_type = os_type)) {
-    return(.lexicalAbsolutePath(path, style, os_type = os_type))
-  }
-  path <- .resolveNativeSymbolicLinks(
-    path,
-    style,
-    os_type = os_type
-  )
-  if (.nativePathExists(path)) {
-    return(.normalizeExistingPath(path, os_type = os_type))
-  }
-  .lexicalAbsolutePath(
-    path,
-    .absolutePathStyle(path, os_type = os_type),
-    os_type = os_type
-  )
-}
-
-.normalizeOverridePath <- function(path, key) {
-  if (
-    !is.character(path) ||
-      length(path) != 1L ||
-      is.na(path) ||
-      !nzchar(path)
-  ) {
-    stop(
-      "cerebro_options[['",
-      key,
-      "']] must be one non-empty absolute path.",
-      call. = FALSE
-    )
-  }
-  style <- .absolutePathStyle(path)
-  if (style %in% c("windows-device", "windows-malformed")) {
-    detail <- if (identical(style, "windows-device")) {
-      "device or extended-length"
-    } else {
-      "malformed Windows"
-    }
-    stop(
-      "Windows ",
-      detail,
-      " path namespaces are not supported.",
-      call. = FALSE
-    )
-  }
-  if (is.na(style)) {
-    stop(
-      "cerebro_options[['",
-      key,
-      "']] must be one absolute path.",
-      call. = FALSE
-    )
-  }
-  if (
-    !identical(.Platform$OS.type, "windows") &&
-      identical(style, "unc") &&
-      startsWith(path, "/")
-  ) {
-    stop(
-      "Forward-slash UNC paths are ambiguous outside Windows; use a ",
-      "backslash UNC or drive path for a Windows host-managed override.",
-      call. = FALSE
-    )
-  }
-  if (!.nativeAbsolutePath(path, style)) {
-    return(path)
-  }
-  .canonicalTargetPath(path)
-}
-
-.pathWithin <- function(
-  candidate,
-  parent,
-  os_type = .Platform$OS.type,
-  canonicalize = function(path) {
-    .canonicalTargetPath(path, os_type = os_type)
-  }
-) {
-  candidate_style <- .absolutePathStyle(candidate, os_type = os_type)
-  candidate_style <- .nativeFilesystemStyle(
-    candidate,
-    candidate_style,
-    os_type = os_type
-  )
-  if (!.nativeAbsolutePath(candidate, candidate_style, os_type = os_type)) {
-    return(FALSE)
-  }
-  candidate <- canonicalize(candidate)
-  parent <- canonicalize(parent)
-  if (identical(os_type, "windows")) {
-    candidate <- tolower(candidate)
-    parent <- tolower(parent)
-  }
-  parent_prefix <- if (endsWith(parent, "/")) {
-    parent
-  } else {
-    paste0(parent, "/")
-  }
-  identical(candidate, parent) || startsWith(candidate, parent_prefix)
-}
 
 # Backend descriptors and frozen plans ------------------------------------
 
@@ -1233,6 +646,29 @@ dedent <- function(string) {
     save_rds = function(object, file) saveRDS(object, file),
     write_lines = function(text, connection) writeLines(text, connection)
   )
+}
+
+.removeBundleSystemMetadata <- function(root) {
+  metadata <- list.files(
+    root,
+    pattern = "^(\\.DS_Store|\\._.*)$",
+    all.files = TRUE,
+    full.names = TRUE,
+    recursive = TRUE,
+    include.dirs = FALSE,
+    no.. = TRUE
+  )
+  if (!length(metadata)) {
+    return(invisible(TRUE))
+  }
+  unlink(metadata, recursive = FALSE, force = TRUE)
+  if (any(vapply(metadata, .bundlePathExists, logical(1)))) {
+    stop(
+      "Failed to remove filesystem metadata from the staged App.",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
 }
 
 .attemptBundleOperation <- function(operation) {
@@ -1961,7 +1397,14 @@ dedent <- function(string) {
 #'   to FALSE.
 #' @param display_mode Exactly one of \code{"auto"}, \code{"normal"}, or
 #'   \code{"showcase"}; defaults to \code{"normal"}.
-#' @param colors Optional named list of colour palettes per dataset.
+#' @param colors Optional colour palettes, keyed by data set label, then by
+#'   grouping variable, then by group level:
+#'   \code{list("PBMC example" = list(sample = c(sample_1 = "#1f77b4")))}.
+#'   The level names have to be the ones in the data. A palette may cover only
+#'   some levels; the rest keep their default colour. Anything R cannot read as
+#'   a colour, or a label that is not in \code{cerebro_data}, is reported here
+#'   rather than ignored at runtime. Users can still override a colour in the
+#'   Color management tab, which wins for that session.
 #' @param cerebro_options Extra entries merged into \code{Cerebro.options} in
 #'   the generated app. Matrix overrides must be absolute host paths and make
 #'   the resulting app host-dependent. Native paths must resolve outside
@@ -1978,6 +1421,12 @@ dedent <- function(string) {
 #' @param crb_pick_smallest_file Forwarded to \code{Cerebro.options}.
 #' @param show_upload_ui One non-missing logical controlling whether users may
 #'   upload their own data; defaults to \code{FALSE}.
+#' @param initial_dataset Optional exact data set label to load initially. This
+#'   does not change the order of \code{cerebro_data}. URL selection and a
+#'   session's current selection take precedence.
+#' @param initial_page Optional stable Viewer page identifier to open after the
+#'   initial data set loads. Defaults to the existing Data info start page when
+#'   omitted and is applied only once per Viewer session.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Named list with \code{overview_projection_point_size}
 #'   (and optionally other keys) forwarded to \code{Cerebro.options}.
@@ -1994,7 +1443,9 @@ dedent <- function(string) {
 #' @param spatial_image_settings Optional nested settings in
 #'   \code{dataset -> spatial entry -> image label -> settings} form. Settings
 #'   may contain only \code{flip_x}, \code{flip_y}, \code{scale_x},
-#'   \code{scale_y}, \code{offset_x}, \code{offset_y}, and \code{rotation}.
+#'   \code{scale_y}, \code{offset_x}, \code{offset_y}, \code{rotation},
+#'   \code{image_opacity}, \code{point_opacity}, and \code{point_size}.
+#'   Opacities use the inclusive range 0 to 1 and point size must be positive.
 #'   A leaf may target an embedded or external image available under that exact
 #'   dataset and spatial entry. The image label must exist in the union of the
 #'   CRB's embedded images and this call's \code{spatial_images}; unknown
@@ -2085,6 +1536,8 @@ createShinyApp <- function(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
+  initial_dataset = NULL,
+  initial_page = NULL,
   auth = NULL,
   ...
 ) {
@@ -2169,6 +1622,33 @@ createShinyApp <- function(
       paste(forbidden_spatial_options, collapse = ", "),
       ". Supply these through the corresponding createShinyApp() formal ",
       "parameters instead.",
+      call. = FALSE
+    )
+  }
+  if (
+    !is.null(initial_dataset) &&
+      (!is.character(initial_dataset) ||
+        length(initial_dataset) != 1L ||
+        is.na(initial_dataset) ||
+        !initial_dataset %in% data_labels)
+  ) {
+    stop(
+      "'initial_dataset' must be NULL or exactly one cerebro_data label.",
+      call. = FALSE
+    )
+  }
+  if (
+    !is.null(initial_page) &&
+      (!is.character(initial_page) ||
+        length(initial_page) != 1L ||
+        is.na(initial_page) ||
+        !initial_page %in% builder_viewer_known_page_ids())
+  ) {
+    stop(
+      paste0(
+        "'initial_page' must be NULL or exactly one known Viewer page ",
+        "identifier."
+      ),
       call. = FALSE
     )
   }
@@ -2260,15 +1740,76 @@ createShinyApp <- function(
   .bundleDestinationState(result_dir, overwrite)
 
   if (!is.null(colors)) {
+    ## The shape the app reads is
+    ##   list("<data set label>" = list(<grouping variable> = c(level = hex)))
+    ## Checking it here is worth some noise: a palette that is silently wrong
+    ## looks identical to no palette at all once the app is running, and the
+    ## generated bundle is usually built once and shipped.
     if (is.null(names(colors)) || any(names(colors) == "")) {
       stop("colors must be a named list or vector.", call. = FALSE)
     }
-    if (length(intersect(names(colors), names(cerebro_data))) == 0) {
+    unknown <- setdiff(names(colors), names(cerebro_data))
+    if (length(unknown) == length(colors)) {
       warning(
         "Colors and cerebro_data do not match, random colors will be used.",
         call. = FALSE
       )
       colors <- NULL
+    } else if (length(unknown) > 0) {
+      warning(
+        "No data set named ",
+        paste(sQuote(unknown), collapse = ", "),
+        "; those palettes will not be used.",
+        call. = FALSE
+      )
+    }
+  }
+  if (!is.null(colors)) {
+    for (dataset in names(colors)) {
+      palettes <- colors[[dataset]]
+      if (!is.list(palettes) || is.null(names(palettes))) {
+        stop(
+          "colors[[",
+          sQuote(dataset),
+          "]] must be a named list, one entry per grouping variable, e.g. ",
+          "list(sample = c(pbmc_1 = \"#1f77b4\")).",
+          call. = FALSE
+        )
+      }
+      for (variable in names(palettes)) {
+        palette <- palettes[[variable]]
+        if (!is.character(palette) || is.null(names(palette))) {
+          stop(
+            "colors[[",
+            sQuote(dataset),
+            "]][[",
+            sQuote(variable),
+            "]] must be a character vector named by group level.",
+            call. = FALSE
+          )
+        }
+        ## A partial palette is fine -- the defaults fill the rest -- but an
+        ## unusable colour is not, and it would only show up as an error deep
+        ## inside a plot at runtime.
+        invalid <- vapply(
+          palette,
+          function(x) {
+            inherits(try(grDevices::col2rgb(x), silent = TRUE), "try-error")
+          },
+          logical(1)
+        )
+        if (any(invalid)) {
+          stop(
+            "colors[[",
+            sQuote(dataset),
+            "]][[",
+            sQuote(variable),
+            "]] has values R cannot read as colours: ",
+            paste(palette[invalid], collapse = ", "),
+            call. = FALSE
+          )
+        }
+      }
     }
   }
 
@@ -2361,6 +1902,17 @@ createShinyApp <- function(
   if (!dir.exists(extdata_source)) {
     stop(
       "extdata source files not found in CerebroNexus package.",
+      call. = FALSE
+    )
+  }
+  app_template_source <- system.file(
+    "viewer",
+    "_bundle_app.R",
+    package = "CerebroNexus"
+  )
+  if (!file.exists(app_template_source)) {
+    stop(
+      "The package-owned App entrypoint template is missing.",
       call. = FALSE
     )
   }
@@ -2748,6 +2300,7 @@ createShinyApp <- function(
   if (!build_ops$copy(extdata_source, stage_result_dir, recursive = TRUE)) {
     stop("Failed to copy extdata files.", call. = FALSE)
   }
+  .removeBundleSystemMetadata(stage_result_dir)
 
   # Build Cerebro.options ----------------------------------------------------##
   if (verbose) {
@@ -2771,7 +2324,9 @@ createShinyApp <- function(
   internal_option_names <- c(
     ".bundle_backend_plan",
     ".bundle_run_options",
-    ".viewer_auth"
+    ".viewer_auth",
+    "initial_dataset",
+    "initial_page"
   )
   option_names <- names(cerebro_options)
   if (!is.null(option_names)) {
@@ -2796,6 +2351,12 @@ createShinyApp <- function(
   }
   if (!is.null(show_upload_ui)) {
     cerebro_options[["show_upload_ui"]] <- show_upload_ui
+  }
+  if (!is.null(initial_dataset)) {
+    cerebro_options[["initial_dataset"]] <- initial_dataset
+  }
+  if (!is.null(initial_page)) {
+    cerebro_options[["initial_page"]] <- initial_page
   }
   if (!is.null(point_size)) {
     cerebro_options[["point_size"]] <- point_size
@@ -2825,58 +2386,9 @@ createShinyApp <- function(
   )
 
   # Generate app.R -----------------------------------------------------------##
-  app_content <- dedent(
-    '
-    library(dplyr)
-    library(DT)
-    library(plotly)
-    library(shiny)
-    library(shinydashboard)
-    library(shinyWidgets)
-
-    cerebro_root <- "."
-
-    if (file.exists("cerebro_config.rds")) {
-      Cerebro.options <<- readRDS("cerebro_config.rds")
-    } else {
-      stop("cerebro_config.rds not found!")
-    }
-
-    if (!is.null(Cerebro.options$colors)) {
-      colors <- Cerebro.options$colors
-    }
-
-    bundle_run_options <- Cerebro.options$.bundle_run_options
-    shiny_options <- bundle_run_options$shiny_app_options
-
-    source(file.path(cerebro_root, "viewer/shiny_UI.R"))
-    source(file.path(cerebro_root, "viewer/shiny_server.R"))
-    source(file.path(cerebro_root, "viewer/auth.R"), local = TRUE)
-
-    viewer_app <- viewer_auth_apply(
-      ui,
-      server,
-      Cerebro.options[[".viewer_auth"]],
-      Cerebro.options[["cerebro_root"]]
-    )
-
-    shiny::shinyApp(
-      ui = viewer_app$ui,
-      server = viewer_app$server,
-      onStart = function() {
-        previous <- options(
-          shiny.maxRequestSize = bundle_run_options$max_request_size_bytes
-        )
-        shiny::onStop(function() {
-          options(previous)
-        })
-      },
-      options = shiny_options
-    )
-  '
-  )
-
-  build_ops$write_lines(app_content, app_file)
+  if (!build_ops$copy(app_template_source, app_file, overwrite = FALSE)) {
+    stop("Failed to copy the App entrypoint template.", call. = FALSE)
+  }
   tryCatch(
     parse(file = app_file, keep.source = FALSE),
     error = function(error_condition) {

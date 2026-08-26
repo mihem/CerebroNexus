@@ -43,6 +43,22 @@ publication_test_backups <- function(root) {
   )
 }
 
+test_that("bundle staging removes macOS filesystem metadata", {
+  root <- withr::local_tempdir()
+  nested <- file.path(root, "viewer", "www")
+  dir.create(nested, recursive = TRUE)
+  writeLines("finder", file.path(root, ".DS_Store"))
+  writeLines("finder", file.path(nested, ".DS_Store"))
+  writeLines("appledouble", file.path(nested, "._asset.js"))
+  writeLines("keep", file.path(nested, "asset.js"))
+
+  expect_true(.removeBundleSystemMetadata(root))
+  expect_false(file.exists(file.path(root, ".DS_Store")))
+  expect_false(file.exists(file.path(nested, ".DS_Store")))
+  expect_false(file.exists(file.path(nested, "._asset.js")))
+  expect_true(file.exists(file.path(nested, "asset.js")))
+})
+
 publication_expect_stage_failure <- function(failure) {
   root <- withr::local_tempdir()
   source <- file.path(root, "source")
@@ -79,14 +95,23 @@ publication_expect_stage_failure <- function(failure) {
       "injected config write error"
     },
     write = {
-      ops$write_lines <- function(text, connection) {
-        stop("injected app write error")
+      original_copy <- ops$copy
+      ops$copy <- function(from, to, ...) {
+        if (identical(basename(from), "_bundle_app.R")) {
+          stop("injected app write error")
+        }
+        original_copy(from, to, ...)
       }
       "injected app write error"
     },
     parse = {
-      ops$write_lines <- function(text, connection) {
-        writeLines("shiny::shinyApp(", connection)
+      original_copy <- ops$copy
+      ops$copy <- function(from, to, ...) {
+        if (identical(basename(from), "_bundle_app.R")) {
+          writeLines("shiny::shinyApp(", to)
+          return(TRUE)
+        }
+        original_copy(from, to, ...)
       }
       "Generated app.R is invalid"
     }

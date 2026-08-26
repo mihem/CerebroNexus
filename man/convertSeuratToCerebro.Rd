@@ -27,7 +27,8 @@ convertSeuratToCerebro(
   add_most_expressed_genes = TRUE,
   most_expressed_genes = NULL,
   bcr_file = NULL,
-  tcr_file = NULL
+  tcr_file = NULL,
+  spatial_coordinate_transforms = NULL
 )
 }
 \arguments{
@@ -97,6 +98,10 @@ vector is path shorthand; a leaf may instead be
 ymax = ...))}. Missing bounds are derived from the exported coordinates.
 Supplied images are embedded in the generated CRB; existing embedded images
 declared by the Seurat object are retained.}
+
+\item{spatial_coordinate_transforms}{Optional named list of spatial
+coordinate transforms keyed by exact Seurat FOV/image name. Entries are
+forwarded unchanged to \code{exportFromSeurat()}.}
 
 \item{verbose}{Logical indicating whether to print progress messages; default:
 \code{TRUE}.}

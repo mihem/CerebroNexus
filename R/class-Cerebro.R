@@ -1293,17 +1293,6 @@ Cerebro <- R6::R6Class(
             call. = FALSE
           )
         }
-        outside <- coordinates[["x"]] < bounds[["xmin"]] |
-          coordinates[["x"]] > bounds[["xmax"]] |
-          coordinates[["y"]] < bounds[["ymin"]] |
-          coordinates[["y"]] > bounds[["ymax"]]
-        if (any(outside)) {
-          stop(
-            image_context,
-            " has coordinates outside its declared bounds.",
-            call. = FALSE
-          )
-        }
         bounds
       }
       if ("histology_images" %in% names(data)) {
@@ -1392,7 +1381,11 @@ Cerebro <- R6::R6Class(
           label <- image_names[[i]]
           payload <- images[[i]]
           image_context <- paste0(context, " image `", label, "`")
-          valid_fields <- c("histology_image", "histology_image_bounds")
+          valid_fields <- c(
+            "histology_image",
+            "histology_image_bounds",
+            "histology_alignment"
+          )
           if (
             !is.list(payload) ||
               is.null(names(payload)) ||
@@ -1403,7 +1396,7 @@ Cerebro <- R6::R6Class(
             stop(
               image_context,
               " must contain `histology_image` and optional ",
-              "`histology_image_bounds`.",
+              "`histology_image_bounds` / `histology_alignment`.",
               call. = FALSE
             )
           }
@@ -1422,7 +1415,29 @@ Cerebro <- R6::R6Class(
               call. = FALSE
             )
           }
-          list(
+          alignment <- payload[["histology_alignment"]]
+          valid_alignment <- is.null(alignment) ||
+            (is.list(alignment) &&
+              !is.object(alignment) &&
+              !is.null(names(alignment)) &&
+              !anyNA(names(alignment)) &&
+              all(nzchar(names(alignment))) &&
+              !anyDuplicated(names(alignment)) &&
+              all(vapply(
+                alignment,
+                function(value) {
+                  is.atomic(value) && length(value) == 1L && !is.na(value)
+                },
+                logical(1)
+              )))
+          if (!valid_alignment) {
+            stop(
+              image_context,
+              " `histology_alignment` must be a named list of scalar values.",
+              call. = FALSE
+            )
+          }
+          normalized_payload <- list(
             histology_image = image,
             histology_image_bounds = normalize_bounds(
               payload[["histology_image_bounds"]],
@@ -1430,6 +1445,10 @@ Cerebro <- R6::R6Class(
               image_context
             )
           )
+          if (!is.null(alignment)) {
+            normalized_payload$histology_alignment <- alignment
+          }
+          normalized_payload
         })
         names(normalized) <- image_names
         images <- normalized
