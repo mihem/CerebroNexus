@@ -33,6 +33,13 @@ server <- function(input, output, session) {
     ),
     local = TRUE
   )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/clone_contract.R"
+    ),
+    local = TRUE
+  )
 
   ##--------------------------------------------------------------------------##
   ## Central parameters.
@@ -718,6 +725,13 @@ server <- function(input, output, session) {
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/viewer/trekker/server.R"
+    ),
+    local = TRUE
+  )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/coordinated_views/server.R"
     ),
     local = TRUE
   )
