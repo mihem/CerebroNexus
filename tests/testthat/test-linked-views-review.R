@@ -315,7 +315,8 @@ test_that("specialist drawer controls match the Linked views control style", {
     css,
     paste0(
       "body .form-control:not(.colourpicker-input)",
-      ":not(.shiny-colour-input):not(.bootstrap-select):not(.selectpicker)"
+      ":not(.shiny-colour-input):not(.bootstrap-select):not(.selectpicker)",
+      ":not(.selectize-control)"
     ),
     fixed = TRUE
   )
@@ -359,4 +360,116 @@ test_that("IR keeps low-frequency analysis controls in More settings", {
     'output$ir_primary_param_panel <- renderUI({',
     fixed = TRUE
   )
+})
+
+test_that("Spatial keeps specialist outputs behind the compact control hierarchy", {
+  projection_ui <- paste(
+    readLines(
+      file.path(viewer_dir, "spatial", "UI_projection.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  tab_ui <- paste(
+    readLines(file.path(viewer_dir, "spatial", "UI.R"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(projection_ui, "cerebroVizPageHeader(", fixed = TRUE)
+  expect_match(
+    projection_ui,
+    'class = "cerebro-viz-row cerebro-viz-top-layout"',
+    fixed = TRUE
+  )
+  expect_match(projection_ui, "cerebroSettingsButton(", fixed = TRUE)
+  expect_match(projection_ui, "cerebroSettingsDrawer(", fixed = TRUE)
+  expect_no_match(projection_ui, 'class = "cerebro-param-col"', fixed = TRUE)
+
+  expect_match(tab_ui, 'uiOutput("spatial_projection_UI")', fixed = TRUE)
+  expect_match(
+    tab_ui,
+    'uiOutput("spatial_selected_cells_plot_UI")',
+    fixed = TRUE
+  )
+  expect_match(
+    tab_ui,
+    'uiOutput("spatial_selected_cells_table_UI")',
+    fixed = TRUE
+  )
+})
+
+test_that("specialist visualizations keep their client-side fast paths", {
+  trajectory_js <- paste(
+    readLines(
+      file.path(viewer_dir, "trajectory", "js_projection_update_plot.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  immune_js <- paste(
+    readLines(
+      file.path(
+        viewer_dir,
+        "immune_repertoire",
+        "js_projection_update_plot.js"
+      ),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  hla_viz <- paste(
+    readLines(
+      file.path(viewer_dir, "hla_tcr_motifs", "visualizations.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(
+    trajectory_js,
+    "window.cerebroProjection.render2DCategorical",
+    fixed = TRUE
+  )
+  expect_match(
+    immune_js,
+    "window.cerebroProjection.render2DCategorical",
+    fixed = TRUE
+  )
+  expect_match(hla_viz, "visNetworkProxy", fixed = TRUE)
+  expect_match(hla_viz, "visUpdateNodes", fixed = TRUE)
+
+  shared_js <- paste(
+    readLines(
+      file.path(viewer_dir, "www", "projection_scatter.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  trajectory_viz <- paste(
+    readLines(
+      file.path(viewer_dir, "trajectory", "projection_plot.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  immune_viz <- paste(
+    readLines(
+      file.path(viewer_dir, "immune_repertoire", "visualizations.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  spatial_viz <- paste(
+    readLines(
+      file.path(viewer_dir, "spatial", "func_projection_update_plot.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(shared_js, "selectionCoordinatesByPlot", fixed = TRUE)
+  expect_match(shared_js, "customdata: data.selection_key", fixed = TRUE)
+  expect_match(spatial_viz, "selection_key", fixed = TRUE)
+  expect_match(trajectory_viz, "selection_key", fixed = TRUE)
+  expect_match(immune_viz, "selection_key", fixed = TRUE)
 })

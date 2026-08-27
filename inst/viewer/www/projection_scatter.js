@@ -1,7 +1,7 @@
 // =============================================================================
 // Shared projection-scatter renderer.
 //
-// This is spatial's mature projection JS (custom top legend, persistent x|y
+// This is spatial's mature projection JS (custom top legend, persistent cell
 // selection, group labels, group hulls, modebar-off, container sizing),
 // GENERALISED so every projection tab (spatial / overview / gene_expression /
 // trajectory / immune_repertoire) renders through the SAME code.
@@ -31,11 +31,30 @@
   }
 
   // --- per-plot state ---------------------------------------------------------
-  // Persistent selection, decoupled from every plot parameter. Keyed on cell
-  // position (x|y), so it survives changes to the colouring variable, point
-  // size, opacity, "show % of cells", background, etc. Held per plot id, so
-  // each projection plot has its own independent selection.
-  const selectionByPlot = new Map(); // plotId -> Set<"x|y"> (or absent)
+  // Persistent selection, decoupled from every plot parameter. Prefer the
+  // stable cell key supplied as Plotly customdata; fall back to x/y for older
+  // callers. Coordinates are retained separately for zoom framing and for the
+  // existing Shiny selected-cell outputs, which still consume x/y.
+  const selectionByPlot = new Map(); // plotId -> Set<"id:..." | "xy:...">
+  const selectionCoordinatesByPlot = new Map(); // plotId -> Map<key, {x, y}>
+
+  function pointSelectionKey(point) {
+    if (point.customdata !== undefined && point.customdata !== null) {
+      return 'id:' + String(point.customdata);
+    }
+    return 'xy:' + point.x + '|' + point.y;
+  }
+
+  function traceSelectionKey(trace, i) {
+    if (
+      trace.customdata &&
+      trace.customdata[i] !== undefined &&
+      trace.customdata[i] !== null
+    ) {
+      return 'id:' + String(trace.customdata[i]);
+    }
+    return 'xy:' + trace.x[i] + '|' + trace.y[i];
+  }
 
   // Groups hidden via the legend, per plot. Pushed to Shiny so the selected-
   // cells count/panels can exclude cells in hidden groups. Kept separate from
@@ -412,9 +431,9 @@
     return s && s.size ? s : null;
   }
 
-  // Push the current selection to Shiny as {x:[...], y:[...]} (or null) under
-  // `<plot_id>_persistent_selection`. R rebuilds its "x-y" identifiers from
-  // these, matching how the selected-cells table keys cells. No
+  // Push the current selection to Shiny as {x:[...], y:[...], ids:[...]} (or
+  // null) under `<plot_id>_persistent_selection`. Existing selected-cell
+  // outputs keep consuming x/y while newer callers can use stable cell IDs. No
   // {priority:'event'}: this is persistent selection STATE that must remain
   // readable across later reactive invalidations (an event-priority input
   // resets to null after one flush, dropping the selection on the next
@@ -426,12 +445,17 @@
     if (keys && keys.size) {
       const x = [];
       const y = [];
+      const ids = [];
+      const coords = selectionCoordinatesByPlot.get(plotId) || new Map();
       keys.forEach((k) => {
-        const sep = k.indexOf('|');
-        x.push(parseFloat(k.slice(0, sep)));
-        y.push(parseFloat(k.slice(sep + 1)));
+        const point = coords.get(k);
+        if (point) {
+          x.push(point.x);
+          y.push(point.y);
+        }
+        if (k.startsWith('id:')) ids.push(k.slice(3));
       });
-      payload = { x: x, y: y };
+      payload = { x: x, y: y, ids: ids };
     }
     Shiny.setInputValue(plotId + '_persistent_selection', payload);
   }
@@ -440,29 +464,45 @@
   function setSelectionFromEvent(plotId, eventData) {
     if (!eventData || !eventData.points || !eventData.points.length) {
       selectionByPlot.delete(plotId);
+      selectionCoordinatesByPlot.delete(plotId);
     } else {
       const keys = new Set();
+      const coords = new Map();
       eventData.points.forEach((p) => {
-        keys.add(p.x + '|' + p.y);
+        const key = pointSelectionKey(p);
+        keys.add(key);
+        coords.set(key, { x: p.x, y: p.y });
       });
       selectionByPlot.set(plotId, keys);
+      selectionCoordinatesByPlot.set(plotId, coords);
     }
     syncSelectionToShiny(plotId);
   }
 
   // Re-apply a harvested selection to freshly built traces: mark the points
-  // whose x|y is in the set as selectedpoints so Plotly keeps them at full
+  // whose stable ID (or legacy x/y fallback) is in the set as selectedpoints so
+  // Plotly keeps them at full
   // opacity and dims the rest. No-op when nothing is selected.
-  function applySelection(traces, selectedKeys) {
+  function applySelection(traces, selectedKeys, plotId) {
     if (!selectedKeys || selectedKeys.size === 0) return;
     traces.forEach((trace) => {
       if (!trace.x || trace.mode === 'text' || trace.mode === 'lines') return;
       const picked = [];
       for (let i = 0; i < trace.x.length; i++) {
-        if (selectedKeys.has(trace.x[i] + '|' + trace.y[i])) picked.push(i);
+        const key = traceSelectionKey(trace, i);
+        if (selectedKeys.has(key)) {
+          picked.push(i);
+          let coords = selectionCoordinatesByPlot.get(plotId);
+          if (!coords) {
+            coords = new Map();
+            selectionCoordinatesByPlot.set(plotId, coords);
+          }
+          coords.set(key, { x: trace.x[i], y: trace.y[i] });
+        }
       }
       if (picked.length) trace.selectedpoints = picked;
     });
+    syncSelectionToShiny(plotId);
   }
 
   // The dashed selection outline lives in layout.selections, a layout-level
@@ -524,11 +564,12 @@
   function selectionBounds(plotId) {
     const keys = getSelection(plotId);
     if (!keys) return null;
+    const coords = selectionCoordinatesByPlot.get(plotId) || new Map();
     let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
     keys.forEach((k) => {
-      const sep = k.indexOf('|');
-      const x = parseFloat(k.slice(0, sep));
-      const y = parseFloat(k.slice(sep + 1));
+      const point = coords.get(k);
+      const x = point && Number(point.x);
+      const y = point && Number(point.y);
       if (Number.isFinite(x)) {
         if (x < xMin) xMin = x;
         if (x > xMax) xMax = x;
@@ -1145,6 +1186,7 @@
       traces.push({
         x: data.x,
         y: data.y,
+        customdata: data.selection_key,
         mode: 'markers',
         type: 'scattergl',
         marker: {
@@ -1156,7 +1198,7 @@
         hoverinfo: hover.hoverinfo,
         hoverlabel: HOVERLABEL,
       });
-      applySelection(traces, selectedKeys);
+      applySelection(traces, selectedKeys, plotId);
       createCustomLegend(plotId, meta.traces, extra.coexpr_colors || meta.coexpr_colors);
     } else {
       const { min: colorMin, max: colorMax } = finiteExtent(data.color);
@@ -1178,6 +1220,7 @@
       traces.push({
         x: data.x,
         y: data.y,
+        customdata: data.selection_key,
         mode: 'markers',
         type: 'scattergl',
         marker: marker,
@@ -1185,7 +1228,7 @@
         text: hover.text,
         hoverlabel: HOVERLABEL,
       });
-      applySelection(traces, selectedKeys);
+      applySelection(traces, selectedKeys, plotId);
       createContinuousLegend(
         plotId,
         meta.color_variable,
@@ -1242,6 +1285,7 @@
       x: data.x,
       y: data.y,
       z: data.z,
+      customdata: data.selection_key,
       mode: 'markers',
       type: 'scatter3d',
       marker: marker,
@@ -1250,7 +1294,7 @@
       hoverlabel: HOVERLABEL,
       showlegend: false,
     }];
-    applySelection(traces, selectedKeys);
+    applySelection(traces, selectedKeys, plotId);
     createContinuousLegend(
       plotId,
       meta.color_variable,
@@ -1324,6 +1368,7 @@
     const traces = data.x.map((xVal, i) => ({
       x: xVal,
       y: data.y[i],
+      customdata: data.selection_key && data.selection_key[i],
       name: meta.traces[i],
       // Reapply a legend-hidden group across this rebuild so the trace stays
       // 'legendonly' instead of springing back to visible while Shiny still
@@ -1380,7 +1425,7 @@
       });
     }
 
-    applySelection(traces, selectedKeys);
+    applySelection(traces, selectedKeys, plotId);
 
     const layout = baseLayout2D();
     if (selectionOutline) layout.selections = selectionOutline;
@@ -1443,6 +1488,7 @@
       x: xVal,
       y: data.y[i],
       z: data.z[i],
+      customdata: data.selection_key && data.selection_key[i],
       name: meta.traces[i],
       mode: 'markers',
       type: 'scatter3d',
@@ -1475,7 +1521,7 @@
       });
     }
 
-    applySelection(traces, selectedKeys);
+    applySelection(traces, selectedKeys, plotId);
 
     const layout = baseLayout3D();
     applyContainerSize(layout, plotId, container);
@@ -1497,6 +1543,7 @@
   // on, so return to the full autorange view, unlock, and reset the button.
   function clearSelection(plotId) {
     selectionByPlot.delete(plotId);
+    selectionCoordinatesByPlot.delete(plotId);
     syncSelectionToShiny(plotId);
     const wasZoomed = zoomedPlots.delete(plotId);
     zoomSavedSelections.delete(plotId);

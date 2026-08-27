@@ -34,6 +34,35 @@
     var w = window.HTMLWidgets.find("#hla_plot_motifNetwork");
     return w && w.network ? w.network : null;
   }
+  window.hlaShowNodeDetails = function (id) {
+    var out = document.getElementById("hla-node-details");
+    var n = net();
+    if (!out || !n || id == null) {
+      if (out) {
+        out.innerHTML = "";
+        out.style.display = "none";
+      }
+      return;
+    }
+    var node = n.body && n.body.data && n.body.data.nodes
+      ? n.body.data.nodes.get(id) : null;
+    var detail = node && (node.detail || node.title);
+    if (!detail) {
+      out.innerHTML = "";
+      out.style.display = "none";
+      return;
+    }
+    out.innerHTML = detail;
+    out.style.display = "block";
+  };
+  if (window.Shiny && Shiny.addCustomMessageHandler) {
+    Shiny.addCustomMessageHandler("hla-refresh-node-details", function (_message) {
+      var n = net();
+      var selected = n && typeof n.getSelectedNodes === "function"
+        ? n.getSelectedNodes() : [];
+      window.hlaShowNodeDetails(selected.length ? selected[0] : null);
+    });
+  }
   function zoomBy(f) {
     var n = net();
     if (!n || typeof n.getScale !== "function") return;

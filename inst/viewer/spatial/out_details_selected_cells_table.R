@@ -31,11 +31,20 @@ output[["spatial_details_selected_cells_table"]] <- DT::renderDataTable({
     ## filter out non-selected cells with X-Y identifier
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
-      dplyr::mutate(identifier = paste0(X1, '-', X2)) %>%
+      dplyr::mutate(identifier = paste0(X1, '-', X2))
+    cells_df[["selection_key"]] <- if ("cell_barcode" %in% colnames(cells_df)) {
+      as.character(cells_df[["cell_barcode"]])
+    } else {
+      cells_df[["identifier"]]
+    }
+    selected_cells <- spatial_projection_selected_cells()
+    cells_df <- cells_df %>%
       dplyr::filter(
-        identifier %in% spatial_projection_selected_cells()$identifier
+        selection_key %in%
+          selected_cells[["selection_key"]] |
+          identifier %in% selected_cells[["identifier"]]
       ) %>%
-      dplyr::select(-c(X1, X2, identifier)) %>%
+      dplyr::select(-c(X1, X2, identifier, selection_key)) %>%
       ## Put cell_barcode first WHEN present; the rest of the spatial module
       ## treats it as optional (falls back to rownames), so any_of() keeps this
       ## table consistent instead of erroring on metadata without that column.

@@ -8,7 +8,7 @@ spatial_projection_selected_cells <- reactive({
   req(spatial_projection_data_to_plot())
 
   ## The selection is held persistently on the JS side (see
-  ## js_projection_update_plot.js) and pushed here as {x, y} so it survives plot
+  ## projection_scatter.js) and pushed here as {x, y, ids} so it survives plot
   ## parameter changes. Plotly's own plotly_selected event is NOT used, because a
   ## re-render (e.g. changing "Color cells by") wipes it while the selection must
   ## stay. The identifier is built the same way the table keys cells (paste0 with
@@ -25,6 +25,11 @@ spatial_projection_selected_cells <- reactive({
     identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
     stringsAsFactors = FALSE
   )
+  selection[["selection_key"]] <- if (length(sel[["ids"]]) == nrow(selection)) {
+    as.character(sel[["ids"]])
+  } else {
+    selection[["identifier"]]
+  }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and
   ## the selected-cells panels reflect only visible groups (shared helper in
@@ -37,6 +42,11 @@ spatial_projection_selected_cells <- reactive({
     metadata <- cbind(plot_data$coordinates, plot_data$cells_df) %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
       dplyr::mutate(identifier = paste0(X1, '-', X2))
+    metadata[["selection_key"]] <- if ("cell_barcode" %in% colnames(metadata)) {
+      as.character(metadata[["cell_barcode"]])
+    } else {
+      metadata[["identifier"]]
+    }
     selection <- filterSelectionByHiddenGroups(
       selection,
       metadata,

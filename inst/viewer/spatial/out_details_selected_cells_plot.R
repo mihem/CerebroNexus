@@ -33,10 +33,19 @@ output[["spatial_details_selected_cells_plot"]] <- plotly::renderPlotly({
     ##
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
+      dplyr::mutate(identifier = paste0(X1, '-', X2))
+    cells_df[["selection_key"]] <- if ("cell_barcode" %in% colnames(cells_df)) {
+      as.character(cells_df[["cell_barcode"]])
+    } else {
+      cells_df[["identifier"]]
+    }
+    selected_cells <- spatial_projection_selected_cells()
+    cells_df <- cells_df %>%
       dplyr::mutate(
-        identifier = paste0(X1, '-', X2),
         group = ifelse(
-          identifier %in% spatial_projection_selected_cells()$identifier,
+          selection_key %in%
+            selected_cells[["selection_key"]] |
+            identifier %in% selected_cells[["identifier"]],
           'selected',
           'not selected'
         ),

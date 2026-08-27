@@ -174,6 +174,11 @@ observeEvent(trajectory_projection_prepared(), {
   ## metadata, so they are NOT columns 1/2).
   coordinates <- list(cells_df[["DR_1"]], cells_df[["DR_2"]])
   color_input <- cells_df[[color_variable]]
+  selection_keys <- if ("cell_barcode" %in% colnames(cells_df)) {
+    as.character(cells_df[["cell_barcode"]])
+  } else {
+    rownames(cells_df)
+  }
 
   container_dimensions <- shinyjs::js$trajectoryGetContainerDimensions()
   container_info <- list(
@@ -193,6 +198,7 @@ observeEvent(trajectory_projection_prepared(), {
     output_data <- list(
       x = coordinates[[1]],
       y = coordinates[[2]],
+      selection_key = selection_keys,
       color = color_input,
       point_size = prepared[["point_size"]],
       point_opacity = prepared[["point_opacity"]],
@@ -232,6 +238,7 @@ observeEvent(trajectory_projection_prepared(), {
       x = list(),
       y = list(),
       z = list(),
+      selection_key = list(),
       color = list(),
       point_size = prepared[["point_size"]],
       point_opacity = prepared[["point_opacity"]],
@@ -252,6 +259,7 @@ observeEvent(trajectory_projection_prepared(), {
       output_meta[["traces"]][[i]] <- j
       output_data[["x"]][[i]] <- coordinates[[1]][cells_to_extract]
       output_data[["y"]][[i]] <- coordinates[[2]][cells_to_extract]
+      output_data[["selection_key"]][[i]] <- selection_keys[cells_to_extract]
       output_data[["color"]][[i]] <- unname(color_assignments[[j]])
       output_hover[["text"]][[i]] <- prepared[["hover_info"]][cells_to_extract]
       i <- i + 1
@@ -314,7 +322,7 @@ trajectory_projection_selected_cells <- reactive({
   req(trajectory_selection_ok())
 
   ## The selection is held persistently on the JS side (shared
-  ## projection_scatter.js) and pushed here as {x, y} under
+  ## projection_scatter.js) and pushed here as {x, y, ids} under
   ## <plot_id>_persistent_selection, so it survives plot-parameter changes.
   ## The identifier matches how the selected-cells table keys cells
   ## (paste0 of the two projection coordinates with '-').
@@ -328,6 +336,11 @@ trajectory_projection_selected_cells <- reactive({
     identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
     stringsAsFactors = FALSE
   )
+  selection[["selection_key"]] <- if (length(sel[["ids"]]) == nrow(selection)) {
+    as.character(sel[["ids"]])
+  } else {
+    selection[["identifier"]]
+  }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and
   ## the selected-cells panels reflect only visible groups (shared helper in
@@ -341,7 +354,10 @@ trajectory_projection_selected_cells <- reactive({
       input[["trajectory_selected_name"]]
     )
     metadata <- mergeTrajectoryWithMetaData(trajectory_data) %>%
-      dplyr::mutate(identifier = paste0(DR_1, '-', DR_2))
+      dplyr::mutate(
+        identifier = paste0(DR_1, '-', DR_2),
+        selection_key = as.character(cell_barcode)
+      )
     selection <- filterSelectionByHiddenGroups(
       selection,
       metadata,

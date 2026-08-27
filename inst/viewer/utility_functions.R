@@ -2015,11 +2015,21 @@ filterSelectionByHiddenGroups <- function(
   if (length(hidden_groups) == 0) {
     return(selection)
   }
+  stable_key_matches <-
+    "selection_key" %in%
+    colnames(metadata) &&
+    "selection_key" %in% colnames(selection) &&
+    any(selection[["selection_key"]] %in% metadata[["selection_key"]])
+  key <- if (stable_key_matches) {
+    "selection_key"
+  } else {
+    "identifier"
+  }
   if (
     is.null(color_variable) ||
       !color_variable %in% colnames(metadata) ||
-      !"identifier" %in% colnames(metadata) ||
-      !"identifier" %in% colnames(selection)
+      !key %in% colnames(metadata) ||
+      !key %in% colnames(selection)
   ) {
     return(selection)
   }
@@ -2028,7 +2038,7 @@ filterSelectionByHiddenGroups <- function(
   ## group is not hidden. match() on identifier avoids a join dependency and
   ## keeps selection row order intact.
   group_by_identifier <- metadata[[color_variable]][
-    match(selection[["identifier"]], metadata[["identifier"]])
+    match(selection[[key]], metadata[[key]])
   ]
   keep <- !(group_by_identifier %in% hidden_groups)
   selection[keep, , drop = FALSE]

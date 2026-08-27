@@ -158,18 +158,14 @@ test_that("background-image selection only recreates image calibration controls"
   )
   expect_match(
     projection_ui,
-    'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
+    'uiOutput\\("spatial_projection_background_select_UI"\\)'
   )
   expect_match(
     projection_ui,
-    paste0(
-      'tagList\\([[:space:]]*',
-      'uiOutput\\("spatial_projection_scatter_parameters_UI"\\),[[:space:]]*',
-      'uiOutput\\("spatial_projection_background_parameters_UI"\\)',
-      '[[:space:]]*\\)'
-    ),
-    perl = TRUE
+    'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
   )
+  expect_match(projection_ui, '"Appearance"', fixed = TRUE)
+  expect_match(projection_ui, '"Background image"', fixed = TRUE)
 })
 
 test_that("ImageFeaturePlot reaches getExpressionMatrix as a Cerebro method", {
@@ -788,13 +784,18 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
   shiny::testServer(server, {
     session$setInputs(spatial_projection_to_display = "sliceB")
     session$flushReact()
-    html <- as.character(output$spatial_projection_main_parameters_UI$html)
+    main_html <- as.character(
+      output$spatial_projection_main_parameters_UI$html
+    )
+    background_html <- as.character(
+      output$spatial_projection_background_select_UI$html
+    )
 
-    expect_match(html, 'value="sliceB" selected', fixed = TRUE)
-    expect_match(html, "embedded::IF", fixed = TRUE)
-    expect_match(html, "external::MIBI", fixed = TRUE)
-    expect_false(grepl("embedded::H&amp;E", html, fixed = TRUE))
-    expect_false(grepl("external::DAPI", html, fixed = TRUE))
+    expect_match(main_html, 'value="sliceB" selected', fixed = TRUE)
+    expect_match(background_html, "embedded::IF", fixed = TRUE)
+    expect_match(background_html, "external::MIBI", fixed = TRUE)
+    expect_false(grepl("embedded::H&amp;E", background_html, fixed = TRUE))
+    expect_false(grepl("external::DAPI", background_html, fixed = TRUE))
     expect_identical(getSpatialData("sliceB")$coordinates$x, 101:102)
   })
 })

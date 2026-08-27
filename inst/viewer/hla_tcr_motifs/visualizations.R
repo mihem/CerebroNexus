@@ -320,6 +320,7 @@ hla_build_motif_visnet <- function(
     size = hla_node_radius(clone_count, node_scale),
     color = node_color,
     title = titles,
+    detail = titles,
     font.size = 16,
     font.color = "#2a3f5f",
     font.vadjust = -20,
@@ -553,10 +554,10 @@ output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
   net <- visNetwork::visEvents(
     net,
     selectNode = htmlwidgets::JS(
-      "function(p) { Shiny.setInputValue('hla_selected_node_id', p.nodes[0], {priority: 'event'}); }"
+      "function(p) { window.hlaShowNodeDetails(p.nodes[0]); }"
     ),
     deselectNode = htmlwidgets::JS(
-      "function() { Shiny.setInputValue('hla_selected_node_id', null, {priority: 'event'}); }"
+      "function() { window.hlaShowNodeDetails(null); }"
     ),
     # The opening view (igraph coords, fitted to the canvas) is the smallest the
     # network may get. Zoom is button-only (zoomView = FALSE), so the floor is
@@ -568,6 +569,9 @@ output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
       "function() {",
       "  var w = HTMLWidgets.find('#hla_plot_motifNetwork');",
       "  var net = w && w.network; if (!net) { return; }",
+      "  if (!net.hlaDetailsReady) {",
+      "    net.hlaDetailsReady = true; window.hlaShowNodeDetails(null);",
+      "  }",
       "  var s = net.getScale();",
       "  if (!(s > 0)) { return; }",
       # The opening fit settles over a few draws (scale keeps shrinking to fit
@@ -606,56 +610,9 @@ observeEvent(hla_visnet(), ignoreInit = TRUE, {
   # a rebuild and re-fit.
   visNetwork::visUpdateNodes(
     proxy,
-    nodes = vn$nodes[, c("id", "color", "title", "size")]
+    nodes = vn$nodes[, c("id", "color", "title", "detail", "size")]
   )
-})
-
-## ---- Stable details for the selected node ----------------------------- ##
-output$hla_node_details <- renderUI({
-  g <- hla_motif_graph()
-  selected <- suppressWarnings(as.integer(input$hla_selected_node_id))
-  if (
-    !hla_motif_graph_ok(g) ||
-      length(selected) != 1 ||
-      is.na(selected) ||
-      selected < 1 ||
-      selected > igraph::vcount(g)
-  ) {
-    # Nothing selected: render nothing so the network fills the height (the
-    # details appear here only once a node is clicked). Keeping a standing
-    # "select a node" hint below the plot just shortened it, like the removed
-    # definitional note; the interaction is covered in the info guide.
-    return(NULL)
-  }
-  v <- igraph::V(g)[selected]
-  value <- function(name) {
-    x <- igraph::vertex_attr(g, name, index = v)
-    if (length(x) == 0 || is.na(x) || !nzchar(as.character(x))) {
-      "—"
-    } else {
-      as.character(x)
-    }
-  }
-  tags$div(
-    class = "well well-sm",
-    style = "margin-top: 8px; margin-bottom: 4px; font-size: 12px;",
-    tags$b(value("cdr3")),
-    tags$span(sprintf(" · V/J: %s / %s", value("v_gene"), value("j_gene"))),
-    tags$br(),
-    tags$span(sprintf(
-      "Motif: %s · consensus: %s · max mismatch: %s · cells: %s",
-      value("motif_group"),
-      value("motif_consensus"),
-      value("motif_max_mismatch"),
-      value("clone_count")
-    )),
-    if (value("cell_type_dist") != "—") {
-      tagList(tags$br(), value("cell_type_dist"))
-    },
-    if (value("mhc_context_dist") != "—") {
-      tagList(tags$br(), value("mhc_context_dist"))
-    }
-  )
+  session$sendCustomMessage("hla-refresh-node-details", list())
 })
 
 ## ---- Export: tables + manifest ---------------------------------------- ##

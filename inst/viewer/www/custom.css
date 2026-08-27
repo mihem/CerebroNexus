@@ -487,6 +487,21 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   flex: 1 1 auto;
   min-width: 0;
 }
+.cerebro-viz-toolbar .spatial-rgb-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.cerebro-viz-toolbar .spatial-rgb-controls .form-group {
+  flex: 1 1 180px;
+  min-width: 180px;
+  max-width: 240px;
+}
+.hla-node-details {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
 .cerebro-viz-toolbar .control-label {
   margin-bottom: 5px;
   color: var(--c-text);

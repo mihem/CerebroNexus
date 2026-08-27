@@ -87,6 +87,11 @@ spatial_projection_update_plot <- function(input) {
     plot_parameters[['color_variable']] <- color_variable
   }
   color_input <- metadata[[color_variable]]
+  selection_keys <- if ("cell_barcode" %in% colnames(metadata)) {
+    as.character(metadata[["cell_barcode"]])
+  } else {
+    rownames(metadata)
+  }
 
   ## get container dimensions
   container_dimensions <- shinyjs::js$getContainerDimensions()
@@ -378,6 +383,7 @@ spatial_projection_update_plot <- function(input) {
     output_data <- list(
       x = coordinates[[1]],
       y = coordinates[[2]],
+      selection_key = selection_keys,
       color = rgb_colors,
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
@@ -431,6 +437,7 @@ spatial_projection_update_plot <- function(input) {
     output_data <- list(
       x = coordinates[[1]],
       y = coordinates[[2]],
+      selection_key = selection_keys,
       color = color_input,
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
@@ -499,6 +506,7 @@ spatial_projection_update_plot <- function(input) {
       x = list(),
       y = list(),
       z = list(),
+      selection_key = list(),
       color = list(),
       point_size = plot_parameters[["point_size"]],
       point_opacity = plot_parameters[["point_opacity"]],
@@ -533,6 +541,8 @@ spatial_projection_update_plot <- function(input) {
 
         output_data[['x']][[i]] <- coordinates[[1]][cells_to_extract]
         output_data[['y']][[i]] <- coordinates[[2]][cells_to_extract]
+        output_data[['selection_key']][[i]] <-
+          selection_keys[cells_to_extract]
         output_data[['color']][[i]] <- unname(color_assignments[which(
           names(color_assignments) == j
         )])
@@ -605,6 +615,8 @@ spatial_projection_update_plot <- function(input) {
         output_data[['x']][[i]] <- coordinates[[1]][cells_to_extract]
         output_data[['y']][[i]] <- coordinates[[2]][cells_to_extract]
         output_data[['z']][[i]] <- coordinates[[3]][cells_to_extract]
+        output_data[['selection_key']][[i]] <-
+          selection_keys[cells_to_extract]
         output_data[['color']][[i]] <- unname(color_assignments[which(
           names(color_assignments) == j
         )])

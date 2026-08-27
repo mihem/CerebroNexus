@@ -110,10 +110,20 @@ test_that("motif network exposes a stable selected-node detail panel", {
     ),
     collapse = "\n"
   )
+  js <- paste(
+    readLines(
+      hla_inst_file("viewer/www/hla_motifs.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
 
-  expect_match(ui, "hla_node_details")
-  expect_match(viz, "hla_selected_node_id")
+  expect_match(ui, 'id = "hla-node-details"', fixed = TRUE)
+  expect_match(viz, "detail = titles", fixed = TRUE)
+  expect_match(viz, "window.hlaShowNodeDetails", fixed = TRUE)
+  expect_no_match(viz, "hla_selected_node_id", fixed = TRUE)
   expect_match(viz, "visEvents")
+  expect_match(js, "hla-refresh-node-details", fixed = TRUE)
 })
 
 test_that("core shim binds locally without polluting globalenv", {
@@ -421,7 +431,7 @@ test_that("motif network nodes carry no group column", {
   node_df <- regmatches(
     viz,
     regexpr(
-      "nodes <- data\\.frame\\([\\s\\S]{0,400}?\\n  \\)",
+      "nodes <- data\\.frame\\([\\s\\S]{0,800}?\\n  \\)",
       viz,
       perl = TRUE
     )

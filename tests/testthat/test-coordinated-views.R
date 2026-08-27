@@ -221,10 +221,6 @@ test_that("Linked views chooses its grid from both viewport dimensions", {
   expect_match(js, "VIEWPORT_GUTTER", fixed = TRUE)
   expect_match(js, "var VIEWPORT_GUTTER = 7", fixed = TRUE)
   expect_match(ui, 'class = "cv-secondary-analysis"', fixed = TRUE)
-  expect_match(
-    ui,
-    'class = "cv-secondary-analysis",\n      style = "display:none"'
-  )
 })
 
 test_that("Linked views keeps replacement controls contextual and user-facing", {

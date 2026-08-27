@@ -1,7 +1,6 @@
 // =============================================================================
 // Spatial projection: thin wrappers over the shared projection-scatter renderer
-// (inst/shiny/www/projection_scatter.js) plus the spatial-only UI helpers
-// (scroll-down indicator, Additional-parameters collapse/scroll behaviour).
+// (inst/shiny/www/projection_scatter.js) plus the spatial-only selection hint.
 //
 // The rendering logic (custom legend, persistent x|y selection, group labels,
 // group hulls, container sizing, modebar-off) now lives ONCE in the shared
@@ -137,95 +136,3 @@ shinyjs.hideScrollDownIndicator = function () {
     }, 400);
   }
 };
-
-// When the user OPENS the Additional-parameters box, collapse the
-// Main-parameters box so the tall background controls lift up the page.
-(function () {
-  var additionalId = 'spatial_additional_parameters_wrapper';
-
-  function collapseMainParameters() {
-    var mainWrapper = document.getElementById('spatial_main_parameters_wrapper');
-    if (!mainWrapper) return;
-    var box = mainWrapper.querySelector('.box');
-    if (!box || box.classList.contains('collapsed-box')) return;
-    var btn = box.querySelector('[data-widget="collapse"]');
-    if (btn) btn.click();
-  }
-
-  var observed = null;
-  var wasCollapsed = true;
-
-  var observer = new MutationObserver(function () {
-    if (!observed) return;
-    var nowCollapsed = observed.classList.contains('collapsed-box');
-    if (wasCollapsed && !nowCollapsed) {
-      collapseMainParameters();
-    }
-    wasCollapsed = nowCollapsed;
-  });
-
-  setInterval(function () {
-    var wrapper = document.getElementById(additionalId);
-    var box = wrapper ? wrapper.querySelector('.box') : null;
-    if (box && box !== observed) {
-      observer.disconnect();
-      observed = box;
-      wasCollapsed = box.classList.contains('collapsed-box');
-      observer.observe(box, {
-        attributes: true,
-        attributeFilter: ['class']
-      });
-    }
-  }, 500);
-})();
-
-// 'More below' scroll hint for the Additional-parameters panel.
-(function () {
-  var wrapperId = 'spatial_additional_parameters_wrapper';
-
-  function ensureHint(wrapper) {
-    var hint = document.getElementById('spatial_additional_scroll_hint');
-    if (!hint) {
-      hint = document.createElement('div');
-      hint.id = 'spatial_additional_scroll_hint';
-      hint.textContent = '⌄';
-      hint.title = 'Scroll for more';
-      wrapper.appendChild(hint);
-    }
-    return hint;
-  }
-
-  function update() {
-    var wrapper = document.getElementById(wrapperId);
-    if (!wrapper) return;
-    var body = wrapper.querySelector('.box-body');
-    var box = wrapper.querySelector('.box');
-    var hint = ensureHint(wrapper);
-    var collapsed = box && box.classList.contains('collapsed-box');
-    var scrollable = body && body.scrollHeight - body.clientHeight > 4;
-    var atBottom =
-      body && body.scrollTop >= body.scrollHeight - body.clientHeight - 4;
-    if (!collapsed && scrollable && !atBottom) {
-      hint.classList.add('is-visible');
-    } else {
-      hint.classList.remove('is-visible');
-    }
-  }
-
-  document.addEventListener(
-    'scroll',
-    function (e) {
-      if (
-        e.target &&
-        e.target.classList &&
-        e.target.classList.contains('box-body') &&
-        e.target.closest('#' + wrapperId)
-      ) {
-        update();
-      }
-    },
-    true
-  );
-  window.addEventListener('resize', update);
-  setInterval(update, 800);
-})();

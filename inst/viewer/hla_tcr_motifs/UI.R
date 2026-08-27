@@ -94,7 +94,11 @@ tab_hla_tcr_motifs <- tabItem(
                 )
               )
             ),
-            uiOutput("hla_node_details"),
+            tags$div(
+              id = "hla-node-details",
+              class = "well well-sm hla-node-details",
+              style = "display:none"
+            ),
             uiOutput("hla_motif_note"),
             # A picture cannot be recomputed or audited; the tables and their
             # manifest can. See output$hla_export_analysis.

@@ -620,7 +620,7 @@ test_that("lazy-load boundary: self-made plots stay unloaded, scRepertoire plots
   expect_identical(app$get_value(export = "ir_heavy_deps_loaded"), FALSE)
   app$run_js('document.querySelector(".modal-footer button").click();')
   app$wait_for_js(
-    'document.querySelector(".modal") === null',
+    'document.querySelector(".modal.in, .modal.show") === null',
     timeout = 10000
   )
 

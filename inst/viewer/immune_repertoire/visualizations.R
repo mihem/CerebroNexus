@@ -642,6 +642,7 @@ observe({
   traces <- list()
   data_x <- list()
   data_y <- list()
+  data_key <- list()
   data_color <- list()
   hover_info <- list()
   hover_text <- list()
@@ -650,6 +651,7 @@ observe({
     traces[[length(traces) + 1]] <- "Other cells"
     data_x[[length(data_x) + 1]] <- bg$x
     data_y[[length(data_y) + 1]] <- bg$y
+    data_key[[length(data_key) + 1]] <- bg$barcode
     data_color[[length(data_color) + 1]] <- "#D9D9D9"
     ## Background cells skip hover (per-trace hoverinfo, honoured by shared JS).
     hover_info[[length(hover_info) + 1]] <- "skip"
@@ -667,6 +669,7 @@ observe({
     traces[[length(traces) + 1]] <- lvl
     data_x[[length(data_x) + 1]] <- sub$x
     data_y[[length(data_y) + 1]] <- sub$y
+    data_key[[length(data_key) + 1]] <- sub$barcode
     data_color[[length(data_color) + 1]] <- unname(IR_EXPANSION_COLORS[[lvl]])
     hover_info[[length(hover_info) + 1]] <- "text"
     hover_text[[length(hover_text) + 1]] <- paste0(
@@ -691,6 +694,7 @@ observe({
   output_data <- list(
     x = data_x,
     y = data_y,
+    selection_key = data_key,
     color = data_color,
     point_size = marker_size,
     point_opacity = alpha,
