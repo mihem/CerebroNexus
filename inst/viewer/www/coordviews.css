@@ -56,6 +56,14 @@
   position: relative;
 }
 .coordviews-page .cv-ctl { display: flex; flex-direction: column; gap: 5px; }
+.coordviews-page .cv-topbar > .cv-ctl {
+  flex: 1 1 180px;
+  min-width: 180px;
+  max-width: 240px;
+}
+.coordviews-page .cv-topbar > .cv-ctl > .selectize-control {
+  width: 100%;
+}
 .coordviews-page .cv-ctl > label {
   font-size: 14px; font-weight: 600; color: var(--cv-text);
   text-transform: none; letter-spacing: 0;
@@ -67,7 +75,7 @@
   border-radius: var(--r-sm, 8px); background: var(--cv-surface); color: var(--cv-text);
   font-size: 14px; font-family: inherit;
 }
-.coordviews-page .cv-topbar select { min-width: 168px; }
+.coordviews-page .cv-topbar select { width: 100%; min-width: 0; }
 #cv-more .cv-more-inner select { min-width: 150px; }
 .coordviews-page .cv-topbar select:focus,
 #cv-more .cv-more-inner select:focus {
@@ -75,11 +83,12 @@
   box-shadow: 0 0 0 3px var(--cv-amber50);
 }
 .coordviews-page .cv-spatial-ctl .selectize-input { max-width: 320px; }
-.coordviews-page #cv-pick-color + .selectize-control { min-width: 168px; }
+.coordviews-page #cv-pick-color + .selectize-control { width: 100%; min-width: 0; }
 .coordviews-page #cv-pick-color + .selectize-control .selectize-dropdown-content {
   max-height: min(560px, calc(100dvh - 240px));
 }
-.coordviews-page #cv-proj-ctl .selectize-input { max-width: 320px; }
+.coordviews-page #cv-proj-ctl .selectize-control,
+.coordviews-page #cv-proj-ctl .selectize-input { width: 100%; max-width: none; }
 
 /* Background image choices are scoped to the selected spatial data.  The
    compact, intrinsic-width mode switch deliberately avoids filling the full
@@ -248,7 +257,7 @@
 
 /* ---- right cluster: global readout -------------------------------------- */
 .coordviews-page .cv-topbar-right {
-  margin-left: auto; display: flex; align-items: center; gap: 14px;
+  order: 98; display: flex; align-items: center; gap: 14px;
 }
 /* Sized up to match the buttons beside it — it reports on the same selection
    they act on, and at 12px it read as a footnote to them. One line, so the bar's
@@ -310,7 +319,8 @@
 
 /* ---- "More" toggle + responsive settings drawer ------------------------- */
 .coordviews-page .cv-morebtn {
-  align-self: flex-end; display: inline-flex; align-items: center; gap: 7px;
+  order: 99; align-self: flex-end; display: inline-flex; align-items: center; gap: 7px;
+  margin-left: auto;
   padding: 0 14px; font-size: 14px; font-weight: 700;
   border: 1px solid var(--cv-amber200); background: var(--cv-amber50);
   color: var(--cv-amber700); border-radius: var(--r-sm, 8px); cursor: pointer; height: 42px;

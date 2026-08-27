@@ -69,7 +69,7 @@ test_that("trajectory module loads without breaking the main app", {
   expect_true(grepl("1,476", cells_box$html))
 })
 
-test_that("trajectory projection fits the viewport with selectors in parameters", {
+test_that("trajectory projection fits the viewport with selectors in the top bar", {
   app <- shared_app()
 
   app$click(selector = 'a[href="#shiny-tab-trajectory"]')
@@ -95,15 +95,15 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
   expect_true(app$get_js(
     paste0(
       "document.getElementById('trajectory_selected_method')",
-      ".closest('.box').querySelector('.box-title')",
-      ".innerText.includes('Main parameters')"
+      ".closest('.cerebro-viz-toolbar') !== null"
     )
   ))
   expect_true(app$get_js(
     paste0(
       "document.getElementById('trajectory_selected_name')",
-      ".closest('.box').querySelector('.box-title')",
-      ".innerText.includes('Main parameters')"
+      ".closest('.cerebro-viz-toolbar') === ",
+      "document.getElementById('trajectory_selected_method')",
+      ".closest('.cerebro-viz-toolbar')"
     )
   ))
 

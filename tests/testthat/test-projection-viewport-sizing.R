@@ -55,6 +55,48 @@ test_that("projection height is calculated from measured viewport geometry", {
   expect_equal(output, "[692,642,240,792]")
 })
 
+test_that("projection square mode constrains width to the available height", {
+  testthat::skip_if(Sys.which("node") == "", "node not on PATH")
+  js_path <- repo_file(
+    "inst",
+    "viewer",
+    "www",
+    "projection_scatter.js"
+  )
+  runner <- tempfile(fileext = ".js")
+  on.exit(unlink(runner), add = TRUE)
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      "global.window = {};",
+      "global.document = { addEventListener: function () {} };",
+      sprintf(
+        "eval(fs.readFileSync(%s, 'utf8'));",
+        encodeString(js_path, quote = "\"")
+      ),
+      "const target = window.cerebroProjection._projectionTargetSize;",
+      "console.log(JSON.stringify([",
+      "  target(900, 640, false),",
+      "  target(900, 640, true),",
+      "  target(520, 640, true)",
+      "]));"
+    ),
+    runner
+  )
+
+  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_equal(
+    output,
+    paste0(
+      '[{"width":900,"height":640},',
+      '{"width":640,"height":640},',
+      '{"width":520,"height":520}]'
+    )
+  )
+})
+
 test_that("generic fill sizing skips elements outside layout", {
   testthat::skip_if(Sys.which("node") == "", "node not on PATH")
   js_path <- repo_file(
@@ -323,7 +365,7 @@ test_that("projection sizing isolates Plotly from surrounding box content", {
   expect_equal(output, c("true", "true"))
 })
 
-test_that("trajectory selectors live inside Main parameters", {
+test_that("trajectory selectors live together in the top bar", {
   tab_source <- paste(
     readLines(repo_file("inst", "viewer", "trajectory", "UI.R")),
     collapse = "\n"
@@ -351,7 +393,7 @@ test_that("trajectory selectors live inside Main parameters", {
   expect_match(
     projection_source,
     paste0(
-      'tagList\\(\\s*',
+      'class = "cerebro-viz-primary",\\s*',
       'uiOutput\\("trajectory_select_method_and_name_UI"\\),\\s*',
       'uiOutput\\("trajectory_projection_main_parameters_UI"\\)'
     ),

@@ -1002,6 +1002,16 @@ test_that("the parameter gate stays OUTSIDE the cached graph reactives", {
     "req\\(input\\$hla_color_by\\)",
     perl = TRUE
   )
+  expect_match(
+    hla_params_ready_src(data_src),
+    "is\\.null\\(input\\$hla_by_v\\)",
+    perl = TRUE
+  )
+  expect_match(
+    hla_params_ready_src(data_src),
+    "is\\.null\\(input\\$hla_show_isolated\\)",
+    perl = TRUE
+  )
 })
 
 test_that("the parameter panel renders once, then updates in place", {

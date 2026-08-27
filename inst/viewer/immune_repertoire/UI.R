@@ -1,9 +1,8 @@
 ##----------------------------------------------------------------------------##
 ## Tab: Immune Repertoire (unified TCR/BCR)
 ##
-## Layout mirrors the Main tab (gene_expression/UI_projection.R): a left column
-## of parameter boxes (Main / Additional / Group filters) and a right column
-## holding the visualization tab strip and the current plot.
+## High-frequency analysis controls stay above the visualization. Low-frequency
+## analysis, display, and filtering controls share the app-wide settings drawer.
 ##----------------------------------------------------------------------------##
 
 ## Prepend the shared plotly layout factory and the shared projection-scatter
@@ -30,42 +29,46 @@ tab_immune_repertoire <- tabItem(
       "irClonalUMAPZoomToSelection"
     )
   ),
+  cerebroVizPageHeader(
+    "Immune repertoire",
+    "ir_main_parameters_info",
+    "Explore clonotype abundance, diversity, overlap, and clonal structure."
+  ),
   fluidRow(
-    class = "cerebro-viz-row",
-    ## ---- Left column: parameter boxes ---------------------------------- ##
+    class = "cerebro-viz-row cerebro-viz-top-layout",
     column(
-      width = 3,
+      width = 12,
       offset = 0,
-      class = "cerebro-param-col",
-      tagList(
-        cerebroBox(
-          title = tagList(
-            "Main parameters",
-            cerebroInfoButton("ir_main_parameters_info")
-          ),
+      class = "cerebro-viz-toolbar-col",
+      div(
+        class = "cerebro-viz-toolbar",
+        div(
+          class = "cerebro-viz-primary",
           uiOutput("ir_main_params_UI")
         ),
-        cerebroBox(
-          title = tagList(
-            "Additional parameters",
+        cerebroSettingsButton("ir_more_button", "ir_more"),
+        cerebroSettingsDrawer(
+          "ir_more",
+          cerebroSettingsSection(
+            "Analysis",
+            uiOutput("ir_more_analysis_UI"),
+            cerebroInfoButton("ir_more_analysis_info")
+          ),
+          cerebroSettingsSection(
+            "Appearance",
+            uiOutput("ir_additional_params_UI"),
             cerebroInfoButton("ir_additional_parameters_info")
           ),
-          uiOutput("ir_additional_params_UI"),
-          collapsed = TRUE
-        ),
-        cerebroBox(
-          title = tagList(
+          cerebroSettingsSection(
             "Group filters",
+            uiOutput("ir_group_filters_UI"),
             cerebroInfoButton("ir_group_filters_info")
-          ),
-          uiOutput("ir_group_filters_UI"),
-          collapsed = TRUE
+          )
         )
       )
     ),
-    ## ---- Right column: visualization tab strip + current plot ---------- ##
     column(
-      width = 9,
+      width = 12,
       offset = 0,
       class = "cerebro-viz-col",
       cerebroBox(

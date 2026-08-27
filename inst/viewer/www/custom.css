@@ -420,6 +420,353 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   min-width: 0;
   padding: 0 !important;         /* kill Bootstrap col gutter */
 }
+
+/* Projection, Trajectory, Immune repertoire, and HLA & TCR Motifs follow
+   Linked views: only primary controls stay in a compact top bar; secondary
+   controls live in a fixed drawer that never changes the plot geometry. */
+.cerebro-viz-row.cerebro-viz-top-layout {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.cerebro-viz-top-layout > .cerebro-viz-toolbar-col,
+.cerebro-viz-top-layout > .cerebro-viz-col {
+  flex: 0 0 auto;
+  width: 100% !important;
+  min-width: 0;
+  padding: 0 !important;
+}
+.cerebro-viz-page-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.cerebro-viz-page-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.cerebro-viz-page-meta {
+  padding: 2px 0 12px;
+  color: var(--c-text-2);
+  font-size: 12.5px;
+}
+.cerebro-viz-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 8px 14px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.cerebro-viz-primary {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.cerebro-viz-toolbar .shiny-html-output {
+  display: contents;
+}
+.cerebro-viz-toolbar .form-group {
+  flex: 1 1 180px;
+  width: auto;
+  max-width: 240px;
+  margin-bottom: 0;
+}
+.cerebro-viz-toolbar > .cerebro-info-btn {
+  flex: 0 0 auto;
+  align-self: center;
+}
+.cerebro-viz-toolbar .shiny-panel-conditional {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cerebro-viz-toolbar .control-label {
+  margin-bottom: 5px;
+  color: var(--c-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-viz-toolbar .selectize-input,
+.cerebro-settings-drawer .selectize-input {
+  box-sizing: border-box !important;
+  border: 1px solid var(--c-border-2) !important;
+  border-radius: var(--r-sm) !important;
+  background: var(--c-surface) !important;
+  color: var(--c-text) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  box-shadow: none !important;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-viz-toolbar .selectize-input {
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 7px 12px !important;
+}
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .selectize-input {
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 9px 12px !important;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-viz-toolbar .selectize-input.focus,
+.cerebro-settings-drawer .selectize-input.focus {
+  border-color: var(--c-amber) !important;
+  box-shadow: 0 0 0 3px var(--c-amber-50) !important;
+}
+/* pickerInput() renders a .form-control wrapper around its real button. The
+   shared form-control rule above must not paint that wrapper too, or the button
+   appears inset inside a second border. */
+.cerebro-viz-toolbar .bootstrap-select.form-control,
+.cerebro-settings-drawer .bootstrap-select.form-control {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+.cerebro-viz-toolbar .bootstrap-select.form-control {
+  height: 38px !important;
+  min-height: 38px !important;
+}
+.cerebro-settings-drawer .bootstrap-select.form-control {
+  height: 42px !important;
+  min-height: 42px !important;
+}
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle,
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 14px;
+  line-height: 22px;
+  box-shadow: none;
+}
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle {
+  height: 38px;
+  min-height: 38px;
+  padding: 7px 36px 7px 12px;
+}
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
+  height: 42px;
+  min-height: 42px;
+  padding: 9px 36px 9px 12px;
+}
+.cerebro-viz-primary .ir-flow-controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 12px;
+  min-width: 0;
+}
+.cerebro-viz-primary .ir-flow-control-item {
+  flex: 1 1 180px !important;
+  min-width: 180px !important;
+  max-width: 240px;
+}
+.cerebro-viz-toolbar .bootstrap-select.open > .dropdown-toggle,
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle:focus,
+.cerebro-settings-drawer .bootstrap-select.open > .dropdown-toggle,
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle:focus {
+  border-color: var(--c-amber);
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px var(--c-amber-50);
+}
+.cerebro-settings-drawer .checkbox {
+  margin: 0 0 10px;
+}
+.cerebro-settings-drawer .checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  padding-left: 0;
+  color: var(--c-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+.cerebro-settings-drawer .checkbox input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: static;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid #878787;
+  border-radius: 3px;
+  background: var(--c-surface);
+  cursor: pointer;
+}
+.cerebro-settings-drawer .checkbox input[type=checkbox]:checked {
+  border-color: var(--c-amber);
+  background-color: var(--c-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.4 6.3 11.5 13 4.7' fill='none' stroke='%23ff7013' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+}
+.cerebro-settings-drawer .cerebro-square-option {
+  margin: 4px 0 12px;
+}
+.cerebro-settings-drawer .cerebro-square-option .checkbox {
+  box-sizing: border-box;
+  height: 42px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  transition: background .15s ease, border-color .15s ease;
+}
+.cerebro-settings-drawer .cerebro-square-option .checkbox:hover {
+  background: var(--c-surface-2);
+}
+.cerebro-settings-drawer .cerebro-square-option .checkbox:has(input:checked) {
+  border-color: var(--c-amber-300);
+  background: var(--c-amber-50);
+  color: var(--c-amber-700);
+}
+.cerebro-more-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  margin-left: auto;
+  padding: 0 14px;
+  border: 1px solid var(--c-amber-300);
+  border-radius: var(--r-sm);
+  background: var(--c-amber-50);
+  color: var(--c-amber-700);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .12s ease;
+}
+.cerebro-more-btn:hover,
+.cerebro-more-btn[aria-expanded="true"] {
+  border-color: var(--c-amber);
+  background: var(--c-amber-100);
+}
+.cerebro-more-btn:active { transform: scale(.955); }
+.cerebro-more-caret {
+  width: 0;
+  height: 0;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  border-left: 5.5px solid currentColor;
+  transform-origin: 2.5px 50%;
+  transition: transform .2s ease;
+}
+.cerebro-more-btn[aria-expanded="true"] .cerebro-more-caret {
+  transform: rotate(90deg);
+}
+.cerebro-settings-drawer {
+  display: none;
+  position: fixed;
+  z-index: 1600;
+  inset: 0 0 0 auto;
+  width: min(420px, calc(100vw - 24px));
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: 12px 0 0 12px;
+  background: var(--c-surface);
+  box-shadow: -12px 0 34px rgba(0, 0, 0, .16);
+  opacity: 0;
+  transform: translateX(100%);
+  transition: transform .22s var(--ease), opacity .16s ease;
+}
+.cerebro-settings-drawer.is-mounted {
+  display: flex;
+  flex-direction: column;
+}
+.cerebro-settings-drawer.is-open {
+  opacity: 1;
+  transform: none;
+}
+.cerebro-settings-titlebar {
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 14px;
+  font-weight: 700;
+}
+.cerebro-settings-close {
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 24px/24px inherit;
+  cursor: pointer;
+}
+.cerebro-settings-close:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.cerebro-settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cerebro-settings-section + .cerebro-settings-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--c-border);
+}
+.cerebro-settings-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--c-text-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.cerebro-settings-heading .cerebro-info-btn {
+  margin-left: auto;
+}
+.cerebro-settings-drawer .form-group:last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .cerebro-settings-drawer {
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
 /* Narrow viewports: stack the param panel above the plot rather than crushing
    both. Below this width a side-by-side split isn't comfortable anyway. */
 @media (max-width: 900px) {
@@ -873,7 +1220,7 @@ body .btn-group-justified > .btn.radiobtn.btn-primary.active {
    chosen for contrast. Exclude it from the generic white-fill rule via :not()
    so the browser keeps its inline colours (a !important override here would
    still beat the inline style, so exclusion is the only clean fix). */
-body .form-control:not(.colourpicker-input):not(.shiny-colour-input),
+body .form-control:not(.colourpicker-input):not(.shiny-colour-input):not(.bootstrap-select):not(.selectpicker):not(.selectize-control),
 body .selectize-input,
 body .selectize-dropdown {
   border: 1px solid var(--c-border-2) !important;
@@ -898,11 +1245,11 @@ body .form-control.shiny-colour-input {
   box-shadow: none !important;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-body .form-control:hover,
+body .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):hover,
 body .selectize-input:hover {
   border-color: var(--c-text-3) !important;
 }
-body .form-control:focus,
+body .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):focus,
 body .selectize-input.focus {
   border-color: var(--c-amber) !important;
   box-shadow: 0 0 0 3px var(--c-amber-50) !important;

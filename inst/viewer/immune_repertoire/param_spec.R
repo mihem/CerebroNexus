@@ -561,6 +561,15 @@ IR_ORDER_BY_TABS <- c(
   "Property"
 )
 
+## Low-frequency analysis controls live in More settings. Everything else in
+## IR_PARAM_SPEC remains in the top bar because it directly defines the plot.
+IR_MORE_PARAM_IDS <- c(
+  "ir_p_umap_show_all",
+  "ir_p_n_boots",
+  "ir_p_rare_n_boots",
+  "ir_p_order_by"
+)
+
 ## Assemble the display params applicable to a given tab.
 ir_display_params_for <- function(tab) {
   params <- IR_DISPLAY_BASE

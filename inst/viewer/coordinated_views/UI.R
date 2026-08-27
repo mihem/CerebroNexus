@@ -653,12 +653,10 @@ tab_coordinated_views <- tabItem(
       )
     ),
 
-    ## Keep the lightweight client readout target for internal state updates, but
-    ## do not expose it on the landing surface. The expensive server-rendered
-    ## selected-cell plot/table has no UI target here and therefore does not run.
+    ## Selection composition and clonotypes update client-side as soon as cells
+    ## are selected in any linked panel.
     div(
       class = "cv-secondary-analysis",
-      style = "display:none",
       div(
         class = "cv-readout",
         id = "cv-readout",
@@ -799,6 +797,13 @@ tab_coordinated_views <- tabItem(
           )
         )
       )
+    ),
+
+    ## Detailed selected-cell plot and table are rendered only while a selection
+    ## exists, so the landing surface stays compact without dropping the result.
+    div(
+      class = "cv-secondary-analysis",
+      shiny::uiOutput("coordviews_selected_cells_UI")
     ),
 
     tags$dialog(

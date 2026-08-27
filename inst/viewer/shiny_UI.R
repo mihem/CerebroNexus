@@ -33,6 +33,66 @@ boxTitle <- function(title) {
   p(title, style = "padding-right: 5px; display: inline")
 }
 
+cerebroSettingsButton <- function(id, target) {
+  tags$button(
+    type = "button",
+    id = id,
+    class = "cerebro-more-btn",
+    `aria-expanded` = "false",
+    `aria-controls` = target,
+    `data-cerebro-drawer-target` = target,
+    icon("sliders"),
+    tags$span("More settings"),
+    tags$span(class = "cerebro-more-caret")
+  )
+}
+
+cerebroVizPageHeader <- function(title, info_id, subtitle) {
+  tagList(
+    div(
+      class = "cerebro-viz-page-heading",
+      tags$h3(title),
+      cerebroInfoButton(info_id)
+    ),
+    div(class = "cerebro-viz-page-meta", subtitle)
+  )
+}
+
+cerebroSettingsSection <- function(title, content, info = NULL) {
+  div(
+    class = "cerebro-settings-section",
+    div(
+      class = "cerebro-settings-heading",
+      tags$span(title),
+      info
+    ),
+    content
+  )
+}
+
+cerebroSettingsDrawer <- function(id, ...) {
+  div(
+    id = id,
+    class = "cerebro-settings-drawer",
+    role = "dialog",
+    `aria-modal` = "false",
+    `aria-hidden` = "true",
+    `aria-labelledby` = paste0(id, "_title"),
+    div(
+      class = "cerebro-settings-titlebar",
+      tags$span(id = paste0(id, "_title"), "More settings"),
+      tags$button(
+        type = "button",
+        class = "cerebro-settings-close",
+        `data-cerebro-drawer-close` = "",
+        `aria-label` = "Close More settings",
+        HTML("&times;")
+      )
+    ),
+    div(class = "cerebro-settings-body", ...)
+  )
+}
+
 ## Read an entire file into a single string. Used to inline .js/.svg/.html
 ## assets into the UI. readChar reads `size` bytes (the file's byte count) and
 ## stops at EOF, which faithfully covers ASCII/UTF-8 assets. Defined here,
@@ -346,6 +406,7 @@ ui <- dashboardPage(
       cerebro_js("trekker.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
       cerebro_js("coordviews.js", defer = TRUE),
+      cerebro_js("settings_drawer.js", defer = TRUE),
       ## Shared projection-scatter engine, loaded ONCE here instead of being
       ## inlined into all five projection tabs' extendShinyjs() (~69KB x5). Both
       ## files expose only window globals (window.cerebroProjectionLayout /

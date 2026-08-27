@@ -36,6 +36,19 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
       step = preferences[["overview_plot_point_opacity"]][["step"]],
       value = preferences[["overview_plot_point_opacity"]][["default"]]
     ),
+    shiny::tagAppendAttributes(
+      checkboxInput(
+        inputId = "overview_projection_keep_square",
+        label = "Keep plot square",
+        value = FALSE
+      ),
+      class = "cerebro-square-option"
+    )
+  )
+})
+
+output[["overview_projection_data_parameters_UI"]] <- renderUI({
+  tagList(
     sliderInput(
       "overview_projection_percentage_cells_to_show",
       label = "Show % of cells",
@@ -53,6 +66,11 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
 outputOptions(
   output,
   "overview_projection_additional_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "overview_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 

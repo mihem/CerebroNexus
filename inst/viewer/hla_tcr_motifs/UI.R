@@ -7,62 +7,58 @@
 ## Subtitle is a hard constraint from the design: everything on this page is
 ## exploratory HLA CONTEXT and association, never inferred restriction.
 ##
-## Layout mirrors the other module pages: a left column of parameter boxes and
-## a right column with a visualization tab strip (Motif Network / HLA
-## Associations / Data & QC).
+## Primary analysis choices stay above the visualization. Secondary analysis,
+## display, and evidence controls use the same fixed settings drawer as the
+## other specialist pages.
 ##----------------------------------------------------------------------------##
 
 tab_hla_tcr_motifs <- tabItem(
   tabName = "hla_tcr_motifs",
+  cerebroVizPageHeader(
+    "HLA & TCR Motifs",
+    "hla_parameters_info",
+    "Exploratory HLA context and association — not inferred restriction."
+  ),
   fluidRow(
-    class = "cerebro-viz-row",
-    ## ---- Left column: parameter boxes ---------------------------------- ##
+    class = "cerebro-viz-row cerebro-viz-top-layout",
     column(
-      width = 3,
+      width = 12,
       offset = 0,
-      class = "cerebro-param-col",
-      tagList(
-        cerebroBox(
-          title = tagList(
-            "Parameters",
-            cerebroInfoButton("hla_parameters_info")
-          ),
-          content = uiOutput("hla_parameters_ui")
+      class = "cerebro-viz-toolbar-col",
+      div(
+        class = "cerebro-viz-toolbar",
+        div(
+          class = "cerebro-viz-primary",
+          uiOutput("hla_parameters_ui")
         ),
-        cerebroBox(
-          title = tagList(
-            "Additional parameters",
+        cerebroSettingsButton("hla_more_button", "hla_more"),
+        cerebroSettingsDrawer(
+          "hla_more",
+          cerebroSettingsSection(
+            "Analysis",
+            uiOutput("hla_more_parameters_ui")
+          ),
+          cerebroSettingsSection(
+            "Appearance",
+            uiOutput("hla_additional_params_ui"),
             cerebroInfoButton("hla_additional_parameters_info")
           ),
-          content = uiOutput("hla_additional_params_ui"),
-          collapsed = TRUE
-        ),
-        cerebroBox(
-          title = tagList(
+          cerebroSettingsSection(
             "Evidence status",
+            uiOutput("hla_status_ui"),
             cerebroInfoButton("hla_status_info")
-          ),
-          content = uiOutput("hla_status_ui")
+          )
         )
       )
     ),
-    ## ---- Right column: visualization tab strip ------------------------- ##
     column(
-      width = 9,
+      width = 12,
       offset = 0,
-      # cerebro-viz-col: every other viz page carries this so the plot column
-      # absorbs the row's slack and can shrink below its content (min-width:0)
-      # instead of forcing overflow. HLA was the one page that omitted it, so the
-      # careful flex rules in custom.css never applied here.
       class = "cerebro-viz-col",
       cerebroBox(
         title = tagList(
           "HLA & TCR Motifs",
-          cerebroInfoButton("hla_visualizations_info"),
-          tags$span(
-            style = "font-size: 12px; font-weight: normal; color: #888;",
-            "Exploratory HLA context and association — not inferred restriction."
-          )
+          cerebroInfoButton("hla_visualizations_info")
         ),
         content = tabsetPanel(
           id = "hla_tabs",

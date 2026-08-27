@@ -24,43 +24,51 @@ output[["trajectory_projection_UI"]] <- renderUI({
   }
 
   tagList(
+    cerebroVizPageHeader(
+      "Trajectory",
+      "trajectory_projection_main_parameters_info",
+      "Explore inferred cell-state transitions and pseudotime."
+    ),
     fluidRow(
-      class = "cerebro-viz-row",
+      class = "cerebro-viz-row cerebro-viz-top-layout",
       column(
-        width = 3,
+        width = 12,
         offset = 0,
-        class = "cerebro-param-col",
-        cerebroBox(
-          title = tagList(
-            "Main parameters",
-            cerebroInfoButton("trajectory_projection_main_parameters_info")
-          ),
-          tagList(
+        class = "cerebro-viz-toolbar-col",
+        div(
+          class = "cerebro-viz-toolbar",
+          div(
+            class = "cerebro-viz-primary",
             uiOutput("trajectory_select_method_and_name_UI"),
             uiOutput("trajectory_projection_main_parameters_UI")
-          )
-        ),
-        cerebroBox(
-          title = tagList(
-            "Additional parameters",
-            cerebroInfoButton(
-              "trajectory_projection_additional_parameters_info"
+          ),
+          cerebroSettingsButton(
+            "trajectory_projection_more_button",
+            "trajectory_projection_more"
+          ),
+          cerebroSettingsDrawer(
+            "trajectory_projection_more",
+            cerebroSettingsSection(
+              "Appearance",
+              uiOutput("trajectory_projection_additional_parameters_UI"),
+              cerebroInfoButton(
+                "trajectory_projection_additional_parameters_info"
+              )
+            ),
+            cerebroSettingsSection(
+              "Data",
+              uiOutput("trajectory_projection_data_parameters_UI")
+            ),
+            cerebroSettingsSection(
+              "Group filters",
+              uiOutput("trajectory_projection_group_filters_UI"),
+              cerebroInfoButton("trajectory_projection_group_filters_info")
             )
-          ),
-          uiOutput("trajectory_projection_additional_parameters_UI"),
-          collapsed = TRUE
-        ),
-        cerebroBox(
-          title = tagList(
-            "Group filters",
-            cerebroInfoButton("trajectory_projection_group_filters_info")
-          ),
-          uiOutput("trajectory_projection_group_filters_UI"),
-          collapsed = TRUE
+          )
         )
       ),
       column(
-        width = 9,
+        width = 12,
         offset = 0,
         class = "cerebro-viz-col",
         shiny::tagAppendAttributes(
@@ -245,7 +253,12 @@ output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
       max = preferences[["gene_expression_plot_point_opacity"]][["max"]],
       step = preferences[["gene_expression_plot_point_opacity"]][["step"]],
       value = preferences[["gene_expression_plot_point_opacity"]][["default"]]
-    ),
+    )
+  )
+})
+
+output[["trajectory_projection_data_parameters_UI"]] <- renderUI({
+  tagList(
     sliderInput(
       "trajectory_percentage_cells_to_show",
       label = "Show % of cells",
@@ -269,6 +282,11 @@ output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
 outputOptions(
   output,
   "trajectory_projection_additional_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "trajectory_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 

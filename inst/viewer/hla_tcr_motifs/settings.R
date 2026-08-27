@@ -33,12 +33,12 @@ HLA_TWO_LINE_RENDER <- I(
   }"
 )
 
-## ---- Left-column parameters ------------------------------------------- ##
+## ---- Primary parameters ------------------------------------------------ ##
 output$hla_parameters_ui <- renderUI({
   chains <- hla_tcr_chains()
   # The panel is rebuilt only when the DATA changes (which controls exist), so
   # its own inputs are read under isolate() below: reading them live made every
-  # scope / colour / checkbox change tear the whole panel down (finding #8). The
+  # scope / colour change tear the whole panel down (finding #8). The
   # colour-by choices come from the shared hla_color_by_choices() reactive and
   # are kept current in place by the observer under this renderUI.
   tagList(
@@ -112,7 +112,6 @@ output$hla_parameters_ui <- renderUI({
       condition = "input.hla_scope == 'pair'",
       uiOutput("hla_pair_allele_ui")
     ),
-    uiOutput("hla_scope_status"),
     sliderInput(
       "hla_min_nodes",
       "Minimum motif size (nodes):",
@@ -120,7 +119,14 @@ output$hla_parameters_ui <- renderUI({
       max = 10,
       value = hla_default_min_nodes(),
       step = 1
-    ),
+    )
+  )
+})
+
+## ---- Secondary analysis parameters ------------------------------------ ##
+output$hla_more_parameters_ui <- renderUI({
+  tagList(
+    uiOutput("hla_scope_status"),
     # Live read-out of what the current threshold actually shows, so the effect
     # of moving the slider is visible without guessing.
     uiOutput("hla_motif_readout"),
@@ -157,6 +163,8 @@ output$hla_parameters_ui <- renderUI({
     )
   )
 })
+
+outputOptions(output, "hla_more_parameters_ui", suspendWhenHidden = FALSE)
 
 ## Keep the colour-by picker's options current WITHOUT rebuilding the panel.
 ## The choices depend on scope (pair scope swaps "MHC context" for "Pair class")

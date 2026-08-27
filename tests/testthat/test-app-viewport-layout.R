@@ -188,18 +188,19 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     "const fill = Array.from(tab.querySelectorAll('.cerebro-fill'))",
     ".find(el => el.getClientRects().length > 0);",
     "const row = fill.closest('.cerebro-viz-row');",
-    "const param = row.querySelector('.cerebro-param-col');",
+    "const toolbar = row.querySelector('.cerebro-viz-toolbar');",
     "const viz = row.querySelector('.cerebro-viz-col');",
     "const wrapper = fill.closest('.content-wrapper');",
     "const fr = fill.getBoundingClientRect();",
-    "const pr = param.getBoundingClientRect();",
+    "const tr = toolbar.getBoundingClientRect();",
     "const vr = viz.getBoundingClientRect();",
     "return {",
     "viewportHeight: window.innerHeight, viewportWidth: window.innerWidth,",
     "fillTop: fr.top, fillBottom: fr.bottom, fillHeight: fr.height,",
     "fillOverflow: getComputedStyle(fill).overflow,",
-    "paramLeft: pr.left, paramTop: pr.top, paramBottom: pr.bottom,",
-    "vizLeft: vr.left, vizTop: vr.top,",
+    "toolbarLeft: tr.left, toolbarRight: tr.right,",
+    "toolbarTop: tr.top, toolbarBottom: tr.bottom,",
+    "vizLeft: vr.left, vizRight: vr.right, vizTop: vr.top,",
     "wrapperClientWidth: wrapper.clientWidth,",
     "wrapperScrollWidth: wrapper.scrollWidth",
     "};",
@@ -210,8 +211,80 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   expect_gte(desktop$fillHeight, 240)
   expect_lte(desktop$fillBottom, desktop$viewportHeight)
   expect_identical(desktop$fillOverflow, "visible")
-  expect_lt(desktop$paramLeft, desktop$vizLeft)
-  expect_lt(abs(desktop$paramTop - desktop$vizTop), 1)
+  expect_lte(desktop$toolbarBottom, desktop$vizTop + 1)
+  expect_lt(abs(desktop$toolbarLeft - desktop$vizLeft), 1)
+  expect_lt(abs(desktop$toolbarRight - desktop$vizRight), 1)
+
+  top_layout_js <- function(tab_name) {
+    paste0(
+      "(() => {",
+      "const row = document.querySelector('#shiny-tab-",
+      tab_name,
+      " .cerebro-viz-top-layout');",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
+      "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
+      "return {paramBottom:p.bottom, vizTop:v.top, ",
+      "paramLeft:p.left, paramRight:p.right, vizLeft:v.left, vizRight:v.right};",
+      "})()"
+    )
+  }
+  for (tab_name in c("overview", "trajectory")) {
+    app$click(selector = paste0('a[href="#shiny-tab-', tab_name, '"]'))
+    app$wait_for_js(
+      paste0(
+        "(() => {",
+        "const row = document.querySelector('#shiny-tab-",
+        tab_name,
+        " .cerebro-viz-top-layout');",
+        "return row && row.getClientRects().length > 0;",
+        "})()"
+      ),
+      timeout = 30000
+    )
+    layout <- app$get_js(top_layout_js(tab_name))
+    expect_lte(layout$paramBottom, layout$vizTop + 1)
+    expect_lt(abs(layout$paramLeft - layout$vizLeft), 1)
+    expect_lt(abs(layout$paramRight - layout$vizRight), 1)
+  }
+
+  app$click(selector = 'a[href="#shiny-tab-immune_repertoire"]')
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#shiny-tab-immune_repertoire .cerebro-viz-top-layout')",
+      ".getClientRects().length > 0"
+    ),
+    timeout = 10000
+  )
+
+  ## More settings is a viewport drawer, not another layout row. Opening it
+  ## must leave the visualization at exactly the same position and size.
+  viz_geometry_js <- paste0(
+    "(() => {",
+    "const v = document.querySelector(",
+    "'#shiny-tab-immune_repertoire .cerebro-viz-col').getBoundingClientRect();",
+    "return {left:v.left, top:v.top, width:v.width, height:v.height};",
+    "})()"
+  )
+  viz_before_more <- app$get_js(viz_geometry_js)
+  app$click(selector = "#ir_more_button")
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const d = document.getElementById('ir_more');",
+      "return d.classList.contains('is-open') && ",
+      "getComputedStyle(d).position === 'fixed';",
+      "})()"
+    ),
+    timeout = 5000
+  )
+  viz_with_more <- app$get_js(viz_geometry_js)
+  expect_equal(viz_with_more, viz_before_more, tolerance = 1)
+  app$click(selector = "#ir_more [data-cerebro-drawer-close]")
+  app$wait_for_js(
+    "!document.getElementById('ir_more').classList.contains('is-open')",
+    timeout = 5000
+  )
 
   app$get_chromote_session()$set_viewport_size(width = 800, height = 800)
   app$wait_for_js(
@@ -223,7 +296,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
       "(() => {",
       "const row = document.querySelector(",
       "'#shiny-tab-immune_repertoire .cerebro-viz-row');",
-      "const p = row.querySelector('.cerebro-param-col').getBoundingClientRect();",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
       "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
       "return p.bottom <= v.top + 1;",
       "})()"
@@ -232,7 +305,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   )
 
   narrow <- app$get_js(geometry_js)
-  expect_lte(narrow$paramBottom, narrow$vizTop + 1)
+  expect_lte(narrow$toolbarBottom, narrow$vizTop + 1)
   expect_lte(narrow$wrapperScrollWidth, narrow$wrapperClientWidth)
   expect_gte(narrow$fillHeight, 240)
 
@@ -252,7 +325,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
       "(() => {",
       "const row = document.querySelector(",
       "'#shiny-tab-immune_repertoire .cerebro-viz-row');",
-      "const p = row.querySelector('.cerebro-param-col').getBoundingClientRect();",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
       "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
       "return p.bottom <= v.top + 1;",
       "})()"
@@ -261,7 +334,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   )
 
   phone <- app$get_js(geometry_js)
-  expect_lte(phone$paramBottom, phone$vizTop + 1)
+  expect_lte(phone$toolbarBottom, phone$vizTop + 1)
   expect_gte(phone$fillHeight, 240)
 
   ## The document must not scroll horizontally. `.content-wrapper` clips its own

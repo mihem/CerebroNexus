@@ -91,6 +91,7 @@
   const PROJECTION_MIN_HEIGHT = 240;
   const PROJECTION_BOTTOM_GAP = 18;
   let projectionWindowResizeBound = false;
+  let projectionSquareToggleBound = false;
 
   function projectionTargetHeight(
     viewportHeight,
@@ -103,6 +104,14 @@
       viewportHeight - wrapperTop - contentBelow - bottomGap
     );
     return Math.max(minimumHeight, available);
+  }
+
+  function projectionTargetSize(availableWidth, availableHeight, keepSquare) {
+    const width = Math.floor(availableWidth);
+    const height = Math.floor(availableHeight);
+    if (!keepSquare) return { width: width, height: height };
+    const side = Math.min(width, height);
+    return { width: side, height: side };
   }
 
   // withSpinner() adds one wrapper whose bounds are exactly the output bounds.
@@ -186,14 +195,22 @@
     // measured from the live DOM. Legend height is already represented by the
     // wrapper's top coordinate because the legend is its preceding sibling.
     const contentBelow = Math.max(0, boxRect.bottom - wrapperRect.bottom);
-    const height = projectionTargetHeight(
+    const availableHeight = projectionTargetHeight(
       window.innerHeight,
       wrapperRect.top,
       contentBelow,
       PROJECTION_BOTTOM_GAP,
       PROJECTION_MIN_HEIGHT
     );
-    const width = Math.floor(wrapperRect.width);
+    const squareToggle = document.getElementById(plotId + '_keep_square');
+    const keepSquare = Boolean(squareToggle && squareToggle.checked);
+    const targetSize = projectionTargetSize(
+      wrapperRect.width,
+      availableHeight,
+      keepSquare
+    );
+    const width = targetSize.width;
+    const height = targetSize.height;
     const fullLayout = elements.plot._fullLayout;
     const plotlySizeMatches =
       fullLayout &&
@@ -276,6 +293,9 @@
 
     elements.wrapper.style.height = height + 'px';
     elements.plot.style.height = height + 'px';
+    elements.plot.style.width = width + 'px';
+    elements.plot.style.marginLeft = keepSquare ? 'auto' : '';
+    elements.plot.style.marginRight = keepSquare ? 'auto' : '';
     // Plotly.react receives an explicit width/height from the Shiny round trip.
     // Merely changing CSS and calling Plots.resize does not replace those layout
     // values, leaving the internal SVG at its old size and letting axis labels
@@ -373,6 +393,17 @@
       projectionResizeState.forEach(function (_state, plotId) {
         scheduleProjectionResize(plotId);
       });
+    });
+  }
+
+  function bindProjectionSquareToggle() {
+    if (projectionSquareToggleBound) return;
+    projectionSquareToggleBound = true;
+    document.addEventListener('change', function (event) {
+      const id = event.target && event.target.id;
+      const suffix = '_keep_square';
+      if (!id || !id.endsWith(suffix)) return;
+      scheduleProjectionResize(id.slice(0, -suffix.length));
     });
   }
 
@@ -1547,10 +1578,12 @@
       registeredPlots.add(plotId);
       bindKeyHandler();
       bindProjectionWindowResize();
+      bindProjectionSquareToggle();
       scheduleProjectionResize(plotId);
     },
     _finiteExtent: finiteExtent,
     _projectionTargetHeight: projectionTargetHeight,
+    _projectionTargetSize: projectionTargetSize,
     _projectionSizingElement: projectionSizingElement,
     _revealProjectionHost: revealProjectionHost,
     _shouldRevealProjection: shouldRevealProjection,
