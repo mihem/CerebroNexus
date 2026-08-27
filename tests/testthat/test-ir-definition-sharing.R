@@ -51,6 +51,11 @@ ir_env$cerebro_group_colors <- function(n) {
 }
 ir_env$input <- list()
 ir_env$session <- list()
+sys.source(
+  file.path(dirname(dirname(data_r)), "clone_contract.R"),
+  envir = ir_env,
+  keep.source = FALSE
+)
 sys.source(data_r, envir = ir_env, keep.source = FALSE)
 
 ir_parse_segments <- ir_env$ir_parse_segments

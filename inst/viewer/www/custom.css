@@ -151,22 +151,79 @@ html, body, body .wrapper {
 }
 
 /* -------------------------------------------------------------------------
-   Header (topbar) — REMOVED: no top bar, no hamburger. The brand moves into
-   the sidebar and the content lifts up to fill the space.
+   Header (topbar) — REMOVED. Its native sidebar control remains as a floating
+   edge button; AdminLTE supplies the collapse state and resize event.
    ------------------------------------------------------------------------- */
 /* Collapse the whole top bar (navbar + sidebar-toggle) to zero height so it
    holds no space and cuts no seam between sidebar and content. */
 body.skin-blue .main-header {
   height: 0 !important;
   min-height: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   border: none !important;
   box-shadow: none !important;
 }
 body.skin-blue .main-header .navbar,
-body.skin-blue .main-header .logo,
-body.skin-blue .main-header .sidebar-toggle {
+body.skin-blue .main-header .logo {
   display: none !important;
+}
+html body.skin-blue .main-header .navbar {
+  display: block !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+html body.skin-blue .main-header .navbar .sidebar-toggle {
+  display: flex !important;
+  position: fixed;
+  top: 50%;
+  left: 230px;
+  z-index: 1030;
+  width: 20px;
+  height: 42px;
+  margin: -21px 0 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-surface-3);
+  color: var(--c-text-2);
+  border: 0;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 3px 0 7px -2px rgba(17, 17, 26, .22);
+  transition: left .3s ease-in-out, color var(--dur) var(--ease),
+    background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+html body.skin-blue .main-header .navbar .sidebar-toggle:hover {
+  background: var(--c-amber-100);
+  color: var(--c-amber-700);
+  box-shadow: 5px 0 11px -2px rgba(17, 17, 26, .30);
+}
+html body.skin-blue .main-header .sidebar-toggle::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform .24s ease;
+}
+html body.skin-blue.sidebar-collapse .main-header .sidebar-toggle {
+  left: 0;
+}
+html body.skin-blue.sidebar-collapse .main-header .sidebar-toggle::before {
+  transform: rotate(225deg);
+}
+@media (min-width: 768px) {
+  body.sidebar-mini.sidebar-collapse .content-wrapper,
+  body.sidebar-mini.sidebar-collapse .right-side,
+  body.sidebar-mini.sidebar-collapse .main-footer {
+    margin-left: 0 !important;
+  }
+  body.sidebar-mini.sidebar-collapse .main-sidebar,
+  body.sidebar-mini.sidebar-collapse .left-side {
+    width: 230px !important;
+    transform: translateX(-230px) !important;
+  }
 }
 /* AdminLTE's `fixed` layout offsets both the sidebar and the content by the
    50px header height — via `padding-top: 50px` (NOT margin). With the header
@@ -1212,7 +1269,7 @@ body .btn:active { transform: translateY(0.5px); }
     border: none !important;
     box-shadow: none !important;
   }
-  html body.skin-blue .main-header .sidebar-toggle {
+  html body.skin-blue .main-header .navbar .sidebar-toggle {
     display: flex !important;
     position: fixed;
     top: 8px;
@@ -1224,11 +1281,20 @@ body .btn:active { transform: translateY(0.5px); }
     padding: 0;
     align-items: center;
     justify-content: center;
-    background: var(--c-surface, #ffffff);
-    color: var(--c-text, #333333);
+    background: var(--c-surface-3);
+    color: var(--c-text-2);
     border: 1px solid var(--c-border, rgba(0, 0, 0, 0.12));
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    margin: 0;
+    transition: none;
+  }
+  html body.skin-blue .main-header .sidebar-toggle::before {
+    content: "";
+    transform: rotate(225deg);
+  }
+  html body.skin-blue.sidebar-open .main-header .sidebar-toggle::before {
+    transform: rotate(45deg);
   }
 }
 

@@ -288,23 +288,19 @@ ir_plot_height <- function(facet_mode = c("none", "grid", "wrap")) {
 ##----------------------------------------------------------------------------##
 
 ## ---- Chains that define each receptor class --------------------------- ##
-IR_TCR_CHAINS <- c("TRA", "TRB", "TRG", "TRD")
-IR_BCR_CHAINS <- c("IGH", "IGK", "IGL")
+IR_TCR_CHAINS <- CEREBRO_TCR_CHAINS
+IR_BCR_CHAINS <- CEREBRO_BCR_CHAINS
 
 ## ---- Which receptor classes are present in the data ------------------- ##
 ## Returns a named vector ("TCR" / "BCR") of the receptor types actually
 ## detected, so the Clonal UMAP selector only offers what exists. The names
 ## are the labels shown to the user; values feed ir_umap_chains().
 ir_receptor_types <- reactive({
-  chains <- tryCatch(detect_chains(ir_data()), error = function(e) character(0))
-  types <- character(0)
-  if (length(intersect(chains, IR_TCR_CHAINS)) > 0) {
-    types <- c(types, "TCR" = "TCR")
-  }
-  if (length(intersect(chains, IR_BCR_CHAINS)) > 0) {
-    types <- c(types, "BCR" = "BCR")
-  }
-  types
+  present <- tryCatch(
+    cerebro_receptors_present(ir_data()),
+    error = function(e) character(0)
+  )
+  stats::setNames(present, present)
 })
 
 ## ---- Chains belonging to the selected receptor type ------------------- ##
@@ -315,25 +311,12 @@ ir_umap_chains <- function(receptor) {
 ## ---- Clone-size bin breaks / labels (scRepertoire cloneSize defaults) -- ##
 ## A clone's size = number of cells carrying that clonotype (within the
 ## selected receptor). Cells are binned into the standard expansion levels.
-IR_CLONE_BINS <- c(0, 1, 5, 20, 100, Inf)
-IR_CLONE_LABELS <- c(
-  "Single (0 < X <= 1)",
-  "Small (1 < X <= 5)",
-  "Medium (5 < X <= 20)",
-  "Large (20 < X <= 100)",
-  "Hyperexpanded (100 < X)"
-)
+IR_CLONE_BINS <- CEREBRO_CLONE_BINS
+IR_CLONE_LABELS <- CEREBRO_CLONE_LABELS
 
 ## ---- Which CT* column a cloneCall maps to ----------------------------- ##
 ir_clonecall_col <- function(cloneCall) {
-  switch(
-    cloneCall %||% "gene",
-    "gene" = "CTgene",
-    "nt" = "CTnt",
-    "aa" = "CTaa",
-    "strict" = "CTstrict",
-    "CTgene"
-  )
+  cerebro_clonecall_col(cloneCall)
 }
 
 ## ---- Clonal UMAP data: coords + per-cell expansion level --------------- ##
@@ -424,6 +407,15 @@ ir_clonal_umap_data <- function(
   if (has_receptor) {
     # Clone size = number of cells sharing the clonotype; bin into expansion levels.
     rows <- rows[!is.na(rows$clone) & nzchar(rows$clone), , drop = FALSE]
+    # Do not let repertoire rows absent from the object inflate clone sizes.
+    all_cells <- tryCatch(
+      as.character(getMetaData()$cell_barcode),
+      error = function(e) NULL
+    )
+    if (!is.null(all_cells)) {
+      rows <- rows[rows$barcode %in% all_cells, , drop = FALSE]
+    }
+    has_receptor <- nrow(rows) > 0
   }
   if (!has_receptor || nrow(rows) == 0) {
     # No receptor cells. With show_all we can still draw the grey background;

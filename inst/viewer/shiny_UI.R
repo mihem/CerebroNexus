@@ -236,6 +236,13 @@ source(
   local = TRUE
 )
 source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/viewer/coordinated_views/UI.R"
+  ),
+  local = TRUE
+)
+source(
   paste0(Cerebro.options[["cerebro_root"]], "/viewer/hla_tcr_motifs/UI.R"),
   local = TRUE
 )
@@ -279,6 +286,11 @@ ui <- dashboardPage(
         selected = TRUE
       ),
       menuItem("Projection", tabName = "overview", icon = icon("home")),
+      menuItem(
+        "Linked views",
+        tabName = "coordinated_views",
+        icon = icon("project-diagram")
+      ),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
       ## Marker genes and Most expressed genes are inserted conditionally (see
       ## insertConditionalTab in shiny_server.R): a data set that carries neither
@@ -328,9 +340,12 @@ ui <- dashboardPage(
       cerebro_css("custom.css"),
       cerebro_css("trekker.css"),
       cerebro_css("hla_motifs.css"),
+      cerebro_css("coordviews.css"),
       cerebro_js("fill_height.js", defer = TRUE),
+      cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("trekker.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
+      cerebro_js("coordviews.js", defer = TRUE),
       ## Shared projection-scatter engine, loaded ONCE here instead of being
       ## inlined into all five projection tabs' extendShinyjs() (~69KB x5). Both
       ## files expose only window globals (window.cerebroProjectionLayout /
@@ -345,6 +360,7 @@ ui <- dashboardPage(
     tabItems(
       tab_load_data,
       tab_overview,
+      tab_coordinated_views,
       tab_groups,
       tab_marker_genes,
       tab_most_expressed_genes,

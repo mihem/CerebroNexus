@@ -17,13 +17,16 @@
 
   var D = null, N = 0;
   var view = "pair", src = "csv", mode = "celltype", gene = null, tool = "box";
-  var ps = 2.2, nr = 250, showEv = true, morphT = 0;
+  var ps = 2.2, pointOpacity = 0.85, nr = 250, showEv = true, morphT = 0;
   var sel = null, pick = null, hover = null;
+  var nicheSet = null;   // cells within the picked nucleus's niche (physical)
   var confThresh = -1; // >=0 when the confidence dissolve filter is active
   var hidden = new Set();
   var gfCT = null, gfCL = null; // group filters: allowed cell types / clusters (null = all)
   var U_SP = null, U_UM = null;
   var P = null;
+  var tissueImage = null;
+  var dataGeneration = 0;
 
   var fmt = function (n) {
     return n == null || isNaN(n) ? "—" : Number(n).toLocaleString("en-US");
@@ -39,8 +42,9 @@
   var PAL = ["#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A", "#19D3F3",
     "#FF6692", "#B6E880", "#FF97FF", "#FECB52", "#2f6fd6", "#f97316", "#16a34a",
     "#9a5cd0", "#e05780", "#38b2ac", "#d97706", "#7bb0e8"];
-  var CT_COL = { ExN: "#636EFA", InN: "#EF553B", Oligo: "#00CC96", Astro: "#AB63FA",
+  var LEGACY_CT_COL = { ExN: "#636EFA", InN: "#EF553B", Oligo: "#00CC96", Astro: "#AB63FA",
     Micro: "#f97316", OPC: "#19D3F3", DG: "#FF6692", Neuron: "#9a9aa0" };
+  var CT_COL = {};
   var VIR = [[68, 1, 84], [72, 40, 120], [62, 73, 137], [49, 104, 142],
     [38, 130, 142], [31, 158, 137], [53, 183, 121], [110, 206, 88],
     [181, 222, 43], [253, 231, 37]];
@@ -61,6 +65,11 @@
     // in the vignette rather than offered as an in-app switch.)
     SRC = { csv: { x: D.x, y: D.y, t: "Location CSV" } };
     CT = D.clusters.map(function (c) { return D.celltype[c]; });
+    CT_COL = {};
+    Array.from(new Set(CT)).forEach(function (cellType, index) {
+      CT_COL[cellType] = (D.celltype_colors && D.celltype_colors[cellType]) ||
+        LEGACY_CT_COL[cellType] || PAL[index % PAL.length];
+    });
     EV = new Map(D.evidence.map(function (e) { return [e.cell, e]; }));
   }
 
@@ -74,7 +83,7 @@
     var ox = (1 - dw * k) / 2, oy = (1 - dh * k) / 2;
     var nx = new Float32Array(N), ny = new Float32Array(N);
     for (i = 0; i < N; i++) { nx[i] = (xs[i] - x0) * k + ox; ny[i] = (ys[i] - y0) * k + oy; }
-    return { nx: nx, ny: ny };
+    return { nx: nx, ny: ny, x0: x0, y0: y0, k: k, ox: ox, oy: oy };
   }
   function rebuildSpatialUnit() { U_SP = unit(SRC[src].x, SRC[src].y); }
 
@@ -173,6 +182,14 @@
     var s = Array.prototype.slice.call(arr).sort(function (a, b) { return a - b; });
     confThresh = s[Math.floor(pct / 100 * (s.length - 1))];
   }
+  function cellTypeColor(value) {
+    return (D && D.builder_colors && D.builder_colors[value]) ||
+      CT_COL[value] || "#9a9aa0";
+  }
+  function clusterColor(value) {
+    return (D && D.builder_colors && D.builder_colors[String(value)]) ||
+      PAL[value % PAL.length];
+  }
   function baseColor(i) {
     if (isCont()) {
       var g = curField();
@@ -180,8 +197,10 @@
       var c = viridis(g.v[i] / 255);
       return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
     }
-    if (mode === "celltype") return CT_COL[CT[i]] || "#9a9aa0";
-    return PAL[D.clusters[i] % PAL.length];
+    if (mode === "celltype") {
+      return cellTypeColor(CT[i]);
+    }
+    return clusterColor(D.clusters[i]);
   }
   function visible(i) {
     // Group filters (always applied): the pickerInputs in the "Group filters"
@@ -207,11 +226,52 @@
       sel.forEach(function (i) { if (visible(i)) s2.add(i); });
       sel = s2.size ? s2 : null; renderSel();
     }
-    renderLegend(); drawAll();
+    rebuildNiche(); renderLegend(); drawAll();
+  }
+  // The picked nucleus + everything within `nr` µm of it in physical space. Also
+  // the highlight set: cells in it stay solid, everything else fades. Null unless
+  // a single nucleus is picked (a lasso selection supersedes it). The distance
+  // loop is CBGeom.nicheAround (shared with coordviews.js). This engine keys on
+  // D.x/D.y and passes inclusive=<, skipNaN=false.
+  function rebuildNiche() {
+    nicheSet = null;
+    if (pick == null || sel || !D || !D.x) return;
+    var px = D.x[pick], py = D.y[pick];
+    nicheSet = CBGeom.nicheAround(D.x, D.y, N, pick, px, py, nr * nr, false, false);
+  }
+  function drawTissueImage(p) {
+    if (
+      !tissueImage || !tissueImage.complete || p.kind !== "sp" ||
+      view === "morph" || !D.histology_image_bounds
+    ) return;
+    var b = D.histology_image_bounds, u = U_SP;
+    var values = [b.xmin, b.xmax, b.ymin, b.ymax].map(Number);
+    if (!values.every(Number.isFinite) || values[1] <= values[0] || values[3] <= values[2]) return;
+    var pad = 14, S = Math.min(p.W, p.H) - 2 * pad;
+    var ox = (p.W - S) / 2, oy = (p.H - S) / 2;
+    var screen = function (x, y) {
+      var nx = (x - u.x0) * u.k + u.ox;
+      var ny = (y - u.y0) * u.k + u.oy;
+      return [(ox + nx * S) * p.k + p.tx, (oy + S - ny * S) * p.k + p.ty];
+    };
+    var topLeft = screen(values[0], values[3]);
+    var bottomRight = screen(values[1], values[2]);
+    var alignment = D.histology_alignment || {};
+    p.ctx.globalAlpha = Number.isFinite(+alignment.image_opacity)
+      ? Math.max(0, Math.min(1, +alignment.image_opacity)) : 0.75;
+    p.ctx.drawImage(
+      tissueImage,
+      topLeft[0],
+      topLeft[1],
+      bottomRight[0] - topLeft[0],
+      bottomRight[1] - topLeft[1]
+    );
+    p.ctx.globalAlpha = 1;
   }
   function draw(p) {
     if (!p.sx || !p.W) return; // not projected yet (e.g. tab still hidden)
     var c = p.ctx; c.clearRect(0, 0, p.W, p.H);
+    drawTissueImage(p);
     var order = null, j, i, pass;
     var cf = confThresh >= 0 ? cfVals() : null; // confidence dissolve filter
     if (isCont() && curField()) {
@@ -219,13 +279,16 @@
       order = Array.from({ length: N }, function (_, k) { return k; })
         .sort(function (a, b) { return gv[a] - gv[b]; });
     }
+    // Highlight set = lasso selection, or (on pick) the niche. In it → solid;
+    // outside → faded.
+    var hi = sel || nicheSet;
     for (pass = 0; pass < 2; pass++) {
       for (j = 0; j < N; j++) {
         i = order ? order[j] : j;
         if (!visible(i)) continue;
-        var inSel = !sel || sel.has(i);
-        if (pass === 0 ? inSel : !inSel) continue;
-        var a = sel ? (inSel ? 0.95 : 0.06) : 0.85;
+        var inHi = !hi || hi.has(i);
+        if (pass === 0 ? inHi : !inHi) continue;
+        var a = hi ? (inHi ? Math.max(pointOpacity, 0.9) : 0.06) : pointOpacity;
         if (cf && cf[i] < confThresh) a *= 0.05; // dissolve low-confidence nuclei
         c.globalAlpha = a;
         c.fillStyle = baseColor(i);
@@ -250,8 +313,11 @@
           if (ys[q] < y0) y0 = ys[q]; if (ys[q] > y1) y1 = ys[q];
         }
         k = S / Math.max(x1 - x0, y1 - y0);
-        c.strokeStyle = "rgba(249,115,22,.55)"; c.lineWidth = 1.2; c.setLineDash([4, 3]);
-        c.beginPath(); c.arc(p.sx[pick], p.sy[pick], nr * k * p.k, 0, 6.2832); c.stroke();
+        var rpx = nr * k * p.k;
+        c.fillStyle = "rgba(37,99,235,0.10)";
+        c.beginPath(); c.arc(p.sx[pick], p.sy[pick], rpx, 0, 6.2832); c.fill();
+        c.strokeStyle = "#1d4ed8"; c.lineWidth = 2.5; c.setLineDash([7, 4]);
+        c.beginPath(); c.arc(p.sx[pick], p.sy[pick], rpx, 0, 6.2832); c.stroke();
         c.setLineDash([]);
       }
     }
@@ -280,14 +346,9 @@
   }
   function drawAll() { if (P) paneList().forEach(draw); }
 
-  function inPoly(x, y, poly) {
-    var c = false, i, j;
-    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
-      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c;
-    }
-    return c;
-  }
+  // inPoly lives in the shared CBGeom module (www/cv-geom.js). `nearest` stays
+  // here: its visibility predicate and point-size-tracking hit radius are this
+  // engine's, not shared.
   function nearest(p, mx, my) {
     // Hit radius tracks the Point-size slider (with a floor) so a big dot has a
     // correspondingly big clickable area rather than a fixed ~13px target.
@@ -313,7 +374,7 @@
   function clickInspect(p, e) {
     var r = p.cv.getBoundingClientRect();
     var k = nearest(p, e.clientX - r.left, e.clientY - r.top);
-    if (k >= 0) { pick = k; renderInspector(); }
+    if (k >= 0) { pick = k; rebuildNiche(); renderInspector(); drawAll(); }
   }
   function wire(p) {
     var pos = function (e) {
@@ -398,12 +459,13 @@
         if (p.moved && p.lasso.length > 2) {
           var s2 = new Set(), j;
           for (j = 0; j < N; j++) {
-            if (visible(j) && inPoly(p.sx[j], p.sy[j], p.lasso)) s2.add(j);
+            if (visible(j) && CBGeom.inPoly(p.sx[j], p.sy[j], p.lasso)) s2.add(j);
           }
           sel = s2.size ? s2 : null; pick = null; renderSel();
         } else { clickInspect(p, e); }
         p.lasso = null;
       }
+      rebuildNiche();   // a lasso/box selection clears any niche highlight
       drawAll();
     });
   }
@@ -442,9 +504,9 @@
     var mx = rows.length ? rows[0][1] : 1;
     var bars = rows.length ? rows.map(function (e) {
       var k = e[0], v = e[1];
-      return "<div class=\"tk-bar\"><span class=\"tk-nm\" style=\"color:" + (CT_COL[k] || "#666") +
+      return "<div class=\"tk-bar\"><span class=\"tk-nm\" style=\"color:" + cellTypeColor(k) +
         "\">" + esc(k) + "</span><span class=\"tk-tr\"><span class=\"tk-fl\" style=\"width:" +
-        (v / mx * 100) + "%;background:" + (CT_COL[k] || "#999") + "\"></span></span>" +
+        (v / mx * 100) + "%;background:" + cellTypeColor(k) + "\"></span></span>" +
         "<span class=\"tk-ct\">" + v + "</span></div>";
     }).join("") : "<div class=\"tk-hint\">No other nuclei within this radius — increase the niche radius.</div>";
 
@@ -469,7 +531,7 @@
       : "";
     el.innerHTML = "<div class=\"tk-insp\"><div>" +
       "<h4 class=\"tk-sub-h\">Identity</h4>" +
-      "<dl class=\"tk-kv\"><dt>Cell type</dt><dd style=\"color:" + (CT_COL[CT[i]] || "#666") + "\">" + esc(CT[i]) + "</dd>" +
+      "<dl class=\"tk-kv\"><dt>Cell type</dt><dd style=\"color:" + cellTypeColor(CT[i]) + "\">" + esc(CT[i]) + "</dd>" +
       "<dt>Cluster</dt><dd>" + esc(D.clusters[i]) + "</dd>" +
       "<dt>x</dt><dd>" + D.x[i].toFixed(0) + " µm</dd>" +
       "<dt>y</dt><dd>" + D.y[i].toFixed(0) + " µm</dd>" +
@@ -497,9 +559,9 @@
       var mx = Math.max.apply(null, f.by_type.map(function (b) { return b.median; })) || 1;
       var rows = f.by_type.slice().sort(function (a, b) { return b.median - a.median; })
         .map(function (b) {
-          return "<div class=\"tk-bar\"><span class=\"tk-nm\" style=\"color:" + (CT_COL[b.type] || "#666") +
+          return "<div class=\"tk-bar\"><span class=\"tk-nm\" style=\"color:" + cellTypeColor(b.type) +
             "\">" + esc(b.type) + "</span><span class=\"tk-tr\"><span class=\"tk-fl\" style=\"width:" +
-            (b.median / mx * 100) + "%;background:" + (CT_COL[b.type] || "#999") + "\"></span></span>" +
+            (b.median / mx * 100) + "%;background:" + cellTypeColor(b.type) + "\"></span></span>" +
             "<span class=\"tk-ct\">" + b.median.toFixed(2) + "</span></div>";
         }).join("");
       html += "<div class=\"tk-sub-h\" style=\"margin-top:10px\">Median by cell type — who forms domains, who disperses</div>" +
@@ -540,7 +602,7 @@
     var cnt = {};
     (mode === "celltype" ? CT : D.clusters).forEach(function (k) { cnt[k] = (cnt[k] || 0) + 1; });
     keys.forEach(function (k) {
-      var col = mode === "celltype" ? (CT_COL[k] || "#999") : PAL[k % PAL.length];
+      var col = mode === "celltype" ? cellTypeColor(k) : clusterColor(k);
       var d = document.createElement("div");
       d.className = "tk-lg" + (hidden.has(k) ? " off" : "");
       d.innerHTML = "<span class=\"tk-dot\" style=\"background:" + col + "\"></span>" + esc(k) +
@@ -605,7 +667,7 @@
     else if (act === "zoomout") zoomAll(1 / 1.3);
     else if (act === "reset") resetAll();
     else if (act === "zoomsel") zoomToSel();
-    else if (act === "clear") { sel = null; renderSel(); drawAll(); }
+    else if (act === "clear") { sel = null; rebuildNiche(); renderSel(); drawAll(); }
     else if (act === "download") downloadPNG();
   }
   function updateToolbarActive() {
@@ -685,15 +747,15 @@
   }
 
   /* ---- header / QC / evidence / moran (static per dataset) --------------- */
-  function renderStatic() {
-    var q = D.qc, m = D.meta;
-    $("tk-b-assay").textContent = q.assay || "Trekker";
-    $("tk-subline").innerHTML = "<code>" + esc(q.sample_id) + "</code> · " + fmt(m.n_cells) +
-      " nuclei (down-sampled from " + fmt(m.n_cells_full) + " confidently positioned) · " +
-      fmt(m.n_genes_obj) + " genes (whole transcriptome, not a panel) · coordinate unit " + esc(m.unit);
+  // Shared with coordviews.js: Linked views shows the same coordinate-source /
+  // QC / positioning / Moran's I detail for a Trekker data set, in a modal
+  // instead of a permanent page section. These builders return HTML strings so
+  // both callers can drop them into their own DOM ids.
+  var CerebroTrekker = window.CerebroTrekker = window.CerebroTrekker || {};
 
+  CerebroTrekker.buildStatsGrid = function (q) {
     var pass2p = q.pct_2plus < 20;
-    $("tk-stats").innerHTML = [
+    return [
       ["Total nuclei", fmt(q.total_nuclei), "single-nuclei library", ""],
       ["In Trekker library", q.pct_in_lib.toFixed(2) + "%", fmt(q.in_lib) + " nuclei · ref >95%", q.pct_in_lib > 95 ? "ok" : "warn"],
       ["Valid spatial barcodes", q.pct_valid_sb.toFixed(2) + "%", "ref >95%", q.pct_valid_sb > 95 ? "ok" : "warn"],
@@ -704,9 +766,11 @@
       return "<div class=\"tk-stat " + r[3] + "\"><div class=\"tk-k\">" + r[0] + "</div><div class=\"tk-v\">" +
         r[1] + "</div><div class=\"tk-m\">" + r[2] + "</div></div>";
     }).join("");
+  };
 
+  CerebroTrekker.buildPositionTable = function (q) {
     var tot = q.total_nuclei;
-    $("tk-postbl").innerHTML = [
+    return [
       ["0 (unpositioned)", q.n_0, "Excluded · coordinate is the <code>0,0</code> sentinel"],
       ["1", q.n_1, "<b>Imported</b> (incl. salvaged)"],
       ["2", q.n_2, "Excluded"], ["3", q.n_3, "Excluded"], ["≥4", q.n_4p, "Excluded"]
@@ -714,15 +778,19 @@
       return "<tr><td>" + r[0] + "</td><td class=\"num\">" + fmt(r[1]) + "</td><td class=\"num\">" +
         (r[1] / tot * 100).toFixed(2) + "%</td><td class=\"tk-muted\">" + r[2] + "</td></tr>";
     }).join("");
+  };
 
+  CerebroTrekker.buildSalvFlag = function (q) {
     var salv = q.salv_2 + q.salv_3;
-    $("tk-salvflag").innerHTML = "<b>Confidently positioned ≠ exactly one location.</b> The " +
+    return "<b>Confidently positioned ≠ exactly one location.</b> The " +
       fmt(q.n_1) + " imported nuclei = native single-location " + fmt(q.o_1) +
       " + vendor-salvaged from 2 (" + q.salv_2 + ") + from 3 (" + q.salv_3 + "), i.e. <b>" + salv +
       " (" + (salv / q.n_1 * 100).toFixed(2) + "%)</b> are upstream-salvaged multi-location nuclei. " +
       "The label must be <code>vendor_confidently_positioned</code>.";
+  };
 
-    $("tk-prov").innerHTML = [
+  CerebroTrekker.buildProvenanceDl = function (q) {
+    return [
       ["Platform / assay", esc(q.assay)], ["Sample ID", esc(q.sample_id)], ["Tile ID", esc(q.tile_id)],
       ["Pipeline version", "<span class=\"tk-muted\">missing (metric absent)</span>"],
       ["Coordinate source", "Location CSV (canonical)"],
@@ -731,16 +799,41 @@
       ["Histology image", "<span class=\"tk-muted\">none (not provided in bundle)</span>"],
       ["Moran's I source", "<span class=\"tk-badge tk-badge-soft\" style=\"font-size:10px\">Upstream</span>"]
     ].map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; }).join("");
+  };
 
-    $("tk-rangeflag").innerHTML = "<b>The vendor's own demo crosses the vendor's own reference line.</b> " +
+  CerebroTrekker.buildRangeFlag = function (q) {
+    return "<b>The vendor's own demo crosses the vendor's own reference line.</b> " +
       "The 2+ location rate " + q.pct_2plus + "% > the manual's suggested <20%. The app should only show " +
       "\"below vendor reference range\" and must not adjudicate sample usability for the user.";
+  };
 
-    $("tk-morantbl").innerHTML = D.moran.map(function (r) {
+  // `linkable` = true adds a 4th "Show in plot" column (Trekker page, where a
+  // click can switch the gene-colour mode). Linked views has no such mode to
+  // switch into, so its modal passes false and gets a plain 3-column table.
+  CerebroTrekker.buildMoranRows = function (moran, linkable) {
+    return moran.map(function (r) {
+      var link = linkable
+        ? "<td><a href=\"#\" class=\"tk-link\" data-g=\"" + esc(r.gene) + "\">Show in plot →</a></td>"
+        : "";
       return "<tr><td class=\"num tk-muted\">" + r.rank + "</td>" +
         "<td style=\"font-weight:600\">" + esc(r.gene) + "</td><td class=\"num\">" + r.I.toFixed(4) + "</td>" +
-        "<td><a href=\"#\" class=\"tk-link\" data-g=\"" + esc(r.gene) + "\">Show in plot →</a></td></tr>";
+        link + "</tr>";
     }).join("");
+  };
+
+  function renderStatic() {
+    var q = D.qc, m = D.meta;
+    $("tk-b-assay").textContent = q.assay || "Trekker";
+    $("tk-subline").innerHTML = "<code>" + esc(q.sample_id) + "</code> · " + fmt(m.n_cells) +
+      " nuclei (down-sampled from " + fmt(m.n_cells_full) + " confidently positioned) · " +
+      fmt(m.n_genes_obj) + " genes (whole transcriptome, not a panel) · coordinate unit " + esc(m.unit);
+
+    $("tk-stats").innerHTML = CerebroTrekker.buildStatsGrid(q);
+    $("tk-postbl").innerHTML = CerebroTrekker.buildPositionTable(q);
+    $("tk-salvflag").innerHTML = CerebroTrekker.buildSalvFlag(q);
+    $("tk-prov").innerHTML = CerebroTrekker.buildProvenanceDl(q);
+    $("tk-rangeflag").innerHTML = CerebroTrekker.buildRangeFlag(q);
+    $("tk-morantbl").innerHTML = CerebroTrekker.buildMoranRows(D.moran, true);
     $("tk-morantbl").querySelectorAll("a").forEach(function (a) {
       a.onclick = function (e) {
         e.preventDefault();
@@ -752,16 +845,42 @@
 
   /* ---- init on data arrival ---------------------------------------------- */
   function initFromData(data) {
+    var generation = ++dataGeneration;
     D = data;
     if (!D.genes) D.genes = {};
     N = D.x.length;
+    ps = 2.2;
+    var alignment = D.histology_alignment || {};
+    if (Number.isFinite(+alignment.point_size) && +alignment.point_size > 0) {
+      ps = +alignment.point_size;
+    }
+    if (Number.isFinite(+alignment.point_opacity)) {
+      pointOpacity = Math.max(0, Math.min(1, +alignment.point_opacity));
+    } else {
+      pointOpacity = 0.85;
+    }
+    tissueImage = null;
+    if (typeof D.histology_image === "string" && D.histology_image.indexOf("data:image/") === 0) {
+      var image = new Image();
+      image.onload = function () {
+        if (generation !== dataGeneration) return;
+        tissueImage = image;
+        drawAll();
+      };
+      image.onerror = function () {
+        if (generation !== dataGeneration) return;
+        tissueImage = null;
+        drawAll();
+      };
+      image.src = D.histology_image;
+    }
     rebuildSources();
     U_UM = unit(D.ux, D.uy);
     rebuildSpatialUnit();
     if (!P) P = { sp: Pane("tk-cv-sp", "tk-tip-sp", "sp"), um: Pane("tk-cv-um", "tk-tip-um", "um") };
     if (!P.sp._wired) { Object.values(P).forEach(function (p) { wire(p); p._wired = true; }); }
-    var sc = $("tk-selclear"); if (sc && !sc._wired) { sc.onclick = function () { sel = null; renderSel(); drawAll(); }; sc._wired = true; }
-    sel = null; pick = null; hover = null; hidden.clear();
+    var sc = $("tk-selclear"); if (sc && !sc._wired) { sc.onclick = function () { sel = null; rebuildNiche(); renderSel(); drawAll(); }; sc._wired = true; }
+    sel = null; pick = null; hover = null; hidden.clear(); nicheSet = null;
     gfCT = null; gfCL = null;
     cancelTransitionPlay();
     Object.values(P).forEach(function (p) { p.k = 1; p.tx = 0; p.ty = 0; });
@@ -869,7 +988,8 @@
         break;
       case "trekker_ps": ps = +value; drawAll(); break;
       case "trekker_nr":
-        nr = +value; if (pick != null) renderInspector(); else drawAll();
+        nr = +value; rebuildNiche(); drawAll();
+        if (pick != null) renderInspector();
         break;
       case "trekker_morph":
         morphT = +value; if (P) { project(P.sp); draw(P.sp); }

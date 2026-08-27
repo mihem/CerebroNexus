@@ -23,6 +23,128 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   app$wait_for_idle(timeout = 20000)
 
   app$wait_for_js(
+    'document.querySelector(\'a[href="#shiny-tab-coordinated_views"]\') !== null',
+    timeout = 30000
+  )
+  app$click(selector = 'a[href="#shiny-tab-coordinated_views"]')
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const p = document.querySelector('.cv-pane:not(.cv-hidden)');",
+      "const c = p && p.querySelector('canvas:not(.cv-mini)');",
+      "return c && c.getBoundingClientRect().width > 100;",
+      "})()"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "Array.from(document.querySelectorAll('.cv-ptitle'))",
+      ".some(el => el.textContent.includes('B_cell_maturation'))"
+    ),
+    timeout = 30000
+  )
+
+  linked_geometry_js <- paste0(
+    "(() => {",
+    "const canvas = document.querySelector(",
+    "'.cv-pane:not(.cv-hidden) canvas:not(.cv-mini)');",
+    "const rect = canvas.getBoundingClientRect();",
+    "const wrapper = document.querySelector('.content-wrapper');",
+    "const toggle = document.querySelector('.sidebar-toggle').getBoundingClientRect();",
+    "return {collapsed: document.body.classList.contains('sidebar-collapse'),",
+    "canvasWidth: rect.width, canvasHeight: rect.height,",
+    "canvasLeft: rect.left, toggleRight: toggle.right, toggleWidth: toggle.width,",
+    "contentWidth: wrapper.getBoundingClientRect().width};",
+    "})()"
+  )
+  linked_open <- app$get_js(linked_geometry_js)
+  expect_false(linked_open$collapsed)
+  expect_gt(abs(linked_open$canvasWidth - linked_open$canvasHeight), 20)
+  expect_equal(linked_open$toggleWidth, 20, tolerance = 1)
+  expect_lte(linked_open$toggleRight, linked_open$canvasLeft)
+
+  toggle_style_js <- paste0(
+    "(() => {",
+    "const style = getComputedStyle(document.querySelector('.sidebar-toggle'));",
+    "return {background: style.backgroundColor, color: style.color};",
+    "})()"
+  )
+  toggle_default <- app$get_js(toggle_style_js)
+  expect_identical(toggle_default$background, "rgb(236, 235, 235)")
+  expect_identical(toggle_default$color, "rgb(107, 107, 112)")
+
+  toggle_center <- app$get_js(paste0(
+    "(() => {",
+    "const r = document.querySelector('.sidebar-toggle').getBoundingClientRect();",
+    "return {x: r.left + r.width / 2, y: r.top + r.height / 2};",
+    "})()"
+  ))
+  app$get_chromote_session()$Input$dispatchMouseEvent(
+    type = "mouseMoved",
+    x = toggle_center$x,
+    y = toggle_center$y
+  )
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const style = getComputedStyle(document.querySelector('.sidebar-toggle'));",
+      "return style.backgroundColor === 'rgb(255, 228, 209)' && ",
+      "style.color === 'rgb(200, 90, 14)';",
+      "})()"
+    ),
+    timeout = 5000
+  )
+  toggle_hover <- app$get_js(toggle_style_js)
+  expect_identical(toggle_hover$color, "rgb(200, 90, 14)")
+
+  app$click(selector = '.sidebar-toggle')
+  app$wait_for_js(
+    paste0(
+      "document.body.classList.contains('sidebar-collapse') && ",
+      "document.querySelector('.content-wrapper').getBoundingClientRect().width > ",
+      linked_open$contentWidth + 150
+    ),
+    timeout = 10000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'.cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
+      ".getBoundingClientRect().width > ",
+      linked_open$canvasWidth + 20
+    ),
+    timeout = 10000
+  )
+  linked_collapsed <- app$get_js(linked_geometry_js)
+  expect_true(linked_collapsed$collapsed)
+  expect_gt(linked_collapsed$canvasWidth, linked_open$canvasWidth + 20)
+
+  app$run_js(paste0(
+    "const square = document.getElementById('cv-square-plots');",
+    "square.checked = true;",
+    "square.dispatchEvent(new Event('input', {bubbles:true}));"
+  ))
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const r = document.querySelector(",
+      "'.cv-pane:not(.cv-hidden) canvas:not(.cv-mini)').getBoundingClientRect();",
+      "return Math.abs(r.width - r.height) < 2;",
+      "})()"
+    ),
+    timeout = 10000
+  )
+
+  ## Restore the default shell state before checking the existing responsive
+  ## visualization pages below.
+  app$click(selector = '.sidebar-toggle')
+  app$wait_for_js(
+    "!document.body.classList.contains('sidebar-collapse')",
+    timeout = 10000
+  )
+
+  app$wait_for_js(
     'document.querySelector(\'a[href="#shiny-tab-immune_repertoire"]\') !== null',
     timeout = 30000
   )
