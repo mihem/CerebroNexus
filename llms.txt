@@ -7,10 +7,11 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 ![Lifecycle:
 stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 
-CerebroNexus is a [Shiny](https://shiny.posit.co/) platform for
-exploring and sharing single-cell and spatial transcriptomics data, with
-gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses.
-See the [full documentation](https://mihem.github.io/CerebroNexus/).
+**CerebroNexus** (**Ce**ll**Re**port**Bro**wser **Nexus**) is a
+[Shiny](https://shiny.posit.co/) platform for exploring and sharing
+single-cell and spatial transcriptomics data, with gene-expression,
+immune-repertoire, trajectory, and HLA-TCR analyses. See the [full
+documentation](https://mihem.github.io/CerebroNexus/).
 
 [Try the live demo](https://osmzhlab.uni-muenster.de/shiny/demo/).
 
