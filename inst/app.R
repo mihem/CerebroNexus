@@ -179,4 +179,4 @@ source("viewer/shiny_server.R", local = TRUE)
 ##----------------------------------------------------------------------------##
 ## launch app
 ##----------------------------------------------------------------------------##
-shiny::shinyApp(ui = ui, server = server)
+viewer_admin_http_app(shiny::shinyApp(ui = ui, server = server))

@@ -98,7 +98,7 @@ cv_share_open <- tryCatch(
 )
 coordviews_share_store <- cv_share_open$store
 coordviews_share_error <- cv_share_open$error
-cv_share_ttl_seconds <- 7L * 24L * 60L * 60L
+cv_share_ttl_seconds <- viewer_admin_share_ttl(Cerebro.options)
 cv_share_ttl_days <- as.integer(cv_share_ttl_seconds / (24L * 60L * 60L))
 cv_share_creator <- function(session) {
   if (is.null(session) || is.null(session$userData)) {
@@ -498,7 +498,7 @@ observeEvent(
             coordviews_share_store,
             prepared$json,
             dataset$fingerprint,
-            creator = cv_share_creator(session),
+            creator = viewer_auth_context(session)$user %||% "anonymous",
             dataset_label = cv_selected_dataset_name() %||% "",
             ttl_seconds = cv_share_ttl_seconds
           )

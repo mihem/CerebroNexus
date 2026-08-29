@@ -2,6 +2,10 @@
   stop(message, call. = FALSE)
 }
 
+.viewer_auth_is_admin <- function(value) {
+  isTRUE(value) || identical(value, "TRUE")
+}
+
 .viewer_auth_validate_config <- function(config) {
   expected <- c(
     "credentials_path",
@@ -135,6 +139,29 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
       "Authentication database or passphrase is invalid."
     )
   }
+  admin_options <- get0(
+    "Cerebro.options",
+    envir = .GlobalEnv,
+    inherits = FALSE,
+    ifnotfound = list()
+  )
+  admin_config <- viewer_admin_config(admin_options)
+  if (!is.null(admin_config)) {
+    configured_checker <- checker
+    admin_checker <- shinymanager::check_credentials(data.frame(
+      user = admin_config$account,
+      password = admin_config$password,
+      admin = TRUE,
+      stringsAsFactors = FALSE
+    ))
+    checker <- function(user, password) {
+      if (viewer_admin_login(user, password, admin_config)) {
+        admin_checker(user, password)
+      } else {
+        configured_checker(user, password)
+      }
+    }
+  }
   brand <- .viewer_auth_brand(root)
 
   secured_server <- function(input, output, session) {
@@ -173,6 +200,17 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
         started(TRUE)
         subject(user)
         last_activity(now_ms())
+        assign(
+          "viewer_auth",
+          list(
+            authenticated = TRUE,
+            user = user,
+            is_admin = !is.null(admin_config) &&
+              identical(user, admin_config$account) &&
+              .viewer_auth_is_admin(auth$admin)
+          ),
+          envir = session$userData
+        )
         server(input, output, session)
       } else if (
         started() &&

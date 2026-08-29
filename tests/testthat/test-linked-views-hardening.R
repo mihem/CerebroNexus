@@ -231,6 +231,7 @@ test_that("Shared Link SQLite files are private on POSIX", {
 
 test_that("Share URLs keep dataset identity and hide bearer tokens in fragments", {
   client <- viewer_hardening_text("www/coordviews-config.js")
+  admin <- viewer_hardening_text("www/admin.js")
   server <- viewer_hardening_text("coordinated_views/server.R")
 
   expect_match(
@@ -246,6 +247,7 @@ test_that("Share URLs keep dataset identity and hide bearer tokens in fragments"
   ))
   expect_match(client, "window.location.pathname", fixed = TRUE)
   expect_false(grepl("!linked || !linked.ready()", client, fixed = TRUE))
+  expect_match(admin, "url.hash = 'linked_view='", fixed = TRUE)
   expect_match(
     server,
     "dataset_label = cv_selected_dataset_name()",

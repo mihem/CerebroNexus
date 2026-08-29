@@ -368,6 +368,10 @@ source(
   paste0(Cerebro.options[["cerebro_root"]], "/viewer/about/UI.R"),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/viewer/admin/UI.R"),
+  local = TRUE
+)
 
 ## Enhanced module UIs.
 source(
@@ -501,7 +505,8 @@ ui <- dashboardPage(
         tabName = "color_management",
         icon = icon("palette")
       ),
-      menuItem("About", tabName = "about", icon = icon("at"))
+      menuItem("About", tabName = "about", icon = icon("at")),
+      div(id = "sidebar_item_admin_placeholder")
     )
   ),
   dashboardBody(
@@ -527,12 +532,14 @@ ui <- dashboardPage(
       cerebro_css("trekker.css"),
       cerebro_css("hla_motifs.css"),
       cerebro_css("coordviews.css"),
+      cerebro_css("admin.css"),
       cerebro_js("fill_height.js", defer = TRUE),
       cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("cell_views_state.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
       cerebro_js("viewer-clipboard.js", defer = TRUE),
       cerebro_js("coordviews-config.js", defer = TRUE),
+      cerebro_js("admin.js", defer = TRUE),
       cerebro_js("viewer-shell.js", defer = TRUE),
       cerebro_js("multiselect.js", defer = TRUE),
       cerebro_js("cell_views.js"),
@@ -557,7 +564,8 @@ ui <- dashboardPage(
       tab_gene_expression,
       tab_gene_id_conversion,
       tab_color_management,
-      tab_about
+      tab_about,
+      tab_admin
     ),
     tags$script(inactivity)
   )

@@ -17,6 +17,11 @@ source(
   ),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/viewer/admin/core.R"),
+  local = TRUE
+)
+
 server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
@@ -685,6 +690,10 @@ server <- function(input, output, session) {
       Cerebro.options[["cerebro_root"]],
       "/viewer/coordinated_views/server.R"
     ),
+    local = TRUE
+  )
+  source(
+    paste0(Cerebro.options[["cerebro_root"]], "/viewer/admin/server.R"),
     local = TRUE
   )
   source(
