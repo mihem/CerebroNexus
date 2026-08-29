@@ -36,11 +36,13 @@ test_that("HLA node selection maps cleanly between motif keys and cells", {
   )
 })
 
-test_that("HLA exposes shared cohort controls and network state hooks", {
+test_that("HLA exposes the shared cohort controls and a network saved-view adapter", {
   ui <- viewer_hla_text("hla_tcr_motifs/UI.R")
   visual <- viewer_hla_text("hla_tcr_motifs/visualizations.R")
   server <- viewer_hla_text("hla_tcr_motifs/network_table.R")
   client <- viewer_hla_text("www/hla_motifs.js")
+  adapter <- viewer_hla_text("www/specialist-view-state.js")
+  config <- viewer_hla_text("coordinated_views/config.R")
 
   expect_match(ui, 'cerebroSelectionStatus(', fixed = TRUE)
   expect_match(ui, '"hla_motif_network"', fixed = TRUE)
@@ -55,4 +57,6 @@ test_that("HLA exposes shared cohort controls and network state hooks", {
   expect_match(client, "hla_motif_selected_keys", fixed = TRUE)
   expect_match(client, "captureState", fixed = TRUE)
   expect_match(client, "applyState", fixed = TRUE)
+  expect_match(adapter, "hla_motif_network", fixed = TRUE)
+  expect_match(config, "hla_motif_network", fixed = TRUE)
 })

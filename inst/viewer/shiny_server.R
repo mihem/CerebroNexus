@@ -17,7 +17,6 @@ source(
   ),
   local = TRUE
 )
-
 server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
