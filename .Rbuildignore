@@ -23,4 +23,5 @@ TODO.md
 ^tmp$
 ^tmp/
 Rplots\.pdf$
+^inst/private-data/linked-view-shares\.sqlite$
 ^tests/bench$
