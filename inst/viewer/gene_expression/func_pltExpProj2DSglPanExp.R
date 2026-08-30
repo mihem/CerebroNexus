@@ -35,31 +35,6 @@ pltExpProj2DSglPanExp <- function(
     ) +
     lims(x = x_range, y = y_range) +
     cerebro_export_theme()
-  ## check if selected color scale
-  ## ... selected color scale is "Viridis"
-  if (tolower(color_scale) == 'viridis') {
-    ## add color scale to plot
-    plot <- plot +
-      ggplot2::scale_fill_viridis_c(
-        option = "viridis",
-        limits = color_range,
-        oob = scales::squish,
-        direction = -1,
-        name = "Log-normalised\nexpression",
-        guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")
-      )
-    ## ... selected color scale is anything else than "Viridis"
-  } else {
-    ## add color scale to plot
-    plot <- plot +
-      scale_fill_distiller(
-        palette = color_scale,
-        limits = color_range,
-        oob = scales::squish,
-        direction = 1,
-        name = "Log-normalised\nexpression",
-        guide = guide_colorbar(frame.colour = "black", ticks.colour = "black")
-      )
-  }
+  plot <- plot + expressionFillScale(color_scale, color_range)
   return(plot)
 }

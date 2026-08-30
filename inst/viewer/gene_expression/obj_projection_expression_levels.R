@@ -16,8 +16,6 @@ expression_projection_expression_levels <- reactive({
     expression_selected_genes()
   )
 
-  # message('--> trigger "expression_projection_expression_levels"')
-
   withProgress(message = 'Calculating expression levels...', value = 0.2, {
     cells_to_show <- expression_projection_cells_to_show()
     ## expression_projection_cells_to_show() returns numeric row ids (see
@@ -69,7 +67,7 @@ expression_projection_expression_levels <- reactive({
         )
         expression_matrix <- Matrix::t(expression_matrix)
         expression_levels <- list()
-        for (i in 1:ncol(expression_matrix)) {
+        for (i in seq_len(ncol(expression_matrix))) {
           expression_levels[[colnames(expression_matrix)[
             i
           ]]] <- as.vector(expression_matrix[, i])
@@ -92,7 +90,6 @@ expression_projection_expression_levels <- reactive({
         )
       }
     }
-    # message(str(expression_levels))
     return(expression_levels)
   })
 })

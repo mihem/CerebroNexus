@@ -26,14 +26,13 @@
   /* --- Brand: calm slate-blue for structure/links --------------------- */
   --c-blue-50:  #eef4fb;
   --c-blue-100: #d7e6f7;
-  --c-blue-300: #7bb0e8;
   --c-blue:     #2f6fd6;   /* primary structural blue */
-  --c-blue-600: #2560bd;
   --c-blue-700: #1d4ea0;
 
   /* --- Accent: warm amber for data, emphasis, active state ------------ */
   --c-amber-50:  #fff4ec;
   --c-amber-100: #ffe4d1;
+  --c-amber-200: #fbcfa8;
   --c-amber-300: #ffb27a;
   --c-amber:     #f97316;  /* signature warm-orange accent */
   --c-amber-600: #ea6a0f;
@@ -43,20 +42,8 @@
   --c-success: #16a34a;
   --c-warning: #d97706;
   --c-error:   #dc2626;
-
-  /* --- Charts: axis/grid/hover tokens for plotly + ggplot -------------- */
-  /* Plotly/ggplot cannot read CSS variables, so these mirror the hex values
-     hardcoded in www/projection_layouts.js (CEREBRO_THEME) and the R helper
-     cerebro_plotly_theme() — this block is the human-readable source of
-     truth; keep the three in sync. Warm neutrals reuse --c-* above. */
-  --chart-grid:    #ececec;  /* = --c-border    (hairline gridlines)     */
-  --chart-axis:    #e0e0e0;  /* = --c-border-2  (axis / spine line)      */
-  --chart-tick:    #6b6b70;  /* = --c-text-2    (tick labels)            */
-  --chart-title:   #1c1c1e;  /* = --c-text      (axis titles)            */
-  --chart-signal:  #2f6fd6;  /* = --c-blue      (primary signal series)  */
-  --chart-accent:  #f97316;  /* = --c-amber     (accent / emphasis)      */
-  --chart-up:      #4c9a6b;  /* muted green  — increase / up-regulated   */
-  --chart-down:    #c05b5b;  /* muted brick  — decrease / down-regulated */
+  --c-error-100: #fee2e2;
+  --c-error-700: #b91c1c;
 
   /* --- Elevation: soft, layered, low-contrast shadows ----------------- */
   --shadow-1: 0 1px 2px rgba(17,17,26,0.04), 0 1px 3px rgba(17,17,26,0.05);
@@ -74,6 +61,9 @@
   /* --- Motion --------------------------------------------------------- */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur:  0.16s;
+  --c-toolbar-control-height: 36px;
+  --c-control-width: 240px;
+  --c-select-min-width: 12rem;
 
   /* --- Fonts ---------------------------------------------------------- */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
@@ -255,6 +245,8 @@ body.skin-blue .sidebar .cerebro-brand .cerebro-logo {
   width: 188px;
   height: auto;
 }
+.cerebro-nav-close,
+#cerebro-nav-scrim { display: none; }
 body.skin-blue .sidebar-menu > li { position: relative; }
 body.skin-blue .sidebar-menu > li > a {
   color: var(--c-text) !important;
@@ -419,6 +411,391 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   width: auto !important;        /* override Bootstrap .col-sm-9 width */
   min-width: 0;
   padding: 0 !important;         /* kill Bootstrap col gutter */
+}
+
+/* Projection, Trajectory, Immune repertoire, and HLA & TCR Motifs follow
+   Linked views: only primary controls stay in a compact top bar; secondary
+   controls live in a fixed drawer that never changes the plot geometry. */
+.cerebro-viz-row.cerebro-viz-top-layout {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.cerebro-viz-top-layout > .cerebro-viz-toolbar-col,
+.cerebro-viz-top-layout > .cerebro-viz-col {
+  flex: 0 0 auto;
+  width: 100% !important;
+  min-width: 0;
+  padding: 0 !important;
+}
+.cerebro-viz-top-layout > .cerebro-viz-col > .col-sm-12 > .box {
+  margin-bottom: 12px;
+}
+.cerebro-viz-page-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.cerebro-viz-page-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.cerebro-viz-page-meta {
+  padding: 2px 0 12px;
+  color: var(--c-text-2);
+  font-size: 12.5px;
+}
+.cerebro-viz-toolbar,
+.coordviews-page .cv-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 8px 14px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.cerebro-viz-primary {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+.cerebro-viz-toolbar .shiny-html-output {
+  display: contents;
+}
+.cerebro-viz-toolbar .form-group,
+.coordviews-page .cv-topbar > .cv-ctl {
+  flex: 0 1 var(--c-control-width);
+  width: var(--c-control-width);
+  min-width: min(var(--c-select-min-width), 100%);
+  max-width: 100%;
+  margin-bottom: 0;
+}
+.cerebro-viz-toolbar .form-group.cerebro-multiselect-host,
+.coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host {
+  flex: 0 1 var(--c-control-width);
+  width: var(--c-control-width);
+}
+.cerebro-viz-toolbar .form-group.cerebro-multiselect-host.cerebro-multiselect-expanded,
+.coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host.cerebro-multiselect-expanded {
+  flex-basis: var(--cerebro-multiselect-width, var(--c-control-width));
+  width: var(--cerebro-multiselect-width, var(--c-control-width));
+}
+.cerebro-viz-toolbar .cerebro-multiselect,
+.coordviews-page .cv-topbar .cerebro-multiselect {
+  width: 100% !important;
+}
+.cerebro-viz-toolbar > .cerebro-info-btn {
+  flex: 0 0 auto;
+  align-self: center;
+}
+.cerebro-viz-toolbar .shiny-panel-conditional {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cerebro-viz-toolbar .spatial-rgb-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.cerebro-viz-toolbar .spatial-rgb-controls .form-group {
+  flex: 1 1 180px;
+  min-width: 180px;
+  max-width: 240px;
+}
+.hla-node-details {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+.cerebro-viz-toolbar .control-label,
+.coordviews-page .cv-ctl > label {
+  margin-bottom: 5px;
+  color: var(--c-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-viz-toolbar .selectize-input,
+.coordviews-page .cv-topbar .selectize-input,
+.cerebro-settings-drawer .selectize-input {
+  box-sizing: border-box !important;
+  border: 1px solid var(--c-border-2) !important;
+  border-radius: var(--r-sm) !important;
+  background: var(--c-surface) !important;
+  color: var(--c-text) !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+  box-shadow: none !important;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
+.coordviews-page .cv-topbar .selectize-input,
+.cerebro-viz-toolbar .selectize-input {
+  height: var(--c-toolbar-control-height) !important;
+  min-height: var(--c-toolbar-control-height) !important;
+  padding: 6px 12px !important;
+}
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .selectize-input {
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 9px 12px !important;
+}
+.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-viz-toolbar .selectize-input.focus,
+.coordviews-page .cv-topbar .selectize-input.focus,
+.cerebro-settings-drawer .selectize-input.focus {
+  border-color: var(--c-amber) !important;
+  box-shadow: 0 0 0 3px var(--c-amber-50) !important;
+}
+/* pickerInput() renders a .form-control wrapper around its real button. The
+   shared form-control rule above must not paint that wrapper too, or the button
+   appears inset inside a second border. */
+.cerebro-viz-toolbar .bootstrap-select.form-control,
+.cerebro-settings-drawer .bootstrap-select.form-control {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+.cerebro-viz-toolbar .bootstrap-select.form-control {
+  height: var(--c-toolbar-control-height) !important;
+  min-height: var(--c-toolbar-control-height) !important;
+}
+.cerebro-settings-drawer .bootstrap-select.form-control {
+  height: auto !important;
+  min-height: 42px !important;
+}
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle,
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 14px;
+  line-height: 22px;
+  box-shadow: none;
+}
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle {
+  height: var(--c-toolbar-control-height);
+  min-height: var(--c-toolbar-control-height);
+  padding: 6px 36px 6px 12px;
+}
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
+  height: 42px;
+  min-height: 42px;
+  padding: 9px 36px 9px 12px;
+}
+.cerebro-viz-primary .ir-flow-controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 12px;
+  min-width: 0;
+}
+.cerebro-viz-primary .ir-flow-control-item {
+  flex: 1 1 180px !important;
+  min-width: 180px !important;
+  max-width: 240px;
+}
+.cerebro-viz-toolbar .bootstrap-select.open > .dropdown-toggle,
+.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle:focus,
+.cerebro-settings-drawer .bootstrap-select.open > .dropdown-toggle,
+.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle:focus {
+  border-color: var(--c-amber);
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px var(--c-amber-50);
+}
+.cerebro-settings-drawer .form-group {
+  margin-bottom: 16px;
+}
+.cerebro-settings-drawer .checkbox {
+  margin: 0 0 10px;
+}
+.cerebro-settings-drawer .checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  padding-left: 0;
+  color: var(--c-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+.cerebro-settings-drawer .checkbox input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: static;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid #878787;
+  border-radius: 3px;
+  background: var(--c-surface);
+  cursor: pointer;
+}
+.cerebro-settings-drawer .checkbox input[type=checkbox]:checked {
+  border-color: var(--c-amber);
+  background-color: var(--c-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.4 6.3 11.5 13 4.7' fill='none' stroke='%23ff7013' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+}
+.cerebro-more-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  height: var(--c-toolbar-control-height);
+  margin-left: auto;
+  padding: 0 14px;
+  border: 1px solid var(--c-amber-300);
+  border-radius: var(--r-sm);
+  background: var(--c-amber-50);
+  color: var(--c-amber-700);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .12s ease;
+}
+.cerebro-more-btn:hover,
+.cerebro-more-btn[aria-expanded="true"] {
+  border-color: var(--c-amber);
+  background: var(--c-amber-100);
+}
+.cerebro-more-btn:active { transform: scale(.955); }
+
+.cerebro-viz-toolbar .cerebro-toolbar-export {
+  height: var(--c-toolbar-control-height);
+  padding: 0 12px;
+  border-color: var(--c-border-2) !important;
+  border-radius: var(--r-sm);
+  background: var(--c-surface) !important;
+  color: var(--c-text-2) !important;
+  font-size: 13px;
+  font-weight: 650;
+}
+.cerebro-viz-toolbar .cerebro-toolbar-export:hover {
+  border-color: var(--c-amber-300) !important;
+  background: var(--c-amber-50) !important;
+  color: var(--c-amber-700) !important;
+}
+
+.cerebro-more-caret {
+  width: 0;
+  height: 0;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  border-left: 5.5px solid currentColor;
+  transform-origin: 2.5px 50%;
+  transition: transform .2s ease;
+}
+.cerebro-more-btn[aria-expanded="true"] .cerebro-more-caret {
+  transform: rotate(90deg);
+}
+.cerebro-settings-drawer {
+  display: none;
+  position: fixed;
+  z-index: 1600;
+  inset: 0 0 0 auto;
+  width: min(420px, calc(100vw - 24px));
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: 12px 0 0 12px;
+  background: var(--c-surface);
+  box-shadow: -12px 0 34px rgba(0, 0, 0, .16);
+  opacity: 0;
+  transform: translateX(100%);
+  transition: transform .22s var(--ease), opacity .16s ease;
+}
+.cerebro-settings-drawer.is-mounted {
+  display: flex;
+  flex-direction: column;
+}
+.cerebro-settings-drawer.is-open {
+  opacity: 1;
+  transform: none;
+}
+.cerebro-settings-titlebar {
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 14px;
+  font-weight: 700;
+}
+.cerebro-settings-close {
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 24px/24px inherit;
+  cursor: pointer;
+}
+.cerebro-settings-close:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.cerebro-settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cerebro-settings-section + .cerebro-settings-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--c-border);
+}
+.cerebro-settings-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--c-text-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.cerebro-settings-heading .cerebro-info-btn {
+  margin-left: auto;
+}
+.cerebro-settings-drawer .form-group:last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .cerebro-settings-drawer {
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 /* Narrow viewports: stack the param panel above the plot rather than crushing
    both. Below this width a side-by-side split isn't comfortable anyway. */
@@ -873,7 +1250,7 @@ body .btn-group-justified > .btn.radiobtn.btn-primary.active {
    chosen for contrast. Exclude it from the generic white-fill rule via :not()
    so the browser keeps its inline colours (a !important override here would
    still beat the inline style, so exclusion is the only clean fix). */
-body .form-control:not(.colourpicker-input):not(.shiny-colour-input),
+body .form-control:not(.colourpicker-input):not(.shiny-colour-input):not(.bootstrap-select):not(.selectpicker):not(.selectize-control),
 body .selectize-input,
 body .selectize-dropdown {
   border: 1px solid var(--c-border-2) !important;
@@ -898,17 +1275,31 @@ body .form-control.shiny-colour-input {
   box-shadow: none !important;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-body .form-control:hover,
+body .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):hover,
 body .selectize-input:hover {
   border-color: var(--c-text-3) !important;
 }
-body .form-control:focus,
+body .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):focus,
 body .selectize-input.focus {
   border-color: var(--c-amber) !important;
   box-shadow: 0 0 0 3px var(--c-amber-50) !important;
   outline: none;
 }
 body .selectize-input { padding: 7px 12px !important; min-height: 34px; }
+body select.form-control,
+body .selectize-control,
+body .bootstrap-select {
+  min-inline-size: min(var(--c-select-min-width), 100%);
+  max-inline-size: 100%;
+}
+.cerebro-viz-toolbar .selectize-control.multi .selectize-input,
+.coordviews-page .cv-topbar .selectize-control.multi .selectize-input {
+  height: auto !important;
+  min-height: var(--c-toolbar-control-height) !important;
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  white-space: normal !important;
+}
 /* The dropdown is an overlay: give BOTH the outer panel and its inner content
    a solid white fill and a high z-index, or the options render over a
    see-through panel (page content shows through) and clicks miss. */
@@ -922,6 +1313,8 @@ body .selectize-dropdown {
 }
 body .selectize-dropdown .selectize-dropdown-content {
   background: var(--c-white) !important;
+  max-height: var(--cerebro-select-menu-max-height, none);
+  overflow-y: auto;
 }
 body .selectize-dropdown .option {
   background: var(--c-white) !important;
@@ -947,8 +1340,41 @@ body .selectize-control.multi .selectize-input > .item {
   color: var(--c-amber-700) !important;
   border: 1px solid var(--c-amber-100) !important;
   border-radius: var(--r-xs) !important;
-  padding: 1px 8px !important;
+  margin: 0 3px 0 0 !important;
+  padding: 0 8px !important;
   font-size: 13px;
+  line-height: 20px;
+}
+body .selectize-control.plugin-remove_button .selectize-input > .item {
+  padding-right: 0 !important;
+}
+body .selectize-control.plugin-remove_button .item .remove {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  margin-left: 7px;
+  padding: 0 6px;
+  border-left: 1px solid var(--c-amber-100);
+  color: inherit;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+body .selectize-control.plugin-remove_button .item .remove:hover {
+  background: var(--c-amber-100);
+}
+
+@media (max-width: 767px) {
+  .cerebro-viz-toolbar .form-group,
+  .cerebro-viz-toolbar .form-group.cerebro-multiselect-host,
+  .cerebro-viz-toolbar .form-group.cerebro-multiselect-host.cerebro-multiselect-expanded,
+  .coordviews-page .cv-topbar > .cv-ctl,
+  .coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host,
+  .coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host.cerebro-multiselect-expanded {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
 }
 
 body label, body .control-label {
@@ -1242,24 +1668,18 @@ body .fa-spinner { color: var(--c-amber) !important; }
 body .btn-primary:active { transform: translateY(1px); }
 body .btn:active { transform: translateY(0.5px); }
 
+body .shiny-bound-output {
+  transition: opacity var(--dur) var(--ease);
+}
+body .recalculating { opacity: 1; }
+body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
+
 /* -------------------------------------------------------------------------
    Responsive
    ------------------------------------------------------------------------- */
 @media (max-width: 767px) {
   body .content-wrapper, body .right-side { padding: 56px 14px 12px; }
   body .box-body { padding: 14px 16px; }
-
-  /* Below the AdminLTE breakpoint the sidebar is pushed off-canvas, and its
-     hamburger (.sidebar-toggle, data-toggle="push-menu") is the ONLY way back to
-     it. The desktop rules above hide the whole header (the logo now lives inside
-     the sidebar), which also hid that hamburger — leaving phone users stuck on
-     the first tab. Re-expose just the toggle here as a floating control. It is
-     position:fixed so the header's height:0 / overflow:hidden never clips it,
-     and AdminLTE's push-menu JS still drives it. */
-  /* Un-collapse the header AND the navbar (the toggle's parent, also hidden by
-     the desktop rule) just enough that the toggle can render — both stay
-     height:0 so no bar reappears, and the toggle floats free via position:fixed.
-     The `html` prefix out-specifies the always-on desktop display:none rule. */
   html body.skin-blue .main-header,
   html body.skin-blue .main-header .navbar {
     display: block !important;
@@ -1274,27 +1694,94 @@ body .btn:active { transform: translateY(0.5px); }
     position: fixed;
     top: 8px;
     left: 8px;
-    z-index: 1030;
+    z-index: 1400;
     width: 40px;
     height: 40px;
     margin: 0;
     padding: 0;
     align-items: center;
     justify-content: center;
-    background: var(--c-surface-3);
-    color: var(--c-text-2);
+    background: var(--c-surface);
+    color: var(--c-text);
     border: 1px solid var(--c-border, rgba(0, 0, 0, 0.12));
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-    margin: 0;
-    transition: none;
+    font-size: 0;
   }
   html body.skin-blue .main-header .sidebar-toggle::before {
-    content: "";
-    transform: rotate(225deg);
+    content: "" !important;
+    display: block;
+    width: 18px;
+    height: 14px;
+    border: 0;
+    transform: none;
+    background:
+      linear-gradient(currentColor, currentColor) 0 0 / 18px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 6px / 18px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 12px / 18px 2px no-repeat;
   }
-  html body.skin-blue.sidebar-open .main-header .sidebar-toggle::before {
-    transform: rotate(45deg);
+
+  html body.skin-blue .main-sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 1500 !important;
+    width: min(84vw, 320px) !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transform: translateX(-100%) !important;
+    transition: transform .22s var(--ease) !important;
+    box-shadow: var(--shadow-4) !important;
+  }
+  html body.skin-blue.sidebar-open .main-sidebar {
+    transform: translateX(0) !important;
+  }
+  html body.skin-blue.sidebar-open .content-wrapper,
+  html body.skin-blue.sidebar-open .right-side,
+  html body.skin-blue.sidebar-open .main-footer {
+    margin-left: 0 !important;
+    transform: none !important;
+  }
+  html body.skin-blue .cerebro-nav-close {
+    display: grid;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    place-items: center;
+    color: var(--c-text-2);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    font: 26px/1 var(--font-sans);
+  }
+  html body.skin-blue .cerebro-nav-close:hover,
+  html body.skin-blue .cerebro-nav-close:focus-visible {
+    color: var(--c-text);
+    background: var(--c-surface-2);
+  }
+  html body.skin-blue #cerebro-nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1450;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(28, 28, 30, .36);
+    border: 0;
+    transition: opacity .2s ease;
+  }
+  html body.skin-blue.sidebar-open #cerebro-nav-scrim {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
@@ -1305,230 +1792,128 @@ body .btn:active { transform: translateY(0.5px); }
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* -------------------------------------------------------------------------
-   Projection first-paint flash suppression (all projection tabs)
-
-   Each projection output is wrapped in a plain <div class="cerebro-projection-
-   gate"> that Shiny renders and the plotly htmlwidget never reconstructs (the
-   widget rewrites className on its OWN .js-plotly-plot div, so a class put
-   directly on the output is lost — the gate wrapper survives). This rule hides
-   the plotly plot inside the gate the instant Shiny inserts it, before any JS
-   runs. The plot is created at a fixed 60vh placeholder, then re-sized to the
-   measured viewport height a frame after its data arrives; without this the
-   empty placeholder paints and visibly jumps to the settled size on first open.
-   The shared renderer (www/projection_scatter.js) adds `is-sized` to the gate
-   once the first MEASURED height is on a plot that already holds data, so the
-   settled size is the first thing the user ever sees.
-
-   Hide the GATE itself, not the plotly div: the htmlwidget writes an inline
-   `visibility` on its own .js-plotly-plot div, and an inline style beats any
-   stylesheet rule targeting that div. The plot ships with `visibility:inherit`,
-   so hiding the ancestor gate makes the plot inherit `hidden` regardless — and
-   `is-sized` flips the gate back to visible.
-   ------------------------------------------------------------------------- */
-.cerebro-projection-gate {
+/* Selection workspace / Active cohort share one slot so selecting cells does
+   not move the plot. This is the single-view counterpart of Linked Views. */
+.cerebro-selection-status-slot {
+  display: grid;
+  margin: 0 0 8px;
+}
+.cerebro-selection-status-slot > .cerebro-selection-status-guide,
+.cerebro-selection-status-slot > .cerebro-selection-status-active {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  min-height: 48px;
+  box-sizing: border-box;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.cerebro-selection-status-guide {
+  padding: 7px 10px;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text-2);
+}
+.cerebro-selection-status-active {
+  padding: 8px 10px;
+  border: 1px solid var(--c-border);
+  border-left: 4px solid var(--c-amber);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--c-text-2);
+}
+.cerebro-selection-status-hidden {
+  opacity: 0;
   visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-2px);
 }
-.cerebro-projection-gate.is-sized {
-  visibility: visible;
+.cerebro-selection-status-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--c-amber-700);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
-/* Plotly writes `visibility: visible` as an INLINE style on its own
-   `.js-plotly-plot` div, which beats the container's inherited `hidden` and
-   lets the canvas flash at the pre-sized size before the JS reveal gate opens.
-   Override that inline value at the child level until the gate is sized. */
-.cerebro-projection-gate .js-plotly-plot {
-  visibility: hidden !important;
+.cerebro-selection-status-count {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  min-width: 0;
+  color: var(--c-text);
 }
-.cerebro-projection-gate.is-sized .js-plotly-plot {
-  visibility: visible !important;
+.cerebro-selection-status-profile {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 9px;
+  border: 1px solid var(--c-amber-300);
+  border-radius: 999px;
+  color: var(--c-amber-700);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cerebro-selection-status-origin {
+  color: var(--c-text-3);
+  white-space: nowrap;
 }
 
-/* -------------------------------------------------------------------------
-   Projection re-render loading feedback (all projection tabs)
-
-   A parameter change (colour variable, point size, "% of cells", …) sends the
-   render over a Shiny round trip; on a large data set the plot can sit frozen
-   for a beat with no signal that anything is happening. The shared renderer
-   (www/projection_scatter.js) dims the plot to `opacity` below while a render
-   is in flight and restores it in the Plotly.react `.then()`, so a slow render
-   fades slightly instead of appearing stuck.
-
-   This is a pure OPACITY transition on the plotly div — deliberately ORTHOGONAL
-   to the gate above, which uses `visibility` for first-paint. The two never
-   fight: `visibility` decides whether the settled plot is shown at all;
-   `opacity` decides how a re-render of an already-visible plot reads. The dim
-   is only armed after a 100ms delay (JS side), so fast renders never flash.
-   Respects prefers-reduced-motion via the global reset above (which zeroes all
-   transition durations), so reduced-motion users get an instant swap. */
-.cerebro-projection-gate .js-plotly-plot {
-  transition: opacity 0.18s ease;
-}
-.cerebro-projection-gate .js-plotly-plot.cerebro-plot-loading {
-  opacity: 0.55;
-}
-
-/* -------------------------------------------------------------------------
-   Selection action buttons (Zoom / Clear) — shared by every projection tab.
-
-   The two buttons sit on ONE right-aligned row and never wrap: a plain
-   text-align:right column let them drop to a second line on narrower viewports.
-   flex-wrap:nowrap keeps them together; each button suppresses its own wrap so
-   the labels stay intact.
-   ------------------------------------------------------------------------- */
+/* Zoom and Clear stay with the active cohort they affect. */
 .cerebro-selection-actions {
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 5px;
+  margin-left: auto;
 }
 .cerebro-selection-actions .btn {
+  min-width: 132px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: var(--r-xs);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
   transition: background-color 0.12s ease, border-color 0.12s ease,
     box-shadow 0.12s ease, transform 0.05s ease;
 }
-
-/* Colour-code the two actions so they read apart at a glance: Zoom is a blue
-   accent (a "focus in" action), Clear is a muted red (a "discard" action). Both
-   are outline buttons at rest and fill on hover, matching the app's flat look.
-   !important is required: the Console theme sets `body .btn-default { color:
-   var(--c-text) !important }`, which an id selector alone cannot override. */
-.cerebro-selection-actions #overview_projection_zoom_to_selection,
-.cerebro-selection-actions #expression_projection_zoom_to_selection,
-.cerebro-selection-actions #trajectory_projection_zoom_to_selection,
-.cerebro-selection-actions #spatial_projection_zoom_to_selection {
-  color: #2c7ab3 !important;
-  border-color: #a4c8e1 !important;
+.cerebro-selection-actions .cerebro-selection-action-zoom {
+  color: var(--c-amber-700) !important;
+  border-color: var(--c-amber-300) !important;
+  background: var(--c-surface) !important;
 }
-.cerebro-selection-actions #overview_projection_zoom_to_selection:hover,
-.cerebro-selection-actions #expression_projection_zoom_to_selection:hover,
-.cerebro-selection-actions #trajectory_projection_zoom_to_selection:hover,
-.cerebro-selection-actions #spatial_projection_zoom_to_selection:hover {
-  color: #ffffff !important;
-  background-color: #2c7ab3 !important;
-  border-color: #2c7ab3 !important;
+.cerebro-selection-actions .cerebro-selection-action-zoom:hover {
+  background: var(--c-amber-100) !important;
 }
-.cerebro-selection-actions #overview_projection_clear_selection,
-.cerebro-selection-actions #expression_projection_clear_selection,
-.cerebro-selection-actions #trajectory_projection_clear_selection,
-.cerebro-selection-actions #spatial_projection_clear_selection {
-  color: #c0392b !important;
-  border-color: #e6b0aa !important;
+.cerebro-selection-actions .cerebro-selection-action-clear {
+  color: var(--c-error-700) !important;
+  border-color: color-mix(in srgb, var(--c-error-700) 28%, var(--c-surface)) !important;
+  background: var(--c-surface) !important;
 }
-.cerebro-selection-actions #overview_projection_clear_selection:hover,
-.cerebro-selection-actions #expression_projection_clear_selection:hover,
-.cerebro-selection-actions #trajectory_projection_clear_selection:hover,
-.cerebro-selection-actions #spatial_projection_clear_selection:hover {
-  color: #ffffff !important;
-  background-color: #c0392b !important;
-  border-color: #c0392b !important;
+.cerebro-selection-actions .cerebro-selection-action-clear:hover {
+  background: var(--c-error-100) !important;
 }
-
 /* Click feedback: a brief press-down + darker fill so a tap clearly registers. */
 .cerebro-selection-actions .btn:active {
   transform: translateY(1px);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Active (zoomed-in) state for the Zoom button: a solid blue fill with WHITE
-   text so it reads as "currently zoomed — click to reset". The selectors repeat
-   the button ids: the rest-state rules above are id-specific, so the active rule
-   must match that specificity (id + class) or its white text loses to the blue
-   rest colour and becomes invisible against the blue fill. */
-.cerebro-selection-actions #overview_projection_zoom_to_selection.is-zoomed,
-.cerebro-selection-actions #expression_projection_zoom_to_selection.is-zoomed,
-.cerebro-selection-actions #trajectory_projection_zoom_to_selection.is-zoomed,
-.cerebro-selection-actions #spatial_projection_zoom_to_selection.is-zoomed,
-.cerebro-selection-actions #overview_projection_zoom_to_selection.is-zoomed:hover,
-.cerebro-selection-actions #expression_projection_zoom_to_selection.is-zoomed:hover,
-.cerebro-selection-actions #trajectory_projection_zoom_to_selection.is-zoomed:hover,
-.cerebro-selection-actions #spatial_projection_zoom_to_selection.is-zoomed:hover {
-  background-color: #2c7ab3 !important;
-  border-color: #2c7ab3 !important;
+/* A filled amber Zoom button indicates that clicking it resets the view. */
+.cerebro-selection-actions .cerebro-selection-action-zoom.is-zoomed,
+.cerebro-selection-actions .cerebro-selection-action-zoom.is-zoomed:hover {
+  background-color: var(--c-amber) !important;
+  border-color: var(--c-amber) !important;
   color: #ffffff !important;
-}
-
-/* -------------------------------------------------------------------------
-   Shared projection legend (all projection tabs)
-
-   The projection-scatter renderer (www/projection_scatter.js) builds a custom
-   HTML legend as a horizontal bar ABOVE the plot, in its own band, so it never
-   covers data points and switching categorical <-> continuous never shifts the
-   scatter. Every tab's legend container gets the class .cerebro-projection-legend
-   (its id is <plot_id>_legend); these styles were formerly inline in
-   spatial/UI.R and are now shared so overview / gene_expression / trajectory /
-   immune_repertoire render an identical legend.
-   ------------------------------------------------------------------------- */
-.cerebro-projection-legend {
-  position: static;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 6px;
-  padding: 5px 10px;
-  margin: 0 0 6px 0;
-  font-family: inherit;
-  user-select: none;
-}
-.cerebro-projection-legend .legend-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-}
-.cerebro-projection-legend.is-continuous .legend-header {
-  margin: 0 8px 0 0;
-}
-.cerebro-projection-legend .legend-title-text {
-  font-weight: 600;
-  font-size: 13px;
-  color: #333;
-}
-.cerebro-projection-legend .custom-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  border-radius: 3px;
-}
-.cerebro-projection-legend .custom-legend-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-.cerebro-projection-legend .legend-color-box {
-  display: inline-block;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-.cerebro-projection-legend .legend-text {
-  color: #333;
-  white-space: nowrap;
-}
-.cerebro-projection-legend .legend-item-hidden {
-  opacity: 0.35;
-}
-.cerebro-projection-legend .legend-item-hidden .legend-text {
-  text-decoration: line-through;
-}
-.cerebro-projection-legend .continuous-legend-content {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-.cerebro-projection-legend .continuous-legend-gradient {
-  width: 120px;
-  height: 12px;
-  flex: 0 0 auto;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-.cerebro-projection-legend .continuous-legend-label {
-  font-size: 11px;
-  color: #333;
 }
 
 /* Panel "info" button (cerebroInfoButton): the small gap that used to be a
@@ -1564,4 +1949,93 @@ body .btn:active { transform: translateY(0.5px); }
   color: var(--c-text-2);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.cerebro-selection-composition-slot {
+  position: absolute;
+  z-index: 7;
+  left: 12px;
+  bottom: 12px;
+  width: min(300px, calc(100% - 24px));
+}
+.cerebro-selection-composition-card {
+  padding: 11px 12px 10px;
+  border: 1px solid var(--c-amber-200);
+  border-left: 4px solid var(--c-amber);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 7px 24px rgba(43, 37, 32, .16);
+  backdrop-filter: blur(5px);
+}
+.cerebro-selection-composition-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cerebro-selection-composition-head strong {
+  color: var(--c-text);
+  font-size: 13px;
+}
+.cerebro-selection-composition-head span,
+.cerebro-selection-composition-sub {
+  color: var(--c-text-3);
+  font-size: 10.5px;
+}
+.cerebro-selection-composition-sub {
+  margin: 1px 0 8px;
+}
+.cerebro-selection-composition-rows {
+  display: grid;
+  gap: 5px;
+}
+.cerebro-selection-composition-row {
+  display: grid;
+  grid-template-columns: minmax(76px, 1fr) minmax(54px, .8fr) 64px;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+}
+.cerebro-selection-composition-label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-2);
+  font-weight: 600;
+}
+.cerebro-selection-composition-label i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.cerebro-selection-composition-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cerebro-selection-composition-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--c-surface-2);
+}
+.cerebro-selection-composition-track i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+}
+.cerebro-selection-composition-value {
+  color: var(--c-text-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .cerebro-selection-composition-slot {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
 }

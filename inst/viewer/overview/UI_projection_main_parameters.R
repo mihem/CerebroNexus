@@ -2,6 +2,7 @@
 ## UI elements to set main parameters for the projection.
 ##----------------------------------------------------------------------------##
 output[["overview_projection_main_parameters_UI"]] <- renderUI({
+  color_choices <- setdiff(colnames(getMetaData()), "cell_barcode")
   tagList(
     selectInput(
       "overview_projection_to_display",
@@ -11,9 +12,14 @@ output[["overview_projection_main_parameters_UI"]] <- renderUI({
     selectInput(
       "overview_projection_point_color",
       label = "Color cells by",
-      choices = colnames(getMetaData())[
-        !colnames(getMetaData()) %in% c("cell_barcode")
-      ]
+      choices = color_choices,
+      selected = if ("cell_type" %in% color_choices) {
+        "cell_type"
+      } else if (length(color_choices)) {
+        color_choices[[1L]]
+      } else {
+        NULL
+      }
     )
   )
 })

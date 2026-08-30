@@ -15,7 +15,7 @@
 ##   3. where the expansion bins fall    (scRepertoire's cloneSize defaults)
 ##
 ## Sourced before any module, so both pages read the same answers. Anything that
-## renders a clone-expansion level -- including www/coordviews.js, which carries
+## renders a clone-expansion level -- including www/cell_views.js, which carries
 ## its own copy of the labels for the client-side clone layout -- has to agree
 ## with this file.
 

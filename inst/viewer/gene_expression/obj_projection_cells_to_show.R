@@ -3,7 +3,6 @@
 ##----------------------------------------------------------------------------##
 expression_projection_cells_to_show <- reactive({
   req(input[["expression_projection_percentage_cells_to_show"]])
-  # message('--> trigger "expression_projection_cells_to_show"')
   ## require group filters UI elements and at least 1 group level to be selected
   for (i in getGroups()) {
     req(input[[paste0("expression_projection_group_filter_", i)]])
@@ -32,8 +31,7 @@ expression_projection_cells_to_show <- reactive({
   ## randomly remove cells (if necessary)
   cells_df <- randomlySubsetCells(cells_df, pct_cells)
   ## put rows in random order
-  cells_df <- cells_df[sample(1:nrow(cells_df)), ]
+  cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
   cells_to_show <- cells_df$row_id
-  #   message(str(cells_to_show))
   return(cells_to_show)
 })

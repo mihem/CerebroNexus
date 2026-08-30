@@ -6,7 +6,6 @@ expression_projection_coordinates <- reactive({
     expression_projection_parameters_plot(),
     expression_projection_cells_to_show()
   )
-  # message('--> trigger "expression_projection_coordinates"')
   parameters <- expression_projection_parameters_plot()
   cells_to_show <- expression_projection_cells_to_show()
   req(
@@ -27,6 +26,5 @@ expression_projection_coordinates <- reactive({
       c(1, 2)
     ]
   }
-  #   message(str(coordinates))
   return(coordinates)
 })

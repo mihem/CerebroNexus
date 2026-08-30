@@ -30,8 +30,6 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
     ]
   }
 
-  ## Build this entry's choices only. Values carry source + label identity; paths
-  ## and data URIs remain server-side descriptors and never become input values.
   current_spatial <- input[["spatial_projection_to_display"]]
   if (
     is.null(current_spatial) ||
@@ -39,33 +37,6 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
   ) {
     current_spatial <- availableSpatial()[1]
   }
-  current_sd <- tryCatch(
-    getSpatialData(current_spatial),
-    error = function(e) NULL
-  )
-  embedded_images <- if (is.null(current_sd)) {
-    list()
-  } else {
-    embedded_spatial_images(current_sd)
-  }
-  dataset <- spatial_dataset_name(
-    if (exists("available_crb_files")) available_crb_files$files else NULL,
-    if (exists("available_crb_files")) available_crb_files$selected else NULL
-  )
-  external_images <- configured_spatial_images(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    dataset,
-    current_spatial
-  )
-  background_choices <- spatial_background_choices(
-    embedded_images,
-    external_images
-  )
-  selected_background <- normalize_spatial_background_choice(
-    isolate(input[["spatial_projection_background_image"]]),
-    background_choices
-  )
-
   tagList(
     selectInput(
       "spatial_projection_to_display",
@@ -106,48 +77,86 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
     ## spatial overlap reads as a mixed hue. Any channel may be left empty.
     conditionalPanel(
       condition = "input.spatial_projection_plot_type == 'Co-expression (RGB)'",
-      selectizeInput(
-        "spatial_projection_coexpr_r",
-        label = "Red channel gene",
-        choices = NULL,
-        options = list(
-          maxOptions = 1000,
-          placeholder = 'Gene for red...',
-          create = FALSE,
-          loadThrottle = 300
-        )
-      ),
-      selectizeInput(
-        "spatial_projection_coexpr_g",
-        label = "Green channel gene",
-        choices = NULL,
-        options = list(
-          maxOptions = 1000,
-          placeholder = 'Gene for green...',
-          create = FALSE,
-          loadThrottle = 300
-        )
-      ),
-      selectizeInput(
-        "spatial_projection_coexpr_b",
-        label = "Blue channel gene",
-        choices = NULL,
-        options = list(
-          maxOptions = 1000,
-          placeholder = 'Gene for blue...',
-          create = FALSE,
-          loadThrottle = 300
+      div(
+        class = "spatial-rgb-controls",
+        selectizeInput(
+          "spatial_projection_coexpr_r",
+          label = "Red channel gene",
+          choices = NULL,
+          options = list(
+            maxOptions = 1000,
+            placeholder = 'Gene for red...',
+            create = FALSE,
+            loadThrottle = 300
+          )
+        ),
+        selectizeInput(
+          "spatial_projection_coexpr_g",
+          label = "Green channel gene",
+          choices = NULL,
+          options = list(
+            maxOptions = 1000,
+            placeholder = 'Gene for green...',
+            create = FALSE,
+            loadThrottle = 300
+          )
+        ),
+        selectizeInput(
+          "spatial_projection_coexpr_b",
+          label = "Blue channel gene",
+          choices = NULL,
+          options = list(
+            maxOptions = 1000,
+            placeholder = 'Gene for blue...',
+            create = FALSE,
+            loadThrottle = 300
+          )
         )
       )
-    ),
-    ## Keep the selector present for image-free entries too, where its sole
-    ## choice is No Background. Re-rendering on a spatial switch resets a stale
-    ## source-tagged value before the plot reactive can reuse old image data.
-    selectInput(
-      "spatial_projection_background_image",
-      label = "Background image",
-      choices = background_choices,
-      selected = selected_background
+    )
+  )
+})
+
+## Background selection is low-frequency configuration, so it lives in More
+## settings while retaining the original input id consumed by the plot logic.
+output[["spatial_projection_background_select_UI"]] <- renderUI({
+  req(data_set(), length(availableSpatial()) > 0)
+  current_spatial <- input[["spatial_projection_to_display"]]
+  if (
+    is.null(current_spatial) ||
+      !(current_spatial %in% availableSpatial())
+  ) {
+    current_spatial <- availableSpatial()[1]
+  }
+  current_sd <- tryCatch(
+    getSpatialData(current_spatial),
+    error = function(e) NULL
+  )
+  embedded_images <- if (is.null(current_sd)) {
+    list()
+  } else {
+    embedded_spatial_images(current_sd)
+  }
+  dataset <- spatial_dataset_name(
+    if (exists("available_crb_files")) available_crb_files$files else NULL,
+    if (exists("available_crb_files")) available_crb_files$selected else NULL
+  )
+  external_images <- configured_spatial_images(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    dataset,
+    current_spatial
+  )
+  background_choices <- spatial_background_choices(
+    embedded_images,
+    external_images
+  )
+  selectInput(
+    "spatial_projection_background_image",
+    label = "Background image",
+    choices = background_choices,
+    selected = normalize_spatial_background_choice(
+      isolate(input[["spatial_projection_background_image"]]),
+      background_choices
     )
   )
 })
@@ -189,6 +198,11 @@ lapply(
 outputOptions(
   output,
   "spatial_projection_main_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "spatial_projection_background_select_UI",
   suspendWhenHidden = FALSE
 )
 

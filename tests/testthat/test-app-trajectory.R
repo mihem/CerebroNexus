@@ -69,21 +69,21 @@ test_that("trajectory module loads without breaking the main app", {
   expect_true(grepl("1,476", cells_box$html))
 })
 
-test_that("trajectory projection fits the viewport with selectors in parameters", {
+test_that("trajectory projection fits the viewport with selectors in the top bar", {
   app <- shared_app()
 
   app$click(selector = 'a[href="#shiny-tab-trajectory"]')
   app$wait_for_idle(timeout = 20000)
 
-  # The method/name selectors and the projection render through nested
-  # renderUI + Plotly, which take several server round-trips; on a slow (CI)
+  # The method/name selectors and Canvas projection render through nested
+  # renderUI, which takes several server round-trips; on a slow (CI)
   # machine one wait_for_idle can return before they exist. Wait for the actual
   # nodes so the assertions below never read a half-rendered tab.
   app$wait_for_js(
     paste0(
       "document.getElementById('trajectory_selected_method') != null && ",
       "document.getElementById('trajectory_selected_name') != null && ",
-      "document.querySelector('#trajectory_projection .main-svg') != null && ",
+      "document.querySelector('#trajectory_projection_cell_view_host .cv-canvas-wrap > canvas:not(.cv-mini)') != null && ",
       "document.getElementById('trajectory_number_of_selected_cells') != null"
     ),
     timeout = 30000
@@ -95,46 +95,96 @@ test_that("trajectory projection fits the viewport with selectors in parameters"
   expect_true(app$get_js(
     paste0(
       "document.getElementById('trajectory_selected_method')",
-      ".closest('.box').querySelector('.box-title')",
-      ".innerText.includes('Main parameters')"
+      ".closest('.cerebro-viz-toolbar') !== null"
     )
   ))
   expect_true(app$get_js(
     paste0(
       "document.getElementById('trajectory_selected_name')",
-      ".closest('.box').querySelector('.box-title')",
-      ".innerText.includes('Main parameters')"
+      ".closest('.cerebro-viz-toolbar') === ",
+      "document.getElementById('trajectory_selected_method')",
+      ".closest('.cerebro-viz-toolbar')"
     )
   ))
 
   geometry <- app$get_js(paste0(
     "(() => {",
-    "const plot = document.getElementById('trajectory_projection');",
-    "const box = plot.closest('.box');",
-    "const footer = document.getElementById(",
-    "'trajectory_number_of_selected_cells');",
-    "const svg = plot.querySelector('.main-svg');",
-    "const ticks = Array.from(plot.querySelectorAll(",
-    "'.xaxislayer-above .xtick text, .yaxislayer-above .ytick text'));",
-    "const tickBottom = Math.max(...ticks.map(",
-    "tick => tick.getBoundingClientRect().bottom));",
+    "const plot = document.querySelector(",
+    "'#trajectory_projection_cell_view_host .cv-canvas-wrap > canvas:not(.cv-mini)');",
+    "const host = plot.closest('.cerebro-cell-view-host');",
+    "const status = document.querySelector(",
+    "'#shiny-tab-trajectory .cerebro-selection-status-slot');",
     "return {",
     "viewport: window.innerHeight,",
     "plotHeight: plot.getBoundingClientRect().height,",
+    "plotTop: plot.getBoundingClientRect().top,",
     "plotBottom: plot.getBoundingClientRect().bottom,",
-    "svgBottom: svg.getBoundingClientRect().bottom,",
-    "tickBottom: tickBottom,",
-    "footerTop: footer.getBoundingClientRect().top,",
-    "boxBottom: box.getBoundingClientRect().bottom,",
-    "footerBottom: footer.getBoundingClientRect().bottom",
+    "hostBottom: host.getBoundingClientRect().bottom,",
+    "statusBottom: status.getBoundingClientRect().bottom",
     "};",
     "})()"
   ))
 
   expect_gte(geometry$plotHeight, 240)
-  expect_lte(geometry$svgBottom, geometry$plotBottom + 1)
-  expect_lte(geometry$tickBottom, geometry$plotBottom + 1)
-  expect_lt(geometry$tickBottom, geometry$footerTop)
-  expect_lte(geometry$footerBottom, geometry$viewport)
-  expect_lte(geometry$boxBottom, geometry$viewport)
+  expect_lt(geometry$statusBottom, geometry$plotTop)
+  expect_lte(geometry$plotBottom, geometry$hostBottom)
+  expect_lte(geometry$hostBottom, geometry$viewport)
+
+  drag <- app$get_js(paste0(
+    "(() => {",
+    "const host=document.getElementById('trajectory_projection_cell_view_host');",
+    "host.querySelector('.cv-tbtn[data-act=\"box\"]').click();",
+    "const r=host.querySelector('.cv-canvas-wrap > canvas:not(.cv-mini)')",
+    ".getBoundingClientRect();",
+    "return {x1:r.left+r.width*.08,y1:r.top+r.height*.08,",
+    "x2:r.right-r.width*.08,y2:r.bottom-r.height*.08};",
+    "})()"
+  ))
+  viewer_drag_mouse(app, drag$x1, drag$y1, drag$x2, drag$y2)
+  app$wait_for_js(
+    paste0(
+      "!document.getElementById('trajectory_projection_selection_active')",
+      ".classList.contains('cerebro-selection-status-hidden')"
+    ),
+    timeout = 10000
+  )
+
+  app$click(selector = "#trajectory_projection_zoom_to_selection")
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#trajectory_projection_cell_view_host .cv-mini.is-on') !== null"
+    ),
+    timeout = 10000
+  )
+  app$run_js(paste0(
+    "document.querySelector(",
+    "'#trajectory_projection_cell_view_host .cv-tbtn[data-act=\"pan\"]'",
+    ").click()"
+  ))
+  viewer_drag_mouse(
+    app,
+    drag$x1,
+    drag$y1,
+    drag$x1 + 35,
+    drag$y1 + 20
+  )
+  expect_false(app$get_js(paste0(
+    "document.getElementById('trajectory_projection_clear_selection')",
+    ".offsetParent === null"
+  )))
+
+  app$click(selector = "#trajectory_projection_clear_selection")
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('trajectory_projection_selection_active')",
+      ".classList.contains('cerebro-selection-status-hidden')"
+    ),
+    timeout = 10000
+  )
+  app$run_js(paste0(
+    "document.querySelector(",
+    "'#trajectory_projection_cell_view_host .cv-tbtn[data-act=\"reset\"]'",
+    ").click()"
+  ))
 })

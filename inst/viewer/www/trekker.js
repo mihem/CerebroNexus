@@ -231,7 +231,7 @@
   // The picked nucleus + everything within `nr` µm of it in physical space. Also
   // the highlight set: cells in it stay solid, everything else fades. Null unless
   // a single nucleus is picked (a lasso selection supersedes it). The distance
-  // loop is CBGeom.nicheAround (shared with coordviews.js). This engine keys on
+  // loop is CBGeom.nicheAround (shared with cell_views.js). This engine keys on
   // D.x/D.y and passes inclusive=<, skipNaN=false.
   function rebuildNiche() {
     nicheSet = null;
@@ -747,7 +747,7 @@
   }
 
   /* ---- header / QC / evidence / moran (static per dataset) --------------- */
-  // Shared with coordviews.js: Linked views shows the same coordinate-source /
+  // Shared with cell_views.js: Linked views shows the same coordinate-source /
   // QC / positioning / Moran's I detail for a Trekker data set, in a modal
   // instead of a permanent page section. These builders return HTML strings so
   // both callers can drop them into their own DOM ids.

@@ -84,7 +84,15 @@ ir_data <- reactive({
 ## Returns `default` when the input is missing/empty.
 ir_param <- function(id, default = NULL) {
   v <- input[[id]]
-  if (is.null(v)) default else v
+  if (
+    is.null(v) ||
+      length(v) == 0 ||
+      (is.character(v) && length(v) == 1 && !nzchar(v))
+  ) {
+    default
+  } else {
+    v
+  }
 }
 
 ## ---- Resolve the generic "Order groups" (order.by) value -------------- ##

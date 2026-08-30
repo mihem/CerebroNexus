@@ -9,7 +9,7 @@
 ## Layout is deliberately different from the other tabs: NO left param column.
 ## A horizontal control bar sits above a full-width panel grid, so the linked
 ## views get the room the standard param/viz split does not. All controls carry
-## `cv-` ids and are wired client-side by www/coordviews.js; the server sends a
+## `cv-` ids and are wired client-side by www/cell_views.js; the server sends a
 ## single per-dataset bundle. Custom styles are scoped under `.coordviews-page`.
 ##----------------------------------------------------------------------------##
 
@@ -75,7 +75,7 @@ cv_panebar <- function(panel) {
 }
 
 ## One panel slot. Four initial slots avoid DOM churn for the common case;
-## www/coordviews.js clones more when several spatial sections push the linked
+## www/cell_views.js clones more when several spatial sections push the linked
 ## workspace beyond four panels, then lays all visible slots out responsively.
 ## Every head carries a (hidden) Trekker info button, shown by JS on whichever
 ## panel ends up holding the Trekker space.
@@ -201,7 +201,6 @@ tab_coordinated_views <- tabItem(
       id = "cv-meta",
       "Load a single-cell data set to explore its modalities together."
     ),
-
     ## ---- horizontal control bar (the layout fix) ------------------------ ##
     div(
       class = "cv-topbar",
@@ -214,7 +213,7 @@ tab_coordinated_views <- tabItem(
       ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
       ## All coordinates already travel in the bundle, so this stays client-side.
       div(
-        class = "cv-ctl",
+        class = "cv-ctl cv-multiselect-ctl",
         id = "cv-proj-ctl",
         tags$label("Projection"),
         tags$select(id = "cv-pick-proj", multiple = "multiple")
@@ -223,7 +222,7 @@ tab_coordinated_views <- tabItem(
       ## independent linked canvas; all sections still share colour, filtering,
       ## brushing and hover state.
       div(
-        class = "cv-ctl",
+        class = "cv-ctl cv-multiselect-ctl",
         id = "cv-spatial-ctl",
         style = "display:none",
         tags$label("Spatial data"),
@@ -312,13 +311,13 @@ tab_coordinated_views <- tabItem(
             type = "button",
             class = "cv-seg-btn is-on",
             `data-mode` = "stack",
-            "Rank stack"
+            tags$span("Rank", tags$br(), "stack")
           ),
           tags$button(
             type = "button",
             class = "cv-seg-btn",
             `data-mode` = "bands",
-            "Expansion bands"
+            tags$span("Expansion", tags$br(), "bands")
           )
         )
       ),
@@ -541,7 +540,7 @@ tab_coordinated_views <- tabItem(
 
     ## ---- linked-workspace guide / active cohort -------------------------- ##
     ## The quiet opening guide makes the two defining interactions discoverable.
-    ## Once cells are selected it yields this space to the richer cohort bar.
+    ## The guide stays visible; the active cohort appears beneath it.
     div(
       class = "cv-status-slot",
       div(
@@ -557,41 +556,82 @@ tab_coordinated_views <- tabItem(
           id = "cv-workspace-guide-text",
           "Drag in any view to create an active cohort. Use Focus to enlarge one lens while keeping the others linked."
         ),
-        tags$button(
-          type = "button",
-          class = "cv-workspace-overview",
-          id = "cv-workspace-overview",
-          style = "display:none",
-          icon("table-cells-large"),
-          "Back to overview"
+        div(
+          class = "cv-workspace-actions",
+          tags$button(
+            type = "button",
+            class = "cv-workspace-overview",
+            id = "cv-workspace-overview",
+            style = "display:none",
+            icon("table-cells-large"),
+            "Back to overview"
+          )
         )
       ),
 
       ## Active cohort: the shared state all lenses are describing.
       div(
-        class = "cv-selbar cv-collapse",
-        id = "cv-selbar",
-        tags$span(
-          class = "cv-sel-kicker",
-          id = "cv-sel-kicker",
-          "Active cohort"
+        class = paste(
+          "cv-selbar cv-collapse",
+          "cerebro-selection-status-active"
         ),
-        tags$span(class = "cv-sel-count", id = "cv-seltext", "—"),
-        tags$span(class = "cv-sel-chip", id = "cv-selprofile", ""),
-        tags$span(class = "cv-sel-detail", id = "cv-selorigin", ""),
-        tags$span(class = "cv-sel-detail", id = "cv-selcoverage", ""),
+        id = "cv-selbar",
+        div(
+          class = "cv-selcopy",
+          tags$span(
+            class = "cerebro-selection-status-kicker",
+            id = "cv-sel-kicker",
+            "Active cohort"
+          ),
+          tags$span(
+            class = "cerebro-selection-status-count",
+            id = "cv-seltext",
+            "—"
+          ),
+          tags$span(
+            class = "cerebro-selection-status-profile",
+            id = "cv-selprofile",
+            ""
+          ),
+          tags$span(
+            class = "cerebro-selection-status-origin",
+            id = "cv-selorigin",
+            ""
+          ),
+          tags$span(
+            class = "cerebro-selection-status-origin",
+            id = "cv-selcoverage",
+            ""
+          )
+        ),
         ## Actions sit with the cohort they affect, rather than in the unrelated
         ## global-control row. They remain hidden until a selection/niche exists.
         div(
-          class = "cv-selactions cv-collapse",
+          class = paste(
+            "cv-selactions cv-collapse",
+            "cerebro-selection-actions"
+          ),
           id = "cv-selactions",
           style = "display:none",
-          tags$button(
-            id = "cv-zoom",
-            class = "cv-zoombtn",
-            "Zoom to selection"
-          ),
-          tags$button(id = "cv-clear", class = "cv-clearbtn", "Clear selection")
+          div(
+            class = "cv-sel-action-row",
+            tags$button(
+              id = "cv-zoom",
+              class = paste(
+                "btn btn-xs btn-default",
+                "cerebro-selection-action-zoom"
+              ),
+              "Zoom to selection"
+            ),
+            tags$button(
+              id = "cv-clear",
+              class = paste(
+                "btn btn-xs btn-default",
+                "cerebro-selection-action-clear"
+              ),
+              "Clear selection"
+            )
+          )
         )
       )
     ),
@@ -609,7 +649,7 @@ tab_coordinated_views <- tabItem(
     ),
     ## ---- panel grid ----------------------------------------------------- ##
     ## Every selected/present space gets its OWN panel: selected projections,
-    ## selected Spatial sections, Trekker and Clonal. coordviews.js
+    ## selected Spatial sections, Trekker and Clonal. cell_views.js
     ## assigns spaces, hides unused slots, creates extras as needed, and wraps
     ## panels automatically while keeping each canvas at least 300px wide.
     div(
@@ -653,12 +693,10 @@ tab_coordinated_views <- tabItem(
       )
     ),
 
-    ## Keep the lightweight client readout target for internal state updates, but
-    ## do not expose it on the landing surface. The expensive server-rendered
-    ## selected-cell plot/table has no UI target here and therefore does not run.
+    ## Selection composition and clonotypes update client-side as soon as cells
+    ## are selected in any linked panel.
     div(
       class = "cv-secondary-analysis",
-      style = "display:none",
       div(
         class = "cv-readout",
         id = "cv-readout",
@@ -799,6 +837,13 @@ tab_coordinated_views <- tabItem(
           )
         )
       )
+    ),
+
+    ## Detailed selected-cell plot and table are rendered only while a selection
+    ## exists, so the landing surface stays compact without dropping the result.
+    div(
+      class = "cv-secondary-analysis",
+      shiny::uiOutput("coordviews_selected_cells_UI")
     ),
 
     tags$dialog(

@@ -45,7 +45,7 @@ server <- function(input, output, session) {
   ## Central parameters.
   ##--------------------------------------------------------------------------##
   preferences <- reactiveValues(
-    overview_plot_point_size = list(
+    projection_plot_point_size = list(
       min = 1,
       max = 20,
       step = 1,
@@ -67,7 +67,7 @@ server <- function(input, output, session) {
         2
       )
     ),
-    overview_plot_point_opacity = list(
+    projection_plot_point_opacity = list(
       min = 0.1,
       max = 1.0,
       step = 0.1,
@@ -84,12 +84,14 @@ server <- function(input, output, session) {
       step = 0.1,
       default = ifelse(
         exists('Cerebro.options') &&
-          !is.null(Cerebro.options[['gene_expression_default_point_opacity']]),
+          !is.null(Cerebro.options[[
+            'gene_expression_default_point_opacity'
+          ]]),
         Cerebro.options[['gene_expression_default_point_opacity']],
         1.0
       )
     ),
-    overview_plot_percentage_cells_to_show = list(
+    projection_plot_percentage_cells_to_show = list(
       min = 10,
       max = 100,
       step = 10,
@@ -111,7 +113,9 @@ server <- function(input, output, session) {
           !is.null(Cerebro.options[[
             'gene_expression_default_percentage_cells_to_show'
           ]]),
-        Cerebro.options[['gene_expression_default_percentage_cells_to_show']],
+        Cerebro.options[[
+          'gene_expression_default_percentage_cells_to_show'
+        ]],
         100
       )
     ),

@@ -234,6 +234,10 @@ render_bundle_spatial_background <- function(
   renderer <- new.env(parent = globalenv())
   renderer$Cerebro.options <- config
   sys.source(
+    file.path(app, "viewer", "utility_functions.R"),
+    envir = renderer
+  )
+  sys.source(
     file.path(
       app,
       "viewer",
@@ -243,48 +247,10 @@ render_bundle_spatial_background <- function(
     envir = renderer
   )
 
-  js <- get("js", envir = asNamespace("shinyjs"))
-  binding_names <- c(
-    "getContainerDimensions",
-    "updatePlot2DContinuousSpatial"
-  )
-  binding_existed <- vapply(
-    binding_names,
-    exists,
-    logical(1),
-    envir = js,
-    inherits = FALSE
-  )
-  previous_bindings <- lapply(binding_names, function(name) {
-    if (exists(name, envir = js, inherits = FALSE)) {
-      get(name, envir = js, inherits = FALSE)
-    } else {
-      NULL
-    }
-  })
-  on.exit(
-    for (index in seq_along(binding_names)) {
-      name <- binding_names[[index]]
-      if (binding_existed[[index]]) {
-        assign(name, previous_bindings[[index]], envir = js)
-      } else if (exists(name, envir = js, inherits = FALSE)) {
-        rm(list = name, envir = js)
-      }
-    },
-    add = TRUE
-  )
-
   rendered_meta <- NULL
-  assign(
-    "getContainerDimensions",
-    function() list(width = 800, height = 600),
-    envir = js
-  )
-  assign(
-    "updatePlot2DContinuousSpatial",
-    function(meta, ...) rendered_meta <<- meta,
-    envir = js
-  )
+  renderer$cerebroCellViewRender <- function(id, meta, ...) {
+    rendered_meta <<- meta
+  }
 
   withr::with_dir(
     app,

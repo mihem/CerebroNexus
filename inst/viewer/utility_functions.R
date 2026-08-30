@@ -51,6 +51,358 @@ cachePlot <- function(x, ...) {
 }
 
 ##----------------------------------------------------------------------------##
+## Canvas projection UIs are created by module files sourced inside server().
+## Keep this helper in the same per-session scope so a newly opened session does
+## not depend on the process-startup shiny_UI.R environment being reloaded.
+cerebroCellViewOutput <- function(id) {
+  div(
+    id = paste0(id, "_cell_view_host"),
+    class = "coordviews-page cerebro-cell-view-host",
+    `data-cell-view-id` = id,
+    div(
+      class = "cerebro-cell-view-surface",
+      `aria-live` = "polite"
+    ),
+    shiny::uiOutput(
+      paste0(id, "_composition"),
+      class = "cerebro-selection-composition-slot"
+    )
+  )
+}
+
+cerebroCellViewRender <- function(
+  id,
+  meta,
+  data,
+  hover = list(),
+  extra = list()
+) {
+  session$sendCustomMessage(
+    "cell_view_render",
+    list(
+      id = id,
+      meta = meta,
+      data = data,
+      hover = hover,
+      extra = extra
+    )
+  )
+}
+
+cerebroCellViewScatterPayload <- function(
+  coordinates,
+  color,
+  color_variable,
+  selection_keys,
+  point_size,
+  point_opacity,
+  color_assignments = NULL,
+  hover_info = NULL,
+  hover = TRUE,
+  point_line = list(),
+  x_range = list(),
+  y_range = list(),
+  reset_axes = FALSE,
+  n_dimensions = 2L
+) {
+  continuous <- is.numeric(color)
+  has_z <- as.integer(n_dimensions) == 3L && length(coordinates) >= 3L
+  meta <- list(
+    color_type = if (continuous) "continuous" else "categorical",
+    color_variable = color_variable
+  )
+  data <- list(
+    x = if (continuous) coordinates[[1L]] else list(),
+    y = if (continuous) coordinates[[2L]] else list(),
+    selection_key = if (continuous) selection_keys else list(),
+    color = if (continuous) color else list(),
+    point_size = point_size,
+    point_opacity = point_opacity,
+    point_line = point_line,
+    x_range = x_range,
+    y_range = y_range,
+    reset_axes = reset_axes
+  )
+  if (has_z) {
+    data[["z"]] <- if (continuous) coordinates[[3L]] else list()
+  }
+
+  show_hover <- isTRUE(hover)
+  hover_data <- list(
+    hoverinfo = if (show_hover) "text" else "skip",
+    text = if (continuous && show_hover) unname(hover_info) else list()
+  )
+  if (continuous) {
+    return(list(meta = meta, data = data, hover = hover_data))
+  }
+  if (is.null(color_assignments)) {
+    stop("color_assignments are required for categorical cell views")
+  }
+
+  meta[["traces"]] <- list()
+  cells_by_group <- split(seq_along(color), as.character(color))
+  hover_names <- names(hover_info)
+  aligned_hover <- if (!show_hover) {
+    NULL
+  } else if (
+    !is.null(hover_names) &&
+      any(!is.na(hover_names) & nzchar(hover_names))
+  ) {
+    unname(hover_info[match(selection_keys, hover_names)])
+  } else {
+    unname(hover_info)
+  }
+  index <- 1L
+  for (group in names(color_assignments)) {
+    cells <- cells_by_group[[group]]
+    if (is.null(cells)) {
+      next
+    }
+    meta[["traces"]][[index]] <- group
+    data[["x"]][[index]] <- coordinates[[1L]][cells]
+    data[["y"]][[index]] <- coordinates[[2L]][cells]
+    if (has_z) {
+      data[["z"]][[index]] <- coordinates[[3L]][cells]
+    }
+    data[["selection_key"]][[index]] <- selection_keys[cells]
+    data[["color"]][[index]] <- unname(color_assignments[[group]])
+    if (show_hover) {
+      hover_data[["text"]][[index]] <- aligned_hover[cells]
+    }
+    index <- index + 1L
+  }
+
+  list(meta = meta, data = data, hover = hover_data)
+}
+
+cerebroSelectionSummary <- function(
+  selection,
+  source,
+  color_variable = NULL,
+  metadata = getMetaData(),
+  groups = getGroups(),
+  main_group = NULL,
+  composition = FALSE,
+  max_groups = 5L
+) {
+  keys <- if (
+    is.data.frame(selection) && "selection_key" %in% names(selection)
+  ) {
+    selection[["selection_key"]]
+  } else if (is.data.frame(selection) && "cell_barcode" %in% names(selection)) {
+    selection[["cell_barcode"]]
+  } else if (is.list(selection) && !is.null(selection[["ids"]])) {
+    selection[["ids"]]
+  } else if (is.character(selection)) {
+    selection
+  } else {
+    character(0)
+  }
+  keys <- unique(as.character(keys[!is.na(keys) & nzchar(keys)]))
+  n_selected <- if (length(keys)) {
+    length(keys)
+  } else if (is.data.frame(selection)) {
+    nrow(selection)
+  } else {
+    length(selection)
+  }
+  total <- if (is.data.frame(metadata)) nrow(metadata) else 0L
+  unit <- tryCatch(getObservationUnit()$plural, error = function(e) "cells")
+
+  if (is.null(main_group)) {
+    parameters <- tryCatch(getParameters(), error = function(e) NULL)
+    main_group <- if (is.list(parameters)) parameters[["main_group"]] else NULL
+  }
+  normalized_groups <- tolower(gsub("[^[:alnum:]]", "", groups))
+  cell_type_index <- which(startsWith(normalized_groups, "celltype"))
+  cell_type_group <- if (length(cell_type_index)) {
+    groups[[cell_type_index[[1L]]]]
+  } else {
+    NULL
+  }
+
+  if (isTRUE(composition)) {
+    comp_candidates <- unique(c(
+      cell_type_group,
+      if (!is.null(color_variable) && color_variable %in% groups) {
+        color_variable
+      },
+      groups
+    ))
+    comp_candidates <- comp_candidates[
+      !is.na(comp_candidates) &
+        nzchar(comp_candidates) &
+        comp_candidates %in% colnames(metadata)
+    ]
+    if (
+      !length(keys) ||
+        !length(comp_candidates) ||
+        !"cell_barcode" %in% colnames(metadata)
+    ) {
+      return(NULL)
+    }
+    comp_group <- comp_candidates[[1L]]
+    values <- as.character(metadata[[comp_group]][
+      match(keys, as.character(metadata[["cell_barcode"]]))
+    ])
+    values <- values[!is.na(values) & nzchar(values)]
+    if (!length(values)) {
+      return(NULL)
+    }
+
+    counts <- sort(table(values), decreasing = TRUE)
+    max_groups <- max(1L, as.integer(max_groups[[1L]]))
+    shown_counts <- utils::head(counts, max_groups)
+    if (length(counts) > max_groups) {
+      shown_counts <- c(
+        shown_counts,
+        Other = sum(utils::tail(counts, -max_groups))
+      )
+    }
+    color_map <- tryCatch(
+      reactive_colors()[[comp_group]],
+      error = function(e) NULL
+    )
+    if (is.null(color_map)) {
+      levels_here <- names(counts)
+      fallback_colors <- tryCatch(
+        cerebro_group_colors(length(levels_here)),
+        error = function(e) grDevices::hcl.colors(length(levels_here), "Set 2")
+      )
+      color_map <- stats::setNames(
+        fallback_colors,
+        levels_here
+      )
+    }
+    total_counted <- sum(counts)
+    rows <- lapply(names(shown_counts), function(label) {
+      count <- unname(shown_counts[[label]])
+      percent <- 100 * count / total_counted
+      color <- if (identical(label, "Other")) {
+        "#aeb5bb"
+      } else {
+        unname(color_map[label])
+      }
+      if (is.null(color) || is.na(color) || !nzchar(color)) {
+        color <- "#aeb5bb"
+      }
+      shiny::tags$div(
+        class = "cerebro-selection-composition-row",
+        shiny::tags$span(
+          class = "cerebro-selection-composition-label",
+          shiny::tags$i(style = paste0("background:", color)),
+          shiny::tags$span(label)
+        ),
+        shiny::tags$span(
+          class = "cerebro-selection-composition-track",
+          shiny::tags$i(
+            style = paste0(
+              "width:",
+              formatC(percent, format = "f", digits = 1),
+              "%;background:",
+              color
+            )
+          )
+        ),
+        shiny::tags$span(
+          class = "cerebro-selection-composition-value",
+          paste0(
+            formatC(count, format = "f", big.mark = ",", digits = 0),
+            " · ",
+            round(percent),
+            "%"
+          )
+        )
+      )
+    })
+    return(shiny::tags$div(
+      class = "cerebro-selection-composition-card",
+      role = "status",
+      `aria-live` = "polite",
+      shiny::tags$div(
+        class = "cerebro-selection-composition-head",
+        shiny::tags$strong("Composition"),
+        shiny::tags$span(paste0(
+          "Selected ",
+          formatC(n_selected, format = "f", big.mark = ",", digits = 0),
+          " / ",
+          formatC(total, format = "f", big.mark = ",", digits = 0),
+          " ",
+          unit
+        ))
+      ),
+      shiny::tags$div(
+        class = "cerebro-selection-composition-sub",
+        paste("by", comp_group)
+      ),
+      shiny::tags$div(
+        class = "cerebro-selection-composition-rows",
+        rows
+      )
+    ))
+  }
+
+  candidates <- unique(c(main_group, cell_type_group, color_variable, groups))
+  candidates <- candidates[
+    !is.na(candidates) & nzchar(candidates) & candidates %in% colnames(metadata)
+  ]
+
+  profile <- NULL
+  if (
+    length(keys) &&
+      length(candidates) &&
+      "cell_barcode" %in% colnames(metadata)
+  ) {
+    values <- as.character(metadata[[candidates[[1L]]]][
+      match(keys, as.character(metadata[["cell_barcode"]]))
+    ])
+    values <- values[!is.na(values) & nzchar(values)]
+    if (length(values)) {
+      counts <- table(values)
+      dominant <- names(counts)[[which.max(counts)]]
+      profile <- shiny::tags$span(
+        class = "cerebro-selection-status-profile",
+        paste0(
+          dominant,
+          " \u00b7 ",
+          round(100 * max(counts) / length(values)),
+          "%"
+        )
+      )
+    }
+  }
+
+  shiny::tagList(
+    shiny::tags$span(
+      "Selected ",
+      shiny::tags$b(formatC(
+        n_selected,
+        format = "f",
+        big.mark = ",",
+        digits = 0
+      )),
+      " / ",
+      formatC(total, format = "f", big.mark = ",", digits = 0),
+      " ",
+      unit
+    ),
+    profile,
+    if (
+      !is.null(source) &&
+        length(source) &&
+        !is.na(source[[1L]]) &&
+        nzchar(source[[1L]])
+    ) {
+      shiny::tags$span(
+        class = "cerebro-selection-status-origin",
+        paste("Selected in", source[[1L]])
+      )
+    }
+  )
+}
+
+##----------------------------------------------------------------------------##
+
 ## Dynamic default point size for scatter/projection plots.
 ##
 ## Picks a sensible default marker size from how many points are drawn and how
@@ -2015,11 +2367,21 @@ filterSelectionByHiddenGroups <- function(
   if (length(hidden_groups) == 0) {
     return(selection)
   }
+  stable_key_matches <-
+    "selection_key" %in%
+    colnames(metadata) &&
+    "selection_key" %in% colnames(selection) &&
+    any(selection[["selection_key"]] %in% metadata[["selection_key"]])
+  key <- if (stable_key_matches) {
+    "selection_key"
+  } else {
+    "identifier"
+  }
   if (
     is.null(color_variable) ||
       !color_variable %in% colnames(metadata) ||
-      !"identifier" %in% colnames(metadata) ||
-      !"identifier" %in% colnames(selection)
+      !key %in% colnames(metadata) ||
+      !key %in% colnames(selection)
   ) {
     return(selection)
   }
@@ -2028,10 +2390,34 @@ filterSelectionByHiddenGroups <- function(
   ## group is not hidden. match() on identifier avoids a join dependency and
   ## keeps selection row order intact.
   group_by_identifier <- metadata[[color_variable]][
-    match(selection[["identifier"]], metadata[["identifier"]])
+    match(selection[[key]], metadata[[key]])
   ]
   keep <- !(group_by_identifier %in% hidden_groups)
   selection[keep, , drop = FALSE]
+}
+
+selectedCellMask <- function(selection_key, identifier, selection) {
+  if (length(selection_key) != length(identifier)) {
+    stop("Selection identity vectors must have equal length.", call. = FALSE)
+  }
+  if (is.null(selection) || !is.data.frame(selection)) {
+    return(rep(FALSE, length(identifier)))
+  }
+  stable <- if ("selection_key" %in% colnames(selection)) {
+    as.character(selection[["selection_key"]])
+  } else {
+    character()
+  }
+  stable <- stable[!is.na(stable) & nzchar(stable)]
+  if (length(stable)) {
+    return(as.character(selection_key) %in% stable)
+  }
+  coordinates <- if ("identifier" %in% colnames(selection)) {
+    as.character(selection[["identifier"]])
+  } else {
+    character()
+  }
+  as.character(identifier) %in% coordinates
 }
 
 ##----------------------------------------------------------------------------##

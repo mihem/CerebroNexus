@@ -24,98 +24,66 @@ output[["trajectory_projection_UI"]] <- renderUI({
   }
 
   tagList(
+    cerebroVizPageHeader(
+      "Trajectory",
+      "trajectory_projection_info",
+      "Explore inferred cell-state transitions and pseudotime."
+    ),
     fluidRow(
-      class = "cerebro-viz-row",
+      class = "cerebro-viz-row cerebro-viz-top-layout",
       column(
-        width = 3,
+        width = 12,
         offset = 0,
-        class = "cerebro-param-col",
-        cerebroBox(
-          title = tagList(
-            "Main parameters",
-            cerebroInfoButton("trajectory_projection_main_parameters_info")
-          ),
-          tagList(
+        class = "cerebro-viz-toolbar-col",
+        div(
+          class = "cerebro-viz-toolbar",
+          div(
+            class = "cerebro-viz-primary",
             uiOutput("trajectory_select_method_and_name_UI"),
-            uiOutput("trajectory_projection_main_parameters_UI")
-          )
-        ),
-        cerebroBox(
-          title = tagList(
-            "Additional parameters",
-            cerebroInfoButton(
-              "trajectory_projection_additional_parameters_info"
+            uiOutput("trajectory_projection_main_parameters_UI"),
+            shinyFiles::shinySaveButton(
+              "trajectory_projection_export",
+              label = "Export PDF",
+              title = "Export trajectory to PDF file.",
+              filetype = "pdf",
+              viewtype = "icon",
+              class = "cerebro-toolbar-export"
             )
           ),
-          uiOutput("trajectory_projection_additional_parameters_UI"),
-          collapsed = TRUE
-        ),
-        cerebroBox(
-          title = tagList(
-            "Group filters",
-            cerebroInfoButton("trajectory_projection_group_filters_info")
+          cerebroSettingsButton(
+            "trajectory_projection_more_button",
+            "trajectory_projection_more"
           ),
-          uiOutput("trajectory_projection_group_filters_UI"),
-          collapsed = TRUE
+          cerebroSettingsDrawer(
+            "trajectory_projection_more",
+            cerebroSettingsSection(
+              "Appearance",
+              uiOutput("trajectory_projection_additional_parameters_UI"),
+              cerebroInfoButton(
+                "trajectory_projection_additional_parameters_info"
+              )
+            ),
+            cerebroSettingsSection(
+              "Data",
+              uiOutput("trajectory_projection_data_parameters_UI")
+            ),
+            cerebroSettingsSection(
+              "Group filters",
+              uiOutput("trajectory_projection_group_filters_UI"),
+              cerebroInfoButton("trajectory_projection_group_filters_info")
+            )
+          )
         )
       ),
       column(
-        width = 9,
+        width = 12,
         offset = 0,
         class = "cerebro-viz-col",
-        shiny::tagAppendAttributes(
-          cerebroBox(
-            title = tagList(
-              boxTitle("Trajectory"),
-              cerebroInfoButton("trajectory_projection_info"),
-              shinyFiles::shinySaveButton(
-                "trajectory_projection_export",
-                label = "export to PDF",
-                title = "Export trajectory to PDF file.",
-                filetype = "pdf",
-                viewtype = "icon",
-                class = "btn-xs"
-              )
-            ),
-            tagList(
-              plotly::plotlyOutput(
-                "trajectory_projection",
-                width = "auto",
-                height = "60vh"
-              ),
-              tags$br(),
-              fluidRow(
-                column(
-                  width = 8,
-                  htmlOutput("trajectory_number_of_selected_cells")
-                ),
-                column(
-                  width = 4,
-                  tags$div(
-                    class = "cerebro-selection-actions",
-                    shinyjs::hidden(
-                      actionButton(
-                        inputId = "trajectory_projection_zoom_to_selection",
-                        label = "Zoom to selection",
-                        icon = icon("magnifying-glass-plus"),
-                        class = "btn-xs btn-default"
-                      )
-                    ),
-                    shinyjs::hidden(
-                      actionButton(
-                        inputId = "trajectory_projection_clear_selection",
-                        label = "Clear selection",
-                        icon = icon("eraser"),
-                        class = "btn-xs btn-default btn-breathing"
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          ),
-          class = "cerebro-projection-gate"
-        )
+        cerebroSelectionStatus(
+          "trajectory_projection",
+          "trajectory_number_of_selected_cells"
+        ),
+        cerebroCellViewOutput("trajectory_projection")
       )
     )
   )
@@ -208,13 +176,13 @@ output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
       plot_height_px = session$clientData[[
         "output_trajectory_projection_height"
       ]],
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
+      fallback = preferences[["projection_plot_point_size"]][["default"]]
     ),
     error = function(e) {
-      preferences[["gene_expression_plot_point_size"]][["default"]]
+      preferences[["projection_plot_point_size"]][["default"]]
     }
   )
 
@@ -233,32 +201,37 @@ output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
     sliderInput(
       "trajectory_point_size",
       label = "Point size",
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
       value = default_point_size
     ),
     sliderInput(
       "trajectory_point_opacity",
       label = "Point opacity",
-      min = preferences[["gene_expression_plot_point_opacity"]][["min"]],
-      max = preferences[["gene_expression_plot_point_opacity"]][["max"]],
-      step = preferences[["gene_expression_plot_point_opacity"]][["step"]],
-      value = preferences[["gene_expression_plot_point_opacity"]][["default"]]
-    ),
+      min = preferences[["projection_plot_point_opacity"]][["min"]],
+      max = preferences[["projection_plot_point_opacity"]][["max"]],
+      step = preferences[["projection_plot_point_opacity"]][["step"]],
+      value = preferences[["projection_plot_point_opacity"]][["default"]]
+    )
+  )
+})
+
+output[["trajectory_projection_data_parameters_UI"]] <- renderUI({
+  tagList(
     sliderInput(
       "trajectory_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      min = preferences[["projection_plot_percentage_cells_to_show"]][[
         "min"
       ]],
-      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      max = preferences[["projection_plot_percentage_cells_to_show"]][[
         "max"
       ]],
-      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      step = preferences[["projection_plot_percentage_cells_to_show"]][[
         "step"
       ]],
-      value = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      value = preferences[["projection_plot_percentage_cells_to_show"]][[
         "default"
       ]]
     )
@@ -269,6 +242,11 @@ output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
 outputOptions(
   output,
   "trajectory_projection_additional_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "trajectory_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 

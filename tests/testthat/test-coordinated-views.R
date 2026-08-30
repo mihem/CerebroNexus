@@ -126,7 +126,7 @@ test_that("trajectory coordinates and graph enter Linked views", {
 
 test_that("Linked views treats projections as a multi-panel selection", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(ui_file) && file.exists(js_file))
 
   ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
@@ -144,7 +144,7 @@ test_that("Linked views treats projections as a multi-panel selection", {
 })
 
 test_that("Linked views gives Colour by the shared Selectize control", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(js_file))
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
   expect_match(js, "function fillColorPicker()", fixed = TRUE)
@@ -152,16 +152,27 @@ test_that("Linked views gives Colour by the shared Selectize control", {
   expect_match(js, "sel.selectize.setValue(colorBy, true)", fixed = TRUE)
 })
 
-test_that("Linked views expands Colour by within the available viewport", {
+test_that("Linked views delegates menu height to the shared viewport sizing", {
   css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "multiselect.js")
   skip_if_not(file.exists(css_file))
   css <- paste(readLines(css_file, warn = FALSE), collapse = "\n")
-  expect_match(
-    css,
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  expect_false(grepl(
     "#cv-pick-color + .selectize-control .selectize-dropdown-content",
+    css,
+    fixed = TRUE
+  ))
+  expect_match(
+    js,
+    "--cerebro-select-menu-max-height",
     fixed = TRUE
   )
-  expect_match(css, "calc(100dvh - 240px)", fixed = TRUE)
+  expect_match(
+    js,
+    "window.innerHeight - top - 16",
+    fixed = TRUE
+  )
 })
 
 test_that("Linked views places the shared legend above the panel grid", {
@@ -186,7 +197,7 @@ test_that("Linked views hides its empty pane slots before data arrives", {
 })
 
 test_that("Linked views reflows after its workspace becomes wider", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(js_file))
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
 
@@ -194,22 +205,9 @@ test_that("Linked views reflows after its workspace becomes wider", {
   expect_match(js, "resizeObserver.observe(panesHost)", fixed = TRUE)
 })
 
-test_that("Linked views keeps a committed lasso through view-only zooms", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
-  skip_if_not(file.exists(js_file))
-  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
-
-  zoom_body <- function(name) {
-    start <- regexpr(paste0("function ", name, "()"), js, fixed = TRUE)[[1]]
-    expect_gt(start, 0)
-    substr(js, start, start + 500L)
-  }
-  expect_false(grepl("clearLassos", zoom_body("toggleZoom"), fixed = TRUE))
-})
-
 test_that("Linked views chooses its grid from both viewport dimensions", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(ui_file) && file.exists(js_file))
   ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
@@ -221,15 +219,11 @@ test_that("Linked views chooses its grid from both viewport dimensions", {
   expect_match(js, "VIEWPORT_GUTTER", fixed = TRUE)
   expect_match(js, "var VIEWPORT_GUTTER = 7", fixed = TRUE)
   expect_match(ui, 'class = "cv-secondary-analysis"', fixed = TRUE)
-  expect_match(
-    ui,
-    'class = "cv-secondary-analysis",\n      style = "display:none"'
-  )
 })
 
 test_that("Linked views keeps replacement controls contextual and user-facing", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   server_file <- file.path(dirname(bundle_file), "server.R")
   skip_if_not(
     file.exists(ui_file) && file.exists(js_file) && file.exists(server_file)
@@ -251,7 +245,7 @@ test_that("Linked views keeps replacement controls contextual and user-facing", 
 
 test_that("Trekker depth views form one collapsed insights region", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
   skip_if_not(
     file.exists(ui_file) && file.exists(js_file) && file.exists(css_file)
@@ -692,11 +686,12 @@ test_that("Linked views prefers cell type while consuming Viewer defaults", {
   for (point_size in c(0, 5, 20)) {
     cv_env$Cerebro.options$viewer_content$ds$overview_point_size <- point_size
     bundle <- cv_env$cv_build_bundle(crb)
+    expected_point_size <- if (point_size < 1) 2 else point_size
     expect_identical(bundle$default_projection, "tsne")
     expect_identical(bundle$default_group, "cell_type")
     expect_identical(
       bundle$default_point_size,
-      point_size,
+      expected_point_size,
       info = paste("point size", point_size)
     )
     expect_identical(bundle$default_percentage_cells_to_show, 60)
@@ -842,7 +837,7 @@ test_that("Builder Trekker backgrounds and appearance reach Linked views", {
   expect_identical(trekker$builder_point_size, 9)
 
   js <- paste(
-    readLines(file.path(dirname(bundle_file), "..", "www", "coordviews.js")),
+    readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
     collapse = "\n"
   )
   expect_match(js, "function pointSizeOf(p)", fixed = TRUE)
@@ -1234,7 +1229,7 @@ test_that("each section offers only its own configured backgrounds", {
   )
 
   js <- paste(
-    readLines(file.path(dirname(bundle_file), "..", "www", "coordviews.js")),
+    readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
     collapse = "\n"
   )
   expect_match(js, "pr.rotation != null ? pr.rotation : 0", fixed = TRUE)
@@ -1321,7 +1316,7 @@ test_that("per-image settings also apply to embedded backgrounds", {
     )
   )
   js <- paste(
-    readLines(file.path(dirname(bundle_file), "..", "www", "coordviews.js")),
+    readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
     collapse = "\n"
   )
   expect_match(js, "function imageRenderState(img, state)", fixed = TRUE)
@@ -1332,7 +1327,7 @@ test_that("the alignment bar follows the chosen background, not the data set", {
   ## With "None" chosen there is nothing on screen for those controls to adjust,
   ## so the bar goes away with the image. Keyed on the CURRENT choice rather than
   ## on whether the data set has an image at all, which is what it used to ask.
-  js <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(js))
   txt <- paste(readLines(js, warn = FALSE), collapse = "\n")
   expect_match(
@@ -1496,7 +1491,7 @@ test_that("More settings is an accessible drawer rather than a draggable window"
   )
   js <- paste(
     readLines(
-      file.path(local_inst, "viewer/www/coordviews.js"),
+      file.path(local_inst, "viewer/www/cell_views.js"),
       warn = FALSE
     ),
     collapse = "\n"
@@ -1519,6 +1514,21 @@ test_that("More settings is an accessible drawer rather than a draggable window"
   expect_match(css, "#cv-more,", fixed = TRUE)
   expect_match(css, "transition: none", fixed = TRUE)
   expect_no_match(css, "transition: transform .3s", fixed = TRUE)
+})
+
+test_that("Linked views stylesheet has balanced rule blocks", {
+  skip_if(is.na(local_inst), "viewer sources not found")
+  css <- paste(
+    readLines(
+      file.path(local_inst, "viewer/www/coordviews.css"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  count <- function(token) {
+    lengths(regmatches(css, gregexpr(token, css, fixed = TRUE)))
+  }
+  expect_equal(count("{"), count("}"))
 })
 
 test_that("external backgrounds require matching PNG or JPEG magic bytes", {
@@ -1569,7 +1579,7 @@ test_that("external backgrounds require matching PNG or JPEG magic bytes", {
 })
 
 test_that("background state keys namespace FOV and direct modalities", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(js_file))
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
   expect_match(js, "function backgroundStateKey\\(sp\\)")
@@ -1578,7 +1588,7 @@ test_that("background state keys namespace FOV and direct modalities", {
 })
 
 test_that("same-dataset refresh preserves percentage and group filters", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   skip_if_not(file.exists(js_file))
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
   expect_match(

@@ -17,7 +17,6 @@ expression_projection_data_to_plot_raw <- reactive({
       expression_projection_hover_info() == "none",
     !is.null(input[["expression_projection_genes_in_separate_panels"]])
   )
-  # message('--> trigger "expression_projection_data_to_plot"')
   parameters <- expression_projection_parameters_plot()
   if (parameters[['is_trajectory']]) {
     req(
@@ -33,11 +32,13 @@ expression_projection_data_to_plot_raw <- reactive({
     expression_levels = expression_projection_expression_levels(),
     plot_parameters = expression_projection_parameters_plot(),
     color_settings = expression_projection_parameters_color(),
+    selection_keys = as.character(
+      expression_projection_data()[["cell_barcode"]]
+    ),
     hover_info = expression_projection_hover_info(),
     trajectory = expression_projection_trajectory(),
     separate_panels = input[["expression_projection_genes_in_separate_panels"]]
   )
-  # message(str(to_return))
   return(to_return)
 })
 

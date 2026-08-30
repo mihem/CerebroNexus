@@ -108,8 +108,8 @@ output$ir_main_params_UI <- renderUI({
     ),
     # Global controls, flowed two-per-row so no hidden control leaves a gap.
     ir_flow_controls(controls),
-    # Function-specific analysis parameters (IR_PARAM_SPEC for the current tab).
-    uiOutput("ir_param_panel"),
+    # High-frequency analysis parameters for the current tab.
+    uiOutput("ir_primary_param_panel"),
     # Scatter / Compare sample selectors only on their own tabs.
     conditionalPanel(
       condition = "input.ir_tabs == 'Scatter'",
@@ -146,16 +146,9 @@ output$ir_additional_params_UI <- renderUI({
   uiOutput("ir_display_panel")
 })
 
-## ---- Helper: flow a list of controls, one per full-width row ---------- ##
-## The left parameter column is narrow (width = 3), so each control gets its
-## own full-width row rather than being packed two-per-row.
+## ---- Helper: flow controls across the shared top parameter area -------- ##
 ir_flow_controls <- function(controls) {
-  controls <- Filter(Negate(is.null), controls)
-  if (length(controls) == 0) {
-    return(NULL)
-  }
-  rows <- lapply(controls, function(ctrl) fluidRow(column(12, ctrl)))
-  do.call(tagList, rows)
+  ir_flow_controls_inline(controls)
 }
 
 ## ---- Helper: lay controls out side-by-side, wrapping only when needed -- ##
@@ -169,11 +162,13 @@ ir_flow_controls_inline <- function(controls, min_width = "160px") {
   }
   items <- lapply(controls, function(ctrl) {
     div(
+      class = "ir-flow-control-item",
       style = sprintf("flex: 1 1 %s; min-width: %s;", min_width, min_width),
       ctrl
     )
   })
   div(
+    class = "ir-flow-controls",
     style = "display: flex; flex-wrap: wrap; gap: 0 12px; align-items: flex-end;",
     do.call(tagList, items)
   )
@@ -290,16 +285,15 @@ ir_gene_families <- reactive({
   if (length(present) == 0) fams else present
 })
 
-## ---- Function-specific parameter panel (driven by IR_PARAM_SPEC) ------ ##
-## Renders exactly the analysis-parameter controls of the current tab's
-## scRepertoire function. Dynamic choice tokens are resolved here; all selects
-## use selectize = FALSE (selectize drops options in hidden/dynamic UI).
-output$ir_param_panel <- renderUI({
-  tab <- input$ir_tabs
+## ---- Function-specific parameter panels (driven by IR_PARAM_SPEC) ----- ##
+## The top bar gets plot-defining controls; low-frequency controls listed in
+## IR_MORE_PARAM_IDS render in the drawer. Dynamic choices are shared so the
+## two surfaces cannot drift.
+ir_analysis_spec <- function(tab, more = FALSE) {
   if (
     is.null(tab) || !exists("IR_PARAM_SPEC") || is.null(IR_PARAM_SPEC[[tab]])
   ) {
-    return(NULL)
+    return(list())
   }
   spec <- IR_PARAM_SPEC[[tab]]
 
@@ -311,6 +305,23 @@ output$ir_param_panel <- renderUI({
       tab %in% IR_ORDER_BY_TABS
   ) {
     spec <- c(spec, list(IR_ORDER_BY_PARAM))
+  }
+
+  is_more <- vapply(
+    spec,
+    function(p) p$id %in% IR_MORE_PARAM_IDS,
+    logical(1)
+  )
+  spec[is_more == more]
+}
+
+ir_analysis_panel <- function(more = FALSE) {
+  spec <- ir_analysis_spec(input$ir_tabs, more)
+  if (length(spec) == 0) {
+    if (more) {
+      return(helpText("No additional analysis settings for this plot."))
+    }
+    return(NULL)
   }
 
   groups <- tryCatch(getGroups(), error = function(e) character(0))
@@ -370,8 +381,22 @@ output$ir_param_panel <- renderUI({
     )
   })
 
-  # one control per full-width row (narrow left column)
-  ir_flow_controls(controls)
+  if (more) {
+    ir_flow_controls_inline(controls, min_width = "100%")
+  } else {
+    ir_flow_controls(controls)
+  }
+}
+
+output$ir_primary_param_panel <- renderUI({
+  ir_analysis_panel(more = FALSE)
+})
+
+output$ir_more_analysis_UI <- renderUI({
+  if (!has_scRepertoire() || is.null(ir_data_raw())) {
+    return(NULL)
+  }
+  ir_analysis_panel(more = TRUE)
 })
 
 ## ---- Reactive: number of samples -------------------------------------- ##
@@ -381,9 +406,8 @@ n_samples <- reactive({
 })
 
 ## ---- Generic display options ------------------------------------------ ##
-## Renders the IR_DISPLAY_SPEC controls applicable to the current tab. Lives in
-## the collapsible "Additional parameters" box (see UI.R), so it needs no extra
-## collapse of its own.
+## Renders the IR_DISPLAY_SPEC controls applicable to the current tab. The
+## settings drawer owns the section and scrolling, so this stays flat.
 output$ir_display_panel <- renderUI({
   tab <- input$ir_tabs
   if (!exists("ir_display_params_for")) {
@@ -419,10 +443,7 @@ output$ir_display_panel <- renderUI({
     textInput(p$id, p$label, value = p$value)
   })
 
-  # one control per row
-  rows <- lapply(controls, function(ctrl) fluidRow(column(12, ctrl)))
-
-  do.call(tagList, rows)
+  do.call(tagList, controls)
 })
 
 ## ---- Reactive: current display parameter values ----------------------- ##
@@ -515,9 +536,8 @@ ir_umap_cells_to_show <- reactive({
 })
 
 ## ---- Info dialogs: explain the parameters shown on the current tab ---- ##
-## The info buttons next to each left-column box open a modal that explains,
-## in plain language, exactly the controls visible on the current tab. Text
-## comes from IR_PARAM_DESC (param_spec.R) so it never drifts from the controls.
+## The top bar and drawer info buttons explain the controls visible on the
+## current tab. Text comes from IR_PARAM_DESC so it cannot drift from the UI.
 
 ## Render a list of param ids as styled help cards (bold name + plain text).
 ir_param_help_cards <- function(ids) {
@@ -553,25 +573,40 @@ IR_PARAM_LABELS <- local({
       labs[[p$id]] <- sub(":\\s*$", "", p$label)
     }
   }
-  for (p in c(IR_DISPLAY_BASE, IR_DISPLAY_SCATTER)) {
+  for (p in c(IR_DISPLAY_BASE, IR_DISPLAY_SCATTER, IR_DISPLAY_LEGEND)) {
     labs[[p$id]] <- sub(":\\s*$", "", p$label)
   }
+  labs[[IR_ORDER_BY_PARAM$id]] <- sub(":\\s*$", "", IR_ORDER_BY_PARAM$label)
   labs
 })
 
-## Main parameters info: global controls + this tab's analysis params.
+## Main parameters info: global controls + top-bar analysis params.
 observeEvent(input$ir_main_parameters_info, {
   tab <- input$ir_tabs
-  spec_ids <- if (
-    !is.null(tab) && exists("IR_PARAM_SPEC") && !is.null(IR_PARAM_SPEC[[tab]])
-  ) {
-    vapply(IR_PARAM_SPEC[[tab]], function(p) p$id, character(1))
-  } else {
-    character(0)
-  }
+  spec_ids <- vapply(
+    ir_analysis_spec(tab, more = FALSE),
+    function(p) p$id,
+    character(1)
+  )
   ids <- c(ir_visible_global_ids(tab), spec_ids)
   showModal(modalDialog(
     title = paste0("Main parameters", if (!is.null(tab)) paste0(" — ", tab)),
+    ir_param_help_cards(ids),
+    easyClose = TRUE,
+    footer = modalButton("Close"),
+    size = "l"
+  ))
+})
+
+observeEvent(input$ir_more_analysis_info, {
+  tab <- input$ir_tabs
+  ids <- vapply(
+    ir_analysis_spec(tab, more = TRUE),
+    function(p) p$id,
+    character(1)
+  )
+  showModal(modalDialog(
+    title = paste0("Analysis settings", if (!is.null(tab)) paste0(" — ", tab)),
     ir_param_help_cards(ids),
     easyClose = TRUE,
     footer = modalButton("Close"),
@@ -611,8 +646,8 @@ observeEvent(input$ir_group_filters_info, {
   ))
 })
 
-## Keep the left-column boxes' dynamic UI alive even while their box is
-## collapsed, so controls exist in the DOM (mirrors the Main tab's pattern).
+## Keep drawer controls alive while the drawer is closed.
 outputOptions(output, "ir_additional_params_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_group_filters_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_display_panel", suspendWhenHidden = FALSE)
+outputOptions(output, "ir_more_analysis_UI", suspendWhenHidden = FALSE)

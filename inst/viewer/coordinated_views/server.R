@@ -7,7 +7,7 @@
 ## Responsibility: build ONE per-dataset bundle describing the cells, their
 ## categorical groupings, and every available "space" (a named 2-D layout of the
 ## SAME cells: umap / spatial / clone), plus per-cell clone identity, and push it
-## to www/coordviews.js. All interaction (linked brushing, highlight, readout) is
+## to www/cell_views.js. All interaction (linked brushing, highlight, readout) is
 ## then client-side. The engine keys selection on cell index, so a brush in any
 ## panel highlights the same cells in every other panel — across modalities.
 ##----------------------------------------------------------------------------##
@@ -83,7 +83,6 @@ coordviews_color_patch <- reactive({
   colors <- tryCatch(reactive_colors(), error = function(e) NULL)
   cv_color_patch(b, colors)
 })
-
 ## Nothing is built or sent until the user actually opens the tab.
 ##
 ## `coordviews_bundle()` walks every cell of the loaded object -- reductions,
@@ -92,7 +91,7 @@ coordviews_color_patch <- reactive({
 ## open; colour edits now stay in the small patch reactive above.
 ##
 ## The client reports whether the workspace is on screen (`coordviews_visible`)
-## -- see www/coordviews.js for why that signal rather than the sidebar's
+## -- see www/cell_views.js for why that signal rather than the sidebar's
 ## active-tab input. The gate is CURRENT visibility, not "was opened once":
 ## a sticky flag stopped the first build but left every later one, so opening
 ## the tab, going to Color management and changing a colour rebuilt and re-sent
@@ -118,10 +117,7 @@ observe(
       return()
     }
     if (is.null(bundle$error)) {
-      bundle <- cv_apply_color_patch(
-        bundle,
-        isolate(coordviews_color_patch())
-      )
+      bundle <- cv_apply_color_patch(bundle, isolate(coordviews_color_patch()))
     }
     session$sendCustomMessage("coordviews_data", bundle)
     coordviews_build_log$sent_n <- coordviews_build_log$n
@@ -486,12 +482,12 @@ observeEvent(
 ##----------------------------------------------------------------------------##
 ## Spatial histology-image controls — shown only when the current data set's
 ## spatial entry carries an embedded image. The controls are client-owned
-## (cv-img- ids), wired by coordviews.js; adjusting them re-styles the image on
+## (cv-img- ids), wired by cell_views.js; adjusting them re-styles the image on
 ## the canvas instantly and never round-trips to the server.
 ##----------------------------------------------------------------------------##
 output[["coordviews_image_ui"]] <- renderUI({
   ## suspendWhenHidden = FALSE below keeps these controls in the DOM for
-  ## coordviews.js to wire, which also means this output runs while the tab is
+  ## cell_views.js to wire, which also means this output runs while the tab is
   ## hidden -- and it reads the bundle. Without the same gate as the push, it
   ## would build the bundle on connect on its own and the laziness would be
   ## worth nothing.

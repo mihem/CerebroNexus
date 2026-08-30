@@ -158,18 +158,14 @@ test_that("background-image selection only recreates image calibration controls"
   )
   expect_match(
     projection_ui,
-    'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
+    'uiOutput\\("spatial_projection_background_select_UI"\\)'
   )
   expect_match(
     projection_ui,
-    paste0(
-      'tagList\\([[:space:]]*',
-      'uiOutput\\("spatial_projection_scatter_parameters_UI"\\),[[:space:]]*',
-      'uiOutput\\("spatial_projection_background_parameters_UI"\\)',
-      '[[:space:]]*\\)'
-    ),
-    perl = TRUE
+    'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
   )
+  expect_match(projection_ui, '"Appearance"', fixed = TRUE)
+  expect_match(projection_ui, '"Background image"', fixed = TRUE)
 })
 
 test_that("ImageFeaturePlot reaches getExpressionMatrix as a Cerebro method", {
@@ -503,40 +499,22 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   sys.source(
     file.path(
       system.file("viewer", package = "CerebroNexus"),
+      "utility_functions.R"
+    ),
+    envir = renderer
+  )
+  sys.source(
+    file.path(
+      system.file("viewer", package = "CerebroNexus"),
       "spatial",
       "func_projection_update_plot.R"
     ),
     envir = renderer
   )
-  js <- get("js", envir = asNamespace("shinyjs"))
-  bindings <- c("getContainerDimensions", "updatePlot2DContinuousSpatial")
-  existed <- vapply(bindings, exists, logical(1), envir = js, inherits = FALSE)
-  previous <- lapply(bindings, function(name) {
-    if (exists(name, envir = js, inherits = FALSE)) get(name, envir = js)
-  })
-  on.exit(
-    {
-      for (i in seq_along(bindings)) {
-        if (existed[[i]]) {
-          assign(bindings[[i]], previous[[i]], envir = js)
-        } else if (exists(bindings[[i]], envir = js, inherits = FALSE)) {
-          rm(list = bindings[[i]], envir = js)
-        }
-      }
-    },
-    add = TRUE
-  )
   rendered <- NULL
-  assign(
-    "getContainerDimensions",
-    function() list(width = 800, height = 600),
-    envir = js
-  )
-  assign(
-    "updatePlot2DContinuousSpatial",
-    function(meta, data, ...) rendered <<- list(meta = meta, data = data),
-    envir = js
-  )
+  renderer$cerebroCellViewRender <- function(id, meta, data, ...) {
+    rendered <<- list(meta = meta, data = data)
+  }
 
   params <- list(
     color_variable = "score",
@@ -616,130 +594,43 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_identical(rendered$data$y, c(30, 70))
 })
 
-test_that("spatial background JS seeds resolved rotation on image changes", {
-  scatter_js <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
-      "www",
-      "projection_scatter.js"
-    )),
+test_that("shared Canvas owns spatial background identity and appearance", {
+  engine <- paste(
+    readLines(viewer_test_path("www", "cell_views.js")),
     collapse = "\n"
   )
-  background_js <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
+  controls <- paste(
+    readLines(viewer_test_path(
       "spatial",
-      "js_spatial_background.js"
+      "obj_projection_background_controls.R"
     )),
     collapse = "\n"
   )
 
+  expect_match(engine, "JSON.stringify(meta.background_identity)", fixed = TRUE)
   expect_match(
-    scatter_js,
-    paste0(
-      "meta\\.background_rotation[[:space:]]*,[[:space:]]*\\n?",
-      "[[:space:]]*meta\\.background_identity[[:space:]]*\\n?",
-      "[[:space:]]*\\)"
-    ),
-    perl = TRUE
+    engine,
+    "rotation: Number(meta.background_rotation) || 0",
+    fixed = TRUE
   )
-  expect_match(scatter_js, "meta\\.background_identity", perl = TRUE)
-  expect_match(
-    background_js,
-    "rotate !== undefined.*dataset\\.rotate === undefined",
-    perl = TRUE
-  )
-  expect_match(
-    background_js,
-    "dataset\\.rotate = String\\(rotate\\)",
-    perl = TRUE
-  )
+  expect_match(engine, "function updateSingleBackground", fixed = TRUE)
+  expect_match(engine, "stashImgState(space)", fixed = TRUE)
+  expect_match(controls, '"cell_view_background"', fixed = TRUE)
+
   renderer_src <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
-      "spatial",
-      "func_projection_update_plot.R"
-    )),
+    readLines(viewer_test_path("spatial", "func_projection_update_plot.R")),
     collapse = "\n"
   )
-  identity_assignments <- gregexpr(
+  assignments <- gregexpr(
     "background_identity = plot_parameters",
     renderer_src,
     fixed = TRUE
   )[[1L]]
-  expect_length(identity_assignments[identity_assignments > 0L], 3L)
-})
-
-test_that("spatial background JS isolates identical URIs by logical identity", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
-  js_path <- file.path(
-    system.file("viewer", package = "CerebroNexus"),
-    "spatial",
-    "js_spatial_background.js"
-  )
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
-      "const fs = require('fs');",
-      "global.shinyjs = { getParams: (x) => x };",
-      "const wrapper = { id: 'spatial_projection_wrapper', style: {}, insertBefore: () => {} };",
-      "const plot = { id: 'spatial_projection', parentElement: wrapper, style: {}, dataset: {} };",
-      "const bg = { id: 'spatial_projection_background', parentElement: wrapper, style: {}, dataset: {} };",
-      "const elements = { spatial_projection: plot, spatial_projection_wrapper: wrapper, spatial_projection_background: bg };",
-      "global.document = { getElementById: id => elements[id] || null, createElement: () => { throw new Error('unexpected create'); } };",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(js_path, quote = "\"")
-      ),
-      "shinyjs.applySpatialBackground = () => {};",
-      "const uri = 'data:image/png;base64,SAME';",
-      "const a = {dataset:'Atlas', spatial_name:'sliceA', source:'embedded', label:'H&E'};",
-      "const b = {dataset:'Other', spatial_name:'sliceB', source:'external', label:'H&E'};",
-      "shinyjs.syncSpatialBackground(uri, false, false, 1, 1, 0.8, null, 2, 3, 10, a);",
-      "shinyjs.updateSpatialBackgroundAppearance({flipX:true, scaleX:4, offsetX:40, rotate:80});",
-      "shinyjs.syncSpatialBackground(uri, false, true, 2, 3, 0.4, null, 5, 6, 20, b);",
-      "const switched = {flipX:bg.dataset.flipX, flipY:bg.dataset.flipY, scaleX:bg.dataset.scaleX, scaleY:bg.dataset.scaleY, offsetX:bg.dataset.offsetX, offsetY:bg.dataset.offsetY, rotate:bg.dataset.rotate, opacity:bg.dataset.opacity, identity:bg.dataset.backgroundIdentity};",
-      "shinyjs.updateSpatialBackgroundAppearance({flipX:true, scaleX:7, offsetX:70, rotate:90});",
-      "shinyjs.syncSpatialBackground(uri, false, false, 9, 9, 0.1, null, 9, 9, 9, b);",
-      "const same = {flipX:bg.dataset.flipX, scaleX:bg.dataset.scaleX, offsetX:bg.dataset.offsetX, rotate:bg.dataset.rotate};",
-      "console.log(JSON.stringify({switched, same}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_equal(
-    attr(output, "status"),
-    NULL,
-    info = paste(output, collapse = "\n")
-  )
-  result <- jsonlite::fromJSON(output)
-  expect_identical(
-    unname(unlist(result$switched[c(
-      "flipX",
-      "flipY",
-      "scaleX",
-      "scaleY",
-      "offsetX",
-      "offsetY",
-      "rotate",
-      "opacity"
-    )])),
-    c("false", "true", "2", "3", "5", "6", "20", "0.4")
-  )
-  expect_identical(
-    jsonlite::fromJSON(result$switched$identity),
-    list(
-      dataset = "Other",
-      spatial_name = "sliceB",
-      source = "external",
-      label = "H&E"
-    )
-  )
-  expect_identical(
-    unname(unlist(result$same)),
-    c("true", "7", "70", "90")
+  expect_length(assignments[assignments > 0L], 1L)
+  expect_match(
+    renderer_src,
+    'payload[["meta"]] <- c(background_meta, payload[["meta"]])',
+    fixed = TRUE
   )
 })
 
@@ -788,13 +679,18 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
   shiny::testServer(server, {
     session$setInputs(spatial_projection_to_display = "sliceB")
     session$flushReact()
-    html <- as.character(output$spatial_projection_main_parameters_UI$html)
+    main_html <- as.character(
+      output$spatial_projection_main_parameters_UI$html
+    )
+    background_html <- as.character(
+      output$spatial_projection_background_select_UI$html
+    )
 
-    expect_match(html, 'value="sliceB" selected', fixed = TRUE)
-    expect_match(html, "embedded::IF", fixed = TRUE)
-    expect_match(html, "external::MIBI", fixed = TRUE)
-    expect_false(grepl("embedded::H&amp;E", html, fixed = TRUE))
-    expect_false(grepl("external::DAPI", html, fixed = TRUE))
+    expect_match(main_html, 'value="sliceB" selected', fixed = TRUE)
+    expect_match(background_html, "embedded::IF", fixed = TRUE)
+    expect_match(background_html, "external::MIBI", fixed = TRUE)
+    expect_false(grepl("embedded::H&amp;E", background_html, fixed = TRUE))
+    expect_false(grepl("external::DAPI", background_html, fixed = TRUE))
     expect_identical(getSpatialData("sliceB")$coordinates$x, 101:102)
   })
 })

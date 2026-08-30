@@ -18,13 +18,13 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
       ),
       plot_width_px = session$clientData[["output_spatial_projection_width"]],
       plot_height_px = session$clientData[["output_spatial_projection_height"]],
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
+      fallback = preferences[["projection_plot_point_size"]][["default"]]
     ),
     error = function(e) {
-      preferences[["gene_expression_plot_point_size"]][["default"]]
+      preferences[["projection_plot_point_size"]][["default"]]
     }
   )
 
@@ -63,29 +63,29 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
     sliderInput(
       "spatial_projection_point_size",
       label = "Point size",
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
       value = default_point_size
     ),
     sliderInput(
       "spatial_projection_point_opacity",
       label = "Point opacity",
-      min = preferences[["gene_expression_plot_point_opacity"]][["min"]],
-      max = preferences[["gene_expression_plot_point_opacity"]][["max"]],
-      step = preferences[["gene_expression_plot_point_opacity"]][["step"]],
+      min = preferences[["projection_plot_point_opacity"]][["min"]],
+      max = preferences[["projection_plot_point_opacity"]][["max"]],
+      step = preferences[["projection_plot_point_opacity"]][["step"]],
       value = 1
     ),
     sliderInput(
       "spatial_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      min = preferences[["projection_plot_percentage_cells_to_show"]][[
         "min"
       ]],
-      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      max = preferences[["projection_plot_percentage_cells_to_show"]][[
         "max"
       ]],
-      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      step = preferences[["projection_plot_percentage_cells_to_show"]][[
         "step"
       ]],
       value = 100

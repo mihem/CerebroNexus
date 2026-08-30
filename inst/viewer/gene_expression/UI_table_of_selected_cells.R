@@ -70,11 +70,28 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
     ## data
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
-      dplyr::mutate(identifier = paste0(X1, '-', X2)) %>%
-      dplyr::filter(identifier %in% selected_cells$identifier) %>%
-      dplyr::select(-c(X1, X2, identifier)) %>%
+      dplyr::mutate(identifier = paste0(X1, '-', X2))
+    cells_df[["selection_key"]] <- if ("cell_barcode" %in% colnames(cells_df)) {
+      as.character(cells_df[["cell_barcode"]])
+    } else {
+      as.character(seq_len(nrow(cells_df)))
+    }
+    cells_df <- cells_df[
+      selectedCellMask(
+        cells_df[["selection_key"]],
+        cells_df[["identifier"]],
+        selected_cells
+      ),
+      ,
+      drop = FALSE
+    ] %>%
+      dplyr::select(-c(X1, X2, identifier, selection_key)) %>%
       dplyr::rename(expression_level = level) %>%
-      dplyr::select(cell_barcode, expression_level, everything())
+      dplyr::select(
+        dplyr::any_of("cell_barcode"),
+        expression_level,
+        everything()
+      )
     ## check how many cells are left after filtering
     ## ... no cells are left
     if (nrow(cells_df) == 0) {

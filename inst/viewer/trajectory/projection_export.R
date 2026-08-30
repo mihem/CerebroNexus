@@ -56,7 +56,7 @@ observeEvent(input[["trajectory_projection_export"]], {
     )
 
     ## put rows in random order
-    cells_df <- cells_df[sample(1:nrow(cells_df)), ]
+    cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
 
     ## start building the plot
     plot <- ggplot() +

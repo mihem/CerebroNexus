@@ -1,12 +1,13 @@
 /* ==========================================================================
-   Coordinated cross-modal views — client-side engine.
+   Shared cell-view Canvas engine.
 
    Every modality is just a named 2-D layout of the SAME cells:
      umap    = expression embedding
      spatial = physical coordinates
      clone   = (clone expansion-rank, within-clone index)
-   The engine renders N panels, each showing one "space", over a single shared
-   selection set keyed on CELL INDEX. Because the selection is by cell index,
+   The engine renders one specialist view or N linked panels, each showing one
+   "space", over a shared selection set keyed on CELL INDEX. Because selection
+   is by cell index,
    brushing in any panel highlights the same cells in every other panel —
    across modalities — with no special-casing. This is the coordination fabric
    the paper claims, generalised so the immune repertoire is a first-class
@@ -22,53 +23,65 @@
   'use strict';
 
   var D = null;                 // the data bundle
+  var linkedBundle = null;      // cached while a dedicated page owns the canvas
+  var singleViews = {};         // latest specialist payload per plot id
+  var singleRequests = new Set(); // visible hosts awaiting their first payload
+  var singleActive = null;      // plot id currently using the shared surface
+  var singleIndexCells = null;  // cells array behind the cached barcode index
+  var singleIndexMap = null;
+  var singleSpaceIds = [];      // one space, or one per gene in multi-panel mode
+  var singleSpaceModes = {};    // space id -> categorical/continuous colour mode
+  var surfaceHome = null;       // original Linked Views panel/legend locations
+  var linkedState = null;       // Linked workspace state while a single page owns the surface
   var pendingColorPatch = null; // palette received before its dataset bundle
   var panels = [];              // [{key, canvas, ctx, spaceId, W, H, sx, sy, lasso, drag, moved}]
   var sel = null;               // Set of selected cell indices (null = none)
   var selectionSource = null;   // label of the lens that created the active cohort
+  var selectionSourceSpace = null; // space id of the lens that created it
   var pick = null;              // hovered/clicked cell index
-// Panel + cell of a PINNED tooltip: the one a click left in place, carrying the
-// Details and Close buttons. {null, null} when no tooltip is pinned.
-var pinnedTip = { panel: null, cell: null };
-// Cell under the cursor, wherever it is. The whole point of linked views is that
-// a cell is the SAME cell in every panel, so pointing at it in one has to mark it
-// in the others -- that is how the eye carries a position in the embedding over
-// to a position in tissue. Null when the cursor is not on a cell.
-var hoverCell = null;
-// The gene a reply is still wanted for. Set when one is asked for and cleared by
-// the reply, so a late answer for a gene the user has moved on from is dropped
-// rather than drawn under the current gene's name.
-var geneWanted = null;
-// Alignment is a property of a (section, background image) PAIR, not of the
-// workspace. One shared imgState meant the numbers followed the user from one
-// slide to another, which is how a calibration ended up describing an image it
-// was never made for. Keyed `section|imageId`; cleared with the data set, since
-// the ids belong to the object that produced them.
-var imgStates = {};
-// Which background each section was last showing, so returning to a section
-// returns the view of it the user left, not merely its alignment. Keyed by
-// section name; cleared with the data set.
-var imgChoice = {};
-// The data set the current state belongs to. Compared against the incoming
-// bundle's identity to tell a new data set from a re-sent one.
-var dataShown = null;
-// Guards the async decode: a fast switch could have an earlier image finish
-// loading after a later one and paint itself over the current choice.
-var imgToken = 0;
-// The visible spatial sections are independent spaces. Selection, colour and
-// filters are global; image choice/alignment stay on their own section. One of
-// them is active so the single alignment bar has an unambiguous target.
-var selectedSpatial = [];
-var activeSpatialId = null;
-// A background choice belongs to one spatial section. Auto/None/Custom must
-// not leak from donor A into donor C merely because they are shown together.
-var backgroundModes = {};
-var backgroundScopePulse = false;
-var spatialTemplate = null;
-// Panel key currently promoted as the primary lens, or null for equal overview.
-// Context lenses stay present and coordinated while the primary grows.
-var focusPanel = null;
-  var zoomed = false;           // is the umap panel currently zoomed to a selection
+  // Panel + cell of a PINNED tooltip: the one a click left in place, carrying the
+  // Details and Close buttons. {null, null} when no tooltip is pinned.
+  var pinnedTip = { panel: null, cell: null };
+  // Cell under the cursor, wherever it is. The whole point of linked views is that
+  // a cell is the SAME cell in every panel, so pointing at it in one has to mark it
+  // in the others -- that is how the eye carries a position in the embedding over
+  // to a position in tissue. Null when the cursor is not on a cell.
+  var hoverCell = null;
+  // The gene a reply is still wanted for. Set when one is asked for and cleared by
+  // the reply, so a late answer for a gene the user has moved on from is dropped
+  // rather than drawn under the current gene's name.
+  var geneWanted = null;
+  // Alignment is a property of a (section, background image) PAIR, not of the
+  // workspace. One shared imgState meant the numbers followed the user from one
+  // slide to another, which is how a calibration ended up describing an image it
+  // was never made for. Keyed `section|imageId`; cleared with the data set, since
+  // the ids belong to the object that produced them.
+  var imgStates = {};
+  // Which background each section was last showing, so returning to a section
+  // returns the view of it the user left, not merely its alignment. Keyed by
+  // section name; cleared with the data set.
+  var imgChoice = {};
+  // The data set the current state belongs to. Compared against the incoming
+  // bundle's identity to tell a new data set from a re-sent one.
+  var dataShown = null;
+  // Guards the async decode: a fast switch could have an earlier image finish
+  // loading after a later one and paint itself over the current choice.
+  var imgToken = 0;
+  // The visible spatial sections are independent spaces. Selection, colour and
+  // filters are global; image choice/alignment stay on their own section. One of
+  // them is active so the single alignment bar has an unambiguous target.
+  var selectedSpatial = [];
+  var activeSpatialId = null;
+  // A background choice belongs to one spatial section. Auto/None/Custom must
+  // not leak from donor A into donor C merely because they are shown together.
+  var backgroundModes = {};
+  var backgroundScopePulse = false;
+  var spatialTemplate = null;
+  // Panel key currently promoted as the primary lens, or null for equal overview.
+  // Context lenses stay present and coordinated while the primary grows.
+  var focusPanel = null;
+  var zoomed = false;           // did the cohort Zoom action change a panel view?
+  var zoomedSpace = null;       // space controlled by that action
   var selectMode = 'lasso';     // drag-select mode: 'lasso' (freeform) or 'box'
   // Trekker controls brought into Linked views (only when D.trekker is present):
   var dissolvePct = 0;          // % of least-confident nuclei to dissolve
@@ -147,6 +160,50 @@ var focusPanel = null;
   function viridisCss(t) {
     var k = Math.round(Math.max(0, Math.min(1, t)) * 255);
     return VIR_CSS[k];
+  }
+  var SINGLE_SCALES = {
+    YlGnBu: ['#ffffd9', '#c7e9b4', '#41b6c4', '#225ea8', '#081d58'],
+    YlOrRd: ['#ffffcc', '#fed976', '#fd8d3c', '#e31a1c', '#800026'],
+    Blues: ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b'],
+    Greens: ['#f7fcf5', '#c7e9c0', '#74c476', '#238b45', '#00441b'],
+    Reds: ['#fff5f0', '#fcbba1', '#fb6a4a', '#cb181d', '#67000d'],
+    RdBu: ['#67001f', '#d6604d', '#f7f7f7', '#4393c3', '#053061'],
+    Viridis: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725']
+  };
+  function rgbChannels(color) {
+    var value = cssColor(color, '#888888');
+    if (value[0] === '#') {
+      if (value.length === 4) value = '#' + value[1] + value[1] + value[2] +
+        value[2] + value[3] + value[3];
+      return [parseInt(value.slice(1, 3), 16), parseInt(value.slice(3, 5), 16),
+        parseInt(value.slice(5, 7), 16)];
+    }
+    var match = value.match(/[\d.]+/g);
+    return match ? match.slice(0, 3).map(Number) : [136, 136, 136];
+  }
+  function singlePalette(scale, reverse) {
+    var raw = typeof scale === 'string' ? SINGLE_SCALES[scale] : scale;
+    if (!Array.isArray(raw) || !raw.length) return null;
+    var stops = Array.isArray(raw[0]) ? raw.map(function (item) {
+      return [Number(item[0]), item[1]];
+    }) : raw.map(function (color, index) {
+      return [index / Math.max(1, raw.length - 1), color];
+    });
+    if (reverse) stops = stops.map(function (item) {
+      return [1 - item[0], item[1]];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+    var out = new Array(256), right = 1;
+    for (var i = 0; i < 256; i++) {
+      var t = i / 255;
+      while (right < stops.length - 1 && t > stops[right][0]) right++;
+      var left = stops[Math.max(0, right - 1)], next = stops[right];
+      var span = next[0] - left[0], local = span > 0 ? (t - left[0]) / span : 0;
+      var a = rgbChannels(left[1]), b = rgbChannels(next[1]);
+      out[i] = 'rgb(' + [0, 1, 2].map(function (channel) {
+        return Math.round(a[channel] + (b[channel] - a[channel]) * local);
+      }).join(',') + ')';
+    }
+    return out;
   }
 
   function $(id) { return document.getElementById(id); }
@@ -239,6 +296,7 @@ var focusPanel = null;
   // True value behind a field's quantised code (fields travel 0..scale to keep
   // the bundle small; min/max carry the real range).
   function fieldValue(fld, i) {
+    if (fld.raw && fld.raw[i] != null && !isNaN(fld.raw[i])) return fld.raw[i];
     var q = fld.v[i];
     if (q == null || isNaN(q)) return null;
     return fld.min + (q / (fld.scale || 255)) * (fld.max - fld.min);
@@ -303,12 +361,22 @@ var focusPanel = null;
   // expansion axis into a needle.
   function unitOf(space) {
     var xs = space.x, ys = space.y, zs = space.z || null, n = xs.length;
-    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    var xr = space.xRange, yr = space.yRange;
+    var fixedX = Array.isArray(xr) && xr.length === 2 &&
+      isFinite(Number(xr[0])) && isFinite(Number(xr[1])) &&
+      Number(xr[0]) !== Number(xr[1]);
+    var fixedY = Array.isArray(yr) && yr.length === 2 &&
+      isFinite(Number(yr[0])) && isFinite(Number(yr[1])) &&
+      Number(yr[0]) !== Number(yr[1]);
+    var x0 = fixedX ? Math.min(Number(xr[0]), Number(xr[1])) : Infinity;
+    var x1 = fixedX ? Math.max(Number(xr[0]), Number(xr[1])) : -Infinity;
+    var y0 = fixedY ? Math.min(Number(yr[0]), Number(yr[1])) : Infinity;
+    var y1 = fixedY ? Math.max(Number(yr[0]), Number(yr[1])) : -Infinity;
     for (var i = 0; i < n; i++) {
       var xv = xs[i], yv = ys[i];
-      if (xv == null || isNaN(xv)) continue;
-      if (xv < x0) x0 = xv; if (xv > x1) x1 = xv;
-      if (yv < y0) y0 = yv; if (yv > y1) y1 = yv;
+      if (xv == null || yv == null || isNaN(xv) || isNaN(yv)) continue;
+      if (!fixedX) { if (xv < x0) x0 = xv; if (xv > x1) x1 = xv; }
+      if (!fixedY) { if (yv < y0) y0 = yv; if (yv > y1) y1 = yv; }
     }
     var dw = (x1 - x0) || 1, dh = (y1 - y0) || 1;
     var kx, ky, ox, oy;
@@ -431,15 +499,19 @@ var focusPanel = null;
   // Cached per (data set, colouring, gene): the sort is over every cell and the
   // answer only changes when one of those does.
   var _ordD = null, _ordKey = null, _ordVal = null;
-  function paintOrder() {
+  function panelColorMode(p) {
+    return p && p.colorBy ? p.colorBy : colorBy;
+  }
+  function paintOrder(p) {
     if (!D) return null;
-    var key = colorBy + '|' + (D.gene ? D.gene.gene : '');
+    var mode = panelColorMode(p);
+    var key = mode + '|' + (D.gene ? D.gene.gene : '');
     if (_ordD === D && _ordKey === key) return _ordVal;
     var vals = null;
-    if (colorBy === GENE_MODE && D.gene) {
+    if (mode === GENE_MODE && D.gene) {
       vals = D.gene.v;
     } else {
-      var f = fieldOf();
+      var f = fieldForMode(mode);
       if (f) vals = f.v;
     }
     var ord = null;
@@ -468,16 +540,18 @@ var focusPanel = null;
   // hidden -- they saturate at the ends, and the colourbar says so.
   var colorClip = 0.01;
   var _clipD = null, _clipKey = null, _clipVal = null;
-  function clipRange() {
+  function clipRange(p) {
     if (!D) return null;
-    var vals = null, span = 255;
-    if (colorBy === GENE_MODE && D.gene) { vals = D.gene.v; span = 255; }
+    var mode = panelColorMode(p);
+    var vals = null, span = 255, field = null;
+    if (mode === GENE_MODE && D.gene) { vals = D.gene.v; span = 255; }
     else {
-      var f = fieldOf();
-      if (f) { vals = f.v; span = f.scale || 255; }
+      field = fieldForMode(mode);
+      if (field) { vals = field.v; span = field.scale || 255; }
     }
     if (!vals) return null;
-    var key = colorBy + '|' + (D.gene ? D.gene.gene : '') + '|' + colorClip;
+    if (field && field.unclipped) return { lo: 0, hi: span };
+    var key = mode + '|' + (D.gene ? D.gene.gene : '') + '|' + colorClip;
     if (_clipD === D && _clipKey === key) return _clipVal;
     var r;
     if (colorClip <= 0) {
@@ -504,19 +578,20 @@ var focusPanel = null;
     return r;
   }
   // Quantised value -> 0..1 across the active colour range.
-  function clipT(v, span) {
-    var r = _clipVal;
+  function clipT(v, span, range) {
+    var r = range || _clipVal;
     if (!r) return v / span;
     if (r.hi <= r.lo) return 0;
     return Math.max(0, Math.min(1, (v - r.lo) / (r.hi - r.lo)));
   }
 
-  function colorOf(i) {
-    if (colorBy === GENE_MODE) {
+  function colorOf(i, p) {
+    var mode = panelColorMode(p);
+    if (mode === GENE_MODE) {
       if (!D.gene) return '#dcdcdc';
-      return viridisCss(clipT(D.gene.v[i], 255));
+      return viridisCss(clipT(D.gene.v[i], 255, clipRange(p)));
     }
-    if (colorBy === RGB_MODE) {
+    if (mode === RGB_MODE) {
       var e = rgbAt(i);
       if (e.m <= RGB_MIN) return RGB_GREY;            // non-expressing → grey
       // Blend grey -> full-brightness hue by intensity; never near-black.
@@ -526,22 +601,25 @@ var focusPanel = null;
       }
       return 'rgb(' + o[0] + ',' + o[1] + ',' + o[2] + ')';
     }
-    var fld = fieldOf();
+    var fld = fieldForMode(mode);
     if (fld) {
+      if (fld.colors) return cssColor(fld.colors[i], '#e6e7ea');
       var fv = fld.v[i];
       if (fv == null || isNaN(fv)) return '#e6e7ea';   // unpositioned / NA → faint
-      return viridisCss(clipT(fv, fld.scale || 255));
+      var t = clipT(fv, fld.scale || 255, clipRange(p));
+      return fld.palette ? fld.palette[Math.round(t * 255)] : viridisCss(t);
     }
-    var g = catOf(colorBy);
+    var g = catOf(mode);
     if (!g) return '#7b8794';   // nothing categorical to colour by → one colour
     var lv = g.values[i];
     if (lv < 0 || lv == null) return '#cccccc';
     return (g.colors && g.colors[lv]) || PAL[lv % PAL.length];
   }
-  function visible(i) {
+  function visible(i, p) {
+    var mode = panelColorMode(p);
     // Continuous modes never hide points (no categorical legend to toggle).
-    if (colorBy === GENE_MODE || colorBy === RGB_MODE || fieldOf()) return true;
-    var g = catOf(colorBy);
+    if (mode === GENE_MODE || mode === RGB_MODE || fieldForMode(mode)) return true;
+    var g = catOf(mode);
     if (!g) return true;
     return !hidden.has(g.values[i]);
   }
@@ -584,7 +662,7 @@ var focusPanel = null;
     dissolveThresh = vals[Math.min(k, vals.length - 1)];
   }
   // Legend-visible AND filter-active — the single gate every render/hit-test uses.
-  function shown(i) { return visible(i) && activeCell(i); }
+  function shown(i, p) { return visible(i, p) && activeCell(i); }
   // Stable per-cell subsample: the same subset persists across redraws/toggles
   // (deterministic hash), so lowering "% of cells" never reshuffles the view.
   function rebuildPctMask() {
@@ -698,25 +776,17 @@ var focusPanel = null;
   // moving, because hit testing happens against the already-projected cells.
   function lassoToUnit(p, lasso) {
     if (!lasso || !p._SX || !p._SY) return null;
-    var v = p.view, SX = p._SX, SY = p._SY, ox = p._sox, oy = p._soy;
-    return lasso.map(function (q) {
-      var zx = (q[0] - ox) / SX;
-      var zy = (oy + SY - q[1]) / SY;
-      return v
-        ? [(zx - 0.5) * v.span + v.cx, (zy - 0.5) * v.span + v.cy]
-        : [zx, zy];
-    });
+    return CBGeom.screenToUnit(p.view, {
+      x: p._sox, y: p._soy, width: p._SX, height: p._SY
+    }, lasso);
   }
   function lassoToScreen(p) {
     var lasso = p.lassoData || p.lasso;
     if (!lasso || !p._SX || !p._SY) return lasso;
     if (!p.lassoData) return lasso;
-    var v = p.view, SX = p._SX, SY = p._SY, ox = p._sox, oy = p._soy;
-    return lasso.map(function (q) {
-      var zx = v ? (q[0] - v.cx) / v.span + 0.5 : q[0];
-      var zy = v ? (q[1] - v.cy) / v.span + 0.5 : q[1];
-      return [ox + zx * SX, oy + SY - zy * SY];
-    });
+    return CBGeom.unitToScreen(p.view, {
+      x: p._sox, y: p._soy, width: p._SX, height: p._SY
+    }, lasso);
   }
 
   // The rotation project() applies, as a function. Anything that has to land
@@ -881,6 +951,26 @@ var focusPanel = null;
     c.restore();
   }
 
+  function drawHulls(p) {
+    var sp = spaceById[p.spaceId];
+    if (!sp || !sp.hulls || !sp.hulls.length) return;
+    var c = p.ctx;
+    sp.hulls.forEach(function (hull) {
+      if (!hull || hull.x.length < 3 || hull.x.length !== hull.y.length) return;
+      c.save(); c.beginPath();
+      hull.x.forEach(function (x, index) {
+        var point = dataToScreen(p, Number(x), Number(hull.y[index]));
+        if (!point) return;
+        if (index) c.lineTo(point[0], point[1]);
+        else c.moveTo(point[0], point[1]);
+      });
+      c.closePath();
+      c.fillStyle = cssColor(hull.color, '#7b8794'); c.globalAlpha = 0.08; c.fill();
+      c.globalAlpha = 0.7; c.lineWidth = 1.5; c.strokeStyle = c.fillStyle; c.stroke();
+      c.restore();
+    });
+  }
+
   // Draw a labelled L-shaped frame for an abstract space (the clone panel).
   // Geometric spaces (umap, spatial) carry no _axisSpec and stay axis-free, so
   // their coordinates read as "layout, not measurement" — the usual convention.
@@ -930,9 +1020,8 @@ var focusPanel = null;
 
   // Paint one cell dot at the given alpha, coloured by the active mode.
   // ---- group labels --------------------------------------------------------
-  // Each level's median position, drawn on the panel. The Projection tab draws
-  // the same labels (centerOfGroups + a plotly text trace); without them a
-  // cluster map can only be read by cross-referencing the legend.
+  // Each level's median position, drawn on the panel so a cluster map does not
+  // need to be read only by cross-referencing the legend.
   //
   // Cached per (space, colouring) in SPACE units, so panning and zooming reuse
   // it — a median over n cells must never run on the drag-redraw path. The
@@ -941,10 +1030,10 @@ var focusPanel = null;
   var labelsOn = true;
   var _lblCache = { d: null };
   function groupLabelsFor(p) {
-    var g = catOf(colorBy); if (!g) return null;
+    var mode = panelColorMode(p), g = catOf(mode); if (!g) return null;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
     if (!u) return null;
-    var key = p.spaceId + '|' + colorBy;
+    var key = p.spaceId + '|' + mode;
     if (_lblCache.d !== D) _lblCache = { d: D };
     // The cached medians belong to ONE unit normalisation; switching projection,
     // spatial sample or clonal layout rebuilds `_unit`, which must invalidate
@@ -1117,12 +1206,13 @@ var focusPanel = null;
     // The frame, in the same padded unit box as the dots. It can extend past the
     // edge when the view runs off the data; the canvas clips it, which reads
     // correctly — part of what is on screen is outside the space.
-    var x = MINI_PAD + (v.cx - v.span / 2) * S;
-    var y = MINI_PAD + S - (v.cy + v.span / 2) * S;
-    var w = v.span * S;
-    c.fillStyle = 'rgba(47,111,214,.14)';
+    var bounds = CBGeom.viewBounds(v);
+    var x = MINI_PAD + bounds.x0 * S;
+    var y = MINI_PAD + (1 - bounds.y1) * S;
+    var w = (bounds.x1 - bounds.x0) * S;
+    c.fillStyle = 'rgba(249,115,22,.14)';
     c.fillRect(x, y, w, w);
-    c.strokeStyle = '#2f6fd6'; c.lineWidth = 1.25;
+    c.strokeStyle = '#f97316'; c.lineWidth = 1.25;
     c.strokeRect(x + 0.5, y + 0.5, w - 1, w - 1);
   }
 
@@ -1160,17 +1250,20 @@ var focusPanel = null;
     return pointSize * (0.5 + 0.85 * t);
   }
 
-  function paintCell(p, i, alpha) {
+  function paintCell(p, i, alpha, border) {
     var c = p.ctx;
     c.globalAlpha = alpha;
-    c.fillStyle = colorOf(i);
+    c.fillStyle = colorOf(i, p);
     c.beginPath(); c.arc(p.sx[i], p.sy[i], radiusOf(p, i), 0, 6.2832); c.fill();
+    if (border) {
+      c.strokeStyle = border.color; c.lineWidth = border.width; c.stroke();
+    }
   }
 
-  function shownState() {
+  function shownState(p) {
     var mask = new Uint8Array(D.n), count = 0;
     for (var i = 0; i < D.n; i++) {
-      if (shown(i)) { mask[i] = 1; count++; }
+      if (shown(i, p)) { mask[i] = 1; count++; }
     }
     return { mask: mask, count: count };
   }
@@ -1181,6 +1274,7 @@ var focusPanel = null;
     p._renderPointSize = pointSizeOf(p);
     var panelPointOpacity = pointOpacityOf(p);
     drawImage(p);
+    drawHulls(p);
     drawTrajectory(p);
     drawAxes(p);
     // One two-layer pass: background on layer 0, foreground on layer 1 (on top).
@@ -1190,13 +1284,14 @@ var focusPanel = null;
     // slider governs. Both the layering and the paint go through one code path.
     // Highlight set = the lasso selection, or (Trekker) the picked nucleus's
     // niche. Cells in it stay solid; everything else fades.
-    var n = D.n, i, rgb = colorBy === RGB_MODE;
+    var n = D.n, i, rgb = panelColorMode(p) === RGB_MODE;
+    var space = spaceById[p.spaceId], border = space && space.pointBorder;
     var hiSet = (sel && sel.size) ? sel : nicheSet;
     // shown(i) (= visible + activeCell) is stable across this draw but is tested
     // 2n times below (two layers) plus once in the evidence pass; precompute it
     // once. Uint8 mask, indexed instead of recomputed — halves the per-cell work
     // on the hot lasso-drag redraw path.
-    if (!shownMask || shownMask.length !== n) shownMask = shownState().mask;
+    if (!shownMask || shownMask.length !== n) shownMask = shownState(p).mask;
     // Within one layer the alpha is CONSTANT (it depends only on fg/hiSet, which
     // is what defines the layer), so a layer can be drawn as one path per colour
     // instead of one path per cell. On a large data set that turns ~n canvas
@@ -1213,7 +1308,7 @@ var focusPanel = null;
     // otherwise. In the batched path this also fixes the ORDER OF THE BUCKETS:
     // they are created as their first member is met, and object keys keep
     // insertion order, so filling them low-to-high paints them low-to-high.
-    var ord = paintOrder();
+    var ord = paintOrder(p);
     for (var layer = 0; layer < 2; layer++) {
       var alpha = hiSet ? (layer === 1 ? 0.95 : 0.05)
         : rgb ? (layer === 1 ? 1 : 0.5 * panelPointOpacity) : panelPointOpacity;
@@ -1223,7 +1318,7 @@ var focusPanel = null;
           i = ord ? ord[oi] : oi;
           if (!p.ok[i] || !shownMask[i]) continue;
           if ((layer === 0) === (rgb ? rgbExpressing(i) : !!(hiSet && hiSet.has(i)))) continue;
-          var col = colorOf(i);
+          var col = colorOf(i, p);
           if (!buckets) buckets = {};
           (buckets[col] || (buckets[col] = [])).push(i);
         }
@@ -1239,6 +1334,9 @@ var focusPanel = null;
               c.arc(p.sx[j], p.sy[j], rj, 0, 6.2832);
             }
             c.fill();
+            if (border) {
+              c.strokeStyle = border.color; c.lineWidth = border.width; c.stroke();
+            }
           }
         }
         continue;
@@ -1248,7 +1346,7 @@ var focusPanel = null;
         if (!p.ok[i] || !shownMask[i]) continue;
         var fg = rgb ? rgbExpressing(i) : !!(hiSet && hiSet.has(i));
         if ((layer === 0) === fg) continue;   // bg on layer 0, fg on layer 1
-        paintCell(p, i, alpha);
+        paintCell(p, i, alpha, border);
       }
     }
     // Trekker: ring nuclei that carry positioning evidence.
@@ -1288,30 +1386,26 @@ var focusPanel = null;
         var radiusX = nicheRadius * nu.k * p._SX * viewScale;
         var radiusY = nicheRadius * nu.k * p._SY * viewScale;
         c.globalAlpha = 1;
-        c.fillStyle = 'rgba(37,99,235,0.10)';
+        c.fillStyle = 'rgba(249,115,22,.10)';
         c.beginPath();
         c.ellipse(p.sx[pick], p.sy[pick], radiusX, radiusY, 0, 0, 6.2832);
         c.fill();
-        c.strokeStyle = '#1d4ed8'; c.lineWidth = 2.5; c.setLineDash([7, 4]);
+        c.strokeStyle = '#f97316'; c.lineWidth = 2.5; c.setLineDash([7, 4]);
         c.beginPath();
         c.ellipse(p.sx[pick], p.sy[pick], radiusX, radiusY, 0, 0, 6.2832);
         c.stroke();
         c.setLineDash([]);
       }
     }
-    // lasso: filled while dragging; a dashed outline once committed (kept so the
-    // selected region stays visible until an interaction deliberately replaces it).
+    // Match the specialist Projection canvas: keep the light fill and solid
+    // outline after selection so the active region remains immediately legible.
     var outline = lassoToScreen(p);
     if (outline && outline.length > 1) {
-      c.globalAlpha = 1; c.strokeStyle = '#2f6fd6'; c.lineWidth = 1.5;
+      c.globalAlpha = 1; c.strokeStyle = '#ff7013'; c.lineWidth = 1.6;
       c.beginPath(); c.moveTo(outline[0][0], outline[0][1]);
       for (var q = 1; q < outline.length; q++) c.lineTo(outline[q][0], outline[q][1]);
       c.closePath();
-      if (p.drag) {
-        c.fillStyle = 'rgba(47,111,214,.08)'; c.fill(); c.stroke();
-      } else {
-        c.setLineDash([5, 4]); c.stroke(); c.setLineDash([]);
-      }
+      c.fillStyle = 'rgba(255,112,19,.07)'; c.fill(); c.stroke();
     }
     c.globalAlpha = 1;
     // Its own canvas — drawn last so it also settles after a view change.
@@ -1332,9 +1426,14 @@ var focusPanel = null;
     el.textContent = 'showing ' + fmt(n) + ' of ' + fmt(D.n) + ' cells';
   }
   function drawAll() {
-    var state = shownState();
-    panels.forEach(function (p) { draw(p, state.mask); });
-    renderShownCount(state.count);
+    var first = null;
+    panels.forEach(function (p) {
+      if (!p.spaceId) return;
+      var state = shownState(p);
+      if (!first) first = state;
+      draw(p, state.mask);
+    });
+    if (first) renderShownCount(first.count);
   }
   // Drop any committed lasso outlines when an interaction deliberately changes
   // what the region means (for example a new selection or selection zoom).
@@ -1536,7 +1635,7 @@ var focusPanel = null;
   function nearest(p, mx, my) {
     var best = -1, bd = 200, n = D.n, i;
     for (i = 0; i < n; i++) {
-      if (!p.ok[i] || !shown(i)) continue;
+      if (!p.ok[i] || !shown(i, p)) continue;
       var dx = p.sx[i] - mx, dy = p.sy[i] - my, d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = i; }
     }
@@ -1552,12 +1651,21 @@ var focusPanel = null;
   }
   function setSelection(s, source) {
     sel = (s && s.size) ? s : null;
-    if (!sel) selectionSource = null;
-    else if (source) selectionSource = selectionSourceLabel(source);
+    if (!sel) {
+      selectionSource = null;
+      selectionSourceSpace = null;
+    } else if (source) {
+      selectionSource = selectionSourceLabel(source);
+      if (typeof source === 'string') selectionSourceSpace = null;
+      else selectionSourceSpace = source.spaceId || null;
+    }
     rebuildNiche();   // a lasso selection supersedes the niche highlight
     // A zoom is tied to a specific selection, so any selection change (new brush
     // or clear) returns to the full view and resets the toggle.
-    if (zoomed) { resetZoom(); zoomed = false; }
+    if (zoomed) {
+      resetZoom(panelForSpace(zoomedSpace));
+      zoomed = false; zoomedSpace = null;
+    }
     updateZoomBtn();
     updateSelActions();
     updateZselButtons();
@@ -1622,58 +1730,28 @@ var focusPanel = null;
     var show = hasSel || hasNiche;
     revealEl($('cv-selactions'), show);
     var zb = $('cv-zoom');
-    // Offered only when there is a flat panel for it to act on: with the
-    // expression panel showing a 3-D embedding it would have nothing to zoom,
-    // and a button that does nothing reads as one that failed.
-    var canZoom = hasSel && panels.some(function (p) {
-      return isProjectionPanel(p) && !panelIs3D(p);
-    });
+    // Offered only when at least one visible flat panel contains selected cells.
+    // The action follows the panel that created the cohort, whatever its modality.
+    var canZoom = hasSel && panels.some(canZoomPanel);
     if (zb) zb.style.display = canZoom ? '' : 'none';
   }
-  // Zoom ONLY the expression (umap) panel to the bounding box of its selected
-  // cells — the point of the action is to inspect the umap's internal structure
-  // for the selection. The other panel (Spatial / Clonal) keeps its full view; a
-  // clonal rank layout has no meaningful "zoom", and the spatial context is more
-  // useful whole. The umap panel maps the selection's unit-box extent (padded,
-  // aspect-preserved, centred) to fill itself.
-  // `only` = a single panel to zoom, or null for the default (the expression
-  // panel). The default is deliberately narrow: "zoom to selection" from the top
-  // bar is about inspecting the umap's internal structure for a selection, and a
-  // clonal rank layout has no meaningful zoom while the spatial context reads
-  // better whole. But that is a default, not a rule -- a panel's own toolbar can
-  // ask for its own, which is the only way to get in close on the tissue.
-  function zoomToSelection(only) {
-    if (!sel || !sel.size) return false;
-    var did = false;
-    panels.forEach(function (p) {
-      if (only ? p !== only : !isProjectionPanel(p)) return;
-      // Never a rotated cloud, whichever button asked. A zoom is a rectangle in
-      // screen space, and on a 3-D panel that rectangle is only the one the
-      // current angle produces -- turn it afterwards and the cells it was fitted
-      // to are somewhere else, quite possibly off screen. The per-panel button
-      // is hidden on a 3-D panel for this reason; the top bar's defaults to the
-      // expression panel, which can itself be showing a 3-D embedding.
-      if (panelIs3D(p)) return;
-      var sp = spaceById[p.spaceId], u = sp && sp._unit;
-      if (!u) return;
-      var nx0 = Infinity, nx1 = -Infinity, ny0 = Infinity, ny1 = -Infinity, any = false;
-      sel.forEach(function (i) {
-        if (!u.ok[i]) return;
-        any = true;
-        var nx = u.nx[i], ny = u.ny[i];
-        if (nx < nx0) nx0 = nx; if (nx > nx1) nx1 = nx;
-        if (ny < ny0) ny0 = ny; if (ny > ny1) ny1 = ny;
-      });
-      if (!any) return;
-      var span = Math.max(nx1 - nx0, ny1 - ny0) * 1.25;
-      if (!(span > 0.02)) span = 0.02;   // floor: don't over-zoom a tiny selection
-      p.view = clampView(p,
-        { cx: (nx0 + nx1) / 2, cy: (ny0 + ny1) / 2, span: span });
-      project(p);
-      did = true;
+  // Zoom one requested panel to the bounding box of its selected cells.
+  function zoomToSelection(p) {
+    if (!canZoomPanel(p)) return false;
+    var u = spaceById[p.spaceId]._unit;
+    var nx0 = Infinity, nx1 = -Infinity, ny0 = Infinity, ny1 = -Infinity;
+    sel.forEach(function (i) {
+      if (!u.ok[i]) return;
+      var nx = u.nx[i], ny = u.ny[i];
+      if (nx < nx0) nx0 = nx; if (nx > nx1) nx1 = nx;
+      if (ny < ny0) ny0 = ny; if (ny > ny1) ny1 = ny;
     });
-    if (did) drawAll();
-    return did;
+    p.view = clampView(p, CBGeom.fitView(
+      nx0, nx1, ny0, ny1, 1.25, 0.02
+    ));
+    project(p);
+    drawAll();
+    return true;
   }
   // Promote one lens without leaving the linked workspace. The focused pane
   // grows; every other pane remains visible as context and keeps its viewport.
@@ -1701,7 +1779,6 @@ var focusPanel = null;
       if (!p.pane) return;
       var primary = !!focusPanel && p.key === focusPanel;
       var context = !!focusPanel && p.key !== focusPanel && !!p.spaceId;
-      p.pane.classList.remove('cv-folded');
       p.pane.classList.toggle('cv-focus-primary', primary);
       p.pane.classList.toggle('cv-focus-context', context);
       p.pane.style.order = primary ? '0' : (context ? '1' : '');
@@ -1798,16 +1875,30 @@ var focusPanel = null;
   // multi-section spatial data set the selection can be entirely in another
   // section, and the button then looked available and did nothing.
   function canZoomPanel(p) {
-    if (!sel || !sel.size || !p.spaceId || panelIs3D(p)) return false;
+    if (!p || !sel || !sel.size || !p.spaceId || panelIs3D(p)) return false;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
     if (!u || !u.ok) return false;
     var any = false;
     sel.forEach(function (i) { if (u.ok[i]) any = true; });
     return any;
   }
-  function resetZoom() {
+  function panelForSpace(spaceId) {
+    if (!spaceId) return null;
+    return panels.find(function (panel) { return panel.spaceId === spaceId; }) || null;
+  }
+  function selectionZoomPanel() {
+    var source = panelForSpace(selectionSourceSpace);
+    if (canZoomPanel(source)) return source;
+    return panels.find(function (panel) {
+      return isProjectionPanel(panel) && canZoomPanel(panel);
+    }) || panels.find(canZoomPanel) || null;
+  }
+  function resetZoom(only) {
     var any = false;
-    panels.forEach(function (p) { if (p.view) { p.view = null; project(p); any = true; } });
+    panels.forEach(function (p) {
+      if (only && p !== only) return;
+      if (p.view) { p.view = null; project(p); any = true; }
+    });
     if (any) drawAll();
   }
   // The Zoom button is a toggle: zoom in to the selection, or zoom back out. Its
@@ -1818,8 +1909,14 @@ var focusPanel = null;
     b.classList.toggle('is-zoomed', zoomed);
   }
   function toggleZoom() {
-    if (zoomed) { resetZoom(); zoomed = false; }
-    else { zoomed = zoomToSelection(); }
+    var target = selectionZoomPanel();
+    if (zoomed) {
+      resetZoom(panelForSpace(zoomedSpace) || target);
+      zoomed = false; zoomedSpace = null;
+    } else {
+      zoomed = !!target && zoomToSelection(target);
+      zoomedSpace = zoomed ? target.spaceId : null;
+    }
     updateZoomBtn();
   }
   // Sync the active drag-mode highlight (box vs lasso) across every toolbar.
@@ -1904,8 +2001,8 @@ var focusPanel = null;
       if (p.spaceId !== spaceId) return;
       clearPanelView(p);
     });
-    if (isProjectionSpace(spaceById[spaceId]) && zoomed) {
-      zoomed = false; updateZoomBtn();
+    if (spaceId === zoomedSpace && zoomed) {
+      zoomed = false; zoomedSpace = null; updateZoomBtn();
     }
   }
 
@@ -1914,28 +2011,20 @@ var focusPanel = null;
   // panel centre gives the plain in/out of the toolbar buttons.
   function zoomAt(p, mx, my, factor) {
     if (!p._SX || !p._SY) return;
-    var v = p.view || { cx: 0.5, cy: 0.5, span: 1 };
-    var span = v.span * factor;
-    if (span >= 1) {
+    var zx = (mx - p._sox) / p._SX;
+    var zy = (p._soy + p._SY - my) / p._SY;
+    var next = CBGeom.zoomView(p.view, factor, [zx, zy], 0.04);
+    if (!next) {
       if (p.view) { p.view = null; project(p); }
     } else {
-      span = Math.max(0.04, span);
-      // cursor position in view-relative units, then in space units
-      var zx = (mx - p._sox) / p._SX;
-      var zy = (p._soy + p._SY - my) / p._SY;
-      var ux = v.cx + (zx - 0.5) * v.span, uy = v.cy + (zy - 0.5) * v.span;
       // Clamped, so zooming toward a point near the edge slides the anchor a
       // little rather than carrying the view off the data.
-      p.view = clampView(p, {
-        cx: ux - (zx - 0.5) * span,
-        cy: uy - (zy - 0.5) * span,
-        span: span
-      });
+      p.view = clampView(p, next);
       project(p);
     }
-    // keep the umap "Zoom back" toggle honest when the panel returns to full
-    if (isProjectionPanel(p) && !p.view && zoomed) {
-      zoomed = false; updateZoomBtn();
+    // Keep the cohort "Zoom back" toggle honest when its panel returns to full.
+    if (p.spaceId === zoomedSpace && !p.view && zoomed) {
+      zoomed = false; zoomedSpace = null; updateZoomBtn();
     }
     drawAll();
   }
@@ -1960,10 +2049,58 @@ var focusPanel = null;
     } catch (e) { /* toDataURL can throw if the canvas is tainted; ignore */ }
   }
   function reportSelection() {
-    if (typeof Shiny === 'undefined' || !Shiny.setInputValue) return;
     var arr = null;
     if (sel && sel.size) { arr = []; sel.forEach(function (i) { arr.push(D.cells[i]); }); }
-    Shiny.setInputValue('coordviews_selection', arr);
+    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+      if (singleActive) {
+        var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
+        if (arr && sp) sel.forEach(function (i) {
+          x.push(sp.x[i]); y.push(sp.y[i]);
+        });
+        Shiny.setInputValue(singleActive + '_persistent_selection', arr
+          ? { x: x, y: y, ids: arr } : null);
+      } else {
+        Shiny.setInputValue('coordviews_selection', arr);
+      }
+    }
+    if (singleActive) {
+      var guide = $(singleActive + '_selection_guide');
+      var active = $(singleActive + '_selection_active');
+      if (guide) guide.classList.toggle('cerebro-selection-status-hidden', !!arr);
+      if (active) active.classList.toggle('cerebro-selection-status-hidden', !arr);
+    }
+    window.dispatchEvent(new CustomEvent(
+      singleActive ? 'cerebro:specialist-state' : 'cerebro:linkedviews-selection',
+      { detail: singleActive
+        ? { viewId: singleActive, selectedCells: arr ? arr.length : 0 }
+        : { selectedCells: arr ? arr.length : 0 } }
+    ));
+  }
+
+  function reportSingleHiddenGroups() {
+    if (!singleActive || typeof Shiny === 'undefined' || !Shiny.setInputValue) return;
+    var group = catOf(singleSpaceModes[singleSpaceIds[0]]);
+    var names = group ? Array.from(hidden).map(function (index) {
+      return group.levels[index];
+    }).filter(function (name) { return name != null; }) : [];
+    Shiny.setInputValue(singleActive + '_hidden_groups', names);
+  }
+
+  function reportSingleZoom() {
+    if (!singleActive) return;
+    var panel = panels.find(function (candidate) { return !!candidate.spaceId; });
+    var on = !!(panel && panel.view);
+    var button = $(singleActive + '_zoom_to_selection');
+    if (!button) return;
+    button.classList.toggle('is-zoomed', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var label = button.querySelector('span');
+    if (label) label.textContent = on ? 'Reset zoom' : 'Zoom to selection';
+    var icon = button.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('fa-magnifying-glass-plus', !on);
+      icon.classList.toggle('fa-magnifying-glass-minus', on);
+    }
   }
 
   // ---- readouts (composition + top clonotypes) — fully client-side --------
@@ -2004,16 +2141,18 @@ var focusPanel = null;
       panels.forEach(function (p) {
         if (!p.spaceId || !p.ok) return;
         var n = 0; sel.forEach(function (i) { if (p.ok[i]) n++; });
-        mapped.push(n);
+        var space = spaceById[p.spaceId];
+        mapped.push({ label: space ? space.label : p.spaceId, count: n });
       });
       var coverage = $('cv-selcoverage');
       if (coverage) {
-        var lo = mapped.length ? Math.min.apply(Math, mapped) : sel.size;
-        var hi = mapped.length ? Math.max.apply(Math, mapped) : sel.size;
+        var mappedCounts = mapped.map(function (item) { return item.count; });
+        var lo = mappedCounts.length ? Math.min.apply(Math, mappedCounts) : sel.size;
         coverage.textContent = lo === sel.size
           ? (mapped.length + ' linked views · complete mapping')
-          : (lo + '–' + hi + ' / ' + sel.size + ' mapped across ' +
-            mapped.length + ' views');
+          : mapped.map(function (item) {
+            return item.label + ' ' + item.count + '/' + sel.size;
+          }).join(' · ');
       }
     } else if (pick != null && nicheSet) {
       // A picked Trekker nucleus is the single-cell counterpart of an active
@@ -2276,10 +2415,12 @@ var focusPanel = null;
     if (!show) return;
     var g = $('cv-grad');
     if (g) {
+      var field = fieldOf();
       var stops = [];
       for (var i = 0; i <= 10; i++) {
-        var c = viridis(i / 10);
-        stops.push('rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ') ' + (i * 10) + '%');
+        var color = field && field.palette
+          ? field.palette[Math.round(i / 10 * 255)] : viridisCss(i / 10);
+        stops.push(color + ' ' + (i * 10) + '%');
       }
       g.style.background = 'linear-gradient(90deg,' + stops.join(',') + ')';
     }
@@ -2306,6 +2447,14 @@ var focusPanel = null;
   }
   function renderLegend() {
     var L = $('cv-legend'); if (!L) return;
+    var singlePayload = singleActive && singleViews[singleActive];
+    var hideSingleLegend = !!(singlePayload && singlePayload.meta &&
+      singlePayload.meta.legend_position === 'none');
+    L.style.display = hideSingleLegend ? 'none' : '';
+    var singleFontSize = Number(singlePayload && singlePayload.meta &&
+      singlePayload.meta.legend_font_size);
+    L.style.fontSize = isFinite(singleFontSize) && singleFontSize > 0
+      ? singleFontSize + 'px' : '';
     L.innerHTML = '';
     function appendEvidenceLegend() {
       if (!evidenceOn) return;
@@ -2322,6 +2471,16 @@ var focusPanel = null;
       return;
     }
     var fld = fieldOf();
+    if (fld && fld.colors) {
+      renderColorbar(false);
+      (fld.channelLabels || []).forEach(function (label, index) {
+        var d = document.createElement('div'); d.className = 'cv-lg cv-rgb-lg';
+        d.innerHTML = '<span class="cv-dot" style="background:' +
+          cssColor((fld.channelColors || [])[index]) + '"></span>' + esc(label);
+        L.appendChild(d);
+      });
+      return;
+    }
     if (fld) {   // Trekker physical / meta field → viridis colourbar (min..max)
       renderColorbar(true, fld.max, fld.label, fld.min);
       appendEvidenceLegend();
@@ -2358,7 +2517,7 @@ var focusPanel = null;
         esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>';
       d.onclick = function () {
         if (hidden.has(li)) hidden.delete(li); else hidden.add(li);
-        renderLegend(); drawAll();
+        reportSingleHiddenGroups(); renderLegend(); drawAll();
       };
       L.appendChild(d);
     });
@@ -2380,6 +2539,13 @@ var focusPanel = null;
   // a tooltip taller than what it is pointing at.
   var HOVER_MAX_GROUPS = 6;
   function hoverHtml(i, pinned) {
+    if (singleActive) {
+      var singleSpace = spaceById[singleSpaceIds[0]];
+      var raw = singleSpace && singleSpace._hover && singleSpace._hover[i];
+      var text = String(raw || D.cells[i] || '')
+        .replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
+      return '<div class="cv-tip-row">' + esc(text).replace(/\n/g, '<br>') + '</div>';
+    }
     var rows = [];
     var g = catOf(colorBy);
     // headline = the active categorical level, else the barcode
@@ -2778,6 +2944,10 @@ var focusPanel = null;
   function wireHover(p) {
     var tip = $(p.tipId);
     p.canvas.addEventListener('mousemove', function (e) {
+      var space = singleActive && spaceById[p.spaceId];
+      if (space && space._hoverEnabled === false) {
+        tip.style.opacity = 0; setHoverCell(null); return;
+      }
       var r = p.canvas.getBoundingClientRect();
       var mx = e.clientX - r.left, my = e.clientY - r.top;
       // A pinned tooltip owns this panel's tooltip element until it is closed —
@@ -2789,7 +2959,7 @@ var focusPanel = null;
         return;
       }
       var i = nearest(p, mx, my);
-      if (i < 0) {
+      if (i < 0 || (space && space._hoverMask && !space._hoverMask[i])) {
         if (own) tip.style.opacity = 0;
         setHoverCell(null);
         return;
@@ -2826,7 +2996,13 @@ var focusPanel = null;
       // arm a drag on this one. The mode is therefore overridden at the event,
       // and a drag that would have selected orbits instead — the gesture stays
       // useful rather than dying silently.
-      if (panelIs3D(p) && selectMode !== 'pan' && e.button !== 1 && !e.shiftKey) {
+      var dragKind = CBGeom.dragKind(
+        selectMode,
+        panelIs3D(p),
+        e.button,
+        e.shiftKey
+      );
+      if (dragKind === 'orbit') {
         e.preventDefault();
         p.orbiting = true; p.orbitFrom = pos(e);
         p.orbitBase = p.rot ? { rx: p.rot.rx, ry: p.rot.ry } : { rx: 0, ry: 0 };
@@ -2837,8 +3013,7 @@ var focusPanel = null;
       // (the shortcut plotly users reach for without switching tools). Orbit
       // mode lands here too when the panel is FLAT — there is nothing to turn,
       // and panning is the nearest useful reading of the same drag.
-      if (selectMode === 'pan' || selectMode === 'orbit' ||
-        e.button === 1 || e.shiftKey) {
+      if (dragKind === 'pan') {
         e.preventDefault();
         p.panning = true; p.panFrom = pos(e);
         p.panView = p.view
@@ -2872,11 +3047,11 @@ var focusPanel = null;
         // screen delta -> view units; y is inverted (canvas y grows downward).
         // Clamped, so dragging on past the edge simply stops instead of sailing
         // off into blank canvas.
-        p.view = clampView(p, {
-          cx: v.cx - (pq[0] - p.panFrom[0]) / SX * v.span,
-          cy: v.cy + (pq[1] - p.panFrom[1]) / SY * v.span,
-          span: v.span
-        });
+        p.view = clampView(p, CBGeom.panView(
+          v,
+          (pq[0] - p.panFrom[0]) / SX,
+          (pq[1] - p.panFrom[1]) / SY
+        ));
         project(p); draw(p);
         return;
       }
@@ -2922,7 +3097,7 @@ var focusPanel = null;
       if (p.moved && p.lasso && p.lasso.length > 2) {
         var s = new Set();
         for (var i = 0; i < D.n; i++) {
-          if (p.ok[i] && shown(i) && CBGeom.inPoly(p.sx[i], p.sy[i], p.lasso)) s.add(i);
+          if (p.ok[i] && shown(i, p) && CBGeom.inPoly(p.sx[i], p.sy[i], p.lasso)) s.add(i);
         }
         // A real lasso selection supersedes any prior single-cell pick — clear it
         // BEFORE setSelection so its drawAll() drops the stale orange pick ring
@@ -3025,6 +3200,7 @@ var focusPanel = null;
         });
         p.pane.addEventListener('click', function (e) {
           if (!e.target.closest('.cv-ptitle')) return;
+          if (!canFocusPanel()) return;
           var pane = this, found = null;
           panels.forEach(function (candidate) {
             if (candidate.pane === pane) found = candidate;
@@ -3033,6 +3209,7 @@ var focusPanel = null;
         });
         p.pane.addEventListener('dblclick', function (e) {
           if (!e.target.closest('.cv-canvas-wrap')) return;
+          if (!canFocusPanel()) return;
           var pane = this, found = null;
           panels.forEach(function (candidate) {
             if (candidate.pane === pane) found = candidate;
@@ -3071,6 +3248,10 @@ var focusPanel = null;
       if (panesHost) resizeObserver.observe(panesHost);
       resizeObserver._cvPanesObserved = true;
     }
+  }
+
+  function canFocusPanel() {
+    return !singleActive;
   }
 
   // Coordinate-source / QC / positioning / Moran's I detail for a Trekker data
@@ -3437,14 +3618,20 @@ var focusPanel = null;
   // visible() on the draw hot path, but its result only changes when the dataset
   // or the colour mode changes — so the string work runs once, not ~3n/draw.
   var _fldCacheD = null, _fldCacheKey = null, _fldCacheVal = null;
-  function fieldOf() {
-    if (_fldCacheD === D && _fldCacheKey === colorBy) return _fldCacheVal;
+  function fieldOf(p) {
+    var mode = panelColorMode(p);
+    if (_fldCacheD === D && _fldCacheKey === mode) return _fldCacheVal;
     var v = null;
-    if (D && D.fields && colorBy && colorBy.indexOf(FIELD_PREFIX) === 0) {
-      v = D.fields[colorBy.slice(FIELD_PREFIX.length)] || null;
+    if (D && D.fields && mode && mode.indexOf(FIELD_PREFIX) === 0) {
+      v = D.fields[mode.slice(FIELD_PREFIX.length)] || null;
     }
-    _fldCacheD = D; _fldCacheKey = colorBy; _fldCacheVal = v;
+    _fldCacheD = D; _fldCacheKey = mode; _fldCacheVal = v;
     return v;
+  }
+  function fieldForMode(mode) {
+    return D && D.fields && typeof mode === 'string' &&
+      mode.indexOf(FIELD_PREFIX) === 0
+      ? (D.fields[mode.slice(FIELD_PREFIX.length)] || null) : null;
   }
 
   // Spatial autocorrelation belongs to the spatial lens that gives it meaning.
@@ -3455,7 +3642,9 @@ var focusPanel = null;
       return { label: D.gene.gene, values: D.gene.v };
     }
     var fld = fieldOf();
-    return fld ? { label: fld.label || 'Continuous value', values: fld.v } : null;
+    return fld
+      ? { label: fld.label || 'Continuous value', values: fld.raw || fld.v }
+      : null;
   }
   function spatialMoran(space, values) {
     var valid = [], i;
@@ -3966,26 +4155,6 @@ var focusPanel = null;
         setSpatialImage(id, sp);
       };
     });
-    // Kept as an invisible compatibility surface for older browser automation
-    // and extensions. The visible UI is the mode control + per-section cards.
-    var activeImages = spatialImages(active);
-    var legacy = document.createElement('select');
-    legacy.id = 'cv-img-pick';
-    legacy.hidden = true;
-    legacy.setAttribute('aria-hidden', 'true');
-    legacy.innerHTML = ['<option value="' + IMG_NONE + '">None</option>'].concat(
-      activeImages.map(function (im) {
-        return '<option value="' + esc(im.id) + '">' + esc(im.label || im.id) + '</option>';
-      })
-    ).join('');
-    legacy.disabled = !activeImages.length;
-    legacy.value = active && active._customImageId ? active._customImageId
-      : (activeImages[0] ? activeImages[0].id : IMG_NONE);
-    legacy.onchange = function () {
-      setSpatialImage(legacy.value, activeSpatial());
-      renderImagePicker();
-    };
-    pop.appendChild(legacy);
   }
 
   // Switch background. The cells have not moved -- only what is behind them --
@@ -4307,6 +4476,7 @@ var focusPanel = null;
   // Spaces in panel order: expression, trajectory, physical, immune, then any
   // future modality spaces.
   function orderedSpaces() {
+    if (singleActive && singleSpaceIds.length) return singleSpaceIds.slice();
     var out = [];
     selectedProjections.forEach(function (name) {
       var id = projectionId(name); if (spaceById[id]) out.push(id);
@@ -4344,9 +4514,7 @@ var focusPanel = null;
     focusPanel = null;
     panels.forEach(function (p) {
       if (p.pane) {
-        p.pane.classList.remove(
-          'cv-folded', 'cv-focus-primary', 'cv-focus-context'
-        );
+        p.pane.classList.remove('cv-focus-primary', 'cv-focus-context');
         p.pane.style.order = '';
         p.pane.style.gridColumn = '';
         p.pane.style.gridRow = '';
@@ -4372,7 +4540,9 @@ var focusPanel = null;
     panels.forEach(function (p, i) {
       if (i < order.length) {
         var reappearing = p.pane && p.pane.classList.contains('cv-hidden');
-        p.spaceId = order[i]; clearPanelView(p);
+        p.spaceId = order[i];
+        p.colorBy = singleActive ? singleSpaceModes[p.spaceId] || null : null;
+        clearPanelView(p);
         if (p.pane) {
           p.pane.classList.remove('cv-hidden');
           if (reappearing) fadeInPane(p.pane);
@@ -4382,6 +4552,7 @@ var focusPanel = null;
         if (title) title.textContent = shownSpace ? shownSpace.label : p.spaceId;
       } else {
         p.spaceId = null;
+        p.colorBy = null;
         if (p.pane) p.pane.classList.add('cv-hidden');
       }
     });
@@ -4400,15 +4571,6 @@ var focusPanel = null;
   }
   // Size visible panels from the available width. Each canvas remains at least
   // 300px wide when possible and extra spaces flow onto later rows.
-  //
-  // Two floors, and the difference matters. PREF_SIDE is the size below which a
-  // panel stops being comfortable, and it decides the column count. MIN_SIDE is
-  // the size below which it stops being useful, and it is the only hard floor on
-  // plots. Using the comfortable size as the hard floor is what broke the
-  // promise above: on a 1366x768 screen four panels need more height than the
-  // viewport has, the floor refused to go under 300, and the last row simply
-  // fell off the bottom -- on the one layout that most needs to be seen at once.
-  var PREF_SIDE = 300;
   var MIN_SIDE = 300;
   var VIEWPORT_GUTTER = 7;
   // Context is a persistent orientation aid, not the place for close reading.
@@ -4519,7 +4681,7 @@ var focusPanel = null;
     var overview = !focusPanel
       ? bestOverviewGrid(k, usableW, Math.max(1, availH), chromeX, overhead, gap)
       : null;
-    var columnFloor = focusPanel ? FOCUS_CONTEXT_SIDE : PREF_SIDE;
+    var columnFloor = focusPanel ? FOCUS_CONTEXT_SIDE : MIN_SIDE;
     var availableCols = Math.max(1,
       Math.floor((usableW + gap) / (columnFloor + chromeX + gap)));
     var overviewFitsFloor = overview && overview.side >= MIN_SIDE;
@@ -4627,9 +4789,10 @@ var focusPanel = null;
     closeCard(); cardMeta = null;
     unpinTip();
     D = null; spaceById = {}; sel = null; selectionSource = null;
+    selectionSourceSpace = null;
     pick = null; nicheSet = null;
     hoverCell = null; focusPanel = null;
-    zoomed = false; hidden = new Set(); groupFilter = {};
+    zoomed = false; zoomedSpace = null; hidden = new Set(); groupFilter = {};
     panels.forEach(function (p) {
       p.spaceId = null; p.sx = null; p.sy = null; p.ok = null;
       p.lasso = null; p.lassoData = null; p.view = null;
@@ -4674,15 +4837,497 @@ var focusPanel = null;
     return true;
   }
 
+  // ---- single-view adapter ------------------------------------------------
+  // Dedicated pages keep their existing R data preparation and controls, but
+  // mount this workspace's panel surface and renderer. Only one dashboard tab
+  // is visible at a time, so one physical surface can serve every page without
+  // duplicating canvases, listeners or viewport state machines.
+  var rebuildingBase = false;
+  function singleHost(id) {
+    return document.getElementById(id + '_cell_view_host');
+  }
+  function visibleSingleId() {
+    var hosts = document.querySelectorAll('[data-cell-view-id]');
+    for (var i = 0; i < hosts.length; i++) {
+      if (hosts[i].offsetParent !== null) return hosts[i].dataset.cellViewId;
+    }
+    return null;
+  }
+  function rememberSurfaceHome() {
+    if (surfaceHome) return;
+    var legend = $('cv-legend'), cbar = $('cv-cbar');
+    var panes = document.querySelector('#coordviews .cv-panes') ||
+      document.querySelector('.coordviews-page .cv-panes');
+    if (!panes) return;
+    surfaceHome = {
+      panes: panes, panesParent: panes.parentNode, panesNext: panes.nextSibling,
+      legend: legend, legendParent: legend && legend.parentNode,
+      legendNext: legend && legend.nextSibling,
+      cbar: cbar, cbarParent: cbar && cbar.parentNode,
+      cbarNext: cbar && cbar.nextSibling
+    };
+  }
+  function restoreNode(node, parent, next) {
+    if (!node || !parent || node.parentNode === parent) return;
+    parent.insertBefore(node, next && next.parentNode === parent ? next : null);
+  }
+  function restoreLinkedSurface() {
+    if (!surfaceHome) return;
+    restoreNode(surfaceHome.panes, surfaceHome.panesParent, surfaceHome.panesNext);
+    restoreNode(surfaceHome.cbar, surfaceHome.cbarParent, surfaceHome.cbarNext);
+    restoreNode(surfaceHome.legend, surfaceHome.legendParent, surfaceHome.legendNext);
+  }
+  function resetSingleViews() {
+    restoreLinkedSurface();
+    singleViews = {}; singleActive = null;
+    singleRequests.clear();
+    singleSpaceIds = []; singleSpaceModes = {};
+    singleIndexCells = null; singleIndexMap = null;
+    linkedState = null;
+  }
+  function mountSingleSurface(id) {
+    rememberSurfaceHome();
+    var host = singleHost(id), surface = host && host.querySelector('.cerebro-cell-view-surface');
+    if (!surface || !surfaceHome) return false;
+    surface.innerHTML = '';
+    var legend = document.createElement('div');
+    legend.className = 'cerebro-cell-view-legend';
+    surface.appendChild(legend); surface.appendChild(surfaceHome.panes);
+    if (surfaceHome.legend) legend.appendChild(surfaceHome.legend);
+    if (surfaceHome.cbar) legend.appendChild(surfaceHome.cbar);
+    return true;
+  }
+  function singleIndex() {
+    var cells = linkedBundle && linkedBundle.cells;
+    if (cells === singleIndexCells && singleIndexMap) return singleIndexMap;
+    var out = new Map();
+    if (Array.isArray(cells)) {
+      cells.forEach(function (cell, i) { out.set(String(cell), i); });
+    }
+    singleIndexCells = cells; singleIndexMap = out;
+    return singleIndexMap;
+  }
+  function emptyVector(value) {
+    return new Array(linkedBundle.n || (linkedBundle.cells || []).length).fill(value);
+  }
+  function alignSingleCoordinates(data, nested) {
+    var index = singleIndex();
+    var x = emptyVector(null), y = emptyVector(null), z = emptyVector(null);
+    var groups = emptyVector(-1), levels = [], colors = [];
+    var hover = emptyVector('');
+    var hoverEnabled = emptyVector(true);
+    if (nested) {
+      var traces = Array.isArray(data.meta.traces) ? data.meta.traces : [];
+      var hoverModes = data.hover && data.hover.hoverinfo;
+      traces.forEach(function (name, group) {
+        levels.push(String(name));
+        var colour = data.data.color && data.data.color[group];
+        colors.push(String(Array.isArray(colour) ? colour[0] : colour || '#7b8794'));
+        var gx = data.data.x[group] || [], gy = data.data.y[group] || [];
+        var gz = data.data.z && data.data.z[group] || [];
+        var gk = data.data.selection_key && data.data.selection_key[group] || [];
+        var gh = data.hover && data.hover.text && data.hover.text[group] || [];
+        var hoverMode = Array.isArray(hoverModes) ? hoverModes[group] : hoverModes;
+        for (var j = 0; j < gx.length; j++) {
+          var at = index.get(String(gk[j])); if (at == null) continue;
+          x[at] = Number(gx[j]); y[at] = Number(gy[j]);
+          if (gz[j] != null) z[at] = Number(gz[j]);
+          groups[at] = group; hover[at] = gh[j] || '';
+          hoverEnabled[at] = hoverMode !== 'skip';
+        }
+      });
+    } else {
+      var keys = Array.isArray(data.data.selection_key)
+        ? data.data.selection_key : [];
+      var hx = data.data.x || [], hy = data.data.y || [], hz = data.data.z || [];
+      var hh = data.hover && Array.isArray(data.hover.text) ? data.hover.text : [];
+      var enabled = !(data.hover && data.hover.hoverinfo === 'skip');
+      for (var k = 0; k < hx.length; k++) {
+        var pos = index.get(String(keys[k])); if (pos == null) continue;
+        x[pos] = Number(hx[k]); y[pos] = Number(hy[k]);
+        if (hz[k] != null) z[pos] = Number(hz[k]);
+        hover[pos] = hh[k] || '';
+        hoverEnabled[pos] = enabled;
+      }
+    }
+    return { x: x, y: y, z: z, groups: groups,
+      levels: levels, colors: colors, hover: hover, hoverEnabled: hoverEnabled };
+  }
+  function quantisedField(label, raw, keys, data) {
+    var index = singleIndex(), values = emptyVector(null), min = Infinity, max = -Infinity;
+    for (var i = 0; i < raw.length; i++) {
+      var at = index.get(String(keys[i]));
+      var value = Number(raw[i]);
+      if (at == null || !isFinite(value)) continue;
+      values[at] = value; if (value < min) min = value; if (value > max) max = value;
+    }
+    if (!isFinite(min)) { min = 0; max = 1; }
+    var range = data && data.color_range;
+    if (Array.isArray(range) && range.length === 2 &&
+      isFinite(Number(range[0])) && isFinite(Number(range[1])) &&
+      Number(range[0]) !== Number(range[1])) {
+      min = Math.min(Number(range[0]), Number(range[1]));
+      max = Math.max(Number(range[0]), Number(range[1]));
+    }
+    if (max <= min) max = min + 1;
+    var q = values.map(function (value) {
+      if (value == null) return null;
+      return Math.round(Math.max(0, Math.min(1,
+        (value - min) / (max - min))) * 1000);
+    });
+    return { label: label, v: q, raw: values, min: min, max: max, scale: 1000,
+      unclipped: true,
+      palette: singlePalette(data && data.colorscale, data && data.reversescale) };
+  }
+  function directColorField(meta, raw, keys) {
+    var index = singleIndex(), colors = emptyVector('#e6e7ea');
+    for (var i = 0; i < raw.length; i++) {
+      var at = index.get(String(keys[i]));
+      if (at != null) colors[at] = cssColor(raw[i], '#e6e7ea');
+    }
+    return {
+      label: meta.color_variable || 'Co-expression', colors: colors,
+      channelLabels: Array.isArray(meta.traces) ? meta.traces : [],
+      channelColors: Array.isArray(meta.coexpr_colors) ? meta.coexpr_colors : []
+    };
+  }
+  function singleEdges(extra) {
+    var shapes = extra && Array.isArray(extra.shapes) ? extra.shapes : [];
+    return shapes.filter(function (shape) {
+      return shape && shape.x0 != null && shape.y0 != null &&
+        shape.x1 != null && shape.y1 != null;
+    }).map(function (shape) {
+      return [Number(shape.x0), Number(shape.y0), Number(shape.x1), Number(shape.y1)];
+    });
+  }
+  function singleHulls(extra) {
+    var raw = extra && extra.group_hulls;
+    if (!raw || !Array.isArray(raw.x) || !Array.isArray(raw.y)) return [];
+    return raw.x.map(function (x, index) {
+      return {
+        x: x || [], y: raw.y[index] || [],
+        color: raw.color && raw.color[index] || '#7b8794'
+      };
+    });
+  }
+  function buildSingleSpaces(id, payload) {
+    var meta = payload.meta || {}, data = payload.data || {}, extra = payload.extra || {};
+    var categorical = meta.color_type === 'categorical';
+    var aligned = alignSingleCoordinates({ meta: meta, data: data, hover: payload.hover }, categorical);
+    var baseId = 'single::' + id, spaces = [], modes = {};
+    var edges = singleEdges(extra);
+    var hulls = singleHulls(extra);
+    var hasZ = aligned.z.some(function (value) { return value != null; });
+    var hasHover = aligned.hoverEnabled.some(Boolean);
+    var makeSpace = function (spaceId, label) {
+      var space = { id: spaceId, label: label || id, x: aligned.x, y: aligned.y };
+      space._projectionName = spaceId;
+      space._hover = aligned.hover;
+      space._hoverEnabled = hasHover;
+      space._hoverMask = aligned.hoverEnabled;
+      if (hasZ) space.z = aligned.z;
+      if (!hasZ && !data.reset_axes) {
+        space.xRange = data.x_range;
+        space.yRange = data.y_range;
+      }
+      var borderWidth = Number(data.point_line && data.point_line.width);
+      if (borderWidth > 0) {
+        space.pointBorder = {
+          color: cssColor(data.point_line.color, 'rgba(90,90,90,.35)'),
+          width: Math.max(0.5, borderWidth * 0.7)
+        };
+      }
+      if (Array.isArray(meta.axes)) space.axes = meta.axes.slice(0, 3);
+      if (edges.length) { space.trajectory = true; space.edges = edges; }
+      if (hulls.length) space.hulls = hulls;
+      if (meta.is_spatial) {
+        space.background_scope = id;
+        space._sampleName = meta.image_label || 'Spatial';
+        var bounds = meta.image_bounds || null;
+        if (meta.background_image && bounds) {
+          var imageId = meta.background_identity
+            ? JSON.stringify(meta.background_identity) : 'single-background';
+          var opacity = Number(meta.background_opacity);
+          space.images = [{
+            id: imageId, label: meta.image_label || 'Tissue background',
+            uri: meta.background_image, bounds: bounds,
+            preset: {
+              opacity: isFinite(opacity) ? opacity : 0.6,
+              offsetX: Number(meta.background_offset_x) || 0,
+              offsetY: Number(meta.background_offset_y) || 0,
+              scaleX: Number(meta.background_scale_x) || 1,
+              scaleY: Number(meta.background_scale_y) || 1,
+              flipX: !!meta.background_flip_x,
+              flipY: !!meta.background_flip_y,
+              rotation: Number(meta.background_rotation) || 0
+            }
+          }];
+          space._customImageId = imageId;
+        }
+      }
+      spaceById[spaceId] = space; spaces.push(spaceId); return space;
+    };
+    if (categorical) {
+      var groupName = '__single_group__' + id;
+      D.cat_extra[groupName] = {
+        values: aligned.groups, levels: aligned.levels, colors: aligned.colors
+      };
+      makeSpace(baseId, meta.space_label || id);
+      modes[baseId] = groupName;
+    } else if (meta.color_type === 'coexpression') {
+      var directName = 'single:' + id + ':rgb';
+      D.fields[directName] = directColorField(
+        meta, Array.isArray(data.color) ? data.color : [],
+        Array.isArray(data.selection_key) ? data.selection_key : []
+      );
+      makeSpace(baseId, meta.space_label || id);
+      modes[baseId] = FIELD_PREFIX + directName;
+    } else {
+      var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+      var multiple = data.color && !Array.isArray(data.color) && typeof data.color === 'object';
+      var entries = multiple ? Object.keys(data.color).map(function (name) {
+        return [name, data.color[name]];
+      }) : [[meta.color_variable || 'Value', data.color || []]];
+      entries.forEach(function (entry, panel) {
+        var fieldName = 'single:' + id + ':' + panel;
+        D.fields[fieldName] = quantisedField(entry[0], entry[1] || [], keys, data);
+        var spaceId = entries.length === 1 ? baseId : baseId + ':' + panel;
+        makeSpace(spaceId, entry[0]); modes[spaceId] = FIELD_PREFIX + fieldName;
+      });
+    }
+    return { spaces: spaces, modes: modes };
+  }
+  function stashSingleState() {
+    if (!singleActive || !singleViews[singleActive]) return;
+    var view = singleViews[singleActive];
+    view.selection = selectedCellIds();
+    var group = catOf(singleSpaceModes[singleSpaceIds[0]]);
+    view.hiddenGroups = group ? Array.from(hidden).map(function (index) {
+      return group.levels[index];
+    }).filter(function (name) { return name != null; }) : [];
+    view.mode = selectMode;
+    view.lenses = panels.filter(function (p) { return p.spaceId; }).map(function (p) {
+      return { view: p.view && Object.assign({}, p.view), rot: p.rot && Object.assign({}, p.rot),
+        lassoData: p.lassoData && p.lassoData.map(function (q) { return q.slice(); }) };
+    });
+  }
+  function activateSingle(id, resetAxes) {
+    var payload = singleViews[id];
+    if (!payload || !linkedBundle || rebuildingBase) return false;
+    if (!singleActive && !linkedState) linkedState = exportWorkspace();
+    stashSingleState();
+    if (resetAxes) payload.lenses = [];
+    restoreLinkedSurface();
+    singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
+    if (!mountSingleSurface(id)) { singleActive = null; return false; }
+    D = Object.assign({}, linkedBundle, {
+      fields: Object.assign({}, linkedBundle.fields || {}),
+      cat_extra: Object.assign({}, linkedBundle.cat_extra || {})
+    });
+    spaceById = {}; spatialTemplate = null; _clipD = null;
+    var built = buildSingleSpaces(id, payload);
+    payload.data.reset_axes = false;
+    singleSpaceIds = built.spaces; singleSpaceModes = built.modes;
+    sanitiseColors(D);
+    singleSpaceIds.forEach(function (spaceId) {
+      var space = spaceById[spaceId]; if (isSpatialSpace(space)) loadSpaceImage(space);
+    });
+    if (payload.backgroundState) updateSingleBackground(id, payload.backgroundState);
+    colorBy = singleSpaceModes[singleSpaceIds[0]] || colorBy;
+    hidden = new Set(); groupFilter = {}; sel = null; selectionSource = null;
+    selectionSourceSpace = null;
+    pick = null; hoverCell = null; focusPanel = null;
+    zoomed = false; zoomedSpace = null;
+    pctShow = 100; pctMask = null; keepPlotsSquare = false;
+    dissolvePct = 0; dissolveThresh = null; evidenceOn = false; nicheSet = null;
+    unpinTip(); closeCard(); cardMeta = null;
+    var group = catOf(singleSpaceModes[singleSpaceIds[0]]);
+    if (group && Array.isArray(payload.hiddenGroups)) {
+      payload.hiddenGroups.forEach(function (name) {
+        var index = group.levels.indexOf(String(name)); if (index >= 0) hidden.add(index);
+      });
+    }
+    ps = Math.max(0.5, Number(payload.data && payload.data.point_size) || ps * 2) / 2;
+    pointOpacity = Math.max(0.05,
+      Math.min(1, Number(payload.data && payload.data.point_opacity) || pointOpacity));
+    psSeeded = pointSizeEdited = pointOpacityEdited = true;
+    ensurePanelSlots(singleSpaceIds.length); buildPanels(); layoutPanels();
+    selectMode = payload.mode || 'lasso'; syncModeButtons(); syncCursors();
+    var saved = payload.lenses || [];
+    panels.forEach(function (p, index) {
+      if (!p.spaceId || !saved[index]) return;
+      p.view = saved[index].view || null; p.rot = saved[index].rot || null;
+      p.lassoData = saved[index].lassoData || null; project(p);
+    });
+    if (Array.isArray(payload.selection) && payload.selection.length) {
+      var cells = singleIndex(), restored = new Set();
+      payload.selection.forEach(function (cell) {
+        var at = cells.get(String(cell)); if (at != null) restored.add(at);
+      });
+      sel = restored.size ? restored : null;
+    }
+    renderLegend(); resizeAll(); renderSelbar(); drawAll();
+    reportSingleHiddenGroups(); reportSelection(); reportSingleZoom();
+    return true;
+  }
+  function activateLinked() {
+    if (!linkedBundle) return;
+    var state = linkedState;
+    stashSingleState(); restoreLinkedSurface();
+    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    rebuildingBase = true;
+    try {
+      onData(linkedBundle);
+    } finally {
+      rebuildingBase = false;
+    }
+    if (state) restoreWorkspace(state);
+    linkedState = null;
+  }
+
+  function registerSingle(id) {
+    if (!id) return null;
+    if (!singleViews[id]) singleViews[id] = { id: id };
+    return singleViews[id];
+  }
+
+  function renderSingle(id, meta, data, hover, extra) {
+    var previous = registerSingle(id); if (!previous) return;
+    singleRequests.delete(id);
+    meta = meta || {}; data = data || {};
+    var changedGroup = previous.meta && previous.meta.color_variable !== meta.color_variable;
+    singleViews[id] = Object.assign(previous, {
+      id: id, meta: meta || {}, data: data || {}, hover: hover || {},
+      extra: extra || {}
+    });
+    if (changedGroup) singleViews[id].hiddenGroups = [];
+    if (data.reset_axes) singleViews[id].lenses = [];
+    var pending = singleViews[id].pendingSavedState;
+    if (pending) {
+      singleViews[id].pendingSavedState = null;
+      applySingleState(id, pending);
+    } else if (visibleSingleId() === id) {
+      activateSingle(id, !!data.reset_axes);
+    }
+  }
+
+  function clearSingleSelection(id) {
+    var view = registerSingle(id); if (!view) return;
+    view.selection = []; view.lenses = (view.lenses || []).map(function (lens) {
+      return Object.assign({}, lens, { lassoData: null });
+    });
+    if (singleActive === id) {
+      pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+      reportSingleZoom();
+    }
+  }
+
+  function toggleSingleZoom(id) {
+    if (singleActive !== id) return;
+    var panel = panels.find(function (candidate) { return !!candidate.spaceId; });
+    if (!panel || panelIs3D(panel)) return;
+    if (panel.view) {
+      panel.view = null; project(panel); drawAll();
+    } else {
+      zoomToSelection(panel);
+    }
+    zoomed = !!panel.view;
+    zoomedSpace = zoomed ? panel.spaceId : null;
+    updateZoomBtn(); reportSingleZoom();
+  }
+
+  function captureSingleState(id) {
+    var view = singleViews[id];
+    if (!view || !view.data) return null;
+    if (singleActive === id) stashSingleState();
+    var lens = view.lenses && view.lenses[0] || {};
+    var rotation = lens.rot || {};
+    return {
+      cells: (view.selection || []).slice(),
+      geometry: lens.lassoData && lens.lassoData.length > 2 ? {
+        mode: view.mode === 'box' ? 'box' : 'lasso', panel: 0,
+        polygon: lens.lassoData.map(function (point) { return point.slice(); })
+      } : null,
+      view: {
+        viewport: lens.view ? Object.assign({}, lens.view) : null,
+        rotation: { x: Number(rotation.rx) || 0, y: Number(rotation.ry) || 0 },
+        mode: view.mode || 'lasso', zoomed: !!lens.view,
+        hidden_groups: (view.hiddenGroups || []).slice()
+      }
+    };
+  }
+
+  function applySingleState(id, saved) {
+    var target = registerSingle(id); if (!target) return { selectedCells: 0 };
+    if (!target.data) {
+      target.pendingSavedState = saved;
+      return { selectedCells: saved && saved.selection ? saved.selection.cells.length : 0 };
+    }
+    var selection = saved && saved.selection || {};
+    var view = saved && saved.view || {};
+    var viewport = view.zoomed === false ? null : view.viewport;
+    if (viewport && viewport.cx == null && viewport.x0 != null) {
+      viewport = {
+        cx: (Number(viewport.x0) + Number(viewport.x1)) / 2,
+        cy: (Number(viewport.y0) + Number(viewport.y1)) / 2,
+        span: Math.max(Number(viewport.x1) - Number(viewport.x0),
+          Number(viewport.y1) - Number(viewport.y0))
+      };
+    }
+    target.selection = (selection.cells || []).map(String);
+    target.hiddenGroups = (view.hidden_groups || []).map(String);
+    target.mode = view.mode || 'lasso';
+    target.lenses = [{
+      view: viewport ? Object.assign({}, viewport) : null,
+      rot: view.rotation ? {
+        rx: Number(view.rotation.x) || 0, ry: Number(view.rotation.y) || 0
+      } : null,
+      lassoData: selection.geometry && selection.geometry.polygon
+        ? selection.geometry.polygon.map(function (point) {
+          return [Number(point[0]), Number(point[1])];
+        }) : null
+    }];
+    if (visibleSingleId() === id) activateSingle(id);
+    return { selectedCells: target.selection.length };
+  }
+
+  function updateSingleBackground(id, values) {
+    var view = singleViews[id]; if (!view) return;
+    values = values || {};
+    var names = {
+      opacity: 'opacity', offsetX: 'offsetX', offsetY: 'offsetY',
+      scaleX: 'scaleX', scaleY: 'scaleY', flipX: 'flipX',
+      flipY: 'flipY', rotate: 'rotate'
+    };
+    view.backgroundState = Object.assign({}, view.backgroundState || {}, values);
+    if (singleActive !== id) return;
+    singleSpaceIds.forEach(function (spaceId) {
+      var space = spaceById[spaceId]; if (!space || !space._imgState) return;
+      Object.keys(names).forEach(function (name) {
+        if (values[name] != null) space._imgState[names[name]] = values[name];
+      });
+      stashImgState(space);
+    });
+    drawAll();
+  }
+
   function onData(bundle) {
     // A data set the builders cannot turn into a bundle (no embedding, or a
     // build error) arrives as {error: "..."}. Blank the workspace and SAY so —
     // returning early would leave the PREVIOUS data set's panels on screen,
     // silently attributing one data set's cells to another.
     if (!bundle || bundle.error || !bundle.spaces || !bundle.spaces.length) {
+      linkedBundle = null;
+      resetSingleViews();
       showUnavailable(bundle && bundle.error);
+      reportWorkspaceReady();
       return;
     }
+    if (singleActive) {
+      stashSingleState(); restoreLinkedSurface();
+      singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    }
+    linkedBundle = bundle;
     D = bundle;
     sanitiseColors(D);
     syncCloneTiers();
@@ -4697,6 +5342,7 @@ var focusPanel = null;
     var previousProjections = selectedProjections.slice();
     var previousActiveName = activeSpatial() && activeSpatial()._sampleName;
     if (dataChanged) {
+      resetSingleViews();
       imgStates = {};
       imgChoice = {};
     }
@@ -4750,6 +5396,7 @@ var focusPanel = null;
       (D.groups ? Object.keys(D.groups)[0] : null) || null;
     unpinTip();
     hidden = new Set(); sel = null; selectionSource = null;
+    selectionSourceSpace = null;
     pick = null; hoverCell = null;
     focusPanel = null;
     // Reset point appearance only for a genuinely different data set. A bundle
@@ -4792,7 +5439,7 @@ var focusPanel = null;
     // Give every present space its own panel and hide the unused slots (this also
     // places the Trekker info button on the Trekker panel).
     layoutPanels();
-    zoomed = false; updateZoomBtn(); syncModeButtons();
+    zoomed = false; zoomedSpace = null; updateZoomBtn(); syncModeButtons();
     updateSelActions();   // hide the Zoom / Clear group until a selection exists
     updateZselButtons();
     // Immune axis present → reveal the clonal-layout switch and lay out the
@@ -4839,17 +5486,472 @@ var focusPanel = null;
     if (pendingColorPatch && applyColorPatch(pendingColorPatch)) {
       pendingColorPatch = null;
     }
+    reportWorkspaceReady();
+    if (!rebuildingBase) {
+      var singleId = visibleSingleId();
+      if (singleId && singleViews[singleId]) activateSingle(singleId);
+    }
   }
+
+  // ---- portable local workspace ------------------------------------------
+  // The JSON contains identities and interaction state only; no expression,
+  // coordinates, images, receptor sequences or other source data leave D.
+  function configFingerprint() {
+    if (!D || !Array.isArray(D.cells)) return '';
+    if (typeof D.dataset_fingerprint === 'string' && D.dataset_fingerprint) {
+      return D.dataset_fingerprint;
+    }
+    if (typeof D.cell_fingerprint === 'string' && D.cell_fingerprint) {
+      return D.cell_fingerprint;
+    }
+    var a = 2166136261, b = 2246822519;
+    D.cells.forEach(function (cell) {
+      var text = String(cell) + '\u0000';
+      for (var i = 0; i < text.length; i++) {
+        a = Math.imul(a ^ text.charCodeAt(i), 16777619) >>> 0;
+        b = Math.imul(b ^ text.charCodeAt(i), 3266489917) >>> 0;
+      }
+    });
+    return D.cells.length + ':' + a.toString(16) + ':' + b.toString(16);
+  }
+
+  function selectedCellIds() {
+    var out = [];
+    if (sel) sel.forEach(function (index) { out.push(D.cells[index]); });
+    return out;
+  }
+
+  function namedFilters() {
+    var out = {};
+    Object.keys(groupFilter).forEach(function (name) {
+      var group = D.groups && D.groups[name];
+      if (!group) return;
+      out[name] = Array.from(groupFilter[name]).map(function (index) {
+        return group.levels[index];
+      });
+    });
+    return out;
+  }
+
+  function savedHiddenLevels() {
+    var group = catOf(colorBy);
+    if (!group || !hidden.size) return [];
+    return [{
+      group: colorBy,
+      levels: Array.from(hidden).sort(function (a, b) { return a - b; })
+        .map(function (index) { return group.levels[index]; })
+    }];
+  }
+
+  function savedLenses() {
+    return panels.filter(function (panel) { return !!panel.spaceId; }).map(function (panel) {
+      var view = panel.view || { cx: 0.5, cy: 0.5, span: 1 };
+      return {
+        space: panel.spaceId,
+        viewport: { cx: view.cx, cy: view.cy, span: view.span },
+        rotation: panel.rot ? { rx: panel.rot.rx, ry: panel.rot.ry } : null
+      };
+    });
+  }
+
+  function savedGeometry() {
+    var source = null;
+    panels.some(function (panel) {
+      if (!panel.lassoData || !panel.spaceId) return false;
+      source = {
+        space: panel.spaceId,
+        mode: selectMode === 'box' ? 'box' : 'lasso',
+        polygon: panel.lassoData
+      };
+      return true;
+    });
+    return source;
+  }
+
+  function savedBackgrounds() {
+    return selectedSpatial.map(function (name) {
+      var space = spaceById[spatialId(name)];
+      var images = spatialImages(space);
+      if (!space || !images.length) return null;
+      stashImgState(space);
+      var mode = backgroundModeFor(space);
+      var selectedImage = mode === 'custom' ? space._customImageId : null;
+      var image = currentImage(space) || images.filter(function (item) {
+        return item.id === selectedImage;
+      })[0] || images[0];
+      var key = imgKey(space, image);
+      var state = space._imgState || (key && imgStates[key]) || presetState(image);
+      return {
+        section: name,
+        mode: mode === 'custom' ? 'image' : mode,
+        image_id: mode === 'custom' ? selectedImage : null,
+        opacity: state.opacity,
+        alignment: {
+          show: state.show !== false,
+          offset_x: state.offsetX,
+          offset_y: state.offsetY,
+          scale_x: state.scaleX,
+          scale_y: state.scaleY,
+          rotation: state.rotate,
+          flip_x: !!state.flipX,
+          flip_y: !!state.flipY,
+          lock_aspect: state.lock !== false
+        }
+      };
+    }).filter(Boolean);
+  }
+
+  function selectedGene(id) {
+    var input = $(id);
+    return input && typeof input.value === 'string' ? input.value : '';
+  }
+
+  function exportWorkspace() {
+    if (!D) throw new Error('Load a data set before saving a linked view.');
+    var active = activeSpatial();
+    var focusSpace = null;
+    panels.forEach(function (panel) {
+      if (panel.key === focusPanel) focusSpace = panel.spaceId;
+    });
+    return {
+      schema: 'cerebronexus-linked-view',
+      version: 1,
+      created_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      dataset: {
+        cell_count: D.n,
+        cell_fingerprint: configFingerprint()
+      },
+      selection: {
+        cells: selectedCellIds(),
+        source: selectionSource || null,
+        geometry: savedGeometry()
+      },
+      view: {
+        projections: selectedProjections.slice(),
+        spatial_sections: selectedSpatial.slice(),
+        active_spatial: active && active._sampleName || null,
+        colour: {
+          mode: colorBy,
+          gene: colorBy === GENE_MODE
+            ? ((D.gene && D.gene.gene) || selectedGene('coordviews_gene')) : null,
+          rgb_genes: colorBy === RGB_MODE
+            ? ['r', 'g', 'b'].map(function (channel) {
+              return selectedGene('coordviews_gene_' + channel);
+            }) : [],
+          clip: colorClip
+        },
+        filters: namedFilters(),
+        hidden_levels: savedHiddenLevels(),
+        display: {
+          point_size: ps,
+          point_opacity: pointOpacity,
+          percentage_cells: pctShow,
+          group_labels: labelsOn,
+          selection_mode: selectMode === 'box' ? 'box' : 'lasso',
+          clone_layout: CLONE_MODE,
+          keep_square: keepPlotsSquare
+        },
+        focus_space: focusSpace,
+        lenses: savedLenses(),
+        spatial_backgrounds: savedBackgrounds(),
+        trekker: {
+          dissolve_percentage: dissolvePct,
+          evidence: evidenceOn,
+          niche_radius: nicheRadius
+        }
+      }
+    };
+  }
+
+  function configError(message) {
+    throw new Error(message);
+  }
+
+  function finiteNumber(value, fallback, min, max) {
+    value = Number(value);
+    if (!isFinite(value)) return fallback;
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function validateWorkspace(config) {
+    if (!D) configError('Load a data set before opening a linked view.');
+    if (!config || !config.dataset ||
+        config.dataset.cell_fingerprint !== configFingerprint()) {
+      configError('This linked view belongs to a different cell population.');
+    }
+    var view = config.view;
+    var availableProjections = D.projections ? Object.keys(D.projections) : [];
+    if (view.projections.some(function (name) {
+      return availableProjections.indexOf(name) < 0;
+    })) configError('The file uses a projection that is unavailable here.');
+
+    var samples = spatialSamples();
+    var availableSpatial = samples.map(function (sample) { return sample.name; });
+    if (view.spatial_sections.some(function (name) {
+      return availableSpatial.indexOf(name) < 0;
+    })) configError('The file uses a Spatial section that is unavailable here.');
+
+    var mode = view.colour.mode;
+    if (!(catOf(mode) || fieldForMode(mode) || mode === GENE_MODE || mode === RGB_MODE)) {
+      configError('The file uses a colour mode that is unavailable here.');
+    }
+    Object.keys(view.filters).forEach(function (name) {
+      if (!D.groups || !D.groups[name]) configError('The file contains an invalid filter.');
+    });
+
+    var spaces = new Set((D.spaces || []).map(function (space) { return space.id; }));
+    view.projections.forEach(function (name) { spaces.add(projectionId(name)); });
+    view.spatial_sections.forEach(function (name) { spaces.add(spatialId(name)); });
+    if (view.lenses.some(function (lens) { return !spaces.has(lens.space); })) {
+      configError('The file contains an invalid view lens.');
+    }
+
+    var cells = singleIndex();
+    if (config.selection.cells.some(function (cell) { return !cells.has(String(cell)); })) {
+      configError('The file selects cells that are unavailable here.');
+    }
+    return { cells: cells };
+  }
+
+  function restoreWorkspace(config) {
+    var validated = validateWorkspace(config);
+    var view = config.view || {}, selection = config.selection || {};
+    var restoredSelection = new Set();
+    selection.cells.forEach(function (cell) {
+      restoredSelection.add(validated.cells.get(String(cell)));
+    });
+
+    setSelectedProjections(view.projections);
+    setSelectedSpatial(view.spatial_sections);
+    (view.spatial_backgrounds || []).forEach(function (saved) {
+      var space = spaceById[spatialId(saved.section)];
+      if (!space) return;
+      var images = spatialImages(space);
+      backgroundModes[backgroundStateKey(space)] = saved.mode === 'image' ? 'custom' : saved.mode;
+      space._customImageId = saved.image_id || ((images[0] && images[0].id) || IMG_NONE);
+      imgChoice[backgroundStateKey(space)] = space._customImageId;
+      var alignment = saved.alignment;
+      if (alignment) {
+        var image = currentImage(space), key = imgKey(space, image);
+        if (key) imgStates[key] = {
+          show: alignment.show !== false,
+          opacity: finiteNumber(saved.opacity, .6, 0, 1),
+          offsetX: finiteNumber(alignment.offset_x, 0, -1e9, 1e9),
+          offsetY: finiteNumber(alignment.offset_y, 0, -1e9, 1e9),
+          scaleX: finiteNumber(alignment.scale_x, 1, .000001, 1e6),
+          scaleY: finiteNumber(alignment.scale_y, 1, .000001, 1e6),
+          rotate: finiteNumber(alignment.rotation, 0, -1e6, 1e6),
+          flipX: !!alignment.flip_x,
+          flipY: !!alignment.flip_y,
+          lock: alignment.lock_aspect !== false
+        };
+      }
+      loadSpaceImage(space);
+    });
+    if (view.active_spatial) {
+      activeSpatialId = spatialId(view.active_spatial);
+      activateSpatial(activeSpatialId);
+    }
+
+    var colourState = view.colour, colour = colourState.mode;
+    colorClip = Number(colourState.clip);
+    var clipEl = $('cv-clip'); if (clipEl) clipEl.value = String(colorClip);
+    if (colour === GENE_MODE && colourState.gene) {
+      colourByGene(colourState.gene);
+    } else {
+      setColorBy(colour);
+      var colourEl = $('cv-pick-color');
+      if (colourEl) {
+        if (colourEl.selectize) colourEl.selectize.setValue(colour, true);
+        else colourEl.value = colour;
+      }
+    }
+    if (colour === RGB_MODE) {
+      ['r', 'g', 'b'].forEach(function (channel, index) {
+        var gene = colourState.rgb_genes[index], el = $('coordviews_gene_' + channel);
+        if (el && el.selectize) {
+          if (gene) el.selectize.addOption({ value: gene, label: gene });
+          el.selectize.setValue(gene, false);
+        } else if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+          Shiny.setInputValue('coordviews_gene_' + channel, gene);
+        }
+      });
+    }
+
+    groupFilter = {};
+    Object.keys(view.filters || {}).forEach(function (name) {
+      var group = D.groups && D.groups[name], levels = view.filters[name];
+      var allowed = new Set();
+      levels.forEach(function (level) {
+        var index = group.levels.indexOf(level);
+        allowed.add(index);
+      });
+      if (allowed.size < group.levels.length) groupFilter[name] = allowed;
+    });
+    hidden = new Set();
+    var activeGroup = catOf(colorBy);
+    var hiddenState = Array.isArray(view.hidden_levels)
+      ? view.hidden_levels.filter(function (item) { return item.group === colorBy; })[0]
+      : null;
+    if (activeGroup && hiddenState) {
+      hiddenState.levels.forEach(function (level) {
+        var index = activeGroup.levels.indexOf(level);
+        if (index >= 0) hidden.add(index);
+      });
+    }
+
+    var display = view.display || {};
+    ps = finiteNumber(display.point_size, ps, 0, 20);
+    pointOpacity = finiteNumber(display.point_opacity, pointOpacity, 0, 1);
+    pctShow = finiteNumber(display.percentage_cells, pctShow, 5, 100);
+    psSeeded = pointSizeEdited = pointOpacityEdited = true;
+    labelsOn = display.group_labels !== false;
+    keepPlotsSquare = !!display.keep_square;
+    selectMode = display.selection_mode;
+    applyCloneLayout(display.clone_layout);
+    setSegOn(display.clone_layout);
+    dissolvePct = finiteNumber(view.trekker && view.trekker.dissolve_percentage, dissolvePct, 0, 100);
+    evidenceOn = !!(view.trekker && view.trekker.evidence);
+    nicheRadius = finiteNumber(view.trekker && view.trekker.niche_radius, nicheRadius, 1, 100000);
+    rebuildPctMask(); rebuildDissolve();
+
+    [['cv-ps', ps], ['cv-opacity', pointOpacity], ['cv-pct', pctShow],
+      ['cv-dissolve', dissolvePct], ['cv-niche', nicheRadius]].forEach(function (item) {
+      var el = $(item[0]); if (el) el.value = String(item[1]);
+    });
+    var psLabel = $('cv-ps-val'); if (psLabel) psLabel.textContent = ps.toFixed(1);
+    var opacityLabel = $('cv-op-val'); if (opacityLabel) opacityLabel.textContent = pointOpacity.toFixed(2);
+    var pctLabel = $('cv-pct-val'); if (pctLabel) pctLabel.textContent = String(pctShow);
+    var dissolveLabel = $('cv-dissolve-val'); if (dissolveLabel) dissolveLabel.textContent = String(dissolvePct);
+    var nicheLabel = $('cv-niche-val'); if (nicheLabel) nicheLabel.textContent = String(nicheRadius);
+    var labelsEl = $('cv-labels'); if (labelsEl) labelsEl.checked = labelsOn;
+    var squareEl = $('cv-square-plots'); if (squareEl) squareEl.checked = keepPlotsSquare;
+    var evidenceEl = $('cv-evidence'); if (evidenceEl) evidenceEl.checked = evidenceOn;
+
+    view.lenses.forEach(function (saved) {
+      panels.forEach(function (panel) {
+        if (panel.spaceId !== saved.space) return;
+        var viewport = saved.viewport;
+        panel.view = viewport.cx === 0.5 && viewport.cy === 0.5 &&
+          viewport.span === 1 ? null : clampView(panel, viewport);
+        panel.rot = saved.rotation && isFinite(saved.rotation.rx) &&
+          isFinite(saved.rotation.ry)
+          ? { rx: Number(saved.rotation.rx), ry: Number(saved.rotation.ry) } : null;
+        project(panel);
+      });
+    });
+
+    clearLassos();
+    var geometry = selection.geometry;
+    if (geometry && Array.isArray(geometry.polygon)) {
+      panels.some(function (panel) {
+        if (panel.spaceId !== geometry.space) return false;
+        panel.lassoData = geometry.polygon.map(function (point) {
+          return [Number(point[0]), Number(point[1])];
+        });
+        return true;
+      });
+    }
+
+    focusPanel = null;
+    if (view.focus_space) {
+      panels.some(function (panel) {
+        if (panel.spaceId !== view.focus_space) return false;
+        setFocusPanel(panel.key);
+        return true;
+      });
+    }
+    renderGroupFilters(); renderLegend(); syncModeButtons();
+    _layoutKey = null; resizeAll(); positionAllRangeVals();
+    setSelection(
+      restoredSelection,
+      geometry && geometry.space
+        ? { spaceId: geometry.space }
+        : (selection.source || 'Saved view')
+    );
+    return { selected_cells: restoredSelection.size };
+  }
+
+  function workspaceSummary() {
+    return {
+      ready: !!(D && configFingerprint()),
+      datasetFingerprint: D ? configFingerprint() : null,
+      selectedCells: sel ? sel.size : 0,
+      selectedCellBarcodes: selectedCellIds(),
+      colourMode: colorBy,
+      projections: selectedProjections.slice(),
+      spatialSections: selectedSpatial.slice(),
+      activeSpatial: D && activeSpatial() ? activeSpatial()._sampleName || null : null
+    };
+  }
+
+  function applyWorkspace(config, colourData) {
+    if (D && colourData && colourData.mode === GENE_MODE) {
+      D.gene = {
+        gene: colourData.gene,
+        v: colourData.v,
+        max: colourData.max
+      };
+    } else if (D && colourData && colourData.mode === RGB_MODE) {
+      D.rgb = {
+        r: colourData.r,
+        g: colourData.g,
+        b: colourData.b,
+        genes: colourData.genes
+      };
+    }
+    var result = restoreWorkspace(config);
+    return { selectedCells: result.selected_cells };
+  }
+
+  function reportWorkspaceReady() {
+    var summary = workspaceSummary();
+    window.dispatchEvent(new CustomEvent('cerebro:linkedviews-ready', {
+      detail: {
+        ready: summary.ready,
+        selectedCells: summary.selectedCells
+      }
+    }));
+  }
+
+  window.cerebroLinkedViewsState = Object.freeze({
+    ready: function () { return workspaceSummary().ready; },
+    capture: exportWorkspace,
+    apply: applyWorkspace,
+    summary: workspaceSummary
+  });
+
+  window.cerebroCellViews = Object.freeze({
+    captureState: captureSingleState,
+    applyState: applySingleState
+  });
 
   // ---- boot ----------------------------------------------------------------
   // All controls are client-owned (cv- ids), so no shiny:inputchanged is needed.
   // The only server touchpoints: receive the bundle, and signal readiness once
   // the session is actually connected (setInputValue is not callable before).
+  var booted = false;
   function boot() {
-    if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) return;
+    if (booted) return true;
+    if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) return false;
+    booted = true;
     Shiny.addCustomMessageHandler('coordviews_data', onData);
     Shiny.addCustomMessageHandler('coordviews_colors', function (patch) {
       if (!applyColorPatch(patch)) pendingColorPatch = patch;
+    });
+    Shiny.addCustomMessageHandler('cell_view_render', function (message) {
+      if (!message || !message.id) return;
+      renderSingle(
+        message.id,
+        message.meta,
+        message.data,
+        message.hover,
+        message.extra
+      );
+    });
+    Shiny.addCustomMessageHandler('cell_view_background', function (message) {
+      if (!message || !message.id) return;
+      updateSingleBackground(message.id, message.values);
     });
 
     // Single-gene expression vector (0-255) for the current gene.
@@ -4907,9 +6009,27 @@ var focusPanel = null;
     var lastVis = null;
     function reportVisibility() {
       var el = $('cv-meta');
-      var vis = !!(el && el.offsetParent !== null);   // absent or display:none
-      if (vis === lastVis) return;
-      lastVis = vis;
+      var linkedVis = !!(el && el.offsetParent !== null);
+      var singleId = visibleSingleId();
+      var vis = linkedVis || !!singleId;
+      var key = linkedVis ? 'linked' : (singleId || 'hidden');
+      var host = singleId && singleHost(singleId);
+      var surface = host && host.querySelector('.cerebro-cell-view-surface');
+      var mounted = !singleId || !!(surfaceHome && surface &&
+        surface.contains(surfaceHome.panes));
+      if (key === lastVis && mounted) return;
+      lastVis = key;
+      if (singleId && !singleViews[singleId] && !singleRequests.has(singleId)) {
+        singleRequests.add(singleId);
+        Shiny.setInputValue(singleId + '_render_request', Date.now(), {
+          priority: 'event'
+        });
+      }
+      if (singleId && linkedBundle && singleViews[singleId]) {
+        activateSingle(singleId);
+      } else if (linkedVis && singleActive) {
+        activateLinked();
+      }
       if (Shiny.setInputValue) {
         Shiny.setInputValue('coordviews_visible', vis);
       }
@@ -5017,6 +6137,16 @@ var focusPanel = null;
         unpinTip();
         return;
       }
+      var singleAction = t && t.closest &&
+        t.closest('[data-cell-view-action][data-cell-view-id]');
+      if (singleAction) {
+        e.preventDefault();
+        var singleId = singleAction.getAttribute('data-cell-view-id');
+        var singleAct = singleAction.getAttribute('data-cell-view-action');
+        if (singleAct === 'clear') clearSingleSelection(singleId);
+        else if (singleAct === 'zoom') toggleSingleZoom(singleId);
+        return;
+      }
       // per-panel modebar: select mode (box/lasso), zoom in/out, reset, PNG
       var tb = t && t.closest && t.closest('.cv-tbtn');
       if (tb) {
@@ -5037,7 +6167,9 @@ var focusPanel = null;
             // rotation is part of "where you are looking" too
             if (pp.rot) { pp.rot = null; pp.miniBg = null; project(pp); }
             if (pp.view) { pp.view = null; project(pp); }
-            if (isProjectionPanel(pp)) { zoomed = false; updateZoomBtn(); }
+            if (pp.spaceId === zoomedSpace) {
+              zoomed = false; zoomedSpace = null; updateZoomBtn();
+            }
             drawAll();
           }
         }
@@ -5206,9 +6338,13 @@ var focusPanel = null;
       // the grid just changed shape; an open card has to be re-centred on it
       if (cardOpen()) centreCard();
     });
+    return true;
   }
 
+  function bootWhenReady() {
+    if (!boot()) window.setTimeout(bootWhenReady, 50);
+  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else { boot(); }
+    document.addEventListener('DOMContentLoaded', bootWhenReady);
+  } else { bootWhenReady(); }
 })();

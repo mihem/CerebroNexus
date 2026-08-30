@@ -11,38 +11,45 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
       plot_height_px = session$clientData[[
         "output_overview_projection_height"
       ]],
-      min = preferences[["overview_plot_point_size"]][["min"]],
-      max = preferences[["overview_plot_point_size"]][["max"]],
-      step = preferences[["overview_plot_point_size"]][["step"]],
-      fallback = preferences[["overview_plot_point_size"]][["default"]]
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
+      fallback = preferences[["projection_plot_point_size"]][["default"]]
     ),
-    error = function(e) preferences[["overview_plot_point_size"]][["default"]]
+    error = function(e) preferences[["projection_plot_point_size"]][["default"]]
   )
 
   tagList(
     sliderInput(
       "overview_projection_point_size",
       label = "Point size",
-      min = preferences[["overview_plot_point_size"]][["min"]],
-      max = preferences[["overview_plot_point_size"]][["max"]],
-      step = preferences[["overview_plot_point_size"]][["step"]],
+      min = preferences[["projection_plot_point_size"]][["min"]],
+      max = preferences[["projection_plot_point_size"]][["max"]],
+      step = preferences[["projection_plot_point_size"]][["step"]],
       value = point_size_default
     ),
     sliderInput(
       "overview_projection_point_opacity",
       label = "Point opacity",
-      min = preferences[["overview_plot_point_opacity"]][["min"]],
-      max = preferences[["overview_plot_point_opacity"]][["max"]],
-      step = preferences[["overview_plot_point_opacity"]][["step"]],
-      value = preferences[["overview_plot_point_opacity"]][["default"]]
-    ),
+      min = preferences[["projection_plot_point_opacity"]][["min"]],
+      max = preferences[["projection_plot_point_opacity"]][["max"]],
+      step = preferences[["projection_plot_point_opacity"]][["step"]],
+      value = preferences[["projection_plot_point_opacity"]][["default"]]
+    )
+  )
+})
+
+output[["overview_projection_data_parameters_UI"]] <- renderUI({
+  tagList(
     sliderInput(
       "overview_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["overview_plot_percentage_cells_to_show"]][["min"]],
-      max = preferences[["overview_plot_percentage_cells_to_show"]][["max"]],
-      step = preferences[["overview_plot_percentage_cells_to_show"]][["step"]],
-      value = preferences[["overview_plot_percentage_cells_to_show"]][[
+      min = preferences[["projection_plot_percentage_cells_to_show"]][["min"]],
+      max = preferences[["projection_plot_percentage_cells_to_show"]][["max"]],
+      step = preferences[["projection_plot_percentage_cells_to_show"]][[
+        "step"
+      ]],
+      value = preferences[["projection_plot_percentage_cells_to_show"]][[
         "default"
       ]]
     )
@@ -53,6 +60,11 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
 outputOptions(
   output,
   "overview_projection_additional_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "overview_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 

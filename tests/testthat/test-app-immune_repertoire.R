@@ -19,10 +19,21 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
 }
 
 ir_sidebar_selector <- 'a[href="#shiny-tab-immune_repertoire"]'
+ir_canvas_selector <- paste0(
+  "#ir_clonalUMAP_projection_cell_view_host ",
+  ".cv-canvas-wrap > canvas:not(.cv-mini)"
+)
 
 wait_for_ir_sidebar <- function(app, timeout = 60000) {
   app$wait_for_js(
     sprintf("document.querySelector('%s') !== null", ir_sidebar_selector),
+    timeout = timeout
+  )
+}
+
+wait_for_ir_canvas <- function(app, timeout = 60000) {
+  app$wait_for_js(
+    sprintf("document.querySelector('%s') !== null", ir_canvas_selector),
     timeout = timeout
   )
 }
@@ -368,17 +379,26 @@ test_that("Clonal UMAP tab renders with receptor + projection selectors", {
   expect_gte(as.numeric(n_options("ir_p_umap_receptor")), 1)
   expect_gte(as.numeric(n_options("ir_p_umap_projection")), 1)
 
-  # The interactive plotly UMAP should render a plotly canvas (not an R error).
-  # Non-faceted Clonal UMAP now renders through the shared projection engine, so
-  # the plotly host is #ir_clonalUMAP_projection (not the old #ir_plot_clonalUMAP).
+  # The non-faceted Clonal UMAP renders through the shared Canvas engine.
+  wait_for_ir_canvas(app)
+  has_canvas <- app$get_js(
+    sprintf("document.querySelector('%s') !== null;", ir_canvas_selector)
+  )
+  expect_true(isTRUE(has_canvas))
   app$wait_for_js(
-    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
+    paste0(
+      "(function(){",
+      "var c=document.querySelector('",
+      ir_canvas_selector,
+      "');",
+      "if(!c||!c.width||!c.height)return false;",
+      "var p=c.getContext('2d').getImageData(0,0,c.width,c.height).data;",
+      "for(var i=3;i<p.length;i+=4){if(p[i])return true;}",
+      "return false;",
+      "})()"
+    ),
     timeout = 20000
   )
-  has_plotly <- app$get_js(
-    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null;"
-  )
-  expect_true(isTRUE(has_plotly))
 })
 
 test_that("Display options panel exposes scatter params on scatter-type tabs", {
@@ -413,16 +433,16 @@ test_that("Display options panel exposes scatter params on scatter-type tabs", {
   expect_true(isTRUE(control_exists("ir_d_alpha")))
 })
 
-test_that("IR page uses the Main-tab layout (Main/Additional/Group boxes)", {
+test_that("IR page uses the compact top toolbar and settings drawer", {
   app <- shared_app()
   activate_ir_tab(app)
 
-  # The three left-column parameter boxes (by their info buttons) and the
-  # right-column visualization tab strip should all be present.
+  # The page guide stays in the header; secondary controls remain in the drawer.
   exists_el <- function(sel) {
     app$get_js(sprintf("document.querySelector('%s') !== null;", sel))
   }
-  expect_true(isTRUE(exists_el("#ir_main_parameters_info")))
+  expect_true(isTRUE(exists_el("#ir_visualizations_info")))
+  expect_true(isTRUE(exists_el("#ir_more_button")))
   expect_true(isTRUE(exists_el("#ir_additional_parameters_info")))
   expect_true(isTRUE(exists_el("#ir_group_filters_info")))
   expect_true(isTRUE(exists_el("#ir_tabs")))
@@ -444,16 +464,12 @@ test_that("Clonal UMAP has Show-all toggle and group filters", {
   )
   expect_true(isTRUE(has_group_filter))
 
-  # The interactive plotly UMAP should render a plotly canvas (not an R error).
-  # Non-faceted host is the shared projection engine's #ir_clonalUMAP_projection.
-  app$wait_for_js(
-    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
-    timeout = 20000
+  # The non-faceted host renders through the shared Canvas engine.
+  wait_for_ir_canvas(app)
+  has_canvas <- app$get_js(
+    sprintf("document.querySelector('%s') !== null;", ir_canvas_selector)
   )
-  has_plotly <- app$get_js(
-    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null;"
-  )
-  expect_true(isTRUE(has_plotly))
+  expect_true(isTRUE(has_canvas))
 })
 
 test_that("Clonal UMAP switches to static facets only when grouped", {
@@ -472,28 +488,42 @@ test_that("Clonal UMAP switches to static facets only when grouped", {
     app$get_js(sprintf("document.querySelector('%s') !== null;", sel))
   }
 
-  # Ungrouped: the non-faceted host renders through the shared projection engine
-  # (#ir_clonalUMAP_projection); grouping swaps in the static faceted ggplot.
+  # Ungrouped uses the shared Canvas host; grouping swaps in the static facet.
   app$wait_for_js(
-    "document.querySelector('#ir_clonalUMAP_projection .plotly') !== null",
-    timeout = 20000
+    paste0(
+      "(function(){",
+      "var group=document.querySelector('#ir_p_umap_group_by');",
+      "var canvas=document.querySelector('",
+      ir_canvas_selector,
+      "');",
+      "var img=document.querySelector('#ir_plot_clonalUMAP_static img');",
+      "return !!group && group.value==='' && !!canvas && !img;",
+      "})()"
+    ),
+    timeout = 60000
   )
-  expect_true(isTRUE(exists_el("#ir_p_umap_group_by")))
-  expect_true(isTRUE(exists_el("#ir_clonalUMAP_projection .plotly")))
-  expect_false(isTRUE(exists_el("#ir_plot_clonalUMAP_static img")))
 
   app$set_inputs(ir_p_umap_group_by = "sample", wait_ = FALSE)
   app$wait_for_idle(timeout = 20000)
-
-  expect_false(isTRUE(exists_el("#ir_clonalUMAP_projection .plotly")))
-  expect_true(isTRUE(exists_el("#ir_plot_clonalUMAP_static img")))
-  plot_value <- app$get_value(output = "ir_plot_clonalUMAP_static")
-  panel_rows <- vapply(
-    plot_value$coordmap$panels,
-    function(panel) panel$row,
-    integer(1)
+  app$wait_for_js(
+    paste0(
+      "(function(){",
+      "var canvas=document.querySelector('",
+      ir_canvas_selector,
+      "');",
+      "var group=document.querySelector('#ir_p_umap_group_by');",
+      "var img=document.querySelector('#ir_plot_clonalUMAP_static img');",
+      "return !!group && group.value==='sample' && canvas===null && ",
+      "!!img && img.complete && img.naturalWidth>0;",
+      "})()"
+    ),
+    timeout = 45000
   )
-  expect_identical(unique(panel_rows), 1L)
+
+  expect_false(isTRUE(exists_el(
+    ir_canvas_selector
+  )))
+  expect_true(isTRUE(exists_el("#ir_plot_clonalUMAP_static img")))
   static_size <- app$get_js(
     paste0(
       "(function(){",
@@ -510,6 +540,24 @@ test_that("Clonal UMAP switches to static facets only when grouped", {
   expect_gte(as.numeric(static_size$h), 300)
   expect_gte(as.numeric(static_size$imgW), as.numeric(static_size$w) * 0.9)
   expect_gte(as.numeric(static_size$imgH), 300)
+
+  app$set_inputs(ir_p_umap_group_by = "", wait_ = FALSE)
+  app$wait_for_idle(timeout = 20000)
+
+  expect_true(isTRUE(exists_el(ir_canvas_selector)))
+  expect_false(isTRUE(exists_el("#ir_plot_clonalUMAP_static img")))
+  logs <- app$get_logs()
+  bad_logs <- grepl(
+    "figure margins too large|Invalid IHDR|could not write",
+    logs$message
+  )
+  expect_false(
+    any(bad_logs),
+    info = paste(
+      capture.output(print(logs[bad_logs, , drop = FALSE])),
+      collapse = "\n"
+    )
+  )
 })
 
 test_that("Clone call is hidden on the Clonal UMAP tab", {
@@ -533,7 +581,7 @@ test_that("Clone call is hidden on the Clonal UMAP tab", {
   expect_true(isTRUE(exists_el("#ir_cloneCall")))
 })
 
-test_that("Main parameters info button opens a help dialog", {
+test_that("page info button opens the repertoire guide", {
   local_app_support(inst_dir)
   app <- AppDriver$new(
     inst_dir,
@@ -545,12 +593,12 @@ test_that("Main parameters info button opens a help dialog", {
   withr::defer(app$stop())
   activate_ir_tab(app)
 
-  # Move to a tab with several controls, then click the Main parameters info.
+  # Move to a tab with several controls, then open the consolidated page guide.
   app$set_inputs(ir_tabs = "Diversity", wait_ = FALSE)
   app$wait_for_idle(timeout = 45000)
-  app$run_js("document.querySelector('#ir_main_parameters_info').click();")
+  app$run_js("document.querySelector('#ir_visualizations_info').click();")
   app$wait_for_js(
-    "(function(){var m=document.querySelector('.modal-body');return !!m && /ir-help-card/.test(m.innerHTML);})()",
+    "(function(){var m=document.querySelector('.modal-body');return !!m && /ir-guide/.test(m.innerHTML);})()",
     timeout = 45000
   )
 
@@ -558,8 +606,8 @@ test_that("Main parameters info button opens a help dialog", {
   modal_html <- app$get_js(
     "(function(){var m=document.querySelector('.modal-body');return m?m.innerHTML:'';})();"
   )
-  expect_true(grepl("ir-help-card", modal_html))
-  expect_true(grepl("Metric|Clone call|Bootstrap", modal_html))
+  expect_true(grepl("ir-guide", modal_html))
+  expect_true(grepl("Clonal UMAP|Abundance|Diversity", modal_html))
 })
 
 test_that("lazy-load boundary: self-made plots stay unloaded, scRepertoire plots load + render", {
@@ -620,7 +668,7 @@ test_that("lazy-load boundary: self-made plots stay unloaded, scRepertoire plots
   expect_identical(app$get_value(export = "ir_heavy_deps_loaded"), FALSE)
   app$run_js('document.querySelector(".modal-footer button").click();')
   app$wait_for_js(
-    'document.querySelector(".modal") === null',
+    'document.querySelector(".modal.in, .modal.show") === null',
     timeout = 10000
   )
 

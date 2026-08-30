@@ -19,6 +19,24 @@
 ## Null-coalescing helper (local, so we don't depend on rlang/shiny exporting it).
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
+cv_cell_ids <- function(ids, context = "data set") {
+  ids <- enc2utf8(as.character(ids))
+  if (anyNA(ids) || any(!nzchar(ids))) {
+    stop(context, " contains a missing cell ID.", call. = FALSE)
+  }
+  if (anyDuplicated(ids)) {
+    stop(context, " contains duplicate cell IDs.", call. = FALSE)
+  }
+  ids
+}
+
+cv_cell_fingerprint <- function(cells) {
+  path <- tempfile("cerebronexus-cell-ids-")
+  on.exit(unlink(path), add = TRUE)
+  writeBin(sort(enc2utf8(cells)), path, useBytes = TRUE)
+  unname(tools::md5sum(path))
+}
+
 ## Categorical palette (mirrors the app's plotly categorical colours).
 cv_palette <- c(
   "#636EFA",
@@ -235,7 +253,7 @@ cv_alignment_appearance <- function(alignment) {
       unname(value)
     }
   }
-  preset <- list(
+  list(
     image_opacity = number("image_opacity", 0, 1),
     point_opacity = number("point_opacity", 0, 1),
     point_size = number("point_size", 0, 20, lower_open = TRUE)
@@ -531,7 +549,6 @@ cv_apply_color_patch <- function(bundle, patch) {
   }
   bundle
 }
-
 cv_space <- function(id, label, x, y) {
   list(id = id, label = label, x = I(x), y = I(y))
 }
@@ -572,6 +589,10 @@ cv_build_trajectories <- function(crb, cells) {
       if ("cell_barcode" %in% colnames(meta)) {
         trajectory_cells <- as.character(meta$cell_barcode)
       }
+      trajectory_cells <- cv_cell_ids(
+        trajectory_cells,
+        paste0("Trajectory `", trajectory_name, "`")
+      )
       idx <- match(cells, trajectory_cells)
       if (!any(!is.na(idx))) {
         next
@@ -604,7 +625,7 @@ cv_build_trajectories <- function(crb, cells) {
 ## the bundle small); `min`/`max` carry the TRUE range so the client can render a
 ## real-valued colourbar and hover value instead of the quantised index. Trekker's
 ## own fields arrive pre-quantised to 0-255, hence the per-field `scale` rather
-## than one global constant. Must match FIELD_PREFIX in www/coordviews.js.
+## than one global constant. Must match FIELD_PREFIX in www/cell_views.js.
 cv_field_mode <- "__field__"
 cv_field_scale <- 1000L
 cv_field <- function(
@@ -788,7 +809,11 @@ cv_build_projections <- function(crb, cells) {
     if (is.null(pj)) {
       next
     }
-    pjidx <- match(cells, rownames(pj))
+    projection_cells <- cv_cell_ids(
+      rownames(pj),
+      paste0("Projection `", pn, "`")
+    )
+    pjidx <- match(cells, projection_cells)
     nd <- as.integer(ncol(pj))
     entry <- list(
       x = I(round(as.numeric(pj[pjidx, 1]), 4)),
@@ -832,7 +857,11 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
   if (is.null(co)) {
     return(NULL)
   }
-  sidx <- match(cells, rownames(co))
+  spatial_cells <- cv_cell_ids(
+    rownames(co),
+    paste0("Spatial section `", nm, "`")
+  )
+  sidx <- match(cells, spatial_cells)
   xr <- range(co[, 1], na.rm = TRUE)
   yr <- range(co[, 2], na.rm = TRUE)
   ## Every background this section can be shown against, as objects with their
@@ -1060,7 +1089,8 @@ cv_build_trekker <- function(crb, cells, md) {
   ) {
     return(NULL)
   }
-  tk_idx <- match(cells, tk$barcodes)
+  trekker_cells <- cv_cell_ids(tk$barcodes, "Trekker data")
+  tk_idx <- match(cells, trekker_cells)
   if (!any(!is.na(tk_idx))) {
     return(NULL)
   }
@@ -1221,7 +1251,7 @@ cv_build_trekker <- function(crb, cells, md) {
     evidence_img = ev_img,
     ## Dataset-level (not per-cell, no `tk_idx` re-indexing needed): the
     ## same coordinate-source / QC / Moran's I detail the Trekker page
-    ## shows, surfaced here via a modal (see coordviews.js `cv-tk-info-btn`).
+    ## shows, surfaced here via a modal (see cell_views.js `cv-tk-info-btn`).
     qc = tk$qc,
     moran = tk$moran
   )
@@ -1387,8 +1417,9 @@ cv_build_bundle <- function(crb) {
   if (is.null(md) || !("cell_barcode" %in% colnames(md))) {
     return(NULL)
   }
-  cells <- as.character(md$cell_barcode)
+  cells <- cv_cell_ids(md$cell_barcode)
   n <- length(cells)
+  cell_fingerprint <- cv_cell_fingerprint(cells)
 
   ## Seed a stable fallback here. The user-editable palette travels separately
   ## as cv_color_patch(), so changing one colour cannot rebuild this bundle.
@@ -1428,9 +1459,34 @@ cv_build_bundle <- function(crb) {
       is.na(default_point_size) ||
       !is.finite(default_point_size)
   ) {
-    default_point_size <- NULL
+    default_point_size <- suppressWarnings(as.numeric(
+      if (
+        exists("Cerebro.options") &&
+          !is.null(Cerebro.options[["point_size"]][[
+            "overview_projection_point_size"
+          ]])
+      ) {
+        Cerebro.options[["point_size"]][["overview_projection_point_size"]]
+      } else if (
+        exists("Cerebro.options") &&
+          !is.null(Cerebro.options[["overview_default_point_size"]])
+      ) {
+        Cerebro.options[["overview_default_point_size"]]
+      } else {
+        2
+      }
+    ))
   } else {
     default_point_size <- unname(default_point_size)
+  }
+  if (
+    length(default_point_size) != 1L ||
+      is.na(default_point_size) ||
+      !is.finite(default_point_size) ||
+      default_point_size < 1 ||
+      default_point_size > 20
+  ) {
+    default_point_size <- 2
   }
   if (
     length(default_percentage_cells_to_show) != 1L ||
@@ -1445,7 +1501,30 @@ cv_build_bundle <- function(crb) {
       default_percentage_cells_to_show
     )
   }
-  default_point_opacity <- NULL
+  default_point_opacity <- suppressWarnings(as.numeric(
+    if (
+      exists("Cerebro.options") &&
+        !is.null(Cerebro.options[["projection_default_point_opacity"]])
+    ) {
+      Cerebro.options[["projection_default_point_opacity"]]
+    } else if (
+      exists("Cerebro.options") &&
+        !is.null(Cerebro.options[["overview_default_point_opacity"]])
+    ) {
+      Cerebro.options[["overview_default_point_opacity"]]
+    } else {
+      1
+    }
+  ))
+  if (
+    length(default_point_opacity) != 1L ||
+      is.na(default_point_opacity) ||
+      !is.finite(default_point_opacity) ||
+      default_point_opacity < 0 ||
+      default_point_opacity > 1
+  ) {
+    default_point_opacity <- 1
+  }
   spaces <- list()
   if (length(projections)) {
     configured_projection <- viewer_content[["default_projection"]]
@@ -1532,7 +1611,17 @@ cv_build_bundle <- function(crb) {
           exists("available_crb_files") &&
             !is.null(available_crb_files$selected)
         ) {
-          as.character(available_crb_files$selected)
+          selected <- as.character(available_crb_files$selected)
+          index <- match(selected, as.character(available_crb_files$files))
+          if (
+            length(index) == 1L &&
+              !is.na(index) &&
+              length(available_crb_files$names) >= index
+          ) {
+            as.character(available_crb_files$names[[index]])
+          } else {
+            basename(selected)
+          }
         } else {
           paste0("cells:", n, ":", if (n) cells[1] else "")
         }
@@ -1540,11 +1629,15 @@ cv_build_bundle <- function(crb) {
       error = function(e) paste0("cells:", n)
     ),
     cells = I(cells),
+    cell_fingerprint = cell_fingerprint,
     n = n,
     groups = groups,
     cat_extra = cat_extra,
     cat_skipped = cat_skipped,
     fields = fields,
+    genes = I(enc2utf8(tryCatch(crb$getGeneNames(), error = function(e) {
+      character()
+    }))),
     default_group = default_group,
     default_point_size = default_point_size,
     default_percentage_cells_to_show = default_percentage_cells_to_show,

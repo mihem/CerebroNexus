@@ -81,7 +81,7 @@ spatial_projection_data_to_plot_raw <- reactive({
       colnames(metadata) &&
       is.numeric(metadata[[plot_parameters[['color_variable']]]])
   ) {
-    color_assignments <- NA
+    color_assignments <- NULL
   } else {
     color_assignments <- assignColorsToGroups(
       metadata,

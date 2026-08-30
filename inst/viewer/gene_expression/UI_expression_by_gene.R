@@ -49,14 +49,9 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
     ) %>%
       dplyr::slice_max(expression, n = 50)
   }
-  ## prepare color scale, either "viridis" or other
-  ## ...
-  if (input[["expression_projection_color_scale"]] == 'viridis') {
-    color_scale <- 'Viridis'
-    ## ...
-  } else {
-    color_scale <- input[["expression_projection_color_scale"]]
-  }
+  color_scale <- expressionColorScale(
+    input[["expression_projection_color_scale"]]
+  )
   ## prepare plot
   plotly::plot_ly(
     expression_levels,
@@ -71,7 +66,9 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
     marker = list(
       color = ~expression,
       colorscale = color_scale,
-      reversescale = TRUE,
+      reversescale = expressionReverseColorScale(
+        input[["expression_projection_color_scale"]]
+      ),
       line = list(
         color = "rgb(196,196,196)",
         width = 1

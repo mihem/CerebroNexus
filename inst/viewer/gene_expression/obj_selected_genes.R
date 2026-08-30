@@ -8,7 +8,6 @@ expression_selected_genes <- reactive({
     input[["expression_analysis_mode"]],
     list_of_genes()
   )
-  # message('--> trigger "expression_selected_genes"')
   ## prepare empty list for data
   gene_sets <- list(
     "genes_to_display" = character(),
@@ -51,6 +50,5 @@ expression_selected_genes <- reactive({
   gene_sets[["genes_to_display_missing"]] <- gene_sets[[
     "genes_to_display"
   ]][which(is.na(genes_to_display_here))]
-  # message(str(gene_sets))
   return(gene_sets)
 })

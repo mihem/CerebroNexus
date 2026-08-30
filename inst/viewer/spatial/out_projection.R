@@ -1,29 +1,4 @@
 ##----------------------------------------------------------------------------##
-## Plotly plot of the selected projection.
-##----------------------------------------------------------------------------##
-output[["spatial_projection"]] <- plotly::renderPlotly({
-  plotly::plot_ly(
-    type = 'scattergl',
-    mode = 'markers',
-    source = "spatial_projection"
-  ) %>%
-    plotly::layout(
-      xaxis = list(
-        autorange = TRUE,
-        mirror = TRUE,
-        showline = TRUE,
-        zeroline = FALSE
-      ),
-      yaxis = list(
-        autorange = TRUE,
-        mirror = TRUE,
-        showline = TRUE,
-        zeroline = FALSE
-      )
-    )
-})
-
-##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["spatial_projection_info"]], {

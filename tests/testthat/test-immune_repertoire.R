@@ -969,12 +969,13 @@ test_that("IR panel has an info button wired to an illustrated guide modal", {
   skip_if_not(file.exists(ui_file) && file.exists(guide_file))
   ui <- paste(readLines(ui_file), collapse = "\n")
   guide <- paste(readLines(guide_file), collapse = "\n")
-  # Button in the box title.
+  # Button in the consolidated page header.
   expect_match(
     ui,
-    'cerebroInfoButton\\("ir_visualizations_info"\\)',
-    perl = TRUE
+    'cerebroVizPageHeader(',
+    fixed = TRUE
   )
+  expect_match(ui, '"ir_visualizations_info"', fixed = TRUE)
   # Observer that opens the tabbed modal on click.
   expect_match(
     guide,

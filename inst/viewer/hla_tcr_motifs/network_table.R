@@ -184,6 +184,120 @@ hla_network_table_data <- reactive({
   out
 })
 
+hla_selected_node_keys <- reactiveVal(character(0))
+
+hla_graph_node_keys <- function(graph) {
+  if (hla_motif_graph_ok(graph)) {
+    as.character(igraph::V(graph)$name)
+  } else {
+    character(0)
+  }
+}
+
+hla_selection_values <- function(value, maximum = 10000L) {
+  value <- unname(as.character(unlist(value, use.names = FALSE)))
+  value <- value[!is.na(value) & nzchar(value)]
+  if (length(value) > maximum || any(nchar(value, type = "bytes") > 1024L)) {
+    return(character(0))
+  }
+  unique(value)
+}
+
+observeEvent(
+  input[["hla_motif_selected_keys"]],
+  {
+    keys <- hla_selection_values(input[["hla_motif_selected_keys"]])
+    graph <- isolate(hla_motif_graph())
+    available <- hla_graph_node_keys(graph)
+    hla_selected_node_keys(intersect(keys, available))
+  },
+  ignoreInit = TRUE
+)
+
+hla_selected_cells <- reactive({
+  graph <- hla_motif_graph()
+  keys <- intersect(
+    hla_selected_node_keys(),
+    hla_graph_node_keys(graph)
+  )
+  hla_cells_for_node_keys(
+    hla_scoped_segments(),
+    keys,
+    by_v = isTRUE(hla_param("hla_by_v", hla_by_v_default()))
+  )
+})
+
+output$hla_selected_count <- renderUI({
+  cerebroSelectionSummary(
+    hla_selected_cells(),
+    "HLA & TCR motif network"
+  )
+})
+
+output$hla_motif_network_composition <- renderUI({
+  cerebroSelectionSummary(
+    hla_selected_cells(),
+    "HLA & TCR motif network",
+    composition = TRUE
+  )
+})
+
+observe({
+  graph <- hla_motif_graph()
+  keys <- intersect(
+    hla_selected_node_keys(),
+    hla_graph_node_keys(graph)
+  )
+  if (!identical(keys, hla_selected_node_keys())) {
+    hla_selected_node_keys(keys)
+    return()
+  }
+  cells <- hla_selected_cells()
+  session$sendCustomMessage(
+    "hla_motif_selection_state",
+    list(node_keys = keys, cells = cells)
+  )
+})
+
+observeEvent(
+  input[["hla_motif_network_clear_selection"]],
+  {
+    hla_selected_node_keys(character(0))
+    session$sendCustomMessage(
+      "hla_motif_selection_command",
+      list(action = "clear")
+    )
+  },
+  ignoreInit = TRUE
+)
+
+observeEvent(
+  input[["hla_motif_network_zoom_to_selection"]],
+  {
+    session$sendCustomMessage(
+      "hla_motif_selection_command",
+      list(action = "zoom")
+    )
+  },
+  ignoreInit = TRUE
+)
+
+observeEvent(
+  input[["hla_motif_restore_cells"]],
+  {
+    request <- input[["hla_motif_restore_cells"]]
+    cells <- hla_selection_values(if (is.list(request)) request$cells else NULL)
+    graph <- isolate(hla_motif_graph())
+    keys <- hla_node_keys_for_cells(
+      isolate(hla_scoped_segments()),
+      cells,
+      by_v = isTRUE(isolate(hla_param("hla_by_v", hla_by_v_default())))
+    )
+    hla_selected_node_keys(intersect(keys, hla_graph_node_keys(graph)))
+  },
+  ignoreInit = TRUE
+)
+
 output$hla_network_table <- DT::renderDataTable({
   df <- hla_network_table_data()
   if (is.null(df)) {

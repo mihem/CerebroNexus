@@ -7,7 +7,7 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
 }
 
 ## shinytest2's wait_for_idle() tracks server reactivity, NOT the async
-## client-side projection renderer (www/projection_scatter.js). After it returns,
+## client-side cell-view renderer (www/cell_views.js). After it returns,
 ## a projection output can still be mid-paint and a renderUI-created input can be
 ## unbound, so reading a value or setting such an input the instant wait_for_idle
 ## returns races the render and intermittently fails (a 500 on the value URL, a
@@ -164,9 +164,8 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   )
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_background') && ",
-      "document.getElementById('spatial_projection_background').dataset.",
-      "backgroundImage.startsWith('data:image/')"
+      "document.querySelector(",
+      "'#spatial_projection_cell_view_host canvas:not(.cv-mini)')"
     ),
     timeout = 30000
   )
@@ -204,9 +203,8 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   )
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_background') && ",
-      "document.getElementById('spatial_projection_background').dataset.",
-      "backgroundImage === ''"
+      "document.querySelector(",
+      "'#spatial_projection_cell_view_host canvas:not(.cv-mini)')"
     ),
     timeout = 30000
   )
@@ -221,9 +219,23 @@ test_that("{shinytest2} recording: main", {
   activate_tab(app, "overview")
   app$wait_for_idle(timeout = 10000)
 
-  ## verify the projection renders
-  plot_val <- retry_get_value(app, output = "overview_projection")
-  expect_false(is.null(plot_val))
+  ## verify the shared Canvas projection renders
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 20000
+  )
+  plot_size <- app$get_js(
+    paste0(
+      "(function(){var e=document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)');",
+      "return {w:e.clientWidth,h:e.clientHeight};})()"
+    )
+  )
+  expect_gte(as.numeric(plot_size$w), 300)
+  expect_gte(as.numeric(plot_size$h), 240)
 
   ## get unfiltered cell count
   cells_all <- retry_get_value(app, export = "overview_cells_to_show")
@@ -421,9 +433,23 @@ test_that("{shinytest2} recording: gene_expression", {
   expect_true(grepl("MS4A1", genes_text))
   expect_true(grepl("0 gene(s) are not in data set", genes_text, fixed = TRUE))
 
-  ## projection plot renders after gene selection
-  proj_val <- retry_get_value(app, output = "expression_projection")
-  expect_false(is.null(proj_val))
+  ## shared Canvas projection renders after gene selection
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#expression_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 20000
+  )
+  proj_size <- app$get_js(
+    paste0(
+      "(function(){var e=document.querySelector(",
+      "'#expression_projection_cell_view_host canvas:not(.cv-mini)');",
+      "return {w:e.clientWidth,h:e.clientHeight};})()"
+    )
+  )
+  expect_gte(as.numeric(proj_size$w), 300)
+  expect_gte(as.numeric(proj_size$h), 240)
 
   ## verify expression levels have some non-zero values (cells with color)
   expr_levels <- retry_get_value(app, export = "expression_levels")

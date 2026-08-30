@@ -19,7 +19,7 @@
 ## Background image APPEARANCE — decoupled channel.
 ##
 ## opacity / move / flip / scale / rotate are pushed straight to the background
-## <div> via shinyjs.updateSpatialBackgroundAppearance. This does NOT go through
+## canvas through the shared cell-view action. This does NOT go through
 ## spatial_projection_parameters_plot / spatial_projection_update_plot, so the
 ## scatter plot is never re-rendered when the user nudges the background — the
 ## dimensional-reduction plot stays a function of its own parameters alone.
@@ -48,17 +48,21 @@ observe({
 
   ## Pass NULL for any control that has not been created yet (e.g. before an
   ## image is chosen); the JS side leaves the corresponding style unchanged.
-  ## Named arguments — shinyjs packs them into one `params` object that the JS
-  ## side unpacks via getParams (positional formals would NOT be spread).
-  shinyjs::js$updateSpatialBackgroundAppearance(
-    opacity = if (is.null(opacity)) NULL else opacity,
-    offsetX = if (is.null(offset_x)) NULL else offset_x,
-    offsetY = if (is.null(offset_y)) NULL else offset_y,
-    flipX = if (is.null(flip_x)) NULL else isTRUE(flip_x),
-    flipY = if (is.null(flip_y)) NULL else isTRUE(flip_y),
-    scaleX = if (is.null(scale_x)) NULL else scale_x,
-    scaleY = if (is.null(scale_y)) NULL else scale_y,
-    rotate = if (is.null(rotate)) NULL else rotate
+  session$sendCustomMessage(
+    "cell_view_background",
+    list(
+      id = "spatial_projection",
+      values = list(
+        opacity = if (is.null(opacity)) NULL else opacity,
+        offsetX = if (is.null(offset_x)) NULL else offset_x,
+        offsetY = if (is.null(offset_y)) NULL else offset_y,
+        flipX = if (is.null(flip_x)) NULL else isTRUE(flip_x),
+        flipY = if (is.null(flip_y)) NULL else isTRUE(flip_y),
+        scaleX = if (is.null(scale_x)) NULL else scale_x,
+        scaleY = if (is.null(scale_y)) NULL else scale_y,
+        rotate = if (is.null(rotate)) NULL else rotate
+      )
+    )
   )
 })
 

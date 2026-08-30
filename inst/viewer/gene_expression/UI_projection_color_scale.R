@@ -6,6 +6,7 @@ output[["expression_projection_color_scale_UI"]] <- renderUI({
     "expression_projection_color_scale",
     label = "Color scale",
     choices = c(
+      "Cerebro orange",
       "YlGnBu",
       "YlOrRd",
       "Blues",
@@ -14,7 +15,7 @@ output[["expression_projection_color_scale_UI"]] <- renderUI({
       "RdBu",
       "Viridis"
     ),
-    selected = "YlGnBu"
+    selected = "Cerebro orange"
   )
 })
 

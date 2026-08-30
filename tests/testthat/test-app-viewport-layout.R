@@ -45,6 +45,95 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     timeout = 30000
   )
 
+  ## Focus remains a Linked views interaction; only standalone single-panel
+  ## hosts suppress it.
+  app$run_js(paste0(
+    "document.querySelector(",
+    "'.cv-pane:not(.cv-hidden) .cv-canvas-wrap > canvas:not(.cv-mini)')",
+    ".dispatchEvent(new MouseEvent('dblclick',",
+    "{bubbles:true,cancelable:true}));"
+  ))
+  app$wait_for_js(
+    "document.querySelector('.cv-panes.cv-has-focus') !== null",
+    timeout = 10000
+  )
+  app$click(selector = ".cv-focus-btn.is-on")
+  app$wait_for_js(
+    paste0(
+      "document.querySelector('.cv-panes.cv-has-focus') === null && ",
+      "document.querySelector('.cv-panes.cv-focus-transitioning') === null"
+    ),
+    timeout = 10000
+  )
+
+  ## A linked selection owns the lens it came from. Zoom must follow that lens,
+  ## and a minimap is useful only while a lens is actually zoomed.
+  trajectory_box <- app$get_js(paste0(
+    "(() => {",
+    "const title = Array.from(document.querySelectorAll('.cv-ptitle'))",
+    ".find(el => el.textContent.includes('B_cell_maturation'));",
+    "const pane = title.closest('.cv-pane');",
+    "pane.querySelector('.cv-tbtn[data-act=\"box\"]').click();",
+    "const r = pane.querySelector('canvas:not(.cv-mini)').getBoundingClientRect();",
+    "return {x1:r.left+r.width*.08,y1:r.top+r.height*.08,",
+    "x2:r.right-r.width*.08,y2:r.bottom-r.height*.08};",
+    "})()"
+  ))
+  viewer_drag_mouse(
+    app,
+    trajectory_box$x1,
+    trajectory_box$y1,
+    trajectory_box$x2,
+    trajectory_box$y2
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelector('#cv-selbar:not(.cv-collapse)') && ",
+      "document.getElementById('cv-zoom').offsetParent !== null"
+    ),
+    timeout = 10000
+  )
+  expect_length(
+    unlist(app$get_js(
+      "Array.from(document.querySelectorAll('.cv-mini.is-on')).map(String)"
+    )),
+    0
+  )
+
+  app$click(selector = "#cv-zoom")
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const title = Array.from(document.querySelectorAll('.cv-ptitle'))",
+      ".find(el => el.textContent.includes('B_cell_maturation'));",
+      "return title.closest('.cv-pane').querySelector('.cv-mini.is-on') !== null;",
+      "})()"
+    ),
+    timeout = 10000
+  )
+  zoomed_titles <- unlist(app$get_js(paste0(
+    "Array.from(document.querySelectorAll('.cv-pane'))",
+    ".filter(p => p.querySelector('.cv-mini.is-on'))",
+    ".map(p => p.querySelector('.cv-ptitle').textContent.trim())"
+  )))
+  expect_length(zoomed_titles, 1)
+  expect_match(zoomed_titles[[1]], "B_cell_maturation", fixed = TRUE)
+  expect_identical(
+    app$get_js("document.getElementById('cv-zoom').textContent.trim()"),
+    "Zoom back"
+  )
+
+  app$click(selector = "#cv-zoom")
+  app$wait_for_js(
+    "document.querySelectorAll('.cv-mini.is-on').length === 0",
+    timeout = 10000
+  )
+  app$click(selector = "#cv-clear")
+  app$wait_for_js(
+    "document.getElementById('cv-selbar').classList.contains('cv-collapse')",
+    timeout = 10000
+  )
+
   linked_geometry_js <- paste0(
     "(() => {",
     "const canvas = document.querySelector(",
@@ -188,18 +277,19 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     "const fill = Array.from(tab.querySelectorAll('.cerebro-fill'))",
     ".find(el => el.getClientRects().length > 0);",
     "const row = fill.closest('.cerebro-viz-row');",
-    "const param = row.querySelector('.cerebro-param-col');",
+    "const toolbar = row.querySelector('.cerebro-viz-toolbar');",
     "const viz = row.querySelector('.cerebro-viz-col');",
     "const wrapper = fill.closest('.content-wrapper');",
     "const fr = fill.getBoundingClientRect();",
-    "const pr = param.getBoundingClientRect();",
+    "const tr = toolbar.getBoundingClientRect();",
     "const vr = viz.getBoundingClientRect();",
     "return {",
     "viewportHeight: window.innerHeight, viewportWidth: window.innerWidth,",
     "fillTop: fr.top, fillBottom: fr.bottom, fillHeight: fr.height,",
     "fillOverflow: getComputedStyle(fill).overflow,",
-    "paramLeft: pr.left, paramTop: pr.top, paramBottom: pr.bottom,",
-    "vizLeft: vr.left, vizTop: vr.top,",
+    "toolbarLeft: tr.left, toolbarRight: tr.right,",
+    "toolbarTop: tr.top, toolbarBottom: tr.bottom,",
+    "vizLeft: vr.left, vizRight: vr.right, vizTop: vr.top,",
     "wrapperClientWidth: wrapper.clientWidth,",
     "wrapperScrollWidth: wrapper.scrollWidth",
     "};",
@@ -210,8 +300,167 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   expect_gte(desktop$fillHeight, 240)
   expect_lte(desktop$fillBottom, desktop$viewportHeight)
   expect_identical(desktop$fillOverflow, "visible")
-  expect_lt(desktop$paramLeft, desktop$vizLeft)
-  expect_lt(abs(desktop$paramTop - desktop$vizTop), 1)
+  expect_lte(desktop$toolbarBottom, desktop$vizTop + 1)
+  expect_lt(abs(desktop$toolbarLeft - desktop$vizLeft), 1)
+  expect_lt(abs(desktop$toolbarRight - desktop$vizRight), 1)
+
+  top_layout_js <- function(tab_name) {
+    paste0(
+      "(() => {",
+      "const row = document.querySelector('#shiny-tab-",
+      tab_name,
+      " .cerebro-viz-top-layout');",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
+      "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
+      "return {paramBottom:p.bottom, vizTop:v.top, ",
+      "paramLeft:p.left, paramRight:p.right, vizLeft:v.left, vizRight:v.right};",
+      "})()"
+    )
+  }
+  for (tab_name in c("overview", "trajectory")) {
+    app$click(selector = paste0('a[href="#shiny-tab-', tab_name, '"]'))
+    app$wait_for_js(
+      paste0(
+        "(() => {",
+        "const row = document.querySelector('#shiny-tab-",
+        tab_name,
+        " .cerebro-viz-top-layout');",
+        "return row && row.getClientRects().length > 0;",
+        "})()"
+      ),
+      timeout = 30000
+    )
+    layout <- app$get_js(top_layout_js(tab_name))
+    expect_lte(layout$paramBottom, layout$vizTop + 1)
+    expect_lt(abs(layout$paramLeft - layout$vizLeft), 1)
+    expect_lt(abs(layout$paramRight - layout$vizRight), 1)
+  }
+
+  standalone_dblclick_stays_put <- function(tab_name, host_id) {
+    app$click(selector = paste0('a[href="#shiny-tab-', tab_name, '"]'))
+    canvas_selector <- paste0(
+      "#",
+      host_id,
+      " .cv-canvas-wrap > canvas:not(.cv-mini)"
+    )
+    app$wait_for_js(
+      paste0(
+        "document.querySelector('",
+        canvas_selector,
+        "')?.getBoundingClientRect().height > 200"
+      ),
+      timeout = 30000
+    )
+    before <- app$get_js(paste0(
+      "document.querySelector('",
+      canvas_selector,
+      "').getBoundingClientRect().height"
+    ))
+    app$run_js(paste0(
+      "document.querySelector('",
+      canvas_selector,
+      "').dispatchEvent(",
+      "new MouseEvent('dblclick',{bubbles:true,cancelable:true}));"
+    ))
+    app$wait_for_idle(timeout = 10000)
+    after <- app$get_js(paste0(
+      "document.querySelector('",
+      canvas_selector,
+      "').getBoundingClientRect().height"
+    ))
+    expect_equal(after, before, tolerance = 2)
+    expect_false(isTRUE(app$get_js(paste0(
+      "document.getElementById('",
+      host_id,
+      "').classList.contains('cv-has-focus')"
+    ))))
+  }
+
+  app$click(selector = 'a[href="#shiny-tab-overview"]')
+  app$wait_for_js(
+    "document.getElementById('overview_projection_point_color')?.value === 'cell_type'",
+    timeout = 30000
+  )
+  expect_false(isTRUE(app$get_js(
+    "document.getElementById('overview_projection_keep_square') !== null"
+  )))
+  app$click(selector = "#overview_projection_more_button")
+  app$wait_for_js(
+    "document.getElementById('overview_projection_more').classList.contains('is-open')",
+    timeout = 5000
+  )
+  filters_fit <- app$get_js(paste0(
+    "(() => {",
+    "const groups=Array.from(document.querySelectorAll(",
+    "'#overview_projection_group_filters_UI .form-group'));",
+    "return groups.every((group,index) => {",
+    "if(index===groups.length-1)return true;",
+    "const button=group.querySelector('.dropdown-toggle');",
+    "const nextLabel=groups[index+1].querySelector('label');",
+    "return button && nextLabel && ",
+    "button.getBoundingClientRect().bottom <= ",
+    "nextLabel.getBoundingClientRect().top;",
+    "});",
+    "})()"
+  ))
+  expect_true(isTRUE(filters_fit))
+  app$click(selector = "#overview_projection_more [data-cerebro-drawer-close]")
+
+  standalone_dblclick_stays_put(
+    "overview",
+    "overview_projection_cell_view_host"
+  )
+  standalone_dblclick_stays_put(
+    "trajectory",
+    "trajectory_projection_cell_view_host"
+  )
+
+  app$click(selector = 'a[href="#shiny-tab-immune_repertoire"]')
+  app$set_inputs(ir_tabs = "Clonal UMAP", wait_ = FALSE)
+  standalone_dblclick_stays_put(
+    "immune_repertoire",
+    "ir_clonalUMAP_projection_cell_view_host"
+  )
+
+  app$click(selector = 'a[href="#shiny-tab-immune_repertoire"]')
+  app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#shiny-tab-immune_repertoire .cerebro-viz-top-layout')",
+      ".getClientRects().length > 0"
+    ),
+    timeout = 10000
+  )
+
+  ## More settings is a viewport drawer, not another layout row. Opening it
+  ## must leave the visualization at exactly the same position and size.
+  viz_geometry_js <- paste0(
+    "(() => {",
+    "const v = document.querySelector(",
+    "'#shiny-tab-immune_repertoire .cerebro-viz-col').getBoundingClientRect();",
+    "return {left:v.left, top:v.top, width:v.width, height:v.height};",
+    "})()"
+  )
+  viz_before_more <- app$get_js(viz_geometry_js)
+  app$click(selector = "#ir_more_button")
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const d = document.getElementById('ir_more');",
+      "return d.classList.contains('is-open') && ",
+      "getComputedStyle(d).position === 'fixed';",
+      "})()"
+    ),
+    timeout = 5000
+  )
+  viz_with_more <- app$get_js(viz_geometry_js)
+  expect_equal(viz_with_more, viz_before_more, tolerance = 1)
+  app$click(selector = "#ir_more [data-cerebro-drawer-close]")
+  app$wait_for_js(
+    "!document.getElementById('ir_more').classList.contains('is-open')",
+    timeout = 5000
+  )
 
   app$get_chromote_session()$set_viewport_size(width = 800, height = 800)
   app$wait_for_js(
@@ -223,16 +472,25 @@ test_that("IR fill layout survives tab activation and responsive resize", {
       "(() => {",
       "const row = document.querySelector(",
       "'#shiny-tab-immune_repertoire .cerebro-viz-row');",
-      "const p = row.querySelector('.cerebro-param-col').getBoundingClientRect();",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
       "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
       "return p.bottom <= v.top + 1;",
       "})()"
     ),
     timeout = 10000
   )
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const w = document.querySelector('.content-wrapper');",
+      "return w.scrollWidth <= w.clientWidth;",
+      "})()"
+    ),
+    timeout = 10000
+  )
 
   narrow <- app$get_js(geometry_js)
-  expect_lte(narrow$paramBottom, narrow$vizTop + 1)
+  expect_lte(narrow$toolbarBottom, narrow$vizTop + 1)
   expect_lte(narrow$wrapperScrollWidth, narrow$wrapperClientWidth)
   expect_gte(narrow$fillHeight, 240)
 
@@ -252,7 +510,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
       "(() => {",
       "const row = document.querySelector(",
       "'#shiny-tab-immune_repertoire .cerebro-viz-row');",
-      "const p = row.querySelector('.cerebro-param-col').getBoundingClientRect();",
+      "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
       "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
       "return p.bottom <= v.top + 1;",
       "})()"
@@ -261,7 +519,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   )
 
   phone <- app$get_js(geometry_js)
-  expect_lte(phone$paramBottom, phone$vizTop + 1)
+  expect_lte(phone$toolbarBottom, phone$vizTop + 1)
   expect_gte(phone$fillHeight, 240)
 
   ## The document must not scroll horizontally. `.content-wrapper` clips its own

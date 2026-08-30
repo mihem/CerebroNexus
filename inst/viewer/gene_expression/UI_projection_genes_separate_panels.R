@@ -4,7 +4,7 @@
 output[["expression_projection_genes_in_separate_panels_UI"]] <- renderUI({
   shinyWidgets::awesomeCheckbox(
     inputId = "expression_projection_genes_in_separate_panels",
-    label = HTML("Show genes in separate panels<br>(experimental)"),
+    label = "Show genes in separate panels",
     value = FALSE
   )
 })

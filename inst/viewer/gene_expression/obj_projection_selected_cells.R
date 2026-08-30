@@ -9,10 +9,8 @@ expression_projection_selected_cells <- reactive({
     expression_projection_parameters_plot(),
     expression_projection_data()
   )
-  # message('--> trigger "expression_projection_selected_cells"')
-
   ## The selection is held persistently on the JS side (shared
-  ## projection_scatter.js) and pushed here as {x, y} under
+  ## cell_views.js) and pushed here as {x, y, ids} under
   ## <plot_id>_persistent_selection, so it survives plot-parameter changes
   ## (colour scale / range / point size). Plotly's volatile plotly_selected
   ## event is NOT used, because a re-render would wipe it. The identifier is
@@ -22,10 +20,14 @@ expression_projection_selected_cells <- reactive({
   if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
     return(NULL)
   }
-  data.frame(
+  selection <- data.frame(
     x = as.numeric(sel[["x"]]),
     y = as.numeric(sel[["y"]]),
     identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
     stringsAsFactors = FALSE
   )
+  if (length(sel[["ids"]]) == nrow(selection)) {
+    selection[["selection_key"]] <- as.character(sel[["ids"]])
+  }
+  selection
 })

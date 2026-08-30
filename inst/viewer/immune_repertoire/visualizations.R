@@ -231,35 +231,6 @@ IR_EXPANSION_COLORS <- stats::setNames(
   )
 )
 
-## Shared projection look, mirrored for the Clonal UMAP so it reads as the same
-## app as the Main / spatial / trajectory projections. Colours/font come from the
-## single shared source cerebro_plotly_theme() (mirrors projection_layouts.js and
-## the custom.css --chart-* tokens) instead of a private copy. The Clonal UMAP
-## keeps its own engine (per-level traces, faceting, grey "Other cells") — only
-## the layout styling is aligned.
-IR_PROJECTION_FONT <- cerebro_plotly_theme()$font
-IR_PROJECTION_STYLE <- cerebro_plotly_theme()
-
-## Axis styled like the shared projection.
-ir_projection_axis <- function() {
-  list(
-    autorange = TRUE,
-    mirror = TRUE,
-    showline = TRUE,
-    zeroline = FALSE,
-    gridcolor = IR_PROJECTION_STYLE$grid,
-    linecolor = IR_PROJECTION_STYLE$axis,
-    tickfont = list(
-      color = IR_PROJECTION_STYLE$tick,
-      family = IR_PROJECTION_FONT
-    ),
-    titlefont = list(
-      color = IR_PROJECTION_STYLE$title,
-      family = IR_PROJECTION_FONT
-    )
-  )
-}
-
 ## Render a scRepertoire ggplot as an interactive plotly figure. safeRenderPlot
 ## still does the heavy lifting (display options, empty-state and error plots,
 ## silent-error re-raise); we just convert its ggplot result with ggplotly and
@@ -487,108 +458,63 @@ ir_clonal_umap_ggplot <- function(df, group_by, point_size, alpha, ncol) {
 output$ir_ui_clonalUMAP <- renderUI({
   group_by <- ir_param("ir_p_umap_group_by", "")
   if (is.null(group_by) || !nzchar(group_by)) {
-    ## Non-faceted: render through the shared projection-scatter engine (same
-    ## host div + selection buttons as Main/spatial). The plot itself is drawn
-    ## client-side by js$updateClonalUMAP into this plotlyOutput; the empty
-    ## bootstrap renderPlotly below only creates the target div.
+    ## Non-faceted: render through the shared cell-view engine (same host and
+    ## selection controls as Projection and Spatial).
     return(ir_clonalUMAP_projection_ui())
   }
   ## Faceted: a group_by column is chosen. Faceting needs a multi-panel ggplot,
   ## which the single-canvas shared renderer cannot express, so this variant
-  ## stays on the static plotOutput.
-  ir_fill_plot(
+  ## stays on a static image output.
+  imageOutput(
     "ir_plot_clonalUMAP_static",
-    spinner = FALSE,
     height = paste0(ir_umap_split_output_height(group_by), "px")
   )
 })
 
-## Shared-projection host for the non-faceted Clonal UMAP: the plotly div the
-## shared renderer targets, plus the Clear/Zoom-to-selection buttons (hidden
-## until a selection exists). Mirrors overview/UI_projection.R.
-ir_clonalUMAP_projection_ui <- function() {
-  tagList(
-    div(
-      class = "cerebro-projection-gate",
-      shinycssloaders::withSpinner(
-        plotly::plotlyOutput(
-          "ir_clonalUMAP_projection",
-          width = "auto",
-          # 60vh placeholder, same as the overview projection: the shared
-          # renderer measures and resizes to the real viewport height, and the
-          # projection reveal gate keeps it hidden until then. A placeholder
-          # close to the settled height means no visible jump on reveal (the old
-          # calc(100vh - 250px) started ~125px too tall and shrank in view).
-          height = "60vh"
-        ),
-        type = 8,
-        hide.ui = FALSE
-      )
-    ),
-    div(
-      class = "cerebro-selection-actions",
-      style = "margin-top: 6px;",
-      shinyjs::hidden(
-        actionButton(
-          inputId = "ir_clonalUMAP_projection_zoom_to_selection",
-          label = "Zoom to selection",
-          icon = icon("magnifying-glass-plus"),
-          class = "btn-xs btn-default"
-        )
-      ),
-      shinyjs::hidden(
-        actionButton(
-          inputId = "ir_clonalUMAP_projection_clear_selection",
-          label = "Clear selection",
-          icon = icon("eraser"),
-          class = "btn-xs btn-default btn-breathing"
-        )
-      )
-    )
+output[["ir_selection_status_UI"]] <- renderUI({
+  if (!has_scRepertoire() || is.null(ir_data())) {
+    return(NULL)
+  }
+  active_tab <- input[["ir_tabs"]]
+  group_by <- ir_param("ir_p_umap_group_by", "")
+  if (
+    (!is.null(active_tab) && !identical(active_tab, "Clonal UMAP")) ||
+      (!is.null(group_by) && nzchar(group_by))
+  ) {
+    return(NULL)
+  }
+  cerebroSelectionStatus(
+    "ir_clonalUMAP_projection",
+    "ir_clonalUMAP_number_of_selected_cells"
   )
-}
-
-## Bootstrap the shared-projection host div. The shared renderer draws into this
-## same plotly output via Plotly.react (js$updateClonalUMAP); this empty
-## scattergl only creates the target div, exactly like overview/out_projection.R.
-output$ir_clonalUMAP_projection <- plotly::renderPlotly({
-  plotly::plot_ly(
-    type = "scattergl",
-    mode = "markers",
-    source = "ir_clonalUMAP_projection"
-  ) %>%
-    plotly::layout(
-      xaxis = ir_projection_axis(),
-      yaxis = ir_projection_axis()
-    )
 })
 
-## Draw the non-faceted Clonal UMAP through the shared projection-scatter engine.
+## Shared cell-view host for the non-faceted Clonal UMAP.
+ir_clonalUMAP_projection_ui <- function() {
+  cerebroCellViewOutput("ir_clonalUMAP_projection")
+}
+
+## Draw the non-faceted Clonal UMAP through the shared cell-view engine.
 ## We marshal the same grey "Other cells" background + one-trace-per-expansion-
 ## level data the old renderPlotly built, but as the meta/data/hover arrays the
-## shared render2DCategorical consumes, then hand off to JS. Runs only when no
+## shared renderer consumes. Runs only when no
 ## grouping column is chosen (the faceted variant uses the static ggplot below).
 observe({
+  input[["ir_clonalUMAP_projection_render_request"]]
   group_by <- ir_param("ir_p_umap_group_by", "")
   ## Faceting is handled by the static ggplot path; nothing to push here.
   if (!is.null(group_by) && nzchar(group_by)) {
     return()
   }
 
-  ## Depend on the host div's reported width so the render RE-FIRES once the div
-  ## materialises. The host lives behind renderUI (emitted only when non-faceted),
-  ## so unlike the always-present Main plot, the div may not exist when this first
-  ## runs. clientData width is populated once the div is in the DOM and sized;
-  ## requiring it both registers the dependency and avoids a react on a 0-size or
-  ## absent div (which would draw blank or throw). Re-fires on faceted->non-
-  ## faceted switches and tab re-open, and harmlessly on resize.
-  plot_width <- session$clientData[["output_ir_clonalUMAP_projection_width"]]
-  req(!is.null(plot_width) && plot_width > 0)
-
-  receptor <- ir_param("ir_p_umap_receptor")
-  projection <- ir_param("ir_p_umap_projection")
+  ## These controls arrive from a dynamic UI. Wait for their real client values
+  ## rather than drawing once with R fallbacks and again as each control binds.
+  receptor <- input[["ir_p_umap_receptor"]]
+  projection <- input[["ir_p_umap_projection"]]
+  show_all <- input[["ir_p_umap_show_all"]]
+  req(receptor, projection, !is.null(show_all))
   clone_call <- "gene"
-  show_all <- isTRUE(ir_param("ir_p_umap_show_all", TRUE))
+  show_all <- isTRUE(show_all)
   cells <- ir_umap_cells_to_show()
   df <- ir_clonal_umap_data(
     projection,
@@ -608,30 +534,19 @@ observe({
   if (length(alpha) != 1 || is.na(alpha)) {
     alpha <- 0.8
   }
-  ## plotly marker sizes read larger than ggplot's; scale up so the points are
-  ## comparable to the other UMAPs (matches the old renderer).
+  ## Preserve the existing Clonal UMAP display scale in the shared renderer.
   marker_size <- point_size * 5
 
   legend_size <- suppressWarnings(as.numeric(dp[["ir_d_legend_size"]]))
   if (length(legend_size) != 1 || is.na(legend_size) || legend_size <= 0) {
     legend_size <- 12
   }
-  ## Map the IR legend-position choice onto the shared renderer's legend modes:
-  ## "top" -> the custom top bar (shared default); right/bottom/left -> plotly's
-  ## native legend; "none" -> hidden. Default to the top bar for the unified look.
-  legend_pos <- dp[["ir_d_legend_pos"]]
-  if (!is.character(legend_pos) || length(legend_pos) != 1) {
-    legend_pos <- "top"
-  }
-  legend_position <- switch(
-    legend_pos,
-    top = "top",
-    right = "right",
-    bottom = "bottom",
-    left = "left",
-    none = "none",
+  ## The shared Canvas uses one top legend; retain the user's hide option.
+  legend_position <- if (identical(dp[["ir_d_legend_pos"]], "none")) {
+    "none"
+  } else {
     "top"
-  )
+  }
 
   ## Grey background = cells without the selected receptor (expansion = NA);
   ## coloured foreground = receptor cells with an expansion level. One trace per
@@ -642,6 +557,7 @@ observe({
   traces <- list()
   data_x <- list()
   data_y <- list()
+  data_key <- list()
   data_color <- list()
   hover_info <- list()
   hover_text <- list()
@@ -650,6 +566,7 @@ observe({
     traces[[length(traces) + 1]] <- "Other cells"
     data_x[[length(data_x) + 1]] <- bg$x
     data_y[[length(data_y) + 1]] <- bg$y
+    data_key[[length(data_key) + 1]] <- bg$barcode
     data_color[[length(data_color) + 1]] <- "#D9D9D9"
     ## Background cells skip hover (per-trace hoverinfo, honoured by shared JS).
     hover_info[[length(hover_info) + 1]] <- "skip"
@@ -667,6 +584,7 @@ observe({
     traces[[length(traces) + 1]] <- lvl
     data_x[[length(data_x) + 1]] <- sub$x
     data_y[[length(data_y) + 1]] <- sub$y
+    data_key[[length(data_key) + 1]] <- sub$barcode
     data_color[[length(data_color) + 1]] <- unname(IR_EXPANSION_COLORS[[lvl]])
     hover_info[[length(hover_info) + 1]] <- "text"
     hover_text[[length(hover_text) + 1]] <- paste0(
@@ -691,6 +609,7 @@ observe({
   output_data <- list(
     x = data_x,
     y = data_y,
+    selection_key = data_key,
     color = data_color,
     point_size = marker_size,
     point_opacity = alpha,
@@ -702,65 +621,31 @@ observe({
     text = hover_text
   )
 
-  shinyjs::js$updateClonalUMAP(output_meta, output_data, output_hover)
+  cerebroCellViewRender(
+    "ir_clonalUMAP_projection",
+    output_meta,
+    output_data,
+    output_hover
+  )
 })
 
-## ---- Clonal UMAP selection buttons (shared-projection engine) ----------- ##
-## Delegate to the shared JS clear/zoom for this plot id, mirroring
-## overview/event_projection_clear_selection.R.
-observeEvent(input[["ir_clonalUMAP_projection_clear_selection"]], {
-  shinyjs::js$irClonalUMAPClearSelection()
-})
-observeEvent(input[["ir_clonalUMAP_projection_zoom_to_selection"]], {
-  shinyjs::js$irClonalUMAPZoomToSelection()
-})
-
-## Reflect the zoom state on the button (filled "Reset zoom" while zoomed in),
-## toggled from the <plot_id>_zoom_state input the shared JS pushes.
-observeEvent(
-  input[["ir_clonalUMAP_projection_zoom_state"]],
-  {
-    zoomed <- isTRUE(input[["ir_clonalUMAP_projection_zoom_state"]])
-    shinyjs::toggleClass(
-      id = "ir_clonalUMAP_projection_zoom_to_selection",
-      class = "is-zoomed",
-      condition = zoomed
-    )
-    updateActionButton(
-      session,
-      "ir_clonalUMAP_projection_zoom_to_selection",
-      label = if (zoomed) "Reset zoom" else "Zoom to selection",
-      icon = if (zoomed) {
-        icon("magnifying-glass-minus")
-      } else {
-        icon("magnifying-glass-plus")
-      }
-    )
-  },
-  ignoreInit = TRUE
-)
-
-## Show the selection buttons only while a persistent selection exists. The
-## shared JS pushes the selection payload under <plot_id>_persistent_selection.
-observe({
+## ---- Clonal UMAP selection summaries ----------------------------------- ##
+output[["ir_clonalUMAP_number_of_selected_cells"]] <- renderUI({
   sel <- input[["ir_clonalUMAP_projection_persistent_selection"]]
-  has_selection <- !is.null(sel) && length(sel) > 0
-  if (has_selection) {
-    shinyjs::show("ir_clonalUMAP_projection_clear_selection")
-    shinyjs::show("ir_clonalUMAP_projection_zoom_to_selection")
-  } else {
-    shinyjs::hide("ir_clonalUMAP_projection_clear_selection")
-    shinyjs::hide("ir_clonalUMAP_projection_zoom_to_selection")
-  }
+  cerebroSelectionSummary(sel, "Clonal UMAP")
 })
 
-output$ir_plot_clonalUMAP_static <- renderPlot(
+output[["ir_clonalUMAP_projection_composition"]] <- renderUI({
+  sel <- input[["ir_clonalUMAP_projection_persistent_selection"]]
+  cerebroSelectionSummary(sel, "Clonal UMAP", composition = TRUE)
+})
+
+output$ir_plot_clonalUMAP_static <- renderImage(
   {
-    req_plot_space("ir_plot_clonalUMAP_static")
     receptor <- ir_param("ir_p_umap_receptor")
     projection <- ir_param("ir_p_umap_projection")
     group_by <- ir_param("ir_p_umap_group_by", "")
-    validate(need(nzchar(group_by), "Choose a grouping column."))
+    req(nzchar(group_by))
     clone_call <- "gene"
     show_all <- isTRUE(ir_param("ir_p_umap_show_all", TRUE))
     cells <- ir_umap_cells_to_show()
@@ -772,7 +657,7 @@ output$ir_plot_clonalUMAP_static <- renderPlot(
       cells = cells
     )
 
-    safeRenderPlot(
+    plot <- safeRenderPlot(
       {
         if (is.null(df) || nrow(df) == 0) {
           return(
@@ -808,11 +693,11 @@ output$ir_plot_clonalUMAP_static <- renderPlot(
           alpha <- 0.8
         }
         n_groups <- length(levels(df$.umap_group))
-        layout <- ir_umap_split_layout(
+        layout <- isolate(ir_umap_split_layout(
           n_groups,
           width = session$clientData$output_ir_plot_clonalUMAP_static_width,
           height = session$clientData$output_ir_plot_clonalUMAP_static_height
-        )
+        ))
         ir_clonal_umap_ggplot(
           df,
           group_by = group_by,
@@ -823,24 +708,27 @@ output$ir_plot_clonalUMAP_static <- renderPlot(
       },
       "clonalUMAP"
     )
+    layout <- isolate(ir_umap_split_current_layout(group_by))
+    path <- tempfile(fileext = ".png")
+    ggplot2::ggsave(
+      path,
+      plot = plot,
+      width = layout$width,
+      height = layout$height,
+      units = "px",
+      dpi = 72,
+      bg = "white"
+    )
+    list(
+      src = path,
+      contentType = "image/png",
+      width = layout$width,
+      height = layout$height,
+      alt = "Clonal UMAP grouped by the selected cell metadata"
+    )
   },
-  width = function() {
-    group_by <- ir_param("ir_p_umap_group_by", "")
-    ceiling(ir_umap_split_current_layout(group_by)$width)
-  },
-  height = function() {
-    group_by <- ir_param("ir_p_umap_group_by", "")
-    ceiling(ir_umap_split_current_layout(group_by)$height)
-  }
-) %>%
-  ir_bindCache(
-    input$ir_p_umap_receptor,
-    input$ir_p_umap_projection,
-    input$ir_p_umap_show_all,
-    input$ir_p_umap_group_by,
-    input$ir_d_point_size,
-    input$ir_d_alpha
-  )
+  deleteFile = TRUE
+)
 
 ## ---- BCR-specific renderers --------------------------------------------- ##
 output$ir_plot_isotype <- plotly::renderPlotly({

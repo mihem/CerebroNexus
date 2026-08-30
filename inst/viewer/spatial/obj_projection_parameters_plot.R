@@ -13,11 +13,6 @@ spatial_projection_parameters_plot_raw <- reactive({
     !is.null(preferences[["use_webgl"]]),
     !is.null(preferences[["show_hover_info_in_projections"]])
   )
-  message(
-    '[spatial] params reactive triggered, background = ',
-    input[["spatial_projection_background_image"]]
-  )
-
   plot_type <- input[["spatial_projection_plot_type"]]
   color_variable <- NULL
   feature_to_display <- NULL
@@ -66,10 +61,10 @@ spatial_projection_parameters_plot_raw <- reactive({
 
   ## Background APPEARANCE (opacity, move, flip, scale, rotate) is deliberately
   ## NOT read here. Those are decoupled from the scatter plot: they flow through
-  ## an independent observer -> shinyjs.updateSpatialBackgroundAppearance, which
-  ## only re-styles the background <div>. Reading them in this reactive would make
-  ## the whole plot re-render (Plotly.react) on every opacity/move tick, which is
-  ## exactly the coupling we removed. isolate() the initial opacity so the first
+  ## an independent observer -> shared background action, which redraws the
+  ## existing Canvas without rebuilding its cell payload. Reading them in this
+  ## reactive would resend the whole plot on every opacity/move tick. isolate()
+  ## the initial opacity so the first
   ## render of a freshly chosen image starts at the current slider value without
   ## creating a reactive dependency on it.
   background_opacity <- isolate({
@@ -175,7 +170,6 @@ spatial_projection_parameters_plot_raw <- reactive({
     webgl = preferences[["use_webgl"]],
     hover_info = preferences[["show_hover_info_in_projections"]]
   )
-  # message(str(parameters))
   return(parameters)
 })
 
@@ -191,6 +185,5 @@ spatial_projection_parameters_other <- reactiveValues(
 
 ##
 observeEvent(input[['spatial_projection_to_display']], {
-  # message('--> set "spatial: reset_axes"')
   spatial_projection_parameters_other[['reset_axes']] <- TRUE
 })

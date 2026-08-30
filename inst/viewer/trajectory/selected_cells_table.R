@@ -72,12 +72,16 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime))
 
-  ## filter out non-selected cells with X-Y identifier. The projection plots the
-  ## DR_1 / DR_2 coordinates, and the persistent selection keys cells on those
-  ## same coordinates, so the identifier here must be built from DR_1 / DR_2 too.
+  ## Filter by stable cell identity; the shared projection keeps barcode-backed
+  ## selections across recolouring and trace rebuilds. Coordinates remain the
+  ## fallback for older Plotly event payloads without customdata.
   cells_df <- cells_df %>%
     dplyr::mutate(identifier = paste0(DR_1, '-', DR_2)) %>%
-    dplyr::filter(identifier %in% selected_cells$identifier) %>%
+    dplyr::filter(selectedCellMask(
+      cell_barcode,
+      identifier,
+      selected_cells
+    )) %>%
     dplyr::select(-identifier) %>%
     dplyr::select(cell_barcode, everything())
 

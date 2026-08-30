@@ -1,21 +1,19 @@
 ##----------------------------------------------------------------------------##
 ## Text showing the number of selected cells.
 ##----------------------------------------------------------------------------##
-output[["spatial_number_of_selected_cells"]] <- renderText({
-  ## check selection
-  ## ... selection has not been made or there is no cell in it
-  if (is.null(spatial_projection_selected_cells())) {
-    ## manually set counter to 0
-    number_of_selected_cells <- 0
-    ## prepare string to show
-    paste0("<b>Number of selected cells</b>: ", number_of_selected_cells)
-    ## ... selection has been made and at least 1 cell is in it
-  } else {
-    ## get number of selected cells
-    number_of_selected_cells <- spatial_projection_selected_cells() %>%
-      nrow() %>%
-      formatC(format = "f", big.mark = ",", digits = 0)
-    ## prepare string to show
-    paste0("<b>Number of selected cells</b>: ", number_of_selected_cells)
-  }
+output[["spatial_number_of_selected_cells"]] <- renderUI({
+  cerebroSelectionSummary(
+    spatial_projection_selected_cells(),
+    input[["spatial_projection_to_display"]],
+    input[["spatial_projection_point_color"]]
+  )
+})
+
+output[["spatial_projection_composition"]] <- renderUI({
+  cerebroSelectionSummary(
+    spatial_projection_selected_cells(),
+    input[["spatial_projection_to_display"]],
+    input[["spatial_projection_point_color"]],
+    composition = TRUE
+  )
 })

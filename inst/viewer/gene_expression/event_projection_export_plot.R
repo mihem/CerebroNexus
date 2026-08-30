@@ -35,7 +35,7 @@ observeEvent(input[["expression_projection_export"]], {
   save_file_path <- as.character(save_file_input$datapath[1])
   ## bring cells in order, either random or highest expression on top
   if (plot_parameters[['plot_order']] == 'Random') {
-    cell_order <- sample(1:length(expression_levels))
+    cell_order <- sample(seq_along(expression_levels))
     cells_df <- cells_df[cell_order, ]
   } else if (plot_parameters[['plot_order']] == 'Highest expression on top') {
     cell_order <- order(expression_levels)

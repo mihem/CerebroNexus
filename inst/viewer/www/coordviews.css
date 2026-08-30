@@ -6,140 +6,97 @@
    linked panels the room the per-tab param/viz split does not.
    ========================================================================== */
 
-.coordviews-page {
-  --cv-border: var(--c-border, #ececec);
-  --cv-surface: var(--c-surface, #fff);
-  --cv-surface2: var(--c-surface-2, #f4f4f5);
-  --cv-text: var(--c-text, #1c1c1e);
-  --cv-text2: var(--c-text-2, #6b6b70);
-  --cv-text3: var(--c-text-3, #9a9aa0);
-  --cv-blue: var(--c-blue, #2f6fd6);
-  --cv-blue50: var(--c-blue-50, #eef4fb);
-  --cv-blue100: var(--c-blue-100, #d7e6f7);
-  /* Amber is the app's accent, so it is what "this control is on" looks like:
-     the tints below carry every active/checked state on this page. Blue is left
-     to focus rings (a platform convention worth keeping distinct) and to the
-     geometry of a selection — the lasso outline and the minimap's viewport
-     frame — which are marks on the data, not states of a control. */
-  --cv-amber: var(--c-amber, #f97316);
-  --cv-amber50: var(--c-amber-50, #fff3ea);
-  --cv-amber100: var(--c-amber-100, #fde3cf);
-  --cv-amber200: var(--c-amber-200, #fbcfa8);
-  --cv-amber700: var(--c-amber-700, #c2410c);
-  /* Tints of the theme's --c-error, which ships as a single value. Used only by
-     Clear selection — see the selection-actions block for why those two buttons
-     sit outside the amber vocabulary. */
-  --cv-red50: #fef2f2;
-  --cv-red100: #fee2e2;
-  --cv-red200: #fecaca;
-  --cv-red700: #b91c1c;
-}
-
 /* ---- dataset meta strip ------------------------------------------------- */
 .coordviews-page .cv-meta {
   font-size: 12.5px;
-  color: var(--cv-text2);
+  color: var(--c-text-2);
   padding: 2px 0 12px;
 }
-
 /* ---- top control bar (the layout fix) ----------------------------------- */
 .coordviews-page .cv-topbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
   gap: 16px;
-  padding: 8px 14px 12px;
-  background: var(--cv-surface);
-  border: 1px solid var(--cv-border);
-  border-radius: 10px;
-  margin-bottom: 14px;
   position: relative;
 }
 .coordviews-page .cv-ctl { display: flex; flex-direction: column; gap: 5px; }
-.coordviews-page .cv-ctl > label {
-  font-size: 14px; font-weight: 600; color: var(--cv-text);
-  text-transform: none; letter-spacing: 0;
+.coordviews-page .cv-topbar > .cv-ctl > .selectize-control {
+  width: 100%;
 }
 .coordviews-page .cv-topbar select,
 #cv-more .cv-more-inner select {
   box-sizing: border-box; width: min(320px, 100%); height: 42px; padding: 9px 12px;
-  border: 1px solid var(--c-border-2, #e0e0e0);
-  border-radius: var(--r-sm, 8px); background: var(--cv-surface); color: var(--cv-text);
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm); background: var(--c-surface); color: var(--c-text);
   font-size: 14px; font-family: inherit;
 }
-.coordviews-page .cv-topbar select { min-width: 168px; }
+.coordviews-page .cv-topbar select {
+  width: 100%; min-width: 0; height: var(--c-toolbar-control-height);
+  padding: 6px 12px;
+}
 #cv-more .cv-more-inner select { min-width: 150px; }
 .coordviews-page .cv-topbar select:focus,
 #cv-more .cv-more-inner select:focus {
-  outline: none; border-color: var(--cv-amber);
-  box-shadow: 0 0 0 3px var(--cv-amber50);
+  outline: none; border-color: var(--c-amber);
+  box-shadow: 0 0 0 3px var(--c-amber-50);
 }
-.coordviews-page .cv-spatial-ctl .selectize-input { max-width: 320px; }
-.coordviews-page #cv-pick-color + .selectize-control { min-width: 168px; }
-.coordviews-page #cv-pick-color + .selectize-control .selectize-dropdown-content {
-  max-height: min(560px, calc(100dvh - 240px));
-}
-.coordviews-page #cv-proj-ctl .selectize-input { max-width: 320px; }
-
 /* Background image choices are scoped to the selected spatial data.  The
    compact, intrinsic-width mode switch deliberately avoids filling the full
    settings window when the window is wide. */
 .coordviews-page .cv-bg-ctl { position: relative; width: 100%; max-width: 100%; }
 .coordviews-page .cv-bg-settings {
-  width: 100%; max-width: 100%; padding: 12px; border: 1px solid var(--cv-border);
-  border-radius: 8px; background: var(--cv-surface2);
+  width: 100%; max-width: 100%; padding: 12px; border: 1px solid var(--c-border);
+  border-radius: 8px; background: var(--c-surface-2);
 }
 .coordviews-page .cv-bg-settings.is-scope-changing {
   animation: cv-bg-scope-change .2s ease-out;
 }
 @keyframes cv-bg-scope-change {
-  0% { border-color: var(--cv-amber); box-shadow: 0 0 0 0 rgba(255, 112, 19, .24); }
-  50% { border-color: var(--cv-amber200); box-shadow: 0 0 0 7px rgba(255, 112, 19, 0); }
-  100% { border-color: var(--cv-border); box-shadow: none; }
+  0% { border-color: var(--c-amber); box-shadow: 0 0 0 0 rgba(255, 112, 19, .24); }
+  50% { border-color: var(--c-amber-200); box-shadow: 0 0 0 7px rgba(255, 112, 19, 0); }
+  100% { border-color: var(--c-border); box-shadow: none; }
 }
 .coordviews-page .cv-bg-display {
   width: fit-content; max-width: 100%; padding-bottom: 12px;
-  border-bottom: 1px solid var(--cv-border);
+  border-bottom: 1px solid var(--c-border);
 }
 .coordviews-page .cv-bg-display-title {
-  margin-bottom: 7px; color: var(--cv-text); font-size: 12px; font-weight: 650;
+  margin-bottom: 7px; color: var(--c-text); font-size: 12px; font-weight: 650;
 }
 .coordviews-page .cv-bg-mode {
   display: inline-flex; width: fit-content; max-width: 100%; overflow: hidden; border-radius: 6px;
-  border: 1px solid var(--c-border-2, #e0e0e0); background: var(--cv-surface);
+  border: 1px solid var(--c-border-2); background: var(--c-surface);
 }
 .coordviews-page .cv-bg-space-tabs {
   display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
 }
 .coordviews-page .cv-bg-space-tab {
   max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  padding: 6px 10px; border: 1px solid var(--cv-border); border-radius: 6px;
-  background: var(--cv-surface); color: var(--cv-text2); cursor: pointer;
+  padding: 6px 10px; border: 1px solid var(--c-border); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text-2); cursor: pointer;
   font: 600 11.5px/1.2 inherit;
 }
-.coordviews-page .cv-bg-space-tab:hover { background: var(--cv-surface2); }
+.coordviews-page .cv-bg-space-tab:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-bg-space-tab.is-on {
-  border-color: var(--cv-amber200); background: var(--cv-amber50); color: var(--cv-amber700);
+  border-color: var(--c-amber-200); background: var(--c-amber-50); color: var(--c-amber-700);
 }
 .coordviews-page .cv-bg-mode-btn {
-  border: 0; border-left: 1px solid var(--c-border-2, #e0e0e0);
-  background: transparent; color: var(--cv-text2); cursor: pointer;
+  border: 0; border-left: 1px solid var(--c-border-2);
+  background: transparent; color: var(--c-text-2); cursor: pointer;
   flex: 0 0 auto; padding: 7px 11px; font: 600 12px/1.2 inherit;
 }
 .coordviews-page .cv-bg-customize-btn { min-width: 116px; text-align: left; }
 .coordviews-page .cv-bg-mode-btn:first-child { border-left: 0; }
-.coordviews-page .cv-bg-mode-btn:hover { background: var(--cv-surface2); }
+.coordviews-page .cv-bg-mode-btn:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-bg-mode-btn.is-on {
-  background: var(--cv-amber50); color: var(--cv-amber700);
+  background: var(--c-amber-50); color: var(--c-amber-700);
 }
 .coordviews-page .cv-bg-popover {
   display: none; position: absolute; z-index: 1200; width: min(390px, 86vw); padding: 10px;
-  background: var(--cv-surface); border: 1px solid var(--cv-border);
+  background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
 }
 .coordviews-page .cv-bg-popover.is-open { display: block; }
 .coordviews-page .cv-bg-row {
-  padding: 10px; border-radius: 8px; background: var(--cv-surface2);
+  padding: 10px; border-radius: 8px; background: var(--c-surface-2);
 }
 .coordviews-page .cv-bg-row + .cv-bg-row { margin-top: 8px; }
 .coordviews-page .cv-bg-row-heading {
@@ -148,11 +105,11 @@
 }
 .coordviews-page .cv-bg-row-label { font-size: 12.5px; font-weight: 650; }
 .coordviews-page .cv-bg-count,
-.coordviews-page .cv-bg-unavailable { font-size: 11px; color: var(--cv-text3); }
+.coordviews-page .cv-bg-unavailable { font-size: 11px; color: var(--c-text-3); }
 .coordviews-page .cv-bg-row select { width: 100%; min-width: 0; }
 .coordviews-page .cv-bg-single {
   display: flex; align-items: center; gap: 9px; cursor: pointer;
-  font-size: 12px; color: var(--cv-text2);
+  font-size: 12px; color: var(--c-text-2);
 }
 .coordviews-page .cv-bg-thumb {
   width: 28px; height: 20px; border-radius: 5px;
@@ -171,7 +128,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
 }
 .coordviews-page .cv-bg-single input:checked + .cv-bg-switch {
-  background: var(--cv-amber);
+  background: var(--c-amber);
 }
 .coordviews-page .cv-bg-single input:checked + .cv-bg-switch::after {
   transform: translateX(14px);
@@ -188,30 +145,30 @@
 }
 .coordviews-page .cv-range input[type=range]::-webkit-slider-runnable-track,
 .coordviews-page .cv-img-ctl input[type=range]::-webkit-slider-runnable-track {
-  height: 8px; border: 1px solid var(--cv-border); border-radius: 999px;
-  background: linear-gradient(to right, var(--cv-amber) 0 var(--cv-range-fill, 50%), #fff var(--cv-range-fill, 50%) 100%);
+  height: 8px; border: 1px solid var(--c-border); border-radius: 999px;
+  background: linear-gradient(to right, var(--c-amber) 0 var(--cv-range-fill, 50%), #fff var(--cv-range-fill, 50%) 100%);
 }
 .coordviews-page .cv-range input[type=range]::-webkit-slider-thumb,
 .coordviews-page .cv-img-ctl input[type=range]::-webkit-slider-thumb {
-  width: 25px; height: 25px; margin-top: -10px; border: 3px solid var(--cv-amber);
+  width: 25px; height: 25px; margin-top: -10px; border: 3px solid var(--c-amber);
   border-radius: 50%; background: #fff; cursor: pointer; -webkit-appearance: none;
 }
 .coordviews-page .cv-range input[type=range]::-moz-range-track,
 .coordviews-page .cv-img-ctl input[type=range]::-moz-range-track {
-  height: 8px; border: 1px solid var(--cv-border); border-radius: 999px; background: #fff;
+  height: 8px; border: 1px solid var(--c-border); border-radius: 999px; background: #fff;
 }
 .coordviews-page .cv-range input[type=range]::-moz-range-progress,
 .coordviews-page .cv-img-ctl input[type=range]::-moz-range-progress {
-  height: 8px; border-radius: 999px; background: var(--cv-amber);
+  height: 8px; border-radius: 999px; background: var(--c-amber);
 }
 .coordviews-page .cv-range input[type=range]::-moz-range-thumb,
 .coordviews-page .cv-img-ctl input[type=range]::-moz-range-thumb {
-  width: 19px; height: 19px; border: 3px solid var(--cv-amber); border-radius: 50%; background: #fff; cursor: pointer;
+  width: 19px; height: 19px; border: 3px solid var(--c-amber); border-radius: 50%; background: #fff; cursor: pointer;
 }
 .coordviews-page .cv-ps-val,
 .coordviews-page .cv-img-range-value {
   position: absolute; z-index: 1; top: 0; transform: translateX(-50%); pointer-events: none;
-  padding: 2px 5px; border-radius: 4px; background: var(--cv-amber); color: #fff;
+  padding: 2px 5px; border-radius: 4px; background: var(--c-amber); color: #fff;
   font-size: 10.5px; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
 .coordviews-page .cv-range-min,
@@ -219,115 +176,82 @@
 .coordviews-page .cv-img-range-min,
 .coordviews-page .cv-img-range-max {
   position: absolute; top: 0; padding: 2px 5px; border-radius: 4px;
-  background: var(--cv-surface); color: var(--cv-text2); font-size: 10.5px; line-height: 1.2;
+  background: var(--c-surface); color: var(--c-text-2); font-size: 10.5px; line-height: 1.2;
 }
 .coordviews-page .cv-range-min { left: 0; }
 .coordviews-page .cv-range-max { right: 0; }
 .coordviews-page .cv-range::after,
 .coordviews-page .cv-img-range::after {
   content: ""; position: absolute; z-index: 0; left: 8px; right: 8px; bottom: 0; height: 7px;
-  background: repeating-linear-gradient(90deg, var(--cv-text3) 0 1px, transparent 1px 10%);
+  background: repeating-linear-gradient(90deg, var(--c-text-3) 0 1px, transparent 1px 10%);
   opacity: .55; pointer-events: none;
 }
 /* ---- segmented toggle (clonal-panel layout) ----------------------------- */
 .coordviews-page .cv-seg {
-  height: 42px; box-sizing: border-box;
-  display: inline-flex; border: 1px solid var(--c-border-2, #e0e0e0);
-  border-radius: var(--r-sm, 8px); overflow: hidden; background: var(--cv-surface);
+  width: 100%;
+  height: var(--c-toolbar-control-height); box-sizing: border-box;
+  display: inline-flex; border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm); overflow: hidden; background: var(--c-surface);
 }
 .coordviews-page .cv-seg-btn {
-  border: 0; background: transparent; color: var(--cv-text2);
-  padding: 0 14px; font-size: 14px; font-family: inherit; cursor: pointer;
-  border-left: 1px solid var(--c-border-2, #e0e0e0);
+  flex: 1 1 0; min-width: 0;
+  border: 0; background: transparent; color: var(--c-text-2);
+  padding: 0 8px; font-size: 14px; line-height: 1.05; font-family: inherit; cursor: pointer;
+  border-left: 1px solid var(--c-border-2); white-space: normal;
 }
 .coordviews-page .cv-seg-btn:first-child { border-left: 0; }
-.coordviews-page .cv-seg-btn:hover { background: var(--cv-surface2); }
+.coordviews-page .cv-seg-btn:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-seg-btn.is-on {
-  background: var(--cv-amber50); color: var(--cv-amber700); font-weight: 600;
+  background: var(--c-amber-50); color: var(--c-amber-700); font-weight: 600;
 }
 
 /* ---- right cluster: global readout -------------------------------------- */
 .coordviews-page .cv-topbar-right {
-  margin-left: auto; display: flex; align-items: center; gap: 14px;
+  order: 98; display: flex; align-items: center; gap: 14px;
 }
 /* Sized up to match the buttons beside it — it reports on the same selection
    they act on, and at 12px it read as a footnote to them. One line, so the bar's
    height is still set by the buttons and does not change. */
 .coordviews-page .cv-shown {
-  font-size: 15px; color: var(--cv-amber700); font-weight: 700;
+  font-size: 15px; color: var(--c-amber-700); font-weight: 700;
   white-space: nowrap;
 }
 /* Zoom + Clear live inside the active-cohort bar, beside the selection they
    affect. They stay horizontal and move to a new flex line only when needed. */
 .coordviews-page .cv-selactions {
-  display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px;
+  display: grid; gap: 6px; justify-items: end;
   align-self: center; margin-left: auto;
   transition: opacity .16s ease, transform .16s ease;
+}
+.coordviews-page .cv-sel-action-row {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px;
 }
 /* collapsed (hidden) state — a quiet fade + tiny lift */
 .coordviews-page .cv-selactions.cv-collapse {
   opacity: 0; transform: translateY(-4px); pointer-events: none;
 }
-/* Zoom + Clear share identical compact metrics and differ only by colour, so
-   they read as equal-weight actions on the cohort rather than more settings. */
-.coordviews-page .cv-selactions button {
-  min-width: 126px; height: 30px; box-sizing: border-box;
-  display: inline-flex; align-items: center; justify-content: center;
-  white-space: nowrap; font-family: inherit; cursor: pointer;
-  padding: 0 9px; font-size: 12.5px; font-weight: 700; line-height: 1;
-  border: 1px solid; border-radius: 6px;
-}
-/* These two are deliberately OUTSIDE the amber vocabulary. Everything else in
-   the bar is a persistent control whose amber means "this is on"; these appear
-   only once a selection exists and act ON it. Sharing amber with the always-on
-   controls is exactly what made them stop standing out.
-   Blue and red rather than green and red: green/red is the pairing that
-   collapses for the ~8% of men with red-green colour blindness, and blue also
-   ties Zoom to the blue already used for selection geometry — the lasso outline
-   and the minimap's viewport frame. */
-/* Only background and text are set: the shared rule above declares `border: 1px
-   solid` with no colour, so the border follows `color`. That is what lets one
-   set of box metrics produce two clearly different buttons, and it gives each an
-   outline strong enough to hold its own against the panels behind it. */
-.coordviews-page .cv-zoombtn {
-  background: var(--cv-blue50); color: var(--c-blue-700, #1d4ea0);
-}
-.coordviews-page .cv-zoombtn:hover { background: var(--cv-blue100); }
-/* Zoomed-in flips to a filled blue, so the state is legible at a glance rather
-   than needing the label to be read. The border is set explicitly here — the
-   text has gone white, and an inherited white border would ring the button. */
-.coordviews-page .cv-zoombtn.is-zoomed {
-  border-color: var(--cv-blue); background: var(--cv-blue); color: #fff;
-}
-.coordviews-page .cv-zoombtn.is-zoomed:hover {
-  background: var(--c-blue-600, #2560bd); border-color: var(--c-blue-600, #2560bd);
-}
-/* Clear — red, for the one action here that takes something away. */
-.coordviews-page .cv-clearbtn {
-  background: var(--cv-red50); color: var(--cv-red700);
-}
-.coordviews-page .cv-clearbtn:hover { background: var(--cv-red100); }
-
 /* ---- "More" toggle + responsive settings drawer ------------------------- */
 .coordviews-page .cv-morebtn {
-  align-self: flex-end; display: inline-flex; align-items: center; gap: 7px;
+  order: 99; align-self: flex-end; display: inline-flex; align-items: center; gap: 7px;
+  margin-left: auto;
   padding: 0 14px; font-size: 14px; font-weight: 700;
-  border: 1px solid var(--cv-amber200); background: var(--cv-amber50);
-  color: var(--cv-amber700); border-radius: var(--r-sm, 8px); cursor: pointer; height: 42px;
+  border: 1px solid var(--c-amber-200); background: var(--c-amber-50);
+  color: var(--c-amber-700); border-radius: var(--r-sm); cursor: pointer;
+  height: var(--c-toolbar-control-height);
   transition: background .18s ease, border-color .18s ease, color .18s ease,
     transform .12s cubic-bezier(.34, 1.4, .64, 1);
 }
-.coordviews-page .cv-morebtn:hover { background: var(--cv-amber100); border-color: var(--cv-amber); }
+.coordviews-page .cv-morebtn:hover { background: var(--c-amber-100); border-color: var(--c-amber); }
 /* press: a small give, springing back on release */
 .coordviews-page .cv-morebtn:active { transform: scale(.955); }
 /* open: the same amber "active" convention the segmented toggles use, so the
    button states which half of the bar it controls is currently showing */
 .coordviews-page .cv-morebtn[aria-expanded="true"] {
-  background: var(--cv-amber50); border-color: var(--cv-amber200);
-  color: var(--cv-amber700);
+  background: var(--c-amber-50); border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
 }
 .coordviews-page .cv-morebtn[aria-expanded="true"]:hover {
-  background: var(--cv-amber100);
+  background: var(--c-amber-100);
 }
 /* The caret ROTATES between pointing right (collapsed) and down (open) — one
    mark that travels, rather than two glyphs swapping. Drawn with borders rather
@@ -357,7 +281,7 @@
   inset: 0 0 0 auto; width: min(420px, calc(100vw - 24px)); height: 100vh;
   height: 100dvh; padding: 0 14px 14px; opacity: 0;
   box-sizing: border-box;
-  background: var(--cv-surface); border: 1px solid var(--cv-border);
+  background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 12px 0 0 12px; box-shadow: -12px 0 34px rgba(0, 0, 0, .16);
   transform: translateX(100%); transition: transform .22s cubic-bezier(.2, .8, .2, 1),
     opacity .16s ease; overflow: hidden;
@@ -366,15 +290,15 @@
 #cv-more.is-open { opacity: 1; transform: none; }
 #cv-more .cv-more-titlebar {
   display: flex; flex: 0 0 auto; align-items: center; gap: 8px; height: 52px;
-  margin: 0 -14px; padding: 0 13px; border-bottom: 1px solid var(--cv-border);
+  margin: 0 -14px; padding: 0 13px; border-bottom: 1px solid var(--c-border);
 }
 #cv-more .cv-more-title { font-size: 14px; font-weight: 700; }
 #cv-more .cv-more-close {
   display: block; margin-left: auto; width: 32px; height: 32px; padding: 0;
-  border: 0; border-radius: 5px; background: transparent; color: var(--cv-text2);
+  border: 0; border-radius: 5px; background: transparent; color: var(--c-text-2);
   cursor: pointer; font: 24px/24px inherit;
 }
-#cv-more .cv-more-close:hover { background: var(--cv-surface2); color: var(--cv-text); }
+#cv-more .cv-more-close:hover { background: var(--c-surface-2); color: var(--c-text); }
 #cv-more .cv-more-clip {
   flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto;
   overscroll-behavior: contain;
@@ -385,11 +309,11 @@
 }
 #cv-more .cv-more-section { min-width: 0; }
 #cv-more .cv-more-heading {
-  margin: 0 0 9px; color: var(--cv-text2); font-size: 10.5px;
+  margin: 0 0 9px; color: var(--c-text-2); font-size: 10.5px;
   font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
 }
 #cv-more .cv-more-images {
-  flex: 1 1 100%; padding-bottom: 14px; border-bottom: 1px solid var(--cv-border);
+  flex: 1 1 100%; padding-bottom: 14px; border-bottom: 1px solid var(--c-border);
 }
 #cv-more .cv-more-points {
   display: grid; grid-template-columns: minmax(0, 1fr);
@@ -421,22 +345,23 @@
 /* niche-radius slider disabled until a nucleus is picked */
 .coordviews-page .cv-disabled { opacity: 0.45; }
 .coordviews-page .cv-disabled input[type=range] { cursor: not-allowed; }
+
 .coordviews-page .cv-filters-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .coordviews-page .cv-filt { position: relative; }
 .coordviews-page .cv-filt-btn {
   padding: 5px 10px; font-size: 12px; font-family: inherit; cursor: pointer;
-  border: 1px solid var(--cv-border); border-radius: 6px;
-  background: var(--cv-surface2); color: var(--cv-text);
+  border: 1px solid var(--c-border); border-radius: 6px;
+  background: var(--c-surface-2); color: var(--c-text);
 }
-.coordviews-page .cv-filt-btn:hover { background: var(--cv-amber50); border-color: var(--cv-amber200); }
+.coordviews-page .cv-filt-btn:hover { background: var(--c-amber-50); border-color: var(--c-amber-200); }
 /* While its menu is open the chip stays lit, so the menu can be traced back to
    the chip it belongs to — which matters most when several chips sit in a row. */
 .coordviews-page .cv-filt-btn.is-open {
-  background: var(--cv-amber50); border-color: var(--cv-amber200);
-  color: var(--cv-amber700);
+  background: var(--c-amber-50); border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
 }
-.coordviews-page .cv-filt-btn.is-open .cv-filt-ct { color: var(--cv-amber); }
-.coordviews-page .cv-filt-ct { color: var(--cv-text3); font-weight: 400; }
+.coordviews-page .cv-filt-btn.is-open .cv-filt-ct { color: var(--c-amber); }
+.coordviews-page .cv-filt-ct { color: var(--c-text-3); font-weight: 400; }
 /* Styled to sit beside the native <select> menus in the same bar. Those are
    drawn by the OS and cannot be restyled, so this one moves toward them: a soft
    large radius, a tick in a reserved gutter instead of a checkbox, and full-row
@@ -449,30 +374,30 @@
      list of eight is worse than a slightly taller menu. Only a genuinely long
      list (fine-grained clusters) ever scrolls. */
   max-height: min(60vh, 480px); overflow-y: auto;
-  background: var(--cv-surface); border: 1px solid var(--cv-border);
+  background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 11px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, .13), 0 2px 6px rgba(0, 0, 0, .06);
 }
 .coordviews-page .cv-filt-acts {
   display: flex; gap: 6px; padding: 1px 3px 7px; margin-bottom: 5px;
-  border-bottom: 1px solid var(--cv-border);
+  border-bottom: 1px solid var(--c-border);
 }
 .coordviews-page .cv-filt-acts button {
   flex: 1; font-size: 11px; padding: 4px 0; cursor: pointer;
-  border: 1px solid var(--cv-border); border-radius: 6px;
-  background: var(--cv-surface2); color: var(--cv-text2);
+  border: 1px solid var(--c-border); border-radius: 6px;
+  background: var(--c-surface-2); color: var(--c-text-2);
   transition: background .14s ease, color .14s ease;
 }
 .coordviews-page .cv-filt-acts button:hover {
-  background: var(--cv-amber50); color: var(--cv-amber700);
+  background: var(--c-amber-50); color: var(--c-amber-700);
 }
 .coordviews-page .cv-filt-item {
   display: flex; align-items: center; gap: 7px; padding: 5px 9px 5px 5px;
   border-radius: 6px;
-  font-size: 12.5px; font-weight: 400; color: var(--cv-text); cursor: pointer;
+  font-size: 12.5px; font-weight: 400; color: var(--c-text); cursor: pointer;
   white-space: nowrap;
 }
-.coordviews-page .cv-filt-item:hover { background: var(--cv-amber50); }
+.coordviews-page .cv-filt-item:hover { background: var(--c-amber-50); }
 /* The checkbox stays for semantics and keyboard use, but is not what is drawn —
    a tick in a fixed-width gutter reads better next to the OS menus, and the
    gutter is always reserved so rows do not shift as levels are toggled. */
@@ -485,17 +410,37 @@
 .coordviews-page .cv-filt-item::before {
   content: "✓"; flex: none; width: 13px; text-align: center;
   font-size: 12px; font-weight: 700; line-height: 1;
-  color: var(--cv-amber); opacity: 0;
+  color: var(--c-amber); opacity: 0;
   transition: opacity .12s ease;
 }
 .coordviews-page .cv-filt-item:has(input:checked)::before { opacity: 1; }
 /* keyboard focus has to be visible even though the input itself is not */
 .coordviews-page .cv-filt-item:focus-within {
-  background: var(--cv-amber50);
-  outline: 2px solid var(--cv-amber200); outline-offset: -2px;
+  background: var(--c-amber-50);
+  outline: 2px solid var(--c-amber-200); outline-offset: -2px;
 }
 
 /* ---- panel grid --------------------------------------------------------- */
+.cerebro-cell-view-host {
+  position: relative;
+  min-width: 0;
+}
+.cerebro-cell-view-surface {
+  width: 100%;
+  min-width: 0;
+}
+.cerebro-cell-view-host .cv-panes {
+  flex: 1 1 auto;
+  padding: 0;
+}
+.cerebro-cell-view-host .cv-pane {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.cerebro-cell-view-host .cv-pane-head {
+  padding: 0 4px;
+}
 /* JS (layoutPanels + resizeAll) sets full-width tracks and rectangular canvases;
    here we establish the grid and panel transitions. */
 .coordviews-page .cv-panes {
@@ -521,7 +466,7 @@
 }
 .coordviews-page .cv-pane {
   position: relative;
-  background: var(--cv-surface); border: 1px solid var(--cv-border);
+  background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 10px; padding: 12px;
   display: flex; flex-direction: column;
   transition: opacity .2s ease, border-color .2s ease, box-shadow .2s ease;
@@ -533,16 +478,16 @@
 }
 .coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
 .coordviews-page .cv-pane.cv-focus-primary {
-  border-color: var(--cv-amber);
-  box-shadow: 0 0 0 2px var(--cv-amber50), var(--shadow-2, 0 4px 12px rgba(0,0,0,.10));
+  border-color: var(--c-amber);
+  box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-2);
 }
 .coordviews-page .cv-pane.cv-focus-context {
-  border-color: var(--cv-border);
-  box-shadow: var(--shadow-1, 0 1px 3px rgba(0,0,0,.06));
+  border-color: var(--c-border);
+  box-shadow: var(--shadow-1);
 }
 .coordviews-page .cv-pane.cv-active-spatial {
-  border-color: var(--cv-amber200);
-  box-shadow: 0 0 0 2px var(--cv-amber50), var(--shadow-1, 0 1px 3px rgba(0,0,0,.08));
+  border-color: var(--c-amber-200);
+  box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-1);
 }
 .coordviews-page .cv-pane.cv-hidden { display: none; }
 .coordviews-page .cv-pane-head {
@@ -554,14 +499,14 @@
 }
 .coordviews-page .cv-role-badge {
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
-  border: 1px solid var(--cv-border); border-radius: 999px;
-  background: var(--cv-surface2); color: var(--cv-text3);
+  border: 1px solid var(--c-border); border-radius: 999px;
+  background: var(--c-surface-2); color: var(--c-text-3);
   font-size: 9.5px; font-weight: 750; letter-spacing: .055em;
   line-height: 1; text-transform: uppercase;
 }
 .coordviews-page .cv-role-badge.is-focus {
-  border-color: var(--cv-amber200); background: var(--cv-amber50);
-  color: var(--cv-amber700);
+  border-color: var(--c-amber-200); background: var(--c-amber-50);
+  color: var(--c-amber-700);
 }
 .coordviews-page .cv-role-badge.is-context {
   border-color: #d8e1ea; background: #f6f8fa; color: #687585;
@@ -598,15 +543,15 @@
 .coordviews-page .cv-pane.cv-narrow .cv-panebar {
   position: absolute; top: 44px; right: 10px; z-index: 4;
   margin-left: 0; flex-direction: column;
-  background: var(--cv-surface); border: 1px solid var(--cv-border);
+  background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 6px; padding: 3px;
 }
 .coordviews-page .cv-tbtn {
   position: relative;
   width: 26px; height: 22px; padding: 0; font-size: 11px;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--cv-border); background: var(--cv-surface);
-  color: var(--cv-text2); border-radius: 5px; cursor: pointer;
+  border: 1px solid var(--c-border); background: var(--c-surface);
+  color: var(--c-text-2); border-radius: 5px; cursor: pointer;
 }
 /* Toolbar tooltip, drawn rather than delegated to the native `title` — the
    native delay is the browser's (~1s in Chrome) and is not configurable, which
@@ -640,10 +585,10 @@
 .coordviews-page .cv-pane.cv-narrow .cv-tbtn:focus-visible::after {
   transform: translateY(-50%);
 }
-.coordviews-page .cv-tbtn:hover { background: var(--cv-surface2); color: var(--cv-text); }
+.coordviews-page .cv-tbtn:hover { background: var(--c-surface-2); color: var(--c-text); }
 .coordviews-page .cv-tbtn.is-on {
-  background: var(--cv-amber50); border-color: var(--cv-amber200);
-  color: var(--cv-amber700);
+  background: var(--c-amber-50); border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
 }
 .coordviews-page .cv-focus-btn {
   width: auto; min-width: 72px; height: 26px; padding: 0 9px; gap: 5px;
@@ -660,15 +605,15 @@
   transform: none;
 }
 .coordviews-page .cv-pane-head select {
-  margin-left: auto; padding: 4px 7px; border: 1px solid var(--c-border-2, #e0e0e0);
-  border-radius: 6px; background: var(--cv-surface2); color: var(--cv-text2);
+  margin-left: auto; padding: 4px 7px; border: 1px solid var(--c-border-2);
+  border-radius: 6px; background: var(--c-surface-2); color: var(--c-text-2);
   font-size: 11.5px; font-family: inherit;
 }
 /* The wrapper gives the minimap a stable positioning anchor. */
 .coordviews-page .cv-canvas-wrap { position: relative; margin: auto 0; }
 .coordviews-page canvas {
   /* JS sizes each canvas to the panel's available rectangle. */
-  display: block; background: var(--cv-surface);
+  display: block; background: var(--c-surface);
   border-radius: 6px; cursor: crosshair;
   transition: width .2s ease, height .2s ease;
 }
@@ -678,20 +623,20 @@
    in only once a panel is zoomed or panned, and never takes the pointer — it is
    an indicator, not a control. */
 .coordviews-page .cv-mini {
-  position: absolute; left: 10px; bottom: 10px; z-index: 3;
+  position: absolute; right: 10px; bottom: 10px; z-index: 3;
   width: 84px; height: 84px; margin: 0;
   background: rgba(255, 255, 255, .84);
-  border: 1px solid var(--cv-border); border-radius: 6px;
+  border: 1px solid var(--c-border); border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .10);
   cursor: default; pointer-events: none;
-  opacity: 0; transform: translateY(5px) scale(.97); transform-origin: 0 100%;
+  opacity: 0; transform: translateY(5px) scale(.97); transform-origin: 100% 100%;
   transition: opacity .2s ease, transform .24s cubic-bezier(.4, 0, .2, 1);
 }
 .coordviews-page .cv-mini.is-on { opacity: 1; transform: none; }
 /* On a small panel 84px is a big share of the square; scale it down (the canvas
    keeps its backing store, so this only shrinks how it is presented). */
 .coordviews-page .cv-pane.cv-narrow .cv-mini {
-  width: 64px; height: 64px; left: 8px; bottom: 8px;
+  width: 64px; height: 64px; right: 8px; bottom: 8px;
 }
 /* Pan mode: the cursor is the only cue that a drag will move the view rather
    than select cells, so it has to change with the mode and while dragging. */
@@ -721,7 +666,7 @@
    the ring marks it as held in place rather than following the cursor. */
 .coordviews-page .cv-tip-pinned {
   pointer-events: auto;
-  box-shadow: 0 0 0 1px var(--cv-amber500, #f59e0b), 0 6px 18px rgba(0, 0, 0, .3);
+  box-shadow: 0 0 0 1px var(--c-amber), 0 6px 18px rgba(0, 0, 0, .3);
 }
 .coordviews-page .cv-tip-act {
   display: flex; gap: 6px;
@@ -777,8 +722,8 @@
   width: min(400px, 100% - 20px);
   max-height: min(560px, 100% - 20px, 76vh);
   display: none; flex-direction: column;
-  background: var(--cv-surface); color: var(--cv-text);
-  border: 1px solid var(--cv-border); border-radius: 12px;
+  background: var(--c-surface); color: var(--c-text);
+  border: 1px solid var(--c-border); border-radius: 12px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, .20), 0 2px 8px rgba(0, 0, 0, .08);
   overflow: hidden;
   opacity: 0;
@@ -793,13 +738,13 @@
 .coordviews-page .cv-card.is-in { opacity: 1; transform: none; }
 .coordviews-page .cv-card-head {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 13px 14px 11px; border-bottom: 1px solid var(--cv-border);
+  padding: 13px 14px 11px; border-bottom: 1px solid var(--c-border);
 }
 .coordviews-page .cv-card-title {
   font-size: 14.5px; font-weight: 650; line-height: 1.25;
 }
 .coordviews-page .cv-card-bc {
-  margin-top: 2px; font-size: 11.5px; color: var(--cv-text2);
+  margin-top: 2px; font-size: 11.5px; color: var(--c-text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
 }
@@ -808,16 +753,16 @@
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 17px; line-height: 1; font-family: inherit;
   border: 1px solid transparent; border-radius: 6px;
-  background: transparent; color: var(--cv-text3); cursor: pointer;
+  background: transparent; color: var(--c-text-3); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
 .coordviews-page .cv-card-x:hover {
-  background: var(--cv-surface2); color: var(--cv-text);
+  background: var(--c-surface-2); color: var(--c-text);
 }
 .coordviews-page .cv-card-body { overflow-y: auto; padding: 4px 14px 14px; }
 .coordviews-page .cv-card-sec {
   font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--cv-text3);
+  text-transform: uppercase; color: var(--c-text-3);
   margin: 13px 0 6px;
 }
 /* Key/value rows: the keys share one column so the values line up and can be
@@ -827,31 +772,31 @@
   display: grid; grid-template-columns: minmax(74px, 116px) 1fr; gap: 3px 10px;
   font-size: 12px; align-items: baseline;
 }
-.coordviews-page .cv-card-k { color: var(--cv-text2); word-break: break-word; }
+.coordviews-page .cv-card-k { color: var(--c-text-2); word-break: break-word; }
 .coordviews-page .cv-card-v {
-  color: var(--cv-text); font-variant-numeric: tabular-nums;
+  color: var(--c-text); font-variant-numeric: tabular-nums;
   word-break: break-word;
 }
 /* The full CDR3 — the reason the card exists; never truncated here. */
 .coordviews-page .cv-card-seq {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11.5px; line-height: 1.5; word-break: break-all;
-  background: var(--cv-surface2); border-radius: 6px; padding: 7px 9px;
+  background: var(--c-surface-2); border-radius: 6px; padding: 7px 9px;
 }
-.coordviews-page .cv-card-sub { font-size: 11.5px; color: var(--cv-text2); margin-top: 5px; }
+.coordviews-page .cv-card-sub { font-size: 11.5px; color: var(--c-text-2); margin-top: 5px; }
 .coordviews-page .cv-evidence-thumb {
   display: block; width: 100%; padding: 0; overflow: hidden; cursor: zoom-in;
-  border: 1px solid var(--cv-border); border-radius: 8px;
-  background: var(--cv-surface2);
+  border: 1px solid var(--c-border); border-radius: 8px;
+  background: var(--c-surface-2);
 }
 .coordviews-page .cv-evidence-thumb img {
   display: block; width: 100%; max-height: 180px; object-fit: contain;
 }
-.coordviews-page .cv-evidence-thumb:hover { border-color: var(--cv-amber200); }
+.coordviews-page .cv-evidence-thumb:hover { border-color: var(--c-amber-200); }
 /* Placeholder rows shown while the full meta row is fetched from the server. */
 .coordviews-page .cv-card-skel { display: grid; gap: 6px; }
 .coordviews-page .cv-card-skel span {
-  height: 11px; border-radius: 3px; background: var(--cv-surface2);
+  height: 11px; border-radius: 3px; background: var(--c-surface-2);
   animation: cvSkel 1.1s ease-in-out infinite;
 }
 .coordviews-page .cv-card-skel span:nth-child(2) { width: 82%; }
@@ -866,25 +811,25 @@
   display: flex; align-items: center; gap: 5px; cursor: pointer;
   user-select: none; padding: 1px 4px; border-radius: 3px;
 }
-.coordviews-page .cv-lg:hover { background: var(--cv-surface2); }
+.coordviews-page .cv-lg:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-lg.off { opacity: .5; }
 .coordviews-page .cv-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .coordviews-page .cv-evidence-dot {
   width: 9px; height: 9px; border: 1.5px solid #1f2937; border-radius: 50%; flex: none;
   box-sizing: border-box;
 }
-.coordviews-page .cv-lg-ct { color: var(--cv-text3); }
+.coordviews-page .cv-lg-ct { color: var(--c-text-3); }
 /* RGB channel legend: informational, not a toggle */
 .coordviews-page .cv-rgb-lg { cursor: default; }
 .coordviews-page .cv-rgb-lg:hover { background: transparent; }
-.coordviews-page .cv-rgb-none { color: var(--cv-text3); font-style: italic; }
+.coordviews-page .cv-rgb-none { color: var(--c-text-3); font-style: italic; }
 
 /* ---- histology image control bar ---------------------------------------- */
 .coordviews-page .cv-imgbar {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
   align-items: end; gap: 12px 16px;
   padding: 9px 12px; margin-bottom: 14px;
-  background: var(--cv-surface2); border: 1px solid var(--cv-border);
+  background: var(--c-surface-2); border: 1px solid var(--c-border);
   border-radius: 8px; font-size: 12px;
 }
 .coordviews-page .cv-bg-settings .cv-imgbar {
@@ -909,19 +854,14 @@
   opacity: 0; transform: translateY(-4px); pointer-events: none;
 }
 .coordviews-page .cv-imgbar-title {
-  font-weight: 650; color: var(--cv-text); margin-right: 2px;
+  font-weight: 650; color: var(--c-text); margin-right: 2px;
 }
 .coordviews-page .cv-imgbar-heading {
   display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; grid-column: 1 / -1;
 }
-.coordviews-page .cv-imgbar-active {
-  padding: 2px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 650;
-  color: var(--cv-amber700); background: var(--cv-amber50);
-  border: 1px solid var(--cv-amber200); white-space: nowrap;
-}
 .coordviews-page .cv-img-ctl { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .coordviews-page .cv-img-ctl > label {
-  font-size: 11px; color: var(--cv-text2); font-weight: 600; white-space: nowrap;
+  font-size: 11px; color: var(--c-text-2); font-weight: 600; white-space: nowrap;
   line-height: 1; margin: 0;
 }
 /* margin:0 + vertical-align:middle so the native range centres on the label's
@@ -938,7 +878,7 @@
 .coordviews-page .cv-img-range-max { right: 0; }
 .coordviews-page .cv-chk {
   display: flex; align-items: center; gap: 5px; font-size: 11.5px;
-  color: var(--cv-text2); cursor: pointer; user-select: none; margin: 0;
+  color: var(--c-text-2); cursor: pointer; user-select: none; margin: 0;
 }
 .coordviews-page .cv-chk input[type=checkbox],
 .coordviews-page .cv-filt-menu input[type=checkbox] {
@@ -948,34 +888,34 @@
 }
 .coordviews-page .cv-chk input[type=checkbox]:checked,
 .coordviews-page .cv-filt-menu input[type=checkbox]:checked {
-  border-color: var(--cv-amber); background-color: #fff;
+  border-color: var(--c-amber); background-color: #fff;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.4 6.3 11.5 13 4.7' fill='none' stroke='%23ff7013' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-size: 14px 14px; background-position: center; background-repeat: no-repeat;
 }
 /* A checkbox sitting in the top bar as a control in its own right. */
 .coordviews-page .cv-chk-ctl {
-  height: 42px; box-sizing: border-box; padding: 0 12px; gap: 7px;
-  border: 1px solid var(--cv-border); border-radius: var(--r-sm, 8px);
-  background: var(--cv-surface); color: var(--cv-text);
+  height: var(--c-toolbar-control-height); box-sizing: border-box; padding: 0 12px; gap: 7px;
+  border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  background: var(--c-surface); color: var(--c-text);
   font-size: 14px; white-space: nowrap;
   transition: background .15s ease, border-color .15s ease;
 }
-.coordviews-page .cv-chk-ctl:hover { background: var(--cv-surface2); }
+.coordviews-page .cv-chk-ctl:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-chk-ctl:has(input:checked) {
-  background: var(--cv-amber50); border-color: var(--cv-amber200);
-  color: var(--cv-amber700);
+  background: var(--c-amber-50); border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
 }
 
 /* ---- colourbar (single-gene continuous) --------------------------------- */
 .coordviews-page .cv-cbar {
   display: flex; align-items: center; gap: 8px;
-  margin: 12px 2px 0; font-size: 11px; color: var(--cv-text2);
+  margin: 12px 2px 0; font-size: 11px; color: var(--c-text-2);
 }
 .coordviews-page .cv-grad {
   flex: 0 1 240px; height: 10px; border-radius: 5px;
-  border: 1px solid var(--cv-border);
+  border: 1px solid var(--c-border);
 }
-.coordviews-page .cv-cbar-note { color: var(--cv-text3); }
+.coordviews-page .cv-cbar-note { color: var(--c-text-3); }
 
 /* ---- RGB co-expression channel row -------------------------------------- */
 .coordviews-page .cv-rgb-ctl .cv-rgb-row {
@@ -993,25 +933,15 @@
 /* keep the mode-specific gene pickers compact in the top bar */
 .coordviews-page #cv-gene-ctl .form-group,
 .coordviews-page #cv-rgb-ctl .form-group { margin-bottom: 0; }
-.coordviews-page #cv-gene-ctl .selectize-control { min-width: 190px; }
 /* Match searchable gene controls to the shared native/selectize metrics while
    retaining their compact widths in this horizontal toolbar. */
 .coordviews-page .cv-topbar .selectize-control .selectize-input {
-  box-sizing: border-box !important; height: 42px !important; min-height: 42px !important;
-  padding: 9px 12px !important; line-height: 22px !important;
-  border: 1px solid var(--c-border-2, #e0e0e0) !important;
-  border-radius: var(--r-sm, 8px) !important;
-  background: var(--cv-surface) !important; color: var(--cv-text) !important;
-  font-size: 14px !important; box-shadow: none !important;
   display: flex !important; flex-wrap: nowrap !important; align-items: center !important;
   overflow-x: auto !important; overflow-y: hidden !important; white-space: nowrap !important;
 }
-.coordviews-page .cv-topbar .selectize-control .selectize-input.focus {
-  border-color: var(--cv-amber) !important; box-shadow: 0 0 0 3px var(--cv-amber50) !important;
-}
 .coordviews-page .cv-topbar .selectize-control .selectize-input input,
 .coordviews-page .cv-topbar .selectize-dropdown { font-size: 14px !important; }
-.coordviews-page .cv-topbar .selectize-control { height: 42px; }
+.coordviews-page .cv-topbar .selectize-control { height: var(--c-toolbar-control-height); }
 .coordviews-page .cv-topbar .selectize-control .selectize-input > .item {
   flex: 0 0 auto; margin: 0 3px 0 0 !important; line-height: 18px !important;
 }
@@ -1026,25 +956,19 @@
 /* ---- selection bar ------------------------------------------------------ */
 .coordviews-page .cv-status-slot { display: grid; margin: 14px 0 8px; }
 .coordviews-page .cv-status-slot > .cv-workspace-guide,
-.coordviews-page .cv-status-slot > .cv-selbar { grid-area: 1 / 1; margin: 0; }
+.coordviews-page .cv-status-slot > .cv-selbar {
+  grid-area: 1 / 1;
+  margin: 0;
+}
 /* The status slot keeps the panes still; only its contents fade. */
 .coordviews-page .cv-selbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 8px 12px;
+}
+.coordviews-page .cv-selcopy {
   display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px;
-  background: var(--cv-amber50); border: 1px solid var(--cv-amber200);
-  border-radius: 8px; padding: 8px 10px; font-size: 12px;
-  color: var(--cv-text2);
-  transition: opacity .18s ease;
+  min-width: 0;
 }
-.coordviews-page .cv-sel-kicker {
-  color: var(--cv-amber700); font-size: 10.5px; font-weight: 750;
-  letter-spacing: .045em; text-transform: uppercase;
-}
-.coordviews-page .cv-sel-count { color: var(--cv-text); }
-.coordviews-page .cv-sel-chip {
-  padding: 3px 8px; border: 1px solid var(--cv-amber200); border-radius: 999px;
-  background: var(--cv-surface); color: var(--cv-amber700); font-weight: 650;
-}
-.coordviews-page .cv-sel-detail { color: var(--cv-text3); white-space: nowrap; }
 .coordviews-page .cv-selbar.cv-collapse {
   opacity: 0; visibility: hidden; pointer-events: none;
 }
@@ -1055,8 +979,8 @@
 .coordviews-page .cv-workspace-guide {
   display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px;
   padding: 7px 10px;
-  border: 1px solid var(--cv-border); border-radius: 8px;
-  background: var(--cv-surface); color: var(--cv-text2); font-size: 12px;
+  border: 1px solid var(--c-border); border-radius: 8px;
+  background: var(--c-surface); color: var(--c-text-2); font-size: 12px;
   transition: opacity .18s ease;
 }
 .coordviews-page .cv-workspace-guide.cv-collapse {
@@ -1064,18 +988,36 @@
 }
 .coordviews-page .cv-workspace-kicker {
   display: inline-flex; align-items: center; gap: 5px;
-  color: var(--cv-amber700); font-size: 10.5px; font-weight: 750;
+  color: var(--c-amber-700); font-size: 10.5px; font-weight: 750;
   letter-spacing: .045em; text-transform: uppercase; white-space: nowrap;
 }
-.coordviews-page .cv-workspace-guide-text { color: var(--cv-text2); }
+.coordviews-page .cv-workspace-guide-text {
+  flex: 1 1 0;
+  min-width: 12rem;
+  color: var(--c-text-2);
+}
+.coordviews-page .cv-workspace-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto;
+}
 .coordviews-page .cv-workspace-overview {
-  margin-left: auto; padding: 4px 9px; cursor: pointer;
+  padding: 4px 9px; cursor: pointer;
   display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid var(--cv-amber200); border-radius: 6px;
-  background: var(--cv-amber50); color: var(--cv-amber700);
+  border: 1px solid var(--c-amber-200); border-radius: 6px;
+  background: var(--c-amber-50); color: var(--c-amber-700);
   font-family: inherit; font-size: 11.5px; font-weight: 650;
 }
 .coordviews-page .cv-workspace-overview:hover { background: #fff1e6; }
+
+@media (max-width: 900px) {
+  .coordviews-page .cv-selbar { grid-template-columns: minmax(0, 1fr); }
+  .coordviews-page .cv-selactions {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
 
 /* ---- readout (composition + clonotypes) --------------------------------- */
 .coordviews-page .cv-readout {
@@ -1086,10 +1028,10 @@
 .coordviews-page .cv-read-h {
   font-size: 12.5px; font-weight: 650; margin-bottom: 9px;
 }
-.coordviews-page .cv-read-sub { font-weight: 400; color: var(--cv-text3); font-size: 11px; }
+.coordviews-page .cv-read-sub { font-weight: 400; color: var(--c-text-3); font-size: 11px; }
 .coordviews-page .cv-empty, .coordviews-page .cv-empty-sm {
-  color: var(--cv-text3); font-size: 12.5px; line-height: 1.6;
-  border: 1px dashed var(--c-border-2, #e0e0e0); border-radius: 8px;
+  color: var(--c-text-3); font-size: 12.5px; line-height: 1.6;
+  border: 1px dashed var(--c-border-2); border-radius: 8px;
   padding: 18px 14px;
 }
 .coordviews-page .cv-empty-sm { padding: 10px; }
@@ -1097,48 +1039,48 @@
 .coordviews-page .cv-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .coordviews-page .cv-bar-nm { width: 92px; flex: none; font-weight: 600; }
 .coordviews-page .cv-bar-tr {
-  flex: 1; background: var(--cv-surface2); border-radius: 3px; height: 14px; overflow: hidden;
+  flex: 1; background: var(--c-surface-2); border-radius: 3px; height: 14px; overflow: hidden;
 }
 .coordviews-page .cv-bar-fl { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
 .coordviews-page .cv-bar-ct {
-  width: 42px; flex: none; text-align: right; color: var(--cv-text2);
+  width: 42px; flex: none; text-align: right; color: var(--c-text-2);
   font-variant-numeric: tabular-nums;
 }
 
 .coordviews-page .cv-ctable { width: 100%; border-collapse: collapse; font-size: 12px; }
 .coordviews-page .cv-ctable th, .coordviews-page .cv-ctable td {
-  text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--cv-border);
+  text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--c-border);
 }
 .coordviews-page .cv-ctable th {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em;
-  color: var(--cv-text3); font-weight: 650;
+  color: var(--c-text-3); font-weight: 650;
 }
 .coordviews-page .cv-ctable td.num, .coordviews-page .cv-ctable th.num {
   text-align: right; font-variant-numeric: tabular-nums;
 }
 .coordviews-page .cv-ctable tbody tr:last-child td { border-bottom: 0; }
 .coordviews-page .cv-crow { cursor: pointer; }
-.coordviews-page .cv-crow:hover { background: var(--cv-amber50); }
+.coordviews-page .cv-crow:hover { background: var(--c-amber-50); }
 .coordviews-page .cv-cdr3 {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px; color: var(--cv-text);
+  font-size: 11px; color: var(--c-text);
 }
 /* "+N" after a clonotype label: the clone covers N+1 distinct CDR3s and the
    label names only the dominant one. Muted and non-monospace so it reads as an
    annotation rather than part of the sequence. */
 .coordviews-page .cv-cdr3-more {
   font-family: var(--cv-font, inherit);
-  font-size: 10px; color: var(--cv-text3); cursor: help;
+  font-size: 10px; color: var(--c-text-3); cursor: help;
 }
-.coordviews-page .cv-hint { font-size: 11px; color: var(--cv-text3); margin-top: 8px; }
+.coordviews-page .cv-hint { font-size: 11px; color: var(--c-text-3); margin-top: 8px; }
 .coordviews-page .cv-field-summary { min-width: min(520px, 100%); }
 .coordviews-page .cv-field-desc {
-  margin: -2px 0 12px; color: var(--cv-text2); font-size: 11.5px; line-height: 1.45;
+  margin: -2px 0 12px; color: var(--c-text-2); font-size: 11.5px; line-height: 1.45;
 }
 .coordviews-page .cv-field-table-title {
-  margin-bottom: 7px; color: var(--cv-text2); font-size: 11px; font-weight: 650;
+  margin-bottom: 7px; color: var(--c-text-2); font-size: 11px; font-weight: 650;
 }
-.coordviews-page .cv-field-table-title span { margin-left: 6px; font-weight: 400; color: var(--cv-text3); }
+.coordviews-page .cv-field-table-title span { margin-left: 6px; font-weight: 400; color: var(--c-text-3); }
 .coordviews-page .cv-field-table { display: grid; gap: 6px; }
 .coordviews-page .cv-field-row {
   display: grid; grid-template-columns: minmax(76px, 130px) minmax(120px, 1fr) auto;
@@ -1148,17 +1090,17 @@
 .coordviews-page .cv-field-bars { display: grid; gap: 2px; }
 .coordviews-page .cv-field-track { height: 5px; border-radius: 999px; background: #edf0f2; overflow: hidden; }
 .coordviews-page .cv-field-track span { display: block; height: 100%; background: #aeb8c2; border-radius: inherit; }
-.coordviews-page .cv-field-track.is-selected span { background: var(--cv-amber); }
+.coordviews-page .cv-field-track.is-selected span { background: var(--c-amber); }
 .coordviews-page .cv-field-values { display: flex; gap: 8px; min-width: 70px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
-.coordviews-page .cv-field-values span { color: var(--cv-text3); }
-.coordviews-page .cv-field-values b { color: var(--cv-amber700); font-weight: 650; }
+.coordviews-page .cv-field-values span { color: var(--c-text-3); }
+.coordviews-page .cv-field-values b { color: var(--c-amber-700); font-weight: 650; }
 
 /* Trekker's depth views form one analysis region below the linked workspace.
    It is present only for Trekker data and collapsed by default, so retaining
    the old page's inspector/QC/Moran depth does not compete with the canvases. */
 .coordviews-page .cv-tk-insights {
-  margin-top: 14px; border: 1px solid var(--cv-border);
-  border-radius: 12px; background: var(--cv-surface); overflow: hidden;
+  margin-top: 14px; border: 1px solid var(--c-border);
+  border-radius: 12px; background: var(--c-surface); overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, .025);
   margin-bottom: var(--cv-tk-anchor-space, 0px);
   transition: margin-bottom .2s cubic-bezier(.4, 0, .2, 1);
@@ -1166,7 +1108,7 @@
 .coordviews-page .cv-tk-insights-toggle {
   width: 100%; min-height: 64px; padding: 12px 16px; border: 0;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  text-align: left; background: transparent; color: var(--cv-text);
+  text-align: left; background: transparent; color: var(--c-text);
   cursor: pointer; font: inherit;
 }
 .coordviews-page .cv-tk-insights-toggle:hover { background: #fafafa; }
@@ -1176,21 +1118,21 @@
 }
 .coordviews-page .cv-tk-insights-toggle strong { font-size: 15px; }
 .coordviews-page .cv-tk-insights-toggle small {
-  grid-column: 2; color: var(--cv-text3); font-size: 11.5px;
+  grid-column: 2; color: var(--c-text-3); font-size: 11.5px;
   font-weight: 400;
 }
 .coordviews-page .cv-tk-insights-kicker {
-  color: var(--cv-amber700); font-size: 9.5px; font-weight: 750;
+  color: var(--c-amber-700); font-size: 9.5px; font-weight: 750;
   letter-spacing: .09em; text-transform: uppercase;
 }
 .coordviews-page .cv-tk-insights-toggle .fa-chevron-down {
-  color: var(--cv-text3); transition: transform .18s ease;
+  color: var(--c-text-3); transition: transform .18s ease;
 }
 .coordviews-page .cv-tk-insights-toggle.is-open .fa-chevron-down {
   transform: rotate(180deg);
 }
 .coordviews-page .cv-tk-insights-body {
-  border-top: 1px solid var(--cv-border); padding: 0 16px 18px;
+  border-top: 1px solid var(--c-border); padding: 0 16px 18px;
 }
 .coordviews-page .cv-tk-tabs {
   display: flex; gap: 3px; overflow-x: auto; padding: 10px 0 12px;
@@ -1198,13 +1140,13 @@
 }
 .coordviews-page .cv-tk-tab {
   flex: 0 0 auto; padding: 7px 11px; border: 1px solid transparent;
-  border-radius: 7px; background: transparent; color: var(--cv-text2);
+  border-radius: 7px; background: transparent; color: var(--c-text-2);
   cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
   line-height: 1.2;
 }
 .coordviews-page .cv-tk-tab:hover { background: #f6f6f7; }
 .coordviews-page .cv-tk-tab.is-active {
-  border-color: #ffd1b5; background: #fff5ee; color: var(--cv-amber700);
+  border-color: #ffd1b5; background: #fff5ee; color: var(--c-amber-700);
 }
 .coordviews-page .cv-tk-panel-stage {
   position: relative; min-height: 420px; overflow: hidden;
@@ -1228,11 +1170,11 @@
 }
 .coordviews-page .cv-tk-cell-empty {
   padding: 22px; border: 1px dashed #dedee2; border-radius: 8px;
-  color: var(--cv-text3); text-align: center; font-size: 12px;
+  color: var(--c-text-3); text-align: center; font-size: 12px;
 }
 .coordviews-page .cv-tk-cell-content > h4 { margin: 0 0 2px; font-size: 16px; }
 .coordviews-page .cv-tk-cell-bc {
-  margin-bottom: 10px; color: var(--cv-text3);
+  margin-bottom: 10px; color: var(--c-text-3);
   font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
 }
@@ -1245,8 +1187,8 @@
 }
 .coordviews-page #cv-tk-cell-body > .cv-tk-cell-block {
   min-width: 0; height: 100%; padding: 12px;
-  border: 1px solid var(--cv-border); border-radius: 9px;
-  background: var(--cv-surface2);
+  border: 1px solid var(--c-border); border-radius: 9px;
+  background: var(--c-surface-2);
 }
 .coordviews-page #cv-tk-cell-body .cv-card-sec { margin: 0 0 10px; }
 .coordviews-page #cv-tk-cell-body .cv-card-kv {
@@ -1318,10 +1260,6 @@
 }
 .cv-evidence-modal img { display: block; max-width: 100%; margin: 0 auto; }
 
-/* Kept for old saved markup only. The adaptive focus model no longer folds
-   linked context away. */
-.coordviews-page .cv-pane.cv-folded { display: none; }
-
 /* One local fallback keeps this standalone asset accessible; custom.css also
    applies the same preference globally. */
 @media (prefers-reduced-motion: reduce) {
@@ -1344,17 +1282,17 @@
 
 /* The focus button while its lens is primary. */
 .coordviews-page .cv-tbtn.cv-focus-btn.is-on {
-  background: var(--cv-amber50); color: var(--cv-amber700);
+  background: var(--c-amber-50); color: var(--c-amber-700);
 }
 
 /* "Reset to preset" sits at the end of the histology alignment bar. Quiet: it
    undoes work rather than doing any, and it is next to the controls it undoes. */
 .coordviews-page .cv-imgbar-reset {
   margin: 0; padding: 6px 10px; cursor: pointer; align-self: end;
-  border: 1px solid var(--c-border-2, #e0e0e0); border-radius: 6px;
-  background: var(--cv-surface); color: var(--cv-text2);
+  border: 1px solid var(--c-border-2); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text-2);
   font-family: inherit; font-size: 12px;
 }
 .coordviews-page .cv-imgbar-reset:hover {
-  background: var(--cv-surface2); color: var(--cv-text);
+  background: var(--c-surface-2); color: var(--c-text);
 }

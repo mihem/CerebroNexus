@@ -26,10 +26,20 @@ output[["overview_details_selected_cells_plot"]] <- plotly::renderPlotly({
     ##
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
+      dplyr::mutate(identifier = paste0(X1, '-', X2))
+    cells_df[["selection_key"]] <- if ("cell_barcode" %in% colnames(cells_df)) {
+      as.character(cells_df[["cell_barcode"]])
+    } else {
+      as.character(seq_len(nrow(cells_df)))
+    }
+    cells_df <- cells_df %>%
       dplyr::mutate(
-        identifier = paste0(X1, '-', X2),
         group = ifelse(
-          identifier %in% overview_projection_selected_cells()$identifier,
+          selectedCellMask(
+            selection_key,
+            identifier,
+            overview_projection_selected_cells()
+          ),
           'selected',
           'not selected'
         ),

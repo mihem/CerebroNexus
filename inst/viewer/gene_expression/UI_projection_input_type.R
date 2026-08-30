@@ -12,7 +12,8 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
       )),
       multiple = TRUE,
       options = list(
-        create = TRUE
+        create = TRUE,
+        plugins = list("remove_button")
       )
     )
   } else if (input[["expression_analysis_mode"]] == "Gene set") {

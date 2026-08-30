@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------------*
- * Shared 2-D geometry kernels for the canvas engines (coordviews.js, trekker.js).
+ * Shared 2-D geometry kernels for the canvas engines (cell_views.js, trekker.js).
  *
  * Both engines render the SAME cells as points on a canvas and need the same
  * primitives. Each used to keep its own copy; the niche radius rule had already
@@ -43,6 +43,87 @@
       if (inclusive ? d <= r2 : d < r2) s.add(i);
     }
     return s;
+  };
+
+  // One viewport model for Linked Views and the specialist canvases. A null
+  // view means the full unit square; zoomed views use centre + square span.
+  G.viewBounds = function (view) {
+    if (view && view.x0 != null) {
+      return { x0: view.x0, x1: view.x1, y0: view.y0, y1: view.y1 };
+    }
+    var v = view || { cx: 0.5, cy: 0.5, span: 1 };
+    return {
+      x0: v.cx - v.span / 2,
+      x1: v.cx + v.span / 2,
+      y0: v.cy - v.span / 2,
+      y1: v.cy + v.span / 2
+    };
+  };
+
+  G.zoomView = function (view, factor, anchor, minSpan) {
+    var v = view || { cx: 0.5, cy: 0.5, span: 1 };
+    var span = v.span * factor;
+    if (span >= 1) return null;
+    span = Math.max(minSpan == null ? 0.04 : minSpan, span);
+    var a = anchor || [0.5, 0.5];
+    var ux = v.cx + (a[0] - 0.5) * v.span;
+    var uy = v.cy + (a[1] - 0.5) * v.span;
+    return {
+      cx: ux - (a[0] - 0.5) * span,
+      cy: uy - (a[1] - 0.5) * span,
+      span: span
+    };
+  };
+
+  G.panView = function (view, dx, dy) {
+    var v = view || { cx: 0.5, cy: 0.5, span: 1 };
+    return {
+      cx: v.cx - dx * v.span,
+      cy: v.cy + dy * v.span,
+      span: v.span
+    };
+  };
+
+  G.fitView = function (x0, x1, y0, y1, padding, minSpan) {
+    var span = Math.max(x1 - x0, y1 - y0) * padding;
+    span = Math.max(minSpan, span);
+    return {
+      cx: (x0 + x1) / 2,
+      cy: (y0 + y1) / 2,
+      span: span
+    };
+  };
+
+  G.screenToUnit = function (view, frame, polygon) {
+    var b = G.viewBounds(view);
+    return polygon.map(function (point) {
+      return [
+        b.x0 + (point[0] - frame.x) / frame.width * (b.x1 - b.x0),
+        b.y0 + (frame.y + frame.height - point[1]) / frame.height *
+          (b.y1 - b.y0)
+      ];
+    });
+  };
+
+  G.unitToScreen = function (view, frame, polygon) {
+    var b = G.viewBounds(view);
+    return polygon.map(function (point) {
+      return [
+        frame.x + (point[0] - b.x0) / (b.x1 - b.x0) * frame.width,
+        frame.y + frame.height -
+          (point[1] - b.y0) / (b.y1 - b.y0) * frame.height
+      ];
+    });
+  };
+
+  // Linked Views semantics: 3-D selection gestures orbit; middle/shift drag
+  // and explicit Pan/Orbit modes pan a flat view; only the remainder selects.
+  G.dragKind = function (mode, is3D, button, shiftKey) {
+    if (is3D && mode !== 'pan' && button !== 1 && !shiftKey) return 'orbit';
+    if (mode === 'pan' || mode === 'orbit' || button === 1 || shiftKey) {
+      return 'pan';
+    }
+    return 'select';
   };
 
   window.CBGeom = G;
