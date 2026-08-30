@@ -68,7 +68,10 @@ observeEvent(input[["expression_projection_export"]], {
     if (plot_parameters[["projection"]] %in% availableProjections()) {
       ## ... separate panels requested and "gene" column present
       if (
-        input[["expression_projection_genes_in_separate_panels"]] == TRUE &&
+        identical(
+          input[["expression_projection_genes_in_separate_panels"]],
+          "separate"
+        ) &&
           "gene" %in% colnames(cells_df) == TRUE
       ) {
         ## prepare plot

@@ -228,25 +228,36 @@ tab_coordinated_views <- tabItem(
         tags$label("Spatial data"),
         tags$select(id = "cv-pick-spatial", multiple = "multiple")
       ),
-      ## Single-gene expression picker — a real server-side gene search (the
-      ## whole transcriptome), shown only in "Gene expression" mode. JS toggles
-      ## visibility; the server pushes the 0-255 vector on change.
+      ## Mean/per-gene expression picker. Per-gene mode expands the linked
+      ## spaces into a gene x space grid; the client enforces a 12-panel cap.
       div(
         class = "cv-ctl",
         id = "cv-gene-ctl",
         style = "display:none",
-        tags$label("Gene"),
+        tags$label("Gene(s)"),
         selectizeInput(
           "coordviews_gene",
           label = NULL,
           choices = NULL,
-          multiple = FALSE,
+          multiple = TRUE,
           options = list(
             maxOptions = 1000,
-            placeholder = "select a gene...",
+            placeholder = "select genes...",
             create = FALSE,
+            plugins = list("remove_button"),
             loadThrottle = 300
           )
+        )
+      ),
+      div(
+        class = "cv-ctl",
+        id = "cv-gene-panel-color-ctl",
+        style = "display:none",
+        tags$label("Panel colours"),
+        tags$select(
+          id = "cv-gene-panel-color",
+          tags$option(value = "shared", "Shared scale"),
+          tags$option(value = "distinct", "Distinct colours")
         )
       ),
       ## Three-gene co-expression: one gene per RGB channel, shown only in
@@ -319,19 +330,6 @@ tab_coordinated_views <- tabItem(
             `data-mode` = "bands",
             tags$span("Expansion", tags$br(), "bands")
           )
-        )
-      ),
-      ## Group labels at each level's median position, as the Projection tab
-      ## draws them. ON by default, and in the bar rather than behind "More":
-      ## it changes what is drawn on every panel, which is not the kind of switch
-      ## to keep folded away.
-      div(
-        class = "cv-ctl",
-        tags$label("Labels"),
-        tags$label(
-          class = "cv-chk cv-chk-ctl",
-          tags$input(type = "checkbox", id = "cv-labels", checked = "checked"),
-          "Group labels"
         )
       ),
       ## Reveals the rest of the control bar (point opacity, cell subsampling,
@@ -460,6 +458,17 @@ tab_coordinated_views <- tabItem(
                 value = "0.8",
                 disp = "0.80",
                 val_id = "cv-op-val"
+              ),
+              ## Group labels change only mark decoration, so they live with
+              ## the other low-frequency point appearance settings.
+              tags$label(
+                class = "cv-chk cv-chk-ctl",
+                tags$input(
+                  type = "checkbox",
+                  id = "cv-labels",
+                  checked = "checked"
+                ),
+                "Group labels"
               ),
               tags$label(
                 class = "cv-chk cv-chk-ctl",

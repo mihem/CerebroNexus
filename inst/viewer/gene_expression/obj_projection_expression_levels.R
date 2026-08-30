@@ -43,7 +43,16 @@ expression_projection_expression_levels <- reactive({
     )
 
     if (length(genes_present) == 0) {
-      expression_levels <- rep(0, n_cells)
+      expression_levels <- if (
+        identical(
+          input[["expression_projection_genes_in_separate_panels"]],
+          "rgb"
+        )
+      ) {
+        list(r = rep(0, n_cells), g = rep(0, n_cells), b = rep(0, n_cells))
+      } else {
+        rep(0, n_cells)
+      }
     } else {
       req(expression_projection_coordinates())
       ## All branches below go through data_set()$getExpressionMatrix(cells, genes)
@@ -55,8 +64,27 @@ expression_projection_expression_levels <- reactive({
       ## [ ] subset), RleMatrix (match() against colnames), and IterableMatrix,
       ## so the former IterableMatrix special case is no longer needed.
       if (
+        identical(
+          input[["expression_projection_genes_in_separate_panels"]],
+          "rgb"
+        )
+      ) {
+        incProgress(0.3, detail = "Calculating RGB co-expression...")
+        expression_levels <- lapply(genes_data[["rgb_genes"]], function(gene) {
+          if (is.null(gene) || !gene %in% genes_present) {
+            return(rep(0, n_cells))
+          }
+          unname(as.numeric(data_set()$getExpressionMatrix(
+            cells = cells_to_show_bc,
+            genes = gene
+          )))
+        })
+      } else if (
         ncol(expression_projection_coordinates()) == 2 &&
-          input[["expression_projection_genes_in_separate_panels"]] == TRUE &&
+          identical(
+            input[["expression_projection_genes_in_separate_panels"]],
+            "separate"
+          ) &&
           length(genes_present) >= 2 &&
           length(genes_present) <= 9
       ) {

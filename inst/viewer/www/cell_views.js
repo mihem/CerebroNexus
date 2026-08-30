@@ -127,9 +127,9 @@
 
   // RGB co-expression: cells whose max channel is <= RGB_MIN form a light-grey
   // substrate; the rest blend FROM that grey toward their full-brightness hue by
-  // intensity (max/255), so weak co-expression stays faint (≈grey) and only
-  // strong expression is vivid — additive RGB otherwise renders low signal as
-  // near-black on white. One grey source, shared by the colour and the layering.
+  // intensity (max/255), so weak co-expression stays faint (≈grey). Cells above
+  // threshold in all three channels are black so triple co-expression remains
+  // visible on the white canvas. One threshold shared by colour and layering.
   var RGB_MIN = 28;
   var RGB_GREY_RGB = [217, 219, 222];
   var RGB_GREY = 'rgb(' + RGB_GREY_RGB.join(',') + ')';
@@ -594,7 +594,8 @@
     if (mode === RGB_MODE) {
       var e = rgbAt(i);
       if (e.m <= RGB_MIN) return RGB_GREY;            // non-expressing → grey
-      // Blend grey -> full-brightness hue by intensity; never near-black.
+      if (e.r > RGB_MIN && e.g > RGB_MIN && e.b > RGB_MIN) return '#000000';
+      // Blend grey -> full-brightness hue by intensity.
       var t = e.m / 255, ch = [e.r, e.g, e.b], o = [0, 0, 0];
       for (var k = 0; k < 3; k++) {
         o[k] = Math.round(RGB_GREY_RGB[k] + (ch[k] / e.m * 255 - RGB_GREY_RGB[k]) * t);
@@ -2411,9 +2412,11 @@
   // ---- legend (categorical) / colourbar (gene) ----------------------------
   function renderColorbar(show, maxVal, label, minVal) {
     var C = $('cv-cbar'); if (!C) return;
+    C.classList.remove('cv-shared-range');
     C.style.display = show ? 'flex' : 'none';
-    if (!show) return;
     var g = $('cv-grad');
+    if (g) g.style.display = '';
+    if (!show) return;
     if (g) {
       var field = fieldOf();
       var stops = [];
@@ -2445,6 +2448,37 @@
     if (cb1) cb1.textContent = hi == null ? '' : (clipped ? '≥' : '') + hi.toFixed(1);
     var note = $('cv-cbar-note'); if (note) note.textContent = label || 'expression';
   }
+  function renderPanelScales(show) {
+    panels.forEach(function (panel) {
+      if (!panel.pane) return;
+      var old = panel.pane.querySelector('.cv-panel-scale');
+      if (old) old.remove();
+      if (!show || !panel.spaceId) return;
+      var field = fieldForMode(panelColorMode(panel));
+      if (!field || !field.palette) return;
+      var stops = [0, 64, 128, 192, 255].map(function (at, index) {
+        return field.palette[at] + ' ' + (index * 25) + '%';
+      });
+      var scale = document.createElement('span');
+      scale.className = 'cv-panel-scale';
+      scale.style.background = 'linear-gradient(90deg,' + stops.join(',') + ')';
+      scale.title = field.label + ' color scale; numeric range shared across panels';
+      var title = panel.pane.querySelector('.cv-ptitle');
+      if (title) title.insertAdjacentElement('afterend', scale);
+    });
+  }
+  function renderSharedExpressionRange(field) {
+    var C = $('cv-cbar'); if (!C || !field) return;
+    C.style.display = 'flex';
+    C.classList.add('cv-shared-range');
+    var g = $('cv-grad'); if (g) g.style.display = 'none';
+    var lo = $('cv-cb0');
+    if (lo) lo.textContent = 'Shared expression range:';
+    var hi = $('cv-cb1');
+    if (hi) hi.textContent = Number(field.min).toFixed(1) + '–' +
+      Number(field.max).toFixed(1);
+    var note = $('cv-cbar-note'); if (note) note.textContent = '';
+  }
   function renderLegend() {
     var L = $('cv-legend'); if (!L) return;
     var singlePayload = singleActive && singleViews[singleActive];
@@ -2456,6 +2490,10 @@
     L.style.fontSize = isFinite(singleFontSize) && singleFontSize > 0
       ? singleFontSize + 'px' : '';
     L.innerHTML = '';
+    var distinctPanels = !!(singlePayload && singlePayload.data &&
+      singlePayload.data.panel_colorscales &&
+      Object.keys(singlePayload.data.panel_colorscales).length > 1);
+    renderPanelScales(distinctPanels);
     function appendEvidenceLegend() {
       if (!evidenceOn) return;
       var e = document.createElement('div');
@@ -2470,7 +2508,18 @@
       appendEvidenceLegend();
       return;
     }
+    if (colorBy === GENE_PANELS_MODE) {
+      var firstPanelField = panels.length ? fieldOf(panels[0]) : null;
+      if (firstPanelField) renderSharedExpressionRange(firstPanelField);
+      renderPanelScales($('cv-gene-panel-color') &&
+        $('cv-gene-panel-color').value === 'distinct');
+      return;
+    }
     var fld = fieldOf();
+    if (distinctPanels && fld) {
+      renderSharedExpressionRange(fld);
+      return;
+    }
     if (fld && fld.colors) {
       renderColorbar(false);
       (fld.channelLabels || []).forEach(function (label, index) {
@@ -2487,8 +2536,8 @@
       return;
     }
     if (colorBy === RGB_MODE) {
-      // Legend for the three additive channels: a colour swatch + the gene that
-      // drives it (or "—" if empty). Updates when a channel gene changes.
+      // RGB needs both the channel assignments and their blends: without the
+      // latter, yellow/cyan/magenta/black points have no visible explanation.
       renderColorbar(false);
       var chans = [['R', '#e11d1d'], ['G', '#12a150'], ['B', '#2563eb']];
       var genes = (D.rgb && D.rgb.genes) || ['', '', ''];
@@ -2501,6 +2550,23 @@
           (gene ? esc(gene) : '<span class="cv-rgb-none">not set</span>');
         L.appendChild(d);
       });
+      [
+        ['Low expression', RGB_GREY, ''],
+        ['R + G', '#ffff00', ''],
+        ['R + B', '#ff00ff', ''],
+        ['G + B', '#00ffff', ''],
+        ['R + G + B', '#000000', '']
+      ].forEach(function (blend) {
+        var d = document.createElement('div');
+        d.className = 'cv-lg cv-rgb-lg';
+        d.innerHTML = '<span class="cv-dot' + blend[2] + '" style="background:' +
+          blend[1] + '"></span>' + blend[0];
+        L.appendChild(d);
+      });
+      var note = document.createElement('div');
+      note.className = 'cv-rgb-note';
+      note.textContent = 'Each channel is scaled independently to its gene’s expression range.';
+      L.appendChild(note);
       appendEvidenceLegend();
       return;
     }
@@ -3612,7 +3678,9 @@
 
   // Colour picker: categorical groups + two special continuous modes. Selecting
   // a gene mode reveals its picker(s); the server answers with the value vector.
-  var GENE_MODE = '__gene__', RGB_MODE = '__rgb__', FIELD_PREFIX = '__field__';
+  var GENE_MODE = '__gene__', GENE_PANELS_MODE = '__gene_panels__';
+  var RGB_MODE = '__rgb__', FIELD_PREFIX = '__field__';
+  var genePanelBaseCount = 1;
   // Trekker continuous field currently selected in "Colour by", or null.
   // Memoised on (D, colorBy): fieldOf() is called per cell inside colorOf()/
   // visible() on the draw hot path, but its result only changes when the dataset
@@ -3766,8 +3834,9 @@
         return D.fields[k].label || k;
       }));
     html += grp('Expression',
-      '<option value="' + GENE_MODE + '">Gene expression</option>' +
-      '<option value="' + RGB_MODE + '">Co-expression (RGB)</option>');
+      '<option value="' + GENE_MODE + '">Mean gene expression</option>' +
+      '<option value="' + GENE_PANELS_MODE + '">Per-gene expression panels</option>' +
+      '<option value="' + RGB_MODE + '">RGB co-expression</option>');
     if (sel.selectize) sel.selectize.destroy();
     sel.innerHTML = html;
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.selectize) {
@@ -3789,12 +3858,25 @@
     el.style.display = on ? '' : 'none';
   }
   function setColorBy(mode) {
+    var previousMode = colorBy;
     colorBy = mode; hidden = new Set();
     var geneCtl = $('cv-gene-ctl'), rgbCtl = $('cv-rgb-ctl');
-    if (geneCtl) geneCtl.style.display = (mode === GENE_MODE) ? '' : 'none';
+    var panelColorCtl = $('cv-gene-panel-color-ctl');
+    var geneMode = mode === GENE_MODE || mode === GENE_PANELS_MODE;
+    if (geneCtl) geneCtl.style.display = geneMode ? '' : 'none';
     if (rgbCtl) rgbCtl.style.display = (mode === RGB_MODE) ? '' : 'none';
+    if (panelColorCtl) panelColorCtl.style.display =
+      (mode === GENE_PANELS_MODE) ? '' : 'none';
+    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+      Shiny.setInputValue('coordviews_expression_mode',
+        mode === GENE_PANELS_MODE ? 'panels' : 'mean', { priority: 'event' });
+    }
     updateClipControl();
     clipRange();                 // seed the cache the colours read from
+    if (previousMode === GENE_PANELS_MODE || mode === GENE_PANELS_MODE) {
+      var order = orderedSpaces();
+      ensurePanelSlots(Math.min(12, order.length)); buildPanels(); layoutPanels();
+    }
     renderLegend(); drawAll(); renderReadout(); updateMoranBadges();
   }
 
@@ -4495,7 +4577,35 @@
         out.push(s.id);
       }
     });
-    return out;
+    if (colorBy !== GENE_PANELS_MODE || !D.genePanels || !D.genePanels.length) {
+      return out;
+    }
+    genePanelBaseCount = Math.max(1, out.length);
+    var maxGenes = Math.max(1, Math.floor(12 / Math.max(1, out.length)));
+    var genes = D.genePanels.slice(0, maxGenes), expanded = [];
+    var distinct = $('cv-gene-panel-color') &&
+      $('cv-gene-panel-color').value === 'distinct';
+    var scales = ['Reds', 'Blues', 'Greens', 'YlOrRd'];
+    genes.forEach(function (gene, geneIndex) {
+      var fieldName = '__linked_gene_' + geneIndex;
+      D.fields[fieldName] = {
+        label: gene.gene, v: gene.v, min: 0, max: D.genePanelMax || 1,
+        scale: 255, unclipped: true,
+        palette: singlePalette(distinct ? scales[geneIndex % scales.length] : 'YlOrRd')
+      };
+      out.forEach(function (spaceId) {
+        var source = spaceById[spaceId], virtualId = fieldName + '::' + spaceId;
+        if (!source) return;
+        spaceById[virtualId] = Object.assign({}, source, {
+          id: virtualId,
+          _baseSpaceId: spaceId,
+          label: gene.gene + ' · ' + source.label,
+          _panelColorMode: FIELD_PREFIX + fieldName
+        });
+        expanded.push(virtualId);
+      });
+    });
+    return expanded;
   }
   // Assign each present space to a panel; hide the unused slots; surface the
   // Trekker info button on whichever panel holds the Trekker space.
@@ -4541,14 +4651,16 @@
       if (i < order.length) {
         var reappearing = p.pane && p.pane.classList.contains('cv-hidden');
         p.spaceId = order[i];
-        p.colorBy = singleActive ? singleSpaceModes[p.spaceId] || null : null;
+        var shownSpace = spaceById[p.spaceId];
+        p.colorBy = singleActive ? singleSpaceModes[p.spaceId] || null
+          : (shownSpace && shownSpace._panelColorMode) || null;
         clearPanelView(p);
         if (p.pane) {
           p.pane.classList.remove('cv-hidden');
           if (reappearing) fadeInPane(p.pane);
         }
         var title = $('cv-title-' + p.key.toLowerCase());
-        var shownSpace = spaceById[p.spaceId];
+        shownSpace = spaceById[p.spaceId];
         if (title) title.textContent = shownSpace ? shownSpace.label : p.spaceId;
       } else {
         p.spaceId = null;
@@ -4953,7 +5065,7 @@
     return { x: x, y: y, z: z, groups: groups,
       levels: levels, colors: colors, hover: hover, hoverEnabled: hoverEnabled };
   }
-  function quantisedField(label, raw, keys, data) {
+  function quantisedField(label, raw, keys, data, panelScale) {
     var index = singleIndex(), values = emptyVector(null), min = Infinity, max = -Infinity;
     for (var i = 0; i < raw.length; i++) {
       var at = index.get(String(keys[i]));
@@ -4977,7 +5089,8 @@
     });
     return { label: label, v: q, raw: values, min: min, max: max, scale: 1000,
       unclipped: true,
-      palette: singlePalette(data && data.colorscale, data && data.reversescale) };
+      palette: singlePalette(panelScale || (data && data.colorscale),
+        panelScale ? false : data && data.reversescale) };
   }
   function directColorField(meta, raw, keys) {
     var index = singleIndex(), colors = emptyVector('#e6e7ea');
@@ -4990,6 +5103,27 @@
       channelLabels: Array.isArray(meta.traces) ? meta.traces : [],
       channelColors: Array.isArray(meta.coexpr_colors) ? meta.coexpr_colors : []
     };
+  }
+  function singleRgbData(data) {
+    var index = singleIndex(), keys = Array.isArray(data.selection_key)
+      ? data.selection_key : [], raw = data.rgb || {}, out = {};
+    ['r', 'g', 'b'].forEach(function (channel) {
+      var values = emptyVector(0), source = Array.isArray(raw[channel])
+        ? raw[channel] : [], maximum = 0;
+      for (var i = 0; i < source.length; i++) {
+        var at = index.get(String(keys[i])), value = Number(source[i]);
+        if (at == null || !isFinite(value)) continue;
+        values[at] = value; if (value > maximum) maximum = value;
+      }
+      out[channel] = values.map(function (value) {
+        return maximum > 0 ? Math.round(value / maximum * 255) : 0;
+      });
+    });
+    var genes = data.rgb_genes || {};
+    out.genes = ['r', 'g', 'b'].map(function (channel) {
+      return genes[channel] || '';
+    });
+    return out;
   }
   function singleEdges(extra) {
     var shapes = extra && Array.isArray(extra.shapes) ? extra.shapes : [];
@@ -5074,6 +5208,10 @@
       };
       makeSpace(baseId, meta.space_label || id);
       modes[baseId] = groupName;
+    } else if (meta.color_type === 'rgb') {
+      D.rgb = singleRgbData(data);
+      makeSpace(baseId, meta.space_label || id);
+      modes[baseId] = RGB_MODE;
     } else if (meta.color_type === 'coexpression') {
       var directName = 'single:' + id + ':rgb';
       D.fields[directName] = directColorField(
@@ -5090,7 +5228,9 @@
       }) : [[meta.color_variable || 'Value', data.color || []]];
       entries.forEach(function (entry, panel) {
         var fieldName = 'single:' + id + ':' + panel;
-        D.fields[fieldName] = quantisedField(entry[0], entry[1] || [], keys, data);
+        var panelScale = data.panel_colorscales && data.panel_colorscales[entry[0]];
+        D.fields[fieldName] = quantisedField(
+          entry[0], entry[1] || [], keys, data, panelScale);
         var spaceId = entries.length === 1 ? baseId : baseId + ':' + panel;
         makeSpace(spaceId, entry[0]); modes[spaceId] = FIELD_PREFIX + fieldName;
       });
@@ -5547,7 +5687,8 @@
     return panels.filter(function (panel) { return !!panel.spaceId; }).map(function (panel) {
       var view = panel.view || { cx: 0.5, cy: 0.5, span: 1 };
       return {
-        space: panel.spaceId,
+        space: (spaceById[panel.spaceId] &&
+          spaceById[panel.spaceId]._baseSpaceId) || panel.spaceId,
         viewport: { cx: view.cx, cy: view.cy, span: view.span },
         rotation: panel.rot ? { rx: panel.rot.rx, ry: panel.rot.ry } : null
       };
@@ -5605,6 +5746,14 @@
     var input = $(id);
     return input && typeof input.value === 'string' ? input.value : '';
   }
+  function selectedGenes(id) {
+    var input = $(id);
+    if (!input) return [];
+    if (input.selectize) return input.selectize.items.slice();
+    return Array.prototype.map.call(input.selectedOptions || [], function (option) {
+      return option.value;
+    });
+  }
 
   function exportWorkspace() {
     if (!D) throw new Error('Load a data set before saving a linked view.');
@@ -5632,6 +5781,8 @@
         active_spatial: active && active._sampleName || null,
         colour: {
           mode: colorBy,
+          genes: (colorBy === GENE_MODE || colorBy === GENE_PANELS_MODE)
+            ? selectedGenes('coordviews_gene') : [],
           gene: colorBy === GENE_MODE
             ? ((D.gene && D.gene.gene) || selectedGene('coordviews_gene')) : null,
           rgb_genes: colorBy === RGB_MODE
@@ -5692,7 +5843,8 @@
     })) configError('The file uses a Spatial section that is unavailable here.');
 
     var mode = view.colour.mode;
-    if (!(catOf(mode) || fieldForMode(mode) || mode === GENE_MODE || mode === RGB_MODE)) {
+    if (!(catOf(mode) || fieldForMode(mode) || mode === GENE_MODE ||
+      mode === GENE_PANELS_MODE || mode === RGB_MODE)) {
       configError('The file uses a colour mode that is unavailable here.');
     }
     Object.keys(view.filters).forEach(function (name) {
@@ -5756,7 +5908,17 @@
     var colourState = view.colour, colour = colourState.mode;
     colorClip = Number(colourState.clip);
     var clipEl = $('cv-clip'); if (clipEl) clipEl.value = String(colorClip);
-    if (colour === GENE_MODE && colourState.gene) {
+    if ((colour === GENE_MODE || colour === GENE_PANELS_MODE) &&
+      Array.isArray(colourState.genes) && colourState.genes.length) {
+      setColorBy(colour);
+      var genePicker = $('coordviews_gene');
+      if (genePicker && genePicker.selectize) {
+        colourState.genes.forEach(function (gene) {
+          genePicker.selectize.addOption({ value: gene, label: gene });
+        });
+        genePicker.selectize.setValue(colourState.genes, false);
+      }
+    } else if (colour === GENE_MODE && colourState.gene) {
       colourByGene(colourState.gene);
     } else {
       setColorBy(colour);
@@ -5982,6 +6144,27 @@
       clipRange();
       if (colorBy === GENE_MODE) { renderLegend(); drawAll(); updateMoranBadges(); }
     });
+    Shiny.addCustomMessageHandler('coordviews_genepanels', function (m) {
+      if (!D || !m || !m.ok) return;
+      var genes = Array.isArray(m.genes) ? m.genes : [m.genes];
+      var values = m.values || [];
+      if (genes.length === 1 && (!values.length || typeof values[0] === 'number')) {
+        values = [values];
+      }
+      D.genePanelMax = Number(m.max) || 1;
+      D.genePanels = genes.map(function (gene, index) {
+        return { gene: gene, v: values[index] || [] };
+      });
+      if (colorBy !== GENE_PANELS_MODE) return;
+      var limit = Math.max(1, Math.floor(12 / genePanelBaseCount));
+      var picker = $('coordviews_gene');
+      if (picker && picker.selectize && picker.selectize.items.length > limit) {
+        picker.selectize.setValue(picker.selectize.items.slice(0, limit));
+        return;
+      }
+      ensurePanelSlots(Math.min(12, orderedSpaces().length));
+      buildPanels(); layoutPanels(); renderLegend(); resizeAll(); drawAll();
+    });
     // The exact meta row behind the open detail card. Ignored if the card has
     // since moved on to another cell (or closed) — a slow reply must not
     // repaint a card that is now describing something else.
@@ -5996,6 +6179,11 @@
       D.rgb = { r: m.r, g: m.g, b: m.b, genes: m.genes };
       if (colorBy === RGB_MODE) { renderLegend(); drawAll(); }
     });
+    var genePanelColor = $('cv-gene-panel-color');
+    if (genePanelColor) genePanelColor.onchange = function () {
+      if (colorBy !== GENE_PANELS_MODE) return;
+      layoutPanels(); renderLegend(); drawAll();
+    };
 
     // Report whether the workspace is on screen -- both ways, and not just the
     // first time. Building the bundle walks every cell of the loaded object and

@@ -369,8 +369,8 @@ cv_has_expression <- function() {
   isTRUE(tryCatch(nrow(data_set()$expression) > 0, error = function(e) FALSE))
 }
 
-## Pull one gene, scaled 0-255, aligned to `cells`. Returns NULL if unavailable.
-cv_gene_vector <- function(gene, cells) {
+## Pull one gene aligned to `cells`. Returns NULL if unavailable.
+cv_gene_values <- function(gene, cells) {
   if (is.null(gene) || !nzchar(gene)) {
     return(NULL)
   }
@@ -391,6 +391,11 @@ cv_gene_vector <- function(gene, cells) {
       as.numeric(m[1, ])
     }
   }
+  v[is.na(v)] <- 0
+  v
+}
+
+cv_scale_gene_values <- function(v) {
   mx <- suppressWarnings(max(v, na.rm = TRUE))
   q <- if (is.finite(mx) && mx > 0) {
     as.integer(round(v / mx * 255))
@@ -399,6 +404,14 @@ cv_gene_vector <- function(gene, cells) {
   }
   q[is.na(q)] <- 0L
   list(v = q, max = round(mx, 3))
+}
+
+cv_gene_vector <- function(gene, cells) {
+  v <- cv_gene_values(gene, cells)
+  if (is.null(v)) {
+    return(NULL)
+  }
+  cv_scale_gene_values(v)
 }
 
 serverSideGeneSelector(
@@ -413,23 +426,68 @@ lapply(
   }
 )
 
-observeEvent(input[["coordviews_gene"]], {
-  req(coordviews_visible())
-  b <- cv_ok(coordviews_bundle())
-  g <- input[["coordviews_gene"]]
-  if (is.null(b) || is.null(g) || !nzchar(g)) {
-    return()
+observeEvent(
+  list(
+    input[["coordviews_gene"]],
+    input[["coordviews_expression_mode"]]
+  ),
+  {
+    req(coordviews_visible())
+    b <- cv_ok(coordviews_bundle())
+    genes <- unique(input[["coordviews_gene"]])
+    genes <- genes[!is.na(genes) & nzchar(genes)]
+    if (is.null(b) || length(genes) == 0) {
+      return()
+    }
+    values <- lapply(genes, cv_gene_values, cells = b$cells)
+    keep <- !vapply(values, is.null, logical(1))
+    genes <- genes[keep]
+    values <- values[keep]
+    if (length(values) == 0) {
+      session$sendCustomMessage(
+        "coordviews_geneval",
+        list(gene = "", ok = FALSE)
+      )
+      return()
+    }
+    mode <- input[["coordviews_expression_mode"]]
+    if (identical(mode, "panels")) {
+      global_max <- max(unlist(values), na.rm = TRUE)
+      scaled <- lapply(values, function(v) {
+        if (is.finite(global_max) && global_max > 0) {
+          as.integer(round(v / global_max * 255))
+        } else {
+          rep(0L, length(v))
+        }
+      })
+      session$sendCustomMessage(
+        "coordviews_genepanels",
+        list(
+          ok = TRUE,
+          genes = genes,
+          values = scaled,
+          max = round(global_max, 3)
+        )
+      )
+    } else {
+      mean_values <- Reduce(`+`, values) / length(values)
+      gv <- cv_scale_gene_values(mean_values)
+      session$sendCustomMessage(
+        "coordviews_geneval",
+        list(
+          gene = if (length(genes) == 1) {
+            genes[[1]]
+          } else {
+            paste0("Mean expression (", length(genes), " genes)")
+          },
+          ok = TRUE,
+          v = gv$v,
+          max = gv$max
+        )
+      )
+    }
   }
-  gv <- cv_gene_vector(g, b$cells)
-  if (is.null(gv)) {
-    session$sendCustomMessage("coordviews_geneval", list(gene = g, ok = FALSE))
-    return()
-  }
-  session$sendCustomMessage(
-    "coordviews_geneval",
-    list(gene = g, ok = TRUE, v = gv$v, max = gv$max)
-  )
-})
+)
 
 ## RGB co-expression: one gene per channel, each scaled independently; an empty
 ## channel is all-zero. Recompute whenever any of the three genes changes.

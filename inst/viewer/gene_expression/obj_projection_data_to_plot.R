@@ -37,7 +37,11 @@ expression_projection_data_to_plot_raw <- reactive({
     ),
     hover_info = expression_projection_hover_info(),
     trajectory = expression_projection_trajectory(),
-    separate_panels = input[["expression_projection_genes_in_separate_panels"]]
+    display_mode = input[["expression_projection_genes_in_separate_panels"]],
+    separate_panels = identical(
+      input[["expression_projection_genes_in_separate_panels"]],
+      "separate"
+    )
   )
   return(to_return)
 })

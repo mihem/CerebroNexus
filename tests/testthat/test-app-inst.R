@@ -433,6 +433,83 @@ test_that("{shinytest2} recording: gene_expression", {
   expect_true(grepl("MS4A1", genes_text))
   expect_true(grepl("0 gene(s) are not in data set", genes_text, fixed = TRUE))
 
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_genes_in_separate_panels')",
+      "?.disabled === false && ",
+      "document.getElementById('expression_projection_gene_color_mode')",
+      "?.disabled === true"
+    ),
+    timeout = 10000
+  )
+
+  app$set_inputs(
+    expression_genes_input = c("MS4A1", "CD3D"),
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_genes_in_separate_panels')",
+      "?.disabled === false"
+    ),
+    timeout = 10000
+  )
+  app$set_inputs(
+    expression_projection_genes_in_separate_panels = "separate",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_gene_color_mode')",
+      "?.disabled === false"
+    ),
+    timeout = 10000
+  )
+  app$set_inputs(
+    expression_projection_gene_color_mode = "different",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelectorAll(",
+      "'#expression_projection_cell_view_host ",
+      ".cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
+      ".length === 2"
+    ),
+    timeout = 20000
+  )
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const panes=Array.from(document.querySelectorAll(",
+      "'#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));",
+      "const note=document.getElementById('cv-cbar')?.textContent || '';",
+      "return panes.length===2 && ",
+      "panes.every(p => p.querySelector('.cv-panel-scale')) && ",
+      "panes.every(p => {const b=p.querySelector('.cv-focus-btn');",
+      "return b && Math.abs(p.getBoundingClientRect().right-",
+      "b.getBoundingClientRect().right)<=14;}) && ",
+      "note.includes('Shared expression range');",
+      "})()"
+    ),
+    timeout = 20000
+  )
+
+  app$set_inputs(expression_genes_input = "MS4A1", wait_ = FALSE)
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const display=document.getElementById(",
+      "'expression_projection_genes_in_separate_panels');",
+      "const colour=document.getElementById(",
+      "'expression_projection_gene_color_mode');",
+      "return !display?.disabled && display.value==='separate' && ",
+      "colour?.disabled && colour.value==='shared';",
+      "})()"
+    ),
+    timeout = 10000
+  )
+
   ## shared Canvas projection renders after gene selection
   app$wait_for_js(
     paste0(
@@ -454,7 +531,7 @@ test_that("{shinytest2} recording: gene_expression", {
   ## verify expression levels have some non-zero values (cells with color)
   expr_levels <- retry_get_value(app, export = "expression_levels")
   expect_true(length(expr_levels) > 0)
-  expect_true(any(expr_levels > 0))
+  expect_true(any(unlist(expr_levels, use.names = FALSE) > 0))
 
   app$stop()
 })

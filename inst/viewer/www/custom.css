@@ -469,6 +469,11 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 .cerebro-viz-toolbar .shiny-html-output {
   display: contents;
 }
+.cerebro-gene-rgb-row {
+  display: grid; grid-template-columns: repeat(3, minmax(132px, 1fr));
+  gap: 8px; flex: 1 1 430px; min-width: min(430px, 100%);
+}
+.cerebro-gene-rgb-row .form-group { min-width: 0; margin-bottom: 0; }
 .cerebro-viz-toolbar .form-group,
 .coordviews-page .cv-topbar > .cv-ctl {
   flex: 0 1 var(--c-control-width);
@@ -2037,5 +2042,36 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
     position: static;
     width: 100%;
     margin-top: 8px;
+  }
+}
+
+/* Disabled multi-gene controls retain a hover target for their native hint.
+   When a second gene (or Separate panels) unlocks one, the replacement input
+   gets one short emphasis pulse; it does not loop or add JS state. */
+.cerebro-gene-control.is-disabled {
+  cursor: help;
+}
+.cerebro-gene-control.is-disabled .form-control {
+  pointer-events: none;
+}
+.cerebro-gene-control.cerebro-control-unlocked .form-control {
+  animation: cerebro-control-unlock 650ms ease-out both;
+}
+@keyframes cerebro-control-unlock {
+  0% {
+    box-shadow: 0 0 0 0 rgba(231, 95, 37, .55);
+    transform: translateY(3px);
+  }
+  45% {
+    box-shadow: 0 0 0 5px rgba(231, 95, 37, .22);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(231, 95, 37, 0);
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-gene-control.cerebro-control-unlocked .form-control {
+    animation: none;
   }
 }

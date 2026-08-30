@@ -8,11 +8,13 @@ expression_projection_update_plot <- function(input) {
   selection_keys <- input[['selection_keys']]
   hover_info <- input[['hover_info']]
   trajectory <- input[['trajectory']]
+  display_mode <- input[['display_mode']]
   separate_panels <- input[['separate_panels']]
   ## sort cells based on expression (if applicable)
   if (
     plot_parameters[['plot_order']] == 'Highest expression on top' &&
-      separate_panels == FALSE
+      separate_panels == FALSE &&
+      !identical(display_mode, "rgb")
   ) {
     cell_order <- order(expression_levels)
     coordinates <- coordinates[cell_order, ]
@@ -48,6 +50,17 @@ expression_projection_update_plot <- function(input) {
   output_data[["colorscale"]] <- expressionColorScale(
     color_settings[["color_scale"]]
   )
+  if (
+    is.list(expression_levels) &&
+      !identical(display_mode, "rgb") &&
+      identical(color_settings[["color_mode"]], "different")
+  ) {
+    output_data[["panel_colorscales"]] <- expressionPanelColorScales(
+      names(expression_levels),
+      color_settings[["color_mode"]],
+      color_settings[["color_scale"]]
+    )
+  }
   output_data[["color_range"]] <- color_settings[["color_range"]]
   output_data[["reversescale"]] <- expressionReverseColorScale(
     color_settings[["color_scale"]]
@@ -66,7 +79,8 @@ expression_projection_update_plot <- function(input) {
     ## fix order of trajectory meta data if cells are sorted by expression
     if (
       plot_parameters[['plot_order']] == 'Highest expression on top' &&
-        separate_panels == FALSE
+        separate_panels == FALSE &&
+        !identical(display_mode, "rgb")
     ) {
       trajectory[['meta']] <- trajectory[['meta']][cell_order, ]
     }
@@ -94,6 +108,21 @@ expression_projection_update_plot <- function(input) {
       trajectory_lines <- c(trajectory_lines, list(line))
     }
   }
+  if (identical(display_mode, "rgb")) {
+    output_data[["rgb"]] <- expression_levels[c("r", "g", "b")]
+    output_data[["rgb_genes"]] <- color_settings[["rgb_genes"]]
+    cerebroCellViewRender(
+      "expression_projection",
+      list(
+        color_type = "rgb",
+        color_variable = "RGB co-expression"
+      ),
+      output_data,
+      output_hover,
+      extra = list(shapes = trajectory_lines)
+    )
+    return(invisible(NULL))
+  }
   n_dimensions <- plot_parameters[["n_dimensions"]]
   multi <- n_dimensions == 2 &&
     isTRUE(separate_panels) &&
@@ -102,9 +131,16 @@ expression_projection_update_plot <- function(input) {
     output_data[['z']] <- coordinates[[3]]
   }
   if (n_dimensions == 3 || !is.list(input[["expression_levels"]]) || multi) {
+    legend_label <- if (is.list(expression_levels)) {
+      "Expression"
+    } else if (length(color_settings[["genes"]]) == 1) {
+      color_settings[["genes"]][[1]]
+    } else {
+      paste0("Mean expression (", length(color_settings[["genes"]]), " genes)")
+    }
     cerebroCellViewRender(
       "expression_projection",
-      list(color_type = "continuous", color_variable = "Expression"),
+      list(color_type = "continuous", color_variable = legend_label),
       output_data,
       output_hover,
       extra = list(shapes = trajectory_lines)

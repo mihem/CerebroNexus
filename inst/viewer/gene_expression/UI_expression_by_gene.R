@@ -21,7 +21,7 @@ output[["expression_by_gene_UI"]] <- renderUI({
 ## Bar plot.
 ##----------------------------------------------------------------------------##
 output[["expression_by_gene"]] <- plotly::renderPlotly({
-  req(input[["expression_projection_color_scale"]])
+  req(expression_projection_parameters_color())
   ## prepare expression levels, depending on genes provided by user
   ## ... if no genes are available
   if (length(expression_selected_genes()$genes_to_display_present) == 0) {
@@ -49,9 +49,8 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
     ) %>%
       dplyr::slice_max(expression, n = 50)
   }
-  color_scale <- expressionColorScale(
-    input[["expression_projection_color_scale"]]
-  )
+  color_settings <- expression_projection_parameters_color()
+  color_scale <- expressionColorScale(color_settings[["color_scale"]])
   ## prepare plot
   plotly::plot_ly(
     expression_levels,
@@ -67,7 +66,7 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
       color = ~expression,
       colorscale = color_scale,
       reversescale = expressionReverseColorScale(
-        input[["expression_projection_color_scale"]]
+        color_settings[["color_scale"]]
       ),
       line = list(
         color = "rgb(196,196,196)",

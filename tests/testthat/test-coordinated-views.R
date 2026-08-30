@@ -1516,6 +1516,41 @@ test_that("More settings is an accessible drawer rather than a draggable window"
   expect_no_match(css, "transition: transform .3s", fixed = TRUE)
 })
 
+test_that("Linked views keeps labels in More settings and explains RGB blends", {
+  skip_if(is.na(local_inst), "viewer sources not found")
+
+  ui <- paste(
+    readLines(
+      file.path(local_inst, "viewer/coordinated_views/UI.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  js <- paste(
+    readLines(
+      file.path(local_inst, "viewer/www/cell_views.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  points_pos <- regexpr(
+    'class = "cv-more-section cv-more-points"',
+    ui,
+    fixed = TRUE
+  )[1]
+  labels_pos <- regexpr('id = "cv-labels"', ui, fixed = TRUE)[1]
+  expect_gt(points_pos, 0)
+  expect_gt(labels_pos, points_pos)
+
+  expect_match(js, "Low expression", fixed = TRUE)
+  expect_match(js, "R + G", fixed = TRUE)
+  expect_match(js, "R + B", fixed = TRUE)
+  expect_match(js, "G + B", fixed = TRUE)
+  expect_match(js, "R + G + B", fixed = TRUE)
+  expect_match(js, "Each channel is scaled independently", fixed = TRUE)
+})
+
 test_that("Linked views stylesheet has balanced rule blocks", {
   skip_if(is.na(local_inst), "viewer sources not found")
   css <- paste(

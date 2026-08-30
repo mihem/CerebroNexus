@@ -74,8 +74,7 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
     input[["expression_projection_to_display"]],
     input[["expression_projection_point_size"]],
     input[["expression_projection_point_opacity"]],
-    input[["expression_projection_color_scale"]],
-    input[["expression_projection_color_range"]],
+    expression_projection_parameters_color(),
     !is.null(input[["expression_by_pseudotime_show_trend_line"]]),
     input[["expression_by_pseudotime_trend_line_bandwidth"]],
     input[["expression_by_pseudotime_trend_line_width"]],
@@ -91,9 +90,9 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
     <b>Pseudotime</b>: {formatC(cells_df[[ 'pseudotime' ]], format = 'f', digits = 2)}
     <b>State</b>: {cells_df[[ 'state' ]]}"
   )
-  color_scale <- expressionColorScale(
-    input[["expression_projection_color_scale"]]
-  )
+  color_settings <- expression_projection_parameters_color()
+  color_scale <- expressionColorScale(color_settings[["color_scale"]])
+  color_range <- color_settings[["color_range"]]
   ## Pick scatter trace type up-front based on the WebGL toggle; replaces the
   ## former plotly::toWebGL() post-processing, which had to rebuild the whole
   ## figure. Applied to both the marker trace and the trend line below.
@@ -115,10 +114,10 @@ output[["expression_by_pseudotime"]] <- plotly::renderPlotly({
         opacity = input[["expression_projection_point_opacity"]],
         colorscale = color_scale,
         cauto = FALSE,
-        cmin = input[["expression_projection_color_range"]][1],
-        cmax = input[["expression_projection_color_range"]][2],
+        cmin = color_range[1],
+        cmax = color_range[2],
         reversescale = expressionReverseColorScale(
-          input[["expression_projection_color_scale"]]
+          color_settings[["color_scale"]]
         ),
         line = list(
           color = "rgb(196,196,196)",

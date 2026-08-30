@@ -28,8 +28,10 @@ output[["expression_projection_UI"]] <- renderUI({
                 selected = "Gene(s)"
               )
             ),
+            uiOutput("expression_projection_genes_in_separate_panels_UI"),
+            uiOutput("expression_projection_select_projection_UI"),
             uiOutput("expression_projection_input_type_UI"),
-            uiOutput("expression_projection_select_projection_UI")
+            uiOutput("expression_projection_gene_color_mode_UI")
           ),
           cerebroSettingsButton(
             "expression_projection_more_button",
@@ -41,20 +43,11 @@ output[["expression_projection_UI"]] <- renderUI({
               "Appearance",
               tagList(
                 uiOutput("expression_projection_additional_parameters_UI"),
-                uiOutput("expression_projection_point_border_UI"),
-                uiOutput("expression_projection_genes_in_separate_panels_UI")
+                uiOutput("expression_projection_point_border_UI")
               ),
               cerebroInfoButton(
                 "expression_projection_additional_parameters_info"
               )
-            ),
-            cerebroSettingsSection(
-              "Colour scale",
-              tagList(
-                uiOutput("expression_projection_color_scale_UI"),
-                uiOutput("expression_projection_color_range_UI")
-              ),
-              cerebroInfoButton("expression_projection_color_scale_info")
             ),
             cerebroSettingsSection(
               "Axes",
