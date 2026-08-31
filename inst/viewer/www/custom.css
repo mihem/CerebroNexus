@@ -473,6 +473,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   display: grid; grid-template-columns: repeat(3, minmax(132px, 1fr));
   gap: 8px; flex: 1 1 430px; min-width: min(430px, 100%);
 }
+.cerebro-gene-rgb-channel,
 .cerebro-gene-rgb-row .form-group { min-width: 0; margin-bottom: 0; }
 .cerebro-viz-toolbar .form-group,
 .coordviews-page .cv-topbar > .cv-ctl {
@@ -504,6 +505,12 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   flex: 1 1 auto;
   min-width: 0;
 }
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .form-group) {
+  flex: 0 1 var(--c-control-width);
+  width: var(--c-control-width);
+  min-width: min(var(--c-select-min-width), 100%);
+  max-width: 100%;
+}
 .cerebro-viz-toolbar .spatial-rgb-controls {
   display: flex;
   flex-wrap: wrap;
@@ -526,8 +533,8 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   font-size: 14px;
   font-weight: 600;
 }
-.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
-.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-viz-toolbar .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown),
 .cerebro-viz-toolbar .selectize-input,
 .coordviews-page .cv-topbar .selectize-input,
 .cerebro-settings-drawer .selectize-input {
@@ -540,21 +547,21 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   line-height: 22px !important;
   box-shadow: none !important;
 }
-.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-viz-toolbar .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown),
 .coordviews-page .cv-topbar .selectize-input,
 .cerebro-viz-toolbar .selectize-input {
   height: var(--c-toolbar-control-height) !important;
   min-height: var(--c-toolbar-control-height) !important;
   padding: 6px 12px !important;
 }
-.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown),
+.cerebro-settings-drawer .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown),
 .cerebro-settings-drawer .selectize-input {
   height: 42px !important;
   min-height: 42px !important;
   padding: 9px 12px !important;
 }
-.cerebro-viz-toolbar .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
-.cerebro-settings-drawer .form-control:not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-viz-toolbar .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown):focus,
+.cerebro-settings-drawer .form-control:not(.bootstrap-select):not(.selectpicker):not(.selectize-control):not(.selectize-dropdown):focus,
 .cerebro-viz-toolbar .selectize-input.focus,
 .coordviews-page .cv-topbar .selectize-input.focus,
 .cerebro-settings-drawer .selectize-input.focus {
@@ -620,12 +627,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   border-color: var(--c-amber);
   outline: 0 !important;
   box-shadow: 0 0 0 3px var(--c-amber-50);
-}
-.cerebro-settings-drawer .form-group {
-  margin-bottom: 16px;
-}
-.cerebro-settings-drawer .checkbox {
-  margin: 0 0 10px;
 }
 .cerebro-settings-drawer .checkbox label {
   display: flex;
@@ -717,13 +718,15 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   position: fixed;
   z-index: 1600;
   inset: 0 0 0 auto;
-  width: min(420px, calc(100vw - 24px));
+  width: clamp(400px, 30vw, 480px);
+  max-width: calc(100vw - 24px);
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   border: 1px solid var(--c-border);
   border-radius: 12px 0 0 12px;
   background: var(--c-surface);
+  background: color-mix(in srgb, var(--c-surface) 90%, transparent);
   box-shadow: -12px 0 34px rgba(0, 0, 0, .16);
   opacity: 0;
   transform: translateX(100%);
@@ -770,10 +773,18 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+.cerebro-settings-body > .shiny-html-output,
+.cerebro-settings-body > .shiny-bound-output {
+  display: contents;
+}
+.cerebro-settings-section {
+  padding: 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c-surface-2) 72%, transparent);
+}
 .cerebro-settings-section + .cerebro-settings-section {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--c-border);
+  margin-top: 12px;
 }
 .cerebro-settings-heading {
   display: flex;
@@ -789,8 +800,188 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 .cerebro-settings-heading .cerebro-info-btn {
   margin-left: auto;
 }
-.cerebro-settings-drawer .form-group:last-child {
-  margin-bottom: 0;
+.cerebro-settings-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px 22px;
+  align-items: start;
+}
+.cerebro-settings-content > .shiny-html-output,
+.cerebro-settings-content > .shiny-bound-output {
+  display: contents;
+}
+.cerebro-settings-content .cerebro-settings-contents {
+  display: contents;
+}
+.cerebro-settings-content .form-group,
+.cerebro-settings-content .checkbox {
+  min-width: 0;
+  margin: 0;
+}
+.cerebro-settings-content .shiny-input-container:has(.irs--shiny) {
+  width: 100%;
+}
+.cerebro-settings-content .cerebro-group-filters,
+.cerebro-settings-content .spatial-image-controls,
+.cerebro-settings-content .spatial-rgb-controls,
+.cerebro-settings-content > .cerebro-settings-section,
+.cerebro-settings-content .cerebro-settings-full,
+.cerebro-settings-content .help-block {
+  grid-column: 1 / -1;
+}
+
+/* Spatial image sliders pair dragging with exact numeric entry. */
+.spatial-image-controls {
+  display: grid;
+  gap: 12px;
+}
+.spatial-image-offset-field {
+  display: grid;
+  gap: 5px;
+}
+.spatial-image-offset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.cerebro-settings-content .spatial-image-offset-row
+  .shiny-input-container:has(.irs--shiny) {
+  width: 100%;
+  max-width: none;
+}
+.spatial-image-offset-row .form-group,
+.spatial-image-offset-number .form-control {
+  width: 100%;
+}
+.spatial-image-actions {
+  display: grid;
+  gap: 8px;
+}
+
+/* Shared group-filter chips used by Linked views and projection-style pages. */
+.cerebro-group-filters {
+  min-width: 200px;
+}
+.cerebro-group-filters .cv-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cerebro-group-filters .cv-filt {
+  position: relative;
+}
+.cerebro-group-filters .cv-filt-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cerebro-group-filters .cv-filt-btn:hover,
+.cerebro-group-filters .cv-filt-btn.is-open {
+  border-color: var(--c-amber-200);
+  background: var(--c-amber-50);
+}
+.cerebro-group-filters .cv-filt-btn.is-open {
+  color: var(--c-amber-700);
+}
+.cerebro-group-filters .cv-filt-btn.is-open .cv-filt-ct {
+  color: var(--c-amber);
+}
+.cerebro-group-filters .cv-filt-ct {
+  color: var(--c-text-3);
+  font-weight: 400;
+}
+.cerebro-group-filters .cv-filt-menu {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  min-width: 172px;
+  max-height: min(60vh, 480px);
+  margin-top: 5px;
+  padding: 5px;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 11px;
+  background: var(--c-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .13), 0 2px 6px rgba(0, 0, 0, .06);
+}
+.cerebro-group-filters .cv-filt-acts {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding: 1px 3px 7px;
+  border-bottom: 1px solid var(--c-border);
+}
+.cerebro-group-filters .cv-filt-acts button {
+  flex: 1;
+  padding: 4px 0;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-surface-2);
+  color: var(--c-text-2);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.cerebro-group-filters .cv-filt-acts button:hover {
+  background: var(--c-amber-50);
+  color: var(--c-amber-700);
+}
+.cerebro-group-filters .cv-filt-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px 5px 5px;
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 12.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cerebro-group-filters .cv-filt-item:hover {
+  background: var(--c-amber-50);
+}
+.cerebro-group-filters .cv-filt-item input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.cerebro-group-filters .cv-filt-item::before {
+  content: "✓";
+  flex: none;
+  width: 13px;
+  color: var(--c-amber);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+.cerebro-group-filters .cv-filt-item:has(input:checked)::before {
+  opacity: 1;
+}
+.cerebro-group-filters .cv-filt-item:focus-within {
+  background: var(--c-amber-50);
+  outline: 2px solid var(--c-amber-200);
+  outline-offset: -2px;
+}
+.cerebro-group-filters .cv-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
 }
 @media (max-width: 900px) {
   .cerebro-settings-drawer {
@@ -800,6 +991,9 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
     border: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+  .cerebro-settings-content {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 /* Narrow viewports: stack the param panel above the plot rather than crushing
@@ -1383,16 +1577,16 @@ body .selectize-control.plugin-remove_button .item .remove:hover {
 }
 
 body label, body .control-label {
-  color: var(--c-text) !important;
-  font-weight: 600 !important;
-  font-size: 14px !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
+  color: var(--c-text);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
   margin-bottom: 5px;
 }
 body .shiny-input-container > label.control-label { font-size: 14px; display: block; }
 body .material-switch label,
-body .shiny-input-checkboxgroup label,
+body .shiny-input-checkboxgroup:not(.cv-filt) label,
 body .shiny-input-radiogroup label {
   font-weight: 450 !important;
   color: var(--c-text) !important;
@@ -1410,6 +1604,26 @@ body .irs--shiny .irs-from, body .irs--shiny .irs-to, body .irs--shiny .irs-sing
 }
 body .irs--shiny .irs-line { background: var(--c-surface-3) !important; }
 body .irs--shiny .irs-grid-text { color: var(--c-text-2) !important; }
+
+/* Trekker transition stays as compact as the neighbouring selects. */
+body .trekker-transition-control .irs--shiny {
+  height: var(--c-toolbar-control-height);
+}
+body .trekker-transition-control .irs-min,
+body .trekker-transition-control .irs-max,
+body .trekker-transition-control .irs-from,
+body .trekker-transition-control .irs-to,
+body .trekker-transition-control .irs-single,
+body .trekker-transition-control .irs-grid {
+  display: none !important;
+}
+body .trekker-transition-control .irs-line,
+body .trekker-transition-control .irs-bar {
+  top: 17px;
+}
+body .trekker-transition-control .irs-handle {
+  top: 10px;
+}
 
 /* materialSwitch → soft toggle, warm ON state, no inset shadow */
 body .material-switch > label::before {
@@ -1549,6 +1763,12 @@ body div.dt-buttons .dt-button:hover {
 /* -------------------------------------------------------------------------
    Modals — elevated content dialog
    ------------------------------------------------------------------------- */
+body .modal-backdrop {
+  z-index: 1700 !important;
+}
+body .modal {
+  z-index: 1710 !important;
+}
 body .modal-content {
   border: 1px solid var(--c-border) !important;
   border-radius: var(--r-lg) !important;
@@ -1654,6 +1874,7 @@ body .fa-spinner { color: var(--c-amber) !important; }
    miss). A gentle fade gives the same "content settled in" feel without that
    trap. Fill-mode is `backwards` only, so nothing lingers after it runs. */
 .tab-pane.active > * { animation: console-fadeInContent .28s var(--ease) backwards; }
+.cerebro-page-focus-target:focus { outline: none !important; }
 @keyframes console-fadeInContent {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -2045,33 +2266,48 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   }
 }
 
-/* Disabled multi-gene controls retain a hover target for their native hint.
-   When a second gene (or Separate panels) unlocks one, the replacement input
-   gets one short emphasis pulse; it does not loop or add JS state. */
-.cerebro-gene-control.is-disabled {
-  cursor: help;
+.cerebro-gene-control.cerebro-control-unlocked .selectize-input {
+  animation: cerebro-control-enter .2s var(--ease) both;
 }
-.cerebro-gene-control.is-disabled .form-control {
-  pointer-events: none;
+.cerebro-gene-input-output > * {
+  transition: opacity .18s var(--ease), transform .18s var(--ease),
+    max-height .22s var(--ease);
 }
-.cerebro-gene-control.cerebro-control-unlocked .form-control {
-  animation: cerebro-control-unlock 650ms ease-out both;
+.cerebro-gene-input-output.is-changing > * {
+  max-height: 0 !important;
+  opacity: 0;
+  transform: translateY(-5px);
 }
-@keyframes cerebro-control-unlock {
+.cerebro-gene-rgb-row.cerebro-control-enter {
+  animation: cerebro-control-group-enter .22s var(--ease) both;
+}
+.cerebro-gene-rgb-channel {
+  animation: cerebro-control-enter .2s var(--ease) both;
+}
+.cerebro-gene-rgb-channel:nth-child(2) {
+  animation-delay: 35ms;
+}
+.cerebro-gene-rgb-channel:nth-child(3) {
+  animation-delay: 70ms;
+}
+@keyframes cerebro-control-enter {
   0% {
-    box-shadow: 0 0 0 0 rgba(231, 95, 37, .55);
-    transform: translateY(3px);
-  }
-  45% {
-    box-shadow: 0 0 0 5px rgba(231, 95, 37, .22);
+    opacity: 0;
+    transform: translateY(-5px);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(231, 95, 37, 0);
+    opacity: 1;
     transform: translateY(0);
   }
 }
+@keyframes cerebro-control-group-enter {
+  0% { max-height: 0; opacity: 0; transform: translateY(-5px); }
+  100% { max-height: 90px; opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .cerebro-gene-control.cerebro-control-unlocked .form-control {
+  .cerebro-gene-control.cerebro-control-unlocked .selectize-input,
+  .cerebro-gene-rgb-row.cerebro-control-enter,
+  .cerebro-gene-rgb-channel {
     animation: none;
   }
 }

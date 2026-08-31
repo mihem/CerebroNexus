@@ -50,11 +50,14 @@ if (!is.na(local_inst)) {
 ## this env has to. A bundle built without it would silently answer that question
 ## on its own again, which is the divergence the file exists to prevent.
 contract_file <- file.path(dirname(bundle_file), "..", "clone_contract.R")
+utility_file <- file.path(dirname(bundle_file), "..", "utility_functions.R")
 cv_env <- new.env()
 have_bundle <- nzchar(bundle_file) &&
   file.exists(bundle_file) &&
-  file.exists(contract_file)
+  file.exists(contract_file) &&
+  file.exists(utility_file)
 if (have_bundle) {
+  sys.source(utility_file, envir = cv_env)
   sys.source(contract_file, envir = cv_env)
   sys.source(bundle_file, envir = cv_env)
 }
@@ -194,6 +197,27 @@ test_that("Linked views hides its empty pane slots before data arrives", {
   skip_if_not(file.exists(ui_file))
   ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
   expect_match(ui, 'class = "cv-pane cv-hidden"', fixed = TRUE)
+})
+
+test_that("Linked views highlights only the visualization under the pointer", {
+  ui_file <- file.path(dirname(bundle_file), "UI.R")
+  css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  skip_if_not(file.exists(ui_file) && file.exists(css_file))
+  ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
+  css <- paste(readLines(css_file, warn = FALSE), collapse = "\n")
+
+  expect_match(ui, 'class = "coordviews-page linked-views-page"', fixed = TRUE)
+  expect_match(
+    css,
+    ".linked-views-page > .cv-panes > .cv-pane:hover",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "(?m)^\\.coordviews-page \\.cv-pane:hover \\{$",
+    css,
+    perl = TRUE
+  ))
+  expect_false(grepl(".cv-pane.cv-active-spatial", css, fixed = TRUE))
 })
 
 test_that("Linked views reflows after its workspace becomes wider", {
@@ -634,7 +658,7 @@ test_that("cv_build_bundle still works when no grouping variable is registered",
   expect_equal(b$default_group, paste0(cv_env$cv_field_mode, "meta:nUMI"))
 })
 
-test_that("Linked views prefers cell type while consuming Viewer defaults", {
+test_that("Linked views consumes the selected dataset point appearance", {
   skip_if_not(have_bundle)
   cells <- c("c1", "c2", "c3")
   md <- data.frame(
@@ -662,12 +686,13 @@ test_that("Linked views prefers cell type while consuming Viewer defaults", {
     getImmuneRepertoire = function() NULL
   )
   cv_env$Cerebro.options <- list(
+    point_size = c(ds = 5),
+    point_opacity = c(ds = 0.7),
+    percentage_cells_to_show = c(ds = 60),
     viewer_content = list(
       ds = list(
         default_projection = "tsne",
-        default_trajectory = NULL,
-        overview_point_size = 5,
-        overview_percentage_cells_to_show = 60
+        default_trajectory = NULL
       )
     )
   )
@@ -683,19 +708,12 @@ test_that("Linked views prefers cell type while consuming Viewer defaults", {
     add = TRUE
   )
 
-  for (point_size in c(0, 5, 20)) {
-    cv_env$Cerebro.options$viewer_content$ds$overview_point_size <- point_size
-    bundle <- cv_env$cv_build_bundle(crb)
-    expected_point_size <- if (point_size < 1) 2 else point_size
-    expect_identical(bundle$default_projection, "tsne")
-    expect_identical(bundle$default_group, "cell_type")
-    expect_identical(
-      bundle$default_point_size,
-      expected_point_size,
-      info = paste("point size", point_size)
-    )
-    expect_identical(bundle$default_percentage_cells_to_show, 60)
-  }
+  bundle <- cv_env$cv_build_bundle(crb)
+  expect_identical(bundle$default_projection, "tsne")
+  expect_identical(bundle$default_group, "cell_type")
+  expect_identical(bundle$default_point_size, 5)
+  expect_identical(bundle$default_point_opacity, 0.7)
+  expect_identical(bundle$default_percentage_cells_to_show, 60)
 })
 
 test_that("spatial and Trekker spaces do not require an expression projection", {
@@ -795,8 +813,10 @@ test_that("Builder Trekker backgrounds and appearance reach Linked views", {
   )
 
   cv_env$Cerebro.options <- list(
+    point_size = c(ds = 5),
+    point_opacity = c(ds = 0.65),
     viewer_content = list(
-      ds = list(overview_point_size = 5)
+      ds = list()
     )
   )
   cv_env$available_crb_files <- list(
@@ -829,12 +849,11 @@ test_that("Builder Trekker backgrounds and appearance reach Linked views", {
   )
   expect_identical(trekker$images[[1L]]$preset$opacity, 0.7)
   expect_identical(trekker$background_scope, "Trekker")
-  ## Linked views keeps Overview as the shared-control seed while each spatial
-  ## space carries its own Builder appearance until the user changes that
-  ## shared control.
+  ## Cell appearance belongs to the dataset, not its background image.
   expect_identical(bundle$default_point_size, 5)
-  expect_identical(trekker$builder_point_opacity, 0.65)
-  expect_identical(trekker$builder_point_size, 9)
+  expect_identical(bundle$default_point_opacity, 0.65)
+  expect_null(trekker$builder_point_opacity)
+  expect_null(trekker$builder_point_size)
 
   js <- paste(
     readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
@@ -842,6 +861,22 @@ test_that("Builder Trekker backgrounds and appearance reach Linked views", {
   )
   expect_match(js, "function pointSizeOf(p)", fixed = TRUE)
   expect_match(js, "function pointOpacityOf(p)", fixed = TRUE)
+})
+
+test_that("Canvas uses one point-size unit in linked and standalone views", {
+  skip_if_not(have_bundle)
+  js <- paste(
+    readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
+    collapse = "\n"
+  )
+
+  expect_match(js, "var radius = pointSize / 2;", fixed = TRUE)
+  expect_no_match(
+    js,
+    "Number(payload.data && payload.data.point_size) || ps * 2) / 2",
+    fixed = TRUE
+  )
+  expect_match(js, "function syncPointControls()", fixed = TRUE)
 })
 
 test_that("a clone's label names its dominant CDR3 and says how many it hides", {
@@ -1222,9 +1257,7 @@ test_that("each section offers only its own configured backgrounds", {
       flipX = TRUE,
       flipY = FALSE,
       rotation = 90,
-      opacity = 0.6,
-      pointOpacity = 0.55,
-      pointSize = 8
+      opacity = 0.6
     )
   )
 
@@ -1310,8 +1343,6 @@ test_that("per-image settings also apply to embedded backgrounds", {
       flipY = FALSE,
       rotation = -32,
       opacity = 0.7,
-      pointOpacity = 0.35,
-      pointSize = 9,
       geometryBaked = TRUE
     )
   )
@@ -1321,6 +1352,61 @@ test_that("per-image settings also apply to embedded backgrounds", {
   )
   expect_match(js, "function imageRenderState(img, state)", fixed = TRUE)
   expect_match(js, "if (!pr.geometryBaked) return state;", fixed = TRUE)
+})
+
+test_that("legacy spatial images share identity and point appearance", {
+  skip_if_not(have_bundle)
+  cells <- c("c1", "c2")
+  crb <- list(getSpatialData = function(name) {
+    list(
+      coordinates = data.frame(
+        x = c(1, 2),
+        y = c(3, 4),
+        row.names = cells
+      ),
+      histology_image = "data:image/png;base64,AA==",
+      histology_image_bounds = list(xmin = 0, xmax = 3, ymin = 0, ymax = 5)
+    )
+  })
+  cv_env$Cerebro.options <- list(
+    point_size = c(ds = 5),
+    point_opacity = c(ds = 0.9),
+    spatial_image_settings = list(
+      ds = list(
+        fov = list(
+          `Tissue background` = list(offset_y = -10, flip_y = TRUE)
+        )
+      )
+    )
+  )
+  cv_env$available_crb_files <- list(
+    selected = "f.crb",
+    files = c(ds = "f.crb"),
+    names = "ds"
+  )
+  on.exit(
+    {
+      rm("Cerebro.options", envir = cv_env)
+      rm("available_crb_files", envir = cv_env)
+    },
+    add = TRUE
+  )
+
+  built <- cv_env$cv_spatial_one(crb, cells, "fov", allow_external = TRUE)
+
+  expect_identical(built$images[[1L]]$label, "Tissue background")
+  expect_identical(built$images[[1L]]$preset$offsetY, -10)
+  expect_true(built$images[[1L]]$preset$flipY)
+  expect_null(built$point_size)
+  expect_null(built$point_opacity)
+  expect_identical(
+    cv_env$viewerScatterDefaults(cv_env$Cerebro.options, "ds"),
+    list(
+      point_size = 5,
+      point_opacity = 0.9,
+      percentage_cells_to_show = 100
+    )
+  )
 })
 
 test_that("the alignment bar follows the chosen background, not the data set", {
@@ -1489,6 +1575,13 @@ test_that("More settings is an accessible drawer rather than a draggable window"
     ),
     collapse = "\n"
   )
+  shared_ui <- paste(
+    readLines(
+      file.path(local_inst, "viewer/shiny_UI.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
   js <- paste(
     readLines(
       file.path(local_inst, "viewer/www/cell_views.js"),
@@ -1503,16 +1596,28 @@ test_that("More settings is an accessible drawer rather than a draggable window"
     ),
     collapse = "\n"
   )
+  shared_css <- paste(
+    readLines(
+      file.path(local_inst, "viewer/www/custom.css"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
 
-  expect_match(ui, '`role` = "dialog"', fixed = TRUE)
-  expect_match(ui, '`aria-hidden` = "true"', fixed = TRUE)
+  expect_match(ui, "cerebroSettingsDrawer(", fixed = TRUE)
+  expect_match(shared_ui, 'role = "dialog"', fixed = TRUE)
+  expect_match(shared_ui, '`aria-hidden` = "true"', fixed = TRUE)
   expect_no_match(ui, "data-cv-more-drag-handle", fixed = TRUE)
   expect_no_match(ui, "Drag to move", fixed = TRUE)
   expect_no_match(js, "beginMoreDrag", fixed = TRUE)
   expect_no_match(js, "moreFloating", fixed = TRUE)
-  expect_match(css, "@media (prefers-reduced-motion: reduce)", fixed = TRUE)
-  expect_match(css, "#cv-more,", fixed = TRUE)
-  expect_match(css, "transition: none", fixed = TRUE)
+  expect_match(
+    shared_css,
+    "@media (prefers-reduced-motion: reduce)",
+    fixed = TRUE
+  )
+  expect_match(shared_css, ".cerebro-settings-drawer {", fixed = TRUE)
+  expect_no_match(css, "#cv-more", fixed = TRUE)
   expect_no_match(css, "transition: transform .3s", fixed = TRUE)
 })
 
@@ -1534,14 +1639,14 @@ test_that("Linked views keeps labels in More settings and explains RGB blends", 
     collapse = "\n"
   )
 
-  points_pos <- regexpr(
-    'class = "cv-more-section cv-more-points"',
+  appearance_pos <- regexpr(
+    '"Appearance"',
     ui,
     fixed = TRUE
   )[1]
-  labels_pos <- regexpr('id = "cv-labels"', ui, fixed = TRUE)[1]
-  expect_gt(points_pos, 0)
-  expect_gt(labels_pos, points_pos)
+  labels_pos <- regexpr('"cv-labels"', ui, fixed = TRUE)[1]
+  expect_gt(appearance_pos, 0)
+  expect_gt(labels_pos, appearance_pos)
 
   expect_match(js, "Low expression", fixed = TRUE)
   expect_match(js, "R + G", fixed = TRUE)
@@ -1628,28 +1733,11 @@ test_that("same-dataset refresh preserves percentage and group filters", {
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
   expect_match(
     js,
-    "if \\(dataChanged\\) \\{[\\s\\S]{0,1600}groupFilter = \\{\\};[\\s\\S]{0,1800}rebuildPctMask\\(\\)",
+    "if \\(dataChanged\\) \\{[\\s\\S]{0,1600}groupFilter = \\{\\};[\\s\\S]{0,2600}rebuildPctMask\\(\\)",
     perl = TRUE
   )
   expect_no_match(
     js,
     "pctMask = null; groupFilter = \\{\\};[[:space:]]*rebuildPctMask\\(\\)"
-  )
-})
-
-test_that("direct Trekker backgrounds retain their configured point appearance", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
-  skip_if_not(file.exists(js_file))
-  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
-
-  expect_match(
-    js,
-    "space._builderDefaultPointOpacity === undefined",
-    fixed = TRUE
-  )
-  expect_match(
-    js,
-    "space._builderDefaultPointSize === undefined",
-    fixed = TRUE
   )
 })

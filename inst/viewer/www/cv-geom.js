@@ -1,22 +1,18 @@
 /*----------------------------------------------------------------------------*
- * Shared 2-D geometry kernels for the canvas engines (cell_views.js, trekker.js).
+ * Shared 2-D geometry kernels for the cell_views.js canvas engine.
  *
- * Both engines render the SAME cells as points on a canvas and need the same
- * primitives. Each used to keep its own copy; the niche radius rule had already
- * drifted between them (<= vs <). Keeping ONE copy here makes that class of drift
- * impossible — change the loop once and both engines follow.
+ * Specialist and linked panels render the same cells and use these pure
+ * geometry primitives through one engine.
  *
  * Pure functions over plain (typed) arrays — no engine state, no DOM. Loaded
- * before both engines (see shiny_UI.R) so `window.CBGeom` is ready when their
- * IIFEs run. Only the genuinely shared kernels live here: `nearest` (hover hit-
- * test, per-engine visibility + hit radius) and `project` (unrelated bodies that
- * merely share a name) deliberately stay inline in each engine.
+ * before the engine (see shiny_UI.R) so `window.CBGeom` is ready when its IIFE
+ * runs.
  *----------------------------------------------------------------------------*/
 (function () {
   var G = {};
 
   // Ray-casting point-in-polygon. poly = [[x, y], ...]. Was byte-identical in
-  // both engines.
+  // all cell-view modes.
   G.inPoly = function (x, y, poly) {
     var c = false, n = poly.length, i, j;
     for (i = 0, j = n - 1; i < n; j = i++) {
@@ -29,10 +25,9 @@
 
   // The niche: the `centre` cell + every cell within radius r (r2 = r*r) of
   // (px, py) in DATA space. Returns a Set of indices. The two engines differ
-  // ONLY in these flags, kept explicit at the call site instead of as two
-  // divergent loop bodies:
-  //   inclusive — <= r2 (coordviews) vs < r2 (trekker)
-  //   skipNaN   — skip null/NaN coords, i.e. unpositioned cells (coordviews)
+  // Flags stay explicit at the call site for the few modality-specific rules.
+  //   inclusive — whether cells exactly on the radius are included
+  //   skipNaN   — skip null/NaN coords, i.e. unpositioned cells
   G.nicheAround = function (xs, ys, n, centre, px, py, r2, inclusive, skipNaN) {
     var s = new Set();
     s.add(centre);

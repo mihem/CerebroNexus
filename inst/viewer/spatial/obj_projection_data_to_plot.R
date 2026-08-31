@@ -135,8 +135,8 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Pin the axes to the FULL cell extent, not the currently displayed subset.
   ## Otherwise, changing "Show % of cells" rescales the axes to whatever subset
   ## is plotted and the plot visibly jitters. We compute the range over ALL cells
-  ## (in the same rotated frame) and pass it as an explicit x/y range, unless the
-  ## user has set a manual range. A small margin keeps edge points off the frame.
+  ## (in the same rotated frame) and pass it as an explicit x/y range. A small
+  ## margin keeps edge points off the frame.
   if (
     is.null(plot_parameters[["x_range"]]) ||
       length(plot_parameters[["x_range"]]) < 2 ||
@@ -165,7 +165,7 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## With an explicit full-extent range we must NOT let the JS autorange (which
   ## would refit to the subset). reset_axes is meant to snap back to the full
   ## view on a dataset switch — that is exactly the full-extent range we set, so
-  ## honour a manual range but otherwise keep the fixed range.
+  ## keep the fixed range.
   reset_axes <- isolate(spatial_projection_parameters_other[['reset_axes']])
   if (
     length(plot_parameters[["x_range"]]) >= 2 &&

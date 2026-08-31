@@ -71,21 +71,7 @@ spatial_projection_update_plot <- function(input) {
   color_assignments <- input[['color_assignments']]
   hover_info <- input[['hover_info']]
 
-  ## Guard against a colour variable that does not exist in THIS dataset's
-  ## metadata. When the loaded .crb is switched, plot_parameters (debounced) and
-  ## metadata can be momentarily inconsistent — the colour column may still name
-  ## a variable from the previous dataset (Xenium "cluster" vs MERFISH
-  ## "cell_type"). A missing column makes the downstream dplyr::group_by() error
-  ## and freezes the plot on the old data. Fall back to the first metadata column
-  ## so the render always succeeds and self-corrects on the next tick.
   color_variable <- plot_parameters[['color_variable']]
-  if (
-    is.null(color_variable) ||
-      !(color_variable %in% colnames(metadata))
-  ) {
-    color_variable <- colnames(metadata)[1]
-    plot_parameters[['color_variable']] <- color_variable
-  }
   color_input <- metadata[[color_variable]]
   selection_keys <- if ("cell_barcode" %in% colnames(metadata)) {
     as.character(metadata[["cell_barcode"]])
@@ -207,9 +193,9 @@ spatial_projection_update_plot <- function(input) {
   }
 
   ## Axis ranges are a property of the CELLS only — never the background image.
-  ## The scatter plot's coordinate system is fixed by the point bounding box (or
-  ## the user's manual range); the background is a passenger that the JS maps into
-  ## that fixed system via its stored `image_bounds` (data-space extent → pixels).
+  ## The scatter plot's coordinate system is fixed by the point bounding box;
+  ## the background is a passenger that the JS maps into that fixed system via
+  ## its stored `image_bounds` (data-space extent → pixels).
   ## So we do NOT widen the axes to the image extent here: doing that squashed the
   ## points (the image is larger than the spot bbox, and — combined with the old
   ## scaleanchor lock — it blew the y-axis out to negative values). Selecting a
@@ -288,7 +274,12 @@ spatial_projection_update_plot <- function(input) {
         color_type = "coexpression",
         traces = as.list(coexpr_labels),
         coexpr_colors = as.list(coexpr_colors),
-        color_variable = paste(coexpr_labels, collapse = "  ")
+        color_variable = paste(coexpr_labels, collapse = "  "),
+        appearance = list(
+          group_labels = FALSE,
+          draw_border = isTRUE(plot_parameters[["draw_border"]]),
+          keep_square = isTRUE(plot_parameters[["keep_square"]])
+        )
       )
     )
     output_data <- list(
@@ -328,6 +319,8 @@ spatial_projection_update_plot <- function(input) {
     selection_keys = selection_keys,
     point_size = plot_parameters[["point_size"]],
     point_opacity = plot_parameters[["point_opacity"]],
+    group_labels = plot_parameters[["group_labels"]],
+    keep_square = plot_parameters[["keep_square"]],
     point_line = point_line,
     x_range = x_range_out,
     y_range = y_range_out,

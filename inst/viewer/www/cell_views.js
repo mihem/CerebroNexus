@@ -90,12 +90,11 @@
   var nicheRadius = 250;        // µm radius for the picked-nucleus niche readout
   var nicheSet = null;          // cell indices inside the picked nucleus's niche
   var colorBy = null;           // group name
-  var ps = 3.0;                 // point size
-  var pointOpacity = 0.8;       // base draw opacity (no-selection view)
+  var ps = 5;                   // point diameter in CSS pixels
+  var pointOpacity = 1;         // base draw opacity (no-selection view)
+  var bordersOn = false;        // outline cell points in the active view
   var keepPlotsSquare = false;  // fluid rectangles use the workspace by default
-  // Builder alignment appearance belongs to one physical space. It seeds that
-  // space until the user deliberately moves the shared workspace control; from
-  // that point the user's value is the global linked-view override.
+  // Point appearance is dataset-wide; these flags preserve live user edits.
   var pointSizeEdited = false;
   var pointOpacityEdited = false;
   var hidden = new Set();       // hidden level indices for the active group
@@ -380,7 +379,7 @@
     }
     var dw = (x1 - x0) || 1, dh = (y1 - y0) || 1;
     var kx, ky, ox, oy;
-    if (space.stretch) {
+    if (space.stretch || isSpatialSpace(space)) {
       kx = 1 / dw; ky = 1 / dh; ox = 0; oy = 0;
     } else {
       var k = 1 / Math.max(dw, dh);
@@ -443,19 +442,43 @@
     }
     // x0/y0/k/ox/oy let us map ARBITRARY data coords (e.g. image bounds) to the
     // same unit box the points use, so a background image aligns to the cells.
-    // (Aspect-preserving spaces only — kx === ky there; the image never uses a
-    // stretched space.)
+    // `ky` is retained separately because a spatial canvas follows the data's
+    // own aspect ratio instead of letterboxing it into a square first.
     //
     // `bx` is where the DATA actually lies inside the unit box. Aspect-preserving
     // spaces letterbox the shorter axis, so that is not [0,1] on both axes, and
     // clampView() needs the real extent to keep a panned view on the data.
     return { nx: nx, ny: ny, nz: nz, ok: ok,
       x0: x0, y0: y0, k: kx, ky: ky, ox: ox, oy: oy,
+      aspect: dw / dh,
       bx: nz
         ? { x0: 0, x1: 1, y0: 0, y1: 1 }   // rotatable: the sphere fills the box
         : { x0: ox, x1: ox + dw * kx, y0: oy, y1: oy + dh * ky },
       occ: occ, sat: occSAT(occ),
       cmx: cnt ? cmx / cnt : 0.5, cmy: cnt ? cmy / cnt : 0.5 };
+  }
+
+  // Trekker's endpoints use unrelated coordinate systems. Normalise each one
+  // once, then interpolate in their shared unit box; normalising every mixed
+  // raw frame would refit the cloud and visually cancel the transition.
+  function transitionUnit(from, to, t) {
+    var n = from.nx.length, nx = new Float32Array(n), ny = new Float32Array(n);
+    var ok = new Uint8Array(n), occ = new Uint8Array(OCC * OCC);
+    var cmx = 0, cmy = 0, cnt = 0;
+    for (var i = 0; i < n; i++) {
+      if (!from.ok[i] || !to.ok[i]) continue;
+      nx[i] = from.nx[i] + (to.nx[i] - from.nx[i]) * t;
+      ny[i] = from.ny[i] + (to.ny[i] - from.ny[i]) * t;
+      ok[i] = 1; cmx += nx[i]; cmy += ny[i]; cnt++;
+      occ[occIdx(ny[i]) * OCC + occIdx(nx[i])] = 1;
+    }
+    return {
+      nx: nx, ny: ny, nz: null, ok: ok,
+      aspect: from.aspect + (to.aspect - from.aspect) * t,
+      bx: { x0: 0, x1: 1, y0: 0, y1: 1 },
+      occ: occ, sat: occSAT(occ),
+      cmx: cnt ? cmx / cnt : 0.5, cmy: cnt ? cmy / cnt : 0.5
+    };
   }
 
   // Map a unit-box coord (nx, ny in [0,1]) to this panel's screen pixels,
@@ -475,7 +498,7 @@
     var u = spaceById[p.spaceId] && spaceById[p.spaceId]._unit;
     if (!u || p._SX == null || p._SY == null) return null;
     var nx = (dx - u.x0) * u.k + u.ox;
-    var ny = (dy - u.y0) * u.k + u.oy;
+    var ny = (dy - u.y0) * u.ky + u.oy;
     return unitToScreen(p, nx, ny);
   }
 
@@ -1223,32 +1246,19 @@
   // but not of different alphas, so shading by opacity would cost the batching
   // exactly where it matters most.
   function pointSizeOf(p) {
-    var sp = p && spaceById[p.spaceId];
-    var configured = sp && sp.builder_point_size != null
-      ? Number(sp.builder_point_size) : NaN;
-    if (!pointSizeEdited && isFinite(configured) &&
-      configured >= 0 && configured <= 20) {
-      return configured;
-    }
     return ps;
   }
   function pointOpacityOf(p) {
-    var sp = p && spaceById[p.spaceId];
-    var configured = sp && sp.builder_point_opacity != null
-      ? Number(sp.builder_point_opacity) : NaN;
-    if (!pointOpacityEdited && isFinite(configured) &&
-      configured >= 0 && configured <= 1) {
-      return configured;
-    }
     return pointOpacity;
   }
   function radiusOf(p, i) {
     var pointSize = p._renderPointSize == null
       ? pointSizeOf(p) : p._renderPointSize;
-    if (!p.depth) return pointSize;
+    var radius = pointSize / 2;
+    if (!p.depth) return radius;
     var t = (p.depth[i] - p._dmin) / p._dspan;   // 0 = furthest, 1 = nearest
     if (t < 0) t = 0; else if (t > 1) t = 1;
-    return pointSize * (0.5 + 0.85 * t);
+    return radius * (0.5 + 0.85 * t);
   }
 
   function paintCell(p, i, alpha, border) {
@@ -1287,6 +1297,9 @@
     // niche. Cells in it stay solid; everything else fades.
     var n = D.n, i, rgb = panelColorMode(p) === RGB_MODE;
     var space = spaceById[p.spaceId], border = space && space.pointBorder;
+    if (!border && bordersOn) {
+      border = { color: 'rgba(90,90,90,.42)', width: 0.7 };
+    }
     var hiSet = (sel && sel.size) ? sel : nicheSet;
     // shown(i) (= visible + activeCell) is stable across this draw but is tested
     // 2n times below (two layers) plus once in the evidence pass; precompute it
@@ -1435,19 +1448,12 @@
       draw(p, state.mask);
     });
     if (first) renderShownCount(first.count);
+    updateResetButtons();
   }
   // Drop any committed lasso outlines when an interaction deliberately changes
   // what the region means (for example a new selection or selection zoom).
   // Returns true if anything was cleared.
-  // Default point radius from the cell count and the panel size: a 200k-cell
-  // panel needs smaller dots than a 2k one, and nobody should have to find the
-  // slider to get a readable first paint. Same idea as the Projection tab's
-  // dynamicPointSize(), fitted to this canvas's radius scale.
-  //
-  // It seeds the value ONCE per data set and then leaves it alone. Recomputing
-  // on every resize would mean the dots visibly change size when the bar's
-  // second row opens or a bar appears — the panels shrink slightly, and a point
-  // size that twitches at every unrelated layout change reads as a glitch.
+  // Seed the dataset-level point size once, then leave user changes alone.
   var psSeeded = false;
   function autoPointSize(side) {
     if (!D) return;
@@ -1456,8 +1462,6 @@
       ? NaN : Number(D.default_point_size);
     var v;
     if (isFinite(configured)) {
-      // The Builder's Overview point size now belongs to the unified workspace.
-      // Builder and Linked views share the full public 0..20 range.
       v = Math.max(0, Math.min(20, configured));
     } else {
       var base = 6.5 - Math.log10(Math.max(1, D.n));
@@ -1465,121 +1469,18 @@
       v = Math.max(0.8, Math.min(7, base * scale));
     }
     ps = Math.round(v * 5) / 5;                    // slider step is 0.2
-    var el = $('cv-ps'); if (el) el.value = String(ps);
-    var lbl = $('cv-ps-val'); if (lbl) lbl.textContent = ps.toFixed(1);
-    positionRangeVal('cv-ps', 'cv-ps-val');
+    setLinkedSliderValue('cv-ps', ps);
   }
 
-  // ---- the More settings overlay -------------------------------------------
-  // Open/closed is one class on the viewport drawer plus aria-expanded on the
-  // trigger. Unlike the former second bar row, it never claims layout height:
-  // the visualisation grid stays still while advanced point/image controls are
-  // adjusted above it.
-  function isMoreOpen() {
-    var mp = $('cv-more');
-    return !!(mp && mp.classList.contains('is-open'));
+  // ---- the shared More settings overlay ------------------------------------
+  // The app-wide settings_drawer.js owns mounting, focus and overlay state.
+  // This renderer only requests closure when its data context resets.
+  function closeMore() {
+    var drawer = $('cv-more');
+    if (!drawer || !drawer.classList.contains('is-open')) return;
+    var close = drawer.querySelector('[data-cerebro-drawer-close]');
+    if (close) close.click();
   }
-  // Shut every open group-filter menu and clear the "open" look on its chip.
-  function closeFilterMenus() {
-    Array.prototype.forEach.call(
-      document.querySelectorAll('.coordviews-page .cv-filt'),
-      function (wrap) {
-        var m = wrap.querySelector('.cv-filt-menu');
-        if (m) m.style.display = 'none';
-        var b = wrap.querySelector('.cv-filt-btn');
-        if (b) b.classList.remove('is-open');
-      }
-    );
-  }
-
-  var moreMountTimer = null;
-
-  function syncMoreMode() {
-    var mp = $('cv-more');
-    if (!mp) return;
-    mp.setAttribute(
-      'aria-modal',
-      window.matchMedia('(max-width: 900px)').matches ? 'true' : 'false'
-    );
-  }
-
-  function setMoreOpen(open, restoreFocus) {
-    var mp = $('cv-more'), btn = $('cv-more-btn');
-    if (!mp) return;
-    if (open) {
-      document.dispatchEvent(new CustomEvent('cerebro:overlay-opening', {
-        detail: { owner: 'more' }
-      }));
-    }
-    syncMoreMode();
-    // Mount before opening, unmount after closing. While folded the overlay is
-    // display:none; once mounted it is fixed to the viewport, never creating a
-    // new flex line or changing the available panel height.
-    clearTimeout(moreMountTimer);
-    if (open) {
-      // A transformed app shell becomes the containing block of fixed children.
-      // Move this exact node (never clone/rebuild it) to body so "fixed" means
-      // the real viewport and every input value/event binding survives intact.
-      if (mp.parentNode !== document.body) document.body.appendChild(mp);
-      mp.classList.add('is-mounted');
-      void mp.offsetWidth;              // commit the display change first
-    } else {
-      moreMountTimer = setTimeout(function () {
-        if (!mp.classList.contains('is-open')) mp.classList.remove('is-mounted');
-      }, 260);
-    }
-    mp.classList.toggle('is-open', open);
-    mp.setAttribute('aria-hidden', open ? 'false' : 'true');
-    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      window.requestAnimationFrame(function () {
-        var close = $('cv-more-close');
-        if (close && isMoreOpen()) close.focus();
-      });
-    } else if (restoreFocus !== false && btn && mp.contains(document.activeElement)) {
-      btn.focus();
-    }
-    // A level menu left open inside a folded row would still be "open" when the
-    // row comes back — and the click that reopens the row would then read as the
-    // click that closes the menu. Fold them away with their row.
-    if (!open) closeFilterMenus();
-    // This is deliberately not resizeAll(): More is outside normal flow, so a
-    // settings visit must not remeasure or resize any visualisation panel.
-  }
-
-  window.addEventListener('resize', syncMoreMode);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && isMoreOpen()) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      setMoreOpen(false);
-      return;
-    }
-    if (e.key !== 'Tab' || !isMoreOpen() ||
-        !window.matchMedia('(max-width: 900px)').matches) return;
-    var mp = $('cv-more');
-    var focusable = Array.prototype.filter.call(
-      mp.querySelectorAll(
-        'button:not([disabled]), a[href], input:not([disabled]), ' +
-        'select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      ),
-      function (el) { return el.getClientRects().length > 0; }
-    );
-    if (!focusable.length) return;
-    var first = focusable[0], last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }, true);
-  document.addEventListener('cerebro:overlay-opening', function (e) {
-    if (e.detail && e.detail.owner !== 'more' && isMoreOpen()) {
-      setMoreOpen(false, false);
-    }
-  });
 
   function clearLassos() {
     var any = false;
@@ -1589,24 +1490,33 @@
     return any;
   }
 
-  // Centre a slider's value bubble over its thumb. Uses the slider's fixed 150px
-  // width as a fallback so it positions correctly even while its panel is hidden
-  // (offsetWidth 0), and re-runs on every input.
-  function positionRangeVal(sliderId, valId) {
-    var s = $(sliderId), v = $(valId);
-    if (!s || !v) return;
-    var min = parseFloat(s.min), max = parseFloat(s.max), val = parseFloat(s.value);
-    var frac = (max > min) ? (val - min) / (max - min) : 0;
-    var w = s.offsetWidth || 150, thumb = 25;
-    v.style.left = (frac * (w - thumb) + thumb / 2) + 'px';
-    s.style.setProperty('--cv-range-fill', (frac * 100) + '%');
+  // Linked views uses the same Shiny slider widget as Projection. Programmatic
+  // state restores update its existing ionRangeSlider instance instead of
+  // maintaining a second, hand-positioned value bubble.
+  function setLinkedSliderValue(id, value, step) {
+    var el = $(id); if (!el) return;
+    el.value = String(value);
+    var slider = window.jQuery(el).data('ionRangeSlider');
+    if (!slider) return;
+    var options = { from: Number(value) };
+    if (step != null) options.step = step;
+    el._cvSyncing = true;
+    try { slider.update(options); }
+    finally { el._cvSyncing = false; }
   }
-  function positionAllRangeVals() {
-    positionRangeVal('cv-ps', 'cv-ps-val');
-    positionRangeVal('cv-opacity', 'cv-op-val');
-    positionRangeVal('cv-pct', 'cv-pct-val');
-    positionRangeVal('cv-dissolve', 'cv-dissolve-val');
-    positionRangeVal('cv-niche', 'cv-niche-val');
+  function syncPointControls() {
+    setLinkedSliderValue('cv-ps', ps, 1);
+    setLinkedSliderValue('cv-opacity', pointOpacity, 0.1);
+    setLinkedSliderValue('cv-pct', pctShow, 10);
+  }
+  function setLinkedSliderDisabled(id, disabled) {
+    var el = $(id); if (!el) return;
+    el.disabled = disabled;
+    var slider = window.jQuery(el).data('ionRangeSlider');
+    if (!slider) return;
+    el._cvSyncing = true;
+    try { slider.update({ disable: disabled }); }
+    finally { el._cvSyncing = false; }
   }
 
   function positionImgRangeValue(slider) {
@@ -1866,8 +1776,16 @@
     panels.forEach(function (p) {
       if (!p.pane) return;
       var btn = p.pane.querySelector('.cv-zsel-btn');
-      if (!btn) return;
-      btn.style.display = canZoomPanel(p) ? '' : 'none';
+      if (btn) btn.style.display = canZoomPanel(p) ? '' : 'none';
+      var clear = p.pane.querySelector('.cv-clear-btn');
+      if (clear) clear.style.display = sel && sel.size ? '' : 'none';
+    });
+  }
+  function updateResetButtons() {
+    panels.forEach(function (p) {
+      if (!p.pane) return;
+      var button = p.pane.querySelector('.cv-tbtn[data-act="reset"]');
+      if (button) button.disabled = !(p.view || p.rot);
     });
   }
   // Only where the button would do something: a selection, a flat panel (a
@@ -2186,7 +2104,7 @@
   // it in the Trekker physical space. Doubles as the highlight set — cells in
   // it stay solid, everything else fades. Null unless a single nucleus is picked
   // (and no lasso selection is active). The distance loop is CBGeom.nicheAround
-  // (shared with trekker.js). This engine keys on spaceById['trekker'] and passes
+  // This engine keys on spaceById['trekker'] and passes
   // inclusive=<=, skipNaN=true (unpositioned cells align to NaN here).
   function rebuildNiche() {
     nicheSet = null;
@@ -2295,9 +2213,8 @@
   // lasso selection is active), so its slider is disabled — with a hint tooltip —
   // until then.
   function updateNicheEnabled() {
-    var nk = $('cv-niche'); if (!nk) return;
     var on = (pick != null && !(sel && sel.size));
-    nk.disabled = !on;
+    setLinkedSliderDisabled('cv-niche', !on);
     var wrap = $('cv-niche-wrap');
     if (wrap) {
       wrap.classList.toggle('cv-disabled', !on);
@@ -4104,17 +4021,6 @@
     _layoutKey = null;
     var img = currentImage(space);
     if (!img || !img.uri) return;
-    var imagePreset = img.preset || {};
-    if (space._builderDefaultPointOpacity === undefined) {
-      space._builderDefaultPointOpacity = space.builder_point_opacity;
-    }
-    if (space._builderDefaultPointSize === undefined) {
-      space._builderDefaultPointSize = space.builder_point_size;
-    }
-    space.builder_point_opacity = imagePreset.pointOpacity != null
-      ? imagePreset.pointOpacity : space._builderDefaultPointOpacity;
-    space.builder_point_size = imagePreset.pointSize != null
-      ? imagePreset.pointSize : space._builderDefaultPointSize;
     var k = imgKey(space, img);
     space._imgState = (k && imgStates[k]) ? imgStates[k] : presetState(img);
     // Only the newest request may paint. Without the token a large image chosen
@@ -4127,28 +4033,6 @@
     };
     im.src = img.uri;
     space._imgEl = im;
-  }
-
-  function seedPointAppearanceFromImage(space) {
-    var img = currentImage(space);
-    var preset = (img && img.preset) || {};
-    if (!pointOpacityEdited && preset.pointOpacity != null &&
-      isFinite(Number(preset.pointOpacity))) {
-      pointOpacity = Number(preset.pointOpacity);
-      var opacity = $('cv-opacity');
-      if (opacity) { opacity.step = 'any'; opacity.value = String(pointOpacity); }
-      var opacityLabel = $('cv-op-val');
-      if (opacityLabel) opacityLabel.textContent = pointOpacity.toFixed(2);
-    }
-    if (!pointSizeEdited && preset.pointSize != null &&
-      isFinite(Number(preset.pointSize))) {
-      ps = Number(preset.pointSize);
-      psSeeded = true;
-      var size = $('cv-ps');
-      if (size) { size.step = 'any'; size.value = String(ps); }
-      var sizeLabel = $('cv-ps-val');
-      if (sizeLabel) sizeLabel.textContent = ps.toFixed(1);
-    }
   }
 
   // The line above the panels names the spaces on screen, so it has to be
@@ -4167,6 +4051,14 @@
         fmt(D.clone.n_clones) + ' clonotypes' : '');
   }
 
+  function setTrekkerSettingsVisible(visible) {
+    var controls = $('cv-trekker-ctl');
+    if (!controls) return;
+    controls.style.display = visible ? '' : 'none';
+    var section = controls.closest('.cerebro-settings-section');
+    if (section) section.style.display = visible ? '' : 'none';
+  }
+
   // The background picker is scoped to the selected spatial section. Its tabs
   // stay at the top of the Background image section so the mode below and the
   // Image alignment bar both read as settings for that chosen section.
@@ -4176,6 +4068,8 @@
     var allSpaces = backgroundSpaces();
     var active = activeSpatial();
     if (!active || allSpaces.indexOf(active) < 0) active = allSpaces[0] || null;
+    var section = ctl.closest('.cerebro-settings-section');
+    if (section) section.style.display = active ? '' : 'none';
     ctl.style.display = active ? '' : 'none';
     if (tabs) {
       tabs.innerHTML = allSpaces.map(function (sp) {
@@ -4252,7 +4146,6 @@
     loadSpaceImage(sp);
     if (sp.id === activeSpatialId) {
       seedImgControls();
-      seedPointAppearanceFromImage(sp);
     }
     renderImagePicker();
     updateSpaceScopedControls();
@@ -4285,7 +4178,6 @@
     });
     renderImagePicker();
     seedImgControls();
-    seedPointAppearanceFromImage(activeSpatial());
     updateSpaceScopedControls();
   }
 
@@ -4367,9 +4259,7 @@
       x: spatialTemplate.x,
       y: spatialTemplate.y,
       image: spatialTemplate.image,
-      images: spatialTemplate.images || [],
-      builder_point_opacity: spatialTemplate.builder_point_opacity,
-      builder_point_size: spatialTemplate.builder_point_size
+      images: spatialTemplate.images || []
     }];
   }
   function rebuildSpatialInstances() {
@@ -4394,10 +4284,6 @@
         y: sample.y,
         image: sample.image || null,
         images: images,
-        builder_point_opacity: sample.builder_point_opacity,
-        builder_point_size: sample.builder_point_size,
-        _builderDefaultPointOpacity: sample.builder_point_opacity,
-        _builderDefaultPointSize: sample.builder_point_size,
         _sampleName: sample.name,
         _spatialSample: true,
         _customImageId: custom,
@@ -4476,6 +4362,7 @@
     var host = $('cv-filters-row'); if (!host) return;
     host.innerHTML = '';
     Object.keys(D.groups).forEach(function (gname) {
+      if (gname.indexOf('__single_') === 0) return;
       var g = D.groups[gname];
       if (!g || !g.levels || !g.levels.length) return;
       var allowed = groupFilter[gname];
@@ -4490,7 +4377,7 @@
       var wrap = document.createElement('div');
       wrap.className = 'cv-filt';
       wrap.setAttribute('data-group', gname);
-      wrap.innerHTML = '<button type="button" class="cv-filt-btn">' +
+      wrap.innerHTML = '<button type="button" class="cv-filt-btn" aria-expanded="false">' +
         esc(groupLabel(gname)) +
         ' <span class="cv-filt-ct">' + nsel + '/' + g.levels.length +
         '</span></button><div class="cv-filt-menu" style="display:none">' +
@@ -4508,8 +4395,6 @@
     });
     if (k >= total) delete groupFilter[gname];   // all levels on = no filter
     else groupFilter[gname] = chosen;
-    var ct = wrap.querySelector('.cv-filt-ct');
-    if (ct) ct.textContent = (groupFilter[gname] ? chosen.size : total) + '/' + total;
     applyActiveChange();
   }
 
@@ -4749,6 +4634,44 @@
     return best;
   }
 
+  // Spatial axes are normalised independently into a unit box; giving that box
+  // the data's x/y aspect restores one physical screen scale for both axes.
+  // Non-spatial views remain square unless their own layout says otherwise.
+  function panelDataAspect(p) {
+    var sp = p && spaceById[p.spaceId];
+    if (!isSpatialSpace(sp)) return null;
+    if (!sp._unit) sp._unit = unitOf(sp);
+    var aspect = Number(sp._unit.aspect);
+    return isFinite(aspect) && aspect > 0 ? aspect : null;
+  }
+
+  // When every visible panel fits on one row, size all canvases to one shared
+  // height and let their data aspects determine their widths. The pane tracks
+  // still consume the full workspace; spare width becomes harmless breathing
+  // room around centred canvases instead of geometric distortion.
+  function fitAspectRow(vis, availW, availH, chromeX, overhead, gap) {
+    if (!vis.length) return null;
+    var aspects = vis.map(function (p) { return panelDataAspect(p); });
+    if (!aspects.some(Boolean)) return null;
+    aspects = aspects.map(function (aspect) { return aspect || 1; });
+    var contentW = availW - gap * (vis.length - 1) - chromeX * vis.length;
+    var aspectSum = aspects.reduce(function (sum, aspect) {
+      return sum + aspect;
+    }, 0);
+    var height = Math.min(availH - overhead, contentW / aspectSum);
+    if (!isFinite(height) || height < MIN_SIDE) return null;
+    height = Math.floor(height);
+    var widths = aspects.map(function (aspect) {
+      return Math.max(1, Math.floor(height * aspect));
+    });
+    var tracks = widths.map(function (width) { return width + chromeX; });
+    var used = tracks.reduce(function (sum, width) { return sum + width; }, 0) +
+      gap * (vis.length - 1);
+    var spare = Math.max(0, availW - used) / vis.length;
+    tracks = tracks.map(function (width) { return width + spare; });
+    return { height: height, widths: widths, tracks: tracks };
+  }
+
   function resizeAll() {
     if (!D || !panels.length) return;
     var panes = panels[0].pane && panels[0].pane.parentElement;
@@ -4855,19 +4778,27 @@
     // constrains both dimensions to the shorter side.
     panes.classList.remove('cv-n2', 'cv-n3', 'cv-n4', 'cv-single');
     panes.classList.add(single ? 'cv-single' : ('cv-n' + k));
-    var col = []; for (var c = 0; c < cols; c++) col.push(colW + 'px');
-    panes.style.gridTemplateColumns = col.join(' ');
-    panes.style.gridTemplateRows = '';
-    var panelWidth = Math.max(150, Math.floor(colW - chromeX));
     var rows = Math.ceil(k / cols);
     var panelHeight = Math.max(
       MIN_SIDE,
       Math.floor((availH - (rows - 1) * gap) / rows - overhead)
     );
+    var rowFit = !focusPanel && rows === 1
+      ? fitAspectRow(vis, usableW, availH, chromeX, overhead, gap)
+      : null;
+    var col = rowFit ? rowFit.tracks : [];
+    if (!rowFit) {
+      for (var c = 0; c < cols; c++) col.push(colW);
+    }
+    panes.style.gridTemplateColumns = col.map(function (width) {
+      return width + 'px';
+    }).join(' ');
+    panes.style.gridTemplateRows = '';
+    var panelWidth = Math.max(150, Math.floor(colW - chromeX));
     var primaryWidth = cols > 1
       ? Math.max(panelWidth, Math.floor(colW * 2 + gap - chromeX))
       : panelWidth;
-    vis.forEach(function (p) {
+    vis.forEach(function (p, index) {
       var primary = !!focusPanel && p.key === focusPanel;
       if (p.pane) {
         p.pane.style.gridColumn = primary && cols > 1 ? 'span 2' : '';
@@ -4875,8 +4806,15 @@
         // cell; the smaller lenses flow into the open tracks around it.
         p.pane.style.gridRow = primary && cols > 2 ? 'span 2' : '';
       }
-      var width = primary ? primaryWidth : panelWidth;
-      var height = primary ? focusSide : (focusPanel ? side : panelHeight);
+      var width = rowFit ? rowFit.widths[index]
+        : (primary ? primaryWidth : panelWidth);
+      var height = rowFit ? rowFit.height
+        : (primary ? focusSide : (focusPanel ? side : panelHeight));
+      var aspect = panelDataAspect(p);
+      if (aspect) {
+        if (width / height > aspect) width = Math.round(height * aspect);
+        else height = Math.max(180, Math.round(width / aspect));
+      }
       if (keepPlotsSquare) {
         var squareSide = Math.min(width, height);
         width = squareSide;
@@ -4928,8 +4866,9 @@
       'cv-tk-insights', 'cv-clone-layout-ctl'].forEach(function (id) {
       var el = $(id); if (el) el.style.display = 'none';
     });
+    setTrekkerSettingsVisible(false);
     setTrekkerInsightsOpen(false);
-    setMoreOpen(false);
+    closeMore();
     reportSelection();
   }
 
@@ -4968,6 +4907,7 @@
   function rememberSurfaceHome() {
     if (surfaceHome) return;
     var legend = $('cv-legend'), cbar = $('cv-cbar');
+    var insights = $('cv-tk-insights');
     var panes = document.querySelector('#coordviews .cv-panes') ||
       document.querySelector('.coordviews-page .cv-panes');
     if (!panes) return;
@@ -4976,7 +4916,9 @@
       legend: legend, legendParent: legend && legend.parentNode,
       legendNext: legend && legend.nextSibling,
       cbar: cbar, cbarParent: cbar && cbar.parentNode,
-      cbarNext: cbar && cbar.nextSibling
+      cbarNext: cbar && cbar.nextSibling,
+      insights: insights, insightsParent: insights && insights.parentNode,
+      insightsNext: insights && insights.nextSibling
     };
   }
   function restoreNode(node, parent, next) {
@@ -4988,6 +4930,11 @@
     restoreNode(surfaceHome.panes, surfaceHome.panesParent, surfaceHome.panesNext);
     restoreNode(surfaceHome.cbar, surfaceHome.cbarParent, surfaceHome.cbarNext);
     restoreNode(surfaceHome.legend, surfaceHome.legendParent, surfaceHome.legendNext);
+    restoreNode(
+      surfaceHome.insights,
+      surfaceHome.insightsParent,
+      surfaceHome.insightsNext
+    );
   }
   function resetSingleViews() {
     restoreLinkedSurface();
@@ -5007,6 +4954,11 @@
     surface.appendChild(legend); surface.appendChild(surfaceHome.panes);
     if (surfaceHome.legend) legend.appendChild(surfaceHome.legend);
     if (surfaceHome.cbar) legend.appendChild(surfaceHome.cbar);
+    var insightsHost = document.getElementById(id.replace(/_projection$/, '') +
+      '_shared_insights');
+    if (insightsHost && surfaceHome.insights) {
+      insightsHost.appendChild(surfaceHome.insights);
+    }
     return true;
   }
   function singleIndex() {
@@ -5144,8 +5096,106 @@
       };
     });
   }
+  function alignFlatValues(keys, values, fallback) {
+    var index = singleIndex(), out = emptyVector(fallback);
+    (keys || []).forEach(function (key, i) {
+      var at = index.get(String(key));
+      if (at != null) out[at] = values && values[i] != null ? values[i] : fallback;
+    });
+    return out;
+  }
+  function buildSpecialistPanels(id, payload) {
+    var meta = payload.meta || {}, data = payload.data || {};
+    if (!Array.isArray(data.panels) || !data.panels.length) return null;
+    var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    var spaces = [], modes = {}, mode;
+    if (meta.color_type === 'categorical') {
+      var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
+      var rawGroups = alignFlatValues(keys, data.group || [], null);
+      var groups = rawGroups.map(function (value) {
+        var at = levels.indexOf(String(value)); return at < 0 ? -1 : at;
+      });
+      var groupName = '__single_group__' + id;
+      var group = {
+        values: groups,
+        levels: levels,
+        colors: Array.isArray(meta.group_colors) ? meta.group_colors : []
+      };
+      (meta.shared_filters ? D.groups : D.cat_extra)[groupName] = group;
+      mode = groupName;
+    } else {
+      var fieldName = 'single:' + id + ':value';
+      D.fields[fieldName] = quantisedField(
+        meta.color_variable || 'Value',
+        Array.isArray(data.color) ? data.color : [],
+        keys,
+        data
+      );
+      mode = FIELD_PREFIX + fieldName;
+    }
+    data.panels.forEach(function (panel, panelIndex) {
+      var panelKeys = Array.isArray(panel.selection_key)
+        ? panel.selection_key : keys;
+      var t = Math.max(0, Math.min(1, Number(panel.transition) || 0));
+      var xs = panel.x || [];
+      var ys = panel.y || [];
+      if (Array.isArray(panel.from_x) && Array.isArray(panel.to_x)) {
+        xs = panel.from_x.map(function (value, i) {
+          return Number(value) + (Number(panel.to_x[i]) - Number(value)) * t;
+        });
+        ys = panel.from_y.map(function (value, i) {
+          return Number(value) + (Number(panel.to_y[i]) - Number(value)) * t;
+        });
+      }
+      var spaceId = 'single::' + id + '::' + (panel.id || panelIndex);
+      var space = {
+        id: spaceId,
+        label: panel.label || panel.id || id,
+        x: alignFlatValues(panelKeys, xs, null),
+        y: alignFlatValues(panelKeys, ys, null),
+        _hover: alignFlatValues(panelKeys, panel.hover || [], ''),
+        _hoverEnabled: true,
+        _hoverMask: emptyVector(true)
+      };
+      if (Array.isArray(panel.from_x) && Array.isArray(panel.to_x)) {
+        var fromX = alignFlatValues(panelKeys, panel.from_x, null);
+        var fromY = alignFlatValues(panelKeys, panel.from_y, null);
+        var toX = alignFlatValues(panelKeys, panel.to_x, null);
+        var toY = alignFlatValues(panelKeys, panel.to_y, null);
+        space._transition = {
+          fromX: fromX, fromY: fromY, toX: toX, toY: toY,
+          fromUnit: unitOf({ x: fromX, y: fromY }),
+          toUnit: unitOf({ x: toX, y: toY })
+        };
+        space._unit = transitionUnit(
+          space._transition.fromUnit, space._transition.toUnit, t
+        );
+      }
+      if (panel.projection) space._projectionName = panel.id || 'projection';
+      if (panel.spatial) {
+        space.background_scope = panel.label || 'Trekker';
+        space._sampleName = panel.label || 'Trekker';
+      }
+      if (panel.background_image && panel.image_bounds) {
+        space.images = [{
+          id: panel.image_id || 'trekker-background',
+          label: panel.image_label || 'Trekker background',
+          uri: panel.background_image,
+          bounds: panel.image_bounds,
+          preset: panel.image_preset || {}
+        }];
+        space._customImageId = space.images[0].id;
+      }
+      spaceById[spaceId] = space;
+      spaces.push(spaceId);
+      modes[spaceId] = mode;
+    });
+    return { spaces: spaces, modes: modes };
+  }
   function buildSingleSpaces(id, payload) {
     var meta = payload.meta || {}, data = payload.data || {}, extra = payload.extra || {};
+    var specialistPanels = buildSpecialistPanels(id, payload);
+    if (specialistPanels) return specialistPanels;
     var categorical = meta.color_type === 'categorical';
     var aligned = alignSingleCoordinates({ meta: meta, data: data, hover: payload.hover }, categorical);
     var baseId = 'single::' + id, spaces = [], modes = {};
@@ -5204,7 +5254,9 @@
     if (categorical) {
       var groupName = '__single_group__' + id;
       D.cat_extra[groupName] = {
-        values: aligned.groups, levels: aligned.levels, colors: aligned.colors
+        values: aligned.groups,
+        levels: aligned.levels,
+        colors: aligned.colors
       };
       makeSpace(baseId, meta.space_label || id);
       modes[baseId] = groupName;
@@ -5278,7 +5330,25 @@
     selectionSourceSpace = null;
     pick = null; hoverCell = null; focusPanel = null;
     zoomed = false; zoomedSpace = null;
-    pctShow = 100; pctMask = null; keepPlotsSquare = false;
+    var appearance = payload.meta.appearance;
+    if (appearance) {
+      labelsOn = appearance.group_labels !== false;
+      bordersOn = !!appearance.draw_border;
+      keepPlotsSquare = !!appearance.keep_square;
+    } else {
+      var labelsControl = $('cv-labels');
+      var bordersControl = $('cv-borders');
+      var squareControl = $('cv-square-plots');
+      if (labelsControl) labelsOn = !!labelsControl.checked;
+      if (bordersControl) bordersOn = !!bordersControl.checked;
+      if (squareControl) keepPlotsSquare = !!squareControl.checked;
+    }
+    var incomingPercentage = Number(
+      payload.data && payload.data.percentage_cells_to_show
+    );
+    pctShow = isFinite(incomingPercentage)
+      ? Math.max(10, Math.min(100, incomingPercentage)) : 100;
+    pctMask = null; rebuildPctMask();
     dissolvePct = 0; dissolveThresh = null; evidenceOn = false; nicheSet = null;
     unpinTip(); closeCard(); cardMeta = null;
     var group = catOf(singleSpaceModes[singleSpaceIds[0]]);
@@ -5287,11 +5357,20 @@
         var index = group.levels.indexOf(String(name)); if (index >= 0) hidden.add(index);
       });
     }
-    ps = Math.max(0.5, Number(payload.data && payload.data.point_size) || ps * 2) / 2;
+    var incomingPointSize = Number(payload.data && payload.data.point_size);
+    if (isFinite(incomingPointSize) && incomingPointSize >= 1) {
+      ps = Math.min(20, incomingPointSize);
+    }
     pointOpacity = Math.max(0.05,
       Math.min(1, Number(payload.data && payload.data.point_opacity) || pointOpacity));
     psSeeded = pointSizeEdited = pointOpacityEdited = true;
     ensurePanelSlots(singleSpaceIds.length); buildPanels(); layoutPanels();
+    renderGroupFilters();
+    updateSpaceScopedControls();
+    setTrekkerSettingsVisible(!!D.trekker);
+    var trekkerInsights = $('cv-tk-insights');
+    if (trekkerInsights) trekkerInsights.style.display = D.trekker ? '' : 'none';
+    if (D.trekker) fillTrekkerInsights();
     selectMode = payload.mode || 'lasso'; syncModeButtons(); syncCursors();
     var saved = payload.lenses || [];
     panels.forEach(function (p, index) {
@@ -5543,34 +5622,42 @@
     // can be re-sent after returning to the tab; that refresh must not discard
     // the user's shared override.
     if (dataChanged) {
+      labelsOn = true;
+      bordersOn = false;
+      keepPlotsSquare = false;
       groupFilter = {};
+      var labelsControl = $('cv-labels');
+      if (labelsControl) labelsControl.checked = labelsOn;
+      var bordersControl = $('cv-borders');
+      if (bordersControl) bordersControl.checked = bordersOn;
+      var squareControl = $('cv-square-plots');
+      if (squareControl) squareControl.checked = keepPlotsSquare;
       var configuredOpacity = Number(D.default_point_opacity);
       pointOpacity = D.default_point_opacity != null && isFinite(configuredOpacity)
         ? Math.max(0, Math.min(1, configuredOpacity)) : 0.8;
+      var configuredPointSize = Number(D.default_point_size);
+      ps = D.default_point_size != null && isFinite(configuredPointSize)
+        ? Math.max(1, Math.min(20, configuredPointSize)) : 5;
       pointSizeEdited = false;
       pointOpacityEdited = false;
-      psSeeded = false;
-      var opEl = $('cv-opacity'); if (opEl) opEl.value = String(pointOpacity);
-      var opLbl = $('cv-op-val');
-      if (opLbl) opLbl.textContent = pointOpacity.toFixed(2);
+      psSeeded = true;
+      setLinkedSliderValue('cv-ps', ps, 0.2);
+      setLinkedSliderValue('cv-opacity', pointOpacity, 0.05);
 
       var configuredPercentage = Number(D.default_percentage_cells_to_show);
       pctShow = D.default_percentage_cells_to_show != null &&
         isFinite(configuredPercentage)
         ? Math.max(10, Math.min(100, configuredPercentage)) : 100;
       rebuildPctMask();
-      var pctEl = $('cv-pct'); if (pctEl) pctEl.value = String(pctShow);
-      var pctLbl = $('cv-pct-val'); if (pctLbl) pctLbl.textContent = String(pctShow);
+      setLinkedSliderValue('cv-pct', pctShow, 10);
     }
-    setMoreOpen(false);   // a new data set starts with advanced settings closed
+    closeMore();   // a new data set starts with advanced settings closed
     // Trekker controls reset
     dissolvePct = 0; dissolveThresh = null; evidenceOn = false; nicheRadius = 250;
     nicheSet = null;
-    var dsEl = $('cv-dissolve'); if (dsEl) dsEl.value = '0';
-    var dsLbl = $('cv-dissolve-val'); if (dsLbl) dsLbl.textContent = '0';
+    setLinkedSliderValue('cv-dissolve', dissolvePct, 5);
     var evEl = $('cv-evidence'); if (evEl) evEl.checked = false;
-    var nkEl = $('cv-niche'); if (nkEl) nkEl.value = '250';
-    var nkLbl = $('cv-niche-val'); if (nkLbl) nkLbl.textContent = '250';
+    setLinkedSliderValue('cv-niche', nicheRadius, 25);
 
     ensurePanelSlots(orderedSpaces().length);
     renderMeta();
@@ -5590,8 +5677,7 @@
     updateSpaceScopedControls();
     // Trekker controls (dissolve + evidence) appear only when the bundle has them
     var hasTk = !!(D.trekker && (D.trekker.conf || D.trekker.evidence));
-    var tkc = $('cv-trekker-ctl');
-    if (tkc) tkc.style.display = hasTk ? '' : 'none';
+    setTrekkerSettingsVisible(hasTk);
     var tkInsights = $('cv-tk-insights');
     if (tkInsights) tkInsights.style.display = D.trekker ? '' : 'none';
     setTrekkerInsightsOpen(false);
@@ -5616,13 +5702,13 @@
     });
     renderLegend();
     resizeAll();
+    setTimeout(syncPointControls, 0);
     renderSelbar(); renderReadout();
     // Clear the server-side selection too: sel was reset to null above, but the
     // server input still holds the PREVIOUS dataset's barcodes until we push. The
     // "selected cells" plot/table (server-rendered) key off it, so without this
     // they'd show stale/wrong cells after a dataset switch.
     reportSelection();
-    positionAllRangeVals();
     if (pendingColorPatch && applyColorPatch(pendingColorPatch)) {
       pendingColorPatch = null;
     }
@@ -5798,6 +5884,7 @@
           point_opacity: pointOpacity,
           percentage_cells: pctShow,
           group_labels: labelsOn,
+          cell_borders: bordersOn,
           selection_mode: selectMode === 'box' ? 'box' : 'lasso',
           clone_layout: CLONE_MODE,
           keep_square: keepPlotsSquare
@@ -5968,6 +6055,7 @@
     pctShow = finiteNumber(display.percentage_cells, pctShow, 5, 100);
     psSeeded = pointSizeEdited = pointOpacityEdited = true;
     labelsOn = display.group_labels !== false;
+    bordersOn = !!display.cell_borders;
     keepPlotsSquare = !!display.keep_square;
     selectMode = display.selection_mode;
     applyCloneLayout(display.clone_layout);
@@ -5979,14 +6067,10 @@
 
     [['cv-ps', ps], ['cv-opacity', pointOpacity], ['cv-pct', pctShow],
       ['cv-dissolve', dissolvePct], ['cv-niche', nicheRadius]].forEach(function (item) {
-      var el = $(item[0]); if (el) el.value = String(item[1]);
+      setLinkedSliderValue(item[0], item[1]);
     });
-    var psLabel = $('cv-ps-val'); if (psLabel) psLabel.textContent = ps.toFixed(1);
-    var opacityLabel = $('cv-op-val'); if (opacityLabel) opacityLabel.textContent = pointOpacity.toFixed(2);
-    var pctLabel = $('cv-pct-val'); if (pctLabel) pctLabel.textContent = String(pctShow);
-    var dissolveLabel = $('cv-dissolve-val'); if (dissolveLabel) dissolveLabel.textContent = String(dissolvePct);
-    var nicheLabel = $('cv-niche-val'); if (nicheLabel) nicheLabel.textContent = String(nicheRadius);
     var labelsEl = $('cv-labels'); if (labelsEl) labelsEl.checked = labelsOn;
+    var bordersEl = $('cv-borders'); if (bordersEl) bordersEl.checked = bordersOn;
     var squareEl = $('cv-square-plots'); if (squareEl) squareEl.checked = keepPlotsSquare;
     var evidenceEl = $('cv-evidence'); if (evidenceEl) evidenceEl.checked = evidenceOn;
 
@@ -6024,7 +6108,7 @@
       });
     }
     renderGroupFilters(); renderLegend(); syncModeButtons();
-    _layoutKey = null; resizeAll(); positionAllRangeVals();
+    _layoutKey = null; resizeAll();
     setSelection(
       restoredSelection,
       geometry && geometry.space
@@ -6253,6 +6337,9 @@
     // clear button + point-size slider live in the top bar (client-owned)
     document.addEventListener('click', function (e) {
       var t = e.target;
+      if (t && t.closest && t.closest('#cv-more-btn, #trekker_more_button')) {
+        setTimeout(syncPointControls, 0);
+      }
       if (t && t.closest && t.closest('#cv-tk-insights-toggle')) {
         var tkToggle = $('cv-tk-insights-toggle');
         setTrekkerInsightsOpen(
@@ -6345,6 +6432,10 @@
           selectMode = act; syncModeButtons(); return;
         }
         if (act === 'trekker-info') { openTrekkerInsights('qc', true); return; }
+        if (act === 'clear') {
+          pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+          return;
+        }
         if (pp) {
           if (act === 'png') { downloadPanelPNG(pp); }
           else if (act === 'zin') { zoomStep(pp, 0.8); }
@@ -6373,16 +6464,6 @@
         pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
         return;
       }
-      if (t && t.closest && t.closest('#cv-more-close')) {
-        setMoreOpen(false);
-        return;
-      }
-      // "More" drawer toggle
-      var moreBtn = t && t.closest && t.closest('#cv-more-btn');
-      if (moreBtn) {
-        setMoreOpen(!isMoreOpen());
-        return;
-      }
       // clonal-layout segmented toggle: recompute the clone space + reproject
       var seg = t && t.closest && t.closest('#cv-clone-layout .cv-seg-btn');
       if (seg) {
@@ -6394,75 +6475,110 @@
         drawAll();
         return;
       }
-      // group-filter chip: open/close its level menu. Only ever one at a time —
-      // several open at once overlap each other and say nothing more than one.
-      var fbtn = t && t.closest && t.closest('.cv-filt-btn');
-      if (fbtn) {
-        var wrap0 = fbtn.parentElement;
-        var menu = wrap0.querySelector('.cv-filt-menu');
-        var willOpen = !!menu && menu.style.display === 'none';
-        closeFilterMenus();
-        if (menu) menu.style.display = willOpen ? '' : 'none';
-        fbtn.classList.toggle('is-open', willOpen);
-        if (willOpen) {
-          window.requestAnimationFrame(function () {
-            // More scrolls internally. Keep the entire popover inside that
-            // scrollport so it is visible and hit-testable near either edge.
-            menu.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-          });
-        }
-        return;
-      }
-      // group-filter All / None
-      var act = t && t.closest && t.closest('.cv-filt-acts button');
-      if (act) {
-        var wrap = act.closest('.cv-filt'), on = act.getAttribute('data-act') === 'all';
-        Array.prototype.forEach.call(
-          wrap.querySelectorAll('.cv-filt-menu input[type=checkbox]'),
-          function (b) { b.checked = on; }
-        );
-        readFilter(wrap);
-        return;
-      }
     });
-    document.addEventListener('input', function (e) {
+    function updateTrekkerTransition(e) {
       var id = e.target && e.target.id;
+      if (id !== 'trekker_morph' || singleActive !== 'trekker_projection') return;
+      var transition = Math.max(0, Math.min(1, Number(e.target.value) || 0));
+      singleSpaceIds.forEach(function (spaceId) {
+        var space = spaceById[spaceId], source = space && space._transition;
+        if (!source) return;
+        space.x = source.fromX.map(function (value, index) {
+          return value == null || source.toX[index] == null ? null
+            : value + (source.toX[index] - value) * transition;
+        });
+        space.y = source.fromY.map(function (value, index) {
+          return value == null || source.toY[index] == null ? null
+            : value + (source.toY[index] - value) * transition;
+        });
+        space._unit = transitionUnit(source.fromUnit, source.toUnit, transition);
+        panels.forEach(function (panel) {
+          if (panel.spaceId === spaceId) project(panel);
+        });
+      });
+      drawAll();
+    }
+    function updateLinkedSlider(target) {
+      if (!target || target._cvSyncing) return;
+      var id = target.id, value = Number(target.value);
+      if (!isFinite(value)) return;
       if (id === 'cv-ps') {
-        psSeeded = true;            // a chosen size is never overwritten
+        psSeeded = true;
         pointSizeEdited = true;
-        ps = +e.target.value;
-        var lbl = $('cv-ps-val'); if (lbl) lbl.textContent = (+e.target.value).toFixed(1);
-        positionRangeVal('cv-ps', 'cv-ps-val');
+        ps = value;
         drawAll();
       } else if (id === 'cv-opacity') {
         pointOpacityEdited = true;
-        pointOpacity = +e.target.value;
-        var ol = $('cv-op-val'); if (ol) ol.textContent = pointOpacity.toFixed(2);
-        positionRangeVal('cv-opacity', 'cv-op-val');
+        pointOpacity = value;
         drawAll();
-      } else if (id === 'cv-square-plots') {
-        keepPlotsSquare = !!e.target.checked;
-        _layoutKey = null;
-        resizeAll();
       } else if (id === 'cv-pct') {
-        pctShow = +e.target.value;
-        var pl = $('cv-pct-val'); if (pl) pl.textContent = pctShow;
-        positionRangeVal('cv-pct', 'cv-pct-val');
+        pctShow = value;
         rebuildPctMask(); applyActiveChange();
       } else if (id === 'cv-dissolve') {
-        dissolvePct = +e.target.value;
-        var dl = $('cv-dissolve-val'); if (dl) dl.textContent = dissolvePct;
-        positionRangeVal('cv-dissolve', 'cv-dissolve-val');
+        dissolvePct = value;
         rebuildDissolve(); applyActiveChange();
       } else if (id === 'cv-niche') {
-        nicheRadius = +e.target.value;
-        var nl = $('cv-niche-val'); if (nl) nl.textContent = nicheRadius;
-        positionRangeVal('cv-niche', 'cv-niche-val');
-        rebuildNiche();               // resize the highlighted niche + circle
-        renderSelbar();                // keep Active cell radius/count in sync
+        nicheRadius = value;
+        rebuildNiche();
+        renderSelbar();
         drawAll();
-        if (!sel) renderReadout();     // recompute the niche of the picked cell
-      } else if (id && id.indexOf('cv-img-') === 0) {
+        if (!sel) renderReadout();
+      }
+    }
+    function updateLinkedToggle(target) {
+      var id = target && target.id;
+      if (id === 'cv-labels') {
+        var nextLabels = !!target.checked;
+        if (labelsOn === nextLabels) return true;
+        labelsOn = nextLabels;
+        drawAll();
+        return true;
+      }
+      if (id === 'cv-borders') {
+        var nextBorders = !!target.checked;
+        if (bordersOn === nextBorders) return true;
+        bordersOn = nextBorders;
+        drawAll();
+        return true;
+      }
+      if (id === 'cv-square-plots') {
+        var nextSquare = !!target.checked;
+        if (keepPlotsSquare === nextSquare) return true;
+        keepPlotsSquare = nextSquare;
+        _layoutKey = null;
+        resizeAll();
+        return true;
+      }
+      return false;
+    }
+    window.jQuery(document)
+      .off(
+        'input.cvTrekkerTransition change.cvTrekkerTransition',
+        '#trekker_morph'
+      )
+      .on(
+        'input.cvTrekkerTransition change.cvTrekkerTransition',
+        '#trekker_morph',
+        function () {
+          updateTrekkerTransition({
+            target: { id: this.id, value: this.value }
+          });
+        }
+      );
+    window.jQuery(document)
+      .off(
+        'input.cvLinkedSettings',
+        '#cv-ps, #cv-opacity, #cv-pct, #cv-dissolve, #cv-niche'
+      )
+      .on(
+        'input.cvLinkedSettings',
+        '#cv-ps, #cv-opacity, #cv-pct, #cv-dissolve, #cv-niche',
+        function () { updateLinkedSlider(this); }
+      );
+    document.addEventListener('input', function (e) {
+      var id = e.target && e.target.id;
+      if (updateLinkedToggle(e.target)) return;
+      if (id && id.indexOf('cv-img-') === 0) {
         positionImgRangeValue(e.target); syncImgControls(id); drawAll();
       }
     });
@@ -6484,34 +6600,29 @@
         return;
       }
       if (id === 'cv-evidence') { evidenceOn = e.target.checked; drawAll(); return; }
-      if (id === 'cv-labels') { labelsOn = e.target.checked; drawAll(); return; }
+      if (updateLinkedToggle(e.target)) return;
       // a group-filter level checkbox toggled
-      var fwrap = e.target && e.target.closest && e.target.closest('.cv-filt');
+      var fwrap = e.target && e.target.closest &&
+        e.target.closest('#cv-filters-row .cv-filt');
       if (fwrap && e.target.matches && e.target.matches('.cv-filt-menu input[type=checkbox]')) {
         readFilter(fwrap);
       }
     });
-    // A click anywhere outside a filter widget dismisses its menu — a popover
-    // that only closes via the control that opened it is a trap. Registered
-    // separately from the main click handler because that one returns early on
-    // most branches, and this has to run for all of them. Clicks INSIDE the
-    // widget are left alone so several levels can be ticked in one visit.
+    // The shared drawer owns group-filter popovers. This page listener only
+    // dismisses the background-image popover.
     document.addEventListener('click', function (e) {
       var t = e.target;
       var pop = $('cv-bg-popover');
       if (pop && !(t && t.closest && t.closest('.cv-bg-ctl'))) {
         pop.classList.remove('is-open');
       }
-      if (t && t.closest && t.closest('.cv-filt')) return;
-      closeFilterMenus();
     });
-    // Escape closes the detail card — it behaves like a dialog, so it should
-    // dismiss like one — and any open filter menu, for the same reason.
+    // Escape closes the detail card and background-image popover. The shared
+    // drawer listener handles the drawer and its group-filter menus.
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       var bgPop = $('cv-bg-popover');
       if (bgPop) bgPop.classList.remove('is-open');
-      closeFilterMenus();
       if (!cardOpen()) return;
       pick = null; unpinTip(); closeCard(); drawAll();
       if (!sel) {

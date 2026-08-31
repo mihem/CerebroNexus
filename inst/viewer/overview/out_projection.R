@@ -26,8 +26,7 @@ overview_projection_info <- list(
       <li>Cells can be colored by the sample they came from, the cluster they were assigned, the number of transcripts or expressed genes, percentage of mitochondrial and ribosomal gene expression, an apoptotic score (calculated based on the expression of few marker genes; more info in the 'Sample info' tab on the left), or cell cycle status (determined using the Seurat and Cyclone method).</li>
       <li>Confidence ellipses show the 95% confidence regions.</li>
       <li>Samples and clusters can be removed from the plot individually to highlight a contrast of interest.</li>
-      <li>By default, the point size is set to 15 without any transparency but both these attributes can be changed using the sliders on the left. The point size can also be set to reflect the number of transcripts or expressed genes.</li>
-      <li>The last two slider elements on the left can be used to resize the projection axes. This can be particularly useful when a projection contains a population of cell that is very far away from the rest and therefore creates a big empty space (which is not uncommon for UMAPs)</li>
+      <li>Point size, point opacity, and the percentage of displayed cells can be changed in More settings.</li>
     </ul>
     The plot is interactive (drag and zoom) but depending on the computer of the user and the number of cells displayed it can become very slow."
   )

@@ -37,21 +37,30 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
         )
       }
       return(div(
-        class = "cerebro-gene-rgb-row",
-        channel_input(
-          "r",
-          "Red channel",
-          if (length(previous) >= 1) previous[[1]]
+        class = "cerebro-gene-rgb-row cerebro-control-enter",
+        div(
+          class = "cerebro-gene-rgb-channel",
+          channel_input(
+            "r",
+            "Red channel",
+            if (length(previous) >= 1) previous[[1]]
+          )
         ),
-        channel_input(
-          "g",
-          "Green channel",
-          if (length(previous) >= 2) previous[[2]]
+        div(
+          class = "cerebro-gene-rgb-channel",
+          channel_input(
+            "g",
+            "Green channel",
+            if (length(previous) >= 2) previous[[2]]
+          )
         ),
-        channel_input(
-          "b",
-          "Blue channel",
-          if (length(previous) >= 3) previous[[3]]
+        div(
+          class = "cerebro-gene-rgb-channel",
+          channel_input(
+            "b",
+            "Blue channel",
+            if (length(previous) >= 3) previous[[3]]
+          )
         )
       ))
     }

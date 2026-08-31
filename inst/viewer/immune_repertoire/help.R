@@ -162,7 +162,7 @@ ir_tab_help <- list(
       "• Receptor: choose TCR or BCR (only the types present in your data are offered).",
       "• Projection: which dimensional reduction to plot on.",
       "• Clone call: how clonotype identity is defined (gene/nt/aa/strict).",
-      "• Display options: point size and opacity (and font/title) for the scatter.",
+      "• Display options: point size and opacity for the scatter.",
       "",
       "What to look for: expanded (orange/gold) cells clustering in a region suggest a localized clonal response — e.g. an activated/effector population.",
       sep = "\n"

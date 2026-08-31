@@ -12,7 +12,7 @@
 ##     straight to the background <div>, never re-rendering the scatter plot),
 ##   - the aspect-ratio lock / single-vs-XY scale mirroring,
 ##   - Reset (returns to the per-dataset spatial_images_* preset),
-##   - the Move slider <-> numeric-box two-way sync.
+##   - slider <-> numeric-box two-way sync.
 ##----------------------------------------------------------------------------##
 
 ##----------------------------------------------------------------------------##
@@ -96,40 +96,7 @@ observeEvent(input[["spatial_projection_background_scale"]], {
 })
 
 ##----------------------------------------------------------------------------##
-## Locking the aspect ratio while X and Y scales differ has no single sensible
-## value to collapse to, so it resets scale to 1 (both the locked slider and the
-## X/Y sliders). When X and Y already match, locking keeps that shared value.
-##----------------------------------------------------------------------------##
-observeEvent(input[["spatial_projection_background_scale_lock"]], {
-  if (!isTRUE(input[["spatial_projection_background_scale_lock"]])) {
-    return()
-  }
-  sx <- input[["spatial_projection_background_scale_x"]]
-  sy <- input[["spatial_projection_background_scale_y"]]
-  if (
-    is.null(sx) ||
-      is.null(sy) ||
-      !is.finite(sx) ||
-      !is.finite(sy) ||
-      isTRUE(all.equal(sx, sy) == TRUE)
-  ) {
-    ## already equal (or not yet initialised) — keep the shared value
-    if (!is.null(sx) && is.finite(sx)) {
-      updateSliderInput(
-        session,
-        "spatial_projection_background_scale",
-        value = sx
-      )
-    }
-    return()
-  }
-  updateSliderInput(session, "spatial_projection_background_scale", value = 1)
-  updateSliderInput(session, "spatial_projection_background_scale_x", value = 1)
-  updateSliderInput(session, "spatial_projection_background_scale_y", value = 1)
-})
-
-##----------------------------------------------------------------------------##
-## Reset the background-image adjustments back to identity.
+## Reset every background-image adjustment to the shared preset.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["spatial_projection_background_reset"]], {
   spatial_name <- input[["spatial_projection_to_display"]]
@@ -155,34 +122,32 @@ observeEvent(input[["spatial_projection_background_reset"]], {
   } else {
     selected_descriptor$label
   }
-  reset_preset_default <- function(setting, fallback) {
-    if (is.null(image_label)) {
-      return(fallback)
-    }
-    resolve_spatial_image_setting(
-      if (exists("Cerebro.options")) Cerebro.options else NULL,
-      dataset,
-      spatial_name,
-      image_label,
-      setting,
-      fallback
-    )
-  }
+  preset <- spatialImagePreset(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    dataset,
+    spatial_name,
+    image_label
+  )
+  updateSliderInput(
+    session,
+    "spatial_projection_background_opacity",
+    value = preset$opacity
+  )
   updateSliderInput(
     session,
     "spatial_projection_background_offset_x",
-    value = reset_preset_default("offset_x", 0)
+    value = preset$offsetX
   )
   updateSliderInput(
     session,
     "spatial_projection_background_offset_y",
-    value = reset_preset_default("offset_y", 0)
+    value = preset$offsetY
   )
   ## Move, flip and scale all reset to their preset (the shipped alignment),
   ## matching how the UI seeds them, so Reset restores the aligned overlay rather
   ## than a bare image. Scale is single-source now, so it too returns to preset.
-  scale_x_reset <- reset_preset_default("scale_x", 1)
-  scale_y_reset <- reset_preset_default("scale_y", 1)
+  scale_x_reset <- preset$scaleX
+  scale_y_reset <- preset$scaleY
   updateCheckboxInput(
     session,
     "spatial_projection_background_scale_lock",
@@ -206,29 +171,27 @@ observeEvent(input[["spatial_projection_background_reset"]], {
   updateSliderInput(
     session,
     "spatial_projection_background_rotate",
-    value = reset_preset_default("rotation", 0)
+    value = preset$rotation
   )
   updateCheckboxInput(
     session,
     "spatial_projection_background_flip_x",
-    value = isTRUE(reset_preset_default("flip_x", FALSE))
+    value = preset$flipX
   )
   updateCheckboxInput(
     session,
     "spatial_projection_background_flip_y",
-    value = isTRUE(reset_preset_default("flip_y", FALSE))
+    value = preset$flipY
   )
 })
 
 ##----------------------------------------------------------------------------##
-## Two-way sync between each Move slider (coarse drag, authoritative) and its
-## numeric box (exact keyboard entry / unit-level nudge). The slider is the value
-## the appearance observer above reads; the numeric box only mirrors it. Each
-## direction updates the OTHER control, guarded by an equality check so the two
-## observers can't ping-pong into an infinite loop.
+## Two-way sync between each authoritative slider and its exact numeric box.
+## Each direction updates the OTHER control, guarded by an equality check so the
+## two observers cannot ping-pong into an infinite loop.
 ##----------------------------------------------------------------------------##
 local({
-  sync_move <- function(slider_id, numeric_id) {
+  sync_slider_numeric <- function(slider_id, numeric_id) {
     ## slider -> numeric
     observeEvent(input[[slider_id]], {
       new_val <- input[[slider_id]]
@@ -254,13 +217,29 @@ local({
       updateSliderInput(session, slider_id, value = new_val)
     })
   }
-  sync_move(
+  sync_slider_numeric(
     "spatial_projection_background_offset_x",
     "spatial_projection_background_offset_x_num"
   )
-  sync_move(
+  sync_slider_numeric(
     "spatial_projection_background_offset_y",
     "spatial_projection_background_offset_y_num"
+  )
+  sync_slider_numeric(
+    "spatial_projection_background_scale",
+    "spatial_projection_background_scale_num"
+  )
+  sync_slider_numeric(
+    "spatial_projection_background_scale_x",
+    "spatial_projection_background_scale_x_num"
+  )
+  sync_slider_numeric(
+    "spatial_projection_background_scale_y",
+    "spatial_projection_background_scale_y_num"
+  )
+  sync_slider_numeric(
+    "spatial_projection_background_rotate",
+    "spatial_projection_background_rotate_num"
   )
 })
 
@@ -320,7 +299,11 @@ observeEvent(input[["spatial_projection_background_copy_preset"]], {
     scale_y = null_to(scale_y, 1),
     flip_x = isTRUE(input[["spatial_projection_background_flip_x"]]),
     flip_y = isTRUE(input[["spatial_projection_background_flip_y"]]),
-    rotation = null_to(input[["spatial_projection_background_rotate"]], 0)
+    rotation = null_to(input[["spatial_projection_background_rotate"]], 0),
+    image_opacity = null_to(
+      input[["spatial_projection_background_opacity"]],
+      0.6
+    )
   )
   spatial_preset_code(code)
 })

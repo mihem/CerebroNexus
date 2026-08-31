@@ -15,7 +15,9 @@ trajectory_projection_prepared <- reactive({
     input[["trajectory_percentage_cells_to_show"]],
     input[["trajectory_point_color"]],
     input[["trajectory_point_size"]],
-    input[["trajectory_point_opacity"]]
+    input[["trajectory_point_opacity"]],
+    !is.null(input[["trajectory_projection_point_border"]]),
+    !is.null(input[["trajectory_projection_keep_square"]])
   )
 
   trajectory_data <- trajectory_data_reactive()
@@ -24,21 +26,15 @@ trajectory_projection_prepared <- reactive({
   cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime))
 
-  ## available group filters
-  group_filters <- names(input)[grepl(
-    names(input),
-    pattern = "trajectory_projection_group_filter_"
-  )]
-
-  ## remove cells based on group filters
-  keep_cells <- rep(TRUE, nrow(cells_df))
-  for (i in group_filters) {
-    group <- strsplit(i, split = "trajectory_projection_group_filter_")[[1]][2]
-    if (group %in% colnames(cells_df)) {
-      keep_cells <- keep_cells & (cells_df[[group]] %in% input[[i]])
-    }
-  }
-  cells_df <- cells_df[keep_cells, ]
+  groups <- getGroups()
+  group_filters <- stats::setNames(
+    lapply(groups, function(group) {
+      selected <- input[[paste0("trajectory_projection_group_filter_", group)]]
+      if (is.null(selected)) getGroupLevels(group) else selected
+    }),
+    groups
+  )
+  cells_df <- cells_df[cerebroGroupFilterMask(cells_df, group_filters), ]
 
   ## randomly remove cells (if necessary)
   cells_df <- randomlySubsetCells(
@@ -46,9 +42,20 @@ trajectory_projection_prepared <- reactive({
     input[["trajectory_percentage_cells_to_show"]]
   )
 
-  ## Empty-state guard: no cells after filtering.
-  if (nrow(cells_df) == 0) {
-    return(NULL)
+  ## Send an explicit empty payload so clearing every filter cannot leave the
+  ## previous Canvas frame visible.
+  if (nrow(cells_df) == 0L) {
+    return(list(
+      cells_df = cells_df,
+      trajectory_lines = list(),
+      hover_info = character(0),
+      color_variable = input[["trajectory_point_color"]],
+      point_size = input[["trajectory_point_size"]],
+      point_opacity = input[["trajectory_point_opacity"]],
+      group_labels = isTRUE(input[["trajectory_projection_group_labels"]]),
+      draw_border = isTRUE(input[["trajectory_projection_point_border"]]),
+      keep_square = isTRUE(input[["trajectory_projection_keep_square"]])
+    ))
   }
 
   ## put rows in random order (so no group is drawn systematically on top)
@@ -84,7 +91,10 @@ trajectory_projection_prepared <- reactive({
     hover_info = as.character(hover_info),
     color_variable = input[["trajectory_point_color"]],
     point_size = input[["trajectory_point_size"]],
-    point_opacity = input[["trajectory_point_opacity"]]
+    point_opacity = input[["trajectory_point_opacity"]],
+    group_labels = isTRUE(input[["trajectory_projection_group_labels"]]),
+    draw_border = isTRUE(input[["trajectory_projection_point_border"]]),
+    keep_square = isTRUE(input[["trajectory_projection_keep_square"]])
   )
 })
 
@@ -143,6 +153,12 @@ observeEvent(
 
     cells_df <- prepared[["cells_df"]]
     color_variable <- prepared[["color_variable"]]
+    if (
+      identical(color_variable, "state") &&
+        is.numeric(cells_df[[color_variable]])
+    ) {
+      cells_df[[color_variable]] <- factor(cells_df[[color_variable]])
+    }
     ## The projection coordinates are the DR_1 / DR_2 columns contributed by the
     ## trajectory meta (mergeTrajectoryWithMetaData appends them after the cell
     ## metadata, so they are NOT columns 1/2).
@@ -154,10 +170,18 @@ observeEvent(
       rownames(cells_df)
     }
 
-    point_line <- list(color = cerebro_plotly_theme()$axis, width = 1)
+    point_line <- if (prepared[["draw_border"]]) {
+      list(color = cerebro_plotly_theme()$axis, width = 1)
+    } else {
+      list()
+    }
 
-    color_assignments <- NULL
-    if (!is.numeric(color_input)) {
+    color_assignments <- if (nrow(cells_df) == 0L) {
+      character(0)
+    } else {
+      NULL
+    }
+    if (nrow(cells_df) > 0L && !is.numeric(color_input)) {
       color_assignments <- assignColorsToGroups(cells_df, color_variable)
       ## Fall back to the default colourset if the variable is not pre-assigned.
       if (is.null(color_assignments)) {
@@ -176,6 +200,8 @@ observeEvent(
       selection_keys = selection_keys,
       point_size = prepared[["point_size"]],
       point_opacity = prepared[["point_opacity"]],
+      group_labels = prepared[["group_labels"]],
+      keep_square = prepared[["keep_square"]],
       point_line = point_line,
       reset_axes = reset_axes_now,
       color_assignments = color_assignments,

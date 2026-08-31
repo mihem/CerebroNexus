@@ -46,6 +46,15 @@ test_that("immune_repertoire module files parse without errors", {
   }
 })
 
+test_that("Clonal UMAP forwards the shared point-size unit unchanged", {
+  viz <- paste(
+    readLines(file.path(shiny_root, "immune_repertoire", "visualizations.R")),
+    collapse = "\n"
+  )
+  expect_no_match(viz, "marker_size <- point_size * 5", fixed = TRUE)
+  expect_match(viz, "point_size = point_size", fixed = TRUE)
+})
+
 test_that("immune_repertoire UI defines correct tabName", {
   ui_file <- file.path(shiny_root, "immune_repertoire", "UI.R")
   skip_if_not(file.exists(ui_file))
@@ -360,8 +369,10 @@ test_that("ir_bindCache keeps only global cache keys centralized", {
     helper,
     "ir_p_order_by|ir_p_clone_size|ir_d_point_size|ir_d_alpha"
   )
-  expect_match(helper, "ir_d_base_size")
-  expect_match(helper, "ir_d_title")
+  expect_no_match(
+    helper,
+    "ir_d_base_size|ir_d_legend_size|ir_d_legend_key|ir_d_legend_pos|ir_d_title"
+  )
   expect_match(helper, "available_crb_files\\$selected")
 })
 

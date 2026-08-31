@@ -118,6 +118,57 @@ test_that("{shinytest2} recording: overview", {
   app$stop()
 })
 
+test_that("Projection switches categorical spatial datasets coherently", {
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "projection_dataset_switch",
+    height = 950,
+    width = 1619
+  )
+  withr::defer(app$stop())
+  app$wait_for_idle(timeout = 30000)
+
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_merfish.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_idle(timeout = 30000)
+  activate_tab(app, "overview", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('overview_projection_point_color')?.value ",
+      "=== 'cell_type'"
+    ),
+    timeout = 30000
+  )
+
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('overview_projection_point_color')?.value ",
+      "=== 'cluster'"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 30000
+  )
+
+  expect_false(any(grepl(
+    "color_assignments are required for categorical cell views",
+    app$get_logs()$message,
+    fixed = TRUE
+  )))
+})
+
 test_that("Spatial backgrounds reset when the spatial dataset changes", {
   local_app_support(inst_dir)
   app <- AppDriver$new(
@@ -166,6 +217,17 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     paste0(
       "document.querySelector(",
       "'#spatial_projection_cell_view_host canvas:not(.cv-mini)')"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_scale').value ",
+      "=== '1.55' && ",
+      "document.getElementById('spatial_projection_background_scale_x').value ",
+      "=== '1.55' && ",
+      "document.getElementById('spatial_projection_background_scale_y').value ",
+      "=== '1.55'"
     ),
     timeout = 30000
   )
@@ -236,6 +298,18 @@ test_that("{shinytest2} recording: main", {
   )
   expect_gte(as.numeric(plot_size$w), 300)
   expect_gte(as.numeric(plot_size$h), 240)
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#overview_projection_point_size').value)"
+    )),
+    6
+  )
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#overview_projection_point_opacity').value)"
+    )),
+    1
+  )
 
   ## get unfiltered cell count
   cells_all <- retry_get_value(app, export = "overview_cells_to_show")
@@ -438,7 +512,7 @@ test_that("{shinytest2} recording: gene_expression", {
       "document.getElementById('expression_projection_genes_in_separate_panels')",
       "?.disabled === false && ",
       "document.getElementById('expression_projection_gene_color_mode')",
-      "?.disabled === true"
+      " === null"
     ),
     timeout = 10000
   )
@@ -465,6 +539,16 @@ test_that("{shinytest2} recording: gene_expression", {
     ),
     timeout = 10000
   )
+  enabled_style <- app$get_js(
+    paste0(
+      "(() => {const c=document.querySelector('.cerebro-gene-control');",
+      "const i=c?.querySelector('.selectize-input');",
+      "return c&&i?{disabled:c.classList.contains('is-disabled'),",
+      "animation:getComputedStyle(i).animationName}:null;})()"
+    )
+  )
+  expect_false(isTRUE(enabled_style$disabled))
+  expect_identical(enabled_style$animation, "cerebro-control-enter")
   app$set_inputs(
     expression_projection_gene_color_mode = "different",
     wait_ = FALSE
@@ -504,7 +588,7 @@ test_that("{shinytest2} recording: gene_expression", {
       "const colour=document.getElementById(",
       "'expression_projection_gene_color_mode');",
       "return !display?.disabled && display.value==='separate' && ",
-      "colour?.disabled && colour.value==='shared';",
+      "colour===null;",
       "})()"
     ),
     timeout = 10000
@@ -532,6 +616,25 @@ test_that("{shinytest2} recording: gene_expression", {
   expr_levels <- retry_get_value(app, export = "expression_levels")
   expect_true(length(expr_levels) > 0)
   expect_true(any(unlist(expr_levels, use.names = FALSE) > 0))
+
+  app$set_inputs(
+    expression_projection_genes_in_separate_panels = "rgb",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    "document.querySelectorAll('.cerebro-gene-rgb-channel').length === 3",
+    timeout = 10000
+  )
+  rgb_animations <- app$get_js(
+    paste0(
+      "Array.from(document.querySelectorAll('.cerebro-gene-rgb-channel'))",
+      ".map(e=>getComputedStyle(e).animationName)"
+    )
+  )
+  expect_identical(
+    unname(unlist(rgb_animations)),
+    rep("cerebro-control-enter", 3)
+  )
 
   app$stop()
 })

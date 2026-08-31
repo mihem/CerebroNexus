@@ -381,7 +381,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     "document.getElementById('overview_projection_point_color')?.value === 'cell_type'",
     timeout = 30000
   )
-  expect_false(isTRUE(app$get_js(
+  expect_true(isTRUE(app$get_js(
     "document.getElementById('overview_projection_keep_square') !== null"
   )))
   app$click(selector = "#overview_projection_more_button")

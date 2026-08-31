@@ -58,7 +58,20 @@ output[["trajectory_projection_UI"]] <- renderUI({
             "trajectory_projection_more",
             cerebroSettingsSection(
               "Appearance",
-              uiOutput("trajectory_projection_additional_parameters_UI"),
+              tagList(
+                uiOutput("trajectory_projection_additional_parameters_UI"),
+                uiOutput("trajectory_projection_group_labels_UI"),
+                checkboxInput(
+                  "trajectory_projection_point_border",
+                  "Draw border around cells",
+                  value = TRUE
+                ),
+                checkboxInput(
+                  "trajectory_projection_keep_square",
+                  "Keep plots square",
+                  value = FALSE
+                )
+              ),
               cerebroInfoButton(
                 "trajectory_projection_additional_parameters_info"
               )
@@ -164,81 +177,68 @@ trajectory_projection_main_parameters_info <- list(
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_projection_additional_parameters_UI"]] <- renderUI({
-  ## Start from a dynamic default sized to the cell count + canvas, falling back
-  ## to the fixed default if that can't be computed. A configured preset (below)
-  ## still takes precedence over this when one is set.
-  default_point_size <- tryCatch(
-    dynamicPointSize(
-      n_points = nrow(getMetaData()),
-      plot_width_px = session$clientData[[
-        "output_trajectory_projection_width"
-      ]],
-      plot_height_px = session$clientData[[
-        "output_trajectory_projection_height"
-      ]],
-      min = preferences[["projection_plot_point_size"]][["min"]],
-      max = preferences[["projection_plot_point_size"]][["max"]],
-      step = preferences[["projection_plot_point_size"]][["step"]],
-      fallback = preferences[["projection_plot_point_size"]][["default"]]
-    ),
-    error = function(e) {
-      preferences[["projection_plot_point_size"]][["default"]]
-    }
-  )
-
-  if (
-    exists("Cerebro.options") &&
-      !is.null(Cerebro.options[["point_size"]]) &&
-      is.list(Cerebro.options[["point_size"]]) &&
-      !is.null(Cerebro.options[["point_size"]][["trajectory_point_size"]])
-  ) {
-    default_point_size <- Cerebro.options[["point_size"]][[
-      "trajectory_point_size"
-    ]]
-  }
+  appearance <- current_scatter_defaults()
 
   tagList(
     sliderInput(
       "trajectory_point_size",
       label = "Point size",
-      min = preferences[["projection_plot_point_size"]][["min"]],
-      max = preferences[["projection_plot_point_size"]][["max"]],
-      step = preferences[["projection_plot_point_size"]][["step"]],
-      value = default_point_size
+      min = preferences[["cell_point_size"]][["min"]],
+      max = preferences[["cell_point_size"]][["max"]],
+      step = preferences[["cell_point_size"]][["step"]],
+      value = appearance$point_size
     ),
     sliderInput(
       "trajectory_point_opacity",
       label = "Point opacity",
-      min = preferences[["projection_plot_point_opacity"]][["min"]],
-      max = preferences[["projection_plot_point_opacity"]][["max"]],
-      step = preferences[["projection_plot_point_opacity"]][["step"]],
-      value = preferences[["projection_plot_point_opacity"]][["default"]]
+      min = preferences[["cell_point_opacity"]][["min"]],
+      max = preferences[["cell_point_opacity"]][["max"]],
+      step = preferences[["cell_point_opacity"]][["step"]],
+      value = appearance$point_opacity
     )
   )
 })
 
 output[["trajectory_projection_data_parameters_UI"]] <- renderUI({
+  appearance <- current_scatter_defaults()
+
   tagList(
     sliderInput(
       "trajectory_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["projection_plot_percentage_cells_to_show"]][[
+      min = preferences[["cell_percentage_cells_to_show"]][[
         "min"
       ]],
-      max = preferences[["projection_plot_percentage_cells_to_show"]][[
+      max = preferences[["cell_percentage_cells_to_show"]][[
         "max"
       ]],
-      step = preferences[["projection_plot_percentage_cells_to_show"]][[
+      step = preferences[["cell_percentage_cells_to_show"]][[
         "step"
       ]],
-      value = preferences[["projection_plot_percentage_cells_to_show"]][[
-        "default"
-      ]]
+      value = appearance$percentage_cells_to_show
     )
   )
 })
 
-## make sure elements are loaded even though the box is collapsed
+output[["trajectory_projection_group_labels_UI"]] <- renderUI({
+  color_variable <- input[["trajectory_point_color"]]
+  req(color_variable)
+  metadata <- getMetaData()
+  categorical <- identical(color_variable, "state") ||
+    (color_variable %in%
+      colnames(metadata) &&
+      !is.numeric(metadata[[color_variable]]))
+  if (!categorical) {
+    return(NULL)
+  }
+  checkboxInput(
+    "trajectory_projection_group_labels",
+    "Group labels",
+    value = TRUE
+  )
+})
+
+## Keep controls available while the settings drawer is hidden.
 outputOptions(
   output,
   "trajectory_projection_additional_parameters_UI",
@@ -247,6 +247,11 @@ outputOptions(
 outputOptions(
   output,
   "trajectory_projection_data_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "trajectory_projection_group_labels_UI",
   suspendWhenHidden = FALSE
 )
 
@@ -285,56 +290,27 @@ trajectory_projection_additional_parameters_info <- list(
 )
 
 ##----------------------------------------------------------------------------##
-## UI elements for group filters of projection plot.
+## Shared group filters for the trajectory projection.
 ##----------------------------------------------------------------------------##
 
-output[["trajectory_projection_group_filters_UI"]] <- renderUI({
-  group_filters <- list()
-  for (i in getGroups()) {
-    group_filters[[i]] <- shinyWidgets::pickerInput(
-      paste0("trajectory_projection_group_filter_", i),
-      label = i,
-      choices = getGroupLevels(i),
-      selected = getGroupLevels(i),
-      options = list("actions-box" = TRUE),
-      multiple = TRUE
-    )
-  }
-  group_filters
-})
-
-## make sure elements are loaded even though the box is collapsed
-outputOptions(
+registerGroupFiltersUI(
   output,
-  "trajectory_projection_group_filters_UI",
-  suspendWhenHidden = FALSE
+  "trajectory_projection",
+  getGroups = getGroups,
+  getGroupLevels = getGroupLevels
 )
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 
-observeEvent(input[["trajectory_projection_group_filters_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_projection_group_filters_info$text,
-      title = trajectory_projection_group_filters_info$title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
-})
-
-##----------------------------------------------------------------------------##
-## Text in info box.
-##----------------------------------------------------------------------------##
-
-trajectory_projection_group_filters_info <- list(
+registerGroupFiltersInfo(
+  input,
+  "trajectory_projection",
   title = "Group filters for projection of trajectory",
   text = HTML(
     "
-    The elements in this panel allow you to select which cells should be plotted based on the group(s) they belong to. For each grouping variable, you can activate or deactivate group levels. Only cells that are pass all filters (for each grouping variable) are shown in the projection.
+    The elements in this panel allow you to select which cells should be plotted based on the group(s) they belong to. For each grouping variable, you can activate or deactivate group levels. Only cells that pass all filters (for each grouping variable) are shown in the projection.
     "
   )
 )

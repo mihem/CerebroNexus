@@ -110,15 +110,26 @@ Cerebro.options <<- list(
   ),
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,
-  "overview_default_point_size" = 1,
-  "gene_expression_default_point_size" = 2,
-  ## Larger default spatial points so cell-type layering reads clearly against
-  ## the histology background in the demo.
-  "point_size" = list("spatial_projection_point_size" = 5),
-  "overview_default_point_opacity" = 0.3,
-  "gene_expression_default_point_opacity" = 0.5,
-  "overview_default_percentage_cells_to_show" = 100,
-  "gene_expression_default_percentage_cells_to_show" = 20,
+  ## One appearance per dataset, shared by every cell scatter page.
+  "point_size" = c(
+    "PBMC - Full (T+B)" = 6,
+    "Mouse brain (Visium)" = 5,
+    "Mouse hippocampus (Slide-seq v2)" = 5,
+    "Mouse ileum (MERFISH)" = 5,
+    "Mouse brain (Xenium)" = 5,
+    "Mouse brain (Trekker)" = 4.4,
+    "HLA & TCR" = 1
+  ),
+  "point_opacity" = c(
+    "PBMC - Full (T+B)" = 1,
+    "Mouse brain (Visium)" = 1,
+    "Mouse hippocampus (Slide-seq v2)" = 1,
+    "Mouse ileum (MERFISH)" = 1,
+    "Mouse brain (Xenium)" = 1,
+    "Mouse brain (Trekker)" = 0.85,
+    "HLA & TCR" = 0.3
+  ),
+  "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = FALSE
 )
 

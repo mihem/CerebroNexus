@@ -70,6 +70,16 @@ cv_panebar <- function(panel) {
     ## as fullscreen everywhere else. This is the same mark plotly puts on its
     ## "Reset axes" button, which is where these users are coming from.
     tbtn("reset", "Reset view", "house"),
+    tags$button(
+      type = "button",
+      class = "cv-tbtn cv-clear-btn",
+      `data-act` = "clear",
+      `data-panel` = panel,
+      style = "display:none",
+      `data-tip` = "Clear selection",
+      `aria-label` = "Clear selection",
+      icon("eraser")
+    ),
     tbtn("png", "Download PNG", "download")
   )
 }
@@ -145,48 +155,10 @@ cv_pane <- function(key) {
   )
 }
 
-## One "value bubble + <input type=range>" control block. Every slider in the
-## control bar / More panel shares this markup (only the label, ids, bounds and
-## initial display text differ), so they all route through here. `disp` is the
-## initial bubble text (e.g. "0.80" for a 0.8 value); `val_id` is the bubble's id
-## (kept explicit because it does not always follow input_id, e.g. cv-op-val);
-## `wrap_id` sets an id on the outer div when a control needs one (cv-niche-wrap).
-cv_range <- function(
-  label,
-  input_id,
-  min,
-  max,
-  step,
-  value,
-  disp,
-  val_id,
-  wrap_id = NULL
-) {
-  div(
-    class = "cv-ctl cv-ctl-range",
-    id = wrap_id,
-    tags$label(label),
-    div(
-      class = "cv-range",
-      tags$span(class = "cv-range-min", min),
-      tags$span(class = "cv-ps-val", id = val_id, disp),
-      tags$span(class = "cv-range-max", max),
-      tags$input(
-        type = "range",
-        id = input_id,
-        min = min,
-        max = max,
-        step = step,
-        value = value
-      )
-    )
-  )
-}
-
 tab_coordinated_views <- tabItem(
   tabName = "coordinated_views",
   div(
-    class = "coordviews-page",
+    class = "coordviews-page linked-views-page",
     ## ---- header + info -------------------------------------------------- ##
     div(
       style = "display:flex;align-items:baseline;gap:10px;margin-bottom:2px;",
@@ -332,20 +304,10 @@ tab_coordinated_views <- tabItem(
           )
         )
       ),
-      ## Reveals the rest of the control bar (point opacity, cell subsampling,
-      ## group filters). The caret is its own element so it can ROTATE between
-      ## pointing right (collapsed) and down (open) rather than swap glyphs.
-      tags$button(
-        type = "button",
-        id = "cv-more-btn",
-        class = "cv-morebtn",
-        `aria-expanded` = "false",
-        `aria-controls` = "cv-more",
-        icon("sliders"),
-        tags$span("More settings"),
-        ## drawn in CSS (a glyph's position inside its box varies by font, which
-        ## a rotation makes visible as a wobble)
-        tags$span(class = "cv-caret")
+      ## Reveals the shared advanced-settings drawer.
+      cerebroSettingsButton(
+        "cv-more-btn",
+        "cv-more"
       ),
       ## Right-aligned global filter/subsample readout. Cohort actions belong to
       ## the Active cohort bar below, not to this settings row.
@@ -357,47 +319,83 @@ tab_coordinated_views <- tabItem(
         tags$span(class = "cv-shown", id = "cv-shown")
       ),
 
-      ## ---- responsive advanced-settings drawer ------------------------- ##
-      ## Additional projection parameters (opacity, % of cells) + per-group
-      ## filters. These belong to the same control system as the row above, but
-      ## use a stable viewport drawer so plots never resize when it opens.
-      ##
-      ## The exact control node is moved to a body-level viewport drawer when it
-      ## opens. Its clip owns internal scrolling; its inner wrapper owns spacing.
-      div(
-        class = "cv-more coordviews-page",
-        id = "cv-more",
-        `role` = "dialog",
-        `aria-modal` = "false",
-        `aria-hidden` = "true",
-        `aria-labelledby` = "cv-more-title",
+      ## ---- shared advanced-settings drawer ----------------------------- ##
+      ## The app-wide drawer owns viewport placement, scrolling, spacing and
+      ## responsive layout. Linked views supplies only its page-specific controls.
+      cerebroSettingsDrawer(
+        "cv-more",
         div(
-          class = "cv-more-titlebar",
-          tags$span(
-            class = "cv-more-title",
-            id = "cv-more-title",
-            "More settings"
+          class = "coordviews-page",
+          cerebroSettingsSection(
+            "Appearance",
+            tagList(
+              sliderInput(
+                "cv-ps",
+                label = "Point size",
+                min = 1,
+                max = 20,
+                step = 1,
+                value = 5
+              ),
+              sliderInput(
+                "cv-opacity",
+                label = "Point opacity",
+                min = 0.1,
+                max = 1,
+                step = 0.1,
+                value = 1
+              ),
+              checkboxInput(
+                "cv-labels",
+                "Group labels",
+                value = TRUE
+              ),
+              checkboxInput(
+                "cv-borders",
+                "Draw border around cells",
+                value = FALSE
+              ),
+              checkboxInput(
+                "cv-square-plots",
+                "Keep plots square",
+                value = FALSE
+              )
+            )
           ),
-          tags$button(
-            type = "button",
-            id = "cv-more-close",
-            class = "cv-more-close",
-            `aria-label` = "Close More settings",
-            HTML("&times;")
-          )
-        ),
-        div(
-          class = "cv-more-clip",
-          div(
-            class = "cv-more-inner",
-            ## Advanced controls float over the workspace rather than growing
-            ## the bar. Point appearance and per-image calibration are two
-            ## deliberately distinct sections of one low-frequency surface.
-            div(
-              class = "cv-more-section cv-more-images",
-              tags$div(class = "cv-more-heading", "Background image"),
+          cerebroSettingsSection(
+            "Data",
+            tagList(
+              sliderInput(
+                "cv-pct",
+                label = "Show % of cells",
+                min = 10,
+                max = 100,
+                step = 10,
+                value = 100
+              ),
+              shiny::tagAppendAttributes(
+                selectInput(
+                  "cv-clip",
+                  label = "Colour range",
+                  choices = c(
+                    "Full range" = "0",
+                    "1-99%" = "0.01",
+                    "2-98%" = "0.02",
+                    "5-95%" = "0.05"
+                  ),
+                  selected = "0.01",
+                  selectize = FALSE
+                ),
+                id = "cv-clip-ctl",
+                style = "display:none"
+              )
+            )
+          ),
+          shiny::tagAppendAttributes(
+            cerebroSettingsSection(
+              "Background image",
               div(
-                class = "cv-ctl cv-bg-ctl",
+                class = "cv-ctl cv-bg-ctl cerebro-settings-full",
                 id = "cv-img-pick-ctl",
                 style = "display:none",
                 div(class = "cv-bg-space-tabs", id = "cv-bg-space-tabs"),
@@ -433,114 +431,48 @@ tab_coordinated_views <- tabItem(
                 div(class = "cv-bg-popover", id = "cv-bg-popover")
               )
             ),
-            div(
-              class = "cv-more-section cv-more-points",
-              tags$div(class = "cv-more-heading", "Points"),
-              ## Point size sits with Point opacity: they are the same kind of
-              ## adjustment to the same marks, and separating them put one in the
-              ## always-visible bar and the other behind "More".
-              cv_range(
-                "Point size",
-                "cv-ps",
-                min = "0",
-                max = "20",
-                step = "0.2",
-                value = "3",
-                disp = "3.0",
-                val_id = "cv-ps-val"
-              ),
-              cv_range(
-                "Point opacity",
-                "cv-opacity",
-                min = "0",
-                max = "1",
-                step = "0.05",
-                value = "0.8",
-                disp = "0.80",
-                val_id = "cv-op-val"
-              ),
-              ## Group labels change only mark decoration, so they live with
-              ## the other low-frequency point appearance settings.
-              tags$label(
-                class = "cv-chk cv-chk-ctl",
-                tags$input(
-                  type = "checkbox",
-                  id = "cv-labels",
-                  checked = "checked"
+            style = "display:none"
+          ),
+          shiny::tagAppendAttributes(
+            cerebroSettingsSection(
+              "Spatial mapping",
+              div(
+                class = "cv-trekker cerebro-settings-contents",
+                id = "cv-trekker-ctl",
+                style = "display:none",
+                sliderInput(
+                  "cv-dissolve",
+                  label = "Dissolve least-confident (%)",
+                  min = 0,
+                  max = 95,
+                  step = 5,
+                  value = 0
                 ),
-                "Group labels"
-              ),
-              tags$label(
-                class = "cv-chk cv-chk-ctl",
-                tags$input(type = "checkbox", id = "cv-square-plots"),
-                "Keep plots square"
-              ),
-              cv_range(
-                "Show % of cells",
-                "cv-pct",
-                min = "5",
-                max = "100",
-                step = "5",
-                value = "100",
-                disp = "100",
-                val_id = "cv-pct-val"
+                shiny::tagAppendAttributes(
+                  sliderInput(
+                    "cv-niche",
+                    label = "Niche radius (µm)",
+                    min = 50,
+                    max = 500,
+                    step = 25,
+                    value = 250
+                  ),
+                  id = "cv-niche-wrap"
+                ),
+                checkboxInput(
+                  "cv-evidence",
+                  label = "Mark positioning evidence",
+                  value = FALSE
+                )
               )
             ),
-            ## Continuous colourings only (JS shows it for a gene or a numeric
-            ## field). A single extreme value otherwise owns the top of the
-            ## scale and presses every other cell into the bottom few percent of
-            ## the colour map, where nothing can be told apart.
+            style = "display:none"
+          ),
+          cerebroSettingsSection(
+            "Group filters",
             div(
-              class = "cv-ctl",
-              id = "cv-clip-ctl",
-              style = "display:none",
-              tags$label("Colour range"),
-              tags$select(
-                id = "cv-clip",
-                tags$option(value = "0", "Full range"),
-                tags$option(value = "0.01", selected = NA, "1-99%"),
-                tags$option(value = "0.02", "2-98%"),
-                tags$option(value = "0.05", "5-95%")
-              )
-            ),
-            div(
-              class = "cv-ctl cv-filters",
-              tags$label("Group filters"),
+              class = "cv-ctl cv-filters cerebro-group-filters",
               div(class = "cv-filters-row", id = "cv-filters-row")
-            ),
-            ## Trekker-only controls (shown by JS when the bundle carries Trekker data):
-            ## dissolve least-confident positions + ring nuclei with positioning
-            ## evidence. Colour-by physical/meta fields is added to the Colour by list.
-            div(
-              class = "cv-trekker",
-              id = "cv-trekker-ctl",
-              style = "display:none",
-              cv_range(
-                "Dissolve least-confident (%)",
-                "cv-dissolve",
-                min = "0",
-                max = "95",
-                step = "5",
-                value = "0",
-                disp = "0",
-                val_id = "cv-dissolve-val"
-              ),
-              cv_range(
-                "Niche radius (µm)",
-                "cv-niche",
-                min = "50",
-                max = "500",
-                step = "25",
-                value = "250",
-                disp = "250",
-                val_id = "cv-niche-val",
-                wrap_id = "cv-niche-wrap"
-              ),
-              tags$label(
-                class = "cv-chk cv-evidence-chk",
-                tags$input(type = "checkbox", id = "cv-evidence"),
-                "Mark positioning evidence"
-              )
             )
           )
         )

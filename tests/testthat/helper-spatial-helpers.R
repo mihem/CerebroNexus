@@ -6,6 +6,13 @@ spatial_helpers_file <- file.path(
   "spatial",
   "func_spatial_helpers.R"
 )
+utility_helpers_file <- file.path(
+  "..",
+  "..",
+  "inst",
+  "viewer",
+  "utility_functions.R"
+)
 
 if (!file.exists(spatial_helpers_file)) {
   spatial_helpers_file <- system.file(
@@ -13,7 +20,14 @@ if (!file.exists(spatial_helpers_file)) {
     package = "CerebroNexus"
   )
 }
+if (!file.exists(utility_helpers_file)) {
+  utility_helpers_file <- system.file(
+    "viewer/utility_functions.R",
+    package = "CerebroNexus"
+  )
+}
 
+sys.source(utility_helpers_file, envir = environment())
 sys.source(spatial_helpers_file, envir = environment())
 
 expected_spatial_image_target <- function(

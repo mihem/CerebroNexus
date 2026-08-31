@@ -3,8 +3,7 @@
 ##----------------------------------------------------------------------------##
 overview_projection_hover_info <- reactive({
   req(
-    hover_info_projections(),
-    overview_projection_cells_to_show()
+    hover_info_projections()
   )
   if (
     !is.null(preferences[["show_hover_info_in_projections"]]) &&

@@ -437,36 +437,12 @@ IR_PARAM_SPEC <- list(
 )
 
 ## ---------------------------------------------------------------------------
-## IR_DISPLAY_SPEC — generic display/style parameters, applied to all IR plots
+## IR display parameters that have a consistent consumer on scatter plots.
 ##
-## Parallel to IR_PARAM_SPEC but for pure presentation (font size, title, and
-## for scatter-type plots point size / opacity). Rendered into a collapsible
-## "Display options" panel (see ir_display_panel in settings.R) and applied via
-## ir_apply_display(). Each param spec has the same shape as IR_PARAM_SPEC.
-##
-## Two reusable groups keep per-tab declarations DRY:
-##   IR_DISPLAY_BASE    — applies to every plot (font size, title)
-##   IR_DISPLAY_SCATTER — extra params only meaningful for point clouds
-## ir_display_params_for(tab) assembles the applicable set per tab.
+## Font and legend controls were removed: they affected only some ggplot paths
+## and were no-ops on shared Canvas / several Plotly views. More settings should
+## expose only controls that behave consistently wherever they are shown.
 ## ---------------------------------------------------------------------------
-
-IR_DISPLAY_BASE <- list(
-  list(
-    id = "ir_d_base_size",
-    label = "Font size:",
-    type = "slider",
-    value = 12,
-    min = 6,
-    max = 30,
-    step = 1
-    # ),
-    # list(
-    #   id = "ir_d_title",
-    #   label = "Title:",
-    #   type = "text",
-    #   value = ""
-  )
-)
 
 IR_DISPLAY_SCATTER <- list(
   list(
@@ -486,43 +462,6 @@ IR_DISPLAY_SCATTER <- list(
     min = 0.1,
     max = 1,
     step = 0.05
-  )
-)
-
-## Legend controls — applicable to every plot (each has a legend). Font size and
-## key/point size apply on both the ggplot and plotly paths; position also lets
-## the legend be hidden.
-IR_DISPLAY_LEGEND <- list(
-  list(
-    id = "ir_d_legend_size",
-    label = "Legend font size:",
-    type = "slider",
-    value = 12,
-    min = 6,
-    max = 30,
-    step = 1
-  ),
-  list(
-    id = "ir_d_legend_key",
-    label = "Legend point size:",
-    type = "slider",
-    value = 3,
-    min = 1,
-    max = 12,
-    step = 0.5
-  ),
-  list(
-    id = "ir_d_legend_pos",
-    label = "Legend position:",
-    type = "select",
-    choices = c(
-      "Right" = "right",
-      "Bottom" = "bottom",
-      "Top" = "top",
-      "Left" = "left",
-      "Hidden" = "none"
-    ),
-    value = "top"
   )
 )
 
@@ -572,12 +511,24 @@ IR_MORE_PARAM_IDS <- c(
 
 ## Assemble the display params applicable to a given tab.
 ir_display_params_for <- function(tab) {
-  params <- IR_DISPLAY_BASE
+  params <- list()
   if (!is.null(tab) && tab %in% IR_SCATTER_TABS) {
     params <- c(params, IR_DISPLAY_SCATTER)
   }
-  # Every plot has a legend, so the legend controls apply to all tabs.
-  params <- c(params, IR_DISPLAY_LEGEND)
+  if (identical(tab, "Clonal UMAP")) {
+    params <- c(
+      params,
+      list(list(
+        id = "ir_d_percentage_cells_to_show",
+        label = "Show % of cells:",
+        type = "slider",
+        value = 100,
+        min = 10,
+        max = 100,
+        step = 10
+      ))
+    )
+  }
   params
 }
 
@@ -660,13 +611,9 @@ IR_PARAM_DESC <- list(
   ir_p_pp_aa_length = IR_DESC_AA_LENGTH,
 
   ## ---- Display options ----
-  ir_d_base_size = "Base font size for the plot's text (axis labels, legend, title).",
-  ir_d_title = "A custom title shown above the plot. Leave blank for none.",
   ir_d_point_size = "Diameter of the scatter points.",
   ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily.",
-  ir_d_legend_size = "Font size of the legend text.",
-  ir_d_legend_key = "Size of the point/marker shown for each legend entry.",
-  ir_d_legend_pos = "Where to place the legend, or hide it.",
+  ir_d_percentage_cells_to_show = "Percentage of cells sampled for the Clonal UMAP. Lower values can improve performance for large datasets.",
 
   ## ---- Homeostasis ----
   ir_p_clone_size = "The upper bounds (as a fraction of the repertoire) that bin clones into Rare / Small / Medium / Large / Hyperexpanded. Five increasing numbers, comma-separated. Leave as-is for scRepertoire's defaults.",

@@ -32,7 +32,11 @@ output[["overview_projection_UI"]] <- renderUI({
                 uiOutput("overview_projection_additional_parameters_UI"),
                 uiOutput("overview_projection_show_group_label_UI"),
                 uiOutput("overview_projection_point_border_UI"),
-                uiOutput("overview_projection_scales_UI")
+                checkboxInput(
+                  "overview_projection_keep_square",
+                  "Keep plots square",
+                  value = FALSE
+                )
               ),
               cerebroInfoButton(
                 "overview_projection_additional_parameters_info"

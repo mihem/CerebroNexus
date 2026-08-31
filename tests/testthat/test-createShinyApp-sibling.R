@@ -225,6 +225,103 @@ build_test_app <- function(cerebro_data, result_dir, ...) {
   )
 }
 
+test_that("scatter defaults accept one value or one value per dataset", {
+  labels <- c("PBMC", "Xenium")
+
+  expect_identical(
+    .normalizeDatasetNumericOption(4, labels, "point_size", 1, 20),
+    c(PBMC = 4, Xenium = 4)
+  )
+  expect_identical(
+    .normalizeDatasetNumericOption(
+      list(PBMC = 0.4, Xenium = 0.9),
+      labels,
+      "point_opacity",
+      0.1,
+      1
+    ),
+    c(PBMC = 0.4, Xenium = 0.9)
+  )
+  expect_identical(
+    .normalizeDatasetNumericOption(
+      100,
+      labels,
+      "percentage_cells_to_show",
+      10,
+      100
+    ),
+    c(PBMC = 100, Xenium = 100)
+  )
+  expect_error(
+    .normalizeDatasetNumericOption(c(2, 5), labels, "point_size", 1, 20),
+    "must be named"
+  )
+  expect_error(
+    .normalizeDatasetNumericOption(
+      list(PBMC = 0.5),
+      labels,
+      "point_opacity",
+      0.1,
+      1
+    ),
+    "exactly match"
+  )
+  expect_error(
+    .normalizeDatasetNumericOption(0, labels, "point_size", 1, 20),
+    "between 1 and 20"
+  )
+})
+
+test_that("Viewer resolves scatter defaults for the selected dataset", {
+  runtime <- new.env(parent = globalenv())
+  sys.source(
+    viewer_test_path("utility_functions.R"),
+    envir = runtime
+  )
+  options <- list(
+    point_size = c(PBMC = 2, Xenium = 5),
+    point_opacity = c(PBMC = 0.4, Xenium = 1),
+    percentage_cells_to_show = c(PBMC = 40, Xenium = 100)
+  )
+
+  expect_identical(
+    runtime$viewerScatterDefaults(options, "Xenium"),
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+  )
+  expect_identical(
+    runtime$viewerScatterDefaults(list(), "Xenium"),
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+  )
+  expect_identical(
+    runtime$viewerScatterDefaults(options, "Missing"),
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+  )
+})
+
+test_that("createShinyApp stores dataset scatter defaults directly", {
+  root <- tempfile("point-appearance-")
+  dir.create(root)
+  first <- write_bundle_crb(root, "first.crb")
+  second <- write_bundle_crb(root, "second.crb")
+  app <- file.path(root, "app")
+
+  build_test_app(
+    c(PBMC = first, Xenium = second),
+    app,
+    point_size = list(PBMC = 2, Xenium = 5),
+    point_opacity = 0.8,
+    percentage_cells_to_show = list(PBMC = 60, Xenium = 100)
+  )
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+
+  expect_identical(config$point_size, c(PBMC = 2, Xenium = 5))
+  expect_identical(config$point_opacity, c(PBMC = 0.8, Xenium = 0.8))
+  expect_identical(
+    config$percentage_cells_to_show,
+    c(PBMC = 60, Xenium = 100)
+  )
+})
+
 render_bundle_spatial_background <- function(
   app,
   config,
@@ -2459,7 +2556,12 @@ test_that("spatial images and settings preserve dataset spatial image nesting", 
     spatial_image_settings = list(
       Dataset = list(
         `section-a` = list(
-          `H&E` = list(flip_x = TRUE, scale_x = 1.5, rotation = 90)
+          `H&E` = list(
+            flip_x = TRUE,
+            scale_x = 1.5,
+            rotation = 90,
+            image_opacity = 0.7
+          )
         ),
         `section-b` = list(
           DAPI = list(
@@ -2494,7 +2596,12 @@ test_that("spatial images and settings preserve dataset spatial image nesting", 
   )
   expect_identical(
     config$spatial_image_settings$Dataset[["section-a"]][["H&E"]],
-    list(flip_x = TRUE, scale_x = 1.5, rotation = 90)
+    list(
+      flip_x = TRUE,
+      scale_x = 1.5,
+      rotation = 90,
+      image_opacity = 0.7
+    )
   )
   expect_identical(
     config$spatial_image_settings$Dataset[["section-b"]]$DAPI,
@@ -2526,13 +2633,7 @@ test_that("builder-owned spatial options cannot bypass formal parameters", {
   crb <- write_spatial_bundle_crb(file.path(root, "source"))
   keys <- c(
     "spatial_images",
-    "spatial_image_settings",
-    "spatial_images_flip_x",
-    "spatial_images_flip_y",
-    "spatial_images_scale_x",
-    "spatial_images_scale_y",
-    "spatial_images_offset_x",
-    "spatial_images_offset_y"
+    "spatial_image_settings"
   )
 
   for (key in keys) {
@@ -2694,6 +2795,10 @@ test_that("spatial image settings accept only strict scalar fields", {
   )
   cases <- list(
     list(settings = list(opacity = 0.5), error = "unknown setting.*opacity"),
+    list(
+      settings = list(image_opacity = 1.1),
+      error = "image_opacity.*between 0 and 1"
+    ),
     list(settings = list(flip_x = 1), error = "flip_x.*logical scalar"),
     list(settings = list(flip_y = NA), error = "flip_y.*logical scalar"),
     list(settings = list(scale_x = Inf), error = "scale_x.*finite numeric"),
@@ -2718,7 +2823,7 @@ test_that("spatial image settings accept only strict scalar fields", {
   }
 })
 
-test_that("legacy spatial image arguments require one unambiguous spatial", {
+test_that("legacy spatial image paths require one unambiguous spatial", {
   root <- withr::local_tempdir()
   image <- file.path(root, "histology.png")
   writeLines("IMAGE", image)
@@ -2731,8 +2836,7 @@ test_that("legacy spatial image arguments require one unambiguous spatial", {
   build_test_app(
     c(Dataset = single),
     app,
-    spatial_images = c(Dataset = image),
-    spatial_images_flip_x = c(Dataset = TRUE)
+    spatial_images = c(Dataset = image)
   )
   config <- readRDS(file.path(app, "cerebro_config.rds"))
   expect_identical(
@@ -2744,11 +2848,6 @@ test_that("legacy spatial image arguments require one unambiguous spatial", {
       "histology.png"
     )
   )
-  expect_identical(
-    config$spatial_image_settings$Dataset$section[["Tissue background"]],
-    list(flip_x = TRUE)
-  )
-
   multiple <- write_spatial_bundle_crb(
     file.path(root, "multiple"),
     spatials = list(first = character(), second = character())
@@ -2871,36 +2970,6 @@ test_that("unambiguous legacy multi-path vectors bundle every image", {
   expect_named(images, c("Tissue background 1", "Tissue background 2"))
   expect_identical(readLines(file.path(app, images[[1L]])), "FIRST")
   expect_identical(readLines(file.path(app, images[[2L]])), "SECOND")
-})
-
-test_that("legacy multi-path images broadcast legacy per-dataset settings", {
-  root <- withr::local_tempdir()
-  crb <- write_spatial_bundle_crb(file.path(root, "source"))
-  paths <- file.path(root, c("first.png", "second.png"))
-  writeLines("FIRST", paths[[1L]])
-  writeLines("SECOND", paths[[2L]])
-  app <- file.path(root, "app")
-
-  build_test_app(
-    c(Dataset = crb),
-    app,
-    spatial_images = list(Dataset = paths),
-    spatial_images_flip_x = c(Dataset = TRUE),
-    spatial_images_scale_x = c(Dataset = 1.5)
-  )
-
-  settings <- readRDS(file.path(
-    app,
-    "cerebro_config.rds"
-  ))$spatial_image_settings$Dataset$section
-  expect_identical(
-    settings[["Tissue background 1"]],
-    list(flip_x = TRUE, scale_x = 1.5)
-  )
-  expect_identical(
-    settings[["Tissue background 2"]],
-    list(flip_x = TRUE, scale_x = 1.5)
-  )
 })
 
 test_that("one spatial image can be shared by multiple data sets", {

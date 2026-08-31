@@ -10,6 +10,11 @@ expression_projection_update_plot <- function(input) {
   trajectory <- input[['trajectory']]
   display_mode <- input[['display_mode']]
   separate_panels <- input[['separate_panels']]
+  appearance <- list(
+    group_labels = FALSE,
+    draw_border = isTRUE(plot_parameters[["draw_border"]]),
+    keep_square = isTRUE(plot_parameters[["keep_square"]])
+  )
   ## sort cells based on expression (if applicable)
   if (
     plot_parameters[['plot_order']] == 'Highest expression on top' &&
@@ -115,7 +120,8 @@ expression_projection_update_plot <- function(input) {
       "expression_projection",
       list(
         color_type = "rgb",
-        color_variable = "RGB co-expression"
+        color_variable = "RGB co-expression",
+        appearance = appearance
       ),
       output_data,
       output_hover,
@@ -140,7 +146,11 @@ expression_projection_update_plot <- function(input) {
     }
     cerebroCellViewRender(
       "expression_projection",
-      list(color_type = "continuous", color_variable = legend_label),
+      list(
+        color_type = "continuous",
+        color_variable = legend_label,
+        appearance = appearance
+      ),
       output_data,
       output_hover,
       extra = list(shapes = trajectory_lines)

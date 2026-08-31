@@ -20,6 +20,105 @@ viewerUploadPath <- function(input_file, options) {
   datapath
 }
 
+viewerDatasetName <- function(files, selected) {
+  if (is.null(files) || is.null(selected) || is.null(names(files))) {
+    return(NULL)
+  }
+  index <- which(files == selected)
+  if (!length(index)) {
+    return(NULL)
+  }
+  name <- names(files)[[index[[1L]]]]
+  if (is.na(name) || !nzchar(name)) NULL else name
+}
+
+viewerScatterDefaults <- function(options, dataset = NULL) {
+  resolve <- function(key, fallback, minimum, maximum) {
+    value <- options[[key]]
+    if (length(value) > 1L && !is.null(dataset) && !is.null(names(value))) {
+      value <- value[dataset]
+    }
+    value <- suppressWarnings(as.numeric(value))
+    if (
+      length(value) != 1L ||
+        is.na(value) ||
+        !is.finite(value) ||
+        value < minimum ||
+        value > maximum
+    ) {
+      fallback
+    } else {
+      unname(value)
+    }
+  }
+  list(
+    point_size = resolve("point_size", 5, 1, 20),
+    point_opacity = resolve("point_opacity", 1, 0.1, 1),
+    percentage_cells_to_show = resolve(
+      "percentage_cells_to_show",
+      100,
+      10,
+      100
+    )
+  )
+}
+
+spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
+  defaults <- list(
+    offsetX = 0,
+    offsetY = 0,
+    scaleX = 1,
+    scaleY = 1,
+    flipX = FALSE,
+    flipY = FALSE,
+    rotation = 0,
+    opacity = 0.6
+  )
+  keys <- list(dataset, spatial_name, image_label)
+  if (
+    !is.list(options) ||
+      any(vapply(
+        keys,
+        function(key) {
+          length(key) != 1L || is.na(key) || !nzchar(key)
+        },
+        logical(1)
+      ))
+  ) {
+    return(defaults)
+  }
+  setting <- options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
+    image_label
+  ]]
+  if (!is.list(setting)) {
+    return(defaults)
+  }
+  number <- function(key, fallback, minimum = -Inf, maximum = Inf) {
+    value <- suppressWarnings(as.numeric(setting[[key]]))
+    if (
+      length(value) != 1L ||
+        is.na(value) ||
+        !is.finite(value) ||
+        value < minimum ||
+        value > maximum
+    ) {
+      fallback
+    } else {
+      unname(value)
+    }
+  }
+  list(
+    offsetX = number("offset_x", defaults$offsetX),
+    offsetY = number("offset_y", defaults$offsetY),
+    scaleX = number("scale_x", defaults$scaleX, .Machine$double.eps),
+    scaleY = number("scale_y", defaults$scaleY, .Machine$double.eps),
+    flipX = isTRUE(setting[["flip_x"]]),
+    flipY = isTRUE(setting[["flip_y"]]),
+    rotation = number("rotation", defaults$rotation),
+    opacity = number("image_opacity", defaults$opacity, 0, 1)
+  )
+}
+
 ##----------------------------------------------------------------------------##
 ## Guarded bindCache wrapper for plot/reactive outputs.
 ##
@@ -96,6 +195,8 @@ cerebroCellViewScatterPayload <- function(
   selection_keys,
   point_size,
   point_opacity,
+  group_labels = TRUE,
+  keep_square = FALSE,
   color_assignments = NULL,
   hover_info = NULL,
   hover = TRUE,
@@ -105,11 +206,33 @@ cerebroCellViewScatterPayload <- function(
   reset_axes = FALSE,
   n_dimensions = 2L
 ) {
+  dimensions <- if (as.integer(n_dimensions) == 3L) 3L else 2L
+  if (length(coordinates) < dimensions) {
+    stop("coordinates do not contain the requested dimensions")
+  }
+  cell_counts <- c(
+    vapply(coordinates[seq_len(dimensions)], length, integer(1)),
+    color = length(color),
+    selection_keys = length(selection_keys)
+  )
+  if (length(unique(cell_counts)) != 1L) {
+    stop(
+      "coordinates, color, and selection_keys must describe the same number of cells"
+    )
+  }
+
   continuous <- is.numeric(color)
   has_z <- as.integer(n_dimensions) == 3L && length(coordinates) >= 3L
   meta <- list(
     color_type = if (continuous) "continuous" else "categorical",
-    color_variable = color_variable
+    color_variable = color_variable,
+    appearance = list(
+      group_labels = isTRUE(group_labels),
+      draw_border = isTRUE(
+        suppressWarnings(as.numeric(point_line[["width"]])) > 0
+      ),
+      keep_square = isTRUE(keep_square)
+    )
   )
   data <- list(
     x = if (continuous) coordinates[[1L]] else list(),
@@ -137,6 +260,15 @@ cerebroCellViewScatterPayload <- function(
   }
   if (is.null(color_assignments)) {
     stop("color_assignments are required for categorical cell views")
+  }
+  levels_in_view <- unique(as.character(color))
+  levels_in_view <- levels_in_view[!is.na(levels_in_view)]
+  missing_levels <- setdiff(levels_in_view, names(color_assignments))
+  if (length(missing_levels)) {
+    stop(
+      "color_assignments are missing categorical levels: ",
+      paste(missing_levels, collapse = ", ")
+    )
   }
 
   meta[["traces"]] <- list()
@@ -399,65 +531,6 @@ cerebroSelectionSummary <- function(
       )
     }
   )
-}
-
-##----------------------------------------------------------------------------##
-
-## Dynamic default point size for scatter/projection plots.
-##
-## Picks a sensible default marker size from how many points are drawn and how
-## big the plot canvas is, so a dataset of 2k cells and one of 500k cells each
-## start out readable instead of both defaulting to a fixed value that is too
-## fat for the large one (a solid blob) or too thin for the small one (sparse).
-##
-##   - Point count (primary): size decreases logarithmically as points grow, so
-##     dense plots don't smear into one mass and sparse plots stay visible.
-##     Tuned so ~100 pts -> ~9, ~2.7k -> ~6, ~10k -> ~5, ~50k -> ~4, ~200k -> ~2
-##     on the reference canvas.
-##   - Canvas area (secondary): a larger plot can carry slightly larger points
-##     (fills the space), a smaller one shrinks them. Correction is clamped so
-##     it only nudges, never dominates.
-##
-## Returns a value already clamped to [min, max] and rounded to `step`. When the
-## point count is unknown/invalid it returns `fallback` so callers can keep the
-## old fixed default. Canvas dimensions are optional; omit them (NULL) to size
-## on point count alone.
-##----------------------------------------------------------------------------##
-dynamicPointSize <- function(
-  n_points,
-  plot_width_px = NULL,
-  plot_height_px = NULL,
-  min = 1,
-  max = 20,
-  step = 1,
-  fallback = 2
-) {
-  if (is.null(n_points) || !is.finite(n_points) || n_points < 1) {
-    return(fallback)
-  }
-
-  ## primary: logarithmic falloff with point count
-  base <- 13 - 2.0 * log10(n_points)
-
-  ## secondary: gentle canvas-area correction relative to a ~900x700 reference
-  scale <- 1
-  if (
-    !is.null(plot_width_px) &&
-      !is.null(plot_height_px) &&
-      is.finite(plot_width_px) &&
-      is.finite(plot_height_px) &&
-      plot_width_px > 0 &&
-      plot_height_px > 0
-  ) {
-    ref_area <- 900 * 700
-    area <- plot_width_px * plot_height_px
-    scale <- sqrt(area / ref_area)
-    scale <- max(0.75, min(1.35, scale))
-  }
-
-  sz <- base * scale
-  sz <- max(min, min(max, sz))
-  round(sz / step) * step
 }
 
 ##----------------------------------------------------------------------------##
@@ -1180,6 +1253,24 @@ buildHoverInfoForProjections <- function(table) {
     )
   }
   return(hover_info)
+}
+
+##----------------------------------------------------------------------------##
+## Apply inclusive group filters consistently across projection-style tabs.
+##----------------------------------------------------------------------------##
+cerebroGroupFilterMask <- function(metadata, filters) {
+  keep <- rep(TRUE, nrow(metadata))
+  for (group in names(filters)) {
+    if (!group %in% colnames(metadata)) {
+      next
+    }
+    selected <- filters[[group]]
+    if (is.null(selected) || !length(selected)) {
+      return(rep(FALSE, nrow(metadata)))
+    }
+    keep <- keep & metadata[[group]] %in% selected
+  }
+  keep
 }
 
 ##----------------------------------------------------------------------------##
@@ -2159,7 +2250,7 @@ getGroupsWithMostExpressedGenes <- function() {
     return(data_set()$getGroupsWithMostExpressedGenes())
   }
 }
-getMostExpressedGenes <- function(group) {
+viewerGetMostExpressedGenes <- function(group) {
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$getMostExpressedGenes(group))
   }

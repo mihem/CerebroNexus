@@ -658,7 +658,8 @@
     "scale_y",
     "offset_x",
     "offset_y",
-    "rotation"
+    "rotation",
+    "image_opacity"
   )
   logical_fields <- c("flip_x", "flip_y")
 
@@ -784,6 +785,16 @@
               call. = FALSE
             )
           }
+          if (
+            identical(field, "image_opacity") &&
+              (value < 0 || value > 1)
+          ) {
+            stop(
+              context,
+              " setting `image_opacity` must be between 0 and 1.",
+              call. = FALSE
+            )
+          }
         }
         leaf
       })
@@ -795,134 +806,4 @@
   })
   names(normalized) <- datasets
   normalized
-}
-
-#' Normalize one legacy per-dataset image setting
-#'
-#' @keywords internal
-#' @noRd
-.normalizeLegacyAppSpatialSetting <- function(
-  values,
-  argument,
-  field,
-  catalogs,
-  images
-) {
-  if (is.null(values)) {
-    return(NULL)
-  }
-  datasets <- .spatialManifestNames(values, paste0("`", argument, "`"))
-  unknown <- setdiff(datasets, names(catalogs))
-  if (length(unknown) > 0L) {
-    stop(
-      "`",
-      argument,
-      "` dataset `",
-      unknown[[1L]],
-      "` is not present in `cerebro_data`.",
-      call. = FALSE
-    )
-  }
-  logical_field <- field %in% c("flip_x", "flip_y")
-  result <- list()
-  for (i in seq_along(values)) {
-    dataset <- datasets[[i]]
-    value <- values[[i]]
-    valid <- if (logical_field) {
-      is.logical(value) && length(value) == 1L && !is.na(value)
-    } else {
-      is.numeric(value) && length(value) == 1L && is.finite(value)
-    }
-    if (!valid) {
-      type <- if (logical_field) "logical" else "finite numeric"
-      stop("`", argument, "` must contain ", type, " scalars.", call. = FALSE)
-    }
-    migrated_targets <- attr(images, "legacy_external_targets")[[dataset]]
-    targets <- list()
-    target_spatials <- if (is.null(migrated_targets)) {
-      stats::setNames(
-        lapply(names(catalogs[[dataset]]), function(spatial_name) {
-          union(
-            catalogs[[dataset]][[spatial_name]],
-            names(images[[dataset]][[spatial_name]])
-          )
-        }),
-        names(catalogs[[dataset]])
-      )
-    } else {
-      migrated_targets
-    }
-    for (spatial_name in names(target_spatials)) {
-      image_names <- target_spatials[[spatial_name]]
-      for (image_name in image_names) {
-        targets[[length(targets) + 1L]] <- c(spatial_name, image_name)
-      }
-    }
-    if (is.null(migrated_targets) && length(targets) != 1L) {
-      available <- vapply(
-        targets,
-        function(target) paste(target, collapse = "/"),
-        character(1)
-      )
-      detail <- if (length(available) == 0L) {
-        "no image targets are available"
-      } else {
-        paste0("available image targets: ", paste(available, collapse = ", "))
-      }
-      stop(
-        "Legacy `",
-        argument,
-        "` for dataset `",
-        dataset,
-        "` requires exactly one image target; ",
-        detail,
-        ".",
-        call. = FALSE
-      )
-    }
-    for (target in targets) {
-      spatial_name <- target[[1L]]
-      image_name <- target[[2L]]
-      result[[dataset]][[spatial_name]][[image_name]][[field]] <- value
-    }
-  }
-  result
-}
-
-#' Merge normalized per-image setting manifests
-#'
-#' @keywords internal
-#' @noRd
-.mergeAppSpatialImageSettings <- function(current, addition) {
-  if (is.null(addition)) {
-    return(current)
-  }
-  if (is.null(current)) {
-    current <- list()
-  }
-  for (dataset in names(addition)) {
-    for (spatial_name in names(addition[[dataset]])) {
-      for (image_name in names(addition[[dataset]][[spatial_name]])) {
-        leaf <- addition[[dataset]][[spatial_name]][[image_name]]
-        existing <- current[[dataset]][[spatial_name]][[image_name]]
-        conflicts <- intersect(names(existing), names(leaf))
-        if (length(conflicts) > 0L) {
-          stop(
-            "Spatial image setting `",
-            conflicts[[1L]],
-            "` is declared more than once for dataset `",
-            dataset,
-            "` spatial `",
-            spatial_name,
-            "` image `",
-            image_name,
-            "`.",
-            call. = FALSE
-          )
-        }
-        current[[dataset]][[spatial_name]][[image_name]] <- c(existing, leaf)
-      }
-    }
-  }
-  current
 }

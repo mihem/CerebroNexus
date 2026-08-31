@@ -66,7 +66,7 @@ cerebroSettingsSection <- function(title, content, info = NULL) {
       tags$span(title),
       info
     ),
-    content
+    div(class = "cerebro-settings-content", content)
   )
 }
 
@@ -90,6 +90,19 @@ cerebroSettingsDrawer <- function(id, ...) {
       )
     ),
     div(class = "cerebro-settings-body", ...)
+  )
+}
+
+cerebroCellViewOutput <- function(id) {
+  div(
+    id = paste0(id, "_cell_view_host"),
+    class = "coordviews-page cerebro-cell-view-host",
+    `data-cell-view-id` = id,
+    div(class = "cerebro-cell-view-surface", `aria-live` = "polite"),
+    shiny::uiOutput(
+      paste0(id, "_composition"),
+      class = "cerebro-selection-composition-slot"
+    )
   )
 }
 
@@ -488,7 +501,7 @@ ui <- dashboardPage(
     ## self-contained IIFE with its own Shiny-readiness retry, so order-safe).
     ##  - custom.css      : Console design language; overrides AdminLTE 2 chrome.
     ##  - fill_height.js  : sizes any .cerebro-fill element to the live viewport.
-    ##  - trekker.*       : Trekker page assets (scoped under .trekker-page / tk-).
+    ##  - trekker.css     : Trekker insight/QC presentation shared with Linked views.
     ##  - hla_motifs.*    : modebar over the visNetwork motif network.
     tags$head(
       cerebro_css("custom.css"),
@@ -497,7 +510,6 @@ ui <- dashboardPage(
       cerebro_css("coordviews.css"),
       cerebro_js("fill_height.js", defer = TRUE),
       cerebro_js("cv-geom.js", defer = TRUE),
-      cerebro_js("trekker.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
       cerebro_js("viewer-shell.js", defer = TRUE),
       cerebro_js("multiselect.js", defer = TRUE),

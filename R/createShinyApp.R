@@ -47,6 +47,75 @@ dedent <- function(string) {
   paste(lines, collapse = "\n")
 }
 
+.normalizeDatasetNumericOption <- function(
+  value,
+  data_labels,
+  argument,
+  minimum,
+  maximum
+) {
+  supplied_as_list <- is.list(value)
+  if (supplied_as_list) {
+    scalar_numeric <- vapply(
+      value,
+      function(x) is.numeric(x) && length(x) == 1L,
+      logical(1)
+    )
+    if (!all(scalar_numeric)) {
+      stop("'", argument, "' values must be numeric scalars.", call. = FALSE)
+    }
+    value <- unlist(value, use.names = TRUE)
+  }
+  if (!is.numeric(value) || length(value) == 0L) {
+    stop("'", argument, "' must be numeric.", call. = FALSE)
+  }
+  if (length(value) == 1L && !supplied_as_list) {
+    value <- rep(unname(value), length(data_labels))
+    names(value) <- data_labels
+  } else {
+    if (
+      is.null(names(value)) || anyNA(names(value)) || any(names(value) == "")
+    ) {
+      stop(
+        "'",
+        argument,
+        "' must be named when it has multiple values.",
+        call. = FALSE
+      )
+    }
+    if (
+      anyDuplicated(names(value)) ||
+        !setequal(names(value), data_labels) ||
+        length(value) != length(data_labels)
+    ) {
+      stop(
+        "'",
+        argument,
+        "' names must exactly match cerebro_data labels.",
+        call. = FALSE
+      )
+    }
+    value <- value[data_labels]
+  }
+  if (
+    anyNA(value) ||
+      any(!is.finite(value)) ||
+      any(value < minimum | value > maximum)
+  ) {
+    stop(
+      "'",
+      argument,
+      "' values must be between ",
+      minimum,
+      " and ",
+      maximum,
+      ".",
+      call. = FALSE
+    )
+  }
+  value
+}
+
 # Generated app run-option manifest ----------------------------------------
 
 .bundleRunOptions <- function(
@@ -1979,8 +2048,16 @@ dedent <- function(string) {
 #' @param show_upload_ui One non-missing logical controlling whether users may
 #'   upload their own data; defaults to \code{FALSE}.
 #' @param welcome_message Welcome message shown in the Load Data tab.
-#' @param point_size Named list with \code{overview_projection_point_size}
-#'   (and optionally other keys) forwarded to \code{Cerebro.options}.
+#' @param point_size Point size from 1 through 20. Supply one number for every
+#'   dataset, or a named numeric vector/list whose names exactly match
+#'   \code{cerebro_data}. The value initializes every cell scatter view.
+#' @param point_opacity Point opacity from 0.1 through 1. Supply one number for
+#'   every dataset, or a named numeric vector/list whose names exactly match
+#'   \code{cerebro_data}. The value initializes every cell scatter view.
+#' @param percentage_cells_to_show Percentage of cells from 10 through 100.
+#'   Supply one number for every dataset, or a named numeric vector/list whose
+#'   names exactly match \code{cerebro_data}. The value initializes every cell
+#'   scatter view; subsequent UI changes remain page-local.
 #' @param variable_to_compare Forwarded to \code{Cerebro.options}.
 #' @param spatial_images Optional nested external-image manifest in
 #'   \code{dataset -> spatial entry -> image label -> path} form. Dataset names
@@ -1995,34 +2072,12 @@ dedent <- function(string) {
 #'   \code{dataset -> spatial entry -> image label -> settings} form. Settings
 #'   may contain only \code{flip_x}, \code{flip_y}, \code{scale_x},
 #'   \code{scale_y}, \code{offset_x}, \code{offset_y}, and \code{rotation}.
+#'   \code{image_opacity} may additionally set the initial image opacity from
+#'   0 through 1.
 #'   A leaf may target an embedded or external image available under that exact
 #'   dataset and spatial entry. The image label must exist in the union of the
 #'   CRB's embedded images and this call's \code{spatial_images}; unknown
 #'   identities are rejected. Labels are user-facing names, not protocol names.
-#' @param spatial_images_flip_x Legacy named per-dataset horizontal flip values.
-#'   Each dataset must resolve to exactly one spatial image target, unless a
-#'   legacy multi-path \code{spatial_images} declaration was migrated; then the
-#'   value applies to every migrated external image.
-#' @param spatial_images_flip_y Legacy named per-dataset vertical flip values.
-#'   Each dataset must resolve to exactly one spatial image target, unless a
-#'   legacy multi-path \code{spatial_images} declaration was migrated; then the
-#'   value applies to every migrated external image.
-#' @param spatial_images_scale_x Legacy named per-dataset X scale values. Each
-#'   dataset must resolve to exactly one spatial image target, unless a legacy
-#'   multi-path \code{spatial_images} declaration was migrated; then the value
-#'   applies to every migrated external image.
-#' @param spatial_images_scale_y Legacy named per-dataset Y scale values. Each
-#'   dataset must resolve to exactly one spatial image target, unless a legacy
-#'   multi-path \code{spatial_images} declaration was migrated; then the value
-#'   applies to every migrated external image.
-#' @param spatial_images_offset_x Legacy named per-dataset horizontal offsets.
-#'   Each dataset must resolve to exactly one spatial image target, unless a
-#'   legacy multi-path \code{spatial_images} declaration was migrated; then the
-#'   value applies to every migrated external image.
-#' @param spatial_images_offset_y Legacy named per-dataset vertical offsets.
-#'   Each dataset must resolve to exactly one spatial image target, unless a
-#'   legacy multi-path \code{spatial_images} declaration was migrated; then the
-#'   value applies to every migrated external image.
 #' @param spatial_plot_rotation Named list/vector; initial rotation (degrees)
 #'   applied to spatial cell coordinates. Names must match \code{cerebro_data}.
 #' @param auth Optional authentication settings. \code{NULL}, the default,
@@ -2031,7 +2086,6 @@ dedent <- function(string) {
 #'   created by \code{shinymanager::create_db()}, and \code{passphrase_env},
 #'   the name of the environment variable containing its passphrase. Optional
 #'   \code{timeout_minutes} defaults to 15.
-#' @param ... Currently unused; reserved for future arguments.
 #'
 #' @return Invisibly returns \code{result_dir}. If that path changes resolution
 #'   during the build, warns and returns the frozen absolute publication path.
@@ -2072,21 +2126,14 @@ createShinyApp <- function(
   crb_pick_smallest_file = TRUE,
   show_upload_ui = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
-  point_size = list(
-    overview_projection_point_size = NULL
-  ),
+  point_size = 5,
+  point_opacity = 1,
+  percentage_cells_to_show = 100,
   variable_to_compare = NULL,
   spatial_images = NULL,
   spatial_image_settings = NULL,
-  spatial_images_flip_x = NULL,
-  spatial_images_flip_y = NULL,
-  spatial_images_scale_x = NULL,
-  spatial_images_scale_y = NULL,
-  spatial_images_offset_x = NULL,
-  spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
-  auth = NULL,
-  ...
+  auth = NULL
 ) {
   # Validate inputs ----------------------------------------------------------##
   if (is.list(cerebro_data)) {
@@ -2148,17 +2195,41 @@ createShinyApp <- function(
   if (anyDuplicated(data_labels)) {
     stop("cerebro_data labels must be unique.", call. = FALSE)
   }
-  builder_spatial_options <- c(
-    "spatial_images",
-    "spatial_image_settings",
-    "spatial_images_flip_x",
-    "spatial_images_flip_y",
-    "spatial_images_scale_x",
-    "spatial_images_scale_y",
-    "spatial_images_offset_x",
-    "spatial_images_offset_y"
+  point_size <- .normalizeDatasetNumericOption(
+    point_size,
+    data_labels,
+    "point_size",
+    1,
+    20
   )
+  point_opacity <- .normalizeDatasetNumericOption(
+    point_opacity,
+    data_labels,
+    "point_opacity",
+    0.1,
+    1
+  )
+  percentage_cells_to_show <- .normalizeDatasetNumericOption(
+    percentage_cells_to_show,
+    data_labels,
+    "percentage_cells_to_show",
+    10,
+    100
+  )
+  builder_spatial_options <- c("spatial_images", "spatial_image_settings")
   supplied_option_names <- names(cerebro_options)
+  duplicate_scatter_options <- intersect(
+    supplied_option_names,
+    c("point_size", "point_opacity", "percentage_cells_to_show")
+  )
+  if (length(duplicate_scatter_options)) {
+    stop(
+      "Supply ",
+      paste(duplicate_scatter_options, collapse = " and "),
+      " through the matching createShinyApp() parameter, not cerebro_options.",
+      call. = FALSE
+    )
+  }
   forbidden_spatial_options <- unique(intersect(
     supplied_option_names,
     builder_spatial_options
@@ -2379,27 +2450,6 @@ createShinyApp <- function(
     spatial_catalogs,
     spatial_images
   )
-  legacy_settings <- list(
-    spatial_images_flip_x = "flip_x",
-    spatial_images_flip_y = "flip_y",
-    spatial_images_scale_x = "scale_x",
-    spatial_images_scale_y = "scale_y",
-    spatial_images_offset_x = "offset_x",
-    spatial_images_offset_y = "offset_y"
-  )
-  for (argument in names(legacy_settings)) {
-    addition <- .normalizeLegacyAppSpatialSetting(
-      get(argument, inherits = FALSE),
-      argument,
-      legacy_settings[[argument]],
-      spatial_catalogs,
-      spatial_images
-    )
-    spatial_image_settings <- .mergeAppSpatialImageSettings(
-      spatial_image_settings,
-      addition
-    )
-  }
   crb_targets <- paste0(private_data_root, "/", basename(cerebro_data))
   copy_plan <- list()
   claimed_targets <- character()
@@ -2797,9 +2847,9 @@ createShinyApp <- function(
   if (!is.null(show_upload_ui)) {
     cerebro_options[["show_upload_ui"]] <- show_upload_ui
   }
-  if (!is.null(point_size)) {
-    cerebro_options[["point_size"]] <- point_size
-  }
+  cerebro_options[["point_size"]] <- point_size
+  cerebro_options[["point_opacity"]] <- point_opacity
+  cerebro_options[["percentage_cells_to_show"]] <- percentage_cells_to_show
   if (!is.null(colors)) {
     cerebro_options[["colors"]] <- colors
   }

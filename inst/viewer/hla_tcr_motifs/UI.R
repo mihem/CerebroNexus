@@ -35,17 +35,20 @@ tab_hla_tcr_motifs <- tabItem(
         cerebroSettingsDrawer(
           "hla_more",
           cerebroSettingsSection(
-            "Analysis",
-            uiOutput("hla_more_parameters_ui")
-          ),
-          cerebroSettingsSection(
             "Appearance",
             uiOutput("hla_additional_params_ui"),
             cerebroInfoButton("hla_additional_parameters_info")
           ),
           cerebroSettingsSection(
+            "Analysis",
+            uiOutput("hla_more_parameters_ui")
+          ),
+          cerebroSettingsSection(
             "Evidence status",
-            uiOutput("hla_status_ui"),
+            div(
+              class = "cerebro-settings-full",
+              uiOutput("hla_status_ui")
+            ),
             cerebroInfoButton("hla_status_info")
           )
         )

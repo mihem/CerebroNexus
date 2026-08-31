@@ -21,7 +21,8 @@ test_that("emits every option under the canonical image identity", {
     scale_y = 1.55,
     flip_x = FALSE,
     flip_y = TRUE,
-    rotation = 0
+    rotation = 0,
+    image_opacity = 0.8
   )
   expect_true(grepl(
     '"Spatial atlas" = list(',
@@ -48,6 +49,7 @@ test_that("emits every option under the canonical image identity", {
     out,
     fixed = TRUE
   ))
+  expect_match(out, "image_opacity = 0.8", fixed = TRUE)
 })
 
 test_that("preserves identity values in a complete image preset", {

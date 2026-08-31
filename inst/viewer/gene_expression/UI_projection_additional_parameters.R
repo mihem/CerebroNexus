@@ -2,26 +2,30 @@
 ## UI elements to set additional plotting parameters.
 ##----------------------------------------------------------------------------##
 output[["expression_projection_additional_parameters_UI"]] <- renderUI({
-  ## Dynamic default point size from cell count + canvas size, falling back to
-  ## the configured fixed default if either is unavailable.
-  point_size_default <- tryCatch(
-    dynamicPointSize(
-      n_points = nrow(getMetaData()),
-      plot_width_px = session$clientData[[
-        "output_expression_projection_width"
-      ]],
-      plot_height_px = session$clientData[[
-        "output_expression_projection_height"
-      ]],
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
+  appearance <- current_scatter_defaults()
+
+  tagList(
+    sliderInput(
+      "expression_projection_point_size",
+      label = "Point size",
+      min = preferences[["cell_point_size"]][["min"]],
+      max = preferences[["cell_point_size"]][["max"]],
+      step = preferences[["cell_point_size"]][["step"]],
+      value = appearance$point_size
     ),
-    error = function(e) {
-      preferences[["gene_expression_plot_point_size"]][["default"]]
-    }
+    sliderInput(
+      "expression_projection_point_opacity",
+      label = "Point opacity",
+      min = preferences[["cell_point_opacity"]][["min"]],
+      max = preferences[["cell_point_opacity"]][["max"]],
+      step = preferences[["cell_point_opacity"]][["step"]],
+      value = appearance$point_opacity
+    )
   )
+})
+
+output[["expression_projection_data_parameters_UI"]] <- renderUI({
+  appearance <- current_scatter_defaults()
 
   tagList(
     selectInput(
@@ -31,45 +35,31 @@ output[["expression_projection_additional_parameters_UI"]] <- renderUI({
       selected = "Highest expression on top"
     ),
     sliderInput(
-      "expression_projection_point_size",
-      label = "Point size",
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      value = point_size_default
-    ),
-    sliderInput(
-      "expression_projection_point_opacity",
-      label = "Point opacity",
-      min = preferences[["gene_expression_plot_point_opacity"]][["min"]],
-      max = preferences[["gene_expression_plot_point_opacity"]][["max"]],
-      step = preferences[["gene_expression_plot_point_opacity"]][["step"]],
-      value = preferences[["gene_expression_plot_point_opacity"]][["default"]]
-    ),
-    sliderInput(
       "expression_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      min = preferences[["cell_percentage_cells_to_show"]][[
         "min"
       ]],
-      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      max = preferences[["cell_percentage_cells_to_show"]][[
         "max"
       ]],
-      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      step = preferences[["cell_percentage_cells_to_show"]][[
         "step"
       ]],
-      value = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
-        "default"
-      ]]
+      value = appearance$percentage_cells_to_show
     )
   )
 })
 
-
-## make sure elements are loaded even though the box is collapsed
+## Keep controls available while the settings drawer is hidden.
 outputOptions(
   output,
   "expression_projection_additional_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "expression_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 

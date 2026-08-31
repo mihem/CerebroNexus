@@ -126,10 +126,16 @@ output$hla_parameters_ui <- renderUI({
 ## ---- Secondary analysis parameters ------------------------------------ ##
 output$hla_more_parameters_ui <- renderUI({
   tagList(
-    uiOutput("hla_scope_status"),
+    div(
+      class = "cerebro-settings-full",
+      uiOutput("hla_scope_status")
+    ),
     # Live read-out of what the current threshold actually shows, so the effect
     # of moving the slider is visible without guessing.
-    uiOutput("hla_motif_readout"),
+    div(
+      class = "cerebro-settings-full",
+      uiOutput("hla_motif_readout")
+    ),
     checkboxInput(
       "hla_by_v",
       "Split motifs by V gene",
@@ -144,7 +150,7 @@ output$hla_more_parameters_ui <- renderUI({
     # or like bad data. It is neither: it has too many levels to read as colour.
     if (length(hla_color_cols_dropped()) > 0) {
       tags$p(
-        class = "text-muted",
+        class = "text-muted cerebro-settings-full",
         style = "font-size: 11px;",
         sprintf(
           paste(
@@ -157,7 +163,7 @@ output$hla_more_parameters_ui <- renderUI({
       )
     },
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       "Edges use Hamming distance 1 (fixed)."
     )
@@ -195,14 +201,11 @@ observeEvent(
   ignoreInit = TRUE
 )
 
-## ---- Additional parameters (collapsed by default) --------------------- ##
+## ---- Appearance controls (settings drawer) ---------------------------- ##
 ## Display-only controls: nothing here rebuilds the graph.
 ##
-## The box ships collapsed, and Shiny suspends a hidden output — but
-## shinydashboard's collapse animation never triggers a recalculation, so the
-## control stayed empty even after the user opened the box. Unsuspend it. Safe
-## here precisely because this UI is static: it reads no data set, so it cannot
-## drag reactive work into a hidden panel (cf. the spatial_images regression).
+## The drawer starts hidden, so keep this static output available for its first
+## open without pulling data-dependent work into the hidden panel.
 output$hla_additional_params_ui <- renderUI({
   tagList(
     radioButtons(
@@ -217,7 +220,7 @@ output$hla_additional_params_ui <- renderUI({
       inline = TRUE
     ),
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       sprintf(
         paste(
@@ -237,7 +240,7 @@ output$hla_additional_params_ui <- renderUI({
       step = 0.1
     ),
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       paste(
         "Display only: it scales every node and the size cap by the same",

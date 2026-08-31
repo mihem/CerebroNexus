@@ -32,16 +32,24 @@ output[["spatial_projection_UI"]] <- renderUI({
                 uiOutput("spatial_projection_scatter_parameters_UI"),
                 uiOutput("spatial_projection_show_group_label_UI"),
                 uiOutput("spatial_projection_point_border_UI"),
-                uiOutput("spatial_projection_scales_UI")
+                checkboxInput(
+                  "spatial_projection_keep_square",
+                  "Keep plots square",
+                  value = FALSE
+                )
               ),
               cerebroInfoButton(
                 "spatial_projection_additional_parameters_info"
               )
             ),
             cerebroSettingsSection(
+              "Data",
+              uiOutput("spatial_projection_data_parameters_UI")
+            ),
+            cerebroSettingsSection(
               "Background image",
-              tagList(
-                uiOutput("spatial_projection_background_select_UI"),
+              div(
+                class = "spatial-image-controls",
                 uiOutput("spatial_projection_background_parameters_UI")
               )
             ),

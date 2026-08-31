@@ -156,13 +156,70 @@ test_that("background-image selection only recreates image calibration controls"
     projection_ui,
     'uiOutput\\("spatial_projection_scatter_parameters_UI"\\)'
   )
-  expect_match(
+  expect_no_match(
     projection_ui,
     'uiOutput\\("spatial_projection_background_select_UI"\\)'
+  )
+  main_parameters_ui <- paste(
+    readLines(file.path(
+      shiny_root,
+      "spatial",
+      "UI_projection_main_parameters.R"
+    )),
+    collapse = "\n"
+  )
+  expect_match(
+    main_parameters_ui,
+    'label = "Color cells by"[\\s\\S]{0,320}"spatial_projection_background_image"',
+    perl = TRUE
   )
   expect_match(
     projection_ui,
     'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
+  )
+  expect_match(
+    projection_ui,
+    'class = "spatial-image-controls"',
+    fixed = TRUE
+  )
+  additional_ui <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "UI_projection_additional_parameters.R")
+    ),
+    collapse = "\n"
+  )
+  for (class_name in c(
+    "cerebroSettingsSection(",
+    "cerebro-settings-content",
+    "cerebro-settings-full",
+    "spatial-image-offset-row",
+    "spatial-image-actions"
+  )) {
+    expect_match(additional_ui, class_name, fixed = TRUE)
+  }
+  expect_match(additional_ui, 'paste0(id, "_num")', fixed = TRUE)
+  for (obsolete_class in c(
+    "spatial-image-control-group",
+    "spatial-image-transform-group",
+    "spatial-image-scale-pair",
+    "spatial-image-flips"
+  )) {
+    expect_no_match(additional_ui, obsolete_class, fixed = TRUE)
+  }
+  settings_css <- paste(
+    readLines(file.path(shiny_root, "www", "custom.css")),
+    collapse = "\n"
+  )
+  expect_match(settings_css, ".spatial-image-offset-row {", fixed = TRUE)
+  expect_match(
+    settings_css,
+    ".cerebro-settings-section {",
+    fixed = TRUE
+  )
+  expect_no_match(
+    settings_css,
+    ".spatial-image-controls .shiny-panel-conditional {\n  display: grid;",
+    fixed = TRUE
   )
   expect_match(projection_ui, '"Appearance"', fixed = TRUE)
   expect_match(projection_ui, '"Background image"', fixed = TRUE)
@@ -198,28 +255,6 @@ test_that("ImageFeaturePlot reaches getExpressionMatrix as a Cerebro method", {
       )
     }
   }
-})
-
-test_that("plot update guards against a colour variable absent from metadata", {
-  # Switching the loaded .crb can leave the point-colour dropdown holding a
-  # column from the previous dataset (e.g. Xenium "cluster" vs MERFISH
-  # "cell_type"). Colouring by a missing column makes the downstream
-  # dplyr::group_by() error and freezes the plot on the old data. The render
-  # function must fall back to a valid metadata column. Assert the guard survives
-  # (cross-line tolerant per project convention).
-  fpath <- file.path(shiny_root, "spatial", "func_projection_update_plot.R")
-  skip_if_not(file.exists(fpath), message = "spatial update module missing")
-  src <- paste(readLines(fpath), collapse = "\n")
-  expect_match(
-    src,
-    "color_variable[\\s\\S]{0,80}%in%[\\s\\S]{0,20}colnames\\(metadata\\)",
-    perl = TRUE
-  )
-  expect_match(
-    src,
-    "color_variable[\\s\\S]{0,40}<-[\\s\\S]{0,40}colnames\\(metadata\\)\\[1\\]",
-    perl = TRUE
-  )
 })
 
 test_that("group_filters widget the spatial tab depends on is present", {
@@ -280,23 +315,57 @@ test_that("Spatial tab is wired into the app UI and server", {
 ## Spatial background image: createShinyApp production channel + demo wiring.
 ##----------------------------------------------------------------------------##
 
-test_that("createShinyApp accepts the spatial_images parameters", {
-  # Guard the production API surface: every spatial_images* arg must be part of
-  # the formals so downstream users can pass histology backgrounds and their
-  # per-dataset alignment defaults (flip / scale / move / rotate).
+test_that("createShinyApp exposes only the nested spatial image settings API", {
   args <- names(formals(createShinyApp))
-  for (a in c(
-    "spatial_images",
-    "spatial_image_settings",
-    "spatial_images_flip_x",
-    "spatial_images_flip_y",
-    "spatial_images_scale_x",
-    "spatial_images_scale_y",
-    "spatial_images_offset_x",
-    "spatial_images_offset_y",
-    "spatial_plot_rotation"
+  expect_true("spatial_images" %in% args)
+  expect_true("spatial_image_settings" %in% args)
+  expect_true("spatial_plot_rotation" %in% args)
+  expect_false("..." %in% args)
+  expect_false(any(
+    c(
+      "spatial_images_flip_x",
+      "spatial_images_flip_y",
+      "spatial_images_scale_x",
+      "spatial_images_scale_y",
+      "spatial_images_offset_x",
+      "spatial_images_offset_y"
+    ) %in%
+      args
+  ))
+})
+
+test_that("Spatial UI seeds and resets every field from the shared image preset", {
+  ui <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "UI_projection_additional_parameters.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  controls <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "obj_projection_background_controls.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  expect_match(
+    ui,
+    "spatial_projection_background_opacity[\\s\\S]{0,120}value = preset\\$opacity",
+    perl = TRUE
+  )
+  expect_match(
+    controls,
+    "spatial_projection_background_opacity[\\s\\S]{0,120}value = preset\\$opacity",
+    perl = TRUE
+  )
+  for (numeric_id in c(
+    "spatial_projection_background_scale_num",
+    "spatial_projection_background_scale_x_num",
+    "spatial_projection_background_scale_y_num",
+    "spatial_projection_background_rotate_num"
   )) {
-    expect_true(a %in% args, info = a)
+    expect_match(controls, numeric_id, fixed = TRUE)
   }
 })
 
@@ -682,15 +751,11 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
     main_html <- as.character(
       output$spatial_projection_main_parameters_UI$html
     )
-    background_html <- as.character(
-      output$spatial_projection_background_select_UI$html
-    )
-
     expect_match(main_html, 'value="sliceB" selected', fixed = TRUE)
-    expect_match(background_html, "embedded::IF", fixed = TRUE)
-    expect_match(background_html, "external::MIBI", fixed = TRUE)
-    expect_false(grepl("embedded::H&amp;E", background_html, fixed = TRUE))
-    expect_false(grepl("external::DAPI", background_html, fixed = TRUE))
+    expect_match(main_html, "embedded::IF", fixed = TRUE)
+    expect_match(main_html, "external::MIBI", fixed = TRUE)
+    expect_false(grepl("embedded::H&amp;E", main_html, fixed = TRUE))
+    expect_false(grepl("external::DAPI", main_html, fixed = TRUE))
     expect_identical(getSpatialData("sliceB")$coordinates$x, 101:102)
   })
 })

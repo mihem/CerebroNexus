@@ -2,7 +2,7 @@
 ## UI elements with switch to draw border around cells.
 ##----------------------------------------------------------------------------##
 output[["spatial_projection_point_border_UI"]] <- renderUI({
-  shinyWidgets::awesomeCheckbox(
+  checkboxInput(
     inputId = "spatial_projection_point_border",
     label = "Draw border around cells",
     value = FALSE

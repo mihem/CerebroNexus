@@ -227,16 +227,11 @@ cv_selected_viewer_content <- function() {
   configured[[dataset]]
 }
 
-## Builder alignment carries both image and point appearance. Bounds already
-## contain its geometric transform, so Linked views only needs these appearance
-## scalars and must validate them before they become client defaults.
+## Bounds already contain Builder geometry; only background opacity belongs to
+## image alignment. Cell point appearance is dataset-wide.
 cv_alignment_appearance <- function(alignment) {
   if (!is.list(alignment)) {
-    return(list(
-      image_opacity = NULL,
-      point_opacity = NULL,
-      point_size = NULL
-    ))
+    return(list(image_opacity = NULL))
   }
   number <- function(key, lower, upper, lower_open = FALSE) {
     value <- suppressWarnings(as.numeric(alignment[[key]]))
@@ -253,67 +248,19 @@ cv_alignment_appearance <- function(alignment) {
       unname(value)
     }
   }
-  list(
-    image_opacity = number("image_opacity", 0, 1),
-    point_opacity = number("point_opacity", 0, 1),
-    point_size = number("point_size", 0, 20, lower_open = TRUE)
-  )
+  list(image_opacity = number("image_opacity", 0, 1))
 }
 
 ## Convert one public per-image settings leaf to the JavaScript transform
 ## contract. The same helper is used for embedded and external backgrounds:
 ## createShinyApp() intentionally allows a setting to target either kind.
 cv_image_preset <- function(spatial_name, image_label) {
-  defaults <- list(
-    offsetX = 0,
-    offsetY = 0,
-    scaleX = 1,
-    scaleY = 1,
-    flipX = FALSE,
-    flipY = FALSE,
-    rotation = 0,
-    opacity = 0.6
+  spatialImagePreset(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    cv_selected_dataset_name(),
+    spatial_name,
+    image_label
   )
-  if (!exists("Cerebro.options")) {
-    return(defaults)
-  }
-  dataset <- cv_selected_dataset_name()
-  settings <- Cerebro.options[["spatial_image_settings"]]
-  if (
-    is.null(dataset) ||
-      is.null(settings) ||
-      !(dataset %in% names(settings)) ||
-      !(spatial_name %in% names(settings[[dataset]])) ||
-      !(image_label %in% names(settings[[dataset]][[spatial_name]]))
-  ) {
-    return(defaults)
-  }
-  setting <- settings[[dataset]][[spatial_name]][[image_label]]
-  number <- function(key, default) {
-    value <- suppressWarnings(as.numeric(setting[[key]] %||% default))
-    if (length(value) != 1L || is.na(value) || !is.finite(value)) {
-      default
-    } else {
-      unname(value)
-    }
-  }
-  preset <- list(
-    offsetX = number("offset_x", defaults$offsetX),
-    offsetY = number("offset_y", defaults$offsetY),
-    scaleX = number("scale_x", defaults$scaleX),
-    scaleY = number("scale_y", defaults$scaleY),
-    flipX = isTRUE(setting[["flip_x"]]),
-    flipY = isTRUE(setting[["flip_y"]]),
-    rotation = number("rotation", defaults$rotation),
-    opacity = number("image_opacity", defaults$opacity)
-  )
-  if (!is.null(setting[["point_opacity"]])) {
-    preset$pointOpacity <- number("point_opacity", 0.8)
-  }
-  if (!is.null(setting[["point_size"]])) {
-    preset$pointSize <- number("point_size", 3)
-  }
-  preset
 }
 
 ## Overlay the alignment stored beside one embedded image onto the generic
@@ -345,11 +292,6 @@ cv_embedded_alignment_preset <- function(preset, alignment) {
     preset$flipY <- isTRUE(alignment[["flip_y"]])
   }
   preset$opacity <- number("image_opacity", preset$opacity)
-  preset$pointOpacity <- number(
-    "point_opacity",
-    preset$pointOpacity %||% 0.8
-  )
-  preset$pointSize <- number("point_size", preset$pointSize %||% 3)
   ## The Builder serializes embedded pixels after applying this geometry and
   ## writes their final data-space bounds. Viewer controls still expose the
   ## saved calibration, but drawing must apply only changes relative to it.
@@ -881,7 +823,7 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
   if (is.null(embedded) || !length(embedded)) {
     legacy_image <- sd[["histology_image", exact = TRUE]]
     embedded <- if (!is.null(legacy_image)) {
-      list("Embedded histology" = legacy_image)
+      list("Tissue background" = legacy_image)
     } else {
       list()
     }
@@ -935,12 +877,6 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
     entry_appearance <- cv_alignment_appearance(entry_alignment)
     if (length(entry_appearance$image_opacity) == 1L) {
       preset$opacity <- entry_appearance$image_opacity
-    }
-    if (length(entry_appearance$point_opacity) == 1L) {
-      preset$pointOpacity <- entry_appearance$point_opacity
-    }
-    if (length(entry_appearance$point_size) == 1L) {
-      preset$pointSize <- entry_appearance$point_size
     }
     alignment_source <- if (is.list(alignment)) {
       as.character(alignment$source %||% character())
@@ -1012,9 +948,7 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
     ## `image` is the default one, kept so anything reading the older singular
     ## contract still works; `images` is the list the picker is built from.
     image = image,
-    images = images,
-    point_opacity = appearance$point_opacity,
-    point_size = appearance$point_size
+    images = images
   )
 }
 
@@ -1062,14 +996,10 @@ cv_build_spatial <- function(crb, cells) {
         x = I(s$x),
         y = I(s$y),
         image = s$image,
-        images = I(s$images),
-        builder_point_opacity = s$point_opacity,
-        builder_point_size = s$point_size
+        images = I(s$images)
       )
     })
   }
-  space$builder_point_opacity <- first$point_opacity
-  space$builder_point_size <- first$point_size
   space
 }
 
@@ -1172,8 +1102,6 @@ cv_build_trekker <- function(crb, cells, md) {
     space$images <- I(list(image_entry))
     space$background_scope <- "Trekker"
   }
-  space$builder_point_opacity <- appearance$point_opacity
-  space$builder_point_size <- appearance$point_size
   ## Bring the Trekker page's extra controls into Linked views: continuous
   ## physical fields to colour by, per-cell positioning confidence (dissolve),
   ## and a positioning-evidence flag (nuclei markers). All aligned to `cells`;
@@ -1448,83 +1376,13 @@ cv_build_bundle <- function(crb) {
   projections <- cv_build_projections(crb, cells)
   viewer_content <- cv_selected_viewer_content()
   default_projection <- NULL
-  default_point_size <- suppressWarnings(
-    as.numeric(viewer_content[["overview_point_size"]])
+  appearance <- viewerScatterDefaults(
+    if (exists("Cerebro.options")) Cerebro.options else list(),
+    cv_selected_dataset_name()
   )
-  default_percentage_cells_to_show <- suppressWarnings(
-    as.numeric(viewer_content[["overview_percentage_cells_to_show"]])
-  )
-  if (
-    length(default_point_size) != 1L ||
-      is.na(default_point_size) ||
-      !is.finite(default_point_size)
-  ) {
-    default_point_size <- suppressWarnings(as.numeric(
-      if (
-        exists("Cerebro.options") &&
-          !is.null(Cerebro.options[["point_size"]][[
-            "overview_projection_point_size"
-          ]])
-      ) {
-        Cerebro.options[["point_size"]][["overview_projection_point_size"]]
-      } else if (
-        exists("Cerebro.options") &&
-          !is.null(Cerebro.options[["overview_default_point_size"]])
-      ) {
-        Cerebro.options[["overview_default_point_size"]]
-      } else {
-        2
-      }
-    ))
-  } else {
-    default_point_size <- unname(default_point_size)
-  }
-  if (
-    length(default_point_size) != 1L ||
-      is.na(default_point_size) ||
-      !is.finite(default_point_size) ||
-      default_point_size < 1 ||
-      default_point_size > 20
-  ) {
-    default_point_size <- 2
-  }
-  if (
-    length(default_percentage_cells_to_show) != 1L ||
-      is.na(default_percentage_cells_to_show) ||
-      !is.finite(default_percentage_cells_to_show) ||
-      default_percentage_cells_to_show < 10 ||
-      default_percentage_cells_to_show > 100
-  ) {
-    default_percentage_cells_to_show <- 100
-  } else {
-    default_percentage_cells_to_show <- unname(
-      default_percentage_cells_to_show
-    )
-  }
-  default_point_opacity <- suppressWarnings(as.numeric(
-    if (
-      exists("Cerebro.options") &&
-        !is.null(Cerebro.options[["projection_default_point_opacity"]])
-    ) {
-      Cerebro.options[["projection_default_point_opacity"]]
-    } else if (
-      exists("Cerebro.options") &&
-        !is.null(Cerebro.options[["overview_default_point_opacity"]])
-    ) {
-      Cerebro.options[["overview_default_point_opacity"]]
-    } else {
-      1
-    }
-  ))
-  if (
-    length(default_point_opacity) != 1L ||
-      is.na(default_point_opacity) ||
-      !is.finite(default_point_opacity) ||
-      default_point_opacity < 0 ||
-      default_point_opacity > 1
-  ) {
-    default_point_opacity <- 1
-  }
+  default_point_size <- appearance$point_size
+  default_percentage_cells_to_show <- appearance$percentage_cells_to_show
+  default_point_opacity <- appearance$point_opacity
   spaces <- list()
   if (length(projections)) {
     configured_projection <- viewer_content[["default_projection"]]

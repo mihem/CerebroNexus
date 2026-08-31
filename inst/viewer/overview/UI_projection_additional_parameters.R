@@ -2,56 +2,41 @@
 ## UI elements to set additional parameters for the projection.
 ##----------------------------------------------------------------------------##
 output[["overview_projection_additional_parameters_UI"]] <- renderUI({
-  ## Dynamic default point size from cell count + canvas size, falling back to
-  ## the configured fixed default if either is unavailable.
-  point_size_default <- tryCatch(
-    dynamicPointSize(
-      n_points = nrow(getMetaData()),
-      plot_width_px = session$clientData[["output_overview_projection_width"]],
-      plot_height_px = session$clientData[[
-        "output_overview_projection_height"
-      ]],
-      min = preferences[["projection_plot_point_size"]][["min"]],
-      max = preferences[["projection_plot_point_size"]][["max"]],
-      step = preferences[["projection_plot_point_size"]][["step"]],
-      fallback = preferences[["projection_plot_point_size"]][["default"]]
-    ),
-    error = function(e) preferences[["projection_plot_point_size"]][["default"]]
-  )
+  appearance <- current_scatter_defaults()
 
   tagList(
     sliderInput(
       "overview_projection_point_size",
       label = "Point size",
-      min = preferences[["projection_plot_point_size"]][["min"]],
-      max = preferences[["projection_plot_point_size"]][["max"]],
-      step = preferences[["projection_plot_point_size"]][["step"]],
-      value = point_size_default
+      min = preferences[["cell_point_size"]][["min"]],
+      max = preferences[["cell_point_size"]][["max"]],
+      step = preferences[["cell_point_size"]][["step"]],
+      value = appearance$point_size
     ),
     sliderInput(
       "overview_projection_point_opacity",
       label = "Point opacity",
-      min = preferences[["projection_plot_point_opacity"]][["min"]],
-      max = preferences[["projection_plot_point_opacity"]][["max"]],
-      step = preferences[["projection_plot_point_opacity"]][["step"]],
-      value = preferences[["projection_plot_point_opacity"]][["default"]]
+      min = preferences[["cell_point_opacity"]][["min"]],
+      max = preferences[["cell_point_opacity"]][["max"]],
+      step = preferences[["cell_point_opacity"]][["step"]],
+      value = appearance$point_opacity
     )
   )
 })
 
 output[["overview_projection_data_parameters_UI"]] <- renderUI({
+  appearance <- current_scatter_defaults()
+
   tagList(
     sliderInput(
       "overview_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["projection_plot_percentage_cells_to_show"]][["min"]],
-      max = preferences[["projection_plot_percentage_cells_to_show"]][["max"]],
-      step = preferences[["projection_plot_percentage_cells_to_show"]][[
+      min = preferences[["cell_percentage_cells_to_show"]][["min"]],
+      max = preferences[["cell_percentage_cells_to_show"]][["max"]],
+      step = preferences[["cell_percentage_cells_to_show"]][[
         "step"
       ]],
-      value = preferences[["projection_plot_percentage_cells_to_show"]][[
-        "default"
-      ]]
+      value = appearance$percentage_cells_to_show
     )
   )
 })
@@ -86,7 +71,6 @@ observeEvent(input[["overview_projection_additional_parameters_info"]], {
 ##----------------------------------------------------------------------------##
 ## Text in info box.
 ##----------------------------------------------------------------------------##
-# <li><b>Range of X/Y axis (located in dropdown menu above the projection):</b> Set the X/Y axis limits. This is useful when you want to change the aspect ratio of the plot.</li>
 overview_projection_additional_parameters_info <- list(
   title = "Additional parameters for projection",
   text = HTML(

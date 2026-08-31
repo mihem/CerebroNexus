@@ -29,15 +29,11 @@ tab_immune_repertoire <- tabItem(
         cerebroSettingsButton("ir_more_button", "ir_more"),
         cerebroSettingsDrawer(
           "ir_more",
+          uiOutput("ir_appearance_section_UI"),
           cerebroSettingsSection(
             "Analysis",
             uiOutput("ir_more_analysis_UI"),
             cerebroInfoButton("ir_more_analysis_info")
-          ),
-          cerebroSettingsSection(
-            "Appearance",
-            uiOutput("ir_additional_params_UI"),
-            cerebroInfoButton("ir_additional_parameters_info")
           ),
           cerebroSettingsSection(
             "Group filters",

@@ -5,8 +5,8 @@ output[["overview_projection_show_group_label_UI"]] <- renderUI({
   req(input[["overview_projection_point_color"]])
   if (input[["overview_projection_point_color"]] %in% getGroups()) {
     checkboxInput(
-      inputId = "overview_projection_show_group_label",
-      label = "Plot group labels in exported PDF",
+      inputId = "overview_projection_group_labels",
+      label = "Group labels",
       value = TRUE
     )
   }

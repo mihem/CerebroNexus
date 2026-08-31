@@ -13,7 +13,7 @@ cv_repo_file <- function(...) {
 test_that("the Viewer loads shared linked-view geometry helpers", {
   ui_file <- cv_repo_file("inst", "viewer", "shiny_UI.R")
   geom_file <- cv_repo_file("inst", "viewer", "www", "cv-geom.js")
-  trekker_file <- cv_repo_file("inst", "viewer", "www", "trekker.js")
+  cell_views_file <- cv_repo_file("inst", "viewer", "www", "cell_views.js")
   app_source <- paste(
     readLines(ui_file, warn = FALSE),
     collapse = "\n"
@@ -26,9 +26,9 @@ test_that("the Viewer loads shared linked-view geometry helpers", {
     fixed = TRUE
   )
 
-  trekker_source <- paste(
-    readLines(trekker_file, warn = FALSE),
+  cell_views_source <- paste(
+    readLines(cell_views_file, warn = FALSE),
     collapse = "\n"
   )
-  expect_match(trekker_source, "CBGeom.inPoly", fixed = TRUE)
+  expect_match(cell_views_source, "CBGeom.inPoly", fixed = TRUE)
 })

@@ -10,12 +10,11 @@ output[["expression_projection_gene_color_mode_UI"]] <- renderUI({
   if (is.null(display_mode)) {
     display_mode <- "combined"
   }
-  if (identical(display_mode, "rgb")) {
+  if (n_genes <= 1 || display_mode != "separate") {
     return(NULL)
   }
-  disabled <- n_genes <= 1 || display_mode != "separate"
-  selected <- input[["expression_projection_gene_color_mode"]]
-  if (disabled || is.null(selected)) {
+  selected <- isolate(input[["expression_projection_gene_color_mode"]])
+  if (is.null(selected)) {
     selected <- "shared"
   }
   control <- selectInput(
@@ -29,19 +28,9 @@ output[["expression_projection_gene_color_mode_UI"]] <- renderUI({
   )
   control$attribs$class <- paste(
     control$attribs$class,
-    "cerebro-gene-control",
-    if (disabled) "is-disabled" else "cerebro-control-unlocked"
+    "cerebro-gene-control cerebro-control-unlocked"
   )
-  if (disabled) {
-    control$attribs$title <- if (n_genes <= 1) {
-      "Select at least 2 genes to configure panel colors."
-    } else {
-      "Choose Separate panels to configure panel colors."
-    }
-    shinyjs::disabled(control)
-  } else {
-    control
-  }
+  control
 })
 
 outputOptions(

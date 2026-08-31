@@ -1,49 +1,19 @@
 ##----------------------------------------------------------------------------##
 ## UI elements to set group filters for the projection.
 ##----------------------------------------------------------------------------##
-output[["overview_projection_group_filters_UI"]] <- renderUI({
-  group_filters <- list()
-  for (i in getGroups()) {
-    group_filters[[i]] <- shinyWidgets::pickerInput(
-      paste0("overview_projection_group_filter_", i),
-      label = i,
-      choices = getGroupLevels(i),
-      selected = getGroupLevels(i),
-      options = list(
-        "actions-box" = TRUE
-      ),
-      multiple = TRUE
-    )
-  }
-  return(group_filters)
-})
-
-## make sure elements are loaded even though the box is collapsed
-outputOptions(
+registerGroupFiltersUI(
   output,
-  "overview_projection_group_filters_UI",
-  suspendWhenHidden = FALSE
+  "overview_projection",
+  getGroups = getGroups,
+  getGroupLevels = getGroupLevels
 )
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
-observeEvent(input[["overview_projection_group_filters_info"]], {
-  showModal(
-    modalDialog(
-      overview_projection_group_filters_info[["text"]],
-      title = overview_projection_group_filters_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
-})
-
-##----------------------------------------------------------------------------##
-## Text in info box.
-##----------------------------------------------------------------------------##
-overview_projection_group_filters_info <- list(
+registerGroupFiltersInfo(
+  input,
+  "overview_projection",
   title = "Group filters for projection",
   text = HTML(
     "

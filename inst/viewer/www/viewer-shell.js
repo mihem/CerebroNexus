@@ -51,6 +51,7 @@
         var pane = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
         if (!pane) return;
         var target = pane.querySelector("h1, h2, h3") || pane;
+        target.classList.add("cerebro-page-focus-target");
         target.setAttribute("tabindex", "-1");
         target.focus({ preventScroll: true });
         moved = true;

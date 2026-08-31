@@ -206,8 +206,7 @@ output$ir_visualizations_UI <- renderUI({
 ## ---- Clonal UMAP -------------------------------------------------------- ##
 ## Overlays clone expansion level on the cell projection (UMAP/tSNE). Data is
 ## built in data.R (ir_clonal_umap_data); here we draw the coloured scatter.
-## Point size / opacity come from the generic display options; font size and
-## title are applied by safeRenderPlot via ir_apply_display.
+## Point size / opacity come from the shared scatter display options.
 ## Expansion level is an ordinal magnitude (clone size increasing), so it gets a
 ## sequential ramp in the app's --c-blue family (matches the projection's
 ## continuous colourscale): larger (more expanded) clones read as a deeper blue.
@@ -512,7 +511,14 @@ observe({
   receptor <- input[["ir_p_umap_receptor"]]
   projection <- input[["ir_p_umap_projection"]]
   show_all <- input[["ir_p_umap_show_all"]]
-  req(receptor, projection, !is.null(show_all))
+  req(
+    receptor,
+    projection,
+    !is.null(show_all),
+    !is.null(input[["ir_clonalUMAP_group_labels"]]),
+    !is.null(input[["ir_clonalUMAP_point_border"]]),
+    !is.null(input[["ir_clonalUMAP_keep_square"]])
+  )
   clone_call <- "gene"
   show_all <- isTRUE(show_all)
   cells <- ir_umap_cells_to_show()
@@ -526,6 +532,10 @@ observe({
   req(!is.null(df) && nrow(df) > 0)
 
   dp <- tryCatch(ir_display_params(), error = function(e) list())
+  df <- randomlySubsetCells(
+    df,
+    dp[["ir_d_percentage_cells_to_show"]] %||% 100
+  )
   point_size <- suppressWarnings(as.numeric(dp[["ir_d_point_size"]]))
   if (length(point_size) != 1 || is.na(point_size)) {
     point_size <- 1
@@ -534,20 +544,6 @@ observe({
   if (length(alpha) != 1 || is.na(alpha)) {
     alpha <- 0.8
   }
-  ## Preserve the existing Clonal UMAP display scale in the shared renderer.
-  marker_size <- point_size * 5
-
-  legend_size <- suppressWarnings(as.numeric(dp[["ir_d_legend_size"]]))
-  if (length(legend_size) != 1 || is.na(legend_size) || legend_size <= 0) {
-    legend_size <- 12
-  }
-  ## The shared Canvas uses one top legend; retain the user's hide option.
-  legend_position <- if (identical(dp[["ir_d_legend_pos"]], "none")) {
-    "none"
-  } else {
-    "top"
-  }
-
   ## Grey background = cells without the selected receptor (expansion = NA);
   ## coloured foreground = receptor cells with an expansion level. One trace per
   ## expansion level, in canonical order, so each keeps its turbo colour.
@@ -603,17 +599,24 @@ observe({
     color_type = "categorical",
     traces = traces,
     color_variable = "expansion",
-    legend_position = legend_position,
-    legend_font_size = legend_size
+    appearance = list(
+      group_labels = isTRUE(input[["ir_clonalUMAP_group_labels"]]),
+      draw_border = isTRUE(input[["ir_clonalUMAP_point_border"]]),
+      keep_square = isTRUE(input[["ir_clonalUMAP_keep_square"]])
+    )
   )
   output_data <- list(
     x = data_x,
     y = data_y,
     selection_key = data_key,
     color = data_color,
-    point_size = marker_size,
+    point_size = point_size,
     point_opacity = alpha,
-    point_line = list(),
+    point_line = if (isTRUE(input[["ir_clonalUMAP_point_border"]])) {
+      list(color = "rgb(196,196,196)", width = 1)
+    } else {
+      list()
+    },
     reset_axes = TRUE
   )
   output_hover <- list(
@@ -656,6 +659,7 @@ output$ir_plot_clonalUMAP_static <- renderImage(
       show_all = show_all,
       cells = cells
     )
+    dp <- tryCatch(ir_display_params(), error = function(e) list())
 
     plot <- safeRenderPlot(
       {
@@ -678,12 +682,15 @@ output$ir_plot_clonalUMAP_static <- renderImage(
               ggplot2::theme_void()
           )
         }
+        df <- randomlySubsetCells(
+          df,
+          dp[["ir_d_percentage_cells_to_show"]] %||% 100
+        )
         df <- ir_umap_grouped_data(df, group_by)
         validate(need(
           !is.null(df) && nrow(df) > 0,
           "No cells match this grouping."
         ))
-        dp <- tryCatch(ir_display_params(), error = function(e) list())
         point_size <- suppressWarnings(as.numeric(dp[["ir_d_point_size"]]))
         if (length(point_size) != 1 || is.na(point_size)) {
           point_size <- 1
@@ -1149,25 +1156,11 @@ output$ir_plot_clonalCompare <- plotly::renderPlotly({
       if (!isTRUE(prep$ok)) {
         return(ir_empty_plotly(prep$message))
       }
-      dp <- tryCatch(ir_display_params(), error = function(e) list())
-      legend_pos <- dp[["ir_d_legend_pos"]]
-      if (!is.character(legend_pos) || length(legend_pos) != 1) {
-        legend_pos <- "right"
-      }
-      ## The custom "top" bar is a shared-scatter feature; here plain Plotly has
-      ## no top-bar mode, so fold "top" into the native right legend.
-      if (identical(legend_pos, "top")) {
-        legend_pos <- "right"
-      }
-      title <- dp[["ir_d_title"]]
       ir_compare_alluvial_plotly(
         prep,
         palette = IR_COMPARE_PALETTE,
         theme = cerebro_plotly_theme(),
-        hoverlabel = cerebro_plotly_hoverlabel(),
-        legend_pos = legend_pos,
-        base_size = dp[["ir_d_base_size"]],
-        title = if (is.character(title) && nzchar(title)) title else NULL
+        hoverlabel = cerebro_plotly_hoverlabel()
       )
     },
     error = function(e) {

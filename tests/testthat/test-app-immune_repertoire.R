@@ -412,25 +412,81 @@ test_that("Display options panel exposes scatter params on scatter-type tabs", {
     ))
   }
 
-  # Abundance (non-scatter): base display params present, scatter ones absent.
+  # Abundance (non-scatter): IR-only font controls and scatter params are absent.
   app$set_inputs(ir_tabs = "Abundance", wait_ = FALSE)
   app$wait_for_idle(timeout = 45000)
   app$wait_for_js(
-    "document.querySelector('#ir_d_base_size') !== null && document.querySelector('#ir_d_point_size') === null",
+    "document.querySelector('#ir_more_analysis_UI') !== null && document.querySelector('#ir_d_base_size') === null && document.querySelector('#ir_d_legend_size') === null && document.querySelector('#ir_d_legend_pos') === null && document.querySelector('#ir_d_legend_key') === null && document.querySelector('#ir_d_point_size') === null",
     timeout = 45000
   )
-  expect_true(isTRUE(control_exists("ir_d_base_size")))
+  expect_false(isTRUE(control_exists("ir_d_base_size")))
+  expect_false(isTRUE(control_exists("ir_d_legend_size")))
+  expect_false(isTRUE(control_exists("ir_d_legend_pos")))
+  expect_false(isTRUE(control_exists("ir_d_legend_key")))
   expect_false(isTRUE(control_exists("ir_d_point_size")))
 
   # Clonal UMAP (scatter-type): point size + opacity also present.
   app$set_inputs(ir_tabs = "Clonal UMAP", wait_ = FALSE)
   app$wait_for_idle(timeout = 45000)
   app$wait_for_js(
-    "document.querySelector('#ir_d_point_size') !== null && document.querySelector('#ir_d_alpha') !== null",
+    paste0(
+      "document.querySelector('#ir_d_point_size') !== null && ",
+      "document.querySelector('#ir_d_alpha') !== null && ",
+      "document.querySelector('#ir_d_percentage_cells_to_show') !== null"
+    ),
     timeout = 45000
   )
   expect_true(isTRUE(control_exists("ir_d_point_size")))
   expect_true(isTRUE(control_exists("ir_d_alpha")))
+  expect_true(isTRUE(control_exists("ir_d_percentage_cells_to_show")))
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#ir_d_point_size').value)"
+    )),
+    6
+  )
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#ir_d_alpha').value)"
+    )),
+    1
+  )
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#ir_d_percentage_cells_to_show').value)"
+    )),
+    100
+  )
+})
+
+test_that("Linked views shows the dataset point size in More settings", {
+  app <- shared_app()
+  app$run_js(
+    "document.querySelector('a[href=\"#shiny-tab-coordinated_views\"]').click();"
+  )
+  app$wait_for_js(
+    "document.querySelector('#cv-more-btn') !== null",
+    timeout = 45000
+  )
+  app$run_js("document.querySelector('#cv-more-btn').click();")
+  app$wait_for_js(
+    paste0(
+      "document.querySelector('#cv-ps') !== null && ",
+      "Number(document.querySelector('#cv-ps').value) === 6 && ",
+      "Number(document.querySelector('#cv-opacity').value) === 1"
+    ),
+    timeout = 45000
+  )
+  expect_identical(
+    as.numeric(app$get_js("Number(document.querySelector('#cv-ps').value)")),
+    6
+  )
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#cv-opacity').value)"
+    )),
+    1
+  )
 })
 
 test_that("IR page uses the compact top toolbar and settings drawer", {

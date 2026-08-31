@@ -24,6 +24,8 @@ overview_projection_update_plot <- function(input) {
     selection_keys = selection_keys,
     point_size = plot_parameters[["point_size"]],
     point_opacity = plot_parameters[["point_opacity"]],
+    group_labels = plot_parameters[["group_labels"]],
+    keep_square = plot_parameters[["keep_square"]],
     point_line = if (plot_parameters[["draw_border"]]) {
       list(color = "rgb(196,196,196)", width = 1)
     } else {

@@ -42,7 +42,7 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
   pct_data <- tryCatch(
     {
       if (selected_group %in% getGroupsWithMostExpressedGenes()) {
-        getMostExpressedGenes(selected_group)
+        viewerGetMostExpressedGenes(selected_group)
       } else {
         NULL
       }
@@ -149,7 +149,7 @@ output[["most_expressed_genes_filter_subgroups_UI"]] <- renderUI({
   results_df <- tryCatch(
     {
       if (metric_type == "pct") {
-        getMostExpressedGenes(selected_group)
+        viewerGetMostExpressedGenes(selected_group)
       } else {
         getMeanExpression(selected_group)
       }
@@ -200,7 +200,7 @@ output[["most_expressed_genes_table"]] <- DT::renderDataTable({
   results_df <- tryCatch(
     {
       if (metric_type == "pct") {
-        getMostExpressedGenes(selected_group)
+        viewerGetMostExpressedGenes(selected_group)
       } else {
         getMeanExpression(selected_group)
       }
