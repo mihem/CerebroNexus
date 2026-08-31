@@ -189,119 +189,105 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
         "input.spatial_projection_background_image && ",
         "input.spatial_projection_background_image !== 'none'"
       ),
-      sliderInput(
+      slider_number_input(
         "spatial_projection_background_opacity",
-        label = "Image opacity",
-        min = 0,
-        max = 1,
-        value = preset$opacity,
-        step = 0.05
+        "Opacity",
+        0,
+        1,
+        preset$opacity,
+        0.05,
+        full = TRUE
       ),
-      cerebroSettingsSection(
-        "Position",
-        tagList(
-          ## The slider remains authoritative; the number box mirrors it for
-          ## exact keyboard entry.
+      ## The slider remains authoritative; the number box mirrors it for exact
+      ## keyboard entry. These stay in the existing Background image card rather
+      ## than introducing Position / Transform cards inside it.
+      slider_number_input(
+        "spatial_projection_background_offset_x",
+        "Horizontal",
+        -offset_limit,
+        offset_limit,
+        offset_x_default,
+        offset_step,
+        full = TRUE
+      ),
+      slider_number_input(
+        "spatial_projection_background_offset_y",
+        "Vertical",
+        -offset_limit,
+        offset_limit,
+        offset_y_default,
+        offset_step,
+        full = TRUE
+      ),
+      tags$div(
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "input.spatial_projection_background_scale_lock",
           slider_number_input(
-            "spatial_projection_background_offset_x",
-            "Horizontal",
-            -offset_limit,
-            offset_limit,
-            offset_x_default,
-            offset_step,
-            full = TRUE
-          ),
-          slider_number_input(
-            "spatial_projection_background_offset_y",
-            "Vertical",
-            -offset_limit,
-            offset_limit,
-            offset_y_default,
-            offset_step,
-            full = TRUE
+            "spatial_projection_background_scale",
+            "Scale",
+            0.2,
+            3,
+            scale_x_default,
+            0.05
           )
         )
       ),
-      cerebroSettingsSection(
-        "Transform",
-        tagList(
-          tags$div(
-            class = "cerebro-settings-full",
-            checkboxInput(
-              "spatial_projection_background_scale_lock",
-              label = "Lock aspect ratio",
-              value = aspect_locked_default
-            )
-          ),
-          ## Transform controls stay full-width so the slider and exact-value
-          ## field remain easy to use in the narrow settings drawer.
-          tags$div(
-            class = "cerebro-settings-full",
-            conditionalPanel(
-              condition = "input.spatial_projection_background_scale_lock",
-              slider_number_input(
-                "spatial_projection_background_scale",
-                "Scale",
-                0.2,
-                3,
-                scale_x_default,
-                0.05
-              )
-            )
-          ),
-          ## Unlocked: independent X / Y scale, one control per row.
-          tags$div(
-            class = "cerebro-settings-full",
-            conditionalPanel(
-              condition = "!input.spatial_projection_background_scale_lock",
-              slider_number_input(
-                "spatial_projection_background_scale_x",
-                "Scale X",
-                0.2,
-                3,
-                scale_x_default,
-                0.05
-              )
-            )
-          ),
-          tags$div(
-            class = "cerebro-settings-full",
-            conditionalPanel(
-              condition = "!input.spatial_projection_background_scale_lock",
-              slider_number_input(
-                "spatial_projection_background_scale_y",
-                "Scale Y",
-                0.2,
-                3,
-                scale_y_default,
-                0.05
-              )
-            )
-          ),
+      tags$div(
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "!input.spatial_projection_background_scale_lock",
           slider_number_input(
-            "spatial_projection_background_rotate",
-            "Rotation",
-            -180,
-            180,
-            rotation_default,
-            1,
-            full = TRUE
+            "spatial_projection_background_scale_x",
+            "Scale X",
+            0.2,
+            3,
+            scale_x_default,
+            0.05
+          )
+        )
+      ),
+      tags$div(
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "!input.spatial_projection_background_scale_lock",
+          slider_number_input(
+            "spatial_projection_background_scale_y",
+            "Scale Y",
+            0.2,
+            3,
+            scale_y_default,
+            0.05
+          )
+        )
+      ),
+      slider_number_input(
+        "spatial_projection_background_rotate",
+        "Rotation",
+        -180,
+        180,
+        rotation_default,
+        1,
+        full = TRUE
+      ),
+      tags$div(
+        class = "cerebro-settings-full",
+        tags$div(
+          class = "cerebro-settings-content spatial-image-checks",
+          checkboxInput(
+            "spatial_projection_background_scale_lock",
+            label = "Lock aspect ratio",
+            value = aspect_locked_default
           ),
-          tags$div(
-            class = "cerebro-settings-full",
-            tags$div(
-              class = "cerebro-settings-content",
-              checkboxInput(
-                "spatial_projection_background_flip_x",
-                label = "Flip horizontally",
-                value = flip_x_default
-              ),
-              checkboxInput(
-                "spatial_projection_background_flip_y",
-                label = "Flip vertically",
-                value = flip_y_default
-              )
-            )
+          checkboxInput(
+            "spatial_projection_background_flip_x",
+            label = "Flip horizontally",
+            value = flip_x_default
+          ),
+          checkboxInput(
+            "spatial_projection_background_flip_y",
+            label = "Flip vertically",
+            value = flip_y_default
           )
         )
       ),

@@ -80,6 +80,12 @@ test_that("bundle.R parses and defines the builder API", {
   for (fn in api) {
     expect_true(is.function(get0(fn, envir = cv_env)), info = fn)
   }
+  bundle_src <- paste(readLines(bundle_file, warn = FALSE), collapse = "\n")
+  expect_match(
+    bundle_src,
+    "rotateSpatialCoordinates(co, rotation)",
+    fixed = TRUE
+  )
 })
 
 test_that("trajectory coordinates and graph enter Linked views", {
@@ -229,6 +235,25 @@ test_that("Linked views reflows after its workspace becomes wider", {
   expect_match(js, "resizeObserver.observe(panesHost)", fixed = TRUE)
 })
 
+test_that("Linked views panel sizing remains automatic", {
+  ui_file <- file.path(dirname(bundle_file), "UI.R")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  skip_if_not(
+    file.exists(ui_file) && file.exists(js_file) && file.exists(css_file)
+  )
+  ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  css <- paste(readLines(css_file, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl('class = "cv-resize-handle"', ui, fixed = TRUE))
+  expect_false(grepl("beginPanelResize", js, fixed = TRUE))
+  expect_false(grepl("panelSizes", js, fixed = TRUE))
+  expect_match(css, ".coordviews-page .cv-panes {", fixed = TRUE)
+  expect_match(css, "flex-wrap: wrap", fixed = TRUE)
+  expect_false(grepl("cv-resize-handle", css, fixed = TRUE))
+})
+
 test_that("Linked views chooses its grid from both viewport dimensions", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
@@ -237,12 +262,21 @@ test_that("Linked views chooses its grid from both viewport dimensions", {
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
 
   expect_match(js, "function bestOverviewGrid", fixed = TRUE)
+  expect_match(js, "getComputedStyle(panes).columnGap", fixed = TRUE)
+  expect_no_match(js, "var gap = 14", fixed = TRUE)
   expect_match(js, "Math.ceil(panelCount / cols)", fixed = TRUE)
   expect_match(js, "widthSide", fixed = TRUE)
   expect_match(js, "heightSide", fixed = TRUE)
   expect_match(js, "VIEWPORT_GUTTER", fixed = TRUE)
   expect_match(js, "var VIEWPORT_GUTTER = 7", fixed = TRUE)
-  expect_match(ui, 'class = "cv-secondary-analysis"', fixed = TRUE)
+  expect_no_match(
+    ui,
+    "Lasso-drag in any panel to select cells.",
+    fixed = TRUE
+  )
+  expect_match(ui, 'id = "cv-readout"', fixed = TRUE)
+  expect_match(ui, 'style = "display:none"', fixed = TRUE)
+  expect_match(js, "host.style.display = 'none'", fixed = TRUE)
 })
 
 test_that("Linked views keeps replacement controls contextual and user-facing", {
@@ -1010,7 +1044,7 @@ test_that("receptor detection does not stop at the third sample", {
   expect_setequal(cv_env$cerebro_receptors_present(ir), c("TCR", "BCR"))
 })
 
-test_that("the histology bar offers both scale axes and a way back", {
+test_that("the histology bar offers compact numeric alignment controls", {
   ## A preset can be non-uniform. A single Scale control had to collapse the two
   ## axes into one number, and every other control in the bar then rewrote the
   ## pair from it -- so a nudge to the opacity squared the image up. Pinned at
@@ -1026,7 +1060,17 @@ test_that("the histology bar offers both scale axes and a way back", {
   expect_match(txt, "cv-img-scaley", fixed = TRUE)
   expect_match(txt, "cv-img-lock", fixed = TRUE)
   expect_match(txt, "cv-img-reset", fixed = TRUE)
+  expect_match(txt, 'type = "number"', fixed = TRUE)
+  expect_match(txt, 'paste0(id, "-number")', fixed = TRUE)
+  expect_match(txt, "cv-img-checks", fixed = TRUE)
+  expect_no_match(txt, "cv-img-range-min", fixed = TRUE)
+  expect_no_match(txt, "cv-img-range-max", fixed = TRUE)
+  expect_no_match(txt, "cv-img-range-value", fixed = TRUE)
   expect_no_match(txt, "\"cv-img-scale\"")
+
+  css_path <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  css <- paste(readLines(css_path, warn = FALSE), collapse = "\n")
+  expect_no_match(css, ".cv-img-range::after", fixed = TRUE)
 })
 
 
@@ -1266,7 +1310,11 @@ test_that("each section offers only its own configured backgrounds", {
     collapse = "\n"
   )
   expect_match(js, "pr.rotation != null ? pr.rotation : 0", fixed = TRUE)
-  expect_match(js, "c.rotate(-state.rotate * Math.PI / 180)", fixed = TRUE)
+  expect_match(
+    js,
+    "rotateDataPoint(b.xmin, b.ymax, state.rotate)",
+    fixed = TRUE
+  )
 })
 
 test_that("per-image settings also apply to embedded backgrounds", {
@@ -1369,6 +1417,7 @@ test_that("legacy spatial images share identity and point appearance", {
     )
   })
   cv_env$Cerebro.options <- list(
+    spatial_plot_rotation = list(ds = c(fov = 90)),
     point_size = c(ds = 5),
     point_opacity = c(ds = 0.9),
     spatial_image_settings = list(
@@ -1397,6 +1446,7 @@ test_that("legacy spatial images share identity and point appearance", {
   expect_identical(built$images[[1L]]$label, "Tissue background")
   expect_identical(built$images[[1L]]$preset$offsetY, -10)
   expect_true(built$images[[1L]]$preset$flipY)
+  expect_identical(built$images[[1L]]$preset$rotation, 0)
   expect_null(built$point_size)
   expect_null(built$point_opacity)
   expect_identical(
@@ -1422,6 +1472,21 @@ test_that("the alignment bar follows the chosen background, not the data set", {
     perl = TRUE
   )
   expect_no_match(txt, "hasImg = D.spaces.some", fixed = TRUE)
+})
+
+test_that("background display is one image dropdown with None last", {
+  ui_path <- file.path(dirname(bundle_file), "UI.R")
+  ui <- paste(readLines(ui_path, warn = FALSE), collapse = "\n")
+  js_path <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  js <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
+
+  expect_match(ui, 'id = "cv-bg-image-select"', fixed = TRUE)
+  expect_match(ui, 'class = "form-control"', fixed = TRUE)
+  expect_no_match(ui, 'data-cv-bg-mode', fixed = TRUE)
+  expect_no_match(ui, '"Auto"', fixed = TRUE)
+  expect_no_match(ui, '"Customize…"', fixed = TRUE)
+  expect_match(js, ".concat(['<option value=\"' + IMG_NONE", fixed = TRUE)
+  expect_match(js, "selectize.addOption(options)", fixed = TRUE)
 })
 
 test_that("bundling two images of the same basename keeps both", {
@@ -1739,5 +1804,22 @@ test_that("same-dataset refresh preserves percentage and group filters", {
   expect_no_match(
     js,
     "pctMask = null; groupFilter = \\{\\};[[:space:]]*rebuildPctMask\\(\\)"
+  )
+})
+
+test_that("brush gestures start from visualization pane whitespace", {
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  skip_if_not(file.exists(js_file))
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  expect_match(js, "var brushTarget = p.pane || p.canvas;", fixed = TRUE)
+  expect_match(
+    js,
+    "brushTarget.addEventListener('mousedown'",
+    fixed = TRUE
+  )
+  expect_match(
+    js,
+    "window.addEventListener('mousemove'",
+    fixed = TRUE
   )
 })

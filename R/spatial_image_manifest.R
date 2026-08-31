@@ -807,3 +807,60 @@
   names(normalized) <- datasets
   normalized
 }
+
+#' Normalize per-spatial-entry plot rotations
+#'
+#' @keywords internal
+#' @noRd
+.normalizeAppSpatialPlotRotation <- function(rotation, catalogs) {
+  if (is.null(rotation)) {
+    return(NULL)
+  }
+  if (!is.list(rotation)) {
+    stop("`spatial_plot_rotation` must be a named list.", call. = FALSE)
+  }
+  datasets <- .spatialManifestNames(rotation, "`spatial_plot_rotation`")
+  unknown_datasets <- setdiff(datasets, names(catalogs))
+  if (length(unknown_datasets)) {
+    stop(
+      "`spatial_plot_rotation` dataset `",
+      unknown_datasets[[1L]],
+      "` is not present in `cerebro_data`.",
+      call. = FALSE
+    )
+  }
+  normalized <- lapply(datasets, function(dataset) {
+    values <- rotation[[dataset]]
+    spatial_names <- .spatialManifestNames(
+      values,
+      paste0("`spatial_plot_rotation` dataset `", dataset, "`")
+    )
+    unknown_spatials <- setdiff(spatial_names, names(catalogs[[dataset]]))
+    if (length(unknown_spatials)) {
+      stop(
+        "`spatial_plot_rotation` dataset `",
+        dataset,
+        "` spatial `",
+        unknown_spatials[[1L]],
+        "` is not available.",
+        call. = FALSE
+      )
+    }
+    valid <- vapply(
+      values,
+      function(value) {
+        is.numeric(value) && length(value) == 1L && is.finite(value)
+      },
+      logical(1)
+    )
+    if (!all(valid)) {
+      stop(
+        "`spatial_plot_rotation` values must be finite numeric rotations.",
+        call. = FALSE
+      )
+    }
+    values <- vapply(values, as.numeric, numeric(1))
+    stats::setNames(values, spatial_names)
+  })
+  stats::setNames(normalized, datasets)
+}

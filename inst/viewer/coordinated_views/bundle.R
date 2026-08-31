@@ -799,6 +799,12 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
   if (is.null(co)) {
     return(NULL)
   }
+  rotation <- spatialPlotRotation(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    cv_selected_dataset_name(),
+    nm
+  )
+  co <- rotateSpatialCoordinates(co, rotation)
   spatial_cells <- cv_cell_ids(
     rownames(co),
     paste0("Spatial section `", nm, "`")

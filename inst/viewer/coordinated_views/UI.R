@@ -404,31 +404,13 @@ tab_coordinated_views <- tabItem(
                   div(
                     class = "cv-bg-display",
                     tags$div(class = "cv-bg-display-title", "Display"),
-                    div(
-                      class = "cv-bg-mode",
-                      tags$button(
-                        type = "button",
-                        class = "cv-bg-mode-btn is-on",
-                        `data-cv-bg-mode` = "auto",
-                        "Auto"
-                      ),
-                      tags$button(
-                        type = "button",
-                        class = "cv-bg-mode-btn",
-                        `data-cv-bg-mode` = "none",
-                        "None"
-                      ),
-                      tags$button(
-                        type = "button",
-                        class = "cv-bg-mode-btn cv-bg-customize-btn",
-                        `data-cv-bg-mode` = "custom",
-                        "Customize…"
-                      )
+                    tags$select(
+                      id = "cv-bg-image-select",
+                      class = "form-control"
                     )
                   ),
                   uiOutput("coordviews_image_ui")
-                ),
-                div(class = "cv-bg-popover", id = "cv-bg-popover")
+                )
               )
             ),
             style = "display:none"
@@ -634,20 +616,9 @@ tab_coordinated_views <- tabItem(
       )
     ),
 
-    ## Selection composition and clonotypes update client-side as soon as cells
-    ## are selected in any linked panel.
-    div(
-      class = "cv-secondary-analysis",
-      div(
-        class = "cv-readout",
-        id = "cv-readout",
-        div(
-          class = "cv-empty",
-          "Lasso-drag in any panel to select cells. The same cells highlight in ",
-          "every panel, and their composition and top clonotypes appear here."
-        )
-      )
-    ),
+    ## Selection results appear only after there is something to show, leaving
+    ## the initial workspace entirely available to the visualisations.
+    div(class = "cv-readout", id = "cv-readout", style = "display:none"),
 
     ## ---- Trekker insights ------------------------------------------------- ##
     ## One discoverable, default-collapsed analysis region replaces the old

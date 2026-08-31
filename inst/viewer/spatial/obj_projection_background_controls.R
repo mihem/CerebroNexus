@@ -218,6 +218,10 @@ local({
     })
   }
   sync_slider_numeric(
+    "spatial_projection_background_opacity",
+    "spatial_projection_background_opacity_num"
+  )
+  sync_slider_numeric(
     "spatial_projection_background_offset_x",
     "spatial_projection_background_offset_x_num"
   )
@@ -306,6 +310,10 @@ observeEvent(input[["spatial_projection_background_copy_preset"]], {
     )
   )
   spatial_preset_code(code)
+  session$sendCustomMessage(
+    "spatial_copy_preset",
+    list(text = code)
+  )
 })
 
 output[["spatial_projection_background_preset_code"]] <- renderText({

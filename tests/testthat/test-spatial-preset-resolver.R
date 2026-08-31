@@ -1,6 +1,10 @@
 # Pure contracts for Viewer spatial background identity and settings.
 
 spatial_options <- list(
+  spatial_plot_rotation = list(
+    Atlas = c(sliceA = 90, sliceB = -90),
+    Other = c(sliceA = 180)
+  ),
   spatial_images = list(
     Atlas = list(
       sliceA = list(
@@ -33,6 +37,45 @@ spatial_options <- list(
     Other = list(sliceA = list(Histology = list(offset_x = 99)))
   )
 )
+
+test_that("one resolver rotates spatial coordinates for every Viewer surface", {
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "sliceA"), 90)
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "sliceB"), -90)
+  expect_identical(spatialPlotRotation(spatial_options, "Other", "sliceA"), 180)
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "missing"), 0)
+  expect_identical(spatialPlotRotation(spatial_options, "missing", "sliceA"), 0)
+
+  coordinates <- data.frame(x = c(0, 1), y = c(0, 2))
+  expect_equal(
+    rotateSpatialCoordinates(coordinates, 90),
+    data.frame(x = c(0, -2), y = c(0, 1)),
+    tolerance = 1e-12
+  )
+})
+
+test_that("MERFISH plot and image rotations are configured independently", {
+  app_env <- new.env(parent = globalenv())
+  app_lines <- readLines(system.file("app.R", package = "CerebroNexus"))
+  options_start <- grep("^Cerebro.options", app_lines)[[1L]]
+  options_end <- grep('^  "projections_show_hover_info"', app_lines)[[1L]]
+  expression <- app_lines[options_start:(options_end + 1L)]
+  expression[[1L]] <- sub("<<-", "<-", expression[[1L]], fixed = TRUE)
+  app_env$custom_welcome_message <- "test"
+  eval(parse(text = expression), envir = app_env)
+  options <- app_env$Cerebro.options
+
+  expect_identical(
+    options$spatial_plot_rotation[["Mouse ileum (MERFISH)"]][["fov"]],
+    90
+  )
+  expect_identical(
+    options$spatial_image_settings[["Mouse ileum (MERFISH)"]][["fov"]][[
+      "Tissue background"
+    ]]$rotation,
+    90
+  )
+  expect_null(options$spatial_images[["Mouse ileum (MERFISH)"]])
+})
 
 test_that("configured images resolve one exact dataset and spatial leaf", {
   slice_a <- configured_spatial_images(spatial_options, "Atlas", "sliceA")

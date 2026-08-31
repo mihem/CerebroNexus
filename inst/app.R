@@ -119,6 +119,11 @@ Cerebro.options <<- list(
         )
       )
     ),
+    "Mouse ileum (MERFISH)" = list(
+      "fov" = list(
+        "Tissue background" = list(rotation = 90)
+      )
+    ),
     "Mouse brain (Xenium)" = list(
       "fov" = list(
         "Tissue background" = list(offset_y = -10, flip_y = TRUE)
@@ -132,6 +137,11 @@ Cerebro.options <<- list(
         )
       )
     )
+  ),
+  ## Plot rotation is independent of per-image alignment above and is resolved
+  ## for one exact dataset + spatial entry.
+  "spatial_plot_rotation" = list(
+    "Mouse ileum (MERFISH)" = c("fov" = 90)
   ),
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,

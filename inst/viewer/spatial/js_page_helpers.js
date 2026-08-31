@@ -60,3 +60,46 @@ shinyjs.hideScrollDownIndicator = function () {
     if (indicator.parentElement) indicator.remove();
   }, 400);
 };
+
+// The button says Copy, so copy the generated preset instead of only revealing
+// a code block. The textarea fallback keeps local HTTP Shiny sessions working,
+// where the secure Clipboard API may be unavailable.
+(function registerSpatialPresetCopy() {
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand('copy');
+    area.remove();
+    return copied ? Promise.resolve() : Promise.reject(new Error('copy failed'));
+  }
+
+  function register() {
+    if (!window.Shiny || !Shiny.addCustomMessageHandler) return false;
+    Shiny.addCustomMessageHandler('spatial_copy_preset', function (message) {
+      const button = document.getElementById(
+        'spatial_projection_background_copy_preset'
+      );
+      const previous = button ? button.innerHTML : '';
+      function status(label) {
+        if (!button) return;
+        button.textContent = label;
+        setTimeout(function () { button.innerHTML = previous; }, 1200);
+      }
+      copyText(message && message.text ? message.text : '').then(function () {
+        status('Copied');
+      }).catch(function () { status('Copy failed'); });
+    });
+    return true;
+  }
+
+  if (!register()) {
+    document.addEventListener('shiny:connected', register, { once: true });
+  }
+})();

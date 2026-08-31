@@ -239,6 +239,13 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
   app$wait_for_js(
     paste0(
+      "document.getElementById('spatial_projection_to_display')?.",
+      "selectize?.options.fov_colour !== undefined"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
       "document.getElementById('spatial_projection_background_image').value === ",
       "'external::Tissue background'"
     ),
@@ -349,13 +356,31 @@ test_that("Linked views resets the active background to its preset", {
     ".click();"
   ))
   app$wait_for_js(
-    "document.getElementById('cv-img-reset') !== null",
+    "document.getElementById('cv-img-rotate-number') !== null",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotateNumber = document.getElementById('cv-img-rotate-number');",
+    "rotateNumber.value = '83.79';",
+    "rotateNumber.dispatchEvent(new Event('input', { bubbles: true }));"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-rotate').value === '83.79'",
     timeout = 30000
   )
   app$run_js(paste0(
     "var rotate = document.getElementById('cv-img-rotate');",
-    "rotate.value = '83.79';",
-    "rotate.dispatchEvent(new Event('input', { bubbles: true }));",
+    "rotate.value = '42';",
+    "rotate.dispatchEvent(new Event('input', { bubbles: true }));"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-rotate-number').value === '42'",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotateNumber = document.getElementById('cv-img-rotate-number');",
+    "rotateNumber.value = '83.79';",
+    "rotateNumber.dispatchEvent(new Event('input', { bubbles: true }));",
     "var flipX = document.getElementById('cv-img-flipx');",
     "flipX.checked = true;",
     "flipX.dispatchEvent(new Event('change', { bubbles: true }));",
@@ -368,7 +393,7 @@ test_that("Linked views resets the active background to its preset", {
   state <- app$get_js(paste0(
     "({",
     "rotation: document.getElementById('cv-img-rotate').value,",
-    "badge: document.getElementById('cv-img-rotate-val').textContent,",
+    "rotationNumber: document.getElementById('cv-img-rotate-number').value,",
     "offsetX: document.getElementById('cv-img-offx').value,",
     "offsetY: document.getElementById('cv-img-offy').value,",
     "flipX: document.getElementById('cv-img-flipx').checked,",
@@ -376,7 +401,7 @@ test_that("Linked views resets the active background to its preset", {
     "})"
   ))
   expect_identical(state$rotation, "0")
-  expect_identical(state$badge, "0")
+  expect_identical(state$rotationNumber, "0")
   expect_identical(state$offsetX, "10")
   expect_identical(state$offsetY, "0")
   expect_false(state$flipX)

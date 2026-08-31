@@ -72,9 +72,6 @@
   // them is active so the single alignment bar has an unambiguous target.
   var selectedSpatial = [];
   var activeSpatialId = null;
-  // A background choice belongs to one spatial section. Auto/None/Custom must
-  // not leak from donor A into donor C merely because they are shown together.
-  var backgroundModes = {};
   var backgroundScopePulse = false;
   var spatialTemplate = null;
   // Panel key currently promoted as the primary lens, or null for equal overview.
@@ -354,10 +351,9 @@
   }
 
   // ---- per-space unit normalisation ---------------------------------------
-  // Real geometry (umap, spatial) preserves aspect ratio. An abstract space
-  // with independent axes (the clone panel) sets `stretch` so X and Y each
-  // fill the box on their own — otherwise a wide clone-rank axis squashes the
-  // expansion axis into a needle.
+  // Spatial coordinates and explicitly stretched abstract layouts normalise
+  // each axis independently. Other embeddings keep their internal shape in a
+  // unit box, while their fluid panel may use a rectangular screen canvas.
   function unitOf(space) {
     var xs = space.x, ys = space.y, zs = space.z || null, n = xs.length;
     var xr = space.xRange, yr = space.yRange;
@@ -842,12 +838,6 @@
   function anyFlatPanel() {
     return panels.some(function (p) { return p.spaceId && !panelIs3D(p); });
   }
-  // Whether the data set offers a 2-D embedding at all -- not whether one is on
-  // screen. Decides whether "you cannot select here" can be followed by advice.
-  function anyFlatProjection() {
-    var P = D && D.projections; if (!P) return false;
-    return Object.keys(P).some(function (k) { return (P[k].ndim || 2) < 3; });
-  }
 
   // The cursor is the only warning of what a drag is about to do. A rotatable
   // panel always drags-to-turn, whatever the toolbar says, so it always shows
@@ -921,6 +911,12 @@
       rotate: state.rotate - (Number(pr.rotation) || 0)
     };
   }
+  function rotateDataPoint(x, y, degrees) {
+    if (!degrees) return [x, y];
+    var theta = degrees * Math.PI / 180;
+    return [x * Math.cos(theta) - y * Math.sin(theta),
+      x * Math.sin(theta) + y * Math.cos(theta)];
+  }
   function drawImage(p) {
     var sp = spaceById[p.spaceId];
     var cimg = currentImage(sp);
@@ -929,26 +925,35 @@
     var b = cimg.bounds;
     if (!b) return;
     state = imageRenderState(cimg, state);
-    var tl = dataToScreen(p, b.xmin, b.ymax);   // data ymax = top (y-up)
-    var br = dataToScreen(p, b.xmax, b.ymin);
-    if (!tl || !br) return;
-    var x = Math.min(tl[0], br[0]), y = Math.min(tl[1], br[1]);
-    var w = Math.abs(br[0] - tl[0]), h = Math.abs(br[1] - tl[1]);
-    if (!(w > 0) || !(h > 0)) return;
+    var tlData = rotateDataPoint(b.xmin, b.ymax, state.rotate);
+    var trData = rotateDataPoint(b.xmax, b.ymax, state.rotate);
+    var blData = rotateDataPoint(b.xmin, b.ymin, state.rotate);
+    var centerData = rotateDataPoint(
+      (Number(b.xmin) + Number(b.xmax)) / 2,
+      (Number(b.ymin) + Number(b.ymax)) / 2,
+      state.rotate
+    );
+    var tl = dataToScreen(p, tlData[0], tlData[1]);
+    var tr = dataToScreen(p, trData[0], trData[1]);
+    var bl = dataToScreen(p, blData[0], blData[1]);
+    var center = dataToScreen(p, centerData[0], centerData[1]);
+    if (!tl || !tr || !bl || !center) return;
     // Convert the DATA-unit offset to screen pixels by mapping two points through
     // the same projection the cells use (handles scale + the y-axis inversion).
-    var o0 = dataToScreen(p, b.xmin, b.ymin);
-    var o1 = dataToScreen(p, b.xmin + state.offsetX, b.ymin + state.offsetY);
-    var offSX = (o0 && o1) ? (o1[0] - o0[0]) : 0;
-    var offSY = (o0 && o1) ? (o1[1] - o0[1]) : 0;
+    var o1 = dataToScreen(p, centerData[0] + state.offsetX,
+      centerData[1] + state.offsetY);
+    var offSX = o1 ? (o1[0] - center[0]) : 0;
+    var offSY = o1 ? (o1[1] - center[1]) : 0;
     var c = p.ctx;
     c.save();
     c.globalAlpha = state.opacity;
-    c.translate(x + w / 2 + offSX, y + h / 2 + offSY);
-    if (state.rotate) c.rotate(-state.rotate * Math.PI / 180);
+    c.translate(center[0] + offSX, center[1] + offSY);
     c.scale(state.scaleX * (state.flipX ? -1 : 1),
       state.scaleY * (state.flipY ? -1 : 1));
-    c.drawImage(sp._imgEl, -w / 2, -h / 2, w, h);
+    c.transform(tr[0] - tl[0], tr[1] - tl[1],
+      bl[0] - tl[0], bl[1] - tl[1],
+      tl[0] - center[0], tl[1] - center[1]);
+    c.drawImage(sp._imgEl, 0, 0, 1, 1);
     c.restore();
     c.globalAlpha = 1;
   }
@@ -1519,23 +1524,29 @@
     finally { el._cvSyncing = false; }
   }
 
-  function positionImgRangeValue(slider) {
-    if (!slider) return;
-    var wrap = slider.closest('.cv-img-range');
-    var value = wrap && wrap.querySelector('.cv-img-range-value');
-    if (!value) return;
-    var min = parseFloat(slider.min), max = parseFloat(slider.max), val = parseFloat(slider.value);
-    var frac = (max > min) ? (val - min) / (max - min) : 0;
-    var w = slider.offsetWidth || 148, thumb = 16;
-    value.textContent = String(Math.round(val * 100) / 100);
-    value.style.left = (frac * (w - thumb) + thumb / 2) + 'px';
-    slider.style.setProperty('--cv-range-fill', (frac * 100) + '%');
+  function syncImgRangeValue(range, raw) {
+    if (!range || raw === '') return false;
+    var min = parseFloat(range.min), max = parseFloat(range.max);
+    var value = Number(raw);
+    if (!isFinite(value)) return false;
+    if (isFinite(min)) value = Math.max(min, value);
+    if (isFinite(max)) value = Math.min(max, value);
+    range.value = String(value);
+    value = Number(range.value);
+    var number = $(range.id + '-number');
+    if (number) {
+      number.min = range.min; number.max = range.max; number.step = range.step;
+      number.value = String(value);
+    }
+    var frac = (max > min) ? (value - min) / (max - min) : 0;
+    range.style.setProperty('--cv-range-fill', (frac * 100) + '%');
+    return true;
   }
 
-  function positionAllImgRangeValues() {
+  function syncAllImgRangeValues() {
     Array.prototype.forEach.call(
       document.querySelectorAll('.cv-img-range input[type=range]'),
-      positionImgRangeValue
+      function (range) { syncImgRangeValue(range, range.value); }
     );
   }
 
@@ -2223,35 +2234,14 @@
   }
   function renderReadout() {
     var host = $('cv-readout'); if (!host) return;
+    host.style.display = '';
     updateNicheEnabled();
     if (!sel || !sel.size) {
       if (renderNiche(host)) return;   // Trekker: picked-nucleus niche composition
       var fieldOnly = fieldSummaryHtml();
       if (fieldOnly) { host.innerHTML = fieldOnly; return; }
-      host.innerHTML = '<div class="cv-empty">' + (anyFlatPanel()
-        ? ('Lasso-drag in any ' + (panels.some(panelIs3D) ? '2-D ' : '') +
-          'panel to select cells. The same cells highlight ' +
-          'in every panel, and their composition and top clonotypes appear here.' +
-          (D.trekker ? ' <b>Or click a single nucleus</b> to see its niche — ' +
-            'the cell-type composition within the radius (µm).' : ''))
-        // Everything on screen is rotatable, so there is nowhere here to draw a
-        // selection that means anything. Say so rather than leave the instruction
-        // above pointing at a gesture that will silently rotate. Both halves have
-        // to agree about what the data set holds: "the only embedding is 3-D"
-        // followed by "pick a 2-D one" contradicts itself, and the half that is
-        // wrong is the one the user will act on. Pointing at the Projection tab
-        // is no answer either -- its 3-D scatter is no more lassoable than these
-        // panels are.
-        : ((anyFlatProjection()
-          ? 'Every panel is showing a 3-D embedding, so they are for turning ' +
-            'and looking.'
-          : 'This data set\'s only embedding is 3-D, so these panels are for ' +
-            'turning and looking.') +
-          ' A lasso on a rotated cloud would take in cells ' +
-          'hidden behind the ones you can see, so ' + (anyFlatProjection()
-            ? 'pick a <b>2-D</b> projection above to select.'
-            : 'selecting needs a 2-D embedding, which this data set does not ' +
-              'carry.'))) + '</div>';
+      host.innerHTML = '';
+      host.style.display = 'none';
       return;
     }
     var idxs = []; sel.forEach(function (i) { idxs.push(i); });
@@ -2961,11 +2951,13 @@
 
   // ---- brush + pick --------------------------------------------------------
   function wireBrush(p) {
+    var brushTarget = p.pane || p.canvas;
     var pos = function (e) {
       var r = p.canvas.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top];
     };
-    p.canvas.addEventListener('mousedown', function (e) {
+    brushTarget.addEventListener('mousedown', function (e) {
+      if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
       if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
       // A rotatable panel NAVIGATES; it does not select. Selection here is done
       // on screen coordinates, and once the cloud has depth those stop being a
@@ -3012,7 +3004,7 @@
       });
       p.drag = true; p.moved = false; p.start = pos(e); p.lasso = [p.start]; p.lassoData = null;
     });
-    p.canvas.addEventListener('mousemove', function (e) {
+    window.addEventListener('mousemove', function (e) {
       if (p.orbiting) {
         var oq = pos(e), RAD = 0.009;   // radians per pixel dragged
         p.rot = {
@@ -3939,9 +3931,6 @@
   function currentImage(sp) {
     var list = spatialImages(sp);
     if (!list.length) return null;
-    var mode = backgroundModeFor(sp);
-    if (mode === 'none') return null;
-    if (mode === 'auto') return list[0];
     var wanted = sp && sp._customImageId;
     if (wanted === IMG_NONE) return null;
     for (var i = 0; i < list.length; i++) {
@@ -3959,10 +3948,6 @@
     if (!sp) return null;
     if (sp._spatialSample) return 'fov:' + (sp.id || spatialName(sp));
     return 'space:' + (sp.id || 'unknown') + ':' + spatialName(sp);
-  }
-  function backgroundModeFor(sp) {
-    var key = backgroundStateKey(sp);
-    return (key && backgroundModes[key]) || 'auto';
   }
   // The key a calibration is stored under. Both halves matter: the same image
   // against a different section is a different alignment problem.
@@ -4063,8 +4048,9 @@
   // stay at the top of the Background image section so the mode below and the
   // Image alignment bar both read as settings for that chosen section.
   function renderImagePicker() {
-    var ctl = $('cv-img-pick-ctl'), pop = $('cv-bg-popover'), tabs = $('cv-bg-space-tabs');
-    if (!ctl || !pop) return;
+    var ctl = $('cv-img-pick-ctl'), select = $('cv-bg-image-select');
+    var tabs = $('cv-bg-space-tabs');
+    if (!ctl || !select) return;
     var allSpaces = backgroundSpaces();
     var active = activeSpatial();
     if (!active || allSpaces.indexOf(active) < 0) active = allSpaces[0] || null;
@@ -4094,43 +4080,32 @@
         backgroundScopePulse = false;
       }
     }
-    var buttons = ctl.querySelectorAll('[data-cv-bg-mode]');
-    Array.prototype.forEach.call(buttons, function (button) {
-      button.classList.toggle('is-on', button.dataset.cvBgMode === backgroundModeFor(active));
-    });
-    pop.innerHTML = active ? [active].map(function (sp) {
-      var list = spatialImages(sp), count = list.length;
-      var heading = '<div class="cv-bg-row-heading"><span class="cv-bg-row-label">' +
-        esc(sp._sampleName) + '</span><span class="cv-bg-count">' + count +
-        (count === 1 ? ' image' : ' images') + '</span></div>';
-      var body;
-      if (!count) {
-        body = '<div class="cv-bg-unavailable">No image available</div>';
-      } else if (count === 1) {
-        body = '<label class="cv-bg-single"><span class="cv-bg-thumb"></span>' +
-          '<span class="cv-bg-single-name">' + esc(list[0].label || list[0].id) +
-          '</span><input type="checkbox" data-cv-bg-space="' + esc(sp.id) + '"' +
-          (sp._customImageId === IMG_NONE ? '' : ' checked') + '><span class="cv-bg-switch"></span></label>';
-      } else {
-        var opts = ['<option value="' + IMG_NONE + '">None</option>'].concat(
-          list.map(function (im) { return '<option value="' + esc(im.id) + '">' +
-            esc(im.label || im.id) + '</option>'; })
-        );
-        body = '<select data-cv-bg-space="' + esc(sp.id) + '">' + opts.join('') + '</select>';
-      }
-      return '<div class="cv-bg-row">' + heading + body + '</div>';
-    }).join('') : '';
-    (active ? [active] : []).forEach(function (sp) {
-      var input = pop.querySelector('[data-cv-bg-space="' + cssEscape(sp.id) + '"]');
-      if (!input) return;
-      if (input.tagName === 'SELECT') input.value = sp._customImageId || spatialImages(sp)[0].id;
-      input.onchange = function () {
-        var id = input.type === 'checkbox'
-          ? (input.checked ? spatialImages(sp)[0].id : IMG_NONE)
-          : input.value;
-        setSpatialImage(id, sp);
-      };
-    });
+    var images = active ? spatialImages(active) : [];
+    var options = images.map(function (im) {
+      return { value: im.id, text: im.label || im.id };
+    }).concat([{ value: IMG_NONE, text: 'None' }]);
+    var value = active && active._customImageId
+      ? active._customImageId
+      : (images[0] ? images[0].id : IMG_NONE);
+    if (!select.selectize && window.jQuery && window.jQuery.fn && window.jQuery.fn.selectize) {
+      window.jQuery(select).selectize({
+        persist: false,
+        onChange: function (id) { if (id) setSpatialImage(id, activeSpatial()); }
+      });
+    }
+    if (select.selectize) {
+      select.selectize.clearOptions(true);
+      select.selectize.addOption(options);
+      select.selectize.setValue(value, true);
+      if (images.length) select.selectize.enable(); else select.selectize.disable();
+    } else {
+      select.innerHTML = images.map(function (im) {
+        return '<option value="' + esc(im.id) + '">' + esc(im.label || im.id) + '</option>';
+      }).concat(['<option value="' + IMG_NONE + '">None</option>']).join('');
+      select.disabled = !images.length;
+      select.value = value;
+      select.onchange = function () { setSpatialImage(select.value, active); };
+    }
   }
 
   // Switch background. The cells have not moved -- only what is behind them --
@@ -4142,26 +4117,12 @@
     stashImgState(sp);
     sp._customImageId = id;
     imgChoice[backgroundStateKey(sp)] = id;
-    backgroundModes[backgroundStateKey(sp)] = 'custom';
     loadSpaceImage(sp);
     if (sp.id === activeSpatialId) {
       seedImgControls();
     }
     renderImagePicker();
     updateSpaceScopedControls();
-    drawAll();
-  }
-
-  function setBackgroundMode(mode, sp) {
-    if (['auto', 'none', 'custom'].indexOf(mode) < 0) return;
-    sp = sp || activeSpatial();
-    if (!sp) return;
-    stashImgState(sp);
-    backgroundModes[backgroundStateKey(sp)] = mode;
-    loadSpaceImage(sp);
-    renderImagePicker();
-    updateSpaceScopedControls();
-    seedImgControls();
     drawAll();
   }
 
@@ -4194,7 +4155,7 @@
     if (!sp) return;
     var cur = currentImage(sp);
     var v = st || sp._imgState || presetState(cur);
-    var set = function (id, x) { var el = $(id); if (el) el.value = String(x); };
+    var set = function (id, x) { syncImgRangeValue($(id), x); };
     var tick = function (id, on) { var el = $(id); if (el) el.checked = !!on; };
     var span = (cur && cur.coord_span) || null;
     if (span && span.length >= 2) {
@@ -4229,7 +4190,6 @@
     tick('cv-img-flipx', v.flipX);
     tick('cv-img-flipy', v.flipY);
     tick('cv-img-show', v.show !== false);
-    positionAllImgRangeValues();
     var activeLabel = $('cv-img-active-label');
     if (activeLabel) activeLabel.textContent = sp._sampleName || '';
   }
@@ -4424,11 +4384,11 @@
     var sxv = num('cv-img-scalex', imgState.scaleX);
     var syv = num('cv-img-scaley', imgState.scaleY);
     if (lock && changed === 'cv-img-scalex') {
-      syv = sxv; if (syEl) syEl.value = String(sxv);
+      syv = sxv; syncImgRangeValue(syEl, sxv);
     } else if (lock && changed === 'cv-img-scaley') {
-      sxv = syv; if (sxEl) sxEl.value = String(syv);
+      sxv = syv; syncImgRangeValue(sxEl, syv);
     } else if (lock && changed === 'cv-img-lock') {
-      syv = sxv; if (syEl) syEl.value = String(sxv);
+      syv = sxv; syncImgRangeValue(syEl, sxv);
     }
     imgState.scaleX = sxv; imgState.scaleY = syv;
     imgState.rotate = num('cv-img-rotate', imgState.rotate);
@@ -4505,15 +4465,13 @@
   }
   function layoutPanels() {
     var order = orderedSpaces();
-    // A new data set is a new set of spaces; whichever panel had the grid may
-    // not even hold the same one now.
+    // A new data set is a new set of spaces; the previous focus may no longer
+    // exist in the new layout.
     focusPanel = null;
     panels.forEach(function (p) {
       if (p.pane) {
         p.pane.classList.remove('cv-focus-primary', 'cv-focus-context');
         p.pane.style.order = '';
-        p.pane.style.gridColumn = '';
-        p.pane.style.gridRow = '';
       }
       var fb = p.pane && p.pane.querySelector('.cv-focus-btn');
       if (fb) {
@@ -4646,15 +4604,13 @@
     return isFinite(aspect) && aspect > 0 ? aspect : null;
   }
 
-  // When every visible panel fits on one row, size all canvases to one shared
-  // height and let their data aspects determine their widths. The pane tracks
-  // still consume the full workspace; spare width becomes harmless breathing
-  // room around centred canvases instead of geometric distortion.
+  // A row made entirely of physical spatial views shares one height and lets
+  // their data aspects determine width. Mixed rows stay fluid: an FOV keeps its
+  // physical ratio, while UMAP/trajectory/clone panels consume their full slot.
   function fitAspectRow(vis, availW, availH, chromeX, overhead, gap) {
     if (!vis.length) return null;
     var aspects = vis.map(function (p) { return panelDataAspect(p); });
-    if (!aspects.some(Boolean)) return null;
-    aspects = aspects.map(function (aspect) { return aspect || 1; });
+    if (!aspects.every(Boolean)) return null;
     var contentW = availW - gap * (vis.length - 1) - chromeX * vis.length;
     var aspectSum = aspects.reduce(function (sum, aspect) {
       return sum + aspect;
@@ -4690,7 +4646,9 @@
       _layoutKey = key;
       _layoutPass = 1;
     }
-    var gap = 14;
+    // CSS owns the flex layout. Read its actual gap so the width calculation
+    // cannot drift from the browser and push the last pane onto a new row.
+    var gap = parseFloat(getComputedStyle(panes).columnGap) || 0;
     // Each pane is border-box with 12px padding + 1px border, so its content is
     // 26px narrower than its column track. The canvas takes that full width;
     // height is still fitted to the viewport by the existing overview logic.
@@ -4708,7 +4666,10 @@
       visibleBottom - panes.getBoundingClientRect().top - bottomPad -
       2 * VIEWPORT_GUTTER
     );
-    var usableW = availW;
+    // Keep the same small viewport gutter horizontally as vertically. A
+    // classic scrollbar can appear after height fitting and steal a few pixels;
+    // without this reserve the final flex item wraps onto a new row.
+    var usableW = Math.max(1, availW - 2 * VIEWPORT_GUTTER);
 
     // Overview is a genuine two-dimensional fit: try every possible column
     // count and choose the one that maximises a balanced cell. If there are so
@@ -4777,8 +4738,6 @@
     // Explicit tracks consume all available width. In the default fluid mode,
     // canvases also consume their row's share of available height. Square mode
     // constrains both dimensions to the shorter side.
-    panes.classList.remove('cv-n2', 'cv-n3', 'cv-n4', 'cv-single');
-    panes.classList.add(single ? 'cv-single' : ('cv-n' + k));
     var rows = Math.ceil(k / cols);
     var panelHeight = Math.max(
       MIN_SIDE,
@@ -4787,30 +4746,18 @@
     var rowFit = !focusPanel && rows === 1
       ? fitAspectRow(vis, usableW, availH, chromeX, overhead, gap)
       : null;
-    var col = rowFit ? rowFit.tracks : [];
-    if (!rowFit) {
-      for (var c = 0; c < cols; c++) col.push(colW);
-    }
-    panes.style.gridTemplateColumns = col.map(function (width) {
-      return width + 'px';
-    }).join(' ');
-    panes.style.gridTemplateRows = '';
     var panelWidth = Math.max(150, Math.floor(colW - chromeX));
     var primaryWidth = cols > 1
       ? Math.max(panelWidth, Math.floor(colW * 2 + gap - chromeX))
       : panelWidth;
     vis.forEach(function (p, index) {
       var primary = !!focusPanel && p.key === focusPanel;
-      if (p.pane) {
-        p.pane.style.gridColumn = primary && cols > 1 ? 'span 2' : '';
-        // With three or more tracks the large lens occupies a genuine 2×2 bento
-        // cell; the smaller lenses flow into the open tracks around it.
-        p.pane.style.gridRow = primary && cols > 2 ? 'span 2' : '';
-      }
       var width = rowFit ? rowFit.widths[index]
         : (primary ? primaryWidth : panelWidth);
       var height = rowFit ? rowFit.height
         : (primary ? focusSide : (focusPanel ? side : panelHeight));
+      var paneWidth = rowFit ? rowFit.tracks[index]
+        : (primary ? primaryWidth + chromeX : Math.floor(colW));
       var aspect = panelDataAspect(p);
       if (aspect) {
         if (width / height > aspect) width = Math.round(height * aspect);
@@ -4820,6 +4767,11 @@
         var squareSide = Math.min(width, height);
         width = squareSide;
         height = squareSide;
+      }
+      if (p.pane) {
+        p.pane.style.flexBasis = paneWidth + 'px';
+        p.pane.style.width = paneWidth + 'px';
+        p.pane.style.height = '';
       }
       resizePanel(p, width, height);
     });
@@ -4861,7 +4813,8 @@
     var C = $('cv-cbar'); if (C) C.style.display = 'none';
     var R = $('cv-readout');
     if (R) {
-      R.innerHTML = '<div class="cv-empty">Nothing to show for this data set.</div>';
+      R.innerHTML = '';
+      R.style.display = 'none';
     }
     ['cv-workspace-guide', 'cv-selbar', 'cv-selactions', 'cv-shown', 'cv-trekker-ctl',
       'cv-tk-insights', 'cv-clone-layout-ctl'].forEach(function (id) {
@@ -5601,7 +5554,6 @@
     var activeName = !dataChanged && selectedSpatial.indexOf(previousActiveName) >= 0
       ? previousActiveName : selectedSpatial[0];
     activeSpatialId = activeName ? spatialId(activeName) : null;
-    if (dataChanged) backgroundModes = {};
     rebuildSpatialInstances();
     Object.keys(spaceById).forEach(function (id) {
       var direct = spaceById[id];
@@ -5802,8 +5754,7 @@
       var images = spatialImages(space);
       if (!space || !images.length) return null;
       stashImgState(space);
-      var mode = backgroundModeFor(space);
-      var selectedImage = mode === 'custom' ? space._customImageId : null;
+      var selectedImage = space._customImageId || images[0].id;
       var image = currentImage(space) || images.filter(function (item) {
         return item.id === selectedImage;
       })[0] || images[0];
@@ -5811,8 +5762,8 @@
       var state = space._imgState || (key && imgStates[key]) || presetState(image);
       return {
         section: name,
-        mode: mode === 'custom' ? 'image' : mode,
-        image_id: mode === 'custom' ? selectedImage : null,
+        mode: selectedImage === IMG_NONE ? 'none' : 'image',
+        image_id: selectedImage === IMG_NONE ? null : selectedImage,
         opacity: state.opacity,
         alignment: {
           show: state.show !== false,
@@ -5967,8 +5918,9 @@
       var space = spaceById[spatialId(saved.section)];
       if (!space) return;
       var images = spatialImages(space);
-      backgroundModes[backgroundStateKey(space)] = saved.mode === 'image' ? 'custom' : saved.mode;
-      space._customImageId = saved.image_id || ((images[0] && images[0].id) || IMG_NONE);
+      space._customImageId = saved.mode === 'none'
+        ? IMG_NONE
+        : (saved.image_id || ((images[0] && images[0].id) || IMG_NONE));
       imgChoice[backgroundStateKey(space)] = space._customImageId;
       var alignment = saved.alignment;
       if (alignment) {
@@ -6330,7 +6282,7 @@
     if (imageHost && window.MutationObserver) {
       new MutationObserver(function () {
         renderImagePicker();
-        positionAllImgRangeValues();
+        syncAllImgRangeValues();
       })
         .observe(imageHost, { childList: true });
     }
@@ -6369,30 +6321,6 @@
       if (moranBadge) { openMoranDialog(moranBadge); return; }
       if (t && t.closest && t.closest('#cv-workspace-overview')) {
         if (focusPanel) setFocusPanel(focusPanel);
-        return;
-      }
-      var bgMode = t && t.closest && t.closest('[data-cv-bg-mode]');
-      if (bgMode) {
-        var mode = bgMode.getAttribute('data-cv-bg-mode');
-        var active = activeSpatial();
-        var pop = $('cv-bg-popover');
-        if (mode === 'custom' && backgroundModeFor(active) === 'custom') {
-          if (pop) pop.classList.toggle('is-open');
-        } else {
-          setBackgroundMode(mode, active);
-          if (pop) pop.classList.toggle('is-open', mode === 'custom');
-        }
-        if (mode === 'custom' && pop && pop.classList.contains('is-open')) {
-          var ctl = $('cv-img-pick-ctl'), buttonBox = bgMode.getBoundingClientRect();
-          var ctlBox = ctl && ctl.getBoundingClientRect();
-          if (ctl && ctlBox) {
-            var left = buttonBox.left - ctlBox.left;
-            left = Math.max(0, Math.min(ctl.clientWidth - pop.offsetWidth, left));
-            pop.style.left = left + 'px';
-            pop.style.top = (buttonBox.bottom - ctlBox.top + 8) + 'px';
-            pop.style.right = 'auto';
-          }
-        }
         return;
       }
       // The pinned tooltip's two actions. Checked before anything else, because
@@ -6579,12 +6507,28 @@
     document.addEventListener('input', function (e) {
       var id = e.target && e.target.id;
       if (updateLinkedToggle(e.target)) return;
+      if (id && id.slice(-7) === '-number' && id.indexOf('cv-img-') === 0) {
+        var range = $(id.slice(0, -7));
+        if (syncImgRangeValue(range, e.target.value)) {
+          syncImgControls(range.id); drawAll();
+        }
+        return;
+      }
       if (id && id.indexOf('cv-img-') === 0) {
-        positionImgRangeValue(e.target); syncImgControls(id); drawAll();
+        if (e.target.type === 'range') syncImgRangeValue(e.target, e.target.value);
+        syncImgControls(id); drawAll();
       }
     });
     document.addEventListener('change', function (e) {
       var id = e.target && e.target.id;
+      if (id && id.slice(-7) === '-number' && id.indexOf('cv-img-') === 0) {
+        var range = $(id.slice(0, -7));
+        if (!syncImgRangeValue(range, e.target.value)) {
+          syncImgRangeValue(range, range && range.value);
+        }
+        if (range) { syncImgControls(range.id); drawAll(); }
+        return;
+      }
       if (id && id.indexOf('cv-img-') === 0) { syncImgControls(id); drawAll(); return; }
       // The gene picker is read by the server directly, so without this the
       // client would not know a request was in flight and would keep drawing the
@@ -6609,21 +6553,10 @@
         readFilter(fwrap);
       }
     });
-    // The shared drawer owns group-filter popovers. This page listener only
-    // dismisses the background-image popover.
-    document.addEventListener('click', function (e) {
-      var t = e.target;
-      var pop = $('cv-bg-popover');
-      if (pop && !(t && t.closest && t.closest('.cv-bg-ctl'))) {
-        pop.classList.remove('is-open');
-      }
-    });
-    // Escape closes the detail card and background-image popover. The shared
-    // drawer listener handles the drawer and its group-filter menus.
+    // Escape closes the detail card. The shared drawer listener handles the
+    // drawer and its group-filter menus.
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
-      var bgPop = $('cv-bg-popover');
-      if (bgPop) bgPop.classList.remove('is-open');
       if (!cardOpen()) return;
       pick = null; unpinTip(); closeCard(); drawAll();
       if (!sel) {

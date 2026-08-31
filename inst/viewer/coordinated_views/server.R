@@ -593,19 +593,9 @@ output[["coordviews_image_ui"]] <- renderUI({
   if (is.null(span) || length(span) < 2) {
     span <- c(400, 400)
   }
-  rng <- function(id, mn, mx, val, step) {
-    fmt <- function(x) {
-      format(signif(x, 4), trim = TRUE, scientific = FALSE)
-    }
+  rng <- function(id, label, mn, mx, val, step) {
     div(
       class = "cv-img-range",
-      tags$span(class = "cv-img-range-min", fmt(mn)),
-      tags$span(
-        class = "cv-img-range-value",
-        id = paste0(id, "-val"),
-        fmt(val)
-      ),
-      tags$span(class = "cv-img-range-max", fmt(mx)),
       tags$input(
         type = "range",
         id = id,
@@ -613,6 +603,16 @@ output[["coordviews_image_ui"]] <- renderUI({
         max = mx,
         value = val,
         step = step
+      ),
+      tags$input(
+        type = "number",
+        id = paste0(id, "-number"),
+        class = "cv-img-number",
+        min = mn,
+        max = mx,
+        value = val,
+        step = step,
+        `aria-label` = paste(label, "value")
       )
     )
   }
@@ -650,21 +650,20 @@ output[["coordviews_image_ui"]] <- renderUI({
       class = "cv-imgbar-heading",
       tags$span(class = "cv-imgbar-title", "Alignment")
     ),
-    chk("cv-img-show", "Show", TRUE),
     div(
       class = "cv-img-ctl",
-      tags$label("Opacity"),
-      rng("cv-img-opacity", 0, 1, pr$opacity %||% 0.6, "any")
+      tags$label(`for` = "cv-img-opacity-number", "Opacity"),
+      rng("cv-img-opacity", "Opacity", 0, 1, pr$opacity %||% 0.6, "any")
     ),
     div(
       class = "cv-img-ctl",
-      tags$label("Move X"),
-      rng("cv-img-offx", -sx, sx, pr$offsetX %||% 0, "any")
+      tags$label(`for` = "cv-img-offx-number", "Move X"),
+      rng("cv-img-offx", "Move X", -sx, sx, pr$offsetX %||% 0, "any")
     ),
     div(
       class = "cv-img-ctl",
-      tags$label("Move Y"),
-      rng("cv-img-offy", -sy, sy, pr$offsetY %||% 0, "any")
+      tags$label(`for` = "cv-img-offy-number", "Move Y"),
+      rng("cv-img-offy", "Move Y", -sy, sy, pr$offsetY %||% 0, "any")
     ),
     ## Two scales, not one. A preset can carry scaleX != scaleY -- a calibration
     ## that is genuinely non-uniform -- and a single slider had to pick a number
@@ -673,32 +672,51 @@ output[["coordviews_image_ui"]] <- renderUI({
     ## uniform scale is the common case and two sliders to drag is a worse one.
     div(
       class = "cv-img-ctl",
-      tags$label("Scale X"),
-      rng("cv-img-scalex", scale_lo, scale_hi, pr$scaleX %||% 1, "any")
+      tags$label(`for` = "cv-img-scalex-number", "Scale X"),
+      rng(
+        "cv-img-scalex",
+        "Scale X",
+        scale_lo,
+        scale_hi,
+        pr$scaleX %||% 1,
+        "any"
+      )
     ),
     div(
       class = "cv-img-ctl",
-      tags$label("Scale Y"),
+      tags$label(`for` = "cv-img-scaley-number", "Scale Y"),
       rng(
         "cv-img-scaley",
+        "Scale Y",
         scale_lo,
         scale_hi,
         pr$scaleY %||% pr$scaleX %||% 1,
         "any"
       )
     ),
-    chk(
-      "cv-img-lock",
-      "Lock aspect",
-      isTRUE(is.null(pr$scaleY) || identical(pr$scaleY, pr$scaleX))
-    ),
     div(
       class = "cv-img-ctl",
-      tags$label("Rotate"),
-      rng("cv-img-rotate", -180, 180, pr$rotation %||% 0, "any")
+      tags$label(`for` = "cv-img-rotate-number", "Rotate"),
+      rng(
+        "cv-img-rotate",
+        "Rotate",
+        -180,
+        180,
+        pr$rotation %||% 0,
+        "any"
+      )
     ),
-    chk("cv-img-flipx", "Flip X", isTRUE(pr$flipX)),
-    chk("cv-img-flipy", "Flip Y", isTRUE(pr$flipY)),
+    div(
+      class = "cv-img-checks",
+      chk("cv-img-show", "Show", TRUE),
+      chk(
+        "cv-img-lock",
+        "Lock aspect",
+        isTRUE(is.null(pr$scaleY) || identical(pr$scaleY, pr$scaleX))
+      ),
+      chk("cv-img-flipx", "Flip X", isTRUE(pr$flipX)),
+      chk("cv-img-flipy", "Flip Y", isTRUE(pr$flipY))
+    ),
     ## Alignment is fiddly and easy to lose; the preset is the state the data set
     ## shipped with, so there has to be a way back to it that is not "reload".
     tags$button(

@@ -44,6 +44,20 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     ),
     timeout = 30000
   )
+  app$wait_for_js(
+    paste0(
+      "(() => {const r=document.getElementById('cv-readout');",
+      "return r && r.offsetParent === null && !r.textContent.trim();})()"
+    ),
+    timeout = 5000
+  )
+  linked_initial <- app$get_js(paste0(
+    "(() => {const panes=Array.from(document.querySelectorAll(",
+    "'.cv-pane:not(.cv-hidden)'));return {count:panes.length,",
+    "rows:new Set(panes.map(p=>Math.round(p.getBoundingClientRect().top))).size};})()"
+  ))
+  expect_identical(linked_initial$count, 3L)
+  expect_identical(linked_initial$rows, 1L)
 
   ## Focus remains a Linked views interaction; only standalone single-panel
   ## hosts suppress it.
@@ -89,7 +103,8 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   app$wait_for_js(
     paste0(
       "document.querySelector('#cv-selbar:not(.cv-collapse)') && ",
-      "document.getElementById('cv-zoom').offsetParent !== null"
+      "document.getElementById('cv-zoom').offsetParent !== null && ",
+      "document.getElementById('cv-readout').offsetParent !== null"
     ),
     timeout = 10000
   )

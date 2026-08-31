@@ -229,14 +229,15 @@ test_that("Standalone cell-view toolbars reach the panel top-right", {
   }
 })
 
-test_that("Spatial canvases preserve geometry in the shared responsive grid", {
+test_that("Spatial geometry does not constrain fluid linked views", {
   js <- viewer_source("www", "cell_views.js")
 
   expect_match(js, "space.stretch || isSpatialSpace(space)", fixed = TRUE)
   expect_match(js, "function panelDataAspect", fixed = TRUE)
   expect_match(js, "Number(sp._unit.aspect)", fixed = TRUE)
   expect_match(js, "function fitAspectRow", fixed = TRUE)
-  expect_match(js, "if (!aspects.some(Boolean)) return null;", fixed = TRUE)
+  expect_match(js, "if (!aspects.every(Boolean)) return null;", fixed = TRUE)
+  expect_no_match(js, "if (!aspects.some(Boolean)) return null;", fixed = TRUE)
   expect_match(js, "fitAspectRow(vis, usableW", fixed = TRUE)
   expect_match(js, "var aspect = panelDataAspect(p);", fixed = TRUE)
 })

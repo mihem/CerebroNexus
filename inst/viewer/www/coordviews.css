@@ -32,9 +32,7 @@
   outline: none; border-color: var(--c-amber);
   box-shadow: 0 0 0 3px var(--c-amber-50);
 }
-/* Background image choices are scoped to the selected spatial data.  The
-   compact, intrinsic-width mode switch deliberately avoids filling the full
-   settings window when the window is wide. */
+/* Background image choices are scoped to the selected spatial data. */
 .coordviews-page .cv-bg-ctl { position: relative; width: 100%; max-width: 100%; }
 .coordviews-page .cv-bg-settings {
   width: 100%; max-width: 100%; padding: 12px; border: 1px solid var(--c-border);
@@ -49,16 +47,13 @@
   100% { border-color: var(--c-border); box-shadow: none; }
 }
 .coordviews-page .cv-bg-display {
-  width: fit-content; max-width: 100%; padding-bottom: 12px;
+  width: 100%; max-width: 100%; padding-bottom: 12px;
   border-bottom: 1px solid var(--c-border);
 }
 .coordviews-page .cv-bg-display-title {
   margin-bottom: 7px; color: var(--c-text); font-size: 12px; font-weight: 650;
 }
-.coordviews-page .cv-bg-mode {
-  display: inline-flex; width: fit-content; max-width: 100%; overflow: hidden; border-radius: 6px;
-  border: 1px solid var(--c-border-2); background: var(--c-surface);
-}
+.coordviews-page .cv-bg-display .selectize-control { width: 100%; }
 .coordviews-page .cv-bg-space-tabs {
   display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
 }
@@ -71,61 +66,6 @@
 .coordviews-page .cv-bg-space-tab:hover { background: var(--c-surface-2); }
 .coordviews-page .cv-bg-space-tab.is-on {
   border-color: var(--c-amber-200); background: var(--c-amber-50); color: var(--c-amber-700);
-}
-.coordviews-page .cv-bg-mode-btn {
-  border: 0; border-left: 1px solid var(--c-border-2);
-  background: transparent; color: var(--c-text-2); cursor: pointer;
-  flex: 0 0 auto; padding: 7px 11px; font: 600 12px/1.2 inherit;
-}
-.coordviews-page .cv-bg-customize-btn { min-width: 116px; text-align: left; }
-.coordviews-page .cv-bg-mode-btn:first-child { border-left: 0; }
-.coordviews-page .cv-bg-mode-btn:hover { background: var(--c-surface-2); }
-.coordviews-page .cv-bg-mode-btn.is-on {
-  background: var(--c-amber-50); color: var(--c-amber-700);
-}
-.coordviews-page .cv-bg-popover {
-  display: none; position: absolute; z-index: 1200; width: min(390px, 86vw); padding: 10px;
-  background: var(--c-surface); border: 1px solid var(--c-border);
-  border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14);
-}
-.coordviews-page .cv-bg-popover.is-open { display: block; }
-.coordviews-page .cv-bg-row {
-  padding: 10px; border-radius: 8px; background: var(--c-surface-2);
-}
-.coordviews-page .cv-bg-row + .cv-bg-row { margin-top: 8px; }
-.coordviews-page .cv-bg-row-heading {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 7px;
-}
-.coordviews-page .cv-bg-row-label { font-size: 12.5px; font-weight: 650; }
-.coordviews-page .cv-bg-count,
-.coordviews-page .cv-bg-unavailable { font-size: 11px; color: var(--c-text-3); }
-.coordviews-page .cv-bg-row select { width: 100%; min-width: 0; }
-.coordviews-page .cv-bg-single {
-  display: flex; align-items: center; gap: 9px; cursor: pointer;
-  font-size: 12px; color: var(--c-text-2);
-}
-.coordviews-page .cv-bg-thumb {
-  width: 28px; height: 20px; border-radius: 5px;
-  background: linear-gradient(135deg, #f6d7e8, #d9c4ee);
-  border: 1px solid rgba(0, 0, 0, .08);
-}
-.coordviews-page .cv-bg-single-name { flex: 1; min-width: 0; }
-.coordviews-page .cv-bg-single input { position: absolute; opacity: 0; }
-.coordviews-page .cv-bg-switch {
-  width: 32px; height: 18px; border-radius: 999px; position: relative;
-  background: #c8c8cc; transition: background .16s ease;
-}
-.coordviews-page .cv-bg-switch::after {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
-  border-radius: 50%; background: #fff; transition: transform .16s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
-}
-.coordviews-page .cv-bg-single input:checked + .cv-bg-switch {
-  background: var(--c-amber);
-}
-.coordviews-page .cv-bg-single input:checked + .cv-bg-switch::after {
-  transform: translateX(14px);
 }
 /* ---- segmented toggle (clonal-panel layout) ----------------------------- */
 .coordviews-page .cv-seg {
@@ -203,33 +143,30 @@
 .coordviews-page.cerebro-cell-view-host .cv-pane-head {
   padding: 0 4px;
 }
-/* JS (layoutPanels + resizeAll) keeps tracks full-width while fitting each
-   canvas to its data geometry; here we establish the grid and transitions. */
+/* JS (layoutPanels + resizeAll) gives each pane a flex basis while fitting its
+   canvas to the data geometry. */
 .coordviews-page .cv-panes {
   /* A restored view can briefly sit in a shrink-to-fit tab wrapper.  Make the
-     grid claim the page width before its JS tracks are measured; otherwise two
+     workspace claim the page width before its JS tracks are measured; otherwise two
      saved lenses inherit that narrow measurement and remain stranded left. */
-  display: grid; width: 100%; min-width: 0; box-sizing: border-box;
+  display: flex; flex-wrap: wrap;
+  width: 100%; min-width: 0; box-sizing: border-box;
   padding: 14px 0 8px;
-  gap: 18px; justify-content: stretch; align-content: start;
-  /* anchors the detail card to the grid's centre (it is absolutely positioned,
-     so it stays out of the grid's own layout) */
+  gap: 18px; justify-content: flex-start; align-items: flex-start;
+  align-content: flex-start;
+  /* anchors the detail card to the workspace's centre (it is absolutely
+     positioned, so it stays out of the panel flow) */
   position: relative;
-  /* When the available height changes (the "More" panel opening, a bar toggling)
-     resizeAll writes new px column tracks; transitioning them makes the panels
-     glide to the new size instead of snapping. The canvas transitions in step
-     (below), and resizeAll's crisp redraw lands after the transition settles. */
-  transition: grid-template-columns .2s ease;
 }
 .coordviews-page .cv-panes.cv-focus-transitioning {
-  /* FLIP owns the motion while focus changes: do not make the grid and each
-     pane animate competing versions of the same reflow. */
+  /* FLIP owns the motion while focus changes. */
   transition: none;
 }
 .coordviews-page .cv-pane {
   position: relative;
   background: var(--c-surface); border: 1px solid var(--c-border);
   border-radius: 10px; padding: 12px;
+  box-sizing: border-box; flex: 0 0 auto;
   display: flex; flex-direction: column; align-self: start;
   transition: opacity .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
@@ -596,8 +533,7 @@
 
 /* ---- histology image control bar ---------------------------------------- */
 .coordviews-page .cv-imgbar {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
-  align-items: end; gap: 12px 16px;
+  display: flex; flex-direction: column; gap: 8px;
   padding: 9px 12px; margin-bottom: 14px;
   background: var(--c-surface-2); border: 1px solid var(--c-border);
   border-radius: 8px; font-size: 12px;
@@ -627,9 +563,12 @@
   font-weight: 650; color: var(--c-text); margin-right: 2px;
 }
 .coordviews-page .cv-imgbar-heading {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; grid-column: 1 / -1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px;
 }
-.coordviews-page .cv-img-ctl { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.coordviews-page .cv-img-ctl {
+  display: grid; grid-template-columns: 72px minmax(0, 1fr) 64px;
+  align-items: center; gap: 10px;
+}
 .coordviews-page .cv-img-ctl > label {
   font-size: 11px; color: var(--c-text-2); font-weight: 600; white-space: nowrap;
   line-height: 1; margin: 0;
@@ -638,7 +577,7 @@
    line rather than sitting a couple of px low (its default margin breaks the
    flex centering). */
 .coordviews-page .cv-img-ctl input[type=range] {
-  position: absolute; left: 0; bottom: 4px; width: 100%; height: 26px; margin: 0;
+  width: 100%; min-width: 0; height: 26px; margin: 0;
   appearance: none; -webkit-appearance: none; background: transparent; display: block;
 }
 .coordviews-page .cv-img-ctl input[type=range]::-webkit-slider-runnable-track {
@@ -659,24 +598,20 @@
   width: 19px; height: 19px; border: 3px solid var(--c-amber); border-radius: 50%; background: #fff; cursor: pointer;
 }
 .coordviews-page .cv-img-range {
-  position: relative; width: 100%; height: 51px; padding-top: 20px;
+  display: contents;
 }
-.coordviews-page .cv-img-range-value {
-  position: absolute; z-index: 1; top: 0; transform: translateX(-50%); pointer-events: none;
-  padding: 2px 5px; border-radius: 4px; background: var(--c-amber); color: #fff;
-  font-size: 10.5px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+.coordviews-page .cv-img-number {
+  width: 64px; min-width: 0; height: 30px; box-sizing: border-box;
+  padding: 4px 6px; border: 1px solid var(--c-border-2); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text); text-align: right;
+  font: 12px/1 var(--cv-font, inherit); font-variant-numeric: tabular-nums;
 }
-.coordviews-page .cv-img-range-min,
-.coordviews-page .cv-img-range-max {
-  position: absolute; top: 0; padding: 2px 5px; border-radius: 4px;
-  background: var(--c-surface); color: var(--c-text-2); font-size: 10.5px; line-height: 1.2;
+.coordviews-page .cv-img-number:focus {
+  outline: 2px solid var(--c-amber-100); border-color: var(--c-amber);
 }
-.coordviews-page .cv-img-range-min { left: 0; }
-.coordviews-page .cv-img-range-max { right: 0; }
-.coordviews-page .cv-img-range::after {
-  content: ""; position: absolute; z-index: 0; left: 8px; right: 8px; bottom: 0; height: 7px;
-  background: repeating-linear-gradient(90deg, var(--c-text-3) 0 1px, transparent 1px 10%);
-  opacity: .55; pointer-events: none;
+.coordviews-page .cv-img-checks {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding-top: 2px;
 }
 /* ---- colourbar (single-gene continuous) --------------------------------- */
 .coordviews-page .cv-cbar {
@@ -1052,7 +987,7 @@
 /* "Reset to preset" sits at the end of the histology alignment bar. Quiet: it
    undoes work rather than doing any, and it is next to the controls it undoes. */
 .coordviews-page .cv-imgbar-reset {
-  margin: 0; padding: 6px 10px; cursor: pointer; align-self: end;
+  width: 100%; margin: 0; padding: 7px 10px; cursor: pointer;
   border: 1px solid var(--c-border-2); border-radius: 6px;
   background: var(--c-surface); color: var(--c-text-2);
   font-family: inherit; font-size: 12px;

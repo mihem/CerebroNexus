@@ -407,3 +407,35 @@ test_that("argument and misc spatial images cannot claim the same label", {
     "sliceA.*H&E.*both"
   )
 })
+
+test_that("spatial plot rotations are validated per dataset and FOV", {
+  catalogs <- list(
+    Atlas = list(sliceA = "H&E", sliceB = character()),
+    Other = list(fov = "DAPI")
+  )
+  expect_identical(
+    .normalizeAppSpatialPlotRotation(
+      list(Atlas = c(sliceA = 90, sliceB = -90)),
+      catalogs
+    ),
+    list(Atlas = c(sliceA = 90, sliceB = -90))
+  )
+  expect_identical(
+    .normalizeAppSpatialPlotRotation(
+      list(Other = list(fov = 180)),
+      catalogs
+    ),
+    list(Other = c(fov = 180))
+  )
+  expect_error(
+    .normalizeAppSpatialPlotRotation(list(Atlas = c(missing = 90)), catalogs),
+    "spatial `missing` is not available"
+  )
+  expect_error(
+    .normalizeAppSpatialPlotRotation(
+      list(Atlas = c(sliceA = NA_real_)),
+      catalogs
+    ),
+    "finite numeric rotation"
+  )
+})

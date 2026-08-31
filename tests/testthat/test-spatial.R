@@ -189,15 +189,23 @@ test_that("background-image selection only recreates image calibration controls"
     collapse = "\n"
   )
   for (class_name in c(
-    "cerebroSettingsSection(",
     "cerebro-settings-content",
     "cerebro-settings-full",
     "spatial-image-offset-row",
+    "spatial-image-checks",
     "spatial-image-actions"
   )) {
     expect_match(additional_ui, class_name, fixed = TRUE)
   }
+  expect_no_match(additional_ui, "cerebroSettingsSection(", fixed = TRUE)
+  expect_match(additional_ui, '"Opacity"', fixed = TRUE)
+  expect_no_match(additional_ui, '"Image opacity"', fixed = TRUE)
   expect_match(additional_ui, 'paste0(id, "_num")', fixed = TRUE)
+  expect_match(
+    additional_ui,
+    'slider_number_input(\n        "spatial_projection_background_opacity"',
+    fixed = TRUE
+  )
   for (obsolete_class in c(
     "spatial-image-control-group",
     "spatial-image-transform-group",
@@ -211,6 +219,13 @@ test_that("background-image selection only recreates image calibration controls"
     collapse = "\n"
   )
   expect_match(settings_css, ".spatial-image-offset-row {", fixed = TRUE)
+  expect_match(
+    settings_css,
+    ".spatial-image-offset-slider .irs-grid",
+    fixed = TRUE
+  )
+  expect_match(settings_css, "grid-template-columns: 1fr;", fixed = TRUE)
+  expect_match(settings_css, "margin-top: 12px;", fixed = TRUE)
   expect_match(
     settings_css,
     ".cerebro-settings-section {",
@@ -351,7 +366,7 @@ test_that("Spatial UI seeds and resets every field from the shared image preset"
   )
   expect_match(
     ui,
-    "spatial_projection_background_opacity[\\s\\S]{0,120}value = preset\\$opacity",
+    "spatial_projection_background_opacity[\\s\\S]{0,200}preset\\$opacity",
     perl = TRUE
   )
   expect_match(
@@ -360,6 +375,7 @@ test_that("Spatial UI seeds and resets every field from the shared image preset"
     perl = TRUE
   )
   for (numeric_id in c(
+    "spatial_projection_background_opacity_num",
     "spatial_projection_background_scale_num",
     "spatial_projection_background_scale_x_num",
     "spatial_projection_background_scale_y_num",
@@ -367,6 +383,13 @@ test_that("Spatial UI seeds and resets every field from the shared image preset"
   )) {
     expect_match(controls, numeric_id, fixed = TRUE)
   }
+  expect_match(controls, '"spatial_copy_preset"', fixed = TRUE)
+  page_js <- paste(
+    readLines(file.path(shiny_root, "spatial", "js_page_helpers.js")),
+    collapse = "\n"
+  )
+  expect_match(page_js, "navigator.clipboard.writeText", fixed = TRUE)
+  expect_match(page_js, "document.execCommand('copy')", fixed = TRUE)
 })
 
 test_that("createShinyApp bundles a spatial image and writes the option", {
@@ -907,6 +930,23 @@ test_that("app.R ships the Visium H&E overlay pre-aligned", {
   expect_match(app_src, "offset_x = 600", fixed = TRUE)
   expect_match(app_src, "scale_x = 1.55", fixed = TRUE)
   expect_match(app_src, "flip_y = TRUE", fixed = TRUE)
+})
+
+test_that("app.R configures MERFISH plot and image rotations separately", {
+  app_src <- paste(
+    readLines(system.file("app.R", package = "CerebroNexus")),
+    collapse = "\n"
+  )
+  expect_match(
+    app_src,
+    '"fov" = 90',
+    fixed = TRUE
+  )
+  expect_match(
+    app_src,
+    '"Tissue background" = list(rotation = 90)',
+    fixed = TRUE
+  )
 })
 
 ##----------------------------------------------------------------------------##

@@ -837,14 +837,13 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .spatial-image-offset-field {
   display: grid;
-  gap: 5px;
-}
-.spatial-image-offset-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
+  grid-template-columns: 92px minmax(0, 1fr) 68px;
   gap: 10px;
   align-items: center;
-  min-width: 0;
+}
+.spatial-image-offset-field > .control-label { margin: 0; }
+.spatial-image-offset-row {
+  display: contents;
 }
 .cerebro-settings-content .spatial-image-offset-row
   .shiny-input-container:has(.irs--shiny) {
@@ -855,9 +854,31 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 .spatial-image-offset-number .form-control {
   width: 100%;
 }
+.spatial-image-offset-number .form-control {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 4px 7px !important;
+  text-align: right;
+}
+.spatial-image-offset-slider .irs--shiny { height: 30px; }
+.spatial-image-offset-slider .irs-line,
+.spatial-image-offset-slider .irs-bar { top: 11px; }
+.spatial-image-offset-slider .irs-handle { top: 3px; }
+.spatial-image-offset-slider .irs-min,
+.spatial-image-offset-slider .irs-max,
+.spatial-image-offset-slider .irs-from,
+.spatial-image-offset-slider .irs-to,
+.spatial-image-offset-slider .irs-single,
+.spatial-image-offset-slider .irs-grid { display: none !important; }
+.spatial-image-checks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
 .spatial-image-actions {
   display: grid;
   gap: 8px;
+  margin-top: 12px;
 }
 
 /* Shared group-filter chips used by Linked views and projection-style pages. */

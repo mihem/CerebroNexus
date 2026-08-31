@@ -119,6 +119,43 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
   )
 }
 
+spatialPlotRotation <- function(options, dataset, spatial_name) {
+  configured <- if (is.list(options)) {
+    options[["spatial_plot_rotation"]]
+  } else {
+    NULL
+  }
+  value <- if (
+    !is.null(dataset) &&
+      !is.null(spatial_name) &&
+      is.list(configured) &&
+      dataset %in% names(configured) &&
+      spatial_name %in% names(configured[[dataset]])
+  ) {
+    configured[[dataset]][[spatial_name]]
+  } else {
+    NULL
+  }
+  value <- suppressWarnings(as.numeric(value))
+  if (length(value) != 1L || is.na(value) || !is.finite(value)) {
+    0
+  } else {
+    unname(value)
+  }
+}
+
+rotateSpatialCoordinates <- function(coordinates, degrees) {
+  if (is.null(coordinates) || identical(degrees, 0)) {
+    return(coordinates)
+  }
+  theta <- degrees * pi / 180
+  x <- coordinates[, 1]
+  y <- coordinates[, 2]
+  coordinates[, 1] <- x * cos(theta) - y * sin(theta)
+  coordinates[, 2] <- x * sin(theta) + y * cos(theta)
+  coordinates
+}
+
 ##----------------------------------------------------------------------------##
 ## Guarded bindCache wrapper for plot/reactive outputs.
 ##

@@ -2078,8 +2078,10 @@ dedent <- function(string) {
 #'   dataset and spatial entry. The image label must exist in the union of the
 #'   CRB's embedded images and this call's \code{spatial_images}; unknown
 #'   identities are rejected. Labels are user-facing names, not protocol names.
-#' @param spatial_plot_rotation Named list/vector; initial rotation (degrees)
-#'   applied to spatial cell coordinates. Names must match \code{cerebro_data}.
+#' @param spatial_plot_rotation Optional nested rotations in
+#'   \code{dataset -> spatial entry -> degrees} form, applied only to spatial
+#'   cell coordinates. Dataset names must match \code{cerebro_data}; spatial
+#'   names must match the corresponding CRB's \code{availableSpatial()}.
 #' @param auth Optional authentication settings. \code{NULL}, the default,
 #'   leaves the generated Viewer public. To require a login, provide a named
 #'   list with \code{credentials}, the path to an encrypted SQLite database
@@ -2410,11 +2412,6 @@ createShinyApp <- function(
     }
     x[matching]
   }
-  spatial_plot_rotation <- validate_named_against_data(
-    spatial_plot_rotation,
-    "spatial_plot_rotation"
-  )
-
   if (!requireNamespace("CerebroNexus", quietly = TRUE)) {
     stop(
       "Package 'CerebroNexus' is required but not installed.",
@@ -2441,6 +2438,10 @@ createShinyApp <- function(
   preflight_data <- .preflightBundleData(cerebro_data)
   backends <- preflight_data$backends
   spatial_catalogs <- preflight_data$spatial_catalogs
+  spatial_plot_rotation <- .normalizeAppSpatialPlotRotation(
+    spatial_plot_rotation,
+    spatial_catalogs
+  )
   spatial_images <- .normalizeAppSpatialImages(
     spatial_images,
     spatial_catalogs
