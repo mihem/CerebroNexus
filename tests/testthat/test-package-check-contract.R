@@ -23,6 +23,17 @@ test_that("development-only directories are excluded from package builds", {
   expect_true(all(expected %in% ignores))
 })
 
+test_that("pkgdown output directory has no tracked source files", {
+  skip_if_not_source_tree()
+  tracked_docs <- system2(
+    "git",
+    c("-C", shQuote(source_file()), "ls-files", "--", "docs"),
+    stdout = TRUE
+  )
+
+  expect_length(tracked_docs, 0L)
+})
+
 test_that("package and exported-app branding use the current identity", {
   description_path <- source_file("DESCRIPTION")
   if (!file.exists(description_path)) {
