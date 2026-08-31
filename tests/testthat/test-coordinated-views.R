@@ -316,6 +316,41 @@ test_that("cv_group/cv_space/cv_clone force JSON arrays even at length 1", {
   expect_false(startsWith(arr(cl$n_clones), "["))
 })
 
+test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
+  skip_if_not(have_bundle)
+  skip_if_not_installed("jsonlite")
+  cells <- "c1"
+  md <- data.frame(
+    cell_barcode = cells,
+    cluster = "A",
+    row.names = cells,
+    stringsAsFactors = FALSE
+  )
+  crb <- list(
+    getMetaData = function() md,
+    getGroups = function() "cluster",
+    getParameters = function() list(main_group = "cluster"),
+    availableProjections = function() "umap",
+    getProjection = function(name) {
+      matrix(c(1, 2), nrow = 1, dimnames = list(cells, c("x", "y")))
+    },
+    availableSpatial = function() NULL,
+    getTrekker = function() NULL,
+    getImmuneRepertoire = function() NULL
+  )
+
+  bundle <- cv_env$cv_build_bundle(crb)
+  projection <- bundle$projections$umap
+  as_json <- function(x) as.character(jsonlite::toJSON(x, auto_unbox = TRUE))
+
+  expect_s3_class(bundle$cells, "AsIs")
+  expect_s3_class(projection$x, "AsIs")
+  expect_s3_class(projection$y, "AsIs")
+  expect_match(as_json(bundle$cells), "^\\[")
+  expect_match(as_json(projection$x), "^\\[")
+  expect_match(as_json(projection$y), "^\\[")
+})
+
 test_that("cv_color_patch carries only palette updates for the current bundle", {
   skip_if_not(have_bundle)
   bundle <- list(
@@ -338,6 +373,37 @@ test_that("cv_color_patch carries only palette updates for the current bundle", 
   expect_equal(as.character(patch$groups$cluster), c("#111111", "#222222"))
   expect_equal(as.character(patch$cat_extra$donor), c("#cccccc", "#dddddd"))
   expect_s3_class(patch$groups$cluster, "AsIs")
+})
+
+test_that("palette patches can refresh an existing bundle", {
+  skip_if_not(have_bundle)
+  bundle <- list(
+    groups = list(
+      cluster = cv_env$cv_group(0L, "A", "#aaaaaa")
+    ),
+    cat_extra = list()
+  )
+  patch <- list(
+    groups = list(cluster = I("#123456")),
+    cat_extra = list()
+  )
+
+  refreshed <- cv_env$cv_apply_color_patch(bundle, patch)
+
+  expect_identical(as.character(refreshed$groups$cluster$colors), "#123456")
+})
+
+test_that("hidden palette changes are replayed without rebuilding data", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
+
+  expect_match(server, "cv_apply_color_patch(", fixed = TRUE)
+  expect_match(server, "coordviews_build_log$sent_n == 0", fixed = TRUE)
+  expect_match(
+    server,
+    'session$sendCustomMessage("coordviews_colors"',
+    fixed = TRUE
+  )
 })
 
 ## A minimal but realistically-shaped IR table: the CT* columns spell out chain
@@ -380,6 +446,24 @@ test_that("cv_clone_per_cell aligns clone identity to cells, NA when unmatched",
   expect_equal(out$ctaa, c("CAVX_CASSCCC", "CAVM_CASSAAA", NA))
   ## No IR at all -> NULL (the immune axis is simply skipped).
   expect_null(cv_env$cv_clone_per_cell(NULL, cells))
+})
+
+test_that("receptor detection falls back from empty CTstrict values", {
+  skip_if_not(have_bundle)
+  ir <- list(data.frame(
+    CTgene = c(
+      "TRAV1-2.TRAJ33.TRAC_TRBV6-4.TRBJ2-1.TRBC2",
+      "IGHV3-23.IGHJ4.IGHM_IGKV1-5.IGKJ1.IGKC"
+    ),
+    CTstrict = c(NA_character_, ""),
+    stringsAsFactors = FALSE
+  ))
+
+  expect_setequal(cv_env$cerebro_receptors_present(ir), c("TCR", "BCR"))
+  expect_identical(
+    cv_env$cerebro_rows_in_receptor(ir[[1]], "TCR", "CTgene"),
+    c(TRUE, FALSE)
+  )
 })
 
 test_that("cv_clone_per_cell calls clones the way the Clonal UMAP does", {
@@ -1499,11 +1583,28 @@ test_that("same-dataset refresh preserves percentage and group filters", {
   js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
   expect_match(
     js,
-    "if \\(dataChanged\\) \\{[\\s\\S]{0,1200}rebuildPctMask\\(\\)",
+    "if \\(dataChanged\\) \\{[\\s\\S]{0,1600}groupFilter = \\{\\};[\\s\\S]{0,1800}rebuildPctMask\\(\\)",
     perl = TRUE
   )
   expect_no_match(
     js,
     "pctMask = null; groupFilter = \\{\\};[[:space:]]*rebuildPctMask\\(\\)"
+  )
+})
+
+test_that("direct Trekker backgrounds retain their configured point appearance", {
+  js_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.js")
+  skip_if_not(file.exists(js_file))
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+
+  expect_match(
+    js,
+    "space._builderDefaultPointOpacity === undefined",
+    fixed = TRUE
+  )
+  expect_match(
+    js,
+    "space._builderDefaultPointSize === undefined",
+    fixed = TRUE
   )
 })

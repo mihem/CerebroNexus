@@ -117,6 +117,12 @@ observe(
     if (identical(coordviews_build_log$sent_n, coordviews_build_log$n)) {
       return()
     }
+    if (is.null(bundle$error)) {
+      bundle <- cv_apply_color_patch(
+        bundle,
+        isolate(coordviews_color_patch())
+      )
+    }
     session$sendCustomMessage("coordviews_data", bundle)
     coordviews_build_log$sent_n <- coordviews_build_log$n
   },
@@ -126,7 +132,9 @@ observe(
 observeEvent(
   reactive_colors(),
   {
-    req(coordviews_visible())
+    if (coordviews_build_log$sent_n == 0L) {
+      return()
+    }
     session$sendCustomMessage("coordviews_colors", coordviews_color_patch())
   },
   ignoreInit = TRUE

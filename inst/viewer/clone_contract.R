@@ -79,16 +79,34 @@ cerebro_clone_expansion <- function(size) {
 ## UMAP offers them -- so "the default receptor" means the same thing on both
 ## pages. Reads the chain names out of CTstrict, which spells them out even when
 ## the clone is being called on another column.
+cerebro_receptor_reference <- function(
+  df,
+  clone_col = cerebro_clonecall_col()
+) {
+  if (is.null(df)) {
+    return(character(0))
+  }
+  fallback <- if (clone_col %in% colnames(df)) {
+    as.character(df[[clone_col]])
+  } else {
+    rep(NA_character_, nrow(df))
+  }
+  if (!("CTstrict" %in% colnames(df))) {
+    return(fallback)
+  }
+  strict <- as.character(df$CTstrict)
+  missing <- is.na(strict) | !nzchar(strict)
+  strict[missing] <- fallback[missing]
+  strict
+}
+
 cerebro_receptors_present <- function(ir) {
   if (is.null(ir) || !length(ir)) {
     return(character(0))
   }
   refs <- unlist(
     lapply(ir, function(df) {
-      if (is.null(df) || !("CTstrict" %in% colnames(df))) {
-        return(character(0))
-      }
-      as.character(df$CTstrict)
+      cerebro_receptor_reference(df)
     }),
     use.names = FALSE
   )
@@ -120,11 +138,7 @@ cerebro_receptors_present <- function(ir) {
 ## fall back to the clone column only when it is absent.
 cerebro_rows_in_receptor <- function(df, receptor, clone_col) {
   keep <- cerebro_receptor_chains(receptor)
-  ref <- if ("CTstrict" %in% colnames(df)) {
-    as.character(df$CTstrict)
-  } else {
-    as.character(df[[clone_col]])
-  }
+  ref <- cerebro_receptor_reference(df, clone_col)
   vapply(
     ref,
     function(s) {

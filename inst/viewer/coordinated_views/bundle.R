@@ -519,6 +519,19 @@ cv_color_patch <- function(bundle, color_map = NULL) {
     cat_extra = patch_groups(bundle$cat_extra)
   )
 }
+
+cv_apply_color_patch <- function(bundle, patch) {
+  if (is.null(bundle) || !is.null(bundle$error) || !is.list(patch)) {
+    return(bundle)
+  }
+  for (kind in intersect(c("groups", "cat_extra"), names(patch))) {
+    for (group_name in intersect(names(bundle[[kind]]), names(patch[[kind]]))) {
+      bundle[[kind]][[group_name]]$colors <- patch[[kind]][[group_name]]
+    }
+  }
+  bundle
+}
+
 cv_space <- function(id, label, x, y) {
   list(id = id, label = label, x = I(x), y = I(y))
 }
@@ -778,8 +791,8 @@ cv_build_projections <- function(crb, cells) {
     pjidx <- match(cells, rownames(pj))
     nd <- as.integer(ncol(pj))
     entry <- list(
-      x = round(as.numeric(pj[pjidx, 1]), 4),
-      y = round(as.numeric(pj[pjidx, 2]), 4),
+      x = I(round(as.numeric(pj[pjidx, 1]), 4)),
+      y = I(round(as.numeric(pj[pjidx, 2]), 4)),
       ndim = nd
     )
     ## I() so a single-cell data set still serialises z as an array, the same
@@ -1526,7 +1539,7 @@ cv_build_bundle <- function(crb) {
       },
       error = function(e) paste0("cells:", n)
     ),
-    cells = cells,
+    cells = I(cells),
     n = n,
     groups = groups,
     cat_extra = cat_extra,

@@ -3834,6 +3834,12 @@ var focusPanel = null;
     var img = currentImage(space);
     if (!img || !img.uri) return;
     var imagePreset = img.preset || {};
+    if (space._builderDefaultPointOpacity === undefined) {
+      space._builderDefaultPointOpacity = space.builder_point_opacity;
+    }
+    if (space._builderDefaultPointSize === undefined) {
+      space._builderDefaultPointSize = space.builder_point_size;
+    }
     space.builder_point_opacity = imagePreset.pointOpacity != null
       ? imagePreset.pointOpacity : space._builderDefaultPointOpacity;
     space.builder_point_size = imagePreset.pointSize != null
@@ -4749,8 +4755,8 @@ var focusPanel = null;
     // Reset point appearance only for a genuinely different data set. A bundle
     // can be re-sent after returning to the tab; that refresh must not discard
     // the user's shared override.
-    groupFilter = {};
     if (dataChanged) {
+      groupFilter = {};
       var configuredOpacity = Number(D.default_point_opacity);
       pointOpacity = D.default_point_opacity != null && isFinite(configuredOpacity)
         ? Math.max(0, Math.min(1, configuredOpacity)) : 0.8;
