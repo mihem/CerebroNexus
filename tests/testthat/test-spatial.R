@@ -761,15 +761,9 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
 })
 
 test_that("bundled real demos embed a genuine tissue image in the .crb", {
-  # MERFISH and Xenium carry their REAL histology image (DAPI) inside the .crb
-  # under the canonical `histology_images` manifest, with coordinate-space
-  # bounds, so the Spatial tab
-  # renders the true tissue background out of the box. (Visium uses an external
-  # image — tested above; Slide-seq carries no image — tested below.)
-  for (f in c(
-    "demo_spatial_merfish",
-    "demo_spatial_xenium"
-  )) {
+  # MERFISH carries its real DAPI inside the CRB. Visium and Xenium use external
+  # files; Slide-seq carries no image.
+  for (f in "demo_spatial_merfish") {
     path <- system.file(
       file.path("extdata/examples", paste0(f, ".crb")),
       package = "CerebroNexus"
@@ -883,7 +877,7 @@ test_that("embedded image demos store the image natively with no flip flag", {
   # Embedded images are stored in their native orientation; there is no per-.crb
   # render-flip flag (removed — display alignment is a user control in the tab).
   # Guard that the image is present and no stale flip flag lingers.
-  for (f in c("demo_spatial_xenium", "demo_spatial_merfish")) {
+  for (f in "demo_spatial_merfish") {
     path <- system.file(
       file.path("extdata/examples", paste0(f, ".crb")),
       package = "CerebroNexus"

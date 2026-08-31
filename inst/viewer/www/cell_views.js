@@ -4229,6 +4229,7 @@
     tick('cv-img-flipx', v.flipX);
     tick('cv-img-flipy', v.flipY);
     tick('cv-img-show', v.show !== false);
+    positionAllImgRangeValues();
     var activeLabel = $('cv-img-active-label');
     if (activeLabel) activeLabel.textContent = sp._sampleName || '';
   }

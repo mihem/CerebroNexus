@@ -86,12 +86,12 @@ Genuinely measured, public spatial-transcriptomics demos. Each is a down-sampled
 | `demo_spatial_visium.crb` | Mouse brain (Visium) | `SeuratData::stxBrain` (anterior1) | 2,696 | ✅ H&E, **external** PNG |
 | `demo_spatial_slideseq.crb` | Mouse hippocampus (Slide-seq v2) | `SeuratData::ssHippo` | 5,000 | — (structural, see §5) |
 | `demo_spatial_merfish.crb` | Mouse ileum (MERFISH) | `MerfishData::MouseIleumPetukhov2021` | 5,000 | ✅ DAPI mosaic, **embedded** |
-| `demo_spatial_xenium.crb` | Mouse brain (Xenium) | 10x `Xenium_V1_FF_Mouse_Brain_Coronal_Subset_CTX_HP` | 5,000 | ✅ DAPI morphology, **embedded** |
+| `demo_spatial_xenium.crb` | Mouse brain (Xenium) | 10x `Xenium_V1_FF_Mouse_Brain_Coronal_Subset_CTX_HP` | 5,000 | ✅ DAPI + 2 colour variants, **external** PNG |
 
 They deliberately exercise **both** background-image paths the app supports:
 
-- **MERFISH / Xenium** embed named images in the `.crb` under `histology_images`, with each extent in coordinate space under `histology_image_bounds`.
-- **Visium** loads its H&E from an *external* PNG (`demo_spatial_visium_he.png`) via `spatial_images` in `inst/app.R` — a live example of that path, which also keeps the Visium `.crb` smaller. The tab offers it by filename.
+- **MERFISH** embeds its named DAPI image in the `.crb` under `histology_images`.
+- **Visium / Xenium** load images from external PNG files via `spatial_images` in `inst/app.R`. Xenium exposes `fov` with native DAPI and `fov_colour` with matching 90° pink and fluorescent-yellow variants.
 
 `demo_spatial.crb` + `demo_spatial_histology.svg` are lightweight **synthetic** fixtures used only by `test-spatial.R`; they are intentionally not in the app's dropdown.
 

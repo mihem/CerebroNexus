@@ -190,7 +190,7 @@ test_that("legacy singular spatial images normalize on read", {
 })
 
 test_that("legacy fixture list bounds normalize to a numeric vector", {
-  for (fixture in c("demo_spatial_xenium.crb", "demo_spatial_merfish.crb")) {
+  for (fixture in "demo_spatial_merfish.crb") {
     path <- system.file(
       "extdata",
       "examples",
@@ -219,6 +219,53 @@ test_that("legacy fixture list bounds normalize to a numeric vector", {
       info = fixture
     )
   }
+})
+
+test_that("Xenium colour demo loads images from files", {
+  path <- system.file(
+    "extdata",
+    "examples",
+    "demo_spatial_xenium.crb",
+    package = "CerebroNexus"
+  )
+  skip_if(path == "" || !file.exists(path), message = "Xenium fixture missing")
+
+  crb <- readRDS(path)
+  expect_named(crb$spatial, c("fov", "fov_colour"))
+
+  fov <- crb$getSpatialData("fov")
+  colour <- crb$getSpatialData("fov_colour")
+  expect_identical(fov$histology_images, list())
+  expect_identical(colour$histology_images, list())
+  expect_identical(rownames(colour$coordinates), rownames(fov$coordinates))
+
+  expect_identical(
+    unname(colour$coordinates$x),
+    unname(-fov$coordinates$y)
+  )
+  expect_identical(
+    unname(colour$coordinates$y),
+    unname(fov$coordinates$x)
+  )
+
+  image_dir <- system.file(
+    "extdata",
+    "examples",
+    "spatial",
+    "xenium",
+    package = "CerebroNexus"
+  )
+  expect_true(dir.exists(image_dir))
+  expect_true(all(file.exists(file.path(
+    image_dir,
+    c("dapi.png", "pink_stain_90.png", "fluorescent_yellow_90.png")
+  ))))
+
+  dapi <- png::readPNG(file.path(image_dir, "dapi.png"))
+  pink <- png::readPNG(file.path(image_dir, "pink_stain_90.png"))
+  yellow <- png::readPNG(file.path(image_dir, "fluorescent_yellow_90.png"))
+  expect_identical(dim(pink)[1:2], rev(dim(dapi)[1:2]))
+  expect_identical(dim(yellow), dim(pink))
 })
 
 test_that("canonical manifests reject legacy list bounds", {

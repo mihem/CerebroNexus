@@ -232,6 +232,48 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     timeout = 30000
   )
   app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_idle(timeout = 30000)
+  wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Tissue background'"
+    ),
+    timeout = 30000
+  )
+  app$set_inputs(spatial_projection_to_display = "fov_colour", wait_ = FALSE)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Pink stain'"
+    ),
+    timeout = 30000
+  )
+  expect_identical(
+    unlist(
+      app$get_js(paste0(
+        "Object.keys(document.getElementById(",
+        "'spatial_projection_background_image').selectize.options)"
+      )),
+      use.names = FALSE
+    ),
+    c("none", "external::Pink stain", "external::Fluorescent yellow")
+  )
+  app$set_inputs(
+    spatial_projection_background_image = "external::Fluorescent yellow",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Fluorescent yellow'"
+    ),
+    timeout = 30000
+  )
+  app$set_inputs(
     crb_file_selector = "extdata/examples/demo_spatial_slideseq.crb",
     wait_ = FALSE
   )
@@ -270,6 +312,75 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
+})
+
+test_that("Linked views resets the active background to its preset", {
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "linked_background_reset",
+    height = 950,
+    width = 1619
+  )
+  withr::defer(app$stop())
+  app$wait_for_idle(timeout = 20000)
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  activate_tab(app, "coordinated_views", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('cv-pick-spatial')?.selectize ",
+      "!== undefined"
+    ),
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "document.getElementById('cv-pick-spatial').selectize",
+    ".setValue(['fov', 'fov_colour']);"
+  ))
+  app$wait_for_js(
+    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]') !== null",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]')",
+    ".click();"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-reset') !== null",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotate = document.getElementById('cv-img-rotate');",
+    "rotate.value = '83.79';",
+    "rotate.dispatchEvent(new Event('input', { bubbles: true }));",
+    "var flipX = document.getElementById('cv-img-flipx');",
+    "flipX.checked = true;",
+    "flipX.dispatchEvent(new Event('change', { bubbles: true }));",
+    "var flipY = document.getElementById('cv-img-flipy');",
+    "flipY.checked = false;",
+    "flipY.dispatchEvent(new Event('change', { bubbles: true }));",
+    "document.getElementById('cv-img-reset').click();"
+  ))
+  Sys.sleep(0.5)
+  state <- app$get_js(paste0(
+    "({",
+    "rotation: document.getElementById('cv-img-rotate').value,",
+    "badge: document.getElementById('cv-img-rotate-val').textContent,",
+    "offsetX: document.getElementById('cv-img-offx').value,",
+    "offsetY: document.getElementById('cv-img-offy').value,",
+    "flipX: document.getElementById('cv-img-flipx').checked,",
+    "flipY: document.getElementById('cv-img-flipy').checked",
+    "})"
+  ))
+  expect_identical(state$rotation, "0")
+  expect_identical(state$badge, "0")
+  expect_identical(state$offsetX, "10")
+  expect_identical(state$offsetY, "0")
+  expect_false(state$flipX)
+  expect_true(state$flipY)
 })
 
 

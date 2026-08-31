@@ -35,11 +35,9 @@ Cerebro.options <<- list(
     ## agnostic .getSpatialData extraction, spanning spot / bead / in-situ-imaging
     ## capture and Seurat v4 vs v5 objects: Slide-seq v2 is a
     ## Seurat v4 object, the others are v5. The demos deliberately show BOTH
-    ## background-image paths: MERFISH and Xenium EMBED their genuine histology
-    ## image (DAPI) inside the .crb, while Visium loads its H&E from an EXTERNAL
-    ## file (demo_spatial_visium_he.png) via `spatial_images` below — a live
-    ## example of that path, which also keeps the Visium .crb smaller. Slide-seq
-    ## has no tissue photo by design (bead scatter is the complete spatial view).
+    ## background-image paths: MERFISH embeds its DAPI in the .crb; Visium and
+    ## Xenium load external files via `spatial_images` below. Slide-seq has no
+    ## tissue photo by design (bead scatter is the complete spatial view).
     ## Rebuild with data-raw/build_spatial_demos.R.
     "Mouse brain (Visium)" = "extdata/examples/demo_spatial_visium.crb",
     "Mouse hippocampus (Slide-seq v2)" = "extdata/examples/demo_spatial_slideseq.crb",
@@ -73,10 +71,8 @@ Cerebro.options <<- list(
     "HLA & TCR" = "extdata/examples/demo_hla_tcr_dextramer.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
-  ## Visium loads its real H&E background from an EXTERNAL image file (rather than
-  ## embedding it in the .crb) — this exercises the `spatial_images` code path.
-  ## The key must match the dropdown label above. The other image demos embed
-  ## their image inside the .crb.
+  ## Visium and Xenium load real backgrounds from external image files. The
+  ## nested keys match dataset -> spatial data -> Background image dropdown.
   ## Images default to NO flip; the Spatial tab's "Flip vertically/horizontally"
   ## checkboxes let the user align it if a given dataset needs it (for this Visium
   ## H&E that is a vertical flip, matching Seurat's own SpatialPlot).
@@ -84,6 +80,27 @@ Cerebro.options <<- list(
     "Mouse brain (Visium)" = list(
       "anterior1" = c(
         "Tissue background" = "extdata/examples/demo_spatial_visium_he.png"
+      )
+    ),
+    "Mouse brain (Xenium)" = list(
+      "fov" = list(
+        "Tissue background" = list(
+          path = "extdata/examples/spatial/xenium/dapi.png",
+          bounds = c(xmin = 0, xmax = 5448.5, ymin = 0, ymax = 3538.55)
+        )
+      ),
+      "fov_colour" = list(
+        "Pink stain" = list(
+          path = "extdata/examples/spatial/xenium/pink_stain_90.png",
+          bounds = c(xmin = -3538.55, xmax = 0, ymin = 0, ymax = 5448.5)
+        ),
+        "Fluorescent yellow" = list(
+          path = paste0(
+            "extdata/examples/spatial/xenium/",
+            "fluorescent_yellow_90.png"
+          ),
+          bounds = c(xmin = -3538.55, xmax = 0, ymin = 0, ymax = 5448.5)
+        )
       )
     )
   ),
@@ -105,6 +122,14 @@ Cerebro.options <<- list(
     "Mouse brain (Xenium)" = list(
       "fov" = list(
         "Tissue background" = list(offset_y = -10, flip_y = TRUE)
+      ),
+      "fov_colour" = list(
+        "Pink stain" = list(offset_x = 10, flip_x = FALSE, flip_y = TRUE),
+        "Fluorescent yellow" = list(
+          offset_x = 10,
+          flip_x = FALSE,
+          flip_y = TRUE
+        )
       )
     )
   ),

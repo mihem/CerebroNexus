@@ -17,11 +17,9 @@
 ##   | demo_spatial_merfish.crb   | MERFISH      | MerfishData Petukhov 2021 ileum | DAPI
 ##   | demo_spatial_xenium.crb    | 10x Xenium   | 10x mouse brain CTX+HP (public) | DAPI
 ##
-## Visium, MERFISH and Xenium additionally embed their GENUINE histology image
-## (low-res H&E raster / DAPI mosaic) in the .crb spatial slot under
-## `histology_image`, with the image extent in coordinate space under
-## `histology_image_bounds`, so the Spatial tab can render the real tissue
-## background aligned to the cells.
+## Visium and Xenium load their genuine histology images from standalone files;
+## MERFISH embeds its DAPI mosaic in the .crb. This deliberately exercises both
+## supported image paths without storing duplicate Xenium rasters in the .crb.
 ##
 ## Slide-seq v2 (ssHippo) is a Seurat *v4-era* `SlideSeq` object; it is the
 ## end-to-end proof that exportFromSeurat handles v4 spatial objects, not only
@@ -253,6 +251,19 @@ save_raster_png <- function(arr, file, max_px = 1200, flip_y = FALSE) {
   dir.create(dirname(file), showWarnings = FALSE, recursive = TRUE)
   png::writePNG(arr, file)
   invisible(file)
+}
+
+## Preserve Xenium pixel geometry while creating a coloured 90-degree variant.
+tint_and_rotate_raster <- function(arr, colour) {
+  arr <- .prepare_raster_array(arr, max_px = Inf)
+  grey <- 0.2126 * arr[,, 1] + 0.7152 * arr[,, 2] + 0.0722 * arr[,, 3]
+  rgb <- grDevices::col2rgb(colour)[, 1] / 255
+  tinted <- array(0, dim = dim(arr))
+  for (channel in seq_len(3L)) {
+    tinted[,, channel] <- grey * rgb[[channel]]
+  }
+  rotated <- aperm(tinted, c(2, 1, 3))
+  rotated[, rev(seq_len(dim(rotated)[2])), , drop = FALSE]
 }
 
 ## Extract one channel of a JPEG2000-compressed OME-TIFF (the format 10x Xenium
@@ -645,6 +656,16 @@ build_xenium <- function() {
     type = "centroids",
     assay = assay
   )
+  colour_xy <- data.frame(
+    x = -xy$y,
+    y = xy$x,
+    row.names = rownames(xy)
+  )
+  obj[["fov_colour"]] <- CreateFOV(
+    list(centroids = CreateCentroids(as.matrix(colour_xy))),
+    type = "centroids",
+    assay = assay
+  )
 
   ## Extract the REAL DAPI morphology channel via RBioFormats (pure R).
   ## pixel_size (um/px) comes from experiment.xenium; fall back to the documented
@@ -663,8 +684,6 @@ build_xenium <- function() {
   if (!file.exists(ome)) {
     ome <- file.path(dir, "morphology_focus", "morphology_focus_0000.ome.tif")
   }
-  img_uri <- NULL
-  img_bounds <- NULL
   if (file.exists(ome)) {
     res <- extract_ome_tiff_channel(
       ome,
@@ -673,22 +692,38 @@ build_xenium <- function() {
       max_px = 1400L
     )
     if (!is.null(res)) {
-      ## Stored native (no build flip). Display orientation, if a flip is ever
-      ## needed, is a user control in the Spatial tab.
-      img_uri <- encode_raster_png(res$raster, max_px = 1400L)
-      img_bounds <- res$bounds
+      image_dir <- file.path(out_dir, "spatial", "xenium")
+      save_raster_png(
+        res$raster,
+        file.path(image_dir, "dapi.png"),
+        max_px = 1400L
+      )
+      save_raster_png(
+        tint_and_rotate_raster(res$raster, "#ff2d8d"),
+        file.path(image_dir, "pink_stain_90.png"),
+        max_px = 1400L
+      )
+      save_raster_png(
+        tint_and_rotate_raster(res$raster, "#edff00"),
+        file.path(image_dir, "fluorescent_yellow_90.png"),
+        max_px = 1400L
+      )
     }
   }
 
-  export_and_verify(
+  built <- export_and_verify(
     obj,
     assay,
     groups = c("cluster"),
     file = file.path(out_dir, "demo_spatial_xenium.crb"),
     experiment_name = "Xenium mouse brain (CTX+HP)",
-    organism = "mm",
-    image = img_uri,
-    image_bounds = img_bounds
+    organism = "mm"
+  )
+  stopifnot(
+    "Xenium spatial variants missing" = setequal(
+      built$availableSpatial(),
+      c("fov", "fov_colour")
+    )
   )
 }
 
