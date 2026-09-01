@@ -611,11 +611,15 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
     c("cells", "source", "geometry"),
     path = "$.selection"
   )
-  geometry <- cv_config_record(
-    selection$geometry,
-    c("space", "mode", "polygon"),
-    path = "$.selection.geometry"
-  )
+  geometry <- if (is.null(selection$geometry)) {
+    NULL
+  } else {
+    cv_config_record(
+      selection$geometry,
+      c("space", "mode", "polygon"),
+      path = "$.selection.geometry"
+    )
+  }
   selected_cells <- cv_config_string_array(
     selection$cells,
     "$.selection.cells",
@@ -649,7 +653,7 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
   )
   colour <- cv_config_record(
     view$colour,
-    c("mode", "gene", "rgb_genes", "clip"),
+    c("mode", "genes", "gene", "rgb_genes", "clip"),
     path = "$.view.colour"
   )
   display <- cv_config_record(
@@ -659,6 +663,7 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
       "point_size",
       "point_opacity",
       "group_labels",
+      "cell_borders",
       "selection_mode",
       "clone_layout",
       "keep_square"
@@ -690,25 +695,34 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
         selection$source,
         "$.selection.source"
       ),
-      geometry = list(
-        space = cv_config_string(
-          geometry$space,
-          "$.selection.geometry.space"
-        ),
-        mode = cv_config_choice(
-          geometry$mode,
-          "$.selection.geometry.mode",
-          c("lasso", "box")
-        ),
-        polygon = cv_config_normalize_polygon(
-          geometry$polygon,
-          "$.selection.geometry.polygon"
+      geometry = if (is.null(geometry)) {
+        NULL
+      } else {
+        list(
+          space = cv_config_string(
+            geometry$space,
+            "$.selection.geometry.space"
+          ),
+          mode = cv_config_choice(
+            geometry$mode,
+            "$.selection.geometry.mode",
+            c("lasso", "box")
+          ),
+          polygon = cv_config_normalize_polygon(
+            geometry$polygon,
+            "$.selection.geometry.polygon"
+          )
         )
-      )
+      }
     ),
     view = list(
       colour = list(
         mode = cv_config_string(colour$mode, "$.view.colour.mode"),
+        genes = cv_config_string_array(
+          colour$genes,
+          "$.view.colour.genes",
+          max_items = 64L
+        ),
         gene = cv_config_nullable_string(colour$gene, "$.view.colour.gene"),
         rgb_genes = cv_config_string_array(
           colour$rgb_genes,
@@ -759,6 +773,14 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
           display$group_labels,
           "$.view.display.group_labels"
         ),
+        cell_borders = if (is.null(display$cell_borders)) {
+          FALSE
+        } else {
+          cv_config_logical(
+            display$cell_borders,
+            "$.view.display.cell_borders"
+          )
+        },
         selection_mode = cv_config_choice(
           display$selection_mode,
           "$.view.display.selection_mode",
@@ -833,7 +855,10 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
       "The focused lens is not part of this workspace."
     )
   }
-  if (!normalized$selection$geometry$space %in% lens_spaces) {
+  if (
+    !is.null(normalized$selection$geometry) &&
+      !normalized$selection$geometry$space %in% lens_spaces
+  ) {
     cv_config_abort(
       "invalid_reference",
       "The selection region is not part of this workspace."
@@ -891,6 +916,24 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
       "Only RGB colour mode may carry RGB genes."
     )
   }
+  if (
+    identical(normalized_view$colour$mode, "__gene_panels__") &&
+      !length(normalized_view$colour$genes)
+  ) {
+    cv_config_abort(
+      "invalid_reference",
+      "Per-gene panels must identify at least one gene."
+    )
+  }
+  if (
+    !normalized_view$colour$mode %in% c("__gene__", "__gene_panels__") &&
+      length(normalized_view$colour$genes)
+  ) {
+    cv_config_abort(
+      "invalid_reference",
+      "Only gene colour modes may carry genes."
+    )
+  }
 
   normalized
 }
@@ -901,6 +944,7 @@ cv_linked_json_document <- function(config) {
   # wire format stays structurally stable for non-R consumers.
   document <- config
   document$selection$cells <- I(document$selection$cells)
+  document$view$colour$genes <- I(document$view$colour$genes)
   document$view$colour$rgb_genes <- I(document$view$colour$rgb_genes)
   document$view$projections <- I(document$view$projections)
   document$view$spatial_sections <- I(document$view$spatial_sections)

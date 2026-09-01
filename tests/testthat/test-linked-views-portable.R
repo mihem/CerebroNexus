@@ -23,7 +23,8 @@ test_that("current Linked views state round-trips through the share validator", 
     ),
     view = list(
       colour = list(
-        mode = "cell_type",
+        mode = "__gene_panels__",
+        genes = "CD3D",
         gene = NULL,
         rgb_genes = character(),
         clip = 0.05
@@ -38,6 +39,7 @@ test_that("current Linked views state round-trips through the share validator", 
         point_size = 3,
         point_opacity = 0.8,
         group_labels = TRUE,
+        cell_borders = TRUE,
         selection_mode = "box",
         clone_layout = "stack",
         keep_square = TRUE
@@ -61,8 +63,69 @@ test_that("current Linked views state round-trips through the share validator", 
   restored <- helpers$cv_config_decode(prepared$json, cells = rev(cells))
 
   expect_true(restored$view$display$keep_square)
+  expect_true(restored$view$display$cell_borders)
+  expect_identical(restored$view$colour$genes, "CD3D")
   expect_identical(restored$view$focus_space, "projection::umap")
   expect_identical(restored$view$hidden_levels[[1]]$levels, "T cells")
+  expect_match(prepared$json, '"genes": ["CD3D"]', fixed = TRUE)
+})
+
+test_that("Linked views round-trip without a selection geometry", {
+  root <- system.file("viewer", package = "CerebroNexus")
+  helpers <- new.env(parent = globalenv())
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
+  cells <- c("cell-1", "cell-2")
+  config <- list(
+    schema = "cerebronexus-linked-view",
+    version = 1L,
+    created_at = "2026-08-27T12:00:00Z",
+    dataset = list(
+      cell_count = 2L,
+      cell_fingerprint = helpers$cv_config_cell_fingerprint(cells)
+    ),
+    selection = list(cells = "cell-1", source = "umap", geometry = NULL),
+    view = list(
+      colour = list(
+        mode = "cell_type",
+        genes = character(),
+        gene = NULL,
+        rgb_genes = character(),
+        clip = 0.05
+      ),
+      projections = "umap",
+      spatial_sections = character(),
+      active_spatial = NULL,
+      filters = structure(list(), names = character()),
+      hidden_levels = list(),
+      display = list(
+        percentage_cells = 100,
+        point_size = 3,
+        point_opacity = 0.8,
+        group_labels = TRUE,
+        cell_borders = FALSE,
+        selection_mode = "lasso",
+        clone_layout = "stack",
+        keep_square = FALSE
+      ),
+      focus_space = "projection::umap",
+      lenses = list(list(
+        space = "projection::umap",
+        viewport = list(cx = 0.5, cy = 0.5, span = 1),
+        rotation = NULL
+      )),
+      spatial_backgrounds = list(),
+      trekker = list(
+        dissolve_percentage = 0,
+        evidence = FALSE,
+        niche_radius = 250
+      )
+    )
+  )
+
+  prepared <- helpers$cv_config_prepare(config, cells = cells)
+  restored <- helpers$cv_config_decode(prepared$json, cells = cells)
+
+  expect_null(restored$selection$geometry)
 })
 
 test_that("cell identity validation is unique and order-independent", {
