@@ -294,6 +294,36 @@ test_that("canonical spatial image manifests take precedence over legacy fields"
   expect_null(normalized[["histology_image_bounds"]])
 })
 
+test_that("flat spatial rotations remain a supported public API", {
+  catalogs <- list(
+    Atlas = list(sliceA = "H&E", sliceB = "DAPI"),
+    Other = list(sliceA = "H&E")
+  )
+
+  normalized <- .normalizeAppSpatialPlotRotation(
+    c(Atlas = 90, Other = -45),
+    catalogs
+  )
+
+  expect_identical(normalized$Atlas, c(sliceA = 90, sliceB = 90))
+  expect_identical(normalized$Other, c(sliceA = -45))
+})
+
+test_that("legacy image alignment maps to the canonical image setting", {
+  catalogs <- list(Atlas = list(sliceA = "H&E"))
+  images <- list()
+
+  normalized <- .normalizeLegacyAppSpatialSetting(
+    c(Atlas = 0.9),
+    "spatial_images_scale_x",
+    "scale_x",
+    catalogs,
+    images
+  )
+
+  expect_identical(normalized$Atlas$sliceA[["H&E"]]$scale_x, 0.9)
+})
+
 test_that("spatial image paths normalize labels, descriptors, and file errors", {
   image_dir <- tempfile("spatial-image-paths-")
   dir.create(image_dir)

@@ -26,6 +26,12 @@ createShinyApp(
   variable_to_compare = NULL,
   spatial_images = NULL,
   spatial_image_settings = NULL,
+  spatial_images_flip_x = NULL,
+  spatial_images_flip_y = NULL,
+  spatial_images_scale_x = NULL,
+  spatial_images_scale_y = NULL,
+  spatial_images_offset_x = NULL,
+  spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
   auth = NULL
 )
@@ -118,8 +124,24 @@ dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's \code{spatial_images}; unknown
 identities are rejected. Labels are user-facing names, not protocol names.}
 
-\item{spatial_plot_rotation}{Named list/vector; initial rotation (degrees)
-applied to spatial cell coordinates. Names must match \code{cerebro_data}.}
+\item{spatial_images_flip_x}{Legacy named per-dataset horizontal flip values.}
+
+\item{spatial_images_flip_y}{Legacy named per-dataset vertical flip values.}
+
+\item{spatial_images_scale_x}{Legacy named per-dataset X scale values.}
+
+\item{spatial_images_scale_y}{Legacy named per-dataset Y scale values.}
+
+\item{spatial_images_offset_x}{Legacy named per-dataset horizontal offsets.}
+
+\item{spatial_images_offset_y}{Legacy named per-dataset vertical offsets.}
+
+\item{spatial_plot_rotation}{Optional nested rotations in
+\code{dataset -> spatial entry -> degrees} form, applied only to spatial
+cell coordinates. The legacy named per-dataset vector form remains
+supported and applies one rotation to every spatial entry in that dataset.
+Dataset names must match \code{cerebro_data}; spatial names must match the
+corresponding CRB's \code{availableSpatial()}.}
 
 \item{auth}{Optional authentication settings. \code{NULL}, the default,
 leaves the generated Viewer public. To require a login, provide a named
@@ -127,7 +149,6 @@ list with \code{credentials}, the path to an encrypted SQLite database
 created by \code{shinymanager::create_db()}, and \code{passphrase_env},
 the name of the environment variable containing its passphrase. Optional
 \code{timeout_minutes} defaults to 15.}
-
 }
 \value{
 Invisibly returns \code{result_dir}. If that path changes resolution

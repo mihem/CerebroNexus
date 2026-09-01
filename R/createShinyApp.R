@@ -2078,10 +2078,18 @@ dedent <- function(string) {
 #'   dataset and spatial entry. The image label must exist in the union of the
 #'   CRB's embedded images and this call's \code{spatial_images}; unknown
 #'   identities are rejected. Labels are user-facing names, not protocol names.
+#' @param spatial_images_flip_x Legacy named per-dataset horizontal flip values.
+#' @param spatial_images_flip_y Legacy named per-dataset vertical flip values.
+#' @param spatial_images_scale_x Legacy named per-dataset X scale values.
+#' @param spatial_images_scale_y Legacy named per-dataset Y scale values.
+#' @param spatial_images_offset_x Legacy named per-dataset horizontal offsets.
+#' @param spatial_images_offset_y Legacy named per-dataset vertical offsets.
 #' @param spatial_plot_rotation Optional nested rotations in
 #'   \code{dataset -> spatial entry -> degrees} form, applied only to spatial
-#'   cell coordinates. Dataset names must match \code{cerebro_data}; spatial
-#'   names must match the corresponding CRB's \code{availableSpatial()}.
+#'   cell coordinates. The legacy named per-dataset vector form remains
+#'   supported and applies one rotation to every spatial entry in that dataset.
+#'   Dataset names must match \code{cerebro_data}; spatial names must match the
+#'   corresponding CRB's \code{availableSpatial()}.
 #' @param auth Optional authentication settings. \code{NULL}, the default,
 #'   leaves the generated Viewer public. To require a login, provide a named
 #'   list with \code{credentials}, the path to an encrypted SQLite database
@@ -2134,6 +2142,12 @@ createShinyApp <- function(
   variable_to_compare = NULL,
   spatial_images = NULL,
   spatial_image_settings = NULL,
+  spatial_images_flip_x = NULL,
+  spatial_images_flip_y = NULL,
+  spatial_images_scale_x = NULL,
+  spatial_images_scale_y = NULL,
+  spatial_images_offset_x = NULL,
+  spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
   auth = NULL
 ) {
@@ -2218,7 +2232,16 @@ createShinyApp <- function(
     10,
     100
   )
-  builder_spatial_options <- c("spatial_images", "spatial_image_settings")
+  builder_spatial_options <- c(
+    "spatial_images",
+    "spatial_image_settings",
+    "spatial_images_flip_x",
+    "spatial_images_flip_y",
+    "spatial_images_scale_x",
+    "spatial_images_scale_y",
+    "spatial_images_offset_x",
+    "spatial_images_offset_y"
+  )
   supplied_option_names <- names(cerebro_options)
   duplicate_scatter_options <- intersect(
     supplied_option_names,
@@ -2451,6 +2474,26 @@ createShinyApp <- function(
     spatial_catalogs,
     spatial_images
   )
+  legacy_settings <- list(
+    spatial_images_flip_x = "flip_x",
+    spatial_images_flip_y = "flip_y",
+    spatial_images_scale_x = "scale_x",
+    spatial_images_scale_y = "scale_y",
+    spatial_images_offset_x = "offset_x",
+    spatial_images_offset_y = "offset_y"
+  )
+  for (argument in names(legacy_settings)) {
+    spatial_image_settings <- .mergeAppSpatialImageSettings(
+      spatial_image_settings,
+      .normalizeLegacyAppSpatialSetting(
+        get(argument, inherits = FALSE),
+        argument,
+        legacy_settings[[argument]],
+        spatial_catalogs,
+        spatial_images
+      )
+    )
+  }
   crb_targets <- paste0(private_data_root, "/", basename(cerebro_data))
   copy_plan <- list()
   claimed_targets <- character()

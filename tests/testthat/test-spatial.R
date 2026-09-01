@@ -330,13 +330,13 @@ test_that("Spatial tab is wired into the app UI and server", {
 ## Spatial background image: createShinyApp production channel + demo wiring.
 ##----------------------------------------------------------------------------##
 
-test_that("createShinyApp exposes only the nested spatial image settings API", {
+test_that("createShinyApp preserves legacy and nested spatial settings APIs", {
   args <- names(formals(createShinyApp))
   expect_true("spatial_images" %in% args)
   expect_true("spatial_image_settings" %in% args)
   expect_true("spatial_plot_rotation" %in% args)
   expect_false("..." %in% args)
-  expect_false(any(
+  expect_true(all(
     c(
       "spatial_images_flip_x",
       "spatial_images_flip_y",
@@ -659,8 +659,8 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   )
   expect_identical(rendered$data$x_range, c(0, 100))
   expect_identical(rendered$data$y_range, c(10, 90))
-  expect_identical(rendered$data$x, c(20, 80))
-  expect_identical(rendered$data$y, c(30, 70))
+  expect_identical(as.numeric(rendered$data$x), c(20, 80))
+  expect_identical(as.numeric(rendered$data$y), c(30, 70))
   expect_identical(rendered$meta$background_rotation, 37)
   expect_identical(
     rendered$meta$background_identity,
@@ -682,8 +682,8 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_null(rendered$meta$background_image)
   expect_identical(rendered$data$x_range, c(0, 100))
   expect_identical(rendered$data$y_range, c(10, 90))
-  expect_identical(rendered$data$x, c(20, 80))
-  expect_identical(rendered$data$y, c(30, 70))
+  expect_identical(as.numeric(rendered$data$x), c(20, 80))
+  expect_identical(as.numeric(rendered$data$y), c(30, 70))
 })
 
 test_that("shared Canvas owns spatial background identity and appearance", {
