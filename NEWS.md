@@ -1,3 +1,12 @@
+# CerebroNexus 4.3.6
+
+## Viewer
+
+- Linked views can be saved locally, restored, exported and shared through
+  expiring links while preserving panels, filters, viewports and selections.
+- Share storage now scopes anonymous creation quotas by client identity and
+  excludes revoked or expired links from active capacity.
+
 # CerebroNexus 4.3.5
 
 ## Viewer
