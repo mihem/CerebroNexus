@@ -354,6 +354,15 @@ cerebroCellViewScatterPayload <- function(
   list(meta = meta, data = data, hover = hover_data)
 }
 
+cerebroSelectionCount <- function(selection) {
+  ids <- if (is.list(selection) && !is.null(selection$ids)) {
+    selection$ids
+  } else {
+    selection
+  }
+  length(ids)
+}
+
 cerebroSelectionSummary <- function(
   selection,
   source,

@@ -190,6 +190,18 @@ test_that("categorical scatter payloads retain cells with missing metadata", {
   )
 })
 
+test_that("selection counts use payload cell IDs", {
+  expect_identical(
+    utils_env$cerebroSelectionCount(list(
+      ids = paste0("cell-", seq_len(2536)),
+      source = "trekker",
+      geometry = list()
+    )),
+    2536L
+  )
+  expect_identical(utils_env$cerebroSelectionCount(c("c1", "c2")), 2L)
+})
+
 test_that("centerOfGroups returns a typed empty tibble for a missing group column", {
   result <- centerOfGroups(
     coordinates = matrix(c(1, 2, 3, 4), ncol = 2),

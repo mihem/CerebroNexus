@@ -2118,14 +2118,7 @@
   // (and no lasso selection is active). The distance loop is CBGeom.nicheAround
   // inclusive=<=, skipNaN=true (unpositioned cells align to NaN here).
   function trekkerSpace() {
-    var ids = Object.keys(spaceById);
-    for (var i = 0; i < ids.length; i++) {
-      var space = spaceById[ids[i]];
-      if (space && (space.id === 'trekker' || space._role === 'trekker')) {
-        return space;
-      }
-    }
-    return null;
+    return window.CBViewState.spaceByRole(spaceById, 'trekker');
   }
   function panelIsTrekker(panel) {
     var space = panel && spaceById[panel.spaceId];
@@ -3499,16 +3492,25 @@
     } else if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
       Shiny.setInputValue('coordviews_gene', gene);
     }
-    if (singleActive === 'trekker_projection') {
+    var trekkerControls = window.CBViewState.trekkerGeneControls(
+      singleActive,
+      gene
+    );
+    if (trekkerControls) {
       var mode = $('trekker_mode');
       var picker = $('trekker_gene_pick');
-      if (mode && mode.selectize) mode.selectize.setValue('gene', false);
+      if (mode && mode.selectize) {
+        mode.selectize.setValue(trekkerControls.trekker_mode, false);
+      }
       if (picker && picker.selectize) {
         picker.selectize.addOption({ value: gene, label: gene });
-        picker.selectize.setValue(gene, false);
+        picker.selectize.setValue(trekkerControls.trekker_gene_pick, false);
       } else if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-        Shiny.setInputValue('trekker_mode', 'gene');
-        Shiny.setInputValue('trekker_gene_pick', gene);
+        Shiny.setInputValue('trekker_mode', trekkerControls.trekker_mode);
+        Shiny.setInputValue(
+          'trekker_gene_pick',
+          trekkerControls.trekker_gene_pick
+        );
       }
     }
   }
@@ -5357,12 +5359,7 @@
     var saved = payload.lenses || [];
     panels.forEach(function (p, index) {
       if (!p.spaceId) return;
-      var lens = saved.filter(function (candidate) {
-        return candidate.spaceId === p.spaceId;
-      })[0];
-      if (!lens && !saved.some(function (candidate) { return candidate.spaceId; })) {
-        lens = saved[index];
-      }
+      var lens = window.CBViewState.lensForSpace(saved, p.spaceId, index);
       if (!lens) return;
       p.view = lens.view || null; p.rot = lens.rot || null;
       p.lassoData = lens.lassoData || null; project(p);
@@ -6202,7 +6199,7 @@
       geneWanted = null;
       if (!m.ok) {
         // Nothing to draw. Say so rather than keep showing the last gene.
-        D.gene = null;
+        window.CBViewState.clearExpression(D, 'gene');
         clipRange();
         if (colorBy === GENE_MODE) {
           renderColorbar(true, null, esc(m.gene) + ' — not available');
@@ -6219,7 +6216,7 @@
     Shiny.addCustomMessageHandler('coordviews_genepanels', function (m) {
       if (!D || !m) return;
       if (!m.ok) {
-        D.genePanels = null;
+        window.CBViewState.clearExpression(D, 'panels');
         if (colorBy === GENE_PANELS_MODE) {
           buildPanels(); layoutPanels(); renderLegend(); resizeAll(); drawAll();
         }
@@ -6256,7 +6253,7 @@
     Shiny.addCustomMessageHandler('coordviews_rgbval', function (m) {
       if (!D || !m) return;
       if (!m.ok) {
-        D.rgb = null;
+        window.CBViewState.clearExpression(D, 'rgb');
         if (colorBy === RGB_MODE) { renderLegend(); drawAll(); }
         return;
       }

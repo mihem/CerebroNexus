@@ -258,12 +258,10 @@ observe({
 output[["trekker_number_of_selected_cells"]] <- renderUI({
   selected <- input[["trekker_projection_persistent_selection"]] %||%
     character()
-  ids <- if (is.list(selected) && !is.null(selected$ids)) {
-    selected$ids
-  } else {
-    selected
-  }
-  tags$span(format(length(ids), big.mark = ","), " cells selected")
+  tags$span(
+    format(cerebroSelectionCount(selected), big.mark = ","),
+    " cells selected"
+  )
 })
 
 ## Moran's I "Show in plot" link: switch to gene mode and select the gene. The
