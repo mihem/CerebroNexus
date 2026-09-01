@@ -48,6 +48,8 @@ test_that("HLA exposes shared cohort controls and network state hooks", {
   expect_match(visual, "handleNativeSelection", fixed = TRUE)
   expect_match(server, "hla_motif_selected_keys", fixed = TRUE)
   expect_match(server, "hla_motif_selection_command", fixed = TRUE)
+  expect_match(server, "node_keys = I(keys)", fixed = TRUE)
+  expect_match(server, "cells = I(cells)", fixed = TRUE)
   expect_match(client, "DOMtoCanvas", fixed = TRUE)
   expect_match(client, "canvasToDOM", fixed = TRUE)
   expect_match(client, "hla_motif_selected_keys", fixed = TRUE)

@@ -371,6 +371,37 @@ test_that("cv_group/cv_space/cv_clone force JSON arrays even at length 1", {
   expect_false(startsWith(arr(cl$n_clones), "["))
 })
 
+test_that("one-cell dynamic expression messages retain JSON arrays", {
+  skip_if_not_installed("jsonlite")
+  skip_if_not(have_bundle, "coordinated_views/bundle.R not found")
+
+  decode <- function(value) {
+    jsonlite::fromJSON(
+      jsonlite::toJSON(value, auto_unbox = TRUE),
+      simplifyVector = FALSE
+    )
+  }
+
+  gene <- decode(cv_env$cv_gene_message("CD3D", 128L, 1.5))
+  panels <- decode(cv_env$cv_gene_panels_message(
+    c("CD3D", "MS4A1"),
+    list(64L, 192L),
+    2
+  ))
+  rgb <- decode(cv_env$cv_rgb_message(
+    list(v = 10L, gene = "CD3D"),
+    list(v = 20L, gene = "MS4A1"),
+    list(v = 30L, gene = "NKG7")
+  ))
+
+  expect_type(gene$v, "list")
+  expect_true(all(vapply(panels$values, is.list, logical(1))))
+  expect_type(rgb$r, "list")
+  expect_type(rgb$g, "list")
+  expect_type(rgb$b, "list")
+  expect_type(rgb$genes, "list")
+})
+
 test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
   skip_if_not(have_bundle)
   skip_if_not_installed("jsonlite")

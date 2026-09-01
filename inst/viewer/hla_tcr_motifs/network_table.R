@@ -255,7 +255,7 @@ observe({
   cells <- hla_selected_cells()
   session$sendCustomMessage(
     "hla_motif_selection_state",
-    list(node_keys = keys, cells = cells)
+    list(node_keys = I(keys), cells = I(cells))
   )
 })
 

@@ -202,6 +202,86 @@ test_that("single-view scatter payloads carry their display label", {
   expect_false("space_label" %in% names(default_payload$meta))
 })
 
+test_that("direct one-cell renderer messages retain array fields", {
+  skip_if_not_installed("jsonlite")
+
+  message <- utils_env$cerebroCellViewMessage(
+    "trekker_projection",
+    meta = list(
+      color_type = "categorical",
+      traces = "cluster",
+      group_colors = "#123456"
+    ),
+    data = list(
+      selection_key = "cell-1",
+      group = "cluster",
+      panels = list(list(
+        id = "trekker",
+        selection_key = "cell-1",
+        x = 1,
+        y = 2,
+        from_x = 3,
+        from_y = 4,
+        to_x = 5,
+        to_y = 6
+      ))
+    ),
+    hover = list(text = "cell-1")
+  )
+  wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(message, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+
+  expect_type(wire$meta$traces, "list")
+  expect_type(wire$meta$group_colors, "list")
+  expect_type(wire$data$selection_key, "list")
+  expect_type(wire$data$group, "list")
+  expect_type(wire$data$panels[[1L]]$selection_key, "list")
+  expect_type(wire$data$panels[[1L]]$x, "list")
+  expect_type(wire$data$panels[[1L]]$from_x, "list")
+  expect_type(wire$hover$text, "list")
+
+  continuous <- utils_env$cerebroCellViewMessage(
+    "expression_projection",
+    meta = list(color_type = "rgb"),
+    data = list(
+      selection_key = "cell-1",
+      x = 1,
+      y = 2,
+      color = 0.5,
+      rgb = list(r = 10L, g = 20L, b = 30L)
+    )
+  )
+  continuous_wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(continuous, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+  expect_type(continuous_wire$data$selection_key, "list")
+  expect_type(continuous_wire$data$x, "list")
+  expect_type(continuous_wire$data$color, "list")
+  expect_type(continuous_wire$data$rgb$r, "list")
+
+  categorical <- utils_env$cerebroCellViewMessage(
+    "ir_clonalUMAP_projection",
+    meta = list(color_type = "categorical", traces = list("Single")),
+    data = list(
+      selection_key = list("cell-1"),
+      x = list(1),
+      y = list(2),
+      color = list("#123456")
+    ),
+    hover = list(text = list("cell-1"))
+  )
+  categorical_wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(categorical, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+  expect_type(categorical_wire$data$x[[1L]], "list")
+  expect_type(categorical_wire$data$selection_key[[1L]], "list")
+  expect_type(categorical_wire$hover$text[[1L]], "list")
+})
+
 test_that("categorical scatter payloads retain cells with missing metadata", {
   payload <- utils_env$cerebroCellViewScatterPayload(
     coordinates = list(c(1, 2), c(3, 4)),

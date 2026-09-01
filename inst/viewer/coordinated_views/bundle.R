@@ -478,6 +478,29 @@ cv_group <- function(values, levels, colors) {
   list(values = I(values), levels = I(levels), colors = I(colors))
 }
 
+cv_gene_message <- function(gene, values, maximum) {
+  list(gene = gene, ok = TRUE, v = I(values), max = maximum)
+}
+
+cv_gene_panels_message <- function(genes, values, maximum) {
+  list(
+    ok = TRUE,
+    genes = I(genes),
+    values = lapply(values, I),
+    max = maximum
+  )
+}
+
+cv_rgb_message <- function(red, green, blue) {
+  list(
+    ok = TRUE,
+    r = I(red$v),
+    g = I(green$v),
+    b = I(blue$v),
+    genes = I(c(red$gene, green$gene, blue$gene))
+  )
+}
+
 ## Colour management changes labels, not cells or coordinates. Send that small
 ## delta separately so recolouring never rebuilds the per-dataset bundle.
 cv_color_patch <- function(bundle, color_map = NULL) {

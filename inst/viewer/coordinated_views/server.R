@@ -473,27 +473,21 @@ observeEvent(
       })
       session$sendCustomMessage(
         "coordviews_genepanels",
-        list(
-          ok = TRUE,
-          genes = genes,
-          values = scaled,
-          max = round(global_max, 3)
-        )
+        cv_gene_panels_message(genes, scaled, round(global_max, 3))
       )
     } else {
       mean_values <- Reduce(`+`, values) / length(values)
       gv <- cv_scale_gene_values(mean_values)
       session$sendCustomMessage(
         "coordviews_geneval",
-        list(
-          gene = if (length(genes) == 1) {
+        cv_gene_message(
+          if (length(genes) == 1) {
             genes[[1]]
           } else {
             paste0("Mean expression (", length(genes), " genes)")
           },
-          ok = TRUE,
-          v = gv$v,
-          max = gv$max
+          gv$v,
+          gv$max
         )
       )
     }
@@ -537,13 +531,7 @@ observeEvent(
     }
     session$sendCustomMessage(
       "coordviews_rgbval",
-      list(
-        ok = TRUE,
-        r = r$v,
-        g = g$v,
-        b = bl$v,
-        genes = c(r$gene, g$gene, bl$gene)
-      )
+      cv_rgb_message(r, g, bl)
     )
   },
   ignoreInit = TRUE
