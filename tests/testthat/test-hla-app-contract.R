@@ -543,7 +543,11 @@ test_that("the panel info button is wired to a sourced guide", {
     ),
     collapse = "\n"
   )
-  expect_match(ui, "cerebroInfoButton\\(\"hla_visualizations_info\"\\)")
+  expect_match(
+    ui,
+    "cerebroVizPageHeader\\([\\s\\S]*?\"hla_visualizations_info\"",
+    perl = TRUE
+  )
   expect_match(server, "help_guide\\.R", perl = TRUE)
   expect_match(guide, "observeEvent\\(input\\$hla_visualizations_info")
 })

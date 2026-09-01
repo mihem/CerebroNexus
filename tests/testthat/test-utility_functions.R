@@ -172,12 +172,7 @@ test_that("single-cell scatter payloads remain arrays on the wire", {
 })
 
 test_that("single-view scatter payloads carry their display label", {
-  source_utils_env <- new.env()
-  source(
-    testthat::test_path("..", "..", "inst", "viewer", "utility_functions.R"),
-    local = source_utils_env
-  )
-  payload <- source_utils_env$cerebroCellViewScatterPayload(
+  payload <- utils_env$cerebroCellViewScatterPayload(
     coordinates = list(c(1, 2), c(3, 4)),
     color = c(0.1, 0.2),
     color_variable = "expression",
@@ -190,7 +185,7 @@ test_that("single-view scatter payloads carry their display label", {
 
   expect_identical(payload$meta$space_label, "UMAP")
 
-  default_payload <- source_utils_env$cerebroCellViewScatterPayload(
+  default_payload <- utils_env$cerebroCellViewScatterPayload(
     coordinates = list(c(1, 2), c(3, 4)),
     color = c(0.1, 0.2),
     color_variable = "expression",

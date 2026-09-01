@@ -96,7 +96,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   trajectory_box <- app$get_js(paste0(
     "(() => {",
     "const title = Array.from(document.querySelectorAll('.cv-ptitle'))",
-    ".find(el => el.textContent.includes('B_cell_maturation'));",
+    ".find(el => el.textContent.includes('B cell maturation'));",
     "const pane = title.closest('.cv-pane');",
     "pane.querySelector('.cv-tbtn[data-act=\"box\"]').click();",
     "const r = pane.querySelector('canvas:not(.cv-mini)').getBoundingClientRect();",
@@ -131,7 +131,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     paste0(
       "(() => {",
       "const title = Array.from(document.querySelectorAll('.cv-ptitle'))",
-      ".find(el => el.textContent.includes('B_cell_maturation'));",
+      ".find(el => el.textContent.includes('B cell maturation'));",
       "return title.closest('.cv-pane').querySelector('.cv-mini.is-on') !== null;",
       "})()"
     ),
@@ -143,7 +143,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     ".map(p => p.querySelector('.cv-ptitle').textContent.trim())"
   )))
   expect_length(zoomed_titles, 1)
-  expect_match(zoomed_titles[[1]], "B_cell_maturation", fixed = TRUE)
+  expect_match(zoomed_titles[[1]], "B cell maturation", fixed = TRUE)
   expect_identical(
     app$get_js("document.getElementById('cv-zoom').textContent.trim()"),
     "Zoom back"
