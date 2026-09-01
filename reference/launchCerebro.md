@@ -13,12 +13,9 @@ launchCerebro(
   expression_matrix_h5 = NULL,
   expression_matrix_BPCells = NULL,
   welcome_message = NULL,
-  overview_default_point_size = 5,
-  gene_expression_default_point_size = 5,
-  overview_default_point_opacity = 1,
-  gene_expression_default_point_opacity = 1,
-  overview_default_percentage_cells_to_show = 100,
-  gene_expression_default_percentage_cells_to_show = 100,
+  point_size = 5,
+  point_opacity = 1,
+  percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   ...
 )
@@ -79,35 +76,20 @@ launchCerebro(
   tab. Can contain HTML formatting, e.g. `'<h3>Hi!</h3>'`. Defaults to
   `NULL`.
 
-- overview_default_point_size:
+- point_size:
 
-  Default point size in overview. This value can be changed in the UI;
-  defaults to 5.
+  Default point size for cell scatter views. This value can be changed
+  in the UI; defaults to 5.
 
-- gene_expression_default_point_size:
+- point_opacity:
 
-  Default point size in gene_expression. This value can be changed in
-  the UI; defaults to 5.
+  Default point opacity for cell scatter views. This value can be
+  changed in the UI; defaults to 1.
 
-- overview_default_point_opacity:
+- percentage_cells_to_show:
 
-  Default point opacity in overview. This value can be changed in the
-  UI; defaults to 1.0.
-
-- gene_expression_default_point_opacity:
-
-  Default point opacity in gene expression. This value can be changed in
-  the UI; defaults to 1.0.
-
-- overview_default_percentage_cells_to_show:
-
-  Default percentage of cells to show in overview. This value can be
-  changed in the UI; defaults to 100.
-
-- gene_expression_default_percentage_cells_to_show:
-
-  Default percentage of cells to show in gene expression. This value can
-  be changed in the UI; defaults to 100.
+  Default percentage of cells shown in every cell scatter view. This
+  value can be changed independently in each page; defaults to 100.
 
 - projections_show_hover_info:
 

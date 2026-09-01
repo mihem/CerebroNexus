@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -87,12 +87,9 @@
 <span>  expression_matrix_h5 <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  expression_matrix_BPCells <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  welcome_message <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  overview_default_point_size <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  gene_expression_default_point_size <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  overview_default_point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  gene_expression_default_point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  overview_default_percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  gene_expression_default_percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span>,</span>
 <span>  projections_show_hover_info <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -155,36 +152,20 @@ in the "Load data" tab. Can contain HTML formatting, e.g.
 <code>'&lt;h3&gt;Hi!&lt;/h3&gt;'</code>. Defaults to <code>NULL</code>.</p></dd>
 
 
-<dt id="arg-overview-default-point-size">overview_default_point_size<a class="anchor" aria-label="anchor" href="#arg-overview-default-point-size"></a></dt>
-<dd><p>Default point size in overview. This
-value can be changed in the UI; defaults to 5.</p></dd>
+<dt id="arg-point-size">point_size<a class="anchor" aria-label="anchor" href="#arg-point-size"></a></dt>
+<dd><p>Default point size for cell scatter views. This value can
+be changed in the UI; defaults to 5.</p></dd>
 
 
-<dt id="arg-gene-expression-default-point-size">gene_expression_default_point_size<a class="anchor" aria-label="anchor" href="#arg-gene-expression-default-point-size"></a></dt>
-<dd><p>Default point size in gene_expression. This
-value can be changed in the UI; defaults to 5.</p></dd>
+<dt id="arg-point-opacity">point_opacity<a class="anchor" aria-label="anchor" href="#arg-point-opacity"></a></dt>
+<dd><p>Default point opacity for cell scatter views. This value
+can be changed in the UI; defaults to 1.</p></dd>
 
 
-<dt id="arg-overview-default-point-opacity">overview_default_point_opacity<a class="anchor" aria-label="anchor" href="#arg-overview-default-point-opacity"></a></dt>
-<dd><p>Default point opacity in
-overview. This value can be changed in the UI; defaults to 1.0.</p></dd>
-
-
-<dt id="arg-gene-expression-default-point-opacity">gene_expression_default_point_opacity<a class="anchor" aria-label="anchor" href="#arg-gene-expression-default-point-opacity"></a></dt>
-<dd><p>Default point opacity in
-gene expression. This value can be changed in the UI; defaults to 1.0.</p></dd>
-
-
-<dt id="arg-overview-default-percentage-cells-to-show">overview_default_percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-overview-default-percentage-cells-to-show"></a></dt>
-<dd><p>Default percentage of
-cells to show in overview. This value can be changed in the UI; defaults
-to 100.</p></dd>
-
-
-<dt id="arg-gene-expression-default-percentage-cells-to-show">gene_expression_default_percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-gene-expression-default-percentage-cells-to-show"></a></dt>
-<dd><p>Default percentage of
-cells to show in gene expression. This value can be changed in the UI; defaults
-to 100.</p></dd>
+<dt id="arg-percentage-cells-to-show">percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-percentage-cells-to-show"></a></dt>
+<dd><p>Default percentage of cells shown in every
+cell scatter view. This value can be changed independently in each page;
+defaults to 100.</p></dd>
 
 
 <dt id="arg-projections-show-hover-info">projections_show_hover_info<a class="anchor" aria-label="anchor" href="#arg-projections-show-hover-info"></a></dt>

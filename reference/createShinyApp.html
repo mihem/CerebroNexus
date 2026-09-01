@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -107,7 +107,9 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  crb_pick_smallest_file <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  show_upload_ui <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  welcome_message <span class="op">=</span> <span class="st">"Welcome to CerebroNexus!"</span>,</span>
-<span>  point_size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>overview_projection_point_size <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span>,</span>
 <span>  variable_to_compare <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_image_settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -118,8 +120,7 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  spatial_images_offset_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_offset_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_plot_rotation <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  auth <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">...</span></span>
+<span>  auth <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -209,8 +210,22 @@ upload their own data; defaults to <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-point-size">point_size<a class="anchor" aria-label="anchor" href="#arg-point-size"></a></dt>
-<dd><p>Named list with <code>overview_projection_point_size</code>
-(and optionally other keys) forwarded to <code>Cerebro.options</code>.</p></dd>
+<dd><p>Point size from 1 through 20. Supply one number for every
+dataset, or a named numeric vector/list whose names exactly match
+<code>cerebro_data</code>. The value initializes every cell scatter view.</p></dd>
+
+
+<dt id="arg-point-opacity">point_opacity<a class="anchor" aria-label="anchor" href="#arg-point-opacity"></a></dt>
+<dd><p>Point opacity from 0.1 through 1. Supply one number for
+every dataset, or a named numeric vector/list whose names exactly match
+<code>cerebro_data</code>. The value initializes every cell scatter view.</p></dd>
+
+
+<dt id="arg-percentage-cells-to-show">percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-percentage-cells-to-show"></a></dt>
+<dd><p>Percentage of cells from 10 through 100.
+Supply one number for every dataset, or a named numeric vector/list whose
+names exactly match <code>cerebro_data</code>. The value initializes every cell
+scatter view; subsequent UI changes remain page-local.</p></dd>
 
 
 <dt id="arg-variable-to-compare">variable_to_compare<a class="anchor" aria-label="anchor" href="#arg-variable-to-compare"></a></dt>
@@ -234,6 +249,8 @@ when that CRB has exactly one spatial entry.</p></dd>
 <code>dataset -&gt; spatial entry -&gt; image label -&gt; settings</code> form. Settings
 may contain only <code>flip_x</code>, <code>flip_y</code>, <code>scale_x</code>,
 <code>scale_y</code>, <code>offset_x</code>, <code>offset_y</code>, and <code>rotation</code>.
+<code>image_opacity</code> may additionally set the initial image opacity from
+0 through 1.
 A leaf may target an embedded or external image available under that exact
 dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's <code>spatial_images</code>; unknown
@@ -241,50 +258,36 @@ identities are rejected. Labels are user-facing names, not protocol names.</p></
 
 
 <dt id="arg-spatial-images-flip-x">spatial_images_flip_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-x"></a></dt>
-<dd><p>Legacy named per-dataset horizontal flip values.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path <code>spatial_images</code> declaration was migrated; then the
-value applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset horizontal flip values.</p></dd>
 
 
 <dt id="arg-spatial-images-flip-y">spatial_images_flip_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-y"></a></dt>
-<dd><p>Legacy named per-dataset vertical flip values.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path <code>spatial_images</code> declaration was migrated; then the
-value applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset vertical flip values.</p></dd>
 
 
 <dt id="arg-spatial-images-scale-x">spatial_images_scale_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-x"></a></dt>
-<dd><p>Legacy named per-dataset X scale values. Each
-dataset must resolve to exactly one spatial image target, unless a legacy
-multi-path <code>spatial_images</code> declaration was migrated; then the value
-applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset X scale values.</p></dd>
 
 
 <dt id="arg-spatial-images-scale-y">spatial_images_scale_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-y"></a></dt>
-<dd><p>Legacy named per-dataset Y scale values. Each
-dataset must resolve to exactly one spatial image target, unless a legacy
-multi-path <code>spatial_images</code> declaration was migrated; then the value
-applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset Y scale values.</p></dd>
 
 
 <dt id="arg-spatial-images-offset-x">spatial_images_offset_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-x"></a></dt>
-<dd><p>Legacy named per-dataset horizontal offsets.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path <code>spatial_images</code> declaration was migrated; then the
-value applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset horizontal offsets.</p></dd>
 
 
 <dt id="arg-spatial-images-offset-y">spatial_images_offset_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-y"></a></dt>
-<dd><p>Legacy named per-dataset vertical offsets.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path <code>spatial_images</code> declaration was migrated; then the
-value applies to every migrated external image.</p></dd>
+<dd><p>Legacy named per-dataset vertical offsets.</p></dd>
 
 
 <dt id="arg-spatial-plot-rotation">spatial_plot_rotation<a class="anchor" aria-label="anchor" href="#arg-spatial-plot-rotation"></a></dt>
-<dd><p>Named list/vector; initial rotation (degrees)
-applied to spatial cell coordinates. Names must match <code>cerebro_data</code>.</p></dd>
+<dd><p>Optional nested rotations in
+<code>dataset -&gt; spatial entry -&gt; degrees</code> form, applied only to spatial
+cell coordinates. The legacy named per-dataset vector form remains
+supported and applies one rotation to every spatial entry in that dataset.
+Dataset names must match <code>cerebro_data</code>; spatial names must match the
+corresponding CRB's <code>availableSpatial()</code>.</p></dd>
 
 
 <dt id="arg-auth">auth<a class="anchor" aria-label="anchor" href="#arg-auth"></a></dt>
@@ -294,10 +297,6 @@ list with <code>credentials</code>, the path to an encrypted SQLite database
 created by <code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" class="external-link">shinymanager::create_db()</a></code>, and <code>passphrase_env</code>,
 the name of the environment variable containing its passphrase. Optional
 <code>timeout_minutes</code> defaults to 15.</p></dd>
-
-
-<dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
-<dd><p>Currently unused; reserved for future arguments.</p></dd>
 
 </dl></div>
     <div class="section level2">
