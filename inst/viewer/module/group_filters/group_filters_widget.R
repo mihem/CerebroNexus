@@ -1,26 +1,62 @@
 ##----------------------------------------------------------------------------##
-## Shared group-filters widget for projection-style tabs.
-##
-## overview / spatial / gene_expression each used to ship a near-byte-identical
-## UI_projection_group_filters.R file (~90 lines) — same renderUI, same
-## pickerInput loop, same outputOptions, same observeEvent on the info button.
-## The only diffs were the input/output ID prefix and the info-modal text.
-##
-## Two helpers below take a `prefix` and the tab's getGroups / getGroupLevels
-## closures (passed explicitly so this file does not need to be sourced inside
-## the caller's environment).
+## Shared Linked views-style group filters for projection-style tabs.
 ##----------------------------------------------------------------------------##
+
+groupFilterControl <- function(input_id, label, levels, colors) {
+  shiny::div(
+    id = input_id,
+    class = "cv-filt shiny-input-checkboxgroup",
+    role = "group",
+    `aria-label` = label,
+    shiny::tags$button(
+      type = "button",
+      class = "cv-filt-btn",
+      `aria-expanded` = "false",
+      shiny::tags$span(label),
+      " ",
+      shiny::tags$span(
+        class = "cv-filt-ct",
+        paste0(length(levels), "/", length(levels))
+      )
+    ),
+    shiny::div(
+      class = "cv-filt-menu",
+      style = "display:none",
+      shiny::div(
+        class = "cv-filt-acts",
+        shiny::tags$button(type = "button", `data-act` = "all", "All"),
+        shiny::tags$button(type = "button", `data-act` = "none", "None")
+      ),
+      lapply(seq_along(levels), function(index) {
+        level <- levels[[index]]
+        shiny::tags$label(
+          class = "cv-filt-item",
+          shiny::tags$input(
+            type = "checkbox",
+            name = input_id,
+            value = level,
+            checked = "checked"
+          ),
+          shiny::tags$span(
+            class = "cv-dot",
+            style = paste0("background:", colors[[index]])
+          ),
+          shiny::tags$span(level)
+        )
+      })
+    )
+  )
+}
 
 #' Register the group-filters renderUI for a projection-style tab.
 #'
-#' Creates `output[[paste0(prefix, "_group_filters_UI")]]` which renders one
-#' shinyWidgets::pickerInput per grouping variable. Each picker's inputId is
-#' `<prefix>_group_filter_<groupName>` so existing downstream observers
-#' (cells_to_show etc.) continue to read the same input names.
+#' Creates `output[[paste0(prefix, "_group_filters_UI")]]` with one shared
+#' chip/popover control per grouping variable. Each control keeps the input id
+#' `<prefix>_group_filter_<groupName>` used by downstream observers.
 #'
 #' @param output The Shiny output object from the server function.
-#' @param prefix Tab-specific prefix, e.g. "overview_projection",
-#'        "spatial_projection", "expression_projection".
+#' @param prefix Tab-specific prefix, e.g. "overview_projection" or
+#'        "trajectory_projection".
 #' @param getGroups Closure returning a character vector of grouping variable
 #'        names. Pass the caller's own getGroups() defined in
 #'        utility_functions.R.
@@ -29,18 +65,26 @@ registerGroupFiltersUI <- function(output, prefix, getGroups, getGroupLevels) {
   output_id <- paste0(prefix, "_group_filters_UI")
 
   output[[output_id]] <- shiny::renderUI({
-    group_filters <- list()
-    for (i in getGroups()) {
-      group_filters[[i]] <- shinyWidgets::pickerInput(
-        paste0(prefix, "_group_filter_", i),
-        label = i,
-        choices = getGroupLevels(i),
-        selected = getGroupLevels(i),
-        options = list("actions-box" = TRUE),
-        multiple = TRUE
+    filters <- lapply(getGroups(), function(group) {
+      levels <- getGroupLevels(group)
+      colors <- tryCatch(
+        unname(reactive_colors()[[group]][levels]),
+        error = function(e) NULL
       )
-    }
-    group_filters
+      if (is.null(colors) || length(colors) != length(levels)) {
+        colors <- cerebro_group_colors(length(levels))
+      }
+      groupFilterControl(
+        paste0(prefix, "_group_filter_", group),
+        group,
+        levels,
+        colors
+      )
+    })
+    shiny::div(
+      class = "cerebro-group-filters",
+      shiny::div(class = "cv-filters-row", filters)
+    )
   })
 
   ## ensure rendered even when the surrounding cerebroBox is collapsed

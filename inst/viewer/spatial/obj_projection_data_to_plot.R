@@ -81,7 +81,7 @@ spatial_projection_data_to_plot_raw <- reactive({
       colnames(metadata) &&
       is.numeric(metadata[[plot_parameters[['color_variable']]]])
   ) {
-    color_assignments <- NA
+    color_assignments <- NULL
   } else {
     color_assignments <- assignColorsToGroups(
       metadata,
@@ -89,62 +89,37 @@ spatial_projection_data_to_plot_raw <- reactive({
     )
   }
 
-  ## Rotation angle (if configured for the current dataset). Applied to BOTH the
-  ## displayed subset and the full-extent coordinates below so the axis range and
-  ## the points stay in the same frame.
-  rotate_coords <- function(co) {
-    co
-  }
-  if (
-    exists("Cerebro.options") &&
-      !is.null(Cerebro.options[["spatial_plot_rotation"]]) &&
-      exists("available_crb_files") &&
-      !is.null(available_crb_files$selected)
-  ) {
-    match_idx <- which(
-      available_crb_files$files == available_crb_files$selected
-    )
-    if (length(match_idx) > 0) {
-      current_name <- names(available_crb_files$files)[match_idx[1]]
-      if (
-        !is.null(current_name) &&
-          current_name %in% names(Cerebro.options[["spatial_plot_rotation"]])
-      ) {
-        rotation_angle <- Cerebro.options[["spatial_plot_rotation"]][[
-          current_name
-        ]]
-        if (!is.null(rotation_angle) && rotation_angle != 0) {
-          theta <- rotation_angle * pi / 180
-          cos_theta <- cos(theta)
-          sin_theta <- sin(theta)
-          rotate_coords <- function(co) {
-            x <- co[, 1]
-            y <- co[, 2]
-            co[, 1] <- x * cos_theta - y * sin_theta
-            co[, 2] <- x * sin_theta + y * cos_theta
-            co
-          }
-        }
-      }
-    }
-  }
-
+  ## Plot rotation belongs to one exact dataset + spatial entry. Image rotation
+  ## is resolved independently from spatial_image_settings.
+  current_name <- viewerDatasetName(
+    available_crb_files$files,
+    available_crb_files$selected
+  )
+  rotation_angle <- spatialPlotRotation(
+    Cerebro.options,
+    current_name,
+    plot_parameters[["projection"]]
+  )
   ## Apply rotation to the displayed (subset) coordinates.
-  coordinates <- rotate_coords(spatial_projection_coordinates())
+  coordinates <- rotateSpatialCoordinates(
+    spatial_projection_coordinates(),
+    rotation_angle
+  )
 
   ## Pin the axes to the FULL cell extent, not the currently displayed subset.
   ## Otherwise, changing "Show % of cells" rescales the axes to whatever subset
   ## is plotted and the plot visibly jitters. We compute the range over ALL cells
-  ## (in the same rotated frame) and pass it as an explicit x/y range, unless the
-  ## user has set a manual range. A small margin keeps edge points off the frame.
+  ## (in the same rotated frame) and pass it as an explicit x/y range. A small
+  ## margin keeps edge points off the frame.
   if (
     is.null(plot_parameters[["x_range"]]) ||
       length(plot_parameters[["x_range"]]) < 2 ||
       is.null(plot_parameters[["y_range"]]) ||
       length(plot_parameters[["y_range"]]) < 2
   ) {
-    full_coords <- rotate_coords(
-      getSpatialData(plot_parameters[["projection"]])$coordinates
+    full_coords <- rotateSpatialCoordinates(
+      getSpatialData(plot_parameters[["projection"]])$coordinates,
+      rotation_angle
     )
     x_full <- range(full_coords[[1]], na.rm = TRUE)
     y_full <- range(full_coords[[2]], na.rm = TRUE)
@@ -165,7 +140,7 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## With an explicit full-extent range we must NOT let the JS autorange (which
   ## would refit to the subset). reset_axes is meant to snap back to the full
   ## view on a dataset switch — that is exactly the full-extent range we set, so
-  ## honour a manual range but otherwise keep the fixed range.
+  ## keep the fixed range.
   reset_axes <- isolate(spatial_projection_parameters_other[['reset_axes']])
   if (
     length(plot_parameters[["x_range"]]) >= 2 &&

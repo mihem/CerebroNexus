@@ -1,6 +1,10 @@
 # Pure contracts for Viewer spatial background identity and settings.
 
 spatial_options <- list(
+  spatial_plot_rotation = list(
+    Atlas = c(sliceA = 90, sliceB = -90),
+    Other = c(sliceA = 180)
+  ),
   spatial_images = list(
     Atlas = list(
       sliceA = list(
@@ -20,7 +24,12 @@ spatial_options <- list(
   spatial_image_settings = list(
     Atlas = list(
       sliceA = list(
-        `H&E` = list(offset_x = 11, scale_x = 1.25, flip_y = TRUE),
+        `H&E` = list(
+          offset_x = 11,
+          scale_x = 1.25,
+          flip_y = TRUE,
+          image_opacity = 0.8
+        ),
         DAPI = list(offset_x = 22, rotation = 90)
       ),
       sliceB = list(IF = list(offset_x = 33, flip_x = TRUE))
@@ -28,6 +37,45 @@ spatial_options <- list(
     Other = list(sliceA = list(Histology = list(offset_x = 99)))
   )
 )
+
+test_that("one resolver rotates spatial coordinates for every Viewer surface", {
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "sliceA"), 90)
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "sliceB"), -90)
+  expect_identical(spatialPlotRotation(spatial_options, "Other", "sliceA"), 180)
+  expect_identical(spatialPlotRotation(spatial_options, "Atlas", "missing"), 0)
+  expect_identical(spatialPlotRotation(spatial_options, "missing", "sliceA"), 0)
+
+  coordinates <- data.frame(x = c(0, 1), y = c(0, 2))
+  expect_equal(
+    rotateSpatialCoordinates(coordinates, 90),
+    data.frame(x = c(0, -2), y = c(0, 1)),
+    tolerance = 1e-12
+  )
+})
+
+test_that("MERFISH plot and image rotations are configured independently", {
+  app_env <- new.env(parent = globalenv())
+  app_lines <- readLines(system.file("app.R", package = "CerebroNexus"))
+  options_start <- grep("^Cerebro.options", app_lines)[[1L]]
+  options_end <- grep('^  "projections_show_hover_info"', app_lines)[[1L]]
+  expression <- app_lines[options_start:(options_end + 1L)]
+  expression[[1L]] <- sub("<<-", "<-", expression[[1L]], fixed = TRUE)
+  app_env$custom_welcome_message <- "test"
+  eval(parse(text = expression), envir = app_env)
+  options <- app_env$Cerebro.options
+
+  expect_identical(
+    options$spatial_plot_rotation[["Mouse ileum (MERFISH)"]][["fov"]],
+    90
+  )
+  expect_identical(
+    options$spatial_image_settings[["Mouse ileum (MERFISH)"]][["fov"]][[
+      "Tissue background"
+    ]]$rotation,
+    90
+  )
+  expect_null(options$spatial_images[["Mouse ileum (MERFISH)"]])
+})
 
 test_that("configured images resolve one exact dataset and spatial leaf", {
   slice_a <- configured_spatial_images(spatial_options, "Atlas", "sliceA")
@@ -92,72 +140,40 @@ test_that("embedded images expose canonical labels and normalize singular legacy
   expect_identical(embedded_spatial_images(list()), list())
 })
 
-test_that("settings resolve only the exact image leaf", {
+test_that("one preset resolver owns every image setting and default", {
   expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceA",
-      "H&E",
-      "offset_x",
-      0
-    ),
-    11
+    spatialImagePreset(spatial_options, "Atlas", "sliceA", "H&E"),
+    list(
+      offsetX = 11,
+      offsetY = 0,
+      scaleX = 1.25,
+      scaleY = 1,
+      flipX = FALSE,
+      flipY = TRUE,
+      rotation = 0,
+      opacity = 0.8
+    )
   )
   expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceA",
-      "DAPI",
-      "offset_x",
-      0
-    ),
-    22
+    spatialImagePreset(spatial_options, "Atlas", "sliceA", "DAPI"),
+    list(
+      offsetX = 22,
+      offsetY = 0,
+      scaleX = 1,
+      scaleY = 1,
+      flipX = FALSE,
+      flipY = FALSE,
+      rotation = 90,
+      opacity = 0.6
+    )
   )
   expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceA",
-      "DAPI",
-      "rotation",
-      0
-    ),
-    90
+    spatialImagePreset(spatial_options, "Atlas", "sliceC", "IF"),
+    spatialImagePreset(NULL, NULL, NULL, NULL)
   )
   expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceB",
-      "IF",
-      "offset_x",
-      0
-    ),
-    33
-  )
-  expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceC",
-      "IF",
-      "offset_x",
-      0
-    ),
-    0
-  )
-  expect_identical(
-    resolve_spatial_image_setting(
-      spatial_options,
-      "Atlas",
-      "sliceA",
-      "H&E",
-      "rotation",
-      0
-    ),
-    0
+    spatialImagePreset(spatial_options, "Atlas", "sliceA", NULL),
+    spatialImagePreset(NULL, NULL, NULL, NULL)
   )
 })
 
@@ -294,7 +310,8 @@ test_that("copy preset formatter emits exact canonical image settings", {
       scale_y = 0.75,
       offset_x = 2,
       offset_y = -3,
-      rotation = 90
+      rotation = 90,
+      image_opacity = 0.6
     )
   )
   expect_false(grepl("spatial_images_offset_x", code, fixed = TRUE))

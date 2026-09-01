@@ -87,54 +87,6 @@ req_plot_space <- function(output_id, min_px = 80L) {
   shiny::req(isTRUE(w >= min_px), isTRUE(h >= min_px))
 }
 
-## ---- Apply generic display options to a ggplot ------------------------ ##
-## Reads the IR_DISPLAY_SPEC values (see ir_display_params()) and applies the
-## tab-agnostic ones — font size and title — to a ggplot. Point size / opacity
-## are scatter-specific and handled directly by the scatter renderers (so we
-## don't reach into ggplot layer internals here). Non-ggplot input (base-R
-## plots) is returned unchanged.
-ir_apply_display <- function(p, params = NULL) {
-  if (!inherits(p, "ggplot")) {
-    return(p)
-  }
-  if (is.null(params)) {
-    params <- tryCatch(ir_display_params(), error = function(e) list())
-  }
-  base_size <- suppressWarnings(as.numeric(params[["ir_d_base_size"]]))
-  if (length(base_size) == 1 && !is.na(base_size) && base_size > 0) {
-    p <- p + ggplot2::theme(text = ggplot2::element_text(size = base_size))
-  }
-  title <- params[["ir_d_title"]]
-  if (is.character(title) && length(title) == 1 && nzchar(title)) {
-    p <- p + ggplot2::labs(title = title)
-  }
-  # Legend: font size, key/point size and position (or hidden).
-  legend_size <- suppressWarnings(as.numeric(params[["ir_d_legend_size"]]))
-  if (length(legend_size) == 1 && !is.na(legend_size) && legend_size > 0) {
-    p <- p +
-      ggplot2::theme(legend.text = ggplot2::element_text(size = legend_size))
-  }
-  legend_key <- suppressWarnings(as.numeric(params[["ir_d_legend_key"]]))
-  if (length(legend_key) == 1 && !is.na(legend_key) && legend_key > 0) {
-    p <- p +
-      ggplot2::guides(
-        colour = ggplot2::guide_legend(
-          override.aes = list(size = legend_key)
-        ),
-        fill = ggplot2::guide_legend(
-          override.aes = list(size = legend_key)
-        )
-      )
-  }
-  legend_pos <- params[["ir_d_legend_pos"]]
-  if (
-    is.character(legend_pos) && length(legend_pos) == 1 && nzchar(legend_pos)
-  ) {
-    p <- p + ggplot2::theme(legend.position = legend_pos)
-  }
-  p
-}
-
 ## ---- Muffle known-harmless upstream warnings -------------------------- ##
 ## scRepertoire::clonalRarefaction delegates bootstrapping to iNEXT, whose
 ## internals (iNEXT:::invChat -> matrix(apply(Abun.Mat, 2, ...))) emit
@@ -162,13 +114,7 @@ ir_quiet_inext <- function(expr) {
 safeRenderPlot <- function(expr, plot_name = "unknown") {
   tryCatch(
     {
-      # Evaluate the plot expression, then apply the generic display options
-      # (font size / title) to any ggplot it produced. This single hook covers
-      # every renderer that funnels through safeRenderPlot, so individual
-      # renderers don't each need to call ir_apply_display(). Non-ggplot
-      # results (base-R plots) pass through unchanged.
-      result <- force(expr)
-      ir_apply_display(result)
+      force(expr)
     },
     error = function(e) {
       # validate()/need()/req() raise a "shiny.silent.error"; re-raise it so
@@ -487,11 +433,6 @@ ir_bindCache <- function(x, ..., cache = "session") {
     shiny::bindCache(
       x,
       ...,
-      input$ir_d_base_size,
-      input$ir_d_title,
-      input$ir_d_legend_size,
-      input$ir_d_legend_key,
-      input$ir_d_legend_pos,
       available_crb_files$selected,
       cache = cache
     )

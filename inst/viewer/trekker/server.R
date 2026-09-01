@@ -4,17 +4,8 @@
 ## Sourced into the main server scope (try_source with local = parent.frame()),
 ## so `input`, `output`, `session` and `data_set` are in scope.
 ##
-## Responsibilities:
-##   1. render the parameter controls (standard app widgets), so the page uses
-##      the same components/theme as every other tab;
-##   2. push the loaded .crb's `trekker` slot to the client (www/trekker.js);
-##   3. answer whole-transcriptome gene-colouring requests, returning a 0-255
-##      vector aligned to the page's nuclei (via the slot's `barcodes` order).
-##
-## The controls are Shiny inputs; www/trekker.js listens to `shiny:inputchanged`
-## and updates the canvases client-side (instant), so dragging a slider does not
-## round-trip to the server. Only gene expression needs the server (it holds the
-## matrix), so that one path is a request/response.
+## R owns Trekker-specific controls and payload preparation. cell_views.js owns
+## every canvas, viewport, toolbar and linked-selection interaction.
 ##----------------------------------------------------------------------------##
 
 ## Pure helpers (trekker_gene_suggest, trekker_numeric_meta_cols) live in a
@@ -46,7 +37,7 @@ trekker_meta_cols <- reactive({
 ##----------------------------------------------------------------------------##
 ## Parameter controls (standard widgets, rendered only when Trekker data exists)
 ##----------------------------------------------------------------------------##
-output[["trekker_parameters_ui"]] <- renderUI({
+output[["trekker_main_parameters_ui"]] <- renderUI({
   tk <- req(trekker_slot())
   suggest <- trekker_gene_suggest(tk, trekker_gene_names())
   default_gene <- if (length(suggest)) suggest[1] else trekker_gene_names()[1]
@@ -123,197 +114,155 @@ output[["trekker_parameters_ui"]] <- renderUI({
     ),
     conditionalPanel(
       condition = "input.trekker_view == 'morph'",
+      class = "trekker-transition-control",
       sliderInput(
         "trekker_morph",
         label = "Transition (UMAP → Spatial)",
         min = 0,
         max = 1,
         value = 0,
-        step = 0.01
+        step = 0.01,
+        ticks = FALSE
       )
-    ),
-    sliderInput(
-      "trekker_ps",
-      label = "Point size",
-      min = 0.6,
-      max = 6,
-      value = 2.2,
-      step = 0.2
-    ),
-    sliderInput(
-      "trekker_nr",
-      label = "Niche radius (um)",
-      min = 50,
-      max = 500,
-      value = 250,
-      step = 25
-    ),
-    ## Differentiator 1: position uncertainty as an interactive axis. Dissolves
-    ## the least-confidently-positioned nuclei (by the vendor's adopted-cluster
-    ## UMI share) so the tissue sharpens to only its well-supported positions.
-    sliderInput(
-      "trekker_conf",
-      label = "Dissolve least-confident positions (%)",
-      min = 0,
-      max = 95,
-      value = 0,
-      step = 5
-    ),
-    shinyWidgets::materialSwitch(
-      "trekker_evtoggle",
-      label = "Mark nuclei with positioning evidence",
-      value = TRUE,
-      status = "primary",
-      right = TRUE
-    )
-  )
-})
-
-## Group filters (same widget family as the projection tabs): one pickerInput per
-## categorical grouping variable, all levels selected by default. www/trekker.js
-## reads the selections and hides nuclei outside them, so you can isolate a cell
-## type or cluster without having to colour by it.
-output[["trekker_group_filters_ui"]] <- renderUI({
-  tk <- req(trekker_slot())
-  celltypes <- sort(unique(as.character(tk$celltype)))
-  clusters <- sort(unique(tk$clusters))
-  tagList(
-    shinyWidgets::pickerInput(
-      "trekker_group_filter_celltype",
-      label = "Cell type",
-      choices = celltypes,
-      selected = celltypes,
-      options = list("actions-box" = TRUE),
-      multiple = TRUE
-    ),
-    shinyWidgets::pickerInput(
-      "trekker_group_filter_cluster",
-      label = "Cluster",
-      choices = clusters,
-      selected = clusters,
-      options = list("actions-box" = TRUE),
-      multiple = TRUE
     )
   )
 })
 
 ## Render the controls eagerly (not only when the tab is shown) so they exist and
 ## stay in sync with the canvas as soon as a Trekker data set is loaded.
-outputOptions(output, "trekker_parameters_ui", suspendWhenHidden = FALSE)
-outputOptions(output, "trekker_group_filters_ui", suspendWhenHidden = FALSE)
+outputOptions(output, "trekker_main_parameters_ui", suspendWhenHidden = FALSE)
 
-##----------------------------------------------------------------------------##
-## Push the slot to the client on (re)connect or data-set change
-##----------------------------------------------------------------------------##
+## Build the dedicated page as a two-panel specialist payload. Rendering,
+## viewport state, selection and toolbars all stay in cell_views.js.
 observe({
-  input[["trekker_ready"]]
-  tk <- trekker_slot()
-  if (is.null(tk)) {
-    return()
+  input[["trekker_projection_render_request"]]
+  tk <- req(trekker_slot())
+  mode <- input[["trekker_mode"]] %||% "celltype"
+  view <- input[["trekker_view"]] %||% "pair"
+  keys <- as.character(tk$barcodes)
+  cluster <- as.character(tk$clusters)
+  cluster_index <- suppressWarnings(as.integer(cluster)) + 1L
+  cell_type <- if (
+    length(tk$celltype) &&
+      length(cluster_index) == length(keys) &&
+      all(!is.na(cluster_index)) &&
+      all(cluster_index >= 1L & cluster_index <= length(tk$celltype))
+  ) {
+    as.character(tk$celltype[cluster_index])
+  } else {
+    as.character(tk$celltype)[seq_along(keys)]
   }
-  tk$gene_suggest <- trekker_gene_suggest(tk, trekker_gene_names())
-  session$sendCustomMessage("trekker_data", tk)
+  categorical <- mode %in% c("celltype", "cluster")
+  group <- if (identical(mode, "cluster")) cluster else cell_type
+  color <- NULL
+  color_label <- mode
+  if (identical(mode, "gene")) {
+    gene <- input[["trekker_gene_pick"]]
+    if (!is.null(gene) && gene %in% trekker_gene_names()) {
+      color <- as.numeric(tryCatch(
+        data_set()$getExpressionMatrix(cells = keys, genes = gene),
+        error = function(e) rep(NA_real_, length(keys))
+      ))
+      color_label <- gene
+    }
+  } else if (identical(mode, "meta")) {
+    md <- tryCatch(data_set()$getMetaData(), error = function(e) NULL)
+    column <- input[["trekker_meta_pick"]]
+    md_keys <- if (!is.null(md) && "cell_barcode" %in% names(md)) {
+      md[["cell_barcode"]]
+    } else if (!is.null(md)) {
+      rownames(md)
+    } else {
+      character()
+    }
+    color <- if (!is.null(md) && !is.null(column) && column %in% names(md)) {
+      suppressWarnings(as.numeric(md[[column]][match(keys, md_keys)]))
+    } else {
+      rep(NA_real_, length(keys))
+    }
+    color_label <- column
+  } else if (!categorical && !is.null(tk$fields[[mode]]$v)) {
+    color <- as.numeric(tk$fields[[mode]]$v)
+    color_label <- tk$fields[[mode]]$label %||% mode
+  }
+  if (!categorical && is.null(color)) {
+    color <- rep(0, length(keys))
+  }
+  alignment <- tk$histology_alignment %||% list()
+  image_preset <- list(
+    opacity = alignment$image_opacity %||% 0.6,
+    offsetX = alignment$offset_x %||% 0,
+    offsetY = alignment$offset_y %||% 0,
+    scaleX = alignment$scale_x %||% 1,
+    scaleY = alignment$scale_y %||% 1,
+    flipX = isTRUE(alignment$flip_x),
+    flipY = isTRUE(alignment$flip_y),
+    rotation = alignment$rotation %||% 0
+  )
+  spatial_panel <- list(
+    id = "trekker",
+    label = if (identical(view, "morph")) "UMAP → Spatial" else "Spatial",
+    selection_key = keys,
+    x = as.numeric(tk$x),
+    y = as.numeric(tk$y),
+    spatial = TRUE,
+    background_image = tk$histology_image,
+    image_bounds = as.list(tk$histology_image_bounds),
+    image_preset = image_preset
+  )
+  if (identical(view, "morph")) {
+    spatial_panel$from_x <- as.numeric(tk$ux)
+    spatial_panel$from_y <- as.numeric(tk$uy)
+    spatial_panel$to_x <- as.numeric(tk$x)
+    spatial_panel$to_y <- as.numeric(tk$y)
+    spatial_panel$transition <- input[["trekker_morph"]] %||% 0
+  }
+  umap_panel <- list(
+    id = "umap",
+    label = "UMAP",
+    selection_key = keys,
+    x = as.numeric(tk$ux),
+    y = as.numeric(tk$uy),
+    projection = TRUE
+  )
+  panels <- switch(
+    view,
+    sp = list(spatial_panel),
+    um = list(umap_panel),
+    morph = list(spatial_panel),
+    list(spatial_panel, umap_panel)
+  )
+  levels <- if (categorical) sort(unique(group)) else character()
+  appearance <- current_scatter_defaults()
+  cerebroCellViewRender(
+    "trekker_projection",
+    meta = list(
+      color_type = if (categorical) "categorical" else "continuous",
+      color_variable = color_label,
+      traces = levels,
+      group_colors = cerebro_group_colors(length(levels)),
+      shared_filters = categorical
+    ),
+    data = list(
+      selection_key = keys,
+      panels = panels,
+      group = group,
+      color = color,
+      point_size = appearance$point_size,
+      point_opacity = appearance$point_opacity,
+      percentage_cells_to_show = appearance$percentage_cells_to_show
+    )
+  )
 })
 
-##----------------------------------------------------------------------------##
-## Gene colouring (whole transcriptome): send a 0-255 vector aligned to the
-## page's nuclei whenever gene mode is active and a gene is selected.
-##----------------------------------------------------------------------------##
-observeEvent(
-  list(input[["trekker_mode"]], input[["trekker_gene_pick"]]),
-  {
-    tk <- trekker_slot()
-    if (is.null(tk) || is.null(input[["trekker_mode"]])) {
-      return()
-    }
-    if (input[["trekker_mode"]] != "gene") {
-      return()
-    }
-    g <- input[["trekker_gene_pick"]]
-    if (is.null(g) || !nzchar(g)) {
-      return()
-    }
-    if (!(g %in% trekker_gene_names())) {
-      session$sendCustomMessage("trekker_geneval", list(gene = g, ok = FALSE))
-      return()
-    }
-    mat <- tryCatch(
-      data_set()$getExpressionMatrix(cells = tk$barcodes, genes = g),
-      error = function(e) NULL
-    )
-    if (is.null(mat)) {
-      session$sendCustomMessage("trekker_geneval", list(gene = g, ok = FALSE))
-      return()
-    }
-    v <- as.numeric(mat)
-    mx <- suppressWarnings(max(v, na.rm = TRUE))
-    q <- if (is.finite(mx) && mx > 0) {
-      as.integer(round(v / mx * 255))
-    } else {
-      rep(0L, length(v))
-    }
-    session$sendCustomMessage(
-      "trekker_geneval",
-      list(gene = g, ok = TRUE, v = q, max = round(mx, 3))
-    )
-  },
-  ignoreInit = TRUE
-)
-
-## Meta / analysis-field colouring (differentiator 3): send the picked per-cell
-## meta column, aligned to the page's nuclei, min-max scaled to 0-255. Same
-## request/response shape as gene colouring; the client renders it identically.
-observeEvent(
-  list(input[["trekker_mode"]], input[["trekker_meta_pick"]]),
-  {
-    tk <- trekker_slot()
-    if (is.null(tk) || is.null(input[["trekker_mode"]])) {
-      return()
-    }
-    if (input[["trekker_mode"]] != "meta") {
-      return()
-    }
-    col <- input[["trekker_meta_pick"]]
-    if (is.null(col) || !nzchar(col)) {
-      return()
-    }
-    md <- tryCatch(data_set()$getMetaData(), error = function(e) NULL)
-    if (is.null(md) || !(col %in% names(md))) {
-      session$sendCustomMessage("trekker_served", list(ok = FALSE))
-      return()
-    }
-    key <- if ("cell_barcode" %in% names(md)) {
-      md[["cell_barcode"]]
-    } else {
-      rownames(md)
-    }
-    raw <- suppressWarnings(as.numeric(md[[col]][match(tk$barcodes, key)]))
-    if (all(is.na(raw))) {
-      session$sendCustomMessage("trekker_served", list(ok = FALSE))
-      return()
-    }
-    mn <- min(raw, na.rm = TRUE)
-    mx <- max(raw, na.rm = TRUE)
-    rng <- if (mx > mn) mx - mn else 1
-    q <- as.integer(round((raw - mn) / rng * 255))
-    q[is.na(q)] <- 0L
-    session$sendCustomMessage(
-      "trekker_served",
-      list(
-        ok = TRUE,
-        v = q,
-        min = round(mn, 3),
-        max = round(mx, 3),
-        label = col,
-        desc = paste0(
-          "A per-cell value carried by the loaded object, projected onto ",
-          "physical coordinates (an existing single-cell analysis, spatialized)."
-        )
-      )
-    )
-  },
-  ignoreInit = TRUE
-)
+output[["trekker_number_of_selected_cells"]] <- renderUI({
+  selected <- input[["trekker_projection_persistent_selection"]] %||%
+    character()
+  tags$span(
+    format(cerebroSelectionCount(selected), big.mark = ","),
+    " cells selected"
+  )
+})
 
 ## Moran's I "Show in plot" link: switch to gene mode and select the gene. The
 ## widget updates drive the observers above, which send the expression vector.

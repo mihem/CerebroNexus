@@ -33,80 +33,32 @@ server <- function(input, output, session) {
     ),
     local = TRUE
   )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/clone_contract.R"
+    ),
+    local = TRUE
+  )
 
   ##--------------------------------------------------------------------------##
   ## Central parameters.
   ##--------------------------------------------------------------------------##
   preferences <- reactiveValues(
-    overview_plot_point_size = list(
+    cell_point_size = list(
       min = 1,
       max = 20,
-      step = 1,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[['overview_default_point_size']]),
-        Cerebro.options[['overview_default_point_size']],
-        2
-      )
+      step = 1
     ),
-    gene_expression_plot_point_size = list(
-      min = 1,
-      max = 20,
-      step = 1,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[['gene_expression_default_point_size']]),
-        Cerebro.options[['gene_expression_default_point_size']],
-        2
-      )
-    ),
-    overview_plot_point_opacity = list(
+    cell_point_opacity = list(
       min = 0.1,
       max = 1.0,
-      step = 0.1,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[['overview_default_point_opacity']]),
-        Cerebro.options[['overview_default_point_opacity']],
-        1.0
-      )
+      step = 0.1
     ),
-    gene_expression_plot_point_opacity = list(
-      min = 0.1,
-      max = 1.0,
-      step = 0.1,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[['gene_expression_default_point_opacity']]),
-        Cerebro.options[['gene_expression_default_point_opacity']],
-        1.0
-      )
-    ),
-    overview_plot_percentage_cells_to_show = list(
+    cell_percentage_cells_to_show = list(
       min = 10,
       max = 100,
-      step = 10,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[[
-            'overview_default_percentage_cells_to_show'
-          ]]),
-        Cerebro.options[['overview_default_percentage_cells_to_show']],
-        100
-      )
-    ),
-    gene_expression_plot_percentage_cells_to_show = list(
-      min = 10,
-      max = 100,
-      step = 10,
-      default = ifelse(
-        exists('Cerebro.options') &&
-          !is.null(Cerebro.options[[
-            'gene_expression_default_percentage_cells_to_show'
-          ]]),
-        Cerebro.options[['gene_expression_default_percentage_cells_to_show']],
-        100
-      )
+      step = 10
     ),
     use_webgl = TRUE,
     show_hover_info_in_projections = ifelse(
@@ -136,6 +88,16 @@ server <- function(input, output, session) {
     selected = NULL,
     names = NULL
   )
+
+  current_scatter_defaults <- reactive({
+    viewerScatterDefaults(
+      Cerebro.options,
+      viewerDatasetName(
+        available_crb_files$files,
+        available_crb_files$selected
+      )
+    )
+  })
 
   ## listen to selected 'input_file', initialize before UI element is loaded
   observeEvent(input[['input_file']], ignoreNULL = FALSE, {
@@ -460,6 +422,13 @@ server <- function(input, output, session) {
   ## Tabs.
   ##--------------------------------------------------------------------------##
   source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/module/group_filters/group_filters_widget.R"
+    ),
+    local = TRUE
+  )
+  source(
     paste0(Cerebro.options[["cerebro_root"]], "/viewer/load_data/server.R"),
     local = TRUE
   )
@@ -677,15 +646,6 @@ server <- function(input, output, session) {
     file.remove(new_pngs)
   }
 
-  ##--------------------------------------------------------------------------##
-  ## Shared module: group-filters widget used by projection-style tabs.
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/module/group_filters/group_filters_widget.R"
-    ),
-    local = TRUE
-  )
   source(
     paste0(
       Cerebro.options[["cerebro_root"]],
@@ -718,6 +678,13 @@ server <- function(input, output, session) {
     paste0(
       Cerebro.options[["cerebro_root"]],
       "/viewer/trekker/server.R"
+    ),
+    local = TRUE
+  )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/coordinated_views/server.R"
     ),
     local = TRUE
   )

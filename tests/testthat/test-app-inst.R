@@ -7,7 +7,7 @@ if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
 }
 
 ## shinytest2's wait_for_idle() tracks server reactivity, NOT the async
-## client-side projection renderer (www/projection_scatter.js). After it returns,
+## client-side cell-view renderer (www/cell_views.js). After it returns,
 ## a projection output can still be mid-paint and a renderUI-created input can be
 ## unbound, so reading a value or setting such an input the instant wait_for_idle
 ## returns races the render and intermittently fails (a 500 on the value URL, a
@@ -118,6 +118,57 @@ test_that("{shinytest2} recording: overview", {
   app$stop()
 })
 
+test_that("Projection switches categorical spatial datasets coherently", {
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "projection_dataset_switch",
+    height = 950,
+    width = 1619
+  )
+  withr::defer(app$stop())
+  app$wait_for_idle(timeout = 30000)
+
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_merfish.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_idle(timeout = 30000)
+  activate_tab(app, "overview", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('overview_projection_point_color')?.value ",
+      "=== 'cell_type'"
+    ),
+    timeout = 30000
+  )
+
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('overview_projection_point_color')?.value ",
+      "=== 'cluster'"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 30000
+  )
+
+  expect_false(any(grepl(
+    "color_assignments are required for categorical cell views",
+    app$get_logs()$message,
+    fixed = TRUE
+  )))
+})
+
 test_that("Spatial backgrounds reset when the spatial dataset changes", {
   local_app_support(inst_dir)
   app <- AppDriver$new(
@@ -164,9 +215,68 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   )
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_background') && ",
-      "document.getElementById('spatial_projection_background').dataset.",
-      "backgroundImage.startsWith('data:image/')"
+      "document.querySelector(",
+      "'#spatial_projection_cell_view_host canvas:not(.cv-mini)')"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_scale').value ",
+      "=== '1.55' && ",
+      "document.getElementById('spatial_projection_background_scale_x').value ",
+      "=== '1.55' && ",
+      "document.getElementById('spatial_projection_background_scale_y').value ",
+      "=== '1.55'"
+    ),
+    timeout = 30000
+  )
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  app$wait_for_idle(timeout = 30000)
+  wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_to_display')?.",
+      "selectize?.options.fov_colour !== undefined"
+    ),
+    timeout = 30000
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Tissue background'"
+    ),
+    timeout = 30000
+  )
+  app$set_inputs(spatial_projection_to_display = "fov_colour", wait_ = FALSE)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Pink stain'"
+    ),
+    timeout = 30000
+  )
+  expect_identical(
+    unlist(
+      app$get_js(paste0(
+        "Object.keys(document.getElementById(",
+        "'spatial_projection_background_image').selectize.options)"
+      )),
+      use.names = FALSE
+    ),
+    c("none", "external::Pink stain", "external::Fluorescent yellow")
+  )
+  app$set_inputs(
+    spatial_projection_background_image = "external::Fluorescent yellow",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('spatial_projection_background_image').value === ",
+      "'external::Fluorescent yellow'"
     ),
     timeout = 30000
   )
@@ -204,12 +314,98 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   )
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_background') && ",
-      "document.getElementById('spatial_projection_background').dataset.",
-      "backgroundImage === ''"
+      "document.querySelector(",
+      "'#spatial_projection_cell_view_host canvas:not(.cv-mini)')"
     ),
     timeout = 30000
   )
+})
+
+test_that("Linked views resets the active background to its preset", {
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "linked_background_reset",
+    height = 950,
+    width = 1619
+  )
+  withr::defer(app$stop())
+  app$wait_for_idle(timeout = 20000)
+  app$set_inputs(
+    crb_file_selector = "extdata/examples/demo_spatial_xenium.crb",
+    wait_ = FALSE
+  )
+  activate_tab(app, "coordinated_views", timeout = 30000)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('cv-pick-spatial')?.selectize ",
+      "!== undefined"
+    ),
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "document.getElementById('cv-pick-spatial').selectize",
+    ".setValue(['fov', 'fov_colour']);"
+  ))
+  app$wait_for_js(
+    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]') !== null",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]')",
+    ".click();"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-rotate-number') !== null",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotateNumber = document.getElementById('cv-img-rotate-number');",
+    "rotateNumber.value = '83.79';",
+    "rotateNumber.dispatchEvent(new Event('input', { bubbles: true }));"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-rotate').value === '83.79'",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotate = document.getElementById('cv-img-rotate');",
+    "rotate.value = '42';",
+    "rotate.dispatchEvent(new Event('input', { bubbles: true }));"
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-img-rotate-number').value === '42'",
+    timeout = 30000
+  )
+  app$run_js(paste0(
+    "var rotateNumber = document.getElementById('cv-img-rotate-number');",
+    "rotateNumber.value = '83.79';",
+    "rotateNumber.dispatchEvent(new Event('input', { bubbles: true }));",
+    "var flipX = document.getElementById('cv-img-flipx');",
+    "flipX.checked = true;",
+    "flipX.dispatchEvent(new Event('change', { bubbles: true }));",
+    "var flipY = document.getElementById('cv-img-flipy');",
+    "flipY.checked = false;",
+    "flipY.dispatchEvent(new Event('change', { bubbles: true }));",
+    "document.getElementById('cv-img-reset').click();"
+  ))
+  Sys.sleep(0.5)
+  state <- app$get_js(paste0(
+    "({",
+    "rotation: document.getElementById('cv-img-rotate').value,",
+    "rotationNumber: document.getElementById('cv-img-rotate-number').value,",
+    "offsetX: document.getElementById('cv-img-offx').value,",
+    "offsetY: document.getElementById('cv-img-offy').value,",
+    "flipX: document.getElementById('cv-img-flipx').checked,",
+    "flipY: document.getElementById('cv-img-flipy').checked",
+    "})"
+  ))
+  expect_identical(state$rotation, "0")
+  expect_identical(state$rotationNumber, "0")
+  expect_identical(state$offsetX, "10")
+  expect_identical(state$offsetY, "0")
+  expect_false(state$flipX)
+  expect_true(state$flipY)
 })
 
 
@@ -221,9 +417,35 @@ test_that("{shinytest2} recording: main", {
   activate_tab(app, "overview")
   app$wait_for_idle(timeout = 10000)
 
-  ## verify the projection renders
-  plot_val <- retry_get_value(app, output = "overview_projection")
-  expect_false(is.null(plot_val))
+  ## verify the shared Canvas projection renders
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 20000
+  )
+  plot_size <- app$get_js(
+    paste0(
+      "(function(){var e=document.querySelector(",
+      "'#overview_projection_cell_view_host canvas:not(.cv-mini)');",
+      "return {w:e.clientWidth,h:e.clientHeight};})()"
+    )
+  )
+  expect_gte(as.numeric(plot_size$w), 300)
+  expect_gte(as.numeric(plot_size$h), 240)
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#overview_projection_point_size').value)"
+    )),
+    6
+  )
+  expect_identical(
+    as.numeric(app$get_js(
+      "Number(document.querySelector('#overview_projection_point_opacity').value)"
+    )),
+    1
+  )
 
   ## get unfiltered cell count
   cells_all <- retry_get_value(app, export = "overview_cells_to_show")
@@ -421,14 +643,134 @@ test_that("{shinytest2} recording: gene_expression", {
   expect_true(grepl("MS4A1", genes_text))
   expect_true(grepl("0 gene(s) are not in data set", genes_text, fixed = TRUE))
 
-  ## projection plot renders after gene selection
-  proj_val <- retry_get_value(app, output = "expression_projection")
-  expect_false(is.null(proj_val))
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_genes_in_separate_panels')",
+      "?.disabled === false && ",
+      "document.getElementById('expression_projection_gene_color_mode')",
+      " === null"
+    ),
+    timeout = 10000
+  )
+
+  app$set_inputs(
+    expression_genes_input = c("MS4A1", "CD3D"),
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_genes_in_separate_panels')",
+      "?.disabled === false"
+    ),
+    timeout = 10000
+  )
+  app$set_inputs(
+    expression_projection_genes_in_separate_panels = "separate",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('expression_projection_gene_color_mode')",
+      "?.disabled === false"
+    ),
+    timeout = 10000
+  )
+  enabled_style <- app$get_js(
+    paste0(
+      "(() => {const c=document.querySelector('.cerebro-gene-control');",
+      "const i=c?.querySelector('.selectize-input');",
+      "return c&&i?{disabled:c.classList.contains('is-disabled'),",
+      "animation:getComputedStyle(i).animationName}:null;})()"
+    )
+  )
+  expect_false(isTRUE(enabled_style$disabled))
+  expect_identical(enabled_style$animation, "cerebro-control-enter")
+  app$set_inputs(
+    expression_projection_gene_color_mode = "different",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    paste0(
+      "document.querySelectorAll(",
+      "'#expression_projection_cell_view_host ",
+      ".cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
+      ".length === 2"
+    ),
+    timeout = 20000
+  )
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const panes=Array.from(document.querySelectorAll(",
+      "'#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));",
+      "const note=document.getElementById('cv-cbar')?.textContent || '';",
+      "return panes.length===2 && ",
+      "panes.every(p => p.querySelector('.cv-panel-scale')) && ",
+      "panes.every(p => {const b=p.querySelector('.cv-focus-btn');",
+      "return b && Math.abs(p.getBoundingClientRect().right-",
+      "b.getBoundingClientRect().right)<=14;}) && ",
+      "note.includes('Shared expression range');",
+      "})()"
+    ),
+    timeout = 20000
+  )
+
+  app$set_inputs(expression_genes_input = "MS4A1", wait_ = FALSE)
+  app$wait_for_js(
+    paste0(
+      "(() => {",
+      "const display=document.getElementById(",
+      "'expression_projection_genes_in_separate_panels');",
+      "const colour=document.getElementById(",
+      "'expression_projection_gene_color_mode');",
+      "return !display?.disabled && display.value==='separate' && ",
+      "colour===null;",
+      "})()"
+    ),
+    timeout = 10000
+  )
+
+  ## shared Canvas projection renders after gene selection
+  app$wait_for_js(
+    paste0(
+      "document.querySelector(",
+      "'#expression_projection_cell_view_host canvas:not(.cv-mini)') !== null"
+    ),
+    timeout = 20000
+  )
+  proj_size <- app$get_js(
+    paste0(
+      "(function(){var e=document.querySelector(",
+      "'#expression_projection_cell_view_host canvas:not(.cv-mini)');",
+      "return {w:e.clientWidth,h:e.clientHeight};})()"
+    )
+  )
+  expect_gte(as.numeric(proj_size$w), 300)
+  expect_gte(as.numeric(proj_size$h), 240)
 
   ## verify expression levels have some non-zero values (cells with color)
   expr_levels <- retry_get_value(app, export = "expression_levels")
   expect_true(length(expr_levels) > 0)
-  expect_true(any(expr_levels > 0))
+  expect_true(any(unlist(expr_levels, use.names = FALSE) > 0))
+
+  app$set_inputs(
+    expression_projection_genes_in_separate_panels = "rgb",
+    wait_ = FALSE
+  )
+  app$wait_for_js(
+    "document.querySelectorAll('.cerebro-gene-rgb-channel').length === 3",
+    timeout = 10000
+  )
+  rgb_animations <- app$get_js(
+    paste0(
+      "Array.from(document.querySelectorAll('.cerebro-gene-rgb-channel'))",
+      ".map(e=>getComputedStyle(e).animationName)"
+    )
+  )
+  expect_identical(
+    unname(unlist(rgb_animations)),
+    rep("cerebro-control-enter", 3)
+  )
 
   app$stop()
 })

@@ -162,7 +162,7 @@ ir_tab_help <- list(
       "• Receptor: choose TCR or BCR (only the types present in your data are offered).",
       "• Projection: which dimensional reduction to plot on.",
       "• Clone call: how clonotype identity is defined (gene/nt/aa/strict).",
-      "• Display options: point size and opacity (and font/title) for the scatter.",
+      "• Display options: point size and opacity for the scatter.",
       "",
       "What to look for: expanded (orange/gold) cells clustering in a region suggest a localized clonal response — e.g. an activated/effector population.",
       sep = "\n"
@@ -293,7 +293,7 @@ ir_tab_help <- list(
       "T and B cell receptors are assembled by randomly joining gene segments called V (Variable), D (Diversity), and J (Joining).",
       "There are ~50+ V segments and ~10+ J segments in the genome, but not all are used equally.",
       "",
-      "This heatmap shows how frequently each V gene segment is used across your samples. Rows = gene segments, columns = samples. Darker color = more usage.",
+      "This heatmap shows how frequently each V gene segment is used across your samples. Rows = gene segments, columns = samples. Darker colour = more usage.",
       "",
       "What to look for:",
       "\u2022 Some V genes are naturally used more often than others due to accessibility in the genome.",
@@ -347,7 +347,7 @@ ir_tab_help <- list(
       "What to look for:",
       "\u2022 Bright spots in one panel but not others = condition-specific V-J preferences.",
       "\u2022 A diagonal pattern suggests V and J usage are correlated.",
-      "\u2022 Broadly distributed color means diverse V-J usage with no strong preference.",
+      "\u2022 Broadly distributed colour means diverse V-J usage with no strong preference.",
       sep = "\n"
     )
   ),
@@ -424,7 +424,7 @@ ir_tab_help <- list(
     summary = "Alluvial diagram tracking top clonotypes across samples. Shared ribbons represent public or persistent clones.",
     detail = paste(
       "This alluvial (flow) diagram tracks the top clonotypes across your selected samples.",
-      "Each colored ribbon represents a clonotype, and its height represents its proportion.",
+      "Each coloured ribbon represents a clonotype, and its height represents its proportion.",
       "",
       "What to look for:",
       "\u2022 Ribbons that flow across multiple samples = 'public' or shared clonotypes, present in both samples.",

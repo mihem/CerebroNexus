@@ -84,20 +84,6 @@ embedded_spatial_images <- function(spatial_data) {
   list()
 }
 
-resolve_spatial_image_setting <- function(
-  options,
-  dataset,
-  spatial_name,
-  image_label,
-  setting,
-  fallback
-) {
-  value <- options[["spatial_image_settings"]][[dataset]][[spatial_name]][[
-    image_label
-  ]][[setting]]
-  if (is.null(value) || length(value) != 1L || is.na(value)) fallback else value
-}
-
 spatial_background_key <- function(source, label) {
   paste0(source, "::", label)
 }
@@ -204,7 +190,8 @@ format_spatial_preset_code <- function(
   scale_y,
   flip_x,
   flip_y,
-  rotation
+  rotation,
+  image_opacity = 0.6
 ) {
   targets <- list(dataset, spatial_name, image_label)
   if (
@@ -250,6 +237,9 @@ format_spatial_preset_code <- function(
     ",\n",
     "        rotation = ",
     format(rotation, scientific = FALSE),
+    ",\n",
+    "        image_opacity = ",
+    format(image_opacity, scientific = FALSE),
     "\n",
     "      )\n",
     "    )\n",

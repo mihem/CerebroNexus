@@ -5,90 +5,45 @@
 ## selected background image. This preserves users' point-size, opacity and
 ## sampling choices while moving among backgrounds.
 output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
-  ## Start from a dynamic default sized to the spot count + canvas, falling back
-  ## to the fixed default if that can't be computed. A dataset-specific preset
-  ## (below) still takes precedence over this when one is configured.
-  default_point_size <- tryCatch(
-    dynamicPointSize(
-      n_points = tryCatch(
-        nrow(
-          getSpatialData(input[["spatial_projection_to_display"]])$coordinates
-        ),
-        error = function(e) nrow(getMetaData())
-      ),
-      plot_width_px = session$clientData[["output_spatial_projection_width"]],
-      plot_height_px = session$clientData[["output_spatial_projection_height"]],
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      fallback = preferences[["gene_expression_plot_point_size"]][["default"]]
-    ),
-    error = function(e) {
-      preferences[["gene_expression_plot_point_size"]][["default"]]
-    }
-  )
-
-  if (
-    exists("Cerebro.options") &&
-      !is.null(Cerebro.options[["point_size"]]) &&
-      is.list(Cerebro.options[["point_size"]]) &&
-      !is.null(Cerebro.options[["point_size"]][[
-        "spatial_projection_point_size"
-      ]])
-  ) {
-    config_val <- Cerebro.options[["point_size"]][[
-      "spatial_projection_point_size"
-    ]]
-
-    if (is.list(config_val)) {
-      if (
-        !is.null(available_crb_files$names) &&
-          !is.null(available_crb_files$files) &&
-          !is.null(available_crb_files$selected)
-      ) {
-        idx <- which(available_crb_files$files == available_crb_files$selected)
-        if (length(idx) > 0) {
-          current_name <- available_crb_files$names[idx[1]]
-          if (current_name %in% names(config_val)) {
-            default_point_size <- config_val[[current_name]]
-          }
-        }
-      }
-    } else if (is.numeric(config_val)) {
-      default_point_size <- config_val
-    }
-  }
+  appearance <- current_scatter_defaults()
 
   tagList(
     sliderInput(
       "spatial_projection_point_size",
       label = "Point size",
-      min = preferences[["gene_expression_plot_point_size"]][["min"]],
-      max = preferences[["gene_expression_plot_point_size"]][["max"]],
-      step = preferences[["gene_expression_plot_point_size"]][["step"]],
-      value = default_point_size
+      min = preferences[["cell_point_size"]][["min"]],
+      max = preferences[["cell_point_size"]][["max"]],
+      step = preferences[["cell_point_size"]][["step"]],
+      value = appearance$point_size
     ),
     sliderInput(
       "spatial_projection_point_opacity",
       label = "Point opacity",
-      min = preferences[["gene_expression_plot_point_opacity"]][["min"]],
-      max = preferences[["gene_expression_plot_point_opacity"]][["max"]],
-      step = preferences[["gene_expression_plot_point_opacity"]][["step"]],
-      value = 1
-    ),
+      min = preferences[["cell_point_opacity"]][["min"]],
+      max = preferences[["cell_point_opacity"]][["max"]],
+      step = preferences[["cell_point_opacity"]][["step"]],
+      value = appearance$point_opacity
+    )
+  )
+})
+
+output[["spatial_projection_data_parameters_UI"]] <- renderUI({
+  appearance <- current_scatter_defaults()
+
+  tagList(
     sliderInput(
       "spatial_projection_percentage_cells_to_show",
       label = "Show % of cells",
-      min = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      min = preferences[["cell_percentage_cells_to_show"]][[
         "min"
       ]],
-      max = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      max = preferences[["cell_percentage_cells_to_show"]][[
         "max"
       ]],
-      step = preferences[["gene_expression_plot_percentage_cells_to_show"]][[
+      step = preferences[["cell_percentage_cells_to_show"]][[
         "step"
       ]],
-      value = 100
+      value = appearance$percentage_cells_to_show
     )
   )
 })
@@ -153,19 +108,12 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   } else {
     selected_descriptor$label
   }
-  preset_default <- function(setting, fallback) {
-    if (is.null(image_label)) {
-      return(fallback)
-    }
-    resolve_spatial_image_setting(
-      if (exists("Cerebro.options")) Cerebro.options else NULL,
-      dataset,
-      spatial_name,
-      image_label,
-      setting,
-      fallback
-    )
-  }
+  preset <- spatialImagePreset(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    dataset,
+    spatial_name,
+    image_label
+  )
   ## Seed MOVE and FLIP from the preset so the controls honestly reflect the
   ## shipped alignment (checkbox ticked, sliders positioned). Both are read by
   ## the JS as single-source interaction state (dataset.offsetX / dataset.flipY),
@@ -178,16 +126,59 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   ## sees one slider (locked, X drives both) or two (unlocked). Initial lock state
   ## follows the preset: equal x/y -> locked single slider; unequal -> unlocked
   ## with both shown.
-  offset_x_default <- preset_default("offset_x", 0)
-  offset_y_default <- preset_default("offset_y", 0)
-  flip_x_default <- isTRUE(preset_default("flip_x", FALSE))
-  flip_y_default <- isTRUE(preset_default("flip_y", FALSE))
-  scale_x_default <- preset_default("scale_x", 1)
-  scale_y_default <- preset_default("scale_y", 1)
-  rotation_default <- preset_default("rotation", 0)
+  offset_x_default <- preset$offsetX
+  offset_y_default <- preset$offsetY
+  flip_x_default <- preset$flipX
+  flip_y_default <- preset$flipY
+  scale_x_default <- preset$scaleX
+  scale_y_default <- preset$scaleY
+  rotation_default <- preset$rotation
   aspect_locked_default <- isTRUE(
     all.equal(scale_x_default, scale_y_default) == TRUE
   )
+  slider_number_input <- function(
+    id,
+    label,
+    min,
+    max,
+    value,
+    step,
+    full = FALSE
+  ) {
+    tags$div(
+      class = paste(
+        c(if (full) "cerebro-settings-full", "spatial-image-offset-field"),
+        collapse = " "
+      ),
+      tags$label(`for` = id, class = "control-label", label),
+      tags$div(
+        class = "spatial-image-offset-row",
+        tags$div(
+          class = "spatial-image-offset-slider",
+          sliderInput(
+            id,
+            label = NULL,
+            min = min,
+            max = max,
+            value = value,
+            step = step
+          )
+        ),
+        tags$div(
+          class = "spatial-image-offset-number",
+          numericInput(
+            paste0(id, "_num"),
+            label = NULL,
+            value = value,
+            min = min,
+            max = max,
+            step = step,
+            width = "100%"
+          )
+        )
+      )
+    )
+  }
 
   tagList(
     ## Background-image adjustments. Shown only when an image is selected. Every
@@ -198,151 +189,123 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
         "input.spatial_projection_background_image && ",
         "input.spatial_projection_background_image !== 'none'"
       ),
-      tags$hr(style = "margin: 16px 0 10px; border-top: 2px solid #ccc;"),
-      tags$div(
-        style = paste0(
-          "font-size: 15px; font-weight: 700; margin-bottom: 8px; ",
-          "text-transform: uppercase; letter-spacing: 0.04em; color: #337ab7;"
-        ),
-        "Background image"
-      ),
-      sliderInput(
+      slider_number_input(
         "spatial_projection_background_opacity",
-        label = "Image opacity",
-        min = 0,
-        max = 1,
-        value = 0.6,
-        step = 0.05
+        "Opacity",
+        0,
+        1,
+        preset$opacity,
+        0.05,
+        full = TRUE
       ),
-      ## Move: slider for coarse dragging + numeric box for exact keyboard entry
-      ## and unit-level nudging. The slider (`..._offset_x`) stays the AUTHORITATIVE
-      ## input the appearance observer reads; the numeric box (`..._offset_x_num`)
-      ## is a two-way mirror synced by an observer in obj_projection_parameters_plot.R.
-      tags$label(
-        `for` = "spatial_projection_background_offset_x",
-        class = "control-label",
-        "Move horizontally"
+      ## The slider remains authoritative; the number box mirrors it for exact
+      ## keyboard entry. These stay in the existing Background image card rather
+      ## than introducing Position / Transform cards inside it.
+      slider_number_input(
+        "spatial_projection_background_offset_x",
+        "Horizontal",
+        -offset_limit,
+        offset_limit,
+        offset_x_default,
+        offset_step,
+        full = TRUE
       ),
-      tags$div(
-        style = "display: flex; gap: 8px; align-items: center;",
-        tags$div(
-          style = "flex: 1 1 auto;",
-          sliderInput(
-            "spatial_projection_background_offset_x",
-            label = NULL,
-            min = -offset_limit,
-            max = offset_limit,
-            value = offset_x_default,
-            step = offset_step
-          )
-        ),
-        tags$div(
-          style = "flex: 0 0 90px;",
-          numericInput(
-            "spatial_projection_background_offset_x_num",
-            label = NULL,
-            value = offset_x_default,
-            step = offset_step
-          )
-        )
-      ),
-      tags$label(
-        `for` = "spatial_projection_background_offset_y",
-        class = "control-label",
-        "Move vertically"
+      slider_number_input(
+        "spatial_projection_background_offset_y",
+        "Vertical",
+        -offset_limit,
+        offset_limit,
+        offset_y_default,
+        offset_step,
+        full = TRUE
       ),
       tags$div(
-        style = "display: flex; gap: 8px; align-items: center;",
-        tags$div(
-          style = "flex: 1 1 auto;",
-          sliderInput(
-            "spatial_projection_background_offset_y",
-            label = NULL,
-            min = -offset_limit,
-            max = offset_limit,
-            value = offset_y_default,
-            step = offset_step
-          )
-        ),
-        tags$div(
-          style = "flex: 0 0 90px;",
-          numericInput(
-            "spatial_projection_background_offset_y_num",
-            label = NULL,
-            value = offset_y_default,
-            step = offset_step
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "input.spatial_projection_background_scale_lock",
+          slider_number_input(
+            "spatial_projection_background_scale",
+            "Scale",
+            0.2,
+            3,
+            scale_x_default,
+            0.05
           )
         )
       ),
-      checkboxInput(
-        "spatial_projection_background_scale_lock",
-        label = "Lock aspect ratio",
-        value = aspect_locked_default
-      ),
-      ## Locked: one slider drives both axes (X mirrors to Y in the observer).
-      conditionalPanel(
-        condition = "input.spatial_projection_background_scale_lock",
-        sliderInput(
-          "spatial_projection_background_scale",
-          label = "Scale (about centre)",
-          min = 0.2,
-          max = 3,
-          value = scale_x_default,
-          step = 0.05
+      tags$div(
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "!input.spatial_projection_background_scale_lock",
+          slider_number_input(
+            "spatial_projection_background_scale_x",
+            "Scale X",
+            0.2,
+            3,
+            scale_x_default,
+            0.05
+          )
         )
       ),
-      ## Unlocked: independent X / Y scale.
-      conditionalPanel(
-        condition = "!input.spatial_projection_background_scale_lock",
-        sliderInput(
-          "spatial_projection_background_scale_x",
-          label = "Scale X (about centre)",
-          min = 0.2,
-          max = 3,
-          value = scale_x_default,
-          step = 0.05
-        ),
-        sliderInput(
-          "spatial_projection_background_scale_y",
-          label = "Scale Y (about centre)",
-          min = 0.2,
-          max = 3,
-          value = scale_y_default,
-          step = 0.05
+      tags$div(
+        class = "cerebro-settings-full",
+        conditionalPanel(
+          condition = "!input.spatial_projection_background_scale_lock",
+          slider_number_input(
+            "spatial_projection_background_scale_y",
+            "Scale Y",
+            0.2,
+            3,
+            scale_y_default,
+            0.05
+          )
         )
       ),
-      sliderInput(
+      slider_number_input(
         "spatial_projection_background_rotate",
-        label = "Rotate (about centre)",
-        min = -180,
-        max = 180,
-        value = rotation_default,
-        step = 1
+        "Rotation",
+        -180,
+        180,
+        rotation_default,
+        1,
+        full = TRUE
       ),
-      checkboxInput(
-        "spatial_projection_background_flip_x",
-        label = "Flip horizontally",
-        value = flip_x_default
+      tags$div(
+        class = "cerebro-settings-full",
+        tags$div(
+          class = "cerebro-settings-content spatial-image-checks",
+          checkboxInput(
+            "spatial_projection_background_scale_lock",
+            label = "Lock aspect ratio",
+            value = aspect_locked_default
+          ),
+          checkboxInput(
+            "spatial_projection_background_flip_x",
+            label = "Flip horizontally",
+            value = flip_x_default
+          ),
+          checkboxInput(
+            "spatial_projection_background_flip_y",
+            label = "Flip vertically",
+            value = flip_y_default
+          )
+        )
       ),
-      checkboxInput(
-        "spatial_projection_background_flip_y",
-        label = "Flip vertically",
-        value = flip_y_default
-      ),
-      actionButton(
-        "spatial_projection_background_reset",
-        label = "Reset image",
-        icon = icon("undo"),
-        width = "100%"
-      ),
-      ## Turn the current hand-tuned alignment into pasteable Cerebro.options
-      ## preset code, so an app can ship this dataset pre-aligned instead of the
-      ## user re-nudging it every session. Output appears in the box below.
-      actionButton(
-        "spatial_projection_background_copy_preset",
-        label = "Copy alignment as preset",
-        icon = icon("clipboard"),
-        width = "100%"
+      tags$div(
+        class = "spatial-image-actions",
+        actionButton(
+          "spatial_projection_background_reset",
+          label = "Reset image",
+          icon = icon("undo"),
+          width = "100%"
+        ),
+        ## Turn the hand-tuned alignment into pasteable Cerebro.options code.
+        actionButton(
+          "spatial_projection_background_copy_preset",
+          label = "Copy alignment as preset",
+          icon = icon("clipboard"),
+          width = "100%"
+        )
       ),
       conditionalPanel(
         condition = "output.spatial_projection_background_preset_code_present",
@@ -363,10 +326,15 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
 })
 
 
-## make sure elements are loaded even though the box is collapsed
+## Keep controls available while the settings drawer is hidden.
 outputOptions(
   output,
   "spatial_projection_scatter_parameters_UI",
+  suspendWhenHidden = FALSE
+)
+outputOptions(
+  output,
+  "spatial_projection_data_parameters_UI",
   suspendWhenHidden = FALSE
 )
 outputOptions(
@@ -393,7 +361,6 @@ observeEvent(input[["spatial_projection_additional_parameters_info"]], {
 ##----------------------------------------------------------------------------##
 ## Text in info box.
 ##----------------------------------------------------------------------------##
-# <li><b>Range of X/Y axis (located in dropdown menu above the projection):</b> Set the X/Y axis limits. This is useful when you want to change the aspect ratio of the plot.</li>
 spatial_projection_additional_parameters_info <- list(
   title = "Additional parameters for projection",
   text = HTML(

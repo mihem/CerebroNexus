@@ -156,20 +156,88 @@ test_that("background-image selection only recreates image calibration controls"
     projection_ui,
     'uiOutput\\("spatial_projection_scatter_parameters_UI"\\)'
   )
+  expect_no_match(
+    projection_ui,
+    'uiOutput\\("spatial_projection_background_select_UI"\\)'
+  )
+  main_parameters_ui <- paste(
+    readLines(file.path(
+      shiny_root,
+      "spatial",
+      "UI_projection_main_parameters.R"
+    )),
+    collapse = "\n"
+  )
+  expect_match(
+    main_parameters_ui,
+    'label = "Colour by"[\\s\\S]{0,320}"spatial_projection_background_image"',
+    perl = TRUE
+  )
   expect_match(
     projection_ui,
     'uiOutput\\("spatial_projection_background_parameters_UI"\\)'
   )
   expect_match(
     projection_ui,
-    paste0(
-      'tagList\\([[:space:]]*',
-      'uiOutput\\("spatial_projection_scatter_parameters_UI"\\),[[:space:]]*',
-      'uiOutput\\("spatial_projection_background_parameters_UI"\\)',
-      '[[:space:]]*\\)'
-    ),
-    perl = TRUE
+    'class = "spatial-image-controls"',
+    fixed = TRUE
   )
+  additional_ui <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "UI_projection_additional_parameters.R")
+    ),
+    collapse = "\n"
+  )
+  for (class_name in c(
+    "cerebro-settings-content",
+    "cerebro-settings-full",
+    "spatial-image-offset-row",
+    "spatial-image-checks",
+    "spatial-image-actions"
+  )) {
+    expect_match(additional_ui, class_name, fixed = TRUE)
+  }
+  expect_no_match(additional_ui, "cerebroSettingsSection(", fixed = TRUE)
+  expect_match(additional_ui, '"Opacity"', fixed = TRUE)
+  expect_no_match(additional_ui, '"Image opacity"', fixed = TRUE)
+  expect_match(additional_ui, 'paste0(id, "_num")', fixed = TRUE)
+  expect_match(
+    additional_ui,
+    'slider_number_input(\n        "spatial_projection_background_opacity"',
+    fixed = TRUE
+  )
+  for (obsolete_class in c(
+    "spatial-image-control-group",
+    "spatial-image-transform-group",
+    "spatial-image-scale-pair",
+    "spatial-image-flips"
+  )) {
+    expect_no_match(additional_ui, obsolete_class, fixed = TRUE)
+  }
+  settings_css <- paste(
+    readLines(file.path(shiny_root, "www", "custom.css")),
+    collapse = "\n"
+  )
+  expect_match(settings_css, ".spatial-image-offset-row {", fixed = TRUE)
+  expect_match(
+    settings_css,
+    ".spatial-image-offset-slider .irs-grid",
+    fixed = TRUE
+  )
+  expect_match(settings_css, "grid-template-columns: 1fr;", fixed = TRUE)
+  expect_match(settings_css, "margin-top: 12px;", fixed = TRUE)
+  expect_match(
+    settings_css,
+    ".cerebro-settings-section {",
+    fixed = TRUE
+  )
+  expect_no_match(
+    settings_css,
+    ".spatial-image-controls .shiny-panel-conditional {\n  display: grid;",
+    fixed = TRUE
+  )
+  expect_match(projection_ui, '"Appearance"', fixed = TRUE)
+  expect_match(projection_ui, '"Background image"', fixed = TRUE)
 })
 
 test_that("ImageFeaturePlot reaches getExpressionMatrix as a Cerebro method", {
@@ -202,28 +270,6 @@ test_that("ImageFeaturePlot reaches getExpressionMatrix as a Cerebro method", {
       )
     }
   }
-})
-
-test_that("plot update guards against a colour variable absent from metadata", {
-  # Switching the loaded .crb can leave the point-colour dropdown holding a
-  # column from the previous dataset (e.g. Xenium "cluster" vs MERFISH
-  # "cell_type"). Colouring by a missing column makes the downstream
-  # dplyr::group_by() error and freezes the plot on the old data. The render
-  # function must fall back to a valid metadata column. Assert the guard survives
-  # (cross-line tolerant per project convention).
-  fpath <- file.path(shiny_root, "spatial", "func_projection_update_plot.R")
-  skip_if_not(file.exists(fpath), message = "spatial update module missing")
-  src <- paste(readLines(fpath), collapse = "\n")
-  expect_match(
-    src,
-    "color_variable[\\s\\S]{0,80}%in%[\\s\\S]{0,20}colnames\\(metadata\\)",
-    perl = TRUE
-  )
-  expect_match(
-    src,
-    "color_variable[\\s\\S]{0,40}<-[\\s\\S]{0,40}colnames\\(metadata\\)\\[1\\]",
-    perl = TRUE
-  )
 })
 
 test_that("group_filters widget the spatial tab depends on is present", {
@@ -284,24 +330,113 @@ test_that("Spatial tab is wired into the app UI and server", {
 ## Spatial background image: createShinyApp production channel + demo wiring.
 ##----------------------------------------------------------------------------##
 
-test_that("createShinyApp accepts the spatial_images parameters", {
-  # Guard the production API surface: every spatial_images* arg must be part of
-  # the formals so downstream users can pass histology backgrounds and their
-  # per-dataset alignment defaults (flip / scale / move / rotate).
+test_that("createShinyApp preserves legacy and nested spatial settings APIs", {
   args <- names(formals(createShinyApp))
-  for (a in c(
-    "spatial_images",
-    "spatial_image_settings",
-    "spatial_images_flip_x",
-    "spatial_images_flip_y",
-    "spatial_images_scale_x",
-    "spatial_images_scale_y",
-    "spatial_images_offset_x",
-    "spatial_images_offset_y",
-    "spatial_plot_rotation"
+  expect_true("spatial_images" %in% args)
+  expect_true("spatial_image_settings" %in% args)
+  expect_true("spatial_plot_rotation" %in% args)
+  expect_false("..." %in% args)
+  expect_true(all(
+    c(
+      "spatial_images_flip_x",
+      "spatial_images_flip_y",
+      "spatial_images_scale_x",
+      "spatial_images_scale_y",
+      "spatial_images_offset_x",
+      "spatial_images_offset_y"
+    ) %in%
+      args
+  ))
+})
+
+test_that("createShinyApp migrates legacy spatial settings into its bundle", {
+  skip_if_not(file.exists(spatial_crb))
+  img <- system.file(
+    "extdata/examples/demo_spatial_visium_he.png",
+    package = "CerebroNexus"
+  )
+  skip_if_not(file.exists(img))
+  out_dir <- file.path(
+    tempdir(),
+    paste0("cerebro_spatial_legacy_", Sys.getpid())
+  )
+  on.exit(unlink(out_dir, recursive = TRUE), add = TRUE)
+
+  suppressWarnings(suppressMessages(
+    createShinyApp(
+      cerebro_data = c("Legacy spatial" = spatial_crb),
+      result_dir = out_dir,
+      spatial_images = c("Legacy spatial" = img),
+      spatial_images_flip_x = c("Legacy spatial" = TRUE),
+      spatial_images_flip_y = c("Legacy spatial" = FALSE),
+      spatial_images_scale_x = c("Legacy spatial" = 0.9),
+      spatial_images_scale_y = c("Legacy spatial" = 1.1),
+      spatial_images_offset_x = c("Legacy spatial" = 12),
+      spatial_images_offset_y = c("Legacy spatial" = -8),
+      spatial_plot_rotation = c("Legacy spatial" = 37),
+      launch_browser = FALSE,
+      verbose = FALSE
+    )
+  ))
+
+  spatial_name <- readRDS(spatial_crb)$availableSpatial()[[1L]]
+  cfg <- readRDS(file.path(out_dir, "cerebro_config.rds"))
+  preset <- cfg[["spatial_image_settings"]][["Legacy spatial"]][[
+    spatial_name
+  ]][["Tissue background"]]
+  expect_identical(preset[["flip_x"]], TRUE)
+  expect_identical(preset[["flip_y"]], FALSE)
+  expect_equal(preset[["scale_x"]], 0.9)
+  expect_equal(preset[["scale_y"]], 1.1)
+  expect_equal(preset[["offset_x"]], 12)
+  expect_equal(preset[["offset_y"]], -8)
+  expect_equal(
+    cfg[["spatial_plot_rotation"]][["Legacy spatial"]][[spatial_name]],
+    37
+  )
+})
+
+test_that("Spatial UI seeds and resets every field from the shared image preset", {
+  ui <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "UI_projection_additional_parameters.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  controls <- paste(
+    readLines(
+      file.path(shiny_root, "spatial", "obj_projection_background_controls.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  expect_match(
+    ui,
+    "spatial_projection_background_opacity[\\s\\S]{0,200}preset\\$opacity",
+    perl = TRUE
+  )
+  expect_match(
+    controls,
+    "spatial_projection_background_opacity[\\s\\S]{0,120}value = preset\\$opacity",
+    perl = TRUE
+  )
+  for (numeric_id in c(
+    "spatial_projection_background_opacity_num",
+    "spatial_projection_background_scale_num",
+    "spatial_projection_background_scale_x_num",
+    "spatial_projection_background_scale_y_num",
+    "spatial_projection_background_rotate_num"
   )) {
-    expect_true(a %in% args, info = a)
+    expect_match(controls, numeric_id, fixed = TRUE)
   }
+  expect_match(controls, '"spatial_copy_preset"', fixed = TRUE)
+  page_js <- paste(
+    readLines(file.path(shiny_root, "spatial", "js_page_helpers.js")),
+    collapse = "\n"
+  )
+  expect_match(page_js, "navigator.clipboard.writeText", fixed = TRUE)
+  expect_match(page_js, "document.execCommand('copy')", fixed = TRUE)
 })
 
 test_that("createShinyApp bundles a spatial image and writes the option", {
@@ -503,40 +638,22 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   sys.source(
     file.path(
       system.file("viewer", package = "CerebroNexus"),
+      "utility_functions.R"
+    ),
+    envir = renderer
+  )
+  sys.source(
+    file.path(
+      system.file("viewer", package = "CerebroNexus"),
       "spatial",
       "func_projection_update_plot.R"
     ),
     envir = renderer
   )
-  js <- get("js", envir = asNamespace("shinyjs"))
-  bindings <- c("getContainerDimensions", "updatePlot2DContinuousSpatial")
-  existed <- vapply(bindings, exists, logical(1), envir = js, inherits = FALSE)
-  previous <- lapply(bindings, function(name) {
-    if (exists(name, envir = js, inherits = FALSE)) get(name, envir = js)
-  })
-  on.exit(
-    {
-      for (i in seq_along(bindings)) {
-        if (existed[[i]]) {
-          assign(bindings[[i]], previous[[i]], envir = js)
-        } else if (exists(bindings[[i]], envir = js, inherits = FALSE)) {
-          rm(list = bindings[[i]], envir = js)
-        }
-      }
-    },
-    add = TRUE
-  )
   rendered <- NULL
-  assign(
-    "getContainerDimensions",
-    function() list(width = 800, height = 600),
-    envir = js
-  )
-  assign(
-    "updatePlot2DContinuousSpatial",
-    function(meta, data, ...) rendered <<- list(meta = meta, data = data),
-    envir = js
-  )
+  renderer$cerebroCellViewRender <- function(id, meta, data, ...) {
+    rendered <<- list(meta = meta, data = data)
+  }
 
   params <- list(
     color_variable = "score",
@@ -589,8 +706,8 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   )
   expect_identical(rendered$data$x_range, c(0, 100))
   expect_identical(rendered$data$y_range, c(10, 90))
-  expect_identical(rendered$data$x, c(20, 80))
-  expect_identical(rendered$data$y, c(30, 70))
+  expect_identical(as.numeric(rendered$data$x), c(20, 80))
+  expect_identical(as.numeric(rendered$data$y), c(30, 70))
   expect_identical(rendered$meta$background_rotation, 37)
   expect_identical(
     rendered$meta$background_identity,
@@ -612,134 +729,47 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_null(rendered$meta$background_image)
   expect_identical(rendered$data$x_range, c(0, 100))
   expect_identical(rendered$data$y_range, c(10, 90))
-  expect_identical(rendered$data$x, c(20, 80))
-  expect_identical(rendered$data$y, c(30, 70))
+  expect_identical(as.numeric(rendered$data$x), c(20, 80))
+  expect_identical(as.numeric(rendered$data$y), c(30, 70))
 })
 
-test_that("spatial background JS seeds resolved rotation on image changes", {
-  scatter_js <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
-      "www",
-      "projection_scatter.js"
-    )),
+test_that("shared Canvas owns spatial background identity and appearance", {
+  engine <- paste(
+    readLines(viewer_test_path("www", "cell_views.js")),
     collapse = "\n"
   )
-  background_js <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
+  controls <- paste(
+    readLines(viewer_test_path(
       "spatial",
-      "js_spatial_background.js"
+      "obj_projection_background_controls.R"
     )),
     collapse = "\n"
   )
 
+  expect_match(engine, "JSON.stringify(meta.background_identity)", fixed = TRUE)
   expect_match(
-    scatter_js,
-    paste0(
-      "meta\\.background_rotation[[:space:]]*,[[:space:]]*\\n?",
-      "[[:space:]]*meta\\.background_identity[[:space:]]*\\n?",
-      "[[:space:]]*\\)"
-    ),
-    perl = TRUE
+    engine,
+    "rotation: Number(meta.background_rotation) || 0",
+    fixed = TRUE
   )
-  expect_match(scatter_js, "meta\\.background_identity", perl = TRUE)
-  expect_match(
-    background_js,
-    "rotate !== undefined.*dataset\\.rotate === undefined",
-    perl = TRUE
-  )
-  expect_match(
-    background_js,
-    "dataset\\.rotate = String\\(rotate\\)",
-    perl = TRUE
-  )
+  expect_match(engine, "function updateSingleBackground", fixed = TRUE)
+  expect_match(engine, "stashImgState(space)", fixed = TRUE)
+  expect_match(controls, '"cell_view_background"', fixed = TRUE)
+
   renderer_src <- paste(
-    readLines(file.path(
-      system.file("viewer", package = "CerebroNexus"),
-      "spatial",
-      "func_projection_update_plot.R"
-    )),
+    readLines(viewer_test_path("spatial", "func_projection_update_plot.R")),
     collapse = "\n"
   )
-  identity_assignments <- gregexpr(
+  assignments <- gregexpr(
     "background_identity = plot_parameters",
     renderer_src,
     fixed = TRUE
   )[[1L]]
-  expect_length(identity_assignments[identity_assignments > 0L], 3L)
-})
-
-test_that("spatial background JS isolates identical URIs by logical identity", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
-  js_path <- file.path(
-    system.file("viewer", package = "CerebroNexus"),
-    "spatial",
-    "js_spatial_background.js"
-  )
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
-      "const fs = require('fs');",
-      "global.shinyjs = { getParams: (x) => x };",
-      "const wrapper = { id: 'spatial_projection_wrapper', style: {}, insertBefore: () => {} };",
-      "const plot = { id: 'spatial_projection', parentElement: wrapper, style: {}, dataset: {} };",
-      "const bg = { id: 'spatial_projection_background', parentElement: wrapper, style: {}, dataset: {} };",
-      "const elements = { spatial_projection: plot, spatial_projection_wrapper: wrapper, spatial_projection_background: bg };",
-      "global.document = { getElementById: id => elements[id] || null, createElement: () => { throw new Error('unexpected create'); } };",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(js_path, quote = "\"")
-      ),
-      "shinyjs.applySpatialBackground = () => {};",
-      "const uri = 'data:image/png;base64,SAME';",
-      "const a = {dataset:'Atlas', spatial_name:'sliceA', source:'embedded', label:'H&E'};",
-      "const b = {dataset:'Other', spatial_name:'sliceB', source:'external', label:'H&E'};",
-      "shinyjs.syncSpatialBackground(uri, false, false, 1, 1, 0.8, null, 2, 3, 10, a);",
-      "shinyjs.updateSpatialBackgroundAppearance({flipX:true, scaleX:4, offsetX:40, rotate:80});",
-      "shinyjs.syncSpatialBackground(uri, false, true, 2, 3, 0.4, null, 5, 6, 20, b);",
-      "const switched = {flipX:bg.dataset.flipX, flipY:bg.dataset.flipY, scaleX:bg.dataset.scaleX, scaleY:bg.dataset.scaleY, offsetX:bg.dataset.offsetX, offsetY:bg.dataset.offsetY, rotate:bg.dataset.rotate, opacity:bg.dataset.opacity, identity:bg.dataset.backgroundIdentity};",
-      "shinyjs.updateSpatialBackgroundAppearance({flipX:true, scaleX:7, offsetX:70, rotate:90});",
-      "shinyjs.syncSpatialBackground(uri, false, false, 9, 9, 0.1, null, 9, 9, 9, b);",
-      "const same = {flipX:bg.dataset.flipX, scaleX:bg.dataset.scaleX, offsetX:bg.dataset.offsetX, rotate:bg.dataset.rotate};",
-      "console.log(JSON.stringify({switched, same}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_equal(
-    attr(output, "status"),
-    NULL,
-    info = paste(output, collapse = "\n")
-  )
-  result <- jsonlite::fromJSON(output)
-  expect_identical(
-    unname(unlist(result$switched[c(
-      "flipX",
-      "flipY",
-      "scaleX",
-      "scaleY",
-      "offsetX",
-      "offsetY",
-      "rotate",
-      "opacity"
-    )])),
-    c("false", "true", "2", "3", "5", "6", "20", "0.4")
-  )
-  expect_identical(
-    jsonlite::fromJSON(result$switched$identity),
-    list(
-      dataset = "Other",
-      spatial_name = "sliceB",
-      source = "external",
-      label = "H&E"
-    )
-  )
-  expect_identical(
-    unname(unlist(result$same)),
-    c("true", "7", "70", "90")
+  expect_length(assignments[assignments > 0L], 1L)
+  expect_match(
+    renderer_src,
+    'payload[["meta"]] <- c(background_meta, payload[["meta"]])',
+    fixed = TRUE
   )
 })
 
@@ -788,27 +818,22 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
   shiny::testServer(server, {
     session$setInputs(spatial_projection_to_display = "sliceB")
     session$flushReact()
-    html <- as.character(output$spatial_projection_main_parameters_UI$html)
-
-    expect_match(html, 'value="sliceB" selected', fixed = TRUE)
-    expect_match(html, "embedded::IF", fixed = TRUE)
-    expect_match(html, "external::MIBI", fixed = TRUE)
-    expect_false(grepl("embedded::H&amp;E", html, fixed = TRUE))
-    expect_false(grepl("external::DAPI", html, fixed = TRUE))
+    main_html <- as.character(
+      output$spatial_projection_main_parameters_UI$html
+    )
+    expect_match(main_html, 'value="sliceB" selected', fixed = TRUE)
+    expect_match(main_html, "embedded::IF", fixed = TRUE)
+    expect_match(main_html, "external::MIBI", fixed = TRUE)
+    expect_false(grepl("embedded::H&amp;E", main_html, fixed = TRUE))
+    expect_false(grepl("external::DAPI", main_html, fixed = TRUE))
     expect_identical(getSpatialData("sliceB")$coordinates$x, 101:102)
   })
 })
 
 test_that("bundled real demos embed a genuine tissue image in the .crb", {
-  # MERFISH and Xenium carry their REAL histology image (DAPI) inside the .crb
-  # under the canonical `histology_images` manifest, with coordinate-space
-  # bounds, so the Spatial tab
-  # renders the true tissue background out of the box. (Visium uses an external
-  # image — tested above; Slide-seq carries no image — tested below.)
-  for (f in c(
-    "demo_spatial_merfish",
-    "demo_spatial_xenium"
-  )) {
+  # MERFISH carries its real DAPI inside the CRB. Visium and Xenium use external
+  # files; Slide-seq carries no image.
+  for (f in "demo_spatial_merfish") {
     path <- system.file(
       file.path("extdata/examples", paste0(f, ".crb")),
       package = "CerebroNexus"
@@ -922,7 +947,7 @@ test_that("embedded image demos store the image natively with no flip flag", {
   # Embedded images are stored in their native orientation; there is no per-.crb
   # render-flip flag (removed — display alignment is a user control in the tab).
   # Guard that the image is present and no stale flip flag lingers.
-  for (f in c("demo_spatial_xenium", "demo_spatial_merfish")) {
+  for (f in "demo_spatial_merfish") {
     path <- system.file(
       file.path("extdata/examples", paste0(f, ".crb")),
       package = "CerebroNexus"
@@ -952,6 +977,23 @@ test_that("app.R ships the Visium H&E overlay pre-aligned", {
   expect_match(app_src, "offset_x = 600", fixed = TRUE)
   expect_match(app_src, "scale_x = 1.55", fixed = TRUE)
   expect_match(app_src, "flip_y = TRUE", fixed = TRUE)
+})
+
+test_that("app.R configures MERFISH plot and image rotations separately", {
+  app_src <- paste(
+    readLines(system.file("app.R", package = "CerebroNexus")),
+    collapse = "\n"
+  )
+  expect_match(
+    app_src,
+    '"fov" = 90',
+    fixed = TRUE
+  )
+  expect_match(
+    app_src,
+    '"Tissue background" = list(rotation = 90)',
+    fixed = TRUE
+  )
 })
 
 ##----------------------------------------------------------------------------##

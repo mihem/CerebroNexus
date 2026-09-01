@@ -304,22 +304,22 @@ test_that("launchCerebro rejects invalid mode", {
 
 test_that("launchCerebro rejects out-of-range point size", {
   expect_error(
-    launchCerebro(overview_default_point_size = 50),
-    regexp = "overview_default_point_size"
+    launchCerebro(point_size = 50),
+    regexp = "point_size"
   )
 })
 
 test_that("launchCerebro rejects out-of-range opacity", {
   expect_error(
-    launchCerebro(gene_expression_default_point_opacity = 2),
-    regexp = "gene_expression_default_point_opacity"
+    launchCerebro(point_opacity = 2),
+    regexp = "point_opacity"
   )
 })
 
 test_that("launchCerebro rejects out-of-range percentage", {
   expect_error(
-    launchCerebro(gene_expression_default_percentage_cells_to_show = 150),
-    regexp = "gene_expression_default_percentage_cells_to_show"
+    launchCerebro(percentage_cells_to_show = 150),
+    regexp = "percentage_cells_to_show"
   )
 })
 

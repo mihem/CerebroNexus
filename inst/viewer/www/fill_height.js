@@ -13,30 +13,18 @@
 
        height = viewport - (top of this element) - (bottom breathing room)
 
-   `top of this element` is the live sum of everything above it (top bar, box
-   title, tab strip, a wrapping legend), read from the DOM with
-   getBoundingClientRect(). Nothing is hardcoded, so changing any spacing above
-   the plot re-measures on the next frame and the height corrects itself. This
-   is the same primitive projection_scatter.js already uses for the scatter
-   plots (projectionTargetHeight); this file generalises it to any element that
-   opts in with the `cerebro-fill` class.
+   `top of this element` is the unscrolled layout position inside the app's
+   scrollport: the live sum of everything above it (top bar, box title, tab
+   strip, a wrapping legend). Nothing is hardcoded, so changing any spacing
+   above the plot re-measures on the next frame and the height corrects itself.
+   Elements opt in with the `cerebro-fill` class.
 
    Opt in from R:
 
        div(class = "cerebro-fill", <the output at height = "100%">)
 
    custom.css makes `.cerebro-fill` a flex column whose child fills it, so the
-   output (and any spinner wrapper between) inherits the measured height without
-   needing its own resolved-height chain.
-
-   TWO ENGINES, ON PURPOSE (why a fill page and a projection scatter can differ
-   by a few dozen px on the same screen): the projection scatter pages were never
-   migrated here -- they keep projectionTargetHeight in projection_scatter.js.
-   Both use the SAME formula (viewport - top - contentBelow - gap), but this
-   file's contentBelow() also reserves the content-wrapper's bottom padding,
-   which projection_scatter's does not. So e.g. the HLA network (a fill page)
-   sits slightly shorter than the projection scatter. That is the two engines,
-   not a bug; unifying them touches every viz page and is deliberately deferred.
+   output (and any spinner wrapper between) inherits the measured height.
    ========================================================================== */
 (function () {
   "use strict";
@@ -85,6 +73,20 @@
       node = node.parentElement;
     }
     return null;
+  }
+
+  /* Anchor the fill to its unscrolled position inside the app's scrollport.
+     getBoundingClientRect().top alone moves upward as the user scrolls; feeding
+     that moving value back into the height makes the plot grow by exactly the
+     scroll delta and permanently keeps the following panels below the viewport. */
+  function layoutTop(el) {
+    var rect = el.getBoundingClientRect();
+    var scrollport = ancestorWithClass(el, "content-wrapper");
+    if (!scrollport || typeof scrollport.getBoundingClientRect !== "function") {
+      return rect.top;
+    }
+    return rect.top - scrollport.getBoundingClientRect().top +
+      (scrollport.scrollTop || 0);
   }
 
   /* Observe only the layout chain that can move or resize this fill. Stopping
@@ -155,7 +157,7 @@
     if (!isVisible(el)) {
       return;
     }
-    var top = el.getBoundingClientRect().top;
+    var top = layoutTop(el);
     var h = targetHeight(
       window.innerHeight,
       top,
@@ -177,7 +179,7 @@
        out, a widget reports its size a frame later, and each nudges contentBelow
        (hence the target height). Revealing on the first measurement would show
        one height and then correct to another — the "short-then-tall" flash. This
-       is the same two-equal-frames discipline projection_scatter.js uses
+       is the same two-equal-frames discipline cell_views.js uses
        (shouldRevealProjection); generalised here so plain fills reveal the same
        way. When not yet settled, record this height and force a confirming frame
        so a re-measure is guaranteed even without an external trigger. */
@@ -263,13 +265,4 @@
   document.addEventListener("DOMContentLoaded", scheduleSize);
   scheduleSize();
 
-  /* Exposed for unit testing the pure height formula and re-measuring on demand. */
-  window.cerebroFill = {
-    _targetHeight: targetHeight,
-    _isVisible: isVisible,
-    _layoutTargets: layoutTargets,
-    _contentBelow: contentBelow,
-    _shouldReveal: shouldReveal,
-    resize: scheduleSize
-  };
 })();

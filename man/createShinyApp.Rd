@@ -20,7 +20,9 @@ createShinyApp(
   crb_pick_smallest_file = TRUE,
   show_upload_ui = FALSE,
   welcome_message = "Welcome to CerebroNexus!",
-  point_size = list(overview_projection_point_size = NULL),
+  point_size = 5,
+  point_opacity = 1,
+  percentage_cells_to_show = 100,
   variable_to_compare = NULL,
   spatial_images = NULL,
   spatial_image_settings = NULL,
@@ -31,8 +33,7 @@ createShinyApp(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
-  auth = NULL,
-  ...
+  auth = NULL
 )
 }
 \arguments{
@@ -87,8 +88,18 @@ upload their own data; defaults to \code{FALSE}.}
 
 \item{welcome_message}{Welcome message shown in the Load Data tab.}
 
-\item{point_size}{Named list with \code{overview_projection_point_size}
-(and optionally other keys) forwarded to \code{Cerebro.options}.}
+\item{point_size}{Point size from 1 through 20. Supply one number for every
+dataset, or a named numeric vector/list whose names exactly match
+\code{cerebro_data}. The value initializes every cell scatter view.}
+
+\item{point_opacity}{Point opacity from 0.1 through 1. Supply one number for
+every dataset, or a named numeric vector/list whose names exactly match
+\code{cerebro_data}. The value initializes every cell scatter view.}
+
+\item{percentage_cells_to_show}{Percentage of cells from 10 through 100.
+Supply one number for every dataset, or a named numeric vector/list whose
+names exactly match \code{cerebro_data}. The value initializes every cell
+scatter view; subsequent UI changes remain page-local.}
 
 \item{variable_to_compare}{Forwarded to \code{Cerebro.options}.}
 
@@ -106,43 +117,31 @@ when that CRB has exactly one spatial entry.}
 \code{dataset -> spatial entry -> image label -> settings} form. Settings
 may contain only \code{flip_x}, \code{flip_y}, \code{scale_x},
 \code{scale_y}, \code{offset_x}, \code{offset_y}, and \code{rotation}.
+\code{image_opacity} may additionally set the initial image opacity from
+0 through 1.
 A leaf may target an embedded or external image available under that exact
 dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's \code{spatial_images}; unknown
 identities are rejected. Labels are user-facing names, not protocol names.}
 
-\item{spatial_images_flip_x}{Legacy named per-dataset horizontal flip values.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path \code{spatial_images} declaration was migrated; then the
-value applies to every migrated external image.}
+\item{spatial_images_flip_x}{Legacy named per-dataset horizontal flip values.}
 
-\item{spatial_images_flip_y}{Legacy named per-dataset vertical flip values.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path \code{spatial_images} declaration was migrated; then the
-value applies to every migrated external image.}
+\item{spatial_images_flip_y}{Legacy named per-dataset vertical flip values.}
 
-\item{spatial_images_scale_x}{Legacy named per-dataset X scale values. Each
-dataset must resolve to exactly one spatial image target, unless a legacy
-multi-path \code{spatial_images} declaration was migrated; then the value
-applies to every migrated external image.}
+\item{spatial_images_scale_x}{Legacy named per-dataset X scale values.}
 
-\item{spatial_images_scale_y}{Legacy named per-dataset Y scale values. Each
-dataset must resolve to exactly one spatial image target, unless a legacy
-multi-path \code{spatial_images} declaration was migrated; then the value
-applies to every migrated external image.}
+\item{spatial_images_scale_y}{Legacy named per-dataset Y scale values.}
 
-\item{spatial_images_offset_x}{Legacy named per-dataset horizontal offsets.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path \code{spatial_images} declaration was migrated; then the
-value applies to every migrated external image.}
+\item{spatial_images_offset_x}{Legacy named per-dataset horizontal offsets.}
 
-\item{spatial_images_offset_y}{Legacy named per-dataset vertical offsets.
-Each dataset must resolve to exactly one spatial image target, unless a
-legacy multi-path \code{spatial_images} declaration was migrated; then the
-value applies to every migrated external image.}
+\item{spatial_images_offset_y}{Legacy named per-dataset vertical offsets.}
 
-\item{spatial_plot_rotation}{Named list/vector; initial rotation (degrees)
-applied to spatial cell coordinates. Names must match \code{cerebro_data}.}
+\item{spatial_plot_rotation}{Optional nested rotations in
+\code{dataset -> spatial entry -> degrees} form, applied only to spatial
+cell coordinates. The legacy named per-dataset vector form remains
+supported and applies one rotation to every spatial entry in that dataset.
+Dataset names must match \code{cerebro_data}; spatial names must match the
+corresponding CRB's \code{availableSpatial()}.}
 
 \item{auth}{Optional authentication settings. \code{NULL}, the default,
 leaves the generated Viewer public. To require a login, provide a named
@@ -150,8 +149,6 @@ list with \code{credentials}, the path to an encrypted SQLite database
 created by \code{shinymanager::create_db()}, and \code{passphrase_env},
 the name of the environment variable containing its passphrase. Optional
 \code{timeout_minutes} defaults to 15.}
-
-\item{...}{Currently unused; reserved for future arguments.}
 }
 \value{
 Invisibly returns \code{result_dir}. If that path changes resolution

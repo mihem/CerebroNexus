@@ -103,3 +103,36 @@ hla_node_radius <- function(clone_count, scale = 1) {
   s <- max(HLA_NODE_SCALE_MIN, min(HLA_NODE_SCALE_MAX, s))
   pmin(HLA_NODE_R_MIN * sqrt(n), HLA_NODE_R_MAX) * s
 }
+
+hla_segment_node_keys <- function(segments, by_v = FALSE) {
+  if (
+    !is.data.frame(segments) ||
+      !"cdr3" %in% colnames(segments) ||
+      (isTRUE(by_v) && !"v_gene" %in% colnames(segments))
+  ) {
+    return(character(0))
+  }
+  if (isTRUE(by_v)) {
+    paste(segments$v_gene, segments$cdr3, sep = "::")
+  } else {
+    as.character(segments$cdr3)
+  }
+}
+
+hla_cells_for_node_keys <- function(segments, node_keys, by_v = FALSE) {
+  if (!is.data.frame(segments) || !"barcode" %in% colnames(segments)) {
+    return(character(0))
+  }
+  keys <- hla_segment_node_keys(segments, by_v)
+  keep <- keys %in% as.character(node_keys)
+  unique(as.character(segments$barcode[keep & !is.na(segments$barcode)]))
+}
+
+hla_node_keys_for_cells <- function(segments, cells, by_v = FALSE) {
+  if (!is.data.frame(segments) || !"barcode" %in% colnames(segments)) {
+    return(character(0))
+  }
+  keys <- hla_segment_node_keys(segments, by_v)
+  keep <- as.character(segments$barcode) %in% as.character(cells)
+  unique(keys[keep & !is.na(keys)])
+}

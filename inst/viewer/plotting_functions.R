@@ -1,7 +1,7 @@
 ##----------------------------------------------------------------------------##
 ## Shared chart theme (single source of truth for R plots).
 ##
-## Mirrors www/projection_layouts.js CEREBRO_THEME and the custom.css --chart-*
+## Mirrors the Viewer palette used by www/cell_views.js and custom.css.
 ## tokens. Warm neutrals reused from the app --c-* palette so every plotly /
 ## ggplot chart reads as the same design system. Keep these three in sync.
 ##----------------------------------------------------------------------------##
@@ -58,7 +58,7 @@ cerebro_plotly_hoverlabel <- function() {
 
 ## ggplot theme for the static PDF/SVG *exports* (the "export to PDF" buttons).
 ## Submission-grade defaults: a clean sans base family, hairline warm-neutral
-## panel border and gridlines matching the on-screen --chart-* tokens, so the
+## panel border and gridlines matching the on-screen Viewer palette, so the
 ## exported figure reads as the same design system as the interactive plot.
 ## `base_family = ""` lets the device pick its default sans (Helvetica/Arial on
 ## the common PDF/SVG devices), which keeps exported text editable in Illustrator

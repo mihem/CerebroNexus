@@ -2,10 +2,19 @@
 ## UI elements with switch to plot genes in separate panels.
 ##----------------------------------------------------------------------------##
 output[["expression_projection_genes_in_separate_panels_UI"]] <- renderUI({
-  shinyWidgets::awesomeCheckbox(
+  selected <- input[["expression_projection_genes_in_separate_panels"]]
+  if (is.null(selected)) {
+    selected <- "combined"
+  }
+  selectInput(
     inputId = "expression_projection_genes_in_separate_panels",
-    label = HTML("Show genes in separate panels<br>(experimental)"),
-    value = FALSE
+    label = "Display mode",
+    choices = c(
+      "Mean expression" = "combined",
+      "Separate panels" = "separate",
+      "RGB co-expression" = "rgb"
+    ),
+    selected = selected
   )
 })
 

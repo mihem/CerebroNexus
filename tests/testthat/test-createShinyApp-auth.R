@@ -745,11 +745,14 @@ test_that("authentication deployment documentation is runnable and credited", {
   }
 
   description <- read.dcf(auth_test_package_file("DESCRIPTION"))
-  expect_identical(description[[1L, "Version"]], "4.3.4")
   suggests <- strsplit(description[[1L, "Suggests"]], ",")[[1L]]
   expect_true(any(grepl("shinymanager", suggests, fixed = TRUE)))
   expect_false(any(grepl("askpass|chromote", suggests)))
 
   news <- readLines(auth_test_package_file("NEWS.md"), warn = FALSE)
+  expect_identical(
+    news[[1L]],
+    paste("# CerebroNexus", description[[1L, "Version"]])
+  )
   expect_true(any(grepl("encrypted shinymanager", news, fixed = TRUE)))
 })

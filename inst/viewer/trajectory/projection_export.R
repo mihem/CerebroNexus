@@ -5,7 +5,8 @@ observeEvent(input[["trajectory_projection_export"]], {
     input[["trajectory_point_color"]],
     input[["trajectory_percentage_cells_to_show"]],
     input[["trajectory_point_size"]],
-    input[["trajectory_point_opacity"]]
+    input[["trajectory_point_opacity"]],
+    !is.null(input[["trajectory_projection_point_border"]])
   )
 
   ## open dialog to select where plot should be saved and how the file should
@@ -56,20 +57,32 @@ observeEvent(input[["trajectory_projection_export"]], {
     )
 
     ## put rows in random order
-    cells_df <- cells_df[sample(1:nrow(cells_df)), ]
+    cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
+
+    color_variable <- input[["trajectory_point_color"]]
+    categorical <- identical(color_variable, "state") ||
+      !is.numeric(cells_df[[color_variable]])
+    if (categorical) {
+      cells_df[[color_variable]] <- factor(cells_df[[color_variable]])
+    }
 
     ## start building the plot
+    stroke <- if (isTRUE(input[["trajectory_projection_point_border"]])) {
+      0.2
+    } else {
+      0
+    }
     plot <- ggplot() +
       geom_point(
         data = cells_df,
         aes(
-          x = .data[[colnames(cells_df)[1]]],
-          y = .data[[colnames(cells_df)[2]]],
-          fill = .data[[input[["trajectory_point_color"]]]]
+          x = .data[["DR_1"]],
+          y = .data[["DR_2"]],
+          fill = .data[[color_variable]]
         ),
         shape = 21,
         size = input[["trajectory_point_size"]] / 3,
-        stroke = 0.2,
+        stroke = stroke,
         color = "#c4c4c4",
         alpha = input[["trajectory_point_opacity"]]
       ) +
@@ -89,18 +102,36 @@ observeEvent(input[["trajectory_projection_export"]], {
 
     ## depending on type of cell coloring, add different color scale
     ## ... categorical
-    if (
-      is.factor(cells_df[[input[["trajectory_point_color"]]]]) ||
-        is.character(cells_df[[input[["trajectory_point_color"]]]])
-    ) {
+    if (categorical) {
       ## get colors for groups
       colors_for_groups <- assignColorsToGroups(
         cells_df,
-        input[["trajectory_point_color"]]
+        color_variable
       )
 
       ## add color assignments
       plot <- plot + scale_fill_manual(values = colors_for_groups)
+
+      if (isTRUE(input[["trajectory_projection_group_labels"]])) {
+        group_labels <- centerOfGroups(
+          cells_df[, c("DR_1", "DR_2")],
+          cells_df,
+          2,
+          color_variable
+        )
+        plot <- plot +
+          geom_label(
+            data = group_labels,
+            mapping = aes(x_median, y_median, label = group),
+            fill = "white",
+            size = 4.5,
+            color = "black",
+            alpha = 0.5,
+            fontface = "bold",
+            label.size = 0,
+            show.legend = FALSE
+          )
+      }
 
       ## ... not categorical (probably numerical)
     } else {

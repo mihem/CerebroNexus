@@ -70,7 +70,7 @@ createShinyApp(
 | Mouse brain (Visium)             | spatial (spots, external H&E)    | Spatial |
 | Mouse hippocampus (Slide-seq v2) | spatial (beads, no image)        | Spatial |
 | Mouse ileum (MERFISH)            | spatial (imaging, embedded DAPI) | Spatial |
-| Mouse brain (Xenium)             | spatial (imaging, embedded DAPI) | Spatial |
+| Mouse brain (Xenium)             | spatial (imaging, external DAPI variants) | Spatial |
 
 When the app starts, the sidebar shows a dropdown with these samples. Switching
 changes the whole data set — the UMAP, the cell-type composition, and the

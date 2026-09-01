@@ -5,39 +5,6 @@
 ## associations.R (later phases). This file holds the info-button modals.
 ##----------------------------------------------------------------------------##
 
-observeEvent(input$hla_parameters_info, {
-  showModal(modalDialog(
-    title = "Parameters",
-    easyClose = TRUE,
-    size = "l",
-    tagList(
-      tags$p(
-        tags$b("Chain"),
-        " — which TCR chain's CDR3 to cluster (TRB by default)."
-      ),
-      tags$p(
-        tags$b("Colour nodes by"),
-        " — motif cluster (default) or a metadata column."
-      ),
-      tags$p(
-        tags$b("Minimum motif size"),
-        " — keep connected components with at least this many CDR3 nodes."
-      ),
-      tags$p(
-        tags$b("Split motifs by V gene"),
-        " — cluster within each V gene, so identical CDR3s on different V genes are separate."
-      ),
-      tags$p(
-        tags$b("Show unconnected CDR3s"),
-        " — also draw CDR3s that have no Hamming-1 neighbour."
-      ),
-      tags$p(
-        "Edges always use Hamming distance 1: two equal-length CDR3s that differ at exactly one position are joined."
-      )
-    )
-  ))
-})
-
 observeEvent(input$hla_status_info, {
   showModal(modalDialog(
     title = "Evidence status",

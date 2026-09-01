@@ -734,11 +734,11 @@ hla_scope_key <- reactive({
 })
 
 ## ---- Have the build parameters reported yet? --------------------------- ##
-## Every build/display control on this page is created by output$hla_parameters_ui
-## (its choices depend on the data set, so it cannot be static UI). That has a
-## consequence worth stating: on the flush that first draws this page the inputs
-## DO NOT EXIST, so hla_param() serves its fallbacks, and the browser reports the
-## real values one flush later.
+## The build/display controls are created by the primary and More renderUI
+## outputs (their choices depend on the data set, so they cannot be static UI).
+## On the flush that first draws this page the inputs DO NOT EXIST, so
+## hla_param() serves its fallbacks, and the browser reports the real values one
+## flush later.
 ##
 ## Left ungated, the page therefore builds and draws the whole network twice on
 ## first open — once against the fallbacks, then again for real. Both passes
@@ -749,12 +749,11 @@ hla_scope_key <- reactive({
 ## without the other and the first pass becomes a full wasted build of a graph
 ## nobody ever sees.
 ##
-## So wait for the controls to report instead. The slider and the colour picker
-## are created unconditionally, so either being non-NULL proves the panel
-## rendered and reported. Checked with is.null(), NOT req(input$hla_color_by):
-## that input's default value is "" (colour by motif cluster), which req() treats
-## as missing — the network would then never draw until the user picked a
-## colouring.
+## So wait for the controls to report instead. The slider, colour picker, and
+## both More checkboxes are created unconditionally; all must be non-NULL before
+## the first build. Checked with is.null(), NOT req(input$hla_color_by): that
+## input's default value is "" (colour by motif cluster), which req() treats as
+## missing — the network would then never draw until the user picked a colouring.
 ##
 ## The allele pickers need the same wait, one level deeper, and this is easy to
 ## miss because they are not on screen when the problem starts. They live in
@@ -769,7 +768,12 @@ hla_scope_key <- reactive({
 ## set with no analysable allele renders that uiOutput as a bare "no alleles"
 ## message and creates no input at all, so requiring one would wait forever.
 hla_params_ready <- reactive({
-  if (is.null(input$hla_color_by) || is.null(input$hla_min_nodes)) {
+  if (
+    is.null(input$hla_color_by) ||
+      is.null(input$hla_min_nodes) ||
+      is.null(input$hla_by_v) ||
+      is.null(input$hla_show_isolated)
+  ) {
     return(FALSE)
   }
   if (length(hla_allele_choices()) == 0) {

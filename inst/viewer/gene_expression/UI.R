@@ -1,18 +1,6 @@
 ##----------------------------------------------------------------------------##
 ## Tab: Gene (set) expression
 ##----------------------------------------------------------------------------##
-## Prepend the shared plotly layout factory and the shared projection-scatter
-## renderer, then gene_expression's wrappers — all in ONE extendShinyjs() text
-## so they share a global scope (same pattern as spatial/UI.R).
-## Shared projection engine loaded once app-wide (see shiny_UI.R); inline only
-## this tab's thin wrappers over the window globals it exposes.
-js_code_gene_expression_projection <- cerebro_read_file(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/gene_expression/js_projection_update_plot.js"
-  )
-)
-
 tab_gene_expression <- tabItem(
   tabName = "geneExpression",
   ## necessary to ensure alignment of table headers and content
@@ -25,16 +13,6 @@ tab_gene_expression <- tabItem(
       vertical-align: middle;
     }
     "
-  ),
-  shinyjs::extendShinyjs(
-    text = js_code_gene_expression_projection,
-    functions = c(
-      "expressionProjectionUpdatePlot2D",
-      "expressionProjectionUpdatePlot2DMultiPanel",
-      "expressionProjectionUpdatePlot3D",
-      "expressionClearSelection",
-      "expressionZoomToSelection"
-    )
   ),
   uiOutput("expression_projection_UI"),
   uiOutput("expression_details_selected_cells_UI"),

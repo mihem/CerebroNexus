@@ -22,16 +22,29 @@
 .hla-mb-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; cursor: pointer; border-radius: var(--r-xs);
-  color: var(--c-text-3);
+  padding: 0; border: 0; background: transparent; color: var(--c-text-3);
 }
 .hla-mb-btn svg { fill: currentColor; }
 .hla-mb-btn:hover { color: var(--c-text); background: var(--c-surface-2); }
+.hla-mb-btn.is-on {
+  color: var(--c-amber-700);
+  background: var(--c-amber-50);
+  box-shadow: inset 0 0 0 1px var(--c-amber-300);
+}
 /* At the opening fit (the minimum zoom) the zoom-out button greys out and stops
  * responding -- the network can only be zoomed IN. Toggled by visEvents'
  * afterDrawing in hla_tcr_motifs/visualizations.R. */
 .hla-mb-btn--off,
 .hla-mb-btn--off:hover {
   opacity: .3; cursor: default; color: var(--c-text-3); background: none;
+}
+
+.hla-selection-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: block;
+  touch-action: none;
 }
 
 /* HLA Associations: each result table sits in its own card, so the three read

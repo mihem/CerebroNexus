@@ -1,0 +1,1011 @@
+/* ==========================================================================
+   Coordinated cross-modal views — layout & theme.
+   Scoped under .coordviews-page. Reuses the app's Console tokens (custom.css
+   :root vars) so it inherits the shared look. The layout is deliberately
+   full-width with a horizontal control bar (no left param column), giving the
+   linked panels the room the per-tab param/viz split does not.
+   ========================================================================== */
+
+/* ---- dataset meta strip ------------------------------------------------- */
+.coordviews-page .cv-meta {
+  font-size: 12.5px;
+  color: var(--c-text-2);
+  padding: 2px 0 12px;
+}
+/* ---- top control bar (the layout fix) ----------------------------------- */
+.coordviews-page .cv-topbar {
+  gap: 16px;
+  position: relative;
+}
+.coordviews-page .cv-ctl { display: flex; flex-direction: column; gap: 5px; }
+.coordviews-page .cv-topbar > .cv-ctl > .selectize-control {
+  width: 100%;
+}
+.coordviews-page .cv-topbar select {
+  box-sizing: border-box; width: 100%; min-width: 0;
+  height: var(--c-toolbar-control-height); padding: 6px 12px;
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm); background: var(--c-surface); color: var(--c-text);
+  font-size: 14px; font-family: inherit;
+}
+.coordviews-page .cv-topbar select:focus {
+  outline: none; border-color: var(--c-amber);
+  box-shadow: 0 0 0 3px var(--c-amber-50);
+}
+/* Background image choices are scoped to the selected spatial data. */
+.coordviews-page .cv-bg-ctl { position: relative; width: 100%; max-width: 100%; }
+.coordviews-page .cv-bg-settings {
+  width: 100%; max-width: 100%; padding: 12px; border: 1px solid var(--c-border);
+  border-radius: 8px; background: var(--c-surface-2);
+}
+.coordviews-page .cv-bg-settings.is-scope-changing {
+  animation: cv-bg-scope-change .2s ease-out;
+}
+@keyframes cv-bg-scope-change {
+  0% { border-color: var(--c-amber); box-shadow: 0 0 0 0 rgba(255, 112, 19, .24); }
+  50% { border-color: var(--c-amber-200); box-shadow: 0 0 0 7px rgba(255, 112, 19, 0); }
+  100% { border-color: var(--c-border); box-shadow: none; }
+}
+.coordviews-page .cv-bg-display {
+  width: 100%; max-width: 100%; padding-bottom: 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.coordviews-page .cv-bg-display-title {
+  margin-bottom: 7px; color: var(--c-text); font-size: 12px; font-weight: 650;
+}
+.coordviews-page .cv-bg-display .selectize-control { width: 100%; }
+.coordviews-page .cv-bg-space-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+}
+.coordviews-page .cv-bg-space-tab {
+  max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 6px 10px; border: 1px solid var(--c-border); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text-2); cursor: pointer;
+  font: 600 11.5px/1.2 inherit;
+}
+.coordviews-page .cv-bg-space-tab:hover { background: var(--c-surface-2); }
+.coordviews-page .cv-bg-space-tab.is-on {
+  border-color: var(--c-amber-200); background: var(--c-amber-50); color: var(--c-amber-700);
+}
+/* ---- segmented toggle (clonal-panel layout) ----------------------------- */
+.coordviews-page .cv-seg {
+  width: 100%;
+  height: var(--c-toolbar-control-height); box-sizing: border-box;
+  display: inline-flex; border: 1px solid var(--c-border-2);
+  border-radius: var(--r-sm); overflow: hidden; background: var(--c-surface);
+}
+.coordviews-page .cv-seg-btn {
+  flex: 1 1 0; min-width: 0;
+  border: 0; background: transparent; color: var(--c-text-2);
+  padding: 0 8px; font-size: 14px; line-height: 1.05; font-family: inherit; cursor: pointer;
+  border-left: 1px solid var(--c-border-2); white-space: normal;
+}
+.coordviews-page .cv-seg-btn:first-child { border-left: 0; }
+.coordviews-page .cv-seg-btn:hover { background: var(--c-surface-2); }
+.coordviews-page .cv-seg-btn.is-on {
+  background: var(--c-amber-50); color: var(--c-amber-700); font-weight: 600;
+}
+
+/* ---- right cluster: global readout -------------------------------------- */
+.coordviews-page .cv-topbar-right {
+  order: 98; display: flex; align-items: center; gap: 14px;
+}
+/* Sized up to match the buttons beside it — it reports on the same selection
+   they act on, and at 12px it read as a footnote to them. One line, so the bar's
+   height is still set by the buttons and does not change. */
+.coordviews-page .cv-shown {
+  font-size: 15px; color: var(--c-amber-700); font-weight: 700;
+  white-space: nowrap;
+}
+/* Zoom + Clear live inside the active-cohort bar, beside the selection they
+   affect. They stay horizontal and move to a new flex line only when needed. */
+.coordviews-page .cv-selactions {
+  display: grid; gap: 6px; justify-items: end;
+  align-self: center; margin-left: auto;
+  transition: opacity .16s ease, transform .16s ease;
+}
+.coordviews-page .cv-sel-action-row {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px;
+}
+/* collapsed (hidden) state — a quiet fade + tiny lift */
+.coordviews-page .cv-selactions.cv-collapse {
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+}
+/* The button uses the app-wide More settings component; only its position in
+   this toolbar is page-specific. */
+.coordviews-page .cv-topbar > .cerebro-more-btn {
+  order: 99;
+  align-self: flex-end;
+}
+
+/* niche-radius slider disabled until a nucleus is picked */
+.coordviews-page .cv-disabled { opacity: 0.45; }
+.coordviews-page .cv-disabled input[type=range] { cursor: not-allowed; }
+
+/* ---- panel grid --------------------------------------------------------- */
+.cerebro-cell-view-host {
+  position: relative;
+  min-width: 0;
+}
+.cerebro-cell-view-surface {
+  width: 100%;
+  min-width: 0;
+}
+.cerebro-cell-view-host .cv-panes {
+  flex: 1 1 auto;
+  padding: 0;
+}
+.cerebro-cell-view-host .cv-pane {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.coordviews-page.cerebro-cell-view-host .cv-pane-head {
+  padding: 0 4px;
+}
+/* JS (layoutPanels + resizeAll) gives each pane a flex basis while fitting its
+   canvas to the data geometry. */
+.coordviews-page .cv-panes {
+  /* A restored view can briefly sit in a shrink-to-fit tab wrapper.  Make the
+     workspace claim the page width before its JS tracks are measured; otherwise two
+     saved lenses inherit that narrow measurement and remain stranded left. */
+  display: flex; flex-wrap: wrap;
+  width: 100%; min-width: 0; box-sizing: border-box;
+  padding: 14px 0 8px;
+  gap: 18px; justify-content: flex-start; align-items: flex-start;
+  align-content: flex-start;
+  /* anchors the detail card to the workspace's centre (it is absolutely
+     positioned, so it stays out of the panel flow) */
+  position: relative;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning {
+  /* FLIP owns the motion while focus changes. */
+  transition: none;
+}
+.coordviews-page .cv-pane {
+  position: relative;
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: 10px; padding: 12px;
+  box-sizing: border-box; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-self: start;
+  transition: opacity .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning .cv-pane {
+  will-change: transform, opacity;
+  transition: transform .2s cubic-bezier(.22, .61, .36, 1),
+    opacity .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.coordviews-page .cv-panes.cv-focus-transitioning canvas { transition: none; }
+.coordviews-page .cv-pane.cv-focus-primary {
+  border-color: var(--c-amber);
+  box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-2);
+}
+.coordviews-page .cv-pane.cv-focus-context {
+  border-color: var(--c-border);
+  box-shadow: var(--shadow-1);
+}
+.linked-views-page > .cv-panes > .cv-pane:hover {
+  border-color: var(--c-amber-200);
+  box-shadow: 0 0 0 2px var(--c-amber-50), var(--shadow-1);
+}
+.coordviews-page .cv-pane.cv-hidden { display: none; }
+.coordviews-page .cv-pane-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  padding-right: 84px;
+  flex-wrap: wrap;   /* title + space-switch + toolbar never overflow/cut off */
+}
+.coordviews-page .cv-pane-head .cv-ptitle {
+  font-size: 13px; font-weight: 650; cursor: pointer;
+}
+.coordviews-page .cv-role-badge {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+  border: 1px solid var(--c-border); border-radius: 999px;
+  background: var(--c-surface-2); color: var(--c-text-3);
+  font-size: 9.5px; font-weight: 750; letter-spacing: .055em;
+  line-height: 1; text-transform: uppercase;
+}
+.coordviews-page .cv-role-badge.is-focus {
+  border-color: var(--c-amber-200); background: var(--c-amber-50);
+  color: var(--c-amber-700);
+}
+.coordviews-page .cv-role-badge.is-context {
+  border-color: #d8e1ea; background: #f6f8fa; color: #687585;
+}
+.coordviews-page .cv-moran-badge {
+  height: 22px; padding: 0 8px; cursor: pointer;
+  border: 1px solid #cfe1f3; border-radius: 999px;
+  background: #f4f9fe; color: #35688f;
+  font: 650 10.5px/1 var(--cv-font, inherit);
+  font-variant-numeric: tabular-nums;
+}
+.coordviews-page .cv-moran-badge:hover {
+  border-color: #9ec5e7; background: #eaf4fd; color: #245779;
+}
+.coordviews-page .cv-moran-corner {
+  position: absolute; left: 12px; bottom: 12px; z-index: 3;
+}
+/* per-panel hover toolbar (plotly-style), top-right of each panel */
+.coordviews-page .cv-panebar {
+  margin-left: auto; display: flex; gap: 4px;
+  /* Hidden until the pointer is over the panel — but with pointer-events off
+     while invisible, so a click that lands where an invisible button sits does
+     not fire it. :focus-within keeps it reachable by keyboard, which a
+     hover-only reveal would otherwise lock out. */
+  opacity: 0; pointer-events: none; transition: opacity .15s ease;
+}
+.coordviews-page .cv-pane:hover .cv-panebar,
+.coordviews-page .cv-panebar:focus-within {
+  opacity: 1; pointer-events: auto;
+}
+/* Narrow pane (set by the ResizeObserver in resizePanel): the toolbar can no
+   longer share the header row with the title + space-switch without crowding, so
+   it floats as a VERTICAL stack in the pane's top-right corner instead. */
+.coordviews-page .cv-pane.cv-narrow .cv-panebar {
+  position: absolute; top: 44px; right: 10px; z-index: 4;
+  margin-left: 0; flex-direction: column;
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: 6px; padding: 3px;
+}
+.coordviews-page .cv-tbtn {
+  position: relative;
+  width: 26px; height: 22px; padding: 0; font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--c-border); background: var(--c-surface);
+  color: var(--c-text-2); border-radius: 5px; cursor: pointer;
+}
+/* Toolbar tooltip, drawn rather than delegated to the native `title` — the
+   native delay is the browser's (~1s in Chrome) and is not configurable, which
+   is far too long for a bar you sweep across to find a tool.
+   350ms: long enough that passing over the row stays silent, short enough that
+   stopping on a button feels like an answer rather than a wait. Leaving hides it
+   at once (the delay lives only on the :hover rule), so moving between buttons
+   does not trail a stale label. */
+.coordviews-page .cv-tbtn::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 7px); right: 0; z-index: 30;
+  white-space: nowrap; pointer-events: none;
+  padding: 5px 8px; border-radius: 5px;
+  background: rgba(28, 28, 30, .94); color: #fff;
+  font-size: 11.5px; font-weight: 500; line-height: 1.2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+  opacity: 0; transform: translateY(-3px);
+  transition: opacity .13s ease, transform .13s ease;
+}
+.coordviews-page .cv-tbtn:hover::after,
+.coordviews-page .cv-tbtn:focus-visible::after {
+  opacity: 1; transform: none; transition-delay: .35s;
+}
+/* Narrow pane: the toolbar is a vertical stack in the corner, so a tooltip
+   below would cover the next button — put it to the left instead. */
+.coordviews-page .cv-pane.cv-narrow .cv-tbtn::after {
+  top: 50%; right: calc(100% + 7px);
+  transform: translateY(-50%) translateX(3px);
+}
+.coordviews-page .cv-pane.cv-narrow .cv-tbtn:hover::after,
+.coordviews-page .cv-pane.cv-narrow .cv-tbtn:focus-visible::after {
+  transform: translateY(-50%);
+}
+.coordviews-page .cv-tbtn:hover { background: var(--c-surface-2); color: var(--c-text); }
+.coordviews-page .cv-tbtn:disabled { opacity: .35; cursor: default; pointer-events: none; }
+.coordviews-page .cv-tbtn.is-on {
+  background: var(--c-amber-50); border-color: var(--c-amber-200);
+  color: var(--c-amber-700);
+}
+.coordviews-page .cv-focus-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 5;
+  width: auto; min-width: 72px; height: 26px; padding: 0 9px; gap: 5px;
+  flex: none; font-size: 11.5px; font-weight: 650;
+}
+.coordviews-page .cv-focus-btn .svg-inline--fa { font-size: 10px; }
+.coordviews-page .cv-focus-btn::after { top: calc(100% + 6px); }
+.coordviews-page .cv-pane.cv-narrow .cv-focus-btn::after {
+  top: calc(100% + 6px); right: 0;
+  transform: translateY(-3px);
+}
+.coordviews-page .cv-pane.cv-narrow .cv-focus-btn:hover::after,
+.coordviews-page .cv-pane.cv-narrow .cv-focus-btn:focus-visible::after {
+  transform: none;
+}
+@media (hover: none), (pointer: coarse) {
+  .coordviews-page .cv-panebar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .coordviews-page .cv-tbtn {
+    width: 36px;
+    height: 36px;
+  }
+  .coordviews-page .cv-focus-btn {
+    width: auto;
+    min-width: 72px;
+  }
+}
+.coordviews-page .cv-pane-head select {
+  margin-left: auto; padding: 4px 7px; border: 1px solid var(--c-border-2);
+  border-radius: 6px; background: var(--c-surface-2); color: var(--c-text-2);
+  font-size: 11.5px; font-family: inherit;
+}
+/* The wrapper gives the minimap a stable positioning anchor. */
+.coordviews-page .cv-canvas-wrap {
+  position: relative; margin: auto 0; align-self: center;
+}
+.coordviews-page canvas {
+  /* JS fits the canvas inside its panel without distorting spatial geometry. */
+  display: block; background: var(--c-surface);
+  border-radius: 6px; cursor: crosshair;
+  transition: width .2s ease, height .2s ease;
+}
+/* ---- minimap ------------------------------------------------------------ */
+/* Deliberately coarse: a subsampled impression of the space plus a frame for the
+   visible part. It exists to answer "where am I", which needs no detail. Fades
+   in only once a panel is zoomed or panned, and never takes the pointer — it is
+   an indicator, not a control. */
+.coordviews-page .cv-mini {
+  position: absolute; right: 10px; bottom: 10px; z-index: 3;
+  width: 84px; height: 84px; margin: 0;
+  background: rgba(255, 255, 255, .84);
+  border: 1px solid var(--c-border); border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .10);
+  cursor: default; pointer-events: none;
+  opacity: 0; transform: translateY(5px) scale(.97); transform-origin: 100% 100%;
+  transition: opacity .2s ease, transform .24s cubic-bezier(.4, 0, .2, 1);
+}
+.coordviews-page .cv-mini.is-on { opacity: 1; transform: none; }
+/* On a small panel 84px is a big share of the square; scale it down (the canvas
+   keeps its backing store, so this only shrinks how it is presented). */
+.coordviews-page .cv-pane.cv-narrow .cv-mini {
+  width: 64px; height: 64px; right: 8px; bottom: 8px;
+}
+/* Pan mode: the cursor is the only cue that a drag will move the view rather
+   than select cells, so it has to change with the mode and while dragging. */
+.coordviews-page canvas.cv-pannable { cursor: grab; }
+.coordviews-page canvas.cv-grabbing { cursor: grabbing; }
+.coordviews-page .cv-tip {
+  position: absolute; pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: rgba(28,28,30,.82); color: #fff; padding: 8px 10px;
+  border-radius: 6px; font-size: 11.5px; line-height: 1.5;
+  z-index: 6; font-variant-numeric: tabular-nums;
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  /* Never wider than the panel it lives in: the JS clamps the position, but a
+     tooltip wider than the canvas cannot be clamped into view at all. */
+  max-width: min(280px, calc(100% - 16px));
+}
+/* One row per fact, each truncating on its own — a long clonotype gets an
+   ellipsis instead of pushing the whole box past the edge and taking every
+   label with it. */
+.coordviews-page .cv-tip-row {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.coordviews-page .cv-tip-k { opacity: .65; }
+
+/* A pinned tooltip (left by a click) carries the two actions. It becomes a
+   hit-testable surface only while pinned, so its buttons can receive clicks;
+   the ring marks it as held in place rather than following the cursor. */
+.coordviews-page .cv-tip-pinned {
+  pointer-events: auto;
+  box-shadow: 0 0 0 1px var(--c-amber), 0 6px 18px rgba(0, 0, 0, .3);
+}
+.coordviews-page .cv-tip-act {
+  display: flex; gap: 6px;
+  margin-top: 6px; padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, .16);
+}
+.coordviews-page .cv-tip-btn {
+  pointer-events: auto; cursor: pointer;
+  background: rgba(255, 255, 255, .12); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px;
+  padding: 2px 8px; font-size: 10.5px; font-family: inherit; line-height: 1.5;
+}
+.coordviews-page .cv-tip-btn:hover { background: rgba(255, 255, 255, .22); }
+.coordviews-page .cv-tip-close { margin-left: auto; }
+
+/* ---- results reveal ------------------------------------------------------ */
+/* Everything a selection produces — the composition + clonotype readout, the
+   plot of selected cells, the table of selected cells — enters the same way:
+   a short rise out of nothing, staggered top to bottom so the three read as one
+   response arriving rather than three unrelated boxes appearing at once.
+   An ANIMATION rather than a transition, because two of the three are rebuilt
+   from scratch by Shiny on every selection change; a transition has nothing to
+   transition FROM on a brand-new element.
+   `both` keeps the pre-animation state applied during the delay, so a staggered
+   block cannot flash at full opacity before its turn. */
+@keyframes cvRise {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+.coordviews-page .cv-rise {
+  animation: cvRise .18s cubic-bezier(.22, 1, .36, 1) both;
+  animation-delay: var(--cv-rise-delay, 0ms);
+}
+/* ---- single-cell detail card -------------------------------------------- */
+/* Two elements on purpose: .cv-card-pos holds the centring translate, .cv-card
+   holds the fly-in transform. One element would have to rebuild the -50%/-50%
+   inside every animation frame's transform, and any mistake there shows up as a
+   card that lands off-centre. */
+/* Spans the grid so the card can be sized against the GRID, not the viewport.
+   Sizing against the viewport is the trap: the grid is centred inside the page,
+   which itself sits beside the sidebar, so its centre is not the viewport's —
+   a 90vw card centred on the grid hangs off the side of the screen on a narrow
+   window. Measuring against the grid makes the card fit by construction. */
+.coordviews-page .cv-card-pos {
+  position: absolute; inset: 0; z-index: 40;
+  pointer-events: none;             /* only the card itself is interactive */
+}
+/* left/top are written by centreCard(): CSS can centre on the grid, but not on
+   the part of the grid that is actually on screen — and when the panels are
+   taller than the window those are not the same place. */
+.coordviews-page .cv-card {
+  position: absolute; pointer-events: auto;
+  width: min(400px, 100% - 20px);
+  max-height: min(560px, 100% - 20px, 76vh);
+  display: none; flex-direction: column;
+  background: var(--c-surface); color: var(--c-text);
+  border: 1px solid var(--c-border); border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .20), 0 2px 8px rgba(0, 0, 0, .08);
+  overflow: hidden;
+  opacity: 0;
+  /* transform is written per-open by the fly-in, so it is not declared here.
+     left/top are transitioned too: the card is re-centred when the server's meta
+     row arrives and makes it taller, and that correction should glide rather
+     than jump. */
+  transition: opacity .16s ease, transform .2s cubic-bezier(.22, 1, .36, 1),
+    left .2s cubic-bezier(.22, 1, .36, 1), top .2s cubic-bezier(.22, 1, .36, 1);
+}
+.coordviews-page .cv-card.is-open { display: flex; }
+.coordviews-page .cv-card.is-in { opacity: 1; transform: none; }
+.coordviews-page .cv-card-head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 13px 14px 11px; border-bottom: 1px solid var(--c-border);
+}
+.coordviews-page .cv-card-title {
+  font-size: 14.5px; font-weight: 650; line-height: 1.25;
+}
+.coordviews-page .cv-card-bc {
+  margin-top: 2px; font-size: 11.5px; color: var(--c-text-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+.coordviews-page .cv-card-x {
+  margin-left: auto; flex: none; width: 24px; height: 24px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 17px; line-height: 1; font-family: inherit;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--c-text-3); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.coordviews-page .cv-card-x:hover {
+  background: var(--c-surface-2); color: var(--c-text);
+}
+.coordviews-page .cv-card-body { overflow-y: auto; padding: 4px 14px 14px; }
+.coordviews-page .cv-card-sec {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--c-text-3);
+  margin: 13px 0 6px;
+}
+/* Key/value rows: the keys share one column so the values line up and can be
+   read straight down. The column gives way on a narrow card rather than forcing
+   every value to wrap — a meta column name is more compressible than its value. */
+.coordviews-page .cv-card-kv {
+  display: grid; grid-template-columns: minmax(74px, 116px) 1fr; gap: 3px 10px;
+  font-size: 12px; align-items: baseline;
+}
+.coordviews-page .cv-card-k { color: var(--c-text-2); word-break: break-word; }
+.coordviews-page .cv-card-v {
+  color: var(--c-text); font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+/* The full CDR3 — the reason the card exists; never truncated here. */
+.coordviews-page .cv-card-seq {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.5; word-break: break-all;
+  background: var(--c-surface-2); border-radius: 6px; padding: 7px 9px;
+}
+.coordviews-page .cv-card-sub { font-size: 11.5px; color: var(--c-text-2); margin-top: 5px; }
+.coordviews-page .cv-evidence-thumb {
+  display: block; width: 100%; padding: 0; overflow: hidden; cursor: zoom-in;
+  border: 1px solid var(--c-border); border-radius: 8px;
+  background: var(--c-surface-2);
+}
+.coordviews-page .cv-evidence-thumb img {
+  display: block; width: 100%; max-height: 180px; object-fit: contain;
+}
+.coordviews-page .cv-evidence-thumb:hover { border-color: var(--c-amber-200); }
+/* Placeholder rows shown while the full meta row is fetched from the server. */
+.coordviews-page .cv-card-skel { display: grid; gap: 6px; }
+.coordviews-page .cv-card-skel span {
+  height: 11px; border-radius: 3px; background: var(--c-surface-2);
+  animation: cvSkel 1.1s ease-in-out infinite;
+}
+.coordviews-page .cv-card-skel span:nth-child(2) { width: 82%; }
+.coordviews-page .cv-card-skel span:nth-child(3) { width: 64%; }
+@keyframes cvSkel { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+/* ---- legend ------------------------------------------------------------- */
+.coordviews-page .cv-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin: 12px 2px 0; font-size: 11.5px;
+}
+.coordviews-page .cv-lg {
+  display: flex; align-items: center; gap: 5px; cursor: pointer;
+  user-select: none; padding: 1px 4px; border-radius: 3px;
+}
+.coordviews-page .cv-lg:hover { background: var(--c-surface-2); }
+.coordviews-page .cv-lg.off { opacity: .5; }
+.coordviews-page .cv-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.coordviews-page .cv-evidence-dot {
+  width: 9px; height: 9px; border: 1.5px solid #1f2937; border-radius: 50%; flex: none;
+  box-sizing: border-box;
+}
+.coordviews-page .cv-lg-ct { color: var(--c-text-2); }
+/* RGB channel legend: informational, not a toggle */
+.coordviews-page .cv-rgb-lg { cursor: default; }
+.coordviews-page .cv-rgb-lg:hover { background: transparent; }
+.coordviews-page .cv-rgb-none { color: var(--c-text-3); font-style: italic; }
+.coordviews-page .cv-rgb-note {
+  flex: 1 0 100%; color: var(--c-text-3); line-height: 1.35;
+}
+
+/* ---- histology image control bar ---------------------------------------- */
+.coordviews-page .cv-imgbar {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 9px 12px; margin-bottom: 14px;
+  background: var(--c-surface-2); border: 1px solid var(--c-border);
+  border-radius: 8px; font-size: 12px;
+}
+.coordviews-page .cv-bg-settings .cv-imgbar {
+  padding: 12px 0 0; margin: 0; border: 0; border-radius: 0; background: transparent;
+}
+/* Space-scoped controls (this image bar, the clonal-layout switch) fade + lift
+   in/out on a right-panel space switch instead of popping. Same idiom as
+   .cv-selactions; JS drives it via revealEl() in updateSpaceScopedControls. */
+.coordviews-page #cv-clone-layout-ctl {
+  transition: opacity .18s ease, transform .18s ease;
+}
+/* The image bar sits ABOVE the panels, so its HEIGHT must collapse too — else the
+   panels jump up when it hits display:none. Animate max-height (overflow clipped)
+   so they slide, exactly like .cv-selbar. */
+.coordviews-page #coordviews_image_ui {
+  overflow: visible; max-height: none; margin-top: 10px;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.coordviews-page #coordviews_image_ui.cv-collapse { max-height: 0; }
+.coordviews-page #coordviews_image_ui.cv-collapse,
+.coordviews-page #cv-clone-layout-ctl.cv-collapse {
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+}
+.coordviews-page .cv-imgbar-title {
+  font-weight: 650; color: var(--c-text); margin-right: 2px;
+}
+.coordviews-page .cv-imgbar-heading {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px;
+}
+.coordviews-page .cv-img-ctl {
+  display: grid; grid-template-columns: 72px minmax(0, 1fr) 64px;
+  align-items: center; gap: 10px;
+}
+.coordviews-page .cv-img-ctl > label {
+  font-size: 11px; color: var(--c-text-2); font-weight: 600; white-space: nowrap;
+  line-height: 1; margin: 0;
+}
+/* margin:0 + vertical-align:middle so the native range centres on the label's
+   line rather than sitting a couple of px low (its default margin breaks the
+   flex centering). */
+.coordviews-page .cv-img-ctl input[type=range] {
+  width: 100%; min-width: 0; height: 26px; margin: 0;
+  appearance: none; -webkit-appearance: none; background: transparent; display: block;
+}
+.coordviews-page .cv-img-ctl input[type=range]::-webkit-slider-runnable-track {
+  height: 8px; border: 1px solid var(--c-border); border-radius: 999px;
+  background: linear-gradient(to right, var(--c-amber) 0 var(--cv-range-fill, 50%), #fff var(--cv-range-fill, 50%) 100%);
+}
+.coordviews-page .cv-img-ctl input[type=range]::-webkit-slider-thumb {
+  width: 25px; height: 25px; margin-top: -10px; border: 3px solid var(--c-amber);
+  border-radius: 50%; background: #fff; cursor: pointer; -webkit-appearance: none;
+}
+.coordviews-page .cv-img-ctl input[type=range]::-moz-range-track {
+  height: 8px; border: 1px solid var(--c-border); border-radius: 999px; background: #fff;
+}
+.coordviews-page .cv-img-ctl input[type=range]::-moz-range-progress {
+  height: 8px; border-radius: 999px; background: var(--c-amber);
+}
+.coordviews-page .cv-img-ctl input[type=range]::-moz-range-thumb {
+  width: 19px; height: 19px; border: 3px solid var(--c-amber); border-radius: 50%; background: #fff; cursor: pointer;
+}
+.coordviews-page .cv-img-range {
+  display: contents;
+}
+.coordviews-page .cv-img-number {
+  width: 64px; min-width: 0; height: 30px; box-sizing: border-box;
+  padding: 4px 6px; border: 1px solid var(--c-border-2); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text); text-align: right;
+  font: 12px/1 var(--cv-font, inherit); font-variant-numeric: tabular-nums;
+}
+.coordviews-page .cv-img-number:focus {
+  outline: 2px solid var(--c-amber-100); border-color: var(--c-amber);
+}
+.coordviews-page .cv-img-checks {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding-top: 2px;
+}
+/* ---- colourbar (single-gene continuous) --------------------------------- */
+.coordviews-page .cv-cbar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 12px 2px 0; font-size: 11px; color: var(--c-text-2);
+}
+.coordviews-page .cv-grad {
+  flex: 0 1 240px; height: 10px; border-radius: 5px;
+  border: 1px solid var(--c-border);
+}
+.coordviews-page .cv-cbar-note { color: var(--c-text-3); }
+.coordviews-page .cv-cbar.cv-shared-range .cv-grad,
+.coordviews-page .cv-cbar.cv-shared-range .cv-cbar-note { display: none; }
+.coordviews-page .cv-cbar.cv-shared-range #cv-cb0 {
+  color: var(--c-text-2); font-weight: 650;
+}
+.coordviews-page .cv-panel-scale {
+  display: inline-block; width: 52px; height: 6px; flex: 0 0 auto;
+  border: 1px solid var(--c-border); border-radius: 999px;
+}
+
+/* ---- RGB co-expression channel row -------------------------------------- */
+.coordviews-page .cv-topbar > #cv-rgb-ctl {
+  flex: 0 1 408px; width: 408px; min-width: min(408px, 100%);
+}
+.coordviews-page .cv-rgb-ctl .cv-rgb-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+}
+/* Each channel is sized to hold a gene symbol, not stretched to fill — three
+   full-width pickers would hog the bar and push the selection buttons to a new
+   row. Fixed width, no flex-grow. */
+.coordviews-page .cv-rgb-ctl .cv-rgb-row .form-group {
+  margin-bottom: 0; width: auto; min-width: 0;
+}
+.coordviews-page .cv-rgb-ctl .cv-rgb-row .selectize-control {
+  width: 100%; min-width: 0;
+}
+/* keep the mode-specific gene pickers compact in the top bar */
+.coordviews-page #cv-gene-ctl .form-group,
+.coordviews-page #cv-rgb-ctl .form-group { margin-bottom: 0; }
+/* Match searchable gene controls to the shared native/selectize metrics while
+   retaining their compact widths in this horizontal toolbar. */
+.coordviews-page .cv-topbar .selectize-control .selectize-input {
+  display: flex !important; flex-wrap: nowrap !important; align-items: center !important;
+  overflow-x: auto !important; overflow-y: hidden !important; white-space: nowrap !important;
+}
+.coordviews-page .cv-topbar .selectize-control .selectize-input input,
+.coordviews-page .cv-topbar .selectize-dropdown { font-size: 14px !important; }
+.coordviews-page .cv-topbar .selectize-control { height: var(--c-toolbar-control-height); }
+.coordviews-page .cv-topbar .selectize-control .selectize-input > .item {
+  flex: 0 0 auto; margin: 0 3px 0 0 !important; line-height: 18px !important;
+}
+.coordviews-page .cv-topbar .selectize-control .selectize-input > input {
+  flex: 0 0 8px; min-width: 8px !important; height: 18px !important;
+}
+.coordviews-page .cv-topbar .selectize-control.multi .selectize-input > input:only-child {
+  flex-basis: 5.5em;
+  min-width: 5.5em !important;
+}
+
+/* ---- selection bar ------------------------------------------------------ */
+.coordviews-page .cv-status-slot { display: grid; margin: 14px 0 8px; }
+.coordviews-page .cv-status-slot > .cv-workspace-guide,
+.coordviews-page .cv-status-slot > .cv-selbar {
+  grid-area: 1 / 1;
+  margin: 0;
+}
+/* The status slot keeps the panes still; only its contents fade. */
+.coordviews-page .cv-selbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 8px 12px;
+}
+.coordviews-page .cv-selcopy {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px;
+  min-width: 0;
+}
+.coordviews-page .cv-selbar.cv-collapse {
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+
+/* The default workspace state needs an affordance of its own. This compact
+   guide occupies the same strip as the Active cohort bar: selection replaces
+   it, rather than stacking another block above the plots. */
+.coordviews-page .cv-workspace-guide {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--c-border); border-radius: 8px;
+  background: var(--c-surface); color: var(--c-text-2); font-size: 12px;
+  transition: opacity .18s ease;
+}
+.coordviews-page .cv-workspace-guide.cv-collapse {
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+.coordviews-page .cv-workspace-kicker {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--c-amber-700); font-size: 10.5px; font-weight: 750;
+  letter-spacing: .045em; text-transform: uppercase; white-space: nowrap;
+}
+.coordviews-page .cv-workspace-guide-text {
+  flex: 1 1 0;
+  min-width: 12rem;
+  color: var(--c-text-2);
+}
+.coordviews-page .cv-workspace-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto;
+}
+.coordviews-page .cv-workspace-overview {
+  padding: 4px 9px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--c-amber-200); border-radius: 6px;
+  background: var(--c-amber-50); color: var(--c-amber-700);
+  font-family: inherit; font-size: 11.5px; font-weight: 650;
+}
+.coordviews-page .cv-workspace-overview:hover { background: #fff1e6; }
+
+@media (max-width: 900px) {
+  .coordviews-page .cv-selbar { grid-template-columns: minmax(0, 1fr); }
+  .coordviews-page .cv-selactions {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
+/* ---- readout (composition + clonotypes) --------------------------------- */
+.coordviews-page .cv-readout {
+  display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 20px;
+  margin-top: 4px;
+}
+@media (max-width: 900px) { .coordviews-page .cv-readout { grid-template-columns: 1fr; } }
+.coordviews-page .cv-read-h {
+  font-size: 12.5px; font-weight: 650; margin-bottom: 9px;
+}
+.coordviews-page .cv-read-sub { font-weight: 400; color: var(--c-text-2); font-size: 11px; }
+.coordviews-page .cv-empty, .coordviews-page .cv-empty-sm {
+  color: var(--c-text-2); font-size: 12.5px; line-height: 1.6;
+  border: 1px dashed var(--c-border-2); border-radius: 8px;
+  padding: 18px 14px;
+}
+.coordviews-page .cv-empty-sm { padding: 10px; }
+.coordviews-page .cv-bars { font-size: 12px; }
+.coordviews-page .cv-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.coordviews-page .cv-bar-nm { width: 92px; flex: none; font-weight: 600; }
+.coordviews-page .cv-bar-tr {
+  flex: 1; background: var(--c-surface-2); border-radius: 3px; height: 14px; overflow: hidden;
+}
+.coordviews-page .cv-bar-fl { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
+.coordviews-page .cv-bar-ct {
+  width: 42px; flex: none; text-align: right; color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.coordviews-page .cv-ctable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.coordviews-page .cv-ctable th, .coordviews-page .cv-ctable td {
+  text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--c-border);
+}
+.coordviews-page .cv-ctable th {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em;
+  color: var(--c-text-2); font-weight: 650;
+}
+.coordviews-page .cv-ctable td.num, .coordviews-page .cv-ctable th.num {
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.coordviews-page .cv-ctable tbody tr:last-child td { border-bottom: 0; }
+.coordviews-page .cv-crow { cursor: pointer; }
+.coordviews-page .cv-crow:hover { background: var(--c-amber-50); }
+.coordviews-page .cv-cdr3 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--c-text);
+}
+/* "+N" after a clonotype label: the clone covers N+1 distinct CDR3s and the
+   label names only the dominant one. Muted and non-monospace so it reads as an
+   annotation rather than part of the sequence. */
+.coordviews-page .cv-cdr3-more {
+  font-family: var(--cv-font, inherit);
+  font-size: 10px; color: var(--c-text-3); cursor: help;
+}
+.coordviews-page .cv-hint { font-size: 11px; color: var(--c-text-2); margin-top: 8px; }
+.coordviews-page .cv-field-summary { min-width: min(520px, 100%); }
+.coordviews-page .cv-field-desc {
+  margin: -2px 0 12px; color: var(--c-text-2); font-size: 11.5px; line-height: 1.45;
+}
+.coordviews-page .cv-field-table-title {
+  margin-bottom: 7px; color: var(--c-text-2); font-size: 11px; font-weight: 650;
+}
+.coordviews-page .cv-field-table-title span { margin-left: 6px; font-weight: 400; color: var(--c-text-2); }
+.coordviews-page .cv-field-table { display: grid; gap: 6px; }
+.coordviews-page .cv-field-row {
+  display: grid; grid-template-columns: minmax(76px, 130px) minmax(120px, 1fr) auto;
+  gap: 9px; align-items: center; font-size: 11px;
+}
+.coordviews-page .cv-field-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coordviews-page .cv-field-bars { display: grid; gap: 2px; }
+.coordviews-page .cv-field-track { height: 5px; border-radius: 999px; background: #edf0f2; overflow: hidden; }
+.coordviews-page .cv-field-track span { display: block; height: 100%; background: #aeb8c2; border-radius: inherit; }
+.coordviews-page .cv-field-track.is-selected span { background: var(--c-amber); }
+.coordviews-page .cv-field-values { display: flex; gap: 8px; min-width: 70px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.coordviews-page .cv-field-values span { color: var(--c-text-2); }
+.coordviews-page .cv-field-values b { color: var(--c-amber-700); font-weight: 650; }
+
+/* Trekker's depth views form one analysis region below the linked workspace.
+   It is present only for Trekker data and collapsed by default, so retaining
+   the old page's inspector/QC/Moran depth does not compete with the canvases. */
+.coordviews-page .cv-tk-insights {
+  margin-top: 14px; border: 1px solid var(--c-border);
+  border-radius: 12px; background: var(--c-surface); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .025);
+  margin-bottom: var(--cv-tk-anchor-space, 0px);
+  transition: margin-bottom .2s cubic-bezier(.4, 0, .2, 1);
+}
+.coordviews-page .cv-tk-insights-toggle {
+  width: 100%; min-height: 64px; padding: 12px 16px; border: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  text-align: left; background: transparent; color: var(--c-text);
+  cursor: pointer; font: inherit;
+}
+.coordviews-page .cv-tk-insights-toggle:hover { background: #fafafa; }
+.coordviews-page .cv-tk-insights-toggle > span {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  column-gap: 9px; row-gap: 2px;
+}
+.coordviews-page .cv-tk-insights-toggle strong { font-size: 15px; }
+.coordviews-page .cv-tk-insights-toggle small {
+  grid-column: 2; color: var(--c-text-2); font-size: 11.5px;
+  font-weight: 400;
+}
+.coordviews-page .cv-tk-insights-kicker {
+  color: var(--c-amber-700); font-size: 9.5px; font-weight: 750;
+  letter-spacing: .09em; text-transform: uppercase;
+}
+.coordviews-page .cv-tk-insights-toggle .fa-chevron-down {
+  color: var(--c-text-3); transition: transform .18s ease;
+}
+.coordviews-page .cv-tk-insights-toggle.is-open .fa-chevron-down {
+  transform: rotate(180deg);
+}
+.coordviews-page .cv-tk-insights-body {
+  border-top: 1px solid var(--c-border); padding: 0 16px 18px;
+}
+.coordviews-page .cv-tk-tabs {
+  display: flex; gap: 3px; overflow-x: auto; padding: 10px 0 12px;
+  border-bottom: 1px solid #efeff1;
+}
+.coordviews-page .cv-tk-tab {
+  flex: 0 0 auto; padding: 7px 11px; border: 1px solid transparent;
+  border-radius: 7px; background: transparent; color: var(--c-text-2);
+  cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
+  line-height: 1.2;
+}
+.coordviews-page .cv-tk-tab:hover { background: #f6f6f7; }
+.coordviews-page .cv-tk-tab.is-active {
+  border-color: #ffd1b5; background: #fff5ee; color: var(--c-amber-700);
+}
+.coordviews-page .cv-tk-panel-stage {
+  position: relative; min-height: 420px; overflow: hidden;
+  transition: height .2s cubic-bezier(.4, 0, .2, 1);
+}
+.coordviews-page .cv-tk-panel-stage.is-switching .cv-tk-panel {
+  position: absolute; inset: 0 0 auto; width: 100%;
+}
+.coordviews-page .cv-tk-panel {
+  padding-top: 14px; opacity: 1; transform: none;
+  transition: opacity .16s ease, transform .2s cubic-bezier(.4, 0, .2, 1);
+}
+.coordviews-page .cv-tk-panel.is-leaving {
+  opacity: 0; transform: translateY(-5px); pointer-events: none;
+}
+.coordviews-page .cv-tk-panel.is-entering {
+  opacity: 0; transform: translateY(7px); pointer-events: none;
+}
+.coordviews-page .cv-tk-panel .tk-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.coordviews-page .cv-tk-cell-empty {
+  padding: 22px; border: 1px dashed #dedee2; border-radius: 8px;
+  color: var(--c-text-2); text-align: center; font-size: 12px;
+}
+.coordviews-page .cv-tk-cell-content > h4 { margin: 0 0 2px; font-size: 16px; }
+.coordviews-page .cv-tk-cell-bc {
+  margin-bottom: 10px; color: var(--c-text-2);
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+.coordviews-page #cv-tk-cell-body {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px; padding: 0; overflow: visible; align-items: start;
+}
+.coordviews-page #cv-tk-cell-body:not(:has(.cv-tk-cell-block--evidence)) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.coordviews-page #cv-tk-cell-body > .cv-tk-cell-block {
+  min-width: 0; height: 100%; padding: 12px;
+  border: 1px solid var(--c-border); border-radius: 9px;
+  background: var(--c-surface-2);
+}
+.coordviews-page #cv-tk-cell-body .cv-card-sec { margin: 0 0 10px; }
+.coordviews-page #cv-tk-cell-body .cv-card-kv {
+  grid-template-columns: minmax(68px, 110px) minmax(0, 1fr);
+}
+.coordviews-page #cv-tk-cell-body .cv-evidence-thumb {
+  display: grid; place-items: center; min-height: 190px; background: #111318;
+}
+.coordviews-page #cv-tk-cell-body .cv-evidence-thumb img {
+  width: 100%; height: 220px; max-height: 220px; object-fit: contain;
+}
+.coordviews-page #cv-tk-cell-body .cv-card-sub { line-height: 1.45; }
+@media (max-width: 1100px) {
+  .coordviews-page #cv-tk-cell-body,
+  .coordviews-page #cv-tk-cell-body:not(:has(.cv-tk-cell-block--evidence)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .coordviews-page #cv-tk-cell-body > .cv-tk-cell-block:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 760px) {
+  .coordviews-page .cv-tk-insights-toggle small { display: none; }
+  .coordviews-page .cv-tk-panel .tk-grid { grid-template-columns: 1fr 1fr; }
+  .coordviews-page #cv-tk-cell-body { grid-template-columns: 1fr; }
+  .coordviews-page #cv-tk-cell-body > .cv-tk-cell-block:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+.cv-insight-modal {
+  position: relative; width: min(460px, 92vw); padding: 22px 24px;
+  border: 1px solid var(--c-border); border-radius: var(--r-lg);
+  color: var(--c-text); background: var(--c-surface);
+  box-shadow: var(--shadow-4);
+}
+.cv-insight-modal::backdrop { background: rgba(0, 0, 0, .42); }
+.cv-insight-modal .cv-insight-x {
+  position: absolute; top: 10px; right: 12px; width: 28px; height: 28px;
+  border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+  color: var(--c-text-3); font-size: 20px; line-height: 1;
+}
+.cv-insight-modal .cv-insight-x:hover { background: var(--c-surface-2); }
+.cv-insight-modal .cv-insight-kicker {
+  color: #35688f; font-size: 10.5px; font-weight: 750;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.cv-insight-modal h4 { margin: 5px 34px 10px 0; font-size: 17px; }
+.cv-insight-modal p { margin: 12px 0 0; color: var(--c-text-2); line-height: 1.55; }
+.cv-moran-modal-value {
+  font-size: 30px; font-weight: 700; color: #245779;
+  font-variant-numeric: tabular-nums;
+}
+.cv-evidence-modal {
+  position: relative; width: min(860px, 94vw); max-height: 90vh;
+  padding: 20px; overflow: auto;
+  border: 1px solid var(--c-border); border-radius: var(--r-lg);
+  background: var(--c-surface); box-shadow: var(--shadow-4);
+}
+.cv-evidence-modal::backdrop { background: rgba(0, 0, 0, .62); }
+.cv-evidence-modal .cv-insight-x {
+  position: absolute; top: 10px; right: 12px; width: 30px; height: 30px;
+  border: 0; border-radius: 6px; background: rgba(255,255,255,.9);
+  color: #555; cursor: pointer; font-size: 21px; line-height: 1;
+}
+.cv-evidence-modal-cell {
+  margin: 4px 38px 12px 0; color: var(--c-text-2);
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+.cv-evidence-modal img { display: block; max-width: 100%; margin: 0 auto; }
+
+/* The focus button while its lens is primary. */
+.coordviews-page .cv-tbtn.cv-focus-btn.is-on {
+  background: var(--c-amber-50); color: var(--c-amber-700);
+}
+
+/* "Reset to preset" sits at the end of the histology alignment bar. Quiet: it
+   undoes work rather than doing any, and it is next to the controls it undoes. */
+.coordviews-page .cv-imgbar-reset {
+  width: 100%; margin: 0; padding: 7px 10px; cursor: pointer;
+  border: 1px solid var(--c-border-2); border-radius: 6px;
+  background: var(--c-surface); color: var(--c-text-2);
+  font-family: inherit; font-size: 12px;
+}
+.coordviews-page .cv-imgbar-reset:hover {
+  background: var(--c-surface-2); color: var(--c-text);
+}

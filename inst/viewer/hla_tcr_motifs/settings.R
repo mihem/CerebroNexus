@@ -33,12 +33,12 @@ HLA_TWO_LINE_RENDER <- I(
   }"
 )
 
-## ---- Left-column parameters ------------------------------------------- ##
+## ---- Primary parameters ------------------------------------------------ ##
 output$hla_parameters_ui <- renderUI({
   chains <- hla_tcr_chains()
   # The panel is rebuilt only when the DATA changes (which controls exist), so
   # its own inputs are read under isolate() below: reading them live made every
-  # scope / colour / checkbox change tear the whole panel down (finding #8). The
+  # scope / colour change tear the whole panel down (finding #8). The
   # colour-by choices come from the shared hla_color_by_choices() reactive and
   # are kept current in place by the observer under this renderUI.
   tagList(
@@ -90,7 +90,7 @@ output$hla_parameters_ui <- renderUI({
     # one long label wrapped mid-phrase — "(pick allele" / "below)".
     selectizeInput(
       "hla_color_by",
-      "Colour nodes by:",
+      "Colour by",
       choices = isolate(hla_color_by_choices()),
       selected = isolate(hla_param("hla_color_by", "cluster")),
       options = list(render = HLA_TWO_LINE_RENDER)
@@ -112,7 +112,6 @@ output$hla_parameters_ui <- renderUI({
       condition = "input.hla_scope == 'pair'",
       uiOutput("hla_pair_allele_ui")
     ),
-    uiOutput("hla_scope_status"),
     sliderInput(
       "hla_min_nodes",
       "Minimum motif size (nodes):",
@@ -120,10 +119,23 @@ output$hla_parameters_ui <- renderUI({
       max = 10,
       value = hla_default_min_nodes(),
       step = 1
+    )
+  )
+})
+
+## ---- Secondary analysis parameters ------------------------------------ ##
+output$hla_more_parameters_ui <- renderUI({
+  tagList(
+    div(
+      class = "cerebro-settings-full",
+      uiOutput("hla_scope_status")
     ),
     # Live read-out of what the current threshold actually shows, so the effect
     # of moving the slider is visible without guessing.
-    uiOutput("hla_motif_readout"),
+    div(
+      class = "cerebro-settings-full",
+      uiOutput("hla_motif_readout")
+    ),
     checkboxInput(
       "hla_by_v",
       "Split motifs by V gene",
@@ -138,7 +150,7 @@ output$hla_parameters_ui <- renderUI({
     # or like bad data. It is neither: it has too many levels to read as colour.
     if (length(hla_color_cols_dropped()) > 0) {
       tags$p(
-        class = "text-muted",
+        class = "text-muted cerebro-settings-full",
         style = "font-size: 11px;",
         sprintf(
           paste(
@@ -151,12 +163,14 @@ output$hla_parameters_ui <- renderUI({
       )
     },
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       "Edges use Hamming distance 1 (fixed)."
     )
   )
 })
+
+outputOptions(output, "hla_more_parameters_ui", suspendWhenHidden = FALSE)
 
 ## Keep the colour-by picker's options current WITHOUT rebuilding the panel.
 ## The choices depend on scope (pair scope swaps "MHC context" for "Pair class")
@@ -187,14 +201,11 @@ observeEvent(
   ignoreInit = TRUE
 )
 
-## ---- Additional parameters (collapsed by default) --------------------- ##
+## ---- Appearance controls (settings drawer) ---------------------------- ##
 ## Display-only controls: nothing here rebuilds the graph.
 ##
-## The box ships collapsed, and Shiny suspends a hidden output — but
-## shinydashboard's collapse animation never triggers a recalculation, so the
-## control stayed empty even after the user opened the box. Unsuspend it. Safe
-## here precisely because this UI is static: it reads no data set, so it cannot
-## drag reactive work into a hidden panel (cf. the spatial_images regression).
+## The drawer starts hidden, so keep this static output available for its first
+## open without pulling data-dependent work into the hidden panel.
 output$hla_additional_params_ui <- renderUI({
   tagList(
     radioButtons(
@@ -209,7 +220,7 @@ output$hla_additional_params_ui <- renderUI({
       inline = TRUE
     ),
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       sprintf(
         paste(
@@ -229,7 +240,7 @@ output$hla_additional_params_ui <- renderUI({
       step = 0.1
     ),
     tags$p(
-      class = "text-muted",
+      class = "text-muted cerebro-settings-full",
       style = "font-size: 11px;",
       paste(
         "Display only: it scales every node and the size cap by the same",
@@ -254,7 +265,7 @@ output$hla_color_allele_ui <- renderUI({
   }
   selectizeInput(
     "hla_color_allele",
-    "HLA allele to colour by:",
+    "HLA allele",
     choices = choices,
     # Seeded from the page's shared allele, so appearing for the first time
     # ADOPTS whatever the Associations picker already chose rather than

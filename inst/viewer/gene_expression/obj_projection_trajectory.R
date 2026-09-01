@@ -6,7 +6,6 @@ expression_projection_trajectory <- reactive({
     expression_projection_parameters_plot(),
     expression_projection_cells_to_show()
   )
-  # message('--> trigger "expression_projection_trajectory"')
   parameters <- expression_projection_parameters_plot()
   cells_to_show <- expression_projection_cells_to_show()
   if (parameters[["projection"]] %in% availableProjections()) {
@@ -26,6 +25,5 @@ expression_projection_trajectory <- reactive({
     )
     trajectory_data[['meta']] <- trajectory_data[['meta']][cells_to_show, ]
   }
-  #   message(str(trajectory_data))
   return(trajectory_data)
 })

@@ -193,8 +193,8 @@ test_that("each dataset keeps its own background image + alignment params", {
 
 ## Real-data counterpart: bundle two genuine spatial .crb demos shipped in the
 ## package (no convert step — these are already .crb) so the app is exercised
-## against real coordinate spaces and both background-image paths: Visium with
-## an EXTERNAL H&E png, Xenium with an EMBEDDED histology image.
+## against real coordinate spaces and external image manifests for both Visium
+## and Xenium.
 build_real_app <- function(envir = parent.frame()) {
   visium_crb <- system.file(
     "extdata/examples/demo_spatial_visium.crb",
@@ -208,22 +208,43 @@ build_real_app <- function(envir = parent.frame()) {
     "extdata/examples/demo_spatial_visium_he.png",
     package = "CerebroNexus"
   )
-  if (!all(nzchar(c(visium_crb, xenium_crb, visium_png)))) {
+  xenium_dir <- system.file(
+    "extdata/examples/spatial/xenium",
+    package = "CerebroNexus"
+  )
+  xenium_pngs <- file.path(
+    xenium_dir,
+    c("dapi.png", "pink_stain_90.png", "fluorescent_yellow_90.png")
+  )
+  if (
+    !all(nzchar(c(visium_crb, xenium_crb, visium_png))) ||
+      !all(file.exists(xenium_pngs))
+  ) {
     return(NULL)
   }
 
   root <- withr::local_tempdir(.local_envir = envir)
   app_dir <- file.path(root, "app")
   visium_spatial <- readRDS(visium_crb)$availableSpatial()[[1L]]
+  xenium_spatial <- readRDS(xenium_crb)$availableSpatial()
   createShinyApp(
     cerebro_data = c("Visium" = visium_crb, "Xenium" = xenium_crb),
     result_dir = app_dir,
     launch_browser = FALSE,
-    ## Only Visium gets an external image; Xenium carries its own embedded one.
     spatial_images = list(
       Visium = stats::setNames(
         list(c(Histology = visium_png)),
         visium_spatial
+      ),
+      Xenium = stats::setNames(
+        list(
+          c(`Tissue background` = xenium_pngs[[1L]]),
+          c(
+            `Pink stain` = xenium_pngs[[2L]],
+            `Fluorescent yellow` = xenium_pngs[[3L]]
+          )
+        ),
+        xenium_spatial
       )
     ),
     spatial_image_settings = list(
@@ -263,14 +284,21 @@ test_that("createShinyApp bundles real spatial demos with mixed image paths", {
   ## Both real datasets listed by name.
   expect_setequal(names(cfg[["crb_file_to_load"]]), c("Visium", "Xenium"))
 
-  ## The external image + its alignment apply to Visium only; Xenium relies on
-  ## its embedded histology and must NOT inherit Visium's external image, so it
-  ## has no entry in spatial_images at all.
+  ## Both datasets retain their own spatial/image nesting.
   expect_match(
     cfg$spatial_images$Visium[[visium_spatial]]$Histology,
     "\\.png$"
   )
-  expect_false("Xenium" %in% names(cfg[["spatial_images"]]))
+  expect_named(cfg$spatial_images$Xenium, c("fov", "fov_colour"))
+  expect_named(
+    cfg$spatial_images$Xenium$fov_colour,
+    c("Pink stain", "Fluorescent yellow")
+  )
+  expect_true(all(vapply(
+    cfg$spatial_images$Xenium$fov_colour,
+    function(path) file.exists(file.path(app$app_dir, path)),
+    logical(1)
+  )))
   expect_equal(
     cfg$spatial_image_settings$Visium[[visium_spatial]]$Histology$offset_x,
     120

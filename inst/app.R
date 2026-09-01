@@ -18,7 +18,7 @@ Cerebro.options <<- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "4.3.4",
+  "cerebro_version" = "4.3.5",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -35,11 +35,9 @@ Cerebro.options <<- list(
     ## agnostic .getSpatialData extraction, spanning spot / bead / in-situ-imaging
     ## capture and Seurat v4 vs v5 objects: Slide-seq v2 is a
     ## Seurat v4 object, the others are v5. The demos deliberately show BOTH
-    ## background-image paths: MERFISH and Xenium EMBED their genuine histology
-    ## image (DAPI) inside the .crb, while Visium loads its H&E from an EXTERNAL
-    ## file (demo_spatial_visium_he.png) via `spatial_images` below — a live
-    ## example of that path, which also keeps the Visium .crb smaller. Slide-seq
-    ## has no tissue photo by design (bead scatter is the complete spatial view).
+    ## background-image paths: MERFISH embeds its DAPI in the .crb; Visium and
+    ## Xenium load external files via `spatial_images` below. Slide-seq has no
+    ## tissue photo by design (bead scatter is the complete spatial view).
     ## Rebuild with data-raw/build_spatial_demos.R.
     "Mouse brain (Visium)" = "extdata/examples/demo_spatial_visium.crb",
     "Mouse hippocampus (Slide-seq v2)" = "extdata/examples/demo_spatial_slideseq.crb",
@@ -73,10 +71,8 @@ Cerebro.options <<- list(
     "HLA & TCR" = "extdata/examples/demo_hla_tcr_dextramer.crb"
   ),
   "crb_pick_smallest_file" = FALSE,
-  ## Visium loads its real H&E background from an EXTERNAL image file (rather than
-  ## embedding it in the .crb) — this exercises the `spatial_images` code path.
-  ## The key must match the dropdown label above. The other image demos embed
-  ## their image inside the .crb.
+  ## Visium and Xenium load real backgrounds from external image files. The
+  ## nested keys match dataset -> spatial data -> Background image dropdown.
   ## Images default to NO flip; the Spatial tab's "Flip vertically/horizontally"
   ## checkboxes let the user align it if a given dataset needs it (for this Visium
   ## H&E that is a vertical flip, matching Seurat's own SpatialPlot).
@@ -84,6 +80,27 @@ Cerebro.options <<- list(
     "Mouse brain (Visium)" = list(
       "anterior1" = c(
         "Tissue background" = "extdata/examples/demo_spatial_visium_he.png"
+      )
+    ),
+    "Mouse brain (Xenium)" = list(
+      "fov" = list(
+        "Tissue background" = list(
+          path = "extdata/examples/spatial/xenium/dapi.png",
+          bounds = c(xmin = 0, xmax = 5448.5, ymin = 0, ymax = 3538.55)
+        )
+      ),
+      "fov_colour" = list(
+        "Pink stain" = list(
+          path = "extdata/examples/spatial/xenium/pink_stain_90.png",
+          bounds = c(xmin = -3538.55, xmax = 0, ymin = 0, ymax = 5448.5)
+        ),
+        "Fluorescent yellow" = list(
+          path = paste0(
+            "extdata/examples/spatial/xenium/",
+            "fluorescent_yellow_90.png"
+          ),
+          bounds = c(xmin = -3538.55, xmax = 0, ymin = 0, ymax = 5448.5)
+        )
       )
     )
   ),
@@ -102,23 +119,52 @@ Cerebro.options <<- list(
         )
       )
     ),
+    "Mouse ileum (MERFISH)" = list(
+      "fov" = list(
+        "Tissue background" = list(rotation = 90)
+      )
+    ),
     "Mouse brain (Xenium)" = list(
       "fov" = list(
         "Tissue background" = list(offset_y = -10, flip_y = TRUE)
+      ),
+      "fov_colour" = list(
+        "Pink stain" = list(offset_x = 10, flip_x = FALSE, flip_y = TRUE),
+        "Fluorescent yellow" = list(
+          offset_x = 10,
+          flip_x = FALSE,
+          flip_y = TRUE
+        )
       )
     )
   ),
+  ## Plot rotation is independent of per-image alignment above and is resolved
+  ## for one exact dataset + spatial entry.
+  "spatial_plot_rotation" = list(
+    "Mouse ileum (MERFISH)" = c("fov" = 90)
+  ),
   "cerebro_root" = ".",
   "welcome_message" = custom_welcome_message,
-  "overview_default_point_size" = 1,
-  "gene_expression_default_point_size" = 2,
-  ## Larger default spatial points so cell-type layering reads clearly against
-  ## the histology background in the demo.
-  "point_size" = list("spatial_projection_point_size" = 5),
-  "overview_default_point_opacity" = 0.3,
-  "gene_expression_default_point_opacity" = 0.5,
-  "overview_default_percentage_cells_to_show" = 100,
-  "gene_expression_default_percentage_cells_to_show" = 20,
+  ## One appearance per dataset, shared by every cell scatter page.
+  "point_size" = c(
+    "PBMC - Full (T+B)" = 6,
+    "Mouse brain (Visium)" = 5,
+    "Mouse hippocampus (Slide-seq v2)" = 5,
+    "Mouse ileum (MERFISH)" = 5,
+    "Mouse brain (Xenium)" = 5,
+    "Mouse brain (Trekker)" = 4.4,
+    "HLA & TCR" = 1
+  ),
+  "point_opacity" = c(
+    "PBMC - Full (T+B)" = 1,
+    "Mouse brain (Visium)" = 1,
+    "Mouse hippocampus (Slide-seq v2)" = 1,
+    "Mouse ileum (MERFISH)" = 1,
+    "Mouse brain (Xenium)" = 1,
+    "Mouse brain (Trekker)" = 0.85,
+    "HLA & TCR" = 0.3
+  ),
+  "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = FALSE
 )
 

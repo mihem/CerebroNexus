@@ -8,7 +8,7 @@ overview_projection_selected_cells <- reactive({
   req(overview_projection_data_to_plot())
 
   ## The selection is held persistently on the JS side (shared
-  ## projection_scatter.js) and pushed here as {x, y} under
+  ## cell_views.js) and pushed here as {x, y, ids} under
   ## <plot_id>_persistent_selection, so it survives plot-parameter changes
   ## (colour / point size / % of cells). Plotly's volatile plotly_selected event
   ## is NOT used, because a re-render would wipe it. The identifier is built the
@@ -24,6 +24,9 @@ overview_projection_selected_cells <- reactive({
     identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
     stringsAsFactors = FALSE
   )
+  if (length(sel[["ids"]]) == nrow(selection)) {
+    selection[["selection_key"]] <- as.character(sel[["ids"]])
+  }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and
   ## the selected-cells panels reflect only visible groups. The shared JS pushes
@@ -38,6 +41,11 @@ overview_projection_selected_cells <- reactive({
     metadata <- metadata %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
       dplyr::mutate(identifier = paste0(X1, '-', X2))
+    metadata[["selection_key"]] <- if ("cell_barcode" %in% colnames(metadata)) {
+      as.character(metadata[["cell_barcode"]])
+    } else {
+      as.character(seq_len(nrow(metadata)))
+    }
     selection <- filterSelectionByHiddenGroups(
       selection,
       metadata,

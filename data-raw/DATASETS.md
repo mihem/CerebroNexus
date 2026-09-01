@@ -121,7 +121,7 @@ Built by `data-raw/build_spatial_demos.R` (see [`spatial.md`](spatial.md) for de
 - **object type**: `SpatialExperiment` (converted to a Seurat `FOV`+`Centroids` object at build time so extraction runs via `GetTissueCoordinates`, exactly as `LoadVizgen`/`LoadXenium` would). The SPE ships with **no cell names**, so the builder mints stable `cell%05d` ids and applies them to matrix/metadata/coords.
 - **sampling**: `set.seed(42)`; cells with `leiden_final == "Removed"` dropped, then ≤ 5,000 stratified by cell type (here 5,000 of 5,800); 241-gene panel kept whole.
 - **cell-type field**: `cell_type` (from the source's `leiden_final` labels: Enterocyte tiers, Goblet, Paneth, Smooth Muscle, Myenteric Plexus, ICC, Telocyte, Stromal, Endothelial, immune subsets, …)
-- **embedded image**: **real DAPI mosaic** (`imgRaster(getImg(spe, "dapi"))`, 9392×5721), stored as `histology_image` with `histology_image_bounds = [0, W] × [0, H]` (cells already sit in DAPI pixel space). **Vertically flipped on encode** (`flip_y = TRUE`): `imgRaster` returns rows in the opposite order to the cell-coordinate y (verified by the brightness test in spatial.md — this is the opposite of Xenium, which is not flipped).
+- **embedded image**: **real DAPI mosaic** (`imgRaster(getImg(spe, "dapi"))`, 9392×5721), stored natively as `histology_image` with `histology_image_bounds = [0, W] × [0, H]` (cells already sit in DAPI pixel space). Display alignment remains a Viewer setting; the builder does not bake a flip into the raster.
 - **license**: Bioconductor `MerfishData` / original Petukhov et al. terms (public reference data).
 - **build**: `data-raw/build_spatial_demos.R` → `build_merfish()`
 - **output**: `inst/extdata/examples/demo_spatial_merfish.crb` (~2.0 MB)
@@ -143,10 +143,10 @@ Built by `data-raw/build_spatial_demos.R` (see [`spatial.md`](spatial.md) for de
 - **object type**: raw 10x Xenium outs (`cell_feature_matrix.h5` + `cells.csv.gz` + `morphology_focus.ome.tif`), assembled into a Seurat `FOV`+`Centroids` object at build time. `LoadXenium` is not used: the public bundle ships the `.h5` matrix (not the mtx directory `LoadXenium` expects) and stores transcripts as `.parquet` (needs `arrow`); reading the matrix + `cells.csv.gz` directly is smaller and dependency-free.
 - **sampling**: `set.seed(42)`; ≤ 5,000 cells stratified by Louvain cluster (here 5,000 of 36,602); 248-gene brain panel kept whole.
 - **cell-type field**: `cluster` (Louvain; the source ships no cell-type labels)
-- **embedded image**: **real DAPI morphology** (first channel of `morphology_focus.ome.tif`, contrast-stretched to a greyscale PNG), stored as `histology_image` with `histology_image_bounds = [0, W·px] × [0, H·px]` where `px = pixel_size` (0.2125 µm/px from `experiment.xenium`) converts the full-resolution pixel raster into the micron coordinate space `GetTissueCoordinates` reports. The OME-TIFF is JPEG2000-compressed, which R's `tiff`/`EBImage` cannot decode, so it is read with the Bioconductor package `RBioFormats` (a pure-R wrapper over the Java Bio-Formats library, no Python); if `RBioFormats` is missing, the demo ships coordinates without the image. **Not vertically flipped** — the RBioFormats raster and the cell centroids share the same top-down frame (verified by the brightness test, see spatial.md); this is the opposite of MERFISH.
+- **embedded image**: **none**. The real DAPI morphology is written to `inst/extdata/examples/spatial/xenium/dapi.png`; pink and fluorescent-yellow 90° variants live beside it. `inst/app.R` loads them with `spatial_images`. The CRB contains `fov` and the matching rotated-coordinate `fov_colour`, keeping image bytes out of the data object. The OME-TIFF is JPEG2000-compressed and read with `RBioFormats` during the reproducible build.
 - **license**: 10x Genomics public dataset terms (freely redistributable).
 - **build**: `data-raw/build_spatial_demos.R` → `build_xenium()`
-- **output**: `inst/extdata/examples/demo_spatial_xenium.crb` (~3.4 MB)
+- **output**: `inst/extdata/examples/demo_spatial_xenium.crb` plus `inst/extdata/examples/spatial/xenium/*.png`
 
 ### Spatial — evaluated, not yet shipped
 

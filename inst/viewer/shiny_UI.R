@@ -33,6 +33,159 @@ boxTitle <- function(title) {
   p(title, style = "padding-right: 5px; display: inline")
 }
 
+cerebroSettingsButton <- function(id, target) {
+  tags$button(
+    type = "button",
+    id = id,
+    class = "cerebro-more-btn",
+    `aria-expanded` = "false",
+    `aria-controls` = target,
+    `data-cerebro-drawer-target` = target,
+    icon("sliders"),
+    tags$span("More settings"),
+    tags$span(class = "cerebro-more-caret")
+  )
+}
+
+cerebroVizPageHeader <- function(title, info_id, subtitle) {
+  tagList(
+    div(
+      class = "cerebro-viz-page-heading",
+      tags$h3(title),
+      cerebroInfoButton(info_id)
+    ),
+    div(class = "cerebro-viz-page-meta", subtitle)
+  )
+}
+
+cerebroSettingsSection <- function(title, content, info = NULL) {
+  div(
+    class = "cerebro-settings-section",
+    div(
+      class = "cerebro-settings-heading",
+      tags$span(title),
+      info
+    ),
+    div(class = "cerebro-settings-content", content)
+  )
+}
+
+cerebroSettingsDrawer <- function(id, ...) {
+  div(
+    id = id,
+    class = "cerebro-settings-drawer",
+    role = "dialog",
+    `aria-modal` = "false",
+    `aria-hidden` = "true",
+    `aria-labelledby` = paste0(id, "_title"),
+    div(
+      class = "cerebro-settings-titlebar",
+      tags$span(id = paste0(id, "_title"), "More settings"),
+      tags$button(
+        type = "button",
+        class = "cerebro-settings-close",
+        `data-cerebro-drawer-close` = "",
+        `aria-label` = "Close More settings",
+        HTML("&times;")
+      )
+    ),
+    div(class = "cerebro-settings-body", ...)
+  )
+}
+
+cerebroCellViewOutput <- function(id) {
+  div(
+    id = paste0(id, "_cell_view_host"),
+    class = "coordviews-page cerebro-cell-view-host",
+    `data-cell-view-id` = id,
+    div(class = "cerebro-cell-view-surface", `aria-live` = "polite"),
+    shiny::uiOutput(
+      paste0(id, "_composition"),
+      class = "cerebro-selection-composition-slot"
+    )
+  )
+}
+
+cerebroSelectionStatus <- function(
+  plot_id,
+  count_output_id,
+  client_actions = TRUE
+) {
+  action_button <- function(action, class, icon_name, label) {
+    input_id <- paste0(
+      plot_id,
+      if (identical(action, "zoom")) {
+        "_zoom_to_selection"
+      } else {
+        "_clear_selection"
+      }
+    )
+    contents <- tagList(icon(icon_name), tags$span(label))
+    if (!client_actions) {
+      return(actionButton(input_id, contents, class = class))
+    }
+    tags$button(
+      id = input_id,
+      type = "button",
+      class = class,
+      `data-cell-view-id` = plot_id,
+      `data-cell-view-action` = action,
+      `aria-pressed` = if (identical(action, "zoom")) "false" else NULL,
+      contents
+    )
+  }
+  div(
+    class = "cerebro-selection-status-slot",
+    div(
+      id = paste0(plot_id, "_selection_guide"),
+      class = "cerebro-selection-status-guide",
+      tags$span(
+        class = "cerebro-selection-status-kicker",
+        icon("arrow-pointer"),
+        "Selection workspace"
+      ),
+      tags$span(
+        class = "cerebro-selection-status-text",
+        "Drag on the plot to create an active cohort."
+      )
+    ),
+    div(
+      id = paste0(plot_id, "_selection_active"),
+      class = paste(
+        "cerebro-selection-status-active",
+        "cerebro-selection-status-hidden"
+      ),
+      `aria-live` = "polite",
+      tags$span(class = "cerebro-selection-status-kicker", "Active cohort"),
+      shiny::tagAppendAttributes(
+        htmlOutput(count_output_id, inline = TRUE),
+        class = "cerebro-selection-status-count"
+      ),
+      tags$div(
+        class = "cerebro-selection-actions",
+        action_button(
+          "zoom",
+          paste(
+            "btn btn-xs btn-default",
+            "cerebro-selection-action-zoom"
+          ),
+          "magnifying-glass-plus",
+          "Zoom to selection"
+        ),
+        action_button(
+          "clear",
+          paste(
+            "btn btn-xs btn-default btn-breathing",
+            "cerebro-selection-action-clear"
+          ),
+          "eraser",
+          "Clear selection"
+        )
+      )
+    )
+  )
+}
+
 ## Read an entire file into a single string. Used to inline .js/.svg/.html
 ## assets into the UI. readChar reads `size` bytes (the file's byte count) and
 ## stops at EOF, which faithfully covers ASCII/UTF-8 assets. Defined here,
@@ -236,6 +389,13 @@ source(
   local = TRUE
 )
 source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/viewer/coordinated_views/UI.R"
+  ),
+  local = TRUE
+)
+source(
   paste0(Cerebro.options[["cerebro_root"]], "/viewer/hla_tcr_motifs/UI.R"),
   local = TRUE
 )
@@ -270,6 +430,13 @@ ui <- dashboardPage(
         )
       )
     ),
+    tags$button(
+      type = "button",
+      id = "cerebro-nav-close",
+      class = "cerebro-nav-close",
+      `aria-label` = "Close navigation",
+      HTML("&times;")
+    ),
     sidebarMenu(
       id = "sidebar",
       menuItem(
@@ -279,6 +446,11 @@ ui <- dashboardPage(
         selected = TRUE
       ),
       menuItem("Projection", tabName = "overview", icon = icon("home")),
+      menuItem(
+        "Linked views",
+        tabName = "coordinated_views",
+        icon = icon("project-diagram")
+      ),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
       ## Marker genes and Most expressed genes are inserted conditionally (see
       ## insertConditionalTab in shiny_server.R): a data set that carries neither
@@ -306,7 +478,7 @@ ui <- dashboardPage(
         icon = icon("barcode")
       ),
       menuItem(
-        "Color management",
+        "Colour management",
         tabName = "color_management",
         icon = icon("palette")
       ),
@@ -315,6 +487,13 @@ ui <- dashboardPage(
   ),
   dashboardBody(
     shinyjs::useShinyjs(),
+    tags$button(
+      type = "button",
+      id = "cerebro-nav-scrim",
+      `aria-label` = "Close navigation",
+      `aria-hidden` = "true",
+      tabindex = "-1"
+    ),
     ## App CSS/JS as cacheable static resources (served from the cerebro_www
     ## resource path registered above) instead of inlined into every page. The
     ## browser caches them across connections and downloads them in parallel;
@@ -322,29 +501,27 @@ ui <- dashboardPage(
     ## self-contained IIFE with its own Shiny-readiness retry, so order-safe).
     ##  - custom.css      : Console design language; overrides AdminLTE 2 chrome.
     ##  - fill_height.js  : sizes any .cerebro-fill element to the live viewport.
-    ##  - trekker.*       : Trekker page assets (scoped under .trekker-page / tk-).
+    ##  - trekker.css     : Trekker insight/QC presentation shared with Linked views.
     ##  - hla_motifs.*    : modebar over the visNetwork motif network.
     tags$head(
       cerebro_css("custom.css"),
       cerebro_css("trekker.css"),
       cerebro_css("hla_motifs.css"),
+      cerebro_css("coordviews.css"),
       cerebro_js("fill_height.js", defer = TRUE),
-      cerebro_js("trekker.js", defer = TRUE),
+      cerebro_js("cv-geom.js", defer = TRUE),
+      cerebro_js("cell_views_state.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
-      ## Shared projection-scatter engine, loaded ONCE here instead of being
-      ## inlined into all five projection tabs' extendShinyjs() (~69KB x5). Both
-      ## files expose only window globals (window.cerebroProjectionLayout /
-      ## window.cerebroProjection); each tab's thin js_projection_update_plot.js
-      ## (still inlined via extendShinyjs) calls those globals. These are NOT
-      ## deferred so the globals exist before the tab scripts' registerPlot()
-      ## runs; layouts before scatter since scatter builds on the layout helpers.
-      cerebro_js("projection_layouts.js"),
-      cerebro_js("projection_scatter.js")
+      cerebro_js("viewer-shell.js", defer = TRUE),
+      cerebro_js("multiselect.js", defer = TRUE),
+      cerebro_js("cell_views.js"),
+      cerebro_js("settings_drawer.js", defer = TRUE)
     ),
     tags$script(HTML('$("body").addClass("fixed");')),
     tabItems(
       tab_load_data,
       tab_overview,
+      tab_coordinated_views,
       tab_groups,
       tab_marker_genes,
       tab_most_expressed_genes,

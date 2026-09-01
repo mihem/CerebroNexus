@@ -1,3 +1,15 @@
+# CerebroNexus 4.3.5
+
+## Viewer
+
+- Projection, Spatial, Trekker, expression, trajectory and repertoire pages
+  now share the coordinated Canvas renderer and consistent selection controls.
+- Generated Viewers preserve legacy Spatial image settings and row-name-only
+  cell identities throughout linked selections and cell details.
+- Linked views combine projections, Spatial sections, Trekker and clonal
+  layouts in one coordinated workspace with shared selection, colouring,
+  filtering and cell details.
+
 # CerebroNexus 4.3.4
 
 ## Viewer

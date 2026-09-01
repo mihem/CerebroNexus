@@ -28,7 +28,7 @@ output[["extra_material_content_UI"]] <- renderUI({
             ),
             shinyWidgets::materialSwitch(
               inputId = "extra_material_table_color_highlighting",
-              label = "Highlight values with colors:",
+              label = "Highlight values with colours:",
               value = TRUE,
               status = "primary",
               inline = TRUE

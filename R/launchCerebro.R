@@ -36,20 +36,13 @@
 #' @param welcome_message \code{string} with custom welcome message to display
 #' in the "Load data" tab. Can contain HTML formatting, e.g.
 #' \code{'<h3>Hi!</h3>'}. Defaults to \code{NULL}.
-#' @param overview_default_point_size Default point size in overview. This
-#' value can be changed in the UI; defaults to 5.
-#' @param gene_expression_default_point_size Default point size in gene_expression. This
-#' value can be changed in the UI; defaults to 5.
-#' @param overview_default_point_opacity Default point opacity in
-#' overview. This value can be changed in the UI; defaults to 1.0.
-#' @param overview_default_percentage_cells_to_show Default percentage of
-#' cells to show in overview. This value can be changed in the UI; defaults
-#' to 100.
-#' @param gene_expression_default_point_opacity Default point opacity in
-#' gene expression. This value can be changed in the UI; defaults to 1.0.
-#' @param gene_expression_default_percentage_cells_to_show Default percentage of
-#' cells to show in gene expression. This value can be changed in the UI; defaults
-#' to 100.
+#' @param point_size Default point size for cell scatter views. This value can
+#'   be changed in the UI; defaults to 5.
+#' @param point_opacity Default point opacity for cell scatter views. This value
+#'   can be changed in the UI; defaults to 1.
+#' @param percentage_cells_to_show Default percentage of cells shown in every
+#'   cell scatter view. This value can be changed independently in each page;
+#'   defaults to 100.
 #' @param projections_show_hover_info Show hover infos in projections. This
 #' setting can be changed in the UI; defaults to TRUE.
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
@@ -93,12 +86,9 @@ launchCerebro <- function(
   expression_matrix_h5 = NULL,
   expression_matrix_BPCells = NULL,
   welcome_message = NULL,
-  overview_default_point_size = 5,
-  gene_expression_default_point_size = 5,
-  overview_default_point_opacity = 1,
-  gene_expression_default_point_opacity = 1,
-  overview_default_percentage_cells_to_show = 100,
-  gene_expression_default_percentage_cells_to_show = 100,
+  point_size = 5,
+  point_opacity = 1,
+  percentage_cells_to_show = 100,
   projections_show_hover_info = TRUE,
   ...
 ) {
@@ -112,29 +102,41 @@ launchCerebro <- function(
     )
   }
   if (
-    overview_default_point_size < 0 ||
-      overview_default_point_size > 20
+    !is.numeric(point_size) ||
+      length(point_size) != 1L ||
+      is.na(point_size) ||
+      !is.finite(point_size) ||
+      point_size < 1 ||
+      point_size > 20
   ) {
     stop(
-      "'overview_default_point_size' parameter must be between 1 and 20",
+      "'point_size' parameter must be between 1 and 20",
       call. = FALSE
     )
   }
   if (
-    gene_expression_default_point_opacity < 0 ||
-      gene_expression_default_point_opacity > 1
+    !is.numeric(point_opacity) ||
+      length(point_opacity) != 1L ||
+      is.na(point_opacity) ||
+      !is.finite(point_opacity) ||
+      point_opacity < 0.1 ||
+      point_opacity > 1
   ) {
     stop(
-      "'gene_expression_default_point_opacity' parameter must be between 0 and 1",
+      "'point_opacity' parameter must be between 0.1 and 1",
       call. = FALSE
     )
   }
   if (
-    gene_expression_default_percentage_cells_to_show < 0 ||
-      gene_expression_default_percentage_cells_to_show > 100
+    !is.numeric(percentage_cells_to_show) ||
+      length(percentage_cells_to_show) != 1L ||
+      is.na(percentage_cells_to_show) ||
+      !is.finite(percentage_cells_to_show) ||
+      percentage_cells_to_show < 10 ||
+      percentage_cells_to_show > 100
   ) {
     stop(
-      "'gene_expression_default_percentage_cells_to_show' parameter must be between 0 and 100",
+      "'percentage_cells_to_show' parameter must be between 10 and 100",
       call. = FALSE
     )
   }
@@ -160,12 +162,9 @@ launchCerebro <- function(
     "expression_matrix_BPCells" = expression_matrix_BPCells,
     "welcome_message" = welcome_message,
     "cerebro_root" = system.file(package = "CerebroNexus"),
-    "overview_default_point_size" = overview_default_point_size,
-    "overview_default_point_opacity" = overview_default_point_opacity,
-    "overview_default_percentage_cells_to_show" = overview_default_percentage_cells_to_show,
-    "gene_expression_default_point_size" = gene_expression_default_point_size,
-    "gene_expression_default_point_opacity" = gene_expression_default_point_opacity,
-    "gene_expression_default_percentage_cells_to_show" = gene_expression_default_percentage_cells_to_show,
+    "point_size" = point_size,
+    "point_opacity" = point_opacity,
+    "percentage_cells_to_show" = percentage_cells_to_show,
     "projections_show_hover_info" = projections_show_hover_info
   )
   assign("Cerebro.options", cerebro_options, envir = .GlobalEnv)

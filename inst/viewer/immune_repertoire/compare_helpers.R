@@ -23,9 +23,9 @@ IR_COMPARE_RECT_BORDER <- "#333333"
 ## hue circle at higher chroma, so adjacent clones get clearly different hues.
 IR_COMPARE_PALETTE <- "Dark 3"
 
-## Give a plotly figure the shared projection-scatter modebar look ("theme a"):
+## Give a plotly figure the shared cell-view modebar look ("theme a"):
 ## hide the Plotly logo and drop the clutter buttons, mirroring the REACT_CONFIG
-## in www/projection_scatter.js so every IR plot's toolbar matches the projection
+## in www/cell_views.js so every IR plot's toolbar matches the projection
 ## tabs. The two custom selection buttons there are tied to the shared scatter
 ## engine's box-select, which the bar/point IR figures don't have, so only the
 ## styling is mirrored here. Defined in this helpers file (sourced before
@@ -303,7 +303,6 @@ ir_compare_clone_rects <- function(prep, clone) {
 ## the user hovers — a marker gives one tooltip per rectangle instead of the
 ## fill's repeated per-vertex text.
 ir_compare_clone_anchors <- function(prep, clone) {
-  hw <- IR_COMPARE_BAR_HALF_WIDTH
   cr <- prep$rects[prep$rects$clone == clone, , drop = FALSE]
   if (nrow(cr) == 0L) {
     return(list(x = numeric(0), y = numeric(0), text = character(0)))

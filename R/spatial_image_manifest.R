@@ -658,7 +658,8 @@
     "scale_y",
     "offset_x",
     "offset_y",
-    "rotation"
+    "rotation",
+    "image_opacity"
   )
   logical_fields <- c("flip_x", "flip_y")
 
@@ -784,6 +785,16 @@
               call. = FALSE
             )
           }
+          if (
+            identical(field, "image_opacity") &&
+              (value < 0 || value > 1)
+          ) {
+            stop(
+              context,
+              " setting `image_opacity` must be between 0 and 1.",
+              call. = FALSE
+            )
+          }
         }
         leaf
       })
@@ -795,6 +806,75 @@
   })
   names(normalized) <- datasets
   normalized
+}
+
+#' Normalize per-spatial-entry plot rotations
+#'
+#' @keywords internal
+#' @noRd
+.normalizeAppSpatialPlotRotation <- function(rotation, catalogs) {
+  if (is.null(rotation)) {
+    return(NULL)
+  }
+  if (is.numeric(rotation)) {
+    datasets <- .spatialManifestNames(rotation, "`spatial_plot_rotation`")
+    rotation <- stats::setNames(
+      lapply(seq_along(rotation), function(i) {
+        stats::setNames(
+          rep(as.numeric(rotation[[i]]), length(catalogs[[datasets[[i]]]])),
+          names(catalogs[[datasets[[i]]]])
+        )
+      }),
+      datasets
+    )
+  }
+  if (!is.list(rotation)) {
+    stop("`spatial_plot_rotation` must be a named list.", call. = FALSE)
+  }
+  datasets <- .spatialManifestNames(rotation, "`spatial_plot_rotation`")
+  unknown_datasets <- setdiff(datasets, names(catalogs))
+  if (length(unknown_datasets)) {
+    stop(
+      "`spatial_plot_rotation` dataset `",
+      unknown_datasets[[1L]],
+      "` is not present in `cerebro_data`.",
+      call. = FALSE
+    )
+  }
+  normalized <- lapply(datasets, function(dataset) {
+    values <- rotation[[dataset]]
+    spatial_names <- .spatialManifestNames(
+      values,
+      paste0("`spatial_plot_rotation` dataset `", dataset, "`")
+    )
+    unknown_spatials <- setdiff(spatial_names, names(catalogs[[dataset]]))
+    if (length(unknown_spatials)) {
+      stop(
+        "`spatial_plot_rotation` dataset `",
+        dataset,
+        "` spatial `",
+        unknown_spatials[[1L]],
+        "` is not available.",
+        call. = FALSE
+      )
+    }
+    valid <- vapply(
+      values,
+      function(value) {
+        is.numeric(value) && length(value) == 1L && is.finite(value)
+      },
+      logical(1)
+    )
+    if (!all(valid)) {
+      stop(
+        "`spatial_plot_rotation` values must be finite numeric rotations.",
+        call. = FALSE
+      )
+    }
+    values <- vapply(values, as.numeric, numeric(1))
+    stats::setNames(values, spatial_names)
+  })
+  stats::setNames(normalized, datasets)
 }
 
 #' Normalize one legacy per-dataset image setting
@@ -838,7 +918,6 @@
       stop("`", argument, "` must contain ", type, " scalars.", call. = FALSE)
     }
     migrated_targets <- attr(images, "legacy_external_targets")[[dataset]]
-    targets <- list()
     target_spatials <- if (is.null(migrated_targets)) {
       stats::setNames(
         lapply(names(catalogs[[dataset]]), function(spatial_name) {
@@ -852,22 +931,20 @@
     } else {
       migrated_targets
     }
-    for (spatial_name in names(target_spatials)) {
-      image_names <- target_spatials[[spatial_name]]
-      for (image_name in image_names) {
-        targets[[length(targets) + 1L]] <- c(spatial_name, image_name)
-      }
-    }
+    targets <- unlist(
+      lapply(names(target_spatials), function(spatial_name) {
+        lapply(target_spatials[[spatial_name]], function(image_name) {
+          c(spatial_name, image_name)
+        })
+      }),
+      recursive = FALSE
+    )
     if (is.null(migrated_targets) && length(targets) != 1L) {
-      available <- vapply(
-        targets,
-        function(target) paste(target, collapse = "/"),
-        character(1)
-      )
-      detail <- if (length(available) == 0L) {
-        "no image targets are available"
-      } else {
+      available <- vapply(targets, paste, character(1), collapse = "/")
+      detail <- if (length(available)) {
         paste0("available image targets: ", paste(available, collapse = ", "))
+      } else {
+        "no image targets are available"
       }
       stop(
         "Legacy `",
@@ -881,9 +958,7 @@
       )
     }
     for (target in targets) {
-      spatial_name <- target[[1L]]
-      image_name <- target[[2L]]
-      result[[dataset]][[spatial_name]][[image_name]][[field]] <- value
+      result[[dataset]][[target[[1L]]]][[target[[2L]]]][[field]] <- value
     }
   }
   result

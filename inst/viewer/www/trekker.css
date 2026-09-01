@@ -1,10 +1,8 @@
 /*----------------------------------------------------------------------------*
  * Trekker page styles.
  *
- * Only the bespoke bits are styled here (the dual scatter panes, the inspector,
- * the QC / evidence / Moran readouts). The controls and the card chrome are
- * standard app widgets (cerebroBox / selectInput / sliderInput / ...), so they
- * inherit the Console theme untouched.
+ * Only Trekker's inspector, QC, evidence and Moran readouts live here. Canvas
+ * panels and toolbars use the shared cell-view styles.
  *
  * Everything is scoped under `.trekker-page` and every class is `tk-`-prefixed,
  * so nothing here restyles the app's generic elements. Colours reference the
@@ -39,51 +37,6 @@
     padding: 1px 5px; border-radius: var(--r-xs); color: var(--c-text-2);
   }
 
-  /* ---- scatter panes ---- */
-  .tk-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .tk-panes.single { grid-template-columns: 1fr; }
-  .tk-pane { position: relative; }
-  .tk-pane-h {
-    font-size: 11.5px; font-weight: 650; color: var(--c-text-2);
-    margin: 0 0 6px; display: flex; align-items: center; gap: 6px;
-  }
-  .tk-pane-h .tk-u { font-weight: 400; color: var(--c-text-3); margin-left: auto; font-size: 11px; }
-  canvas {
-    display: block; width: 100%; background: var(--c-surface);
-    border-radius: var(--r-sm); cursor: crosshair; border: 1px solid var(--c-border);
-  }
-  .tk-tip {
-    position: absolute; pointer-events: none; opacity: 0; transition: opacity .1s;
-    background: rgba(28, 28, 30, .94); color: #fff; padding: 7px 9px;
-    border-radius: var(--r-xs); font-size: 11.5px; line-height: 1.5;
-    white-space: nowrap; z-index: 5; font-variant-numeric: tabular-nums;
-  }
-  .tk-tip b { color: var(--c-amber-300); }
-
-  /* ---- selection bar + legend + colour bar ---- */
-  .tk-selbar {
-    display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px;
-    background: var(--c-blue-50); border: 1px solid var(--c-blue-100);
-    border-radius: var(--r-sm); padding: 7px 11px; color: var(--c-blue-700);
-  }
-  .tk-linkbtn {
-    margin-left: auto; border: 1px solid var(--c-border-2); background: var(--c-surface);
-    color: var(--c-text-2); border-radius: var(--r-xs); padding: 3px 10px;
-    font-size: 11px; cursor: pointer; font-family: inherit;
-  }
-  .tk-linkbtn:hover { background: var(--c-surface-2); color: var(--c-text); }
-  .tk-legend { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 10px; font-size: 11.5px; }
-  .tk-lg {
-    display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;
-    padding: 1px 3px; border-radius: var(--r-xs);
-  }
-  .tk-lg:hover { background: var(--c-surface-2); }
-  .tk-lg.off { opacity: .3; }
-  .tk-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .tk-cbar { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--c-text-2); }
-  .tk-cbar .tk-grad { flex: 1; height: 9px; border-radius: 5px; }
-  .tk-cbar-note { color: var(--c-text-3); }
-
   /* ---- cell inspector ---- */
   .tk-insp { display: grid; grid-template-columns: 200px 1fr 1.3fr; gap: 16px; }
   .tk-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
@@ -97,14 +50,14 @@
   .tk-bar .tk-ct { width: 34px; flex: none; text-align: right; color: var(--c-text-2); font-variant-numeric: tabular-nums; }
   .tk-evimg { width: 100%; border: 1px solid var(--c-border); border-radius: var(--r-sm); background: var(--c-surface); }
   .tk-empty {
-    color: var(--c-text-3); font-size: 12px; text-align: center; padding: 26px 10px;
+    color: var(--c-text-2); font-size: 12px; text-align: center; padding: 26px 10px;
     border: 1px dashed var(--c-border-2); border-radius: var(--r-sm);
   }
 
   /* ---- Data & QC ---- */
   .tk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
   .tk-stat { background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--r-sm); padding: 10px 11px; }
-  .tk-stat .tk-k { font-size: 10.5px; color: var(--c-text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .tk-stat .tk-k { font-size: 10.5px; color: var(--c-text-2); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
   .tk-stat .tk-v { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -.02em; }
   .tk-stat .tk-m { font-size: 11px; color: var(--c-text-2); margin-top: 1px; }
   .tk-stat.warn { background: var(--c-amber-50); border-color: var(--c-amber-100); }
@@ -113,7 +66,7 @@
   .tk-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
   .tk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .tk-table th, .tk-table td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--c-border); }
-  .tk-table th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--c-text-3); font-weight: 650; }
+  .tk-table th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--c-text-2); font-weight: 650; }
   .tk-table tbody tr:last-child td { border-bottom: 0; }
   .tk-table tbody tr:hover { background: var(--c-surface-2); }
   .tk-table .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -122,43 +75,8 @@
     padding: 9px 11px; font-size: 11.5px; color: var(--c-amber-700); margin-top: 11px;
   }
 
-  /* ---- toolbar: a canvas-native modebar styled like the app's plotly one ---- */
-  .tk-plot-wrap { position: relative; }
-  .tk-modebar {
-    position: absolute; top: 24px; right: 8px; z-index: 6;
-    display: flex; align-items: center; gap: 1px; padding: 2px 3px;
-    background: var(--c-surface); border: 1px solid var(--c-border);
-    border-radius: var(--r-sm); box-shadow: 0 1px 4px rgba(0, 0, 0, .10);
-    opacity: 0; transition: opacity .15s; pointer-events: none;
-  }
-  .tk-plot-wrap:hover .tk-modebar { opacity: .96; pointer-events: auto; }
-  .tk-mb-btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; cursor: pointer; border-radius: var(--r-xs);
-    color: var(--c-text-3);
-  }
-  .tk-mb-btn svg { width: 15px; height: 15px; fill: currentColor; }
-  .tk-mb-btn:hover { color: var(--c-text); background: var(--c-surface-2); }
-  .tk-mb-btn.active { color: var(--c-blue); }
-  .tk-mb-sep { width: 1px; height: 15px; background: var(--c-border-2); margin: 0 2px; }
-
   @media (max-width: 1000px) {
-    .tk-panes { grid-template-columns: 1fr; }
     .tk-insp { grid-template-columns: 1fr; }
     .tk-two { grid-template-columns: 1fr; }
   }
-}
-
-/* Zoom dialog lives at <body> level (dialog::backdrop needs the top layer), so
-   it is scoped by its own id rather than nested under .trekker-page. */
-#tk-zoom {
-  border: 0; border-radius: var(--r-md); padding: 0; max-width: 94vw;
-  box-shadow: var(--shadow-4);
-}
-#tk-zoom::backdrop { background: rgba(0, 0, 0, .55); }
-#tk-zoom img { display: block; max-width: min(1100px, 92vw); width: 100%; }
-#tk-zoom .tk-zoom-x {
-  position: absolute; top: 8px; right: 10px; background: rgba(0, 0, 0, .6);
-  color: #fff; border: 0; border-radius: var(--r-xs); padding: 3px 9px;
-  cursor: pointer; font-size: 12px;
 }

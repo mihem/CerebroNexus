@@ -23,7 +23,7 @@ output[["expression_details_selected_cells_UI"]] <- renderUI({
         ),
         shinyWidgets::materialSwitch(
           inputId = "expression_details_selected_cells_color_highlighting",
-          label = "Highlight values with colors:",
+          label = "Highlight values with colours:",
           value = TRUE,
           status = "primary",
           inline = TRUE
@@ -70,11 +70,28 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
     ## data
     cells_df <- cells_df %>%
       dplyr::rename(X1 = 1, X2 = 2) %>%
-      dplyr::mutate(identifier = paste0(X1, '-', X2)) %>%
-      dplyr::filter(identifier %in% selected_cells$identifier) %>%
-      dplyr::select(-c(X1, X2, identifier)) %>%
+      dplyr::mutate(identifier = paste0(X1, '-', X2))
+    cells_df[["selection_key"]] <- if ("cell_barcode" %in% colnames(cells_df)) {
+      as.character(cells_df[["cell_barcode"]])
+    } else {
+      as.character(seq_len(nrow(cells_df)))
+    }
+    cells_df <- cells_df[
+      selectedCellMask(
+        cells_df[["selection_key"]],
+        cells_df[["identifier"]],
+        selected_cells
+      ),
+      ,
+      drop = FALSE
+    ] %>%
+      dplyr::select(-c(X1, X2, identifier, selection_key)) %>%
       dplyr::rename(expression_level = level) %>%
-      dplyr::select(cell_barcode, expression_level, everything())
+      dplyr::select(
+        dplyr::any_of("cell_barcode"),
+        expression_level,
+        everything()
+      )
     ## check how many cells are left after filtering
     ## ... no cells are left
     if (nrow(cells_df) == 0) {
@@ -130,8 +147,8 @@ expression_details_selected_cells_info <- list(
     <b>Automatically format numbers</b><br>
     When active, columns in the table that contain different types of numeric values will be formatted based on what they <u>seem</u> to be. The algorithm will look for integers (no decimal values), percentages, p-values, log-fold changes and apply different formatting schemes to each of them. Importantly, this process does that always work perfectly. If it fails and hinders working with the table, automatic formatting can be deactivated.<br>
     <em>This feature does not work on columns that contain 'NA' values.</em><br>
-    <b>Highlight values with colors</b><br>
-    Similar to the automatic formatting option, when active, CerebroNexus will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colors and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colors and/or the identification does not work properly, you can simply deactivate this feature.<br>
+    <b>Highlight values with colours</b><br>
+    Similar to the automatic formatting option, when active, CerebroNexus will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colours and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colours and/or the identification does not work properly, you can simply deactivate this feature.<br>
     <em>This feature does not work on columns that contain 'NA' values.</em><br>
     <br>
     <em>Columns can be re-ordered by dragging their respective header.</em>"

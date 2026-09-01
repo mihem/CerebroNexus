@@ -190,7 +190,7 @@ test_that("legacy singular spatial images normalize on read", {
 })
 
 test_that("legacy fixture list bounds normalize to a numeric vector", {
-  for (fixture in c("demo_spatial_xenium.crb", "demo_spatial_merfish.crb")) {
+  for (fixture in "demo_spatial_merfish.crb") {
     path <- system.file(
       "extdata",
       "examples",
@@ -221,6 +221,53 @@ test_that("legacy fixture list bounds normalize to a numeric vector", {
   }
 })
 
+test_that("Xenium colour demo loads images from files", {
+  path <- system.file(
+    "extdata",
+    "examples",
+    "demo_spatial_xenium.crb",
+    package = "CerebroNexus"
+  )
+  skip_if(path == "" || !file.exists(path), message = "Xenium fixture missing")
+
+  crb <- readRDS(path)
+  expect_named(crb$spatial, c("fov", "fov_colour"))
+
+  fov <- crb$getSpatialData("fov")
+  colour <- crb$getSpatialData("fov_colour")
+  expect_identical(fov$histology_images, list())
+  expect_identical(colour$histology_images, list())
+  expect_identical(rownames(colour$coordinates), rownames(fov$coordinates))
+
+  expect_identical(
+    unname(colour$coordinates$x),
+    unname(-fov$coordinates$y)
+  )
+  expect_identical(
+    unname(colour$coordinates$y),
+    unname(fov$coordinates$x)
+  )
+
+  image_dir <- system.file(
+    "extdata",
+    "examples",
+    "spatial",
+    "xenium",
+    package = "CerebroNexus"
+  )
+  expect_true(dir.exists(image_dir))
+  expect_true(all(file.exists(file.path(
+    image_dir,
+    c("dapi.png", "pink_stain_90.png", "fluorescent_yellow_90.png")
+  ))))
+
+  dapi <- png::readPNG(file.path(image_dir, "dapi.png"))
+  pink <- png::readPNG(file.path(image_dir, "pink_stain_90.png"))
+  yellow <- png::readPNG(file.path(image_dir, "fluorescent_yellow_90.png"))
+  expect_identical(dim(pink)[1:2], rev(dim(dapi)[1:2]))
+  expect_identical(dim(yellow), dim(pink))
+})
+
 test_that("canonical manifests reject legacy list bounds", {
   payload <- spatial_manifest_payload()
   payload$histology_image_bounds <- as.list(payload$histology_image_bounds)
@@ -245,6 +292,36 @@ test_that("canonical spatial image manifests take precedence over legacy fields"
   expect_named(normalized$histology_images, "DAPI")
   expect_null(normalized[["histology_image"]])
   expect_null(normalized[["histology_image_bounds"]])
+})
+
+test_that("flat spatial rotations remain a supported public API", {
+  catalogs <- list(
+    Atlas = list(sliceA = "H&E", sliceB = "DAPI"),
+    Other = list(sliceA = "H&E")
+  )
+
+  normalized <- .normalizeAppSpatialPlotRotation(
+    c(Atlas = 90, Other = -45),
+    catalogs
+  )
+
+  expect_identical(normalized$Atlas, c(sliceA = 90, sliceB = 90))
+  expect_identical(normalized$Other, c(sliceA = -45))
+})
+
+test_that("legacy image alignment maps to the canonical image setting", {
+  catalogs <- list(Atlas = list(sliceA = "H&E"))
+  images <- list()
+
+  normalized <- .normalizeLegacyAppSpatialSetting(
+    c(Atlas = 0.9),
+    "spatial_images_scale_x",
+    "scale_x",
+    catalogs,
+    images
+  )
+
+  expect_identical(normalized$Atlas$sliceA[["H&E"]]$scale_x, 0.9)
 })
 
 test_that("spatial image paths normalize labels, descriptors, and file errors", {
@@ -358,5 +435,37 @@ test_that("argument and misc spatial images cannot claim the same label", {
   expect_error(
     .mergeSpatialImageDeclarations(misc, argument, coordinates),
     "sliceA.*H&E.*both"
+  )
+})
+
+test_that("spatial plot rotations are validated per dataset and FOV", {
+  catalogs <- list(
+    Atlas = list(sliceA = "H&E", sliceB = character()),
+    Other = list(fov = "DAPI")
+  )
+  expect_identical(
+    .normalizeAppSpatialPlotRotation(
+      list(Atlas = c(sliceA = 90, sliceB = -90)),
+      catalogs
+    ),
+    list(Atlas = c(sliceA = 90, sliceB = -90))
+  )
+  expect_identical(
+    .normalizeAppSpatialPlotRotation(
+      list(Other = list(fov = 180)),
+      catalogs
+    ),
+    list(Other = c(fov = 180))
+  )
+  expect_error(
+    .normalizeAppSpatialPlotRotation(list(Atlas = c(missing = 90)), catalogs),
+    "spatial `missing` is not available"
+  )
+  expect_error(
+    .normalizeAppSpatialPlotRotation(
+      list(Atlas = c(sliceA = NA_real_)),
+      catalogs
+    ),
+    "finite numeric rotation"
   )
 })

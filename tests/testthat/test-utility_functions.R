@@ -34,7 +34,6 @@ source(utils_file, local = utils_env)
 prettifyTable <- utils_env$prettifyTable
 centerOfGroups <- utils_env$centerOfGroups
 cachePlot <- utils_env$cachePlot
-dynamicPointSize <- utils_env$dynamicPointSize
 viewerUploadsEnabled <- utils_env$viewerUploadsEnabled
 viewerUploadPath <- utils_env$viewerUploadPath
 
@@ -108,6 +107,205 @@ test_that("centerOfGroups computes 2D medians per group", {
   expect_equal(result$y_median[result$group == "A"], 5)
   expect_equal(result$x_median[result$group == "B"], 2)
   expect_equal(result$y_median[result$group == "B"], 12)
+})
+
+test_that("cell scatter payload rejects incoherent categorical snapshots", {
+  payload <- utils_env$cerebroCellViewScatterPayload
+  common <- list(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color_variable = "cluster",
+    selection_keys = c("a", "b"),
+    point_size = 5,
+    point_opacity = 1
+  )
+
+  expect_error(
+    do.call(
+      payload,
+      c(
+        common,
+        list(
+          color = NULL,
+          color_assignments = NULL
+        )
+      )
+    ),
+    "same number of cells"
+  )
+  expect_error(
+    do.call(
+      payload,
+      c(
+        common,
+        list(
+          color = c("A", "B"),
+          color_assignments = c(A = "#000000")
+        )
+      )
+    ),
+    "missing categorical levels.*B"
+  )
+})
+
+test_that("single-cell scatter payloads remain arrays on the wire", {
+  skip_if_not_installed("jsonlite")
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(1, 2),
+    color = "A",
+    color_variable = "cluster",
+    selection_keys = "cell-1",
+    point_size = 5,
+    point_opacity = 1,
+    color_assignments = c(A = "#123456"),
+    hover_info = "one cell"
+  )
+  wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(payload, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+
+  expect_type(wire$data$x[[1L]], "list")
+  expect_type(wire$data$y[[1L]], "list")
+  expect_type(wire$data$selection_key[[1L]], "list")
+  expect_type(wire$data$color[[1L]], "list")
+  expect_type(wire$hover$text[[1L]], "list")
+})
+
+test_that("single-view scatter payloads carry their display label", {
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c(0.1, 0.2),
+    color_variable = "expression",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    hover_info = c("first", "second"),
+    space_label = "UMAP"
+  )
+
+  expect_identical(payload$meta$space_label, "UMAP")
+
+  default_payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c(0.1, 0.2),
+    color_variable = "expression",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    hover_info = c("first", "second")
+  )
+  expect_false("space_label" %in% names(default_payload$meta))
+})
+
+test_that("direct one-cell renderer messages retain array fields", {
+  skip_if_not_installed("jsonlite")
+
+  message <- utils_env$cerebroCellViewMessage(
+    "trekker_projection",
+    meta = list(
+      color_type = "categorical",
+      traces = "cluster",
+      group_colors = "#123456"
+    ),
+    data = list(
+      selection_key = "cell-1",
+      group = "cluster",
+      panels = list(list(
+        id = "trekker",
+        selection_key = "cell-1",
+        x = 1,
+        y = 2,
+        from_x = 3,
+        from_y = 4,
+        to_x = 5,
+        to_y = 6
+      ))
+    ),
+    hover = list(text = "cell-1")
+  )
+  wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(message, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+
+  expect_type(wire$meta$traces, "list")
+  expect_type(wire$meta$group_colors, "list")
+  expect_type(wire$data$selection_key, "list")
+  expect_type(wire$data$group, "list")
+  expect_type(wire$data$panels[[1L]]$selection_key, "list")
+  expect_type(wire$data$panels[[1L]]$x, "list")
+  expect_type(wire$data$panels[[1L]]$from_x, "list")
+  expect_type(wire$hover$text, "list")
+
+  continuous <- utils_env$cerebroCellViewMessage(
+    "expression_projection",
+    meta = list(color_type = "rgb"),
+    data = list(
+      selection_key = "cell-1",
+      x = 1,
+      y = 2,
+      color = 0.5,
+      rgb = list(r = 10L, g = 20L, b = 30L)
+    )
+  )
+  continuous_wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(continuous, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+  expect_type(continuous_wire$data$selection_key, "list")
+  expect_type(continuous_wire$data$x, "list")
+  expect_type(continuous_wire$data$color, "list")
+  expect_type(continuous_wire$data$rgb$r, "list")
+
+  categorical <- utils_env$cerebroCellViewMessage(
+    "ir_clonalUMAP_projection",
+    meta = list(color_type = "categorical", traces = list("Single")),
+    data = list(
+      selection_key = list("cell-1"),
+      x = list(1),
+      y = list(2),
+      color = list("#123456")
+    ),
+    hover = list(text = list("cell-1"))
+  )
+  categorical_wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(categorical, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+  expect_type(categorical_wire$data$x[[1L]], "list")
+  expect_type(categorical_wire$data$selection_key[[1L]], "list")
+  expect_type(categorical_wire$hover$text[[1L]], "list")
+})
+
+test_that("categorical scatter payloads retain cells with missing metadata", {
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c("A", NA_character_),
+    color_variable = "cluster",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    color_assignments = c(A = "#123456"),
+    hover_info = c("first", "missing")
+  )
+
+  expect_true("(missing)" %in% payload$meta$traces)
+  expect_identical(
+    sort(unlist(payload$data$selection_key, use.names = FALSE)),
+    c("cell-1", "cell-2")
+  )
+})
+
+test_that("selection counts use payload cell IDs", {
+  expect_identical(
+    utils_env$cerebroSelectionCount(list(
+      ids = paste0("cell-", seq_len(2536)),
+      source = "trekker",
+      geometry = list()
+    )),
+    2536L
+  )
+  expect_identical(utils_env$cerebroSelectionCount(c("c1", "c2")), 2L)
 })
 
 test_that("centerOfGroups returns a typed empty tibble for a missing group column", {
@@ -242,48 +440,4 @@ test_that("cachePlot caches by key and invalidates on key or dataset change", {
     expect_equal(cached(), "nUMI datasetB")
     expect_equal(compute_count, first + 2)
   })
-})
-
-## ---------------------------------------------------------------------------
-## dynamicPointSize: default marker size from point count (+ optional canvas)
-## ---------------------------------------------------------------------------
-
-test_that("dynamicPointSize shrinks as the point count grows", {
-  ## More points -> smaller default, monotonically non-increasing.
-  sizes <- vapply(
-    c(100, 1000, 10000, 100000, 1e6),
-    function(n) dynamicPointSize(n),
-    numeric(1)
-  )
-  expect_true(all(diff(sizes) <= 0))
-  ## A small dataset should be clearly larger than a huge one.
-  expect_gt(dynamicPointSize(100), dynamicPointSize(200000))
-})
-
-test_that("dynamicPointSize stays within [min, max] and snaps to step", {
-  vals <- vapply(
-    c(1, 10, 500, 5000, 5e5, 1e7),
-    function(n) dynamicPointSize(n, min = 1, max = 20, step = 1),
-    numeric(1)
-  )
-  expect_true(all(vals >= 1 & vals <= 20))
-  expect_true(all(vals == round(vals))) # step = 1 -> integers
-})
-
-test_that("dynamicPointSize returns the fallback for missing/invalid counts", {
-  expect_equal(dynamicPointSize(NULL, fallback = 3), 3)
-  expect_equal(dynamicPointSize(NA, fallback = 3), 3)
-  expect_equal(dynamicPointSize(0, fallback = 3), 3)
-  expect_equal(dynamicPointSize(-5, fallback = 3), 3)
-})
-
-test_that("dynamicPointSize lets a larger canvas carry larger points", {
-  small <- dynamicPointSize(5000, plot_width_px = 500, plot_height_px = 400)
-  big <- dynamicPointSize(5000, plot_width_px = 1600, plot_height_px = 1100)
-  expect_gte(big, small)
-  ## The canvas correction only nudges — it never flips the point-count order.
-  expect_gt(
-    dynamicPointSize(200, plot_width_px = 500, plot_height_px = 400),
-    dynamicPointSize(100000, plot_width_px = 1600, plot_height_px = 1100)
-  )
 })

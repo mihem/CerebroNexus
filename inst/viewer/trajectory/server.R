@@ -94,10 +94,3 @@ source(
   ),
   local = TRUE
 )
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/event_projection_clear_selection.R"
-  ),
-  local = TRUE
-)
