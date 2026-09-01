@@ -1,3 +1,11 @@
+# CerebroNexus 4.3.5
+
+## Viewer
+
+- Linked views combine projections, Spatial sections, Trekker and clonal
+  layouts in one coordinated workspace with shared selection, colouring,
+  filtering and cell details.
+
 # CerebroNexus 4.3.4
 
 ## Viewer
