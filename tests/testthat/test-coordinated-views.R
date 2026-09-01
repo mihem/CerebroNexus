@@ -402,6 +402,21 @@ test_that("one-cell dynamic expression messages retain JSON arrays", {
   expect_type(rgb$genes, "list")
 })
 
+test_that("saved per-gene panels use the dynamic payload contract", {
+  skip_if_not(have_bundle, "coordinated_views/bundle.R not found")
+
+  payload <- cv_env$cv_gene_panels_payload(
+    c("CD3D", "MS4A1"),
+    list(c(0, 2), c(1, 4))
+  )
+
+  expect_identical(payload$mode, "__gene_panels__")
+  expect_identical(payload$max, 4)
+  expect_identical(unclass(payload$genes), c("CD3D", "MS4A1"))
+  expect_identical(unclass(payload$values[[1]]), c(0L, 128L))
+  expect_identical(unclass(payload$values[[2]]), c(64L, 255L))
+})
+
 test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
   skip_if_not(have_bundle)
   skip_if_not_installed("jsonlite")

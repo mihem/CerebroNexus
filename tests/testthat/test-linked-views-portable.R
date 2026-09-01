@@ -192,6 +192,42 @@ test_that("specialist configuration is validated and round-trips", {
   expect_identical(restored$selection$cells, "cell-1")
   expect_identical(restored$page$id, "overview_projection")
 
+  unzoomed <- config
+  unzoomed$view["viewport"] <- list(NULL)
+  expect_null(
+    helpers$cv_config_prepare(
+      unzoomed,
+      cells = c("cell-1", "cell-2")
+    )$config$view$viewport
+  )
+
+  zoomed <- config
+  zoomed$view$viewport <- list(cx = 0.5, cy = 0.4, span = 0.75)
+  zoomed$view$zoomed <- TRUE
+  expect_identical(
+    helpers$cv_config_prepare(
+      zoomed,
+      cells = c("cell-1", "cell-2")
+    )$config$view$viewport,
+    list(cx = 0.5, cy = 0.4, span = 0.75)
+  )
+
+  network <- config
+  network$page <- list(
+    id = "hla_motif_network",
+    label = "HLA & TCR Motifs",
+    tab = "hla_tcr_motifs",
+    engine = "network"
+  )
+  network$controls[[1]]$id <- "hla_motifs_chain"
+  expect_identical(
+    helpers$cv_config_prepare(
+      network,
+      cells = c("cell-1", "cell-2")
+    )$config$view$viewport,
+    list(x0 = 0, x1 = 1, y0 = 0, y1 = 1)
+  )
+
   spatial <- config
   spatial$page <- list(
     id = "spatial_projection",

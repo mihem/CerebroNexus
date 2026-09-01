@@ -36,7 +36,8 @@ test_that("specialist state transitions use semantic identities", {
     "  lens:S.lensForSpace(saved,'umap',0).view.cx,",
     "  missing:S.lensForSpace(saved,'missing',0),",
     "  controls:S.trekkerGeneControls('trekker_projection','CD3D'),",
-    "  inactive:S.trekkerGeneControls('spatial_projection','CD3D')",
+    "  inactive:S.trekkerGeneControls('spatial_projection','CD3D'),",
+    "  panel:S.genePanelSpaceId(1,'projection::umap')",
     "}));"
   ))
 
@@ -48,7 +49,8 @@ test_that("specialist state transitions use semantic identities", {
       lens = 2L,
       missing = NULL,
       controls = list(trekker_mode = "gene", trekker_gene_pick = "CD3D"),
-      inactive = NULL
+      inactive = NULL,
+      panel = "__linked_gene_1::projection::umap"
     )
   )
 })

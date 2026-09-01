@@ -83,18 +83,10 @@ if (
     unset = ""
   )
 }
-cv_share_app_namespace <- cv_share_namespace(
-  Cerebro.options[["cerebro_root"]],
-  cv_share_namespace_value
-)
-cv_share_open <- tryCatch(
-  list(
-    store = cv_share_store_open(cv_share_path, cv_share_app_namespace),
-    error = NULL
-  ),
-  error = function(error) {
-    list(store = NULL, error = conditionMessage(error))
-  }
+cv_share_open <- cv_share_store_try_open(
+  path = cv_share_path,
+  root = Cerebro.options[["cerebro_root"]],
+  namespace = cv_share_namespace_value
 )
 coordviews_share_store <- cv_share_open$store
 coordviews_share_error <- cv_share_open$error
@@ -276,6 +268,8 @@ cv_config_validate_genes <- function(config, cells) {
   colour <- config$view$colour
   requested <- if (identical(colour$mode, "__gene__")) {
     colour$gene
+  } else if (identical(colour$mode, "__gene_panels__")) {
+    colour$genes
   } else if (identical(colour$mode, "__rgb__")) {
     colour$rgb_genes
   } else {
@@ -294,27 +288,31 @@ cv_config_validate_genes <- function(config, cells) {
       "The configuration uses a gene that is unavailable here."
     )
   }
-  values <- lapply(requested, cv_gene_vector, cells = cells)
+  values <- lapply(requested, cv_gene_values, cells = cells)
   if (any(vapply(values, is.null, logical(1)))) {
     cv_config_abort(
       "missing_gene",
       "The configuration uses a gene that is unavailable here."
     )
   }
+  if (identical(colour$mode, "__gene_panels__")) {
+    return(cv_gene_panels_payload(requested, values))
+  }
+  scaled <- lapply(values, cv_scale_gene_values)
   if (identical(colour$mode, "__gene__")) {
     return(list(
       mode = "__gene__",
       gene = requested[[1L]],
-      v = I(values[[1L]]$v),
-      max = values[[1L]]$max
+      v = I(scaled[[1L]]$v),
+      max = scaled[[1L]]$max
     ))
   }
   list(
     mode = "__rgb__",
     genes = I(requested),
-    r = I(values[[1L]]$v),
-    g = I(values[[2L]]$v),
-    b = I(values[[3L]]$v)
+    r = I(scaled[[1L]]$v),
+    g = I(scaled[[2L]]$v),
+    b = I(scaled[[3L]]$v)
   )
 }
 
@@ -1014,21 +1012,14 @@ observeEvent(
         "coordviews_geneval",
         list(gene = "", ok = FALSE)
       )
+      session$sendCustomMessage("coordviews_genepanels", list(ok = FALSE))
       return()
     }
     mode <- input[["coordviews_expression_mode"]]
     if (identical(mode, "panels")) {
-      global_max <- max(unlist(values), na.rm = TRUE)
-      scaled <- lapply(values, function(v) {
-        if (is.finite(global_max) && global_max > 0) {
-          as.integer(round(v / global_max * 255))
-        } else {
-          rep(0L, length(v))
-        }
-      })
       session$sendCustomMessage(
         "coordviews_genepanels",
-        cv_gene_panels_message(genes, scaled, round(global_max, 3))
+        cv_gene_panels_payload(genes, values)
       )
     } else {
       mean_values <- Reduce(`+`, values) / length(values)

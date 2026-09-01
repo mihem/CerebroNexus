@@ -122,6 +122,7 @@
         (config.controls || []).forEach(applyControl);
         [0, 250, 750].forEach(function (delay) {
           window.setTimeout(function () {
+            (config.controls || []).forEach(applyControl);
             var api = engine(spec);
             if (api && api.applyState) api.applyState(id, config);
           }, delay);

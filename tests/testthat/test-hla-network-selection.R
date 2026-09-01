@@ -5,6 +5,37 @@ viewer_hla_text <- function(path) {
   )
 }
 
+run_specialist_state_node <- function(body) {
+  skip_if(Sys.which("node") == "", "node not on PATH")
+  runner <- tempfile(fileext = ".js")
+  on.exit(unlink(runner), add = TRUE)
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      "const timers = []; const controls = {}; const applied = [];",
+      "global.window = {setTimeout: fn => timers.push(fn)};",
+      "global.document = {",
+      "  getElementById: id => id === 'shiny-tab-overview' ?",
+      "    {classList:{contains:()=>true}} : (controls[id] || null),",
+      "  querySelector: () => null",
+      "};",
+      "window.jQuery = global.jQuery = element => ({",
+      "  data: () => element.binding",
+      "});",
+      sprintf(
+        "eval(fs.readFileSync(%s, 'utf8'));",
+        encodeString(
+          viewer_test_path("www", "specialist-view-state.js"),
+          quote = "\""
+        )
+      ),
+      body
+    ),
+    runner
+  )
+  system2("node", runner, stdout = TRUE, stderr = TRUE)
+}
+
 test_that("HLA node selection maps cleanly between motif keys and cells", {
   runtime <- new.env(parent = globalenv())
   sys.source(
@@ -59,4 +90,24 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(client, "applyState", fixed = TRUE)
   expect_match(adapter, "hla_motif_network", fixed = TRUE)
   expect_match(config, "hla_motif_network", fixed = TRUE)
+})
+
+test_that("specialist restoration retries dynamically rendered controls", {
+  output <- run_specialist_state_node(c(
+    "window.cerebroCellViews = {applyState: () => {",
+    "  controls.overview_dynamic = {binding:{receiveMessage: (_el, msg) => applied.push(msg.value)}};",
+    "}};",
+    "window.cerebroSpecialistViews.get('overview_projection').apply({",
+    "  selection:{cells:['cell-1']},",
+    "  controls:[{id:'overview_dynamic',multiple:false,values:['restored']}]",
+    "});",
+    "while (timers.length) timers.shift()();",
+    "console.log(JSON.stringify(applied));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list("restored", "restored")
+  )
 })

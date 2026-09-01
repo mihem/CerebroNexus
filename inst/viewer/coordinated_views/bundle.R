@@ -491,6 +491,27 @@ cv_gene_panels_message <- function(genes, values, maximum) {
   )
 }
 
+cv_gene_panels_payload <- function(genes, values) {
+  maximum <- suppressWarnings(max(
+    unlist(values, use.names = FALSE),
+    na.rm = TRUE
+  ))
+  if (!is.finite(maximum)) {
+    maximum <- 0
+  }
+  scaled <- lapply(values, function(value) {
+    if (maximum > 0) {
+      as.integer(round(value / maximum * 255))
+    } else {
+      rep(0L, length(value))
+    }
+  })
+  c(
+    list(mode = "__gene_panels__"),
+    cv_gene_panels_message(genes, scaled, round(maximum, 3))
+  )
+}
+
 cv_rgb_message <- function(red, green, blue) {
   list(
     ok = TRUE,

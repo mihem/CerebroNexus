@@ -201,6 +201,21 @@ cv_share_store_open <- function(path, namespace) {
   )
 }
 
+cv_share_store_try_open <- function(path, root, namespace = "") {
+  tryCatch(
+    list(
+      store = cv_share_store_open(
+        path,
+        cv_share_namespace(root, namespace)
+      ),
+      error = NULL
+    ),
+    error = function(error) {
+      list(store = NULL, error = conditionMessage(error))
+    }
+  )
+}
+
 cv_share_store_cleanup <- function(store, now = Sys.time()) {
   cutoff <- cv_share_time(
     as.POSIXct(now, tz = "UTC") - CV_SHARE_HISTORY_SECONDS

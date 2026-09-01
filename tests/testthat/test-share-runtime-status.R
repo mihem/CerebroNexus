@@ -22,6 +22,23 @@ test_that("an unavailable share store reports a stable deployment error", {
   )
 })
 
+test_that("an invalid Share namespace disables sharing without escaping", {
+  runtime <- new.env(parent = globalenv())
+  sys.source(
+    viewer_test_path("coordinated_views", "share_store.R"),
+    envir = runtime
+  )
+
+  opened <- runtime$cv_share_store_try_open(
+    path = withr::local_tempfile(),
+    root = "/viewer",
+    namespace = strrep("x", 201L)
+  )
+
+  expect_null(opened$store)
+  expect_match(opened$error, "namespace is invalid", ignore.case = TRUE)
+})
+
 test_that("the server publishes actual Share availability and retention", {
   server <- viewer_text("coordinated_views/server.R")
 

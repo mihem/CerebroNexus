@@ -1059,6 +1059,47 @@ cv_specialist_control_values <- function(value, value_type, path) {
   )
 }
 
+cv_specialist_canvas_viewport <- function(value, path) {
+  if (is.null(value)) {
+    return(NULL)
+  }
+  keys <- names(value)
+  if (!is.null(keys) && all(c("x0", "x1", "y0", "y1") %in% keys)) {
+    legacy <- cv_config_record(value, c("x0", "x1", "y0", "y1"), path = path)
+    x0 <- cv_config_number(legacy$x0, cv_config_path(path, "x0"), -1e6, 1e6)
+    x1 <- cv_config_number(legacy$x1, cv_config_path(path, "x1"), -1e6, 1e6)
+    y0 <- cv_config_number(legacy$y0, cv_config_path(path, "y0"), -1e6, 1e6)
+    y1 <- cv_config_number(legacy$y1, cv_config_path(path, "y1"), -1e6, 1e6)
+    if (x0 >= x1 || y0 >= y1) {
+      cv_config_abort("invalid_value", "The saved viewport is invalid.")
+    }
+    return(list(
+      cx = (x0 + x1) / 2,
+      cy = (y0 + y1) / 2,
+      span = max(x1 - x0, y1 - y0)
+    ))
+  }
+  cv_config_normalize_viewport(value, path)
+}
+
+cv_specialist_network_viewport <- function(value, path) {
+  viewport <- cv_config_record(
+    value,
+    c("x0", "x1", "y0", "y1"),
+    path = path
+  )
+  normalized <- list(
+    x0 = cv_config_number(viewport$x0, cv_config_path(path, "x0"), -1e6, 1e6),
+    x1 = cv_config_number(viewport$x1, cv_config_path(path, "x1"), -1e6, 1e6),
+    y0 = cv_config_number(viewport$y0, cv_config_path(path, "y0"), -1e6, 1e6),
+    y1 = cv_config_number(viewport$y1, cv_config_path(path, "y1"), -1e6, 1e6)
+  )
+  if (normalized$x0 >= normalized$x1 || normalized$y0 >= normalized$y1) {
+    cv_config_abort("invalid_value", "The saved viewport is invalid.")
+  }
+  normalized
+}
+
 cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
   cv_config_check_node_limit(config)
   cells <- enc2utf8(as.character(cells))
@@ -1172,22 +1213,21 @@ cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
     c("viewport", "rotation", "mode", "zoomed", "hidden_groups"),
     path = "$.view"
   )
-  viewport <- cv_config_record(
-    view$viewport,
-    c("x0", "x1", "y0", "y1"),
-    path = "$.view.viewport"
-  )
-  normalized_viewport <- list(
-    x0 = cv_config_number(viewport$x0, "$.view.viewport.x0", -1e6, 1e6),
-    x1 = cv_config_number(viewport$x1, "$.view.viewport.x1", -1e6, 1e6),
-    y0 = cv_config_number(viewport$y0, "$.view.viewport.y0", -1e6, 1e6),
-    y1 = cv_config_number(viewport$y1, "$.view.viewport.y1", -1e6, 1e6)
-  )
-  if (
-    normalized_viewport$x0 >= normalized_viewport$x1 ||
-      normalized_viewport$y0 >= normalized_viewport$y1
-  ) {
-    cv_config_abort("invalid_value", "The saved viewport is invalid.")
+  normalized_zoomed <- cv_config_logical(view$zoomed, "$.view.zoomed")
+  normalized_viewport <- if (identical(page_spec$engine, "canvas")) {
+    canvas_viewport <- cv_specialist_canvas_viewport(
+      view$viewport,
+      "$.view.viewport"
+    )
+    if (normalized_zoomed && is.null(canvas_viewport)) {
+      cv_config_abort(
+        "missing_field",
+        "$.view.viewport is required when zoomed."
+      )
+    }
+    if (normalized_zoomed) canvas_viewport else NULL
+  } else {
+    cv_specialist_network_viewport(view$viewport, "$.view.viewport")
   }
   rotation <- cv_config_record(
     view$rotation,
@@ -1252,7 +1292,7 @@ cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
         "$.view.mode",
         c("lasso", "box", "pan", "orbit")
       ),
-      zoomed = cv_config_logical(view$zoomed, "$.view.zoomed"),
+      zoomed = normalized_zoomed,
       hidden_groups = cv_config_string_array(
         view$hidden_groups,
         "$.view.hidden_groups",

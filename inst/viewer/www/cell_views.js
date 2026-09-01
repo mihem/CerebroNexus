@@ -4431,17 +4431,22 @@
 
   // Spaces in panel order: expression, trajectory, physical, immune, then any
   // future modality spaces.
-  function orderedSpaces() {
-    if (singleActive && singleSpaceIds.length) return singleSpaceIds.slice();
+  function baseOrderedSpaces(projections, spatialSections) {
+    var configured = arguments.length > 0;
+    projections = projections || selectedProjections;
+    spatialSections = spatialSections || selectedSpatial;
     var out = [];
-    selectedProjections.forEach(function (name) {
-      var id = projectionId(name); if (spaceById[id]) out.push(id);
+    projections.forEach(function (name) {
+      var id = projectionId(name);
+      if ((configured && D.projections && D.projections[name]) || spaceById[id]) {
+        out.push(id);
+      }
     });
     D.spaces.forEach(function (space) {
       if (space.trajectory && spaceById[space.id]) out.push(space.id);
     });
-    selectedSpatial.forEach(function (name) {
-      var id = spatialId(name); if (spaceById[id]) out.push(id);
+    spatialSections.forEach(function (name) {
+      var id = spatialId(name); if (configured || spaceById[id]) out.push(id);
     });
     ['trekker', 'clone'].forEach(function (id) {
       if (spaceById[id]) out.push(id);
@@ -4451,6 +4456,11 @@
         out.push(s.id);
       }
     });
+    return out;
+  }
+  function orderedSpaces() {
+    if (singleActive && singleSpaceIds.length) return singleSpaceIds.slice();
+    var out = baseOrderedSpaces();
     if (colorBy !== GENE_PANELS_MODE || !D.genePanels || !D.genePanels.length) {
       return out;
     }
@@ -4468,7 +4478,8 @@
         palette: singlePalette(distinct ? scales[geneIndex % scales.length] : 'YlOrRd')
       };
       out.forEach(function (spaceId) {
-        var source = spaceById[spaceId], virtualId = fieldName + '::' + spaceId;
+        var source = spaceById[spaceId];
+        var virtualId = window.CBViewState.genePanelSpaceId(geneIndex, spaceId);
         if (!source) return;
         spaceById[virtualId] = Object.assign({}, source, {
           id: virtualId,
@@ -5755,8 +5766,7 @@
     return panels.filter(function (panel) { return !!panel.spaceId; }).map(function (panel) {
       var view = panel.view || { cx: 0.5, cy: 0.5, span: 1 };
       return {
-        space: (spaceById[panel.spaceId] &&
-          spaceById[panel.spaceId]._baseSpaceId) || panel.spaceId,
+        space: panel.spaceId,
         viewport: { cx: view.cx, cy: view.cy, span: view.span },
         rotation: panel.rot ? { rx: panel.rot.rx, ry: panel.rot.ry } : null
       };
@@ -5919,9 +5929,16 @@
       if (!D.groups || !D.groups[name]) configError('The file contains an invalid filter.');
     });
 
-    var spaces = new Set((D.spaces || []).map(function (space) { return space.id; }));
-    view.projections.forEach(function (name) { spaces.add(projectionId(name)); });
-    view.spatial_sections.forEach(function (name) { spaces.add(spatialId(name)); });
+    var baseSpaces = baseOrderedSpaces(view.projections, view.spatial_sections);
+    var spaces = new Set(baseSpaces);
+    if (mode === GENE_PANELS_MODE) {
+      var maxGenes = Math.max(1, Math.floor(12 / Math.max(1, baseSpaces.length)));
+      view.colour.genes.slice(0, maxGenes).forEach(function (_gene, geneIndex) {
+        baseSpaces.forEach(function (spaceId) {
+          spaces.add(window.CBViewState.genePanelSpaceId(geneIndex, spaceId));
+        });
+      });
+    }
     if (view.lenses.some(function (lens) { return !spaces.has(lens.space); })) {
       configError('The file contains an invalid view lens.');
     }
@@ -6127,6 +6144,11 @@
         b: colourData.b,
         genes: colourData.genes
       };
+    } else if (D && colourData && colourData.mode === GENE_PANELS_MODE) {
+      D.genePanelMax = Number(colourData.max) || 1;
+      D.genePanels = colourData.genes.map(function (gene, index) {
+        return { gene: gene, v: colourData.values[index] || [] };
+      });
     }
     var result = restoreWorkspace(config);
     return { selectedCells: result.selected_cells };
@@ -6235,8 +6257,24 @@
         picker.selectize.setValue(picker.selectize.items.slice(0, limit));
         return;
       }
-      ensurePanelSlots(Math.min(12, orderedSpaces().length));
-      buildPanels(); layoutPanels(); renderLegend(); resizeAll(); drawAll();
+      var order = orderedSpaces();
+      ensurePanelSlots(Math.min(12, order.length));
+      buildPanels();
+      var current = panels.filter(function (panel) { return !!panel.spaceId; });
+      var sameOrder = current.length === order.length && current.every(
+        function (panel, index) { return panel.spaceId === order[index]; }
+      );
+      if (!sameOrder) {
+        layoutPanels();
+      } else {
+        current.forEach(function (panel) {
+          var space = spaceById[panel.spaceId];
+          panel.colorBy = space && space._panelColorMode || null;
+          var title = $('cv-title-' + panel.key.toLowerCase());
+          if (title) title.textContent = space ? space.label : panel.spaceId;
+        });
+      }
+      renderLegend(); resizeAll(); drawAll();
     });
     // The exact meta row behind the open detail card. Ignored if the card has
     // since moved on to another cell (or closed) — a slow reply must not
