@@ -30,6 +30,39 @@ cv_cell_ids <- function(ids, context = "data set") {
   ids
 }
 
+cv_canonical_metadata <- function(metadata) {
+  if (is.null(metadata) || !is.data.frame(metadata)) {
+    return(NULL)
+  }
+  ids <- if ("cell_barcode" %in% colnames(metadata)) {
+    metadata$cell_barcode
+  } else {
+    rownames(metadata)
+  }
+  metadata$cell_barcode <- cv_cell_ids(ids, "metadata")
+  metadata
+}
+
+cv_selected_metadata <- function(metadata, cells) {
+  metadata <- cv_canonical_metadata(metadata)
+  if (is.null(metadata)) {
+    return(NULL)
+  }
+  metadata[metadata$cell_barcode %in% as.character(cells), , drop = FALSE]
+}
+
+cv_cell_metadata <- function(metadata, cell) {
+  metadata <- cv_canonical_metadata(metadata)
+  if (is.null(metadata)) {
+    return(NULL)
+  }
+  index <- match(as.character(cell), metadata$cell_barcode)
+  if (is.na(index)) {
+    return(NULL)
+  }
+  metadata[index, , drop = FALSE]
+}
+
 cv_cell_fingerprint <- function(cells) {
   path <- tempfile("cerebronexus-cell-ids-")
   on.exit(unlink(path), add = TRUE)
@@ -1347,20 +1380,11 @@ cv_default_group <- function(available) {
 ## Assemble the bundle from the loaded Cerebro object. Each modality is built by
 ## its own cv_build_* helper; this function wires them into the final list.
 cv_build_bundle <- function(crb) {
-  md <- crb$getMetaData()
+  md <- cv_canonical_metadata(crb$getMetaData())
   if (is.null(md)) {
     return(NULL)
   }
-  cells <- cv_cell_ids(
-    if ("cell_barcode" %in% colnames(md)) {
-      md$cell_barcode
-    } else {
-      rownames(md)
-    }
-  )
-  if (!length(cells)) {
-    return(NULL)
-  }
+  cells <- md$cell_barcode
   n <- length(cells)
   cell_fingerprint <- cv_cell_fingerprint(cells)
 

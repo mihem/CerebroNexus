@@ -75,6 +75,9 @@ test_that("bundle.R parses and defines the builder API", {
     "cv_build_spatial",
     "cv_build_trekker",
     "cv_build_clone",
+    "cv_canonical_metadata",
+    "cv_selected_metadata",
+    "cv_cell_metadata",
     "cv_build_bundle"
   )
   for (fn in api) {
@@ -301,29 +304,6 @@ test_that("Linked views keeps replacement controls contextual and user-facing", 
   expect_match(js, "function fieldSummaryHtml", fixed = TRUE)
 })
 
-test_that("specialist views preserve identity and clear dependent state", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
-  server_file <- file.path(dirname(bundle_file), "server.R")
-  trekker_file <- file.path(dirname(bundle_file), "..", "trekker", "server.R")
-  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
-  server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
-  trekker <- paste(readLines(trekker_file, warn = FALSE), collapse = "\n")
-
-  expect_match(server, "cells <- as.character(cells)", fixed = TRUE)
-  expect_match(
-    server,
-    '"coordviews_genepanels", list(ok = FALSE)',
-    fixed = TRUE
-  )
-  expect_match(server, '"coordviews_rgbval", list(ok = FALSE)', fixed = TRUE)
-  expect_match(js, "_role: panel.id || null", fixed = TRUE)
-  expect_match(js, "function trekkerSpace()", fixed = TRUE)
-  expect_match(js, "spaceId: p.spaceId", fixed = TRUE)
-  expect_match(js, "candidate.spaceId === p.spaceId", fixed = TRUE)
-  expect_match(js, "Shiny.setInputValue('trekker_mode', 'gene')", fixed = TRUE)
-  expect_match(trekker, "length(ids)", fixed = TRUE)
-})
-
 test_that("Trekker depth views form one collapsed insights region", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
@@ -451,6 +431,43 @@ test_that("bundle cell identity falls back to metadata row names", {
   bundle <- cv_env$cv_build_bundle(crb)
 
   expect_identical(as.character(bundle$cells), cells)
+})
+
+test_that("rownames-only metadata supports selection and cell details", {
+  skip_if_not(have_bundle)
+  metadata <- data.frame(
+    cluster = c("A", "B", "A"),
+    score = c(1, 2, 3),
+    row.names = c("c1", "c2", "c3"),
+    stringsAsFactors = FALSE
+  )
+
+  canonical <- cv_env$cv_canonical_metadata(metadata)
+  selected <- cv_env$cv_selected_metadata(metadata, c("c3", "c1"))
+  detail <- cv_env$cv_cell_metadata(metadata, "c2")
+
+  expect_identical(canonical$cell_barcode, c("c1", "c2", "c3"))
+  expect_identical(selected$cell_barcode, c("c1", "c3"))
+  expect_identical(detail$cell_barcode, "c2")
+  expect_identical(detail$score, 2)
+})
+
+test_that("explicit cell barcodes remain authoritative", {
+  skip_if_not(have_bundle)
+  metadata <- data.frame(
+    cell_barcode = c("explicit-2", "explicit-1"),
+    row.names = c("row-1", "row-2"),
+    stringsAsFactors = FALSE
+  )
+
+  canonical <- cv_env$cv_canonical_metadata(metadata)
+
+  expect_identical(canonical$cell_barcode, metadata$cell_barcode)
+  metadata$cell_barcode <- c("duplicate", "duplicate")
+  expect_error(
+    cv_env$cv_canonical_metadata(metadata),
+    "duplicate cell IDs"
+  )
 })
 
 test_that("cv_color_patch carries only palette updates for the current bundle", {

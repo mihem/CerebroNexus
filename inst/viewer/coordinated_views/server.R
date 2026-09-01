@@ -225,7 +225,7 @@ output[["coordviews_selected_cells_UI"]] <- renderUI({
 output[["coordviews_selected_cells_plot"]] <- plotly::renderPlotly({
   sel <- coordviews_selected_barcodes()
   req(sel, input[["coordviews_selected_cells_plot_variable"]])
-  cells_df <- getMetaData()
+  cells_df <- cv_canonical_metadata(getMetaData())
   var <- input[["coordviews_selected_cells_plot_variable"]]
   req(var %in% colnames(cells_df))
   is_selected <- cells_df[["cell_barcode"]] %in% sel
@@ -303,13 +303,18 @@ output[["coordviews_selected_cells_plot"]] <- plotly::renderPlotly({
 output[["coordviews_selected_cells_table"]] <- DT::renderDataTable({
   sel <- coordviews_selected_barcodes()
   if (is.null(sel)) {
-    return(getMetaData() %>% dplyr::slice(0) %>% prepareEmptyTable())
+    return(
+      cv_canonical_metadata(getMetaData()) %>%
+        dplyr::slice(0) %>%
+        prepareEmptyTable()
+    )
   }
-  cells_df <- getMetaData() %>%
-    dplyr::filter(cell_barcode %in% sel) %>%
+  cells_df <- cv_selected_metadata(getMetaData(), sel) %>%
     dplyr::select(cell_barcode, dplyr::everything())
   if (nrow(cells_df) == 0) {
-    getMetaData() %>% dplyr::slice(0) %>% prepareEmptyTable()
+    cv_canonical_metadata(getMetaData()) %>%
+      dplyr::slice(0) %>%
+      prepareEmptyTable()
   } else {
     prettifyTable(
       cells_df,
@@ -771,17 +776,16 @@ observeEvent(input[["coordviews_cell_detail"]], {
   if (is.null(bc) || !nzchar(bc)) {
     return()
   }
-  md <- tryCatch(getMetaData(), error = function(e) NULL)
-  if (is.null(md) || !("cell_barcode" %in% colnames(md))) {
-    return()
-  }
-  idx <- match(as.character(bc), as.character(md$cell_barcode))
-  if (is.na(idx)) {
+  md <- tryCatch(
+    cv_cell_metadata(getMetaData(), bc),
+    error = function(e) NULL
+  )
+  if (is.null(md)) {
     return()
   }
   cols <- setdiff(colnames(md), "cell_barcode")
   rows <- lapply(cols, function(cn) {
-    list(k = cn, v = cv_fmt_value(md[[cn]][idx]))
+    list(k = cn, v = cv_fmt_value(md[[cn]][1L]))
   })
   session$sendCustomMessage(
     "coordviews_cell_meta",
