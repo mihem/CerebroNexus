@@ -349,6 +349,53 @@ test_that("createShinyApp preserves legacy and nested spatial settings APIs", {
   ))
 })
 
+test_that("createShinyApp migrates legacy spatial settings into its bundle", {
+  skip_if_not(file.exists(spatial_crb))
+  img <- system.file(
+    "extdata/examples/demo_spatial_visium_he.png",
+    package = "CerebroNexus"
+  )
+  skip_if_not(file.exists(img))
+  out_dir <- file.path(
+    tempdir(),
+    paste0("cerebro_spatial_legacy_", Sys.getpid())
+  )
+  on.exit(unlink(out_dir, recursive = TRUE), add = TRUE)
+
+  suppressWarnings(suppressMessages(
+    createShinyApp(
+      cerebro_data = c("Legacy spatial" = spatial_crb),
+      result_dir = out_dir,
+      spatial_images = c("Legacy spatial" = img),
+      spatial_images_flip_x = c("Legacy spatial" = TRUE),
+      spatial_images_flip_y = c("Legacy spatial" = FALSE),
+      spatial_images_scale_x = c("Legacy spatial" = 0.9),
+      spatial_images_scale_y = c("Legacy spatial" = 1.1),
+      spatial_images_offset_x = c("Legacy spatial" = 12),
+      spatial_images_offset_y = c("Legacy spatial" = -8),
+      spatial_plot_rotation = c("Legacy spatial" = 37),
+      launch_browser = FALSE,
+      verbose = FALSE
+    )
+  ))
+
+  spatial_name <- readRDS(spatial_crb)$availableSpatial()[[1L]]
+  cfg <- readRDS(file.path(out_dir, "cerebro_config.rds"))
+  preset <- cfg[["spatial_image_settings"]][["Legacy spatial"]][[
+    spatial_name
+  ]][["Tissue background"]]
+  expect_identical(preset[["flip_x"]], TRUE)
+  expect_identical(preset[["flip_y"]], FALSE)
+  expect_equal(preset[["scale_x"]], 0.9)
+  expect_equal(preset[["scale_y"]], 1.1)
+  expect_equal(preset[["offset_x"]], 12)
+  expect_equal(preset[["offset_y"]], -8)
+  expect_equal(
+    cfg[["spatial_plot_rotation"]][["Legacy spatial"]][[spatial_name]],
+    37
+  )
+})
+
 test_that("Spatial UI seeds and resets every field from the shared image preset", {
   ui <- paste(
     readLines(
