@@ -12,12 +12,12 @@ selection_status_function <- function() {
   ))
   environment <- list2env(
     list(
-      tags = htmltools::tags,
-      div = htmltools::div,
+      tags = shiny::tags,
+      div = shiny::div,
       icon = shiny::icon,
       actionButton = shiny::actionButton,
       htmlOutput = shiny::htmlOutput,
-      tagList = htmltools::tagList
+      tagList = shiny::tagList
     ),
     parent = globalenv()
   )
@@ -28,10 +28,10 @@ selection_status_function <- function() {
 test_that("selection status can omit unsupported sharing", {
   status <- selection_status_function()
 
-  with_share <- htmltools::renderTags(status("projection", "count"))$html
-  without_share <- htmltools::renderTags(
+  with_share <- as.character(status("projection", "count"))
+  without_share <- as.character(
     status("trekker_projection", "count", share = FALSE)
-  )$html
+  )
 
   expect_match(with_share, "cerebro-share-open", fixed = TRUE)
   expect_false(grepl("cerebro-share-open", without_share, fixed = TRUE))
