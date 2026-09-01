@@ -158,7 +158,11 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
       if (viewer_admin_login(user, password, admin_config)) {
         admin_checker(user, password)
       } else {
-        configured_checker(user, password)
+        result <- configured_checker(user, password)
+        if (is.list(result)) {
+          result$admin <- FALSE
+        }
+        result
       }
     }
   }

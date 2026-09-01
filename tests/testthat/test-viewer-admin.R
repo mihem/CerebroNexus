@@ -232,7 +232,7 @@ test_that("Viewer bundles the Admin surface without hard-coded credentials", {
   expect_match(auth, "viewer_admin_config", fixed = TRUE)
   expect_match(
     share_server,
-    'creator = viewer_auth_context(session)$user %||% "anonymous"',
+    "creator = cv_share_creator(session)",
     fixed = TRUE
   )
   expect_false(any(grepl("admin123", c(ui, server, js, auth), fixed = TRUE)))

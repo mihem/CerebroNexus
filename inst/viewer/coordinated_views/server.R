@@ -498,7 +498,7 @@ observeEvent(
             coordviews_share_store,
             prepared$json,
             dataset$fingerprint,
-            creator = viewer_auth_context(session)$user %||% "anonymous",
+            creator = cv_share_creator(session),
             dataset_label = cv_selected_dataset_name() %||% "",
             ttl_seconds = cv_share_ttl_seconds
           )

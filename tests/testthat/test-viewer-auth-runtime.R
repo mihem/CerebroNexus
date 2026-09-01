@@ -115,6 +115,92 @@ test_that("configured Viewer Admin can pass the outer login", {
   })
 })
 
+test_that("database login cannot inherit Viewer Admin authority", {
+  skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
+  runtime <- viewer_auth_runtime_environment()
+  root <- withr::local_tempdir()
+  database <- file.path(root, "private-data", "auth", "credentials.sqlite")
+  dir.create(dirname(database), recursive = TRUE)
+  writeBin(as.raw(c(0x53, 0x51, 0x4c)), database)
+  viewer_auth_runtime_brand_assets(root)
+  withr::local_envvar(
+    CEREBRO_AUTH_TEST_KEY = "runtime test passphrase",
+    CEREBRO_ADMIN_PASSWORD = "independent-admin-password"
+  )
+  old_options <- get0("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
+  withr::defer({
+    if (is.null(old_options)) {
+      if (exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)) {
+        rm("Cerebro.options", envir = .GlobalEnv)
+      }
+    } else {
+      assign("Cerebro.options", old_options, envir = .GlobalEnv)
+    }
+  })
+  assign(
+    "Cerebro.options",
+    list(
+      .share_admin = list(
+        account = "owner",
+        password_env = "CEREBRO_ADMIN_PASSWORD"
+      )
+    ),
+    envir = .GlobalEnv
+  )
+  auth_state <- shiny::reactiveValues(user = NULL, admin = NULL)
+  captured_checker <- NULL
+  checker_calls <- 0L
+  testthat::local_mocked_bindings(
+    read_db_decrypt = function(...) {
+      data.frame(
+        user = "owner",
+        password = "database-password",
+        admin = TRUE,
+        stringsAsFactors = FALSE
+      )
+    },
+    check_credentials = function(credentials) {
+      checker_calls <<- checker_calls + 1L
+      if (checker_calls == 1L) {
+        return(function(user, password) {
+          valid <- identical(user, "owner") &&
+            identical(password, "database-password")
+          list(result = valid, user = user, admin = valid)
+        })
+      }
+      function(user, password) {
+        valid <- identical(user, "owner") &&
+          identical(password, "independent-admin-password")
+        list(result = valid, user = user, admin = valid)
+      }
+    },
+    secure_app = function(ui, ...) ui,
+    secure_server = function(check_credentials, ...) {
+      captured_checker <<- check_credentials
+      auth_state
+    },
+    .package = "shinymanager"
+  )
+  observed <- NULL
+  app <- runtime$viewer_auth_apply(
+    shiny::fluidPage("viewer"),
+    function(input, output, session) {
+      observed <<- session$userData$viewer_auth
+    },
+    viewer_auth_runtime_config(),
+    root
+  )
+
+  shiny::testServer(app$server, {
+    login <- captured_checker("owner", "database-password")
+    expect_true(login$result)
+    auth_state$admin <- login$admin
+    auth_state$user <- login$user
+    session$flushReact()
+    expect_false(observed$is_admin)
+  })
+})
+
 test_that("Viewer authentication runtime is a no-op when disabled", {
   runtime <- viewer_auth_runtime_environment()
   ui <- shiny::fluidPage("viewer")
