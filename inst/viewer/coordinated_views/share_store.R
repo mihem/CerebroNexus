@@ -12,6 +12,7 @@ CV_SHARE_HISTORY_SECONDS <- 30L * 24L * 60L * 60L
 CV_SHARE_MAX_BYTES <- 5L * 1024L * 1024L
 CV_SHARE_RATE_WINDOW_SECONDS <- 60L
 CV_SHARE_RATE_LIMIT <- 20L
+CV_SHARE_MAX_ACTIVE_PER_CREATOR <- 50L
 CV_SHARE_MAX_RECORDS <- 1000L
 CV_SHARE_MAX_STORE_BYTES <- 256L * 1024L * 1024L
 
@@ -79,6 +80,39 @@ cv_share_namespace <- function(root, configured = "") {
     "path-",
     as.character(openssl::sha256(charToRaw(enc2utf8(path))))
   )
+}
+
+cv_share_creator_id <- function(
+  user = NULL,
+  remote_addr = NULL,
+  session_token = NULL
+) {
+  scalar_text <- function(value) {
+    if (
+      is.character(value) &&
+        length(value) == 1L &&
+        !is.na(value) &&
+        nzchar(value)
+    ) {
+      enc2utf8(value)
+    } else {
+      ""
+    }
+  }
+  user <- scalar_text(user)
+  if (nzchar(user)) {
+    return(paste0("user:", user))
+  }
+  identity <- scalar_text(remote_addr)
+  prefix <- "client:"
+  if (!nzchar(identity)) {
+    identity <- scalar_text(session_token)
+    prefix <- "session:"
+  }
+  if (!nzchar(identity)) {
+    return("anonymous")
+  }
+  paste0(prefix, as.character(openssl::sha256(charToRaw(identity))))
 }
 
 cv_share_store_open <- function(path, namespace) {
@@ -201,6 +235,7 @@ cv_share_store_transaction <- function(store, code) {
 }
 
 cv_share_store_check_limits <- function(store, creator, now, incoming_bytes) {
+  now_text <- cv_share_time(now)
   cutoff <- cv_share_time(
     as.POSIXct(now, tz = "UTC") - CV_SHARE_RATE_WINDOW_SECONDS
   )
@@ -212,21 +247,35 @@ cv_share_store_check_limits <- function(store, creator, now, incoming_bytes) {
     ),
     params = list(store$namespace, creator, cutoff)
   )$n[[1L]]
+  creator_records <- DBI::dbGetQuery(
+    store$con,
+    paste(
+      "SELECT COUNT(*) AS n FROM linked_view_shares",
+      "WHERE app_namespace = ? AND creator = ?",
+      "AND revoked_at IS NULL AND expires_at > ?"
+    ),
+    params = list(store$namespace, creator, now_text)
+  )$n[[1L]]
   records <- DBI::dbGetQuery(
     store$con,
-    "SELECT COUNT(*) AS n FROM linked_view_shares WHERE app_namespace = ?",
-    params = list(store$namespace)
+    paste(
+      "SELECT COUNT(*) AS n FROM linked_view_shares",
+      "WHERE app_namespace = ? AND revoked_at IS NULL AND expires_at > ?"
+    ),
+    params = list(store$namespace, now_text)
   )$n[[1L]]
   payload_bytes <- DBI::dbGetQuery(
     store$con,
     paste(
       "SELECT COALESCE(SUM(length(CAST(json AS BLOB))), 0) AS n",
-      "FROM linked_view_shares WHERE app_namespace = ?"
+      "FROM linked_view_shares WHERE app_namespace = ?",
+      "AND revoked_at IS NULL AND expires_at > ?"
     ),
-    params = list(store$namespace)
+    params = list(store$namespace, now_text)
   )$n[[1L]]
   if (
     recent >= CV_SHARE_RATE_LIMIT ||
+      creator_records >= CV_SHARE_MAX_ACTIVE_PER_CREATOR ||
       records >= CV_SHARE_MAX_RECORDS ||
       as.double(payload_bytes) + as.double(incoming_bytes) >
         CV_SHARE_MAX_STORE_BYTES

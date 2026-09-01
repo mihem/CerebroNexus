@@ -74,6 +74,50 @@ test_that("Shared Link creation has a persistent per-creator rate limit", {
   expect_identical(error$code, "share_limit")
 })
 
+test_that("anonymous share quotas are scoped by client identity", {
+  runtime <- viewer_share_runtime()
+
+  expect_identical(
+    runtime$cv_share_creator_id(user = "owner"),
+    "user:owner"
+  )
+  expect_false(identical(
+    runtime$cv_share_creator_id(remote_addr = "192.0.2.1"),
+    runtime$cv_share_creator_id(remote_addr = "192.0.2.2")
+  ))
+  expect_false(identical(
+    runtime$cv_share_creator_id(session_token = "session-a"),
+    runtime$cv_share_creator_id(session_token = "session-b")
+  ))
+})
+
+test_that("Shared Link creation has an active per-creator quota", {
+  runtime <- viewer_share_runtime()
+  runtime$CV_SHARE_RATE_LIMIT <- 100L
+  runtime$CV_SHARE_MAX_ACTIVE_PER_CREATOR <- 1L
+  store <- runtime$cv_share_store_open(withr::local_tempfile(), "viewer-a")
+  withr::defer(DBI::dbDisconnect(store$con))
+
+  runtime$cv_share_store_create(
+    store,
+    json = "{}",
+    fingerprint = "dataset-a",
+    creator = "client-a"
+  )
+  error <- tryCatch(
+    runtime$cv_share_store_create(
+      store,
+      json = "{}",
+      fingerprint = "dataset-a",
+      creator = "client-a"
+    ),
+    error = identity
+  )
+
+  expect_s3_class(error, "cv_share_error")
+  expect_identical(error$code, "share_limit")
+})
+
 test_that("Shared Link storage enforces a per-Viewer record quota", {
   runtime <- viewer_share_runtime()
   runtime$CV_SHARE_MAX_RECORDS <- 1L
@@ -98,6 +142,49 @@ test_that("Shared Link storage enforces a per-Viewer record quota", {
 
   expect_s3_class(error, "cv_share_error")
   expect_identical(error$code, "share_limit")
+})
+
+test_that("revoked and expired shares stop consuming active capacity", {
+  runtime <- viewer_share_runtime()
+  runtime$CV_SHARE_RATE_LIMIT <- 100L
+  runtime$CV_SHARE_MAX_RECORDS <- 1L
+  store <- runtime$cv_share_store_open(withr::local_tempfile(), "viewer-a")
+  withr::defer(DBI::dbDisconnect(store$con))
+  now <- as.POSIXct("2026-08-28 12:00:00", tz = "UTC")
+
+  revoked <- runtime$cv_share_store_create(
+    store,
+    json = "{}",
+    fingerprint = "dataset-a",
+    creator = "client-a",
+    now = now
+  )
+  runtime$cv_share_store_revoke_admin(store, revoked$token, now = now)
+  expect_no_error(runtime$cv_share_store_create(
+    store,
+    json = "{}",
+    fingerprint = "dataset-a",
+    creator = "client-b",
+    now = now
+  ))
+
+  other <- runtime$cv_share_store_open(withr::local_tempfile(), "viewer-b")
+  withr::defer(DBI::dbDisconnect(other$con))
+  runtime$cv_share_store_create(
+    other,
+    json = "{}",
+    fingerprint = "dataset-a",
+    creator = "client-a",
+    now = now,
+    ttl_seconds = 60L
+  )
+  expect_no_error(runtime$cv_share_store_create(
+    other,
+    json = "{}",
+    fingerprint = "dataset-a",
+    creator = "client-b",
+    now = now + 61L
+  ))
 })
 
 test_that("Shared Link payload quota recovers after expired records are purged", {

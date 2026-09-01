@@ -118,10 +118,13 @@ cv_share_creator <- function(session) {
       !is.na(user) &&
       nzchar(user)
   ) {
-    user
-  } else {
-    "anonymous"
+    return(cv_share_creator_id(user = user))
   }
+  remote_addr <- tryCatch(session$request$REMOTE_ADDR, error = function(e) NULL)
+  cv_share_creator_id(
+    remote_addr = remote_addr,
+    session_token = session$token
+  )
 }
 cv_share_unavailable_message <- paste(
   "Share links are unavailable.",
