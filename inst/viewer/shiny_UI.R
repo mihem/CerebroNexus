@@ -109,9 +109,13 @@ cerebroCellViewOutput <- function(id) {
 cerebroSelectionStatus <- function(
   plot_id,
   count_output_id,
-  client_actions = TRUE
+  client_actions = TRUE,
+  share = TRUE
 ) {
   share_button <- function() {
+    if (!share) {
+      return(NULL)
+    }
     tags$button(
       type = "button",
       class = "cerebro-share-open",

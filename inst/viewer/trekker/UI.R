@@ -31,7 +31,8 @@ tab_trekker <- tabItem(
       class = "cerebro-viz-col",
       cerebroSelectionStatus(
         "trekker_projection",
-        "trekker_number_of_selected_cells"
+        "trekker_number_of_selected_cells",
+        share = FALSE
       ),
       cerebroCellViewOutput("trekker_projection"),
       div(id = "trekker_shared_insights")
