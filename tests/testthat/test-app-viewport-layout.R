@@ -40,7 +40,7 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   app$wait_for_js(
     paste0(
       "Array.from(document.querySelectorAll('.cv-ptitle'))",
-      ".some(el => el.textContent.includes('B_cell_maturation'))"
+      ".some(el => el.textContent.includes('B cell maturation'))"
     ),
     timeout = 30000
   )
