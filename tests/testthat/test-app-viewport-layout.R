@@ -149,6 +149,42 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     timeout = 10000
   )
 
+  ## Touch users cannot reveal a hover-only toolbar. Coarse-pointer media must
+  ## keep the controls visible and provide practical tap targets.
+  app$get_chromote_session()$Emulation$setTouchEmulationEnabled(
+    enabled = TRUE,
+    maxTouchPoints = 1
+  )
+  app$wait_for_js(
+    "getComputedStyle(document.querySelector('.cv-panebar')).opacity === '1'",
+    timeout = 5000
+  )
+  touch_toolbar <- app$get_js(paste0(
+    "(() => {",
+    "const bar=document.querySelector('.cv-pane:not(.cv-hidden) .cv-panebar');",
+    "const button=bar.querySelector('.cv-tbtn');",
+    "const bs=getComputedStyle(bar), ts=getComputedStyle(button);",
+    "return {opacity:bs.opacity,pointerEvents:bs.pointerEvents,",
+    "width:parseFloat(ts.width),height:parseFloat(ts.height)};",
+    "})()"
+  ))
+  expect_identical(touch_toolbar$opacity, "1")
+  expect_identical(touch_toolbar$pointerEvents, "auto")
+  expect_gte(touch_toolbar$width, 36)
+  expect_gte(touch_toolbar$height, 36)
+  app$get_chromote_session()$Emulation$setTouchEmulationEnabled(enabled = FALSE)
+
+  ## Legend counts are data, not disabled decoration, so they use the readable
+  ## secondary text colour instead of the low-contrast tertiary token.
+  app$wait_for_js(
+    "document.querySelector('.cv-lg-ct') !== null",
+    timeout = 10000
+  )
+  legend_count_colour <- app$get_js(paste0(
+    "getComputedStyle(document.querySelector('.cv-lg-ct')).color"
+  ))
+  expect_identical(legend_count_colour, "rgb(107, 107, 112)")
+
   linked_geometry_js <- paste0(
     "(() => {",
     "const canvas = document.querySelector(",

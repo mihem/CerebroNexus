@@ -306,6 +306,20 @@
 .coordviews-page .cv-pane.cv-narrow .cv-focus-btn:focus-visible::after {
   transform: none;
 }
+@media (hover: none), (pointer: coarse) {
+  .coordviews-page .cv-panebar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .coordviews-page .cv-tbtn {
+    width: 36px;
+    height: 36px;
+  }
+  .coordviews-page .cv-focus-btn {
+    width: auto;
+    min-width: 72px;
+  }
+}
 .coordviews-page .cv-pane-head select {
   margin-left: auto; padding: 4px 7px; border: 1px solid var(--c-border-2);
   border-radius: 6px; background: var(--c-surface-2); color: var(--c-text-2);
@@ -522,7 +536,7 @@
   width: 9px; height: 9px; border: 1.5px solid #1f2937; border-radius: 50%; flex: none;
   box-sizing: border-box;
 }
-.coordviews-page .cv-lg-ct { color: var(--c-text-3); }
+.coordviews-page .cv-lg-ct { color: var(--c-text-2); }
 /* RGB channel legend: informational, not a toggle */
 .coordviews-page .cv-rgb-lg { cursor: default; }
 .coordviews-page .cv-rgb-lg:hover { background: transparent; }
