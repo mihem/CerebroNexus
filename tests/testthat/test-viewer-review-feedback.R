@@ -14,6 +14,92 @@ viewer_path <- function(...) {
   file.path(viewer_root, ...)
 }
 
+test_that("Viewer copy uses British colour spelling", {
+  sidebar <- viewer_source("shiny_UI.R")
+  management <- viewer_source("color_management", "server.R")
+  tables <- list(
+    marker_genes = viewer_source("marker_genes", "table.R"),
+    linked = viewer_source("coordinated_views", "server.R"),
+    trajectory = viewer_source("trajectory", "selected_cells_table.R"),
+    spatial = viewer_source("spatial", "UI_selected_cells_table.R"),
+    pathways = viewer_source("enriched_pathways", "table.R"),
+    extra = viewer_source("extra_material", "content.R"),
+    expression = viewer_source(
+      "gene_expression",
+      "UI_table_of_selected_cells.R"
+    ),
+    projection = viewer_source("overview", "UI_selected_cells_table.R")
+  )
+  expression <- viewer_source(
+    "gene_expression",
+    "UI_projection_gene_color_mode.R"
+  )
+
+  expect_match(sidebar, 'menuItem\\([[:space:]]*"Colour management"')
+  expect_match(management, 'title = "Colours for groups"', fixed = TRUE)
+  for (name in names(tables)) {
+    expect_match(
+      tables[[name]],
+      'label = "Highlight values with colours:"',
+      fixed = TRUE,
+      info = name
+    )
+  }
+  expect_match(expression, 'label = "Panel colours"', fixed = TRUE)
+  expect_match(expression, '"Distinct colours" = "different"', fixed = TRUE)
+})
+
+test_that("Cell-view colouring controls share one label", {
+  controls <- list(
+    linked = viewer_source("coordinated_views", "UI.R"),
+    projection = viewer_source("overview", "UI_projection_main_parameters.R"),
+    spatial = viewer_source("spatial", "UI_projection_main_parameters.R"),
+    trajectory = viewer_source("trajectory", "projection.R"),
+    trekker = viewer_source("trekker", "server.R"),
+    hla = viewer_source("hla_tcr_motifs", "settings.R")
+  )
+
+  for (name in names(controls)) {
+    expect_match(controls[[name]], '"Colour by"', fixed = TRUE, info = name)
+    expect_no_match(
+      controls[[name]],
+      "Colour (cells|nodes) by",
+      info = name
+    )
+  }
+  expect_match(controls$hla, '"HLA allele"', fixed = TRUE)
+})
+
+test_that("Informational Canvas text uses the readable secondary token", {
+  coordviews <- viewer_source("www", "coordviews.css")
+  trekker <- viewer_source("www", "trekker.css")
+
+  for (selector in c(
+    ".cv-read-sub",
+    ".cv-empty, .coordviews-page .cv-empty-sm",
+    ".cv-ctable th",
+    ".cv-hint",
+    ".cv-field-table-title span",
+    ".cv-field-values span",
+    ".cv-tk-insights-toggle small",
+    ".cv-tk-cell-empty",
+    ".cv-tk-cell-bc"
+  )) {
+    expect_match(
+      coordviews,
+      paste0(gsub("([.()])", "\\\\\\1", selector), "[^}]*var\\(--c-text-2\\)"),
+      info = selector
+    )
+  }
+  for (selector in c(".tk-empty", ".tk-stat .tk-k", ".tk-table th")) {
+    expect_match(
+      trekker,
+      paste0(gsub("([.()])", "\\\\\\1", selector), "[^}]*var\\(--c-text-2\\)"),
+      info = selector
+    )
+  }
+})
+
 test_that("Projection defaults to cell type when available", {
   ui <- viewer_source("overview", "UI_projection_main_parameters.R")
 
@@ -655,9 +741,9 @@ test_that("Gene expression display and colour modes are linked", {
   expect_match(display_ui, '"Mean expression" = "combined"', fixed = TRUE)
   expect_match(display_ui, '"Separate panels" = "separate"', fixed = TRUE)
   expect_match(display_ui, '"RGB co-expression" = "rgb"', fixed = TRUE)
-  expect_match(colour_ui, 'label = "Panel colors"', fixed = TRUE)
+  expect_match(colour_ui, 'label = "Panel colours"', fixed = TRUE)
   expect_match(colour_ui, '"Shared scale" = "shared"', fixed = TRUE)
-  expect_match(colour_ui, '"Distinct colors" = "different"', fixed = TRUE)
+  expect_match(colour_ui, '"Distinct colours" = "different"', fixed = TRUE)
   expect_match(
     colour_ui,
     'n_genes <= 1 || display_mode != "separate"',

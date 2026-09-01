@@ -597,6 +597,7 @@ observe({
 
   output_meta <- list(
     color_type = "categorical",
+    space_label = "Clonal UMAP",
     traces = traces,
     color_variable = "expansion",
     appearance = list(

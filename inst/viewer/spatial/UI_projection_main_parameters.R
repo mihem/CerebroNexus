@@ -75,7 +75,7 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
       condition = "input.spatial_projection_plot_type == 'ImageDimPlot'",
       selectInput(
         "spatial_projection_point_color",
-        label = "Color cells by",
+        label = "Colour by",
         choices = metadata_cols
       )
     ),
@@ -210,7 +210,7 @@ spatial_projection_main_parameters_info <- list(
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
       <li><b>Projection:</b> Select here which projection you want to see in the scatter plot on the right.</li>
-      <li><b>Color cells by:</b> Select which variable, categorical or continuous, from the meta data should be used to color the cells.</li>
+      <li><b>Colour by:</b> Select which variable, categorical or continuous, from the meta data should be used to colour the cells.</li>
     </ul>
     "
   )

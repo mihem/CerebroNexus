@@ -205,7 +205,8 @@ observeEvent(
       point_line = point_line,
       reset_axes = reset_axes_now,
       color_assignments = color_assignments,
-      hover_info = prepared[["hover_info"]]
+      hover_info = prepared[["hover_info"]],
+      space_label = input[["trajectory_selected_name"]]
     )
     cerebroCellViewRender(
       "trajectory_projection",
@@ -240,7 +241,7 @@ observeEvent(input[["trajectory_projection_info"]], {
 trajectory_projection_info <- list(
   title = "Trajectory",
   text = p(
-    "This plot shows cells projected into trajectory space, colored by the specified meta info, e.g. sample or cluster. The path of the trajectory is shown as a black line. Specific to this analysis, every cell has a 'pseudotime' and a transcriptional 'state' which corresponds to its position along the trajectory path."
+    "This plot shows cells projected into trajectory space, coloured by the specified meta info, e.g. sample or cluster. The path of the trajectory is shown as a black line. Specific to this analysis, every cell has a 'pseudotime' and a transcriptional 'state' which corresponds to its position along the trajectory path."
   )
 )
 

@@ -37,7 +37,8 @@ overview_projection_update_plot <- function(input) {
     n_dimensions = n_dimensions,
     color_assignments = color_assignments,
     hover_info = hover_info,
-    hover = plot_parameters[["hover_info"]]
+    hover = plot_parameters[["hover_info"]],
+    space_label = plot_parameters[["projection"]]
   )
 
   cerebroCellViewRender(

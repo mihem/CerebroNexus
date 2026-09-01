@@ -170,7 +170,7 @@ test_that("background-image selection only recreates image calibration controls"
   )
   expect_match(
     main_parameters_ui,
-    'label = "Color cells by"[\\s\\S]{0,320}"spatial_projection_background_image"',
+    'label = "Colour by"[\\s\\S]{0,320}"spatial_projection_background_image"',
     perl = TRUE
   )
   expect_match(

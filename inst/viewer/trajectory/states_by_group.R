@@ -232,6 +232,6 @@ observeEvent(input[["states_by_group_info"]], {
 states_by_group_info <- list(
   title = "Composition of states by another group",
   text = p(
-    "This plot allows to see how state assignments relate to other cells groupings, e.g. clusters or cell cycle assignments. The grouping that the states are compared to depends on the variable that was selected to color cells in the projection plot. If you selected a continuous variable, e.g. the number of transcripts per cell (nUMI), then only the states will be shown. The composition of states by another group can be represented as a bar char or a Sankey plot. Optionally, a table can be shown below. To highlight composition in very small cell groups, results can be shown as percentages rather than actual cell counts. Groups can be removed from the plot by clicking on them in the legend."
+    "This plot allows to see how state assignments relate to other cells groupings, e.g. clusters or cell cycle assignments. The grouping that the states are compared to depends on the variable that was selected to colour cells in the projection plot. If you selected a continuous variable, e.g. the number of transcripts per cell (nUMI), then only the states will be shown. The composition of states by another group can be represented as a bar char or a Sankey plot. Optionally, a table can be shown below. To highlight composition in very small cell groups, results can be shown as percentages rather than actual cell counts. Groups can be removed from the plot by clicking on them in the legend."
   )
 )

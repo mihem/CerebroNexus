@@ -801,7 +801,7 @@ output$hla_motif_note <- renderUI({
     ))
   }
   # The definitional "what a node / edge / motif is" text lives in the info guide
-  # (the info button on this box), so it no longer clutters the page below the
+  # (the info button in the page header), so it no longer clutters the page below the
   # plot. Keep on the page only the two things a reader must not misread from the
   # screen itself: the node-AREA cap (so sizes are not compared past it), and —
   # when it is actually hidden — why the legend is gone.

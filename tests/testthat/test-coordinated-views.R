@@ -129,7 +129,7 @@ test_that("trajectory coordinates and graph enter Linked views", {
 
   expect_length(spaces, 1)
   expect_identical(spaces[[1]]$id, "trajectory::monocle2::B_cell_maturation")
-  expect_identical(spaces[[1]]$label, "B_cell_maturation (trajectory)")
+  expect_identical(spaces[[1]]$label, "B cell maturation (trajectory)")
   expect_equal(unclass(spaces[[1]]$x), c(NA, 10, 20))
   expect_equal(unclass(spaces[[1]]$y), c(NA, 30, 40))
   expect_true(isTRUE(spaces[[1]]$trajectory))

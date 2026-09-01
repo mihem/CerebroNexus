@@ -478,7 +478,7 @@ ui <- dashboardPage(
         icon = icon("barcode")
       ),
       menuItem(
-        "Color management",
+        "Colour management",
         tabName = "color_management",
         icon = icon("palette")
       ),

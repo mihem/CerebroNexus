@@ -10,7 +10,7 @@ spatial_projection_selected_cells <- reactive({
   ## The selection is held persistently on the JS side (see
   ## cell_views.js) and pushed here as {x, y, ids} so it survives plot
   ## parameter changes. Plotly's own plotly_selected event is NOT used, because a
-  ## re-render (e.g. changing "Color cells by") wipes it while the selection must
+  ## re-render (e.g. changing "Colour by") wipes it while the selection must
   ## stay. The identifier is built the same way the table keys cells (paste0 with
   ## '-'), so downstream filtering is unchanged.
   ## The shared renderer pushes the persistent selection under

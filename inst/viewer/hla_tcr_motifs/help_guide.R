@@ -1,5 +1,5 @@
-## ---- Illustrated guide (panel-level info button) ----------------------- ##
-## Content for the "info" modal on the HLA & TCR Motifs panel. Mirrors the
+## ---- Illustrated guide (page-level info button) ------------------------ ##
+## Content for the "info" modal in the HLA & TCR Motifs page header. Mirrors the
 ## Immune Repertoire guide (help_guide.R there): a left tab rail + right content
 ## pane, each tab carrying an annotated inline SVG schematic plus an element key.
 ##
@@ -1376,7 +1376,7 @@ hla_guide_tab_content <- function(tab) {
   )
 }
 
-## ---- Panel-level info button ------------------------------------------ ##
+## ---- Page-level info button ------------------------------------------- ##
 observeEvent(input$hla_visualizations_info, {
   panels <- lapply(HLA_GUIDE_TABS, function(tab) {
     tabPanel(tab, div(class = "hla-guide-pane", hla_guide_tab_content(tab)))

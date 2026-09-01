@@ -574,7 +574,7 @@ cv_build_trajectories <- function(crb, cells) {
       }
       space <- cv_space(
         paste("trajectory", method, trajectory_name, sep = "::"),
-        paste0(trajectory_name, " (trajectory)"),
+        paste0(gsub("_", " ", trajectory_name, fixed = TRUE), " (trajectory)"),
         round(as.numeric(meta$DR_1)[idx], 3),
         round(as.numeric(meta$DR_2)[idx], 3)
       )
@@ -697,7 +697,7 @@ cv_build_groups <- function(crb, md, colors_fn) {
 
 ## Continuous colourings from the meta data — every numeric column, aligned to
 ## the meta data's row order (which IS `cells` order). This is the Projection
-## tab's "Color cells by" list minus the categorical columns: it deliberately
+## tab's "Colour by" list minus the categorical columns: it deliberately
 ## includes the QC columns (nUMI / nGene / percent.mt / nCount_*), because
 ## "colour the embedding by percent.mt and see which blob is junk" is one of the
 ## most-used actions on that page. Constant and all-NA columns are skipped —
@@ -728,7 +728,7 @@ cv_build_fields <- function(md, skip = "cell_barcode") {
 }
 
 ## Categorical columns that are NOT registered grouping variables. The Projection
-## tab offers every meta column in "Color cells by" while its "Group filters" box
+## tab offers every meta column in "Colour by" while its "Group filters" box
 ## only lists getGroups(); this mirrors that split — these are colourings (legend,
 ## legend-hiding) but they do not become filters.
 ##
@@ -1397,7 +1397,7 @@ cv_build_bundle <- function(crb) {
     )
   }
 
-  ## Three colouring sources, mirroring the Projection tab's "Color cells by"
+  ## Three colouring sources, mirroring the Projection tab's "Colour by"
   ## (which offers every meta column) while keeping its narrower "Group filters"
   ## (which lists only getGroups()):
   ##   groups    — registered grouping variables: colour AND filter

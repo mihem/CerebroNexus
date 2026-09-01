@@ -362,8 +362,8 @@ trajectory_distribution_along_pseudotime_info <- list(
   title = "Distribution along pseudotime",
   text = HTML(
     "
-    This plot shows the distribution of the variable selected above to color cells by along pseudotime.<br>
+    This plot shows the distribution of the variable selected above to colour cells by along pseudotime.<br>
     If this is a categorical variable, e.g. 'sample' or 'cluster', you will see a density plot. Subgroups of the selected categorical variable that contain only a single cell will not be shown as no density can be calculated for them.<br>
-    In contrast, if you have selected a continuous variable, e.g. nUMI or nGene, cells will be colored by the state they belong to."
+    In contrast, if you have selected a continuous variable, e.g. nUMI or nGene, cells will be coloured by the state they belong to."
   )
 )

@@ -16,7 +16,7 @@ tab_hla_tcr_motifs <- tabItem(
   tabName = "hla_tcr_motifs",
   cerebroVizPageHeader(
     "HLA & TCR Motifs",
-    "hla_parameters_info",
+    "hla_visualizations_info",
     "Exploratory HLA context and association — not inferred restriction."
   ),
   fluidRow(
@@ -64,10 +64,8 @@ tab_hla_tcr_motifs <- tabItem(
         client_actions = FALSE
       ),
       cerebroBox(
-        title = tagList(
-          "Motif Network",
-          cerebroInfoButton("hla_visualizations_info")
-        ),
+        title = NULL,
+        collapsible = FALSE,
         content = tabsetPanel(
           id = "hla_tabs",
           tabPanel(

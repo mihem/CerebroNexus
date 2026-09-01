@@ -345,6 +345,7 @@ body .content-wrapper, body .right-side {
   height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: 18px 26px !important;
 }
 .content-header { padding: 6px 0 16px; }
@@ -1925,7 +1926,9 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
    Responsive
    ------------------------------------------------------------------------- */
 @media (max-width: 767px) {
-  body .content-wrapper, body .right-side { padding: 56px 14px 12px; }
+  body .content-wrapper, body .right-side {
+    padding: 56px 14px 12px !important;
+  }
   body .box-body { padding: 14px 16px; }
   html body.skin-blue .main-header,
   html body.skin-blue .main-header .navbar {
@@ -2077,6 +2080,11 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   visibility: hidden;
   pointer-events: none;
   transform: translateY(-2px);
+}
+@media (max-width: 767px) {
+  .cerebro-selection-status-slot > .cerebro-selection-status-hidden {
+    display: none;
+  }
 }
 .cerebro-selection-status-kicker {
   display: inline-flex;

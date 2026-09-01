@@ -75,7 +75,7 @@ cv_ok <- function(b) {
 }
 
 ## Palette edits do not change cells, coordinates, or available spaces. Keep the
-## expensive bundle reactive independent of Color management and send only the
+## expensive bundle reactive independent of Colour management and send only the
 ## categorical colours that changed.
 coordviews_color_patch <- reactive({
   b <- cv_ok(coordviews_bundle())
@@ -94,7 +94,7 @@ coordviews_color_patch <- reactive({
 ## -- see www/cell_views.js for why that signal rather than the sidebar's
 ## active-tab input. The gate is CURRENT visibility, not "was opened once":
 ## a sticky flag stopped the first build but left every later one, so opening
-## the tab, going to Color management and changing a colour rebuilt and re-sent
+## the tab, going to Colour management and changing a colour rebuilt and re-sent
 ## the whole bundle to a hidden page.
 coordviews_visible <- reactiveVal(FALSE)
 observeEvent(input[["coordviews_visible"]], {
@@ -206,7 +206,7 @@ output[["coordviews_selected_cells_UI"]] <- renderUI({
           ),
           shinyWidgets::materialSwitch(
             inputId = "coordviews_selected_cells_table_color_highlighting",
-            label = "Highlight values with colors:",
+            label = "Highlight values with colours:",
             value = TRUE,
             status = "primary",
             inline = TRUE

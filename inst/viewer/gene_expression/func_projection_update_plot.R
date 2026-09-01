@@ -121,6 +121,7 @@ expression_projection_update_plot <- function(input) {
       list(
         color_type = "rgb",
         color_variable = "RGB co-expression",
+        space_label = plot_parameters[["projection"]],
         appearance = appearance
       ),
       output_data,
@@ -149,6 +150,7 @@ expression_projection_update_plot <- function(input) {
       list(
         color_type = "continuous",
         color_variable = legend_label,
+        space_label = plot_parameters[["projection"]],
         appearance = appearance
       ),
       output_data,

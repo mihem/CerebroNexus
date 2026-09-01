@@ -129,7 +129,7 @@ output[["trajectory_projection_main_parameters_UI"]] <- renderUI({
 
   selectInput(
     "trajectory_point_color",
-    label = "Color cells by",
+    label = "Colour by",
     choices = c(
       "state",
       "pseudotime",
@@ -166,7 +166,7 @@ trajectory_projection_main_parameters_info <- list(
     <ul>
       <li><b>Choose a method:</b> Select the trajectory-inference method.</li>
       <li><b>Choose a trajectory:</b> Select the trajectory to display.</li>
-      <li><b>Color cells by:</b> Select which variable, categorical or continuous, from the meta data should be used to color the cells.</li>
+      <li><b>Colour by:</b> Select which variable, categorical or continuous, from the meta data should be used to colour the cells.</li>
     </ul>
     "
   )

@@ -241,7 +241,8 @@ cerebroCellViewScatterPayload <- function(
   x_range = list(),
   y_range = list(),
   reset_axes = FALSE,
-  n_dimensions = 2L
+  n_dimensions = 2L,
+  space_label = NULL
 ) {
   dimensions <- if (as.integer(n_dimensions) == 3L) 3L else 2L
   if (length(coordinates) < dimensions) {
@@ -271,6 +272,9 @@ cerebroCellViewScatterPayload <- function(
       keep_square = isTRUE(keep_square)
     )
   )
+  if (!is.null(space_label)) {
+    meta[["space_label"]] <- space_label
+  }
   data <- list(
     x = if (continuous) I(coordinates[[1L]]) else list(),
     y = if (continuous) I(coordinates[[2L]]) else list(),
@@ -2495,7 +2499,7 @@ serverSideGeneSelector <- function(
 ##
 ## selection: data.frame of selected cells with an `identifier` column, or NULL.
 ## metadata:  data.frame with the same `identifier` column plus grouping columns.
-## color_variable: name of the column the legend groups by (current "Color by").
+## color_variable: name of the column the legend groups by (current "Colour by").
 ## hidden_groups: character vector of group names currently hidden (may be NULL).
 ##
 ## Returns the selection with hidden-group cells removed. NULL stays NULL; an

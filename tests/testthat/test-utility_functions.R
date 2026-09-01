@@ -171,6 +171,37 @@ test_that("single-cell scatter payloads remain arrays on the wire", {
   expect_type(wire$hover$text[[1L]], "list")
 })
 
+test_that("single-view scatter payloads carry their display label", {
+  source_utils_env <- new.env()
+  source(
+    testthat::test_path("..", "..", "inst", "viewer", "utility_functions.R"),
+    local = source_utils_env
+  )
+  payload <- source_utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c(0.1, 0.2),
+    color_variable = "expression",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    hover_info = c("first", "second"),
+    space_label = "UMAP"
+  )
+
+  expect_identical(payload$meta$space_label, "UMAP")
+
+  default_payload <- source_utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c(0.1, 0.2),
+    color_variable = "expression",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    hover_info = c("first", "second")
+  )
+  expect_false("space_label" %in% names(default_payload$meta))
+})
+
 test_that("categorical scatter payloads retain cells with missing metadata", {
   payload <- utils_env$cerebroCellViewScatterPayload(
     coordinates = list(c(1, 2), c(3, 4)),

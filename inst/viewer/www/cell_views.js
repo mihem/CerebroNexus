@@ -211,7 +211,7 @@
   }
   // Colours reach a `style` attribute rather than a text node, and they are as
   // data-driven as the labels are: the group colours are seeded from the object
-  // and only then made editable in Color management. Escaping is the wrong tool
+  // and only then made editable in Colour management. Escaping is the wrong tool
   // here -- `red;position:fixed;inset:0` never leaves the attribute, so nothing
   // needs quoting for it to append declarations of its own -- so a value that is
   // not a colour is replaced by one that is.
@@ -2376,7 +2376,7 @@
       var scale = document.createElement('span');
       scale.className = 'cv-panel-scale';
       scale.style.background = 'linear-gradient(90deg,' + stops.join(',') + ')';
-      scale.title = field.label + ' color scale; numeric range shared across panels';
+      scale.title = field.label + ' colour scale; numeric range shared across panels';
       var title = panel.pane.querySelector('.cv-ptitle');
       if (title) title.insertAdjacentElement('afterend', scale);
     });
@@ -4694,10 +4694,7 @@
       visibleBottom - panes.getBoundingClientRect().top - bottomPad -
       2 * VIEWPORT_GUTTER
     );
-    // Keep the same small viewport gutter horizontally as vertically. A
-    // classic scrollbar can appear after height fitting and steal a few pixels;
-    // without this reserve the final flex item wraps onto a new row.
-    var usableW = Math.max(1, availW - 2 * VIEWPORT_GUTTER);
+    var usableW = availW;
 
     // Overview is a genuine two-dimensional fit: try every possible column
     // count and choose the one that maximises a balanced cell. If there are so
@@ -4785,7 +4782,7 @@
       var height = rowFit ? rowFit.height
         : (primary ? focusSide : (focusPanel ? side : panelHeight));
       var paneWidth = rowFit ? rowFit.tracks[index]
-        : (primary ? primaryWidth + chromeX : Math.floor(colW));
+        : (primary ? primaryWidth + chromeX : colW);
       var aspect = panelDataAspect(p);
       if (aspect) {
         if (width / height > aspect) width = Math.round(height * aspect);

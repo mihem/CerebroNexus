@@ -58,6 +58,17 @@ test_that("IR fill layout survives tab activation and responsive resize", {
   ))
   expect_identical(linked_initial$count, 3L)
   expect_identical(linked_initial$rows, 1L)
+  linked_right_edges <- app$get_js(paste0(
+    "(() => {",
+    "const top=document.querySelector('#shiny-tab-coordinated_views .cv-topbar')",
+    ".getBoundingClientRect();",
+    "const panes=Array.from(document.querySelectorAll(",
+    "'#shiny-tab-coordinated_views .cv-pane:not(.cv-hidden)'))",
+    ".map(p=>p.getBoundingClientRect());",
+    "return {top:top.right,pane:Math.max(...panes.map(p=>p.right))};",
+    "})()"
+  ))
+  expect_lt(abs(linked_right_edges$top - linked_right_edges$pane), 1)
 
   ## Focus remains a Linked views interaction; only standalone single-panel
   ## hosts suppress it.
@@ -362,9 +373,12 @@ test_that("IR fill layout survives tab activation and responsive resize", {
       tab_name,
       " .cerebro-viz-top-layout');",
       "const p = row.querySelector('.cerebro-viz-toolbar').getBoundingClientRect();",
-      "const v = row.querySelector('.cerebro-viz-col').getBoundingClientRect();",
+      "const viz = row.querySelector('.cerebro-viz-col');",
+      "const v = viz.getBoundingClientRect();",
+      "const pane = viz.querySelector('.cv-pane:not(.cv-hidden)').getBoundingClientRect();",
       "return {paramBottom:p.bottom, vizTop:v.top, ",
-      "paramLeft:p.left, paramRight:p.right, vizLeft:v.left, vizRight:v.right};",
+      "paramLeft:p.left, paramRight:p.right, vizLeft:v.left, vizRight:v.right,",
+      "paneRight:pane.right};",
       "})()"
     )
   }
@@ -376,7 +390,8 @@ test_that("IR fill layout survives tab activation and responsive resize", {
         "const row = document.querySelector('#shiny-tab-",
         tab_name,
         " .cerebro-viz-top-layout');",
-        "return row && row.getClientRects().length > 0;",
+        "const pane = row && row.querySelector('.cv-pane:not(.cv-hidden)');",
+        "return pane && pane.getClientRects().length > 0;",
         "})()"
       ),
       timeout = 30000
@@ -385,9 +400,10 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     expect_lte(layout$paramBottom, layout$vizTop + 1)
     expect_lt(abs(layout$paramLeft - layout$vizLeft), 1)
     expect_lt(abs(layout$paramRight - layout$vizRight), 1)
+    expect_lt(abs(layout$paramRight - layout$paneRight), 1)
   }
 
-  standalone_dblclick_stays_put <- function(tab_name, host_id) {
+  standalone_dblclick_stays_put <- function(tab_name, host_id, expected_title) {
     app$click(selector = paste0('a[href="#shiny-tab-', tab_name, '"]'))
     canvas_selector <- paste0(
       "#",
@@ -401,6 +417,14 @@ test_that("IR fill layout survives tab activation and responsive resize", {
         "')?.getBoundingClientRect().height > 200"
       ),
       timeout = 30000
+    )
+    expect_identical(
+      app$get_js(paste0(
+        "document.querySelector('#",
+        host_id,
+        " .cv-ptitle').textContent.trim()"
+      )),
+      expected_title
     )
     before <- app$get_js(paste0(
       "document.querySelector('",
@@ -459,18 +483,23 @@ test_that("IR fill layout survives tab activation and responsive resize", {
 
   standalone_dblclick_stays_put(
     "overview",
-    "overview_projection_cell_view_host"
+    "overview_projection_cell_view_host",
+    app$get_js(
+      "document.getElementById('overview_projection_to_display').value"
+    )
   )
   standalone_dblclick_stays_put(
     "trajectory",
-    "trajectory_projection_cell_view_host"
+    "trajectory_projection_cell_view_host",
+    app$get_js("document.getElementById('trajectory_selected_name').value")
   )
 
   app$click(selector = 'a[href="#shiny-tab-immune_repertoire"]')
   app$set_inputs(ir_tabs = "Clonal UMAP", wait_ = FALSE)
   standalone_dblclick_stays_put(
     "immune_repertoire",
-    "ir_clonalUMAP_projection_cell_view_host"
+    "ir_clonalUMAP_projection_cell_view_host",
+    "Clonal UMAP"
   )
 
   app$click(selector = 'a[href="#shiny-tab-immune_repertoire"]')
@@ -581,4 +610,33 @@ test_that("IR fill layout survives tab activation and responsive resize", {
     "document.documentElement.scrollWidth <= window.innerWidth + 1"
   )
   expect_true(isTRUE(page_no_hscroll))
+
+  ## The mobile shell must clear the fixed navigation toggle, and an inactive
+  ## cohort card must not reserve height in the shared selection slot.
+  app$click(selector = 'a[href="#shiny-tab-overview"]')
+  app$wait_for_js(
+    paste0(
+      "document.querySelector('#shiny-tab-overview ",
+      ".cerebro-selection-status-guide')?.getClientRects().length > 0"
+    ),
+    timeout = 30000
+  )
+  mobile_padding_top <- app$get_js(
+    "parseFloat(getComputedStyle(document.querySelector('.content-wrapper')).paddingTop)"
+  )
+  mobile_selection_slot <- app$get_js(paste0(
+    "(() => {",
+    "const slot=document.querySelector('#shiny-tab-overview ",
+    ".cerebro-selection-status-slot');",
+    "const guide=slot.querySelector('.cerebro-selection-status-guide');",
+    "const hidden=slot.querySelector('.cerebro-selection-status-hidden');",
+    "hidden.style.minHeight='120px';",
+    "const result={slot:slot.getBoundingClientRect().height,",
+    "guide:guide.getBoundingClientRect().height};",
+    "hidden.style.removeProperty('min-height');",
+    "return result;",
+    "})()"
+  ))
+  expect_equal(mobile_padding_top, 56)
+  expect_lte(mobile_selection_slot$slot, mobile_selection_slot$guide + 1)
 })

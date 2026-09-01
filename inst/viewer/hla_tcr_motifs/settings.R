@@ -90,7 +90,7 @@ output$hla_parameters_ui <- renderUI({
     # one long label wrapped mid-phrase — "(pick allele" / "below)".
     selectizeInput(
       "hla_color_by",
-      "Colour nodes by:",
+      "Colour by",
       choices = isolate(hla_color_by_choices()),
       selected = isolate(hla_param("hla_color_by", "cluster")),
       options = list(render = HLA_TWO_LINE_RENDER)
@@ -265,7 +265,7 @@ output$hla_color_allele_ui <- renderUI({
   }
   selectizeInput(
     "hla_color_allele",
-    "HLA allele to colour by:",
+    "HLA allele",
     choices = choices,
     # Seeded from the page's shared allele, so appearing for the first time
     # ADOPTS whatever the Associations picker already chose rather than

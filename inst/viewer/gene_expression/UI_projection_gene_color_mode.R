@@ -19,10 +19,10 @@ output[["expression_projection_gene_color_mode_UI"]] <- renderUI({
   }
   control <- selectInput(
     inputId = "expression_projection_gene_color_mode",
-    label = "Panel colors",
+    label = "Panel colours",
     choices = c(
       "Shared scale" = "shared",
-      "Distinct colors" = "different"
+      "Distinct colours" = "different"
     ),
     selected = selected
   )
