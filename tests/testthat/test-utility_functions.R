@@ -147,6 +147,49 @@ test_that("cell scatter payload rejects incoherent categorical snapshots", {
   )
 })
 
+test_that("single-cell scatter payloads remain arrays on the wire", {
+  skip_if_not_installed("jsonlite")
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(1, 2),
+    color = "A",
+    color_variable = "cluster",
+    selection_keys = "cell-1",
+    point_size = 5,
+    point_opacity = 1,
+    color_assignments = c(A = "#123456"),
+    hover_info = "one cell"
+  )
+  wire <- jsonlite::fromJSON(
+    jsonlite::toJSON(payload, auto_unbox = TRUE),
+    simplifyVector = FALSE
+  )
+
+  expect_type(wire$data$x[[1L]], "list")
+  expect_type(wire$data$y[[1L]], "list")
+  expect_type(wire$data$selection_key[[1L]], "list")
+  expect_type(wire$data$color[[1L]], "list")
+  expect_type(wire$hover$text[[1L]], "list")
+})
+
+test_that("categorical scatter payloads retain cells with missing metadata", {
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c("A", NA_character_),
+    color_variable = "cluster",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    color_assignments = c(A = "#123456"),
+    hover_info = c("first", "missing")
+  )
+
+  expect_true("(missing)" %in% payload$meta$traces)
+  expect_identical(
+    sort(unlist(payload$data$selection_key, use.names = FALSE)),
+    c("cell-1", "cell-2")
+  )
+})
+
 test_that("centerOfGroups returns a typed empty tibble for a missing group column", {
   result <- centerOfGroups(
     coordinates = matrix(c(1, 2, 3, 4), ncol = 2),

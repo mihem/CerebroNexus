@@ -1398,8 +1398,9 @@
     }
     // Trekker: dashed niche-radius circle around the picked nucleus (physical
     // panel). Radius µm → screen px via the same data→unit→screen scale.
-    if (pick != null && !sel && D.trekker && p.spaceId === 'trekker' && p.ok[pick]) {
-      var nu = spaceById['trekker'] && spaceById['trekker']._unit;
+    if (pick != null && !sel && D.trekker && panelIsTrekker(p) && p.ok[pick]) {
+      var trekker = trekkerSpace();
+      var nu = trekker && trekker._unit;
       if (nu && p._SX != null && p._SY != null) {
         var viewScale = p.view ? 1 / p.view.span : 1;
         var radiusX = nicheRadius * nu.k * p._SX * viewScale;
@@ -2115,12 +2116,25 @@
   // it in the Trekker physical space. Doubles as the highlight set — cells in
   // it stay solid, everything else fades. Null unless a single nucleus is picked
   // (and no lasso selection is active). The distance loop is CBGeom.nicheAround
-  // This engine keys on spaceById['trekker'] and passes
   // inclusive=<=, skipNaN=true (unpositioned cells align to NaN here).
+  function trekkerSpace() {
+    var ids = Object.keys(spaceById);
+    for (var i = 0; i < ids.length; i++) {
+      var space = spaceById[ids[i]];
+      if (space && (space.id === 'trekker' || space._role === 'trekker')) {
+        return space;
+      }
+    }
+    return null;
+  }
+  function panelIsTrekker(panel) {
+    var space = panel && spaceById[panel.spaceId];
+    return !!(space && (space.id === 'trekker' || space._role === 'trekker'));
+  }
   function rebuildNiche() {
     nicheSet = null;
     if (pick == null || (sel && sel.size) || !D.trekker) return;
-    var sp = spaceById['trekker'];
+    var sp = trekkerSpace();
     if (!sp || !sp.x) return;
     var px = sp.x[pick], py = sp.y[pick];
     if (px == null || isNaN(px)) return;   // picked cell not positioned
@@ -3485,6 +3499,18 @@
     } else if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
       Shiny.setInputValue('coordviews_gene', gene);
     }
+    if (singleActive === 'trekker_projection') {
+      var mode = $('trekker_mode');
+      var picker = $('trekker_gene_pick');
+      if (mode && mode.selectize) mode.selectize.setValue('gene', false);
+      if (picker && picker.selectize) {
+        picker.selectize.addOption({ value: gene, label: gene });
+        picker.selectize.setValue(gene, false);
+      } else if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
+        Shiny.setInputValue('trekker_mode', 'gene');
+        Shiny.setInputValue('trekker_gene_pick', gene);
+      }
+    }
   }
   // Controls that belong to a specific right-panel space (the clonal-layout switch,
   // the histology-image bar) are shown only while that space is the one on screen —
@@ -4517,7 +4543,7 @@
     var showTk = !!(D.trekker && D.trekker.qc);
     panels.forEach(function (p) {
       var btn = $('cv-tk-info-' + p.key.toLowerCase());
-      if (btn) btn.style.display = (showTk && p.spaceId === 'trekker') ? '' : 'none';
+      if (btn) btn.style.display = (showTk && panelIsTrekker(p)) ? '' : 'none';
     });
     updateFocusButtons();
     syncOrbitButtons();
@@ -5104,6 +5130,7 @@
       var spaceId = 'single::' + id + '::' + (panel.id || panelIndex);
       var space = {
         id: spaceId,
+        _role: panel.id || null,
         label: panel.label || panel.id || id,
         x: alignFlatValues(panelKeys, xs, null),
         y: alignFlatValues(panelKeys, ys, null),
@@ -5253,7 +5280,8 @@
     }).filter(function (name) { return name != null; }) : [];
     view.mode = selectMode;
     view.lenses = panels.filter(function (p) { return p.spaceId; }).map(function (p) {
-      return { view: p.view && Object.assign({}, p.view), rot: p.rot && Object.assign({}, p.rot),
+      return { spaceId: p.spaceId,
+        view: p.view && Object.assign({}, p.view), rot: p.rot && Object.assign({}, p.rot),
         lassoData: p.lassoData && p.lassoData.map(function (q) { return q.slice(); }) };
     });
   }
@@ -5328,9 +5356,16 @@
     selectMode = payload.mode || 'lasso'; syncModeButtons(); syncCursors();
     var saved = payload.lenses || [];
     panels.forEach(function (p, index) {
-      if (!p.spaceId || !saved[index]) return;
-      p.view = saved[index].view || null; p.rot = saved[index].rot || null;
-      p.lassoData = saved[index].lassoData || null; project(p);
+      if (!p.spaceId) return;
+      var lens = saved.filter(function (candidate) {
+        return candidate.spaceId === p.spaceId;
+      })[0];
+      if (!lens && !saved.some(function (candidate) { return candidate.spaceId; })) {
+        lens = saved[index];
+      }
+      if (!lens) return;
+      p.view = lens.view || null; p.rot = lens.rot || null;
+      p.lassoData = lens.lassoData || null; project(p);
     });
     if (Array.isArray(payload.selection) && payload.selection.length) {
       var cells = singleIndex(), restored = new Set();
@@ -6163,7 +6198,7 @@
     // nothing to say the request had failed.
     Shiny.addCustomMessageHandler('coordviews_geneval', function (m) {
       if (!D || !m) return;
-      if (geneWanted != null && m.gene !== geneWanted) return;   // stale reply
+      if (m.ok && geneWanted != null && m.gene !== geneWanted) return; // stale reply
       geneWanted = null;
       if (!m.ok) {
         // Nothing to draw. Say so rather than keep showing the last gene.
@@ -6182,7 +6217,14 @@
       if (colorBy === GENE_MODE) { renderLegend(); drawAll(); updateMoranBadges(); }
     });
     Shiny.addCustomMessageHandler('coordviews_genepanels', function (m) {
-      if (!D || !m || !m.ok) return;
+      if (!D || !m) return;
+      if (!m.ok) {
+        D.genePanels = null;
+        if (colorBy === GENE_PANELS_MODE) {
+          buildPanels(); layoutPanels(); renderLegend(); resizeAll(); drawAll();
+        }
+        return;
+      }
       var genes = Array.isArray(m.genes) ? m.genes : [m.genes];
       var values = m.values || [];
       if (genes.length === 1 && (!values.length || typeof values[0] === 'number')) {
@@ -6212,7 +6254,12 @@
     });
     // Three 0-255 channels for RGB co-expression.
     Shiny.addCustomMessageHandler('coordviews_rgbval', function (m) {
-      if (!D || !m || !m.ok) return;
+      if (!D || !m) return;
+      if (!m.ok) {
+        D.rgb = null;
+        if (colorBy === RGB_MODE) { renderLegend(); drawAll(); }
+        return;
+      }
       D.rgb = { r: m.r, g: m.g, b: m.b, genes: m.genes };
       if (colorBy === RGB_MODE) { renderLegend(); drawAll(); }
     });

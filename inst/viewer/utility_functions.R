@@ -272,10 +272,10 @@ cerebroCellViewScatterPayload <- function(
     )
   )
   data <- list(
-    x = if (continuous) coordinates[[1L]] else list(),
-    y = if (continuous) coordinates[[2L]] else list(),
-    selection_key = if (continuous) selection_keys else list(),
-    color = if (continuous) color else list(),
+    x = if (continuous) I(coordinates[[1L]]) else list(),
+    y = if (continuous) I(coordinates[[2L]]) else list(),
+    selection_key = if (continuous) I(selection_keys) else list(),
+    color = if (continuous) I(color) else list(),
     point_size = point_size,
     point_opacity = point_opacity,
     point_line = point_line,
@@ -284,13 +284,13 @@ cerebroCellViewScatterPayload <- function(
     reset_axes = reset_axes
   )
   if (has_z) {
-    data[["z"]] <- if (continuous) coordinates[[3L]] else list()
+    data[["z"]] <- if (continuous) I(coordinates[[3L]]) else list()
   }
 
   show_hover <- isTRUE(hover)
   hover_data <- list(
     hoverinfo = if (show_hover) "text" else "skip",
-    text = if (continuous && show_hover) unname(hover_info) else list()
+    text = if (continuous && show_hover) I(unname(hover_info)) else list()
   )
   if (continuous) {
     return(list(meta = meta, data = data, hover = hover_data))
@@ -298,8 +298,15 @@ cerebroCellViewScatterPayload <- function(
   if (is.null(color_assignments)) {
     stop("color_assignments are required for categorical cell views")
   }
-  levels_in_view <- unique(as.character(color))
-  levels_in_view <- levels_in_view[!is.na(levels_in_view)]
+  color <- as.character(color)
+  color[is.na(color)] <- "(missing)"
+  levels_in_view <- unique(color)
+  if (
+    !("(missing)" %in% names(color_assignments)) &&
+      "(missing)" %in% levels_in_view
+  ) {
+    color_assignments <- c(color_assignments, `(missing)` = "#7b8794")
+  }
   missing_levels <- setdiff(levels_in_view, names(color_assignments))
   if (length(missing_levels)) {
     stop(
@@ -309,7 +316,7 @@ cerebroCellViewScatterPayload <- function(
   }
 
   meta[["traces"]] <- list()
-  cells_by_group <- split(seq_along(color), as.character(color))
+  cells_by_group <- split(seq_along(color), color)
   hover_names <- names(hover_info)
   aligned_hover <- if (!show_hover) {
     NULL
@@ -328,15 +335,18 @@ cerebroCellViewScatterPayload <- function(
       next
     }
     meta[["traces"]][[index]] <- group
-    data[["x"]][[index]] <- coordinates[[1L]][cells]
-    data[["y"]][[index]] <- coordinates[[2L]][cells]
+    data[["x"]][[index]] <- I(coordinates[[1L]][cells])
+    data[["y"]][[index]] <- I(coordinates[[2L]][cells])
     if (has_z) {
-      data[["z"]][[index]] <- coordinates[[3L]][cells]
+      data[["z"]][[index]] <- I(coordinates[[3L]][cells])
     }
-    data[["selection_key"]][[index]] <- selection_keys[cells]
-    data[["color"]][[index]] <- unname(color_assignments[[group]])
+    data[["selection_key"]][[index]] <- I(selection_keys[cells])
+    data[["color"]][[index]] <- I(rep(
+      unname(color_assignments[[group]]),
+      length(cells)
+    ))
     if (show_hover) {
-      hover_data[["text"]][[index]] <- aligned_hover[cells]
+      hover_data[["text"]][[index]] <- I(aligned_hover[cells])
     }
     index <- index + 1L
   }

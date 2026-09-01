@@ -301,6 +301,29 @@ test_that("Linked views keeps replacement controls contextual and user-facing", 
   expect_match(js, "function fieldSummaryHtml", fixed = TRUE)
 })
 
+test_that("specialist views preserve identity and clear dependent state", {
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  trekker_file <- file.path(dirname(bundle_file), "..", "trekker", "server.R")
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
+  trekker <- paste(readLines(trekker_file, warn = FALSE), collapse = "\n")
+
+  expect_match(server, "cells <- as.character(cells)", fixed = TRUE)
+  expect_match(
+    server,
+    '"coordviews_genepanels", list(ok = FALSE)',
+    fixed = TRUE
+  )
+  expect_match(server, '"coordviews_rgbval", list(ok = FALSE)', fixed = TRUE)
+  expect_match(js, "_role: panel.id || null", fixed = TRUE)
+  expect_match(js, "function trekkerSpace()", fixed = TRUE)
+  expect_match(js, "spaceId: p.spaceId", fixed = TRUE)
+  expect_match(js, "candidate.spaceId === p.spaceId", fixed = TRUE)
+  expect_match(js, "Shiny.setInputValue('trekker_mode', 'gene')", fixed = TRUE)
+  expect_match(trekker, "length(ids)", fixed = TRUE)
+})
+
 test_that("Trekker depth views form one collapsed insights region", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
@@ -401,6 +424,33 @@ test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
   expect_match(as_json(bundle$cells), "^\\[")
   expect_match(as_json(projection$x), "^\\[")
   expect_match(as_json(projection$y), "^\\[")
+})
+
+test_that("bundle cell identity falls back to metadata row names", {
+  skip_if_not(have_bundle)
+  cells <- c("c1", "c2")
+  md <- data.frame(
+    cluster = c("A", "B"),
+    row.names = cells,
+    stringsAsFactors = FALSE
+  )
+  crb <- list(
+    getMetaData = function() md,
+    getGroups = function() "cluster",
+    getParameters = function() list(main_group = "cluster"),
+    availableProjections = function() "umap",
+    getProjection = function(name) {
+      matrix(1:4, nrow = 2, dimnames = list(cells, c("x", "y")))
+    },
+    availableSpatial = function() NULL,
+    getTrekker = function() NULL,
+    getImmuneRepertoire = function() NULL,
+    getGeneNames = function() character()
+  )
+
+  bundle <- cv_env$cv_build_bundle(crb)
+
+  expect_identical(as.character(bundle$cells), cells)
 })
 
 test_that("cv_color_patch carries only palette updates for the current bundle", {

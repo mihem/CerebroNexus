@@ -374,6 +374,7 @@ cv_gene_values <- function(gene, cells) {
   if (is.null(gene) || !nzchar(gene)) {
     return(NULL)
   }
+  cells <- as.character(cells)
   m <- tryCatch(
     data_set()$getExpressionMatrix(cells = cells, genes = gene),
     error = function(e) NULL
@@ -437,6 +438,11 @@ observeEvent(
     genes <- unique(input[["coordviews_gene"]])
     genes <- genes[!is.na(genes) & nzchar(genes)]
     if (is.null(b) || length(genes) == 0) {
+      session$sendCustomMessage(
+        "coordviews_geneval",
+        list(gene = "", ok = FALSE)
+      )
+      session$sendCustomMessage("coordviews_genepanels", list(ok = FALSE))
       return()
     }
     values <- lapply(genes, cv_gene_values, cells = b$cells)
@@ -521,6 +527,7 @@ observeEvent(
     g <- chan("coordviews_gene_g")
     bl <- chan("coordviews_gene_b")
     if (!nzchar(r$gene) && !nzchar(g$gene) && !nzchar(bl$gene)) {
+      session$sendCustomMessage("coordviews_rgbval", list(ok = FALSE))
       return()
     }
     session$sendCustomMessage(

@@ -1348,10 +1348,19 @@ cv_default_group <- function(available) {
 ## its own cv_build_* helper; this function wires them into the final list.
 cv_build_bundle <- function(crb) {
   md <- crb$getMetaData()
-  if (is.null(md) || !("cell_barcode" %in% colnames(md))) {
+  if (is.null(md)) {
     return(NULL)
   }
-  cells <- cv_cell_ids(md$cell_barcode)
+  cells <- cv_cell_ids(
+    if ("cell_barcode" %in% colnames(md)) {
+      md$cell_barcode
+    } else {
+      rownames(md)
+    }
+  )
+  if (!length(cells)) {
+    return(NULL)
+  }
   n <- length(cells)
   cell_fingerprint <- cv_cell_fingerprint(cells)
 
