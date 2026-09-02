@@ -294,10 +294,10 @@ observeEvent(
 )
 
 observeEvent(
-  input[["coordviews_config_upload"]],
+  input[["coordviews_config_upload_request"]],
   {
-    upload <- input[["coordviews_config_upload"]]
-    raw_nonce <- isolate(input[["coordviews_config_upload_nonce"]])
+    upload <- input[["coordviews_config_upload_request"]]
+    raw_nonce <- if (is.list(upload)) upload$nonce else NULL
     nonce <- if (
       is.character(raw_nonce) &&
         length(raw_nonce) == 1L &&
@@ -310,7 +310,14 @@ observeEvent(
     }
     tryCatch(
       {
+        cv_config_check_node_limit(upload)
+        upload <- cv_config_record(
+          upload,
+          c("nonce", "action", "name", "size", "text"),
+          path = "$.upload"
+        )
         nonce <- cv_config_string(raw_nonce, "$.upload.nonce", 128L)
+        action <- cv_config_choice(upload$action, "$.upload.action", "apply")
         text <- cv_config_read_upload(upload)
         dataset <- cv_saved_view_dataset()
         normalized <- cv_config_decode(
@@ -321,7 +328,7 @@ observeEvent(
         colour_data <- cv_config_validate_genes(normalized, dataset$cells)
         cv_config_send_result(
           nonce,
-          "apply",
+          action,
           TRUE,
           config = cv_config_json_document(normalized),
           colour_data = colour_data,

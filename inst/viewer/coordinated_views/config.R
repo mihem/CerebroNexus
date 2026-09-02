@@ -974,34 +974,35 @@ cv_config_encode_document <- function(document) {
 }
 
 cv_config_read_upload <- function(upload, max_bytes = CV_CONFIG_MAX_BYTES) {
-  required <- c("name", "size", "datapath")
+  required <- c("name", "size", "text")
   if (
-    !is.data.frame(upload) ||
-      nrow(upload) != 1L ||
+    !is.list(upload) ||
       !all(required %in% names(upload)) ||
       !is.character(upload$name) ||
+      length(upload$name) != 1L ||
       is.na(upload$name[[1L]]) ||
       !grepl("[.]json$", upload$name[[1L]], ignore.case = TRUE) ||
-      !is.character(upload$datapath) ||
-      is.na(upload$datapath[[1L]]) ||
-      !nzchar(upload$datapath[[1L]])
+      !is.numeric(upload$size) ||
+      length(upload$size) != 1L ||
+      is.na(upload$size[[1L]]) ||
+      !is.character(upload$text) ||
+      length(upload$text) != 1L ||
+      is.na(upload$text[[1L]])
   ) {
     cv_config_abort("invalid_file", "Choose one JSON file.")
   }
-  reported_size <- suppressWarnings(as.numeric(upload$size[[1L]]))
-  actual_size <- suppressWarnings(file.info(upload$datapath[[1L]])$size)
+  reported_size <- as.numeric(upload$size[[1L]])
+  actual_size <- nchar(enc2utf8(upload$text[[1L]]), type = "bytes")
   if (
-    !is.finite(reported_size) ||
-      !is.finite(actual_size) ||
+    length(reported_size) != 1L ||
+      !is.finite(reported_size) ||
       reported_size < 0 ||
       actual_size > max_bytes ||
       reported_size > max_bytes
   ) {
     cv_config_abort("too_large", "The configuration is larger than 5 MiB.")
   }
-  connection <- file(upload$datapath[[1L]], open = "rb")
-  on.exit(close(connection), add = TRUE)
-  rawToChar(readBin(connection, what = "raw", n = actual_size))
+  upload$text[[1L]]
 }
 
 cv_specialist_page_specs <- list(

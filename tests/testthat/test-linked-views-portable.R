@@ -132,32 +132,51 @@ test_that("view JSON uploads validate metadata and actual file size", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())
   sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
-  path <- withr::local_tempfile(fileext = ".json")
-  writeChar('{"schema":"test"}', path, eos = NULL)
-  size <- file.info(path)$size
-  upload <- data.frame(
+  text <- '{"schema":"test"}'
+  upload <- list(
     name = "view.json",
-    size = size,
-    datapath = path,
-    stringsAsFactors = FALSE
+    size = nchar(text, type = "bytes"),
+    text = text
   )
+  error_code <- function(expr) {
+    tryCatch({
+      force(expr)
+      NA_character_
+    }, cv_config_error = function(error) error$code)
+  }
 
-  expect_identical(helpers$cv_config_read_upload(upload), '{"schema":"test"}')
-  expect_error(
-    helpers$cv_config_read_upload(upload["name"]),
-    class = "cv_config_error"
+  expect_identical(helpers$cv_config_read_upload(upload), text)
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(upload["name"])),
+    "invalid_file"
   )
-  expect_error(
-    helpers$cv_config_read_upload(transform(upload, name = "view.txt")),
-    class = "cv_config_error"
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(modifyList(upload, list(name = "view.txt")))),
+    "invalid_file"
   )
-  expect_error(
-    helpers$cv_config_read_upload(upload, max_bytes = size - 1L),
-    class = "cv_config_error"
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(
+      modifyList(upload, list(size = 1)), max_bytes = nchar(text) - 1L
+    )),
+    "too_large"
   )
-  expect_error(
-    helpers$cv_config_read_upload(transform(upload, size = NA_real_)),
-    class = "cv_config_error"
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(
+      modifyList(upload, list(size = nchar(text) + 1L)), max_bytes = nchar(text)
+    )),
+    "too_large"
+  )
+  expect_identical(
+    helpers$cv_config_read_upload(upload, max_bytes = nchar(text)),
+    text
+  )
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(modifyList(upload, list(size = -1)))),
+    "too_large"
+  )
+  expect_identical(
+    error_code(helpers$cv_config_read_upload(modifyList(upload, list(size = "17")))),
+    "invalid_file"
   )
 })
 

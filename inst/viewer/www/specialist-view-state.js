@@ -28,6 +28,26 @@
   };
   var controlRestoreHandler = null;
   var controlRestoreTimer = null;
+  var stateRestoreSequence = 0;
+  var readyFingerprints = Object.create(null);
+
+  function datasetFingerprint() {
+    var identity = window.cerebroSavedViewDataset || {};
+    return identity.cell_fingerprint || '';
+  }
+
+  function currentState(id, api) {
+    if (readyFingerprints[id] !== datasetFingerprint()) return null;
+    return api && api.captureState ? api.captureState(id) : null;
+  }
+
+  if (window.addEventListener) {
+    window.addEventListener('cerebro:specialist-state', function (event) {
+      var detail = event && event.detail;
+      var id = detail && detail.viewId;
+      if (id && SPECS[id]) readyFingerprints[id] = detail.datasetFingerprint || '';
+    });
+  }
 
   function engine(spec) {
     if (spec.engine === 'network') return window.cerebroHlaMotifs;
@@ -148,11 +168,11 @@
       label: spec.label,
       ready: function () {
         var api = engine(spec);
-        return !!(api && api.captureState && api.captureState(id));
+        return !!currentState(id, api);
       },
       capture: function () {
         var api = engine(spec);
-        var state = api && api.captureState ? api.captureState(id) : null;
+        var state = currentState(id, api);
         if (!state) throw new Error(spec.label + ' is not ready to save.');
         if (!state.cells.length) throw new Error('Select at least one cell first.');
         return {
@@ -172,22 +192,25 @@
       },
       downloadPNG: function () {
         var api = engine(spec);
-        return !!(api && api.downloadPNG && api.downloadPNG(id));
+        return !!(currentState(id, api) && api.downloadPNG && api.downloadPNG(id));
       },
       apply: function (config) {
         navigate(spec);
         restoreControls(config.controls || []);
+        var restoreSequence = ++stateRestoreSequence;
+        var applied = false;
         [0, 250, 750].forEach(function (delay) {
           window.setTimeout(function () {
+            if (applied || restoreSequence !== stateRestoreSequence) return;
             var api = engine(spec);
-            if (api && api.applyState) api.applyState(id, config);
+            if (api && api.applyState) applied = !!api.applyState(id, config);
           }, delay);
         });
         return { selectedCells: (config.selection.cells || []).length };
       },
       summary: function () {
         var api = engine(spec);
-        var state = api && api.captureState ? api.captureState(id) : null;
+        var state = currentState(id, api);
         var identity = window.cerebroSavedViewDataset || {};
         return {
           ready: !!state,

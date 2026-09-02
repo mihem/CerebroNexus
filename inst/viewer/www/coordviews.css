@@ -229,8 +229,10 @@
   display: flex !important; align-items: center; justify-content: center;
   white-space: nowrap;
 }
-.cv-config-upload .form-control { display: none; }
-.cv-config-upload .shiny-file-input-progress { display: none !important; }
+.cv-config-file-input {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
 .cv-config-upload { position: relative; }
 .cv-config-upload.is-disabled { opacity: .55; pointer-events: none; }
 .cv-config-upload.is-uploading .btn-file { padding-bottom: 17px; }

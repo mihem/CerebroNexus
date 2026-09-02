@@ -1980,23 +1980,12 @@
   }
 
   function downloadPanelPNG(p, filenamePrefix) {
-    try {
-      // Composite onto white first — the canvas itself is transparent, so a raw
-      // export would have no background.
-      var src = p.canvas, tmp = document.createElement('canvas');
-      tmp.width = src.width; tmp.height = src.height;
-      var c = tmp.getContext('2d');
-      c.fillStyle = '#ffffff'; c.fillRect(0, 0, tmp.width, tmp.height);
-      c.drawImage(src, 0, 0);
-      var nm = (spaceById[p.spaceId] && spaceById[p.spaceId].label) || p.spaceId || 'panel';
-      return downloadCanvasPNG(
-        tmp,
-        (filenamePrefix || 'linked-views') + '-' +
-          nm.replace(/[^\w.-]+/g, '_') + '.png'
-      );
-    } catch (e) {
-      return false;
-    }
+    var nm = (spaceById[p.spaceId] && spaceById[p.spaceId].label) ||
+      p.spaceId || 'panel';
+    return downloadPanelsPNG(
+      [p],
+      (filenamePrefix || 'linked-views') + '-' + nm.replace(/[^\w.-]+/g, '_') + '.png'
+    );
   }
 
   function pngFilename(prefix) {
@@ -2087,8 +2076,8 @@
     });
   }
 
-  function downloadVisiblePanelsPNG(filename) {
-    var visible = panels.filter(function (panel) {
+  function downloadPanelsPNG(candidates, filename) {
+    var visible = candidates.filter(function (panel) {
       if (!panel.spaceId || !panel.pane || !panel.canvas) return false;
       return !!visibleRect(panel.pane);
     });
@@ -2214,6 +2203,10 @@
     return downloadCanvasPNG(output, filename);
   }
 
+  function downloadVisiblePanelsPNG(filename) {
+    return downloadPanelsPNG(panels, filename);
+  }
+
   function downloadWorkspacePNG() {
     return !singleActive && downloadVisiblePanelsPNG(
       pngFilename('linked-views')
@@ -2243,7 +2236,11 @@
     window.dispatchEvent(new CustomEvent(
       singleActive ? 'cerebro:specialist-state' : 'cerebro:linkedviews-selection',
       { detail: singleActive
-        ? { viewId: singleActive, selectedCells: arr ? arr.length : 0 }
+        ? {
+          viewId: singleActive,
+          selectedCells: arr ? arr.length : 0,
+          datasetFingerprint: configFingerprint()
+        }
         : { selectedCells: arr ? arr.length : 0 } }
     ));
   }
@@ -5801,7 +5798,8 @@
     // arrives. A bundle can be re-sent when returning to the tab; clearing on
     // every push meant a user's alignment work survived only until they looked
     // away.
-    var dataChanged = D.dataset_id !== dataShown;
+    var datasetIdentity = String(D.dataset_id || '') + '\u0000' + configFingerprint();
+    var dataChanged = datasetIdentity !== dataShown;
     var previousSelected = selectedSpatial.slice();
     var previousProjections = selectedProjections.slice();
     var previousActiveName = activeSpatial() && activeSpatial()._sampleName;
@@ -5810,7 +5808,7 @@
       imgStates = {};
       imgChoice = {};
     }
-    dataShown = D.dataset_id;
+    dataShown = datasetIdentity;
     imgToken++;
     closeCard(); cardMeta = null;   // the card described the previous data set
     spaceById = {};
@@ -6698,7 +6696,11 @@
           return;
         }
         if (pp) {
-          if (act === 'png') { downloadPanelPNG(pp); }
+          if (act === 'png') {
+            window.dispatchEvent(new CustomEvent('cerebro:png-result', {
+              detail: { ok: downloadPanelPNG(pp) }
+            }));
+          }
           else if (act === 'zin') { zoomStep(pp, 0.8); }
           else if (act === 'zout') { zoomStep(pp, 1.25); }
           else if (act === 'focus') { setFocusPanel(pp.key); }

@@ -8,6 +8,7 @@
   var lastFocus = null;
   var pending = null;
   var pendingTimer = null;
+  var pngFeedbackTimer = null;
   var sequence = 0;
   var shinyBound = false;
 
@@ -67,10 +68,12 @@
     exportBusy = !!busy;
     refreshExportControls();
     var upload = byId('coordviews_config_upload');
+    var uploadButton = byId('cv-config-upload-button');
     var host = upload && upload.closest('.cv-config-upload');
     if (host) host.classList.toggle('is-disabled', exportBusy);
     window.setTimeout(function () {
       if (upload) upload.disabled = exportBusy;
+      if (uploadButton) uploadButton.disabled = exportBusy;
     }, 0);
   }
 
@@ -87,15 +90,16 @@
     pendingTimer = window.setTimeout(function () {
       if (!pending || pending.nonce !== nonce) return;
       var failedAction = pending.action;
-      if (failedAction === 'apply') {
-        pendingTimer = null;
-        setUploadLoading(false);
-        status('Open did not finish. Reload this page and try again.', 'error');
-        return;
-      }
       clearPending();
       setUploadLoading(false);
-      status('Download did not finish. Reload this page and try again.', 'error');
+      var upload = byId('coordviews_config_upload');
+      if (failedAction === 'apply' && upload) upload.value = '';
+      status(
+        failedAction === 'apply'
+          ? 'Open did not finish. Try again.'
+          : 'Download did not finish. Try again.',
+        'error'
+      );
     }, 10000);
   }
 
@@ -266,9 +270,22 @@
   }
 
   function beginUpload(event) {
+    var input = event && event.currentTarget;
+    var file = input && input.files && input.files.length === 1
+      ? input.files[0] : null;
     if (pending || typeof Shiny === 'undefined' || !Shiny.setInputValue) {
-      if (event && event.currentTarget) event.currentTarget.value = '';
+      if (input) input.value = '';
       status('The connection is not ready. Try again in a moment.', 'error');
+      return;
+    }
+    if (!file || !/[.]json$/i.test(file.name || '')) {
+      if (input) input.value = '';
+      status('Choose one JSON file.', 'error');
+      return;
+    }
+    if (!isFinite(file.size) || file.size > 5 * 1024 * 1024) {
+      if (input) input.value = '';
+      status('The configuration is larger than 5 MiB.', 'error');
       return;
     }
     var nonce = nextNonce();
@@ -276,18 +293,40 @@
     setBusy(true);
     setUploadLoading(true);
     status('Opening view JSON...', 'working');
-    Shiny.setInputValue('coordviews_config_upload_nonce', nonce, {
-      priority: 'event'
-    });
+    var reader = new window.FileReader();
+    reader.onerror = function () {
+      if (!pending || pending.nonce !== nonce) return;
+      clearPending();
+      setUploadLoading(false);
+      if (input) input.value = '';
+      status('The file could not be read. Try again.', 'error');
+    };
+    reader.onload = function () {
+      if (!pending || pending.nonce !== nonce) return;
+      Shiny.setInputValue('coordviews_config_upload_request', {
+        nonce: nonce,
+        action: 'apply',
+        name: file.name,
+        size: file.size,
+        text: String(reader.result || '')
+      }, { priority: 'event' });
+    };
+    reader.readAsText(file, 'UTF-8');
   }
 
   function pngFeedback(button, ok) {
     var label = button && button.querySelector('span');
     if (!label) return;
-    var original = label.textContent;
+    var original = button.getAttribute('data-png-label') || label.textContent;
+    button.setAttribute('data-png-label', original);
+    if (pngFeedbackTimer) window.clearTimeout(pngFeedbackTimer);
     label.textContent = ok ? 'Downloaded' : 'Could not download';
-    window.setTimeout(function () {
-      if (document.contains(button)) label.textContent = original;
+    pngFeedbackTimer = window.setTimeout(function () {
+      if (document.contains(button)) {
+        label.textContent = original;
+        button.removeAttribute('data-png-label');
+      }
+      pngFeedbackTimer = null;
     }, 1600);
   }
 
@@ -304,6 +343,22 @@
       ok ? 'PNG download started.' : 'This plot is not ready to download.',
       ok ? 'success' : 'error'
     );
+  }
+
+  function announceExternalPNG(event) {
+    var output = byId('cerebro-png-status');
+    if (!output) {
+      output = document.createElement('span');
+      output.id = 'cerebro-png-status';
+      output.className = 'sr-only';
+      output.setAttribute('role', 'status');
+      output.setAttribute('aria-live', 'polite');
+      document.body.appendChild(output);
+    }
+    var ok = !!(event && event.detail && event.detail.ok);
+    var message = ok ? 'PNG download started.' : 'The PNG could not be downloaded.';
+    output.textContent = '';
+    window.setTimeout(function () { output.textContent = message; }, 0);
   }
 
   function connectShiny() {
@@ -338,6 +393,10 @@
     });
     byId('cv-config-download').addEventListener('click', requestDownload);
     var upload = byId('coordviews_config_upload');
+    var uploadButton = byId('cv-config-upload-button');
+    if (upload && uploadButton) {
+      uploadButton.addEventListener('click', function () { upload.click(); });
+    }
     if (upload) upload.addEventListener('change', beginUpload);
     dialog.addEventListener('close', function () {
       status('');
@@ -366,9 +425,12 @@
     });
     window.addEventListener('cerebro:specialist-state', function (event) {
       var detail = event.detail || {};
-      var state = adapterFor(detail.viewId);
-      setReadyFor(detail.viewId, !!(state && state.ready()), detail.selectedCells);
+      window.setTimeout(function () {
+        var state = adapterFor(detail.viewId);
+        setReadyFor(detail.viewId, !!(state && state.ready()), detail.selectedCells);
+      }, 0);
     });
+    window.addEventListener('cerebro:png-result', announceExternalPNG);
     refreshActiveState();
 
     if (window.jQuery) window.jQuery(document).one('shiny:connected', connectShiny);

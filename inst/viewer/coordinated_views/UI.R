@@ -848,15 +848,18 @@ tab_coordinated_views <- tabItem(
             ),
             div(
               class = "cv-config-upload",
-              fileInput(
-                "coordviews_config_upload",
-                label = NULL,
-                accept = c("application/json", ".json"),
-                buttonLabel = tagList(
-                  icon("folder-open"),
-                  tags$span("Open JSON")
-                ),
-                placeholder = "No file selected"
+              tags$button(
+                type = "button",
+                id = "cv-config-upload-button",
+                class = "btn-file",
+                icon("folder-open"),
+                tags$span("Open JSON")
+              ),
+              tags$input(
+                id = "coordviews_config_upload",
+                class = "cv-config-file-input",
+                type = "file",
+                accept = "application/json,.json"
               )
             )
           )
