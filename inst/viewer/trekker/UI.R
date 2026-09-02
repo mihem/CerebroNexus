@@ -32,7 +32,7 @@ tab_trekker <- tabItem(
       cerebroSelectionStatus(
         "trekker_projection",
         "trekker_number_of_selected_cells",
-    portable = FALSE
+        portable = FALSE
       ),
       cerebroCellViewOutput("trekker_projection"),
       div(id = "trekker_shared_insights")
