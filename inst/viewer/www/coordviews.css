@@ -232,6 +232,7 @@
 .cv-config-upload .form-control { display: none; }
 .cv-config-upload .shiny-file-input-progress { display: none !important; }
 .cv-config-upload { position: relative; }
+.cv-config-upload.is-disabled { opacity: .55; pointer-events: none; }
 .cv-config-upload.is-uploading .btn-file { padding-bottom: 17px; }
 .cv-config-upload.is-uploading::before {
   content: "Loading…"; position: absolute; z-index: 2; left: 12px; bottom: 6px;

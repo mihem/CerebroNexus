@@ -1999,19 +1999,98 @@
     }
   }
 
-  function linkedPNGFilename() {
-    return 'linked-views-' + new Date().toISOString()
+  function pngFilename(prefix) {
+    return prefix + '-' + new Date().toISOString()
       .replace(/[-:]/g, '').replace('T', '-').slice(0, 15) + '.png';
   }
 
-  function downloadWorkspacePNG() {
-    if (singleActive) return false;
+  function visibleRect(element) {
+    if (!element) return null;
+    var style = window.getComputedStyle(element);
+    var rect = element.getBoundingClientRect();
+    return style.display !== 'none' && style.visibility !== 'hidden' &&
+      rect.width > 0 && rect.height > 0 ? rect : null;
+  }
+
+  function drawExportKey(context, element, originX, originY) {
+    var rootRect = element.getBoundingClientRect();
+    element.querySelectorAll('.cv-lg, .cv-rgb-note').forEach(function (item) {
+      var rect = item.getBoundingClientRect();
+      var dot = item.querySelector('.cv-dot, .cv-evidence-dot');
+      var itemStyle = window.getComputedStyle(item);
+      var x = originX + rect.left - rootRect.left;
+      var y = originY + rect.top - rootRect.top + rect.height / 2;
+      context.save();
+      var opacity = Number(itemStyle.opacity);
+      context.globalAlpha = isFinite(opacity) ? opacity : 1;
+      if (dot) {
+        var dotStyle = window.getComputedStyle(dot);
+        context.beginPath();
+        context.fillStyle = dotStyle.backgroundColor;
+        context.arc(x + 5, y, 5, 0, Math.PI * 2);
+        context.fill();
+        if (parseFloat(dotStyle.borderWidth)) {
+          context.strokeStyle = dotStyle.borderColor;
+          context.stroke();
+        }
+        x += 16;
+      }
+      context.fillStyle = itemStyle.color;
+      context.font = itemStyle.fontWeight + ' ' + itemStyle.fontSize + ' ' +
+        itemStyle.fontFamily;
+      context.textBaseline = 'middle';
+      context.fillText(item.textContent.trim(), x, y);
+      context.restore();
+    });
+  }
+
+  function fillExportGradient(context, x, y, width, height, palette) {
+    var gradient = context.createLinearGradient(x, 0, x + width, 0);
+    for (var index = 0; index <= 4; index++) {
+      gradient.addColorStop(
+        index / 4,
+        palette ? palette[Math.min(index * 64, 255)] : viridisCss(index / 4)
+      );
+    }
+    context.fillStyle = gradient;
+    context.fillRect(x, y, width, height);
+  }
+
+  function drawExportColorbar(context, element, originX, originY) {
+    var rootRect = element.getBoundingClientRect();
+    var gradientElement = $('cv-grad');
+    var gradientRect = visibleRect(gradientElement);
+    if (gradientRect) {
+      var field = fieldOf();
+      fillExportGradient(
+        context,
+        originX + gradientRect.left - rootRect.left,
+        originY + gradientRect.top - rootRect.top,
+        gradientRect.width,
+        gradientRect.height,
+        field && field.palette
+      );
+    }
+    ['cv-cb0', 'cv-cb1', 'cv-cbar-note'].forEach(function (id) {
+      var label = $(id);
+      var rect = visibleRect(label);
+      if (!rect || !label.textContent.trim()) return;
+      var style = window.getComputedStyle(label);
+      context.fillStyle = style.color;
+      context.font = style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily;
+      context.textBaseline = 'middle';
+      context.fillText(
+        label.textContent.trim(),
+        originX + rect.left - rootRect.left,
+        originY + rect.top - rootRect.top + rect.height / 2
+      );
+    });
+  }
+
+  function downloadVisiblePanelsPNG(filename) {
     var visible = panels.filter(function (panel) {
       if (!panel.spaceId || !panel.pane || !panel.canvas) return false;
-      var style = window.getComputedStyle(panel.pane);
-      var rect = panel.pane.getBoundingClientRect();
-      return style.display !== 'none' && style.visibility !== 'hidden' &&
-        rect.width > 0 && rect.height > 0;
+      return !!visibleRect(panel.pane);
     });
     if (!visible.length) return false;
 
@@ -2024,8 +2103,20 @@
       return result;
     }, { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity });
     var padding = 8;
-    var width = Math.ceil(bounds.right - bounds.left + padding * 2);
-    var height = Math.ceil(bounds.bottom - bounds.top + padding * 2);
+    var panelWidth = bounds.right - bounds.left;
+    var panelHeight = bounds.bottom - bounds.top;
+    var legend = $('cv-legend');
+    var colorbar = $('cv-cbar');
+    var legendRect = visibleRect(legend);
+    var colorbarRect = visibleRect(colorbar);
+    var keyHeight = (legendRect ? legendRect.height + padding : 0) +
+      (colorbarRect ? colorbarRect.height + padding : 0);
+    var keyWidth = Math.max(
+      legendRect ? legendRect.width : 0,
+      colorbarRect ? colorbarRect.width : 0
+    );
+    var width = Math.ceil(Math.max(panelWidth, keyWidth) + padding * 2);
+    var height = Math.ceil(panelHeight + keyHeight + padding * 2);
     if (width < 1 || height < 1) return false;
 
     // Keep exports within conservative cross-browser canvas limits. Large
@@ -2070,6 +2161,18 @@
         x + 12,
         y + 20
       );
+      var panelScale = visibleRect(panel.pane.querySelector('.cv-panel-scale'));
+      if (panelScale) {
+        var panelField = fieldForMode(panelColorMode(panel));
+        fillExportGradient(
+          context,
+          panelScale.left - bounds.left + padding,
+          panelScale.top - bounds.top + padding,
+          panelScale.width,
+          panelScale.height,
+          panelField && panelField.palette
+        );
+      }
 
       var canvasX = canvasRect.left - bounds.left + padding;
       var canvasY = canvasRect.top - bounds.top + padding;
@@ -2099,7 +2202,22 @@
       }
     });
 
-    return downloadCanvasPNG(output, linkedPNGFilename());
+    var keyY = panelHeight + padding * 2;
+    if (legendRect) {
+      drawExportKey(context, legend, padding, keyY);
+      keyY += legendRect.height + padding;
+    }
+    if (colorbarRect) {
+      drawExportColorbar(context, colorbar, padding, keyY);
+    }
+
+    return downloadCanvasPNG(output, filename);
+  }
+
+  function downloadWorkspacePNG() {
+    return !singleActive && downloadVisiblePanelsPNG(
+      pngFilename('linked-views')
+    );
   }
   function reportSelection() {
     var arr = null;
@@ -5600,9 +5718,7 @@
 
   function downloadSinglePNG(id) {
     if (singleActive !== id) return false;
-    var panel = panels.find(function (candidate) { return !!candidate.spaceId; });
-    if (!panel) return false;
-    return downloadPanelPNG(panel, id);
+    return downloadVisiblePanelsPNG(pngFilename(id));
   }
 
   function applySingleState(id, saved) {

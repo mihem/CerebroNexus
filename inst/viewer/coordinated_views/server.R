@@ -311,30 +311,7 @@ observeEvent(
     tryCatch(
       {
         nonce <- cv_config_string(raw_nonce, "$.upload.nonce", 128L)
-        if (
-          is.null(upload) ||
-            !is.data.frame(upload) ||
-            nrow(upload) != 1L ||
-            !grepl("[.]json$", upload$name[[1L]], ignore.case = TRUE)
-        ) {
-          cv_config_abort("invalid_file", "Choose one JSON file.")
-        }
-        reported_size <- suppressWarnings(as.numeric(upload$size[[1L]]))
-        actual_size <- suppressWarnings(file.info(upload$datapath[[1L]])$size)
-        if (
-          !is.finite(reported_size) ||
-            !is.finite(actual_size) ||
-            reported_size > CV_CONFIG_MAX_BYTES ||
-            actual_size > CV_CONFIG_MAX_BYTES
-        ) {
-          cv_config_abort(
-            "too_large",
-            "The configuration is larger than 5 MiB."
-          )
-        }
-        connection <- file(upload$datapath[[1L]], open = "rb")
-        on.exit(close(connection), add = TRUE)
-        text <- rawToChar(readBin(connection, what = "raw", n = actual_size))
+        text <- cv_config_read_upload(upload)
         dataset <- cv_saved_view_dataset()
         normalized <- cv_config_decode(
           enc2utf8(text),

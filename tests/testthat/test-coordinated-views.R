@@ -228,10 +228,16 @@ test_that("Linked views exposes a composed workspace PNG download", {
   expect_match(ui, 'tags$span("Download PNG")', fixed = TRUE)
   expect_false(grepl("cerebro-download-png", ui, fixed = TRUE))
   expect_match(js, "function downloadWorkspacePNG()", fixed = TRUE)
+  expect_match(js, "function downloadVisiblePanelsPNG(filename)", fixed = TRUE)
   expect_match(js, "downloadPNG: downloadWorkspacePNG", fixed = TRUE)
+  expect_match(js, "return downloadVisiblePanelsPNG(pngFilename(id))", fixed = TRUE)
+  expect_match(js, "drawExportKey(context", fixed = TRUE)
+  expect_match(js, "drawExportColorbar(context", fixed = TRUE)
   expect_match(js, "maxPixels = 32 * 1024 * 1024", fixed = TRUE)
   expect_match(config, "target.downloadPNG()", fixed = TRUE)
   expect_match(config, "byId('cv-config-png')", fixed = TRUE)
+  expect_match(config, "PNG download started.", fixed = TRUE)
+  expect_match(config, "upload.disabled = exportBusy", fixed = TRUE)
   expect_match(
     css,
     "(?s)\\.cv-config-dialog \\{[^}]*box-sizing: border-box",
@@ -242,6 +248,7 @@ test_that("Linked views exposes a composed workspace PNG download", {
     ".cv-config-actions > .cv-config-upload { width: 118px; }",
     fixed = TRUE
   )
+  expect_match(css, ".cv-config-upload.is-disabled", fixed = TRUE)
 })
 
 test_that("Linked views highlights only the visualization under the pointer", {

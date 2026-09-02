@@ -66,6 +66,12 @@
   function setBusy(busy) {
     exportBusy = !!busy;
     refreshExportControls();
+    var upload = byId('coordviews_config_upload');
+    var host = upload && upload.closest('.cv-config-upload');
+    if (host) host.classList.toggle('is-disabled', exportBusy);
+    window.setTimeout(function () {
+      if (upload) upload.disabled = exportBusy;
+    }, 0);
   }
 
   function clearPending() {
@@ -81,14 +87,15 @@
     pendingTimer = window.setTimeout(function () {
       if (!pending || pending.nonce !== nonce) return;
       var failedAction = pending.action;
+      if (failedAction === 'apply') {
+        pendingTimer = null;
+        setUploadLoading(false);
+        status('Open did not finish. Reload this page and try again.', 'error');
+        return;
+      }
       clearPending();
       setUploadLoading(false);
-      status(
-        failedAction === 'apply'
-          ? 'Open did not finish. Reload this page and try again.'
-          : 'Download did not finish. Reload this page and try again.',
-        'error'
-      );
+      status('Download did not finish. Reload this page and try again.', 'error');
     }, 10000);
   }
 
@@ -258,8 +265,9 @@
     else download(result);
   }
 
-  function beginUpload() {
+  function beginUpload(event) {
     if (pending || typeof Shiny === 'undefined' || !Shiny.setInputValue) {
+      if (event && event.currentTarget) event.currentTarget.value = '';
       status('The connection is not ready. Try again in a moment.', 'error');
       return;
     }
@@ -292,9 +300,10 @@
       ok = false;
     }
     pngFeedback(button, ok);
-    if (!ok) {
-      status('This plot is not ready to download.', 'error');
-    }
+    status(
+      ok ? 'PNG download started.' : 'This plot is not ready to download.',
+      ok ? 'success' : 'error'
+    );
   }
 
   function connectShiny() {

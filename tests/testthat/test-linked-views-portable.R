@@ -128,6 +128,39 @@ test_that("Linked views round-trip without a selection geometry", {
   expect_null(restored$selection$geometry)
 })
 
+test_that("view JSON uploads validate metadata and actual file size", {
+  root <- system.file("viewer", package = "CerebroNexus")
+  helpers <- new.env(parent = globalenv())
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
+  path <- withr::local_tempfile(fileext = ".json")
+  writeChar('{"schema":"test"}', path, eos = NULL)
+  size <- file.info(path)$size
+  upload <- data.frame(
+    name = "view.json",
+    size = size,
+    datapath = path,
+    stringsAsFactors = FALSE
+  )
+
+  expect_identical(helpers$cv_config_read_upload(upload), '{"schema":"test"}')
+  expect_error(
+    helpers$cv_config_read_upload(upload["name"]),
+    class = "cv_config_error"
+  )
+  expect_error(
+    helpers$cv_config_read_upload(transform(upload, name = "view.txt")),
+    class = "cv_config_error"
+  )
+  expect_error(
+    helpers$cv_config_read_upload(upload, max_bytes = size - 1L),
+    class = "cv_config_error"
+  )
+  expect_error(
+    helpers$cv_config_read_upload(transform(upload, size = NA_real_)),
+    class = "cv_config_error"
+  )
+})
+
 test_that("cell identity validation is unique and order-independent", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())

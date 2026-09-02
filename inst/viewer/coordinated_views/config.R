@@ -973,6 +973,37 @@ cv_config_encode_document <- function(document) {
   text
 }
 
+cv_config_read_upload <- function(upload, max_bytes = CV_CONFIG_MAX_BYTES) {
+  required <- c("name", "size", "datapath")
+  if (
+    !is.data.frame(upload) ||
+      nrow(upload) != 1L ||
+      !all(required %in% names(upload)) ||
+      !is.character(upload$name) ||
+      is.na(upload$name[[1L]]) ||
+      !grepl("[.]json$", upload$name[[1L]], ignore.case = TRUE) ||
+      !is.character(upload$datapath) ||
+      is.na(upload$datapath[[1L]]) ||
+      !nzchar(upload$datapath[[1L]])
+  ) {
+    cv_config_abort("invalid_file", "Choose one JSON file.")
+  }
+  reported_size <- suppressWarnings(as.numeric(upload$size[[1L]]))
+  actual_size <- suppressWarnings(file.info(upload$datapath[[1L]])$size)
+  if (
+    !is.finite(reported_size) ||
+      !is.finite(actual_size) ||
+      reported_size < 0 ||
+      actual_size > max_bytes ||
+      reported_size > max_bytes
+  ) {
+    cv_config_abort("too_large", "The configuration is larger than 5 MiB.")
+  }
+  connection <- file(upload$datapath[[1L]], open = "rb")
+  on.exit(close(connection), add = TRUE)
+  rawToChar(readBin(connection, what = "raw", n = actual_size))
+}
+
 cv_specialist_page_specs <- list(
   overview_projection = list(
     label = "Projection",
