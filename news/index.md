@@ -1,5 +1,13 @@
 # Changelog
 
+## CerebroNexus 4.3.6
+
+### Viewer
+
+- Linked and specialist views can be downloaded as validated portable
+  JSON and opened in another compatible Cerebro session while preserving
+  panels, filters, viewports and selections.
+
 ## CerebroNexus 4.3.5
 
 ### Viewer
