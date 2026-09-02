@@ -2088,7 +2088,9 @@ dedent <- function(string) {
 #'   \code{"hla_tcr_motifs"}, \code{"gene_expression"},
 #'   \code{"gene_id_conversion"}, \code{"color_management"}, and
 #'   \code{"about"}. A conditional page is selected only when it is available
-#'   for the loaded dataset. Shared links take precedence after restoration.
+#'   for the first loaded dataset. Initial routing is attempted only once, so
+#'   switching datasets later never triggers a delayed redirect. Shared links
+#'   take precedence after restoration.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Point size from 1 through 20. Supply one number for every
 #'   dataset, or a named numeric vector/list whose names exactly match

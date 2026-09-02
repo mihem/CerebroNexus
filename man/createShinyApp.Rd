@@ -98,7 +98,9 @@ upload their own data; defaults to \code{FALSE}.}
 \code{"trekker"}, \code{"hla_tcr_motifs"}, \code{"gene_expression"},
 \code{"gene_id_conversion"}, \code{"color_management"}, and
 \code{"about"}. A conditional page is selected only when it is available for
-the loaded dataset. Shared links take precedence after restoration.}
+the first loaded dataset. Initial routing is attempted only once, so switching
+datasets later never triggers a delayed redirect. Shared links take precedence
+after restoration.}
 
 \item{welcome_message}{Welcome message shown in the Load Data tab.}
 
