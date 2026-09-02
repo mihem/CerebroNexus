@@ -1811,7 +1811,6 @@ body .modal-footer { border-top: 1px solid var(--c-border); padding: 15px 24px; 
 /* -------------------------------------------------------------------------
    Loading / progress / notifications — unified to the warm accent
    ------------------------------------------------------------------------- */
-body .recalculating { opacity: 0.55; transition: opacity var(--dur) var(--ease); }
 /* Unexpected output errors remain visibly distinct from intentional validation
    messages so failures are not mistaken for empty or unavailable content. */
 body .shiny-output-error { color: var(--c-error); font-family: var(--font-mono); font-size: 12.5px; }

@@ -9,6 +9,12 @@ output[["extra_material_content_UI"]] <- renderUI({
   req(input[["extra_material_selected_category"]])
   ## if selected category is `tables`
   if (input[["extra_material_selected_category"]] == 'tables') {
+    if (!checkForExtraTables()) {
+      return(fluidRow(cerebroBox(
+        title = boxTitle("Extra material"),
+        "No non-empty tables available."
+      )))
+    }
     ##
     fluidRow(
       cerebroBox(
@@ -69,12 +75,14 @@ output[["extra_material_content_UI"]] <- renderUI({
 ## Table.
 ##----------------------------------------------------------------------------##
 output[["extra_material_table"]] <- DT::renderDataTable({
-  req(
-    input[["extra_material_selected_category"]],
-    input[["extra_material_selected_content"]]
+  req(input[["extra_material_selected_category"]] == "tables")
+  selection <- extra_material_table_selection(
+    extra_material_table_groups(),
+    file_key = input[["extra_material_selected_file"]],
+    sheet_key = input[["extra_material_selected_content"]]
   )
-  ## fetch results
-  results_df <- getExtraTable(input[["extra_material_selected_content"]])
+  req(!is.null(selection))
+  results_df <- selection$sheet$table
   ## don't proceed if input is not a data frame
   req(is.data.frame(results_df))
   ## if the table is empty, skip the processing and show and empty table
@@ -88,17 +96,20 @@ output[["extra_material_table"]] <- DT::renderDataTable({
   } else {
     prettifyTable(
       results_df,
-      filter = list(position = "top", clear = TRUE),
+      filter = extra_material_table_filter(nrow(results_df), ncol(results_df)),
       dom = "Bfrtlip",
+      escape = !identical(selection$group$key, "embedded"),
       show_buttons = TRUE,
       number_formatting = input[["extra_material_table_number_formatting"]],
       color_highlighting = input[["extra_material_table_color_highlighting"]],
       hide_long_columns = TRUE,
       download_file_name = paste0(
-        "extra_material_",
-        input[["extra_material_selected_category"]],
-        "_",
-        input[["extra_material_selected_content"]]
+        "extra_material_tables_",
+        gsub(
+          "[^[:alnum:]_-]+",
+          "_",
+          paste(selection$group$label, selection$sheet$label, sep = "_")
+        )
       ),
       page_length_default = 20,
       page_length_menu = c(20, 50, 100)

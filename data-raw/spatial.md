@@ -344,11 +344,16 @@ So `histology_image_bounds` is `dims × pixel_size`, not the raw pixel dimension
 
 # 4. Image ↔ point alignment
 
-Getting the real image to line up with the points needs two things, because the Spatial tab draws the background as a **DOM layer stretched to fill the plot's drawing area** — it is not a Plotly `layout.image`.
+Getting the real image to line up with the points needs two things. The Spatial
+tab's shared Canvas renderer maps the image bounds and cell coordinates through
+the same data-to-screen transform.
 
 ## 4.1 The flip decision (and why the brightness score was abandoned)
 
-The image is always stored native (row 0 = image top); the renderer draws it top-down while Plotly's y-axis grows upward. Whether a display flip is needed is **not uniform** — it depends on how a dataset's point y relates to its image rows, which differs by platform (`GetTissueCoordinates` vs a raw `y_centroid` vs `MerfishData::imgRaster`).
+The image is always stored native (row 0 = image top). Whether a display flip
+is needed is **not uniform** — it depends on how a dataset's point y relates to
+its image rows, which differs by platform (`GetTissueCoordinates` vs a raw
+`y_centroid` vs `MerfishData::imgRaster`).
 
 There is **no global per-`.crb` flip flag**. The user can align an image with the
 Spatial tab controls, or configure one exact
@@ -367,9 +372,13 @@ Correct orientation is judged by **visual comparison against a native ground-tru
 
 Automated point-on-tissue "brightness" scores were tried and proved **unreliable** — dense tissue like the Xenium brain defeats them. Landmark comparison is the standard. When adding a new image demo: build a native-frame centroid overlay, pick a landmark, flip in the app until it matches. Do not apply a blanket rule.
 
-## 4.2 Aspect lock at render time
+## 4.2 Shared data-space transform
 
-Stretch-to-fill would squash a non-square image (the MERFISH DAPI mosaic is ~0.6:1, tall). When an embedded image is active the renderer sets `yaxis.scaleanchor = 'x'` — `func_projection_update_plot.R` flags `is_embedded`, `js_projection_update_plot.js` applies the lock — so the drawing area keeps the image's width:height and the stretch stays proportional. Non-embedded projections (UMAP etc.) are untouched.
+Stretch-to-fill would squash a non-square image (the MERFISH DAPI mosaic is
+~0.6:1, tall). `func_projection_update_plot.R` sends explicit image bounds and
+`cell_views.js` renders the image through the same Canvas viewport transform as
+the cells. Zoom, pan, flips, offsets, scale and rotation therefore stay aligned
+without a separate Spatial plotting engine.
 
 # 5. Why Slide-seq has no background image
 

@@ -17,6 +17,15 @@ source(
   ),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/viewer/color_config.R"),
+  local = TRUE
+)
+
+## Generated Extra material tables are immutable. Share their lazy cache across
+## sessions instead of reading the same sheet again for every browser tab.
+.extra_material_process_cache <- new.env(parent = emptyenv())
+
 server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
@@ -67,6 +76,57 @@ server <- function(input, output, session) {
       TRUE
     )
   )
+
+  viewer_initial_page_tabs <- c(
+    data_info = "loadData",
+    projection = "overview",
+    linked_views = "coordinated_views",
+    groups = "groups",
+    marker_genes = "markerGenes",
+    most_expressed_genes = "mostExpressedGenes",
+    enriched_pathways = "enrichedPathways",
+    extra_material = "extra_material",
+    immune_repertoire = "immune_repertoire",
+    trajectory = "trajectory",
+    spatial = "spatial",
+    trekker = "trekker",
+    hla_tcr_motifs = "hla_tcr_motifs",
+    gene_expression = "geneExpression",
+    gene_id_conversion = "geneIdConversion",
+    color_management = "color_management",
+    about = "about"
+  )
+  initial_page <- Cerebro.options[["initial_page"]]
+  initial_tab <- if (
+    is.character(initial_page) &&
+      length(initial_page) == 1L &&
+      initial_page %in% names(viewer_initial_page_tabs)
+  ) {
+    unname(viewer_initial_page_tabs[[initial_page]])
+  } else {
+    NULL
+  }
+  conditional_tabs <- unname(viewer_initial_page_tabs[c(
+    "marker_genes",
+    "most_expressed_genes",
+    "enriched_pathways",
+    "extra_material",
+    "immune_repertoire",
+    "trajectory",
+    "spatial",
+    "trekker",
+    "hla_tcr_motifs"
+  )])
+  initial_page_applied <- reactiveVal(FALSE)
+  if (!is.null(initial_tab) && !initial_tab %in% conditional_tabs) {
+    session$onFlushed(
+      function() {
+        updateTabItems(session, "sidebar", selected = initial_tab)
+        initial_page_applied(TRUE)
+      },
+      once = TRUE
+    )
+  }
 
   ## paths for storing plots
   available_storage_volumes <- c(
@@ -386,10 +446,8 @@ server <- function(input, output, session) {
       available_crb_files$selected
     )
 
-  ## Dynamic sidebar: conditional tabs are inserted/removed based on dataset
-  ## content (see insertConditionalTab() below). The old renderMenu +
-  ## shinyjs::toggleElement pattern for trajectory and extra_material has been
-  ## replaced.
+  ## Dynamic sidebar: conditional tabs are shown or hidden based on dataset
+  ## content (see toggleConditionalTab() below).
   ##--------------------------------------------------------------------------##
 
   ##--------------------------------------------------------------------------##
@@ -488,21 +546,10 @@ server <- function(input, output, session) {
   )
 
   ##--------------------------------------------------------------------------##
-  ## Dynamic sidebar: insert/remove conditional tabs based on dataset content.
+  ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
-  insertConditionalTab <- function(
-    tab_label,
-    tab_name,
-    icon_name,
-    check_fn,
-    placeholder_id = tab_name
-  ) {
+  toggleConditionalTab <- function(tab_name, check_fn) {
     item_id <- paste0("sidebar_item_", tab_name)
-    placeholder_selector <- paste0(
-      "#sidebar_item_",
-      placeholder_id,
-      "_placeholder"
-    )
     show_reactive <- reactive({
       req(data_set())
       result <- tryCatch(check_fn(), error = function(e) FALSE)
@@ -511,100 +558,67 @@ server <- function(input, output, session) {
       }
       length(result) > 0
     })
-    inserted <- reactiveVal(FALSE)
     observe({
       req(!is.null(data_set()))
       should_show <- show_reactive()
-      is_inserted <- isolate(inserted())
-      if (should_show && !is_inserted) {
-        session$onFlushed(
-          function() {
-            insertUI(
-              selector = placeholder_selector,
-              where = "afterEnd",
-              ui = tags$li(
-                id = item_id,
-                class = "treeview",
-                menuItem(
-                  tab_label,
-                  tabName = tab_name,
-                  icon = icon(icon_name)
-                )$children
-              ),
-              immediate = TRUE
-            )
-            inserted(TRUE)
-          },
-          once = TRUE
-        )
-      } else if (!should_show && is_inserted) {
-        removeUI(selector = paste0("#", item_id), immediate = TRUE)
-        inserted(FALSE)
+      shinyjs::toggle(id = item_id, condition = should_show)
+      decision <- viewerInitialPageDecision(
+        initial_tab,
+        tab_name,
+        should_show,
+        isolate(initial_page_applied())
+      )
+      if (!is.null(decision)) {
+        initial_page_applied(decision$applied)
+        if (!is.null(decision$selected)) {
+          updateTabItems(session, "sidebar", selected = decision$selected)
+        }
       }
     })
   }
 
-  insertConditionalTab(
-    "Marker genes",
+  toggleConditionalTab(
     "markerGenes",
-    "list-alt",
-    function() getMethodsForMarkerGenes(),
-    placeholder_id = "marker_genes"
+    function() getMethodsForMarkerGenes()
   )
-  insertConditionalTab(
-    "Most expressed genes",
+  toggleConditionalTab(
     "mostExpressedGenes",
-    "bullhorn",
-    function() getGroupsWithMostExpressedGenes(),
-    placeholder_id = "most_expressed_genes"
+    function() getGroupsWithMostExpressedGenes()
   )
-  insertConditionalTab(
-    "Enriched pathways",
+  toggleConditionalTab(
     "enrichedPathways",
-    "project-diagram",
-    function() getMethodsForEnrichedPathways(),
-    placeholder_id = "enriched_pathways"
+    function() getMethodsForEnrichedPathways()
   )
-  insertConditionalTab("Extra material", "extra_material", "gift", function() {
-    getExtraMaterialCategories()
+  toggleConditionalTab("extra_material", function() {
+    length(getExtraMaterialCategories()) > 0L
   })
-  insertConditionalTab(
-    "Immune repertoire",
+  toggleConditionalTab(
     "immune_repertoire",
-    "dna",
     function() {
       getImmuneRepertoire()
     }
   )
-  insertConditionalTab(
-    "Trajectory",
+  toggleConditionalTab(
     "trajectory",
-    "route",
     ## Only supported methods (monocle2) should surface the tab; an unsupported
     ## method would otherwise render a blank tab instead of the empty state.
     function() intersect(getMethodsForTrajectories(), c("monocle2"))
   )
-  insertConditionalTab(
-    "Spatial",
+  toggleConditionalTab(
     "spatial",
-    "map-pin",
     function() availableSpatial()
   )
   ## Trekker single-cell spatial mapping: its own bespoke page (not the generic
   ## Spatial tab). Shown only when the loaded .crb carries a `trekker` slot.
-  insertConditionalTab(
-    "Trekker",
+  toggleConditionalTab(
     "trekker",
-    "map-marked-alt",
     function() {
       tk <- tryCatch(data_set()$getTrekker(), error = function(e) NULL)
       !is.null(tk)
     }
   )
-  insertConditionalTab(
-    "HLA & TCR Motifs",
+  toggleConditionalTab(
     "hla_tcr_motifs",
-    "project-diagram",
     ## Show only when the data set actually carries a TCR (TRA/TRB). HLA typing
     ## is NOT required — the motif network works without it, and the Data & QC
     ## tab is where a user would add HLA, so the page must be reachable first.

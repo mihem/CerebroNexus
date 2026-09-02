@@ -118,7 +118,7 @@ test_that("Trajectory tab is wired into the app UI and server", {
   )
   expect_match(ui_src, "trajectory/UI\\.R")
   expect_match(ui_src, "tab_trajectory")
-  expect_match(ui_src, "sidebar_item_trajectory_placeholder")
+  expect_match(ui_src, 'conditionalSidebarItem\\("Trajectory", "trajectory"')
 
   server_src <- paste(
     readLines(file.path(shiny_root, "shiny_server.R")),
@@ -127,7 +127,7 @@ test_that("Trajectory tab is wired into the app UI and server", {
   expect_match(server_src, "trajectory/server\\.R")
   expect_match(
     server_src,
-    'insertConditionalTab\\([\\s\\S]{0,80}"trajectory"',
+    'toggleConditionalTab\\([\\s\\S]{0,80}"trajectory"',
     perl = TRUE
   )
 })

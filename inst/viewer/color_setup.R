@@ -72,10 +72,6 @@ cerebro_group_colors <- function(n) {
   grDevices::colorRampPalette(default_colorset_base)(n)
 }
 
-# Kept for backward compatibility: any code that still indexes a flat vector gets
-# the full 40-colour flatuicolors set (Dutch + Spanish).
-default_colorset <- cerebro_group_colors(40)
-
 # Cell-cycle phases: the original vibrant four-colour set.
 cell_cycle_colorset <- setNames(
   c("#45aaf2", "#f1c40f", "#e74c3c", "#7f8c8d"),
@@ -85,76 +81,87 @@ cell_cycle_colorset <- setNames(
 ##----------------------------------------------------------------------------##
 ## Assign colors to groups.
 ##----------------------------------------------------------------------------##
+color_input_id <- function(variable, level) {
+  configured_files <- if (exists("Cerebro.options")) {
+    Cerebro.options[["crb_file_to_load"]]
+  } else {
+    NULL
+  }
+  selected_path <- available_crb_files$selected
+  configured_index <- match(selected_path, unname(configured_files))
+  dataset <- if (length(configured_index) == 1L && !is.na(configured_index)) {
+    names(configured_files)[[configured_index]]
+  } else {
+    selected_path
+  }
+  encode <- function(value) {
+    paste(format(charToRaw(enc2utf8(as.character(value)))), collapse = "")
+  }
+  paste0(
+    "color_",
+    encode(dataset),
+    "_",
+    encode(variable),
+    "_",
+    encode(level)
+  )
+}
+
 reactive_colors <- reactive({
   req(data_set())
   ## get cell meta data
   meta_data <- getMetaData()
   colors <- list()
-  ## go through all groups
-  for (group_name in getGroups()) {
-    ## if color selection from the "Color management" tab exist, assign those
-    ## colors, otherwise assign colors from default colorset
-    if (
-      !is.null(input[[paste0(
-        'color_',
-        group_name,
-        '_',
-        getGroupLevels(group_name)[1]
-      )]])
-    ) {
-      for (group_level in getGroupLevels(group_name)) {
-        ## it seems that special characters are not handled well in input/output
-        ## so I replace them with underscores using gsub()
-        colors[[group_name]][group_level] <- input[[paste0(
-          'color_',
-          group_name,
-          '_',
-          gsub(group_level, pattern = '[^[:alnum:]]', replacement = '_')
-        )]]
-      }
+
+  configured <- resolve_configured_colors(
+    color_config = if (exists("Cerebro.options")) {
+      Cerebro.options[["colors"]]
     } else {
-      colors[[group_name]] <- cerebro_group_colors(
-        length(getGroupLevels(group_name))
-      )
-      names(colors[[group_name]]) <- getGroupLevels(group_name)
-      if ('N/A' %in% getGroupLevels(group_name)) {
-        colors[[group_name]][which(
-          names(colors[[group_name]]) == 'N/A'
-        )] <- '#898989'
+      NULL
+    },
+    selected_path = available_crb_files$selected,
+    configured_files = if (exists("Cerebro.options")) {
+      Cerebro.options[["crb_file_to_load"]]
+    } else {
+      NULL
+    }
+  )
+
+  picked_color <- function(variable, level) {
+    input[[color_input_id(variable, level)]]
+  }
+
+  resolve_palette <- function(variable, levels, defaults) {
+    names(defaults) <- levels
+    defaults <- apply_configured_colors(defaults, configured[[variable]])
+    for (level in levels) {
+      picked <- picked_color(variable, level)
+      if (!is.null(picked)) {
+        defaults[level] <- picked
       }
     }
+    defaults
+  }
+
+  ## go through all groups
+  for (group_name in getGroups()) {
+    levels <- getGroupLevels(group_name)
+    defaults <- cerebro_group_colors(length(levels))
+    names(defaults) <- levels
+    if ("N/A" %in% levels) {
+      defaults["N/A"] <- "#898989"
+    }
+    colors[[group_name]] <- resolve_palette(group_name, levels, defaults)
   }
   ## go through columns with cell cycle info
   if (length(getCellCycle()) > 0) {
     for (column in getCellCycle()) {
-      ## if color selection from the "Color management" tab exist, assign those
-      ## colors, otherwise assign colors from cell cycle colorset
-      if (
-        !is.null(input[[paste0(
-          'color_',
-          column,
-          '_',
-          unique(as.character(meta_data[[column]]))[1]
-        )]])
-      ) {
-        for (state in unique(as.character(meta_data[[column]]))) {
-          ## it seems that special characters are not handled well in input/output
-          ## so I replace them with underscores using gsub()
-          colors[[column]][state] <- input[[paste0(
-            'color_',
-            column,
-            '_',
-            gsub(state, pattern = '[^[:alnum:]]', replacement = '_')
-          )]]
-        }
-      } else {
-        colors[[
-          column
-        ]] <- cell_cycle_colorset[seq_along(unique(as.character(meta_data[[
-          column
-        ]])))]
-        names(colors[[column]]) <- unique(as.character(meta_data[[column]]))
-      }
+      states <- unique(as.character(meta_data[[column]]))
+      colors[[column]] <- resolve_palette(
+        column,
+        states,
+        cell_cycle_colorset[seq_along(states)]
+      )
     }
   }
   return(colors)

@@ -33,7 +33,10 @@ createShinyApp(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
-  auth = NULL
+  auth = NULL,
+  extra_tables = NULL,
+  extra_tables_sheets = NULL,
+  initial_page = NULL
 )
 }
 \arguments{
@@ -47,7 +50,8 @@ must not use the reserved build-lock namespace, and its final target must
 not be a symbolic link or unresolved filesystem entry.}
 
 \item{max_request_size}{One finite positive numeric upload limit in MB;
-defaults to 8000.}
+defaults to 8000. Closed Viewers cap the effective request size at 6 MB;
+open Viewers use the supplied value.}
 
 \item{port}{One whole-number port from 1 through 65535; defaults to 8080.}
 
@@ -85,6 +89,18 @@ directory is rejected before any files are written.}
 
 \item{show_upload_ui}{One non-missing logical controlling whether users may
 upload their own data; defaults to \code{FALSE}.}
+
+\item{initial_page}{Optional initial Viewer page. Supported stable IDs are
+\code{"data_info"}, \code{"projection"}, \code{"linked_views"},
+\code{"groups"}, \code{"marker_genes"}, \code{"most_expressed_genes"},
+\code{"enriched_pathways"}, \code{"extra_material"},
+\code{"immune_repertoire"}, \code{"trajectory"}, \code{"spatial"},
+\code{"trekker"}, \code{"hla_tcr_motifs"}, \code{"gene_expression"},
+\code{"gene_id_conversion"}, \code{"color_management"}, and
+\code{"about"}. A conditional page is selected only when it is available for
+the first loaded dataset. Initial routing is attempted only once, so switching
+datasets later never triggers a delayed redirect. Shared links take precedence
+after restoration.}
 
 \item{welcome_message}{Welcome message shown in the Load Data tab.}
 
@@ -149,6 +165,13 @@ list with \code{credentials}, the path to an encrypted SQLite database
 created by \code{shinymanager::create_db()}, and \code{passphrase_env},
 the name of the environment variable containing its passphrase. Optional
 \code{timeout_minutes} defaults to 15.}
+\item{extra_tables}{Optional named collection of CSV, TSV, TXT, XLS, XLSX,
+or XLSM files to bundle as private Extra material tables. Workbook sheets
+are listed separately and loaded only when selected in the Viewer.}
+
+\item{extra_tables_sheets}{Optional named list of Excel sheet renames keyed
+by \code{extra_tables} labels. Each entry maps displayed names to source
+sheet names; unmapped sheets remain available.}
 }
 \value{
 Invisibly returns \code{result_dir}. If that path changes resolution
@@ -187,7 +210,6 @@ select the same resolved input file.
 Generated bundles follow the standard deployment model of one app per R
 process; process-global \code{Cerebro.options} does not provide same-process
 isolation between separately sourced apps.
-
 Launch settings are validated and frozen in a typed internal manifest before
 target preparation. The generated \code{app.R} reads that manifest instead of
 interpolating user values into source, and the staged source is parsed before

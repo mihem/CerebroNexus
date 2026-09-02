@@ -231,6 +231,7 @@ build_real_app <- function(envir = parent.frame()) {
     cerebro_data = c("Visium" = visium_crb, "Xenium" = xenium_crb),
     result_dir = app_dir,
     launch_browser = FALSE,
+    initial_page = "spatial",
     spatial_images = list(
       Visium = stats::setNames(
         list(c(Histology = visium_png)),
@@ -389,6 +390,14 @@ test_that("the generated real-data app boots with the Spatial tab", {
     "document.querySelector('a[href=\"#shiny-tab-spatial\"]') !== null;"
   )
   expect_true(isTRUE(spatial_tab))
+  spatial_active <- driver$get_js(
+    paste0(
+      "document.querySelector('a[href=\"#shiny-tab-spatial\"]')",
+      ".parentElement.classList.contains('active') && ",
+      "document.querySelector('.tab-pane.active').id === 'shiny-tab-spatial';"
+    )
+  )
+  expect_true(isTRUE(spatial_active))
 })
 
 test_that("the generated multi-crb app boots and switches datasets", {

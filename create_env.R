@@ -81,6 +81,7 @@ rix(
     "plotly",
     "qvalue",
     "R6",
+    "readxl",
     "rlang",
     "scales",
     "scRepertoire",
