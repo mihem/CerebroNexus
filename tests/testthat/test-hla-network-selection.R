@@ -145,3 +145,118 @@ test_that("specialist restoration waits for late Shiny-bound controls", {
     list("restored")
   )
 })
+
+test_that("specialist restoration keeps waiting for unresolved controls", {
+  output <- run_specialist_state_node(c(
+    "window.cerebroCellViews = {applyState: () => {}};",
+    "window.cerebroSpecialistViews.get('overview_projection').apply({",
+    "  selection:{cells:['cell-1']},",
+    "  controls:[{id:'overview_dynamic',multiple:false,values:['restored']}]",
+    "});",
+    "timers.sort((a, b) => a.delay - b.delay);",
+    "while (timers.length) timers.shift()();",
+    "controls.overview_dynamic = {id:'overview_dynamic',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_dynamic}));",
+    "console.log(JSON.stringify({applied:applied,handlers:Object.keys(handlers)}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(applied = list("restored"), handlers = list())
+  )
+})
+
+test_that("specialist restoration retains only unresolved controls after the grace period", {
+  output <- run_specialist_state_node(c(
+    "controls.overview_static = {id:'overview_static',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "window.cerebroCellViews = {applyState: () => {}};",
+    "window.cerebroSpecialistViews.get('overview_projection').apply({",
+    "  selection:{cells:['cell-1']},",
+    "  controls:[",
+    "    {id:'overview_static',multiple:false,values:['static restored']},",
+    "    {id:'overview_dynamic',multiple:false,values:['dynamic restored']}",
+    "  ]",
+    "});",
+    "timers.sort((a, b) => a.delay - b.delay);",
+    "while (timers.length) timers.shift()();",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_static}));",
+    "controls.overview_dynamic = {id:'overview_dynamic',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_dynamic}));",
+    "console.log(JSON.stringify({applied:applied,handlers:Object.keys(handlers)}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(
+      applied = list("static restored", "dynamic restored"),
+      handlers = list()
+    )
+  )
+})
+
+test_that("specialist restoration retries a replaced binding that initially throws", {
+  output <- run_specialist_state_node(c(
+    "controls.overview_dynamic = {id:'overview_dynamic',binding:{",
+    "  receiveMessage: () => { throw new Error('replaced'); }",
+    "}};",
+    "window.cerebroCellViews = {applyState: () => {}};",
+    "window.cerebroSpecialistViews.get('overview_projection').apply({",
+    "  selection:{cells:['cell-1']},",
+    "  controls:[{id:'overview_dynamic',multiple:false,values:['restored']}]",
+    "});",
+    "timers.sort((a, b) => a.delay - b.delay);",
+    "while (timers.length) timers.shift()();",
+    "controls.overview_dynamic.binding.receiveMessage =",
+    "  (_el, msg) => applied.push(msg.value);",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_dynamic}));",
+    "console.log(JSON.stringify({applied:applied,handlers:Object.keys(handlers)}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(applied = list("restored"), handlers = list())
+  )
+})
+
+test_that("a new specialist restore cancels unresolved controls from the previous one", {
+  output <- run_specialist_state_node(c(
+    "window.cerebroCellViews = {applyState: () => {}};",
+    "const adapter = window.cerebroSpecialistViews.get('overview_projection');",
+    "adapter.apply({selection:{cells:['cell-1']},controls:[",
+    "  {id:'overview_old',multiple:false,values:['old']}",
+    "]});",
+    "timers.sort((a, b) => a.delay - b.delay);",
+    "while (timers.length) timers.shift()();",
+    "controls.overview_new = {id:'overview_new',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "adapter.apply({selection:{cells:['cell-1']},controls:[",
+    "  {id:'overview_new',multiple:false,values:['new']}",
+    "]});",
+    "controls.overview_old = {id:'overview_old',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_old}));",
+    "console.log(JSON.stringify(applied));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list("new")
+  )
+})

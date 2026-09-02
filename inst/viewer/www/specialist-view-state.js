@@ -74,12 +74,16 @@
 
   function applyControl(control) {
     var element = document.getElementById(control.id);
-    if (!element || !window.jQuery) return;
+    if (!element || !window.jQuery) return false;
     var binding = window.jQuery(element).data('shiny-input-binding');
-    if (!binding || typeof binding.receiveMessage !== 'function') return;
+    if (!binding || typeof binding.receiveMessage !== 'function') return false;
     var value = control.multiple ? control.values : control.values[0];
-    try { binding.receiveMessage(element, { value: value }); }
-    catch (ignore) { /* a dynamic control may be replaced by the preceding one */ }
+    try {
+      binding.receiveMessage(element, { value: value });
+      return true;
+    } catch (ignore) {
+      return false; // a replacement binding may apply it later
+    }
   }
 
   function stopControlRestore() {
@@ -102,16 +106,31 @@
     }
 
     var byId = Object.create(null);
+    var pending = Object.create(null);
     controls.forEach(function (control) { byId[control.id] = control; });
+    controls.forEach(function (control) { pending[control.id] = true; });
     controlRestoreHandler = function (event) {
       var control = event && event.target && byId[event.target.id];
-      if (control) applyControl(control);
+      if (control && applyControl(control)) {
+        delete pending[control.id];
+        if (!controlRestoreTimer && !Object.keys(pending).length) {
+          stopControlRestore();
+        }
+      }
     };
     window.jQuery(document).on(
       'shiny:bound.cerebroSpecialistRestore', controlRestoreHandler
     );
-    controlRestoreTimer = window.setTimeout(stopControlRestore, 10000);
-    controls.forEach(applyControl);
+    controlRestoreTimer = window.setTimeout(function () {
+      controlRestoreTimer = null;
+      Object.keys(byId).forEach(function (id) {
+        if (!pending[id]) delete byId[id];
+      });
+      if (!Object.keys(pending).length) stopControlRestore();
+    }, 10000);
+    controls.forEach(function (control) {
+      if (applyControl(control)) delete pending[control.id];
+    });
   }
 
   function navigate(spec) {
