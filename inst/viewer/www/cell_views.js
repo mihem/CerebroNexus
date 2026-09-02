@@ -1963,7 +1963,23 @@
     if (!p._SX || !p._SY) return;
     zoomAt(p, p._sox + p._SX / 2, p._soy + p._SY / 2, factor);
   }
-  function downloadPanelPNG(p) {
+  function downloadCanvasPNG(canvas, filename) {
+    var link = null;
+    try {
+      link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      return true;
+    } catch (e) {
+      return false;
+    } finally {
+      if (link && link.parentNode) link.parentNode.removeChild(link);
+    }
+  }
+
+  function downloadPanelPNG(p, filenamePrefix) {
     try {
       // Composite onto white first — the canvas itself is transparent, so a raw
       // export would have no background.
@@ -1973,11 +1989,117 @@
       c.fillStyle = '#ffffff'; c.fillRect(0, 0, tmp.width, tmp.height);
       c.drawImage(src, 0, 0);
       var nm = (spaceById[p.spaceId] && spaceById[p.spaceId].label) || p.spaceId || 'panel';
-      var a = document.createElement('a');
-      a.href = tmp.toDataURL('image/png');
-      a.download = 'linked-views-' + nm.replace(/[^\w.-]+/g, '_') + '.png';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch (e) { /* toDataURL can throw if the canvas is tainted; ignore */ }
+      return downloadCanvasPNG(
+        tmp,
+        (filenamePrefix || 'linked-views') + '-' +
+          nm.replace(/[^\w.-]+/g, '_') + '.png'
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function linkedPNGFilename() {
+    return 'linked-views-' + new Date().toISOString()
+      .replace(/[-:]/g, '').replace('T', '-').slice(0, 15) + '.png';
+  }
+
+  function downloadWorkspacePNG() {
+    if (singleActive) return false;
+    var visible = panels.filter(function (panel) {
+      if (!panel.spaceId || !panel.pane || !panel.canvas) return false;
+      var style = window.getComputedStyle(panel.pane);
+      var rect = panel.pane.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' &&
+        rect.width > 0 && rect.height > 0;
+    });
+    if (!visible.length) return false;
+
+    var bounds = visible.reduce(function (result, panel) {
+      var rect = panel.pane.getBoundingClientRect();
+      result.left = Math.min(result.left, rect.left);
+      result.top = Math.min(result.top, rect.top);
+      result.right = Math.max(result.right, rect.right);
+      result.bottom = Math.max(result.bottom, rect.bottom);
+      return result;
+    }, { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity });
+    var padding = 8;
+    var width = Math.ceil(bounds.right - bounds.left + padding * 2);
+    var height = Math.ceil(bounds.bottom - bounds.top + padding * 2);
+    if (width < 1 || height < 1) return false;
+
+    // Keep exports within conservative cross-browser canvas limits. Large
+    // workspaces are proportionally downscaled rather than partially cropped.
+    var scale = Math.min(window.devicePixelRatio || 1, 2);
+    var maxEdge = 8192;
+    var maxPixels = 32 * 1024 * 1024;
+    scale = Math.min(
+      scale,
+      maxEdge / width,
+      maxEdge / height,
+      Math.sqrt(maxPixels / (width * height))
+    );
+    if (!isFinite(scale) || scale <= 0) return false;
+
+    var output = document.createElement('canvas');
+    output.width = Math.max(1, Math.floor(width * scale));
+    output.height = Math.max(1, Math.floor(height * scale));
+    var context = output.getContext('2d');
+    if (!context) return false;
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+
+    visible.forEach(function (panel) {
+      var paneRect = panel.pane.getBoundingClientRect();
+      var canvasRect = panel.canvas.getBoundingClientRect();
+      var x = paneRect.left - bounds.left + padding;
+      var y = paneRect.top - bounds.top + padding;
+      context.fillStyle = '#ffffff';
+      context.fillRect(x, y, paneRect.width, paneRect.height);
+      context.strokeStyle = '#d7dce3';
+      context.lineWidth = 1;
+      context.strokeRect(x + 0.5, y + 0.5, paneRect.width - 1, paneRect.height - 1);
+
+      var title = panel.pane.querySelector('.cv-ptitle');
+      context.fillStyle = '#202733';
+      context.font = '600 13px sans-serif';
+      context.textBaseline = 'middle';
+      context.fillText(
+        title && title.textContent ? title.textContent.trim() : 'Linked view',
+        x + 12,
+        y + 20
+      );
+
+      var canvasX = canvasRect.left - bounds.left + padding;
+      var canvasY = canvasRect.top - bounds.top + padding;
+      context.fillStyle = '#ffffff';
+      context.fillRect(canvasX, canvasY, canvasRect.width, canvasRect.height);
+      context.drawImage(
+        panel.canvas,
+        canvasX,
+        canvasY,
+        canvasRect.width,
+        canvasRect.height
+      );
+
+      if (panel.mini) {
+        var miniStyle = window.getComputedStyle(panel.mini);
+        var miniRect = panel.mini.getBoundingClientRect();
+        if (miniStyle.display !== 'none' && miniStyle.visibility !== 'hidden' &&
+            Number(miniStyle.opacity) > 0 && miniRect.width > 0 && miniRect.height > 0) {
+          context.drawImage(
+            panel.mini,
+            miniRect.left - bounds.left + padding,
+            miniRect.top - bounds.top + padding,
+            miniRect.width,
+            miniRect.height
+          );
+        }
+      }
+    });
+
+    return downloadCanvasPNG(output, linkedPNGFilename());
   }
   function reportSelection() {
     var arr = null;
@@ -5295,11 +5417,17 @@
         lassoData: p.lassoData && p.lassoData.map(function (q) { return q.slice(); }) };
     });
   }
-  function activateSingle(id, resetAxes) {
+  function activateSingle(id, resetAxes, preserveTargetState) {
     var payload = singleViews[id];
     if (!payload || !linkedBundle || rebuildingBase) return false;
     if (!singleActive && !linkedState) linkedState = exportWorkspace();
-    stashSingleState();
+    if (CBViewState.shouldStashSingleState(
+      singleActive,
+      id,
+      preserveTargetState
+    )) {
+      stashSingleState();
+    }
     if (resetAxes) payload.lenses = [];
     restoreLinkedSurface();
     singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
@@ -5470,6 +5598,13 @@
     };
   }
 
+  function downloadSinglePNG(id) {
+    if (singleActive !== id) return false;
+    var panel = panels.find(function (candidate) { return !!candidate.spaceId; });
+    if (!panel) return false;
+    return downloadPanelPNG(panel, id);
+  }
+
   function applySingleState(id, saved) {
     var target = registerSingle(id); if (!target) return { selectedCells: 0 };
     if (!target.data) {
@@ -5500,7 +5635,7 @@
           return [Number(point[0]), Number(point[1])];
         }) : null
     }];
-    if (visibleSingleId() === id) activateSingle(id);
+    if (visibleSingleId() === id) activateSingle(id, false, true);
     return { selectedCells: target.selection.length };
   }
 
@@ -6168,12 +6303,14 @@
     ready: function () { return workspaceSummary().ready; },
     capture: exportWorkspace,
     apply: applyWorkspace,
-    summary: workspaceSummary
+    summary: workspaceSummary,
+    downloadPNG: downloadWorkspacePNG
   });
 
   window.cerebroCellViews = Object.freeze({
     captureState: captureSingleState,
-    applyState: applySingleState
+    applyState: applySingleState,
+    downloadPNG: downloadSinglePNG
   });
 
   // ---- boot ----------------------------------------------------------------

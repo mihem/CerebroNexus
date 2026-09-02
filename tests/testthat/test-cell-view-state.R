@@ -71,3 +71,33 @@ test_that("expression clear transitions remove every dependent payload", {
     list(gene = NULL, genePanels = NULL, rgb = NULL)
   )
 })
+
+test_that("specialist restore does not overwrite a saved state on its active page", {
+  output <- run_state_node(paste0(
+    "const S = window.CBViewState;",
+    "console.log(JSON.stringify({",
+    "  current:S.shouldStashSingleState('overview_projection',",
+    "    'overview_projection',true),",
+    "  navigating:S.shouldStashSingleState('spatial_projection',",
+    "    'overview_projection',true),",
+    "  normal:S.shouldStashSingleState('overview_projection',",
+    "    'overview_projection',false)",
+    "}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(current = FALSE, navigating = TRUE, normal = TRUE)
+  )
+
+  renderer <- paste(
+    readLines(viewer_test_path("www", "cell_views.js"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(
+    renderer,
+    "activateSingle(id, false, true)",
+    fixed = TRUE
+  )
+})

@@ -2121,33 +2121,33 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   white-space: nowrap;
 }
 
-.cerebro-share-open {
+.cerebro-config-open {
   height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 0 10px;
-  border: 1px solid var(--c-amber-300);
+  border: 1px solid var(--c-amber);
   border-radius: var(--r-xs);
-  background: var(--c-amber-50);
-  color: var(--c-amber-700);
+  background: var(--c-amber);
+  color: #ffffff;
   font: 700 12.5px/1 var(--font-sans);
   white-space: nowrap;
   cursor: pointer;
 }
-.cerebro-selection-status-guide > .cerebro-share-open {
+.cerebro-selection-status-guide > .cerebro-config-open {
   margin-left: auto;
 }
-.cerebro-share-open:hover:not(:disabled) {
-  border-color: var(--c-amber);
-  background: var(--c-amber-100);
+.cerebro-config-open:hover:not(:disabled) {
+  border-color: var(--c-amber-700);
+  background: var(--c-amber-700);
 }
-.cerebro-share-open:disabled {
+.cerebro-config-open:disabled {
   opacity: .48;
   cursor: not-allowed;
 }
-.cerebro-share-open:focus-visible {
+.cerebro-config-open:focus-visible {
   outline: 3px solid var(--c-amber-100);
   outline-offset: 2px;
 }
@@ -2161,7 +2161,7 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   margin-left: auto;
 }
 .cerebro-selection-actions .btn,
-.cerebro-selection-actions .cerebro-share-open {
+.cerebro-selection-actions .cerebro-config-open {
   min-width: 132px;
   height: 34px;
   padding: 0 9px;
@@ -2189,12 +2189,12 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
 .cerebro-selection-actions .cerebro-selection-action-clear:hover {
   background: var(--c-error-100) !important;
 }
-.cerebro-selection-actions .cerebro-share-open {
+.cerebro-selection-actions .cerebro-config-open {
   border-color: var(--c-amber);
   background: var(--c-amber);
   color: #ffffff;
 }
-.cerebro-selection-actions .cerebro-share-open:hover:not(:disabled) {
+.cerebro-selection-actions .cerebro-config-open:hover:not(:disabled) {
   border-color: var(--c-amber-700);
   background: var(--c-amber-700);
 }

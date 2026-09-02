@@ -19,7 +19,7 @@ run_specialist_state_node <- function(body) {
       "};",
       "global.document = {",
       "  getElementById: id => id === 'shiny-tab-overview' ?",
-      "    {classList:{contains:()=>true}} : (controls[id] || null),",
+      "    {classList:{contains:()=>true},querySelectorAll:()=>[]} : (controls[id] || null),",
       "  querySelector: () => null",
       "};",
       "window.jQuery = global.jQuery = element => ({",
@@ -93,8 +93,37 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(client, "hla_motif_selected_keys", fixed = TRUE)
   expect_match(client, "captureState", fixed = TRUE)
   expect_match(client, "applyState", fixed = TRUE)
+  expect_match(client, "downloadPNG", fixed = TRUE)
   expect_match(adapter, "hla_motif_network", fixed = TRUE)
+  expect_match(adapter, "downloadPNG", fixed = TRUE)
   expect_match(config, "hla_motif_network", fixed = TRUE)
+})
+
+test_that("Projection adapter captures shared JSON and downloads its PNG", {
+  output <- run_specialist_state_node(c(
+    "const calls = [];",
+    "window.cerebroSavedViewDataset = {cell_count:2,cell_fingerprint:'cells'};",
+    "window.cerebroCellViews = {",
+    "  captureState: id => ({cells:['cell-1'],geometry:null,view:{mode:'lasso'}}),",
+    "  downloadPNG: id => { calls.push(id); return true; }",
+    "};",
+    "const adapter = window.cerebroSpecialistViews.get('overview_projection');",
+    "const captured = adapter.capture();",
+    "console.log(JSON.stringify({schema:captured.schema,page:captured.page.id,",
+    "  cells:captured.selection.cells,downloaded:adapter.downloadPNG(),calls:calls}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(
+      schema = "cerebronexus-specialist-view",
+      page = "overview_projection",
+      cells = list("cell-1"),
+      downloaded = TRUE,
+      calls = list("overview_projection")
+    )
+  )
 })
 
 test_that("specialist restoration follows dynamically bound controls", {

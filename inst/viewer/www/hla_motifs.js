@@ -419,6 +419,11 @@
   window.cerebroHlaMotifs = {
     captureState: captureState,
     applyState: applyState,
+    downloadPNG: function () {
+      if (!net()) return false;
+      downloadPNG();
+      return true;
+    },
     handleNativeSelection: function (ids) {
       if (syncingSelection) return;
       committedCanvas = null;

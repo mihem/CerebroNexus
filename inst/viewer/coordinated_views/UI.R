@@ -173,14 +173,6 @@ tab_coordinated_views <- tabItem(
       id = "cv-meta",
       "Load a single-cell data set to explore its modalities together."
     ),
-    div(
-      id = "cv-share-open-status",
-      class = "cv-share-open-status",
-      role = "status",
-      `aria-live` = "polite",
-      hidden = "hidden"
-    ),
-
     ## ---- horizontal control bar (the layout fix) ------------------------ ##
     div(
       class = "cv-topbar",
@@ -506,9 +498,9 @@ tab_coordinated_views <- tabItem(
             `aria-disabled` = "true",
             `aria-haspopup` = "dialog",
             `aria-controls` = "cv-config-dialog",
-            title = "Select at least one cell before sharing this view",
+            title = "The linked workspace is waiting for its plots",
             icon("share-alt"),
-            tags$span("Share selection")
+            tags$span("Share view")
           )
         )
       ),
@@ -559,15 +551,15 @@ tab_coordinated_views <- tabItem(
           style = "display:none",
           tags$button(
             type = "button",
-            class = "cerebro-share-open",
+            class = "cerebro-config-open",
             `data-view-id` = "linked_views",
             disabled = "disabled",
             `aria-disabled` = "true",
             `aria-haspopup` = "dialog",
             `aria-controls` = "cv-config-dialog",
-            title = "Select at least one cell before sharing this view",
+            title = "The linked workspace is waiting for its plots",
             icon("share-alt"),
-            tags$span("Share selection")
+            tags$span("Share view")
           ),
           div(
             class = "cv-sel-action-row",
@@ -806,13 +798,35 @@ tab_coordinated_views <- tabItem(
         `aria-label` = "Close workspace JSON",
         HTML("&times;")
       ),
-      tags$div(class = "cv-config-kicker", "Portable linked workspace"),
-      tags$h4(id = "cv-config-title", "Linked workspace"),
+      tags$div(class = "cv-config-kicker", "View configuration"),
+      tags$h4(id = "cv-config-title", "Share view"),
       tags$p(
         id = "cv-config-privacy",
         class = "cv-config-privacy",
-        "Portable JSON includes selected cell barcodes and view settings. ",
-        "Source data stays on this device."
+        "Download this display state and its selected cell barcodes as JSON, ",
+        "then open it in another compatible CerebroNexus session. Source data stays ",
+        "on this device."
+      ),
+      tags$section(
+        class = "cv-config-region cv-config-image",
+        `aria-labelledby` = "cv-config-image-title",
+        tags$div(
+          class = "cv-config-region-head cv-config-region-head-actions",
+          tags$div(
+            tags$h5(id = "cv-config-image-title", "Image"),
+            tags$p(
+              id = "cv-config-png-help",
+              "Download the current view as an image."
+            )
+          ),
+          tags$button(
+            type = "button",
+            id = "cv-config-png",
+            class = "cv-config-action",
+            icon("image"),
+            tags$span("Download PNG")
+          )
+        )
       ),
       tags$section(
         class = "cv-config-region cv-config-transfer",
@@ -820,8 +834,8 @@ tab_coordinated_views <- tabItem(
         tags$div(
           class = "cv-config-region-head cv-config-region-head-actions",
           tags$div(
-            tags$h5(id = "cv-config-transfer-title", "Portable JSON"),
-            tags$p("Move this view between devices or browsers.")
+            tags$h5(id = "cv-config-transfer-title", "View JSON"),
+            tags$p("Download or open a validated view configuration.")
           ),
           div(
             class = "cv-config-actions",
@@ -830,15 +844,7 @@ tab_coordinated_views <- tabItem(
               id = "cv-config-download",
               class = "cv-config-action",
               icon("download"),
-              tags$span("Download")
-            ),
-            tags$button(
-              type = "button",
-              id = "cv-config-copy",
-              class = "cv-config-action",
-              `aria-live` = "polite",
-              icon("copy"),
-              tags$span("Copy JSON")
+              tags$span("Download JSON")
             ),
             div(
               class = "cv-config-upload",
@@ -848,66 +854,12 @@ tab_coordinated_views <- tabItem(
                 accept = c("application/json", ".json"),
                 buttonLabel = tagList(
                   icon("folder-open"),
-                  tags$span("Open")
+                  tags$span("Open JSON")
                 ),
                 placeholder = "No file selected"
               )
             )
           )
-        )
-      ),
-      tags$section(
-        class = "cv-config-region cv-config-save-local",
-        `aria-labelledby` = "cv-config-save-local-title",
-        tags$div(
-          class = "cv-config-region-head cv-config-region-head-actions",
-          tags$div(
-            tags$h5(id = "cv-config-save-local-title", "Saved on this device"),
-            tags$p("Private to this browser and this cell population.")
-          ),
-          tags$button(
-            type = "button",
-            id = "cv-snapshot-save",
-            class = "cv-snapshot-save",
-            icon("bookmark"),
-            tags$span("Save current view")
-          )
-        ),
-        tags$div(
-          class = "cv-snapshot-library",
-          tags$h6("Saved views"),
-          tags$div(
-            id = "cv-snapshot-list",
-            class = "cv-snapshot-list",
-            `aria-live` = "polite"
-          )
-        )
-      ),
-      tags$section(
-        id = "cv-config-share",
-        class = "cv-config-region cv-config-share",
-        `aria-labelledby` = "cv-config-share-title",
-        tags$div(
-          class = "cv-config-region-head cv-config-region-head-actions",
-          tags$div(
-            tags$h5(id = "cv-config-share-title", "Share with a link"),
-            tags$p(
-              id = "cv-share-retention",
-              "Availability and expiry are set by this server."
-            )
-          ),
-          tags$button(
-            type = "button",
-            id = "cv-share-create",
-            class = "cv-share-create",
-            icon("link"),
-            tags$span("Create link")
-          )
-        ),
-        tags$div(
-          id = "cv-share-list",
-          class = "cv-share-list",
-          `aria-live` = "polite"
         )
       ),
       tags$p(
@@ -917,47 +869,6 @@ tab_coordinated_views <- tabItem(
         `aria-live` = "polite"
       )
     ),
-    tags$dialog(
-      id = "cv-snapshot-name-dialog",
-      class = "cv-snapshot-name-dialog",
-      `aria-labelledby` = "cv-snapshot-name-title",
-      `aria-describedby` = "cv-snapshot-name-help",
-      tags$button(
-        type = "button",
-        id = "cv-snapshot-name-close",
-        class = "cv-snapshot-name-close",
-        `aria-label` = "Close",
-        HTML("&times;")
-      ),
-      tags$div(class = "cv-config-kicker", "Saved view"),
-      tags$h4(id = "cv-snapshot-name-title", "Save current view"),
-      tags$p(
-        id = "cv-snapshot-name-help",
-        "Give this view a short name so you can find it later."
-      ),
-      tags$input(
-        id = "cv-snapshot-name-input",
-        type = "text",
-        maxlength = "80",
-        autocomplete = "off"
-      ),
-      tags$div(
-        class = "cv-snapshot-name-actions",
-        tags$button(
-          type = "button",
-          id = "cv-snapshot-name-cancel",
-          class = "cv-snapshot-name-cancel",
-          "Cancel"
-        ),
-        tags$button(
-          type = "button",
-          id = "cv-snapshot-name-confirm",
-          class = "cv-snapshot-name-confirm",
-          "Save view"
-        )
-      )
-    ),
-
     tags$dialog(
       id = "cv-moran-modal",
       class = "cv-insight-modal",

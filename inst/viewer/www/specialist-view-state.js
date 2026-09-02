@@ -170,6 +170,10 @@
           controls: captureControls(spec)
         };
       },
+      downloadPNG: function () {
+        var api = engine(spec);
+        return !!(api && api.downloadPNG && api.downloadPNG(id));
+      },
       apply: function (config) {
         navigate(spec);
         restoreControls(config.controls || []);

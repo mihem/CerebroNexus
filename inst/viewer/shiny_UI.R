@@ -110,22 +110,22 @@ cerebroSelectionStatus <- function(
   plot_id,
   count_output_id,
   client_actions = TRUE,
-  share = TRUE
+  portable = TRUE
 ) {
-  share_button <- function() {
-    if (!share) {
+  portable_button <- function() {
+    if (!portable) {
       return(NULL)
     }
     tags$button(
       type = "button",
-      class = "cerebro-share-open",
+      class = "cerebro-config-open",
       `data-view-id` = plot_id,
       disabled = "disabled",
       `aria-disabled` = "true",
       `aria-haspopup` = "dialog",
       `aria-controls` = "cv-config-dialog",
-      icon("share-nodes"),
-      tags$span("Share selection")
+      icon("share-alt"),
+      tags$span("Share view")
     )
   }
   action_button <- function(action, class, icon_name, label) {
@@ -165,7 +165,7 @@ cerebroSelectionStatus <- function(
         class = "cerebro-selection-status-text",
         "Drag on the plot to create an active cohort."
       ),
-      share_button()
+      portable_button()
     ),
     div(
       id = paste0(plot_id, "_selection_active"),
@@ -199,7 +199,7 @@ cerebroSelectionStatus <- function(
           "eraser",
           "Clear selection"
         ),
-        share_button()
+        portable_button()
       )
     )
   )
@@ -531,7 +531,6 @@ ui <- dashboardPage(
       cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("cell_views_state.js", defer = TRUE),
       cerebro_js("hla_motifs.js", defer = TRUE),
-      cerebro_js("viewer-clipboard.js", defer = TRUE),
       cerebro_js("coordviews-config.js", defer = TRUE),
       cerebro_js("viewer-shell.js", defer = TRUE),
       cerebro_js("multiselect.js", defer = TRUE),

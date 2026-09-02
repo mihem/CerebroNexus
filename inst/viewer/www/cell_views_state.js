@@ -36,5 +36,9 @@
     return { trekker_mode: 'gene', trekker_gene_pick: gene };
   };
 
+  S.shouldStashSingleState = function (activeView, targetView, preserveTarget) {
+    return !preserveTarget || activeView !== targetView;
+  };
+
   window.CBViewState = S;
 })();

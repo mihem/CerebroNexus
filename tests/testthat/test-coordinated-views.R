@@ -208,6 +208,42 @@ test_that("Linked views hides its empty pane slots before data arrives", {
   expect_match(ui, 'class = "cv-pane cv-hidden"', fixed = TRUE)
 })
 
+test_that("Linked views exposes a composed workspace PNG download", {
+  ui_file <- file.path(dirname(bundle_file), "UI.R")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  config_file <- file.path(
+    dirname(bundle_file), "..", "www", "coordviews-config.js"
+  )
+  css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  skip_if_not(
+    file.exists(ui_file) && file.exists(js_file) && file.exists(config_file) &&
+      file.exists(css_file)
+  )
+  ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  config <- paste(readLines(config_file, warn = FALSE), collapse = "\n")
+  css <- paste(readLines(css_file, warn = FALSE), collapse = "\n")
+
+  expect_match(ui, 'id = "cv-config-png"', fixed = TRUE)
+  expect_match(ui, 'tags$span("Download PNG")', fixed = TRUE)
+  expect_false(grepl("cerebro-download-png", ui, fixed = TRUE))
+  expect_match(js, "function downloadWorkspacePNG()", fixed = TRUE)
+  expect_match(js, "downloadPNG: downloadWorkspacePNG", fixed = TRUE)
+  expect_match(js, "maxPixels = 32 * 1024 * 1024", fixed = TRUE)
+  expect_match(config, "target.downloadPNG()", fixed = TRUE)
+  expect_match(config, "byId('cv-config-png')", fixed = TRUE)
+  expect_match(
+    css,
+    "(?s)\\.cv-config-dialog \\{[^}]*box-sizing: border-box",
+    perl = TRUE
+  )
+  expect_match(
+    css,
+    ".cv-config-actions > .cv-config-upload { width: 118px; }",
+    fixed = TRUE
+  )
+})
+
 test_that("Linked views highlights only the visualization under the pointer", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")

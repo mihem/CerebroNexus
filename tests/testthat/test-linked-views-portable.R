@@ -1,4 +1,4 @@
-test_that("current Linked views state round-trips through the share validator", {
+test_that("current Linked views state round-trips through the JSON validator", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())
   sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)

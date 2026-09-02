@@ -55,112 +55,6 @@ observe({
     )
   )
 })
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/coordinated_views/share_store.R"
-  ),
-  local = TRUE
-)
-
-cv_share_path <- Cerebro.options[["linked_view_share_db"]]
-if (
-  !is.character(cv_share_path) ||
-    length(cv_share_path) != 1L ||
-    !nzchar(cv_share_path)
-) {
-  cv_share_path <- Sys.getenv("CEREBRONEXUS_LINKED_VIEW_SHARE_DB", unset = "")
-}
-cv_share_namespace_value <- Cerebro.options[["linked_view_share_namespace"]]
-if (
-  !is.character(cv_share_namespace_value) ||
-    length(cv_share_namespace_value) != 1L ||
-    is.na(cv_share_namespace_value) ||
-    !nzchar(cv_share_namespace_value)
-) {
-  cv_share_namespace_value <- Sys.getenv(
-    "CEREBRONEXUS_LINKED_VIEW_SHARE_NAMESPACE",
-    unset = ""
-  )
-}
-cv_share_open <- cv_share_store_try_open(
-  path = cv_share_path,
-  root = Cerebro.options[["cerebro_root"]],
-  namespace = cv_share_namespace_value
-)
-coordviews_share_store <- cv_share_open$store
-coordviews_share_error <- cv_share_open$error
-cv_share_ttl_seconds <- 7L * 24L * 60L * 60L
-cv_share_ttl_days <- as.integer(cv_share_ttl_seconds / (24L * 60L * 60L))
-cv_share_creator <- function(session) {
-  if (is.null(session) || is.null(session$userData)) {
-    return("anonymous")
-  }
-  context <- get0(
-    "viewer_auth",
-    envir = session$userData,
-    inherits = FALSE,
-    ifnotfound = NULL
-  )
-  user <- if (is.list(context)) context$user else NULL
-  if (
-    isTRUE(context$authenticated) &&
-      is.character(user) &&
-      length(user) == 1L &&
-      !is.na(user) &&
-      nzchar(user)
-  ) {
-    return(cv_share_creator_id(user = user))
-  }
-  remote_addr <- tryCatch(session$request$REMOTE_ADDR, error = function(e) NULL)
-  cv_share_creator_id(
-    remote_addr = remote_addr,
-    session_token = session$token
-  )
-}
-cv_share_unavailable_message <- paste(
-  "Share links are unavailable.",
-  paste(
-    "Set CEREBRONEXUS_LINKED_VIEW_SHARE_DB to a writable persistent path."
-  )
-)
-if (!is.null(coordviews_share_error)) {
-  warning(
-    "Linked views sharing unavailable: ",
-    coordviews_share_error,
-    ". ",
-    cv_share_unavailable_message,
-    call. = FALSE
-  )
-}
-session$onFlushed(
-  function() {
-    session$sendCustomMessage(
-      "coordviews_share_status",
-      list(
-        available = !is.null(coordviews_share_store),
-        ttl_days = cv_share_ttl_days,
-        message = if (is.null(coordviews_share_error)) {
-          ""
-        } else {
-          cv_share_unavailable_message
-        }
-      )
-    )
-  },
-  once = TRUE
-)
-
-session$onSessionEnded(function() {
-  if (
-    !is.null(coordviews_share_store) &&
-      DBI::dbIsValid(coordviews_share_store$con)
-  ) {
-    DBI::dbDisconnect(coordviews_share_store$con)
-  }
-})
-
-
 ## Always resolves to something sendable: the bundle, or a list(error = <text>)
 ## describing why this data set has no linked views. Never NULL — see the observe
 ## below for why silence is the one outcome we cannot afford.
@@ -336,7 +230,7 @@ observeEvent(
       is.character(raw_action) &&
         length(raw_action) == 1L &&
         !is.na(raw_action) &&
-        raw_action %in% c("prepare", "apply")
+        identical(raw_action, "prepare")
     ) {
       raw_action
     } else {
@@ -347,7 +241,7 @@ observeEvent(
         cv_config_check_node_limit(request)
         request <- cv_config_record(
           request,
-          c("nonce", "action", "config", "config_json"),
+          c("nonce", "action", "config"),
           required = c("nonce", "action"),
           path = "$.request"
         )
@@ -355,62 +249,30 @@ observeEvent(
         action <- cv_config_choice(
           request$action,
           "$.request.action",
-          c("prepare", "apply")
+          "prepare"
         )
         dataset <- cv_saved_view_dataset()
-        if (identical(action, "prepare")) {
-          request <- cv_config_record(
-            request,
-            c("nonce", "action", "config"),
-            path = "$.request"
-          )
-          prepared <- cv_config_prepare(
-            request$config,
-            cells = dataset$cells,
-            fingerprint = dataset$fingerprint
-          )
-          cv_config_send_result(
-            nonce,
-            action,
-            TRUE,
-            json = prepared$json,
-            filename = paste0(
-              if (identical(prepared$config$schema, CV_CONFIG_SCHEMA)) {
-                "linked-views-"
-              } else {
-                paste0(prepared$config$page$id, "-")
-              },
-              format(Sys.time(), "%Y%m%d-%H%M%S", tz = "UTC"),
-              ".json"
-            ),
-            selected_cells = length(prepared$config$selection$cells)
-          )
-        } else {
-          request <- cv_config_record(
-            request,
-            c("nonce", "action", "config_json"),
-            path = "$.request"
-          )
-          request$config_json <- cv_config_string(
-            request$config_json,
-            "$.request.config_json",
-            CV_CONFIG_MAX_BYTES
-          )
-          normalized <- cv_config_decode(
-            request$config_json,
-            cells = dataset$cells,
-            fingerprint = dataset$fingerprint
-          )
-          colour_data <- cv_config_validate_genes(normalized, dataset$cells)
-          cv_config_send_result(
-            nonce,
-            action,
-            TRUE,
-            config = cv_config_json_document(normalized),
-            colour_data = colour_data,
-            selected_cells = length(normalized$selection$cells)
-          )
-        }
+        prepared <- cv_config_prepare(
+          request$config,
+          cells = dataset$cells,
+          fingerprint = dataset$fingerprint
+        )
+        cv_config_send_result(
+          nonce,
+          action,
+          TRUE,
+          json = prepared$json,
+          filename = paste0(
+            if (identical(prepared$config$schema, CV_CONFIG_SCHEMA)) {
+              "linked-views-"
+            } else {
+              paste0(prepared$config$page$id, "-")
+            },
+            format(Sys.time(), "%Y%m%d-%H%M%S", tz = "UTC"),
+            ".json"
+          ),
+          selected_cells = length(prepared$config$selection$cells)
+        )
       },
       error = function(error) {
         cv_config_log_failure(error)
@@ -424,133 +286,6 @@ observeEvent(
             "internal"
           },
           message = cv_config_safe_message(error)
-        )
-      }
-    )
-  },
-  ignoreInit = TRUE
-)
-
-cv_share_send <- function(nonce, action, ok, ...) {
-  nonce <- if (is.null(nonce)) "" else as.character(nonce)
-  action <- if (is.null(action)) "" else as.character(action)
-  payload <- c(
-    list(nonce = nonce, action = action, ok = isTRUE(ok)),
-    list(...)
-  )
-  session$sendCustomMessage(
-    "coordviews_share_result",
-    payload
-  )
-}
-
-observeEvent(
-  input[["coordviews_share_request"]],
-  {
-    request <- input[["coordviews_share_request"]]
-    nonce <- if (is.list(request) && is.character(request$nonce)) {
-      request$nonce[[1L]]
-    } else {
-      ""
-    }
-    action <- if (is.list(request) && is.character(request$action)) {
-      request$action[[1L]]
-    } else {
-      ""
-    }
-    tryCatch(
-      {
-        cv_config_check_node_limit(request)
-        request <- cv_config_record(
-          request,
-          c("nonce", "action", "config", "token"),
-          required = c("nonce", "action"),
-          path = "$.share_request"
-        )
-        nonce <- cv_config_string(request$nonce, "$.share_request.nonce", 128L)
-        action <- cv_config_choice(
-          request$action,
-          "$.share_request.action",
-          c("share_create", "share_open")
-        )
-        if (is.null(coordviews_share_store)) {
-          cv_share_abort(
-            "share_unavailable",
-            "Share links are unavailable on this server."
-          )
-        }
-        dataset <- cv_saved_view_dataset()
-        if (identical(action, "share_create")) {
-          request <- cv_config_record(
-            request,
-            c("nonce", "action", "config"),
-            required = c("nonce", "action", "config"),
-            path = "$.share_request"
-          )
-          prepared <- cv_config_prepare(
-            request$config,
-            cells = dataset$cells,
-            fingerprint = dataset$fingerprint
-          )
-          created <- cv_share_store_create(
-            coordviews_share_store,
-            prepared$json,
-            dataset$fingerprint,
-            creator = cv_share_creator(session),
-            dataset_label = cv_selected_dataset_name() %||% "",
-            ttl_seconds = cv_share_ttl_seconds
-          )
-          cv_share_send(
-            nonce,
-            action,
-            TRUE,
-            token = created$token,
-            expires_at = created$expires_at,
-            dataset_label = cv_selected_dataset_name() %||% ""
-          )
-        } else if (identical(action, "share_open")) {
-          request <- cv_config_record(
-            request,
-            c("nonce", "action", "token"),
-            required = c("nonce", "action", "token"),
-            path = "$.share_request"
-          )
-          stored <- cv_share_store_fetch(
-            coordviews_share_store,
-            request$token,
-            dataset$fingerprint
-          )
-          normalized <- cv_config_decode(
-            stored$json,
-            cells = dataset$cells,
-            fingerprint = dataset$fingerprint
-          )
-          colour_data <- cv_config_validate_genes(normalized, dataset$cells)
-          cv_share_send(
-            nonce,
-            action,
-            TRUE,
-            config = cv_config_json_document(normalized),
-            colour_data = colour_data,
-            selected_cells = length(normalized$selection$cells)
-          )
-        } else {
-          cv_share_abort("invalid_action", "The share request is invalid.")
-        }
-      },
-      error = function(error) {
-        cv_share_send(
-          nonce,
-          action,
-          FALSE,
-          code = if (!is.null(error$code)) error$code else "internal",
-          message = if (inherits(error, "cv_config_error")) {
-            cv_config_safe_message(error)
-          } else if (inherits(error, "cv_share_error")) {
-            conditionMessage(error)
-          } else {
-            "The share request could not be completed."
-          }
         )
       }
     )

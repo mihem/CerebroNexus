@@ -25,14 +25,15 @@ selection_status_function <- function() {
   environment$cerebroSelectionStatus
 }
 
-test_that("selection status can omit unsupported sharing", {
+test_that("selection status exposes Share view when supported", {
   status <- selection_status_function()
 
-  with_share <- as.character(status("projection", "count"))
-  without_share <- as.character(
-    status("trekker_projection", "count", share = FALSE)
+  with_portable <- as.character(status("projection", "count"))
+  without_portable <- as.character(
+    status("trekker_projection", "count", portable = FALSE)
   )
 
-  expect_match(with_share, "cerebro-share-open", fixed = TRUE)
-  expect_false(grepl("cerebro-share-open", without_share, fixed = TRUE))
+  expect_match(with_portable, "cerebro-config-open", fixed = TRUE)
+  expect_match(with_portable, "Share view", fixed = TRUE)
+  expect_false(grepl("cerebro-config-open", without_portable, fixed = TRUE))
 })
