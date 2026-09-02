@@ -37,6 +37,54 @@ cachePlot <- utils_env$cachePlot
 viewerUploadsEnabled <- utils_env$viewerUploadsEnabled
 viewerUploadPath <- utils_env$viewerUploadPath
 
+test_that("infinite values are replaced without changing other columns", {
+  replaceInfiniteValues <- utils_env$replaceInfiniteValues
+  expect_true(is.function(replaceInfiniteValues))
+  table <- data.frame(
+    dirty = c(-Inf, 1, Inf),
+    clean = c(2, 3, 4),
+    label = c("-Inf", "ok", "Inf"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- replaceInfiniteValues(table)
+
+  expect_identical(result$dirty, c(-999, 1, 999))
+  expect_identical(result$clean, table$clean)
+  expect_identical(result$label, table$label)
+})
+
+test_that("spreadsheet formulas are neutralized in cells and column names", {
+  table <- data.frame(
+    unsafe = c("=1+1", "safe"),
+    safe = c("text", "@SUM(A1)"),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  names(table)[[1L]] <- "=HYPERLINK(\"https://example.test\")"
+
+  result <- utils_env$neutralizeSpreadsheetFormulas(table)
+
+  expect_identical(
+    names(result),
+    c("'=HYPERLINK(\"https://example.test\")", "safe")
+  )
+  expect_identical(result[[1L]], c("'=1+1", "safe"))
+  expect_identical(result[[2L]], c("text", "'@SUM(A1)"))
+})
+
+test_that("duplicate Extra material labels identify the embedded source", {
+  choices <- utils_env$extra_material_table_choices(list(
+    embedded = list(key = "embedded", label = "QC tables"),
+    external = list(key = "external-file:1", label = "QC tables")
+  ))
+
+  expect_identical(
+    choices,
+    c("QC tables (from CRB)" = "embedded", "QC tables" = "external-file:1")
+  )
+})
+
 test_that("CRB cache log labels omit directory paths", {
   label <- get0(".crbLogLabel", envir = utils_env, inherits = FALSE)
   expect_true(is.function(label))

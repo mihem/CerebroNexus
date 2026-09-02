@@ -47,6 +47,14 @@ cerebroSettingsButton <- function(id, target) {
   )
 }
 
+conditionalSidebarItem <- function(label, tab_name, icon_name) {
+  shiny::tagAppendAttributes(
+    menuItem(label, tabName = tab_name, icon = icon(icon_name)),
+    id = paste0("sidebar_item_", tab_name),
+    style = "display: none;"
+  )
+}
+
 cerebroVizPageHeader <- function(title, info_id, subtitle) {
   tagList(
     div(
@@ -471,21 +479,34 @@ ui <- dashboardPage(
         icon = icon("project-diagram")
       ),
       menuItem("Groups", tabName = "groups", icon = icon("layer-group")),
-      ## Marker genes and Most expressed genes are inserted conditionally (see
-      ## insertConditionalTab in shiny_server.R): a data set that carries neither
-      ## — e.g. the spatial demos — no longer shows a sidebar item that opens to
-      ## an empty table. Their tab bodies stay registered in tabItems(); without
-      ## a menuItem there is simply no way to navigate to them, matching how the
-      ## enriched-pathways / trajectory / spatial tabs already behave.
-      div(id = "sidebar_item_marker_genes_placeholder"),
-      div(id = "sidebar_item_most_expressed_genes_placeholder"),
-      div(id = "sidebar_item_enriched_pathways_placeholder"),
-      div(id = "sidebar_item_extra_material_placeholder"),
-      div(id = "sidebar_item_immune_repertoire_placeholder"),
-      div(id = "sidebar_item_trajectory_placeholder"),
-      div(id = "sidebar_item_spatial_placeholder"),
-      div(id = "sidebar_item_trekker_placeholder"),
-      div(id = "sidebar_item_hla_tcr_motifs_placeholder"),
+      ## Conditional items are present when shinydashboard binds the sidebar,
+      ## then shown only for data sets that support them. Keeping their anchors
+      ## in the initial DOM lets updateTabItems() select them reliably.
+      conditionalSidebarItem("Marker genes", "markerGenes", "list-alt"),
+      conditionalSidebarItem(
+        "Most expressed genes",
+        "mostExpressedGenes",
+        "bullhorn"
+      ),
+      conditionalSidebarItem(
+        "Enriched pathways",
+        "enrichedPathways",
+        "project-diagram"
+      ),
+      conditionalSidebarItem("Extra material", "extra_material", "gift"),
+      conditionalSidebarItem(
+        "Immune repertoire",
+        "immune_repertoire",
+        "dna"
+      ),
+      conditionalSidebarItem("Trajectory", "trajectory", "route"),
+      conditionalSidebarItem("Spatial", "spatial", "map-pin"),
+      conditionalSidebarItem("Trekker", "trekker", "map-marked-alt"),
+      conditionalSidebarItem(
+        "HLA & TCR Motifs",
+        "hla_tcr_motifs",
+        "project-diagram"
+      ),
       menuItem(
         "Gene expression",
         tabName = "geneExpression",

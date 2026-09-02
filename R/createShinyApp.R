@@ -124,7 +124,8 @@ dedent <- function(string) {
   host,
   launch_browser,
   quiet,
-  display_mode
+  display_mode,
+  show_upload_ui
 ) {
   if (
     !is.numeric(max_request_size) ||
@@ -177,6 +178,13 @@ dedent <- function(string) {
   }
   validate_logical(launch_browser, "launch_browser")
   validate_logical(quiet, "quiet")
+  validate_logical(show_upload_ui, "show_upload_ui")
+  if (!show_upload_ui) {
+    max_request_size_bytes <- min(
+      max_request_size_bytes,
+      as.double(6 * 1024^2)
+    )
+  }
   if (
     !is.character(display_mode) ||
       length(display_mode) != 1L ||
@@ -199,6 +207,28 @@ dedent <- function(string) {
       quiet = quiet,
       display.mode = display_mode
     )
+  )
+}
+
+.viewerInitialPageTabs <- function() {
+  c(
+    data_info = "loadData",
+    projection = "overview",
+    linked_views = "coordinated_views",
+    groups = "groups",
+    marker_genes = "markerGenes",
+    most_expressed_genes = "mostExpressedGenes",
+    enriched_pathways = "enrichedPathways",
+    extra_material = "extra_material",
+    immune_repertoire = "immune_repertoire",
+    trajectory = "trajectory",
+    spatial = "spatial",
+    trekker = "trekker",
+    hla_tcr_motifs = "hla_tcr_motifs",
+    gene_expression = "geneExpression",
+    gene_id_conversion = "geneIdConversion",
+    color_management = "color_management",
+    about = "about"
   )
 }
 
@@ -1300,6 +1330,7 @@ dedent <- function(string) {
     copy = function(from, to, ...) file.copy(from, to, ...),
     mode = function(path) as.integer(file.info(path)$mode),
     save_rds = function(object, file) saveRDS(object, file),
+    save_extra_rds = function(object, file) .saveExtraTableRDS(object, file),
     write_lines = function(text, connection) writeLines(text, connection)
   )
 }
@@ -2020,7 +2051,8 @@ dedent <- function(string) {
 #'   must not use the reserved build-lock namespace, and its final target must
 #'   not be a symbolic link or unresolved filesystem entry.
 #' @param max_request_size One finite positive numeric upload limit in MB;
-#'   defaults to 8000.
+#'   defaults to 8000. Closed Viewers cap the effective request size at 6 MB;
+#'   open Viewers use the supplied value.
 #' @param port One whole-number port from 1 through 65535; defaults to 8080.
 #' @param host One non-empty character value that the generated app binds to;
 #'   defaults to "127.0.0.1".
@@ -2047,6 +2079,16 @@ dedent <- function(string) {
 #' @param crb_pick_smallest_file Forwarded to \code{Cerebro.options}.
 #' @param show_upload_ui One non-missing logical controlling whether users may
 #'   upload their own data; defaults to \code{FALSE}.
+#' @param initial_page Optional initial Viewer page. Supported stable IDs are
+#'   \code{"data_info"}, \code{"projection"}, \code{"linked_views"},
+#'   \code{"groups"}, \code{"marker_genes"},
+#'   \code{"most_expressed_genes"}, \code{"enriched_pathways"},
+#'   \code{"extra_material"}, \code{"immune_repertoire"},
+#'   \code{"trajectory"}, \code{"spatial"}, \code{"trekker"},
+#'   \code{"hla_tcr_motifs"}, \code{"gene_expression"},
+#'   \code{"gene_id_conversion"}, \code{"color_management"}, and
+#'   \code{"about"}. A conditional page is selected only when it is available
+#'   for the loaded dataset. Shared links take precedence after restoration.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Point size from 1 through 20. Supply one number for every
 #'   dataset, or a named numeric vector/list whose names exactly match
@@ -2096,6 +2138,12 @@ dedent <- function(string) {
 #'   created by \code{shinymanager::create_db()}, and \code{passphrase_env},
 #'   the name of the environment variable containing its passphrase. Optional
 #'   \code{timeout_minutes} defaults to 15.
+#' @param extra_tables Optional named collection of CSV, TSV, TXT, XLS, XLSX,
+#'   or XLSM files to bundle as private Extra material tables. Workbook sheets
+#'   are listed separately and loaded only when selected in the Viewer.
+#' @param extra_tables_sheets Optional named list of Excel sheet renames keyed
+#'   by \code{extra_tables} labels. Each entry maps displayed names to source
+#'   sheet names; unmapped sheets remain available.
 #'
 #' @return Invisibly returns \code{result_dir}. If that path changes resolution
 #'   during the build, warns and returns the frozen absolute publication path.
@@ -2149,7 +2197,10 @@ createShinyApp <- function(
   spatial_images_offset_x = NULL,
   spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
-  auth = NULL
+  auth = NULL,
+  extra_tables = NULL,
+  extra_tables_sheets = NULL,
+  initial_page = NULL
 ) {
   # Validate inputs ----------------------------------------------------------##
   if (is.list(cerebro_data)) {
@@ -2282,6 +2333,21 @@ createShinyApp <- function(
   ) {
     stop("'show_upload_ui' must be TRUE or FALSE.", call. = FALSE)
   }
+  initial_pages <- .viewerInitialPageTabs()
+  if (
+    !is.null(initial_page) &&
+      (!is.character(initial_page) ||
+        length(initial_page) != 1L ||
+        is.na(initial_page) ||
+        !initial_page %in% names(initial_pages))
+  ) {
+    stop(
+      "'initial_page' must be NULL or one of: ",
+      paste(names(initial_pages), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
   if (
     is.null(result_dir) ||
       !is.character(result_dir) ||
@@ -2297,7 +2363,8 @@ createShinyApp <- function(
     host = host,
     launch_browser = launch_browser,
     quiet = quiet,
-    display_mode = display_mode
+    display_mode = display_mode,
+    show_upload_ui = show_upload_ui
   )
   resolved_crb_sources <- vapply(
     cerebro_data,
@@ -2326,6 +2393,10 @@ createShinyApp <- function(
       call. = FALSE
     )
   }
+  extra_table_plan <- .bundleExtraTables(
+    extra_tables = extra_tables,
+    extra_tables_sheets = extra_tables_sheets
+  )
   viewer_auth <- .compileViewerAuth(auth)
   requested_result_dir <- result_dir
   prepared_result <- .prepareBundleResultTarget(result_dir)
@@ -2356,8 +2427,61 @@ createShinyApp <- function(
   .bundleDestinationState(result_dir, overwrite)
 
   if (!is.null(colors)) {
-    if (is.null(names(colors)) || any(names(colors) == "")) {
-      stop("colors must be a named list or vector.", call. = FALSE)
+    if (
+      !is.list(colors) || is.null(names(colors)) || any(names(colors) == "")
+    ) {
+      stop("colors must be a named list by dataset.", call. = FALSE)
+    }
+    valid_palette <- vapply(
+      colors,
+      function(palette) {
+        is.list(palette) &&
+          length(palette) &&
+          !is.null(names(palette)) &&
+          all(nzchar(names(palette))) &&
+          all(vapply(
+            palette,
+            function(values) {
+              is.character(values) &&
+                length(values) &&
+                !is.null(names(values)) &&
+                all(nzchar(names(values)))
+            },
+            logical(1)
+          ))
+      },
+      logical(1)
+    )
+    if (!all(valid_palette)) {
+      stop(
+        paste(
+          "Each colors dataset must be a named list of variables,",
+          "each containing a named character palette."
+        ),
+        call. = FALSE
+      )
+    }
+    valid_colours <- vapply(
+      colors,
+      function(palette) {
+        all(vapply(
+          palette,
+          function(values) {
+            tryCatch(
+              {
+                grDevices::col2rgb(values)
+                TRUE
+              },
+              error = function(error) FALSE
+            )
+          },
+          logical(1)
+        ))
+      },
+      logical(1)
+    )
+    if (!all(valid_colours)) {
+      stop("Every colors value must be a valid R colour.", call. = FALSE)
     }
     if (length(intersect(names(colors), names(cerebro_data))) == 0) {
       warning(
@@ -2773,6 +2897,11 @@ createShinyApp <- function(
     cat("Creating staged directory structure...\n")
   }
   dir.create(private_data_dir, recursive = TRUE, showWarnings = FALSE)
+  extra_table_bundle <- .materializeExtraTables(
+    extra_table_plan,
+    stage_result_dir,
+    save_rds = build_ops$save_extra_rds
+  )
 
   if (verbose) {
     cat("Copying Shiny source files...\n")
@@ -2865,7 +2994,9 @@ createShinyApp <- function(
   internal_option_names <- c(
     ".bundle_backend_plan",
     ".bundle_run_options",
-    ".viewer_auth"
+    ".viewer_auth",
+    "initial_page",
+    "extra_tables"
   )
   option_names <- names(cerebro_options)
   if (!is.null(option_names)) {
@@ -2891,6 +3022,9 @@ createShinyApp <- function(
   if (!is.null(show_upload_ui)) {
     cerebro_options[["show_upload_ui"]] <- show_upload_ui
   }
+  if (!is.null(initial_page)) {
+    cerebro_options[["initial_page"]] <- initial_page
+  }
   cerebro_options[["point_size"]] <- point_size
   cerebro_options[["point_opacity"]] <- point_opacity
   cerebro_options[["percentage_cells_to_show"]] <- percentage_cells_to_show
@@ -2911,6 +3045,9 @@ createShinyApp <- function(
   }
   if (!is.null(spatial_plot_rotation)) {
     cerebro_options[["spatial_plot_rotation"]] <- spatial_plot_rotation
+  }
+  if (!is.null(extra_table_bundle)) {
+    cerebro_options[["extra_tables"]] <- extra_table_bundle
   }
 
   build_ops$save_rds(

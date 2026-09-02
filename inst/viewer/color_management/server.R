@@ -25,12 +25,7 @@ output[["color_assignments_UI"]] <- renderUI({
             color_list <- list()
             for (group_level in getGroupLevels(group_name)) {
               color_list[[group_level]] <- colourpicker::colourInput(
-                inputId = paste0(
-                  'color_',
-                  group_name,
-                  '_',
-                  gsub(group_level, pattern = '[^[:alnum:]]', replacement = '_')
-                ),
+                inputId = color_input_id(group_name, group_level),
                 label = group_level,
                 value = reactive_colors()[[group_name]][group_level]
               )
@@ -57,12 +52,7 @@ output[["color_assignments_UI"]] <- renderUI({
               color_list <- list()
               for (state in unique(as.character(getMetaData()[[column]]))) {
                 color_list[[state]] <- colourpicker::colourInput(
-                  inputId = paste0(
-                    'color_',
-                    column,
-                    '_',
-                    gsub(state, pattern = '[^[:alnum:]]', replacement = '_')
-                  ),
+                  inputId = color_input_id(column, state),
                   label = state,
                   value = reactive_colors()[[column]][state]
                 )

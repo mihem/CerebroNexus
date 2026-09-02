@@ -36,8 +36,8 @@ shared_app <- function() {
 test_that("most_expressed_genes tab navigates and renders table", {
   app <- shared_app()
 
-  # Most expressed genes is now a conditionally + asynchronously inserted sidebar
-  # item (insertConditionalTab). Wait for its menu link to appear, then click it,
+  # Most expressed genes is a conditionally shown sidebar item. Wait for its
+  # menu link to become available, then click it,
   # so the tab activates on a slow CI runner instead of navigating too early.
   app$wait_for_js(
     "document.querySelector('a[href=\"#shiny-tab-mostExpressedGenes\"]') !== null",
@@ -101,41 +101,40 @@ test_that("all three new tabs are visible in sidebar after data load", {
   expect_true(extra_mat)
 })
 
-test_that("insertConditionalTab is defined and wired to conditional tabs", {
+test_that("toggleConditionalTab is defined and wired to conditional tabs", {
   server_file <- file.path(inst_dir, "viewer/shiny_server.R")
   skip_if_not(file.exists(server_file))
   content <- paste(readLines(server_file), collapse = "\n")
 
-  # Function is defined with all required parameters
+  # Function is defined with the tab identity and availability check.
   expect_match(
     content,
-    "insertConditionalTab\\s*<-\\s*function\\s*\\(\\s*tab_label\\s*,\\s*tab_name\\s*,\\s*icon_name\\s*,\\s*check_fn",
+    "toggleConditionalTab\\s*<-\\s*function\\s*\\(\\s*tab_name\\s*,\\s*check_fn",
     perl = TRUE
   )
 
-  # Calls are present for enriched pathways and extra material
+  # Calls are present for enriched pathways and extra material.
   expect_match(
     content,
-    "insertConditionalTab\\s*\\([\\s\\S]*?Enriched pathways",
+    'toggleConditionalTab\\s*\\(\\s*"enrichedPathways"',
     perl = TRUE
   )
   expect_match(
     content,
-    "insertConditionalTab\\s*\\([\\s\\S]*?Extra material",
+    'toggleConditionalTab\\s*\\(\\s*"extra_material"',
     perl = TRUE
   )
 })
 
-test_that("conditional tab placeholders exist in UI source", {
+test_that("conditional sidebar items exist in the initial UI", {
   ui_file <- file.path(inst_dir, "viewer/shiny_UI.R")
   skip_if_not(file.exists(ui_file))
   content <- paste(readLines(ui_file), collapse = "\n")
 
-  # Placeholder divs for the two conditional tabs
   expect_match(
     content,
-    'sidebar_item_enriched_pathways_placeholder',
+    '"Enriched pathways",\\s*"enrichedPathways"',
     perl = TRUE
   )
-  expect_match(content, 'sidebar_item_extra_material_placeholder', perl = TRUE)
+  expect_match(content, '"Extra material", "extra_material"', perl = TRUE)
 })

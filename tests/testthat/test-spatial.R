@@ -311,7 +311,7 @@ test_that("Spatial tab is wired into the app UI and server", {
   )
   expect_match(ui_src, "spatial/UI\\.R")
   expect_match(ui_src, "tab_spatial")
-  expect_match(ui_src, "sidebar_item_spatial_placeholder")
+  expect_match(ui_src, 'conditionalSidebarItem\\("Spatial", "spatial"')
 
   server_src <- paste(
     readLines(file.path(shiny_root, "shiny_server.R")),
@@ -321,7 +321,7 @@ test_that("Spatial tab is wired into the app UI and server", {
   expect_match(server_src, "group_filters/group_filters_widget\\.R")
   expect_match(
     server_src,
-    'insertConditionalTab\\([\\s\\S]{0,80}"spatial"',
+    'toggleConditionalTab\\([\\s\\S]{0,80}"spatial"',
     perl = TRUE
   )
 })

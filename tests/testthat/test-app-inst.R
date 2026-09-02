@@ -86,11 +86,8 @@ wait_for_input <- function(app, id, timeout = 20000) {
   )
 }
 
-## Activate a sidebar tab that is inserted CONDITIONALLY and ASYNCHRONOUSLY
-## (insertConditionalTab in shiny_server.R): Projection ("overview"), Gene
-## expression, Marker genes, etc. are no longer static menuItems, so navigating
-## with set_inputs(sidebar = ...) before the item is inserted silently no-ops and
-## the tab's outputs never render. Wait for the menu link, then click it.
+## Activate a conditionally shown sidebar tab. Wait for the menu link to be
+## available, then click it so the tab's outputs render reliably on slow CI.
 activate_tab <- function(app, tab_name, timeout = 20000) {
   selector <- sprintf("a[href=\"#shiny-tab-%s\"]", tab_name)
   app$wait_for_js(
@@ -522,9 +519,8 @@ test_that("{shinytest2} recording: marker_genes", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  # Marker genes is a conditionally + asynchronously inserted sidebar item
-  # (insertConditionalTab): wait for it, then click, so it activates on a slow
-  # runner instead of navigating before it exists.
+  # Marker genes is a conditionally shown sidebar item. Wait for it, then click,
+  # so it activates on a slow runner instead of navigating too early.
   activate_tab(app, "markerGenes")
   app$wait_for_idle(timeout = 10000)
 

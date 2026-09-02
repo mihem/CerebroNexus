@@ -151,6 +151,16 @@ test_that("createShinyApp validates run options before target preparation", {
       0,
       "TRUE"
     ),
+    initial_page = list(
+      character(),
+      c("projection", "spatial"),
+      NA_character_,
+      "",
+      "not-a-viewer-page",
+      1,
+      TRUE,
+      factor("projection")
+    ),
     display_mode = list(
       NULL,
       character(),
@@ -168,6 +178,14 @@ test_that("createShinyApp validates run options before target preparation", {
       expect_invalid_run_option(argument, value, prepare_calls)
     }
   }
+})
+
+test_that("new run options preserve historical positional arguments", {
+  arguments <- names(formals(createShinyApp))
+
+  expect_identical(arguments[[14L]], "show_upload_ui")
+  expect_identical(arguments[[15L]], "welcome_message")
+  expect_identical(tail(arguments, 1L), "initial_page")
 })
 
 test_that("createShinyApp freezes typed run options into config", {
@@ -211,6 +229,7 @@ test_that("createShinyApp freezes typed run options into config", {
   app <- run_options_build_app(
     fixture,
     max_request_size = request_mb,
+    show_upload_ui = TRUE,
     port = port,
     host = host,
     quiet = TRUE,
@@ -323,6 +342,35 @@ test_that("createShinyApp freezes typed run options into config", {
   expect_identical(runtime$after_stop, runtime$sentinel)
 })
 
+test_that("closed Viewers cap request bodies while open Viewers keep the configured limit", {
+  fixture <- run_options_test_fixture()
+  closed_app <- run_options_build_app(
+    fixture,
+    result_name = "closed-request-app",
+    max_request_size = 8000
+  )
+  small_closed_app <- run_options_build_app(
+    fixture,
+    result_name = "small-closed-request-app",
+    max_request_size = 2
+  )
+  open_app <- run_options_build_app(
+    fixture,
+    result_name = "open-request-app",
+    max_request_size = 37.125,
+    show_upload_ui = TRUE
+  )
+  request_bytes <- function(app) {
+    readRDS(file.path(app, "cerebro_config.rds"))[[
+      ".bundle_run_options"
+    ]]$max_request_size_bytes
+  }
+
+  expect_identical(request_bytes(closed_app), as.double(6 * 1024^2))
+  expect_identical(request_bytes(small_closed_app), as.double(2 * 1024^2))
+  expect_identical(request_bytes(open_app), as.double(37.125 * 1024^2))
+})
+
 test_that("show_upload_ui controls the generated Viewer upload mode", {
   fixture <- run_options_test_fixture()
   default_app <- run_options_build_app(
@@ -356,6 +404,26 @@ test_that("show_upload_ui controls the generated Viewer upload mode", {
     "open"
   )
   expect_true(readRDS(file.path(open_app, "cerebro_config.rds"))$show_upload_ui)
+})
+
+test_that("createShinyApp stores a validated initial Viewer page", {
+  fixture <- run_options_test_fixture()
+  app <- run_options_build_app(
+    fixture,
+    result_name = "initial-page-app",
+    initial_page = "spatial"
+  )
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+  server <- paste(
+    readLines(file.path(app, "viewer", "shiny_server.R"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_identical(config$initial_page, "spatial")
+  expect_match(server, 'projection = "overview"', fixed = TRUE)
+  expect_match(server, 'spatial = "spatial"', fixed = TRUE)
+  expect_match(server, 'trekker = "trekker"', fixed = TRUE)
+  expect_match(server, "updateTabItems", fixed = TRUE)
 })
 
 test_that("createShinyApp accepts every supported display mode", {

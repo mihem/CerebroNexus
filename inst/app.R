@@ -168,7 +168,7 @@ Cerebro.options <<- list(
   "projections_show_hover_info" = FALSE
 )
 
-options(shiny.maxRequestSize = 800 * 1024^2)
+options(shiny.maxRequestSize = 6 * 1024^2)
 
 ##----------------------------------------------------------------------------##
 ## load server and UI functions

@@ -186,26 +186,6 @@ cachePlot <- function(x, ...) {
   }
 }
 
-##----------------------------------------------------------------------------##
-## Canvas projection UIs are created by module files sourced inside server().
-## Keep this helper in the same per-session scope so a newly opened session does
-## not depend on the process-startup shiny_UI.R environment being reloaded.
-cerebroCellViewOutput <- function(id) {
-  div(
-    id = paste0(id, "_cell_view_host"),
-    class = "coordviews-page cerebro-cell-view-host",
-    `data-cell-view-id` = id,
-    div(
-      class = "cerebro-cell-view-surface",
-      `aria-live` = "polite"
-    ),
-    shiny::uiOutput(
-      paste0(id, "_composition"),
-      class = "cerebro-selection-composition-slot"
-    )
-  )
-}
-
 cerebroCellViewMessage <- function(
   id,
   meta,
@@ -748,10 +728,46 @@ findColumnsLogFC <- function(df) {
 ##----------------------------------------------------------------------------##
 ## Functions to prepare and format table.
 ##----------------------------------------------------------------------------##
+replaceInfiniteValues <- function(table) {
+  numeric_columns <- which(vapply(table, is.numeric, logical(1)))
+  dirty_columns <- numeric_columns[vapply(
+    numeric_columns,
+    function(column_index) any(is.infinite(table[[column_index]])),
+    logical(1)
+  )]
+  for (column_index in dirty_columns) {
+    column <- table[[column_index]]
+    infinite <- is.infinite(column)
+    column[infinite] <- sign(column[infinite]) * 999
+    table[[column_index]] <- column
+  }
+  table
+}
+
+neutralizeSpreadsheetFormulas <- function(table) {
+  neutralize <- function(values) {
+    values <- as.character(values)
+    unsafe <- !is.na(values) & grepl("^[[:space:]]*[=+@-]", values)
+    values[unsafe] <- paste0("'", values[unsafe])
+    values
+  }
+  names(table) <- neutralize(names(table))
+  text_columns <- which(vapply(
+    table,
+    function(column) is.character(column) || is.factor(column),
+    logical(1)
+  ))
+  for (column_index in text_columns) {
+    table[[column_index]] <- neutralize(table[[column_index]])
+  }
+  table
+}
+
 prettifyTable <- function(
   table,
   filter,
   dom,
+  escape = FALSE,
   show_buttons = FALSE,
   number_formatting = FALSE,
   color_highlighting = FALSE,
@@ -777,13 +793,12 @@ prettifyTable <- function(
   color_highlighting <- as_toggle(color_highlighting, FALSE)
   show_buttons <- as_toggle(show_buttons, FALSE)
   hide_long_columns <- as_toggle(hide_long_columns, FALSE)
+  escape <- as_toggle(escape, FALSE)
 
   ## replace Inf and -Inf values in numeric columns with 999 or -999,
   ## respectively, because other the columns will be converted to characters
   ## which messes up sorting of values in that column
-  table <- table %>%
-    dplyr::mutate_if(is.numeric, function(x) ifelse(x == Inf, 999, x)) %>%
-    dplyr::mutate_if(is.numeric, function(x) ifelse(x == -Inf, -999, x))
+  table <- replaceInfiniteValues(table)
 
   table_original <- table
 
@@ -903,7 +918,7 @@ prettifyTable <- function(
     table,
     autoHideNavigation = TRUE,
     class = "stripe table-bordered table-condensed",
-    escape = FALSE,
+    escape = escape,
     extensions = table_extensions,
     filter = filter,
     rownames = FALSE,
@@ -1026,7 +1041,7 @@ prettifyTable <- function(
 
   if (color_highlighting == TRUE) {
     ## Highlight colours pulled from the shared chart theme (mirrors the
-    ## custom.css --chart-* tokens and cerebro_plotly_theme()), so the table
+    ## Viewer palette and cerebro_plotly_theme()), so the table
     ## heat/bars read as the same design system as the plots instead of the old
     ## orange/red/pink mix. Magnitude ramps use the accent; magnitude bars use
     ## the signal blue; logical up/down uses the up/down tokens.
@@ -2412,26 +2427,214 @@ getEnrichedPathways <- function(method, group) {
   }
 }
 
-## Wrapper functions for extra_material module.
-getExtraMaterialCategories <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExtraMaterialCategories())
+## Wrapper functions for extra_material module. Generated external tables are
+## private RDS assets and are loaded only after the user chooses a sheet.
+extra_material_external_table_cache <- if (
+  exists(".extra_material_process_cache", inherits = TRUE)
+) {
+  get(".extra_material_process_cache", inherits = TRUE)
+} else {
+  new.env(parent = emptyenv())
+}
+
+extra_material_table_filter <- function(row_count, column_count) {
+  if (as.double(row_count) * as.double(column_count) >= 2000000) {
+    "none"
+  } else {
+    list(position = "top", clear = TRUE)
   }
+}
+
+extra_material_table_groups <- function(external_manifest, embedded) {
+  if (missing(external_manifest)) {
+    external_manifest <- if (
+      exists("Cerebro.options", inherits = TRUE) &&
+        is.list(get("Cerebro.options", inherits = TRUE))
+    ) {
+      get("Cerebro.options", inherits = TRUE)$extra_tables
+    } else {
+      NULL
+    }
+  }
+  if (missing(embedded)) {
+    data <- data_set()
+    embedded <- if (is_cerebro_dataset(data)) {
+      data$getExtraMaterial()$tables
+    } else {
+      NULL
+    }
+  }
+
+  groups <- list()
+  if (is.list(embedded) && length(embedded)) {
+    sheets <- Filter(
+      Negate(is.null),
+      lapply(seq_along(embedded), function(index) {
+        table <- embedded[[index]]
+        if (!is.data.frame(table)) {
+          return(NULL)
+        }
+        label <- names(embedded)[[index]]
+        if (is.null(label) || is.na(label) || !nzchar(label)) {
+          label <- paste("Table", index)
+        }
+        list(key = paste0("embedded:", index), label = label, table = table)
+      })
+    )
+    if (length(sheets)) {
+      groups[["Embedded tables"]] <- list(
+        key = "embedded",
+        label = "Embedded tables",
+        sheets = sheets
+      )
+    }
+  }
+
+  files <- if (is.list(external_manifest)) external_manifest$files else NULL
+  if (is.list(files)) {
+    for (index in seq_along(files)) {
+      file <- files[[index]]
+      sheets <- if (is.list(file)) file$sheets else NULL
+      if (!is.list(sheets) || !length(sheets)) {
+        next
+      }
+      valid <- vapply(
+        sheets,
+        function(sheet) {
+          is.list(sheet) &&
+            is.character(sheet$key) &&
+            length(sheet$key) == 1L &&
+            is.character(sheet$label) &&
+            length(sheet$label) == 1L &&
+            is.character(sheet$path) &&
+            length(sheet$path) == 1L
+        },
+        logical(1)
+      )
+      sheets <- sheets[valid]
+      if (!length(sheets)) {
+        next
+      }
+      label <- names(files)[[index]]
+      if (is.null(label) || is.na(label) || !nzchar(label)) {
+        label <- paste("File", index)
+      }
+      groups[[make.unique(c(names(groups), label))[[
+        length(groups) + 1L
+      ]]]] <- list(
+        key = paste0("external-file:", index),
+        label = label,
+        sheets = sheets
+      )
+    }
+  }
+  groups
+}
+
+extra_material_table_group <- function(groups, key) {
+  if (!is.list(groups) || !length(groups)) {
+    return(NULL)
+  }
+  matches <- vapply(
+    groups,
+    function(group) identical(group$key, key),
+    logical(1)
+  )
+  if (any(matches)) groups[[which(matches)[[1L]]]] else groups[[1L]]
+}
+
+extra_material_table_sheet <- function(group, key) {
+  if (!is.list(group) || !is.list(group$sheets) || !length(group$sheets)) {
+    return(NULL)
+  }
+  matches <- vapply(
+    group$sheets,
+    function(sheet) identical(sheet$key, key),
+    logical(1)
+  )
+  if (any(matches)) group$sheets[[which(matches)[[1L]]]] else group$sheets[[1L]]
+}
+
+extra_material_table_choices <- function(groups) {
+  labels <- vapply(groups, `[[`, character(1), "label")
+  keys <- vapply(groups, `[[`, character(1), "key")
+  duplicated_labels <- duplicated(labels) | duplicated(labels, fromLast = TRUE)
+  labels[duplicated_labels & keys == "embedded"] <- paste0(
+    labels[duplicated_labels & keys == "embedded"],
+    " (from CRB)"
+  )
+  stats::setNames(
+    keys,
+    make.unique(labels, sep = " — ")
+  )
+}
+
+extra_material_external_table <- function(group, sheet) {
+  if (
+    exists(
+      sheet$key,
+      envir = extra_material_external_table_cache,
+      inherits = FALSE
+    )
+  ) {
+    return(get(sheet$key, envir = extra_material_external_table_cache))
+  }
+  root <- if (exists("Cerebro.options", inherits = TRUE)) {
+    get("Cerebro.options", inherits = TRUE)$cerebro_root
+  } else {
+    "."
+  }
+  table <- tryCatch(
+    readRDS(file.path(root, sheet$path)),
+    error = function(error) {
+      stop(
+        "Unable to read table `",
+        sheet$label,
+        "` from `",
+        group$label,
+        "`.",
+        call. = FALSE
+      )
+    }
+  )
+  if (!is.data.frame(table)) {
+    stop("The selected Extra material table is invalid.", call. = FALSE)
+  }
+  table <- neutralizeSpreadsheetFormulas(table)
+  assign(sheet$key, table, envir = extra_material_external_table_cache)
+  table
+}
+
+extra_material_table_selection <- function(
+  groups,
+  file_key = NULL,
+  sheet_key = NULL,
+  load = TRUE
+) {
+  group <- extra_material_table_group(groups, file_key)
+  sheet <- extra_material_table_sheet(group, sheet_key)
+  if (is.null(group) || is.null(sheet)) {
+    return(NULL)
+  }
+  if (isTRUE(load) && is.null(sheet$table)) {
+    sheet$table <- extra_material_external_table(group, sheet)
+  }
+  list(group = group, sheet = sheet)
+}
+
+getExtraMaterialCategories <- function() {
+  categories <- if (is_cerebro_dataset(data_set())) {
+    data_set()$getExtraMaterialCategories()
+  } else {
+    character()
+  }
+  if (length(extra_material_table_groups())) {
+    categories <- union(categories, "tables")
+  }
+  categories
 }
 checkForExtraTables <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$checkForExtraTables())
-  }
-}
-getNamesOfExtraTables <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getNamesOfExtraTables())
-  }
-}
-getExtraTable <- function(name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExtraTable(name))
-  }
+  length(extra_material_table_groups()) > 0L
 }
 checkForExtraPlots <- function() {
   if (is_cerebro_dataset(data_set())) {
