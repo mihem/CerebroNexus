@@ -74,15 +74,24 @@ shiny::runApp(out_dir)
 | `cerebro_data` | named vector/list of `.crb` (or `.rds`) paths; labels and resolved source files must both be unique |
 | `result_dir` | output directory (required; portable basename outside the reserved lock namespace) |
 | `overwrite` | replace `result_dir` after a complete staged build; with `FALSE`, the destination must be absent or empty |
-| `max_request_size` | finite positive numeric upload cap in MB; defaults to `8000` |
+| `max_request_size` | finite positive numeric request cap in MB; defaults to `8000`; closed Viewers use at most 6 MiB |
 | `port`, `host` | whole-number port `1`-`65535` and a non-empty host string; defaults to `8080` / `127.0.0.1` |
 | `launch_browser`, `quiet`, `display_mode` | non-missing logical flags and exactly `auto`, `normal`, or `showcase` for [`shiny::runApp()`](https://rdrr.io/pkg/shiny/man/runApp.html) |
 | `welcome_message` | text shown in the Load Data tab |
-| `colors` | optional named list of palettes (one entry per dataset name) |
+| `colors` | optional `dataset -> variable -> named level colours` list |
 | `cerebro_options` | extra entries merged into `Cerebro.options`; matrix overrides must be absolute host paths (native paths must resolve outside `result_dir`) |
 | `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
 | `show_upload_ui` | allow users to upload their own data; defaults to `FALSE` for generated apps |
-| `point_size`, `variable_to_compare` | forwarded into `Cerebro.options` |
+| `initial_page` | stable Viewer page ID used once when the first dataset loads |
+| `point_size`, `point_opacity`, `percentage_cells_to_show` | scalar or named per-dataset scatter defaults |
+| `variable_to_compare` | forwarded into `Cerebro.options` |
+| `extra_tables`, `extra_tables_sheets` | external delimited files or Excel workbooks, plus optional displayed sheet names |
+
+When `show_upload_ui = FALSE`, the generated Viewer limits the effective
+request size to the smaller of `max_request_size` and 6 MiB. This keeps
+a closed deployment from accepting large request bodies even though no
+upload control is displayed. Open Viewers use the supplied
+`max_request_size`.
 
 ## Bundling multiple datasets (available since 2.0.0)
 
@@ -103,10 +112,66 @@ createShinyApp(
   colors = list(
     "PBMC example" = list(sample = c(pbmc_1 = "#1f77b4"))
   ),
+  point_size = c("PBMC example" = 4),
+  point_opacity = c("PBMC example" = 0.8),
+  percentage_cells_to_show = c("PBMC example" = 75),
   welcome_message = "Welcome to my Cerebro deployment.",
   launch_browser = FALSE
 )
 ```
+
+Each `colors` dataset entry maps metadata variables to named level
+colours. The three scatter options may be one value shared by all
+datasets or a named numeric vector/list whose names exactly match
+`cerebro_data`.
+
+## Initial page
+
+Use `initial_page` with a stable page ID such as `"linked_views"`,
+`"extra_material"`, or `"spatial"`:
+
+``` r
+createShinyApp(
+  cerebro_data = c("PBMC example" = crb),
+  result_dir = file.path(tempdir(), "cerebro_app_spatial"),
+  initial_page = "spatial",
+  launch_browser = FALSE
+)
+```
+
+Initial routing is a one-time decision for the first loaded dataset. If
+that dataset does not support a conditional page, the Viewer stays on
+its normal page; switching later to a compatible dataset does not
+redirect the user after manual navigation. Restored shared links take
+precedence over this default.
+
+## External Extra material tables
+
+`extra_tables` accepts a named collection of CSV, TSV, TXT, XLS, XLSX,
+or XLSM files. Excel workbooks expose each non-empty sheet separately.
+Use `extra_tables_sheets` to rename selected sheets while retaining
+unmapped sheet names:
+
+``` r
+createShinyApp(
+  cerebro_data = c("PBMC example" = crb),
+  result_dir = file.path(tempdir(), "cerebro_app_tables"),
+  extra_tables = list(
+    "QC summary" = "results/qc.csv",
+    "Annotations" = "results/annotations.xlsx"
+  ),
+  extra_tables_sheets = list(
+    "Annotations" = list("Cell labels" = "Sheet1")
+  ),
+  launch_browser = FALSE
+)
+```
+
+The build converts non-empty tables to private RDS assets without
+recording their source paths. The Viewer first presents the file and
+sheet choices, then loads only the selected sheet. Formula-like text is
+neutralized and external table cells are HTML-escaped in the Viewer;
+downloads use the same neutralized data.
 
 ## Sibling files: `.bpcells/` and `.h5`
 

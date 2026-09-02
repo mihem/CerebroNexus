@@ -10,9 +10,11 @@ bundled alongside your single-cell data. Common use cases include:
 - Publication-ready figures
 - Any additional analysis you want to share with collaborators
 
-The tab appears *conditionally* — only when the `.crb` file contains
-extra material. You control what appears, so the interface stays clean
-when no extra content is needed.
+The tab appears *conditionally* — when the `.crb` contains embedded
+material or a generated app includes external tables through
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+You control what appears, so the interface stays clean when no extra
+content is available.
 
 ## Quick start
 
@@ -35,7 +37,7 @@ search, sort, and download.
 **Plots**: any `ggplot2` object. Displayed at original resolution with
 download support.
 
-## Embedding content
+## Embedding content in a CRB
 
 Use the `extra_material` parameter in
 [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md):
@@ -49,6 +51,42 @@ exportFromSeurat(seurat_object,
   )
 )
 ```
+
+Embedded tables and plots travel with the `.crb` and remain available
+wherever that data file is opened.
+
+## Supplying external tables to a generated app
+
+Use `extra_tables` in
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+when tables should belong to one generated deployment rather than to the
+CRB itself:
+
+``` r
+createShinyApp(
+  cerebro_data = c("PBMC" = "pbmc.crb"),
+  result_dir = "pbmc-viewer",
+  extra_tables = list(
+    "QC summary" = "results/qc.csv",
+    "Annotation workbook" = "results/annotations.xlsx"
+  ),
+  extra_tables_sheets = list(
+    "Annotation workbook" = list("Cell labels" = "Sheet1")
+  ),
+  launch_browser = FALSE
+)
+```
+
+CSV, TSV, TXT, XLS, XLSX, and XLSM files are converted during the build
+to private RDS assets. Non-empty workbook sheets appear separately;
+mapped names replace their source sheet names, while unmapped names are
+retained. The Viewer loads a sheet only after it is selected. Original
+source paths are not written to the generated configuration, and
+formula-like text is neutralized before display or download.
+
+In short, `exportFromSeurat(extra_material = ...)` embeds content in the
+CRB; `createShinyApp(extra_tables = ...)` adds deployment-specific
+external tables without modifying that CRB.
 
 ## See also
 

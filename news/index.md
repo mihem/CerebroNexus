@@ -1,6 +1,24 @@
 # Changelog
 
-## CerebroNexus 4.3.6
+## CerebroNexus 4.4.0
+
+### Viewer
+
+- Generated Viewers can bundle private CSV, TSV and Excel workbooks as
+  lazy Extra material tables with optional display names for workbook
+  sheets; formula-like cells and column names are neutralized before
+  export.
+- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  now applies nested per-dataset colour palettes and rejects flat
+  vectors or invalid colour values that generated Viewers cannot
+  interpret.
+- Generated Viewers can open on a configured initial page, including
+  pages that are available only for the loaded dataset, without shifting
+  historical positional arguments.
+- Closed Viewers cap request bodies at 6 MiB, while open Viewers retain
+  their configured upload limit.
+- Manual colour choices remain scoped to the dataset where they were
+  made. \# CerebroNexus 4.3.6
 
 ### Viewer
 

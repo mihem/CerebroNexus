@@ -47,7 +47,7 @@ the names of `cerebro_data`. When the app runs:
 The main spatial view shows cells positioned at their coordinates,
 optionally on a histological background. Cells are coloured by a
 user-selected metadata variable. Hover to see cell metadata; zoom and
-pan via plotly.
+pan with the Canvas toolbar.
 
 ### Main parameters
 

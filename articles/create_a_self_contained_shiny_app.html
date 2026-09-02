@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -199,9 +199,8 @@ lock namespace)</td>
 </tr>
 <tr class="even">
 <td><code>max_request_size</code></td>
-<td>finite positive numeric upload cap in MB; defaults to
-<code>8000</code>
-</td>
+<td>finite positive numeric request cap in MB; defaults to
+<code>8000</code>; closed Viewers use at most 6 MiB</td>
 </tr>
 <tr class="odd">
 <td>
@@ -227,7 +226,8 @@ host string; defaults to <code>8080</code> / <code>127.0.0.1</code>
 </tr>
 <tr class="even">
 <td><code>colors</code></td>
-<td>optional named list of palettes (one entry per dataset name)</td>
+<td>optional
+<code>dataset -&gt; variable -&gt; named level colours</code> list</td>
 </tr>
 <tr class="odd">
 <td><code>cerebro_options</code></td>
@@ -246,14 +246,36 @@ overrides must be absolute host paths (native paths must resolve outside
 for generated apps</td>
 </tr>
 <tr class="even">
+<td><code>initial_page</code></td>
+<td>stable Viewer page ID used once when the first dataset loads</td>
+</tr>
+<tr class="odd">
 <td>
-<code>point_size</code>, <code>variable_to_compare</code>
+<code>point_size</code>, <code>point_opacity</code>,
+<code>percentage_cells_to_show</code>
 </td>
+<td>scalar or named per-dataset scatter defaults</td>
+</tr>
+<tr class="even">
+<td><code>variable_to_compare</code></td>
 <td>forwarded into <code>Cerebro.options</code>
 </td>
 </tr>
+<tr class="odd">
+<td>
+<code>extra_tables</code>, <code>extra_tables_sheets</code>
+</td>
+<td>external delimited files or Excel workbooks, plus optional displayed
+sheet names</td>
+</tr>
 </tbody>
 </table>
+<p>When <code>show_upload_ui = FALSE</code>, the generated Viewer limits
+the effective request size to the smaller of
+<code>max_request_size</code> and 6 MiB. This keeps a closed deployment
+from accepting large request bodies even though no upload control is
+displayed. Open Viewers use the supplied
+<code>max_request_size</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="bundling-multiple-datasets-available-since-2-0-0">Bundling multiple datasets (available since 2.0.0)<a class="anchor" aria-label="anchor" href="#bundling-multiple-datasets-available-since-2-0-0"></a>
@@ -274,9 +296,61 @@ dataset gets a deterministic palette.</p>
 <span>  colors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    <span class="st">"PBMC example"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>sample <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pbmc_1 <span class="op">=</span> <span class="st">"#1f77b4"</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
+<span>  point_size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
+<span>  point_opacity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span>,</span>
+<span>  percentage_cells_to_show <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="fl">75</span><span class="op">)</span>,</span>
 <span>  welcome_message <span class="op">=</span> <span class="st">"Welcome to my Cerebro deployment."</span>,</span>
 <span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Each <code>colors</code> dataset entry maps metadata variables to
+named level colours. The three scatter options may be one value shared
+by all datasets or a named numeric vector/list whose names exactly match
+<code>cerebro_data</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="initial-page">Initial page<a class="anchor" aria-label="anchor" href="#initial-page"></a>
+</h2>
+<p>Use <code>initial_page</code> with a stable page ID such as
+<code>"linked_views"</code>, <code>"extra_material"</code>, or
+<code>"spatial"</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_spatial"</span><span class="op">)</span>,</span>
+<span>  initial_page <span class="op">=</span> <span class="st">"spatial"</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Initial routing is a one-time decision for the first loaded dataset.
+If that dataset does not support a conditional page, the Viewer stays on
+its normal page; switching later to a compatible dataset does not
+redirect the user after manual navigation. Restored shared links take
+precedence over this default.</p>
+</div>
+<div class="section level2">
+<h2 id="external-extra-material-tables">External Extra material tables<a class="anchor" aria-label="anchor" href="#external-extra-material-tables"></a>
+</h2>
+<p><code>extra_tables</code> accepts a named collection of CSV, TSV,
+TXT, XLS, XLSX, or XLSM files. Excel workbooks expose each non-empty
+sheet separately. Use <code>extra_tables_sheets</code> to rename
+selected sheets while retaining unmapped sheet names:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_tables"</span><span class="op">)</span>,</span>
+<span>  extra_tables <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"QC summary"</span> <span class="op">=</span> <span class="st">"results/qc.csv"</span>,</span>
+<span>    <span class="st">"Annotations"</span> <span class="op">=</span> <span class="st">"results/annotations.xlsx"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  extra_tables_sheets <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Annotations"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"Cell labels"</span> <span class="op">=</span> <span class="st">"Sheet1"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The build converts non-empty tables to private RDS assets without
+recording their source paths. The Viewer first presents the file and
+sheet choices, then loads only the selected sheet. Formula-like text is
+neutralized and external table cells are HTML-escaped in the Viewer;
+downloads use the same neutralized data.</p>
 </div>
 <div class="section level2">
 <h2 id="sibling-files--bpcells-and--h5">Sibling files: <code>.bpcells/</code> and <code>.h5</code><a class="anchor" aria-label="anchor" href="#sibling-files--bpcells-and--h5"></a>
@@ -415,7 +489,7 @@ files.</p>
 <p>Anything you want to surface in <code>Cerebro.options</code> that
 isn’t already a top-level argument can go through
 <code>cerebro_options</code>.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>
 <span>  result_dir   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"cerebro_app_opts"</span><span class="op">)</span>,</span>
@@ -438,7 +512,7 @@ supply for those keys is overwritten.</p>
 is self-contained: shipping the folder is all that is required. If you
 configured a host-managed matrix override, provision that absolute path
 separately on the deployment host. Three common targets:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 1. Local</span></span>
 <span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="va">out_dir</span><span class="op">)</span></span>
 <span></span>

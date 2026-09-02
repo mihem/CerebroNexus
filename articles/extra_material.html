@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -117,10 +117,10 @@ cases include:</p>
 <li>Publication-ready figures</li>
 <li>Any additional analysis you want to share with collaborators</li>
 </ul>
-<p>The tab appears <em>conditionally</em> — only when the
-<code>.crb</code> file contains extra material. You control what
-appears, so the interface stays clean when no extra content is
-needed.</p>
+<p>The tab appears <em>conditionally</em> — when the <code>.crb</code>
+contains embedded material or a generated app includes external tables
+through <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>. You control what appears, so the
+interface stays clean when no extra content is available.</p>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
@@ -146,7 +146,7 @@ interactive DT tables with search, sort, and download.</p>
 original resolution with download support.</p>
 </div>
 <div class="section level2">
-<h2 id="embedding-content">Embedding content<a class="anchor" aria-label="anchor" href="#embedding-content"></a>
+<h2 id="embedding-content-in-a-crb">Embedding content in a CRB<a class="anchor" aria-label="anchor" href="#embedding-content-in-a-crb"></a>
 </h2>
 <p>Use the <code>extra_material</code> parameter in
 <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>:</p>
@@ -158,6 +158,38 @@ original resolution with download support.</p>
 <span>    plots  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>umap_overview <span class="op">=</span> <span class="va">umap_plot</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>Embedded tables and plots travel with the <code>.crb</code> and
+remain available wherever that data file is opened.</p>
+</div>
+<div class="section level2">
+<h2 id="supplying-external-tables-to-a-generated-app">Supplying external tables to a generated app<a class="anchor" aria-label="anchor" href="#supplying-external-tables-to-a-generated-app"></a>
+</h2>
+<p>Use <code>extra_tables</code> in <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> when
+tables should belong to one generated deployment rather than to the CRB
+itself:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
+<span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC"</span> <span class="op">=</span> <span class="st">"pbmc.crb"</span><span class="op">)</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="st">"pbmc-viewer"</span>,</span>
+<span>  extra_tables <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"QC summary"</span> <span class="op">=</span> <span class="st">"results/qc.csv"</span>,</span>
+<span>    <span class="st">"Annotation workbook"</span> <span class="op">=</span> <span class="st">"results/annotations.xlsx"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  extra_tables_sheets <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Annotation workbook"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"Cell labels"</span> <span class="op">=</span> <span class="st">"Sheet1"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  launch_browser <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>CSV, TSV, TXT, XLS, XLSX, and XLSM files are converted during the
+build to private RDS assets. Non-empty workbook sheets appear
+separately; mapped names replace their source sheet names, while
+unmapped names are retained. The Viewer loads a sheet only after it is
+selected. Original source paths are not written to the generated
+configuration, and formula-like text is neutralized before display or
+download.</p>
+<p>In short, <code>exportFromSeurat(extra_material = ...)</code> embeds
+content in the CRB; <code>createShinyApp(extra_tables = ...)</code> adds
+deployment-specific external tables without modifying that CRB.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>

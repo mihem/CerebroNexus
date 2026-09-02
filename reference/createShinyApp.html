@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.3.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -120,7 +120,10 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  spatial_images_offset_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images_offset_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_plot_rotation <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  auth <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  auth <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  extra_tables <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  extra_tables_sheets <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  initial_page <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -143,7 +146,8 @@ not be a symbolic link or unresolved filesystem entry.</p></dd>
 
 <dt id="arg-max-request-size">max_request_size<a class="anchor" aria-label="anchor" href="#arg-max-request-size"></a></dt>
 <dd><p>One finite positive numeric upload limit in MB;
-defaults to 8000.</p></dd>
+defaults to 8000. Closed Viewers cap the effective request size at 6 MB;
+open Viewers use the supplied value.</p></dd>
 
 
 <dt id="arg-port">port<a class="anchor" aria-label="anchor" href="#arg-port"></a></dt>
@@ -203,6 +207,20 @@ directory is rejected before any files are written.</p></dd>
 <dt id="arg-show-upload-ui">show_upload_ui<a class="anchor" aria-label="anchor" href="#arg-show-upload-ui"></a></dt>
 <dd><p>One non-missing logical controlling whether users may
 upload their own data; defaults to <code>FALSE</code>.</p></dd>
+
+
+<dt id="arg-initial-page">initial_page<a class="anchor" aria-label="anchor" href="#arg-initial-page"></a></dt>
+<dd><p>Optional initial Viewer page. Supported stable IDs are
+<code>"data_info"</code>, <code>"projection"</code>, <code>"linked_views"</code>,
+<code>"groups"</code>, <code>"marker_genes"</code>, <code>"most_expressed_genes"</code>,
+<code>"enriched_pathways"</code>, <code>"extra_material"</code>,
+<code>"immune_repertoire"</code>, <code>"trajectory"</code>, <code>"spatial"</code>,
+<code>"trekker"</code>, <code>"hla_tcr_motifs"</code>, <code>"gene_expression"</code>,
+<code>"gene_id_conversion"</code>, <code>"color_management"</code>, and
+<code>"about"</code>. A conditional page is selected only when it is available for
+the first loaded dataset. Initial routing is attempted only once, so switching
+datasets later never triggers a delayed redirect. Shared links take precedence
+after restoration.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>
@@ -298,6 +316,17 @@ created by <code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" c
 the name of the environment variable containing its passphrase. Optional
 <code>timeout_minutes</code> defaults to 15.</p></dd>
 
+<dt id="arg-extra-tables">extra_tables<a class="anchor" aria-label="anchor" href="#arg-extra-tables"></a></dt>
+<dd><p>Optional named collection of CSV, TSV, TXT, XLS, XLSX,
+or XLSM files to bundle as private Extra material tables. Workbook sheets
+are listed separately and loaded only when selected in the Viewer.</p></dd>
+
+
+<dt id="arg-extra-tables-sheets">extra_tables_sheets<a class="anchor" aria-label="anchor" href="#arg-extra-tables-sheets"></a></dt>
+<dd><p>Optional named list of Excel sheet renames keyed
+by <code>extra_tables</code> labels. Each entry maps displayed names to source
+sheet names; unmapped sheets remain available.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -330,8 +359,8 @@ Dataset labels and canonical CRB sources are both unique: two labels cannot
 select the same resolved input file.
 Generated bundles follow the standard deployment model of one app per R
 process; process-global <code>Cerebro.options</code> does not provide same-process
-isolation between separately sourced apps.</p>
-<p>Launch settings are validated and frozen in a typed internal manifest before
+isolation between separately sourced apps.
+Launch settings are validated and frozen in a typed internal manifest before
 target preparation. The generated <code>app.R</code> reads that manifest instead of
 interpolating user values into source, and the staged source is parsed before
 publication. The upload limit is installed as
