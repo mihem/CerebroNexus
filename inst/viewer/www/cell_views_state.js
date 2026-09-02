@@ -27,9 +27,17 @@
     return state;
   };
 
+  S.genePanelSpaceId = function (geneIndex, baseSpaceId) {
+    return '__linked_gene_' + geneIndex + '::' + baseSpaceId;
+  };
+
   S.trekkerGeneControls = function (activeView, gene) {
     if (activeView !== 'trekker_projection' || !gene) return null;
     return { trekker_mode: 'gene', trekker_gene_pick: gene };
+  };
+
+  S.shouldStashSingleState = function (activeView, targetView, preserveTarget) {
+    return !preserveTarget || activeView !== targetView;
   };
 
   window.CBViewState = S;

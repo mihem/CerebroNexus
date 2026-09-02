@@ -30,6 +30,7 @@ data-raw/xenium/
 # stray artifact, never source
 Rplots.pdf
 **/Rplots.pdf
+inst/private-data/linked-view-shares.sqlite
 # The bare `result` rule near the top of this file matches a directory of that
 # name at any depth, which also swallowed the benchmark results. Those are the
 # deliverable, not scratch output, so re-include them -- the directory has to be

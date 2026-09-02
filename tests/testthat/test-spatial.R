@@ -1017,7 +1017,7 @@ test_that(".getSpatialData tolerates a real Slide-seq object (NA-named coord col
   obj <- get("ssHippo")
   obj <- suppressWarnings(Seurat::UpdateSeuratObject(obj))
   set.seed(1)
-  obj <- subset(obj, cells = sample(colnames(obj), 200))
+  obj <- suppressWarnings(subset(obj, cells = sample(colnames(obj), 200)))
 
   # confirm the pathological column really is present in the raw source
   tc <- Seurat::GetTissueCoordinates(obj)

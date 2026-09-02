@@ -36,7 +36,8 @@ test_that("specialist state transitions use semantic identities", {
     "  lens:S.lensForSpace(saved,'umap',0).view.cx,",
     "  missing:S.lensForSpace(saved,'missing',0),",
     "  controls:S.trekkerGeneControls('trekker_projection','CD3D'),",
-    "  inactive:S.trekkerGeneControls('spatial_projection','CD3D')",
+    "  inactive:S.trekkerGeneControls('spatial_projection','CD3D'),",
+    "  panel:S.genePanelSpaceId(1,'projection::umap')",
     "}));"
   ))
 
@@ -48,7 +49,8 @@ test_that("specialist state transitions use semantic identities", {
       lens = 2L,
       missing = NULL,
       controls = list(trekker_mode = "gene", trekker_gene_pick = "CD3D"),
-      inactive = NULL
+      inactive = NULL,
+      panel = "__linked_gene_1::projection::umap"
     )
   )
 })
@@ -67,5 +69,35 @@ test_that("expression clear transitions remove every dependent payload", {
   expect_identical(
     jsonlite::fromJSON(output, simplifyVector = FALSE),
     list(gene = NULL, genePanels = NULL, rgb = NULL)
+  )
+})
+
+test_that("specialist restore does not overwrite a saved state on its active page", {
+  output <- run_state_node(paste0(
+    "const S = window.CBViewState;",
+    "console.log(JSON.stringify({",
+    "  current:S.shouldStashSingleState('overview_projection',",
+    "    'overview_projection',true),",
+    "  navigating:S.shouldStashSingleState('spatial_projection',",
+    "    'overview_projection',true),",
+    "  normal:S.shouldStashSingleState('overview_projection',",
+    "    'overview_projection',false)",
+    "}));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(current = FALSE, navigating = TRUE, normal = TRUE)
+  )
+
+  renderer <- paste(
+    readLines(viewer_test_path("www", "cell_views.js"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(
+    renderer,
+    "activateSingle(id, false, true)",
+    fixed = TRUE
   )
 })

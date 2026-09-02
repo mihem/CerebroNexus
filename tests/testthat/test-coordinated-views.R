@@ -208,6 +208,136 @@ test_that("Linked views hides its empty pane slots before data arrives", {
   expect_match(ui, 'class = "cv-pane cv-hidden"', fixed = TRUE)
 })
 
+run_config_transport_node <- function(body) {
+  skip_if(Sys.which("node") == "", "node not on PATH")
+  runner <- tempfile(fileext = ".js")
+  on.exit(unlink(runner), add = TRUE)
+  writeLines(c(
+    "const fs = require('fs');",
+    "const timers = []; const sent = []; const handlers = {}; let applied = 0;",
+    "function classes(){return {toggle:()=>{},add:()=>{},remove:()=>{}};}",
+    "function element(id){return {id:id,value:'',disabled:false,open:false,attrs:{},",
+    "  classList:classes(),listeners:{},addEventListener:function(n,f){this.listeners[n]=f;},",
+    "  setAttribute:function(n,v){this.attrs[n]=v;},getAttribute:function(n){return this.attrs[n]||null;},",
+    "  removeAttribute:function(n){delete this.attrs[n];},focus:()=>{},click:function(){",
+    "    if(this.listeners.click)this.listeners.click.call(this,{currentTarget:this});}};}",
+    "const ids = {}; ['cv-config-dialog','cv-config-open','cv-config-close','cv-config-png',",
+    "  'cv-config-download','coordviews_config_upload','cv-config-upload-button',",
+    "  'cv-config-status'].forEach(id=>{ids[id]=element(id);});",
+    "const host={classList:classes()}; const label={textContent:'Download PNG'};",
+    "ids.coordviews_config_upload.closest=()=>host;",
+    "ids['cv-config-png'].querySelector=()=>label;",
+    "ids['cv-config-dialog'].showModal=function(){this.open=true;};",
+    "ids['cv-config-dialog'].close=function(){this.open=false;};",
+    "global.document={readyState:'complete',activeElement:null,body:{appendChild:()=>{}},",
+    "  getElementById:id=>ids[id]||null,querySelectorAll:()=>[],addEventListener:()=>{},",
+    "  contains:()=>true,createElement:()=>element('created')};",
+    "global.window=global; window.devicePixelRatio=1; window.addEventListener=()=>{};",
+    "window.setTimeout=(fn,delay)=>{const timer={fn:fn,delay:delay};timers.push(timer);return timer;};",
+    "window.clearTimeout=timer=>{const at=timers.indexOf(timer);if(at>=0)timers.splice(at,1);};",
+    "window.FileReader=function(){this.readAsText=file=>{this.result=file.text;this.onload();};};",
+    "window.cerebroLinkedViewsState={ready:()=>true,summary:()=>({selectedCells:1}),",
+    "  capture:()=>({}),apply:()=>{applied+=1;return {selectedCells:1};},downloadPNG:()=>true};",
+    "global.Shiny={setInputValue:(id,value)=>sent.push({id:id,value:value}),",
+    "  addCustomMessageHandler:(id,fn)=>{handlers[id]=fn;}};",
+    sprintf(
+      "eval(fs.readFileSync(%s, 'utf8'));",
+      encodeString(
+        file.path(dirname(bundle_file), "..", "www", "coordviews-config.js"),
+        quote = "\""
+      )
+    ),
+    body
+  ), runner)
+  system2("node", runner, stdout = TRUE, stderr = TRUE)
+}
+
+test_that("JSON upload transport is atomic and ignores timed-out responses", {
+  output <- run_config_transport_node(c(
+    "const upload=ids.coordviews_config_upload;",
+    "upload.files=[{name:'first.json',size:2,text:'{}'}];",
+    "upload.listeners.change({currentTarget:upload});",
+    "const first=sent[0].value; timers.find(timer=>timer.delay===10000).fn();",
+    "upload.files=[{name:'second.json',size:2,text:'{}'}];",
+    "upload.listeners.change({currentTarget:upload}); const second=sent[1].value;",
+    "handlers.coordviews_config_result({nonce:first.nonce,action:'apply',ok:true,",
+    "  config:{schema:'cerebronexus-linked-view'},selected_cells:1});",
+    "handlers.coordviews_config_result({nonce:second.nonce,action:'apply',ok:true,",
+    "  config:{schema:'cerebronexus-linked-view'},selected_cells:1});",
+    "ids['cv-config-png'].listeners.click.call(ids['cv-config-png']);",
+    "ids['cv-config-png'].listeners.click.call(ids['cv-config-png']);",
+    "timers.filter(timer=>timer.delay===1600).forEach(timer=>timer.fn());",
+    "console.log(JSON.stringify({ids:sent.map(item=>item.id),first:first,second:second,",
+    "  applied:applied,label:label.textContent}));"
+  ))
+  result <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    result$ids,
+    list("coordviews_config_upload_request", "coordviews_config_upload_request")
+  )
+  expect_identical(result$first$action, "apply")
+  expect_identical(result$first$name, "first.json")
+  expect_identical(result$first$text, "{}")
+  expect_false(identical(result$first$nonce, result$second$nonce))
+  expect_identical(result$applied, 1L)
+  expect_identical(result$label, "Download PNG")
+})
+
+test_that("Linked views exposes a composed workspace PNG download", {
+  ui_file <- file.path(dirname(bundle_file), "UI.R")
+  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
+  config_file <- file.path(
+    dirname(bundle_file), "..", "www", "coordviews-config.js"
+  )
+  css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
+  skip_if_not(
+    file.exists(ui_file) && file.exists(js_file) && file.exists(config_file) &&
+      file.exists(css_file)
+  )
+  ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
+  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
+  config <- paste(readLines(config_file, warn = FALSE), collapse = "\n")
+  css <- paste(readLines(css_file, warn = FALSE), collapse = "\n")
+
+  expect_match(ui, 'id = "cv-config-png"', fixed = TRUE)
+  expect_match(ui, 'tags$span("Download PNG")', fixed = TRUE)
+  expect_false(grepl("cerebro-download-png", ui, fixed = TRUE))
+  expect_match(js, "function downloadWorkspacePNG()", fixed = TRUE)
+  expect_match(js, "function downloadVisiblePanelsPNG(filename)", fixed = TRUE)
+  expect_match(js, "function downloadPanelsPNG(candidates, filename)", fixed = TRUE)
+  expect_match(js, "downloadPNG: downloadWorkspacePNG", fixed = TRUE)
+  expect_match(js, "return downloadVisiblePanelsPNG(pngFilename(id))", fixed = TRUE)
+  expect_match(js, "drawExportKey(context", fixed = TRUE)
+  expect_match(js, "drawExportColorbar(context", fixed = TRUE)
+  expect_match(js, "maxPixels = 32 * 1024 * 1024", fixed = TRUE)
+  expect_match(config, "target.downloadPNG()", fixed = TRUE)
+  expect_match(config, "byId('cv-config-png')", fixed = TRUE)
+  expect_match(config, "PNG download started.", fixed = TRUE)
+  expect_match(config, "cerebro:png-result", fixed = TRUE)
+  expect_match(js, "cerebro:png-result", fixed = TRUE)
+  expect_match(
+    config,
+    "(?s)cerebro:specialist-state.*window\\.setTimeout",
+    perl = TRUE
+  )
+  expect_match(config, "upload.disabled = exportBusy", fixed = TRUE)
+  expect_match(config, "coordviews_config_upload_request", fixed = TRUE)
+  expect_false(grepl("coordviews_config_upload_nonce", config, fixed = TRUE))
+  expect_match(
+    css,
+    "(?s)\\.cv-config-dialog \\{[^}]*box-sizing: border-box",
+    perl = TRUE
+  )
+  expect_match(
+    css,
+    ".cv-config-actions > .cv-config-upload { width: 118px; }",
+    fixed = TRUE
+  )
+  expect_match(css, ".cv-config-upload.is-disabled", fixed = TRUE)
+})
+
 test_that("Linked views highlights only the visualization under the pointer", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
@@ -400,6 +530,21 @@ test_that("one-cell dynamic expression messages retain JSON arrays", {
   expect_type(rgb$g, "list")
   expect_type(rgb$b, "list")
   expect_type(rgb$genes, "list")
+})
+
+test_that("saved per-gene panels use the dynamic payload contract", {
+  skip_if_not(have_bundle, "coordinated_views/bundle.R not found")
+
+  payload <- cv_env$cv_gene_panels_payload(
+    c("CD3D", "MS4A1"),
+    list(c(0, 2), c(1, 4))
+  )
+
+  expect_identical(payload$mode, "__gene_panels__")
+  expect_identical(payload$max, 4)
+  expect_identical(unclass(payload$genes), c("CD3D", "MS4A1"))
+  expect_identical(unclass(payload$values[[1]]), c(0L, 128L))
+  expect_identical(unclass(payload$values[[2]]), c(64L, 255L))
 })
 
 test_that("single-cell projections and bundle cell IDs stay JSON arrays", {

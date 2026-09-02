@@ -488,6 +488,19 @@ tab_coordinated_views <- tabItem(
             style = "display:none",
             icon("table-cells-large"),
             "Back to overview"
+          ),
+          tags$button(
+            type = "button",
+            id = "cv-config-open",
+            class = "cv-config-open",
+            `data-view-id` = "linked_views",
+            disabled = "disabled",
+            `aria-disabled` = "true",
+            `aria-haspopup` = "dialog",
+            `aria-controls` = "cv-config-dialog",
+            title = "The linked workspace is waiting for its plots",
+            icon("share-alt"),
+            tags$span("Share view")
           )
         )
       ),
@@ -536,6 +549,18 @@ tab_coordinated_views <- tabItem(
           ),
           id = "cv-selactions",
           style = "display:none",
+          tags$button(
+            type = "button",
+            class = "cerebro-config-open",
+            `data-view-id` = "linked_views",
+            disabled = "disabled",
+            `aria-disabled` = "true",
+            `aria-haspopup` = "dialog",
+            `aria-controls` = "cv-config-dialog",
+            title = "The linked workspace is waiting for its plots",
+            icon("share-alt"),
+            tags$span("Share view")
+          ),
           div(
             class = "cv-sel-action-row",
             tags$button(
@@ -758,6 +783,95 @@ tab_coordinated_views <- tabItem(
       shiny::uiOutput("coordviews_selected_cells_UI")
     ),
 
+    ## A portable Linked views configuration contains the cohort's cell
+    ## barcodes and this workspace's controls, but never the source data, image
+    ## pixels, expression values, file paths, or Builder project identity.
+    tags$dialog(
+      id = "cv-config-dialog",
+      class = "cv-config-dialog",
+      `aria-labelledby` = "cv-config-title",
+      `aria-describedby` = "cv-config-privacy",
+      tags$button(
+        type = "button",
+        id = "cv-config-close",
+        class = "cv-config-close",
+        `aria-label` = "Close workspace JSON",
+        HTML("&times;")
+      ),
+      tags$div(class = "cv-config-kicker", "View configuration"),
+      tags$h4(id = "cv-config-title", "Share view"),
+      tags$p(
+        id = "cv-config-privacy",
+        class = "cv-config-privacy",
+        "Download this display state and its selected cell barcodes as JSON, ",
+        "then open it in another compatible CerebroNexus session. Source data stays ",
+        "on this device."
+      ),
+      tags$section(
+        class = "cv-config-region cv-config-image",
+        `aria-labelledby` = "cv-config-image-title",
+        tags$div(
+          class = "cv-config-region-head cv-config-region-head-actions",
+          tags$div(
+            tags$h5(id = "cv-config-image-title", "Image"),
+            tags$p(
+              id = "cv-config-png-help",
+              "Download the current view as an image."
+            )
+          ),
+          tags$button(
+            type = "button",
+            id = "cv-config-png",
+            class = "cv-config-action",
+            icon("image"),
+            tags$span("Download PNG")
+          )
+        )
+      ),
+      tags$section(
+        class = "cv-config-region cv-config-transfer",
+        `aria-labelledby` = "cv-config-transfer-title",
+        tags$div(
+          class = "cv-config-region-head cv-config-region-head-actions",
+          tags$div(
+            tags$h5(id = "cv-config-transfer-title", "View JSON"),
+            tags$p("Download or open a validated view configuration.")
+          ),
+          div(
+            class = "cv-config-actions",
+            tags$button(
+              type = "button",
+              id = "cv-config-download",
+              class = "cv-config-action",
+              icon("download"),
+              tags$span("Download JSON")
+            ),
+            div(
+              class = "cv-config-upload",
+              tags$button(
+                type = "button",
+                id = "cv-config-upload-button",
+                class = "btn-file",
+                icon("folder-open"),
+                tags$span("Open JSON")
+              ),
+              tags$input(
+                id = "coordviews_config_upload",
+                class = "cv-config-file-input",
+                type = "file",
+                accept = "application/json,.json"
+              )
+            )
+          )
+        )
+      ),
+      tags$p(
+        id = "cv-config-status",
+        class = "cv-config-status",
+        role = "status",
+        `aria-live` = "polite"
+      )
+    ),
     tags$dialog(
       id = "cv-moran-modal",
       class = "cv-insight-modal",

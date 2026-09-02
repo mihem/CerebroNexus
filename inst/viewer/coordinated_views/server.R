@@ -24,6 +24,37 @@ source(
   local = TRUE
 )
 
+source(
+  paste0(
+    Cerebro.options[["cerebro_root"]],
+    "/viewer/coordinated_views/config.R"
+  ),
+  local = TRUE
+)
+
+cv_saved_view_dataset <- reactive({
+  metadata <- getMetaData()
+  cells <- if ("cell_barcode" %in% colnames(metadata)) {
+    as.character(metadata$cell_barcode)
+  } else {
+    rownames(metadata)
+  }
+  list(
+    cells = cells,
+    fingerprint = cv_config_cell_fingerprint(cells)
+  )
+})
+
+observe({
+  dataset <- cv_saved_view_dataset()
+  session$sendCustomMessage(
+    "cerebro_saved_view_dataset",
+    list(
+      cell_count = length(dataset$cells),
+      cell_fingerprint = dataset$fingerprint
+    )
+  )
+})
 ## Always resolves to something sendable: the bundle, or a list(error = <text>)
 ## describing why this data set has no linked views. Never NULL — see the observe
 ## below for why silence is the one outcome we cannot afford.
@@ -51,6 +82,7 @@ coordviews_bundle <- reactive({
           )
         )
       } else {
+        b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)
         b
       }
     },
@@ -83,6 +115,246 @@ coordviews_color_patch <- reactive({
   colors <- tryCatch(reactive_colors(), error = function(e) NULL)
   cv_color_patch(b, colors)
 })
+##----------------------------------------------------------------------------##
+## Portable Linked views configuration transport.
+##
+## The browser owns the high-frequency workspace state, but it never turns an
+## arbitrary object into a downloadable or applicable document on its own. The
+## R contract above validates the full snapshot and current cell population at
+## this boundary. Only canonical JSON reaches the clipboard/download path, and
+## only normalized state reaches the browser after upload.
+##----------------------------------------------------------------------------##
+cv_config_send_result <- function(nonce, action, ok, ...) {
+  if (is.null(nonce)) {
+    nonce <- ""
+  }
+  if (is.null(action)) {
+    action <- ""
+  }
+  session$sendCustomMessage(
+    "coordviews_config_result",
+    c(
+      list(
+        nonce = as.character(nonce),
+        action = as.character(action),
+        ok = isTRUE(ok)
+      ),
+      list(...)
+    )
+  )
+}
+
+cv_config_log_failure <- function(error) {
+  code <- if (inherits(error, "cv_config_error")) error$code else "internal"
+  warning(
+    "Linked views configuration failed [",
+    code,
+    "]: ",
+    conditionMessage(error),
+    call. = FALSE
+  )
+}
+
+cv_config_validate_genes <- function(config, cells) {
+  if (!identical(config$schema, CV_CONFIG_SCHEMA)) {
+    return(NULL)
+  }
+  colour <- config$view$colour
+  requested <- if (identical(colour$mode, "__gene__")) {
+    colour$gene
+  } else if (identical(colour$mode, "__gene_panels__")) {
+    colour$genes
+  } else if (identical(colour$mode, "__rgb__")) {
+    colour$rgb_genes
+  } else {
+    character()
+  }
+  if (!length(requested)) {
+    return(NULL)
+  }
+  available <- tryCatch(
+    enc2utf8(as.character(getGeneNames())),
+    error = function(error) character()
+  )
+  if (!length(available) || length(setdiff(requested, available))) {
+    cv_config_abort(
+      "missing_gene",
+      "The configuration uses a gene that is unavailable here."
+    )
+  }
+  values <- lapply(requested, cv_gene_values, cells = cells)
+  if (any(vapply(values, is.null, logical(1)))) {
+    cv_config_abort(
+      "missing_gene",
+      "The configuration uses a gene that is unavailable here."
+    )
+  }
+  if (identical(colour$mode, "__gene_panels__")) {
+    return(cv_gene_panels_payload(requested, values))
+  }
+  scaled <- lapply(values, cv_scale_gene_values)
+  if (identical(colour$mode, "__gene__")) {
+    return(list(
+      mode = "__gene__",
+      gene = requested[[1L]],
+      v = I(scaled[[1L]]$v),
+      max = scaled[[1L]]$max
+    ))
+  }
+  list(
+    mode = "__rgb__",
+    genes = I(requested),
+    r = I(scaled[[1L]]$v),
+    g = I(scaled[[2L]]$v),
+    b = I(scaled[[3L]]$v)
+  )
+}
+
+observeEvent(
+  input[["coordviews_config_request"]],
+  {
+    request <- input[["coordviews_config_request"]]
+    raw_nonce <- if (is.list(request)) request$nonce else NULL
+    raw_action <- if (is.list(request)) request$action else NULL
+    nonce <- if (
+      is.character(raw_nonce) &&
+        length(raw_nonce) == 1L &&
+        !is.na(raw_nonce) &&
+        nchar(enc2utf8(raw_nonce), type = "bytes") <= 128L
+    ) {
+      raw_nonce
+    } else {
+      ""
+    }
+    action <- if (
+      is.character(raw_action) &&
+        length(raw_action) == 1L &&
+        !is.na(raw_action) &&
+        identical(raw_action, "prepare")
+    ) {
+      raw_action
+    } else {
+      "invalid"
+    }
+    tryCatch(
+      {
+        cv_config_check_node_limit(request)
+        request <- cv_config_record(
+          request,
+          c("nonce", "action", "config"),
+          required = c("nonce", "action"),
+          path = "$.request"
+        )
+        nonce <- cv_config_string(request$nonce, "$.request.nonce", 128L)
+        action <- cv_config_choice(
+          request$action,
+          "$.request.action",
+          "prepare"
+        )
+        dataset <- cv_saved_view_dataset()
+        prepared <- cv_config_prepare(
+          request$config,
+          cells = dataset$cells,
+          fingerprint = dataset$fingerprint
+        )
+        cv_config_send_result(
+          nonce,
+          action,
+          TRUE,
+          json = prepared$json,
+          filename = paste0(
+            if (identical(prepared$config$schema, CV_CONFIG_SCHEMA)) {
+              "linked-views-"
+            } else {
+              paste0(prepared$config$page$id, "-")
+            },
+            format(Sys.time(), "%Y%m%d-%H%M%S", tz = "UTC"),
+            ".json"
+          ),
+          selected_cells = length(prepared$config$selection$cells)
+        )
+      },
+      error = function(error) {
+        cv_config_log_failure(error)
+        cv_config_send_result(
+          nonce,
+          action,
+          FALSE,
+          code = if (inherits(error, "cv_config_error")) {
+            error$code
+          } else {
+            "internal"
+          },
+          message = cv_config_safe_message(error)
+        )
+      }
+    )
+  },
+  ignoreInit = TRUE
+)
+
+observeEvent(
+  input[["coordviews_config_upload_request"]],
+  {
+    upload <- input[["coordviews_config_upload_request"]]
+    raw_nonce <- if (is.list(upload)) upload$nonce else NULL
+    nonce <- if (
+      is.character(raw_nonce) &&
+        length(raw_nonce) == 1L &&
+        !is.na(raw_nonce) &&
+        nchar(enc2utf8(raw_nonce), type = "bytes") <= 128L
+    ) {
+      raw_nonce
+    } else {
+      ""
+    }
+    tryCatch(
+      {
+        cv_config_check_node_limit(upload)
+        upload <- cv_config_record(
+          upload,
+          c("nonce", "action", "name", "size", "text"),
+          path = "$.upload"
+        )
+        nonce <- cv_config_string(raw_nonce, "$.upload.nonce", 128L)
+        action <- cv_config_choice(upload$action, "$.upload.action", "apply")
+        text <- cv_config_read_upload(upload)
+        dataset <- cv_saved_view_dataset()
+        normalized <- cv_config_decode(
+          enc2utf8(text),
+          cells = dataset$cells,
+          fingerprint = dataset$fingerprint
+        )
+        colour_data <- cv_config_validate_genes(normalized, dataset$cells)
+        cv_config_send_result(
+          nonce,
+          action,
+          TRUE,
+          config = cv_config_json_document(normalized),
+          colour_data = colour_data,
+          selected_cells = length(normalized$selection$cells)
+        )
+      },
+      error = function(error) {
+        cv_config_log_failure(error)
+        cv_config_send_result(
+          nonce,
+          "apply",
+          FALSE,
+          code = if (inherits(error, "cv_config_error")) {
+            error$code
+          } else {
+            "internal"
+          },
+          message = cv_config_safe_message(error)
+        )
+      }
+    )
+  },
+  ignoreInit = TRUE
+)
+
+
 ## Nothing is built or sent until the user actually opens the tab.
 ##
 ## `coordviews_bundle()` walks every cell of the loaded object -- reductions,
@@ -459,21 +731,14 @@ observeEvent(
         "coordviews_geneval",
         list(gene = "", ok = FALSE)
       )
+      session$sendCustomMessage("coordviews_genepanels", list(ok = FALSE))
       return()
     }
     mode <- input[["coordviews_expression_mode"]]
     if (identical(mode, "panels")) {
-      global_max <- max(unlist(values), na.rm = TRUE)
-      scaled <- lapply(values, function(v) {
-        if (is.finite(global_max) && global_max > 0) {
-          as.integer(round(v / global_max * 255))
-        } else {
-          rep(0L, length(v))
-        }
-      })
       session$sendCustomMessage(
         "coordviews_genepanels",
-        cv_gene_panels_message(genes, scaled, round(global_max, 3))
+        cv_gene_panels_payload(genes, values)
       )
     } else {
       mean_values <- Reduce(`+`, values) / length(values)

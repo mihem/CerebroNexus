@@ -2121,6 +2121,37 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   white-space: nowrap;
 }
 
+.cerebro-config-open {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--c-amber);
+  border-radius: var(--r-xs);
+  background: var(--c-amber);
+  color: #ffffff;
+  font: 700 12.5px/1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cerebro-selection-status-guide > .cerebro-config-open {
+  margin-left: auto;
+}
+.cerebro-config-open:hover:not(:disabled) {
+  border-color: var(--c-amber-700);
+  background: var(--c-amber-700);
+}
+.cerebro-config-open:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+.cerebro-config-open:focus-visible {
+  outline: 3px solid var(--c-amber-100);
+  outline-offset: 2px;
+}
+
 /* Zoom and Clear stay with the active cohort they affect. */
 .cerebro-selection-actions {
   display: flex;
@@ -2129,7 +2160,8 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
   gap: 6px;
   margin-left: auto;
 }
-.cerebro-selection-actions .btn {
+.cerebro-selection-actions .btn,
+.cerebro-selection-actions .cerebro-config-open {
   min-width: 132px;
   height: 34px;
   padding: 0 9px;
@@ -2157,6 +2189,16 @@ body .shiny-bound-output.cerebro-output-waiting { opacity: 0.58; }
 .cerebro-selection-actions .cerebro-selection-action-clear:hover {
   background: var(--c-error-100) !important;
 }
+.cerebro-selection-actions .cerebro-config-open {
+  border-color: var(--c-amber);
+  background: var(--c-amber);
+  color: #ffffff;
+}
+.cerebro-selection-actions .cerebro-config-open:hover:not(:disabled) {
+  border-color: var(--c-amber-700);
+  background: var(--c-amber-700);
+}
+
 /* Click feedback: a brief press-down + darker fill so a tap clearly registers. */
 .cerebro-selection-actions .btn:active {
   transform: translateY(1px);

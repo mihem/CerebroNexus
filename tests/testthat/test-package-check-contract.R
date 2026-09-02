@@ -23,6 +23,15 @@ test_that("development-only directories are excluded from package builds", {
   expect_true(all(expected %in% ignores))
 })
 
+test_that("retired share databases stay out of Git and package builds", {
+  skip_if_not_source_tree()
+  gitignore <- readLines(source_file(".gitignore"), warn = FALSE)
+  buildignore <- readLines(source_file(".Rbuildignore"), warn = FALSE)
+
+  expect_true("inst/private-data/linked-view-shares.sqlite" %in% gitignore)
+  expect_true("^inst/private-data/linked-view-shares\\.sqlite$" %in% buildignore)
+})
+
 test_that("pkgdown output directory has no tracked source files", {
   skip_if_not_source_tree()
   tracked_docs <- system2(

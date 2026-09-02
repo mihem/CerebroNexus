@@ -262,11 +262,16 @@
   }
   function downloadPNG() {
     var network = net();
-    if (!network || !network.canvas || !network.canvas.frame) return;
-    var link = document.createElement('a');
-    link.href = network.canvas.frame.canvas.toDataURL('image/png');
-    link.download = 'hla_motif_network.png';
-    link.click();
+    if (!network || !network.canvas || !network.canvas.frame) return false;
+    try {
+      var link = document.createElement('a');
+      link.href = network.canvas.frame.canvas.toDataURL('image/png');
+      link.download = 'hla_motif_network.png';
+      link.click();
+      return true;
+    } catch (ignore) {
+      return false;
+    }
   }
   function bounds(network) {
     var frame = network.canvas.frame;
@@ -354,7 +359,11 @@
       syncingSelection = false;
     }
     window.dispatchEvent(new CustomEvent('cerebro:specialist-state', {
-      detail: { viewId: 'hla_motif_network', selectedCells: selectedCells.length }
+      detail: {
+        viewId: 'hla_motif_network',
+        selectedCells: selectedCells.length,
+        datasetFingerprint: (window.cerebroSavedViewDataset || {}).cell_fingerprint || ''
+      }
     }));
   }
   function connectShiny() {
@@ -388,7 +397,11 @@
         else if (action === 'zoomin') zoomBy(1.3);
         else if (action === 'zoomout') zoomBy(1 / 1.3);
         else if (action === 'reset') resetView();
-        else if (action === 'download') downloadPNG();
+        else if (action === 'download') {
+          window.dispatchEvent(new CustomEvent('cerebro:png-result', {
+            detail: { ok: downloadPNG() }
+          }));
+        }
       });
     });
     syncModeButtons();
@@ -419,6 +432,9 @@
   window.cerebroHlaMotifs = {
     captureState: captureState,
     applyState: applyState,
+    downloadPNG: function () {
+      return downloadPNG();
+    },
     handleNativeSelection: function (ids) {
       if (syncingSelection) return;
       committedCanvas = null;

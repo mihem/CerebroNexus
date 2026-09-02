@@ -1,6 +1,6 @@
 Package: CerebroNexus
 Title: Interactive visualization of single cell transcriptomics
-Version: 4.3.5
+Version: 4.3.6
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
@@ -40,6 +40,7 @@ Imports:
   htmlwidgets,
   httr (>= 1.4.0),
   igraph,
+  jsonlite,
   later,
   Matrix (>= 1.2),
   methods,
@@ -73,7 +74,6 @@ Suggests:
   ggtree,
   HDF5Array (>= 1.18.1),
   httpuv,
-  jsonlite,
   knitr,
   monocle,
   png,
