@@ -12,15 +12,20 @@ run_specialist_state_node <- function(body) {
   writeLines(
     c(
       "const fs = require('fs');",
-      "const timers = []; const controls = {}; const applied = [];",
-      "global.window = {setTimeout: fn => timers.push(fn)};",
+      "const timers = []; const controls = {}; const applied = []; const handlers = {};",
+      "global.window = {",
+      "  setTimeout: (fn, delay) => { fn.delay = delay; timers.push(fn); return fn; },",
+      "  clearTimeout: fn => { const at = timers.indexOf(fn); if (at >= 0) timers.splice(at, 1); }",
+      "};",
       "global.document = {",
       "  getElementById: id => id === 'shiny-tab-overview' ?",
       "    {classList:{contains:()=>true}} : (controls[id] || null),",
       "  querySelector: () => null",
       "};",
       "window.jQuery = global.jQuery = element => ({",
-      "  data: () => element.binding",
+      "  data: () => element.binding,",
+      "  on: (event, handler) => { handlers[event] = handler; },",
+      "  off: event => { delete handlers[event]; }",
       "});",
       sprintf(
         "eval(fs.readFileSync(%s, 'utf8'));",
@@ -92,15 +97,21 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(config, "hla_motif_network", fixed = TRUE)
 })
 
-test_that("specialist restoration retries dynamically rendered controls", {
+test_that("specialist restoration follows dynamically bound controls", {
   output <- run_specialist_state_node(c(
     "window.cerebroCellViews = {applyState: () => {",
-    "  controls.overview_dynamic = {binding:{receiveMessage: (_el, msg) => applied.push(msg.value)}};",
+    "  if (controls.overview_dynamic) return;",
+    "  controls.overview_dynamic = {id:'overview_dynamic',binding:{",
+    "    receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "  }};",
+    "  Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "    .forEach(name => handlers[name]({target:controls.overview_dynamic}));",
     "}};",
     "window.cerebroSpecialistViews.get('overview_projection').apply({",
     "  selection:{cells:['cell-1']},",
     "  controls:[{id:'overview_dynamic',multiple:false,values:['restored']}]",
     "});",
+    "timers.sort((a, b) => a.delay - b.delay);",
     "while (timers.length) timers.shift()();",
     "console.log(JSON.stringify(applied));"
   ))
@@ -108,6 +119,29 @@ test_that("specialist restoration retries dynamically rendered controls", {
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
     jsonlite::fromJSON(output, simplifyVector = FALSE),
-    list("restored", "restored")
+    list("restored")
+  )
+})
+
+test_that("specialist restoration waits for late Shiny-bound controls", {
+  output <- run_specialist_state_node(c(
+    "window.cerebroCellViews = {applyState: () => {}};",
+    "window.cerebroSpecialistViews.get('overview_projection').apply({",
+    "  selection:{cells:['cell-1']},",
+    "  controls:[{id:'overview_dynamic',multiple:false,values:['restored']}]",
+    "});",
+    "timers.filter(fn => fn.delay <= 750).forEach(fn => fn());",
+    "controls.overview_dynamic = {id:'overview_dynamic',binding:{",
+    "  receiveMessage: (_el, msg) => applied.push(msg.value)",
+    "}};",
+    "Object.keys(handlers).filter(name => name.indexOf('shiny:bound') === 0)",
+    "  .forEach(name => handlers[name]({target:controls.overview_dynamic}));",
+    "console.log(JSON.stringify(applied));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list("restored")
   )
 })

@@ -26,6 +26,8 @@
       prefix: 'hla_'
     }
   };
+  var controlRestoreHandler = null;
+  var controlRestoreTimer = null;
 
   function engine(spec) {
     if (spec.engine === 'network') return window.cerebroHlaMotifs;
@@ -80,6 +82,38 @@
     catch (ignore) { /* a dynamic control may be replaced by the preceding one */ }
   }
 
+  function stopControlRestore() {
+    if (controlRestoreHandler && window.jQuery) {
+      window.jQuery(document).off(
+        'shiny:bound.cerebroSpecialistRestore', controlRestoreHandler
+      );
+    }
+    if (controlRestoreTimer) window.clearTimeout(controlRestoreTimer);
+    controlRestoreHandler = null;
+    controlRestoreTimer = null;
+  }
+
+  function restoreControls(controls) {
+    stopControlRestore();
+    if (!controls.length) return;
+    if (!window.jQuery) {
+      controls.forEach(applyControl);
+      return;
+    }
+
+    var byId = Object.create(null);
+    controls.forEach(function (control) { byId[control.id] = control; });
+    controlRestoreHandler = function (event) {
+      var control = event && event.target && byId[event.target.id];
+      if (control) applyControl(control);
+    };
+    window.jQuery(document).on(
+      'shiny:bound.cerebroSpecialistRestore', controlRestoreHandler
+    );
+    controlRestoreTimer = window.setTimeout(stopControlRestore, 10000);
+    controls.forEach(applyControl);
+  }
+
   function navigate(spec) {
     var tab = document.getElementById('shiny-tab-' + spec.tab);
     if (tab && tab.classList.contains('active')) return;
@@ -119,10 +153,9 @@
       },
       apply: function (config) {
         navigate(spec);
-        (config.controls || []).forEach(applyControl);
+        restoreControls(config.controls || []);
         [0, 250, 750].forEach(function (delay) {
           window.setTimeout(function () {
-            (config.controls || []).forEach(applyControl);
             var api = engine(spec);
             if (api && api.applyState) api.applyState(id, config);
           }, delay);
