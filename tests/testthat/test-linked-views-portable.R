@@ -139,10 +139,13 @@ test_that("view JSON uploads validate metadata and actual file size", {
     text = text
   )
   error_code <- function(expr) {
-    tryCatch({
-      force(expr)
-      NA_character_
-    }, cv_config_error = function(error) error$code)
+    tryCatch(
+      {
+        force(expr)
+        NA_character_
+      },
+      cv_config_error = function(error) error$code
+    )
   }
 
   expect_identical(helpers$cv_config_read_upload(upload), text)
@@ -151,18 +154,23 @@ test_that("view JSON uploads validate metadata and actual file size", {
     "invalid_file"
   )
   expect_identical(
-    error_code(helpers$cv_config_read_upload(modifyList(upload, list(name = "view.txt")))),
+    error_code(helpers$cv_config_read_upload(modifyList(
+      upload,
+      list(name = "view.txt")
+    ))),
     "invalid_file"
   )
   expect_identical(
     error_code(helpers$cv_config_read_upload(
-      modifyList(upload, list(size = 1)), max_bytes = nchar(text) - 1L
+      modifyList(upload, list(size = 1)),
+      max_bytes = nchar(text) - 1L
     )),
     "too_large"
   )
   expect_identical(
     error_code(helpers$cv_config_read_upload(
-      modifyList(upload, list(size = nchar(text) + 1L)), max_bytes = nchar(text)
+      modifyList(upload, list(size = nchar(text) + 1L)),
+      max_bytes = nchar(text)
     )),
     "too_large"
   )
@@ -171,11 +179,17 @@ test_that("view JSON uploads validate metadata and actual file size", {
     text
   )
   expect_identical(
-    error_code(helpers$cv_config_read_upload(modifyList(upload, list(size = -1)))),
+    error_code(helpers$cv_config_read_upload(modifyList(
+      upload,
+      list(size = -1)
+    ))),
     "too_large"
   )
   expect_identical(
-    error_code(helpers$cv_config_read_upload(modifyList(upload, list(size = "17")))),
+    error_code(helpers$cv_config_read_upload(modifyList(
+      upload,
+      list(size = "17")
+    ))),
     "invalid_file"
   )
 })

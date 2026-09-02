@@ -135,22 +135,25 @@ test_that("HLA PNG adapter reports browser export success and failure", {
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
-  writeLines(c(
-    "const fs = require('fs');",
-    "global.window = global;",
-    "let fail = false; let clicks = 0;",
-    "const canvas = {toDataURL: () => { if (fail) throw Error('blocked'); return 'data:image/png'; }};",
-    "window.HTMLWidgets = {find: () => ({network:{canvas:{frame:{canvas:canvas}}}})};",
-    "global.document = {readyState:'loading',addEventListener:()=>{},",
-    "  createElement:()=>({click:()=>{ clicks += 1; }}),getElementById:()=>null};",
-    sprintf(
-      "eval(fs.readFileSync(%s, 'utf8'));",
-      encodeString(viewer_test_path("www", "hla_motifs.js"), quote = "\"")
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      "global.window = global;",
+      "let fail = false; let clicks = 0;",
+      "const canvas = {toDataURL: () => { if (fail) throw Error('blocked'); return 'data:image/png'; }};",
+      "window.HTMLWidgets = {find: () => ({network:{canvas:{frame:{canvas:canvas}}}})};",
+      "global.document = {readyState:'loading',addEventListener:()=>{},",
+      "  createElement:()=>({click:()=>{ clicks += 1; }}),getElementById:()=>null};",
+      sprintf(
+        "eval(fs.readFileSync(%s, 'utf8'));",
+        encodeString(viewer_test_path("www", "hla_motifs.js"), quote = "\"")
+      ),
+      "const success = window.cerebroHlaMotifs.downloadPNG();",
+      "fail = true; const failure = window.cerebroHlaMotifs.downloadPNG();",
+      "console.log(JSON.stringify({success:success,failure:failure,clicks:clicks}));"
     ),
-    "const success = window.cerebroHlaMotifs.downloadPNG();",
-    "fail = true; const failure = window.cerebroHlaMotifs.downloadPNG();",
-    "console.log(JSON.stringify({success:success,failure:failure,clicks:clicks}));"
-  ), runner)
+    runner
+  )
   output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
 
   expect_equal(attr(output, "status"), NULL)

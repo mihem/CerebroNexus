@@ -29,7 +29,9 @@ test_that("retired share databases stay out of Git and package builds", {
   buildignore <- readLines(source_file(".Rbuildignore"), warn = FALSE)
 
   expect_true("inst/private-data/linked-view-shares.sqlite" %in% gitignore)
-  expect_true("^inst/private-data/linked-view-shares\\.sqlite$" %in% buildignore)
+  expect_true(
+    "^inst/private-data/linked-view-shares\\.sqlite$" %in% buildignore
+  )
 })
 
 test_that("pkgdown output directory has no tracked source files", {

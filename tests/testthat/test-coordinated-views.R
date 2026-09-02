@@ -212,43 +212,46 @@ run_config_transport_node <- function(body) {
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
-  writeLines(c(
-    "const fs = require('fs');",
-    "const timers = []; const sent = []; const handlers = {}; let applied = 0;",
-    "function classes(){return {toggle:()=>{},add:()=>{},remove:()=>{}};}",
-    "function element(id){return {id:id,value:'',disabled:false,open:false,attrs:{},",
-    "  classList:classes(),listeners:{},addEventListener:function(n,f){this.listeners[n]=f;},",
-    "  setAttribute:function(n,v){this.attrs[n]=v;},getAttribute:function(n){return this.attrs[n]||null;},",
-    "  removeAttribute:function(n){delete this.attrs[n];},focus:()=>{},click:function(){",
-    "    if(this.listeners.click)this.listeners.click.call(this,{currentTarget:this});}};}",
-    "const ids = {}; ['cv-config-dialog','cv-config-open','cv-config-close','cv-config-png',",
-    "  'cv-config-download','coordviews_config_upload','cv-config-upload-button',",
-    "  'cv-config-status'].forEach(id=>{ids[id]=element(id);});",
-    "const host={classList:classes()}; const label={textContent:'Download PNG'};",
-    "ids.coordviews_config_upload.closest=()=>host;",
-    "ids['cv-config-png'].querySelector=()=>label;",
-    "ids['cv-config-dialog'].showModal=function(){this.open=true;};",
-    "ids['cv-config-dialog'].close=function(){this.open=false;};",
-    "global.document={readyState:'complete',activeElement:null,body:{appendChild:()=>{}},",
-    "  getElementById:id=>ids[id]||null,querySelectorAll:()=>[],addEventListener:()=>{},",
-    "  contains:()=>true,createElement:()=>element('created')};",
-    "global.window=global; window.devicePixelRatio=1; window.addEventListener=()=>{};",
-    "window.setTimeout=(fn,delay)=>{const timer={fn:fn,delay:delay};timers.push(timer);return timer;};",
-    "window.clearTimeout=timer=>{const at=timers.indexOf(timer);if(at>=0)timers.splice(at,1);};",
-    "window.FileReader=function(){this.readAsText=file=>{this.result=file.text;this.onload();};};",
-    "window.cerebroLinkedViewsState={ready:()=>true,summary:()=>({selectedCells:1}),",
-    "  capture:()=>({}),apply:()=>{applied+=1;return {selectedCells:1};},downloadPNG:()=>true};",
-    "global.Shiny={setInputValue:(id,value)=>sent.push({id:id,value:value}),",
-    "  addCustomMessageHandler:(id,fn)=>{handlers[id]=fn;}};",
-    sprintf(
-      "eval(fs.readFileSync(%s, 'utf8'));",
-      encodeString(
-        file.path(dirname(bundle_file), "..", "www", "coordviews-config.js"),
-        quote = "\""
-      )
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      "const timers = []; const sent = []; const handlers = {}; let applied = 0;",
+      "function classes(){return {toggle:()=>{},add:()=>{},remove:()=>{}};}",
+      "function element(id){return {id:id,value:'',disabled:false,open:false,attrs:{},",
+      "  classList:classes(),listeners:{},addEventListener:function(n,f){this.listeners[n]=f;},",
+      "  setAttribute:function(n,v){this.attrs[n]=v;},getAttribute:function(n){return this.attrs[n]||null;},",
+      "  removeAttribute:function(n){delete this.attrs[n];},focus:()=>{},click:function(){",
+      "    if(this.listeners.click)this.listeners.click.call(this,{currentTarget:this});}};}",
+      "const ids = {}; ['cv-config-dialog','cv-config-open','cv-config-close','cv-config-png',",
+      "  'cv-config-download','coordviews_config_upload','cv-config-upload-button',",
+      "  'cv-config-status'].forEach(id=>{ids[id]=element(id);});",
+      "const host={classList:classes()}; const label={textContent:'Download PNG'};",
+      "ids.coordviews_config_upload.closest=()=>host;",
+      "ids['cv-config-png'].querySelector=()=>label;",
+      "ids['cv-config-dialog'].showModal=function(){this.open=true;};",
+      "ids['cv-config-dialog'].close=function(){this.open=false;};",
+      "global.document={readyState:'complete',activeElement:null,body:{appendChild:()=>{}},",
+      "  getElementById:id=>ids[id]||null,querySelectorAll:()=>[],addEventListener:()=>{},",
+      "  contains:()=>true,createElement:()=>element('created')};",
+      "global.window=global; window.devicePixelRatio=1; window.addEventListener=()=>{};",
+      "window.setTimeout=(fn,delay)=>{const timer={fn:fn,delay:delay};timers.push(timer);return timer;};",
+      "window.clearTimeout=timer=>{const at=timers.indexOf(timer);if(at>=0)timers.splice(at,1);};",
+      "window.FileReader=function(){this.readAsText=file=>{this.result=file.text;this.onload();};};",
+      "window.cerebroLinkedViewsState={ready:()=>true,summary:()=>({selectedCells:1}),",
+      "  capture:()=>({}),apply:()=>{applied+=1;return {selectedCells:1};},downloadPNG:()=>true};",
+      "global.Shiny={setInputValue:(id,value)=>sent.push({id:id,value:value}),",
+      "  addCustomMessageHandler:(id,fn)=>{handlers[id]=fn;}};",
+      sprintf(
+        "eval(fs.readFileSync(%s, 'utf8'));",
+        encodeString(
+          file.path(dirname(bundle_file), "..", "www", "coordviews-config.js"),
+          quote = "\""
+        )
+      ),
+      body
     ),
-    body
-  ), runner)
+    runner
+  )
   system2("node", runner, stdout = TRUE, stderr = TRUE)
 }
 
@@ -289,11 +292,16 @@ test_that("Linked views exposes a composed workspace PNG download", {
   ui_file <- file.path(dirname(bundle_file), "UI.R")
   js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
   config_file <- file.path(
-    dirname(bundle_file), "..", "www", "coordviews-config.js"
+    dirname(bundle_file),
+    "..",
+    "www",
+    "coordviews-config.js"
   )
   css_file <- file.path(dirname(bundle_file), "..", "www", "coordviews.css")
   skip_if_not(
-    file.exists(ui_file) && file.exists(js_file) && file.exists(config_file) &&
+    file.exists(ui_file) &&
+      file.exists(js_file) &&
+      file.exists(config_file) &&
       file.exists(css_file)
   )
   ui <- paste(readLines(ui_file, warn = FALSE), collapse = "\n")
@@ -306,9 +314,17 @@ test_that("Linked views exposes a composed workspace PNG download", {
   expect_false(grepl("cerebro-download-png", ui, fixed = TRUE))
   expect_match(js, "function downloadWorkspacePNG()", fixed = TRUE)
   expect_match(js, "function downloadVisiblePanelsPNG(filename)", fixed = TRUE)
-  expect_match(js, "function downloadPanelsPNG(candidates, filename)", fixed = TRUE)
+  expect_match(
+    js,
+    "function downloadPanelsPNG(candidates, filename)",
+    fixed = TRUE
+  )
   expect_match(js, "downloadPNG: downloadWorkspacePNG", fixed = TRUE)
-  expect_match(js, "return downloadVisiblePanelsPNG(pngFilename(id))", fixed = TRUE)
+  expect_match(
+    js,
+    "return downloadVisiblePanelsPNG(pngFilename(id))",
+    fixed = TRUE
+  )
   expect_match(js, "drawExportKey(context", fixed = TRUE)
   expect_match(js, "drawExportColorbar(context", fixed = TRUE)
   expect_match(js, "maxPixels = 32 * 1024 * 1024", fixed = TRUE)
