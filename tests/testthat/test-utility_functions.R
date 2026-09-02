@@ -73,6 +73,37 @@ test_that("spreadsheet formulas are neutralized in cells and column names", {
   expect_identical(result[[2L]], c("text", "'@SUM(A1)"))
 })
 
+test_that("conditional initial routing is consumed by the first dataset", {
+  decide <- utils_env$viewerInitialPageDecision
+
+  first <- decide(
+    initial_tab = "spatial",
+    tab_name = "spatial",
+    should_show = FALSE,
+    applied = FALSE
+  )
+  expect_identical(first, list(applied = TRUE, selected = NULL))
+
+  current_tab <- "overview"
+  later <- decide(
+    initial_tab = "spatial",
+    tab_name = "spatial",
+    should_show = TRUE,
+    applied = first$applied
+  )
+  if (!is.null(later$selected)) {
+    current_tab <- later$selected
+  }
+  expect_null(later)
+  expect_identical(current_tab, "overview")
+
+  expect_identical(
+    decide("spatial", "spatial", TRUE, FALSE),
+    list(applied = TRUE, selected = "spatial")
+  )
+  expect_null(decide("spatial", "trajectory", TRUE, FALSE))
+})
+
 test_that("duplicate Extra material labels identify the embedded source", {
   choices <- utils_env$extra_material_table_choices(list(
     embedded = list(key = "embedded", label = "QC tables"),

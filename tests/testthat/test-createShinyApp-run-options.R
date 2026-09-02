@@ -423,6 +423,7 @@ test_that("createShinyApp stores a validated initial Viewer page", {
   expect_match(server, 'projection = "overview"', fixed = TRUE)
   expect_match(server, 'spatial = "spatial"', fixed = TRUE)
   expect_match(server, 'trekker = "trekker"', fixed = TRUE)
+  expect_match(server, "viewerInitialPageDecision", fixed = TRUE)
   expect_match(server, "updateTabItems", fixed = TRUE)
 })
 

@@ -20,6 +20,21 @@ viewerUploadPath <- function(input_file, options) {
   datapath
 }
 
+viewerInitialPageDecision <- function(
+  initial_tab,
+  tab_name,
+  should_show,
+  applied
+) {
+  if (isTRUE(applied) || !identical(initial_tab, tab_name)) {
+    return(NULL)
+  }
+  list(
+    applied = TRUE,
+    selected = if (isTRUE(should_show)) tab_name else NULL
+  )
+}
+
 viewerDatasetName <- function(files, selected) {
   if (is.null(files) || is.null(selected) || is.null(names(files))) {
     return(NULL)

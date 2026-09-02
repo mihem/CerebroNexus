@@ -562,13 +562,17 @@ server <- function(input, output, session) {
       req(!is.null(data_set()))
       should_show <- show_reactive()
       shinyjs::toggle(id = item_id, condition = should_show)
-      if (
-        should_show &&
-          identical(initial_tab, tab_name) &&
-          !isolate(initial_page_applied())
-      ) {
-        updateTabItems(session, "sidebar", selected = tab_name)
-        initial_page_applied(TRUE)
+      decision <- viewerInitialPageDecision(
+        initial_tab,
+        tab_name,
+        should_show,
+        isolate(initial_page_applied())
+      )
+      if (!is.null(decision)) {
+        initial_page_applied(decision$applied)
+        if (!is.null(decision$selected)) {
+          updateTabItems(session, "sidebar", selected = decision$selected)
+        }
       }
     })
   }
