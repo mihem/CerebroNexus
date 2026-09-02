@@ -46,6 +46,6 @@ pbmc <- addPercentMtRibo(
   organism = 'hg',
   gene_nomenclature = 'name'
 )
-#> [15:23:54] No mitochondrial genes found in data set.
-#> [15:23:54] Calculate percentage of 1 ribosomal transcript(s) present in the data set...
+#> [15:40:14] No mitochondrial genes found in data set.
+#> [15:40:14] Calculate percentage of 1 ribosomal transcript(s) present in the data set...
 ```
