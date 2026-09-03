@@ -13,6 +13,7 @@
 - Closed Viewers cap request bodies at 6 MiB, while open Viewers retain their
   configured upload limit.
 - Manual colour choices remain scoped to the dataset where they were made.
+
 # CerebroNexus 4.3.6
 
 ## Viewer
