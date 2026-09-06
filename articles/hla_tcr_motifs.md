@@ -757,7 +757,7 @@ sessionInfo()
 #> Running under: Ubuntu 24.04.4 LTS
 #> 
 #> Matrix products: default
-#> BLAS/LAPACK: /nix/store/bw1pyf3q5xagajh247fla11gv80ggarr-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0
+#> BLAS/LAPACK: /nix/store/wv19y5w0mw7zcaxdgq7f1nibym3yh4p3-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0
 #> 
 #> locale:
 #>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
