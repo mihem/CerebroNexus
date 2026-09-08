@@ -99,28 +99,3 @@
   names(normalized) <- payload_names
   normalized
 }
-
-#' Validate one embedded spatial image and its coordinate bounds
-#'
-#' @keywords internal
-#' @noRd
-.validateCerebroSpatialImage <- function(payload, image_name, coordinates) {
-  if (.isLegacySpatialImagePayload(payload)) {
-    payload <- .canonicalizeLegacySpatialImagePayload(
-      payload,
-      paste0(
-        "Spatial image payload `",
-        image_name,
-        "` image `Tissue background`"
-      )
-    )
-    payload <- list(`Tissue background` = payload)
-  }
-  list(
-    histology_images = .normalizeEmbeddedSpatialImages(
-      payload,
-      coordinates,
-      paste0("Spatial image payload `", image_name, "`")
-    )
-  )
-}

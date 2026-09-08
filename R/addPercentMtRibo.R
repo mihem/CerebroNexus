@@ -42,49 +42,7 @@ addPercentMtRibo <- function(
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
-  ## check if Seurat is installed
-  if (!requireNamespace("Seurat", quietly = TRUE)) {
-    stop(
-      "The 'Seurat' package is needed for this function to work. Please install it.",
-      call. = FALSE
-    )
-  }
-
-  ## check that Seurat package is at least v3.0
-  if (utils::packageVersion('Seurat') < "3") {
-    stop(
-      paste0(
-        "The installed Seurat package is of version `",
-        utils::packageVersion('Seurat'),
-        "`, but at least v3.0 is required."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check if provided object is of class "Seurat"
-  if (!inherits(object, "Seurat")) {
-    stop(
-      paste0(
-        "Provided object is of class `",
-        class(object),
-        "` but must be of class 'Seurat'."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check version of Seurat object and stop if it is lower than 3
-  if (object@version < "3") {
-    stop(
-      paste0(
-        "Provided Seurat object has version `",
-        object@version,
-        "` but must be at least 3.0."
-      ),
-      call. = FALSE
-    )
-  }
+  .validateSeuratInputs(object)
 
   ## check if organism is supported
   supported_organisms <- c('hg', 'mm')
@@ -157,69 +115,44 @@ addPercentMtRibo <- function(
   ## keep only genes that are present in data set
   ##--------------------------------------------------------------------------##
 
-  if (object@version < "3") {
-    ## check if `raw.data` matrix exist in provided Seurat object
-    if ((is.null(object@raw.data))) {
-      stop(
-        paste0(
-          '`raw.data` matrix could not be found in provided Seurat ',
-          'object.'
-        ),
-        call. = FALSE
-      )
-    }
-    genes_mt_here <- intersect(genes_mt, rownames(object@raw.data))
-    genes_ribo_here <- intersect(genes_ribo, rownames(object@raw.data))
-  } else {
-    ## check if provided assay exists
-    if ((assay %in% names(object@assays) == FALSE)) {
-      stop(
-        paste0(
-          'Assay slot `',
-          assay,
-          '` could not be found in provided Seurat ',
-          'object.'
-        ),
-        call. = FALSE
-      )
-    }
-    ## Resolve split Seurat v5 assays through the shared layer resolver. This
-    ## consumer requires raw counts and therefore never crosses semantic classes.
-    counts_resolution <- .getExpressionMatrix(
-      seurat = object,
-      assay = assay,
-      slot = "counts",
-      join_samples = TRUE,
-      allow_cross_semantic_fallback = FALSE,
-      return_resolution = TRUE
-    )
-    counts_matrix <- .validate_expression_cells(
-      expression_data = counts_resolution$data,
-      object_cells = colnames(object),
-      assay = assay,
-      requested_layer = counts_resolution$requested,
-      resolved_layer = counts_resolution$resolved
-    )
-    ## check if `counts` matrix exist in provided assay
-    if (is.null(counts_matrix) || nrow(counts_matrix) == 0) {
-      stop(
-        paste0(
-          '`counts` matrix could not be found in `',
-          assay,
-          '` assay slot.'
-        ),
-        call. = FALSE
-      )
-    }
-    genes_mt_here <- intersect(
-      genes_mt,
-      rownames(counts_matrix)
-    )
-    genes_ribo_here <- intersect(
-      genes_ribo,
-      rownames(counts_matrix)
+  if (!(assay %in% names(object@assays))) {
+    stop(
+      paste0(
+        'Assay slot `',
+        assay,
+        '` could not be found in provided Seurat ',
+        'object.'
+      ),
+      call. = FALSE
     )
   }
+  counts_resolution <- .getExpressionMatrix(
+    seurat = object,
+    assay = assay,
+    slot = "counts",
+    join_samples = TRUE,
+    allow_cross_semantic_fallback = FALSE,
+    return_resolution = TRUE
+  )
+  counts_matrix <- .validate_expression_cells(
+    expression_data = counts_resolution$data,
+    object_cells = colnames(object),
+    assay = assay,
+    requested_layer = counts_resolution$requested,
+    resolved_layer = counts_resolution$resolved
+  )
+  if (is.null(counts_matrix) || nrow(counts_matrix) == 0) {
+    stop(
+      paste0(
+        '`counts` matrix could not be found in `',
+        assay,
+        '` assay slot.'
+      ),
+      call. = FALSE
+    )
+  }
+  genes_mt_here <- intersect(genes_mt, rownames(counts_matrix))
+  genes_ribo_here <- intersect(genes_ribo, rownames(counts_matrix))
 
   ##--------------------------------------------------------------------------##
   ## prepare slot in Seurat object to store gene lists (if it doesn't already
@@ -296,19 +229,8 @@ addPercentMtRibo <- function(
   ## add results to Seurat object
   ##--------------------------------------------------------------------------##
 
-  if (object@version < "3") {
-    object <- Seurat::AddMetaData(
-      object,
-      data.frame(
-        row.names = colnames(object@raw.data),
-        'percent_mt' = values_mt,
-        'percent_ribo' = values_ribo
-      )
-    )
-  } else {
-    object$percent_mt <- values_mt
-    object$percent_ribo <- values_ribo
-  }
+  object$percent_mt <- values_mt
+  object$percent_ribo <- values_ribo
 
   ##--------------------------------------------------------------------------##
   ##

@@ -70,78 +70,8 @@ getMarkerGenes <- function(
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
-  ## check if Seurat is installed
-  if (!requireNamespace("Seurat", quietly = TRUE)) {
-    stop(
-      "The 'Seurat' package is needed for this function to work. Please install it.",
-      call. = FALSE
-    )
-  }
-
-  ## check that Seurat package is at least v3.0
-  if (utils::packageVersion('Seurat') < "3") {
-    stop(
-      paste0(
-        "The installed Seurat package is of version `",
-        utils::packageVersion('Seurat'),
-        "`, but at least v3.0 is required."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check if provided object is of class "Seurat"
-  if (!inherits(object, "Seurat")) {
-    stop(
-      paste0(
-        "Provided object is of class `",
-        class(object),
-        "` but must be of class 'Seurat'."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check version of Seurat object and stop if it is lower than 3
-  if (object@version < "3") {
-    stop(
-      paste0(
-        "Provided Seurat object has version `",
-        object@version,
-        "` but must be at least 3.0."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check if provided assay exists
-  if (assay %in% names(object@assays) == FALSE) {
-    stop(
-      paste0(
-        'Specified assay slot `',
-        assay,
-        '` could not be found in provided Seurat object.'
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check if provided groups are present in meta data
-  if (any(which(groups %in% colnames(object@meta.data) == FALSE))) {
-    missing_groups <- groups[which(
-      groups %in% colnames(object@meta.data) == FALSE
-    )]
-    stop(
-      paste0(
-        "Group(s) `",
-        paste0(missing_groups, collapse = '`, `'),
-        "` were not ",
-        "found in meta data of provided Seurat object. Only grouping variables ",
-        "that are present in the meta data can be used."
-      ),
-      call. = FALSE
-    )
-  }
+  .validateSeuratInputs(object, assay)
+  .validateSeuratGroups(object, groups)
 
   ## check if 'marker_genes' slot already exists and create it if not
   if (is.null(object@misc$marker_genes)) {

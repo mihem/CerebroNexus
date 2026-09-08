@@ -66,6 +66,13 @@ server <- function(input, output, session) {
     ),
     local = TRUE
   )
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/hla_tcr_motifs/core_shim.R"
+    ),
+    local = TRUE
+  )
 
   ##--------------------------------------------------------------------------##
   ## Central parameters.
@@ -665,8 +672,7 @@ server <- function(input, output, session) {
     ## four would hide this page while the core underneath could analyse it
     ## perfectly well — and the page is the only way to reach Data & QC, so there
     ## would be no way in. The gate has to agree with what the page can do.
-    ## Bound into this scope by the module's core_shim, which is sourced before
-    ## this closure is ever evaluated.
+    ## Bound into this scope by the shared core shim loaded above.
     function() {
       any(
         tryCatch(
@@ -677,24 +683,6 @@ server <- function(input, output, session) {
       )
     }
   )
-
-  ## Cleanup snapshot artifacts that may have been left by test runs.
-  snapshot_dir <- file.path(
-    Cerebro.options[["cerebro_root"]],
-    "..",
-    "..",
-    "tests",
-    "testthat",
-    "_snaps"
-  )
-  new_pngs <- list.files(
-    snapshot_dir,
-    pattern = "\\.new\\.png$",
-    full.names = TRUE
-  )
-  if (length(new_pngs) > 0) {
-    file.remove(new_pngs)
-  }
 
   source(
     paste0(

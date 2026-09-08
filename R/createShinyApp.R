@@ -1695,7 +1695,7 @@ dedent <- function(string) {
   if (!isTRUE(moved_inspection$valid)) {
     restored <- FALSE
     if (!.bundlePathExists(lock$path)) {
-      restore_attempt <- .attemptBundleOperation(function() {
+      .attemptBundleOperation(function() {
         file.rename(release_path, lock$path)
       })
       restored <- dir.exists(lock$path) &&
@@ -2526,50 +2526,6 @@ createShinyApp <- function(
     }
   }
 
-  ## Spatial background images (and their per-dataset transforms) must be named
-  ## to match cerebro_data. Duplicate image data-set names are ambiguous at
-  ## runtime and therefore rejected; other malformed entries are dropped with
-  ## a warning.
-  validate_named_against_data <- function(
-    x,
-    arg_name,
-    reject_duplicates = FALSE
-  ) {
-    if (is.null(x)) {
-      return(NULL)
-    }
-    if (is.null(names(x)) || anyNA(names(x)) || any(names(x) == "")) {
-      warning(
-        arg_name,
-        " must be a named list or vector. Ignoring.",
-        call. = FALSE
-      )
-      return(NULL)
-    }
-    if (reject_duplicates && anyDuplicated(names(x))) {
-      stop(arg_name, " names must be unique.", call. = FALSE)
-    }
-    matching <- names(x) %in% names(cerebro_data)
-    if (!any(matching)) {
-      warning(
-        "No matching names found between ",
-        arg_name,
-        " and cerebro_data. Ignoring.",
-        call. = FALSE
-      )
-      return(NULL)
-    }
-    if (!all(matching)) {
-      warning(
-        "Some ",
-        arg_name,
-        " entries do not match cerebro_data and will be ignored: ",
-        paste(unique(names(x)[!matching]), collapse = ", "),
-        call. = FALSE
-      )
-    }
-    x[matching]
-  }
   if (!requireNamespace("CerebroNexus", quietly = TRUE)) {
     stop(
       "Package 'CerebroNexus' is required but not installed.",

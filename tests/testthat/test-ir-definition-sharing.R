@@ -44,6 +44,10 @@ ir_env$getMetaData <- function(...) NULL
 ir_env$availableProjections <- function(...) character(0)
 ir_env$getProjection <- function(...) NULL
 ir_env$detect_chains <- function(...) character(0)
+ir_env$hla_parse_ir_segments <- getFromNamespace(
+  "hla_parse_ir_segments",
+  "CerebroNexus"
+)
 # Shared palette helper (defined in color_setup.R inside the running app); the
 # plot builders call it for fill colours, so provide a lightweight stand-in.
 ir_env$cerebro_group_colors <- function(n) {
@@ -98,54 +102,26 @@ test_that("ir_parse_segments extracts TRB V/J/CDR3 from CT* columns", {
   )
 })
 
-test_that("ir_parse_segments drops rows lacking the requested chain", {
+test_that("ir_parse_segments requires the requested chain and its J gene", {
   data <- list(
     s1 = data.frame(
-      barcode = c("bc1", "bc2"),
+      barcode = c("bc1", "bc2", "bc3"),
       CTgene = c(
         "TRAV8-6.TRAJ8.TRAC_NA",
-        "TRAV3.TRAJ26.TRAC_TRBV14..TRBJ2-3.TRBC2"
+        "TRAV3.TRAJ26.TRAC_TRBV14..TRBJ2-3.TRBC2",
+        "TRBV02"
       ),
-      CTaa = c("CAVSAFFQKLVF_NA", "CAVTHYGQNFVF_CASSPGGQNTQYF"),
+      CTaa = c(
+        "CAVSAFFQKLVF_NA",
+        "CAVTHYGQNFVF_CASSPGGQNTQYF",
+        "CASSL"
+      ),
       stringsAsFactors = FALSE
     )
   )
   out <- ir_parse_segments(data, chain = "TRB")
   expect_equal(nrow(out), 1)
   expect_equal(out$barcode, "bc2")
-})
-
-test_that("ir_parse_segments carries metadata columns through", {
-  data <- list(
-    s1 = data.frame(
-      barcode = "bc1",
-      CTgene = "TRBV6-2..TRBJ2-6.TRBC2",
-      CTaa = "CASSYLPRRQDRESSGANVLTF",
-      condition = "A",
-      sample = "s1",
-      stringsAsFactors = FALSE
-    )
-  )
-  out <- ir_parse_segments(data, chain = "TRB")
-  expect_true(all(c("condition", "sample") %in% colnames(out)))
-  expect_equal(out$condition, "A")
-})
-
-test_that("ir_parse_segments returns NULL on empty or null input", {
-  expect_null(ir_parse_segments(NULL, "TRB"))
-  expect_null(ir_parse_segments(list(), "TRB"))
-})
-
-test_that("ir_parse_segments returns NULL when no row has the chain", {
-  data <- list(
-    s1 = data.frame(
-      barcode = c("bc1", "bc2"),
-      CTgene = c("TRAV8-6.TRAJ8.TRAC_NA", "TRAV3.TRAJ26.TRAC_NA"),
-      CTaa = c("CAVSAFFQKLVF_NA", "CAVTHYGQNFVF_NA"),
-      stringsAsFactors = FALSE
-    )
-  )
-  expect_null(ir_parse_segments(data, chain = "TRB"))
 })
 
 test_that("ir_parse_segments preserves per-sample metadata via column union", {

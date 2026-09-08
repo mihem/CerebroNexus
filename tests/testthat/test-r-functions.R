@@ -568,59 +568,6 @@ test_that("launchCerebro loads the installed Viewer", {
 })
 
 ## ---------------------------------------------------------------------------
-## .getExpressionMatrix same-semantic fallback guard
-##
-## When a requested layer (e.g. "data") is missing, we must NOT silently fall
-## back to a layer with different semantics (e.g. "counts" or "scale.data"),
-## because the caller would then treat normalised/scaled values as raw counts
-## and vice versa. Fallback is only allowed within the same semantic class,
-## including Seurat v5 split-layer variants like "data.1", "data.2".
-## ---------------------------------------------------------------------------
-
-test_that(".filter_same_semantic_layers keeps only same-root layers", {
-  available <- c("counts", "counts.1", "data", "data.1", "scale.data")
-
-  # requesting "data" → only data / data.* are acceptable fallbacks
-  expect_equal(
-    .filter_same_semantic_layers("data", available),
-    c("data", "data.1")
-  )
-
-  # requesting "counts" → only counts / counts.* (v5 split layers)
-  expect_equal(
-    .filter_same_semantic_layers("counts", available),
-    c("counts", "counts.1")
-  )
-
-  # requesting "scale.data" → the dot in the root must not split it wrongly
-  expect_equal(
-    .filter_same_semantic_layers("scale.data", available),
-    "scale.data"
-  )
-})
-
-test_that(".filter_same_semantic_layers returns empty when no same-root layer", {
-  # requesting "data" but only counts present → no safe fallback
-  expect_length(
-    .filter_same_semantic_layers("data", c("counts", "counts.1")),
-    0L
-  )
-})
-
-test_that(".filter_same_semantic_layers allows cross-semantic when opted in", {
-  available <- c("counts", "data", "scale.data")
-  # legacy behaviour: everything is a candidate, requested layer first
-  expect_equal(
-    .filter_same_semantic_layers(
-      "data",
-      available,
-      allow_cross_semantic = TRUE
-    ),
-    c("data", "counts", "scale.data")
-  )
-})
-
-## ---------------------------------------------------------------------------
 ## .getExpressionMatrix on a counts-only Seurat v5 object
 ##
 ## A common real object — v5 RNA assay with only a `counts` layer (NormalizeData

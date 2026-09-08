@@ -372,7 +372,6 @@ output$hla_status_ui <- renderUI({
     ))
   }
 
-  typed_samples <- length(unique(t$sample))
   src <- paste(unique(t$source_type), collapse = ", ")
   ir_samples <- names(getImmuneRepertoire())
   covered <- sum(ir_samples %in% unique(t$sample))

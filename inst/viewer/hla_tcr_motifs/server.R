@@ -11,13 +11,6 @@
 source(
   paste0(
     Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/core_shim.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
     "/viewer/hla_tcr_motifs/data.R"
   ),
   local = TRUE

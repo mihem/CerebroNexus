@@ -79,9 +79,12 @@ hla_detect_chains <- function(data) {
 #'
 #' @param data Named list of IR data.frames (with metadata joined by barcode).
 #' @param chain Chain prefix, e.g. "TRB" / "TRA".
+#' @param require_j Require a parsed J gene. The immune-repertoire definition
+#'   views use this stricter contract; HLA motif analysis accepts bulk data with
+#'   V and CDR3 only.
 #' @return A data.frame with one row per cell carrying `chain`, or NULL.
 #' @keywords internal
-hla_parse_ir_segments <- function(data, chain) {
+hla_parse_ir_segments <- function(data, chain, require_j = FALSE) {
   if (is.null(data) || length(data) == 0 || is.null(chain) || !nzchar(chain)) {
     return(NULL)
   }
@@ -146,6 +149,9 @@ hla_parse_ir_segments <- function(data, chain) {
     # dropping those rows would discard the whole sample. A missing J stays NA
     # and simply shows as NA in the J distribution / tooltip.
     keep <- !is.na(v_gene) & !is.na(cdr3) & nzchar(cdr3)
+    if (isTRUE(require_j)) {
+      keep <- keep & !is.na(j_gene)
+    }
     if (!any(keep)) {
       return(NULL)
     }

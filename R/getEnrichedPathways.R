@@ -67,49 +67,7 @@ getEnrichedPathways <- function(
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
-  ## check if Seurat is installed
-  if (!requireNamespace("Seurat", quietly = TRUE)) {
-    stop(
-      "The 'Seurat' package is needed for this function to work. Please install it.",
-      call. = FALSE
-    )
-  }
-
-  ## check that Seurat package is at least v3.0
-  if (utils::packageVersion('Seurat') < "3") {
-    stop(
-      paste0(
-        "The installed Seurat package is of version `",
-        utils::packageVersion('Seurat'),
-        "`, but at least v3.0 is required."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check if provided object is of class "Seurat"
-  if (!inherits(object, "Seurat")) {
-    stop(
-      paste0(
-        "Provided object is of class `",
-        class(object),
-        "` but must be of class 'Seurat'."
-      ),
-      call. = FALSE
-    )
-  }
-
-  ## check version of Seurat object and stop if it is lower than 3
-  if (object@version < "3") {
-    stop(
-      paste0(
-        "Provided Seurat object has version `",
-        object@version,
-        "` but must be at least 3.0."
-      ),
-      call. = FALSE
-    )
-  }
+  .validateSeuratInputs(object)
 
   ## check if marker genes are present and stop if they aren't
   if (

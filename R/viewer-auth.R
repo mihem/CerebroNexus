@@ -34,7 +34,6 @@
   )
   credentials <- tables$credentials
   pwd_mngt <- tables$pwd_mngt
-  logs <- tables$logs
   required <- list(
     credentials = c(
       "user",

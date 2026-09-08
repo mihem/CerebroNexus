@@ -84,10 +84,6 @@ embedded_spatial_images <- function(spatial_data) {
   list()
 }
 
-spatial_background_key <- function(source, label) {
-  paste0(source, "::", label)
-}
-
 spatial_background_choices <- function(embedded_images, external_images) {
   c(
     "No Background" = "none",

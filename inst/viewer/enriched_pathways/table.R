@@ -25,7 +25,6 @@ enriched_pathways_data <- reactive({
 
 output[["enriched_pathways_table_UI"]] <- renderUI({
   selected_method <- input[["enriched_pathways_selected_method"]]
-  selected_table <- input[["enriched_pathways_selected_table"]]
   if (
     is.null(selected_method) ||
       selected_method %in% getMethodsForEnrichedPathways() == FALSE

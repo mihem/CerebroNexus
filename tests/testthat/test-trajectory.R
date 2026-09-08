@@ -16,8 +16,6 @@ test_that("all trajectory module files parse without errors", {
     "projection_plot.R",
     "distribution_along_pseudotime.R",
     "expression_metrics.R",
-    "number_of_expressed_genes_by_state.R",
-    "number_of_transcripts_by_state.R",
     "select_method_and_name.R",
     "selected_cells_table.R",
     "states_by_group.R"

@@ -191,9 +191,9 @@ test_that("background choices keep labels separate from source-tagged identity",
     unname(choices),
     c(
       "none",
-      spatial_background_key("embedded", "H&E"),
-      spatial_background_key("external", "H&E"),
-      spatial_background_key("external", "DAPI")
+      "embedded::H&E",
+      "external::H&E",
+      "external::DAPI"
     )
   )
   expect_false(any(
@@ -215,7 +215,7 @@ test_that("stale selections reset to the first current image or none", {
     configured_spatial_images(spatial_options, "Atlas", "sliceB")
   )
   slice_c_choices <- spatial_background_choices(list(), list())
-  old <- spatial_background_key("external", "H&E")
+  old <- "external::H&E"
 
   expect_identical(
     normalize_spatial_background_choice(old, slice_a_choices),
@@ -223,7 +223,7 @@ test_that("stale selections reset to the first current image or none", {
   )
   expect_identical(
     normalize_spatial_background_choice(old, slice_b_choices),
-    spatial_background_key("external", "IF")
+    "external::IF"
   )
   expect_identical(
     normalize_spatial_background_choice(old, slice_c_choices),
@@ -244,7 +244,7 @@ test_that("selected identity resolves the matching descriptor and bounds", {
 
   expect_identical(
     resolve_spatial_background(
-      spatial_background_key("embedded", "DAPI"),
+      "embedded::DAPI",
       embedded,
       external
     )$bounds,
@@ -252,7 +252,7 @@ test_that("selected identity resolves the matching descriptor and bounds", {
   )
   expect_identical(
     resolve_spatial_background(
-      spatial_background_key("external", "DAPI"),
+      "external::DAPI",
       embedded,
       external
     )$bounds,

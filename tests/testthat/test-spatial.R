@@ -657,7 +657,7 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
 
   params <- list(
     color_variable = "score",
-    background_image = spatial_background_key("external", "Atlas"),
+    background_image = "external::Atlas",
     background_descriptor = list(
       source = "external",
       label = "Atlas",

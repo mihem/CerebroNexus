@@ -6,6 +6,80 @@
 .cerebro_layer_roots <- c("scale.data", "counts", "data")
 .cerebro_fallback_roots <- c("data", "counts", "scale.data")
 
+#' Validate common Seurat inputs
+#'
+#' @keywords internal
+#' @noRd
+.validateSeuratInputs <- function(object, assay = NULL) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
+    stop(
+      "The 'Seurat' package is needed for this function to work. Please install it.",
+      call. = FALSE
+    )
+  }
+  if (utils::packageVersion("Seurat") < "3") {
+    stop(
+      paste0(
+        "The installed Seurat package is of version `",
+        utils::packageVersion("Seurat"),
+        "`, but at least v3.0 is required."
+      ),
+      call. = FALSE
+    )
+  }
+  if (!inherits(object, "Seurat")) {
+    stop(
+      paste0(
+        "Provided object is of class `",
+        class(object),
+        "` but must be of class 'Seurat'."
+      ),
+      call. = FALSE
+    )
+  }
+  if (object@version < "3") {
+    stop(
+      paste0(
+        "Provided Seurat object has version `",
+        object@version,
+        "` but must be at least 3.0."
+      ),
+      call. = FALSE
+    )
+  }
+  if (!is.null(assay) && !(assay %in% names(object@assays))) {
+    stop(
+      paste0(
+        "Specified assay slot `",
+        assay,
+        "` could not be found in provided Seurat object."
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+#' Validate Seurat metadata grouping columns
+#'
+#' @keywords internal
+#' @noRd
+.validateSeuratGroups <- function(object, groups) {
+  missing_groups <- groups[!(groups %in% colnames(object@meta.data))]
+  if (length(missing_groups) > 0L) {
+    stop(
+      paste0(
+        "Group(s) `",
+        paste0(missing_groups, collapse = "`, `"),
+        "` were not found in meta data of provided Seurat object. Only ",
+        "grouping variables that are present in the meta data can be used."
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
 #' Semantic root of a (possibly split) Seurat v5 layer name
 #'
 #' `split(assay, f = ...)` names each layer `<root>.<level>`, where the level is
@@ -707,37 +781,6 @@
   )
 }
 
-#' Filter candidate fallback layers to the same semantic class as the request
-#'
-#' Given a requested layer name (e.g. "data", "counts", "scale.data") and the
-#' layers actually present in an assay, return the acceptable fallback layers.
-#' By default only layers sharing the same semantic root are kept, so that a
-#' missing "data" layer never silently falls back to "counts" (raw) or
-#' "scale.data" (scaled). Seurat v5 split layers ("data.1", "data.s1", ...)
-#' share the root of their base layer and are therefore kept. Set
-#' \code{allow_cross_semantic = TRUE} for the legacy behaviour where any
-#' available layer is an acceptable fallback (requested layer ordered first).
-#'
-#' @keywords internal
-#' @noRd
-.filter_same_semantic_layers <- function(
-  requested_layer,
-  available_layers,
-  allow_cross_semantic = FALSE
-) {
-  root_of <- .layer_semantic_root
-
-  if (isTRUE(allow_cross_semantic)) {
-    return(unique(c(
-      intersect(requested_layer, available_layers),
-      setdiff(available_layers, requested_layer)
-    )))
-  }
-
-  requested_root <- root_of(requested_layer)
-  available_layers[root_of(available_layers) == requested_root]
-}
-
 #' Validate expression-matrix cell coverage and order
 #'
 #' @keywords internal
@@ -1172,29 +1215,12 @@
   if (length(x) == 0) "none" else paste(x, collapse = ", ")
 }
 
-.spx_escape_regex <- function(x) {
-  gsub("([\\^$.|?*+()\\[\\]{}\\\\\\-])", "\\\\\\1", x, perl = TRUE)
-}
-
-.spx_is_matrix_like <- function(x) {
-  if (is.null(x)) {
-    return(FALSE)
-  }
-  d <- .spx_try(dim(x))
-  if (.spx_is_try_error(d) || is.null(d) || length(d) != 2) {
-    return(FALSE)
-  }
-  TRUE
-}
-
 .spx_has_slot <- function(obj, slot_name) {
   if (!isS4(obj)) {
     return(FALSE)
   }
   slot_name %in% methods::slotNames(obj)
 }
-
-`%||%` <- function(a, b) if (is.null(a)) b else a
 
 # Extract spatial coordinates and expression from a Seurat object --------------
 #

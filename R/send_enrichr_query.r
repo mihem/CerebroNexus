@@ -36,7 +36,7 @@
       !all(genes == '')
   ) {
     ## send request with gene names
-    temp <- httr::POST(
+    httr::POST(
       url = paste0(URL_API, "/enrich"),
       body = list(
         list = paste(genes, collapse = '\n')
@@ -46,7 +46,7 @@
     ## ... input is a data frame
   } else if (is.data.frame(genes)) {
     ## send request with gene names and scores
-    temp <- httr::POST(
+    httr::POST(
       url = paste0(URL_API, "/enrich"),
       body = list(
         list = paste(paste(genes[, 1], genes[, 2], sep = ','), collapse = '\n')
@@ -65,12 +65,6 @@
 
   ##
   httr::GET(url = paste0(URL_API, "/share"))
-
-  ##
-  dfSAF <- options()$stringsAsFactors
-
-  ##
-  options()
 
   ##
   enrichr_export_fun <- function(x) {

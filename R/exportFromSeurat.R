@@ -1204,7 +1204,6 @@ exportFromSeurat <- function(
       )
     )
   }
-  projections <- list()
   projections_available <- names(object@reductions)
   projections_available_pca <- projections_available[grep(
     projections_available,
@@ -1616,9 +1615,6 @@ exportFromSeurat <- function(
   ##
   ## currently, only tables can be exported
   ##--------------------------------------------------------------------------##
-
-  ## define valid categories
-  valid_categories <- c('tables')
 
   ## check of extra material exists, that it is in list format, and that the
   ## list is not empty
