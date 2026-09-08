@@ -98,8 +98,26 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
 }
 
 test_that("{shinytest2} recording: overview", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "overview", height = 950, width = 1619)
+  launcher_dir <- withr::local_tempdir()
+  writeLines(
+    c(
+      "CerebroNexus::launchCerebro(",
+      "  mode = \"closed\",",
+      "  crb_file_to_load = system.file(",
+      "    \"extdata/examples/example.crb\",",
+      "    package = \"CerebroNexus\"",
+      "  )",
+      ")"
+    ),
+    file.path(launcher_dir, "app.R")
+  )
+  local_app_support(launcher_dir)
+  app <- AppDriver$new(
+    launcher_dir,
+    name = "overview",
+    height = 950,
+    width = 1619
+  )
   app$wait_for_idle(timeout = 20000)
 
   ## Data Info tab: verify key values from the loaded example.crb

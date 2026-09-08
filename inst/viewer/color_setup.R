@@ -89,10 +89,16 @@ color_input_id <- function(variable, level) {
   }
   selected_path <- available_crb_files$selected
   configured_index <- match(selected_path, unname(configured_files))
-  dataset <- if (length(configured_index) == 1L && !is.na(configured_index)) {
-    names(configured_files)[[configured_index]]
-  } else {
-    selected_path
+  dataset <- selected_path
+  if (length(configured_index) == 1L && !is.na(configured_index)) {
+    configured_name <- names(configured_files)[configured_index]
+    if (
+      length(configured_name) == 1L &&
+        !is.na(configured_name) &&
+        nzchar(configured_name)
+    ) {
+      dataset <- configured_name
+    }
   }
   encode <- function(value) {
     paste(format(charToRaw(enc2utf8(as.character(value)))), collapse = "")

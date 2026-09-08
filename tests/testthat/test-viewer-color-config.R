@@ -157,3 +157,27 @@ test_that("manual colours are isolated by loaded data set", {
     )
   })
 })
+
+test_that("manual colours support an unnamed single-file launcher", {
+  server <- function(input, output, session) {
+    path <- "/data/a.crb"
+    Cerebro.options <- list(colors = NULL, crb_file_to_load = path)
+    available_crb_files <- reactiveValues(selected = path)
+    data_set <- reactive(TRUE)
+    getMetaData <- function() data.frame(group = c("a", "b"))
+    getGroups <- function() "group"
+    getGroupLevels <- function(group) c("a", "b")
+    getCellCycle <- function() character()
+    scope <- environment()
+    sys.source(viewer_test_path("color_config.R"), envir = scope)
+    sys.source(viewer_test_path("color_setup.R"), envir = scope)
+
+    session$userData$colors <- reactive_colors
+    session$userData$input_id <- color_input_id
+  }
+
+  shiny::testServer(server, {
+    expect_length(session$userData$input_id("group", "a"), 1L)
+    expect_no_error(session$userData$colors())
+  })
+})

@@ -538,35 +538,6 @@ test_that("launchCerebro rejects non-logical projections_show_hover_info", {
   )
 })
 
-test_that("launchCerebro loads the installed Viewer", {
-  had_options <- exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  previous_options <- if (had_options) {
-    get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  } else {
-    NULL
-  }
-  on.exit(
-    {
-      if (had_options) {
-        assign("Cerebro.options", previous_options, envir = .GlobalEnv)
-      } else if (
-        exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-      ) {
-        rm("Cerebro.options", envir = .GlobalEnv)
-      }
-    },
-    add = TRUE
-  )
-
-  app <- launchCerebro(mode = "closed")
-
-  expect_s3_class(app, "shiny.appobj")
-  expect_identical(
-    get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)$mode,
-    "closed"
-  )
-})
-
 ## ---------------------------------------------------------------------------
 ## .getExpressionMatrix on a counts-only Seurat v5 object
 ##
