@@ -2126,12 +2126,19 @@ run_cell_views_node <- function(hooks, body, setup = character()) {
   output
 }
 
-test_that("indexed hover lookup matches the linear result", {
+test_that("indexed hover lookup stays exact and redraws only the overlay", {
   output <- run_cell_views_node(
     c(
       "shown = function () { return true; };",
+      "var fullDraws = 0, overlayDraws = 0;",
+      "drawAll = function () { fullDraws++; };",
+      "drawInteractionOverlay = function () { overlayDraws++; };",
+      "panels = [{spaceId:'test'}];",
       "window.__cellViewsTest = {",
-      "  build: buildHitGrid, nearest: nearest, linear: nearestLinear",
+      "  build: buildHitGrid, nearest: nearest, linear: nearestLinear,",
+      "  hover: setHoverCell,",
+      "  flush: function () { window.__frame(); },",
+      "  counts: function () { return [fullDraws, overlayDraws]; }",
       "};"
     ),
     c(
@@ -2145,33 +2152,14 @@ test_that("indexed hover lookup matches the linear result", {
       "const indexed = __cellViewsTest.nearest(p, 100, 100);",
       "const built = !!p._hitGrid;",
       "const linear = __cellViewsTest.linear(p, 100, 100);",
-      "console.log([indexed, linear, built].join('|'));"
-    )
-  )
-
-  expect_identical(tail(output, 1L), "4321|4321|true")
-})
-
-test_that("hover changes redraw only the overlay layer", {
-  output <- run_cell_views_node(
-    c(
-      "var fullDraws = 0, hoverDraws = 0;",
-      "drawAll = function () { fullDraws++; };",
-      "drawHoverAll = function () { hoverDraws++; };",
-      "window.__cellViewsTest = {",
-      "  hover: setHoverCell,",
-      "  flush: function () { window.__frame(); },",
-      "  counts: function () { return [fullDraws, hoverDraws]; }",
-      "};"
-    ),
-    c(
       "__cellViewsTest.hover(7); __cellViewsTest.flush();",
-      "console.log(__cellViewsTest.counts().join('|'));"
+      "console.log([indexed, linear, built]",
+      "  .concat(__cellViewsTest.counts()).join('|'));"
     ),
     "global.requestAnimationFrame = function (fn) { window.__frame = fn; return 1; };"
   )
 
-  expect_identical(tail(output, 1L), "0|1")
+  expect_identical(tail(output, 1L), "4321|4321|true|0|1")
 })
 
 test_that("specialist base retains only the active payload cells", {
@@ -2438,7 +2426,7 @@ test_that("specialist identity reset retains the payload being activated", {
   expect_identical(tail(output, 1L), "new|new|null")
 })
 
-test_that("continuous caches follow replaced value arrays", {
+test_that("continuous caches refresh values and retain only current gene data", {
   output <- run_cell_views_node(
     c(
       "window.__cellViewsTest = {",
@@ -2448,51 +2436,10 @@ test_that("continuous caches follow replaced value arrays", {
       "  order: function (mode) { return paintOrder({colorBy:mode}); },",
       "  range: function (mode) { return clipRange({colorBy:mode}); },",
       "  geneMode: GENE_MODE, fieldMode: FIELD_PREFIX + 'score',",
-      "  otherMode: FIELD_PREFIX + 'other'",
-      "};"
-    ),
-    c(
-      "const t = __cellViewsTest;",
-      "t.setData({n:4, gene:{gene:'G', v:[0,100,50,200]}, fields:{",
-      "  score:{v:[0,0,0,255], scale:255},",
-      "  other:{v:[40,30,20,10], scale:255}}});",
-      "t.order(t.geneMode); t.range(t.geneMode);",
-      "t.replaceGene([10,40,20,30]);",
-      "const geneOrder = t.order(t.geneMode);",
-      "const geneRange = t.range(t.geneMode);",
-      "t.order(t.fieldMode); t.range(t.fieldMode);",
-      "t.replaceField([10,40,20,30]);",
-      "const fieldOrder = t.order(t.fieldMode);",
-      "const fieldRange = t.range(t.fieldMode);",
-      "t.order(t.otherMode); t.range(t.otherMode);",
-      "const fieldOrderAgain = t.order(t.fieldMode);",
-      "const fieldRangeAgain = t.range(t.fieldMode);",
-      "t.setData({n:4, gene:{gene:'NA', v:[null,null,null,null]}, fields:{}});",
-      "const missingRange = t.range(t.geneMode);",
-      "const missingRangeAgain = t.range(t.geneMode);",
-      "console.log([geneOrder.join(','), geneRange.lo + ':' + geneRange.hi,",
-      "  fieldOrder.join(','), fieldRange.lo + ':' + fieldRange.hi,",
-      "  fieldOrder === fieldOrderAgain, fieldRange === fieldRangeAgain,",
-      "  missingRange === missingRangeAgain].join('|'));"
-    )
-  )
-
-  expect_identical(
-    tail(output, 1L),
-    "0,2,3,1|10:40|0,2,3,1|10:40|true|true|true"
-  )
-})
-
-test_that("gene caches retain only the current value array", {
-  output <- run_cell_views_node(
-    c(
-      "window.__cellViewsTest = {",
-      "  seed: function () { D = {n:2, fields:{}}; },",
+      "  otherMode: FIELD_PREFIX + 'other',",
       "  setGene: function (index, values) {",
       "    D.gene = {gene:'G' + index, v:values}; colorClip = (index % 4) / 100;",
       "  },",
-      "  order: function () { return paintOrder({colorBy:GENE_MODE}); },",
-      "  range: function () { return clipRange({colorBy:GENE_MODE}); },",
       "  clearGene: function () {",
       "    D.gene = null; paintOrder({colorBy:GENE_MODE});",
       "    clipRange({colorBy:GENE_MODE});",
@@ -2514,17 +2461,46 @@ test_that("gene caches retain only the current value array", {
       "};"
     ),
     c(
-      "const t = __cellViewsTest; t.seed(); let values;",
+      "const t = __cellViewsTest;",
+      "t.setData({n:4, gene:{gene:'G', v:[0,100,50,200]}, fields:{",
+      "  score:{v:[0,0,0,255], scale:255},",
+      "  other:{v:[40,30,20,10], scale:255}}});",
+      "t.order(t.geneMode); t.range(t.geneMode);",
+      "t.replaceGene([10,40,20,30]);",
+      "const geneOrder = t.order(t.geneMode);",
+      "const geneRange = t.range(t.geneMode);",
+      "t.order(t.fieldMode); t.range(t.fieldMode);",
+      "t.replaceField([10,40,20,30]);",
+      "const fieldOrder = t.order(t.fieldMode);",
+      "const fieldRange = t.range(t.fieldMode);",
+      "t.order(t.otherMode); t.range(t.otherMode);",
+      "const fieldOrderAgain = t.order(t.fieldMode);",
+      "const fieldRangeAgain = t.range(t.fieldMode);",
+      "t.setData({n:4, gene:{gene:'NA', v:[null,null,null,null]}, fields:{}});",
+      "const missingRange = t.range(t.geneMode);",
+      "const missingRangeAgain = t.range(t.geneMode);",
+      "t.setData({n:2, fields:{}}); let values;",
       "for (let i = 0; i < 100; i++) {",
-      "  values = [i, i + 1]; t.setGene(i, values); t.order(); t.range();",
+      "  values = [i, i + 1]; t.setGene(i, values);",
+      "  t.order(t.geneMode); t.range(t.geneMode);",
       "}",
-      "const order = t.order(), range = t.range();",
+      "const order = t.order(t.geneMode), range = t.range(t.geneMode);",
       "const stats = t.stats(values, order, range);",
-      "console.log(stats.concat(t.clearGene()).join('|'));"
+      "console.log([geneOrder.join(','), geneRange.lo + ':' + geneRange.hi,",
+      "  fieldOrder.join(','), fieldRange.lo + ':' + fieldRange.hi,",
+      "  fieldOrder === fieldOrderAgain, fieldRange === fieldRangeAgain,",
+      "  missingRange === missingRangeAgain]",
+      "  .concat(stats, t.clearGene()).join('|'));"
     )
   )
 
-  expect_identical(tail(output, 1L), "1|1|0|0|true|true|false|false")
+  expect_identical(
+    tail(output, 1L),
+    paste0(
+      "0,2,3,1|10:40|0,2,3,1|10:40|true|true|true|",
+      "1|1|0|0|true|true|false|false"
+    )
+  )
 })
 
 test_that("freehand drag queues every point and flushes mouseup", {
@@ -2588,70 +2564,4 @@ test_that("dedicated cell views do not request the Linked Views bundle", {
     fixed = TRUE
   )
   expect_no_match(js, "var vis = linkedVis || !!singleId;", fixed = TRUE)
-  expect_match(js, "function singlePayloadCells(payload)", fixed = TRUE)
-  expect_match(js, "function alignStructuredHover(hover)", fixed = TRUE)
-  expect_match(js, "var hoverDrawFrame = null", fixed = TRUE)
-  expect_match(js, "window.cerebroSavedViewDataset || {}", fixed = TRUE)
-  expect_match(js, "identity.cell_fingerprint", fixed = TRUE)
-  expect_match(js, "_singleOnly: true", fixed = TRUE)
-  expect_match(js, "if (singleId && singleViews[singleId])", fixed = TRUE)
-  expect_no_match(
-    js,
-    "singleId && linkedBundle && singleViews[singleId]",
-    fixed = TRUE
-  )
-  expect_no_match(js, "dataset_id: 'single-view'", fixed = TRUE)
-})
-
-test_that("continuous panel calculations cache every field for the current data", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
-  skip_if_not(file.exists(js_file))
-  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
-
-  expect_match(js, "var _ordD = null, _ordCache = new Map();", fixed = TRUE)
-  expect_match(js, "cached.values === vals", fixed = TRUE)
-  expect_match(
-    js,
-    "_ordCache.set(key, { values: vals, order: ord });",
-    fixed = TRUE
-  )
-  expect_match(js, "var _clipD = null, _clipCache = new Map();", fixed = TRUE)
-  expect_match(
-    js,
-    "_clipCache.set(key, { values: vals, clip: colorClip, range: r });",
-    fixed = TRUE
-  )
-  expect_no_match(js, "_ordKey", fixed = TRUE)
-  expect_no_match(js, "_clipKey", fixed = TRUE)
-})
-
-test_that("pointer drags coalesce frames and flush the final event", {
-  js_file <- file.path(dirname(bundle_file), "..", "www", "cell_views.js")
-  skip_if_not(file.exists(js_file))
-  js <- paste(readLines(js_file, warn = FALSE), collapse = "\n")
-  start <- regexpr("function wireBrush(p)", js, fixed = TRUE)[[1]]
-  finish <- regexpr(
-    "// ---- build panels from DOM",
-    substring(js, start),
-    fixed = TRUE
-  )[[1]]
-  brush <- substring(js, start, start + finish - 2L)
-
-  expect_match(brush, "var dragFrame = null, dragEvents = [];", fixed = TRUE)
-  expect_match(brush, "function applyDragMoves(events)", fixed = TRUE)
-  expect_match(brush, "dragFrame = requestAnimationFrame", fixed = TRUE)
-  expect_match(brush, "cancelAnimationFrame(dragFrame)", fixed = TRUE)
-  expect_match(
-    brush,
-    "window.addEventListener('mouseup', function (e) {\n      flushDragMoves(e);",
-    fixed = TRUE
-  )
-  expect_match(js, "p.drag || p.panning || p.orbiting", fixed = TRUE)
-  expect_equal(
-    lengths(regmatches(
-      brush,
-      gregexpr("requestAnimationFrame", brush, fixed = TRUE)
-    )),
-    1L
-  )
 })

@@ -256,18 +256,11 @@ trajectory_projection_selected_cells <- reactive({
   ## <plot_id>_persistent_selection, so it survives plot-parameter changes.
   ## The identifier matches how the selected-cells table keys cells
   ## (paste0 of the two projection coordinates with '-').
-  sel <- input[["trajectory_projection_persistent_selection"]]
-  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
-    return(NULL)
-  }
-  selection <- data.frame(
-    x = as.numeric(sel[["x"]]),
-    y = as.numeric(sel[["y"]]),
-    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
-    stringsAsFactors = FALSE
+  selection <- persistentCellSelection(
+    input[["trajectory_projection_persistent_selection"]]
   )
-  if (length(sel[["ids"]]) == nrow(selection)) {
-    selection[["selection_key"]] <- as.character(sel[["ids"]])
+  if (is.null(selection)) {
+    return(NULL)
   }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and

@@ -15,11 +15,10 @@ packages or changing asynchronous execution semantics.
 
 ## Design
 
-1. Delay hidden outputs until the first browser flush has completed. Restore
-   their existing `suspendWhenHidden = FALSE` behavior one second later, with a
-   short stagger, using the already available `later` package.
-2. Add `debounceAfterFirst()`: the first reactive value is delivered
-   immediately, while later invalidations retain the current debounce delay.
+1. Keep hidden outputs suspended until their owning sidebar tab is visited,
+   then restore their existing `suspendWhenHidden = FALSE` behavior.
+2. Use `debounceEventAfterFirst()`: the first event is delivered immediately;
+   later events debounce before evaluating the expensive reactive.
 3. Fetch all requested RGB genes with one `getExpressionMatrix()` call in Gene
    Expression, Spatial, and Linked Views, then split the returned rows locally.
 4. Cache rotated full Spatial extents within a session. The key includes the

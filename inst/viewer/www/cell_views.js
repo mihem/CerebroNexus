@@ -114,13 +114,6 @@
     '#FF6692', '#B6E880', '#FF97FF', '#FECB52', '#2f6fd6', '#f97316',
     '#16a34a', '#9a5cd0', '#e05780', '#38b2ac', '#d97706', '#7bb0e8'];
 
-  function cssEscape(value) {
-    if (window.CSS && typeof window.CSS.escape === 'function') {
-      return window.CSS.escape(String(value));
-    }
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  }
-
   // RGB co-expression: cells whose max channel is <= RGB_MIN form a light-grey
   // substrate; the rest blend FROM that grey toward their full-brightness hue by
   // intensity (max/255), so weak co-expression stays faint (≈grey). Cells above
@@ -1473,11 +1466,6 @@
       c.fillStyle = 'rgba(255,112,19,.07)'; c.fill(); c.stroke();
     }
     c.globalAlpha = 1;
-  }
-  function drawHoverAll() {
-    panels.forEach(function (p) {
-      if (p.spaceId) drawInteractionOverlay(p);
-    });
   }
   // Live "showing N / M cells" readout — the single feedback that a filter or
   // subsample took effect, regardless of what the panels are coloured by.
@@ -3276,7 +3264,9 @@
     if (hoverDrawFrame !== null) return;
     hoverDrawFrame = requestAnimationFrame(function () {
       hoverDrawFrame = null;
-      drawHoverAll();
+      panels.forEach(function (p) {
+        if (p.spaceId) drawInteractionOverlay(p);
+      });
     });
   }
 

@@ -15,18 +15,11 @@ spatial_projection_selected_cells <- reactive({
   ## '-'), so downstream filtering is unchanged.
   ## The shared renderer pushes the persistent selection under
   ## <plot_id>_persistent_selection; the spatial plot id is 'spatial_projection'.
-  sel <- input[["spatial_projection_persistent_selection"]]
-  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
-    return(NULL)
-  }
-  selection <- data.frame(
-    x = as.numeric(sel[["x"]]),
-    y = as.numeric(sel[["y"]]),
-    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
-    stringsAsFactors = FALSE
+  selection <- persistentCellSelection(
+    input[["spatial_projection_persistent_selection"]]
   )
-  if (length(sel[["ids"]]) == nrow(selection)) {
-    selection[["selection_key"]] <- as.character(sel[["ids"]])
+  if (is.null(selection)) {
+    return(NULL)
   }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and

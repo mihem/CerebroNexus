@@ -103,35 +103,6 @@ run_sync_perf_cell_sampling <- function(view, metadata, filters, percentage) {
   )
 }
 
-test_that("the first reactive value bypasses debounce", {
-  utility_env <- new.env(parent = globalenv())
-  sys.source(
-    file.path(sync_perf_viewer_root, "utility_functions.R"),
-    envir = utility_env
-  )
-  expect_true(is.function(utility_env$debounceAfterFirst))
-
-  compute_count <- 0L
-  server <- function(input, output, session) {
-    raw <- shiny::reactive({
-      shiny::req(input$value)
-      compute_count <<- compute_count + 1L
-      input$value
-    })
-    ready <- utility_env$debounceAfterFirst(raw, 10000)
-  }
-
-  shiny::testServer(server, {
-    session$setInputs(value = "first")
-    expect_identical(ready(), "first")
-    expect_identical(compute_count, 1L)
-
-    session$setInputs(value = "second")
-    expect_identical(ready(), "first")
-    expect_identical(compute_count, 2L)
-  })
-})
-
 test_that("event debounce coalesces expensive work after the first value", {
   utility_env <- new.env(parent = globalenv())
   sys.source(
@@ -334,18 +305,14 @@ test_that("RGB and linked expression use batched reads", {
   linked <- read_sync_perf_viewer("coordinated_views", "server.R")
 
   expect_match(gene_expression, "viewerExpressionValues", fixed = TRUE)
-  expect_match(spatial, "viewerExpressionValues", fixed = TRUE)
-  expect_match(linked, "cv_gene_values_many", fixed = TRUE)
-  expect_match(linked, "viewerExpressionValues", fixed = TRUE)
-})
-
-test_that("separate gene panels do not transpose the expression matrix", {
-  gene_expression <- read_sync_perf_viewer(
-    "gene_expression",
-    "obj_projection_expression_levels.R"
-  )
-
   expect_no_match(gene_expression, "Matrix::t", fixed = TRUE)
+  expect_match(spatial, "viewerExpressionValues", fixed = TRUE)
+  expect_match(
+    linked,
+    "unname(cv_gene_values_many(requested, cells)[requested])",
+    fixed = TRUE
+  )
+  expect_no_match(linked, "cv_gene_values <- function", fixed = TRUE)
 })
 
 test_that("Spatial full extents are memoized by a session reactive", {
@@ -531,16 +498,6 @@ test_that("specialist cell sampling uses one original-row index sample", {
   )
   expect_identical(scalar$cells, 42L)
   expect_identical(scalar$sample_calls, "sample.int")
-
-  for (view in views) {
-    source <- read_sync_perf_viewer(view$file)
-    expect_match(source, "viewerProjectionCellIndices", fixed = TRUE)
-    expect_no_match(source, "cerebroGroupFilterMask", fixed = TRUE)
-    expect_no_match(source, "sample.int", fixed = TRUE)
-    expect_no_match(source, "dplyr::mutate", fixed = TRUE)
-    expect_no_match(source, "dplyr::select", fixed = TRUE)
-    expect_no_match(source, "randomlySubsetCells", fixed = TRUE)
-  }
 })
 
 test_that("projection hover packages an existing metadata subset", {

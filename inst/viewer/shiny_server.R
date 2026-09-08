@@ -522,72 +522,29 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Tabs.
   ##--------------------------------------------------------------------------##
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/module/group_filters/group_filters_widget.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/load_data/server.R"),
-    local = TRUE
-  )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/overview/server.R"),
-    local = TRUE
-  )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/groups/server.R"),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/marker_genes/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/gene_expression/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/gene_id_conversion/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/color_management/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/about/server.R"),
-    local = TRUE
-  )
-  ## Enhanced module servers.
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/most_expressed_genes/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/enriched_pathways/server.R"
-    ),
-    local = TRUE
-  )
+  for (.viewer_source_file in c(
+    "module/group_filters/group_filters_widget.R",
+    "load_data/server.R",
+    "overview/server.R",
+    "groups/server.R",
+    "marker_genes/server.R",
+    "gene_expression/server.R",
+    "gene_id_conversion/server.R",
+    "color_management/server.R",
+    "about/server.R",
+    "most_expressed_genes/server.R",
+    "enriched_pathways/server.R"
+  )) {
+    source(
+      paste0(
+        Cerebro.options[["cerebro_root"]],
+        "/viewer/",
+        .viewer_source_file
+      ),
+      local = TRUE
+    )
+  }
+  rm(.viewer_source_file)
 
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
@@ -684,55 +641,26 @@ server <- function(input, output, session) {
     }
   )
 
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/extra_material/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/immune_repertoire/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/trajectory/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/spatial/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/trekker/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/coordinated_views/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/hla_tcr_motifs/server.R"
-    ),
-    local = TRUE
-  )
+  for (.viewer_module in c(
+    "extra_material",
+    "immune_repertoire",
+    "trajectory",
+    "spatial",
+    "trekker",
+    "coordinated_views",
+    "hla_tcr_motifs"
+  )) {
+    source(
+      paste0(
+        Cerebro.options[["cerebro_root"]],
+        "/viewer/",
+        .viewer_module,
+        "/server.R"
+      ),
+      local = TRUE
+    )
+  }
+  rm(.viewer_module)
 
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).

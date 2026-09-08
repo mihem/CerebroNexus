@@ -396,14 +396,10 @@ test_that("show_upload_ui controls the generated Viewer upload mode", {
     readRDS(file.path(closed_app, "cerebro_config.rds"))$mode,
     "closed"
   )
-  expect_false(
-    readRDS(file.path(default_app, "cerebro_config.rds"))$show_upload_ui
-  )
   expect_identical(
     readRDS(file.path(open_app, "cerebro_config.rds"))$mode,
     "open"
   )
-  expect_true(readRDS(file.path(open_app, "cerebro_config.rds"))$show_upload_ui)
 })
 
 test_that("createShinyApp stores a validated initial Viewer page", {

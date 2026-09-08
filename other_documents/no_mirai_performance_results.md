@@ -7,7 +7,8 @@
 - Current microbenchmarks: the candidate working tree above `649508cf` versus
   the replaced algorithm on the same runtime.
 - Runtime: Apple M1 Pro, 32 GiB RAM, macOS 27.0, R 4.6.1, Node 26.5.1.
-- No asynchronous runtime, cross-session cache, or new dependency is used.
+- No asynchronous runtime, cross-session data/R6 cache, or new dependency is
+  used.
 
 ## End-to-end and server-path measurements
 
@@ -40,6 +41,37 @@ not pay that cost.
 Moving interaction marks to the overlay removes 6,000,000 cell-loop iterations
 and 2,000,000 bytes (1.91 MiB) of visibility-mask allocation per hover event for
 four 500,000-cell panels, before counting the avoided Canvas paint operations.
+
+## Logic and test simplification after `d0691418`
+
+These are static source counts for the files touched by the cleanup, not new
+runtime benchmark results. Existing behavior-oriented tests were retained;
+dead-helper coverage and duplicate source-shape assertions were removed.
+
+| Area | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Modified production source | 11,999 lines | 11,961 lines | -38 (-0.3%) |
+| Targeted Viewer tests | 3,403 lines | 3,271 lines | -132 (-3.9%) |
+| Targeted test cases | 95 | 89 | -6 (-6.3%) |
+| Node process launches in coordinated-view tests | 12 | 10 | -2 (-16.7%) |
+| Completed implementation plan | 93 lines | 0 | -93 (-100%) |
+| Cleanup targets excluding report/design edits | 15,495 lines | 15,232 lines | -263 (-1.7%) |
+| All modified files including report/design edits | 15,627 lines | 15,394 lines | -233 (-1.5%) |
+
+| Control/data path | Before | After | Structural change |
+| --- | ---: | ---: | ---: |
+| Linked-view config expression reads | up to N genes | 1 batch | N to 1 |
+| Gene render: coordinate reactive reads | 6 call sites | 1 | -83.3% |
+| Gene render: expression reactive reads | 3 call sites | 2 | -33.3% |
+| Gene render: hover reactive reads | 4 call sites | 1 | -75.0% |
+| Gene render: trajectory reactive reads | 3 call sites | 1 | -66.7% |
+| Spatial render: metadata reactive reads | 3 call sites | 1 | -66.7% |
+| Spatial render: hover reactive reads | 4 call sites | 1 | -75.0% |
+| Spatial render: coordinate reactive reads | 2 call sites | 1 | -50.0% |
+
+The Shiny reactive values were already memoized within an invalidation cycle, so
+the call-site reductions primarily flatten dependency flow and remove repeated
+lookups. No additional runtime speedup is claimed without a fresh benchmark.
 
 ## Method
 

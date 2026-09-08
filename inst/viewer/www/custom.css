@@ -352,13 +352,7 @@ body .content-wrapper, body .right-side {
 .content-header > h1 { font-size: 22px; font-weight: 650; margin: 0; }
 
 /* -------------------------------------------------------------------------
-   Responsive layout — the visualization is the star.
-   The viz tabs (overview / gene expression / spatial / trajectory / IR) split
-   into a parameter column + a plot column, historically a fixed Bootstrap 3/9
-   grid that made the param panel balloon on wide screens. We switch that row to
-   flexbox: the param column is pinned to a comfortable width band (never so
-   narrow its "<title> info" wraps, never wider than needed), and the plot
-   column absorbs ALL the slack — shrinking or growing takes it, not the chrome.
+   Visualization layout.
    ------------------------------------------------------------------------- */
 /* AdminLTE nests two padded containers: .content-wrapper (our 26px) AND an
    inner section.content (a further 15px each side). Stacked, they inset every
@@ -371,39 +365,13 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   display: flex !important;
   flex-wrap: nowrap;
   align-items: flex-start;
-  /* No flex `gap`: it was inserting 16px BEFORE the first column too, pushing the
-     param panel off the left edge (and symmetrically the plot off the right).
-     The single inter-panel space is a right margin on the param column instead,
-     so both outer edges sit flush against the content padding. */
   margin: 0 !important;
   width: auto !important;
 }
-/* cerebroBox wraps its content in an inner .col-sm-12 that carries Bootstrap's
-   15px side padding. Stacked with our column gap and the column's own edges,
-   that pushed the param panel and the plot far apart (a fat empty channel).
-   Zero that inner padding so each box hugs its column edge — the flex `gap`
-   above is then the ONLY space between the two panels. */
-.cerebro-viz-row > .cerebro-param-col > .col-sm-12,
 .cerebro-viz-row > .cerebro-viz-col > .col-sm-12,
-/* Spatial wraps its Main/Additional boxes in a <div> (for the histology-control
-   insertion), so those boxes are a grandchild of the column, not a direct child.
-   Zero their side padding too — otherwise they keep the default 15px box gutter
-   while the unwrapped Group-filters box hugs the edge, and the two read as
-   misaligned. */
-.cerebro-viz-row > .cerebro-param-col > div > .col-sm-12,
 .cerebro-viz-row > .cerebro-viz-col > div > .col-sm-12 {
   padding-left: 0 !important;
   padding-right: 0 !important;
-}
-/* Param column: fixed comfortable width, no grow/shrink. min keeps the heading +
-   info button on one line; max caps it so wide screens don't bloat it. */
-.cerebro-viz-row > .cerebro-param-col {
-  flex: 0 0 clamp(300px, 23%, 360px);
-  width: auto !important;        /* override Bootstrap .col-sm-3 width */
-  max-width: 360px;
-  min-width: 300px;
-  padding: 0 !important;         /* kill Bootstrap col gutter */
-  margin-right: 16px;            /* the ONLY space between the two panels */
 }
 /* Plot column: takes every remaining pixel. min-width:0 lets Plotly shrink
    below its content size instead of forcing overflow. */
@@ -685,22 +653,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   background: var(--c-amber-100);
 }
 .cerebro-more-btn:active { transform: scale(.955); }
-
-.cerebro-viz-toolbar .cerebro-toolbar-export {
-  height: var(--c-toolbar-control-height);
-  padding: 0 12px;
-  border-color: var(--c-border-2) !important;
-  border-radius: var(--r-sm);
-  background: var(--c-surface) !important;
-  color: var(--c-text-2) !important;
-  font-size: 13px;
-  font-weight: 650;
-}
-.cerebro-viz-toolbar .cerebro-toolbar-export:hover {
-  border-color: var(--c-amber-300) !important;
-  background: var(--c-amber-50) !important;
-  color: var(--c-amber-700) !important;
-}
 
 .cerebro-more-caret {
   width: 0;
@@ -1018,21 +970,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Narrow viewports: stack the param panel above the plot rather than crushing
-   both. Below this width a side-by-side split isn't comfortable anyway. */
-@media (max-width: 900px) {
-  .cerebro-viz-row { flex-wrap: wrap; }
-  .cerebro-viz-row > .cerebro-param-col {
-    flex: 1 1 100%;
-    max-width: none;
-    /* Drop the 300px floor once stacked: on a phone (or with the sidebar open
-       on a narrow screen) the content area can be < 300px, and a hard min-width
-       would push the panel wider than its container and scroll the page
-       sideways. Full-width-but-shrinkable is the correct stacked behaviour. */
-    min-width: 0;
-  }
-}
-
 /* -------------------------------------------------------------------------
    Fill-to-viewport height. www/fill_height.js sets an explicit pixel height on
    every `.cerebro-fill` element (viewport - its live top - a bottom gap). This

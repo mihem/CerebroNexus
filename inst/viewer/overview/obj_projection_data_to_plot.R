@@ -2,8 +2,9 @@
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
 overview_projection_data_to_plot_raw <- reactive({
+  plot_parameters <- overview_projection_parameters_plot()
   req(
-    overview_projection_parameters_plot(),
+    plot_parameters,
     reactive_colors()
   )
   cells_df <- overview_projection_data()
@@ -14,7 +15,6 @@ overview_projection_data_to_plot_raw <- reactive({
       !isTRUE(hover_info$enabled) ||
       nrow(cells_df) == length(hover_info$selection_key)
   )
-  plot_parameters <- overview_projection_parameters_plot()
   color_variable <- plot_parameters[['color_variable']]
   if (nrow(cells_df) == 0L) {
     color_assignments <- character(0)

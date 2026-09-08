@@ -2,48 +2,49 @@
 ## Object that combines all data required for updating projection plot.
 ##----------------------------------------------------------------------------##
 expression_projection_data_to_plot_raw <- reactive({
+  coordinates <- expression_projection_coordinates()
+  plot_parameters <- expression_projection_parameters_plot()
+  color_settings <- expression_projection_parameters_color()
+  hover_info <- expression_projection_hover_info()
+  trajectory <- expression_projection_trajectory()
+  display_mode <- input[["expression_projection_genes_in_separate_panels"]]
   req(
-    expression_projection_coordinates(),
-    expression_projection_parameters_plot(),
-    expression_projection_parameters_color(),
-    expression_projection_hover_info(),
-    expression_projection_trajectory(),
-    nrow(expression_projection_coordinates()) ==
-      length(isolate(expression_projection_expression_levels())) ||
-      nrow(expression_projection_coordinates()) ==
-        length(isolate(expression_projection_expression_levels())[[1]]),
-    !isTRUE(expression_projection_hover_info()$enabled) ||
-      nrow(expression_projection_coordinates()) ==
-        length(expression_projection_hover_info()$selection_key),
-    !is.null(input[["expression_projection_genes_in_separate_panels"]])
+    coordinates,
+    plot_parameters,
+    color_settings,
+    hover_info,
+    trajectory,
+    !is.null(display_mode)
   )
-  parameters <- expression_projection_parameters_plot()
-  if (parameters[['is_trajectory']]) {
+  expression_levels <- isolate(expression_projection_expression_levels())
+  req(
+    nrow(coordinates) == length(expression_levels) ||
+      nrow(coordinates) == length(expression_levels[[1]]),
+    !isTRUE(hover_info$enabled) ||
+      nrow(coordinates) == length(hover_info$selection_key)
+  )
+  expression_levels <- expression_projection_expression_levels()
+  if (plot_parameters[['is_trajectory']]) {
     req(
-      nrow(expression_projection_coordinates()) ==
-        nrow(expression_projection_trajectory()[['meta']])
+      nrow(coordinates) == nrow(trajectory[['meta']])
     )
   }
-  to_return <- list(
-    coordinates = expression_projection_coordinates(),
+  list(
+    coordinates = coordinates,
     reset_axes = isolate(expression_projection_parameters_other[[
       'reset_axes'
     ]]),
-    expression_levels = expression_projection_expression_levels(),
-    plot_parameters = expression_projection_parameters_plot(),
-    color_settings = expression_projection_parameters_color(),
+    expression_levels = expression_levels,
+    plot_parameters = plot_parameters,
+    color_settings = color_settings,
     selection_keys = as.character(
       expression_projection_data()[["cell_barcode"]]
     ),
-    hover_info = expression_projection_hover_info(),
-    trajectory = expression_projection_trajectory(),
-    display_mode = input[["expression_projection_genes_in_separate_panels"]],
-    separate_panels = identical(
-      input[["expression_projection_genes_in_separate_panels"]],
-      "separate"
-    )
+    hover_info = hover_info,
+    trajectory = trajectory,
+    display_mode = display_mode,
+    separate_panels = identical(display_mode, "separate")
   )
-  return(to_return)
 })
 
 expression_projection_render_event <- viewerProjectionEvent(

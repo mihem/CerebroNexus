@@ -30,10 +30,10 @@ skip_if_not(file.exists(utils_file), "utility_functions.R not found")
 utils_env <- new.env()
 source(utils_file, local = utils_env)
 prettifyTable <- utils_env$prettifyTable
-centerOfGroups <- utils_env$centerOfGroups
 cachePlot <- utils_env$cachePlot
 viewerUploadsEnabled <- utils_env$viewerUploadsEnabled
 viewerUploadPath <- utils_env$viewerUploadPath
+persistentCellSelection <- utils_env$persistentCellSelection
 
 test_that("infinite values are replaced without changing other columns", {
   replaceInfiniteValues <- utils_env$replaceInfiniteValues
@@ -417,25 +417,6 @@ test_that("spatial offset ranges require finite coordinates", {
   expect_match(source_text, "length\\(x\\) > 0 && length\\(y\\) > 0")
 })
 
-## ---------------------------------------------------------------------------
-## centerOfGroups
-## ---------------------------------------------------------------------------
-
-test_that("centerOfGroups computes 2D medians per group", {
-  result <- centerOfGroups(
-    coordinates = list(c(0, 10, 2), c(0, 10, 12)),
-    df = data.frame(grp = c("A", "A", "B")),
-    n_dimensions = 2,
-    group = "grp"
-  )
-  result <- as.data.frame(result)
-  expect_setequal(result$group, c("A", "B"))
-  expect_equal(result$x_median[result$group == "A"], 5)
-  expect_equal(result$y_median[result$group == "A"], 5)
-  expect_equal(result$x_median[result$group == "B"], 2)
-  expect_equal(result$y_median[result$group == "B"], 12)
-})
-
 test_that("cell scatter payload rejects incoherent categorical snapshots", {
   payload <- utils_env$cerebroCellViewScatterPayload
   common <- list(
@@ -494,24 +475,8 @@ test_that("single-cell scatter payloads remain arrays on the wire", {
   expect_type(wire$data$x[[1L]], "list")
   expect_type(wire$data$y[[1L]], "list")
   expect_type(wire$data$selection_key[[1L]], "list")
-  expect_type(wire$data$color[[1L]], "list")
+  expect_identical(wire$data$color[[1L]], list("#123456"))
   expect_type(wire$hover$text[[1L]], "list")
-})
-
-test_that("categorical scatter sends one colour per trace", {
-  payload <- utils_env$cerebroCellViewScatterPayload(
-    coordinates = list(c(1, 2), c(3, 4)),
-    color = c("A", "A"),
-    color_variable = "cluster",
-    selection_keys = c("cell-1", "cell-2"),
-    point_size = 5,
-    point_opacity = 1,
-    color_assignments = c(A = "#123456"),
-    hover_info = c("first", "second")
-  )
-
-  expect_identical(length(payload$data$color[[1L]]), 1L)
-  expect_identical(unname(payload$data$color[[1L]]), "#123456")
 })
 
 test_that("structured hover normalization preserves its wire state", {
@@ -671,27 +636,16 @@ test_that("selection counts use payload cell IDs", {
   expect_identical(utils_env$cerebroSelectionCount(c("c1", "c2")), 2L)
 })
 
-test_that("centerOfGroups returns a typed empty tibble for a missing group column", {
-  result <- centerOfGroups(
-    coordinates = matrix(c(1, 2, 3, 4), ncol = 2),
-    df = data.frame(cluster = c("a", "b")),
-    n_dimensions = 2,
-    group = "does_not_exist"
-  )
-  expect_equal(nrow(result), 0)
-  expect_true(all(
-    c("group", "x_median", "y_median", "z_median") %in% colnames(result)
+test_that("persistent selections retain coordinates and stable IDs", {
+  selection <- persistentCellSelection(list(
+    x = c("1", "2"),
+    y = c("3", "4"),
+    ids = c("cell-1", "cell-2")
   ))
-})
 
-test_that("centerOfGroups returns a typed empty tibble for a NULL group", {
-  result <- centerOfGroups(
-    coordinates = matrix(c(1, 2, 3, 4), ncol = 2),
-    df = data.frame(cluster = c("a", "b")),
-    n_dimensions = 2,
-    group = NULL
-  )
-  expect_equal(nrow(result), 0)
+  expect_identical(selection$identifier, c("1-3", "2-4"))
+  expect_identical(selection$selection_key, c("cell-1", "cell-2"))
+  expect_null(persistentCellSelection(list(x = numeric(), y = numeric())))
 })
 
 ## ---------------------------------------------------------------------------

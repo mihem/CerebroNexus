@@ -1,52 +1,3 @@
-#' Remove Common Leading Whitespace from a String
-#'
-#' Eliminates the minimal common indentation shared by all non-empty lines of
-#' the input, preserving relative indentation within blocks.
-#'
-#' @param string A character string containing text with indentation.
-#' @return A dedented character string.
-#' @keywords internal
-#' @noRd
-dedent <- function(string) {
-  if (!is.character(string) || length(string) != 1) {
-    stop("Input must be a single character string")
-  }
-  lines <- strsplit(string, "\n", fixed = TRUE)[[1]]
-  while (length(lines) > 0 && grepl("^\\s*$", lines[1])) {
-    lines <- lines[-1]
-  }
-  while (length(lines) > 0 && grepl("^\\s*$", lines[length(lines)])) {
-    lines <- lines[-length(lines)]
-  }
-  if (length(lines) == 0) {
-    return("")
-  }
-  non_empty_lines <- lines[!grepl("^\\s*$", lines)]
-  if (length(non_empty_lines) == 0) {
-    return("")
-  }
-  lead_spaces <- vapply(
-    non_empty_lines,
-    function(line) {
-      m <- regmatches(line, regexpr("^\\s*", line))
-      nchar(m)
-    },
-    integer(1)
-  )
-  min_indent <- min(lead_spaces)
-  if (min_indent > 0) {
-    pat <- paste0("^\\s{", min_indent, "}")
-    lines <- vapply(
-      lines,
-      function(line) {
-        if (grepl("^\\s*$", line)) line else sub(pat, "", line)
-      },
-      character(1)
-    )
-  }
-  paste(lines, collapse = "\n")
-}
-
 .normalizeDatasetNumericOption <- function(
   value,
   data_labels,
@@ -2337,13 +2288,6 @@ createShinyApp <- function(
   ) {
     stop("'overwrite' must be TRUE or FALSE.", call. = FALSE)
   }
-  if (
-    !is.logical(show_upload_ui) ||
-      length(show_upload_ui) != 1L ||
-      is.na(show_upload_ui)
-  ) {
-    stop("'show_upload_ui' must be TRUE or FALSE.", call. = FALSE)
-  }
   initial_pages <- .viewerInitialPageTabs()
   if (
     !is.null(initial_page) &&
@@ -2969,7 +2913,8 @@ createShinyApp <- function(
     ".bundle_run_options",
     ".viewer_auth",
     "initial_page",
-    "extra_tables"
+    "extra_tables",
+    "show_upload_ui"
   )
   option_names <- names(cerebro_options)
   if (!is.null(option_names)) {
@@ -2991,9 +2936,6 @@ createShinyApp <- function(
   }
   if (!is.null(crb_pick_smallest_file)) {
     cerebro_options[["crb_pick_smallest_file"]] <- crb_pick_smallest_file
-  }
-  if (!is.null(show_upload_ui)) {
-    cerebro_options[["show_upload_ui"]] <- show_upload_ui
   }
   if (!is.null(initial_page)) {
     cerebro_options[["initial_page"]] <- initial_page
@@ -3029,56 +2971,52 @@ createShinyApp <- function(
   )
 
   # Generate app.R -----------------------------------------------------------##
-  app_content <- dedent(
-    '
-    library(dplyr)
-    library(DT)
-    library(plotly)
-    library(shiny)
-    library(shinydashboard)
-    library(shinyWidgets)
+  app_content <- 'library(dplyr)
+library(DT)
+library(plotly)
+library(shiny)
+library(shinydashboard)
+library(shinyWidgets)
 
-    cerebro_root <- "."
+cerebro_root <- "."
 
-    if (file.exists("cerebro_config.rds")) {
-      Cerebro.options <<- readRDS("cerebro_config.rds")
-    } else {
-      stop("cerebro_config.rds not found!")
-    }
+if (file.exists("cerebro_config.rds")) {
+  Cerebro.options <<- readRDS("cerebro_config.rds")
+} else {
+  stop("cerebro_config.rds not found!")
+}
 
-    if (!is.null(Cerebro.options$colors)) {
-      colors <- Cerebro.options$colors
-    }
+if (!is.null(Cerebro.options$colors)) {
+  colors <- Cerebro.options$colors
+}
 
-    bundle_run_options <- Cerebro.options$.bundle_run_options
-    shiny_options <- bundle_run_options$shiny_app_options
+bundle_run_options <- Cerebro.options$.bundle_run_options
+shiny_options <- bundle_run_options$shiny_app_options
 
-    source(file.path(cerebro_root, "viewer/shiny_UI.R"))
-    source(file.path(cerebro_root, "viewer/shiny_server.R"))
-    source(file.path(cerebro_root, "viewer/auth.R"), local = TRUE)
+source(file.path(cerebro_root, "viewer/shiny_UI.R"))
+source(file.path(cerebro_root, "viewer/shiny_server.R"))
+source(file.path(cerebro_root, "viewer/auth.R"), local = TRUE)
 
-    viewer_app <- viewer_auth_apply(
-      ui,
-      server,
-      Cerebro.options[[".viewer_auth"]],
-      Cerebro.options[["cerebro_root"]]
+viewer_app <- viewer_auth_apply(
+  ui,
+  server,
+  Cerebro.options[[".viewer_auth"]],
+  Cerebro.options[["cerebro_root"]]
+)
+
+shiny::shinyApp(
+  ui = viewer_app$ui,
+  server = viewer_app$server,
+  onStart = function() {
+    previous <- options(
+      shiny.maxRequestSize = bundle_run_options$max_request_size_bytes
     )
-
-    shiny::shinyApp(
-      ui = viewer_app$ui,
-      server = viewer_app$server,
-      onStart = function() {
-        previous <- options(
-          shiny.maxRequestSize = bundle_run_options$max_request_size_bytes
-        )
-        shiny::onStop(function() {
-          options(previous)
-        })
-      },
-      options = shiny_options
-    )
-  '
-  )
+    shiny::onStop(function() {
+      options(previous)
+    })
+  },
+  options = shiny_options
+)'
 
   build_ops$write_lines(app_content, app_file)
   tryCatch(

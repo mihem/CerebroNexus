@@ -75,74 +75,68 @@ spatial_projection_group_hulls <- reactive({
 })
 
 spatial_projection_data_to_plot_raw <- reactive({
-  req(
-    spatial_projection_metadata(),
-    spatial_projection_coordinates(),
-    spatial_projection_parameters_plot(),
-    reactive_colors(),
-    spatial_projection_hover_info(),
-    !isTRUE(spatial_projection_hover_info()$enabled) ||
-      nrow(spatial_projection_metadata()) ==
-        length(spatial_projection_hover_info()$selection_key)
-  )
   metadata <- spatial_projection_metadata()
+  coordinates <- spatial_projection_coordinates()
   plot_parameters <- spatial_projection_parameters_plot()
+  hover_info <- spatial_projection_hover_info()
+  req(
+    metadata,
+    coordinates,
+    plot_parameters,
+    reactive_colors(),
+    hover_info,
+    !isTRUE(hover_info$enabled) ||
+      nrow(metadata) == length(hover_info$selection_key)
+  )
 
-  ## Handle ImageFeaturePlot (add gene expression data)
-  if (
-    plot_parameters$plot_type == 'ImageFeaturePlot' &&
+  plot_type <- plot_parameters$plot_type
+  ## Add the expression columns required by the active Spatial mode.
+  uses_expression <- identical(plot_type, "Co-expression (RGB)") ||
+    identical(plot_type, "ImageFeaturePlot") &&
       !is.null(plot_parameters$feature_to_display)
-  ) {
-    gene <- plot_parameters$feature_to_display
-    if (gene %in% getGeneNames()) {
-      # Use cell_barcode column if available, otherwise fallback to rownames
-      if ("cell_barcode" %in% colnames(metadata)) {
-        cells_to_extract <- metadata$cell_barcode
-      } else {
-        cells_to_extract <- rownames(metadata)
+  if (uses_expression) {
+    cells_to_extract <- if ("cell_barcode" %in% colnames(metadata)) {
+      metadata$cell_barcode
+    } else {
+      rownames(metadata)
+    }
+    gene_names <- getGeneNames()
+    if (identical(plot_type, "ImageFeaturePlot")) {
+      gene <- plot_parameters$feature_to_display
+      if (gene %in% gene_names) {
+        expr_values <- viewerExpressionRow(
+          data_set(),
+          cells_to_extract,
+          gene
+        )
+        if (!is.null(expr_values)) {
+          metadata[[gene]] <- expr_values
+        }
       }
-      expr_values <- viewerExpressionRow(
+    } else {
+      ## Keep NULL channels in a list so names cannot shift.
+      coexpr_genes <- list(
+        coexpr_r = plot_parameters$coexpr_r,
+        coexpr_g = plot_parameters$coexpr_g,
+        coexpr_b = plot_parameters$coexpr_b
+      )
+      requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
+      requested_genes <- requested_genes[
+        !is.na(requested_genes) &
+          nzchar(requested_genes) &
+          requested_genes %in% gene_names
+      ]
+      expression_values <- viewerExpressionValues(
         data_set(),
         cells_to_extract,
-        gene
+        requested_genes
       )
-      if (!is.null(expr_values)) {
-        metadata[[gene]] <- expr_values
-      }
-    }
-  }
-
-  ## Co-expression: pull each channel's gene expression into metadata columns
-  ## keyed by a stable channel name, so the renderer can blend them onto RGB.
-  if (plot_parameters$plot_type == "Co-expression (RGB)") {
-    if ("cell_barcode" %in% colnames(metadata)) {
-      cells_to_extract <- metadata$cell_barcode
-    } else {
-      cells_to_extract <- rownames(metadata)
-    }
-    ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
-    ## shift the remaining names, misaligning genes to channels.
-    coexpr_genes <- list(
-      coexpr_r = plot_parameters$coexpr_r,
-      coexpr_g = plot_parameters$coexpr_g,
-      coexpr_b = plot_parameters$coexpr_b
-    )
-    requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
-    requested_genes <- requested_genes[
-      !is.na(requested_genes) &
-        nzchar(requested_genes) &
-        requested_genes %in% getGeneNames()
-    ]
-    expression_values <- viewerExpressionValues(
-      data_set(),
-      cells_to_extract,
-      requested_genes
-    )
-    for (channel in names(coexpr_genes)) {
-      gene <- coexpr_genes[[channel]]
-      metadata[[channel]] <- NA_real_
-      if (!is.null(gene) && gene %in% names(expression_values)) {
-        metadata[[channel]] <- expression_values[[gene]]
+      for (channel in names(coexpr_genes)) {
+        gene <- coexpr_genes[[channel]]
+        metadata[[channel]] <- NA_real_
+        if (!is.null(gene) && gene %in% names(expression_values)) {
+          metadata[[channel]] <- expression_values[[gene]]
+        }
       }
     }
   }
@@ -167,7 +161,7 @@ spatial_projection_data_to_plot_raw <- reactive({
   rotation_angle <- extent$rotation
   ## Apply rotation to the displayed (subset) coordinates.
   coordinates <- rotateSpatialCoordinates(
-    spatial_projection_coordinates(),
+    coordinates,
     rotation_angle
   )
 
@@ -198,18 +192,15 @@ spatial_projection_data_to_plot_raw <- reactive({
     reset_axes <- FALSE
   }
 
-  ## return collect data
-  to_return <- list(
+  list(
     cells_df = metadata,
     coordinates = coordinates,
     reset_axes = reset_axes,
     plot_parameters = plot_parameters,
     color_assignments = color_assignments,
-    hover_info = spatial_projection_hover_info(),
+    hover_info = hover_info,
     group_hulls = spatial_projection_group_hulls()
   )
-
-  return(to_return)
 })
 
 spatial_projection_render_event <- viewerProjectionEvent(
