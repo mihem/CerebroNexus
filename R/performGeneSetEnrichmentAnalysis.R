@@ -328,14 +328,6 @@ performGeneSetEnrichmentAnalysis <- function(
         )
       }
 
-      ## log message
-      # message(
-      #   paste0(
-      #     '[', format(Sys.time(), '%H:%M:%S'), '] Filtering results based on ',
-      #     'specified thresholds...'
-      #   )
-      # )
-
       ## create empty tibble for results
       results <- tibble::tibble(
         group = character(),
@@ -374,14 +366,6 @@ performGeneSetEnrichmentAnalysis <- function(
 
           ## ... at least 2 gene sets are available
         } else if (nrow(temp_results) >= 2) {
-          ## log message
-          # message(
-          #   paste0(
-          #     '[', format(Sys.time(), '%H:%M:%S'), '] Filtering results based ',
-          #     'on specified thresholds...'
-          #   )
-          # )
-
           ## calculate p- and q-values
           temp_p_values <- stats::pnorm(
             -abs(scale(temp_results$enrichment_score)[, 1])

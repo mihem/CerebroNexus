@@ -465,7 +465,6 @@ server <- function(input, output, session) {
         }
       }
     }
-    # message(str(available_trajectories))
     return(available_trajectories)
   })
 
@@ -477,7 +476,6 @@ server <- function(input, output, session) {
 
   # hover info for projection.
   hover_info_projections <- function(cells_df) {
-    # message('--> trigger "hover_info_projections"')
     if (
       !is.null(preferences[["show_hover_info_in_projections"]]) &&
         preferences[['show_hover_info_in_projections']] == TRUE
@@ -486,7 +484,6 @@ server <- function(input, output, session) {
     } else {
       hover_info <- list(enabled = FALSE)
     }
-    # message(str(hover_info))
     return(hover_info)
   }
 

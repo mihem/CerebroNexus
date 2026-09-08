@@ -9,10 +9,7 @@ tab_about <- tabItem(
       column(12, titlePanel("About CerebroNexus")),
       column(
         12,
-        htmlOutput("about"),
-        #        uiOutput("preferences"),
-        actionButton("browser", "browser"),
-        tags$script("$('#browser').hide();")
+        htmlOutput("about")
       )
     ),
     fluidRow(
