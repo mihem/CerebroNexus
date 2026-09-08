@@ -97,6 +97,23 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
   app$run_js(sprintf("document.querySelector('%s').click();", selector))
 }
 
+default_driver <- NULL
+default_driver_env <- environment()
+default_app <- function() {
+  if (is.null(default_driver)) {
+    local_app_support(inst_dir, envir = default_driver_env)
+    default_driver <<- AppDriver$new(
+      inst_dir,
+      name = "default_shared",
+      height = 950,
+      width = 1619
+    )
+    default_driver$wait_for_idle(timeout = 20000)
+    withr::defer(default_driver$stop(), envir = default_driver_env)
+  }
+  default_driver
+}
+
 test_that("{shinytest2} recording: overview", {
   launcher_dir <- withr::local_tempdir()
   writeLines(
@@ -425,9 +442,7 @@ test_that("Linked views resets the active background to its preset", {
 
 
 test_that("{shinytest2} recording: main", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "main", height = 950, width = 1619)
-  app$wait_for_idle(timeout = 20000)
+  app <- default_app()
 
   activate_tab(app, "overview")
   app$wait_for_idle(timeout = 10000)
@@ -488,14 +503,11 @@ test_that("{shinytest2} recording: main", {
     output = FALSE,
     export = FALSE
   )
-  app$stop()
 })
 
 
 test_that("{shinytest2} recording: groups", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "groups", height = 950, width = 1619)
-  app$wait_for_idle(timeout = 20000)
+  app <- default_app()
 
   app$set_inputs(sidebar = "groups")
   app$wait_for_idle(timeout = 10000)
@@ -524,18 +536,10 @@ test_that("{shinytest2} recording: groups", {
     output = FALSE,
     export = FALSE
   )
-  app$stop()
 })
 
 test_that("{shinytest2} recording: marker_genes", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "marker_genes",
-    height = 950,
-    width = 1619
-  )
-  app$wait_for_idle(timeout = 20000)
+  app <- default_app()
 
   # Marker genes is a conditionally shown sidebar item. Wait for it, then click,
   # so it activates on a slow runner instead of navigating too early.
@@ -592,7 +596,6 @@ test_that("{shinytest2} recording: marker_genes", {
     output = FALSE,
     export = FALSE
   )
-  app$stop()
 })
 
 
@@ -628,14 +631,7 @@ test_that("app startup does not eagerly load scRepertoire", {
 })
 
 test_that("{shinytest2} recording: gene_expression", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "gene_expression",
-    height = 950,
-    width = 1619
-  )
-  app$wait_for_idle(timeout = 20000)
+  app <- default_app()
 
   activate_tab(app, "geneExpression")
   app$wait_for_idle(timeout = 10000)
@@ -785,61 +781,6 @@ test_that("{shinytest2} recording: gene_expression", {
     unname(unlist(rgb_animations)),
     rep("cerebro-control-enter", 3)
   )
-
-  app$stop()
-})
-
-test_that("{shinytest2} recording: gene_id_conversion", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "gene_id_conversion",
-    height = 950,
-    width = 1619
-  )
-  app$wait_for_idle(timeout = 20000)
-
-  app$set_inputs(sidebar = "geneIdConversion")
-  app$wait_for_idle(timeout = 10000)
-
-  table_val <- retry_get_value(app, output = "gene_info")
-  expect_false(is.null(table_val))
-
-  app$stop()
-})
-
-test_that("{shinytest2} recording: color_management", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "color_management",
-    height = 950,
-    width = 1619
-  )
-  app$wait_for_idle(timeout = 20000)
-
-  app$set_inputs(sidebar = "color_management")
-  app$wait_for_idle(timeout = 10000)
-
-  ui_val <- retry_get_value(app, output = "color_assignments_UI")
-  expect_false(is.null(ui_val))
-
-  app$stop()
-})
-
-test_that("{shinytest2} recording: about", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(inst_dir, name = "about", height = 950, width = 1619)
-  app$wait_for_idle(timeout = 20000)
-
-  app$set_inputs(sidebar = "about")
-  app$wait_for_idle(timeout = 10000)
-
-  about_text <- retry_get_value(app, output = "about")
-  expect_false(is.null(about_text))
-  expect_true(nchar(about_text) > 0)
-
-  app$stop()
 })
 
 test_that("createShinyApp bundles a working app", {

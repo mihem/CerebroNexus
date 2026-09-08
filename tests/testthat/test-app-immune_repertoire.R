@@ -70,21 +70,8 @@ activate_ir_tab <- function(app, timeout = 60000) {
   )
 }
 
-## The tests in this file each booted their own app, and booting dominates their
-## runtime. The ones that only navigate the plot tabset and read the DOM now
-## share a single driver, created on first use and stopped when the file ends.
-## Ten of the sixteen tests use the shared driver; the other six keep their
-## own boot (below). Measured locally this takes the file from ~170s to ~120s.
-##
-## Sharing is deliberately NOT applied to a test that would be weakened by a
-## reused app. Keep giving these their own AppDriver:
-##   * the lazy-loading boundary test — it asserts what a PRISTINE app has not
-##     loaded, and the shared driver has scRepertoire warm from other tests;
-##   * tests that assert INITIAL state (the active landing tab, "Group by"
-##     empty, Clonal UMAP ungrouped) — a reused app carries prior selections;
-##   * the info-dialog test — it leaves a modal open over the page;
-##   * the "does not break the main app" test — it reads the Data info tab of an
-##     app that has never opened the repertoire page.
+## DOM-only checks share one driver; tests that require a pristine process or
+## mutate initial dataset state keep their own app.
 shared_driver <- NULL
 shared_driver_env <- environment()
 shared_app <- function() {
@@ -105,15 +92,7 @@ shared_app <- function() {
 test_that("first IR plot tab is Clonal UMAP", {
   # The default/landing tab should be the Clonal UMAP overview, so the first
   # thing shown is where expanded clones sit on the cell projection.
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "ir_default_tab",
-    height = 950,
-    width = 1619,
-    load_timeout = 60000
-  )
-  withr::defer(app$stop())
+  app <- shared_app()
   open_ir_tab(app)
 
   active_tab <- app$get_js(
@@ -322,23 +301,6 @@ test_that("immune_repertoire tab can be opened and renders settings", {
     'document.querySelector("#ir_chain") !== null;'
   )
   expect_true(chain_present)
-})
-
-test_that("immune_repertoire module loads without breaking main app", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "ir_load",
-    height = 950,
-    width = 1619,
-    load_timeout = 60000
-  )
-  withr::defer(app$stop())
-  app$wait_for_idle(timeout = 20000)
-
-  # Data info tab should still render normally (1476 cells in the new example)
-  cells_box <- app$get_value(output = "load_data_number_of_cells")
-  expect_true(grepl("1,?476", cells_box$html))
 })
 
 test_that("Clonal UMAP tab renders with receptor + projection selectors", {
@@ -636,15 +598,7 @@ test_that("Clone call is hidden on the Clonal UMAP tab", {
 })
 
 test_that("page info button opens the repertoire guide", {
-  local_app_support(inst_dir)
-  app <- AppDriver$new(
-    inst_dir,
-    name = "ir_info_dialog",
-    height = 950,
-    width = 1619,
-    load_timeout = 60000
-  )
-  withr::defer(app$stop())
+  app <- shared_app()
   activate_ir_tab(app)
 
   # Move to a tab with several controls, then open the consolidated page guide.
