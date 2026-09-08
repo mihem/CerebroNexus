@@ -2126,6 +2126,32 @@ run_cell_views_node <- function(hooks, body, setup = character()) {
   output
 }
 
+test_that("specialist base retains only the active payload cells", {
+  output <- run_cell_views_node(
+    c(
+      "window.__cellViewsTest = {",
+      "  render: function (cells) {",
+      "    renderSingle('view', {}, {selection_key:cells}, {}, {});",
+      "    ensureSingleBase(singleViews.view);",
+      "    return linkedBundle;",
+      "  },",
+      "  ensure: function () {",
+      "    var before = linkedBundle; ensureSingleBase(singleViews.view);",
+      "    return before === linkedBundle;",
+      "  }",
+      "};"
+    ),
+    c(
+      "window.cerebroSavedViewDataset = {cell_count:3, cell_fingerprint:'same'};",
+      "const first = __cellViewsTest.render(['a','b']).cells.join(',');",
+      "const second = __cellViewsTest.render(['b','c']).cells.join(',');",
+      "console.log([first, second, __cellViewsTest.ensure()].join('|'));"
+    )
+  )
+
+  expect_identical(tail(output, 1L), "a,b|b,c|true")
+})
+
 test_that("specialist bases do not reuse cells without a dataset fingerprint", {
   output <- run_cell_views_node(
     c(

@@ -558,6 +558,16 @@ cerebroCellViewRender <- function(
   )
 }
 
+cerebroCellViewStructuredHover <- function(hover_info, show_hover) {
+  hover <- if (isTRUE(show_hover)) hover_info else list()
+  hover$hoverinfo <- if (isTRUE(show_hover) && isTRUE(hover_info$enabled)) {
+    "fields"
+  } else {
+    "skip"
+  }
+  hover
+}
+
 cerebroCellViewScatterPayload <- function(
   coordinates,
   color,
@@ -627,15 +637,12 @@ cerebroCellViewScatterPayload <- function(
   show_hover <- isTRUE(hover)
   structured_hover <- is.list(hover_info) && isTRUE(hover_info$enabled)
   hover_data <- if (show_hover && structured_hover) {
-    hover_info
+    cerebroCellViewStructuredHover(hover_info, TRUE)
   } else {
     list(
       hoverinfo = if (show_hover) "text" else "skip",
       text = if (continuous && show_hover) I(unname(hover_info)) else list()
     )
-  }
-  if (structured_hover) {
-    hover_data$hoverinfo <- if (show_hover) "fields" else "skip"
   }
   if (continuous) {
     return(list(meta = meta, data = data, hover = hover_data))

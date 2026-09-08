@@ -70,14 +70,10 @@ expression_projection_update_plot <- function(input) {
     color_settings[["color_scale"]]
   )
   ## prepare hover info
-  output_hover <- if (plot_parameters[["hover_info"]]) hover_info else list()
-  output_hover$hoverinfo <- if (
-    plot_parameters[["hover_info"]] && isTRUE(hover_info$enabled)
-  ) {
-    "fields"
-  } else {
-    "skip"
-  }
+  output_hover <- cerebroCellViewStructuredHover(
+    hover_info,
+    plot_parameters[["hover_info"]]
+  )
   ## process trajectory data
   trajectory_lines <- list()
   if (plot_parameters[['is_trajectory']]) {

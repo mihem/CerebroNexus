@@ -5288,6 +5288,13 @@
     });
     return cells;
   }
+  function sameSingleCells(left, right) {
+    if (!Array.isArray(left) || left.length !== right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) return false;
+    }
+    return true;
+  }
   function singleDatasetIdentity(cells) {
     var identity = window.cerebroSavedViewDataset || {};
     var savedFingerprint = typeof identity.cell_fingerprint === 'string'
@@ -5330,21 +5337,17 @@
       (!identity.savedFingerprint || linkedBundle._singleIdentity !== identity.token)) {
       linkedBundle = null; D = null; resetSingleViews(payload);
     }
-    var cells = linkedBundle && linkedBundle._singleOnly
-      ? linkedBundle.cells.slice() : [];
-    var seen = new Set(cells.map(String));
-    incoming.forEach(function (cell) {
-      if (!seen.has(cell)) { seen.add(cell); cells.push(cell); }
-    });
-    if (!cells.length) return false;
+    if (linkedBundle && linkedBundle._singleOnly &&
+      sameSingleCells(linkedBundle.cells, incoming)) return true;
+    if (!incoming.length) return false;
     linkedBundle = {
       _singleOnly: true,
       _singleIdentity: identity.token,
       dataset_id: identity.datasetId,
       dataset_fingerprint: identity.fingerprint,
       cell_fingerprint: identity.fingerprint,
-      cells: cells,
-      n: cells.length,
+      cells: incoming,
+      n: incoming.length,
       groups: {}, cat_extra: {}, cat_skipped: {}, fields: {},
       genes: [], projections: {}, trajectories: {}, spaces: [],
       default_group: null
