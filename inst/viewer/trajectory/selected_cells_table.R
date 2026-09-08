@@ -14,31 +14,9 @@ output[["trajectory_selected_cells_table_UI"]] <- renderUI({
     input[["trajectory_selected_name"]],
     trajectory_projection_selected_cells()
   )
-
-  fluidRow(
-    cerebroBox(
-      title = tagList(
-        boxTitle("Table of selected cells"),
-        cerebroInfoButton("trajectory_details_selected_cells_table_info")
-      ),
-      tagList(
-        shinyWidgets::materialSwitch(
-          inputId = "trajectory_details_selected_cells_table_number_formatting",
-          label = "Automatically format numbers:",
-          value = TRUE,
-          status = "primary",
-          inline = TRUE
-        ),
-        shinyWidgets::materialSwitch(
-          inputId = "trajectory_details_selected_cells_table_color_highlighting",
-          label = "Highlight values with colours:",
-          value = TRUE,
-          status = "primary",
-          inline = TRUE
-        ),
-        DT::dataTableOutput("trajectory_details_selected_cells_table")
-      )
-    )
+  cerebroSelectedCellsTableUI(
+    "trajectory_details_selected_cells_table",
+    "Table of selected cells"
   )
 })
 
@@ -47,7 +25,6 @@ output[["trajectory_selected_cells_table_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
-  ## don't do anything before these inputs are selected
   req(
     trajectory_selection_ok(),
     input[["trajectory_percentage_cells_to_show"]],
@@ -55,62 +32,27 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
     input[["trajectory_point_size"]],
     input[["trajectory_point_opacity"]]
   )
-
-  ## collect trajectory data
   trajectory_data <- getTrajectory(
     input[["trajectory_selected_method"]],
     input[["trajectory_selected_name"]]
   )
-
   meta_data <- getMetaData()
   req(!is.null(meta_data))
-
-  ## get info of selected cells and create identifier from X-Y coordinates
-  selected_cells <- trajectory_projection_selected_cells()
-
-  ## extract cells for table
   cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
     dplyr::filter(!is.na(pseudotime))
-
-  ## Filter by stable cell identity; the shared projection keeps barcode-backed
-  ## selections across recolouring and trace rebuilds. Coordinates remain the
-  ## fallback for older Plotly event payloads without customdata.
-  cells_df <- cells_df %>%
-    dplyr::mutate(identifier = paste0(DR_1, '-', DR_2)) %>%
-    dplyr::filter(selectedCellMask(
-      cell_barcode,
-      identifier,
-      selected_cells
-    )) %>%
-    dplyr::select(-identifier) %>%
-    dplyr::select(cell_barcode, everything())
-
-  ## check how many cells are left after filtering
-  ## ... no cells are left
-  if (nrow(cells_df) == 0) {
-    ## prepare empty table
-    getMetaData() %>%
-      dplyr::slice(0) %>%
-      prepareEmptyTable()
-
-    ## ... at least 1 cell is left
-  } else {
-    ## prepare proper table
-    prettifyTable(
-      cells_df,
-      filter = list(position = "top", clear = TRUE),
-      dom = "Brtlip",
-      show_buttons = TRUE,
-      number_formatting = input[[
-        "trajectory_details_selected_cells_table_number_formatting"
-      ]],
-      color_highlighting = input[[
-        "trajectory_details_selected_cells_table_color_highlighting"
-      ]],
-      hide_long_columns = TRUE,
-      download_file_name = "trajectory_details_of_selected_cells"
-    )
-  }
+  cells_df <- selectedCellRows(
+    cells_df,
+    trajectory_projection_selected_cells(),
+    coordinate_columns = c("DR_1", "DR_2"),
+    drop_coordinates = FALSE
+  )
+  selectedCellsDataTable(
+    cells_df,
+    meta_data,
+    input[["trajectory_details_selected_cells_table_number_formatting"]],
+    input[["trajectory_details_selected_cells_table_color_highlighting"]],
+    "trajectory_details_of_selected_cells"
+  )
 })
 
 ##----------------------------------------------------------------------------##
@@ -133,19 +75,7 @@ observeEvent(input[["trajectory_details_selected_cells_table_info"]], {
 ## Text in info box.
 ##----------------------------------------------------------------------------##
 
-trajectory_details_selected_cells_table_info <- list(
-  title = "Details of selected cells",
-  text = HTML(
-    "
-    Table containing meta data (some columns may be hidden, check the 'Column visibility' button) for cells selected in the plot using the box or lasso selection tool. If you want the table to contain all cells in the data set, you must select all cells in the plot. The table can be saved to disk in CSV or Excel format for further analysis.
-    <h4>Options</h4>
-    <b>Automatically format numbers</b><br>
-    When active, columns in the table that contain different types of numeric values will be formatted based on what they <u>seem</u> to be. The algorithm will look for integers (no decimal values), percentages, p-values, log-fold changes and apply different formatting schemes to each of them. Importantly, this process does that always work perfectly. If it fails and hinders working with the table, automatic formatting can be deactivated.<br>
-    <em>This feature does not work on columns that contain 'NA' values.</em><br>
-    <b>Highlight values with colours</b><br>
-    Similar to the automatic formatting option, when active, CerebroNexus will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colours and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colours and/or the identification does not work properly, you can simply deactivate this feature.<br>
-    <em>This feature does not work on columns that contain 'NA' values.</em><br>
-    <br>
-    <em>Columns can be re-ordered by dragging their respective header.</em>"
-  )
+trajectory_details_selected_cells_table_info <- cerebroSelectedCellsTableInfo(
+  "Table containing meta data (some columns may be hidden, check the 'Column visibility' button) for cells selected in the plot using the box or lasso selection tool. If you want the table to contain all cells in the data set, you must select all cells in the plot. The table can be saved to disk in CSV or Excel format for further analysis.",
+  state = "active"
 )

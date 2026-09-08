@@ -3166,6 +3166,120 @@ selectedCellMask <- function(selection_key, identifier, selection) {
   as.character(identifier) %in% coordinates
 }
 
+cerebroSelectedCellsTableUI <- function(id, title) {
+  fluidRow(
+    cerebroBox(
+      title = tagList(
+        boxTitle(title),
+        cerebroInfoButton(paste0(id, "_info"))
+      ),
+      tagList(
+        shinyWidgets::materialSwitch(
+          inputId = paste0(id, "_number_formatting"),
+          label = "Automatically format numbers:",
+          value = TRUE,
+          status = "primary",
+          inline = TRUE
+        ),
+        shinyWidgets::materialSwitch(
+          inputId = paste0(id, "_color_highlighting"),
+          label = "Highlight values with colours:",
+          value = TRUE,
+          status = "primary",
+          inline = TRUE
+        ),
+        DT::dataTableOutput(id)
+      )
+    )
+  )
+}
+
+cerebroSelectedCellsTableInfo <- function(intro, state = "active") {
+  list(
+    title = "Details of selected cells",
+    text = HTML(paste0(
+      intro,
+      "<h4>Options</h4>",
+      "<b>Automatically format numbers</b><br>",
+      "When ",
+      state,
+      ", columns in the table that contain different types of numeric values will be formatted based on what they <u>seem</u> to be. The algorithm will look for integers (no decimal values), percentages, p-values, log-fold changes and apply different formatting schemes to each of them. Importantly, this process does that always work perfectly. If it fails and hinders working with the table, automatic formatting can be deactivated.<br>",
+      "<em>This feature does not work on columns that contain 'NA' values.</em><br>",
+      "<b>Highlight values with colours</b><br>",
+      "Similar to the automatic formatting option, when ",
+      state,
+      ", CerebroNexus will look for known columns in the table (those that contain grouping variables), try to interpret column content, and use colours and other stylistic elements to facilitate quick interpretation of the values. If you prefer the table without colours and/or the identification does not work properly, you can simply deactivate this feature.<br>",
+      "<em>This feature does not work on columns that contain 'NA' values.</em><br><br>",
+      "<em>Columns can be re-ordered by dragging their respective header.</em>"
+    ))
+  )
+}
+
+selectedCellRows <- function(
+  table,
+  selection,
+  coordinate_columns = 1:2,
+  drop_coordinates = TRUE,
+  missing_key = c("index", "identifier")
+) {
+  missing_key <- match.arg(missing_key)
+  table <- as.data.frame(table)
+  coordinate_index <- if (is.character(coordinate_columns)) {
+    match(coordinate_columns, colnames(table))
+  } else {
+    coordinate_columns
+  }
+  identifier <- paste0(
+    table[[coordinate_index[1]]],
+    "-",
+    table[[coordinate_index[2]]]
+  )
+  selection_key <- if ("cell_barcode" %in% colnames(table)) {
+    as.character(table[["cell_barcode"]])
+  } else if (identical(missing_key, "identifier")) {
+    identifier
+  } else {
+    as.character(seq_len(nrow(table)))
+  }
+  table <- table[
+    selectedCellMask(selection_key, identifier, selection),
+    ,
+    drop = FALSE
+  ]
+  if (isTRUE(drop_coordinates)) {
+    table <- table[, -coordinate_index, drop = FALSE]
+  }
+  if ("cell_barcode" %in% colnames(table)) {
+    table <- table[,
+      c("cell_barcode", setdiff(colnames(table), "cell_barcode")),
+      drop = FALSE
+    ]
+  }
+  table
+}
+
+selectedCellsDataTable <- function(
+  table,
+  empty_table,
+  number_formatting,
+  color_highlighting,
+  download_file_name
+) {
+  if (is.null(table) || nrow(table) == 0) {
+    return(prepareEmptyTable(empty_table[0, , drop = FALSE]))
+  }
+  prettifyTable(
+    table,
+    filter = list(position = "top", clear = TRUE),
+    dom = "Brtlip",
+    show_buttons = TRUE,
+    number_formatting = number_formatting,
+    color_highlighting = color_highlighting,
+    hide_long_columns = TRUE,
+    download_file_name = download_file_name
+  )
+}
+
 ##----------------------------------------------------------------------------##
 ## Is the selected trajectory method/name valid for the CURRENT dataset?
 ##
