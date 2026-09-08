@@ -250,11 +250,14 @@ test_that("MSigDB catalogue rejects empty and invalid results", {
   expect_false(exists("catalogue", envir = cache, inherits = FALSE))
 
   second <- utils_env$getMsigdbCatalogue()
-  expect_identical(second, data.frame(
-    gs_name = "SET_A",
-    collection = "H",
-    stringsAsFactors = FALSE
-  ))
+  expect_identical(
+    second,
+    data.frame(
+      gs_name = "SET_A",
+      collection = "H",
+      stringsAsFactors = FALSE
+    )
+  )
   expect_true(exists("catalogue", envir = cache, inherits = FALSE))
   expect_identical(calls, 2L)
   expect_identical(
