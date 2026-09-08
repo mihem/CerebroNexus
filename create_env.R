@@ -55,7 +55,6 @@ rix(
     "callr",
     "png",
     "withr",
-    "formattable",
     "stringr",
     "shinyvalidate",
     "Seurat",

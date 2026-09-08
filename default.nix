@@ -8,7 +8,6 @@
 #  > "callr",
 #  > "png",
 #  > "withr",
-#  > "formattable",
 #  > "stringr",
 #  > "shinyvalidate",
 #  > "Seurat",
@@ -73,7 +72,6 @@ let
       devtools
       dplyr
       DT
-      formattable
       future_apply
       ggplot2
       glue
