@@ -221,7 +221,10 @@ html body.skin-blue.sidebar-collapse .main-header .sidebar-toggle::before {
    (18px) is reasserted with !important in the wrapper rule below so content
    keeps a little breathing room but loses the phantom 50px band. */
 body.skin-blue .main-sidebar,
-body.skin-blue .left-side { padding-top: 0 !important; }
+body.skin-blue .left-side {
+  min-width: 230px;
+  padding-top: 0 !important;
+}
 body.skin-blue .main-footer { margin-top: 0 !important; }
 
 /* -------------------------------------------------------------------------
@@ -1032,12 +1035,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   bottom: 0;
   height: auto !important;
 }
-
-/* Sidebar rail: hold a stable, comfortable width so long menu labels
-   ("Most expressed genes") never wrap; it is chrome, not content, so it does
-   not stretch with the window. */
-body.skin-blue .main-sidebar,
-body.skin-blue .left-side { min-width: 230px; }
 
 /* -------------------------------------------------------------------------
    Data info page — welcome hero + de-emphasised advanced settings.
