@@ -208,15 +208,7 @@ output[["marker_genes_table_no_data"]] <- renderText({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["marker_genes_info"]], {
-  showModal(
-    modalDialog(
-      marker_genes_info[["text"]],
-      title = marker_genes_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(marker_genes_info)
 })
 
 ##----------------------------------------------------------------------------##

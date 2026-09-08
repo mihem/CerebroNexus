@@ -223,15 +223,7 @@ observeEvent(
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["trajectory_projection_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_projection_info[["text"]],
-      title = trajectory_projection_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_projection_info)
 })
 
 ##----------------------------------------------------------------------------##

@@ -316,15 +316,7 @@ output[["enriched_pathways_message_no_data_found"]] <- renderText({
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["enriched_pathways_info"]], {
-  showModal(
-    modalDialog(
-      enriched_pathways_info[["text"]],
-      title = enriched_pathways_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(enriched_pathways_info)
 })
 
 ##----------------------------------------------------------------------------##

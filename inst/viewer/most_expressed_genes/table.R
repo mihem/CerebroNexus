@@ -285,15 +285,7 @@ output[["most_expressed_genes_message_no_data_found"]] <- renderText({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["most_expressed_genes_info"]], {
-  showModal(
-    modalDialog(
-      most_expressed_genes_info[["text"]],
-      title = most_expressed_genes_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(most_expressed_genes_info)
 })
 
 ##----------------------------------------------------------------------------##

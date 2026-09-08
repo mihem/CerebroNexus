@@ -3194,6 +3194,16 @@ cerebroSelectedCellsTableUI <- function(id, title) {
   )
 }
 
+showCerebroInfoModal <- function(info) {
+  shiny::showModal(shiny::modalDialog(
+    info[["text"]],
+    title = info[["title"]],
+    easyClose = TRUE,
+    footer = NULL,
+    size = "l"
+  ))
+}
+
 cerebroSelectedCellsTableInfo <- function(intro, state = "active") {
   list(
     title = "Details of selected cells",

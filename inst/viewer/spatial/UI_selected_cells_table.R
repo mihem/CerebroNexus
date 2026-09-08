@@ -13,15 +13,7 @@ output[["spatial_selected_cells_table_UI"]] <- renderUI({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["spatial_details_selected_cells_table_info"]], {
-  showModal(
-    modalDialog(
-      spatial_details_selected_cells_table_info$text,
-      title = spatial_details_selected_cells_table_info$title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(spatial_details_selected_cells_table_info)
 })
 
 ##----------------------------------------------------------------------------##

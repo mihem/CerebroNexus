@@ -343,15 +343,7 @@ output[[
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["trajectory_distribution_along_pseudotime_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_distribution_along_pseudotime_info[["text"]],
-      title = trajectory_distribution_along_pseudotime_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_distribution_along_pseudotime_info)
 })
 
 ##----------------------------------------------------------------------------##

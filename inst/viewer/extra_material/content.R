@@ -182,15 +182,7 @@ output[["extra_material_plot_plain"]] <- renderPlot({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["extra_material_info"]], {
-  showModal(
-    modalDialog(
-      extra_material_info[["text"]],
-      title = extra_material_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(extra_material_info)
 })
 
 ##----------------------------------------------------------------------------##

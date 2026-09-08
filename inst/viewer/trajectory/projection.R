@@ -135,15 +135,7 @@ output[["trajectory_projection_main_parameters_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["trajectory_projection_main_parameters_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_projection_main_parameters_info$text,
-      title = trajectory_projection_main_parameters_info$title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_projection_main_parameters_info)
 })
 
 ##----------------------------------------------------------------------------##
@@ -252,15 +244,7 @@ outputOptions(
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["trajectory_projection_additional_parameters_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_projection_additional_parameters_info$text,
-      title = trajectory_projection_additional_parameters_info$title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_projection_additional_parameters_info)
 })
 
 ##----------------------------------------------------------------------------##

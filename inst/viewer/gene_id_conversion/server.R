@@ -37,15 +37,7 @@ output[["gene_info"]] <- DT::renderDataTable({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["geneIdConversion_info"]], {
-  showModal(
-    modalDialog(
-      geneIdConversion_info[["text"]],
-      title = geneIdConversion_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(geneIdConversion_info)
 })
 
 ##----------------------------------------------------------------------------##

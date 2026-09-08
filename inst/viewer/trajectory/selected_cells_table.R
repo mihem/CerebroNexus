@@ -60,15 +60,7 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["trajectory_details_selected_cells_table_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_details_selected_cells_table_info$text,
-      title = trajectory_details_selected_cells_table_info$title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_details_selected_cells_table_info)
 })
 
 ##----------------------------------------------------------------------------##

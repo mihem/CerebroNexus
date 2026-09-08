@@ -107,12 +107,6 @@ registerGroupFiltersUI <- function(output, prefix, getGroups, getGroupLevels) {
 registerGroupFiltersInfo <- function(input, prefix, title, text) {
   info_id <- paste0(prefix, "_group_filters_info")
   shiny::observeEvent(input[[info_id]], {
-    shiny::showModal(shiny::modalDialog(
-      text,
-      title = title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    ))
+    showCerebroInfoModal(list(title = title, text = text))
   })
 }

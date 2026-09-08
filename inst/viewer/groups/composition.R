@@ -195,15 +195,7 @@ output[["groups_by_other_group_table"]] <- DT::renderDataTable({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["groups_by_other_group_info"]], {
-  showModal(
-    modalDialog(
-      groups_by_other_group_info[["text"]],
-      title = groups_by_other_group_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(groups_by_other_group_info)
 })
 
 ##----------------------------------------------------------------------------##

@@ -100,15 +100,7 @@ output[["expression_by_gene"]] <- plotly::renderPlotly({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["expression_by_gene_info"]], {
-  showModal(
-    modalDialog(
-      expression_by_gene_info[["text"]],
-      title = expression_by_gene_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(expression_by_gene_info)
 })
 
 ##----------------------------------------------------------------------------##

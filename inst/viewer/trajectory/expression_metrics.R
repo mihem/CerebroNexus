@@ -147,15 +147,7 @@ trajectory_metric_by_state(
 )
 
 observeEvent(input[["trajectory_expression_metrics_info"]], {
-  showModal(
-    modalDialog(
-      trajectory_expression_metrics_info[["text"]],
-      title = trajectory_expression_metrics_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(trajectory_expression_metrics_info)
 })
 
 trajectory_expression_metrics_info <- list(

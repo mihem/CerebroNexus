@@ -73,15 +73,7 @@ output[["color_assignments_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["color_assignments_info"]], {
-  showModal(
-    modalDialog(
-      color_assignments_info[["text"]],
-      title = color_assignments_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(color_assignments_info)
 })
 
 ##----------------------------------------------------------------------------##

@@ -173,15 +173,7 @@ output[["groups_percent_ribo_plot"]] <- plotly::renderPlotly({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["groups_expression_metrics_info"]], {
-  showModal(
-    modalDialog(
-      groups_expression_metrics_info[["text"]],
-      title = groups_expression_metrics_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(groups_expression_metrics_info)
 })
 
 ##----------------------------------------------------------------------------##

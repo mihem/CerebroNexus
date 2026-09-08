@@ -2,15 +2,7 @@
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["overview_projection_info"]], {
-  showModal(
-    modalDialog(
-      overview_projection_info[["text"]],
-      title = overview_projection_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(overview_projection_info)
 })
 
 ##----------------------------------------------------------------------------##

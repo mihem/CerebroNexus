@@ -214,15 +214,7 @@ output[["states_by_group_table"]] <- DT::renderDataTable({
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["states_by_group_info"]], {
-  showModal(
-    modalDialog(
-      states_by_group_info[["text"]],
-      title = states_by_group_info[["title"]],
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    )
-  )
+  showCerebroInfoModal(states_by_group_info)
 })
 
 ##----------------------------------------------------------------------------##
