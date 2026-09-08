@@ -24,7 +24,6 @@ expression_projection_update_plot <- function(input) {
     cell_order <- order(expression_levels)
     coordinates <- coordinates[cell_order, ]
     selection_keys <- selection_keys[cell_order]
-    hover_info <- hover_info[cell_order]
     if (is.list(expression_levels)) {
       for (i in seq_along(expression_levels)) {
         expression_levels[[i]] <- expression_levels[[i]][cell_order]
@@ -71,30 +70,37 @@ expression_projection_update_plot <- function(input) {
     color_settings[["color_scale"]]
   )
   ## prepare hover info
-  output_hover <- list(
-    hoverinfo = ifelse(plot_parameters[["hover_info"]], 'text', 'skip'),
-    text = 'empty'
-  )
-  if (plot_parameters[["hover_info"]]) {
-    output_hover[['text']] <- unname(hover_info)
+  output_hover <- if (plot_parameters[["hover_info"]]) hover_info else list()
+  output_hover$hoverinfo <- if (
+    plot_parameters[["hover_info"]] && isTRUE(hover_info$enabled)
+  ) {
+    "fields"
+  } else {
+    "skip"
   }
   ## process trajectory data
   trajectory_lines <- list()
   if (plot_parameters[['is_trajectory']]) {
-    ## fix order of trajectory meta data if cells are sorted by expression
-    if (
-      plot_parameters[['plot_order']] == 'Highest expression on top' &&
-        separate_panels == FALSE &&
-        !identical(display_mode, "rgb")
-    ) {
-      trajectory[['meta']] <- trajectory[['meta']][cell_order, ]
-    }
     ## add additional info to hover info
-    if (plot_parameters[['hover_info']]) {
-      output_hover[['text']] <- glue::glue(
-        "{output_hover[['text']]}<br>",
-        "<b>State</b>: {trajectory[['meta']]$state}<br>",
-        "<b>Pseudotime</b>: {formatC(trajectory[['meta']]$pseudotime, format = 'f', digits = 2)}"
+    if (
+      plot_parameters[['hover_info']] &&
+        isTRUE(output_hover$enabled)
+    ) {
+      output_hover$fields <- c(
+        output_hover$fields,
+        list(
+          list(
+            label = "State",
+            values = I(as.character(trajectory[['meta']]$state)),
+            format = "text"
+          ),
+          list(
+            label = "Pseudotime",
+            values = I(as.numeric(trajectory[['meta']]$pseudotime)),
+            format = "fixed",
+            digits = 2L
+          )
+        )
       )
     }
     ## convert trajectory edges to the shared renderer's shape format

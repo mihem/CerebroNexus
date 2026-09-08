@@ -475,10 +475,9 @@ server <- function(input, output, session) {
       !is.null(preferences[["show_hover_info_in_projections"]]) &&
         preferences[['show_hover_info_in_projections']] == TRUE
     ) {
-      hover_info <- buildHoverInfoForProjections(cells_df)
-      hover_info <- setNames(hover_info, cells_df$cell_barcode)
+      hover_info <- buildHoverDataForProjections(cells_df)
     } else {
-      hover_info <- 'none'
+      hover_info <- list(enabled = FALSE)
     }
     # message(str(hover_info))
     return(hover_info)

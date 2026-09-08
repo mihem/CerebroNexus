@@ -1423,14 +1423,16 @@ cv_default_group <- function(available) {
 
 ## Assemble the bundle from the loaded Cerebro object. Each modality is built by
 ## its own cv_build_* helper; this function wires them into the final list.
-cv_build_bundle <- function(crb) {
+cv_build_bundle <- function(crb, cell_fingerprint = NULL) {
   md <- cv_canonical_metadata(crb$getMetaData())
   if (is.null(md)) {
     return(NULL)
   }
   cells <- md$cell_barcode
   n <- length(cells)
-  cell_fingerprint <- cv_cell_fingerprint(cells)
+  if (is.null(cell_fingerprint)) {
+    cell_fingerprint <- cv_cell_fingerprint(cells)
+  }
 
   ## Seed a stable fallback here. The user-editable palette travels separately
   ## as cv_color_patch(), so changing one colour cannot rebuild this bundle.

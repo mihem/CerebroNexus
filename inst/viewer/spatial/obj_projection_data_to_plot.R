@@ -51,9 +51,9 @@ spatial_projection_data_to_plot_raw <- reactive({
     spatial_projection_parameters_plot(),
     reactive_colors(),
     spatial_projection_hover_info(),
-    nrow(spatial_projection_metadata()) ==
-      length(spatial_projection_hover_info()) ||
-      spatial_projection_hover_info() == "none"
+    !isTRUE(spatial_projection_hover_info()$enabled) ||
+      nrow(spatial_projection_metadata()) ==
+        length(spatial_projection_hover_info()$selection_key)
   )
   metadata <- spatial_projection_metadata()
   plot_parameters <- spatial_projection_parameters_plot()

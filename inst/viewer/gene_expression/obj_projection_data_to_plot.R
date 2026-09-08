@@ -12,9 +12,9 @@ expression_projection_data_to_plot_raw <- reactive({
       length(isolate(expression_projection_expression_levels())) ||
       nrow(expression_projection_coordinates()) ==
         length(isolate(expression_projection_expression_levels())[[1]]),
-    nrow(expression_projection_coordinates()) ==
-      length(expression_projection_hover_info()) ||
-      expression_projection_hover_info() == "none",
+    !isTRUE(expression_projection_hover_info()$enabled) ||
+      nrow(expression_projection_coordinates()) ==
+        length(expression_projection_hover_info()$selection_key),
     !is.null(input[["expression_projection_genes_in_separate_panels"]])
   )
   parameters <- expression_projection_parameters_plot()

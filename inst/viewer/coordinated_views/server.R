@@ -73,7 +73,8 @@ coordviews_bundle <- reactive({
   coordviews_build_log$n <- coordviews_build_log$n + 1L
   tryCatch(
     {
-      b <- cv_build_bundle(data_set())
+      dataset <- cv_saved_view_dataset()
+      b <- cv_build_bundle(data_set(), dataset$fingerprint)
       if (is.null(b)) {
         list(
           error = paste(
@@ -82,7 +83,7 @@ coordviews_bundle <- reactive({
           )
         )
       } else {
-        b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)
+        b$dataset_fingerprint <- dataset$fingerprint
         b
       }
     },

@@ -295,14 +295,14 @@ spatial_projection_update_plot <- function(input) {
       y_range = y_range_out,
       reset_axes = reset_axes
     )
-    output_hover <- list(
-      hoverinfo = if (plot_parameters[["hover_info"]]) "text" else "skip",
-      text = if (plot_parameters[["hover_info"]]) {
-        unname(hover_info)
-      } else {
-        "empty"
-      }
-    )
+    output_hover <- if (plot_parameters[["hover_info"]]) hover_info else list()
+    output_hover$hoverinfo <- if (
+      plot_parameters[["hover_info"]] && isTRUE(hover_info$enabled)
+    ) {
+      "fields"
+    } else {
+      "skip"
+    }
     cerebroCellViewRender(
       "spatial_projection",
       output_meta,

@@ -543,7 +543,7 @@ test_that("specialist cell sampling uses one original-row index sample", {
   }
 })
 
-test_that("projection hover formats an existing metadata subset", {
+test_that("projection hover packages an existing metadata subset", {
   expressions <- parse(file.path(sync_perf_viewer_root, "shiny_server.R"))
   definition <- NULL
   for (expression in expressions) {
@@ -570,10 +570,10 @@ test_that("projection hover formats an existing metadata subset", {
     format_calls <- 0L
     scope <- list2env(list(
       preferences = list(show_hover_info_in_projections = TRUE),
-      buildHoverInfoForProjections = function(cells) {
+      buildHoverDataForProjections = function(cells) {
         format_calls <<- format_calls + 1L
         formatted <<- cells
-        paste0("hover-", cells$cell_barcode)
+        list(enabled = TRUE, selection_key = I(cells$cell_barcode))
       }
     ))
     hover <- eval(definition, envir = scope)
@@ -581,14 +581,15 @@ test_that("projection hover formats an existing metadata subset", {
     displayed <- metadata[c(4L, 2L), , drop = FALSE]
     result <- hover(displayed)
     expect_identical(formatted, displayed)
-    expect_identical(
-      result,
-      stats::setNames(c("hover-cell4", "hover-cell2"), c("cell4", "cell2"))
-    )
+    expect_true(result$enabled)
+    expect_identical(as.character(result$selection_key), c("cell4", "cell2"))
     expect_identical(format_calls, 1L)
 
     scope$preferences[["show_hover_info_in_projections"]] <- FALSE
-    expect_identical(hover(metadata[c(1L, 3L), , drop = FALSE]), "none")
+    expect_identical(
+      hover(metadata[c(1L, 3L), , drop = FALSE]),
+      list(enabled = FALSE)
+    )
     expect_identical(format_calls, 1L)
   }
 })
@@ -630,6 +631,49 @@ test_that("projection hover text is assembled in one vectorized pass", {
   source <- read_sync_perf_viewer("utility_functions.R")
   expect_match(source, "do.call(paste0, parts)", fixed = TRUE)
   expect_no_match(source, "hover_info <- glue::glue", fixed = TRUE)
+})
+
+test_that("Canvas projection hover stays columnar", {
+  utility <- new.env(parent = globalenv())
+  sys.source(
+    file.path(sync_perf_viewer_root, "utility_functions.R"),
+    envir = utility
+  )
+  utility$getGroups <- function() c("sample", "cell_type")
+  metadata <- data.frame(
+    cell_barcode = c("cell1", "cell2"),
+    nUMI = c(1200, 34567),
+    nGene = c(800, 9012),
+    sample = c("A", "B"),
+    cell_type = c("T", "B")
+  )
+
+  hover <- utility$buildHoverDataForProjections(metadata)
+  expect_true(hover$enabled)
+  expect_identical(as.character(hover$selection_key), metadata$cell_barcode)
+  expect_identical(
+    lapply(hover$fields, function(field) unclass(field$values)),
+    list(metadata$nUMI, metadata$nGene)
+  )
+  expect_identical(
+    lapply(hover$groups, `[[`, "label"),
+    c("sample", "cell_type")
+  )
+  expect_identical(unclass(hover$groups[[1L]]$values), 0:1)
+})
+
+test_that("Linked views reuses the saved-view fingerprint", {
+  server <- read_sync_perf_viewer("coordinated_views", "server.R")
+  expect_match(
+    server,
+    "cv_build_bundle(data_set(), dataset$fingerprint)",
+    fixed = TRUE
+  )
+  expect_no_match(
+    server,
+    "cv_config_cell_fingerprint(b$cells)",
+    fixed = TRUE
+  )
 })
 
 test_that("specialist hover consumers reuse their metadata subset", {

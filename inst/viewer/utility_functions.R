@@ -520,6 +520,22 @@ cerebroCellViewMessage <- function(
       wire_array(hover$text)
     }
   }
+  if (!is.null(hover$selection_key)) {
+    hover$selection_key <- wire_array(hover$selection_key)
+  }
+  if (is.list(hover$fields)) {
+    hover$fields <- lapply(hover$fields, function(field) {
+      field$values <- wire_array(field$values)
+      field
+    })
+  }
+  if (is.list(hover$groups)) {
+    hover$groups <- lapply(hover$groups, function(group) {
+      group$levels <- wire_array(group$levels)
+      group$values <- wire_array(group$values)
+      group
+    })
+  }
   if (is.list(extra$group_hulls)) {
     for (field in intersect(c("x", "y"), names(extra$group_hulls))) {
       extra$group_hulls[[field]] <- wire_nested(extra$group_hulls[[field]])
@@ -609,10 +625,18 @@ cerebroCellViewScatterPayload <- function(
   }
 
   show_hover <- isTRUE(hover)
-  hover_data <- list(
-    hoverinfo = if (show_hover) "text" else "skip",
-    text = if (continuous && show_hover) I(unname(hover_info)) else list()
-  )
+  structured_hover <- is.list(hover_info) && isTRUE(hover_info$enabled)
+  hover_data <- if (show_hover && structured_hover) {
+    hover_info
+  } else {
+    list(
+      hoverinfo = if (show_hover) "text" else "skip",
+      text = if (continuous && show_hover) I(unname(hover_info)) else list()
+    )
+  }
+  if (structured_hover) {
+    hover_data$hoverinfo <- if (show_hover) "fields" else "skip"
+  }
   if (continuous) {
     return(list(meta = meta, data = data, hover = hover_data))
   }
@@ -638,8 +662,8 @@ cerebroCellViewScatterPayload <- function(
 
   meta[["traces"]] <- list()
   cells_by_group <- split(seq_along(color), color)
-  hover_names <- names(hover_info)
-  aligned_hover <- if (!show_hover) {
+  hover_names <- if (structured_hover) NULL else names(hover_info)
+  aligned_hover <- if (!show_hover || structured_hover) {
     NULL
   } else if (
     !is.null(hover_names) &&
@@ -662,11 +686,8 @@ cerebroCellViewScatterPayload <- function(
       data[["z"]][[index]] <- I(coordinates[[3L]][cells])
     }
     data[["selection_key"]][[index]] <- I(selection_keys[cells])
-    data[["color"]][[index]] <- I(rep(
-      unname(color_assignments[[group]]),
-      length(cells)
-    ))
-    if (show_hover) {
+    data[["color"]][[index]] <- I(unname(color_assignments[[group]]))
+    if (show_hover && !structured_hover) {
       hover_data[["text"]][[index]] <- I(aligned_hover[cells])
     }
     index <- index + 1L
@@ -1666,6 +1687,38 @@ buildHoverInfoForProjections <- function(table) {
     parts <- c(parts, list("<br><b>", group, "</b>: ", table[[group]]))
   }
   do.call(paste0, parts)
+}
+
+## Compact hover fields for Canvas projection views. Values stay columnar on
+## the wire; the browser formats only the cell under the pointer.
+buildHoverDataForProjections <- function(table) {
+  groups <- lapply(intersect(getGroups(), colnames(table)), function(group) {
+    values <- as.character(table[[group]])
+    values[is.na(values)] <- "NA"
+    levels <- unique(values)
+    list(
+      label = group,
+      levels = I(levels),
+      values = I(match(values, levels) - 1L)
+    )
+  })
+  list(
+    enabled = TRUE,
+    selection_key = I(as.character(table[["cell_barcode"]])),
+    fields = list(
+      list(
+        label = "Transcripts",
+        values = I(unname(table[["nUMI"]])),
+        format = "integer"
+      ),
+      list(
+        label = "Expressed genes",
+        values = I(unname(table[["nGene"]])),
+        format = "integer"
+      )
+    ),
+    groups = unname(groups)
+  )
 }
 
 ##----------------------------------------------------------------------------##

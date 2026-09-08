@@ -498,6 +498,22 @@ test_that("single-cell scatter payloads remain arrays on the wire", {
   expect_type(wire$hover$text[[1L]], "list")
 })
 
+test_that("categorical scatter sends one colour per trace", {
+  payload <- utils_env$cerebroCellViewScatterPayload(
+    coordinates = list(c(1, 2), c(3, 4)),
+    color = c("A", "A"),
+    color_variable = "cluster",
+    selection_keys = c("cell-1", "cell-2"),
+    point_size = 5,
+    point_opacity = 1,
+    color_assignments = c(A = "#123456"),
+    hover_info = c("first", "second")
+  )
+
+  expect_identical(length(payload$data$color[[1L]]), 1L)
+  expect_identical(unname(payload$data$color[[1L]]), "#123456")
+})
+
 test_that("single-view scatter payloads carry their display label", {
   payload <- utils_env$cerebroCellViewScatterPayload(
     coordinates = list(c(1, 2), c(3, 4)),

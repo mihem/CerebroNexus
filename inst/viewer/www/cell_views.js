@@ -2779,6 +2779,30 @@
   function hoverHtml(i, pinned) {
     if (singleActive) {
       var singleSpace = spaceById[singleSpaceIds[0]];
+      var fields = singleSpace && singleSpace._hoverFields;
+      if (fields) {
+        var html = '<div class="cv-tip-row"><b>Cell</b>: ' +
+          esc(D.cells[i]) + '</div>';
+        fields.fields.forEach(function (field) {
+          var value = field.values[i];
+          if (value == null) return;
+          if (field.format === 'integer') {
+            value = Math.round(Number(value)).toLocaleString('en-US');
+          } else if (field.format === 'fixed') {
+            value = Number(value).toFixed(Number(field.digits) || 0);
+          }
+          html += '<div class="cv-tip-row"><b>' + esc(field.label) +
+            '</b>: ' + esc(value) + '</div>';
+        });
+        fields.groups.forEach(function (group) {
+          var level = group.values[i];
+          var value = level == null || level < 0 ? null : group.levels[level];
+          if (value == null) return;
+          html += '<div class="cv-tip-row"><b>' + esc(group.label) +
+            '</b>: ' + esc(value) + '</div>';
+        });
+        return html;
+      }
       var raw = singleSpace && singleSpace._hover && singleSpace._hover[i];
       var text = String(raw || D.cells[i] || '')
         .replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
@@ -3173,10 +3197,15 @@
   // Mark the hovered cell everywhere. Redraws only when the cell CHANGES: a
   // mousemove fires far more often than the answer to "which cell is nearest"
   // changes, and each redraw is the whole cloud in every panel.
+  var hoverDrawFrame = null;
   function setHoverCell(i) {
     if (hoverCell === i) return;
     hoverCell = i;
-    drawAll();
+    if (hoverDrawFrame !== null) return;
+    hoverDrawFrame = requestAnimationFrame(function () {
+      hoverDrawFrame = null;
+      drawAll();
+    });
   }
 
   function wireHover(p) {
@@ -5336,11 +5365,35 @@
   function emptyVector(value) {
     return new Array(linkedBundle.n || (linkedBundle.cells || []).length).fill(value);
   }
+  function alignStructuredHover(hover) {
+    if (!hover || hover.hoverinfo !== 'fields' || !Array.isArray(hover.selection_key)) {
+      return null;
+    }
+    var keys = hover.selection_key;
+    return {
+      fields: (hover.fields || []).map(function (field) {
+        return {
+          label: String(field.label || ''),
+          format: String(field.format || 'text'),
+          digits: Number(field.digits) || 0,
+          values: alignFlatValues(keys, field.values || [], null)
+        };
+      }),
+      groups: (hover.groups || []).map(function (group) {
+        return {
+          label: String(group.label || ''),
+          levels: Array.isArray(group.levels) ? group.levels.map(String) : [],
+          values: alignFlatValues(keys, group.values || [], -1)
+        };
+      })
+    };
+  }
   function alignSingleCoordinates(data, nested) {
     var index = singleIndex();
     var x = emptyVector(null), y = emptyVector(null), z = emptyVector(null);
     var groups = emptyVector(-1), levels = [], colors = [];
-    var hover = emptyVector('');
+    var hoverFields = alignStructuredHover(data.hover);
+    var hover = hoverFields ? null : emptyVector('');
     var hoverEnabled = emptyVector(true);
     if (nested) {
       var traces = Array.isArray(data.meta.traces) ? data.meta.traces : [];
@@ -5358,7 +5411,8 @@
           var at = index.get(String(gk[j])); if (at == null) continue;
           x[at] = Number(gx[j]); y[at] = Number(gy[j]);
           if (gz[j] != null) z[at] = Number(gz[j]);
-          groups[at] = group; hover[at] = gh[j] || '';
+          groups[at] = group;
+          if (hover) hover[at] = gh[j] || '';
           hoverEnabled[at] = hoverMode !== 'skip';
         }
       });
@@ -5372,12 +5426,13 @@
         var pos = index.get(String(keys[k])); if (pos == null) continue;
         x[pos] = Number(hx[k]); y[pos] = Number(hy[k]);
         if (hz[k] != null) z[pos] = Number(hz[k]);
-        hover[pos] = hh[k] || '';
+        if (hover) hover[pos] = hh[k] || '';
         hoverEnabled[pos] = enabled;
       }
     }
     return { x: x, y: y, z: z, groups: groups,
-      levels: levels, colors: colors, hover: hover, hoverEnabled: hoverEnabled };
+      levels: levels, colors: colors, hover: hover, hoverFields: hoverFields,
+      hoverEnabled: hoverEnabled };
   }
   function quantisedField(label, raw, keys, data, panelScale) {
     var index = singleIndex(), values = emptyVector(null), min = Infinity, max = -Infinity;
@@ -5570,6 +5625,7 @@
       var space = { id: spaceId, label: label || id, x: aligned.x, y: aligned.y };
       space._projectionName = spaceId;
       space._hover = aligned.hover;
+      space._hoverFields = aligned.hoverFields;
       space._hoverEnabled = hasHover;
       space._hoverMask = aligned.hoverEnabled;
       if (hasZ) space.z = aligned.z;

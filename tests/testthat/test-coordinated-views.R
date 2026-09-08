@@ -2515,6 +2515,8 @@ test_that("dedicated cell views do not request the Linked Views bundle", {
   )
   expect_no_match(js, "var vis = linkedVis || !!singleId;", fixed = TRUE)
   expect_match(js, "function singlePayloadCells(payload)", fixed = TRUE)
+  expect_match(js, "function alignStructuredHover(hover)", fixed = TRUE)
+  expect_match(js, "var hoverDrawFrame = null", fixed = TRUE)
   expect_match(js, "window.cerebroSavedViewDataset || {}", fixed = TRUE)
   expect_match(js, "identity.cell_fingerprint", fixed = TRUE)
   expect_match(js, "_singleOnly: true", fixed = TRUE)
