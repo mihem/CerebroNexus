@@ -44,11 +44,7 @@ run_specialist_state_node <- function(body) {
 }
 
 test_that("HLA node selection maps cleanly between motif keys and cells", {
-  runtime <- new.env(parent = globalenv())
-  sys.source(
-    viewer_test_path("hla_tcr_motifs", "core", "hla_visual_helpers.R"),
-    envir = runtime
-  )
+  runtime <- asNamespace("CerebroNexus")
   segments <- data.frame(
     barcode = c("cell-1", "cell-2", "cell-3"),
     v_gene = c("TRBV1", "TRBV1", "TRBV2"),

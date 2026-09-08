@@ -126,51 +126,16 @@ test_that("motif network exposes a stable selected-node detail panel", {
   expect_match(js, "hla-refresh-node-details", fixed = TRUE)
 })
 
-test_that("core shim binds locally without polluting globalenv", {
-  local_env <- new.env(parent = globalenv())
-  # The shim reads Cerebro.options[["cerebro_root"]] to locate its bundled core/
-  # directory; supply it so the source path resolves in this isolated env.
-  local_env$Cerebro.options <- list(cerebro_root = hla_inst_file())
-  global_names <- c("hla_detect_chains", "hla_descriptive_feature_overlap")
-  for (nm in global_names) {
-    if (exists(nm, envir = .GlobalEnv, inherits = FALSE)) {
-      rm(list = nm, envir = .GlobalEnv)
-    }
-  }
-
-  source(
-    hla_inst_file("viewer/hla_tcr_motifs/core_shim.R"),
-    local = local_env
-  )
-
-  expect_true(exists("hla_detect_chains", envir = local_env, inherits = FALSE))
-  expect_true(exists(
-    "hla_descriptive_feature_overlap",
-    envir = local_env,
-    inherits = FALSE
-  ))
-  expect_false(exists(
-    "hla_detect_chains",
-    envir = .GlobalEnv,
-    inherits = FALSE
-  ))
-  expect_false(exists(
-    "hla_descriptive_feature_overlap",
-    envir = .GlobalEnv,
-    inherits = FALSE
-  ))
-})
-
-test_that("bundled core shim resolves without an installed package", {
+test_that("repository core shim resolves without an installed package", {
   repo_root <- normalizePath(testthat::test_path("../.."), mustWork = TRUE)
   app_root <- file.path(repo_root, "inst")
   shim_path <- file.path(
     app_root,
     "viewer/hla_tcr_motifs/core_shim.R"
   )
-  # The shim sources its bundled core/ copies with no package on the search
-  # path -- the exact condition of a createShinyApp bundle. Run it in a --vanilla
-  # subprocess to prove no CerebroNexus install is needed. Under R CMD check
+  # The shim sources the canonical R/ core with no package on the search path.
+  # Run it in a --vanilla subprocess to prove repository mode needs no install.
+  # Under R CMD check
   # the source `inst/` tree is not at this path, so there is nothing to test --
   # skip rather than fail on the missing file.
   testthat::skip_if_not(
@@ -445,78 +410,47 @@ test_that("motif network nodes carry no group column", {
   }
 })
 
-## ---- core_shim sources every core file, byte-for-byte ------------------ ##
-## The shim sys.source()s a hardcoded list of the bundled core/ files -- no
-## namespace fallback, so the bundle never names CerebroNexus. A core file
-## present in R/ but missing from that list is never sourced, so its functions
-## surface as "could not find function" in a running app while unit tests (which
-## reach R/ directly) stay green. Pin the file list here, and pin the bundled
-## copies byte-for-byte against R/ in the next test -- together they guarantee
-## every R/hla_*.R function is reachable at runtime, in every launch mode.
+## ---- one authored source per HLA responsibility ------------------------ ##
 
-test_that("core_shim sources every R/hla_*.R core file", {
+test_that("HLA core has one authored source per responsibility", {
+  repo_root <- testthat::test_path("../..")
+  testthat::skip_if_not(
+    dir.exists(file.path(repo_root, "R")),
+    "source tree not present (installed-package layout)"
+  )
+  package_files <- sort(basename(list.files(
+    file.path(repo_root, "R"),
+    pattern = "^hla_.*[.]R$"
+  )))
+  viewer_files <- sort(basename(list.files(
+    file.path(repo_root, "inst/viewer/hla_tcr_motifs/core"),
+    pattern = "^hla_.*[.]R$"
+  )))
+  expect_equal(
+    package_files,
+    c(
+      "hla_association_core.R",
+      "hla_export.R",
+      "hla_motif_core.R",
+      "hla_typing.R",
+      "hla_visual_helpers.R"
+    )
+  )
+  expect_equal(viewer_files, character(0))
+
   shim <- paste(
     readLines(
-      hla_inst_file("viewer/hla_tcr_motifs/core_shim.R"),
+      file.path(repo_root, "inst/viewer/hla_tcr_motifs/core_shim.R"),
       warn = FALSE
     ),
     collapse = "\n"
   )
-  core_files <- basename(list.files(
-    testthat::test_path("../../R"),
-    pattern = "^hla_.*[.]R$"
-  ))
-  # Doc-only anchors carry no runtime symbols; everything else must be sourced.
-  core_files <- setdiff(core_files, character(0))
-  missing <- core_files[
-    !vapply(
-      core_files,
-      function(f) grepl(paste0('"', f, '"'), shim, fixed = TRUE),
-      logical(1)
-    )
-  ]
-  expect_equal(missing, character(0))
-})
-
-test_that("bundled HLA core/ is byte-identical to the R/ source", {
-  r_dir <- testthat::test_path("../../R")
-  core_dir <- hla_inst_file("viewer/hla_tcr_motifs/core")
-  # The shim sources these copies at runtime; they exist only so the module is
-  # self-contained in a createShinyApp bundle (no R/, no package). If they drift
-  # from R/, the bundle silently runs stale core code. This guard needs the
-  # package R/ source tree, absent under the installed-package test layout --
-  # skip there rather than fail.
-  testthat::skip_if_not(
-    dir.exists(r_dir) &&
-      length(list.files(r_dir, pattern = "^hla_.*[.]R$")) > 0,
-    "R/ source tree not present (installed-package layout)"
-  )
-  core_files <- c(
-    "hla_typing.R",
-    "hla_motif_core.R",
-    "hla_association_core.R",
-    "hla_visual_helpers.R",
-    "hla_export.R"
-  )
-  for (f in core_files) {
-    inst_copy <- file.path(core_dir, f)
-    r_src <- file.path(r_dir, f)
-    expect_true(
-      file.exists(inst_copy),
-      info = paste("missing bundled core copy:", f)
-    )
-    expect_identical(
-      readLines(inst_copy, warn = FALSE),
-      readLines(r_src, warn = FALSE),
-      info = paste0(
-        "inst/viewer/hla_tcr_motifs/core/",
-        f,
-        " drifted from R/",
-        f,
-        " -- re-copy R/hla_*.R into the module's core/ directory."
-      )
-    )
-  }
+  expect_match(shim, "hla_package_core.R", fixed = TRUE)
+  expect_match(shim, "hla_typing.R", fixed = TRUE)
+  expect_match(shim, "hla_association_core.R", fixed = TRUE)
+  expect_match(shim, "hla_motif_core.R", fixed = TRUE)
+  expect_match(shim, "hla_visual_helpers.R", fixed = TRUE)
+  expect_match(shim, "hla_export.R", fixed = TRUE)
 })
 
 ## ---- illustrated guide ------------------------------------------------- ##

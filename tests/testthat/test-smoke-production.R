@@ -579,21 +579,8 @@ test_that("a bundled dataset deserializes and works without CerebroNexus", {
   expect_gt(result$n_projections, 0)
 })
 
-## Regression guard for a class of bug we have hit repeatedly: bundle code that
-## silently depends on CerebroNexus being installed. The static grep above and
-## the deserialize test above each cover one half; this covers the runtime half
-## for module code that loads package-authored helpers. The HLA module is the
-## worst offender -- its pure core lives in R/ (not copied into a bundle) and it
-## used to reach the installed namespace via core_shim. That resolved under
-## R CMD check (package installed) but NOT in an exported bundle, so it passed
-## every check except a user actually running the exported app.
-##
-## The only faithful test is the production condition: build the bundle, then
-## load its module code in a process whose library path genuinely lacks
-## CerebroNexus -- exactly what a user who never installed the package has.
-## If the core files were not copied into the bundle, or core_shim reached for
-## the namespace, or a core file dropped off its source list, the functions the
-## module calls by bare name go unbound here and this fails loudly.
+## Build the bundle, then load its HLA module in a process whose library path
+## lacks CerebroNexus. This proves the generated HLA core remains self-contained.
 test_that("an exported bundle resolves the HLA core with no CerebroNexus installed", {
   skip_if_not_installed("callr")
   skip_on_cran()
@@ -638,12 +625,11 @@ test_that("an exported bundle resolves the HLA core with no CerebroNexus install
         file.path(app_dir, "viewer/hla_tcr_motifs/core_shim.R"),
         envir = e
       )
-      ## One representative function per core file, so a whole file dropping off
-      ## the shim's source list is caught, plus the exact call that used to 500.
+      ## One representative function per authored source file.
       need <- c(
-        "hla_normalize_typing", # hla_typing.R
+        "hla_normalize_typing", # generated package core
         "hla_build_motif_graph", # hla_motif_core.R
-        "hla_descriptive_feature_overlap", # hla_association_core.R
+        "hla_descriptive_feature_overlap", # generated package core
         "hla_distinct_colors", # hla_visual_helpers.R
         "hla_build_manifest" # hla_export.R
       )

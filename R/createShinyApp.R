@@ -1323,6 +1323,15 @@ dedent <- function(string) {
   )
 }
 
+.bundleHlaCoreSource <- function() {
+  namespace <- environment(createShinyApp)
+  symbols <- ls(namespace, pattern = "^(\\.hla_|hla_|HLA_)", all.names = TRUE)
+  if (!"hla_normalize_typing" %in% symbols) {
+    stop("HLA package core is unavailable.", call. = FALSE)
+  }
+  capture.output(dump(symbols, file = "", envir = namespace))
+}
+
 .bundleBuildOps <- function() {
   list(
     access = function(path, mode) file.access(path, mode = mode),
@@ -2911,6 +2920,12 @@ createShinyApp <- function(
   if (!build_ops$copy(shiny_source, stage_result_dir, recursive = TRUE)) {
     stop("Failed to copy Shiny source files.", call. = FALSE)
   }
+  hla_core_file <- file.path(
+    stage_result_dir,
+    "viewer/hla_tcr_motifs/core/hla_package_core.R"
+  )
+  dir.create(dirname(hla_core_file), recursive = TRUE, showWarnings = FALSE)
+  build_ops$write_lines(.bundleHlaCoreSource(), hla_core_file)
 
   if (verbose) {
     cat("Copying data artifacts...\n")
