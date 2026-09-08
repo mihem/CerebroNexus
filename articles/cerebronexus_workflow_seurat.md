@@ -22,9 +22,17 @@ Ket features that can be accessed through Cerebro:
 - Query gene(s) and gene sets from MSigDB and show their expression in
   dimensional reductions.
 - Visualize trajectories calculated with Monocle v2.
-- All plots can be exported to PNG. In addition, 2D dimensional
-  reductions can be exported to PDF.
+- Compatible plots can be exported to PNG from the plot toolbar.
+  Portable views also offer PNG export through **Share view**.
 - Tables can be downloaded in CSV or Excel format.
+
+For a direct image export, click **Download PNG** in the plot toolbar.
+If the current view supports portable sharing, you can instead open
+**Share view** and click **Download PNG** there. The Share view dialog
+also lets you download or open a portable JSON configuration containing
+the current display state and selected cell barcodes, so the same view
+can be restored in another compatible CerebroNexus session without
+including the source data.
 
 ## Installation
 

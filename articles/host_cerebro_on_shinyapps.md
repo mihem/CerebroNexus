@@ -85,10 +85,3 @@ more memory will be necessary.
   set](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md)
 - [Control access to Cerebro with a login
   page](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md)
-
-## Known issues
-
-- Exporting plots to PDF through the `export to PDF` buttons effectively
-  does not work at the moment. That is because it will trigger a file
-  selection dialog on the server side, not allowing the user to specify
-  a location on their local machine.
