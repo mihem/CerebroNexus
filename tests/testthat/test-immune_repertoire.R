@@ -241,17 +241,6 @@ test_that("Diversity x.axis uses grouped bootstrap plot, not scRepertoire's cont
   )
 })
 
-test_that("clonalScatter render guards against invalid group selection", {
-  # clonalScatter compares two groups via x.axis/y.axis (the levels produced by
-  # group.by). The render must validate >= 2 distinct groups to avoid
-  # "attempt to select less than one element" on a single-element list.
-  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
-  skip_if_not(file.exists(viz))
-  content <- paste(readLines(viz), collapse = "\n")
-  expect_match(content, "Clonal scatter needs at least 2 groups")
-  expect_match(content, "Select two different groups")
-})
-
 test_that("safeRenderPlot lets validate/req conditions pass through", {
   # validate()/need()/req() raise a "shiny.silent.error" which is also an
   # `error`. safeRenderPlot must NOT turn it into an error plot, otherwise
@@ -384,33 +373,13 @@ test_that("example.crb preserves core data fields", {
   expect_true(!is.null(crb$experiment))
 })
 
-test_that("renderers enforce scRepertoire parameter constraints", {
-  # Three plots have scRepertoire API constraints that a stale/global control
-  # value can violate, causing internal errors. The renderers must enforce
-  # valid values rather than trust the global Clone call / aa.length inputs.
+test_that("SizeDist enforces its supported clone definition", {
   viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
   skip_if_not(file.exists(viz))
   content <- paste(readLines(viz), collapse = "\n")
-
-  # clonalLength: cloneCall must be a sequence type (nt/aa), never gene/strict
-  expect_match(
-    content,
-    "clonalLength[\\s\\S]{0,400}clone_call <- if \\(isTRUE\\(pars\\$cloneCall %in% c\\(\"nt\", \"aa\"\\)\\)",
-    perl = TRUE
-  )
-
-  # clonalSizeDistribution: the distribution fit only converges on the strict
-  # clone definition for the bundled data, so cloneCall is forced to "strict"
   expect_match(
     content,
     "clonalSizeDistribution\\([\\s\\S]{0,200}cloneCall = \"strict\"",
-    perl = TRUE
-  )
-
-  # percentAA / positionalEntropy: aa.length is validated to a positive integer
-  expect_match(
-    content,
-    "is.na\\(aa_len\\)[\\s\\S]{0,40}aa_len < 1[\\s\\S]{0,60}aa_len <- 20",
     perl = TRUE
   )
 })
@@ -561,13 +530,6 @@ test_that("clonalHomeostasis renderer passes a cloneSize binning", {
   )
 })
 
-test_that("vizGenes renderer passes a y.axis", {
-  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
-  skip_if_not(file.exists(viz))
-  content <- paste(readLines(viz), collapse = "\n")
-  expect_match(content, "y\\.axis\\s*=", info = "y.axis not passed to vizGenes")
-})
-
 test_that("order.by control is declared in param_spec", {
   ps <- file.path(shiny_root, "immune_repertoire", "param_spec.R")
   skip_if_not(file.exists(ps))
@@ -594,34 +556,10 @@ test_that("tab-dependent label uses a NULL-safe %in% guard", {
   )
 })
 
-test_that("Length renderer only facets when a grouping is selected", {
-  # Group results by = None means group.by is NULL: there is no grouping, so the
-  # plot must be a single combined panel (scRepertoire's native overlay), NOT
-  # one facet per loaded sample. Faceting must be gated on a non-NULL groupBy.
-  viz <- file.path(shiny_root, "immune_repertoire", "visualizations.R")
-  skip_if_not(file.exists(viz))
-  content <- paste(readLines(viz), collapse = "\n")
-
-  # The clonalLength renderer branches on whether a grouping is set.
-  expect_match(
-    content,
-    "ir_plot_clonalLength[\\s\\S]{0,1200}is\\.null\\(pars\\$groupBy\\)",
-    perl = TRUE,
-    info = "clonalLength renderer does not gate faceting on is.null(pars$groupBy)"
-  )
-  # facet builder is still used (for the grouped branch).
-  expect_match(
-    content,
-    "ir_plot_clonalLength[\\s\\S]{0,3500}ir_length_facet_plot\\(",
-    perl = TRUE
-  )
-})
-
 # ---- Compare (interactive alluvial) ------------------------------------- #
 
 # Source the pure helpers into a throwaway env so the geometry can be tested
-# without the Shiny app or scRepertoire (the prep + drawing functions take a
-# plain data.frame shaped like clonalCompare(exportTable = TRUE)).
+# without the Shiny app or scRepertoire.
 compare_env <- local({
   helper <- file.path(shiny_root, "immune_repertoire", "compare_helpers.R")
   if (!file.exists(helper)) {
@@ -632,8 +570,6 @@ compare_env <- local({
   e
 })
 
-# A minimal two-group table: clone A is shared (different sizes), clone B is
-# private to sample_1, clone C is private to sample_2.
 compare_tab_2grp <- data.frame(
   clones = c("A", "B", "A", "C"),
   Proportion = c(0.5, 0.3, 0.2, 0.4),

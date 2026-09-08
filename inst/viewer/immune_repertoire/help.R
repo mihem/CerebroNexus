@@ -90,44 +90,6 @@
 
 ## ---- Help text for each visualization tab ----------------------------- ##
 ir_tab_help <- list(
-  Definition = list(
-    short = "Clone-definition resolution",
-    summary = "Shows how the number of distinct clonotypes collapses as the definition tightens from single gene segments up to full V+J+CDR3.",
-    detail = paste(
-      "A 'clonotype' can be defined at different resolutions. Counting only V genes lumps many cells together; adding J, then the CDR3 sequence, splits them into finer and finer groups.",
-      "",
-      "This plot counts distinct entities at each resolution:",
-      "• cells — every receptor-bearing cell of the selected chain.",
-      "• V / J — unique V or J gene segments.",
-      "• V+J — unique V–J combinations.",
-      "• CDR3 — unique CDR3 amino-acid sequences.",
-      "• V+CDR3 and V+J+CDR3 — progressively stricter clone definitions.",
-      "",
-      "The chain follows the 'Chain' selector (TCR defaults to TRB, BCR to IGH). Choose a 'Group by' column to facet the plot per group.",
-      "",
-      "What to look for: a large gap between CDR3 and V+J+CDR3 means the same CDR3 arises on different V/J backbones (convergent recombination).",
-      sep = "\n"
-    )
-  ),
-  "Clone Sharing" = list(
-    short = "Cross-group clonotype sharing",
-    summary = "Classifies each clonotype as private to one unit, public within a group, or shared across groups.",
-    detail = paste(
-      "Some clonotypes appear in only one sample; others are found in several, and a few are shared across different conditions. This plot summarises that sharing.",
-      "",
-      "Each clonotype (V+J+CDR3 of the selected chain) is labelled:",
-      "• Private — seen in only one 'sharing unit' (default: sample).",
-      "• Public (within-group) — in ≥ 2 units, all in the same 'Group by' group.",
-      "• Public (cross-group) — spanning ≥ 2 groups.",
-      "",
-      "Controls:",
-      "• Sharing unit — the smallest unit across which sharing is counted.",
-      "• Group by — the grouping used for within/cross classification.",
-      "",
-      "With no 'Group by' selected the classes collapse to Private / Public.",
-      sep = "\n"
-    )
-  ),
   Abundance = list(
     short = "Clonal abundance distribution",
     summary = "Ranks clonotypes by cell count. Steep drop-off indicates oligoclonal dominance; gradual decline indicates diverse repertoire.",
@@ -222,203 +184,6 @@ ir_tab_help <- list(
       sep = "\n"
     )
   ),
-  Length = list(
-    short = "CDR3 length distribution",
-    summary = "Distribution of CDR3 region lengths. Shifts in the peak may indicate antigen-driven selection constraining receptor structure.",
-    detail = paste(
-      "The CDR3 region is the most variable part of a T/B cell receptor \u2014 it's the primary 'fingers' that grab onto antigens (foreign molecules).",
-      "CDR3 length directly affects what a receptor can bind to.",
-      "",
-      "This plot shows how many clonotypes have each possible CDR3 length (in amino acids or nucleotides).",
-      "",
-      "What to look for:",
-      "\u2022 TCR CDR3 lengths typically peak around 12\u201315 amino acids; BCR CDR3 lengths have a wider range.",
-      "\u2022 A shift in the peak length between conditions may indicate selection for receptors that bind a specific antigen shape.",
-      "\u2022 Very long or very short CDR3 are often self-reactive and may be removed by the immune system (negative selection).",
-      "\u2022 If one sample has a narrower length distribution, it suggests selection pressure is constraining which receptors survive.",
-      sep = "\n"
-    )
-  ),
-  Proportion = list(
-    short = "Clonal proportion",
-    summary = "Cumulative fraction of the repertoire occupied by top-ranked clonotypes. Reveals the degree of clonal dominance.",
-    detail = paste(
-      "Imagine lining up all clonotypes from most common to least common, then asking: 'What percentage of all cells are accounted for by the top 10 clones? Top 100? Top 1000?'",
-      "",
-      "This plot answers exactly that, splitting clones into cumulative bins.",
-      "",
-      "What to look for:",
-      "\u2022 If the top 10 clones already account for 50% of all cells, the repertoire is highly dominated by a few winners.",
-      "\u2022 If even the top 1000 clones account for only a small fraction, the repertoire is very diverse and evenly distributed.",
-      "\u2022 Comparing bars across samples shows which sample has more concentrated (or more spread out) immune responses.",
-      "\u2022 This is a more intuitive way to see 'clonal dominance' than diversity indices.",
-      sep = "\n"
-    )
-  ),
-  Quant = list(
-    short = "Unique clonotype count",
-    summary = "Total number of distinct clonotypes per sample. Sensitive to sequencing depth; use Rarefaction for size-corrected comparison.",
-    detail = paste(
-      "The simplest possible question: just count how many distinct receptor sequences exist in each sample.",
-      "",
-      "What to look for:",
-      "\u2022 More unique clonotypes usually = higher diversity.",
-      "\u2022 Caution: this number is strongly influenced by how many cells were sequenced. A sample with 10,000 cells will naturally show more unique clonotypes than one with 1,000 cells, even if they're equally diverse. Use Rarefaction to correct for this.",
-      "\u2022 Still useful for a quick first look \u2014 large differences between samples of similar size are meaningful.",
-      "\u2022 In disease vs. healthy comparisons, reduced clonotype counts in disease tissue may indicate oligoclonal expansion.",
-      sep = "\n"
-    )
-  ),
-  Rarefaction = list(
-    short = "Rarefaction analysis",
-    summary = "Estimates clonotype discovery at subsampled depths. A plateauing curve confirms sufficient sequencing saturation.",
-    detail = paste(
-      "A critical quality check. Rarefaction asks: 'If we had sequenced fewer cells, how many unique clonotypes would we have found?'",
-      "",
-      "The plot simulates subsampling your data at different depths and counts clonotypes at each level.",
-      "",
-      "What to look for:",
-      "\u2022 If the curve flattens (plateaus), you've sequenced enough \u2014 adding more cells won't reveal many new clonotypes.",
-      "\u2022 If the curve is still rising steeply at the rightmost point, you haven't captured the full diversity and would benefit from sequencing more cells.",
-      "\u2022 This is the proper way to compare clonotype counts between samples of different sizes \u2014 compare the curves at the same subsampled depth.",
-      "\u2022 The shaded bands show confidence intervals from bootstrap resampling. Wider bands = more uncertainty.",
-      "\u2022 Adjust the 'Bootstrap iterations' slider to trade speed for smoother confidence bands.",
-      sep = "\n"
-    )
-  ),
-  `Gene usage` = list(
-    short = "V(D)J gene usage",
-    summary = "Heatmap of V gene segment frequencies across samples. Biased usage may reflect antigen-driven selection or germline accessibility.",
-    detail = paste(
-      "T and B cell receptors are assembled by randomly joining gene segments called V (Variable), D (Diversity), and J (Joining).",
-      "There are ~50+ V segments and ~10+ J segments in the genome, but not all are used equally.",
-      "",
-      "This heatmap shows how frequently each V gene segment is used across your samples. Rows = gene segments, columns = samples. Darker colour = more usage.",
-      "",
-      "What to look for:",
-      "\u2022 Some V genes are naturally used more often than others due to accessibility in the genome.",
-      "\u2022 A V gene that is abnormally high in one condition may indicate antigen-driven selection \u2014 the immune system is preferentially expanding clones using that particular gene because it's good at recognizing a specific pathogen.",
-      "\u2022 Differences in gene usage between healthy and disease samples can be disease biomarkers.",
-      "\u2022 In B cells, comparing IGHV gene usage can reveal biases associated with specific antibody responses.",
-      sep = "\n"
-    )
-  ),
-  vizGenes = list(
-    short = "Gene usage counts",
-    summary = "Raw counts of V/J gene segment usage. Complements the percentage-based heatmap by showing absolute cell numbers.",
-    detail = paste(
-      "Similar to 'Gene usage' but displays raw counts instead of percentages in a heatmap.",
-      "This gives you a sense of both how popular a gene segment is AND how many cells are involved.",
-      "",
-      "What to look for:",
-      "\u2022 High count + high percentage = major gene usage that matters both relatively and absolutely.",
-      "\u2022 High percentage but low count could be an artifact of a small sample.",
-      "\u2022 Compare with 'Gene usage' (which shows percentages) to get both perspectives.",
-      "\u2022 Useful when sample sizes differ significantly \u2014 raw counts show the actual data volume behind each percentage.",
-      sep = "\n"
-    )
-  ),
-  percentGenes = list(
-    short = "Gene usage percentages",
-    summary = "Normalised gene segment usage as a heatmap. Enables fair comparison across samples with different cell counts.",
-    detail = paste(
-      "Shows each V (or J) gene segment as a percentage of total usage, displayed as a heatmap where columns are samples/groups and rows are individual gene segments.",
-      "",
-      "What to look for:",
-      "\u2022 Hot spots (bright cells) show gene segments that dominate in a particular sample.",
-      "\u2022 Gene segments that are bright in disease but dim in healthy (or vice versa) suggest condition-specific gene usage bias.",
-      "\u2022 This view is normalized, so it's fair to compare across samples even if they have different total cell counts.",
-      "\u2022 Note: this uses the chain selected in the 'Chain' dropdown \u2014 if you see unexpected results, check that you've selected the right chain (e.g., TRB for TCR beta).",
-      sep = "\n"
-    )
-  ),
-  percentVJ = list(
-    short = "V-J gene pairing",
-    summary = "V-J combination frequency heatmap. Enriched pairings may indicate convergent selection for specific antigen-binding configurations.",
-    detail = paste(
-      "Each clonotype uses one V gene AND one J gene. This heatmap shows how often each V-J combination appears.",
-      "Each panel (facet) represents a different sample or group.",
-      "",
-      "Why this matters:",
-      "\u2022 V-J pairing is not random \u2014 some combinations are structurally favored.",
-      "\u2022 If a specific V-J combination is unusually enriched in a disease sample, it suggests convergent selection: many independent cells arrived at the same receptor solution in response to the same antigen.",
-      "\u2022 'Public' clonotypes (shared across individuals) often use the same V-J pairings.",
-      "",
-      "What to look for:",
-      "\u2022 Bright spots in one panel but not others = condition-specific V-J preferences.",
-      "\u2022 A diagonal pattern suggests V and J usage are correlated.",
-      "\u2022 Broadly distributed colour means diverse V-J usage with no strong preference.",
-      sep = "\n"
-    )
-  ),
-  `AA %` = list(
-    short = "Positional amino acid composition",
-    summary = "Amino acid frequency at each CDR3 position. Conserved positions suggest structural constraints; variable positions drive antigen specificity.",
-    detail = paste(
-      "The CDR3 region makes direct contact with antigens. This plot shows, at each position along the CDR3, what percentage of clonotypes use each amino acid.",
-      "Each group gets its own facet panel, stacked vertically.",
-      "",
-      "What to look for:",
-      "\u2022 Positions near the edges (start and end of CDR3) tend to be conserved \u2014 they are constrained by V and J gene segments.",
-      "\u2022 Middle positions are usually more variable \u2014 this is where random nucleotide insertions create diversity.",
-      "\u2022 If a certain amino acid dominates a middle position in your disease sample (but not in healthy), it may indicate selection for receptors that bind a specific antigen shape.",
-      "\u2022 Glycine (G), Serine (S), and other small amino acids are common in CDR3 due to their structural flexibility.",
-      "\u2022 Comparing between conditions reveals position-specific amino acid biases that could be functionally important.",
-      sep = "\n"
-    )
-  ),
-  Entropy = list(
-    short = "Positional entropy",
-    summary = "Shannon entropy at each CDR3 position. Low entropy indicates conservation; high entropy reflects sequence diversification.",
-    detail = paste(
-      "Entropy measures 'randomness' or 'uncertainty'. At each CDR3 amino acid position, if all clonotypes use the same amino acid, entropy is 0 (completely conserved). If every amino acid appears equally, entropy is maximal (completely random).",
-      "",
-      "This plot shows normalized Shannon entropy at each position.",
-      "",
-      "What to look for:",
-      "\u2022 Low entropy positions (dips in the curve) are conserved \u2014 structural or functional constraints force most clonotypes to use the same amino acid there.",
-      "\u2022 High entropy positions (peaks) are highly variable \u2014 these are the 'creative' spots where diversity is generated.",
-      "\u2022 The edges of CDR3 (positions 1\u20133 and last 1\u20133) typically have lower entropy because they are encoded by the V and J gene segments.",
-      "\u2022 Comparing entropy profiles between conditions: if a position becomes less random (lower entropy) in disease, it suggests selection pressure at that position.",
-      "\u2022 This is a compact summary of the amino acid composition data shown in the 'AA %' tab.",
-      sep = "\n"
-    )
-  ),
-  Property = list(
-    short = "CDR3 physicochemical profile",
-    summary = "Mean physicochemical property values along the CDR3 region. Shifts between conditions reveal structural selection pressures.",
-    detail = paste(
-      "Amino acids differ in size, charge, hydrophobicity, and other physical/chemical properties. These properties determine how the CDR3 region interacts with antigens.",
-      "",
-      "This plot shows the average value of a physicochemical property at each CDR3 position, with confidence intervals. Choose different property scales from the dropdown:",
-      "\u2022 Atchley Factors: 5 factors capturing size, polarity, charge, etc.",
-      "\u2022 Kidera Factors: 10 factors from statistical analysis of amino acid properties.",
-      "\u2022 Other scales (FASGAI, zScales, etc.) capture different aspects of amino acid chemistry.",
-      "",
-      "What to look for:",
-      "\u2022 Regions with strong positive or negative property values indicate positions where specific physical properties are required (e.g., a hydrophobic core or a charged tip for antigen binding).",
-      "\u2022 Wide confidence intervals mean high variability at that position.",
-      "\u2022 Comparing between conditions: shifts in a property at specific positions suggest the disease selects for CDR3 with different physical characteristics.",
-      "\u2022 This is particularly useful for understanding WHY certain receptors bind their targets \u2014 it goes beyond sequence to structure.",
-      sep = "\n"
-    )
-  ),
-  `K-mer` = list(
-    short = "CDR3 k-mer motifs",
-    summary = "Top recurring short amino acid subsequences in CDR3. Condition-enriched motifs may mark antigen-specific binding signatures.",
-    detail = paste(
-      "A 'k-mer' is a short subsequence of fixed length (default: 3 amino acids). This analysis scans all CDR3 sequences, counts every possible 3-amino-acid window, and shows the most frequent ones.",
-      "",
-      "Think of it as finding the most popular 'building blocks' or 'words' within CDR3 sequences.",
-      "",
-      "What to look for:",
-      "\u2022 Motifs that are frequent in one condition but rare in another may be functionally relevant \u2014 they could be part of the antigen-binding site.",
-      "\u2022 Shared motifs across samples suggest 'public' immune responses where different individuals use similar receptor sequences against the same threat.",
-      "\u2022 Some motifs are common simply because they arise naturally from popular V/J gene segments.",
-      "\u2022 Use the slider to show more or fewer top motifs. Start with 15\u201330 for an overview, increase to 50+ for deeper analysis.",
-      sep = "\n"
-    )
-  ),
   Compare = list(
     short = "Clonotype tracking",
     summary = "Alluvial diagram tracking top clonotypes across samples. Shared ribbons represent public or persistent clones.",
@@ -432,40 +197,6 @@ ir_tab_help <- list(
       "\u2022 In longitudinal studies (same patient, different time points), shared clonotypes represent persistent immune memory.",
       "\u2022 In different patients, shared clonotypes suggest convergent immune responses to the same antigen.",
       "\u2022 The height of each ribbon shows how dominant that clone is \u2014 a thick ribbon across both samples means a highly expanded public clone.",
-      sep = "\n"
-    )
-  ),
-  Overlap = list(
-    short = "Repertoire overlap",
-    summary = "Pairwise clonotype sharing between samples. High overlap indicates similar immune responses or active cell trafficking.",
-    detail = paste(
-      "This heatmap shows pairwise overlap between every combination of samples.",
-      "Overlap is calculated as the fraction of clonotypes shared between two samples.",
-      "",
-      "What to look for:",
-      "\u2022 Dark/high values mean two samples share many clonotypes \u2014 their immune responses are similar.",
-      "\u2022 Light/low values mean the samples have mostly distinct clonotypes.",
-      "\u2022 The diagonal is always maximal (a sample perfectly overlaps with itself).",
-      "\u2022 In treatment studies: high overlap between pre- and post-treatment suggests the treatment didn't dramatically reshape the repertoire.",
-      "\u2022 In tissue comparisons: high overlap between blood and tumor suggests active immune cell trafficking.",
-      "\u2022 Symmetric matrix: overlap(A,B) = overlap(B,A).",
-      sep = "\n"
-    )
-  ),
-  Scatter = list(
-    short = "Clone frequency scatter",
-    summary = "Scatterplot comparing clonotype frequencies between two samples. Off-diagonal clones have expanded or contracted.",
-    detail = paste(
-      "Each dot is a clonotype. The X-axis shows its frequency in one sample; the Y-axis shows its frequency in another.",
-      "",
-      "What to look for:",
-      "\u2022 Dots on the diagonal: clones equally abundant in both samples (stable clones).",
-      "\u2022 Dots above the diagonal: clones expanded in the Y-axis sample relative to the X-axis sample.",
-      "\u2022 Dots below the diagonal: clones expanded in the X-axis sample.",
-      "\u2022 Dots along the X-axis only (Y near 0): clones found only in the first sample.",
-      "\u2022 Dots along the Y-axis only (X near 0): clones found only in the second sample.",
-      "\u2022 Larger dots indicate clones with higher total abundance across both samples.",
-      "\u2022 This is one of the most intuitive plots for identifying clones that expand or contract between conditions.",
       sep = "\n"
     )
   ),
@@ -498,22 +229,6 @@ ir_tab_help <- list(
       "\u2022 IgA enrichment is typical in mucosal tissues or chronic inflammation.",
       "\u2022 Shifts from IgM-dominant to IgG/IgA-dominant between timepoints indicate ongoing germinal centre maturation.",
       "\u2022 This analysis is BCR-specific \u2014 TCR data does not have isotype information.",
-      sep = "\n"
-    )
-  ),
-  `SHM Proxy` = list(
-    short = "Somatic hypermutation proxy",
-    summary = "Within-clone CDR3-H3 nucleotide diversity as a proxy for SHM activity. Higher diversity per clone family implies more mutations.",
-    detail = paste(
-      "Somatic hypermutation (SHM) introduces point mutations in BCR variable regions during germinal centre reactions, enabling affinity maturation.",
-      "This plot approximates SHM activity by counting unique IGH CDR3 nucleotide sequences within each clone family (size >= 2 cells).",
-      "",
-      "What to look for:",
-      "\u2022 Higher within-clone CDR3 nt diversity implies more SHM events in that clone family.",
-      "\u2022 Comparing timepoints: an increase in diversity suggests active affinity maturation.",
-      "\u2022 Clones with diversity = 1 have identical CDR3-H3 nt across all member cells (no observed SHM in CDR3).",
-      "\u2022 This is a proxy metric \u2014 precise SHM quantification requires IgBLAST / Change-O alignment to germline.",
-      "\u2022 Only clone families with >= 2 cells are included to avoid singletons that carry no intra-clonal information.",
       sep = "\n"
     )
   ),
@@ -701,83 +416,6 @@ output$ir_demo_plot <- renderPlot({
           chain = "TRB",
           palette = "inferno"
         ),
-        "Length" = scRepertoire::clonalLength(
-          demo,
-          cloneCall = "aa",
-          chain = "TRB",
-          palette = "inferno"
-        ),
-        "Proportion" = scRepertoire::clonalProportion(
-          demo,
-          cloneCall = "gene",
-          chain = "TRB",
-          palette = "inferno"
-        ),
-        "Quant" = scRepertoire::clonalQuant(
-          demo,
-          cloneCall = "gene",
-          chain = "TRB",
-          scale = FALSE,
-          palette = "inferno"
-        ),
-        "Rarefaction" = scRepertoire::clonalRarefaction(
-          demo,
-          cloneCall = "gene",
-          chain = "TRB",
-          n.boots = 3,
-          palette = "inferno"
-        ),
-        "Gene usage" = scRepertoire::percentGeneUsage(
-          demo,
-          chain = "TRB",
-          gene = "TRBV",
-          plot.type = "heatmap",
-          palette = "inferno"
-        ),
-        "vizGenes" = scRepertoire::vizGenes(
-          demo,
-          x.axis = "TRBV",
-          y.axis = NULL,
-          plot = "heatmap",
-          palette = "inferno"
-        ),
-        "percentGenes" = scRepertoire::percentGenes(
-          demo,
-          chain = "TRB",
-          gene = "Vgene",
-          palette = "inferno"
-        ),
-        "percentVJ" = scRepertoire::percentVJ(
-          demo,
-          chain = "TRB",
-          palette = "inferno"
-        ),
-        "AA %" = scRepertoire::percentAA(
-          demo,
-          chain = "TRB",
-          aa.length = 20,
-          palette = "inferno"
-        ),
-        "Entropy" = scRepertoire::positionalEntropy(
-          demo,
-          chain = "TRB",
-          aa.length = 20,
-          palette = "inferno"
-        ),
-        "Property" = scRepertoire::positionalProperty(
-          demo,
-          chain = "TRB",
-          method = "atchleyFactors",
-          palette = "inferno"
-        ),
-        "K-mer" = scRepertoire::percentKmer(
-          demo,
-          chain = "TRB",
-          cloneCall = "aa",
-          motif.length = 3,
-          top.motifs = 15,
-          palette = "inferno"
-        ),
         "Compare" = scRepertoire::clonalCompare(
           demo,
           cloneCall = "gene",
@@ -785,21 +423,6 @@ output$ir_demo_plot <- renderPlot({
           samples = names(demo),
           top.clones = 5,
           graph = "alluvial",
-          palette = "inferno"
-        ),
-        "Overlap" = scRepertoire::clonalOverlap(
-          demo,
-          cloneCall = "gene",
-          chain = "TRB",
-          method = "overlap",
-          palette = "inferno"
-        ),
-        "Scatter" = scRepertoire::clonalScatter(
-          demo,
-          cloneCall = "gene",
-          chain = "TRB",
-          x.axis = names(demo)[1],
-          y.axis = names(demo)[2],
           palette = "inferno"
         ),
         "Paired Scatter" = scRepertoire::clonalScatter(
@@ -814,11 +437,6 @@ output$ir_demo_plot <- renderPlot({
           demo,
           cloneCall = "gene",
           method = "ward.D2"
-        ),
-        "Definition" = ir_build_definition_plot(
-          demo,
-          chain = "TRB",
-          group_by = NULL
         ),
         "Clone Sharing" = ir_build_sharing_plot(
           # Ensure a `sample` column (the sharing unit) on each demo frame,
@@ -838,7 +456,6 @@ output$ir_demo_plot <- renderPlot({
           group_by = NULL
         ),
         "Isotype" = bcr_isotype_plot(demo, group_col = "sample"),
-        "SHM Proxy" = bcr_shm_proxy_plot(demo, group_col = "sample"),
         stop("No example renderer registered for: ", tab)
       )
       if (is.null(p)) {
