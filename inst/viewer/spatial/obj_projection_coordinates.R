@@ -2,14 +2,10 @@
 ## Coordinates of cells in projection.
 ##----------------------------------------------------------------------------##
 spatial_projection_coordinates <- reactive({
-  req(
-    spatial_projection_parameters_plot(),
-    spatial_projection_cells_to_show()
-  )
-
-  parameters <- spatial_projection_parameters_plot()
+  projection <- input[["spatial_projection_to_display"]]
+  req(projection, projection %in% availableSpatial())
   cells_to_show <- spatial_projection_cells_to_show()
-  req(parameters[["projection"]] %in% availableSpatial())
+  req(cells_to_show)
 
   ## `cells_to_show` are row positions into getMetaData(). Spatial coordinates
   ## are stored in .getSpatialData()'s own `common_cells` order (a possibly
@@ -24,7 +20,7 @@ spatial_projection_coordinates <- reactive({
     barcodes <- rownames(meta_data)[cells_to_show]
   }
 
-  spatial_data <- getSpatialData(parameters[["projection"]])
+  spatial_data <- getSpatialData(projection)
   ## Barcodes absent from the coordinate table (metadata cells without a spatial
   ## position) yield NA rows here; they are simply not drawn. Bail out only if
   ## NOTHING matched, which signals a barcode-space mismatch rather than a few

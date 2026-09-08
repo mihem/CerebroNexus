@@ -207,6 +207,31 @@ test_that("cell identity validation is unique and order-independent", {
   )
 })
 
+test_that("direct-write fingerprints preserve the stored format", {
+  root <- system.file("viewer", package = "CerebroNexus")
+  helpers <- new.env(parent = globalenv())
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
+  cells <- c("cell:1", "神经元", "a", "ab", "")
+  cells <- cells[nzchar(cells)]
+  sorted <- sort(enc2utf8(cells), method = "radix")
+  stream <- paste0(
+    nchar(sorted, type = "bytes"),
+    ":",
+    sorted,
+    collapse = ""
+  )
+  path <- tempfile()
+  withr::defer(unlink(path))
+  writeBin(charToRaw(stream), path)
+  expected <- paste0("md5-cell-set-v1:", unname(tools::md5sum(path)))
+
+  expect_identical(helpers$cv_config_cell_fingerprint(cells), expected)
+  expect_identical(
+    helpers$cv_config_cell_fingerprint(rev(cells)),
+    expected
+  )
+})
+
 test_that("specialist configuration is validated and round-trips", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())

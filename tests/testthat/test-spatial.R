@@ -733,6 +733,68 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_identical(as.numeric(rendered$data$y), c(30, 70))
 })
 
+test_that("external spatial image encoding is cached by file version", {
+  renderer <- new.env(parent = globalenv())
+  sys.source(
+    file.path(
+      system.file("viewer", package = "CerebroNexus"),
+      "spatial",
+      "func_projection_update_plot.R"
+    ),
+    envir = renderer
+  )
+  image <- tempfile(fileext = ".png")
+  withr::defer(unlink(image))
+  writeBin(as.raw(1:4), image)
+  calls <- 0L
+  encode <- function(path) {
+    calls <<- calls + 1L
+    paste0("encoded-", file.info(path)$size)
+  }
+
+  first <- renderer$spatialBackgroundDataUri(image, encode)
+  second <- renderer$spatialBackgroundDataUri(image, encode)
+  writeBin(as.raw(1:5), image)
+  third <- renderer$spatialBackgroundDataUri(image, encode)
+
+  expect_identical(first, second)
+  expect_false(identical(second, third))
+  expect_identical(calls, 2L)
+  expect_true(startsWith(first, "data:image/png;base64,"))
+})
+
+test_that("spatial hull geometry is prepared outside the renderer", {
+  root <- system.file("viewer", package = "CerebroNexus")
+  data_flow <- paste(
+    readLines(file.path(
+      root,
+      "spatial",
+      "obj_projection_data_to_plot.R"
+    )),
+    collapse = "\n"
+  )
+  renderer <- paste(
+    readLines(file.path(
+      root,
+      "spatial",
+      "func_projection_update_plot.R"
+    )),
+    collapse = "\n"
+  )
+
+  expect_match(
+    data_flow,
+    "spatial_projection_group_hulls <- reactive({",
+    fixed = TRUE
+  )
+  expect_match(
+    data_flow,
+    "group_hulls = spatial_projection_group_hulls()",
+    fixed = TRUE
+  )
+  expect_no_match(renderer, "compute_group_hulls(", fixed = TRUE)
+})
+
 test_that("shared Canvas owns spatial background identity and appearance", {
   engine <- paste(
     readLines(viewer_test_path("www", "cell_views.js")),

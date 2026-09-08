@@ -730,7 +730,7 @@
   // ---- panel geometry + projection ----------------------------------------
   function project(p) {
     var sp = spaceById[p.spaceId];
-    if (!sp) { p.sx = null; p.sy = null; return; }
+    if (!sp) { p.sx = null; p.sy = null; p._hitGrid = null; return; }
     if (!sp._unit) sp._unit = unitOf(sp);
     var u = sp._unit, n = D.n;
     // Axis'd spaces (the clone panel) reserve room on the left for the y-label
@@ -808,6 +808,9 @@
         p._dmin = -0.5; p._dspan = 1;
       }
     }
+    // Screen coordinates changed; rebuild the hover index only if the pointer
+    // next asks for it. Pan/orbit frames should not pay for dormant hover work.
+    p._hitGrid = null;
   }
 
   // A committed brush is part of the data conversation, not a decoration at a
@@ -908,6 +911,10 @@
     p.canvas.style.width = width + 'px';
     p.canvas.style.height = height + 'px';
     p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    p.overlay.width = width * dpr; p.overlay.height = height * dpr;
+    p.overlay.style.width = width + 'px';
+    p.overlay.style.height = height + 'px';
+    p.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (p.pane) p.pane.classList.toggle('cv-narrow', width < 420);
     project(p);
   }
@@ -1307,7 +1314,7 @@
 
   function draw(p, shownMask) {
     var c = p.ctx; c.clearRect(0, 0, p.W, p.H);
-    if (!p.sx) return;
+    if (!p.sx) { drawInteractionOverlay(p); return; }
     p._renderPointSize = pointSizeOf(p);
     var panelPointOpacity = pointOpacityOf(p);
     drawImage(p);
@@ -1399,23 +1406,40 @@
     }
     drawAxes3D(p);
     drawGroupLabels(p);
+    c.globalAlpha = 1;
+    // Its own canvas — drawn last so it also settles after a view change.
+    drawMinimap(p);
+    // A pinned tooltip points at a cell, so it has to move when the cell does —
+    // a pan, a zoom, a rotation. Left where it was, it would be labelling
+    // whatever the view slid underneath it.
+    repositionPinned(p);
+    drawInteractionOverlay(p);
+  }
+
+  // Pointer-driven marks live above the expensive point cloud. Hover changes
+  // can now repaint this tiny transparent layer without rebuilding every cell.
+  function drawInteractionOverlay(p) {
+    var c = p.overlayCtx;
+    c.clearRect(0, 0, p.W, p.H);
+    if (!p.sx) return;
+    var pointSize = p._renderPointSize == null ? pointSizeOf(p) : p._renderPointSize;
     // Hovered cell, marked in EVERY panel including the one being pointed at.
     // Thinner and cooler than the pick ring so the two never read as the same
     // state: this one follows the cursor and is gone the moment it leaves.
     if (hoverCell != null && hoverCell !== pick && p.ok[hoverCell]) {
       c.globalAlpha = 1; c.strokeStyle = '#0f172a'; c.lineWidth = 1.6;
       c.beginPath();
-      c.arc(p.sx[hoverCell], p.sy[hoverCell], p._renderPointSize + 3.5, 0, 6.2832);
+      c.arc(p.sx[hoverCell], p.sy[hoverCell], pointSize + 3.5, 0, 6.2832);
       c.stroke();
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1;
       c.beginPath();
-      c.arc(p.sx[hoverCell], p.sy[hoverCell], p._renderPointSize + 5, 0, 6.2832);
+      c.arc(p.sx[hoverCell], p.sy[hoverCell], pointSize + 5, 0, 6.2832);
       c.stroke();
     }
     // picked cell ring
     if (pick != null && p.ok[pick]) {
       c.globalAlpha = 1; c.strokeStyle = '#f97316'; c.lineWidth = 2.2;
-      c.beginPath(); c.arc(p.sx[pick], p.sy[pick], p._renderPointSize + 4, 0, 6.2832); c.stroke();
+      c.beginPath(); c.arc(p.sx[pick], p.sy[pick], pointSize + 4, 0, 6.2832); c.stroke();
     }
     // Trekker: dashed niche-radius circle around the picked nucleus (physical
     // panel). Radius µm → screen px via the same data→unit→screen scale.
@@ -1449,12 +1473,11 @@
       c.fillStyle = 'rgba(255,112,19,.07)'; c.fill(); c.stroke();
     }
     c.globalAlpha = 1;
-    // Its own canvas — drawn last so it also settles after a view change.
-    drawMinimap(p);
-    // A pinned tooltip points at a cell, so it has to move when the cell does —
-    // a pan, a zoom, a rotation. Left where it was, it would be labelling
-    // whatever the view slid underneath it.
-    repositionPinned(p);
+  }
+  function drawHoverAll() {
+    panels.forEach(function (p) {
+      if (p.spaceId) drawInteractionOverlay(p);
+    });
   }
   // Live "showing N / M cells" readout — the single feedback that a filter or
   // subsample took effect, regardless of what the panels are coloured by.
@@ -1573,12 +1596,54 @@
   }
 
   // ---- geometry helpers ----------------------------------------------------
-  // inPoly lives in the shared CBGeom module (www/cv-geom.js). `nearest` stays
-  // here: its visibility predicate (p.ok + shown) and fixed hit radius are this
-  // engine's, not shared.
+  // inPoly lives in the shared CBGeom module (www/cv-geom.js). Hit testing stays
+  // here: its visibility predicate (p.ok + shown) and radius belong to this
+  // engine. Large panels use a projection-local grid; small ones keep the
+  // simpler scan because building an index would cost more than it saves.
+  var HIT_GRID_MIN = 5000, HIT_GRID_SIZE = 16;
+  function buildHitGrid(p) {
+    if (!D || D.n < HIT_GRID_MIN || !p.sx) { p._hitGrid = null; return; }
+    var cols = Math.ceil(p.W / HIT_GRID_SIZE) + 2;
+    var rows = Math.ceil(p.H / HIT_GRID_SIZE) + 2;
+    var buckets = new Array(cols * rows);
+    for (var i = 0; i < D.n; i++) {
+      if (!p.ok[i] || !isFinite(p.sx[i]) || !isFinite(p.sy[i])) continue;
+      var bx = Math.floor(p.sx[i] / HIT_GRID_SIZE) + 1;
+      var by = Math.floor(p.sy[i] / HIT_GRID_SIZE) + 1;
+      if (bx < 0 || bx >= cols || by < 0 || by >= rows) continue;
+      var key = by * cols + bx;
+      (buckets[key] || (buckets[key] = [])).push(i);
+    }
+    p._hitGrid = { cols: cols, rows: rows, buckets: buckets };
+  }
   function nearest(p, mx, my) {
-    var best = -1, bd = 200, n = D.n, i;
-    for (i = 0; i < n; i++) {
+    if (!p._hitGrid && D.n >= HIT_GRID_MIN) buildHitGrid(p);
+    var best = -1, bd = 200, i;
+    var grid = p._hitGrid;
+    if (grid) {
+      var bx = Math.floor(mx / HIT_GRID_SIZE) + 1;
+      var by = Math.floor(my / HIT_GRID_SIZE) + 1;
+      for (var gy = Math.max(0, by - 1); gy <= Math.min(grid.rows - 1, by + 1); gy++) {
+        for (var gx = Math.max(0, bx - 1); gx <= Math.min(grid.cols - 1, bx + 1); gx++) {
+          var bucket = grid.buckets[gy * grid.cols + gx];
+          if (!bucket) continue;
+          for (var j = 0; j < bucket.length; j++) {
+            i = bucket[j];
+            if (!shown(i, p)) continue;
+            var dx = p.sx[i] - mx, dy = p.sy[i] - my, d = dx * dx + dy * dy;
+            if (d < bd || (d === bd && (best < 0 || i < best))) {
+              bd = d; best = i;
+            }
+          }
+        }
+      }
+      return best;
+    }
+    return nearestLinear(p, mx, my);
+  }
+  function nearestLinear(p, mx, my) {
+    var best = -1, bd = 200;
+    for (var i = 0; i < D.n; i++) {
       if (!p.ok[i] || !shown(i, p)) continue;
       var dx = p.sx[i] - mx, dy = p.sy[i] - my, d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = i; }
@@ -2190,6 +2255,13 @@
       context.fillRect(canvasX, canvasY, canvasRect.width, canvasRect.height);
       context.drawImage(
         panel.canvas,
+        canvasX,
+        canvasY,
+        canvasRect.width,
+        canvasRect.height
+      );
+      context.drawImage(
+        panel.overlay,
         canvasX,
         canvasY,
         canvasRect.width,
@@ -3204,7 +3276,7 @@
     if (hoverDrawFrame !== null) return;
     hoverDrawFrame = requestAnimationFrame(function () {
       hoverDrawFrame = null;
-      drawAll();
+      drawHoverAll();
     });
   }
 
@@ -3471,8 +3543,13 @@
     for (var index = panels.length; index < paneEls.length; index++) {
       var key = panelKey(index), low = key.toLowerCase();
       var cv = $('cv-cv-' + low); if (!cv) continue;
+      var overlay = document.createElement('canvas');
+      overlay.className = 'cv-hover-layer';
+      overlay.setAttribute('aria-hidden', 'true');
+      cv.parentNode.insertBefore(overlay, cv.nextSibling);
       var mini = $('cv-mini-' + low);
-      var p = { key: key, canvas: cv, ctx: cv.getContext('2d'), tipId: 'cv-tip-' + low,
+      var p = { key: key, canvas: cv, ctx: cv.getContext('2d'),
+        overlay: overlay, overlayCtx: overlay.getContext('2d'), tipId: 'cv-tip-' + low,
         // the canvas sits in .cv-canvas-wrap now, so the pane is two levels up
         pane: cv.closest('.cv-pane'), spaceId: null, W: 0, H: 0,
         sx: null, sy: null, ok: null, lasso: null, lassoData: null, drag: false, moved: false,

@@ -316,7 +316,7 @@ cv_config_cell_fingerprint <- function(cells) {
   stream <- paste0(nchar(cells, type = "bytes"), ":", cells, collapse = "")
   path <- tempfile("coordviews-fingerprint-")
   on.exit(unlink(path), add = TRUE)
-  writeBin(charToRaw(stream), path)
+  writeLines(stream, path, sep = "", useBytes = TRUE)
   paste0("md5-cell-set-v1:", unname(tools::md5sum(path)))
 }
 

@@ -2126,6 +2126,54 @@ run_cell_views_node <- function(hooks, body, setup = character()) {
   output
 }
 
+test_that("indexed hover lookup matches the linear result", {
+  output <- run_cell_views_node(
+    c(
+      "shown = function () { return true; };",
+      "window.__cellViewsTest = {",
+      "  build: buildHitGrid, nearest: nearest, linear: nearestLinear",
+      "};"
+    ),
+    c(
+      "D = {n:5000};",
+      "const p = {W:500,H:500,sx:new Float32Array(D.n),",
+      "  sy:new Float32Array(D.n),ok:new Uint8Array(D.n)};",
+      "p.sx.fill(450); p.sy.fill(450); p.ok.fill(1);",
+      "p.sx[123] = 101; p.sy[123] = 99;",
+      "p.sx[4321] = 100; p.sy[4321] = 100;",
+      "__cellViewsTest.build(p);",
+      "const indexed = __cellViewsTest.nearest(p, 100, 100);",
+      "const built = !!p._hitGrid;",
+      "const linear = __cellViewsTest.linear(p, 100, 100);",
+      "console.log([indexed, linear, built].join('|'));"
+    )
+  )
+
+  expect_identical(tail(output, 1L), "4321|4321|true")
+})
+
+test_that("hover changes redraw only the overlay layer", {
+  output <- run_cell_views_node(
+    c(
+      "var fullDraws = 0, hoverDraws = 0;",
+      "drawAll = function () { fullDraws++; };",
+      "drawHoverAll = function () { hoverDraws++; };",
+      "window.__cellViewsTest = {",
+      "  hover: setHoverCell,",
+      "  flush: function () { window.__frame(); },",
+      "  counts: function () { return [fullDraws, hoverDraws]; }",
+      "};"
+    ),
+    c(
+      "__cellViewsTest.hover(7); __cellViewsTest.flush();",
+      "console.log(__cellViewsTest.counts().join('|'));"
+    ),
+    "global.requestAnimationFrame = function (fn) { window.__frame = fn; return 1; };"
+  )
+
+  expect_identical(tail(output, 1L), "0|1")
+})
+
 test_that("specialist base retains only the active payload cells", {
   output <- run_cell_views_node(
     c(
