@@ -2094,6 +2094,8 @@ run_cell_views_node <- function(hooks, body, setup = character()) {
     substr(js, 1L, close_at - 1L),
     "\n",
     paste(hooks, collapse = "\n"),
+    "\n",
+    paste(body, collapse = "\n"),
     substr(js, close_at, nchar(js))
   )
   runner <- tempfile(fileext = ".js")
@@ -2107,8 +2109,7 @@ run_cell_views_node <- function(hooks, body, setup = character()) {
       "  createElement:()=>({getContext:()=>null})};",
       "window.addEventListener = ()=>{};",
       setup,
-      js,
-      body
+      js
     ),
     runner
   )
