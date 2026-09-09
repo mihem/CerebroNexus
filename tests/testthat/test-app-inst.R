@@ -109,13 +109,14 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
 
 select_dataset <- function(app, path, timeout = 30000) {
   app$set_inputs(crb_file_selector = path, wait_ = FALSE)
+  file <- basename(path)
   selected <- retry_get_value(
     app,
     input = "crb_file_selector",
     timeout = timeout,
-    validate = function(value) identical(value, path)
+    validate = function(value) identical(basename(value), file)
   )
-  if (!identical(selected, path)) {
+  if (!identical(basename(selected), file)) {
     stop(sprintf("data set did not activate: %s", path), call. = FALSE)
   }
   app$wait_for_idle(timeout = timeout)
