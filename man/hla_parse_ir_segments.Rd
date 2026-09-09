@@ -4,12 +4,16 @@
 \alias{hla_parse_ir_segments}
 \title{Parse V / J / CDR3 for one chain out of scRepertoire CT* columns}
 \usage{
-hla_parse_ir_segments(data, chain)
+hla_parse_ir_segments(data, chain, require_j = FALSE)
 }
 \arguments{
 \item{data}{Named list of IR data.frames (with metadata joined by barcode).}
 
 \item{chain}{Chain prefix, e.g. "TRB" / "TRA".}
+
+\item{require_j}{Require a parsed J gene. The immune-repertoire definition
+views use this stricter contract; HLA motif analysis accepts bulk data with
+V and CDR3 only.}
 }
 \value{
 A data.frame with one row per cell carrying `chain`, or NULL.

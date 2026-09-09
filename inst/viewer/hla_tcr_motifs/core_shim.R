@@ -36,16 +36,31 @@
     "hla_export.R"
   )
 )
+.hla_namespace <- NULL
+.hla_symbols <- character()
 
 if (file.exists(.hla_generated_core)) {
   sys.source(.hla_generated_core, envir = .hla_env)
 } else if (all(file.exists(.hla_package_files))) {
   invisible(lapply(.hla_package_files, sys.source, envir = .hla_env))
-} else if (
+} else if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+  .hla_namespace <- asNamespace("CerebroNexus")
+  .hla_symbols <- ls(
+    .hla_namespace,
+    pattern = "^(\\.hla_|hla_|HLA_)",
+    all.names = TRUE
+  )
+  list2env(
+    mget(.hla_symbols, envir = .hla_namespace, inherits = FALSE),
+    envir = .hla_env
+  )
+}
+
+if (
   !exists(
     "hla_build_manifest",
     envir = .hla_env,
-    inherits = TRUE
+    inherits = FALSE
   )
 ) {
   stop("HLA package core is unavailable.", call. = FALSE)
@@ -55,5 +70,7 @@ rm(
   .hla_env,
   .hla_root,
   .hla_generated_core,
-  .hla_package_files
+  .hla_package_files,
+  .hla_namespace,
+  .hla_symbols
 )

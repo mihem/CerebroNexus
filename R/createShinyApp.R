@@ -1280,7 +1280,7 @@
   if (!"hla_normalize_typing" %in% symbols) {
     stop("HLA package core is unavailable.", call. = FALSE)
   }
-  capture.output(dump(symbols, file = "", envir = namespace))
+  utils::capture.output(dump(symbols, file = "", envir = namespace))
 }
 
 .bundleBuildOps <- function() {

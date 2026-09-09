@@ -169,6 +169,20 @@ test_that("repository core shim resolves without an installed package", {
   expect_equal(status, 0L, info = paste(output, collapse = "\n"))
 })
 
+test_that("installed core shim resolves from the package namespace", {
+  shim_path <- hla_inst_file("viewer/hla_tcr_motifs/core_shim.R")
+  app_root <- file.path(tempdir(), "installed-hla-shim")
+  local_env <- new.env(parent = baseenv())
+  local_env$Cerebro.options <- list(cerebro_root = app_root)
+
+  expect_no_error(sys.source(shim_path, envir = local_env))
+  expect_true(exists(
+    "hla_build_manifest",
+    envir = local_env,
+    inherits = FALSE
+  ))
+})
+
 ## ---- shipped demo contracts ------------------------------------------- ##
 ## One demo ships: real single cells, real paired TCR, real published donor
 ## genotypes. It makes claims the UI depends on, so if a rebuild drops one the
