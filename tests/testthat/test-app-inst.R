@@ -658,6 +658,16 @@ test_that("{shinytest2} recording: gene_expression", {
     expression_genes_input = c("MS4A1", "CD3D"),
     wait_ = FALSE
   )
+  expect_setequal(
+    retry_get_value(
+      app,
+      input = "expression_genes_input",
+      validate = function(value) {
+        setequal(value, c("MS4A1", "CD3D"))
+      }
+    ),
+    c("MS4A1", "CD3D")
+  )
   app$wait_for_js(
     paste0(
       "document.getElementById('expression_projection_genes_in_separate_panels')",
@@ -668,6 +678,14 @@ test_that("{shinytest2} recording: gene_expression", {
   app$set_inputs(
     expression_projection_genes_in_separate_panels = "separate",
     wait_ = FALSE
+  )
+  expect_identical(
+    retry_get_value(
+      app,
+      input = "expression_projection_genes_in_separate_panels",
+      validate = function(value) identical(value, "separate")
+    ),
+    "separate"
   )
   app$wait_for_js(
     paste0(
@@ -690,6 +708,14 @@ test_that("{shinytest2} recording: gene_expression", {
     expression_projection_gene_color_mode = "different",
     wait_ = FALSE
   )
+  expect_identical(
+    retry_get_value(
+      app,
+      input = "expression_projection_gene_color_mode",
+      validate = function(value) identical(value, "different")
+    ),
+    "different"
+  )
   app$wait_for_js(
     paste0(
       "document.querySelectorAll(",
@@ -697,7 +723,7 @@ test_that("{shinytest2} recording: gene_expression", {
       ".cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
       ".length === 2"
     ),
-    timeout = 60000
+    timeout = 20000
   )
   app$wait_for_js(
     paste0(
