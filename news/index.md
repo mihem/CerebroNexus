@@ -1,5 +1,20 @@
 # Changelog
 
+## CerebroNexus 4.4.2
+
+### Viewer
+
+- Plotly charts use Linked views-style toolbars that switch from
+  horizontal to vertical when their panel is narrow; Sankey diagrams no
+  longer show Cartesian-only controls.
+- Viewer tabs keep a stable size on hover, gene selectors remain above
+  their content, and table pagination follows the amber application
+  theme.
+- Composition Sankey diagrams render their data after switching from bar
+  charts.
+- Gene-expression detail and summary panels now follow the active gene
+  mode and cell selection, including consistent RGB violin colours.
+
 ## CerebroNexus 4.4.1
 
 ### Viewer

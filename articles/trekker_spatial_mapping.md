@@ -357,7 +357,7 @@ See `data-raw/trekker.md` for the full design notes and
 sessionInfo()
 #> R version 4.6.1 (2026-06-24)
 #> Platform: x86_64-pc-linux-gnu
-#> Running under: Ubuntu 24.04.4 LTS
+#> Running under: Ubuntu 24.04.5 LTS
 #> 
 #> Matrix products: default
 #> BLAS/LAPACK: /nix/store/wv19y5w0mw7zcaxdgq7f1nibym3yh4p3-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0
