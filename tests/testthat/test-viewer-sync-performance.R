@@ -613,7 +613,7 @@ test_that("Canvas projection hover stays columnar", {
     list(metadata$nUMI, metadata$nGene)
   )
   expect_identical(
-    lapply(hover$groups, `[[`, "label"),
+    vapply(hover$groups, `[[`, character(1), "label"),
     c("sample", "cell_type")
   )
   expect_identical(unclass(hover$groups[[1L]]$values), 0:1)
