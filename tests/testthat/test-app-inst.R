@@ -97,40 +97,10 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
   app$run_js(sprintf("document.querySelector('%s').click();", selector))
 }
 
-default_driver <- NULL
-default_driver_env <- environment()
-default_app <- function() {
-  if (is.null(default_driver)) {
-    local_app_support(inst_dir, envir = default_driver_env)
-    default_driver <<- AppDriver$new(
-      inst_dir,
-      name = "default_shared",
-      height = 950,
-      width = 1619
-    )
-    default_driver$wait_for_idle(timeout = 20000)
-    withr::defer(default_driver$stop(), envir = default_driver_env)
-  }
-  default_driver
-}
-
 test_that("{shinytest2} recording: overview", {
-  launcher_dir <- withr::local_tempdir()
-  writeLines(
-    c(
-      "CerebroNexus::launchCerebro(",
-      "  mode = \"closed\",",
-      "  crb_file_to_load = system.file(",
-      "    \"extdata/examples/example.crb\",",
-      "    package = \"CerebroNexus\"",
-      "  )",
-      ")"
-    ),
-    file.path(launcher_dir, "app.R")
-  )
-  local_app_support(launcher_dir)
+  local_app_support(inst_dir)
   app <- AppDriver$new(
-    launcher_dir,
+    inst_dir,
     name = "overview",
     height = 950,
     width = 1619
@@ -442,7 +412,9 @@ test_that("Linked views resets the active background to its preset", {
 
 
 test_that("{shinytest2} recording: main", {
-  app <- default_app()
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "main", height = 950, width = 1619)
+  app$wait_for_idle(timeout = 20000)
 
   activate_tab(app, "overview")
   app$wait_for_idle(timeout = 10000)
@@ -503,11 +475,14 @@ test_that("{shinytest2} recording: main", {
     output = FALSE,
     export = FALSE
   )
+  app$stop()
 })
 
 
 test_that("{shinytest2} recording: groups", {
-  app <- default_app()
+  local_app_support(inst_dir)
+  app <- AppDriver$new(inst_dir, name = "groups", height = 950, width = 1619)
+  app$wait_for_idle(timeout = 20000)
 
   app$set_inputs(sidebar = "groups")
   app$wait_for_idle(timeout = 10000)
@@ -536,10 +511,18 @@ test_that("{shinytest2} recording: groups", {
     output = FALSE,
     export = FALSE
   )
+  app$stop()
 })
 
 test_that("{shinytest2} recording: marker_genes", {
-  app <- default_app()
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "marker_genes",
+    height = 950,
+    width = 1619
+  )
+  app$wait_for_idle(timeout = 20000)
 
   # Marker genes is a conditionally shown sidebar item. Wait for it, then click,
   # so it activates on a slow runner instead of navigating too early.
@@ -596,6 +579,7 @@ test_that("{shinytest2} recording: marker_genes", {
     output = FALSE,
     export = FALSE
   )
+  app$stop()
 })
 
 
@@ -631,7 +615,14 @@ test_that("app startup does not eagerly load scRepertoire", {
 })
 
 test_that("{shinytest2} recording: gene_expression", {
-  app <- default_app()
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "gene_expression",
+    height = 950,
+    width = 1619
+  )
+  app$wait_for_idle(timeout = 20000)
 
   activate_tab(app, "geneExpression")
   app$wait_for_idle(timeout = 10000)
@@ -781,6 +772,8 @@ test_that("{shinytest2} recording: gene_expression", {
     unname(unlist(rgb_animations)),
     rep("cerebro-control-enter", 3)
   )
+
+  app$stop()
 })
 
 test_that("createShinyApp bundles a working app", {
