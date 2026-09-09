@@ -90,6 +90,25 @@
 
 ## ---- Help text for each visualization tab ----------------------------- ##
 ir_tab_help <- list(
+  "Clone Sharing" = list(
+    short = "Cross-group clonotype sharing",
+    summary = "Classifies each clonotype as private to one unit, public within a group, or shared across groups.",
+    detail = paste(
+      "Some clonotypes appear in only one sample; others are found in several, and a few are shared across different conditions. This plot summarises that sharing.",
+      "",
+      "Each clonotype (V+J+CDR3 of the selected chain) is labelled:",
+      "• Private — seen in only one 'sharing unit' (default: sample).",
+      "• Public (within-group) — in ≥ 2 units, all in the same 'Group by' group.",
+      "• Public (cross-group) — spanning ≥ 2 groups.",
+      "",
+      "Controls:",
+      "• Sharing unit — the smallest unit across which sharing is counted.",
+      "• Group by — the grouping used for within/cross classification.",
+      "",
+      "With no 'Group by' selected the classes collapse to Private / Public.",
+      sep = "\n"
+    )
+  ),
   Abundance = list(
     short = "Clonal abundance distribution",
     summary = "Ranks clonotypes by cell count. Steep drop-off indicates oligoclonal dominance; gradual decline indicates diverse repertoire.",
