@@ -717,15 +717,6 @@ test_that("{shinytest2} recording: gene_expression", {
   )
   app$wait_for_js(
     paste0(
-      "document.querySelectorAll(",
-      "'#expression_projection_cell_view_host ",
-      ".cv-pane:not(.cv-hidden) canvas:not(.cv-mini)')",
-      ".length === 2"
-    ),
-    timeout = 20000
-  )
-  app$wait_for_js(
-    paste0(
       "(() => {",
       "const panes=Array.from(document.querySelectorAll(",
       "'#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));",
