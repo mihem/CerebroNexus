@@ -74,18 +74,12 @@ test_that("Viewer no longer depends on shinyFiles", {
 test_that("Viewer copy uses British colour spelling", {
   sidebar <- viewer_source("shiny_UI.R")
   management <- viewer_source("color_management", "server.R")
-  tables <- list(
+  table_controls <- viewer_source("utility_functions.R")
+  local_tables <- list(
     marker_genes = viewer_source("marker_genes", "table.R"),
     linked = viewer_source("coordinated_views", "server.R"),
-    trajectory = viewer_source("trajectory", "selected_cells_table.R"),
-    spatial = viewer_source("spatial", "UI_selected_cells_table.R"),
     pathways = viewer_source("enriched_pathways", "table.R"),
-    extra = viewer_source("extra_material", "content.R"),
-    expression = viewer_source(
-      "gene_expression",
-      "UI_table_of_selected_cells.R"
-    ),
-    projection = viewer_source("overview", "UI_selected_cells_table.R")
+    extra = viewer_source("extra_material", "content.R")
   )
   expression <- viewer_source(
     "gene_expression",
@@ -94,9 +88,14 @@ test_that("Viewer copy uses British colour spelling", {
 
   expect_match(sidebar, 'menuItem\\([[:space:]]*"Colour management"')
   expect_match(management, 'title = "Colours for groups"', fixed = TRUE)
-  for (name in names(tables)) {
+  expect_match(
+    table_controls,
+    'label = "Highlight values with colours:"',
+    fixed = TRUE
+  )
+  for (name in names(local_tables)) {
     expect_match(
-      tables[[name]],
+      local_tables[[name]],
       'label = "Highlight values with colours:"',
       fixed = TRUE,
       info = name
@@ -411,27 +410,15 @@ test_that("Trekker transition accepts Shiny slider change events", {
   css <- viewer_source("www", "custom.css")
 
   expect_match(javascript, "function updateTrekkerTransition", fixed = TRUE)
+  expect_match(javascript, "id !== 'trekker_morph'", fixed = TRUE)
   expect_match(
     javascript,
-    "window.jQuery(document)",
+    "document.addEventListener('input', function (e)",
     fixed = TRUE
   )
   expect_match(
     javascript,
-    "input.cvTrekkerTransition change.cvTrekkerTransition",
-    fixed = TRUE
-  )
-  expect_match(javascript, "'#trekker_morph'", fixed = TRUE)
-  expect_match(javascript, ".off(", fixed = TRUE)
-  expect_match(javascript, ".on(", fixed = TRUE)
-  expect_no_match(
-    javascript,
-    "document.addEventListener('input', updateTrekkerTransition);",
-    fixed = TRUE
-  )
-  expect_no_match(
-    javascript,
-    "document.addEventListener('change', updateTrekkerTransition);",
+    "document.addEventListener('change', function (e)",
     fixed = TRUE
   )
   expect_match(javascript, "function transitionUnit", fixed = TRUE)
