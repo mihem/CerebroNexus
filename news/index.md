@@ -1,5 +1,14 @@
 # Changelog
 
+## CerebroNexus 4.4.3
+
+### Viewer
+
+- Visualization pages use compact, consistent controls and selection
+  actions to leave more room for plots without layout shifts.
+- Legends, action buttons, and Immune Repertoire/HLA tabs share
+  consistent styling.
+
 ## CerebroNexus 4.4.2
 
 ### Viewer
