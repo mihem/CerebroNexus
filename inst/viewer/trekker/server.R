@@ -160,7 +160,7 @@ observe({
     gene <- input[["trekker_gene_pick"]]
     if (!is.null(gene) && gene %in% trekker_gene_names()) {
       color <- as.numeric(tryCatch(
-        data_set()$getExpressionMatrix(cells = keys, genes = gene),
+        viewerExpressionRow(data_set(), keys, gene),
         error = function(e) rep(NA_real_, length(keys))
       ))
       color_label <- gene

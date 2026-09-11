@@ -1,3 +1,12 @@
+# CerebroNexus 4.4.4
+
+## Performance
+
+- Viewer filtering, sampling, expression access, and mean calculations avoid
+  unnecessary dense copies while preserving sparse and on-disk backends.
+- A reproducible 1M-cell benchmark documents runtime and memory changes against
+  public 10x Genomics data without adding a runtime example API.
+
 # CerebroNexus 4.4.3
 
 ## Viewer

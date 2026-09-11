@@ -14,6 +14,11 @@ spatial_projection_data_to_plot_raw <- reactive({
   )
   metadata <- spatial_projection_metadata()
   plot_parameters <- spatial_projection_parameters_plot()
+  cells_to_extract <- if ("cell_barcode" %in% colnames(metadata)) {
+    metadata$cell_barcode
+  } else {
+    rownames(metadata)
+  }
 
   ## Handle ImageFeaturePlot (add gene expression data)
   if (
@@ -22,22 +27,12 @@ spatial_projection_data_to_plot_raw <- reactive({
   ) {
     gene <- plot_parameters$feature_to_display
     if (gene %in% getGeneNames()) {
-      # Use cell_barcode column if available, otherwise fallback to rownames
-      if ("cell_barcode" %in% colnames(metadata)) {
-        cells_to_extract <- metadata$cell_barcode
-      } else {
-        cells_to_extract <- rownames(metadata)
-      }
-      # Slice only the requested gene x cells to avoid materializing the full
-      # dense matrix on every call. getExpressionMatrix is a Cerebro R6 method,
-      # not a bare function — reach it through data_set() like the gene-
-      # expression module does.
-      expression_data <- data_set()$getExpressionMatrix(
-        cells = cells_to_extract,
-        genes = gene
+      expr_values <- viewerExpressionRow(
+        data_set(),
+        cells_to_extract,
+        gene
       )
-      if (!is.null(expression_data) && gene %in% rownames(expression_data)) {
-        expr_values <- as.vector(expression_data[gene, cells_to_extract])
+      if (!is.null(expr_values)) {
         metadata[[gene]] <- expr_values
       }
     }
@@ -46,11 +41,6 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Co-expression: pull each channel's gene expression into metadata columns
   ## keyed by a stable channel name, so the renderer can blend them onto RGB.
   if (plot_parameters$plot_type == "Co-expression (RGB)") {
-    if ("cell_barcode" %in% colnames(metadata)) {
-      cells_to_extract <- metadata$cell_barcode
-    } else {
-      cells_to_extract <- rownames(metadata)
-    }
     ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
     ## shift the remaining names, misaligning genes to channels.
     coexpr_genes <- list(
@@ -58,19 +48,22 @@ spatial_projection_data_to_plot_raw <- reactive({
       coexpr_g = plot_parameters$coexpr_g,
       coexpr_b = plot_parameters$coexpr_b
     )
+    requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
+    requested_genes <- requested_genes[
+      !is.na(requested_genes) &
+        nzchar(requested_genes) &
+        requested_genes %in% getGeneNames()
+    ]
+    expression_values <- viewerExpressionValues(
+      data_set(),
+      cells_to_extract,
+      requested_genes
+    )
     for (channel in names(coexpr_genes)) {
       gene <- coexpr_genes[[channel]]
       metadata[[channel]] <- NA_real_
-      if (!is.null(gene) && nzchar(gene) && gene %in% getGeneNames()) {
-        expression_data <- data_set()$getExpressionMatrix(
-          cells = cells_to_extract,
-          genes = gene
-        )
-        if (!is.null(expression_data) && gene %in% rownames(expression_data)) {
-          metadata[[channel]] <- as.vector(
-            expression_data[gene, cells_to_extract]
-          )
-        }
+      if (!is.null(gene) && gene %in% names(expression_values)) {
+        metadata[[channel]] <- expression_values[[gene]]
       }
     }
   }

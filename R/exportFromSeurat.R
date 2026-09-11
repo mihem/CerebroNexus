@@ -811,6 +811,7 @@ exportFromSeurat <- function(
       slot = slot,
       join_samples = TRUE,
       allow_cross_semantic_fallback = TRUE,
+      allow_iterable_matrix = identical(expression_matrix_mode, "bpcells"),
       verbose = verbose,
       return_resolution = TRUE
     )
@@ -898,9 +899,8 @@ exportFromSeurat <- function(
       unlink(bpc_abs, recursive = TRUE)
     }
 
-    ## Sparse dgCMatrix is BPCells' native input; dense matrices have to be
-    ## coerced once. Everything else (RleMatrix, DelayedMatrix) is rare enough
-    ## here that we cover it defensively.
+    ## BPCells sources stream directly into the output sidecar. Dense and
+    ## delayed inputs retain the existing conversion path.
     if (!inherits(expression_data, "dgCMatrix")) {
       if (inherits(expression_data, "matrix")) {
         expression_data <- methods::as(expression_data, "CsparseMatrix")
@@ -920,16 +920,21 @@ exportFromSeurat <- function(
     ## sibling ~5x on integer counts (e.g. 50k cells x 20k genes: 440 MB
     ## raw double -> 78 MB bit-packed). Normalised data (slot = "data" or
     ## "scale.data") stays as double — bit-packing would silently truncate.
-    nnz_int_ok <- length(expression_data@x) > 0L &&
-      all(expression_data@x >= 0) &&
-      all(expression_data@x == as.integer(expression_data@x)) &&
-      all(expression_data@x <= .Machine$integer.max)
-    bpc_iter <- methods::as(expression_data, "IterableMatrix")
-    if (nnz_int_ok) {
-      bpc_iter <- BPCells::convert_matrix_type(bpc_iter, type = "uint32_t")
-      bpc_storage_msg <- "uint32_t (bit-packed)"
+    if (inherits(expression_data, "IterableMatrix")) {
+      bpc_iter <- expression_data
+      bpc_storage_msg <- paste0(BPCells::matrix_type(bpc_iter), " (source)")
     } else {
-      bpc_storage_msg <- "double (raw, non-integer values detected)"
+      nnz_int_ok <- length(expression_data@x) > 0L &&
+        all(expression_data@x >= 0) &&
+        all(expression_data@x == as.integer(expression_data@x)) &&
+        all(expression_data@x <= .Machine$integer.max)
+      bpc_iter <- methods::as(expression_data, "IterableMatrix")
+      if (nnz_int_ok) {
+        bpc_iter <- BPCells::convert_matrix_type(bpc_iter, type = "uint32_t")
+        bpc_storage_msg <- "uint32_t (bit-packed)"
+      } else {
+        bpc_storage_msg <- "double (raw, non-integer values detected)"
+      }
     }
 
     if (verbose) {

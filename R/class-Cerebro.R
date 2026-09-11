@@ -466,11 +466,7 @@ Cerebro <- R6::R6Class(
       mat <- self$getExpressionBlock(genes = genes, cells = NULL)
 
       ## calculate mean expression per gene with the backend-aware rowMeans
-      if (
-        inherits(mat, "DelayedArray") ||
-          inherits(mat, "DelayedMatrix") ||
-          inherits(mat, "RleMatrix")
-      ) {
+      if (inherits(mat, "DelayedArray")) {
         mean_expression <- DelayedArray::rowMeans(mat)
       } else if (inherits(mat, "IterableMatrix")) {
         mean_expression <- BPCells::rowMeans(mat)
@@ -500,11 +496,28 @@ Cerebro <- R6::R6Class(
     #' \code{vector} containing (mean) expression across all specified genes in
     #' each specified cell.
     getMeanExpressionForCells = function(cells = NULL, genes = NULL) {
-      ## extract dense matrix using helper
-      mat <- private$extractExpression(cells = cells, genes = genes)
+      if (is.null(genes)) {
+        genes <- rownames(self$expression)
+      }
 
-      ## calculate mean expression per cell (colMeans)
-      mean_expression <- Matrix::colMeans(mat)
+      ## Preserve the historical named NaN result for an empty gene set.
+      if (length(genes) == 0L) {
+        mat <- private$extractExpression(cells = cells, genes = genes)
+        return(Matrix::colMeans(mat))
+      }
+
+      mat <- self$getExpressionBlock(genes = genes, cells = cells)
+      if (ncol(mat) == 0L) {
+        return(numeric())
+      }
+
+      if (inherits(mat, "DelayedArray")) {
+        mean_expression <- DelayedArray::colMeans(mat)
+      } else if (inherits(mat, "IterableMatrix")) {
+        mean_expression <- BPCells::colMeans(mat)
+      } else {
+        mean_expression <- Matrix::colMeans(mat)
+      }
 
       return(mean_expression)
     },
@@ -537,7 +550,8 @@ Cerebro <- R6::R6Class(
       if (length(gene) != 1L || is.na(gene) || !is.character(gene)) {
         stop("`gene` must be a single non-NA character value.", call. = FALSE)
       }
-      if (is.null(cells)) {
+      all_cells <- is.null(cells)
+      if (all_cells) {
         cells <- colnames(self$expression)
       }
       if (!is.character(cells) || anyNA(cells)) {
@@ -547,25 +561,25 @@ Cerebro <- R6::R6Class(
         )
       }
 
+      gene_idx <- match(gene, rownames(self$expression))
+      if (is.na(gene_idx)) {
+        stop(
+          "Gene '",
+          gene,
+          "' not found in expression matrix.",
+          call. = FALSE
+        )
+      }
       ## DelayedArray family (incl. RleMatrix): extract_array with indices
       ## avoids touching cells outside the requested subset.
-      if (
-        inherits(self$expression, "DelayedArray") ||
-          inherits(self$expression, "DelayedMatrix") ||
-          inherits(self$expression, "RleMatrix")
-      ) {
-        gene_idx <- match(gene, rownames(self$expression))
-        if (is.na(gene_idx)) {
-          stop(
-            "Gene '",
-            gene,
-            "' not found in expression matrix.",
-            call. = FALSE
-          )
+      if (inherits(self$expression, "DelayedArray")) {
+        cell_idx <- if (all_cells) {
+          seq_len(ncol(self$expression))
+        } else {
+          match(cells, colnames(self$expression))
         }
-        cell_idx <- match(cells, colnames(self$expression))
-        missing_cells <- cells[is.na(cell_idx)]
-        if (length(missing_cells) > 0L) {
+        if (anyNA(cell_idx)) {
+          missing_cells <- cells[is.na(cell_idx)]
           stop(
             "Cell(s) not found in expression matrix: ",
             paste(utils::head(missing_cells, 5), collapse = ", "),
@@ -585,7 +599,11 @@ Cerebro <- R6::R6Class(
       ## BPCells IterableMatrix: native [gene, cells] returns another
       ## IterableMatrix; coerce 1 x n to numeric.
       if (inherits(self$expression, "IterableMatrix")) {
-        sub <- self$expression[gene, cells, drop = FALSE]
+        sub <- if (all_cells) {
+          self$expression[gene_idx, , drop = FALSE]
+        } else {
+          self$expression[gene_idx, cells, drop = FALSE]
+        }
         out <- as.numeric(as.matrix(sub))
         names(out) <- cells
         return(out)
@@ -593,7 +611,11 @@ Cerebro <- R6::R6Class(
 
       ## dgCMatrix / base matrix: [gene, cells] already returns a named
       ## numeric vector without densifying the full matrix.
-      out <- as.numeric(self$expression[gene, cells])
+      out <- if (all_cells) {
+        as.numeric(self$expression[gene_idx, ])
+      } else {
+        as.numeric(self$expression[gene_idx, cells])
+      }
       names(out) <- cells
       return(out)
     },
@@ -621,8 +643,13 @@ Cerebro <- R6::R6Class(
           call. = FALSE
         )
       }
-      if (is.null(cells)) {
+
+      all_cells <- is.null(cells)
+      if (all_cells) {
         cells <- colnames(self$expression)
+        if (is.null(cells) && ncol(self$expression) == 0L) {
+          cells <- character()
+        }
       }
       if (!is.character(cells) || anyNA(cells)) {
         stop(
@@ -632,8 +659,8 @@ Cerebro <- R6::R6Class(
       }
 
       gene_idx <- match(genes, rownames(self$expression))
-      missing_genes <- genes[is.na(gene_idx)]
-      if (length(missing_genes) > 0L) {
+      if (anyNA(gene_idx)) {
+        missing_genes <- genes[is.na(gene_idx)]
         stop(
           "Gene(s) not found in expression matrix: ",
           paste(utils::head(missing_genes, 5), collapse = ", "),
@@ -641,9 +668,14 @@ Cerebro <- R6::R6Class(
           call. = FALSE
         )
       }
+
+      if (all_cells) {
+        return(self$expression[gene_idx, , drop = FALSE])
+      }
+
       cell_idx <- match(cells, colnames(self$expression))
-      missing_cells <- cells[is.na(cell_idx)]
-      if (length(missing_cells) > 0L) {
+      if (anyNA(cell_idx)) {
+        missing_cells <- cells[is.na(cell_idx)]
         stop(
           "Cell(s) not found in expression matrix: ",
           paste(utils::head(missing_cells, 5), collapse = ", "),
@@ -652,19 +684,8 @@ Cerebro <- R6::R6Class(
         )
       }
 
-      ## DelayedArray subsetting by integer indices preserves laziness and
-      ## avoids relying on every delayed backend supporting character subscripts.
-      if (
-        inherits(self$expression, "DelayedArray") ||
-          inherits(self$expression, "DelayedMatrix") ||
-          inherits(self$expression, "RleMatrix")
-      ) {
-        return(self$expression[gene_idx, cell_idx, drop = FALSE])
-      }
-
-      ## Native character subscripting preserves dgCMatrix/base matrix and
-      ## IterableMatrix classes while keeping dimnames aligned to the request.
-      self$expression[genes, cells, drop = FALSE]
+      ## Integer indices preserve request order without a second name lookup.
+      self$expression[gene_idx, cell_idx, drop = FALSE]
     },
 
     #' @description

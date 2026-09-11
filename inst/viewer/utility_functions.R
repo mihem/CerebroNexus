@@ -201,6 +201,149 @@ cachePlot <- function(x, ...) {
   }
 }
 
+## Apply the shared projection filters and sample original metadata row ids.
+viewerProjectionCellIndices <- function(prefix, metadata = getMetaData()) {
+  groups <- getGroups()
+  percentage <- input[[paste0(prefix, "_percentage_cells_to_show")]]
+  filters <- stats::setNames(
+    lapply(groups, function(group) {
+      value <- input[[paste0(prefix, "_group_filter_", group)]]
+      if (is.null(value)) character() else value
+    }),
+    groups
+  )
+  filters <- filters[
+    !vapply(
+      groups,
+      function(group) {
+        selected <- filters[[group]]
+        values <- metadata[[group]]
+        if (!is.factor(values) || !length(selected)) {
+          return(FALSE)
+        }
+        levels <- tryCatch(
+          as.character(getGroupLevels(group)),
+          error = function(error_condition) character()
+        )
+        length(selected) == length(levels) &&
+          setequal(base::levels(values), levels) &&
+          setequal(as.character(selected), levels) &&
+          !anyNA(values)
+      },
+      logical(1)
+    )
+  ]
+  if (!length(filters)) {
+    cell_count <- nrow(metadata)
+    if (!cell_count) {
+      return(integer())
+    }
+    if (percentage < 100) {
+      size <- ceiling(cell_count * percentage / 100)
+      return(sample.int(cell_count, size))
+    }
+    return(sample.int(cell_count))
+  }
+  indices <- which(cerebroGroupFilterMask(metadata, filters))
+  if (!length(indices)) {
+    return(indices)
+  }
+  size <- if (percentage < 100) {
+    ceiling(length(indices) * percentage / 100)
+  } else {
+    length(indices)
+  }
+  indices[sample.int(length(indices), size)]
+}
+
+## Prefer the R6 row accessor so a single-gene request never needs a temporary
+## 1 x cells matrix. Older serialized objects fall back to the matrix method.
+viewerExpressionRow <- function(data_set, cells, gene) {
+  cells <- as.character(cells)
+  get_row <- tryCatch(data_set$getExpressionRow, error = function(e) NULL)
+  if (is.function(get_row)) {
+    return(as.numeric(get_row(gene = gene, cells = cells)))
+  }
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = gene
+  )
+  if (is.null(expression_matrix)) {
+    return(NULL)
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(as.numeric(expression_matrix))
+  }
+  row_index <- if (is.null(rownames(expression_matrix))) {
+    1L
+  } else {
+    match(gene, rownames(expression_matrix))
+  }
+  if (is.na(row_index)) {
+    return(NULL)
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (is.null(cell_names) || identical(cells, cell_names)) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else {
+    match(cells, cell_names)
+  }
+  as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+}
+
+## Fetch several genes in one backend call and align every returned vector to
+## the requested cell order. Missing genes are omitted from the result.
+viewerExpressionValues <- function(data_set, cells, genes) {
+  cells <- as.character(cells)
+  genes <- unique(as.character(unlist(genes, use.names = FALSE)))
+  genes <- genes[!is.na(genes) & nzchar(genes)]
+  if (!length(genes)) {
+    return(list())
+  }
+
+  if (length(genes) == 1L) {
+    value <- viewerExpressionRow(data_set, cells, genes[[1L]])
+    if (is.null(value)) {
+      return(list())
+    }
+    return(stats::setNames(list(value), genes))
+  }
+
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = genes
+  )
+  if (is.null(expression_matrix)) {
+    return(list())
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(list())
+  }
+
+  gene_names <- rownames(expression_matrix)
+  if (is.null(gene_names) && nrow(expression_matrix) == length(genes)) {
+    gene_names <- genes
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (is.null(cell_names)) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else if (identical(cells, cell_names)) {
+    seq_along(cells)
+  } else {
+    match(cells, cell_names)
+  }
+
+  values <- lapply(genes, function(gene) {
+    row_index <- match(gene, gene_names)
+    if (is.na(row_index)) {
+      return(NULL)
+    }
+    as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+  })
+  names(values) <- genes
+  values[!vapply(values, is.null, logical(1))]
+}
+
 cerebroCellViewMessage <- function(
   id,
   meta,

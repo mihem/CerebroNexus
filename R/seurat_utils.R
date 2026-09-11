@@ -832,6 +832,7 @@
   slot = "data",
   join_samples = TRUE,
   allow_cross_semantic_fallback = FALSE,
+  allow_iterable_matrix = FALSE,
   verbose = FALSE,
   return_resolution = FALSE
 ) {
@@ -841,6 +842,13 @@
       is.na(return_resolution)
   ) {
     stop("`return_resolution` must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (
+    !is.logical(allow_iterable_matrix) ||
+      length(allow_iterable_matrix) != 1L ||
+      is.na(allow_iterable_matrix)
+  ) {
+    stop("`allow_iterable_matrix` must be TRUE or FALSE.", call. = FALSE)
   }
   seurat_version <- as.character(utils::packageVersion("Seurat"))
   is_seurat_v5 <- utils::compareVersion(seurat_version, "5.0.0") >= 0
@@ -1039,7 +1047,10 @@
     )
   }
 
-  if (is.matrix(expr_matrix) || inherits(expr_matrix, "dgCMatrix")) {
+  supported_matrix <- is.matrix(expr_matrix) ||
+    inherits(expr_matrix, "dgCMatrix") ||
+    (isTRUE(allow_iterable_matrix) && inherits(expr_matrix, "IterableMatrix"))
+  if (supported_matrix) {
     if (nrow(expr_matrix) == 0 || ncol(expr_matrix) == 0) {
       stop(
         "Expression matrix is empty (0 rows or 0 columns).\n",

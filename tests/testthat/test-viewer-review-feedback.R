@@ -687,7 +687,7 @@ test_that("Specialist group filters share inclusive empty-selection behavior", {
   )) {
     expect_match(
       do.call(viewer_source, as.list(path)),
-      "cerebroGroupFilterMask",
+      "viewerProjectionCellIndices",
       fixed = TRUE
     )
   }
