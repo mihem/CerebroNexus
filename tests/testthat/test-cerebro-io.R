@@ -1,4 +1,4 @@
-make_bpcells_cerebro <- function(root) {
+make_bpcells_cerebro <- function(root, row_major = FALSE) {
   cells <- paste0("cell-", seq_len(4L))
   counts <- matrix(
     c(0, 1, 4, 2, 0, 5, 3, 6, 0, 7, 8, 9),
@@ -7,10 +7,12 @@ make_bpcells_cerebro <- function(root) {
   )
   sparse <- methods::as(Matrix::Matrix(counts, sparse = TRUE), "CsparseMatrix")
   sidecar <- file.path(root, "expression.bpcells")
-  BPCells::write_matrix_dir(
-    methods::as(sparse, "IterableMatrix"),
-    dir = sidecar
-  )
+  iterable <- methods::as(sparse, "IterableMatrix")
+  if (row_major) {
+    BPCells::transpose_storage_order(iterable, outdir = sidecar)
+  } else {
+    BPCells::write_matrix_dir(iterable, dir = sidecar)
+  }
 
   object <- Cerebro$new()
   object$expression <- BPCells::open_matrix_dir(sidecar)
@@ -38,6 +40,27 @@ expect_cerebro_fields <- function(object, fixture) {
   expect_identical(rownames(object$getProjection("umap")), fixture$cells)
   expect_equal(as.matrix(object$expression), fixture$counts)
 }
+
+test_that("BPCells v2 writer keeps both input orders row-major", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("Matrix")
+
+  counts <- Matrix::Matrix(
+    matrix(1:12, nrow = 3L),
+    sparse = TRUE
+  )
+  column_major <- methods::as(counts, "IterableMatrix")
+  row_source <- tempfile("bpcells-row-source-")
+  BPCells::transpose_storage_order(column_major, outdir = row_source)
+  row_major <- BPCells::open_matrix_dir(row_source)
+
+  for (source in list(column_major, row_major)) {
+    output <- tempfile("bpcells-v2-")
+    written <- .writeBpcellsGeneMajor(source, output)
+    expect_identical(BPCells::storage_order(written), "row")
+    expect_equal(as.matrix(written), as.matrix(source))
+  }
+})
 
 test_that("legacy RDS CRBs rebuild the current Cerebro class", {
   path <- tempfile(fileext = ".crb")
@@ -240,4 +263,45 @@ test_that("Data Info reads the v2 cell count without forcing metadata", {
   )
   expect_match(sample_info, "getNumberOfCells\\(\\)")
   expect_false(grepl("nrow\\(data_set\\(\\)\\$meta_data\\)", sample_info))
+})
+
+test_that("thin schema v2 hydrates row-major BPCells sidecars", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("Matrix")
+
+  root <- withr::local_tempdir()
+  fixture <- make_bpcells_cerebro(root, row_major = TRUE)
+  path <- file.path(root, "thin-v2.crb")
+  saveCerebro(fixture$object, path, codec = "rds")
+
+  payload <- .readCerebroPayload(path)
+  expect_identical(payload$crb_schema$version, 2L)
+  expect_identical(payload$crb_schema$cell_names, "expression")
+  expect_cerebro_fields(readCerebro(path), fixture)
+
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
+  runtime_object <- runtime$read_cerebro_file(path)
+  runtime_object <- runtime$.attachExternalExpression(runtime_object, path)
+  expect_true(rlang::env_binding_are_lazy(runtime_object, "expression"))
+  expect_equal(as.matrix(runtime_object$expression), fixture$counts)
+
+  malformed <- payload
+  malformed$crb_schema$version <- 2
+  malformed_path <- file.path(root, "malformed-v2.crb")
+  saveRDS(malformed, malformed_path)
+  expect_error(readCerebro(malformed_path), "unsupported CRB schema")
+  expect_error(
+    runtime$.attachExternalExpression(
+      runtime$read_cerebro_file(malformed_path),
+      malformed_path
+    ),
+    "unsupported CRB schema"
+  )
+
+  writeLines(
+    c("tampered", fixture$cells[-1L]),
+    file.path(fixture$sidecar, "col_names")
+  )
+  expect_error(readCerebro(path), "cell-name index does not match")
 })

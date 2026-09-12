@@ -54,6 +54,14 @@
   paste0(stem, suffix)
 }
 
+.writeBpcellsGeneMajor <- function(matrix, dir) {
+  if (identical(BPCells::storage_order(matrix), "row")) {
+    BPCells::write_matrix_dir(matrix, dir = dir)
+    return(BPCells::open_matrix_dir(dir))
+  }
+  BPCells::transpose_storage_order(matrix, outdir = dir)
+}
+
 .validatePortableExportBasename <- function(final_file) {
   name <- basename(final_file)
   stem <- tools::file_path_sans_ext(name)
@@ -962,8 +970,9 @@ exportFromSeurat <- function(
         bpc_storage_msg
       ))
     }
-    BPCells::write_matrix_dir(mat = bpc_iter, dir = bpc_abs)
-    mat_handle <- BPCells::open_matrix_dir(dir = bpc_abs)
+    ## Keep Cerebro's genes x cells dimensions, but physically store rows
+    ## contiguously so per-gene and small gene-set queries avoid a full scan.
+    mat_handle <- .writeBpcellsGeneMajor(bpc_iter, bpc_abs)
 
     ## Carry the live handle (absolute path inside @dir -- BPCells normalises
     ## it on open_matrix_dir()) AND the portable relative location tag. Step

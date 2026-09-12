@@ -784,7 +784,12 @@ test_that("a sample-split object exports every cell in bpcells mode", {
   expect_true(dir.exists(matrix_dir))
   on_disk <- BPCells::open_matrix_dir(dir = matrix_dir)
   expect_equal(ncol(on_disk), ncol(obj))
-  expect_equal(nrow(readRDS(crb)$getMetaData()), ncol(obj))
+  expect_identical(BPCells::storage_order(on_disk), "row")
+  payload <- readRDS(crb)
+  expect_identical(payload$crb_schema$version, 2L)
+  expect_identical(payload$crb_schema$cell_names, "expression")
+  expect_equal(nrow(payload$getMetaData()), ncol(obj))
+  expect_equal(dim(readCerebro(crb)$expression), dim(on_disk))
 })
 
 test_that("a layer asked for by name is not joined away underneath the caller", {
