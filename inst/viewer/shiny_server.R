@@ -380,14 +380,20 @@ server <- function(input, output, session) {
         configured_paths
       )
     }
-    ## log message
-    message(data$print())
-    ## check if 'expression' slot exists and print log message with its format
-    ## if it does
-    if (!is.null(data$expression)) {
+    expression_is_deferred <- is.environment(data) &&
+      exists("expression", envir = data, inherits = FALSE) &&
+      isTRUE(rlang::env_binding_are_lazy(data, "expression"))
+    if (expression_is_deferred) {
       print(glue::glue(
-        "[{Sys.time()}] Format of expression data: {class(data$expression)}"
+        "[{Sys.time()}] Data loaded; expression backend will attach on first use."
       ))
+    } else {
+      message(data$print())
+      if (!is.null(data$expression)) {
+        print(glue::glue(
+          "[{Sys.time()}] Format of expression data: {class(data$expression)}"
+        ))
+      }
     }
     ## return loaded data
     return(data)

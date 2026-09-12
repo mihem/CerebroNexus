@@ -203,7 +203,7 @@ R_LIBS="$STARTUP_LIB" \
   thin_qs2_fingerprint=/path/to/cerebro_mouse_brain_1m_fingerprint_qs2.crb
 ```
 
-The recorded values are medians of three fresh Viewer processes per artifact. All three candidates use the same installed 4.6.0 code and unchanged BPCells sidecar, so this comparison isolates the control-file representation and startup fingerprint work.
+The recorded values are medians of three fresh Viewer processes per artifact. All three candidates use the same installed 4.6.0 code from before the runtime scheduling optimization and an unchanged BPCells sidecar, so this comparison isolates the control-file representation and startup fingerprint work.
 
 | CRB artifact | Package attach | App construct | Server listening | Browser to data | Process to data |
 |---|---:|---:|---:|---:|---:|
@@ -211,7 +211,21 @@ The recorded values are medians of three fresh Viewer processes per artifact. Al
 | Thin qs2 without stored fingerprint | 0.999 s | 0.192 s | 1.381 s | 6.490 s | 7.977 s |
 | Thin qs2 with stored fingerprint | 1.015 s | 0.193 s | 1.382 s | 4.559 s | 6.024 s |
 
-Thin qs2 removes 11.8% of legacy process-to-data time. Recording the fingerprint during export brings the total reduction to 33.4% against legacy RDS and 24.5% against the previous thin qs2 artifact. The remaining roughly 4.6 seconds after browser navigation includes Shiny session initialization, CRB hydration, metadata preparation, and the deliberate large-dataset Linked Views prewarm; moving that prewarm out would only transfer latency back to the first Linked Views visit.
+Thin qs2 removes 11.8% of legacy process-to-data time. Recording the fingerprint during export brings the total reduction to 33.4% against legacy RDS and 24.5% against the previous thin qs2 artifact.
+
+The runtime optimization was then measured separately against its exact code starting point with the fingerprinted thin qs2 artifact, the same BPCells sidecar, and three fresh installed-package processes per candidate. The startup harness now records browser document loading separately from the interval between the load event and Data Info becoming ready. Raw measurements are in `tests/bench/results/million_cell_startup_optimization_4_6_0.csv`.
+
+| Startup phase | Starting point | Optimized | Change |
+|---|---:|---:|---:|
+| Package attach | 1.023 s | 1.025 s | 0.2% slower |
+| App construction | 0.192 s | 0.203 s | 5.7% slower |
+| Process start to server listening | 1.387 s | 1.432 s | 3.3% slower |
+| Browser document load | 0.292 s | 0.260 s | 10.9% faster |
+| Load event to Data ready | 4.291 s | 2.287 s | 46.7% faster |
+| Browser navigation to Data ready | 4.589 s | 2.543 s | 44.6% faster |
+| Process start to Data ready | 6.081 s | 4.097 s | 32.6% faster |
+
+The optimized thin BPCells path validates and hydrates the million cell names without loading BPCells, then attaches the expression matrix on its first real use. Large-dataset Linked Views prewarming starts after the initial response and a three-second grace period; its gene-selector gate checks that grace period before inspecting the expression matrix. Overview and Data Info therefore no longer wait for a hidden expression control or hidden Linked Views bundle. The cost is deferred rather than erased: opening an expression-dependent page immediately performs the one-time BPCells attach, while an otherwise idle session performs it during Linked Views prewarming.
 
 New BPCells CRBs written by `saveCerebro()` or an exporter contain the fingerprint automatically. To make an optimized artifact from an older thin CRB while preserving the original benchmark input, write the copy beside the same BPCells sidecar:
 
@@ -261,7 +275,7 @@ Overview and Linked Views now meet the three-second navigation target. Integer v
 
 The full-million gene and RGB rows remain dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU keeps their eventual million-point render responsive and avoids browser lock-up, but it does not turn that storage scan into a three-second operation. Improving those two rows requires a separate expression-cache or pre-aggregation change and is not claimed by this Viewer-rendering release.
 
-The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. Installed 4.6.0 reaches Data Info in a 6.024-second median with a current thin qs2 artifact; the renderer and navigation timings begin only after that startup phase.
+The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. Installed 4.6.0 reaches Data Info in a 4.097-second median with a current thin qs2 artifact, down from 6.081 seconds at the exact runtime starting point; the renderer and navigation timings begin only after that startup phase.
 
 ## Measure the renderer alone
 

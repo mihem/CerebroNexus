@@ -164,6 +164,8 @@ test_that("the cold-start benchmark measures an installed Viewer", {
   expect_match(benchmark, "library(CerebroNexus)", fixed = TRUE)
   expect_no_match(benchmark, "load_all", fixed = TRUE)
   expect_match(benchmark, "library_ms", fixed = TRUE)
+  expect_match(benchmark, "browser_load_ms", fixed = TRUE)
+  expect_match(benchmark, "load_to_data_ms", fixed = TRUE)
   expect_match(benchmark, "browser_to_data_ms", fixed = TRUE)
   expect_match(benchmark, "process_to_data_ms", fixed = TRUE)
 })

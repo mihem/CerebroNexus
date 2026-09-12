@@ -71,6 +71,7 @@ observe({
 coordviews_build_log <- new.env(parent = emptyenv())
 coordviews_build_log$n <- 0L
 coordviews_build_log$sent_n <- 0L
+coordviews_background_ready <- reactiveVal(FALSE)
 
 coordviews_bundle <- reactive({
   req(!is.null(data_set()))
@@ -105,13 +106,26 @@ coordviews_bundle <- reactive({
 })
 
 ## Large datasets need the bundle before an on-demand click can meet the
-## interaction budget. Build it once per session during data initialisation;
-## smaller datasets retain the fully lazy path.
+## interaction budget. Give the browser three seconds to receive the initial data
+## response before using the otherwise idle session to build a hidden page.
 observeEvent(
   cv_saved_view_dataset(),
   {
     req(length(cv_saved_view_dataset()$cells) >= 200000L)
-    isolate(coordviews_bundle())
+    session$onFlushed(
+      function() {
+        later::later(
+          function() {
+            if (!session$isClosed()) {
+              coordviews_background_ready(TRUE)
+              isolate(coordviews_bundle())
+            }
+          },
+          delay = 3
+        )
+      },
+      once = TRUE
+    )
   },
   ignoreInit = FALSE
 )
@@ -749,12 +763,24 @@ cv_gene_vector <- function(gene, cells) {
 serverSideGeneSelector(
   session,
   "coordviews_gene",
-  active = function() cv_has_expression()
+  active = function() {
+    coordviews_background_ready() &&
+      coordviews_visible() &&
+      cv_has_expression()
+  }
 )
 lapply(
   c("coordviews_gene_r", "coordviews_gene_g", "coordviews_gene_b"),
   function(channel_id) {
-    serverSideGeneSelector(session, channel_id, active = cv_has_expression)
+    serverSideGeneSelector(
+      session,
+      channel_id,
+      active = function() {
+        coordviews_background_ready() &&
+          coordviews_visible() &&
+          cv_has_expression()
+      }
+    )
   }
 )
 

@@ -123,6 +123,7 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   )
   runtime_object <- runtime$read_cerebro_file(qs)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, qs)
+  expect_true(rlang::env_binding_are_lazy(runtime_object, "expression"))
   expect_identical(
     runtime_object$cell_fingerprint,
     payload$cell_fingerprint

@@ -106,6 +106,7 @@ for (round in seq_len(repeats)) {
         navigated <- as.numeric(Sys.time())
         invisible(session$Page$navigate(sprintf("http://127.0.0.1:%d/", port)))
         invisible(session$Page$loadEventFired())
+        loaded <- as.numeric(Sys.time())
         invisible(session$Runtime$evaluate(
           "document.querySelector('a[href=\"#shiny-tab-loadData\"]').click()"
         ))
@@ -141,6 +142,8 @@ for (round in seq_len(repeats)) {
           app_construct_ms = 1000 *
             (lookup[["app_constructed"]] - lookup[["library_done"]]),
           server_listen_ms = 1000 * (server_ready - started),
+          browser_load_ms = 1000 * (loaded - navigated),
+          load_to_data_ms = 1000 * (ready - loaded),
           browser_to_data_ms = 1000 * (ready - navigated),
           process_to_data_ms = 1000 * (ready - started)
         )

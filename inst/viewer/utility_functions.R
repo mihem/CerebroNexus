@@ -2619,7 +2619,7 @@ get_or_load_crb <- function(
   checksum
 }
 
-.hydrateThinCrb <- function(obj, crb_path, sidecar, schema) {
+.hydrateThinCrb <- function(obj, crb_path, sidecar, schema, cells = NULL) {
   if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
     stop(
       "The BPCells cell-name index does not match CRB '",
@@ -2628,7 +2628,9 @@ get_or_load_crb <- function(
       call. = FALSE
     )
   }
-  cells <- colnames(obj$expression)
+  if (is.null(cells)) {
+    cells <- colnames(obj$expression)
+  }
   metadata <- obj$meta_data
   if (
     !is.character(cells) ||
@@ -2883,12 +2885,6 @@ get_or_load_crb <- function(
   }
 
   if (be$type == "bpcells") {
-    if (!requireNamespace("BPCells", quietly = TRUE)) {
-      stop(
-        "bpcells-backed crb requires the BPCells package; please install it.",
-        call. = FALSE
-      )
-    }
     if (!dir.exists(loc_abs)) {
       stop(
         sprintf(
@@ -2904,10 +2900,38 @@ get_or_load_crb <- function(
         call. = FALSE
       )
     }
-    print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
-    obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
     if (!is.null(crb_schema)) {
-      obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema)
+      cells <- readLines(file.path(loc_abs, "col_names"), warn = FALSE)
+      obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema, cells)
+      delayedAssign(
+        "expression",
+        {
+          if (!requireNamespace("BPCells", quietly = TRUE)) {
+            stop(
+              paste(
+                "bpcells-backed crb requires the BPCells package;",
+                "please install it."
+              ),
+              call. = FALSE
+            )
+          }
+          print(glue::glue(
+            "[{Sys.time()}] Attaching bpcells backend: {loc_abs}"
+          ))
+          BPCells::open_matrix_dir(dir = loc_abs)
+        },
+        eval.env = environment(),
+        assign.env = obj
+      )
+    } else {
+      if (!requireNamespace("BPCells", quietly = TRUE)) {
+        stop(
+          "bpcells-backed crb requires the BPCells package; please install it.",
+          call. = FALSE
+        )
+      }
+      print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
+      obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
     }
   } else if (be$type == "h5") {
     if (!requireNamespace("HDF5Array", quietly = TRUE)) {

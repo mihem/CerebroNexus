@@ -745,6 +745,27 @@ test_that("Linked views reuses the saved-view fingerprint", {
   ))
 })
 
+test_that("large-dataset work stays off the initial response", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
+
+  expect_match(server, "session$onFlushed(", fixed = TRUE)
+  expect_match(server, "later::later(", fixed = TRUE)
+  expect_match(server, "isolate(coordviews_bundle())", fixed = TRUE)
+  expect_match(
+    server,
+    "coordviews_background_ready <- reactiveVal(FALSE)",
+    fixed = TRUE
+  )
+  expect_match(
+    server,
+    paste0(
+      "coordviews_background_ready\\(\\) &&\\s+",
+      "coordviews_visible\\(\\) &&\\s+cv_has_expression\\(\\)"
+    )
+  )
+})
+
 test_that("bundle cell identity falls back to metadata row names", {
   skip_if_not(have_bundle)
   cells <- c("c1", "c2")
