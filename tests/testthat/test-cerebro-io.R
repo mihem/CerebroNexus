@@ -100,6 +100,11 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   expect_false("cell_barcode" %in% names(payload$meta_data))
   expect_type(payload$meta_data$nUMI, "integer")
   expect_type(payload$meta_data$nGene, "integer")
+  expect_identical(payload$crb_schema$version, 1L)
+  expect_identical(
+    payload$cell_fingerprint,
+    "md5-cell-set-v1:e4f597e835d59a5ae4da3f346939b09e"
+  )
   expect_identical(payload$crb_schema$projection_rownames, "umap")
   expect_identical(
     readBin(qs, "raw", n = 4L),
@@ -118,6 +123,10 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   )
   runtime_object <- runtime$read_cerebro_file(qs)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, qs)
+  expect_identical(
+    runtime_object$cell_fingerprint,
+    payload$cell_fingerprint
+  )
   expect_identical(runtime_object$meta_data, qs_object$meta_data)
   expect_identical(runtime_object$projections, qs_object$projections)
   expect_equal(as.matrix(runtime_object$expression), fixture$counts)

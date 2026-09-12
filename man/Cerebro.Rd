@@ -49,6 +49,9 @@ treats that as \code{"embedded"} for backward compatibility.}
 restored from its external expression sidecar. Legacy and embedded CRBs
 leave this as \code{NULL}.}
 
+    \item{\code{cell_fingerprint}}{Stable identity of the cell population used by
+portable saved views. Older CRBs leave this as \code{NULL}.}
+
     \item{\code{meta_data}}{\code{data.frame} that contains cell meta data.}
 
     \item{\code{projections}}{\code{list} that contains projections/dimensional

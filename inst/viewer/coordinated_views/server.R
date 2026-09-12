@@ -41,7 +41,7 @@ cv_saved_view_dataset <- reactive({
     rownames(metadata)
   }
   stored_fingerprint <- tryCatch(
-    dataset$crb_schema$cell_fingerprint,
+    dataset$cell_fingerprint,
     error = function(error) NULL
   )
   list(

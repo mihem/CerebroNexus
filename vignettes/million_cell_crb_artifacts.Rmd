@@ -174,7 +174,7 @@ The transformation is deterministic:
 10. Export counts, `sample`, `seurat_clusters`, and the full UMAP to a BPCells-backed CRB.
 11. Re-encode only the CRB control payload as thin RDS and thin qs2. Both files reuse the same unchanged Cerebro BPCells sidecar.
 
-The thin CRB uses the sidecar's ordered `col_names` as its canonical cell index. It omits the live expression handle, `meta_data$cell_barcode`, and projection barcode row names, records the `col_names` checksum, and restores those fields in `readCerebro()`.
+The thin CRB uses the sidecar's ordered `col_names` as its canonical cell index. It omits the live expression handle, `meta_data$cell_barcode`, and projection barcode row names, records the `col_names` checksum and portable-view cell fingerprint, and restores the omitted fields in `readCerebro()`. Computing the order-independent fingerprint once during export avoids sorting and hashing one million barcodes whenever the Viewer starts; older CRBs remain readable and calculate it at runtime.
 
 # Files and formats
 

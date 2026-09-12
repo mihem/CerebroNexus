@@ -732,6 +732,12 @@ test_that("Linked views reuses the saved-view fingerprint", {
     "b$dataset_fingerprint <- cv_saved_view_dataset()$fingerprint",
     fixed = TRUE
   )
+  expect_match(server, "dataset$cell_fingerprint", fixed = TRUE)
+  expect_false(grepl(
+    "dataset$crb_schema$cell_fingerprint",
+    server,
+    fixed = TRUE
+  ))
   expect_false(grepl(
     "b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)",
     server,

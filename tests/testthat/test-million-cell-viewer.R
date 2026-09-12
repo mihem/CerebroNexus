@@ -146,6 +146,28 @@ test_that("the real Viewer benchmark accepts the Canvas baseline", {
   expect_match(benchmark, "rgb_ready_ms", fixed = TRUE)
 })
 
+test_that("the cold-start benchmark measures an installed Viewer", {
+  benchmark_file <- testthat::test_path(
+    "..",
+    "bench",
+    "benchmark_million_cell_startup.R"
+  )
+  skip_if_not(
+    file.exists(benchmark_file),
+    "benchmark tree not present (expected when checking a built package)"
+  )
+  benchmark <- paste(
+    readLines(benchmark_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(benchmark, "library(CerebroNexus)", fixed = TRUE)
+  expect_no_match(benchmark, "load_all", fixed = TRUE)
+  expect_match(benchmark, "library_ms", fixed = TRUE)
+  expect_match(benchmark, "browser_to_data_ms", fixed = TRUE)
+  expect_match(benchmark, "process_to_data_ms", fixed = TRUE)
+})
+
 test_that("continuous colours keep stable paint order without comparison sort", {
   skip_if(Sys.which("node") == "", "node not on PATH")
   source <- viewer_test_path("www", "cell_views.js")
