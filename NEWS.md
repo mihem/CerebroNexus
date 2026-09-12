@@ -2,11 +2,16 @@
 
 ## Viewer
 
+- Thin BPCells CRB schema v2 records the cell count and lets the Viewer defer million-cell index hydration until metadata or projections are first used; package-level `readCerebro()` and schema v1 files remain eager and compatible.
+- Data Info is delivered before optional page servers and collapsed group filters are registered, reducing installed-package process-to-1M-cell readiness to a 2.557-second median while preserving those pages after the first response.
+
+# CerebroNexus 4.6.0
+
+## Viewer
+
 - Large projections use WebGPU with a Canvas 2D fallback, preserving complete million-cell views while making pan and zoom interactive.
 - Binary typed-array transport, compact categorical colours, grouped hover columns, and deferred non-render-critical metadata reduce transfer and first-frame work.
 - BPCells-backed CRBs record the portable-view cell fingerprint during export, avoiding a million-cell sort and hash on every Viewer startup while retaining a fallback for older CRBs.
-- Thin BPCells CRB schema v2 records the cell count and lets the Viewer defer million-cell index hydration until metadata or projections are first used; package-level `readCerebro()` and schema v1 files remain eager and compatible.
-- Data Info is delivered before optional page servers and collapsed group filters are registered, reducing installed-package process-to-1M-cell readiness to a 2.557-second median while preserving those pages after the first response.
 - Overview, Linked Views, gene-expression, Spatial, Trajectory, Trekker, and specialist plots share the accelerated renderer and selection state.
 - An opt-in one-million-cell demo and reproducible before/after benchmark document the official 10x E18 mouse-brain workload.
 
