@@ -2,6 +2,17 @@
 
 This directory compares the `embedded`, `bpcells`, and `h5` backends on public single-cell matrices. This page explains how to run it. Read [METHODOLOGY.md](METHODOLOGY.md) for the experimental design and [RESULTS.md](RESULTS.md) before interpreting any number.
 
+## Million-cell page readiness
+
+The page harness uses the official 1M CRB at 100% cells. Because that data set has no immune repertoire, HLA typing, or trajectory, first create a deterministic benchmark-only CRB in the same directory so it can share the expression sidecar:
+
+```bash
+Rscript tests/bench/prepare_viewer_1m_pages.R . /path/to/cerebro_mouse_brain_1m.crb /path/to/cerebro_mouse_brain_1m_pages.crb
+Rscript tests/bench/benchmark_viewer_1m_pages.R . /path/to/cerebro_mouse_brain_1m_pages.crb /path/to/viewer_1m_pages.tsv 3
+```
+
+The harness checks every page exposed by the data set. The enforced first-visit budget is 2 seconds for ordinary pages and 3 seconds for Trajectory and HLA; every repeat visit must be ready within 500 ms. Overview, Groups, Gene Expression, Immune Repertoire, Trajectory, and HLA are required, while data-dependent pages such as Spatial are measured when present. The synthetic additions are performance fixtures only and must not be used for biological conclusions.
+
 > **Current status:** the harness is ready for code review, but no complete `publication` run has been performed on this branch. The archived pilot is retained for provenance only and must not be cited as final evidence.
 
 ## Quick start
