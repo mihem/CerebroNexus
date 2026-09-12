@@ -1,3 +1,12 @@
+# CerebroNexus 4.6.0
+
+## Viewer
+
+- Large projections use WebGPU with a Canvas 2D fallback, preserving complete million-cell views while making pan and zoom interactive.
+- Binary typed-array transport, compact categorical colours, grouped hover columns, and deferred non-render-critical metadata reduce transfer and first-frame work.
+- Overview, Linked Views, gene-expression, Spatial, Trajectory, Trekker, and specialist plots share the accelerated renderer and selection state.
+- An opt-in one-million-cell demo and reproducible before/after benchmark document the official 10x E18 mouse-brain workload.
+
 # CerebroNexus 4.5.1
 
 ## Performance

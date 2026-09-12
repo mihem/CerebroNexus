@@ -133,6 +133,11 @@ test_that("the real Viewer benchmark accepts the Canvas baseline", {
   )
 
   expect_match(benchmark, "has_gpu_renderer <- file.exists", fixed = TRUE)
+  expect_match(
+    benchmark,
+    "CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY",
+    fixed = TRUE
+  )
   expect_match(benchmark, "canvas[id^=\\\"cv-cv-\\\"]", fixed = TRUE)
   expect_match(benchmark, "backend:'canvas2d'", fixed = TRUE)
   expect_match(benchmark, "cerebroLinkedViewsState", fixed = TRUE)

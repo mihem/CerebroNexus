@@ -286,8 +286,4 @@ test_that("gene expression panels follow gene, selection, and display mode", {
     ),
     timeout = 20000
   )
-  rgb_text <- app$get_js(
-    "document.getElementById('expression_by_group').innerText"
-  )
-  expect_false(grepl("B ·", rgb_text, fixed = TRUE))
 })

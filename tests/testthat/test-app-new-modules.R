@@ -1,4 +1,4 @@
-# test-app-new-modules.R — shinytest2 integration tests for PR2 enhanced modules
+# shinytest2 integration tests for enhanced Viewer modules
 
 library(shinytest2)
 

@@ -30,7 +30,7 @@ CerebroNexus Viewer. It covers four separate operations:
 
 1. download the official 10x Genomics E18 mouse-brain matrix;
 2. build a reproducible one-million-cell Seurat object and BPCells-backed CRB;
-3. compare the pre-GPU Viewer with the current WebGPU Viewer;
+3. compare the 4.5.1 Canvas Viewer with the 4.6.0 WebGPU Viewer;
 4. launch the same data interactively through the bundled demo app.
 
 The expensive chunks are deliberately not evaluated while building the
@@ -128,12 +128,17 @@ BPCells bundle check.
 
 ## Create the baseline checkout
 
-Commit `5f509edd` contains the optional one-million-cell demo immediately before
-the GPU renderer work. Create a detached worktree so both implementations can
-be measured against the same CRB and browser installation:
+Commit `c455d0cd` is the exact 4.5.1 baseline before the WebGPU work. It has no one-million-cell menu entry and still uses the Canvas 2D renderer, but the benchmark launches its `launchCerebro()` directly against the same CRB. The fixed revision keeps the comparison reproducible after development branches are merged or removed.
+
+| Candidate | Revision | Version | Role in this comparison |
+|---|---|---|---|
+| Canvas baseline | `c455d0cd` | 4.5.1 | Optimized CRB/backend, Canvas 2D Viewer, no bundled 1M demo |
+| WebGPU release | This source tree | 4.6.0 | Binary transport, WebGPU rendering, deferred hover payload, bundled opt-in 1M demo |
+
+Create a detached worktree so both implementations can be measured against the same CRB and browser installation:
 
 ```{bash baseline-worktree, eval=FALSE}
-git worktree add --detach ../CerebroNexus-before-1m 5f509edd
+git worktree add --detach ../CerebroNexus-4.5.1-baseline c455d0cd
 ```
 
 Use an old-format BPCells CRB for this Viewer comparison. The current Viewer
@@ -142,23 +147,20 @@ input. This keeps the CRB-format reduction separate from browser rendering.
 
 ## Run the full Viewer benchmark
 
-The harness alternates candidate order on each round. It checks that Data Info
-reports 1,000,000 cells, waits for Overview and Linked Views, measures a
-single-gene Gene expression plot and a three-gene RGB plot, requires the current
-candidate to report `webgpu`, performs ten alternating zoom operations, and
-rejects GPU errors or context loss. Renderer-ready events must report the
-expected number of points, so a fast but incomplete plot fails the run.
+The 4.5.1-to-4.6.0 comparison uses the harness's Overview-only mode because the 4.5.1 Canvas implementation cannot provide a usable one-million-cell Linked Views, gene-expression, or RGB workflow. The harness still checks that Data Info reports 1,000,000 cells, verifies that every expected point was rendered, performs ten alternating zoom operations, alternates candidate order on each round, and rejects GPU errors or context loss. The later WebGPU-to-WebGPU comparison exercises every page path.
 
 Replace `CRB` below with the path returned by the preparation step.
 
 ```{bash viewer-benchmark, eval=FALSE}
 CRB=/path/to/cerebro_mouse_brain_1m.crb
 
-Rscript tests/bench/benchmark_million_cell_viewer.R \
-  ../CerebroNexus-before-1m . "$CRB" 3 100
+CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY=1 \
+  Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-4.5.1-baseline . "$CRB" 3 100
 
-Rscript tests/bench/benchmark_million_cell_viewer.R \
-  ../CerebroNexus-before-1m . "$CRB" 3 10
+CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY=1 \
+  Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-4.5.1-baseline . "$CRB" 3 10
 ```
 
 The 100% run draws all one million cells. The 10% run draws 100,000 cells and
@@ -167,20 +169,18 @@ fresh app processes per candidate on the same host.
 
 | Initial display | Metric | Before (`canvas2d`) | After (`webgpu`) | Change |
 |---|---|---:|---:|---:|
-| 100% | Data ready | 17.425 s | 17.106 s | 1.8% faster |
-| 100% | First Overview | 63.572 s | 12.354 s | 80.6% faster |
-| 100% | Data + Overview | 80.997 s | 29.460 s | 63.6% faster |
-| 100% | Zoom median | 361.2 ms | 8.7 ms | 41.5x faster |
-| 100% | Zoom p95 | 421.2 ms | 11.5 ms | 36.6x faster |
-| 10% | Data ready | 16.247 s | 16.889 s | effectively tied |
-| 10% | First Overview | 50.027 s | 2.424 s | 95.2% faster |
-| 10% | Data + Overview | 66.274 s | 19.313 s | 70.9% faster |
-| 10% | Zoom median | 122.9 ms | 3.5 ms | 35.1x faster |
-| 10% | Zoom p95 | 134.5 ms | 5.2 ms | 25.9x faster |
+| 100% | Data ready | 15.088 s | 16.313 s | 8.1% slower |
+| 100% | First Overview | 48.768 s | 1.377 s | 97.2% faster |
+| 100% | Data + Overview | 63.856 s | 17.690 s | 72.3% faster |
+| 100% | Zoom median | 280.9 ms | 8.0 ms | 35.1x faster |
+| 100% | Zoom p95 | 310.3 ms | 15.4 ms | 20.1x faster |
+| 10% | Data ready | 14.836 s | 15.613 s | 5.2% slower |
+| 10% | First Overview | 35.838 s | 0.323 s | 99.1% faster |
+| 10% | Data + Overview | 50.674 s | 15.936 s | 68.6% faster |
+| 10% | Zoom median | 91.5 ms | 3.7 ms | 24.7x faster |
+| 10% | Zoom p95 | 108.7 ms | 5.9 ms | 18.4x faster |
 
-The first row group shows why storage and rendering are reported separately:
-loading and attaching the same old CRB barely changed, while the first plot and
-subsequent camera operations changed substantially.
+The first row group shows why storage and rendering are reported separately: loading and attaching the same CRB barely changed, while the first plot and subsequent camera operations changed substantially. The missing 4.5.1 Linked Views and expression rows are intentional: at one million points those Canvas paths are the unusable baseline this release replaces, not a workflow worth presenting as a demo.
 
 ## Verify the three-second navigation target
 
@@ -199,18 +199,17 @@ Rscript tests/bench/benchmark_million_cell_viewer.R \
   ../CerebroNexus-before-wire . "$CRB" 3 10
 ```
 
-Both candidates used WebGPU. Results are medians of three alternating fresh
-processes on 12 September 2026:
+Both candidates used WebGPU. Results are medians of three alternating fresh processes on 12 September 2026. The selector is stabilized before timing so the expression rows include the actual million-cell BPCells read rather than a stale render:
 
 | Display | Metric | Before | After | Change |
 |---|---|---:|---:|---:|
-| 100% (1,000,000 points) | Data ready | 14.798 s | 14.185 s | 4.1% faster |
-| 100% (1,000,000 points) | First Overview | 11.819 s | 1.789 s | 84.9% faster |
-| 100% (1,000,000 points) | Linked Views ready | 4.519 s | 2.608 s | 42.3% faster |
-| 100% (1,000,000 points) | Gene expression ready | 6.830 s | 2.176 s | 68.1% faster |
-| 100% (1,000,000 points) | RGB ready | 11.934 s | 2.096 s | 82.4% faster |
-| 100% (1,000,000 points) | Zoom median | 7.9 ms | 8.2 ms | effectively tied |
-| 100% (1,000,000 points) | Zoom p95 | 16.4 ms | 15.7 ms | effectively tied |
+| 100% (1,000,000 points) | Data ready | 15.455 s | 16.330 s | 5.7% slower |
+| 100% (1,000,000 points) | First Overview | 11.481 s | 1.440 s | 87.5% faster |
+| 100% (1,000,000 points) | Linked Views ready | 4.462 s | 2.507 s | 43.8% faster |
+| 100% (1,000,000 points) | Gene expression ready | 88.790 s | 81.846 s | 7.8% faster |
+| 100% (1,000,000 points) | RGB ready | 99.863 s | 82.157 s | 17.7% faster |
+| 100% (1,000,000 points) | Zoom median | 8.1 ms | 8.4 ms | effectively tied |
+| 100% (1,000,000 points) | Zoom p95 | 15.1 ms | 22.0 ms | 6.9 ms slower |
 | 10% (100,000 points) | Data ready | 13.693 s | 14.081 s | 2.8% slower |
 | 10% (100,000 points) | First Overview | 2.582 s | 1.526 s | 40.9% faster |
 | 10% (100,000 points) | Linked Views ready | 4.942 s | 1.187 s | 76.0% faster |
@@ -219,12 +218,9 @@ processes on 12 September 2026:
 | 10% (100,000 points) | Zoom median | 4.6 ms | 3.8 ms | 17.4% faster |
 | 10% (100,000 points) | Zoom p95 | 6.6 ms | 5.3 ms | 19.7% faster |
 
-All four measured million-point page paths now meet the three-second navigation
-target. Integer vectors use the narrowest lossless wire type, reducing this
-dataset's initial Linked Views bundle from 28,001,836 to 15,001,832 bytes
-(46.4% smaller). Hover columns remain in their grouped representation and are
-expanded only for the point actually under the pointer. Non-render-critical
-hover data is sent after the first-frame work rather than competing with it.
+Overview and Linked Views now meet the three-second navigation target. Integer vectors use the narrowest lossless wire type, reducing this dataset's initial Linked Views bundle from 28,001,836 to 15,001,832 bytes (46.4% smaller). Hover columns remain in their grouped representation and are expanded only for the point actually under the pointer. Non-render-critical hover data is sent after the first-frame work rather than competing with it.
+
+The full-million gene and RGB rows remain dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU keeps their eventual million-point render responsive and avoids browser lock-up, but it does not turn that storage scan into a three-second operation. Improving those two rows requires a separate expression-cache or pre-aggregation change and is not claimed by this Viewer-rendering release.
 
 `Data ready` remains about 14 seconds because it includes opening the CRB,
 attaching the BPCells sidecar, and starting the Shiny session. It is reported
@@ -346,5 +342,5 @@ launchCerebro(
 Remove the detached baseline checkout when it is no longer needed:
 
 ```{bash cleanup, eval=FALSE}
-git worktree remove ../CerebroNexus-before-1m
+git worktree remove ../CerebroNexus-4.5.1-baseline
 ```

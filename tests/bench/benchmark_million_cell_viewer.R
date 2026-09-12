@@ -36,6 +36,10 @@ if (
   stop("REPEATS and PERCENT must be positive and PERCENT at most 100.")
 }
 Sys.setenv(NOT_CRAN = "true")
+overview_only <- identical(
+  Sys.getenv("CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY"),
+  "1"
+)
 
 quote_r <- function(value) encodeString(value, quote = '"')
 
@@ -138,6 +142,27 @@ run_once <- function(candidate, root, round) {
       as.numeric(browser$imageBytes) < 10000
   ) {
     stop("Viewer canvas validation failed.", call. = FALSE)
+  }
+
+  if (overview_only) {
+    return(data.frame(
+      candidate = candidate,
+      backend = browser$backend,
+      round = round,
+      percentage = percentage,
+      rendered_points = as.numeric(browser$points),
+      data_ready_ms = (data_ready - started) * 1000,
+      overview_ready_ms = (overview_ready - data_ready) * 1000,
+      linked_ready_ms = NA_real_,
+      gene_ready_ms = NA_real_,
+      gene_points = NA_real_,
+      rgb_ready_ms = NA_real_,
+      rgb_points = NA_real_,
+      zoom_median_ms = as.numeric(browser$zoomMedianMs),
+      zoom_p95_ms = as.numeric(browser$zoomP95Ms),
+      image_bytes = as.numeric(browser$imageBytes),
+      check.names = FALSE
+    ))
   }
 
   linked_started <- proc.time()[["elapsed"]]
