@@ -32,7 +32,7 @@ overview_projection_data_to_plot_raw <- reactive({
   )
 })
 
-overview_projection_data_to_plot <- debounce(
+overview_projection_data_to_plot <- debounceAfterFirst(
   overview_projection_data_to_plot_raw,
   150
 )

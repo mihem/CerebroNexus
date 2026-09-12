@@ -44,7 +44,7 @@ expression_projection_data_to_plot_raw <- reactive({
   return(to_return)
 })
 
-expression_projection_data_to_plot <- debounce(
+expression_projection_data_to_plot <- debounceAfterFirst(
   expression_projection_data_to_plot_raw,
   250
 )

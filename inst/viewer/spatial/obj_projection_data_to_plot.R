@@ -35,11 +35,7 @@ spatial_projection_data_to_plot_raw <- reactive({
     spatial_projection_metadata(),
     spatial_projection_coordinates(),
     spatial_projection_parameters_plot(),
-    reactive_colors(),
-    spatial_projection_hover_info(),
-    nrow(spatial_projection_metadata()) ==
-      length(spatial_projection_hover_info()) ||
-      spatial_projection_hover_info() == "none"
+    reactive_colors()
   )
   metadata <- spatial_projection_metadata()
   plot_parameters <- spatial_projection_parameters_plot()
@@ -159,13 +155,17 @@ spatial_projection_data_to_plot_raw <- reactive({
     reset_axes = reset_axes,
     plot_parameters = plot_parameters,
     color_assignments = color_assignments,
-    hover_info = spatial_projection_hover_info()
+    hover_columns = if (isTRUE(plot_parameters[["hover_info"]])) {
+      cerebroProjectionHoverColumns(metadata)
+    } else {
+      list()
+    }
   )
 
   return(to_return)
 })
 
-spatial_projection_data_to_plot <- debounce(
+spatial_projection_data_to_plot <- debounceAfterFirst(
   spatial_projection_data_to_plot_raw,
   150
 )

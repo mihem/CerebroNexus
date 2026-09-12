@@ -201,6 +201,44 @@ cachePlot <- function(x, ...) {
   }
 }
 
+## Return the first complete reactive value immediately; debounce only later
+## invalidations caused by interactive controls.
+debounceAfterFirst <- function(reactive, millis) {
+  delayed <- shiny::debounce(reactive, millis)
+  delivered <- FALSE
+  shiny::reactive({
+    if (!delivered) {
+      value <- reactive()
+      delivered <<- TRUE
+      return(value)
+    }
+    delayed()
+  })
+}
+
+viewerOutputTab <- function(ids) {
+  prefixes <- c(
+    overview_ = "overview",
+    expression_ = "geneExpression",
+    spatial_ = "spatial",
+    coordviews_ = "coordinated_views",
+    groups_ = "groups",
+    ir_ = "immune_repertoire",
+    trajectory_ = "trajectory",
+    trekker_ = "trekker",
+    hla_ = "hla_tcr_motifs"
+  )
+  vapply(
+    ids,
+    function(id) {
+      match <- which(startsWith(id, names(prefixes)))
+      if (length(match)) unname(prefixes[[match[[1L]]]]) else NA_character_
+    },
+    character(1),
+    USE.NAMES = FALSE
+  )
+}
+
 ## Apply the shared projection filters and sample original metadata row ids.
 viewerProjectionCellIndices <- function(prefix, metadata = getMetaData()) {
   groups <- getGroups()

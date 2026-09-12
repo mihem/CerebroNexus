@@ -207,3 +207,57 @@ test_that("projection filtering and sampling preserve original row indices", {
     integer()
   )
 })
+
+test_that("the first reactive value bypasses debounce", {
+  utility_env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), envir = utility_env)
+  compute_count <- 0L
+  server <- function(input, output, session) {
+    raw <- shiny::reactive({
+      shiny::req(input$value)
+      compute_count <<- compute_count + 1L
+      input$value
+    })
+    ready <- utility_env$debounceAfterFirst(raw, 10000)
+  }
+
+  shiny::testServer(server, {
+    session$setInputs(value = "first")
+    expect_identical(ready(), "first")
+    session$setInputs(value = "second")
+    expect_identical(ready(), "first")
+    expect_identical(compute_count, 2L)
+  })
+})
+
+test_that("hidden outputs resolve to their owning sidebar tabs", {
+  utility_env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), envir = utility_env)
+
+  expect_identical(
+    utility_env$viewerOutputTab(c(
+      "overview_plot",
+      "groups_plot",
+      "trajectory_plot",
+      "hla_plot",
+      "unknown_output"
+    )),
+    c("overview", "groups", "trajectory", "hla_tcr_motifs", NA_character_)
+  )
+})
+
+test_that("viewer source parsing is cached but evaluation stays local", {
+  cache_env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("source_cache.R"), envir = cache_env)
+  source_file <- tempfile(fileext = ".R")
+  writeLines("value <- 1L", source_file)
+
+  first <- new.env(parent = baseenv())
+  second <- new.env(parent = baseenv())
+  cache_env$viewerSource(source_file, first)
+  cache_env$viewerSource(source_file, second)
+
+  expect_identical(first$value, 1L)
+  expect_identical(second$value, 1L)
+  expect_identical(length(cache_env$.viewer_source_cache), 1L)
+})

@@ -21,6 +21,10 @@ source(
   paste0(Cerebro.options[["cerebro_root"]], "/viewer/color_config.R"),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/viewer/source_cache.R"),
+  local = TRUE
+)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -31,6 +35,14 @@ source(
 .msigdb_process_cache <- new.env(parent = emptyenv())
 
 server <- function(input, output, session) {
+  source <- function(file, local = FALSE, ...) {
+    dots <- list(...)
+    if (identical(local, TRUE) && !length(dots)) {
+      return(viewerSource(file, parent.frame()))
+    }
+    base::source(file, local = local, ...)
+  }
+
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
   ##--------------------------------------------------------------------------##
@@ -96,6 +108,40 @@ server <- function(input, output, session) {
       TRUE
     )
   )
+
+  ## Outputs inside collapsed boxes may stay active, but only after their
+  ## owning sidebar page has been visited once.
+  viewer_hidden_output_options <- list()
+  viewer_enabled_output_tabs <- character()
+  outputOptions <- function(output, x, ...) {
+    options <- list(...)
+    owner <- viewerOutputTab(x)
+    if (
+      identical(options$suspendWhenHidden, FALSE) &&
+        !is.na(owner) &&
+        !owner %in% viewer_enabled_output_tabs
+    ) {
+      viewer_hidden_output_options[[x]] <<- options
+      return(invisible(NULL))
+    }
+    do.call(shiny::outputOptions, c(list(x = output, name = x), options))
+  }
+  observeEvent(input[["sidebar"]], {
+    tab <- input[["sidebar"]]
+    viewer_enabled_output_tabs <<- union(viewer_enabled_output_tabs, tab)
+    ids <- names(viewer_hidden_output_options)
+    ids <- ids[viewerOutputTab(ids) == tab]
+    for (id in ids) {
+      do.call(
+        shiny::outputOptions,
+        c(
+          list(x = output, name = id),
+          viewer_hidden_output_options[[id]]
+        )
+      )
+      viewer_hidden_output_options[[id]] <<- NULL
+    }
+  })
 
   viewer_initial_page_tabs <- c(
     data_info = "loadData",

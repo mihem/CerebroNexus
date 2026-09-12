@@ -120,7 +120,7 @@ trajectory_projection_prepared <- reactive({
 ## after the drag settles, instead of rebuilding the Canvas payload on every
 ## intermediate value. Mirrors the debounce the other projection tabs already
 ## apply to their parameter/data reactives.
-trajectory_projection_prepared <- debounce(
+trajectory_projection_prepared <- debounceAfterFirst(
   trajectory_projection_prepared,
   200
 )
