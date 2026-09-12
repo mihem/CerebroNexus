@@ -745,6 +745,49 @@ test_that("Linked views reuses the saved-view fingerprint", {
   ))
 })
 
+test_that("saved-view startup identity does not materialize cell names", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(server, "cv_saved_view_identity <- reactive({", fixed = TRUE)
+  expect_match(server, "cell_count = getNumberOfCells()", fixed = TRUE)
+  expect_match(
+    server,
+    "identity <- cv_saved_view_identity()",
+    fixed = TRUE
+  )
+  expect_match(
+    server,
+    "req(cv_saved_view_identity()$cell_count >= 200000L)",
+    fixed = TRUE
+  )
+})
+
+test_that("colour observation starts only after a bundle is sent", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  sent <- regexpr(
+    "coordviews_build_log$sent_n <- coordviews_build_log$n",
+    server,
+    fixed = TRUE
+  )[[1]]
+  observer <- regexpr(
+    "if (!isTRUE(coordviews_build_log$color_observer_started))",
+    server,
+    fixed = TRUE
+  )[[1]]
+
+  expect_gt(sent, 0)
+  expect_gt(observer, sent)
+})
+
 test_that("large-dataset work stays off the initial response", {
   server_file <- file.path(dirname(bundle_file), "server.R")
   server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
@@ -877,12 +920,8 @@ test_that("hidden palette changes are replayed without rebuilding data", {
   server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
 
   expect_match(server, "cv_apply_color_patch(", fixed = TRUE)
-  expect_match(server, "coordviews_build_log$sent_n == 0", fixed = TRUE)
-  expect_match(
-    server,
-    'session$sendCustomMessage("coordviews_colors"',
-    fixed = TRUE
-  )
+  expect_match(server, "color_observer_started", fixed = TRUE)
+  expect_match(server, '"coordviews_colors"', fixed = TRUE)
 })
 
 ## A minimal but realistically-shaped IR table: the CT* columns spell out chain

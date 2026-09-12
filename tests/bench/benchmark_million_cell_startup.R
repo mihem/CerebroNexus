@@ -180,3 +180,40 @@ if (nzchar(output)) {
   dir.create(dirname(output), recursive = TRUE, showWarnings = FALSE)
   utils::write.csv(raw, output, row.names = FALSE)
 }
+
+gate_label <- Sys.getenv("CEREBRO_STARTUP_GATE_LABEL", unset = "")
+if (nzchar(gate_label)) {
+  if (!gate_label %in% summary$candidate) {
+    stop("CEREBRO_STARTUP_GATE_LABEL must name a candidate.", call. = FALSE)
+  }
+  gate_ms <- suppressWarnings(as.numeric(Sys.getenv(
+    "CEREBRO_STARTUP_MAX_PROCESS_TO_DATA_MS",
+    unset = "3000"
+  )))
+  if (!is.finite(gate_ms) || gate_ms <= 0) {
+    stop(
+      "CEREBRO_STARTUP_MAX_PROCESS_TO_DATA_MS must be positive.",
+      call. = FALSE
+    )
+  }
+  observed_ms <- summary$process_to_data_ms[
+    match(gate_label, summary$candidate)
+  ]
+  if (observed_ms >= gate_ms) {
+    stop(
+      sprintf(
+        "Startup gate failed for %s: median %.3f ms must be < %.3f ms.",
+        gate_label,
+        observed_ms,
+        gate_ms
+      ),
+      call. = FALSE
+    )
+  }
+  cat(sprintf(
+    "GATE PASS: %s median %.3f ms < %.3f ms\n",
+    gate_label,
+    observed_ms,
+    gate_ms
+  ))
+}

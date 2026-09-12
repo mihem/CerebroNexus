@@ -168,6 +168,32 @@ test_that("the cold-start benchmark measures an installed Viewer", {
   expect_match(benchmark, "load_to_data_ms", fixed = TRUE)
   expect_match(benchmark, "browser_to_data_ms", fixed = TRUE)
   expect_match(benchmark, "process_to_data_ms", fixed = TRUE)
+  expect_match(benchmark, "CEREBRO_STARTUP_GATE_LABEL", fixed = TRUE)
+  expect_match(
+    benchmark,
+    "CEREBRO_STARTUP_MAX_PROCESS_TO_DATA_MS",
+    fixed = TRUE
+  )
+  expect_match(benchmark, "observed_ms >= gate_ms", fixed = TRUE)
+})
+
+test_that("optional page servers register after the first data flush", {
+  server <- paste(
+    readLines(viewer_test_path("shiny_server.R"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(server, "deferred_viewer_server_files <- c(", fixed = TRUE)
+  expect_match(server, '"marker_genes/server.R"', fixed = TRUE)
+  expect_match(server, '"color_management/server.R"', fixed = TRUE)
+  expect_match(server, "later::later(", fixed = TRUE)
+  expect_match(server, "withReactiveDomain(session", fixed = TRUE)
+  expect_match(
+    server,
+    "for (server_file in deferred_viewer_server_files)",
+    fixed = TRUE
+  )
+  expect_match(server, "envir = server_scope", fixed = TRUE)
 })
 
 test_that("continuous colours keep stable paint order without comparison sort", {
@@ -273,4 +299,22 @@ test_that("Gene projection delegates paint order without copying cell vectors", 
   input$plot_parameters$plot_order <- "Random"
   runtime$expression_projection_update_plot(input)
   expect_identical(captured$data$paint_order, "natural")
+})
+
+test_that("hidden group filters activate after startup rendering", {
+  source <- paste(
+    readLines(
+      viewer_test_path(
+        "module",
+        "group_filters",
+        "group_filters_widget.R"
+      ),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(source, "domain$onFlushed(", fixed = TRUE)
+  expect_match(source, "delay = 0.5", fixed = TRUE)
+  expect_match(source, "suspendWhenHidden = FALSE", fixed = TRUE)
 })

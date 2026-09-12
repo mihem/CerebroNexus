@@ -227,11 +227,36 @@ The runtime optimization was then measured separately against its exact code sta
 
 The optimized thin BPCells path validates and hydrates the million cell names without loading BPCells, then attaches the expression matrix on its first real use. Large-dataset Linked Views prewarming starts after the initial response and a three-second grace period; its gene-selector gate checks that grace period before inspecting the expression matrix. Overview and Data Info therefore no longer wait for a hidden expression control or hidden Linked Views bundle. The cost is deferred rather than erased: opening an expression-dependent page immediately performs the one-time BPCells attach, while an otherwise idle session performs it during Linked Views prewarming.
 
+PR3 adds Thin CRB schema v2 with a stored cell count, allowing Data Info to report the true one-million-cell size without first parsing the sidecar cell index or reconstructing metadata and projection row names. The Viewer registers optional page servers 100 ms after the first response and resumes collapsed group-filter outputs after 500 ms; package-level `readCerebro()` remains eager, old schema v1 files remain compatible, and browser regressions cover the deferred pages. The strict gate is the median of five fresh installed-package processes and requires `process_to_data_ms < 3000` without changing the Data Info readiness selector. Raw measurements are in `tests/bench/results/million_cell_startup_sub3_4_6_0.csv`.
+
+```{bash pr3-startup-gate, eval=FALSE}
+R_LIBS="$STARTUP_LIB" \
+  CEREBRO_STARTUP_REPEATS=5 \
+  CEREBRO_STARTUP_GATE_LABEL=v2_lazy \
+  CEREBRO_STARTUP_MAX_PROCESS_TO_DATA_MS=3000 \
+  CEREBRO_STARTUP_OUTPUT=tests/bench/results/million_cell_startup_sub3_4_6_0.csv \
+  Rscript tests/bench/benchmark_million_cell_startup.R \
+  v1_eager=/path/to/cerebro_mouse_brain_1m_thin_qs2.crb \
+  v2_lazy=/path/to/cerebro_mouse_brain_1m_startup_v2.crb
+```
+
+| Startup phase | Schema v1 eager | Schema v2 lazy | Change |
+|---|---:|---:|---:|
+| Package attach | 1.051 s | 1.048 s | 0.3% faster |
+| App construction | 0.199 s | 0.201 s | 0.7% slower |
+| Process start to server listening | 1.434 s | 1.433 s | 0.1% faster |
+| Browser document load | 0.315 s | 0.296 s | 6.2% faster |
+| Load event to Data Info | 1.770 s | 0.733 s | 58.6% faster |
+| Browser navigation to Data Info | 2.105 s | 1.029 s | 51.1% faster |
+| Process start to Data Info | 3.692 s | 2.557 s | 30.7% faster |
+
+The 2.557-second median passes the `<3 s` gate with 443 ms of headroom. It is 37.6% faster than the preceding 4.097-second installed-runtime optimization point and 71.7% faster than the original 9.045-second Legacy RDS path.
+
 New BPCells CRBs written by `saveCerebro()` or an exporter contain the fingerprint automatically. To make an optimized artifact from an older thin CRB while preserving the original benchmark input, write the copy beside the same BPCells sidecar:
 
 ```{r upgrade-crb}
 old_crb <- "/path/to/cerebro_mouse_brain_1m_thin_qs2.crb"
-current_crb <- file.path(dirname(old_crb), "cerebro_mouse_brain_1m_fingerprint_qs2.crb")
+current_crb <- file.path(dirname(old_crb), "cerebro_mouse_brain_1m_startup_v2.crb")
 saveCerebro(readCerebro(old_crb), current_crb)
 ```
 
@@ -275,7 +300,7 @@ Overview and Linked Views now meet the three-second navigation target. Integer v
 
 The full-million gene and RGB rows remain dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU keeps their eventual million-point render responsive and avoids browser lock-up, but it does not turn that storage scan into a three-second operation. Improving those two rows requires a separate expression-cache or pre-aggregation change and is not claimed by this Viewer-rendering release.
 
-The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. Installed 4.6.0 reaches Data Info in a 4.097-second median with a current thin qs2 artifact, down from 6.081 seconds at the exact runtime starting point; the renderer and navigation timings begin only after that startup phase.
+The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. The PR3 installed-package harness reaches Data Info in a 2.557-second median with a schema v2 thin CRB, down from the preceding 4.097-second runtime optimization point; the renderer and navigation timings begin only after that startup phase.
 
 ## Measure the renderer alone
 

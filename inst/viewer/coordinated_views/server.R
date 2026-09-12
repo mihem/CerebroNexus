@@ -32,31 +32,54 @@ source(
   local = TRUE
 )
 
-cv_saved_view_dataset <- reactive({
-  dataset <- data_set()
+cv_saved_view_cells <- reactive({
   metadata <- getMetaData()
-  cells <- if ("cell_barcode" %in% colnames(metadata)) {
+  if ("cell_barcode" %in% colnames(metadata)) {
     as.character(metadata$cell_barcode)
   } else {
     rownames(metadata)
   }
+})
+
+cv_saved_view_identity <- reactive({
+  dataset <- data_set()
   stored_fingerprint <- tryCatch(
     dataset$cell_fingerprint,
     error = function(error) NULL
   )
+  if (
+    is.character(stored_fingerprint) &&
+      length(stored_fingerprint) == 1L &&
+      !is.na(stored_fingerprint) &&
+      grepl("^md5-cell-set-v1:[[:xdigit:]]{32}$", stored_fingerprint)
+  ) {
+    return(list(
+      cell_count = getNumberOfCells(),
+      fingerprint = stored_fingerprint
+    ))
+  }
+  cells <- cv_saved_view_cells()
   list(
-    cells = cells,
+    cell_count = length(cells),
     fingerprint = cv_config_dataset_fingerprint(cells, stored_fingerprint)
   )
 })
 
+cv_saved_view_dataset <- reactive({
+  cells <- cv_saved_view_cells()
+  list(
+    cells = cells,
+    fingerprint = cv_saved_view_identity()$fingerprint
+  )
+})
+
 observe({
-  dataset <- cv_saved_view_dataset()
+  identity <- cv_saved_view_identity()
   session$sendCustomMessage(
     "cerebro_saved_view_dataset",
     list(
-      cell_count = length(dataset$cells),
-      cell_fingerprint = dataset$fingerprint
+      cell_count = identity$cell_count,
+      cell_fingerprint = identity$fingerprint
     )
   )
 })
@@ -71,6 +94,7 @@ observe({
 coordviews_build_log <- new.env(parent = emptyenv())
 coordviews_build_log$n <- 0L
 coordviews_build_log$sent_n <- 0L
+coordviews_build_log$color_observer_started <- FALSE
 coordviews_background_ready <- reactiveVal(FALSE)
 
 coordviews_bundle <- reactive({
@@ -109,9 +133,9 @@ coordviews_bundle <- reactive({
 ## interaction budget. Give the browser three seconds to receive the initial data
 ## response before using the otherwise idle session to build a hidden page.
 observeEvent(
-  cv_saved_view_dataset(),
+  cv_saved_view_identity(),
   {
-    req(length(cv_saved_view_dataset()$cells) >= 200000L)
+    req(cv_saved_view_identity()$cell_count >= 200000L)
     session$onFlushed(
       function() {
         later::later(
@@ -439,6 +463,19 @@ observe(
       session$sendCustomMessage("coordviews_data", bundle)
     }
     coordviews_build_log$sent_n <- coordviews_build_log$n
+    if (!isTRUE(coordviews_build_log$color_observer_started)) {
+      coordviews_build_log$color_observer_started <- TRUE
+      observeEvent(
+        reactive_colors(),
+        {
+          session$sendCustomMessage(
+            "coordviews_colors",
+            coordviews_color_patch()
+          )
+        },
+        ignoreInit = TRUE
+      )
+    }
   },
   priority = 1
 )
@@ -458,17 +495,6 @@ observeEvent(input[["coordviews_wire_fallback"]], {
     cv_apply_color_patch(bundle, isolate(coordviews_color_patch()))
   )
 })
-
-observeEvent(
-  reactive_colors(),
-  {
-    if (coordviews_build_log$sent_n == 0L) {
-      return()
-    }
-    session$sendCustomMessage("coordviews_colors", coordviews_color_patch())
-  },
-  ignoreInit = TRUE
-)
 
 ##----------------------------------------------------------------------------##
 ## Selected-cell detail views — mirror the Overview/Projection tab. When cells

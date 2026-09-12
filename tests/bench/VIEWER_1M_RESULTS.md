@@ -73,6 +73,22 @@ The bundle benchmark uses three alternating warm rounds. Both candidates read th
 
 The normalized before/after bundle contract is equal. The remaining 48.78 MiB is the intentional all-cell Linked Views workspace; sampling it or changing its transport format would alter Viewer behavior and belongs to the separate Viewer/WebGPU layer.
 
+## PR3 installed Viewer startup
+
+The PR3 startup benchmark uses the installed package, a fresh R process and browser session for every observation, five alternating rounds, the unchanged Data Info selector `load_data_number_of_cells == "1,000,000"`, and the same BPCells sidecar. Schema v1 eagerly restores one million cell names; schema v2 reads its stored cell count for Data Info and defers cell-name hydration until metadata or projections are used. Optional page servers start 100 ms after the first flush, while collapsed group filters resume after 500 ms; browser regression tests verify that the deferred pages and filters still initialize.
+
+| Startup phase | Schema v1 eager | Schema v2 lazy | Change |
+| --- | ---: | ---: | ---: |
+| Package attach | 1.051 s | 1.048 s | 0.3% faster |
+| App construction | 0.199 s | 0.201 s | 0.7% slower |
+| Process start to server listening | 1.434 s | 1.433 s | 0.1% faster |
+| Browser document load | 0.315 s | 0.296 s | 6.2% faster |
+| Load event to Data Info | 1.770 s | 0.733 s | 58.6% faster |
+| Browser navigation to Data Info | 2.105 s | 1.029 s | 51.1% faster |
+| Process start to Data Info | 3.692 s | 2.557 s | 30.7% faster |
+
+The current 2.557-second median passes the strict `<3,000 ms` gate with 443 ms of median headroom. Relative to the prior installed-runtime optimization point of 4.097 seconds, PR3 is 37.6% faster; relative to the original 9.045-second Legacy RDS path, it is 71.7% faster. Raw observations are in `tests/bench/results/million_cell_startup_sub3_4_6_0.csv`.
+
 ## Environment
 
 - Apple M1 Pro, 32 GiB RAM

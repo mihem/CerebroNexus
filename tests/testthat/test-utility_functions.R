@@ -35,6 +35,19 @@ cachePlot <- utils_env$cachePlot
 viewerUploadsEnabled <- utils_env$viewerUploadsEnabled
 viewerUploadPath <- utils_env$viewerUploadPath
 
+test_that("the lightweight TCR gate scans every sample", {
+  repertoire <- list(
+    s1 = data.frame(CTgene = NA_character_),
+    s2 = data.frame(CTgene = NA_character_),
+    s3 = data.frame(CTgene = NA_character_),
+    s4 = data.frame(CTgene = "TRAV1_TRAJ1_TRBV2_TRBJ2")
+  )
+
+  expect_true(utils_env$viewerHasTcrRepertoire(repertoire))
+  expect_false(utils_env$viewerHasTcrRepertoire(NULL))
+  expect_false(utils_env$viewerHasTcrRepertoire(list(data.frame(x = 1))))
+})
+
 test_that("infinite values are replaced without changing other columns", {
   replaceInfiniteValues <- utils_env$replaceInfiniteValues
   expect_true(is.function(replaceInfiniteValues))

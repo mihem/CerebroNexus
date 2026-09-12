@@ -100,7 +100,8 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   expect_false("cell_barcode" %in% names(payload$meta_data))
   expect_type(payload$meta_data$nUMI, "integer")
   expect_type(payload$meta_data$nGene, "integer")
-  expect_identical(payload$crb_schema$version, 1L)
+  expect_identical(payload$crb_schema$version, 2L)
+  expect_identical(payload$crb_schema$n_cells, length(fixture$cells))
   expect_identical(
     payload$cell_fingerprint,
     "md5-cell-set-v1:e4f597e835d59a5ae4da3f346939b09e"
@@ -123,7 +124,14 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   )
   runtime_object <- runtime$read_cerebro_file(qs)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, qs)
+  expect_true(rlang::env_binding_are_lazy(runtime_object, "meta_data"))
+  expect_true(rlang::env_binding_are_lazy(runtime_object, "projections"))
   expect_true(rlang::env_binding_are_lazy(runtime_object, "expression"))
+  expect_identical(
+    runtime$.runtimeCerebroCellCount(runtime_object),
+    length(fixture$cells)
+  )
+  expect_true(rlang::env_binding_are_lazy(runtime_object, "meta_data"))
   expect_identical(
     runtime_object$cell_fingerprint,
     payload$cell_fingerprint
@@ -132,11 +140,60 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   expect_identical(runtime_object$projections, qs_object$projections)
   expect_equal(as.matrix(runtime_object$expression), fixture$counts)
 
+  v1 <- .currentCerebroCopy(payload)
+  v1$crb_schema$n_cells <- NULL
+  v1$crb_schema$version <- 1L
+  v1_path <- file.path(root, "thin-v1.crb")
+  saveRDS(v1, v1_path)
+  expect_cerebro_fields(readCerebro(v1_path), fixture)
+  runtime_v1 <- runtime$read_cerebro_file(v1_path)
+  runtime_v1 <- runtime$.attachExternalExpression(runtime_v1, v1_path)
+  expect_false(rlang::env_binding_are_lazy(runtime_v1, "meta_data"))
+  expect_false(rlang::env_binding_are_lazy(runtime_v1, "projections"))
+  expect_true(rlang::env_binding_are_lazy(runtime_v1, "expression"))
+  expect_identical(runtime_v1$meta_data$cell_barcode, fixture$cells)
+
+  invalid_count <- .currentCerebroCopy(payload)
+  invalid_count$crb_schema$n_cells <- length(fixture$cells) + 1L
+  invalid_count_path <- file.path(root, "invalid-count.crb")
+  saveRDS(invalid_count, invalid_count_path)
+  expect_error(readCerebro(invalid_count_path), "cell count")
+  invalid_count_runtime <- runtime$read_cerebro_file(invalid_count_path)
+  expect_error(
+    runtime$.attachExternalExpression(
+      invalid_count_runtime,
+      invalid_count_path
+    ),
+    "cell count"
+  )
+
   invalid <- .readCerebroPayload(rds)
   invalid$crb_schema$cell_names_md5 <- paste(rep("0", 32L), collapse = "")
   invalid_path <- file.path(root, "invalid-checksum.crb")
   saveRDS(invalid, invalid_path)
   expect_error(readCerebro(invalid_path), "cell-name index does not match")
+
+  duplicated <- .currentCerebroCopy(payload)
+  duplicated_path <- file.path(root, "duplicated-index.crb")
+  names_file <- file.path(fixture$sidecar, "col_names")
+  writeLines(
+    c(fixture$cells[[1L]], fixture$cells[[1L]], fixture$cells[3:4]),
+    names_file,
+    useBytes = TRUE
+  )
+  duplicated$crb_schema$cell_names_md5 <- unname(tools::md5sum(names_file))
+  saveRDS(duplicated, duplicated_path)
+  duplicated_runtime <- runtime$read_cerebro_file(duplicated_path)
+  duplicated_runtime <- runtime$.attachExternalExpression(
+    duplicated_runtime,
+    duplicated_path
+  )
+  expect_true(rlang::env_binding_are_lazy(duplicated_runtime, "meta_data"))
+  expect_error(
+    duplicated_runtime$meta_data,
+    "incompatible cell metadata"
+  )
+  writeLines(fixture$cells, names_file, useBytes = TRUE)
 
   missing_root <- file.path(root, "missing-sidecar")
   dir.create(missing_root)
@@ -158,4 +215,29 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
 
   convertCerebro(qs)
   expect_cerebro_fields(readCerebro(qs), fixture)
+})
+
+test_that("Data Info reads the v2 cell count without forcing metadata", {
+  runtime <- new.env(parent = globalenv())
+  sys.source(
+    viewer_test_path("utility_functions.R"),
+    envir = runtime
+  )
+  object <- new.env(parent = emptyenv())
+  object$crb_schema <- list(version = 2L, n_cells = 4L)
+  delayedAssign(
+    "meta_data",
+    stop("metadata was forced"),
+    assign.env = object
+  )
+
+  expect_identical(runtime$.runtimeCerebroCellCount(object), 4L)
+  expect_true(rlang::env_binding_are_lazy(object, "meta_data"))
+
+  sample_info <- paste(
+    readLines(viewer_test_path("load_data", "sample_info.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(sample_info, "getNumberOfCells\\(\\)")
+  expect_false(grepl("nrow\\(data_set\\(\\)\\$meta_data\\)", sample_info))
 })
