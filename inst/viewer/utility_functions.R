@@ -201,6 +201,181 @@ cachePlot <- function(x, ...) {
   }
 }
 
+## Apply the shared projection filters and sample original metadata row ids.
+viewerProjectionCellIndices <- function(prefix, metadata = getMetaData()) {
+  groups <- getGroups()
+  percentage <- input[[paste0(prefix, "_percentage_cells_to_show")]]
+  filters <- stats::setNames(
+    lapply(groups, function(group) {
+      value <- input[[paste0(prefix, "_group_filter_", group)]]
+      if (is.null(value)) character() else value
+    }),
+    groups
+  )
+  filters <- filters[
+    !vapply(
+      groups,
+      function(group) {
+        selected <- filters[[group]]
+        values <- metadata[[group]]
+        if (!is.factor(values) || !length(selected)) {
+          return(FALSE)
+        }
+        levels <- tryCatch(
+          as.character(getGroupLevels(group)),
+          error = function(error_condition) character()
+        )
+        length(selected) == length(levels) &&
+          setequal(base::levels(values), levels) &&
+          setequal(as.character(selected), levels) &&
+          !anyNA(values)
+      },
+      logical(1)
+    )
+  ]
+  if (!length(filters)) {
+    cell_count <- nrow(metadata)
+    if (!cell_count) {
+      return(integer())
+    }
+    if (percentage < 100) {
+      size <- ceiling(cell_count * percentage / 100)
+      return(sample.int(cell_count, size))
+    }
+    return(sample.int(cell_count))
+  }
+  indices <- which(cerebroGroupFilterMask(metadata, filters))
+  if (!length(indices)) {
+    return(indices)
+  }
+  size <- if (percentage < 100) {
+    ceiling(length(indices) * percentage / 100)
+  } else {
+    length(indices)
+  }
+  indices[sample.int(length(indices), size)]
+}
+
+## Prefer the R6 row accessor so a single-gene request never needs a temporary
+## 1 x cells matrix. Older serialized objects fall back to the matrix method.
+viewerExpressionCells <- function(data_set, cells) {
+  if (!is.numeric(cells)) {
+    return(cells)
+  }
+  accessor <- tryCatch(data_set$getExpressionRow, error = function(e) NULL)
+  if (!is.function(accessor)) {
+    accessor <- tryCatch(data_set$getExpressionMatrix, error = function(e) NULL)
+  }
+  method_env <- if (is.function(accessor)) environment(accessor) else NULL
+  if (
+    is.null(method_env) ||
+      !exists("private", envir = method_env, inherits = FALSE)
+  ) {
+    return(cells)
+  }
+  private <- get("private", envir = method_env, inherits = FALSE)
+  if (
+    is.function(tryCatch(
+      private$resolveExpressionCells,
+      error = function(e) NULL
+    ))
+  ) {
+    return(cells)
+  }
+  cell_names <- colnames(data_set$expression)
+  if (is.null(cell_names)) cells else cell_names[as.integer(cells)]
+}
+
+viewerExpressionRow <- function(data_set, cells, gene) {
+  cells <- viewerExpressionCells(data_set, cells)
+  cell_indices <- is.numeric(cells)
+  get_row <- tryCatch(data_set$getExpressionRow, error = function(e) NULL)
+  if (is.function(get_row)) {
+    return(as.numeric(get_row(gene = gene, cells = cells)))
+  }
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = gene
+  )
+  if (is.null(expression_matrix)) {
+    return(NULL)
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(as.numeric(expression_matrix))
+  }
+  row_index <- if (is.null(rownames(expression_matrix))) {
+    1L
+  } else {
+    match(gene, rownames(expression_matrix))
+  }
+  if (is.na(row_index)) {
+    return(NULL)
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (
+    cell_indices || is.null(cell_names) || identical(cells, cell_names)
+  ) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else {
+    match(cells, cell_names)
+  }
+  as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+}
+
+## Fetch several genes in one backend call and align every returned vector to
+## the requested cell order. Missing genes are omitted from the result.
+viewerExpressionValues <- function(data_set, cells, genes) {
+  cells <- viewerExpressionCells(data_set, cells)
+  cell_indices <- is.numeric(cells)
+  genes <- unique(as.character(unlist(genes, use.names = FALSE)))
+  genes <- genes[!is.na(genes) & nzchar(genes)]
+  if (!length(genes)) {
+    return(list())
+  }
+
+  if (length(genes) == 1L) {
+    value <- viewerExpressionRow(data_set, cells, genes[[1L]])
+    if (is.null(value)) {
+      return(list())
+    }
+    return(stats::setNames(list(value), genes))
+  }
+
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = genes
+  )
+  if (is.null(expression_matrix)) {
+    return(list())
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(list())
+  }
+
+  gene_names <- rownames(expression_matrix)
+  if (is.null(gene_names) && nrow(expression_matrix) == length(genes)) {
+    gene_names <- genes
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (cell_indices || is.null(cell_names)) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else if (identical(cells, cell_names)) {
+    seq_along(cells)
+  } else {
+    match(cells, cell_names)
+  }
+
+  values <- lapply(genes, function(gene) {
+    row_index <- match(gene, gene_names)
+    if (is.na(row_index)) {
+      return(NULL)
+    }
+    as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+  })
+  names(values) <- genes
+  values[!vapply(values, is.null, logical(1))]
+}
+
 cerebroCellViewMessage <- function(
   id,
   meta,
@@ -277,6 +452,15 @@ cerebroCellViewMessage <- function(
       wire_array(hover$text)
     }
   }
+  if (is.list(hover$columns)) {
+    hover$columns <- lapply(hover$columns, function(column) {
+      column$values <- wire_nested(column$values)
+      if (!is.null(column$levels)) {
+        column$levels <- wire_array(column$levels)
+      }
+      column
+    })
+  }
   if (is.list(extra$group_hulls)) {
     for (field in intersect(c("x", "y"), names(extra$group_hulls))) {
       extra$group_hulls[[field]] <- wire_nested(extra$group_hulls[[field]])
@@ -286,6 +470,9 @@ cerebroCellViewMessage <- function(
   list(id = id, meta = meta, data = data, hover = hover, extra = extra)
 }
 
+.cerebro_cell_view_wire_serial <- 0L
+.cerebro_cell_view_aux_pending <- new.env(parent = emptyenv())
+
 cerebroCellViewRender <- function(
   id,
   meta,
@@ -293,10 +480,54 @@ cerebroCellViewRender <- function(
   hover = list(),
   extra = list()
 ) {
-  session$sendCustomMessage(
-    "cell_view_render",
-    cerebroCellViewMessage(id, meta, data, hover, extra)
-  )
+  message <- cerebroCellViewMessage(id, meta, data, hover, extra)
+  if (
+    isTRUE(input[["coordviews_wire_supported"]]) &&
+      exists("cv_wire_pack_message", mode = "function", inherits = TRUE)
+  ) {
+    selection_keys <- message$data$selection_key
+    key_groups <- if (is.list(selection_keys)) {
+      selection_keys
+    } else {
+      list(selection_keys)
+    }
+    n_cells <- sum(vapply(key_groups, length, integer(1)))
+    progressive <- !is.null(selection_keys) &&
+      is.null(message$data$panels) &&
+      n_cells >= 4096L
+    if (progressive) {
+      .cerebro_cell_view_wire_serial <<-
+        .cerebro_cell_view_wire_serial + 1L
+      token <- .cerebro_cell_view_wire_serial
+      message$data$n <- n_cells
+      message$data$wire_token <- token
+      message$data$selection_key <- NULL
+      full_hover <- message$hover
+      message$hover <- list(hoverinfo = "skip")
+      session$sendBinaryMessage(
+        "cell_view_binary",
+        cv_wire_pack_message(message)
+      )
+      stale <- ls(envir = .cerebro_cell_view_aux_pending, all.names = TRUE)
+      stale <- stale[startsWith(stale, paste0(id, ":"))]
+      if (length(stale)) {
+        rm(list = stale, envir = .cerebro_cell_view_aux_pending)
+      }
+      .cerebro_cell_view_aux_pending[[paste(id, token, sep = ":")]] <- list(
+        id = id,
+        wire_token = token,
+        selection_key = selection_keys,
+        hover = full_hover
+      )
+    } else {
+      session$sendBinaryMessage(
+        "cell_view_binary",
+        cv_wire_pack_message(message)
+      )
+    }
+  } else {
+    session$sendCustomMessage("cell_view_render", message)
+  }
 }
 
 cerebroCellViewScatterPayload <- function(
@@ -310,6 +541,7 @@ cerebroCellViewScatterPayload <- function(
   keep_square = FALSE,
   color_assignments = NULL,
   hover_info = NULL,
+  hover_columns = NULL,
   hover = TRUE,
   point_line = list(),
   x_range = list(),
@@ -366,10 +598,36 @@ cerebroCellViewScatterPayload <- function(
   }
 
   show_hover <- isTRUE(hover)
+  structured_hover <- if (show_hover && length(hover_columns)) {
+    lapply(hover_columns, function(column) {
+      if (!is.list(column) || is.null(column$label) || is.null(column$values)) {
+        stop("hover columns require label and values")
+      }
+      if (length(column$values) != cell_counts[[1L]]) {
+        stop("hover columns must describe the same number of cells")
+      }
+      column
+    })
+  } else {
+    list()
+  }
   hover_data <- list(
     hoverinfo = if (show_hover) "text" else "skip",
-    text = if (continuous && show_hover) I(unname(hover_info)) else list()
+    text = if (continuous && show_hover && !length(structured_hover)) {
+      I(unname(hover_info))
+    } else {
+      list()
+    }
   )
+  if (length(structured_hover)) {
+    hover_data$columns <- lapply(structured_hover, function(column) {
+      column$values <- if (continuous) I(unname(column$values)) else list()
+      if (!is.null(column$levels)) {
+        column$levels <- I(unname(column$levels))
+      }
+      column
+    })
+  }
   if (continuous) {
     return(list(meta = meta, data = data, hover = hover_data))
   }
@@ -419,12 +677,14 @@ cerebroCellViewScatterPayload <- function(
       data[["z"]][[index]] <- I(coordinates[[3L]][cells])
     }
     data[["selection_key"]][[index]] <- I(selection_keys[cells])
-    data[["color"]][[index]] <- I(rep(
-      unname(color_assignments[[group]]),
-      length(cells)
-    ))
-    if (show_hover) {
+    data[["color"]][[index]] <- unname(color_assignments[[group]])
+    if (show_hover && !length(structured_hover)) {
       hover_data[["text"]][[index]] <- I(aligned_hover[cells])
+    }
+    for (column_index in seq_along(structured_hover)) {
+      hover_data$columns[[column_index]]$values[[index]] <- I(
+        unname(structured_hover[[column_index]]$values[cells])
+      )
     }
     index <- index + 1L
   }
@@ -1414,6 +1674,39 @@ assignColorsToGroups <- function(table, grouping_variable) {
 ##----------------------------------------------------------------------------##
 ## Build hover info for projections.
 ##----------------------------------------------------------------------------##
+cerebroProjectionHoverColumns <- function(table, groups = getGroups()) {
+  if (!is.data.frame(table)) {
+    stop("projection hover data must be a data frame")
+  }
+  columns <- list()
+  for (spec in list(
+    c(source = "nUMI", label = "Transcripts"),
+    c(source = "nGene", label = "Expressed genes")
+  )) {
+    if (spec[["source"]] %in% colnames(table)) {
+      columns[[length(columns) + 1L]] <- list(
+        label = unname(spec[["label"]]),
+        format = "integer",
+        values = unname(table[[spec[["source"]]]])
+      )
+    }
+  }
+  for (group in unique(as.character(groups))) {
+    if (is.na(group) || !nzchar(group) || !group %in% colnames(table)) {
+      next
+    }
+    values <- as.character(table[[group]])
+    values[is.na(values)] <- "NA"
+    levels <- unique(values)
+    columns[[length(columns) + 1L]] <- list(
+      label = group,
+      levels = levels,
+      values = match(values, levels) - 1L
+    )
+  }
+  columns
+}
+
 buildHoverInfoForProjections <- function(table) {
   ## put together cell ID, number of transcripts and number of expressed genes
   hover_info <- glue::glue(
@@ -1812,6 +2105,29 @@ getMetaData <- function() {
     return(data_set()$getMetaData())
   }
 }
+.runtimeCerebroCellCount <- function(object) {
+  schema <- if (
+    is.environment(object) &&
+      exists("crb_schema", envir = object, inherits = FALSE)
+  ) {
+    object$crb_schema
+  } else {
+    NULL
+  }
+  if (
+    is.list(schema) &&
+      identical(schema$version, 2L) &&
+      is.integer(schema$n_cells) &&
+      length(schema$n_cells) == 1L &&
+      !is.na(schema$n_cells)
+  ) {
+    return(schema$n_cells)
+  }
+  nrow(object$meta_data)
+}
+getNumberOfCells <- function() {
+  .runtimeCerebroCellCount(data_set())
+}
 availableProjections <- function() {
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$availableProjections())
@@ -2018,10 +2334,19 @@ hasEryColumn <- function() {
   !is.null(getEryColumn())
 }
 ##----------------------------------------------------------------------------##
-## Cerebro file reader (.rds via readRDS).
+## Cerebro file reader (RDS or qs2 payload).
 ##----------------------------------------------------------------------------##
 read_cerebro_file <- function(file) {
-  readRDS(file)
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  magic <- readBin(connection, "raw", n = 4L)
+  if (!identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+    return(readRDS(file))
+  }
+  if (!requireNamespace("qs2", quietly = TRUE)) {
+    stop("A qs2 CRB requires the qs2 package.", call. = FALSE)
+  }
+  qs2::qs_read(file)
 }
 
 ##----------------------------------------------------------------------------##
@@ -2254,6 +2579,219 @@ get_or_load_crb <- function(
 ## Direct launches and uploads read only the ordinary expression_backend field;
 ## serialized getter code is never invoked by this internal loading path.
 ##----------------------------------------------------------------------------##
+.readRuntimeCrbSchema <- function(obj, crb_path) {
+  field <- "crb_schema"
+  if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
+    return(NULL)
+  }
+  if (
+    bindingIsActive(field, obj) ||
+      isTRUE(rlang::env_binding_are_lazy(obj, field))
+  ) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema <- obj[[field]]
+  if (is.null(schema)) {
+    return(NULL)
+  }
+  schema_names <- names(schema)
+  expected_names <- if (identical(schema$version, 1L)) {
+    c("version", "cell_names", "cell_names_md5", "projection_rownames")
+  } else if (identical(schema$version, 2L)) {
+    c(
+      "version",
+      "cell_names",
+      "cell_names_md5",
+      "projection_rownames",
+      "n_cells"
+    )
+  } else {
+    character()
+  }
+  valid <- is.list(schema) &&
+    !is.data.frame(schema) &&
+    length(expected_names) > 0L &&
+    length(schema) == length(expected_names) &&
+    !is.null(schema_names) &&
+    !anyDuplicated(schema_names) &&
+    setequal(schema_names, expected_names) &&
+    identical(schema$cell_names, "expression") &&
+    is.character(schema$cell_names_md5) &&
+    length(schema$cell_names_md5) == 1L &&
+    !is.na(schema$cell_names_md5) &&
+    grepl("^[[:xdigit:]]{32}$", schema$cell_names_md5) &&
+    is.character(schema$projection_rownames) &&
+    !anyNA(schema$projection_rownames) &&
+    !any(!nzchar(schema$projection_rownames)) &&
+    !anyDuplicated(schema$projection_rownames) &&
+    (identical(schema$version, 1L) ||
+      (is.integer(schema$n_cells) &&
+        length(schema$n_cells) == 1L &&
+        !is.na(schema$n_cells) &&
+        schema$n_cells >= 0L))
+  if (!valid) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema
+}
+
+.bpcellsCellNamesChecksum <- function(sidecar) {
+  names_file <- file.path(sidecar, "col_names")
+  if (!file.exists(names_file) || dir.exists(names_file)) {
+    stop("The BPCells sidecar has no cell-name index.", call. = FALSE)
+  }
+  checksum <- unname(tools::md5sum(names_file))
+  if (length(checksum) != 1L || is.na(checksum) || !nzchar(checksum)) {
+    stop("Could not checksum the BPCells cell-name index.", call. = FALSE)
+  }
+  checksum
+}
+
+.validateThinCrbShape <- function(metadata, projections, schema) {
+  expected_cells <- if (identical(schema$version, 2L)) {
+    schema$n_cells
+  } else {
+    nrow(metadata)
+  }
+  if (
+    !is.data.frame(metadata) ||
+      nrow(metadata) != expected_cells ||
+      "cell_barcode" %in% names(metadata)
+  ) {
+    stop(
+      "The thin CRB cell count does not match its cell metadata.",
+      call. = FALSE
+    )
+  }
+
+  missing_projections <- setdiff(
+    schema$projection_rownames,
+    names(projections)
+  )
+  if (length(missing_projections)) {
+    stop(
+      "The thin CRB is missing projection '",
+      missing_projections[[1L]],
+      "'.",
+      call. = FALSE
+    )
+  }
+  for (name in schema$projection_rownames) {
+    projection <- projections[[name]]
+    if (!is.data.frame(projection) || nrow(projection) != expected_cells) {
+      stop(
+        "Projection '",
+        name,
+        "' does not match the thin CRB cell index.",
+        call. = FALSE
+      )
+    }
+  }
+  invisible(TRUE)
+}
+
+.hydrateThinCrbFields <- function(metadata, projections, schema, cells) {
+  if (
+    !is.character(cells) ||
+      anyNA(cells) ||
+      any(!nzchar(cells)) ||
+      anyDuplicated(cells) ||
+      nrow(metadata) != length(cells)
+  ) {
+    stop(
+      "The thin CRB and BPCells sidecar have incompatible cell metadata.",
+      call. = FALSE
+    )
+  }
+  for (name in schema$projection_rownames) {
+    projection <- projections[[name]]
+    rownames(projection) <- cells
+    projections[[name]] <- projection
+  }
+  list(
+    meta_data = data.frame(
+      cell_barcode = cells,
+      metadata,
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    ),
+    projections = projections
+  )
+}
+
+.hydrateThinCrb <- function(obj, crb_path, sidecar, schema, cells = NULL) {
+  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
+    stop(
+      "The BPCells cell-name index does not match CRB '",
+      basename(crb_path),
+      "'.",
+      call. = FALSE
+    )
+  }
+  if (is.null(cells)) {
+    cells <- colnames(obj$expression)
+  }
+  metadata <- obj$meta_data
+  projections <- obj$projections
+  .validateThinCrbShape(metadata, projections, schema)
+  hydrated <- .hydrateThinCrbFields(metadata, projections, schema, cells)
+  obj$meta_data <- hydrated$meta_data
+  obj$projections <- hydrated$projections
+  obj
+}
+
+.deferThinCrbHydration <- function(obj, crb_path, sidecar, schema) {
+  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
+    stop(
+      "The BPCells cell-name index does not match CRB '",
+      basename(crb_path),
+      "'.",
+      call. = FALSE
+    )
+  }
+  metadata <- obj$meta_data
+  projections <- obj$projections
+  .validateThinCrbShape(metadata, projections, schema)
+  hydrate <- local({
+    hydrated <- NULL
+    function() {
+      if (is.null(hydrated)) {
+        cells <- readLines(file.path(sidecar, "col_names"), warn = FALSE)
+        hydrated <<- .hydrateThinCrbFields(
+          metadata,
+          projections,
+          schema,
+          cells
+        )
+      }
+      hydrated
+    }
+  })
+  delayedAssign(
+    "meta_data",
+    hydrate()$meta_data,
+    eval.env = environment(),
+    assign.env = obj
+  )
+  delayedAssign(
+    "projections",
+    hydrate()$projections,
+    eval.env = environment(),
+    assign.env = obj
+  )
+  obj
+}
+
 .readRuntimeBackendDescriptor <- function(obj, crb_path) {
   if (!is.environment(obj)) {
     stop(
@@ -2431,6 +2969,7 @@ get_or_load_crb <- function(
   if (!any(grepl("Cerebro", class(obj)))) {
     return(obj)
   }
+  crb_schema <- .readRuntimeCrbSchema(obj, crb_path)
   configured <- !is.null(effective_backend)
   if (!configured) {
     be <- .fallbackRuntimeBackendPlan(obj, crb_path)
@@ -2439,7 +2978,14 @@ get_or_load_crb <- function(
   }
 
   if (identical(be$mode, "embedded")) {
+    if (!is.null(crb_schema)) {
+      stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
+    }
     return(obj)
+  }
+
+  if (!is.null(crb_schema) && !identical(be$type, "bpcells")) {
+    stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
   }
 
   if (identical(be$mode, "host_override")) {
@@ -2450,12 +2996,6 @@ get_or_load_crb <- function(
   }
 
   if (be$type == "bpcells") {
-    if (!requireNamespace("BPCells", quietly = TRUE)) {
-      stop(
-        "bpcells-backed crb requires the BPCells package; please install it.",
-        call. = FALSE
-      )
-    }
     if (!dir.exists(loc_abs)) {
       stop(
         sprintf(
@@ -2471,8 +3011,43 @@ get_or_load_crb <- function(
         call. = FALSE
       )
     }
-    print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
-    obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
+    if (!is.null(crb_schema)) {
+      if (identical(crb_schema$version, 2L)) {
+        obj <- .deferThinCrbHydration(obj, crb_path, loc_abs, crb_schema)
+      } else {
+        cells <- readLines(file.path(loc_abs, "col_names"), warn = FALSE)
+        obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema, cells)
+      }
+      delayedAssign(
+        "expression",
+        {
+          if (!requireNamespace("BPCells", quietly = TRUE)) {
+            stop(
+              paste(
+                "bpcells-backed crb requires the BPCells package;",
+                "please install it."
+              ),
+              call. = FALSE
+            )
+          }
+          print(glue::glue(
+            "[{Sys.time()}] Attaching bpcells backend: {loc_abs}"
+          ))
+          BPCells::open_matrix_dir(dir = loc_abs)
+        },
+        eval.env = environment(),
+        assign.env = obj
+      )
+    } else {
+      if (!requireNamespace("BPCells", quietly = TRUE)) {
+        stop(
+          "bpcells-backed crb requires the BPCells package; please install it.",
+          call. = FALSE
+        )
+      }
+      print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
+      obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
+    }
   } else if (be$type == "h5") {
     if (!requireNamespace("HDF5Array", quietly = TRUE)) {
       stop(
@@ -2797,6 +3372,22 @@ getImmuneRepertoire <- function() {
   tryCatch(ds$getImmuneRepertoire(), error = function(e) list())
 }
 
+viewerHasTcrRepertoire <- function(repertoire) {
+  if (!is.list(repertoire) || !length(repertoire)) {
+    return(FALSE)
+  }
+  any(vapply(
+    repertoire,
+    function(sample) {
+      if (is.null(sample) || !"CTgene" %in% names(sample)) {
+        return(FALSE)
+      }
+      any(grepl("TR[AB]", as.character(sample$CTgene)), na.rm = TRUE)
+    },
+    logical(1)
+  ))
+}
+
 ## ---- What one row of this data set is ---------------------------------- ##
 ## Almost every .crb is single-cell, so a row is a cell and the app says so.
 ## That is not universal: a bulk repertoire data set maps a (donor, clonotype)
@@ -2866,7 +3457,8 @@ serverSideGeneSelector <- function(
   session,
   input_id,
   extra_triggers = function() NULL,
-  active = function() TRUE
+  active = function() TRUE,
+  retry = TRUE
 ) {
   observe({
     extra_triggers()
@@ -2885,7 +3477,6 @@ serverSideGeneSelector <- function(
         session,
         input_id,
         choices = genes,
-        selected = character(0),
         server = TRUE
       )
     }
@@ -2896,11 +3487,15 @@ serverSideGeneSelector <- function(
     ## dropped. onFlushed fires right after R's flush but before the browser
     ## has processed the DOM update, so it's necessary but not sufficient.
     ## Sending the same update again after small timed delays ensures at least
-    ## one lands after the binding exists. The message is idempotent (same
-    ## choices, no selection), so duplicate sends are harmless.
-    session$onFlushed(send_update, once = TRUE)
-    later::later(send_update, delay = 0.3)
-    later::later(send_update, delay = 1.0)
+    ## one lands after the binding exists. Selection is deliberately omitted:
+    ## a delayed choices update must not overwrite a newer browser selection.
+    if (isTRUE(retry)) {
+      session$onFlushed(send_update, once = TRUE)
+      later::later(send_update, delay = 0.3)
+      later::later(send_update, delay = 1.0)
+    } else {
+      later::later(send_update, delay = 0.3)
+    }
   })
 }
 

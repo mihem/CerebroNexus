@@ -91,14 +91,7 @@ output[["states_by_group_plot"]] <- plotly::renderPlotly({
     input[["states_by_group_plot_type"]]
   )
 
-  ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-
-  ## merge trajectory data with meta data
-  cells_df <- mergeTrajectoryWithMetaData(trajectory_data)
+  cells_df <- trajectory_cells_reactive()
 
   ##
   grouping_variable <- input[["states_by_group_select_other_group"]]
@@ -108,7 +101,6 @@ output[["states_by_group_plot"]] <- plotly::renderPlotly({
   if (input[["states_by_group_plot_type"]] == "Bar chart") {
     ##
     composition_df <- cells_df %>%
-      dplyr::filter(!is.na(pseudotime)) %>%
       calculateTableAB(
         "state",
         grouping_variable,
@@ -132,7 +124,6 @@ output[["states_by_group_plot"]] <- plotly::renderPlotly({
   } else if (input[["states_by_group_plot_type"]] == "Sankey plot") {
     ##
     composition_df <- cells_df %>%
-      dplyr::filter(!is.na(pseudotime)) %>%
       calculateTableAB(
         "state",
         grouping_variable,
@@ -167,21 +158,13 @@ output[["states_by_group_table"]] <- DT::renderDataTable({
     input[["states_by_group_select_other_group"]]
   )
 
-  ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-
-  ## merge trajectory data with meta data
-  cells_df <- mergeTrajectoryWithMetaData(trajectory_data)
+  cells_df <- trajectory_cells_reactive()
 
   ##
   grouping_variable <- input[["states_by_group_select_other_group"]]
 
   ## generate table
   composition_df <- cells_df %>%
-    dplyr::filter(!is.na(pseudotime)) %>%
     calculateTableAB(
       "state",
       grouping_variable,

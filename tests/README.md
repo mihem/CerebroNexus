@@ -135,7 +135,7 @@ If you edit `inst/` and want the change reflected:
 Error in <fn>: attempt to apply non-function
 ```
 
-The Shiny session never reaches idle, and shinytest2 reports `Shiny app did not become stable in 15000ms` (often with a misleading sidekick `the fixed layout requires the slimscroll plugin!` JS warning — that one is harmless AdminLTE noise).
+The Shiny session never reaches idle, and shinytest2 reports `Shiny app did not become stable in 15000ms`.
 
 Whenever you add or rename methods on `Cerebro`, regenerate the example fixture by re-exporting from `inst/extdata/examples/pbmc_seurat.rds` with `exportFromSeurat()`, then commit the new `example.crb`.
 

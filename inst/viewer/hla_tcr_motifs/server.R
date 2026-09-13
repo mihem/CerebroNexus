@@ -8,13 +8,15 @@
 ## hla_typing.R); these files only wire reactives, renderers and UI.
 ##----------------------------------------------------------------------------##
 
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/core_shim.R"
-  ),
-  local = TRUE
-)
+if (!exists("hla_detect_chains", inherits = TRUE)) {
+  source(
+    paste0(
+      Cerebro.options[["cerebro_root"]],
+      "/viewer/hla_tcr_motifs/core_shim.R"
+    ),
+    local = TRUE
+  )
+}
 source(
   paste0(
     Cerebro.options[["cerebro_root"]],

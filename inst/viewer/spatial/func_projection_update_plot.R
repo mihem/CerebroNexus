@@ -69,7 +69,7 @@ spatial_projection_update_plot <- function(input) {
   reset_axes <- input[['reset_axes']]
   plot_parameters <- input[['plot_parameters']]
   color_assignments <- input[['color_assignments']]
-  hover_info <- input[['hover_info']]
+  hover_columns <- input[['hover_columns']]
 
   color_variable <- plot_parameters[['color_variable']]
   color_input <- metadata[[color_variable]]
@@ -297,11 +297,8 @@ spatial_projection_update_plot <- function(input) {
     )
     output_hover <- list(
       hoverinfo = if (plot_parameters[["hover_info"]]) "text" else "skip",
-      text = if (plot_parameters[["hover_info"]]) {
-        unname(hover_info)
-      } else {
-        "empty"
-      }
+      text = list(),
+      columns = hover_columns
     )
     cerebroCellViewRender(
       "spatial_projection",
@@ -328,7 +325,7 @@ spatial_projection_update_plot <- function(input) {
     reset_axes = reset_axes,
     n_dimensions = n_dimensions,
     color_assignments = color_assignments,
-    hover_info = hover_info,
+    hover_columns = hover_columns,
     hover = plot_parameters[["hover_info"]],
     space_label = plot_parameters[["projection"]]
   )

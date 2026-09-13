@@ -56,12 +56,6 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
     input[["trajectory_point_opacity"]]
   )
 
-  ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-
   meta_data <- getMetaData()
   req(!is.null(meta_data))
 
@@ -69,8 +63,7 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   selected_cells <- trajectory_projection_selected_cells()
 
   ## extract cells for table
-  cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
-    dplyr::filter(!is.na(pseudotime))
+  cells_df <- trajectory_cells_reactive()
 
   ## Filter by stable cell identity; the shared projection keeps barcode-backed
   ## selections across recolouring and trace rebuilds. Coordinates remain the

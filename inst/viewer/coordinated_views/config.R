@@ -320,6 +320,18 @@ cv_config_cell_fingerprint <- function(cells) {
   paste0("md5-cell-set-v1:", unname(tools::md5sum(path)))
 }
 
+cv_config_dataset_fingerprint <- function(cells, stored = NULL) {
+  if (
+    is.character(stored) &&
+      length(stored) == 1L &&
+      !is.na(stored) &&
+      grepl("^md5-cell-set-v1:[[:xdigit:]]{32}$", stored)
+  ) {
+    return(stored)
+  }
+  cv_config_cell_fingerprint(cells)
+}
+
 cv_config_timestamp <- function(value) {
   value <- cv_config_string(value, "$.created_at", 64L)
   parsed <- suppressWarnings(as.POSIXct(

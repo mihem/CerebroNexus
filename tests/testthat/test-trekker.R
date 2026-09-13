@@ -86,3 +86,20 @@ test_that("trekker_numeric_meta_cols ignores NA when judging constancy", {
   out <- trekker_numeric_meta_cols(meta)
   expect_setequal(out, "varying")
 })
+
+test_that("Trekker payload stays lazy until its page is visible", {
+  server <- paste(
+    readLines(viewer_test_path("trekker", "server.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(
+    server,
+    'req(identical(input[["sidebar"]], "trekker"))',
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    'outputOptions(output, "trekker_main_parameters_ui"',
+    server,
+    fixed = TRUE
+  ))
+})

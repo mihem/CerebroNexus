@@ -215,11 +215,7 @@ html body.skin-blue.sidebar-collapse .main-header .sidebar-toggle::before {
     transform: translateX(-230px) !important;
   }
 }
-/* AdminLTE's `fixed` layout offsets both the sidebar and the content by the
-   50px header height — via `padding-top: 50px` (NOT margin). With the header
-   gone, zero it. Sidebar goes fully flush; the content-wrapper's own top inset
-   (18px) is reasserted with !important in the wrapper rule below so content
-   keeps a little breathing room but loses the phantom 50px band. */
+/* The header is gone, so keep the sidebar flush with the viewport. */
 body.skin-blue .main-sidebar,
 body.skin-blue .left-side { padding-top: 0 !important; }
 body.skin-blue .main-footer { margin-top: 0 !important; }
@@ -228,6 +224,12 @@ body.skin-blue .main-footer { margin-top: 0 !important; }
    Sidebar — white nav rail, rounded items, warm active pill
    ------------------------------------------------------------------------- */
 body.skin-blue .main-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--c-white) !important;
   border-right: 1px solid var(--c-border) !important;
   box-shadow: none !important;
@@ -326,10 +328,6 @@ body.skin-blue .sidebar-menu > li.header {
   font-weight: 700;
 }
 
-/* Content wrapper. The `!important` on padding is deliberate: AdminLTE's fixed
-   skin sets `.content-wrapper { padding-top: 50px }` to clear the (now removed)
-   header, and it loads after us — without !important that 50px band survives and
-   pushes every page down, reading like a phantom header. */
 /* The content area is the ONE scroll container. Everything above it (html, body,
    wrapper) is locked to the viewport and cannot scroll, so a page longer than
    the screen scrolls INSIDE here rather than moving the whole document. Two

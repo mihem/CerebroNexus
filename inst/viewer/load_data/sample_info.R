@@ -37,7 +37,7 @@ output[["load_data_sample_info_UI"]] <- renderUI({
 output[["load_data_number_of_cells"]] <- renderValueBox({
   valueBox(
     value = formatC(
-      nrow(data_set()$meta_data),
+      getNumberOfCells(),
       format = "f",
       big.mark = ",",
       digits = 0

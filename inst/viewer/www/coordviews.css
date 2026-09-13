@@ -513,6 +513,13 @@
   border-radius: 6px; cursor: crosshair;
   transition: width .2s ease, height .2s ease;
 }
+.coordviews-page canvas.cv-gpu-layer {
+  position: absolute; inset: 0; z-index: 0;
+  background: var(--c-surface); pointer-events: none;
+}
+.coordviews-page canvas.cv-gpu-overlay {
+  position: relative; z-index: 1; background: transparent;
+}
 /* ---- minimap ------------------------------------------------------------ */
 /* Deliberately coarse: a subsampled impression of the space plus a frame for the
    visible part. It exists to answer "where am I", which needs no detail. Fades

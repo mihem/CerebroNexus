@@ -23,8 +23,7 @@ trajectory_projection_prepared <- reactive({
   trajectory_data <- trajectory_data_reactive()
 
   ## build data frame with data
-  cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
-    dplyr::filter(!is.na(pseudotime))
+  cells_df <- trajectory_cells_reactive()
 
   groups <- getGroups()
   group_filters <- stats::setNames(
@@ -48,7 +47,8 @@ trajectory_projection_prepared <- reactive({
     return(list(
       cells_df = cells_df,
       trajectory_lines = list(),
-      hover_info = character(0),
+      hover_columns = list(),
+      hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
       color_variable = input[["trajectory_point_color"]],
       point_size = input[["trajectory_point_size"]],
       point_opacity = input[["trajectory_point_opacity"]],
@@ -77,18 +77,35 @@ trajectory_projection_prepared <- reactive({
     )
   })
 
-  ## hover info: cell + metadata + state + pseudotime
-  hover_info <- buildHoverInfoForProjections(cells_df)
-  hover_info <- glue::glue(
-    "{hover_info}<br>",
-    "<b>State</b>: {cells_df$state}<br>",
-    "<b>Pseudotime</b>: {formatC(cells_df$pseudotime, format = 'f', digits = 2)}"
-  )
+  hover <- isTRUE(preferences[["show_hover_info_in_projections"]])
+  hover_columns <- list()
+  if (hover) {
+    state <- as.character(cells_df[["state"]])
+    state[is.na(state)] <- "NA"
+    state_levels <- unique(state)
+    hover_columns <- c(
+      cerebroProjectionHoverColumns(cells_df),
+      list(
+        list(
+          label = "State",
+          levels = state_levels,
+          values = match(state, state_levels) - 1L
+        ),
+        list(
+          label = "Pseudotime",
+          format = "fixed",
+          digits = 2L,
+          values = unname(as.numeric(cells_df[["pseudotime"]]))
+        )
+      )
+    )
+  }
 
   list(
     cells_df = cells_df,
     trajectory_lines = trajectory_lines,
-    hover_info = as.character(hover_info),
+    hover_columns = hover_columns,
+    hover = hover,
     color_variable = input[["trajectory_point_color"]],
     point_size = input[["trajectory_point_size"]],
     point_opacity = input[["trajectory_point_opacity"]],
@@ -135,88 +152,93 @@ observeEvent(
 ##----------------------------------------------------------------------------##
 ## Observer that pushes the prepared data to the shared JS renderer.
 ##----------------------------------------------------------------------------##
+trajectory_projection_started <- reactiveVal(FALSE)
 observeEvent(
-  list(
-    trajectory_projection_prepared(),
-    input[["trajectory_projection_render_request"]]
-  ),
+  input[["trajectory_projection_render_request"]],
   {
-    prepared <- trajectory_projection_prepared()
-    req(prepared)
-
-    ## resolve current reset_axes, then clear it so only a trajectory switch (not
-    ## a colour / point-size tweak) triggers the next autorange.
-    reset_axes_now <- isolate(
-      trajectory_projection_parameters_other[["reset_axes"]]
-    )
-    trajectory_projection_parameters_other[["reset_axes"]] <- FALSE
-
-    cells_df <- prepared[["cells_df"]]
-    color_variable <- prepared[["color_variable"]]
-    if (
-      identical(color_variable, "state") &&
-        is.numeric(cells_df[[color_variable]])
-    ) {
-      cells_df[[color_variable]] <- factor(cells_df[[color_variable]])
-    }
-    ## The projection coordinates are the DR_1 / DR_2 columns contributed by the
-    ## trajectory meta (mergeTrajectoryWithMetaData appends them after the cell
-    ## metadata, so they are NOT columns 1/2).
-    coordinates <- list(cells_df[["DR_1"]], cells_df[["DR_2"]])
-    color_input <- cells_df[[color_variable]]
-    selection_keys <- if ("cell_barcode" %in% colnames(cells_df)) {
-      as.character(cells_df[["cell_barcode"]])
-    } else {
-      rownames(cells_df)
-    }
-
-    point_line <- if (prepared[["draw_border"]]) {
-      list(color = cerebro_plotly_theme()$axis, width = 1)
-    } else {
-      list()
-    }
-
-    color_assignments <- if (nrow(cells_df) == 0L) {
-      character(0)
-    } else {
-      NULL
-    }
-    if (nrow(cells_df) > 0L && !is.numeric(color_input)) {
-      color_assignments <- assignColorsToGroups(cells_df, color_variable)
-      ## Fall back to the default colourset if the variable is not pre-assigned.
-      if (is.null(color_assignments)) {
-        levels_here <- unique(as.character(color_input))
-        color_assignments <- stats::setNames(
-          cerebro_group_colors(length(levels_here)),
-          levels_here
-        )
-      }
-    }
-
-    payload <- cerebroCellViewScatterPayload(
-      coordinates = coordinates,
-      color = color_input,
-      color_variable = color_variable,
-      selection_keys = selection_keys,
-      point_size = prepared[["point_size"]],
-      point_opacity = prepared[["point_opacity"]],
-      group_labels = prepared[["group_labels"]],
-      keep_square = prepared[["keep_square"]],
-      point_line = point_line,
-      reset_axes = reset_axes_now,
-      color_assignments = color_assignments,
-      hover_info = prepared[["hover_info"]],
-      space_label = input[["trajectory_selected_name"]]
-    )
-    cerebroCellViewRender(
-      "trajectory_projection",
-      payload[["meta"]],
-      payload[["data"]],
-      payload[["hover"]],
-      extra = list(shapes = prepared[["trajectory_lines"]])
-    )
-  }
+    trajectory_projection_started(TRUE)
+  },
+  ignoreInit = TRUE
 )
+
+observe({
+  req(trajectory_projection_started())
+  prepared <- trajectory_projection_prepared()
+  req(prepared)
+
+  ## resolve current reset_axes, then clear it so only a trajectory switch (not
+  ## a colour / point-size tweak) triggers the next autorange.
+  reset_axes_now <- isolate(
+    trajectory_projection_parameters_other[["reset_axes"]]
+  )
+  trajectory_projection_parameters_other[["reset_axes"]] <- FALSE
+
+  cells_df <- prepared[["cells_df"]]
+  color_variable <- prepared[["color_variable"]]
+  if (
+    identical(color_variable, "state") &&
+      is.numeric(cells_df[[color_variable]])
+  ) {
+    cells_df[[color_variable]] <- factor(cells_df[[color_variable]])
+  }
+  ## The projection coordinates are the DR_1 / DR_2 columns contributed by the
+  ## trajectory meta (mergeTrajectoryWithMetaData appends them after the cell
+  ## metadata, so they are NOT columns 1/2).
+  coordinates <- list(cells_df[["DR_1"]], cells_df[["DR_2"]])
+  color_input <- cells_df[[color_variable]]
+  selection_keys <- if ("cell_barcode" %in% colnames(cells_df)) {
+    as.character(cells_df[["cell_barcode"]])
+  } else {
+    rownames(cells_df)
+  }
+
+  point_line <- if (prepared[["draw_border"]]) {
+    list(color = cerebro_plotly_theme()$axis, width = 1)
+  } else {
+    list()
+  }
+
+  color_assignments <- if (nrow(cells_df) == 0L) {
+    character(0)
+  } else {
+    NULL
+  }
+  if (nrow(cells_df) > 0L && !is.numeric(color_input)) {
+    color_assignments <- assignColorsToGroups(cells_df, color_variable)
+    ## Fall back to the default colourset if the variable is not pre-assigned.
+    if (is.null(color_assignments)) {
+      levels_here <- unique(as.character(color_input))
+      color_assignments <- stats::setNames(
+        cerebro_group_colors(length(levels_here)),
+        levels_here
+      )
+    }
+  }
+
+  payload <- cerebroCellViewScatterPayload(
+    coordinates = coordinates,
+    color = color_input,
+    color_variable = color_variable,
+    selection_keys = selection_keys,
+    point_size = prepared[["point_size"]],
+    point_opacity = prepared[["point_opacity"]],
+    group_labels = prepared[["group_labels"]],
+    keep_square = prepared[["keep_square"]],
+    point_line = point_line,
+    reset_axes = reset_axes_now,
+    color_assignments = color_assignments,
+    hover_columns = prepared[["hover_columns"]],
+    hover = prepared[["hover"]],
+    space_label = input[["trajectory_selected_name"]]
+  )
+  cerebroCellViewRender(
+    "trajectory_projection",
+    payload[["meta"]],
+    payload[["data"]],
+    payload[["hover"]],
+    extra = list(shapes = prepared[["trajectory_lines"]])
+  )
+})
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
@@ -277,11 +299,7 @@ trajectory_projection_selected_cells <- reactive({
   hidden_groups <- input[["trajectory_projection_hidden_groups"]]
   if (length(hidden_groups) > 0) {
     color_variable <- input[["trajectory_point_color"]]
-    trajectory_data <- getTrajectory(
-      input[["trajectory_selected_method"]],
-      input[["trajectory_selected_name"]]
-    )
-    metadata <- mergeTrajectoryWithMetaData(trajectory_data) %>%
+    metadata <- trajectory_cells_reactive() %>%
       dplyr::mutate(
         identifier = paste0(DR_1, '-', DR_2),
         selection_key = as.character(cell_barcode)

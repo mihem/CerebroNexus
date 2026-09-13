@@ -1,0 +1,9 @@
+metric	scale	pr165_ms	thin_crb_ms	latest_ms	latest_time_change_pct	pr165_alloc_mib	thin_crb_alloc_mib	latest_alloc_mib	latest_alloc_change_pct	check
+full projection selection	1,000,000 cells; all groups; 100%	197	197	31	-84.3	199.1	199.1	19.1	-90.4	equal
+filtered projection selection	1,000,000 cells; 17/33 clusters; 25% = 134557	329	329	28	-91.5	166.5	166.5	39.5	-76.3	equal
+cell index resolution	1,000,000 shuffled canonical indices vs barcode match	79	79	0	-100.0	27.1	27.1	0	-100.0	equal
+single-gene expression	1 gene x 1,000,000 cells; canonical indices; BPCells	4063	4063	4022	-1.0	154.1	154.1	157.1	2.0	equal
+shuffled single-gene expression	1 gene x 100,000 shuffled cells; storage-order BPCells read	7886	7886	5881	-25.4	33.4	33.4	22.3	-33.1	equal
+RGB expression	3 genes x 1,000,000 cells; canonical indices; 3 reads vs 1	12498	12498	4021	-67.8	461.4	461.4	226.1	-51.0	equal
+multi-panel expression	9 genes x 1,000,000 cells; canonical indices; transpose removed	4309	4309	4189	-2.8	562.3	562.3	451.0	-19.8	equal
+mean expression	100 genes x 1,000,000 cells; canonical indices; backend-native	5912	5912	3931	-33.5	1916.8	1916.8	65.4	-96.6	equal

@@ -65,6 +65,7 @@
   // The data set the current state belongs to. Compared against the incoming
   // bundle's identity to tell a new data set from a re-sent one.
   var dataShown = null;
+  var wireToken = 0;
   // Guards the async decode: a fast switch could have an earlier image finish
   // loading after a later one and paint itself over the current choice.
   var imgToken = 0;
@@ -353,6 +354,25 @@
   // Every 2-D layout fills its fluid canvas by normalising x/y independently.
   // Spatial views recover one physical screen scale through panelDataAspect();
   // only rotatable 3-D embeddings keep one shared axis scale here.
+  function deferredUnitOf(space) {
+    var xr = space.xRange, yr = space.yRange;
+    if (space.z || !Array.isArray(xr) || xr.length !== 2 ||
+        !Array.isArray(yr) || yr.length !== 2) return null;
+    var x0 = Math.min(Number(xr[0]), Number(xr[1]));
+    var x1 = Math.max(Number(xr[0]), Number(xr[1]));
+    var y0 = Math.min(Number(yr[0]), Number(yr[1]));
+    var y1 = Math.max(Number(yr[0]), Number(yr[1]));
+    if (![x0, x1, y0, y1].every(isFinite) || x0 === x1 || y0 === y1) return null;
+    var n = space.x.length, dw = x1 - x0, dh = y1 - y0;
+    return {
+      nx: new Float32Array(n), ny: new Float32Array(n), nz: null,
+      ok: new Uint8Array(n), x0: x0, y0: y0, k: 1 / dw, ky: 1 / dh,
+      ox: 0, oy: 0, aspect: dw / dh,
+      bx: { x0: 0, x1: 1, y0: 0, y1: 1 },
+      occ: new Uint8Array(OCC * OCC), sat: null, cmx: 0.5, cmy: 0.5,
+      _pending: { x: space.x, y: space.y }
+    };
+  }
   function unitOf(space) {
     var xs = space.x, ys = space.y, zs = space.z || null, n = xs.length;
     var xr = space.xRange, yr = space.yRange;
@@ -505,6 +525,21 @@
     return { r: r, g: g, b: b, m: Math.max(r, g, b) };
   }
   function rgbExpressing(i) { return rgbAt(i).m > RGB_MIN; }
+  function rgbGpuColor(r, g, b) {
+    r = r || 0; g = g || 0; b = b || 0;
+    var m = Math.max(r, g, b), rr, gg, bb;
+    if (m <= RGB_MIN) {
+      rr = RGB_GREY_RGB[0]; gg = RGB_GREY_RGB[1]; bb = RGB_GREY_RGB[2];
+    } else if (r > RGB_MIN && g > RGB_MIN && b > RGB_MIN) {
+      rr = gg = bb = 0;
+    } else {
+      var t = m / 255;
+      rr = Math.round(RGB_GREY_RGB[0] + (r / m * 255 - RGB_GREY_RGB[0]) * t);
+      gg = Math.round(RGB_GREY_RGB[1] + (g / m * 255 - RGB_GREY_RGB[1]) * t);
+      bb = Math.round(RGB_GREY_RGB[2] + (b / m * 255 - RGB_GREY_RGB[2]) * t);
+    }
+    return rr | (gg << 8) | (bb << 16) | (m > RGB_MIN ? 0x1000000 : 0);
+  }
 
   // ---- colour of a cell under the active mode -----------------------------
   // Painting order for a CONTINUOUS colouring: ascending value, so the cells
@@ -520,31 +555,41 @@
   function panelColorMode(p) {
     return p && p.colorBy ? p.colorBy : colorBy;
   }
+  function quantisedOrder(vals, span) {
+    var counts = new Uint32Array(span + 2), n = vals.length, i, bucket;
+    for (i = 0; i < n; i++) {
+      bucket = vals[i] == null || isNaN(vals[i])
+        ? 0 : Math.max(0, Math.min(span, vals[i] | 0)) + 1;
+      counts[bucket]++;
+    }
+    var offsets = new Uint32Array(counts.length), total = 0;
+    for (i = 0; i < counts.length; i++) {
+      offsets[i] = total;
+      total += counts[i];
+    }
+    var order = new Uint32Array(n);
+    for (i = 0; i < n; i++) {
+      bucket = vals[i] == null || isNaN(vals[i])
+        ? 0 : Math.max(0, Math.min(span, vals[i] | 0)) + 1;
+      order[offsets[bucket]++] = i;
+    }
+    return order;
+  }
   function paintOrder(p) {
     if (!D) return null;
     var mode = panelColorMode(p);
     var key = mode + '|' + (D.gene ? D.gene.gene : '');
     if (_ordD === D && _ordKey === key) return _ordVal;
-    var vals = null;
+    var vals = null, span = 255;
     if (mode === GENE_MODE && D.gene) {
       vals = D.gene.v;
     } else {
       var f = fieldForMode(mode);
-      if (f) vals = f.v;
+      if (f && f.paintOrder !== false) { vals = f.v; span = f.scale || 255; }
     }
-    var ord = null;
-    if (vals) {
-      ord = new Array(D.n);
-      for (var i = 0; i < D.n; i++) ord[i] = i;
-      // Missing values sort first: an unpositioned or NA cell has no signal to
-      // show, so it must never end up covering one that has.
-      ord.sort(function (a, b) {
-        var va = vals[a], vb = vals[b];
-        if (va == null || isNaN(va)) va = -Infinity;
-        if (vb == null || isNaN(vb)) vb = -Infinity;
-        return va - vb;
-      });
-    }
+    // Values are already quantised. A stable counting sort preserves the old
+    // missing-first, low-to-high paint order without sorting 1M JS numbers.
+    var ord = vals ? quantisedOrder(vals, span) : null;
     _ordD = D; _ordKey = key; _ordVal = ord;
     return ord;
   }
@@ -706,10 +751,13 @@
   }
 
   // ---- panel geometry + projection ----------------------------------------
-  function project(p) {
+  function project(p, forceCpu) {
     var sp = spaceById[p.spaceId];
-    if (!sp) { p.sx = null; p.sy = null; return; }
-    if (!sp._unit) sp._unit = unitOf(sp);
+    if (!sp) {
+      p.sx = null; p.sy = null; p.gpuTransformOnly = false;
+      return;
+    }
+    if (!sp._unit) sp._unit = deferredUnitOf(sp) || unitOf(sp);
     var u = sp._unit, n = D.n;
     // Axis'd spaces (the clone panel) reserve room on the left for the y-label
     // and along the bottom for the x-label. The remaining rectangle is filled:
@@ -722,10 +770,19 @@
     var ox = padL, oy = padT;
     p._SX = SX; p._SY = SY; p._S = Math.min(SX, SY);
     p._sox = ox; p._soy = oy;                // for dataToScreen (image bounds)
+    p.ok = u.ok;
+    if (!forceCpu && gpuCandidate(p)) {
+      p.gpuTransformOnly = true;
+      return;
+    }
+    if (u._pending) {
+      sp._unit = unitOf(sp);
+      u = sp._unit;
+    }
+    p.gpuTransformOnly = false;
     if (!p.sx || p.sx.length !== n) {
       p.sx = new Float32Array(n); p.sy = new Float32Array(n);
     }
-    p.ok = u.ok;
     // Inline the unitToScreen transform (avoids per-cell allocation on big sets).
     var v = p.view;
     // ---- 3-D: rotate about the cloud's centre, then flatten ---------------
@@ -786,6 +843,24 @@
         p._dmin = -0.5; p._dspan = 1;
       }
     }
+  }
+
+  function pointScreenX(p, i) {
+    if (!p.gpuTransformOnly) return p.sx && p.sx[i];
+    var u = spaceById[p.spaceId]._unit, x = u.nx[i], view = p.view;
+    if (view) x = (x - view.cx) / view.span + 0.5;
+    return p._sox + x * p._SX;
+  }
+
+  function pointScreenY(p, i) {
+    if (!p.gpuTransformOnly) return p.sy && p.sy[i];
+    var u = spaceById[p.spaceId]._unit, y = u.ny[i], view = p.view;
+    if (view) y = (y - view.cy) / view.span + 0.5;
+    return p._soy + p._SY - y * p._SY;
+  }
+
+  function ensureScreenProjection(p) {
+    if (p.gpuTransformOnly) project(p, true);
   }
 
   // A committed brush is part of the data conversation, not a decoration at a
@@ -886,6 +961,7 @@
     p.canvas.style.width = width + 'px';
     p.canvas.style.height = height + 'px';
     p.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (p.gpu) p.gpu.resize(width, height, dpr);
     if (p.pane) p.pane.classList.toggle('cv-narrow', width < 420);
     project(p);
   }
@@ -1057,6 +1133,25 @@
   // time a filter changes is worse than one that stays where the group is.
   var labelsOn = true;
   var _lblCache = { d: null };
+  function middleValue(values) {
+    if (!values.length) return null;
+    var target = values.length >> 1, left = 0, right = values.length - 1;
+    while (left < right) {
+      var pivot = values[(left + right) >> 1], i = left, j = right;
+      while (i <= j) {
+        while (values[i] < pivot) i++;
+        while (values[j] > pivot) j--;
+        if (i <= j) {
+          var value = values[i]; values[i] = values[j]; values[j] = value;
+          i++; j--;
+        }
+      }
+      if (target <= j) right = j;
+      else if (target >= i) left = i;
+      else break;
+    }
+    return values[target];
+  }
   function groupLabelsFor(p) {
     var mode = panelColorMode(p), g = catOf(mode); if (!g) return null;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
@@ -1077,20 +1172,15 @@
       xs[lv].push(u.nx[i]); ys[lv].push(u.ny[i]);
       if (u.nz) zs[lv].push(u.nz[i]);
     }
-    var med = function (a) {
-      if (!a.length) return null;
-      a.sort(function (x, y) { return x - y; });
-      return a[a.length >> 1];
-    };
     var out = [];
     for (li = 0; li < nlev; li++) {
-      var mx = med(xs[li]);
+      var mx = middleValue(xs[li]);
       if (mx == null) continue;
       // The THIRD component is cached too, so a rotation only has to turn one
       // point per level instead of re-deriving a median over every cell. Cached
       // unrotated, since the cache must survive the rotation changing.
-      out.push({ li: li, nx: mx, ny: med(ys[li]),
-        nz: u.nz ? (med(zs[li]) || 0) : 0, text: String(g.levels[li]) });
+      out.push({ li: li, nx: mx, ny: middleValue(ys[li]),
+        nz: u.nz ? (middleValue(zs[li]) || 0) : 0, text: String(g.levels[li]) });
     }
     _lblCache[key] = { u: u, out: out };
     return out;
@@ -1224,7 +1314,7 @@
   function drawMinimap(p) {
     if (!p.mini || !p.mctx) return;
     var sp = spaceById[p.spaceId], u = sp && sp._unit;
-    var on = !!(p.view && D && p.sx && u);
+    var on = !!(p.view && D && p.ok && u);
     p.mini.classList.toggle('is-on', on);
     if (!on) return;
     if (!p.miniBg || p.miniUnit !== u) p.miniBg = buildMiniBg(p, u);
@@ -1275,7 +1365,22 @@
     }
   }
 
+  var allShownData = null, allShownMask = null;
   function shownState(p) {
+    var filtered = pctMask || dissolveThresh != null || hidden.size;
+    if (!filtered) {
+      for (var name in groupFilter) {
+        if (groupFilter[name]) { filtered = true; break; }
+      }
+    }
+    if (!filtered) {
+      if (allShownData !== D) {
+        allShownData = D;
+        allShownMask = new Uint8Array(D.n);
+        allShownMask.fill(1);
+      }
+      return { mask: allShownMask, count: D.n };
+    }
     var mask = new Uint8Array(D.n), count = 0;
     for (var i = 0; i < D.n; i++) {
       if (shown(i, p)) { mask[i] = 1; count++; }
@@ -1283,9 +1388,251 @@
     return { mask: mask, count: count };
   }
 
-  function draw(p, shownMask) {
+  var GPU_MIN_CELLS = 20000;
+  var gpuColorCache = new Map();
+  function gpuColor(value) {
+    value = cssColor(value, '#888888');
+    if (gpuColorCache.has(value)) return gpuColorCache.get(value);
+    var rgba;
+    if (_colCtx) {
+      _colCtx.clearRect(0, 0, 1, 1);
+      _colCtx.globalAlpha = 1;
+      _colCtx.fillStyle = value;
+      _colCtx.fillRect(0, 0, 1, 1);
+      rgba = Array.prototype.slice.call(_colCtx.getImageData(0, 0, 1, 1).data);
+    } else {
+      rgba = rgbChannels(value).concat(255);
+    }
+    gpuColorCache.set(value, rgba);
+    return rgba;
+  }
+
+  function gpuFilterKey() {
+    var groups = Object.keys(groupFilter).sort().map(function (name) {
+      var values = groupFilter[name];
+      return name + ':' + (values ? Array.from(values).sort().join(',') : '');
+    }).join('|');
+    return Array.from(hidden).sort().join(',') + '|' + groups;
+  }
+
+  function gpuDataState(p) {
+    var mode = panelColorMode(p), field = fieldForMode(mode), group = catOf(mode);
+    return {
+      data: D,
+      unit: spaceById[p.spaceId] && spaceById[p.spaceId]._unit,
+      mode: mode,
+      gene: D.gene && D.gene.v,
+      rgbR: D.rgb && D.rgb.r,
+      rgbG: D.rgb && D.rgb.g,
+      rgbB: D.rgb && D.rgb.b,
+      fieldValues: field && field.v,
+      fieldColors: field && field.colors && field.colors.join(','),
+      fieldPalette: field && field.palette && field.palette.join(','),
+      groupValues: group && group.values,
+      groupColors: group && group.colors && group.colors.join(','),
+      pctMask: pctMask,
+      dissolve: dissolveThresh,
+      filter: gpuFilterKey(),
+      selection: sel,
+      niche: nicheSet,
+      opacity: pointOpacityOf(p),
+      clip: colorClip
+    };
+  }
+
+  function sameGpuDataState(a, b) {
+    if (!a || !b) return false;
+    return Object.keys(a).every(function (key) { return a[key] === b[key]; });
+  }
+
+  function gpuCandidate(p) {
+    if (!p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
+    var space = spaceById[p.spaceId], unit = space && space._unit;
+    return !!(space && unit && !unit.nz && !space.background_scope &&
+      !space._axisSpec && !space.trajectory && !(space.hulls && space.hulls.length));
+  }
+  function gpuEligible(p) {
+    return gpuCandidate(p) && p.gpu.isReady();
+  }
+
+  function hideGpu(p) {
+    if (!p.gpuCanvas) return;
+    p.gpuCanvas.style.display = 'none';
+    p.canvas.classList.remove('cv-gpu-overlay');
+    try { if (p.gpu) p.gpu.clear(); } catch (error) { /* Canvas fallback */ }
+  }
+
+  function attachGpu(p) {
+    if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
+    var canvas = document.createElement('canvas');
+    canvas.className = 'cv-gpu-layer';
+    canvas.style.display = 'none';
+    canvas.setAttribute('aria-hidden', 'true');
+    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    try {
+      p.gpuCanvas = canvas;
+      p.gpu = window.CerebroPointRenderer.create(canvas);
+      canvas._cerebroPointRenderer = p.gpu;
+      p.gpu.ready.then(function () {
+        if (D && p.spaceId) draw(p);
+      }).catch(function () {
+        hideGpu(p);
+        p.gpu = null;
+        if (D && p.spaceId) {
+          p.gpuTransformOnly = false;
+          project(p, true);
+          draw(p);
+        }
+      });
+    } catch (error) {
+      canvas.remove();
+      p.gpuCanvas = null;
+    }
+  }
+
+  function buildGpuData(p, shownMask, shownCount) {
+    var state = gpuDataState(p);
+    if (sameGpuDataState(state, p.gpuDataState)) return p.gpuData;
+    var unit = state.unit, order = paintOrder(p), n = D.n;
+    var positions = new Float32Array(shownCount * 2);
+    var colors = new Uint8Array(shownCount * 4);
+    var layers = new Uint32Array(shownCount);
+    var rgb = panelColorMode(p) === RGB_MODE;
+    var hiSet = (sel && sel.size) ? sel : nicheSet;
+    var foreground = false, out = 0;
+    var pending = unit._pending, cmx = 0, cmy = 0, validCount = 0;
+    var singleGroup = !order && !hiSet && !rgb && shownCount === n &&
+      state.groupValues && state.groupColors &&
+      state.groupColors.indexOf(',') < 0;
+    if (singleGroup) {
+      for (var i = 0; i < n; i++) {
+        if (pending) {
+          var x = pending.x[i], y = pending.y[i];
+          if (x != null && y != null && isFinite(x) && isFinite(y)) {
+            unit.nx[i] = (x - unit.x0) * unit.k;
+            unit.ny[i] = (y - unit.y0) * unit.ky;
+            unit.ok[i] = 1;
+            cmx += unit.nx[i]; cmy += unit.ny[i]; validCount++;
+            unit.occ[occIdx(unit.ny[i]) * OCC + occIdx(unit.nx[i])] = 1;
+          }
+        }
+        if (!unit.ok[i]) continue;
+        positions[out * 2] = unit.nx[i];
+        positions[out * 2 + 1] = unit.ny[i];
+        out++;
+      }
+      var flatRgba = gpuColor(state.groupColors);
+      var flatAlpha = Math.round(flatRgba[3] * pointOpacityOf(p));
+      var packedRgba = (flatRgba[0] | (flatRgba[1] << 8) |
+        (flatRgba[2] << 16) | (flatAlpha << 24)) >>> 0;
+      new Uint32Array(colors.buffer).fill(packedRgba);
+    } else {
+      for (var at = 0; at < n; at++) {
+        i = order ? order[at] : at;
+        if (pending) {
+          x = pending.x[i]; y = pending.y[i];
+          if (x != null && y != null && isFinite(x) && isFinite(y)) {
+            unit.nx[i] = (x - unit.x0) * unit.k;
+            unit.ny[i] = (y - unit.y0) * unit.ky;
+            unit.ok[i] = 1;
+            cmx += unit.nx[i]; cmy += unit.ny[i]; validCount++;
+            unit.occ[occIdx(unit.ny[i]) * OCC + occIdx(unit.nx[i])] = 1;
+          }
+        }
+        if (!unit.ok[i] || !shownMask[i]) continue;
+        positions[out * 2] = unit.nx[i];
+        positions[out * 2 + 1] = unit.ny[i];
+        var packedRgb = rgb
+          ? rgbGpuColor(D.rgb.r[i], D.rgb.g[i], D.rgb.b[i]) : 0;
+        var fg = rgb ? !!(packedRgb & 0x1000000) : !!(hiSet && hiSet.has(i));
+        var alpha = hiSet ? (fg ? 0.95 : 0.05)
+          : rgb ? (fg ? 1 : 0.5 * pointOpacityOf(p)) : pointOpacityOf(p);
+        if (rgb) {
+          colors[out * 4] = packedRgb & 255;
+          colors[out * 4 + 1] = (packedRgb >>> 8) & 255;
+          colors[out * 4 + 2] = (packedRgb >>> 16) & 255;
+          colors[out * 4 + 3] = Math.round(255 * alpha);
+        } else {
+          var rgba = gpuColor(colorOf(i, p));
+          colors[out * 4] = rgba[0];
+          colors[out * 4 + 1] = rgba[1];
+          colors[out * 4 + 2] = rgba[2];
+          colors[out * 4 + 3] = Math.round(rgba[3] * alpha);
+        }
+        layers[out] = fg ? 1 : 0;
+        foreground = foreground || fg;
+        out++;
+      }
+    }
+    if (pending) {
+      unit.sat = occSAT(unit.occ);
+      unit.cmx = validCount ? cmx / validCount : 0.5;
+      unit.cmy = validCount ? cmy / validCount : 0.5;
+      delete unit._pending;
+    }
+    p.gpuDataState = state;
+    p.gpuData = {
+      positions: positions,
+      colors: colors,
+      layers: layers,
+      count: out,
+      foreground: foreground
+    };
+    return p.gpuData;
+  }
+
+  function drawGpuPoints(p, shownMask, shownCount, border) {
+    if (!gpuEligible(p)) { hideGpu(p); return false; }
+    var data, ok;
+    try {
+      data = buildGpuData(p, shownMask, shownCount);
+      p.gpu.setData(data);
+      ok = p.gpu.draw({
+        view: p.view || { cx: 0.5, cy: 0.5, span: 1 },
+        rect: { x: p._sox, y: p._soy, width: p._SX, height: p._SY },
+        pointSize: p._renderPointSize,
+        border: border ? { color: gpuColor(border.color), width: border.width } : null
+      });
+    } catch (error) {
+      hideGpu(p);
+      return false;
+    }
+    if (!ok) { hideGpu(p); return false; }
+    p.gpuCanvas.style.display = 'block';
+    p.canvas.classList.add('cv-gpu-overlay');
+    p.gpuCanvas.dataset.pointCount = String(data.count);
+    return true;
+  }
+
+  function scheduleSingleAux() {
+    var view = singleActive && singleViews[singleActive];
+    var token = view && view.data && view.data.wire_token;
+    if (token == null || view._auxToken === token || view._auxPending === token ||
+        view._auxTimer) return;
+    view._auxPending = token;
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        view._auxPending = null;
+        var current = singleViews[singleActive];
+        if (!current || current !== view || current.data.wire_token !== token ||
+            visibleSingleId() !== singleActive) return;
+        view._auxTimer = setTimeout(function () {
+          view._auxTimer = null;
+          current = singleViews[singleActive];
+          if (!current || current !== view || current.data.wire_token !== token ||
+              visibleSingleId() !== singleActive) return;
+          view._auxToken = token;
+          Shiny.setInputValue('cell_view_aux_request', {
+            id: singleActive, wire_token: token
+          }, { priority: 'event' });
+        }, 5000);
+      });
+    });
+  }
+
+  function draw(p, shownMask, shownCount) {
     var c = p.ctx; c.clearRect(0, 0, p.W, p.H);
-    if (!p.sx) return;
+    if (!p.ok) { hideGpu(p); return; }
     p._renderPointSize = pointSizeOf(p);
     var panelPointOpacity = pointOpacityOf(p);
     drawImage(p);
@@ -1309,7 +1656,11 @@
     // 2n times below (two layers) plus once in the evidence pass; precompute it
     // once. Uint8 mask, indexed instead of recomputed — halves the per-cell work
     // on the hot lasso-drag redraw path.
-    if (!shownMask || shownMask.length !== n) shownMask = shownState(p).mask;
+    if (!shownMask || shownMask.length !== n) {
+      var shown = shownState(p);
+      shownMask = shown.mask;
+      shownCount = shown.count;
+    }
     // Within one layer the alpha is CONSTANT (it depends only on fg/hiSet, which
     // is what defines the layer), so a layer can be drawn as one path per colour
     // instead of one path per cell. On a large data set that turns ~n canvas
@@ -1326,8 +1677,11 @@
     // otherwise. In the batched path this also fixes the ORDER OF THE BUCKETS:
     // they are created as their first member is met, and object keys keep
     // insertion order, so filling them low-to-high paints them low-to-high.
-    var ord = paintOrder(p);
-    for (var layer = 0; layer < 2; layer++) {
+    var gpuDrawn = drawGpuPoints(p, shownMask, shownCount, border);
+    if (!gpuDrawn && p.gpuTransformOnly) return;
+    if (!gpuDrawn) ensureScreenProjection(p);
+    var ord = gpuDrawn ? null : paintOrder(p);
+    for (var layer = 0; !gpuDrawn && layer < 2; layer++) {
       var alpha = hiSet ? (layer === 1 ? 0.95 : 0.05)
         : rgb ? (layer === 1 ? 1 : 0.5 * panelPointOpacity) : panelPointOpacity;
       if (n >= BATCH_MIN) {
@@ -1372,7 +1726,8 @@
       c.globalAlpha = 1; c.strokeStyle = '#1f2937'; c.lineWidth = 1.4;
       for (i = 0; i < n; i++) {
         if (!p.ok[i] || !shownMask[i] || D.trekker.evidence[i] !== 1) continue;
-        c.beginPath(); c.arc(p.sx[i], p.sy[i], p._renderPointSize + 2.5, 0, 6.2832); c.stroke();
+        c.beginPath(); c.arc(pointScreenX(p, i), pointScreenY(p, i),
+          p._renderPointSize + 2.5, 0, 6.2832); c.stroke();
       }
     }
     drawAxes3D(p);
@@ -1383,17 +1738,20 @@
     if (hoverCell != null && hoverCell !== pick && p.ok[hoverCell]) {
       c.globalAlpha = 1; c.strokeStyle = '#0f172a'; c.lineWidth = 1.6;
       c.beginPath();
-      c.arc(p.sx[hoverCell], p.sy[hoverCell], p._renderPointSize + 3.5, 0, 6.2832);
+      c.arc(pointScreenX(p, hoverCell), pointScreenY(p, hoverCell),
+        p._renderPointSize + 3.5, 0, 6.2832);
       c.stroke();
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1;
       c.beginPath();
-      c.arc(p.sx[hoverCell], p.sy[hoverCell], p._renderPointSize + 5, 0, 6.2832);
+      c.arc(pointScreenX(p, hoverCell), pointScreenY(p, hoverCell),
+        p._renderPointSize + 5, 0, 6.2832);
       c.stroke();
     }
     // picked cell ring
     if (pick != null && p.ok[pick]) {
       c.globalAlpha = 1; c.strokeStyle = '#f97316'; c.lineWidth = 2.2;
-      c.beginPath(); c.arc(p.sx[pick], p.sy[pick], p._renderPointSize + 4, 0, 6.2832); c.stroke();
+      c.beginPath(); c.arc(pointScreenX(p, pick), pointScreenY(p, pick),
+        p._renderPointSize + 4, 0, 6.2832); c.stroke();
     }
     // Trekker: dashed niche-radius circle around the picked nucleus (physical
     // panel). Radius µm → screen px via the same data→unit→screen scale.
@@ -1407,11 +1765,13 @@
         c.globalAlpha = 1;
         c.fillStyle = 'rgba(249,115,22,.10)';
         c.beginPath();
-        c.ellipse(p.sx[pick], p.sy[pick], radiusX, radiusY, 0, 0, 6.2832);
+        c.ellipse(pointScreenX(p, pick), pointScreenY(p, pick),
+          radiusX, radiusY, 0, 0, 6.2832);
         c.fill();
         c.strokeStyle = '#f97316'; c.lineWidth = 2.5; c.setLineDash([7, 4]);
         c.beginPath();
-        c.ellipse(p.sx[pick], p.sy[pick], radiusX, radiusY, 0, 0, 6.2832);
+        c.ellipse(pointScreenX(p, pick), pointScreenY(p, pick),
+          radiusX, radiusY, 0, 0, 6.2832);
         c.stroke();
         c.setLineDash([]);
       }
@@ -1433,6 +1793,7 @@
     // a pan, a zoom, a rotation. Left where it was, it would be labelling
     // whatever the view slid underneath it.
     repositionPinned(p);
+    scheduleSingleAux();
   }
   // Live "showing N / M cells" readout — the single feedback that a filter or
   // subsample took effect, regardless of what the panels are coloured by.
@@ -1450,7 +1811,7 @@
       if (!p.spaceId) return;
       var state = shownState(p);
       if (!first) first = state;
-      draw(p, state.mask);
+      draw(p, state.mask, state.count);
     });
     if (first) renderShownCount(first.count);
     updateResetButtons();
@@ -1555,6 +1916,7 @@
   // here: its visibility predicate (p.ok + shown) and fixed hit radius are this
   // engine's, not shared.
   function nearest(p, mx, my) {
+    ensureScreenProjection(p);
     var best = -1, bd = 200, n = D.n, i;
     for (i = 0; i < n; i++) {
       if (!p.ok[i] || !shown(i, p)) continue;
@@ -2142,6 +2504,15 @@
       var canvasY = canvasRect.top - bounds.top + padding;
       context.fillStyle = '#ffffff';
       context.fillRect(canvasX, canvasY, canvasRect.width, canvasRect.height);
+      if (panel.gpuCanvas && panel.gpuCanvas.style.display !== 'none') {
+        context.drawImage(
+          panel.gpuCanvas,
+          canvasX,
+          canvasY,
+          canvasRect.width,
+          canvasRect.height
+        );
+      }
       context.drawImage(
         panel.canvas,
         canvasX,
@@ -2774,10 +3145,59 @@
   // while moving the mouse and, on a data set with several grouping variables,
   // a tooltip taller than what it is pointing at.
   var HOVER_MAX_GROUPS = 6;
+  function singleNestedValue(space, values, i) {
+    if (!space || !space._hoverOffsets) return values && values[i];
+    var offsets = space._hoverOffsets, lo = 0, hi = offsets.length - 1;
+    while (lo + 1 < hi) {
+      var mid = (lo + hi) >> 1;
+      if (i < offsets[mid]) hi = mid; else lo = mid;
+    }
+    var group = values && values[lo];
+    return group && group[i - offsets[lo]];
+  }
+  function singleHoverEnabledAt(space, i) {
+    var modes = space && space._hoverModes;
+    if (!space || !space._hoverOffsets || !Array.isArray(modes)) {
+      return modes !== 'skip';
+    }
+    var offsets = space._hoverOffsets, lo = 0, hi = offsets.length - 1;
+    while (lo + 1 < hi) {
+      var mid = (lo + hi) >> 1;
+      if (i < offsets[mid]) hi = mid; else lo = mid;
+    }
+    return modes[lo] !== 'skip';
+  }
+  function singleHoverColumnValue(column, i, space) {
+    var value = singleNestedValue(space, column.values, i);
+    if (Array.isArray(column.levels)) {
+      value = column.levels[Number(value)];
+    }
+    if (value == null || (typeof value === 'number' && !isFinite(value))) {
+      return 'NA';
+    }
+    if (column.format === 'integer') {
+      var number = Number(value);
+      return isFinite(number) ? Math.round(number).toLocaleString('en-US') : 'NA';
+    }
+    if (column.format === 'fixed') {
+      var fixed = Number(value);
+      return isFinite(fixed) ? fixed.toFixed(Number(column.digits) || 0) : 'NA';
+    }
+    return String(value);
+  }
   function hoverHtml(i, pinned) {
     if (singleActive) {
       var singleSpace = spaceById[singleSpaceIds[0]];
-      var raw = singleSpace && singleSpace._hover && singleSpace._hover[i];
+      var columns = singleSpace && singleSpace._hoverColumns;
+      if (Array.isArray(columns) && columns.length) {
+        var lines = ['Cell: ' + (D.cells[i] || '')];
+        columns.forEach(function (column) {
+          lines.push(column.label + ': ' + singleHoverColumnValue(column, i, singleSpace));
+        });
+        return '<div class="cv-tip-row">' +
+          esc(lines.join('\n')).replace(/\n/g, '<br>') + '</div>';
+      }
+      var raw = singleSpace && singleNestedValue(singleSpace, singleSpace._hover, i);
       var text = String(raw || D.cells[i] || '')
         .replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
       return '<div class="cv-tip-row">' + esc(text).replace(/\n/g, '<br>') + '</div>';
@@ -3026,9 +3446,12 @@
     centreCard();                       // land it before measuring the landing
     var cr = card.getBoundingClientRect();
     var from = null;
-    if (p && p.sx && p.canvas) {
+    if (p && p.ok && p.canvas) {
       var canv = p.canvas.getBoundingClientRect();
-      from = { x: canv.left + p.sx[i], y: canv.top + p.sy[i] };
+      from = {
+        x: canv.left + pointScreenX(p, i),
+        y: canv.top + pointScreenY(p, i)
+      };
     }
     // The start state must be written with transitions OFF. Left on, the browser
     // coalesces "jump to the point" and "go back to centre" into a single
@@ -3100,9 +3523,10 @@
   // say what they are.
   function placeTip(p, tip, i) {
     var tw = tip.offsetWidth, th = tip.offsetHeight, m = 4;
-    var tx = p.sx[i] + 14, ty = p.sy[i] - th - 10;
-    if (tx + tw > p.W - m) tx = p.sx[i] - tw - 14;   // flip left
-    if (ty < m) ty = p.sy[i] + 14;                   // flip below
+    var px = pointScreenX(p, i), py = pointScreenY(p, i);
+    var tx = px + 14, ty = py - th - 10;
+    if (tx + tw > p.W - m) tx = px - tw - 14;   // flip left
+    if (ty < m) ty = py + 14;                   // flip below
     tx = Math.max(m, Math.min(tx, p.W - tw - m));
     ty = Math.max(m, Math.min(ty, p.H - th - m));
     tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
@@ -3159,7 +3583,7 @@
     if (pinnedTip.panel !== p) return;
     var i = pinnedTip.cell, tip = $(p.tipId);
     if (!tip) return;
-    var x = p.sx[i], y = p.sy[i];
+    var x = pointScreenX(p, i), y = pointScreenY(p, i);
     if (x == null || isNaN(x) || x < 0 || y < 0 || x > p.W || y > p.H) {
       tip.style.opacity = 0;
       return;
@@ -3195,7 +3619,7 @@
         return;
       }
       var i = nearest(p, mx, my);
-      if (i < 0 || (space && space._hoverMask && !space._hoverMask[i])) {
+      if (i < 0 || (space && !singleHoverEnabledAt(space, i))) {
         if (own) tip.style.opacity = 0;
         setHoverCell(null);
         return;
@@ -3330,9 +3754,10 @@
       }
       if (!p.drag) return;
       p.drag = false;
-      if (!D || !p.ok || !p.sx) { p.lasso = null; p.lassoData = null; return; }  // not projected yet
+      if (!D || !p.ok) { p.lasso = null; p.lassoData = null; return; }  // not projected yet
       var keep = false;
       if (p.moved && p.lasso && p.lasso.length > 2) {
+        ensureScreenProjection(p);
         var s = new Set();
         for (var i = 0; i < D.n; i++) {
           if (p.ok[i] && shown(i, p) && CBGeom.inPoly(p.sx[i], p.sy[i], p.lasso)) s.add(i);
@@ -3416,7 +3841,10 @@
         // the canvas sits in .cv-canvas-wrap now, so the pane is two levels up
         pane: cv.closest('.cv-pane'), spaceId: null, W: 0, H: 0,
         sx: null, sy: null, ok: null, lasso: null, lassoData: null, drag: false, moved: false,
-        view: null, mini: mini, mctx: null, miniBg: null, miniUnit: null };
+        view: null, mini: mini, mctx: null, miniBg: null, miniUnit: null,
+        gpu: null, gpuCanvas: null, gpuData: null, gpuDataState: null,
+        gpuTransformOnly: false };
+      attachGpu(p);
       // The minimap is a FIXED size, so its backing store is set once here
       // rather than on every re-fit.
       if (mini) {
@@ -5090,10 +5518,12 @@
     hidden = new Set(); groupFilter = {};
     panels.forEach(function (p) {
       p.spaceId = null; p.sx = null; p.sy = null; p.ok = null;
+      p.gpuTransformOnly = false;
       p.lasso = null; p.lassoData = null; p.view = null;
       p.miniBg = null; p.miniUnit = null;
       if (p.mini) p.mini.classList.remove('is-on');
       if (p.ctx) p.ctx.clearRect(0, 0, p.W, p.H);
+      hideGpu(p);
       if (p.pane) p.pane.classList.add('cv-hidden');
     });
     var meta = $('cv-meta');
@@ -5208,7 +5638,7 @@
     return true;
   }
   function singleIndex() {
-    var cells = linkedBundle && linkedBundle.cells;
+    var cells = D && D.cells;
     if (cells === singleIndexCells && singleIndexMap) return singleIndexMap;
     var out = new Map();
     if (Array.isArray(cells)) {
@@ -5218,57 +5648,113 @@
     return singleIndexMap;
   }
   function emptyVector(value) {
-    return new Array(linkedBundle.n || (linkedBundle.cells || []).length).fill(value);
+    return new Array(D && (D.n || (D.cells || []).length) || 0).fill(value);
+  }
+  function singlePayloadCells(payload) {
+    var keys = payload && payload.data && payload.data.selection_key;
+    if (!Array.isArray(keys)) return [];
+    if (!keys.length || !Array.isArray(keys[0])) return keys.map(String);
+    return keys.reduce(function (cells, group) {
+      return cells.concat((group || []).map(String));
+    }, []);
+  }
+  function singlePayloadBundle(id, payload) {
+    var cells = singlePayloadCells(payload);
+    var n = Number(payload.data && payload.data.n) || cells.length;
+    return {
+      dataset_id: 'single:' + id + ':' + n,
+      cells: cells,
+      n: n,
+      groups: {},
+      cat_extra: {},
+      fields: {},
+      projections: {},
+      spaces: []
+    };
   }
   function alignSingleCoordinates(data, nested) {
-    var index = singleIndex();
-    var x = emptyVector(null), y = emptyVector(null), z = emptyVector(null);
-    var groups = emptyVector(-1), levels = [], colors = [];
-    var hover = emptyVector('');
-    var hoverEnabled = emptyVector(true);
+    var n = D && D.n || 0;
+    var x = new Float64Array(n), y = new Float64Array(n);
+    var z = data.data.z ? new Float64Array(n) : null;
+    var groups = nested ? new Int32Array(n) : null;
+    if (groups) groups.fill(-1);
+    var levels = [], colors = [], hover = new Array(n);
+    var hoverEnabled = new Uint8Array(n);
+    var sourceHoverColumns = data.hover && Array.isArray(data.hover.columns)
+      ? data.hover.columns : [];
+    var hoverColumns = sourceHoverColumns.map(function (column) {
+      return {
+        label: String(column.label || ''),
+        format: column.format || null,
+        digits: column.digits,
+        levels: Array.isArray(column.levels) ? column.levels.map(String) : null,
+        values: emptyVector(null)
+      };
+    });
     if (nested) {
       var traces = Array.isArray(data.meta.traces) ? data.meta.traces : [];
       var hoverModes = data.hover && data.hover.hoverinfo;
+      var offset = 0;
       traces.forEach(function (name, group) {
         levels.push(String(name));
         var colour = data.data.color && data.data.color[group];
         colors.push(String(Array.isArray(colour) ? colour[0] : colour || '#7b8794'));
         var gx = data.data.x[group] || [], gy = data.data.y[group] || [];
         var gz = data.data.z && data.data.z[group] || [];
-        var gk = data.data.selection_key && data.data.selection_key[group] || [];
         var gh = data.hover && data.hover.text && data.hover.text[group] || [];
         var hoverMode = Array.isArray(hoverModes) ? hoverModes[group] : hoverModes;
-        for (var j = 0; j < gx.length; j++) {
-          var at = index.get(String(gk[j])); if (at == null) continue;
+        var limit = Math.min(gx.length, n - offset);
+        for (var j = 0; j < limit; j++) {
+          var at = offset + j;
           x[at] = Number(gx[j]); y[at] = Number(gy[j]);
-          if (gz[j] != null) z[at] = Number(gz[j]);
+          if (z && gz[j] != null) z[at] = Number(gz[j]);
           groups[at] = group; hover[at] = gh[j] || '';
           hoverEnabled[at] = hoverMode !== 'skip';
+          sourceHoverColumns.forEach(function (column, columnIndex) {
+            var values = column.values && column.values[group];
+            hoverColumns[columnIndex].values[at] = values ? values[j] : null;
+          });
         }
+        offset += limit;
       });
     } else {
-      var keys = Array.isArray(data.data.selection_key)
-        ? data.data.selection_key : [];
       var hx = data.data.x || [], hy = data.data.y || [], hz = data.data.z || [];
       var hh = data.hover && Array.isArray(data.hover.text) ? data.hover.text : [];
       var enabled = !(data.hover && data.hover.hoverinfo === 'skip');
-      for (var k = 0; k < hx.length; k++) {
-        var pos = index.get(String(keys[k])); if (pos == null) continue;
-        x[pos] = Number(hx[k]); y[pos] = Number(hy[k]);
-        if (hz[k] != null) z[pos] = Number(hz[k]);
-        hover[pos] = hh[k] || '';
-        hoverEnabled[pos] = enabled;
+      var direct = !data.data.selection_key && ArrayBuffer.isView(hx) &&
+        ArrayBuffer.isView(hy) && hx.length === n && hy.length === n;
+      if (direct && !enabled && !sourceHoverColumns.length) {
+        return {
+          x: hx, y: hy,
+          z: ArrayBuffer.isView(hz) && hz.length === n ? hz : null,
+          groups: groups, levels: levels, colors: colors,
+          hover: [], hoverEnabled: hoverEnabled, hoverColumns: []
+        };
+      }
+      for (var k = 0; k < Math.min(hx.length, n); k++) {
+        x[k] = Number(hx[k]); y[k] = Number(hy[k]);
+        if (z && hz[k] != null) z[k] = Number(hz[k]);
+        hover[k] = hh[k] || '';
+        hoverEnabled[k] = enabled;
+        sourceHoverColumns.forEach(function (column, columnIndex) {
+          hoverColumns[columnIndex].values[k] = column.values
+            ? column.values[k] : null;
+        });
       }
     }
     return { x: x, y: y, z: z, groups: groups,
-      levels: levels, colors: colors, hover: hover, hoverEnabled: hoverEnabled };
+      levels: levels, colors: colors, hover: hover, hoverEnabled: hoverEnabled,
+      hoverColumns: hoverColumns };
   }
   function quantisedField(label, raw, keys, data, panelScale) {
-    var index = singleIndex(), values = emptyVector(null), min = Infinity, max = -Infinity;
+    var index = singleIndex(), min = Infinity, max = -Infinity;
+    var direct = !keys || !keys.length;
+    var values = direct && ArrayBuffer.isView(raw) ? raw : emptyVector(null);
+    var complete = direct && values.length === (D && D.n || 0);
     for (var i = 0; i < raw.length; i++) {
-      var at = index.get(String(keys[i]));
+      var at = direct ? i : index.get(String(keys[i]));
       var value = Number(raw[i]);
-      if (at == null || !isFinite(value)) continue;
+      if (at == null || !isFinite(value)) { complete = false; continue; }
       values[at] = value; if (value < min) min = value; if (value > max) max = value;
     }
     if (!isFinite(min)) { min = 0; max = 1; }
@@ -5280,20 +5766,24 @@
       max = Math.max(Number(range[0]), Number(range[1]));
     }
     if (max <= min) max = min + 1;
-    var q = values.map(function (value) {
-      if (value == null) return null;
-      return Math.round(Math.max(0, Math.min(1,
-        (value - min) / (max - min))) * 1000);
-    });
+    var q = complete ? new Uint16Array(values.length) : new Array(values.length);
+    for (i = 0; i < values.length; i++) {
+      value = values[i];
+      q[i] = value == null || !isFinite(value) ? null : Math.round(
+        Math.max(0, Math.min(1, (value - min) / (max - min))) * 1000
+      );
+    }
     return { label: label, v: q, raw: values, min: min, max: max, scale: 1000,
+      paintOrder: !data || data.paint_order !== 'natural',
       unclipped: true,
       palette: singlePalette(panelScale || (data && data.colorscale),
         panelScale ? false : data && data.reversescale) };
   }
   function directColorField(meta, raw, keys) {
     var index = singleIndex(), colors = emptyVector('#e6e7ea');
+    var direct = !keys || !keys.length;
     for (var i = 0; i < raw.length; i++) {
-      var at = index.get(String(keys[i]));
+      var at = direct ? i : index.get(String(keys[i]));
       if (at != null) colors[at] = cssColor(raw[i], '#e6e7ea');
     }
     return {
@@ -5305,17 +5795,22 @@
   function singleRgbData(data) {
     var index = singleIndex(), keys = Array.isArray(data.selection_key)
       ? data.selection_key : [], raw = data.rgb || {}, out = {};
+    var direct = !keys.length;
     ['r', 'g', 'b'].forEach(function (channel) {
-      var values = emptyVector(0), source = Array.isArray(raw[channel])
-        ? raw[channel] : [], maximum = 0;
+      var source = raw[channel] || [], maximum = 0;
+      var values = new Float32Array(D && D.n || 0);
       for (var i = 0; i < source.length; i++) {
-        var at = index.get(String(keys[i])), value = Number(source[i]);
+        var at = direct ? i : index.get(String(keys[i])), value = Number(source[i]);
         if (at == null || !isFinite(value)) continue;
         values[at] = value; if (value > maximum) maximum = value;
       }
-      out[channel] = values.map(function (value) {
-        return maximum > 0 ? Math.round(value / maximum * 255) : 0;
-      });
+      var scaled = new Uint8Array(values.length);
+      if (maximum > 0) {
+        for (i = 0; i < values.length; i++) {
+          scaled[i] = Math.round(values[i] / maximum * 255);
+        }
+      }
+      out[channel] = scaled;
     });
     var genes = data.rgb_genes || {};
     out.genes = ['r', 'g', 'b'].map(function (channel) {
@@ -5448,16 +5943,17 @@
     var baseId = 'single::' + id, spaces = [], modes = {};
     var edges = singleEdges(extra);
     var hulls = singleHulls(extra);
-    var hasZ = aligned.z.some(function (value) { return value != null; });
+    var hasZ = aligned.z !== null;
     var hasHover = aligned.hoverEnabled.some(Boolean);
     var makeSpace = function (spaceId, label) {
       var space = { id: spaceId, label: label || id, x: aligned.x, y: aligned.y };
       space._projectionName = spaceId;
       space._hover = aligned.hover;
+      space._hoverColumns = aligned.hoverColumns;
       space._hoverEnabled = hasHover;
       space._hoverMask = aligned.hoverEnabled;
       if (hasZ) space.z = aligned.z;
-      if (!hasZ && !data.reset_axes) {
+      if (!hasZ) {
         space.xRange = data.x_range;
         space.yRange = data.y_range;
       }
@@ -5521,7 +6017,8 @@
       modes[baseId] = FIELD_PREFIX + directName;
     } else {
       var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
-      var multiple = data.color && !Array.isArray(data.color) && typeof data.color === 'object';
+      var multiple = data.color && !Array.isArray(data.color) &&
+        !ArrayBuffer.isView(data.color) && typeof data.color === 'object';
       var entries = multiple ? Object.keys(data.color).map(function (name) {
         return [name, data.color[name]];
       }) : [[meta.color_variable || 'Value', data.color || []]];
@@ -5553,8 +6050,10 @@
   }
   function activateSingle(id, resetAxes, preserveTargetState) {
     var payload = singleViews[id];
-    if (!payload || !linkedBundle || rebuildingBase) return false;
-    if (!singleActive && !linkedState) linkedState = exportWorkspace();
+    if (!payload || rebuildingBase) return false;
+    if (!singleActive && linkedBundle && D && !linkedState) {
+      linkedState = exportWorkspace();
+    }
     if (CBViewState.shouldStashSingleState(
       singleActive,
       id,
@@ -5567,9 +6066,10 @@
     singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
     setSelectionZoomed(false);
     if (!mountSingleSurface(id)) { singleActive = null; return false; }
-    D = Object.assign({}, linkedBundle, {
-      fields: Object.assign({}, linkedBundle.fields || {}),
-      cat_extra: Object.assign({}, linkedBundle.cat_extra || {})
+    var base = singlePayloadBundle(id, payload);
+    D = Object.assign({}, base, {
+      fields: Object.assign({}, base.fields),
+      cat_extra: Object.assign({}, base.cat_extra)
     });
     spaceById = {}; spatialTemplate = null; _clipD = null;
     var built = buildSingleSpaces(id, payload);
@@ -5641,7 +6141,10 @@
       });
       sel = restored.size ? restored : null;
     }
-    renderLegend(); resizeAll(); renderSelbar(); drawAll();
+    renderLegend();
+    resizeAll();
+    renderSelbar();
+    drawAll();
     reportSingleHiddenGroups(); reportSelection();
     return true;
   }
@@ -5778,6 +6281,101 @@
   }
 
   function onData(bundle) {
+    wireToken++;
+    applyData(bundle);
+  }
+
+  function onBinaryData(buffer) {
+    var token = ++wireToken;
+    try {
+      if (!window.CBViewWire || !window.CBViewWire.supported) {
+        throw new Error('Linked views binary transport is unavailable');
+      }
+      var decoded = window.CBViewWire.unpack(buffer);
+      if (token === wireToken) applyData(decoded);
+    } catch (error) {
+      if (token !== wireToken) return;
+      Shiny.setInputValue('coordviews_wire_fallback', {
+        dataset_id: '', nonce: Date.now()
+      }, { priority: 'event' });
+    }
+  }
+
+  function onBinaryCells(buffer) {
+    try {
+      var message = window.CBViewWire.unpackCells(buffer);
+      if (!D || message.dataset_id !== D.dataset_id ||
+          !Array.isArray(message.cells) || message.cells.length !== D.n) return;
+      D.cells = message.cells;
+      if (linkedBundle) linkedBundle.cells = message.cells;
+      singleIndexCells = null; singleIndexMap = null;
+      reportWorkspaceReady();
+    } catch (error) {
+      Shiny.setInputValue('coordviews_wire_fallback', {
+        dataset_id: '', nonce: Date.now()
+      }, { priority: 'event' });
+    }
+  }
+
+  function onSingleBinary(buffer) {
+    try {
+      var message = window.CBViewWire.unpack(buffer);
+      if (!message || !message.id) return;
+      renderSingle(
+        message.id,
+        message.meta,
+        message.data,
+        message.hover,
+        message.extra
+      );
+    } catch (error) {
+      return;
+    }
+  }
+
+  function onSingleAuxBinary(buffer) {
+    try {
+      var message = window.CBViewWire.unpack(buffer);
+      var view = message && singleViews[message.id];
+      if (!view || !view.data ||
+          Number(view.data.wire_token) !== Number(message.wire_token)) return;
+      view.data.selection_key = message.selection_key;
+      view.hover = message.hover || {};
+      if (singleActive !== message.id) return;
+      var cells = singlePayloadCells(view);
+      if (cells.length !== D.n) return;
+      D.cells = cells;
+      singleIndexCells = null; singleIndexMap = null;
+      var nested = view.meta && view.meta.color_type === 'categorical';
+      var offsets = null;
+      if (nested) {
+        var groups = Array.isArray(view.data.x) ? view.data.x : [];
+        offsets = new Uint32Array(groups.length + 1);
+        groups.forEach(function (group, index) {
+          offsets[index + 1] = offsets[index] + (group ? group.length : 0);
+        });
+      }
+      var hover = view.hover || {};
+      var modes = hover.hoverinfo;
+      var enabled = Array.isArray(modes)
+        ? modes.some(function (mode) { return mode !== 'skip'; })
+        : modes !== 'skip';
+      singleSpaceIds.forEach(function (spaceId) {
+        var space = spaceById[spaceId];
+        if (!space) return;
+        space._hover = Array.isArray(hover.text) ? hover.text : [];
+        space._hoverColumns = Array.isArray(hover.columns) ? hover.columns : [];
+        space._hoverModes = modes;
+        space._hoverOffsets = offsets;
+        space._hoverEnabled = enabled;
+        space._hoverMask = null;
+      });
+    } catch (error) {
+      return;
+    }
+  }
+
+  function applyData(bundle) {
     // A data set the builders cannot turn into a bundle (no embedding, or a
     // build error) arrives as {error: "..."}. Blank the workspace and SAY so —
     // returning early would leave the PREVIOUS data set's panels on screen,
@@ -5970,13 +6568,14 @@
   // The JSON contains identities and interaction state only; no expression,
   // coordinates, images, receptor sequences or other source data leave D.
   function configFingerprint() {
-    if (!D || !Array.isArray(D.cells)) return '';
+    if (!D) return '';
     if (typeof D.dataset_fingerprint === 'string' && D.dataset_fingerprint) {
       return D.dataset_fingerprint;
     }
     if (typeof D.cell_fingerprint === 'string' && D.cell_fingerprint) {
       return D.cell_fingerprint;
     }
+    if (!Array.isArray(D.cells)) return '';
     var a = 2166136261, b = 2246822519;
     D.cells.forEach(function (cell) {
       var text = String(cell) + '\u0000';
@@ -6373,7 +6972,8 @@
 
   function workspaceSummary() {
     return {
-      ready: !!(D && configFingerprint()),
+      ready: !!(D && Array.isArray(D.cells) && D.cells.length === D.n &&
+        configFingerprint()),
       datasetFingerprint: D ? configFingerprint() : null,
       selectedCells: sel ? sel.size : 0,
       selectedCellBarcodes: selectedCellIds(),
@@ -6442,6 +7042,10 @@
     if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) return false;
     booted = true;
     Shiny.addCustomMessageHandler('coordviews_data', onData);
+    Shiny.addCustomMessageHandler('coordviews_binary', onBinaryData);
+    Shiny.addCustomMessageHandler('coordviews_cells', onBinaryCells);
+    Shiny.addCustomMessageHandler('cell_view_binary', onSingleBinary);
+    Shiny.addCustomMessageHandler('cell_view_aux_binary', onSingleAuxBinary);
     Shiny.addCustomMessageHandler('coordviews_colors', function (patch) {
       if (!applyColorPatch(patch)) pendingColorPatch = patch;
     });
@@ -6571,7 +7175,7 @@
       var el = $('cv-meta');
       var linkedVis = !!(el && el.offsetParent !== null);
       var singleId = visibleSingleId();
-      var vis = linkedVis || !!singleId;
+      var vis = linkedVis;
       var key = linkedVis ? 'linked' : (singleId || 'hidden');
       var host = singleId && singleHost(singleId);
       var surface = host && host.querySelector('.cerebro-cell-view-surface');
@@ -6585,10 +7189,16 @@
           priority: 'event'
         });
       }
-      if (singleId && linkedBundle && singleViews[singleId]) {
+      if (singleId && singleViews[singleId]) {
         activateSingle(singleId);
       } else if (singleActive) {
-        activateLinked();
+        if (linkedVis && linkedBundle) {
+          activateLinked();
+        } else {
+          restoreLinkedSurface();
+          singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+          if (linkedVis) showUnavailable('Loading linked views…');
+        }
       }
       if (Shiny.setInputValue) {
         Shiny.setInputValue('coordviews_visible', vis);
@@ -6604,7 +7214,15 @@
     }, true);
     // A reconnect gives a fresh server session that knows nothing, so the state
     // has to be sent again rather than suppressed as unchanged.
-    var onConnected = function () { lastVis = null; reportVisibility(); };
+    var onConnected = function () {
+      Shiny.setInputValue(
+        'coordviews_wire_supported',
+        !!(window.CBViewWire && window.CBViewWire.supported),
+        { priority: 'event' }
+      );
+      lastVis = null;
+      reportVisibility();
+    };
     var jq = window.jQuery;
     if (jq) { jq(document).on('shiny:connected', onConnected); }
     else { document.addEventListener('shiny:connected', onConnected); }

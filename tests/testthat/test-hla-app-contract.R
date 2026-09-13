@@ -215,7 +215,7 @@ test_that("bundled core shim resolves without an installed package", {
 hla_sc_demo <- function() {
   path <- hla_inst_file("extdata/examples/demo_hla_tcr_dextramer.crb")
   testthat::skip_if_not(file.exists(path), "single-cell demo not built")
-  readRDS(path)
+  readCerebro(path)
 }
 
 test_that("shipped demo declares antigen selection, cells and its receptor key", {
@@ -794,8 +794,7 @@ test_that("the page's nav gate scans every sample, like the core does", {
   # The IR module's detect_chains() stops after three samples. The HLA page is
   # gated on chains being present, and it is also the only route to its own
   # Data & QC tab -- so a cohort whose TCR happens to start at sample four would
-  # be locked out of a page that could analyse it. The core already scans all
-  # samples; the gate must use the core.
+  # be locked out of a page that could analyse it.
   late <- list(
     s1 = data.frame(CTgene = NA_character_, stringsAsFactors = FALSE),
     s2 = data.frame(CTgene = NA_character_, stringsAsFactors = FALSE),
@@ -813,7 +812,10 @@ test_that("the page's nav gate scans every sample, like the core does", {
   )
   expect_match(
     src,
-    "\"hla_tcr_motifs\",[\\s\\S]{0,1500}hla_detect_chains\\(getImmuneRepertoire\\(\\)\\)",
+    paste0(
+      "\"hla_tcr_motifs\",[\\s\\S]{0,1500}",
+      "viewerHasTcrRepertoire\\(getImmuneRepertoire\\(\\)\\)"
+    ),
     perl = TRUE
   )
 })
