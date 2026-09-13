@@ -25,7 +25,7 @@ example_crb <- if (!is.na(local_inst)) {
 # Annotate the IR list with cell metadata by barcode (mirrors ir_data_annotated
 # in the module) so group.by columns are available.
 load_ir <- function() {
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   ir <- crb$getImmuneRepertoire()
   md <- crb$getMetaData()
   meta_cols <- setdiff(colnames(md), "cell_barcode")

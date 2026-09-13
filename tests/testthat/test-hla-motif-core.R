@@ -25,6 +25,39 @@ make_ir_list <- function(cdr3s, samples = NULL, cell_types = NULL) {
   split(df, df$sample)
 }
 
+test_that("HLA metadata is joined across samples without changing IR columns", {
+  repertoire <- list(
+    sample_a = data.frame(
+      barcode = c("cell_3", "cell_1"),
+      CTgene = "TRBV1.TRBJ2",
+      CTaa = c("CASSL", "CASSF"),
+      cluster = c("stored", "stored"),
+      stringsAsFactors = FALSE
+    ),
+    sample_b = data.frame(
+      barcode = "cell_2",
+      CTgene = "TRBV1.TRBJ2",
+      CTaa = "CASST",
+      stringsAsFactors = FALSE
+    )
+  )
+  metadata <- data.frame(
+    cell_barcode = c("cell_1", "cell_2", "cell_3"),
+    cluster = c("A", "B", "C"),
+    condition = c("control", "treated", "control"),
+    stringsAsFactors = FALSE
+  )
+
+  annotated <- hla_annotate_ir_metadata(repertoire, metadata)
+
+  expect_identical(names(annotated), names(repertoire))
+  expect_identical(annotated$sample_a$cluster, c("stored", "stored"))
+  expect_identical(annotated$sample_a$condition, c("control", "control"))
+  expect_identical(annotated$sample_b$condition, "treated")
+  expect_identical(annotated$sample_a$sample, rep("sample_a", 2L))
+  expect_identical(annotated$sample_b$sample, "sample_b")
+})
+
 ## ---- J gene is optional (bulk sources give V family + CDR3 only) ------- ##
 
 test_that("rows with a V gene but no J gene are kept, with J as NA", {

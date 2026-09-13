@@ -1,19 +1,82 @@
 ##----------------------------------------------------------------------------##
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
+spatial_projection_full_ranges <- reactive({
+  spatial_name <- input[["spatial_projection_to_display"]]
+  req(spatial_name %in% availableSpatial())
+
+  dataset <- spatial_dataset_name(
+    available_crb_files$files,
+    available_crb_files$selected
+  )
+  rotation_angle <- spatialPlotRotation(
+    Cerebro.options,
+    dataset,
+    spatial_name
+  )
+  full_coords <- rotateSpatialCoordinates(
+    getSpatialData(spatial_name)$coordinates,
+    rotation_angle
+  )
+  x_full <- range(full_coords[[1]], na.rm = TRUE)
+  y_full <- range(full_coords[[2]], na.rm = TRUE)
+  if (!all(is.finite(c(x_full, y_full)))) {
+    return(list(x_range = NULL, y_range = NULL))
+  }
+
+  list(
+    x_range = x_full + c(-1, 1) * diff(x_full) * 0.02,
+    y_range = y_full + c(-1, 1) * diff(y_full) * 0.02
+  )
+})
+
+spatial_projection_group_hulls <- reactive({
+  if (
+    !isTRUE(input[["spatial_projection_show_region_outlines"]]) ||
+      !identical(input[["spatial_projection_plot_type"]], "ImageDimPlot")
+  ) {
+    return(list())
+  }
+  color_variable <- input[["spatial_projection_point_color"]]
+  metadata <- spatial_projection_metadata()
+  req(color_variable, color_variable %in% colnames(metadata))
+  color_input <- metadata[[color_variable]]
+  if (is.numeric(color_input)) {
+    return(list())
+  }
+  coordinates <- spatial_projection_coordinates()
+  dataset <- spatial_dataset_name(
+    available_crb_files$files,
+    available_crb_files$selected
+  )
+  coordinates <- rotateSpatialCoordinates(
+    coordinates,
+    spatialPlotRotation(
+      Cerebro.options,
+      dataset,
+      input[["spatial_projection_to_display"]]
+    )
+  )
+  if (ncol(coordinates) != 2L) {
+    return(list())
+  }
+  compute_group_hulls(
+    coordinates[[1]],
+    coordinates[[2]],
+    as.character(color_input)
+  )
+})
+
 spatial_projection_data_to_plot_raw <- reactive({
   req(
     spatial_projection_metadata(),
     spatial_projection_coordinates(),
     spatial_projection_parameters_plot(),
-    reactive_colors(),
-    spatial_projection_hover_info(),
-    nrow(spatial_projection_metadata()) ==
-      length(spatial_projection_hover_info()) ||
-      spatial_projection_hover_info() == "none"
+    reactive_colors()
   )
   metadata <- spatial_projection_metadata()
   plot_parameters <- spatial_projection_parameters_plot()
+  cells_to_extract <- spatial_projection_cells_to_show()
 
   ## Handle ImageFeaturePlot (add gene expression data)
   if (
@@ -22,22 +85,12 @@ spatial_projection_data_to_plot_raw <- reactive({
   ) {
     gene <- plot_parameters$feature_to_display
     if (gene %in% getGeneNames()) {
-      # Use cell_barcode column if available, otherwise fallback to rownames
-      if ("cell_barcode" %in% colnames(metadata)) {
-        cells_to_extract <- metadata$cell_barcode
-      } else {
-        cells_to_extract <- rownames(metadata)
-      }
-      # Slice only the requested gene x cells to avoid materializing the full
-      # dense matrix on every call. getExpressionMatrix is a Cerebro R6 method,
-      # not a bare function — reach it through data_set() like the gene-
-      # expression module does.
-      expression_data <- data_set()$getExpressionMatrix(
-        cells = cells_to_extract,
-        genes = gene
+      expr_values <- viewerExpressionRow(
+        data_set(),
+        cells_to_extract,
+        gene
       )
-      if (!is.null(expression_data) && gene %in% rownames(expression_data)) {
-        expr_values <- as.vector(expression_data[gene, cells_to_extract])
+      if (!is.null(expr_values)) {
         metadata[[gene]] <- expr_values
       }
     }
@@ -46,11 +99,6 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Co-expression: pull each channel's gene expression into metadata columns
   ## keyed by a stable channel name, so the renderer can blend them onto RGB.
   if (plot_parameters$plot_type == "Co-expression (RGB)") {
-    if ("cell_barcode" %in% colnames(metadata)) {
-      cells_to_extract <- metadata$cell_barcode
-    } else {
-      cells_to_extract <- rownames(metadata)
-    }
     ## Use a list, not c(): an empty channel is NULL, and c() would DROP it and
     ## shift the remaining names, misaligning genes to channels.
     coexpr_genes <- list(
@@ -58,19 +106,22 @@ spatial_projection_data_to_plot_raw <- reactive({
       coexpr_g = plot_parameters$coexpr_g,
       coexpr_b = plot_parameters$coexpr_b
     )
+    requested_genes <- unique(unlist(coexpr_genes, use.names = FALSE))
+    requested_genes <- requested_genes[
+      !is.na(requested_genes) &
+        nzchar(requested_genes) &
+        requested_genes %in% getGeneNames()
+    ]
+    expression_values <- viewerExpressionValues(
+      data_set(),
+      cells_to_extract,
+      requested_genes
+    )
     for (channel in names(coexpr_genes)) {
       gene <- coexpr_genes[[channel]]
       metadata[[channel]] <- NA_real_
-      if (!is.null(gene) && nzchar(gene) && gene %in% getGeneNames()) {
-        expression_data <- data_set()$getExpressionMatrix(
-          cells = cells_to_extract,
-          genes = gene
-        )
-        if (!is.null(expression_data) && gene %in% rownames(expression_data)) {
-          metadata[[channel]] <- as.vector(
-            expression_data[gene, cells_to_extract]
-          )
-        }
+      if (!is.null(gene) && gene %in% names(expression_values)) {
+        metadata[[channel]] <- expression_values[[gene]]
       }
     }
   }
@@ -117,24 +168,9 @@ spatial_projection_data_to_plot_raw <- reactive({
       is.null(plot_parameters[["y_range"]]) ||
       length(plot_parameters[["y_range"]]) < 2
   ) {
-    full_coords <- rotateSpatialCoordinates(
-      getSpatialData(plot_parameters[["projection"]])$coordinates,
-      rotation_angle
-    )
-    x_full <- range(full_coords[[1]], na.rm = TRUE)
-    y_full <- range(full_coords[[2]], na.rm = TRUE)
-    x_margin <- diff(x_full) * 0.02
-    y_margin <- diff(y_full) * 0.02
-    if (all(is.finite(x_full)) && all(is.finite(y_full))) {
-      plot_parameters[["x_range"]] <- c(
-        x_full[1] - x_margin,
-        x_full[2] + x_margin
-      )
-      plot_parameters[["y_range"]] <- c(
-        y_full[1] - y_margin,
-        y_full[2] + y_margin
-      )
-    }
+    full_ranges <- spatial_projection_full_ranges()
+    plot_parameters[["x_range"]] <- full_ranges[["x_range"]]
+    plot_parameters[["y_range"]] <- full_ranges[["y_range"]]
   }
 
   ## With an explicit full-extent range we must NOT let the JS autorange (which
@@ -156,13 +192,18 @@ spatial_projection_data_to_plot_raw <- reactive({
     reset_axes = reset_axes,
     plot_parameters = plot_parameters,
     color_assignments = color_assignments,
-    hover_info = spatial_projection_hover_info()
+    group_hulls = spatial_projection_group_hulls(),
+    hover_columns = if (isTRUE(plot_parameters[["hover_info"]])) {
+      cerebroProjectionHoverColumns(metadata)
+    } else {
+      list()
+    }
   )
 
   return(to_return)
 })
 
-spatial_projection_data_to_plot <- debounce(
+spatial_projection_data_to_plot <- debounceAfterFirst(
   spatial_projection_data_to_plot_raw,
   150
 )

@@ -51,3 +51,23 @@ test_that("returns one colour string per cell", {
   out <- blend(r = c(1, 2, 3, 4), g = c(4, 3, 2, 1), b = NULL)
   expect_length(out, 4)
 })
+
+test_that("spatial RGB batches expression reads and reuses full ranges", {
+  viewer_file <- viewer_test_path(
+    "spatial",
+    "obj_projection_data_to_plot.R"
+  )
+  lines <- readLines(viewer_file, warn = FALSE)
+  rgb_start <- grep("^  ## Co-expression", lines)[[1L]]
+  rgb_end <- grep("^  ## get colors", lines)[[1L]] - 1L
+  rgb_lines <- lines[rgb_start:rgb_end]
+
+  expression_read <- grep("viewerExpressionValues\\(", rgb_lines)[[1L]]
+  channel_loop <- grep("for \\(channel in", rgb_lines)[[1L]]
+  expect_lt(expression_read, channel_loop)
+  expect_match(
+    paste(lines, collapse = "\n"),
+    "spatial_projection_full_ranges <- reactive",
+    fixed = TRUE
+  )
+})

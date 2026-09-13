@@ -36,42 +36,10 @@ hla_ir_annotated <- reactive({
   if (is.null(data) || !is.list(data) || length(data) == 0) {
     return(NULL)
   }
-  md <- tryCatch(getMetaData(), error = function(e) NULL)
-  has_md <- !is.null(md) && "cell_barcode" %in% colnames(md)
-  meta_cols <- if (has_md) {
-    setdiff(colnames(md), "cell_barcode")
-  } else {
-    character(0)
-  }
-  nm <- names(data)
-  out <- lapply(seq_along(data), function(i) {
-    df <- data[[i]]
-    if (is.null(df)) {
-      return(df)
-    }
-    if (has_md && "barcode" %in% colnames(df)) {
-      add <- setdiff(meta_cols, colnames(df))
-      if (length(add) > 0) {
-        idx <- match(df$barcode, md$cell_barcode)
-        for (col in add) {
-          df[[col]] <- md[[col]][idx]
-        }
-      }
-    }
-    # `sample` is STRUCTURAL here, not a metadata column this page hopes to
-    # find: HLA typing is matched to the repertoire by the names of this very
-    # list (hla_analysis_unit_map is handed names(getImmuneRepertoire())), so
-    # the list name is what "sample" has to mean for every join on this page.
-    # Taking it from a metadata column of the same name would leave the page
-    # broken on any object that names it differently, and quietly inconsistent
-    # on one where the column and the list disagree.
-    if (!is.null(nm) && nzchar(nm[i])) {
-      df$sample <- nm[i]
-    }
-    df
-  })
-  names(out) <- nm
-  out
+  hla_annotate_ir_metadata(
+    data,
+    tryCatch(getMetaData(), error = function(e) NULL)
+  )
 })
 
 ## ---- TCR chains available (TRA / TRB only for this page) --------------- ##
@@ -484,8 +452,7 @@ hla_node_meta_cols <- reactive({
   # EVERY colourable column is carried, not just the one currently selected. The
   # graph is cached on this set, so making it independent of hla_color_by means a
   # colour switch never re-keys the cache: the column is already on the node, and
-  # the renderer recolours it in place instead of rebuilding (see the
-  # visNetworkProxy observer in visualizations.R).
+  # the Canvas renderer recolours it without rebuilding the graph.
   ct <- hla_celltype_col()
   cols <- c(
     "sample",

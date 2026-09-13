@@ -62,11 +62,78 @@ hla_detect_chains <- function(data) {
   if (is.null(data) || !is.list(data) || length(data) == 0) {
     return(character(0))
   }
-  all_ct <- unlist(lapply(data, function(df) {
+  all_ct <- unique(unlist(lapply(data, function(df) {
     if ("CTgene" %in% names(df)) as.character(df$CTgene) else character(0)
-  }))
+  })))
   chains <- c(HLA_TCR_CHAINS, HLA_BCR_CHAINS)
   chains[vapply(chains, function(ch) any(grepl(ch, all_ct)), logical(1))]
+}
+
+#' Join cell metadata onto a named immune-repertoire list
+#'
+#' The metadata index is resolved once across every sample. Existing repertoire
+#' columns win, and the repertoire list name remains the structural sample id.
+#'
+#' @param data Named list of scRepertoire-style data.frames.
+#' @param metadata Cell metadata containing `cell_barcode`.
+#' @return `data` with missing metadata columns added by barcode.
+#' @keywords internal
+hla_annotate_ir_metadata <- function(data, metadata) {
+  if (is.null(data) || !is.list(data) || length(data) == 0) {
+    return(data)
+  }
+  has_metadata <- !is.null(metadata) &&
+    is.data.frame(metadata) &&
+    "cell_barcode" %in% colnames(metadata)
+  metadata_cols <- if (has_metadata) {
+    setdiff(colnames(metadata), "cell_barcode")
+  } else {
+    character(0)
+  }
+  eligible <- vapply(
+    data,
+    function(df) !is.null(df) && "barcode" %in% colnames(df),
+    logical(1)
+  )
+  sizes <- vapply(
+    seq_along(data),
+    function(i) if (eligible[[i]]) nrow(data[[i]]) else 0L,
+    integer(1)
+  )
+  indices <- if (has_metadata && any(eligible)) {
+    match(
+      unlist(lapply(data[eligible], `[[`, "barcode"), use.names = FALSE),
+      metadata$cell_barcode
+    )
+  } else {
+    integer(0)
+  }
+  ends <- cumsum(sizes)
+  starts <- ends - sizes + 1L
+  sample_names <- names(data)
+
+  out <- lapply(seq_along(data), function(i) {
+    df <- data[[i]]
+    if (is.null(df)) {
+      return(df)
+    }
+    if (has_metadata && eligible[[i]]) {
+      idx <- if (sizes[[i]] > 0L) {
+        indices[seq.int(starts[[i]], ends[[i]])]
+      } else {
+        integer(0)
+      }
+      for (col in setdiff(metadata_cols, colnames(df))) {
+        df[[col]] <- metadata[[col]][idx]
+      }
+    }
+    if (!is.null(sample_names) && nzchar(sample_names[[i]])) {
+      df$sample <- sample_names[[i]]
+    }
+    df
+  })
+  names(out) <- sample_names
+  out
 }
 
 #' Parse V / J / CDR3 for one chain out of scRepertoire CT* columns
@@ -85,58 +152,45 @@ hla_parse_ir_segments <- function(data, chain) {
   if (is.null(data) || length(data) == 0 || is.null(chain) || !nzchar(chain)) {
     return(NULL)
   }
-  # Positional (1-based) slot index of the chain matching `chain` in each cell's
-  # underscore-joined CT* string; NA when the chain is absent.
-  chain_slot_index <- function(ct_gene_vec) {
-    ct_gene_vec <- as.character(ct_gene_vec)
-    vapply(
-      strsplit(ct_gene_vec, "_", fixed = TRUE),
-      function(parts) {
-        first <- sub(";.*$", "", parts)
-        idx <- which(grepl(chain, first, fixed = TRUE) & first != "NA")
-        if (length(idx) == 0) NA_integer_ else idx[1]
-      },
-      integer(1)
-    )
-  }
-  # Pick each row's slot value from a CT* vector (split once, index per row).
-  pick_slot <- function(ct_vec, slot_idx) {
-    if (length(ct_vec) == 0) {
-      return(character(0))
-    }
-    split_all <- strsplit(as.character(ct_vec), "_", fixed = TRUE)
-    val <- mapply(
-      function(parts, i) {
-        if (is.na(i) || i > length(parts)) NA_character_ else parts[i]
-      },
-      split_all,
-      slot_idx,
-      SIMPLIFY = TRUE,
-      USE.NAMES = FALSE
-    )
-    val[is.na(val) | val == "NA" | !nzchar(val)] <- NA_character_
-    val
-  }
-  first_allele <- function(x) {
-    ifelse(is.na(x), NA_character_, sub(";.*$", "", x))
-  }
-
   rows <- lapply(data, function(df) {
     if (is.null(df) || !all(c("barcode", "CTgene", "CTaa") %in% colnames(df))) {
       return(NULL)
     }
-    slot_idx <- chain_slot_index(df$CTgene)
-    gene_seg <- first_allele(pick_slot(df$CTgene, slot_idx))
-    cdr3 <- first_allele(pick_slot(df$CTaa, slot_idx))
+    gene_parts <- strsplit(as.character(df$CTgene), "_", fixed = TRUE)
+    gene_lengths <- lengths(gene_parts)
+    gene_flat <- unlist(gene_parts, use.names = FALSE)
+    gene_rows <- rep.int(seq_along(gene_parts), gene_lengths)
+    gene_slots <- sequence(gene_lengths)
+    first_gene <- sub(";.*$", "", gene_flat)
+    hits <- which(grepl(chain, first_gene, fixed = TRUE) & first_gene != "NA")
+    hits <- hits[!duplicated(gene_rows[hits])]
+    if (length(hits) == 0L) {
+      return(NULL)
+    }
+    selected_rows <- gene_rows[hits]
+    selected_slots <- gene_slots[hits]
+    gene_seg <- first_gene[hits]
+
+    aa_parts <- strsplit(as.character(df$CTaa), "_", fixed = TRUE)
+    aa_lengths <- lengths(aa_parts)
+    aa_flat <- unlist(aa_parts, use.names = FALSE)
+    aa_starts <- cumsum(c(1L, head(aa_lengths, -1L)))
+    cdr3 <- rep(NA_character_, length(selected_rows))
+    has_aa <- selected_slots <= aa_lengths[selected_rows]
+    aa_index <- aa_starts[selected_rows[has_aa]] + selected_slots[has_aa] - 1L
+    cdr3[has_aa] <- sub(";.*$", "", aa_flat[aa_index])
+    cdr3[is.na(cdr3) | cdr3 == "NA" | !nzchar(cdr3)] <- NA_character_
+
+    token_parts <- strsplit(gene_seg, ".", fixed = TRUE)
+    token_lengths <- lengths(token_parts)
+    token_flat <- unlist(token_parts, use.names = FALSE)
+    token_rows <- rep.int(seq_along(token_parts), token_lengths)
     pull_token <- function(prefix) {
-      vapply(
-        strsplit(gene_seg, ".", fixed = TRUE),
-        function(toks) {
-          hit <- toks[grepl(paste0("^", chain, prefix), toks)]
-          if (length(hit) == 0) NA_character_ else hit[1]
-        },
-        character(1)
-      )
+      token_hits <- which(startsWith(token_flat, paste0(chain, prefix)))
+      token_hits <- token_hits[!duplicated(token_rows[token_hits])]
+      out <- rep(NA_character_, length(gene_seg))
+      out[token_rows[token_hits]] <- token_flat[token_hits]
+      out
     }
     v_gene <- pull_token("V")
     j_gene <- pull_token("J")
@@ -149,7 +203,7 @@ hla_parse_ir_segments <- function(data, chain) {
     if (!any(keep)) {
       return(NULL)
     }
-    out <- df[keep, , drop = FALSE]
+    out <- df[selected_rows[keep], , drop = FALSE]
     out$v_gene <- v_gene[keep]
     out$j_gene <- j_gene[keep]
     out$cdr3 <- cdr3[keep]
@@ -232,9 +286,25 @@ hla_process_length_group <- function(df) {
   # Single distance measure (Hamming); edge and adjacency use the SAME
   # threshold (== 1) so component membership and drawn edges never diverge.
   dist_mat <- stringdist::stringdistmatrix(seqs, seqs, method = "hamming")
-  adj <- dist_mat == 1
-  diag(adj) <- FALSE
-  g <- igraph::graph_from_adjacency_matrix(adj, mode = "undirected")
+  idx <- which(dist_mat == 1 & upper.tri(dist_mat), arr.ind = TRUE)
+  edges <- if (nrow(idx) == 0) {
+    NULL
+  } else {
+    data.frame(
+      from = node_ids[idx[, 1]],
+      to = node_ids[idx[, 2]],
+      stringsAsFactors = FALSE
+    )
+  }
+  g <- igraph::graph_from_data_frame(
+    if (is.null(edges)) {
+      data.frame(from = character(0), to = character(0))
+    } else {
+      edges
+    },
+    vertices = data.frame(name = node_ids),
+    directed = FALSE
+  )
   comps <- igraph::components(g)
 
   # Max pairwise Hamming distance within the component: how far apart its two
@@ -269,17 +339,6 @@ hla_process_length_group <- function(df) {
   df$motif_max_mismatch <- diam[comps$membership]
   df$motif_consensus <- consensus[comps$membership]
 
-  edges <- NULL
-  if (n > 1) {
-    idx <- which(dist_mat == 1 & upper.tri(dist_mat), arr.ind = TRUE)
-    if (nrow(idx) > 0) {
-      edges <- data.frame(
-        from = node_ids[idx[, 1]],
-        to = node_ids[idx[, 2]],
-        stringsAsFactors = FALSE
-      )
-    }
-  }
   list(df = df, edges = edges)
 }
 

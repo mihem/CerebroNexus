@@ -1,0 +1,231 @@
+#!/usr/bin/env Rscript
+
+args <- commandArgs(trailingOnly = TRUE)
+Sys.setenv(NOT_CRAN = "true")
+if (length(args) < 3L || length(args) > 4L) {
+  stop(
+    "usage: benchmark_viewer_1m_pages.R REPO_ROOT CRB OUTPUT_TSV [REPEATS]",
+    call. = FALSE
+  )
+}
+
+root <- normalizePath(args[[1L]], mustWork = TRUE)
+crb <- normalizePath(args[[2L]], mustWork = TRUE)
+output <- normalizePath(args[[3L]], mustWork = FALSE)
+repeats <- if (length(args) == 4L) as.integer(args[[4L]]) else 3L
+if (is.na(repeats) || repeats < 1L) {
+  stop("REPEATS must be a positive integer.", call. = FALSE)
+}
+
+quote_r <- function(value) encodeString(value, quote = '"')
+page <- function(
+  tab,
+  ready = NULL,
+  budget_ms = 2000,
+  required = FALSE,
+  wait_idle = TRUE
+) {
+  list(
+    tab = tab,
+    ready = ready,
+    budget_ms = budget_ms,
+    required = required,
+    wait_idle = wait_idle
+  )
+}
+pages <- list(
+  groups = page(
+    "groups",
+    "#groups_nUMI_plot.js-plotly-plot",
+    required = TRUE
+  ),
+  overview = page(
+    "overview",
+    "#overview_projection_cell_view_host canvas:not(.cv-mini)",
+    required = TRUE
+  ),
+  gene_expression = page(
+    "geneExpression",
+    "#expression_projection_cell_view_host canvas:not(.cv-mini)",
+    required = TRUE
+  ),
+  immune_repertoire = page(
+    "immune_repertoire",
+    paste(
+      "#ir_clonalUMAP_projection_cell_view_host canvas:not(.cv-mini),",
+      "#ir_visualizations_UI .js-plotly-plot"
+    ),
+    required = TRUE
+  ),
+  trajectory = page(
+    "trajectory",
+    "#trajectory_projection_cell_view_host canvas:not(.cv-mini)",
+    budget_ms = 3000,
+    required = TRUE
+  ),
+  hla = page(
+    "hla_tcr_motifs",
+    paste0(
+      "#hla_motif_network_cell_view_host ",
+      "canvas:not(.cv-mini)[data-point-count]"
+    ),
+    budget_ms = 3000,
+    required = TRUE,
+    wait_idle = FALSE
+  ),
+  marker_genes = page("markerGenes"),
+  most_expressed_genes = page("mostExpressedGenes"),
+  enriched_pathways = page("enrichedPathways"),
+  extra_material = page("extra_material"),
+  spatial = page("spatial"),
+  trekker = page("trekker"),
+  gene_id_conversion = page("geneIdConversion"),
+  color_management = page("color_management"),
+  analysis_info = page("analysis_info"),
+  about = page("about"),
+  coordinated_views = page("coordinated_views")
+)
+only <- Sys.getenv("VIEWER_PAGES_ONLY")
+if (nzchar(only)) {
+  only <- trimws(strsplit(only, ",", fixed = TRUE)[[1L]])
+  unknown <- setdiff(only, names(pages))
+  if (length(unknown)) {
+    stop("Unknown VIEWER_PAGES_ONLY page: ", unknown[[1L]], call. = FALSE)
+  }
+  pages <- pages[only]
+}
+
+page_active_js <- function(page, first) {
+  ready <- if (!isTRUE(first) || is.null(page$ready)) {
+    "true"
+  } else {
+    sprintf("!!p.querySelector(%s)", quote_r(page$ready))
+  }
+  idle <- if (isTRUE(first) && isTRUE(page$wait_idle)) {
+    "!document.documentElement.classList.contains('shiny-busy')"
+  } else {
+    "true"
+  }
+  sprintf(
+    "(() => { const p=document.getElementById('shiny-tab-%s'); return window.__cerebroPageBenchReady === true && !!p && p.classList.contains('active') && %s && %s; })()",
+    page$tab,
+    idle,
+    ready
+  )
+}
+
+page_available <- function(app, page) {
+  selector <- sprintf("a[href='#shiny-tab-%s']", page$tab)
+  app$get_js(sprintf("!!document.querySelector(%s)", quote_r(selector)))
+}
+
+open_page <- function(app, page, first = TRUE) {
+  selector <- sprintf("a[href='#shiny-tab-%s']", page$tab)
+  exists <- page_available(app, page)
+  if (!isTRUE(exists)) {
+    if (isTRUE(page$required)) {
+      stop("Missing required benchmark page: ", page$tab, call. = FALSE)
+    }
+    return(NA_real_)
+  }
+  started <- proc.time()[["elapsed"]]
+  message("opening ", page$tab)
+  app$run_js(sprintf(
+    "window.__cerebroPageBenchReady=false; document.querySelector(%s).click(); requestAnimationFrame(() => requestAnimationFrame(() => { window.__cerebroPageBenchReady=true; }));",
+    quote_r(selector)
+  ))
+  app$wait_for_js(page_active_js(page, first), timeout = 120000)
+  elapsed <- (proc.time()[["elapsed"]] - started) * 1000
+  message("ready ", page$tab, ": ", round(elapsed), " ms")
+  elapsed
+}
+
+run_once <- function(round) {
+  app_dir <- tempfile("viewer-1m-pages-")
+  dir.create(app_dir)
+  on.exit(unlink(app_dir, recursive = TRUE, force = TRUE), add = TRUE)
+  writeLines(
+    c(
+      sprintf("devtools::load_all(%s, quiet = TRUE)", quote_r(root)),
+      "launchCerebro(",
+      "  mode = \"closed\",",
+      sprintf("  crb_file_to_load = c(\"1M pages\" = %s),", quote_r(crb)),
+      "  percentage_cells_to_show = 100,",
+      "  projections_show_hover_info = TRUE",
+      ")"
+    ),
+    file.path(app_dir, "app.R")
+  )
+  suppressWarnings(shinytest2::local_app_support(app_dir))
+  app <- shinytest2::AppDriver$new(
+    app_dir,
+    name = paste0("viewer_1m_pages_", round),
+    height = 950,
+    width = 1619,
+    load_timeout = 900000,
+    timeout = 900000
+  )
+  on.exit(app$stop(), add = TRUE)
+  app$wait_for_value(output = "load_data_number_of_cells", timeout = 900000)
+  count <- app$get_value(output = "load_data_number_of_cells")
+  if (is.null(count$html) || !grepl("1,000,000", count$html, fixed = TRUE)) {
+    stop("Data Info did not report 1,000,000 cells.", call. = FALSE)
+  }
+
+  rows <- list()
+  record <- function(visit, name, elapsed_ms) {
+    page <- pages[[name]]
+    budget <- if (identical(visit, "first")) page$budget_ms else 500
+    rows[[length(rows) + 1L]] <<- data.frame(
+      round = round,
+      visit = visit,
+      page = name,
+      elapsed_ms = elapsed_ms,
+      budget_ms = budget,
+      pass = elapsed_ms <= budget,
+      check.names = FALSE
+    )
+  }
+
+  required <- names(pages)[vapply(pages, `[[`, logical(1), "required")]
+  optional <- setdiff(names(pages), required)
+  for (name in required) {
+    elapsed <- open_page(app, pages[[name]], first = TRUE)
+    if (is.finite(elapsed)) {
+      record("first", name, elapsed)
+    }
+  }
+  for (name in required) {
+    app$run_js(
+      "document.querySelector(\"a[href='#shiny-tab-loadData']\").click();"
+    )
+    app$wait_for_js(
+      "document.getElementById('shiny-tab-loadData').classList.contains('active')",
+      timeout = 120000
+    )
+    record("repeat", name, open_page(app, pages[[name]], first = FALSE))
+  }
+  for (name in optional) {
+    if (!isTRUE(page_available(app, pages[[name]]))) {
+      next
+    }
+    record("first", name, open_page(app, pages[[name]], first = TRUE))
+    app$run_js(
+      "document.querySelector(\"a[href='#shiny-tab-loadData']\").click();"
+    )
+    app$wait_for_js(
+      "document.getElementById('shiny-tab-loadData').classList.contains('active')",
+      timeout = 120000
+    )
+    record("repeat", name, open_page(app, pages[[name]], first = FALSE))
+  }
+  do.call(rbind, rows)
+}
+
+results <- do.call(rbind, lapply(seq_len(repeats), run_once))
+dir.create(dirname(output), recursive = TRUE, showWarnings = FALSE)
+write.table(results, output, row.names = FALSE, sep = "\t", quote = FALSE)
+print(results, row.names = FALSE)
+if (any(!results$pass)) {
+  stop("One or more 1M page budgets failed; see ", output, call. = FALSE)
+}

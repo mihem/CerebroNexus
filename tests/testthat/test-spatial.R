@@ -14,7 +14,7 @@ spatial_crb <- system.file(
 
 test_that("demo_spatial.crb exposes spatial data via class methods", {
   skip_if_not(file.exists(spatial_crb))
-  crb <- readRDS(spatial_crb)
+  crb <- readCerebro(spatial_crb)
   spatial <- crb$availableSpatial()
   expect_true(is.character(spatial))
   expect_true(length(spatial) > 0)
@@ -22,7 +22,7 @@ test_that("demo_spatial.crb exposes spatial data via class methods", {
 
 test_that("demo_spatial.crb spatial data is accessible and complete", {
   skip_if_not(file.exists(spatial_crb))
-  crb <- readRDS(spatial_crb)
+  crb <- readCerebro(spatial_crb)
   spatial <- crb$availableSpatial()
   skip_if(length(spatial) == 0)
   data <- crb$getSpatialData(spatial[1])
@@ -38,7 +38,7 @@ test_that("demo_spatial.crb spatial data is accessible and complete", {
 
 test_that("getSpatialData errors on unknown spatial entry", {
   skip_if_not(file.exists(spatial_crb))
-  crb <- readRDS(spatial_crb)
+  crb <- readCerebro(spatial_crb)
   expect_error(crb$getSpatialData("__not_a_real_image__"))
 })
 
@@ -383,7 +383,7 @@ test_that("createShinyApp migrates legacy spatial settings into its bundle", {
     )
   ))
 
-  spatial_name <- readRDS(spatial_crb)$availableSpatial()[[1L]]
+  spatial_name <- readCerebro(spatial_crb)$availableSpatial()[[1L]]
   cfg <- readRDS(file.path(out_dir, "cerebro_config.rds"))
   preset <- cfg[["spatial_image_settings"]][["Legacy spatial"]][[
     spatial_name
@@ -540,7 +540,7 @@ test_that("createShinyApp bundles a spatial image and writes the option", {
   cfg <- readRDS(cfg_path)
   expect_true(!is.null(cfg[["spatial_images"]]))
   # path rewritten to the bundle-relative spatial asset directory
-  spatial_name <- readRDS(spatial_crb)$availableSpatial()[[1L]]
+  spatial_name <- readCerebro(spatial_crb)$availableSpatial()[[1L]]
   stored <- cfg[["spatial_images"]][["Xenium demo"]][[spatial_name]][[
     "Tissue background"
   ]]
@@ -594,7 +594,7 @@ test_that("Visium ships its H&E as an EXTERNAL image, not embedded", {
     crb_path == "" || !file.exists(crb_path),
     message = "visium crb missing"
   )
-  crb <- readRDS(crb_path)
+  crb <- readCerebro(crb_path)
   spatial_name <- crb$availableSpatial()[1]
   sd <- .normalizeSpatialDataImages(
     crb$getSpatialData(spatial_name),
@@ -698,7 +698,8 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
       coordinates = data.frame(x = c(20, 80), y = c(30, 70)),
       reset_axes = FALSE,
       color_assignments = character(),
-      hover_info = c("first", "second"),
+      group_hulls = list(),
+      hover_columns = list(),
       plot_parameters = plot_parameters
     ))
   }
@@ -735,6 +736,54 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_identical(rendered$data$y_range, c(10, 90))
   expect_identical(as.numeric(rendered$data$x), c(20, 80))
   expect_identical(as.numeric(rendered$data$y), c(30, 70))
+})
+
+test_that("external spatial image encoding is cached by file version", {
+  renderer <- new.env(parent = globalenv())
+  sys.source(
+    viewer_test_path("spatial", "func_projection_update_plot.R"),
+    envir = renderer
+  )
+  image <- tempfile(fileext = ".png")
+  withr::defer(unlink(image))
+  writeBin(as.raw(1:4), image)
+  calls <- 0L
+  encode <- function(path) {
+    calls <<- calls + 1L
+    paste0("encoded-", file.info(path)$size)
+  }
+
+  first <- renderer$spatialBackgroundDataUri(image, encode)
+  second <- renderer$spatialBackgroundDataUri(image, encode)
+  writeBin(as.raw(1:5), image)
+  third <- renderer$spatialBackgroundDataUri(image, encode)
+
+  expect_identical(first, second)
+  expect_false(identical(second, third))
+  expect_identical(calls, 2L)
+})
+
+test_that("spatial hull geometry is prepared outside the renderer", {
+  data_flow <- paste(
+    readLines(viewer_test_path("spatial", "obj_projection_data_to_plot.R")),
+    collapse = "\n"
+  )
+  renderer <- paste(
+    readLines(viewer_test_path("spatial", "func_projection_update_plot.R")),
+    collapse = "\n"
+  )
+
+  expect_match(
+    data_flow,
+    "spatial_projection_group_hulls <- reactive({",
+    fixed = TRUE
+  )
+  expect_match(
+    data_flow,
+    "group_hulls = spatial_projection_group_hulls()",
+    fixed = TRUE
+  )
+  expect_no_match(renderer, "compute_group_hulls(", fixed = TRUE)
 })
 
 test_that("shared Canvas owns spatial background identity and appearance", {
@@ -845,7 +894,7 @@ test_that("bundled real demos embed a genuine tissue image in the .crb", {
       package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
-    crb <- readRDS(path)
+    crb <- readCerebro(path)
     spatial_name <- crb$availableSpatial()[1]
     sd <- .normalizeSpatialDataImages(
       crb$getSpatialData(spatial_name),
@@ -891,7 +940,7 @@ test_that("each real spatial demo exposes coordinates with x/y", {
       path == "" || !file.exists(path),
       message = paste0(nm, " demo missing")
     )
-    crb <- readRDS(path)
+    crb <- readCerebro(path)
     images <- crb$availableSpatial()
     expect_true(length(images) > 0, info = nm)
     sd <- crb$getSpatialData(images[1])
@@ -939,7 +988,7 @@ test_that("image-free demo (Slide-seq) carries no histology image", {
       package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
-    crb <- readRDS(path)
+    crb <- readCerebro(path)
     spatial_name <- crb$availableSpatial()[1]
     sd <- .normalizeSpatialDataImages(
       crb$getSpatialData(spatial_name),
@@ -959,7 +1008,7 @@ test_that("embedded image demos store the image natively with no flip flag", {
       package = "CerebroNexus"
     )
     skip_if(path == "" || !file.exists(path), message = paste0(f, " missing"))
-    crb <- readRDS(path)
+    crb <- readCerebro(path)
     spatial_name <- crb$availableSpatial()[1]
     sd <- .normalizeSpatialDataImages(
       crb$getSpatialData(spatial_name),

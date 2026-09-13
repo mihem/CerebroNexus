@@ -567,6 +567,8 @@ ui <- dashboardPage(
       cerebro_js("fill_height.js", defer = TRUE),
       cerebro_js("cv-geom.js", defer = TRUE),
       cerebro_js("cell_views_state.js", defer = TRUE),
+      cerebro_js("cell_points_gpu.js"),
+      cerebro_js("cell_views_wire.js"),
       cerebro_js("hla_motifs.js", defer = TRUE),
       cerebro_js("coordviews-config.js", defer = TRUE),
       cerebro_js("viewer-shell.js", defer = TRUE),
@@ -575,7 +577,6 @@ ui <- dashboardPage(
       cerebro_js("settings_drawer.js", defer = TRUE),
       cerebro_js("specialist-view-state.js", defer = TRUE)
     ),
-    tags$script(HTML('$("body").addClass("fixed");')),
     tabItems(
       tab_load_data,
       tab_overview,

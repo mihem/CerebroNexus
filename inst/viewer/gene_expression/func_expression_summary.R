@@ -80,6 +80,7 @@ plotExpressionSummary <- function(series, groups, colors) {
       level = item$values,
       stringsAsFactors = FALSE
     )
+    plot_data <- compactViolinData(plot_data, "level", "group")
     if (is.null(item$color)) {
       plot <- plotly::plot_ly(
         plot_data,

@@ -548,6 +548,95 @@ test_that("one-cell dynamic expression messages retain JSON arrays", {
   expect_type(rgb$genes, "list")
 })
 
+test_that("large linked-view vectors use a lossless compact wire format", {
+  skip_if_not_installed("base64enc")
+  skip_if_not_installed("jsonlite")
+  skip_if_not(have_bundle, "coordinated_views/bundle.R not found")
+
+  bundle <- list(
+    cells = I(c("cell-1", "cell-2")),
+    groups = list(cluster = cv_env$cv_group(c(0L, NA_integer_), "A", "#fff")),
+    cat_extra = list(),
+    fields = list(score = cv_env$cv_field("Score", c(0L, 1000L), 0, 1)),
+    projections = list(
+      umap = list(x = I(c(1.25, NA_real_)), y = I(c(-2.5, 3.75)), ndim = 2L)
+    ),
+    spaces = list(cv_env$cv_space("spatial", "Spatial", c(4, 5), c(6, 7)))
+  )
+  packed <- cv_env$cv_wire_pack_bundle(bundle, min_length = 1L)
+
+  header_length <- readBin(
+    packed[seq_len(4L)],
+    integer(),
+    size = 4L,
+    endian = "little"
+  )
+  header <- jsonlite::fromJSON(
+    rawToChar(packed[4L + seq_len(header_length)]),
+    simplifyVector = FALSE
+  )
+  data_start <- 4L + header_length + ((4L - header_length %% 4L) %% 4L)
+  decode <- function(value) {
+    type <- value[["__cv_wire__"]]
+    first <- data_start + value$offset + 1L
+    bytes <- packed[seq.int(first, length.out = value$bytes)]
+    if (identical(type, "json")) {
+      return(jsonlite::fromJSON(rawToChar(bytes)))
+    }
+    if (identical(type, "f32")) {
+      readBin(bytes, numeric(), n = value$length, size = 4L, endian = "little")
+    } else {
+      readBin(
+        bytes,
+        integer(),
+        n = value$length,
+        size = switch(type, i8 = 1L, i16 = 2L, 4L),
+        signed = TRUE,
+        endian = "little"
+      )
+    }
+  }
+
+  expect_identical(header$wire_format, "binary-v1")
+  expect_identical(decode(header$cells), c("cell-1", "cell-2"))
+  expect_identical(decode(header$groups$cluster$values), c(0L, NA_integer_))
+  expect_identical(decode(header$fields$score$v), c(0L, 1000L))
+  expect_equal(decode(header$projections$umap$x), c(1.25, NA_real_))
+  expect_equal(decode(header$projections$umap$y), c(-2.5, 3.75))
+  expect_equal(decode(header$spaces[[1L]]$x), c(4, 5))
+  expect_equal(decode(header$spaces[[1L]]$y), c(6, 7))
+})
+
+test_that("Linked views negotiates compact transport with a legacy fallback", {
+  server <- paste(
+    readLines(file.path(dirname(bundle_file), "server.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  client <- paste(
+    readLines(
+      file.path(dirname(bundle_file), "..", "www", "cell_views.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(server, 'input[["coordviews_wire_supported"]]', fixed = TRUE)
+  expect_match(server, "sendBinaryMessage(", fixed = TRUE)
+  expect_match(server, '"coordviews_binary"', fixed = TRUE)
+  expect_match(server, '"coordviews_cells"', fixed = TRUE)
+  expect_match(server, "include_cells = FALSE", fixed = TRUE)
+  expect_match(server, "cv_wire_pack_bundle(bundle", fixed = TRUE)
+  expect_match(server, 'input[["coordviews_wire_fallback"]]', fixed = TRUE)
+  expect_match(client, "CBViewWire.unpack(buffer)", fixed = TRUE)
+  expect_match(client, "CBViewWire.unpackCells(buffer)", fixed = TRUE)
+  expect_match(client, "coordviews_wire_supported", fixed = TRUE)
+  expect_match(client, "coordviews_wire_fallback", fixed = TRUE)
+  expect_equal(
+    sum(gregexpr("coordviews_wire_supported", client, fixed = TRUE)[[1L]] > 0),
+    1L
+  )
+})
+
 test_that("saved per-gene panels use the dynamic payload contract", {
   skip_if_not(have_bundle, "coordinated_views/bundle.R not found")
 
@@ -596,6 +685,128 @@ test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
   expect_match(as_json(bundle$cells), "^\\[")
   expect_match(as_json(projection$x), "^\\[")
   expect_match(as_json(projection$y), "^\\[")
+})
+
+test_that("Linked views does not duplicate immutable bundle data", {
+  skip_if_not(have_bundle)
+  cells <- c("c1", "c2")
+  metadata <- data.frame(
+    cell_barcode = cells,
+    cluster = c("A", "B"),
+    row.names = cells,
+    stringsAsFactors = FALSE
+  )
+  crb <- list(
+    getMetaData = function() metadata,
+    getGroups = function() "cluster",
+    getParameters = function() list(main_group = "cluster"),
+    availableProjections = function() "umap",
+    getProjection = function(name) {
+      matrix(1:4, nrow = 2, dimnames = list(cells, c("x", "y")))
+    },
+    availableSpatial = function() NULL,
+    getTrekker = function() NULL,
+    getImmuneRepertoire = function() NULL,
+    getGeneNames = function() character()
+  )
+
+  bundle <- cv_env$cv_build_bundle(crb)
+  expression_space <- bundle$spaces[[which(
+    vapply(bundle$spaces, `[[`, character(1), "id") == "umap"
+  )]]
+
+  expect_true(all(c("x", "y") %in% names(bundle$projections$umap)))
+  expect_false(any(c("x", "y", "z") %in% names(expression_space)))
+  expect_null(bundle$cell_fingerprint)
+})
+
+test_that("Linked views reuses the saved-view fingerprint", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(
+    server,
+    "b$dataset_fingerprint <- cv_saved_view_dataset()$fingerprint",
+    fixed = TRUE
+  )
+  expect_match(server, "dataset$cell_fingerprint", fixed = TRUE)
+  expect_false(grepl(
+    "dataset$crb_schema$cell_fingerprint",
+    server,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)",
+    server,
+    fixed = TRUE
+  ))
+})
+
+test_that("saved-view startup identity does not materialize cell names", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(server, "cv_saved_view_identity <- reactive({", fixed = TRUE)
+  expect_match(server, "cell_count = getNumberOfCells()", fixed = TRUE)
+  expect_match(
+    server,
+    "identity <- cv_saved_view_identity()",
+    fixed = TRUE
+  )
+  expect_match(
+    server,
+    "req(cv_saved_view_identity()$cell_count >= 200000L)",
+    fixed = TRUE
+  )
+})
+
+test_that("colour observation starts only after a bundle is sent", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  sent <- regexpr(
+    "coordviews_build_log$sent_n <- coordviews_build_log$n",
+    server,
+    fixed = TRUE
+  )[[1]]
+  observer <- regexpr(
+    "if (!isTRUE(coordviews_build_log$color_observer_started))",
+    server,
+    fixed = TRUE
+  )[[1]]
+
+  expect_gt(sent, 0)
+  expect_gt(observer, sent)
+})
+
+test_that("large-dataset work stays off the initial response", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
+
+  expect_match(server, "session$onFlushed(", fixed = TRUE)
+  expect_match(server, "later::later(", fixed = TRUE)
+  expect_match(server, "isolate(coordviews_bundle())", fixed = TRUE)
+  expect_match(
+    server,
+    "coordviews_background_ready <- reactiveVal(FALSE)",
+    fixed = TRUE
+  )
+  expect_match(
+    server,
+    paste0(
+      "coordviews_background_ready\\(\\) &&\\s+",
+      "coordviews_visible\\(\\) &&\\s+cv_has_expression\\(\\)"
+    )
+  )
 })
 
 test_that("bundle cell identity falls back to metadata row names", {
@@ -709,12 +920,8 @@ test_that("hidden palette changes are replayed without rebuilding data", {
   server <- paste(readLines(server_file, warn = FALSE), collapse = "\n")
 
   expect_match(server, "cv_apply_color_patch(", fixed = TRUE)
-  expect_match(server, "coordviews_build_log$sent_n == 0", fixed = TRUE)
-  expect_match(
-    server,
-    'session$sendCustomMessage("coordviews_colors"',
-    fixed = TRUE
-  )
+  expect_match(server, "color_observer_started", fixed = TRUE)
+  expect_match(server, '"coordviews_colors"', fixed = TRUE)
 })
 
 ## A minimal but realistically-shaped IR table: the CT* columns spell out chain
@@ -1224,7 +1431,7 @@ test_that("both pages give a clone the same size", {
   skip_if_not(have_bundle)
   skip_if_not(nzchar(tcr_crb) && file.exists(tcr_crb))
 
-  crb <- readRDS(tcr_crb)
+  crb <- readCerebro(tcr_crb)
   md <- crb$getMetaData()
   cells <- as.character(md$cell_barcode)
   ir <- crb$getImmuneRepertoire()
@@ -1342,7 +1549,7 @@ test_that("the trekker bundle carries what a placement is judged on", {
   skip_if_not(have_bundle)
   skip_if_not(file.exists(trekker_crb))
 
-  b <- cv_env$cv_build_bundle(readRDS(trekker_crb))
+  b <- cv_env$cv_build_bundle(readCerebro(trekker_crb))
   expect_false(is.null(b$trekker))
 
   ## position_confidence is a FIELD -- a colouring -- so the card reads it from
@@ -1843,7 +2050,7 @@ test_that("bundling two images of the same basename keeps both", {
   crb_two <- file.path(tmp, "demo-two.crb")
   file.copy(example, crb_one, overwrite = TRUE)
   file.copy(example, crb_two, overwrite = TRUE)
-  spatial_name <- readRDS(crb_one)$availableSpatial()[[1L]]
+  spatial_name <- readCerebro(crb_one)$availableSpatial()[[1L]]
   app_dir <- file.path(tmp, "app")
   createShinyApp(
     cerebro_data = c("ds one" = crb_one, "ds two" = crb_two),

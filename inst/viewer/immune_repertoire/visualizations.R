@@ -519,7 +519,7 @@ ir_clonalUMAP_projection_ui <- function() {
 ## shared renderer consumes. Runs only when no
 ## grouping column is chosen (the faceted variant uses the static ggplot below).
 observe({
-  input[["ir_clonalUMAP_projection_render_request"]]
+  req(input[["ir_clonalUMAP_projection_render_request"]])
   group_by <- ir_param("ir_p_umap_group_by", "")
   ## Faceting is handled by the static ggplot path; nothing to push here.
   if (!is.null(group_by) && nzchar(group_by)) {

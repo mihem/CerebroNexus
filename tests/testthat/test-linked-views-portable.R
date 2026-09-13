@@ -198,12 +198,29 @@ test_that("cell identity validation is unique and order-independent", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())
   sys.source(file.path(root, "coordinated_views", "bundle.R"), envir = helpers)
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
 
   expect_error(helpers$cv_cell_ids(c("cell-1", "cell-1")), "duplicate")
   expect_error(helpers$cv_cell_ids(c("cell-1", "")), "missing")
   expect_identical(
-    helpers$cv_cell_fingerprint(c("cell-2", "cell-1")),
-    helpers$cv_cell_fingerprint(c("cell-1", "cell-2"))
+    helpers$cv_config_cell_fingerprint(c("cell-2", "cell-1")),
+    helpers$cv_config_cell_fingerprint(c("cell-1", "cell-2"))
+  )
+})
+
+test_that("stored cell fingerprints bypass runtime hashing", {
+  root <- system.file("viewer", package = "CerebroNexus")
+  helpers <- new.env(parent = globalenv())
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
+  stored <- paste0("md5-cell-set-v1:", paste(rep("a", 32L), collapse = ""))
+
+  expect_identical(
+    helpers$cv_config_dataset_fingerprint(c("cell-1", "cell-2"), stored),
+    stored
+  )
+  expect_identical(
+    helpers$cv_config_dataset_fingerprint(c("cell-2", "cell-1"), NULL),
+    helpers$cv_config_cell_fingerprint(c("cell-1", "cell-2"))
   )
 })
 

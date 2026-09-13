@@ -9,6 +9,7 @@
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
+  req(trajectory_projection_sent())
   req(
     input[["trajectory_selected_method"]],
     input[["trajectory_selected_name"]]
@@ -103,8 +104,7 @@ output[[
     trajectory_data <- trajectory_data_reactive()
 
     ## extract cells to plot
-    cells_df <- mergeTrajectoryWithMetaData(trajectory_data) %>%
-      dplyr::filter(!is.na(pseudotime))
+    cells_df <- trajectory_cells_reactive()
 
     incProgress(0.2, detail = "Processing data...")
 

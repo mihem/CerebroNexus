@@ -1,0 +1,5 @@
+metric	scale	v1_ms	v2_ms	time_change_pct	v1_alloc_mib	v2_alloc_mib	alloc_change_pct	check
+single-gene expression	1 gene x 1,000,000 cells	3982	194	-95.1281	141.8899	92.2983	-34.9508	equal
+RGB expression	3 genes x 1,000,000 cells	3984	202	-94.9297	165.0294	115.4378	-30.0502	equal
+multi-panel expression	9 genes x 1,000,000 cells	3970	231	-94.1814	275.4970	225.9053	-18.0008	equal
+mean expression	100 genes x 1,000,000 cells	3748	55	-98.5326	65.4294	65.4294	0	equal

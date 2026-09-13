@@ -254,10 +254,10 @@ test_that("legends use one scrolling row outside the visualization", {
 
   hla <- source_expressions("hla_tcr_motifs/UI.R")
   hla_tab <- find_call_by_class(hla, "hla-motif-tab")
-  hla_plot <- find_call_by_class(hla, "hla-plot-wrap")
   expect_true(contains_call(hla_tab, "uiOutput", "hla_legend_ui"))
-  expect_false(contains_call(hla_plot, "uiOutput", "hla_legend_ui"))
-  expect_true(contains_call(hla_plot, "hlaMotifModebar"))
+  expect_true(
+    contains_call(hla_tab, "cerebroCellViewOutput", "hla_motif_network")
+  )
 
   css <- paste(
     c(

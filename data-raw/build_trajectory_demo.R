@@ -31,7 +31,7 @@ crb_path <- Sys.getenv(
 )
 
 message("Reading ", crb_path)
-crb <- readRDS(crb_path)
+crb <- readCerebro(crb_path)
 
 md <- crb$getMetaData()
 stopifnot("cell_type" %in% colnames(md))

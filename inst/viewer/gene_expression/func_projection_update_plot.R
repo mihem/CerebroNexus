@@ -6,7 +6,7 @@ expression_projection_update_plot <- function(input) {
   plot_parameters <- input[['plot_parameters']]
   color_settings <- input[['color_settings']]
   selection_keys <- input[['selection_keys']]
-  hover_info <- input[['hover_info']]
+  hover_columns <- input[['hover_columns']]
   trajectory <- input[['trajectory']]
   display_mode <- input[['display_mode']]
   separate_panels <- input[['separate_panels']]
@@ -15,24 +15,6 @@ expression_projection_update_plot <- function(input) {
     draw_border = isTRUE(plot_parameters[["draw_border"]]),
     keep_square = isTRUE(plot_parameters[["keep_square"]])
   )
-  ## sort cells based on expression (if applicable)
-  if (
-    plot_parameters[['plot_order']] == 'Highest expression on top' &&
-      separate_panels == FALSE &&
-      !identical(display_mode, "rgb")
-  ) {
-    cell_order <- order(expression_levels)
-    coordinates <- coordinates[cell_order, ]
-    selection_keys <- selection_keys[cell_order]
-    hover_info <- hover_info[cell_order]
-    if (is.list(expression_levels)) {
-      for (i in seq_along(expression_levels)) {
-        expression_levels[[i]] <- expression_levels[[i]][cell_order]
-      }
-    } else {
-      expression_levels <- expression_levels[cell_order]
-    }
-  }
   ## define output_data
   output_data <- list(
     x = coordinates[[1]],
@@ -44,6 +26,13 @@ expression_projection_update_plot <- function(input) {
     point_line = list(),
     x_range = plot_parameters[["x_range"]],
     y_range = plot_parameters[["y_range"]],
+    paint_order = if (
+      identical(plot_parameters[["plot_order"]], "Highest expression on top")
+    ) {
+      "highest"
+    } else {
+      "natural"
+    },
     reset_axes = reset_axes
   )
   if (plot_parameters[["draw_border"]]) {
@@ -73,28 +62,33 @@ expression_projection_update_plot <- function(input) {
   ## prepare hover info
   output_hover <- list(
     hoverinfo = ifelse(plot_parameters[["hover_info"]], 'text', 'skip'),
-    text = 'empty'
+    text = list(),
+    columns = hover_columns
   )
-  if (plot_parameters[["hover_info"]]) {
-    output_hover[['text']] <- unname(hover_info)
-  }
   ## process trajectory data
   trajectory_lines <- list()
   if (plot_parameters[['is_trajectory']]) {
-    ## fix order of trajectory meta data if cells are sorted by expression
-    if (
-      plot_parameters[['plot_order']] == 'Highest expression on top' &&
-        separate_panels == FALSE &&
-        !identical(display_mode, "rgb")
-    ) {
-      trajectory[['meta']] <- trajectory[['meta']][cell_order, ]
-    }
-    ## add additional info to hover info
+    ## Add trajectory values as compact columns; the browser formats only the
+    ## cell actually under the pointer.
     if (plot_parameters[['hover_info']]) {
-      output_hover[['text']] <- glue::glue(
-        "{output_hover[['text']]}<br>",
-        "<b>State</b>: {trajectory[['meta']]$state}<br>",
-        "<b>Pseudotime</b>: {formatC(trajectory[['meta']]$pseudotime, format = 'f', digits = 2)}"
+      states <- as.character(trajectory[['meta']]$state)
+      states[is.na(states)] <- "NA"
+      state_levels <- unique(states)
+      output_hover$columns <- c(
+        output_hover$columns,
+        list(
+          list(
+            label = "State",
+            levels = state_levels,
+            values = match(states, state_levels) - 1L
+          ),
+          list(
+            label = "Pseudotime",
+            format = "fixed",
+            digits = 2L,
+            values = as.numeric(trajectory[['meta']]$pseudotime)
+          )
+        )
       )
     }
     ## convert trajectory edges to the shared renderer's shape format

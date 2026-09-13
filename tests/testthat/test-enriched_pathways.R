@@ -24,7 +24,7 @@ test_that("enriched_pathways UI defines correct tabName", {
 
 test_that("example.crb enriched_pathways class methods work", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   methods <- crb$getMethodsForEnrichedPathways()
   expect_true(is.character(methods))
   expect_true(length(methods) >= 2)
@@ -32,7 +32,7 @@ test_that("example.crb enriched_pathways class methods work", {
 
 test_that("enriched_pathways seurat_enrichr returns real data", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   gse_groups <- crb$getGroupsWithEnrichedPathways("cerebro_seurat_enrichr")
   expect_true(is.character(gse_groups))
   expect_true(length(gse_groups) > 0)
@@ -43,7 +43,7 @@ test_that("enriched_pathways seurat_enrichr returns real data", {
 
 test_that("getMethodsWithEnrichedPathways class method exists", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   has_with <- is.function(crb$getMethodsWithEnrichedPathways)
   has_for <- is.function(crb$getMethodsForEnrichedPathways)
   expect_true(has_with || has_for)

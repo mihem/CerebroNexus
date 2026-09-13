@@ -85,7 +85,7 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(ui, 'cerebroSelectionStatus(', fixed = TRUE)
   expect_match(ui, '"hla_motif_network"', fixed = TRUE)
   expect_match(visual, "node_key", fixed = TRUE)
-  expect_match(visual, "handleNativeSelection", fixed = TRUE)
+  expect_match(visual, "cerebroCellViewRender(", fixed = TRUE)
   expect_match(server, "hla_motif_selected_keys", fixed = TRUE)
   expect_match(server, "hla_motif_selection_command", fixed = TRUE)
   expect_match(server, "node_keys = I(keys)", fixed = TRUE)

@@ -62,6 +62,49 @@ authorized_spatial_image_path <- function(
   image_path
 }
 
+spatialBackgroundDataUri <- local({
+  cache <- new.env(parent = emptyenv())
+  function(path, encode = NULL) {
+    info <- file.info(path)
+    if (is.na(info$size) || is.na(info$mtime)) {
+      return(NULL)
+    }
+    version <- paste(info$size, sprintf("%.9f", as.numeric(info$mtime)))
+    cached <- get0(path, envir = cache, inherits = FALSE)
+    if (!is.null(cached) && identical(cached$version, version)) {
+      return(cached$value)
+    }
+    if (is.null(encode)) {
+      if (!requireNamespace("base64enc", quietly = TRUE)) {
+        warning(
+          "[spatial] base64enc package not available, cannot encode background image"
+        )
+        return(NULL)
+      }
+      encode <- base64enc::base64encode
+    }
+    mime_type <- switch(
+      tolower(tools::file_ext(path)),
+      "jpg" = "image/jpeg",
+      "jpeg" = "image/jpeg",
+      "png" = "image/png",
+      "svg" = "image/svg+xml",
+      "image/jpeg"
+    )
+    value <- tryCatch(
+      paste0("data:", mime_type, ";base64,", encode(path)),
+      error = function(error) {
+        warning("[spatial] Failed to encode background image: ", error$message)
+        NULL
+      }
+    )
+    if (!is.null(value)) {
+      assign(path, list(version = version, value = value), envir = cache)
+    }
+    value
+  }
+})
+
 spatial_projection_update_plot <- function(input) {
   ## assign input data to new variables
   metadata <- input[['cells_df']]
@@ -69,7 +112,7 @@ spatial_projection_update_plot <- function(input) {
   reset_axes <- input[['reset_axes']]
   plot_parameters <- input[['plot_parameters']]
   color_assignments <- input[['color_assignments']]
-  hover_info <- input[['hover_info']]
+  hover_columns <- input[['hover_columns']]
 
   color_variable <- plot_parameters[['color_variable']]
   color_input <- metadata[[color_variable]]
@@ -141,8 +184,6 @@ spatial_projection_update_plot <- function(input) {
       # Calculate bounds from coordinates
       x_rng <- range(coordinates[[1]], na.rm = TRUE)
       y_rng <- range(coordinates[[2]], na.rm = TRUE)
-      ext <- tolower(tools::file_ext(img_path))
-
       explicit_bounds <- selected_background$bounds
       if (is.null(explicit_bounds)) {
         explicit_bounds <- list(
@@ -159,36 +200,7 @@ spatial_projection_update_plot <- function(input) {
         ymax = explicit_bounds[["ymax"]]
       )
 
-      # Encode the image for the shared Canvas renderer.
-      mime_type <- switch(
-        ext,
-        "jpg" = "image/jpeg",
-        "jpeg" = "image/jpeg",
-        "png" = "image/png",
-        "svg" = "image/svg+xml",
-        "image/jpeg"
-      )
-
-      tryCatch(
-        {
-          if (requireNamespace("base64enc", quietly = TRUE)) {
-            encoded <- base64enc::base64encode(img_path)
-            background_image_data <- paste0(
-              "data:",
-              mime_type,
-              ";base64,",
-              encoded
-            )
-          } else {
-            warning(
-              "[spatial] base64enc package not available, cannot encode background image"
-            )
-          }
-        },
-        error = function(e) {
-          warning("[spatial] Failed to encode background image: ", e$message)
-        }
-      )
+      background_image_data <- spatialBackgroundDataUri(img_path)
     }
   }
 
@@ -297,11 +309,8 @@ spatial_projection_update_plot <- function(input) {
     )
     output_hover <- list(
       hoverinfo = if (plot_parameters[["hover_info"]]) "text" else "skip",
-      text = if (plot_parameters[["hover_info"]]) {
-        unname(hover_info)
-      } else {
-        "empty"
-      }
+      text = list(),
+      columns = hover_columns
     )
     cerebroCellViewRender(
       "spatial_projection",
@@ -328,7 +337,7 @@ spatial_projection_update_plot <- function(input) {
     reset_axes = reset_axes,
     n_dimensions = n_dimensions,
     color_assignments = color_assignments,
-    hover_info = hover_info,
+    hover_columns = hover_columns,
     hover = plot_parameters[["hover_info"]],
     space_label = plot_parameters[["projection"]]
   )
@@ -340,11 +349,7 @@ spatial_projection_update_plot <- function(input) {
       n_dimensions == 2 &&
       isTRUE(plot_parameters[["show_region_outlines"]])
   ) {
-    hulls <- compute_group_hulls(
-      coordinates[[1]],
-      coordinates[[2]],
-      as.character(color_input)
-    )
+    hulls <- input[["group_hulls"]]
     present <- intersect(names(hulls), names(color_assignments))
     output_hulls <- list(
       x = unname(lapply(hulls[present], `[[`, "x")),

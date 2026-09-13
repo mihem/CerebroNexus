@@ -19,6 +19,7 @@ convertSeuratToCerebro(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
   cell_cycle = NULL,
@@ -87,6 +88,10 @@ re-resolves both backends relative to the \code{.crb}'s parent
 directory, so packaging the \code{.crb} with its sibling
 \code{<stem>.bpcells/} or \code{<stem>.h5} together is enough for
 portable deployment.}
+
+\item{codec}{Serialization codec for the CRB payload. Defaults to
+\code{"qs2"}; use \code{"rds"} when direct compatibility with
+\code{readRDS()} is required.}
 
 \item{spatial_images}{Optional manifest in
 \code{spatial entry -> image label -> path} form. Spatial-entry names must

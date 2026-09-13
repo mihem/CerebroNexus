@@ -21,6 +21,10 @@ source(
   paste0(Cerebro.options[["cerebro_root"]], "/viewer/color_config.R"),
   local = TRUE
 )
+source(
+  paste0(Cerebro.options[["cerebro_root"]], "/viewer/source_cache.R"),
+  local = TRUE
+)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -31,6 +35,14 @@ source(
 .msigdb_process_cache <- new.env(parent = emptyenv())
 
 server <- function(input, output, session) {
+  source <- function(file, local = FALSE, ...) {
+    dots <- list(...)
+    if (identical(local, TRUE) && !length(dots)) {
+      return(viewerSource(file, parent.frame()))
+    }
+    base::source(file, local = local, ...)
+  }
+
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
   ##--------------------------------------------------------------------------##
@@ -44,6 +56,22 @@ server <- function(input, output, session) {
       "/viewer/utility_functions.R"
     ),
     local = TRUE
+  )
+  observeEvent(
+    input[["cell_view_aux_request"]],
+    {
+      request <- input[["cell_view_aux_request"]]
+      req(is.list(request), request$id, request$wire_token)
+      key <- paste(request$id, request$wire_token, sep = ":")
+      message <- .cerebro_cell_view_aux_pending[[key]]
+      req(!is.null(message))
+      rm(list = key, envir = .cerebro_cell_view_aux_pending)
+      session$sendBinaryMessage(
+        "cell_view_aux_binary",
+        cv_wire_pack_message(message)
+      )
+    },
+    ignoreInit = TRUE
   )
   source(
     paste0(
@@ -80,6 +108,40 @@ server <- function(input, output, session) {
       TRUE
     )
   )
+
+  ## Outputs inside collapsed boxes may stay active, but only after their
+  ## owning sidebar page has been visited once.
+  viewer_hidden_output_options <- list()
+  viewer_enabled_output_tabs <- character()
+  outputOptions <- function(output, x, ...) {
+    options <- list(...)
+    owner <- viewerOutputTab(x)
+    if (
+      identical(options$suspendWhenHidden, FALSE) &&
+        !is.na(owner) &&
+        !owner %in% viewer_enabled_output_tabs
+    ) {
+      viewer_hidden_output_options[[x]] <<- options
+      return(invisible(NULL))
+    }
+    do.call(shiny::outputOptions, c(list(x = output, name = x), options))
+  }
+  observeEvent(input[["sidebar"]], {
+    tab <- input[["sidebar"]]
+    viewer_enabled_output_tabs <<- union(viewer_enabled_output_tabs, tab)
+    ids <- names(viewer_hidden_output_options)
+    ids <- ids[viewerOutputTab(ids) == tab]
+    for (id in ids) {
+      do.call(
+        shiny::outputOptions,
+        c(
+          list(x = output, name = id),
+          viewer_hidden_output_options[[id]]
+        )
+      )
+      viewer_hidden_output_options[[id]] <<- NULL
+    }
+  })
 
   viewer_initial_page_tabs <- c(
     data_info = "loadData",
@@ -364,14 +426,20 @@ server <- function(input, output, session) {
         configured_paths
       )
     }
-    ## log message
-    message(data$print())
-    ## check if 'expression' slot exists and print log message with its format
-    ## if it does
-    if (!is.null(data$expression)) {
+    expression_is_deferred <- is.environment(data) &&
+      exists("expression", envir = data, inherits = FALSE) &&
+      isTRUE(rlang::env_binding_are_lazy(data, "expression"))
+    if (expression_is_deferred) {
       print(glue::glue(
-        "[{Sys.time()}] Format of expression data: {class(data$expression)}"
+        "[{Sys.time()}] Data loaded; expression backend will attach on first use."
       ))
+    } else {
+      message(data$print())
+      if (!is.null(data$expression)) {
+        print(glue::glue(
+          "[{Sys.time()}] Format of expression data: {class(data$expression)}"
+        ))
+      }
     }
     ## return loaded data
     return(data)
@@ -498,51 +566,10 @@ server <- function(input, output, session) {
   source(
     paste0(
       Cerebro.options[["cerebro_root"]],
-      "/viewer/marker_genes/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
       "/viewer/gene_expression/server.R"
     ),
     local = TRUE
   )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/gene_id_conversion/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/color_management/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/about/server.R"),
-    local = TRUE
-  )
-  ## Enhanced module servers.
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/most_expressed_genes/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/enriched_pathways/server.R"
-    ),
-    local = TRUE
-  )
-
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
@@ -621,20 +648,12 @@ server <- function(input, output, session) {
     ## is NOT required — the motif network works without it, and the Data & QC
     ## tab is where a user would add HLA, so the page must be reachable first.
     ##
-    ## hla_detect_chains(), not the IR module's detect_chains(): the latter only
-    ## scans the first three samples, so a cohort whose TCR data starts at sample
-    ## four would hide this page while the core underneath could analyse it
-    ## perfectly well — and the page is the only way to reach Data & QC, so there
-    ## would be no way in. The gate has to agree with what the page can do.
-    ## Bound into this scope by the module's core_shim, which is sourced before
-    ## this closure is ever evaluated.
+    ## The lightweight gate scans every sample; the older IR page helper stops
+    ## after three and could hide a valid cohort whose TCR starts at sample four.
     function() {
-      any(
-        tryCatch(
-          hla_detect_chains(getImmuneRepertoire()),
-          error = function(e) character(0)
-        ) %in%
-          c("TRA", "TRB")
+      tryCatch(
+        viewerHasTcrRepertoire(getImmuneRepertoire()),
+        error = function(e) FALSE
       )
     }
   )
@@ -656,55 +675,50 @@ server <- function(input, output, session) {
   if (length(new_pngs) > 0) {
     file.remove(new_pngs)
   }
+  source(
+    paste0(Cerebro.options[["cerebro_root"]], "/viewer/spatial/server.R"),
+    local = TRUE
+  )
 
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/extra_material/server.R"
-    ),
-    local = TRUE
+  deferred_viewer_server_files <- c(
+    "marker_genes/server.R",
+    "gene_id_conversion/server.R",
+    "color_management/server.R",
+    "about/server.R",
+    "most_expressed_genes/server.R",
+    "enriched_pathways/server.R",
+    "extra_material/server.R",
+    "immune_repertoire/server.R",
+    "trajectory/server.R",
+    "trekker/server.R",
+    "coordinated_views/server.R",
+    "hla_tcr_motifs/server.R"
   )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/immune_repertoire/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/trajectory/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/spatial/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/trekker/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/coordinated_views/server.R"
-    ),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/hla_tcr_motifs/server.R"
-    ),
-    local = TRUE
+  server_scope <- environment()
+  session$onFlushed(
+    function() {
+      later::later(
+        function() {
+          if (session$isClosed()) {
+            return()
+          }
+          withReactiveDomain(session, {
+            for (server_file in deferred_viewer_server_files) {
+              sys.source(
+                file.path(
+                  Cerebro.options[["cerebro_root"]],
+                  "viewer",
+                  server_file
+                ),
+                envir = server_scope
+              )
+            }
+          })
+        },
+        delay = 0.1
+      )
+    },
+    once = TRUE
   )
 
   ##--------------------------------------------------------------------------##

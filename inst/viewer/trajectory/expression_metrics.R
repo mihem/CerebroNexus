@@ -14,6 +14,7 @@
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_expression_metrics_UI"]] <- renderUI({
+  req(trajectory_projection_sent())
   ##
   req(trajectory_selection_ok())
 
@@ -97,11 +98,7 @@ output[["trajectory_states_nUMI_plot"]] <- plotly::renderPlotly({
   req(trajectory_selection_ok())
 
   ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-  trajectory_data <- trajectory_data[["meta"]]
+  trajectory_data <- trajectory_data_reactive()[["meta"]]
 
   ##
   state_colors <- setNames(
@@ -111,7 +108,7 @@ output[["trajectory_states_nUMI_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
+    table = trajectory_cells_reactive(),
     metric = "nUMI",
     coloring_variable = "state",
     colors = state_colors,
@@ -147,11 +144,7 @@ output[["trajectory_states_nGene_plot"]] <- plotly::renderPlotly({
   req(trajectory_selection_ok())
 
   ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-  trajectory_data <- trajectory_data[["meta"]]
+  trajectory_data <- trajectory_data_reactive()[["meta"]]
 
   ##
   state_colors <- setNames(
@@ -161,7 +154,7 @@ output[["trajectory_states_nGene_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
+    table = trajectory_cells_reactive(),
     metric = "nGene",
     coloring_variable = "state",
     colors = state_colors,
@@ -200,11 +193,7 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
   req(mito_col)
 
   ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-  trajectory_data <- trajectory_data[["meta"]]
+  trajectory_data <- trajectory_data_reactive()[["meta"]]
 
   ##
   state_colors <- setNames(
@@ -214,7 +203,7 @@ output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
+    table = trajectory_cells_reactive(),
     metric = mito_col,
     coloring_variable = "state",
     colors = state_colors,
@@ -253,11 +242,7 @@ output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
   req(ribo_col)
 
   ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-  trajectory_data <- trajectory_data[["meta"]]
+  trajectory_data <- trajectory_data_reactive()[["meta"]]
 
   ##
   state_colors <- setNames(
@@ -267,7 +252,7 @@ output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
+    table = trajectory_cells_reactive(),
     metric = ribo_col,
     coloring_variable = "state",
     colors = state_colors,
@@ -306,11 +291,7 @@ output[["trajectory_states_percent_ery_plot"]] <- plotly::renderPlotly({
   req(ery_col)
 
   ## collect trajectory data
-  trajectory_data <- getTrajectory(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
-  )
-  trajectory_data <- trajectory_data[["meta"]]
+  trajectory_data <- trajectory_data_reactive()[["meta"]]
 
   ##
   state_colors <- setNames(
@@ -320,7 +301,7 @@ output[["trajectory_states_percent_ery_plot"]] <- plotly::renderPlotly({
 
   ##
   plotlyViolin(
-    table = mergeTrajectoryWithMetaData(list(meta = trajectory_data)),
+    table = trajectory_cells_reactive(),
     metric = ery_col,
     coloring_variable = "state",
     colors = state_colors,
