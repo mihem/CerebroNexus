@@ -1,3 +1,22 @@
+# CerebroNexus 4.5.1
+
+## Performance
+
+- Viewer filtering, sampling, expression access, and mean calculations avoid unnecessary dense copies while preserving sparse and on-disk backends.
+- Projection, gene-expression, and Spatial paths retain canonical cell indices through backend reads instead of matching up to one million barcodes back to the same matrix columns.
+- A reproducible 1M-cell benchmark separates PR #165 CRB lifecycle gains from Thin CRB and backend hot-path gains, records canonical-index lookup separately, and reports wall time and R allocation for all three stages.
+- Shuffled external-backend reads use storage order internally and restore the requested Viewer order afterward.
+- Linked Views bundles reuse the session cell fingerprint and avoid serializing duplicate projection coordinates.
+- Viewer expression reads retain canonical indices for current CRBs and fall back to barcodes for serialized legacy accessors.
+
+# CerebroNexus 4.5.0
+
+## Data format and I/O
+
+- New `saveCerebro()`, `readCerebro()`, and `convertCerebro()` APIs support codec-independent `.crb` files, automatically read legacy RDS and thin RDS/qs2 CRBs, and use qs2 by default for new files.
+- BPCells-backed thin CRBs omit duplicated cell indexes, projection row names, and live expression handles while validating the shared sidecar checksum during hydration.
+- The reproducible one-million-cell benchmark records source-to-artifact processing, physical file layouts, host and package versions, and comparisons against PR #165.
+
 # CerebroNexus 4.4.3
 
 ## Viewer

@@ -575,7 +575,6 @@ ui <- dashboardPage(
       cerebro_js("settings_drawer.js", defer = TRUE),
       cerebro_js("specialist-view-state.js", defer = TRUE)
     ),
-    tags$script(HTML('$("body").addClass("fixed");')),
     tabItems(
       tab_load_data,
       tab_overview,

@@ -70,7 +70,7 @@ test_that("legacy H5 guidance persists a portable backend descriptor", {
   expect_silent(eval(save_expression, envir = evaluation))
   expect_true(file.exists(evaluation$crb_output))
 
-  saved <- readRDS(evaluation$crb_output)
+  saved <- .readCerebroPayload(evaluation$crb_output)
   backend <- saved$getExpressionBackend()
   expect_null(saved$expression)
   expect_identical(

@@ -80,6 +80,7 @@ rix(
     "pbapply",
     "plotly",
     "qvalue",
+    "qs2",
     "R6",
     "readxl",
     "rlang",

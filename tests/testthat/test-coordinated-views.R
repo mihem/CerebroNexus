@@ -598,6 +598,58 @@ test_that("single-cell projections and bundle cell IDs stay JSON arrays", {
   expect_match(as_json(projection$y), "^\\[")
 })
 
+test_that("Linked views does not duplicate immutable bundle data", {
+  skip_if_not(have_bundle)
+  cells <- c("c1", "c2")
+  metadata <- data.frame(
+    cell_barcode = cells,
+    cluster = c("A", "B"),
+    row.names = cells,
+    stringsAsFactors = FALSE
+  )
+  crb <- list(
+    getMetaData = function() metadata,
+    getGroups = function() "cluster",
+    getParameters = function() list(main_group = "cluster"),
+    availableProjections = function() "umap",
+    getProjection = function(name) {
+      matrix(1:4, nrow = 2, dimnames = list(cells, c("x", "y")))
+    },
+    availableSpatial = function() NULL,
+    getTrekker = function() NULL,
+    getImmuneRepertoire = function() NULL,
+    getGeneNames = function() character()
+  )
+
+  bundle <- cv_env$cv_build_bundle(crb)
+  expression_space <- bundle$spaces[[which(
+    vapply(bundle$spaces, `[[`, character(1), "id") == "umap"
+  )]]
+
+  expect_true(all(c("x", "y") %in% names(bundle$projections$umap)))
+  expect_false(any(c("x", "y", "z") %in% names(expression_space)))
+  expect_null(bundle$cell_fingerprint)
+})
+
+test_that("Linked views reuses the saved-view fingerprint", {
+  server_file <- file.path(dirname(bundle_file), "server.R")
+  server <- paste(
+    readLines(server_file, warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(
+    server,
+    "b$dataset_fingerprint <- cv_saved_view_dataset()$fingerprint",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)",
+    server,
+    fixed = TRUE
+  ))
+})
+
 test_that("bundle cell identity falls back to metadata row names", {
   skip_if_not(have_bundle)
   cells <- c("c1", "c2")
@@ -1224,7 +1276,7 @@ test_that("both pages give a clone the same size", {
   skip_if_not(have_bundle)
   skip_if_not(nzchar(tcr_crb) && file.exists(tcr_crb))
 
-  crb <- readRDS(tcr_crb)
+  crb <- readCerebro(tcr_crb)
   md <- crb$getMetaData()
   cells <- as.character(md$cell_barcode)
   ir <- crb$getImmuneRepertoire()
@@ -1342,7 +1394,7 @@ test_that("the trekker bundle carries what a placement is judged on", {
   skip_if_not(have_bundle)
   skip_if_not(file.exists(trekker_crb))
 
-  b <- cv_env$cv_build_bundle(readRDS(trekker_crb))
+  b <- cv_env$cv_build_bundle(readCerebro(trekker_crb))
   expect_false(is.null(b$trekker))
 
   ## position_confidence is a FIELD -- a colouring -- so the card reads it from
@@ -1843,7 +1895,7 @@ test_that("bundling two images of the same basename keeps both", {
   crb_two <- file.path(tmp, "demo-two.crb")
   file.copy(example, crb_one, overwrite = TRUE)
   file.copy(example, crb_two, overwrite = TRUE)
-  spatial_name <- readRDS(crb_one)$availableSpatial()[[1L]]
+  spatial_name <- readCerebro(crb_one)$availableSpatial()[[1L]]
   app_dir <- file.path(tmp, "app")
   createShinyApp(
     cerebro_data = c("ds one" = crb_one, "ds two" = crb_two),

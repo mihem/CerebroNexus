@@ -201,6 +201,181 @@ cachePlot <- function(x, ...) {
   }
 }
 
+## Apply the shared projection filters and sample original metadata row ids.
+viewerProjectionCellIndices <- function(prefix, metadata = getMetaData()) {
+  groups <- getGroups()
+  percentage <- input[[paste0(prefix, "_percentage_cells_to_show")]]
+  filters <- stats::setNames(
+    lapply(groups, function(group) {
+      value <- input[[paste0(prefix, "_group_filter_", group)]]
+      if (is.null(value)) character() else value
+    }),
+    groups
+  )
+  filters <- filters[
+    !vapply(
+      groups,
+      function(group) {
+        selected <- filters[[group]]
+        values <- metadata[[group]]
+        if (!is.factor(values) || !length(selected)) {
+          return(FALSE)
+        }
+        levels <- tryCatch(
+          as.character(getGroupLevels(group)),
+          error = function(error_condition) character()
+        )
+        length(selected) == length(levels) &&
+          setequal(base::levels(values), levels) &&
+          setequal(as.character(selected), levels) &&
+          !anyNA(values)
+      },
+      logical(1)
+    )
+  ]
+  if (!length(filters)) {
+    cell_count <- nrow(metadata)
+    if (!cell_count) {
+      return(integer())
+    }
+    if (percentage < 100) {
+      size <- ceiling(cell_count * percentage / 100)
+      return(sample.int(cell_count, size))
+    }
+    return(sample.int(cell_count))
+  }
+  indices <- which(cerebroGroupFilterMask(metadata, filters))
+  if (!length(indices)) {
+    return(indices)
+  }
+  size <- if (percentage < 100) {
+    ceiling(length(indices) * percentage / 100)
+  } else {
+    length(indices)
+  }
+  indices[sample.int(length(indices), size)]
+}
+
+## Prefer the R6 row accessor so a single-gene request never needs a temporary
+## 1 x cells matrix. Older serialized objects fall back to the matrix method.
+viewerExpressionCells <- function(data_set, cells) {
+  if (!is.numeric(cells)) {
+    return(cells)
+  }
+  accessor <- tryCatch(data_set$getExpressionRow, error = function(e) NULL)
+  if (!is.function(accessor)) {
+    accessor <- tryCatch(data_set$getExpressionMatrix, error = function(e) NULL)
+  }
+  method_env <- if (is.function(accessor)) environment(accessor) else NULL
+  if (
+    is.null(method_env) ||
+      !exists("private", envir = method_env, inherits = FALSE)
+  ) {
+    return(cells)
+  }
+  private <- get("private", envir = method_env, inherits = FALSE)
+  if (
+    is.function(tryCatch(
+      private$resolveExpressionCells,
+      error = function(e) NULL
+    ))
+  ) {
+    return(cells)
+  }
+  cell_names <- colnames(data_set$expression)
+  if (is.null(cell_names)) cells else cell_names[as.integer(cells)]
+}
+
+viewerExpressionRow <- function(data_set, cells, gene) {
+  cells <- viewerExpressionCells(data_set, cells)
+  cell_indices <- is.numeric(cells)
+  get_row <- tryCatch(data_set$getExpressionRow, error = function(e) NULL)
+  if (is.function(get_row)) {
+    return(as.numeric(get_row(gene = gene, cells = cells)))
+  }
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = gene
+  )
+  if (is.null(expression_matrix)) {
+    return(NULL)
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(as.numeric(expression_matrix))
+  }
+  row_index <- if (is.null(rownames(expression_matrix))) {
+    1L
+  } else {
+    match(gene, rownames(expression_matrix))
+  }
+  if (is.na(row_index)) {
+    return(NULL)
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (
+    cell_indices || is.null(cell_names) || identical(cells, cell_names)
+  ) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else {
+    match(cells, cell_names)
+  }
+  as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+}
+
+## Fetch several genes in one backend call and align every returned vector to
+## the requested cell order. Missing genes are omitted from the result.
+viewerExpressionValues <- function(data_set, cells, genes) {
+  cells <- viewerExpressionCells(data_set, cells)
+  cell_indices <- is.numeric(cells)
+  genes <- unique(as.character(unlist(genes, use.names = FALSE)))
+  genes <- genes[!is.na(genes) & nzchar(genes)]
+  if (!length(genes)) {
+    return(list())
+  }
+
+  if (length(genes) == 1L) {
+    value <- viewerExpressionRow(data_set, cells, genes[[1L]])
+    if (is.null(value)) {
+      return(list())
+    }
+    return(stats::setNames(list(value), genes))
+  }
+
+  expression_matrix <- data_set$getExpressionMatrix(
+    cells = cells,
+    genes = genes
+  )
+  if (is.null(expression_matrix)) {
+    return(list())
+  }
+  if (is.null(dim(expression_matrix))) {
+    return(list())
+  }
+
+  gene_names <- rownames(expression_matrix)
+  if (is.null(gene_names) && nrow(expression_matrix) == length(genes)) {
+    gene_names <- genes
+  }
+  cell_names <- colnames(expression_matrix)
+  cell_index <- if (cell_indices || is.null(cell_names)) {
+    seq_len(min(length(cells), ncol(expression_matrix)))
+  } else if (identical(cells, cell_names)) {
+    seq_along(cells)
+  } else {
+    match(cells, cell_names)
+  }
+
+  values <- lapply(genes, function(gene) {
+    row_index <- match(gene, gene_names)
+    if (is.na(row_index)) {
+      return(NULL)
+    }
+    as.numeric(expression_matrix[row_index, cell_index, drop = TRUE])
+  })
+  names(values) <- genes
+  values[!vapply(values, is.null, logical(1))]
+}
+
 cerebroCellViewMessage <- function(
   id,
   meta,
@@ -2018,10 +2193,19 @@ hasEryColumn <- function() {
   !is.null(getEryColumn())
 }
 ##----------------------------------------------------------------------------##
-## Cerebro file reader (.rds via readRDS).
+## Cerebro file reader (RDS or qs2 payload).
 ##----------------------------------------------------------------------------##
 read_cerebro_file <- function(file) {
-  readRDS(file)
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  magic <- readBin(connection, "raw", n = 4L)
+  if (!identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+    return(readRDS(file))
+  }
+  if (!requireNamespace("qs2", quietly = TRUE)) {
+    stop("A qs2 CRB requires the qs2 package.", call. = FALSE)
+  }
+  qs2::qs_read(file)
 }
 
 ##----------------------------------------------------------------------------##
@@ -2254,6 +2438,129 @@ get_or_load_crb <- function(
 ## Direct launches and uploads read only the ordinary expression_backend field;
 ## serialized getter code is never invoked by this internal loading path.
 ##----------------------------------------------------------------------------##
+.readRuntimeCrbSchema <- function(obj, crb_path) {
+  field <- "crb_schema"
+  if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
+    return(NULL)
+  }
+  if (
+    bindingIsActive(field, obj) ||
+      isTRUE(rlang::env_binding_are_lazy(obj, field))
+  ) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema <- obj[[field]]
+  if (is.null(schema)) {
+    return(NULL)
+  }
+  schema_names <- names(schema)
+  valid <- is.list(schema) &&
+    !is.data.frame(schema) &&
+    length(schema) == 4L &&
+    !is.null(schema_names) &&
+    !anyDuplicated(schema_names) &&
+    setequal(
+      schema_names,
+      c("version", "cell_names", "cell_names_md5", "projection_rownames")
+    ) &&
+    identical(schema$version, 1L) &&
+    identical(schema$cell_names, "expression") &&
+    is.character(schema$cell_names_md5) &&
+    length(schema$cell_names_md5) == 1L &&
+    !is.na(schema$cell_names_md5) &&
+    grepl("^[[:xdigit:]]{32}$", schema$cell_names_md5) &&
+    is.character(schema$projection_rownames) &&
+    !anyNA(schema$projection_rownames) &&
+    !any(!nzchar(schema$projection_rownames)) &&
+    !anyDuplicated(schema$projection_rownames)
+  if (!valid) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema
+}
+
+.bpcellsCellNamesChecksum <- function(sidecar) {
+  names_file <- file.path(sidecar, "col_names")
+  if (!file.exists(names_file) || dir.exists(names_file)) {
+    stop("The BPCells sidecar has no cell-name index.", call. = FALSE)
+  }
+  checksum <- unname(tools::md5sum(names_file))
+  if (length(checksum) != 1L || is.na(checksum) || !nzchar(checksum)) {
+    stop("Could not checksum the BPCells cell-name index.", call. = FALSE)
+  }
+  checksum
+}
+
+.hydrateThinCrb <- function(obj, crb_path, sidecar, schema) {
+  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
+    stop(
+      "The BPCells cell-name index does not match CRB '",
+      basename(crb_path),
+      "'.",
+      call. = FALSE
+    )
+  }
+  cells <- colnames(obj$expression)
+  metadata <- obj$meta_data
+  if (
+    !is.character(cells) ||
+      anyNA(cells) ||
+      any(!nzchar(cells)) ||
+      anyDuplicated(cells) ||
+      !is.data.frame(metadata) ||
+      nrow(metadata) != length(cells) ||
+      "cell_barcode" %in% names(metadata)
+  ) {
+    stop(
+      "The thin CRB and BPCells sidecar have incompatible cell metadata.",
+      call. = FALSE
+    )
+  }
+
+  missing_projections <- setdiff(
+    schema$projection_rownames,
+    names(obj$projections)
+  )
+  if (length(missing_projections)) {
+    stop(
+      "The thin CRB is missing projection '",
+      missing_projections[[1L]],
+      "'.",
+      call. = FALSE
+    )
+  }
+  for (name in schema$projection_rownames) {
+    projection <- obj$projections[[name]]
+    if (!is.data.frame(projection) || nrow(projection) != length(cells)) {
+      stop(
+        "Projection '",
+        name,
+        "' does not match the thin CRB cell index.",
+        call. = FALSE
+      )
+    }
+    rownames(projection) <- cells
+    obj$projections[[name]] <- projection
+  }
+  obj$meta_data <- data.frame(
+    cell_barcode = cells,
+    metadata,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  obj
+}
+
 .readRuntimeBackendDescriptor <- function(obj, crb_path) {
   if (!is.environment(obj)) {
     stop(
@@ -2431,6 +2738,7 @@ get_or_load_crb <- function(
   if (!any(grepl("Cerebro", class(obj)))) {
     return(obj)
   }
+  crb_schema <- .readRuntimeCrbSchema(obj, crb_path)
   configured <- !is.null(effective_backend)
   if (!configured) {
     be <- .fallbackRuntimeBackendPlan(obj, crb_path)
@@ -2439,7 +2747,14 @@ get_or_load_crb <- function(
   }
 
   if (identical(be$mode, "embedded")) {
+    if (!is.null(crb_schema)) {
+      stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
+    }
     return(obj)
+  }
+
+  if (!is.null(crb_schema) && !identical(be$type, "bpcells")) {
+    stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
   }
 
   if (identical(be$mode, "host_override")) {
@@ -2473,6 +2788,9 @@ get_or_load_crb <- function(
     }
     print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
     obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
+    if (!is.null(crb_schema)) {
+      obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema)
+    }
   } else if (be$type == "h5") {
     if (!requireNamespace("HDF5Array", quietly = TRUE)) {
       stop(

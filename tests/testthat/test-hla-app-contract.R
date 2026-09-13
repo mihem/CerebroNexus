@@ -215,7 +215,7 @@ test_that("bundled core shim resolves without an installed package", {
 hla_sc_demo <- function() {
   path <- hla_inst_file("extdata/examples/demo_hla_tcr_dextramer.crb")
   testthat::skip_if_not(file.exists(path), "single-cell demo not built")
-  readRDS(path)
+  readCerebro(path)
 }
 
 test_that("shipped demo declares antigen selection, cells and its receptor key", {

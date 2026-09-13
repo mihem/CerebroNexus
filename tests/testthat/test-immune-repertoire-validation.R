@@ -278,7 +278,7 @@ test_that("the bundled TCR/BCR demo passes the check", {
   }
   skip_if_not(file.exists(crb_path), "demo_full_tcr_bcr.crb not available")
 
-  repertoire <- readRDS(crb_path)$getImmuneRepertoire()
+  repertoire <- readCerebro(crb_path)$getImmuneRepertoire()
   skip_if(length(repertoire) == 0, "demo carries no immune repertoire")
 
   expect_no_error(expect_no_warning(

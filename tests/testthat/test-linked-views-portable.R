@@ -198,12 +198,13 @@ test_that("cell identity validation is unique and order-independent", {
   root <- system.file("viewer", package = "CerebroNexus")
   helpers <- new.env(parent = globalenv())
   sys.source(file.path(root, "coordinated_views", "bundle.R"), envir = helpers)
+  sys.source(file.path(root, "coordinated_views", "config.R"), envir = helpers)
 
   expect_error(helpers$cv_cell_ids(c("cell-1", "cell-1")), "duplicate")
   expect_error(helpers$cv_cell_ids(c("cell-1", "")), "missing")
   expect_identical(
-    helpers$cv_cell_fingerprint(c("cell-2", "cell-1")),
-    helpers$cv_cell_fingerprint(c("cell-1", "cell-2"))
+    helpers$cv_config_cell_fingerprint(c("cell-2", "cell-1")),
+    helpers$cv_config_cell_fingerprint(c("cell-1", "cell-2"))
   )
 })
 

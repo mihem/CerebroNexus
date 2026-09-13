@@ -46,7 +46,7 @@ test_that("extra_material UI defines correct tabName", {
 
 test_that("example.crb extra material returns valid content", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   categories <- crb$getExtraMaterialCategories()
   expect_true(is.character(categories))
   expect_true("tables" %in% categories)
@@ -54,7 +54,7 @@ test_that("example.crb extra material returns valid content", {
 
 test_that("extra material tables are accessible", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   tables <- crb$getNamesOfExtraTables()
   expect_true(is.character(tables))
   expect_true(length(tables) > 0)
@@ -62,13 +62,13 @@ test_that("extra material tables are accessible", {
 
 test_that("checkForExtraTables returns TRUE for example.crb", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   expect_true(crb$checkForExtraTables())
 })
 
 test_that("getExtraTable returns a data.frame", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   tables <- crb$getNamesOfExtraTables()
   skip_if(length(tables) == 0, "No tables in example.crb")
   tbl <- crb$getExtraTable(tables[1])

@@ -82,7 +82,7 @@ coordviews_bundle <- reactive({
           )
         )
       } else {
-        b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)
+        b$dataset_fingerprint <- cv_saved_view_dataset()$fingerprint
         b
       }
     },

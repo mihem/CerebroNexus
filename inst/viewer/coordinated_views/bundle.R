@@ -63,13 +63,6 @@ cv_cell_metadata <- function(metadata, cell) {
   metadata[index, , drop = FALSE]
 }
 
-cv_cell_fingerprint <- function(cells) {
-  path <- tempfile("cerebronexus-cell-ids-")
-  on.exit(unlink(path), add = TRUE)
-  writeBin(sort(enc2utf8(cells)), path, useBytes = TRUE)
-  unname(tools::md5sum(path))
-}
-
 ## Categorical palette (mirrors the app's plotly categorical colours).
 cv_palette <- c(
   "#636EFA",
@@ -1430,7 +1423,6 @@ cv_build_bundle <- function(crb) {
   }
   cells <- md$cell_barcode
   n <- length(cells)
-  cell_fingerprint <- cv_cell_fingerprint(cells)
 
   ## Seed a stable fallback here. The user-editable palette travels separately
   ## as cv_color_patch(), so changing one colour cannot rebuild this bundle.
@@ -1481,19 +1473,13 @@ cv_build_bundle <- function(crb) {
     } else {
       names(projections)[1]
     }
-    dp <- projections[[default_projection]]
-    expression_space <- cv_space(
-      "umap",
-      paste0(default_projection, " (expression)"),
-      dp$x,
-      dp$y
+    ## Coordinates live in `projections`; the client rebuilds this descriptor
+    ## from there. Keeping another x/y/z copy doubles the largest part of a
+    ## million-cell wire payload.
+    expression_space <- list(
+      id = "umap",
+      label = paste0(default_projection, " (expression)")
     )
-    ## A 3-D embedding carries its z into the space too, so the expression panel
-    ## starts orbitable rather than only becoming so after a projection switch.
-    if (!is.null(dp$z)) {
-      expression_space$z <- dp$z
-      expression_space$axes <- dp$axes
-    }
     spaces[[length(spaces) + 1L]] <- expression_space
   }
 
@@ -1570,7 +1556,6 @@ cv_build_bundle <- function(crb) {
       error = function(e) paste0("cells:", n)
     ),
     cells = I(cells),
-    cell_fingerprint = cell_fingerprint,
     n = n,
     groups = groups,
     cat_extra = cat_extra,
