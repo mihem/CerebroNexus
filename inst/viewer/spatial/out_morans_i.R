@@ -30,12 +30,8 @@ output[["spatial_projection_morans_i"]] <- renderText({
   common <- intersect(cells, rownames(coords))
   req(length(common) >= 2)
 
-  expression_data <- data_set()$getExpressionMatrix(
-    cells = common,
-    genes = gene
-  )
-  req(!is.null(expression_data), gene %in% rownames(expression_data))
-  expr <- as.vector(expression_data[gene, common])
+  expr <- viewerExpressionRow(data_set(), common, gene)
+  req(!is.null(expr))
   coords <- coords[common, , drop = FALSE]
 
   ## Down-sample for the O(n^2) neighbour search so large slides stay responsive.

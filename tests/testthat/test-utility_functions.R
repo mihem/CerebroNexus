@@ -494,7 +494,7 @@ test_that("single-cell scatter payloads remain arrays on the wire", {
   expect_type(wire$data$x[[1L]], "list")
   expect_type(wire$data$y[[1L]], "list")
   expect_type(wire$data$selection_key[[1L]], "list")
-  expect_type(wire$data$color[[1L]], "list")
+  expect_identical(wire$data$color[[1L]], "#123456")
   expect_type(wire$hover$text[[1L]], "list")
 })
 

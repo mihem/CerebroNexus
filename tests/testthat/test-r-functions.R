@@ -162,6 +162,245 @@ test_that("Cerebro: getMeanExpressionForGenes returns numeric vector", {
   )
 })
 
+mean_expression_test_matrix <- function() {
+  matrix(
+    c(1, 2, 3, 4, 10, 20, 30, 40, 100, 200, 300, 400),
+    nrow = 3,
+    byrow = TRUE,
+    dimnames = list(paste0("g", 1:3), paste0("c", 1:4))
+  )
+}
+
+test_that("Cerebro: per-cell means preserve dense and sparse semantics", {
+  dense <- mean_expression_test_matrix()
+  matrices <- list(
+    dense = dense,
+    sparse = Matrix::Matrix(dense, sparse = TRUE)
+  )
+
+  for (mat in matrices) {
+    obj <- Cerebro$new()
+    obj$setExpression(mat)
+
+    expect_equal(
+      obj$getMeanExpressionForCells(cells = NULL, genes = NULL),
+      c(c1 = 37, c2 = 74, c3 = 111, c4 = 148)
+    )
+    expect_equal(
+      obj$getMeanExpressionForCells(
+        cells = c("c4", "c2"),
+        genes = c("g3", "g1")
+      ),
+      c(c4 = 202, c2 = 101)
+    )
+    expect_error(
+      obj$getMeanExpressionForCells(genes = "missing"),
+      "Gene\\(s\\) not found"
+    )
+    expect_error(
+      obj$getMeanExpressionForCells(cells = "missing", genes = "g1"),
+      "Cell\\(s\\) not found"
+    )
+
+    empty_genes <- obj$getMeanExpressionForCells(
+      cells = c("c4", "c2"),
+      genes = character()
+    )
+    expect_identical(names(empty_genes), c("c4", "c2"))
+    expect_true(all(is.nan(empty_genes)))
+    expect_identical(
+      obj$getMeanExpressionForCells(cells = character(), genes = "g1"),
+      numeric()
+    )
+  }
+})
+
+test_that("Cerebro: expression access accepts canonical cell indices", {
+  dense <- mean_expression_test_matrix()
+  for (mat in list(dense, Matrix::Matrix(dense, sparse = TRUE))) {
+    obj <- Cerebro$new()
+    obj$setExpression(mat)
+
+    expect_equal(
+      obj$getExpressionRow("g2", cells = c(4L, 2L)),
+      c(c4 = 40, c2 = 20)
+    )
+    expect_equal(
+      obj$getExpressionMatrix(cells = c(4L, 2L), genes = "g2"),
+      as.matrix(mat["g2", c(4L, 2L), drop = FALSE])
+    )
+    expect_equal(
+      obj$getExpressionBlock("g1", cells = c(4L, 2L)),
+      mat["g1", c(4L, 2L), drop = FALSE]
+    )
+    expect_equal(
+      obj$getMeanExpressionForCells(cells = c(4L, 2L), genes = c("g3", "g1")),
+      c(c4 = 202, c2 = 101)
+    )
+    expect_error(obj$getExpressionRow("g1", cells = 0L), "one-based")
+    expect_error(obj$getExpressionBlock("g1", cells = 5L), "one-based")
+  }
+})
+
+zero_column_expression_test_matrix <- function() {
+  matrix(
+    numeric(),
+    nrow = 2L,
+    dimnames = list(c("g1", "g2"), NULL)
+  )
+}
+
+expect_zero_column_cell_means <- function(mat) {
+  obj <- Cerebro$new()
+  obj$setExpression(mat)
+
+  block <- obj$getExpressionBlock(genes = "g1")
+  expect_identical(dim(block), c(1L, 0L))
+  expect_identical(obj$getMeanExpressionForCells(), numeric())
+  expect_error(
+    obj$getMeanExpressionForCells(genes = "missing"),
+    "Gene\\(s\\) not found"
+  )
+}
+
+test_that("Cerebro: zero-column matrices preserve empty-cell semantics", {
+  dense <- zero_column_expression_test_matrix()
+
+  for (mat in list(dense, Matrix::Matrix(dense, sparse = TRUE))) {
+    expect_zero_column_cell_means(mat)
+  }
+})
+
+test_that("Cerebro: non-empty per-cell means request one native block", {
+  SpyCerebro <- R6::R6Class(
+    NULL,
+    inherit = Cerebro,
+    public = list(
+      block_calls = 0L,
+      getExpressionBlock = function(genes, cells = NULL) {
+        self$block_calls <- self$block_calls + 1L
+        super$getExpressionBlock(genes = genes, cells = cells)
+      }
+    )
+  )
+  obj <- SpyCerebro$new()
+  obj$setExpression(mean_expression_test_matrix())
+
+  obj$getMeanExpressionForCells(cells = c("c4", "c2"), genes = c("g3", "g1"))
+  expect_identical(obj$block_calls, 1L)
+
+  empty_genes <- obj$getMeanExpressionForCells(
+    cells = c("c4", "c2"),
+    genes = character()
+  )
+  expect_identical(obj$block_calls, 1L)
+  expect_identical(names(empty_genes), c("c4", "c2"))
+  expect_true(all(is.nan(empty_genes)))
+
+  expect_identical(
+    obj$getMeanExpressionForCells(cells = character(), genes = "g1"),
+    numeric()
+  )
+  expect_identical(obj$block_calls, 2L)
+})
+
+expect_native_cell_means <- function(mat, package, native_class) {
+  calls <- 0L
+  native_input <- FALSE
+  backend_col_means <- getExportedValue(package, "colMeans")
+  testthat::local_mocked_bindings(
+    colMeans = function(x, ...) {
+      calls <<- calls + 1L
+      native_input <<- inherits(x, native_class) && !is.matrix(x)
+      backend_col_means(x, ...)
+    },
+    .package = package
+  )
+  obj <- Cerebro$new()
+  obj$setExpression(mat)
+
+  expect_equal(
+    obj$getMeanExpressionForCells(
+      cells = c("c4", "c2"),
+      genes = c("g3", "g1")
+    ),
+    c(c4 = 202, c2 = 101)
+  )
+  expect_identical(
+    obj$getMeanExpressionForCells(cells = character(), genes = "g1"),
+    numeric()
+  )
+  expect_identical(calls, 1L)
+  expect_true(native_input)
+}
+
+test_that("Cerebro: DelayedArray means stay native", {
+  skip_if_not_installed("DelayedArray")
+  dense <- mean_expression_test_matrix()
+  backends <- list(
+    DelayedMatrix = DelayedArray::DelayedArray(dense),
+    RleMatrix = DelayedArray::RleArray(
+      methods::as(as.vector(dense), "Rle"),
+      dim = dim(dense),
+      dimnames = dimnames(dense)
+    )
+  )
+
+  for (mat in backends) {
+    expect_native_cell_means(mat, "DelayedArray", "DelayedArray")
+  }
+  expect_zero_column_cell_means(
+    DelayedArray::DelayedArray(zero_column_expression_test_matrix())
+  )
+})
+
+test_that("Cerebro: HDF5Array means stay native", {
+  skip_if_not_installed("HDF5Array")
+  write_hdf5 <- function(mat) {
+    HDF5Array::writeHDF5Array(
+      mat,
+      filepath = tempfile(fileext = ".h5"),
+      name = "expression",
+      with.dimnames = TRUE
+    )
+  }
+  expect_native_cell_means(
+    write_hdf5(mean_expression_test_matrix()),
+    "DelayedArray",
+    "DelayedArray"
+  )
+  expect_zero_column_cell_means(write_hdf5(zero_column_expression_test_matrix()))
+})
+
+test_that("Cerebro: BPCells means stay native", {
+  skip_if_not_installed("BPCells")
+  as_bpcells <- function(mat) {
+    methods::as(
+      methods::as(
+        Matrix::Matrix(mat, sparse = TRUE),
+        "CsparseMatrix"
+      ),
+      "IterableMatrix"
+    )
+  }
+  expect_native_cell_means(
+    as_bpcells(mean_expression_test_matrix()),
+    "BPCells",
+    "IterableMatrix"
+  )
+  obj <- Cerebro$new()
+  obj$setExpression(as_bpcells(mean_expression_test_matrix()))
+  expect_equal(
+    obj$getExpressionRow("g2", cells = c(4L, 2L)),
+    c(c4 = 40, c2 = 20)
+  )
+  expect_equal(
+    as.matrix(obj$getExpressionBlock("g1", cells = c(4L, 2L))),
+    mean_expression_test_matrix()["g1", c(4L, 2L), drop = FALSE]
+  )
+  expect_zero_column_cell_means(as_bpcells(zero_column_expression_test_matrix()))
+})
+
 test_that("Cerebro: addGeneList / getGeneLists round-trip", {
   obj <- Cerebro$new()
   # addGeneList(name, genes) — two separate arguments
@@ -203,7 +442,7 @@ test_that("example.crb loads successfully and has correct structure", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
   expect_true(file.exists(path))
 
-  data <- readRDS(path)
+  data <- readCerebro(path)
   expect_true(inherits(data, "Cerebro"))
 
   # groups
@@ -221,7 +460,7 @@ test_that("example.crb loads successfully and has correct structure", {
 
 test_that("example.crb contains expected groups and projections", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-  data <- readRDS(path)
+  data <- readCerebro(path)
 
   expect_true("sample" %in% data$getGroups())
   expect_true("seurat_clusters" %in% data$getGroups())
@@ -232,7 +471,7 @@ test_that("example.crb contains expected groups and projections", {
 
 test_that("example.crb sample levels are as expected", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-  data <- readRDS(path)
+  data <- readCerebro(path)
 
   lvls <- data$getGroupLevels("sample")
   # example data is split into multiple pseudo-samples (donor_1/2/3)

@@ -1,15 +1,19 @@
 ##----------------------------------------------------------------------------##
 ## Update projection plot when expression_projection_data_to_plot() changes.
 ##----------------------------------------------------------------------------##
+expression_projection_started <- reactiveVal(FALSE)
 observeEvent(
-  list(
-    expression_projection_data_to_plot(),
-    input[["expression_projection_render_request"]]
-  ),
+  input[["expression_projection_render_request"]],
   {
-    data <- expression_projection_data_to_plot()
-    req(data)
-    expression_projection_parameters_other[['reset_axes']] <- FALSE
-    expression_projection_update_plot(data)
-  }
+    expression_projection_started(TRUE)
+  },
+  ignoreInit = TRUE
 )
+
+observe({
+  req(expression_projection_started())
+  data <- expression_projection_data_to_plot()
+  req(data)
+  expression_projection_parameters_other[['reset_axes']] <- FALSE
+  expression_projection_update_plot(data)
+})

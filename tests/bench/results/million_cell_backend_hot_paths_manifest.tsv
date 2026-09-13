@@ -1,0 +1,17 @@
+field	value
+measured_at	2026-09-12
+pr165_sha	69893a2b2c9ed1c365b19703b0ce5a9980db2968
+thin_crb_sha	27303f214ab965c08b960226e1cac311b7e135ad
+hot_path_code_sha	3fb88b8aa054db544e30f5d26de897f075ac277b
+bundle_code_sha	1ad8abc0dbf9c0c6f0a184104d886878eef098af
+crb	large-examples/1m/cerebro/cerebro_mouse_brain_1m_thin_qs2.crb
+repeats	3
+crb_lifecycle_rounds	5
+crb_4_5_0_results	million_cell_crb_pr165.csv
+crb_4_5_1_results	million_cell_crb_4_5_1.csv
+host	Apple M1 Pro; 32 GiB RAM
+os	macOS 27.0 (26A5421a)
+r	4.6.1 aarch64
+bpcells	0.3.1
+seurat	5.5.1
+shiny	1.14.0

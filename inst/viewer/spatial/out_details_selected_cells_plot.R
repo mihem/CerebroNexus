@@ -111,6 +111,7 @@ output[["spatial_details_selected_cells_plot"]] <- plotly::renderPlotly({
     ## remove unnecessary columns
     cells_df <- cells_df %>%
       dplyr::select(group, dplyr::all_of(color_variable))
+    cells_df <- compactViolinData(cells_df, color_variable, "group")
     ## create violin/box plot
     plot <- plotly::plot_ly(
       cells_df,

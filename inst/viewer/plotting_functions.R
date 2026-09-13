@@ -84,6 +84,63 @@ cerebro_plotly_toolbar <- function(
 ##----------------------------------------------------------------------------##
 ## Violin plots with plotly, e.g. for expression metrics.
 ##----------------------------------------------------------------------------##
+compactViolinData <- function(
+  table,
+  metric,
+  coloring_variable,
+  max_points_per_group = 4096L
+) {
+  if (nrow(table) <= max_points_per_group) {
+    return(table)
+  }
+
+  values <- table[[metric]]
+  groups <- table[[coloring_variable]]
+  valid <- !is.na(values) & is.finite(values) & !is.na(groups)
+  rows_by_group <- split(which(valid), groups[valid], drop = TRUE)
+  if (!length(rows_by_group)) {
+    return(table[integer(0), c(coloring_variable, metric), drop = FALSE])
+  }
+  compact <- lapply(rows_by_group, function(rows) {
+    if (length(rows) <= max_points_per_group) {
+      return(table[rows, c(coloring_variable, metric), drop = FALSE])
+    }
+    sampled_values <- unname(stats::quantile(
+      values[rows],
+      probs = (seq_len(max_points_per_group) - 0.5) /
+        max_points_per_group,
+      type = 8
+    ))
+    target_mean <- mean(values[rows])
+    sampled_mean <- mean(sampled_values)
+    if (
+      length(unique(sampled_values)) == 1L &&
+        min(values[rows]) != max(values[rows])
+    ) {
+      sampled_values[[length(sampled_values)]] <-
+        target_mean *
+        length(sampled_values) -
+        sampled_values[[1L]] * (length(sampled_values) - 1L)
+      sampled_mean <- mean(sampled_values)
+    }
+    if (sampled_mean != target_mean && all(values[rows] >= 0)) {
+      sampled_values <- sampled_values * target_mean / sampled_mean
+    } else if (sampled_mean != target_mean) {
+      sampled_values <- sampled_values + target_mean - sampled_mean
+    }
+    result <- table[
+      rep(rows[[1L]], max_points_per_group),
+      c(coloring_variable, metric),
+      drop = FALSE
+    ]
+    result[[metric]] <- sampled_values
+    result
+  })
+  result <- do.call(rbind, compact)
+  rownames(result) <- NULL
+  result
+}
+
 plotlyViolin <- function(
   table,
   metric,
@@ -101,27 +158,27 @@ plotlyViolin <- function(
     y_tickformat <- ",.0f"
     y_hoverformat <- ",.0f"
   }
+  table <- compactViolinData(table, metric, coloring_variable)
   ##
-  plot <- table %>%
-    plotly::plot_ly(
-      x = ~ .[[coloring_variable]],
-      y = ~ .[[metric]],
-      type = "violin",
-      box = list(
-        visible = TRUE
-      ),
-      meanline = list(
-        visible = TRUE
-      ),
-      color = ~ .[[coloring_variable]],
-      colors = colors,
-      source = "subset",
-      showlegend = FALSE,
-      hoverinfo = "y",
-      marker = list(
-        size = 5
-      )
-    ) %>%
+  plot <- plotly::plot_ly(
+    x = table[[coloring_variable]],
+    y = table[[metric]],
+    type = "violin",
+    box = list(
+      visible = TRUE
+    ),
+    meanline = list(
+      visible = TRUE
+    ),
+    color = table[[coloring_variable]],
+    colors = colors,
+    source = "subset",
+    showlegend = FALSE,
+    hoverinfo = "y",
+    marker = list(
+      size = 5
+    )
+  ) %>%
     plotly::layout(
       title = "",
       xaxis = cerebro_plotly_axis(title = "", mirror = FALSE),

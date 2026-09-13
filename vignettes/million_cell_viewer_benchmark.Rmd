@@ -1,0 +1,381 @@
+---
+title: "Benchmark the million-cell Viewer"
+author: "Xuesong Wang"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    self_contained: yes
+    mode: selfcontained
+vignette: >
+  %\VignetteIndexEntry{Benchmark the million-cell Viewer}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+# Purpose
+
+This guide reproduces the million-cell workload used to profile the
+CerebroNexus Viewer. It covers four separate operations:
+
+1. download the official 10x Genomics E18 mouse-brain matrix;
+2. build a reproducible one-million-cell Seurat object and BPCells-backed CRB;
+3. compare the 4.5.1 Canvas Viewer with the 4.6.0 WebGPU Viewer;
+4. launch the same data interactively through the bundled demo app.
+
+The expensive chunks are deliberately not evaluated while building the
+vignette. A package build must never download a 3.93 GiB source matrix or start
+a browser benchmark.
+
+# Requirements and disk use
+
+Run the commands from the root of a CerebroNexus checkout. Data preparation
+requires `BPCells`, `Seurat`, `SeuratObject`, and `rhdf5`. The browser benchmark
+also requires `shinytest2` and a Chromium build with WebGPU support.
+
+The source used here contains 27,998 genes and 1,306,127 cells. The preparation
+script selects exactly 1,000,000 cells at evenly spaced indexes, replaces
+Ensembl identifiers with unique gene symbols, and computes a sketch-based UMAP
+with seed 123.
+
+Allow at least 16 GiB of free disk space for the source file, the Seurat and CRB
+BPCells directories, and transactional staging during export. The default cache
+is below `tools::R_user_dir("CerebroNexus", "cache")`; pass `cache_dir` to put it
+on a larger volume.
+
+# Download and prepare the data
+
+The preparation script downloads the official 10x HDF5 matrix only when it is
+absent, then reuses every complete intermediate on later runs.
+
+```{r prepare-data}
+devtools::load_all(quiet = TRUE)
+source("tests/bench/prepare_viewer_1m_data.R")
+
+crb <- prepareViewer1mBenchmarkData()
+crb
+```
+
+To choose another cache root:
+
+```{r prepare-data-custom-cache}
+crb <- prepareViewer1mBenchmarkData(
+  cache_dir = "/Volumes/large-data/CerebroNexus-benchmark"
+)
+```
+
+The original download is:
+
+```text
+https://cf.10xgenomics.com/samples/cell-exp/1.3.0/1M_neurons/1M_neurons_filtered_gene_bc_matrices_h5.h5
+```
+
+The resulting cache contains:
+
+```text
+1m/
+├── source/1M_neurons_filtered_gene_bc_matrices_h5.h5
+├── seurat/mouse_brain_1m.rds
+├── seurat/mouse_brain_1m.bpcells/
+├── cerebro/cerebro_mouse_brain_1m.crb
+└── cerebro/cerebro_mouse_brain_1m.bpcells/
+```
+
+The `.crb` and adjacent `.bpcells/` directory are one portable dataset. Keep
+them together when moving or deploying it.
+
+# Run the regression tests
+
+The focused regression set covers expression export and integrity, the compact
+BPCells CRB contract, the million-cell payload, and renderer integration.
+
+```{bash regression-tests, eval=FALSE}
+Rscript -e 'devtools::test(
+  filter = paste0(
+    "million-cell-renderer|million-cell-viewer|",
+    "seurat-v5-split-layers|export-data-integrity|",
+    "exportFromSeurat|r-functions"
+  ),
+  stop_on_failure = TRUE
+)'
+```
+
+The real BPCells bundle relocation check can be run separately:
+
+```{bash bundle-test, eval=FALSE}
+Rscript -e 'devtools::load_all(quiet = TRUE); testthat::test_file(
+  "tests/testthat/test-createShinyApp-sibling.R",
+  desc = "a bundled real BPCells backend attaches with exact data",
+  stop_on_failure = TRUE
+)'
+```
+
+On 12 September 2026 these commands produced 308 passes, zero failures, zero
+warnings, and one conditional HDF5 skip, followed by 7/7 passes for the real
+BPCells bundle check.
+
+# Compare the Viewer before and after
+
+## Create the baseline checkout
+
+Commit `c455d0cd` is the exact 4.5.1 baseline before the WebGPU work. It has no one-million-cell menu entry and still uses the Canvas 2D renderer, but the benchmark launches its `launchCerebro()` directly against the same CRB. The fixed revision keeps the comparison reproducible after development branches are merged or removed.
+
+| Candidate | Revision | Version | Role in this comparison |
+|---|---|---|---|
+| Canvas baseline | `c455d0cd` | 4.5.1 | Optimized CRB/backend, Canvas 2D Viewer, no bundled 1M demo |
+| WebGPU release | This source tree | 4.6.0 | Binary transport, WebGPU rendering, deferred hover payload, bundled opt-in 1M demo |
+
+Create a detached worktree so both implementations can be measured against the same CRB and browser installation:
+
+```{bash baseline-worktree, eval=FALSE}
+git worktree add --detach ../CerebroNexus-4.5.1-baseline c455d0cd
+```
+
+Use an old-format BPCells CRB for this Viewer comparison. The current Viewer
+loads that format too, so both candidates receive exactly the same serialized
+input. This keeps the CRB-format reduction separate from browser rendering.
+
+## Run the full Viewer benchmark
+
+The 4.5.1-to-4.6.0 comparison uses the harness's Overview-only mode because the 4.5.1 Canvas implementation cannot provide a usable one-million-cell Linked Views, gene-expression, or RGB workflow. The harness still checks that Data Info reports 1,000,000 cells, verifies that every expected point was rendered, performs ten alternating zoom operations, alternates candidate order on each round, and rejects GPU errors or context loss. The later WebGPU-to-WebGPU comparison exercises every page path.
+
+Replace `CRB` below with the path returned by the preparation step.
+
+```{bash viewer-benchmark, eval=FALSE}
+CRB=/path/to/cerebro_mouse_brain_1m.crb
+
+CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY=1 \
+  Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-4.5.1-baseline . "$CRB" 3 100
+
+CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY=1 \
+  Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-4.5.1-baseline . "$CRB" 3 10
+```
+
+The 100% run draws all one million cells. The 10% run draws 100,000 cells and
+matches the bundled demo's initial setting. Timings below are medians of three
+fresh app processes per candidate on the same host.
+
+| Initial display | Metric | Before (`canvas2d`) | After (`webgpu`) | Change |
+|---|---|---:|---:|---:|
+| 100% | Data ready | 15.088 s | 16.313 s | +1.225 s in development harness |
+| 100% | First Overview | 48.768 s | 1.377 s | 97.2% faster |
+| 100% | Data + Overview | 63.856 s | 17.690 s | 72.3% faster |
+| 100% | Zoom median | 280.9 ms | 8.0 ms | 35.1x faster |
+| 100% | Zoom p95 | 310.3 ms | 15.4 ms | 20.1x faster |
+| 10% | Data ready | 14.836 s | 15.613 s | +0.777 s in development harness |
+| 10% | First Overview | 35.838 s | 0.323 s | 99.1% faster |
+| 10% | Data + Overview | 50.674 s | 15.936 s | 68.6% faster |
+| 10% | Zoom median | 91.5 ms | 3.7 ms | 24.7x faster |
+| 10% | Zoom p95 | 108.7 ms | 5.9 ms | 18.4x faster |
+
+The first row group shows why storage and rendering are reported separately: loading and attaching the same CRB barely changed, while the first plot and subsequent camera operations changed substantially. The missing 4.5.1 Linked Views and expression rows are intentional: at one million points those Canvas paths are the unusable baseline this release replaces, not a workflow worth presenting as a demo.
+
+## Profile cold startup
+
+The `Data ready` rows above are end-to-end development-harness measurements, not installed-package startup measurements. The timer starts before `shinytest2::AppDriver$new()`, and the generated child application begins with `devtools::load_all(root)`. A sampled 16.93-second source-tree run attributed about 6.15 seconds to `load_all()`, 2.96 seconds to reading the legacy RDS CRB, 1.63 seconds to sorting and hashing one million cell names, 0.78 seconds to the intentional Linked Views prewarm, 0.10 seconds to constructing the app, and less than 0.10 seconds to the Data Info output itself. Sampled stacks can overlap and do not sum to wall time, but they identify the expensive work.
+
+This also explains why the earlier CRB and backend passes did not expose one 15-second block. `benchmark_million_cell_crb.R` loads the package and warms every file before timing write, decode, and hydrated read operations. `viewer_1m_hot_paths.R` loads the package, reads the CRB, and materializes metadata before its `elapsed_ms()` loops. Those benchmarks correctly isolated their target operations, but neither measured cold Viewer startup.
+
+Use the installed-package harness below to measure startup without charging source loading to the product. It records package attachment, app construction, server listening, browser-to-data readiness, and total process-to-data readiness separately. Candidate order reverses on alternate rounds.
+
+```{bash startup-benchmark, eval=FALSE}
+STARTUP_LIB=$(mktemp -d /tmp/cerebronexus-startup.XXXXXX)
+R CMD INSTALL --library="$STARTUP_LIB" .
+
+R_LIBS="$STARTUP_LIB" \
+  CEREBRO_STARTUP_REPEATS=3 \
+  CEREBRO_STARTUP_OUTPUT=tests/bench/results/million_cell_startup_4_6_0.csv \
+  Rscript tests/bench/benchmark_million_cell_startup.R \
+  legacy_rds=/path/to/cerebro_mouse_brain_1m.crb \
+  thin_qs2_no_fingerprint=/path/to/cerebro_mouse_brain_1m_thin_qs2.crb \
+  thin_qs2_fingerprint=/path/to/cerebro_mouse_brain_1m_fingerprint_qs2.crb
+```
+
+The recorded values are medians of three fresh Viewer processes per artifact. All three candidates use the same installed 4.6.0 code and unchanged BPCells sidecar, so this comparison isolates the control-file representation and startup fingerprint work.
+
+| CRB artifact | Package attach | App construct | Server listening | Browser to data | Process to data |
+|---|---:|---:|---:|---:|---:|
+| Legacy RDS | 1.010 s | 0.192 s | 1.384 s | 7.558 s | 9.045 s |
+| Thin qs2 without stored fingerprint | 0.999 s | 0.192 s | 1.381 s | 6.490 s | 7.977 s |
+| Thin qs2 with stored fingerprint | 1.015 s | 0.193 s | 1.382 s | 4.559 s | 6.024 s |
+
+Thin qs2 removes 11.8% of legacy process-to-data time. Recording the fingerprint during export brings the total reduction to 33.4% against legacy RDS and 24.5% against the previous thin qs2 artifact. The remaining roughly 4.6 seconds after browser navigation includes Shiny session initialization, CRB hydration, metadata preparation, and the deliberate large-dataset Linked Views prewarm; moving that prewarm out would only transfer latency back to the first Linked Views visit.
+
+New BPCells CRBs written by `saveCerebro()` or an exporter contain the fingerprint automatically. To make an optimized artifact from an older thin CRB while preserving the original benchmark input, write the copy beside the same BPCells sidecar:
+
+```{r upgrade-crb}
+old_crb <- "/path/to/cerebro_mouse_brain_1m_thin_qs2.crb"
+current_crb <- file.path(dirname(old_crb), "cerebro_mouse_brain_1m_fingerprint_qs2.crb")
+saveCerebro(readCerebro(old_crb), current_crb)
+```
+
+## Verify the three-second navigation target
+
+The later hot-path pass starts from commit `5a915962`, where WebGPU was already
+enabled. This comparison therefore measures transport, first-frame scheduling,
+group-label calculation, and large-dataset bundle preparation without counting
+the earlier Canvas-to-WebGPU replacement as a second time.
+
+```{bash three-second-baseline, eval=FALSE}
+git worktree add --detach ../CerebroNexus-before-wire 5a915962
+
+Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-before-wire . "$CRB" 3 100
+
+Rscript tests/bench/benchmark_million_cell_viewer.R \
+  ../CerebroNexus-before-wire . "$CRB" 3 10
+```
+
+Both candidates used WebGPU. Results are medians of three alternating fresh processes on 12 September 2026. The selector is stabilized before timing so the expression rows include the actual million-cell BPCells read rather than a stale render:
+
+| Display | Metric | Before | After | Change |
+|---|---|---:|---:|---:|
+| 100% (1,000,000 points) | Data ready | 15.455 s | 16.330 s | +0.875 s in development harness |
+| 100% (1,000,000 points) | First Overview | 11.481 s | 1.440 s | 87.5% faster |
+| 100% (1,000,000 points) | Linked Views ready | 4.462 s | 2.507 s | 43.8% faster |
+| 100% (1,000,000 points) | Gene expression ready | 88.790 s | 81.846 s | 7.8% faster |
+| 100% (1,000,000 points) | RGB ready | 99.863 s | 82.157 s | 17.7% faster |
+| 100% (1,000,000 points) | Zoom median | 8.1 ms | 8.4 ms | effectively tied |
+| 100% (1,000,000 points) | Zoom p95 | 15.1 ms | 22.0 ms | 6.9 ms slower |
+| 10% (100,000 points) | Data ready | 13.693 s | 14.081 s | +0.388 s in development harness |
+| 10% (100,000 points) | First Overview | 2.582 s | 1.526 s | 40.9% faster |
+| 10% (100,000 points) | Linked Views ready | 4.942 s | 1.187 s | 76.0% faster |
+| 10% (100,000 points) | Gene expression ready | 1.018 s | 0.869 s | 14.6% faster |
+| 10% (100,000 points) | RGB ready | 1.795 s | 1.470 s | 18.1% faster |
+| 10% (100,000 points) | Zoom median | 4.6 ms | 3.8 ms | 17.4% faster |
+| 10% (100,000 points) | Zoom p95 | 6.6 ms | 5.3 ms | 19.7% faster |
+
+Overview and Linked Views now meet the three-second navigation target. Integer vectors use the narrowest lossless wire type, reducing this dataset's initial Linked Views bundle from 28,001,836 to 15,001,832 bytes (46.4% smaller). Hover columns remain in their grouped representation and are expanded only for the point actually under the pointer. Non-render-critical hover data is sent after the first-frame work rather than competing with it.
+
+The full-million gene and RGB rows remain dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU keeps their eventual million-point render responsive and avoids browser lock-up, but it does not turn that storage scan into a three-second operation. Improving those two rows requires a separate expression-cache or pre-aggregation change and is not claimed by this Viewer-rendering release.
+
+The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. Installed 4.6.0 reaches Data Info in a 6.024-second median with a current thin qs2 artifact; the renderer and navigation timings begin only after that startup phase.
+
+## Measure the renderer alone
+
+The synthetic harness isolates buffer construction, upload, the first frame,
+zoom, and RGB recolouring from Shiny and CRB startup:
+
+```{bash renderer-benchmark, eval=FALSE}
+Rscript tests/bench/benchmark_million_cell_renderer.R \
+  1000000 15 renderer.csv renderer.png
+```
+
+The same run used Apple Metal 3 through WebGPU and produced:
+
+| Metric | Result |
+|---|---:|
+| GPU buffer size | 15.26 MiB |
+| Renderer initialization | 5.9 ms |
+| Categorical buffer build | 7.6 ms |
+| Categorical upload | 10.7 ms |
+| First frame | 30.6 ms |
+| Pan/zoom median | 8.6 ms |
+| Pan/zoom p95 | 12.2 ms |
+| RGB buffer build | 9.0 ms |
+| RGB upload | 7.8 ms |
+| RGB frame median | 9.5 ms |
+| RGB frame p95 | 13.0 ms |
+
+# Compare the CRB representation
+
+The compact BPCells CRB no longer serializes the live matrix handle or repeated
+cell names. At runtime the Viewer reopens the adjacent BPCells directory,
+validates its cell-name checksum, and restores the omitted metadata and
+projection row names.
+
+Measure an old and newly exported CRB after warming both files once. Alternating
+the order limits systematic page-cache bias:
+
+```{r crb-load-benchmark}
+files <- c(
+  before = "/path/to/cerebro_mouse_brain_1m_before.crb",
+  after = "/path/to/cerebro_mouse_brain_1m_after.crb"
+)
+invisible(lapply(files, readRDS))
+
+rows <- list()
+for (round in seq_len(5L)) {
+  order <- if (round %% 2L) names(files) else rev(names(files))
+  for (candidate in order) {
+    rows[[length(rows) + 1L]] <- data.frame(
+      candidate = candidate,
+      round = round,
+      read_rds_ms = unname(
+        system.time(readRDS(files[[candidate]]))["elapsed"] * 1000
+      )
+    )
+  }
+}
+
+raw <- do.call(rbind, rows)
+aggregate(raw["read_rds_ms"], raw["candidate"], median)
+file.info(files)$size / 1024^2
+```
+
+| Metric | Before | After | Change |
+|---|---:|---:|---:|
+| CRB size | 26.83 MiB | 13.92 MiB | 48.1% smaller |
+| Warm `readRDS()` median | 1,535 ms | 113 ms | 13.6x faster |
+
+These numbers describe only the serialized `.crb`. The 3.5 GiB BPCells
+expression sidecar is unchanged and remains the authoritative expression and
+cell-name store.
+
+# Launch the interactive one-million-cell demo
+
+Point `CEREBRO_1M_DEMO_CRB` at a CRB freshly written by 4.6.0 `saveCerebro()` or an exporter, then run the bundled app. Older CRBs remain compatible but calculate the cell fingerprint once per Viewer session; `convertCerebro()` upgrades one in place, while the copy-preserving example above keeps a baseline artifact for comparison.
+
+```{bash launch-demo, eval=FALSE}
+CEREBRO_1M_DEMO_CRB=/path/to/cerebro_mouse_brain_1m.crb \
+  Rscript -e 'shiny::runApp("inst", host = "127.0.0.1", port = 7451)'
+```
+
+Open `http://127.0.0.1:7451`, then select **10x E18 mouse brain (1M)**. The
+dataset starts at 10% sampling with point size 1 and opacity 0.5. Increasing the
+sampling control to 100% renders all one million points. When the environment
+variable is unset, the bundled application behaves exactly as before and does
+not show this dataset.
+
+For a direct launch without the bundled dataset switcher:
+
+```{r launch-direct}
+devtools::load_all(quiet = TRUE)
+launchCerebro(
+  mode = "closed",
+  crb_file_to_load = c("10x E18 mouse brain (1M)" = crb),
+  percentage_cells_to_show = 10,
+  point_size = 1,
+  point_opacity = 0.5,
+  projections_show_hover_info = TRUE
+)
+```
+
+# Interpretation limits
+
+- The Viewer values are process medians, not confidence intervals.
+- `readRDS()` is a warm operating-system-cache measurement, not cold storage.
+- The full Viewer includes R loading, Shiny transport, JavaScript decoding, and
+  drawing; the synthetic renderer table measures only the browser renderer.
+- WebGPU results depend on the browser, driver, and adapter. The recorded run
+  used Headless Chrome 152 and Apple Metal 3.
+- The one-million-cell subset is suitable for engineering measurements, not a
+  new biological analysis of the source experiment.
+
+Remove the detached baseline checkout when it is no longer needed:
+
+```{bash cleanup, eval=FALSE}
+git worktree remove ../CerebroNexus-4.5.1-baseline
+```

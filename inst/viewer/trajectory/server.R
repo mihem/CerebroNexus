@@ -38,6 +38,11 @@ trajectory_data_reactive <- reactive({
   )
 })
 
+trajectory_cells_reactive <- reactive({
+  mergeTrajectoryWithMetaData(trajectory_data_reactive()) %>%
+    dplyr::filter(!is.na(pseudotime))
+})
+
 source(
   paste0(
     Cerebro.options[["cerebro_root"]],

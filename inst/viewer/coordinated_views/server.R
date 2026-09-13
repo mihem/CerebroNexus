@@ -33,15 +33,20 @@ source(
 )
 
 cv_saved_view_dataset <- reactive({
+  dataset <- data_set()
   metadata <- getMetaData()
   cells <- if ("cell_barcode" %in% colnames(metadata)) {
     as.character(metadata$cell_barcode)
   } else {
     rownames(metadata)
   }
+  stored_fingerprint <- tryCatch(
+    dataset$cell_fingerprint,
+    error = function(error) NULL
+  )
   list(
     cells = cells,
-    fingerprint = cv_config_cell_fingerprint(cells)
+    fingerprint = cv_config_dataset_fingerprint(cells, stored_fingerprint)
   )
 })
 
@@ -61,9 +66,8 @@ observe({
 ## How many times the bundle has actually been built this session. A plain
 ## environment rather than a reactiveVal: it is written from inside the reactive
 ## that it counts, and a reactive value would make that a dependency on itself.
-## Read back through exportTestValues -- "was any work done for a tab nobody
-## opened" is otherwise invisible from the outside, which is how it went
-## unnoticed in the first place.
+## Read back through exportTestValues so tests can distinguish an intentional
+## large-dataset prewarm from accidental builds on the ordinary lazy path.
 coordviews_build_log <- new.env(parent = emptyenv())
 coordviews_build_log$n <- 0L
 coordviews_build_log$sent_n <- 0L
@@ -82,7 +86,7 @@ coordviews_bundle <- reactive({
           )
         )
       } else {
-        b$dataset_fingerprint <- cv_config_cell_fingerprint(b$cells)
+        b$dataset_fingerprint <- cv_saved_view_dataset()$fingerprint
         b
       }
     },
@@ -99,6 +103,18 @@ coordviews_bundle <- reactive({
     }
   )
 })
+
+## Large datasets need the bundle before an on-demand click can meet the
+## interaction budget. Build it once per session during data initialisation;
+## smaller datasets retain the fully lazy path.
+observeEvent(
+  cv_saved_view_dataset(),
+  {
+    req(length(cv_saved_view_dataset()$cells) >= 200000L)
+    isolate(coordviews_bundle())
+  },
+  ignoreInit = FALSE
+)
 
 ## The bundle when it actually built; NULL otherwise. Server-side consumers
 ## (gene vectors, histology controls) need real cells, not an error payload.
@@ -355,12 +371,14 @@ observeEvent(
 )
 
 
-## Nothing is built or sent until the user actually opens the tab.
+## Nothing is sent until the user actually opens the tab. Bundles below the
+## large-dataset prewarm threshold are not built either.
 ##
 ## `coordviews_bundle()` walks every cell of the loaded object -- reductions,
 ## spatial coordinates, the immune repertoire -- and the result is sizeable.
-## Doing that on connect made every session pay for a tab most of them never
-## open; colour edits now stay in the small patch reactive above.
+## Small datasets do not pay for a tab they may never open. Large datasets use
+## the bounded prewarm above so opening the workspace stays under its budget;
+## colour edits still stay in the small patch reactive above.
 ##
 ## The client reports whether the workspace is on screen (`coordviews_visible`)
 ## -- see www/cell_views.js for why that signal rather than the sidebar's
@@ -391,11 +409,41 @@ observe(
     if (is.null(bundle$error)) {
       bundle <- cv_apply_color_patch(bundle, isolate(coordviews_color_patch()))
     }
-    session$sendCustomMessage("coordviews_data", bundle)
+    if (
+      is.null(bundle$error) &&
+        isTRUE(input[["coordviews_wire_supported"]])
+    ) {
+      session$sendBinaryMessage(
+        "coordviews_binary",
+        cv_wire_pack_bundle(bundle, include_cells = FALSE)
+      )
+      session$sendBinaryMessage(
+        "coordviews_cells",
+        cv_wire_pack_cells(bundle$dataset_id, bundle$cells)
+      )
+    } else {
+      session$sendCustomMessage("coordviews_data", bundle)
+    }
     coordviews_build_log$sent_n <- coordviews_build_log$n
   },
   priority = 1
 )
+
+observeEvent(input[["coordviews_wire_fallback"]], {
+  req(coordviews_visible())
+  request <- input[["coordviews_wire_fallback"]]
+  bundle <- cv_ok(coordviews_bundle())
+  req(!is.null(bundle))
+  requested_dataset <- as.character(request$dataset_id %||% "")
+  req(
+    !nzchar(requested_dataset) ||
+      identical(requested_dataset, bundle$dataset_id)
+  )
+  session$sendCustomMessage(
+    "coordviews_data",
+    cv_apply_color_patch(bundle, isolate(coordviews_color_patch()))
+  )
+})
 
 observeEvent(
   reactive_colors(),
@@ -536,9 +584,14 @@ output[["coordviews_selected_cells_plot"]] <- plotly::renderPlotly({
       ifelse(is_selected, "selected", "not selected"),
       levels = c("selected", "not selected")
     )
+    violin_data <- compactViolinData(
+      data.frame(group = grp, value = cells_df[[var]]),
+      "value",
+      "group"
+    )
     plot <- plotly::plot_ly(
-      x = grp,
-      y = cells_df[[var]],
+      x = violin_data[["group"]],
+      y = violin_data[["value"]],
       type = "violin",
       box = list(visible = TRUE),
       meanline = list(visible = TRUE),

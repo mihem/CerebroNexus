@@ -128,13 +128,10 @@ output[["trekker_main_parameters_ui"]] <- renderUI({
   )
 })
 
-## Render the controls eagerly (not only when the tab is shown) so they exist and
-## stay in sync with the canvas as soon as a Trekker data set is loaded.
-outputOptions(output, "trekker_main_parameters_ui", suspendWhenHidden = FALSE)
-
 ## Build the dedicated page as a two-panel specialist payload. Rendering,
 ## viewport state, selection and toolbars all stay in cell_views.js.
 observe({
+  req(identical(input[["sidebar"]], "trekker"))
   input[["trekker_projection_render_request"]]
   tk <- req(trekker_slot())
   mode <- input[["trekker_mode"]] %||% "celltype"
@@ -160,7 +157,7 @@ observe({
     gene <- input[["trekker_gene_pick"]]
     if (!is.null(gene) && gene %in% trekker_gene_names()) {
       color <- as.numeric(tryCatch(
-        data_set()$getExpressionMatrix(cells = keys, genes = gene),
+        viewerExpressionRow(data_set(), keys, gene),
         error = function(e) rep(NA_real_, length(keys))
       ))
       color_label <- gene
