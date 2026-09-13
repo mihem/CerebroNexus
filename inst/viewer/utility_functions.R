@@ -443,7 +443,7 @@ cerebroCellViewMessage <- function(
 
   nested <- identical(meta$color_type, "categorical") && is.null(data$panels)
   for (field in intersect(
-    c("x", "y", "z", "selection_key", "color", "group"),
+    c("x", "y", "z", "selection_key", "color", "group", "point_sizes"),
     names(data)
   )) {
     value <- data[[field]]
@@ -502,6 +502,11 @@ cerebroCellViewMessage <- function(
   if (is.list(extra$group_hulls)) {
     for (field in intersect(c("x", "y"), names(extra$group_hulls))) {
       extra$group_hulls[[field]] <- wire_nested(extra$group_hulls[[field]])
+    }
+  }
+  if (is.list(extra$edges)) {
+    for (field in intersect(c("x0", "y0", "x1", "y1"), names(extra$edges))) {
+      extra$edges[[field]] <- wire_array(extra$edges[[field]])
     }
   }
 
@@ -1817,8 +1822,21 @@ randomlySubsetCells <- function(table, percentage) {
 ##----------------------------------------------------------------------------##
 mergeTrajectoryWithMetaData <- function(trajectory_data) {
   trajectory_meta <- trajectory_data[["meta"]]
+  metadata <- getMetaData()
+  overlap <- intersect(colnames(metadata), colnames(trajectory_meta))
+  if (length(overlap) == 0L) {
+    trajectory_cells <- rownames(trajectory_meta)
+    idx <- if (identical(metadata[["cell_barcode"]], trajectory_cells)) {
+      seq_len(nrow(metadata))
+    } else {
+      match(metadata[["cell_barcode"]], trajectory_cells)
+    }
+    out <- cbind(metadata, trajectory_meta[idx, , drop = FALSE])
+    rownames(out) <- NULL
+    return(out)
+  }
   trajectory_meta[["cell_barcode"]] <- rownames(trajectory_meta)
-  getMetaData() %>%
+  metadata %>%
     dplyr::left_join(trajectory_meta, by = "cell_barcode")
 }
 

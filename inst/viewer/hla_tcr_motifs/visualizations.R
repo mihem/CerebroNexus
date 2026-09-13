@@ -1,17 +1,14 @@
 ##----------------------------------------------------------------------------##
 ## HLA & TCR Motifs — visualization layer
 ##
-## igraph -> visNetwork data + the renderVisNetwork output, plus the parameter
-## and status panels. Colour / legend are applied HERE from the already-built
+## igraph -> shared Canvas payload, plus the parameter and status panels.
+## Colour / legend are applied HERE from the already-built
 ## graph, so changing colour never rebuilds the graph (see data.R).
 ##----------------------------------------------------------------------------##
 
 ## Above this many colour levels a per-cluster legend is unreadable noise, so it
 ## is suppressed (metadata legends are unaffected).
 HLA_MOTIF_MAX_LEGEND_CLUSTERS <- 12
-
-## Categorical palette shared by nodes and the legend (plotly/D3-ish).
-HLA_MOTIF_MAX_PHYSICS <- 1000L
 
 ## Carrier-status colouring is a fixed scale, not an arbitrary categorical one:
 ## the four states always mean the same thing, so they keep the same order and
@@ -54,7 +51,7 @@ hla_esc <- function(x) {
   gsub(">", "&gt;", x, fixed = TRUE)
 }
 
-## ---- Build visNetwork data from a motif igraph ------------------------- ##
+## ---- Build Canvas data from a motif igraph ----------------------------- ##
 ## Node area is proportional to clone_count; colour follows `color_by` (a node attribute) or the
 ## motif cluster by default. Tooltip shows CDR3, clone size + fraction, motif
 ## cluster + consensus + MAX MISMATCH (so a transitive component is never
@@ -452,8 +449,8 @@ hla_visnet <- reactive({
     legend_mode = hla_param("hla_legend_mode", "auto"),
     lineage_col = hla_celltype_col(),
     # Display only. Read here so a size change flows through the SAME colour
-    # path: the graph is untouched, so the proxy below pushes the new radii onto
-    # the existing network instead of rebuilding and re-fitting it.
+    # path: the graph is untouched, so Canvas receives new radii without
+    # rebuilding or re-fitting the layout.
     node_scale = hla_param("hla_node_scale", 1)
   )
 })
@@ -483,144 +480,49 @@ output$hla_motif_readout <- renderUI({
   )
 })
 
-output$hla_plot_motifNetwork <- visNetwork::renderVisNetwork({
-  # Re-render only on a STRUCTURE change. Gate on the readiness latch rather than
-  # the colour-reading hla_params_ready() gate, depend on the cached graph for
-  # structure, and read the coloured visnet ISOLATED so a colour-only change does
-  # NOT re-render -- no spinner, no re-fit, no flash. That path recolours the
-  # existing network in place via the visNetworkProxy observer below.
-  req(hla_ready_latch())
-  hla_motif_graph_cached()
-  vn <- isolate(hla_visnet())
-  if (is.null(vn)) {
-    return(NULL)
-  }
-
-  net <- visNetwork::visNetwork(
-    vn$nodes,
-    vn$edges
-  )
-  # No `scaling`: it only applies to nodes carrying a `value`, and the radius is
-  # already computed per node by hla_node_radius().
-  net <- visNetwork::visNodes(net, shape = "dot")
-  net <- visNetwork::visEdges(net, color = list(color = "#cccccc"))
-  # Draw at the coordinates igraph already computed; the browser runs no physics
-  # at all.
-  #
-  # It used to: visPhysics(stabilization = list(iterations = 150)) made
-  # vis-network settle the graph in JS on every open. That work happens AFTER
-  # Shiny's output is delivered, so shinycssloaders had already taken its spinner
-  # away — and vis-network draws nothing until it finishes. Measured on the
-  # 430-node demo: ~1.8s of blank canvas with no spinner, main thread blocked
-  # throughout. The same layout out of igraph takes ~75ms in C, off the browser's
-  # thread entirely.
-  #
-  # `layout.norm` is visIgraphLayout's documented "coordinates supplied" mode: it
-  # normalises them and sets the flag the vis-network binding needs to scale them
-  # to the canvas. It is used INSTEAD of visIgraphLayout's own layout= /
-  # randomSeed= because that path calls set.seed() on the global RNG and never
-  # restores it — a render must not silently re-seed the user's session.
-  # physics = FALSE excludes the nodes from the simulation; they stay put and
-  # stay draggable.
-  net <- if (!is.null(vn$layout)) {
-    visNetwork::visIgraphLayout(
-      net,
-      layout = "layout.norm",
-      layoutMatrix = vn$layout,
-      type = "full",
-      physics = FALSE
-    )
-  } else {
-    # No coordinates (a graph from before hla_motif_layout existed): fall back to
-    # the browser settling it, rather than drawing every node at the origin.
-    visNetwork::visPhysics(
-      net,
-      enabled = vn$n_render <= HLA_MOTIF_MAX_PHYSICS,
-      stabilization = list(iterations = 150)
-    )
-  }
-  net <- visNetwork::visInteraction(
-    net,
-    hover = TRUE,
-    tooltipDelay = 100,
-    # visNetwork's own green navigation buttons clash with the app's plotly
-    # modebar; turn them off and let a matching modebar (www/hla_motifs.js) drive
-    # zoom via its buttons. Drag-to-pan stays on; zoom-by-scroll is off (below).
-    navigationButtons = FALSE,
-    # Zoom is button-only: scroll-to-zoom would let the graph shrink into empty
-    # canvas past the opening fit. Pan (drag) stays on.
-    zoomView = FALSE,
-    dragView = TRUE
-  )
-  net <- visNetwork::visEvents(
-    net,
-    selectNode = htmlwidgets::JS(
-      paste(
-        "function(p) {",
-        "if (window.cerebroHlaMotifs) {",
-        "window.cerebroHlaMotifs.handleNativeSelection(p.nodes);",
-        "}",
-        "}"
-      )
-    ),
-    deselectNode = htmlwidgets::JS(
-      paste(
-        "function() {",
-        "if (window.cerebroHlaMotifs) {",
-        "window.cerebroHlaMotifs.handleNativeSelection([]);",
-        "}",
-        "}"
-      )
-    ),
-    # The opening view (igraph coords, fitted to the canvas) is the smallest the
-    # network may get. Zoom is button-only (zoomView = FALSE), so the floor is
-    # enforced by www/hla_motifs.js's zoom-out button; here we just capture that
-    # floor and grey the button out once the network sits at it. vis-network
-    # binds `this` to the emitter, not the network, so the instance is looked up
-    # via HTMLWidgets (the same handle www/hla_motifs.js uses).
-    afterDrawing = htmlwidgets::JS(
-      "function() {",
-      "  var w = HTMLWidgets.find('#hla_plot_motifNetwork');",
-      "  var net = w && w.network; if (!net) { return; }",
-      "  var s = net.getScale();",
-      "  if (!(s > 0)) { return; }",
-      # The opening fit settles over a few draws (scale keeps shrinking to fit
-      # the graph), so track the smallest scale seen rather than the first: that
-      # converges to the true fit floor. Zoom-IN only raises it, never lowers.
-      "  net.hlaMinScale = (net.hlaMinScale == null)",
-      "    ? s : Math.min(net.hlaMinScale, s);",
-      # Grey the zoom-out button when the network is already at that floor.
-      "  var b = document.querySelector('#hla-modebar [data-act=\"zoomout\"]');",
-      "  if (b) { b.classList.toggle('hla-mb-btn--off', s <= net.hlaMinScale + 1e-6); }",
-      "  if (window.cerebroHlaMotifs) { window.cerebroHlaMotifs.onDraw(); }",
-      "}"
-    )
-  )
-  # No visLegend: it can only sit left or right and eats 15% of the canvas width.
-  # The legend is drawn above the plot as a single horizontally scrolling row.
-  net
-})
-
-## ---- Recolour in place ------------------------------------------------ ##
-## When only the colour layer changes (colour-by, the allele under the "all"
-## scope, or the legend mode), the graph is identical -- every node carries every
-## colourable column -- so push the new node colours and tooltips onto the
-## existing network via a proxy instead of re-rendering it. This is what makes a
-## colour switch instant: no spinner, no re-fit, no flash. Structure changes go
-## through the renderer above (which rebuilds); ignoreInit skips the first fire,
-## which the initial render already painted.
-observeEvent(hla_visnet(), ignoreInit = TRUE, {
+observe({
+  req(input[["hla_motif_network_render_request"]], hla_ready_latch())
   vn <- hla_visnet()
-  if (is.null(vn)) {
+  if (is.null(vn) || is.null(vn$layout)) {
     return()
   }
-  proxy <- visNetwork::visNetworkProxy("hla_plot_motifNetwork")
-  # `size` travels with the colour update: the node-size multiplier is display
-  # only, so it must resize in place exactly like a recolour rather than trigger
-  # a rebuild and re-fit.
-  visNetwork::visUpdateNodes(
-    proxy,
-    nodes = vn$nodes[, c("id", "color", "title", "detail", "size")]
+
+  from <- vn$edges$from
+  to <- vn$edges$to
+  cerebroCellViewRender(
+    "hla_motif_network",
+    meta = list(
+      color_type = "coexpression",
+      color_variable = vn$legend_title,
+      appearance = list(
+        group_labels = FALSE,
+        draw_border = TRUE,
+        keep_square = FALSE
+      ),
+      space_label = "Motif network"
+    ),
+    data = list(
+      x = vn$layout[, 1],
+      y = vn$layout[, 2],
+      selection_key = vn$nodes$node_key,
+      color = vn$nodes$color,
+      point_sizes = 2 * vn$nodes$size,
+      point_size = min(20, stats::median(2 * vn$nodes$size)),
+      point_opacity = 1,
+      reset_axes = FALSE
+    ),
+    hover = list(
+      hoverinfo = "text",
+      text = vn$nodes$title
+    ),
+    extra = list(
+      edges = list(
+        x0 = vn$layout[from, 1],
+        y0 = vn$layout[from, 2],
+        x1 = vn$layout[to, 1],
+        y1 = vn$layout[to, 2]
+      )
+    )
   )
 })
 

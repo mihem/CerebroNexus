@@ -717,6 +717,7 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
               "from_y",
               "to_x",
               "to_y",
+              "point_sizes",
               "color",
               "r",
               "g",

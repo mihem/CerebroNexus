@@ -122,7 +122,19 @@ All expression results passed equality checks.
 | HLA & TCR Motifs | 248 ms | 128 ms | pass `<500 ms` |
 | Coordinated Views | 130 ms | 113 ms | pass `<500 ms` |
 
-The remaining bottlenecks are page payload construction and transfer rather than gene retrieval. Overview still sends the full million-cell payload, while HLA and Immune Repertoire spend most of their first visit building derived network/repertoire state. Raw exploratory observations are in `tests/bench/results/million_cell_bpcells_quick_pr4.tsv` and `tests/bench/results/million_cell_pages_quick_pr3_pr4.tsv`.
+The focused HLA/Trajectory pass then removed the HLA metadata/parsing bottlenecks, built motif edges without a dense adjacency matrix, rendered the full motif graph through the shared Canvas path, and deferred non-primary Trajectory panels until its million-point projection had flushed.
+
+| Page | PR3 first visit | Focused PR4 first visit | Change | Target |
+| --- | ---: | ---: | ---: | ---: |
+| Trajectory | 3,660 ms | 2,434 ms | 33.5% faster | pass `<3 s` |
+| HLA & TCR Motifs | 5,913 ms | 2,696 ms | 54.4% faster | pass `<3 s` |
+
+| Page | Focused PR4 repeat | Repeat target |
+| --- | ---: | ---: |
+| Trajectory | 1,266 ms | fail `<500 ms` |
+| HLA & TCR Motifs | 126 ms | pass `<500 ms` |
+
+The HLA focused result waits for the shared Canvas renderer to finish drawing every node and edge instead of waiting for unrelated page-level Shiny work to become idle. It is the user-visible completed-first-frame metric; the old PR3 HLA number used the broader idle gate, so its percentage is directional rather than a publication-grade same-harness estimate. Raw exploratory observations are in `tests/bench/results/million_cell_bpcells_quick_pr4.tsv`, `tests/bench/results/million_cell_pages_quick_pr3_pr4.tsv`, and `tests/bench/results/million_cell_hla_trajectory_focused_pr4.tsv`.
 
 ## Environment
 

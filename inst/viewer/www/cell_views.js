@@ -1035,7 +1035,7 @@
 
   function drawTrajectory(p) {
     var sp = spaceById[p.spaceId];
-    if (!sp || !sp.trajectory || !sp.edges || !sp.edges.length) return;
+    if (!sp || !sp.trajectory || !sp.edges) return;
     var c = p.ctx;
     c.save();
     c.globalAlpha = 0.72;
@@ -1043,14 +1043,22 @@
     c.lineWidth = 1.5;
     c.lineCap = 'round';
     c.beginPath();
-    sp.edges.forEach(function (edge) {
-      if (!edge || edge.length < 4) return;
-      var source = dataToScreen(p, Number(edge[0]), Number(edge[1]));
-      var target = dataToScreen(p, Number(edge[2]), Number(edge[3]));
+    var drawEdge = function (x0, y0, x1, y1) {
+      var source = dataToScreen(p, Number(x0), Number(y0));
+      var target = dataToScreen(p, Number(x1), Number(y1));
       if (!source || !target) return;
-      c.moveTo(source[0], source[1]);
-      c.lineTo(target[0], target[1]);
-    });
+      c.moveTo(source[0], source[1]); c.lineTo(target[0], target[1]);
+    };
+    if (Array.isArray(sp.edges)) {
+      sp.edges.forEach(function (edge) {
+        if (edge && edge.length >= 4) drawEdge(edge[0], edge[1], edge[2], edge[3]);
+      });
+    } else {
+      var n = sp.edges.x0 && sp.edges.x0.length || 0;
+      for (var i = 0; i < n; i++) {
+        drawEdge(sp.edges.x0[i], sp.edges.y0[i], sp.edges.x1[i], sp.edges.y1[i]);
+      }
+    }
     c.stroke();
     c.restore();
   }
@@ -1346,8 +1354,11 @@
     return pointOpacity;
   }
   function radiusOf(p, i) {
+    var space = spaceById[p.spaceId];
+    var pointSizes = space && space.pointSizes;
     var pointSize = p._renderPointSize == null
       ? pointSizeOf(p) : p._renderPointSize;
+    if (pointSizes && Number(pointSizes[i]) > 0) pointSize = Number(pointSizes[i]);
     var radius = pointSize / 2;
     if (!p.depth) return radius;
     var t = (p.depth[i] - p._dmin) / p._dspan;   // 0 = furthest, 1 = nearest
@@ -1449,7 +1460,8 @@
     if (!p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     return !!(space && unit && !unit.nz && !space.background_scope &&
-      !space._axisSpec && !space.trajectory && !(space.hulls && space.hulls.length));
+      !space.pointSizes &&
+      !space._axisSpec && !(space.hulls && space.hulls.length));
   }
   function gpuEligible(p) {
     return gpuCandidate(p) && p.gpu.isReady();
@@ -1793,6 +1805,7 @@
     // a pan, a zoom, a rotation. Left where it was, it would be labelling
     // whatever the view slid underneath it.
     repositionPinned(p);
+    p.canvas.dataset.pointCount = String(D.n);
     scheduleSingleAux();
   }
   // Live "showing N / M cells" readout — the single feedback that a filter or
@@ -2567,8 +2580,12 @@
         if (arr && sp) sel.forEach(function (i) {
           x.push(sp.x[i]); y.push(sp.y[i]);
         });
-        Shiny.setInputValue(singleActive + '_persistent_selection', arr
-          ? { x: x, y: y, ids: arr } : null);
+        var singleView = singleViews[singleActive];
+        if (arr || (singleView && singleView._selectionReported)) {
+          Shiny.setInputValue(singleActive + '_persistent_selection', arr
+            ? { x: x, y: y, ids: arr } : null);
+          if (singleView) singleView._selectionReported = true;
+        }
       } else {
         Shiny.setInputValue('coordviews_selection', arr);
       }
@@ -5819,6 +5836,10 @@
     return out;
   }
   function singleEdges(extra) {
+    var columns = extra && extra.edges;
+    if (columns && columns.x0 && columns.y0 && columns.x1 && columns.y1) {
+      return columns;
+    }
     var shapes = extra && Array.isArray(extra.shapes) ? extra.shapes : [];
     return shapes.filter(function (shape) {
       return shape && shape.x0 != null && shape.y0 != null &&
@@ -5943,6 +5964,13 @@
     var baseId = 'single::' + id, spaces = [], modes = {};
     var edges = singleEdges(extra);
     var hulls = singleHulls(extra);
+    var pointSizes = (Array.isArray(data.point_sizes) ||
+      ArrayBuffer.isView(data.point_sizes))
+      ? alignFlatValues(
+        Array.isArray(data.selection_key) ? data.selection_key : [],
+        data.point_sizes,
+        null
+      ) : null;
     var hasZ = aligned.z !== null;
     var hasHover = aligned.hoverEnabled.some(Boolean);
     var makeSpace = function (spaceId, label) {
@@ -5965,7 +5993,11 @@
         };
       }
       if (Array.isArray(meta.axes)) space.axes = meta.axes.slice(0, 3);
-      if (edges.length) { space.trajectory = true; space.edges = edges; }
+      if ((Array.isArray(edges) && edges.length) ||
+          (!Array.isArray(edges) && edges.x0 && edges.x0.length)) {
+        space.trajectory = true; space.edges = edges;
+      }
+      if (pointSizes) space.pointSizes = pointSizes;
       if (hulls.length) space.hulls = hulls;
       if (meta.is_spatial) {
         space.background_scope = id;

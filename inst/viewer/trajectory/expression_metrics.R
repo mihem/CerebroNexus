@@ -14,6 +14,7 @@
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_expression_metrics_UI"]] <- renderUI({
+  req(trajectory_projection_sent())
   ##
   req(trajectory_selection_ok())
 

@@ -9,6 +9,7 @@
 ##----------------------------------------------------------------------------##
 
 output[["trajectory_states_by_group_UI"]] <- renderUI({
+  req(trajectory_projection_sent())
   req(trajectory_selection_ok())
 
   fluidRow(

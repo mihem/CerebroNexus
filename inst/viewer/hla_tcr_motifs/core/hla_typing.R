@@ -680,7 +680,11 @@ hla_lineage_column_score <- function(values) {
   if (length(v) == 0) {
     return(0)
   }
-  mean((hla_lineage_context(v) != "Unknown") & !hla_is_condition_label(v))
+  counts <- table(v)
+  labels <- names(counts)
+  accepted <- hla_lineage_context(labels) != "Unknown" &
+    !hla_is_condition_label(labels)
+  sum(counts[accepted]) / sum(counts)
 }
 
 ## The share a candidate column must reach before it may be INFERRED as the

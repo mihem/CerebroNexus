@@ -1,3 +1,11 @@
+# CerebroNexus 4.6.2
+
+## Viewer
+
+- Gene-major BPCells sidecars accelerate single-gene, RGB, multi-gene, and mean-expression reads for million-cell data while preserving the existing CRB fallback.
+- Inactive page work is deferred, HLA motif processing avoids dense adjacency matrices, and the HLA and Trajectory first frames meet the three-second million-cell target.
+- Specialist Canvas views resend their payload whenever remounted, so returning from Linked Views no longer leaves Projection, Gene Expression, Spatial, Trajectory, or HLA blank.
+
 # CerebroNexus 4.6.1
 
 ## Viewer

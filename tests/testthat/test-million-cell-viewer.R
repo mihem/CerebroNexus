@@ -88,6 +88,44 @@ test_that("specialist pages do not request the full linked bundle", {
   expect_no_match(engine, "linkedVis || !!singleId", fixed = TRUE)
 })
 
+test_that("specialist pages resend whenever they become visible again", {
+  pages <- list(
+    list(
+      c("overview", "event_projection_update_plot.R"),
+      "overview_projection_render_request"
+    ),
+    list(
+      c("gene_expression", "event_projection_update_plot.R"),
+      "expression_projection_render_request"
+    ),
+    list(
+      c("spatial", "event_projection_update_plot.R"),
+      "spatial_projection_render_request"
+    ),
+    list(
+      c("trajectory", "projection_plot.R"),
+      "trajectory_projection_render_request"
+    ),
+    list(
+      c("hla_tcr_motifs", "visualizations.R"),
+      "hla_motif_network_render_request"
+    )
+  )
+
+  for (page in pages) {
+    source <- paste(
+      readLines(do.call(viewer_test_path, as.list(page[[1]])), warn = FALSE),
+      collapse = "\n"
+    )
+    expect_match(
+      source,
+      sprintf('req(input[["%s"]]', page[[2]]),
+      fixed = TRUE,
+      info = page[[2]]
+    )
+  }
+})
+
 test_that("specialist pages use binary transport when the browser supports it", {
   utility <- paste(
     readLines(viewer_test_path("utility_functions.R"), warn = FALSE),
@@ -102,6 +140,46 @@ test_that("specialist pages use binary transport when the browser supports it", 
   expect_match(utility, '"cell_view_binary"', fixed = TRUE)
   expect_match(engine, "'cell_view_binary'", fixed = TRUE)
   expect_match(engine, "!ArrayBuffer.isView(data.color)", fixed = TRUE)
+})
+
+test_that("trajectory cell views remain eligible for WebGPU", {
+  skip_if(Sys.which("node") == "", "node not on PATH")
+  source <- viewer_test_path("www", "cell_views.js")
+  runner <- tempfile(fileext = ".js")
+  on.exit(unlink(runner), add = TRUE)
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      sprintf(
+        "const source = fs.readFileSync(%s, 'utf8');",
+        encodeString(source, quote = '"')
+      ),
+      "const fn = source.match(/function gpuCandidate\\(p\\) \\{[\\s\\S]*?\\n  \\}/)[0];",
+      "const GPU_MIN_CELLS = 4096, D = {n: 1000000};",
+      "const spaceById = {trajectory: {_unit: {nz: false}, trajectory: true}};",
+      "eval(fn);",
+      "if (!gpuCandidate({gpu: {}, spaceId: 'trajectory'})) process.exit(1);"
+    ),
+    runner
+  )
+
+  expect_identical(system2("node", runner), 0L)
+})
+
+test_that("single Canvas views accept per-point sizes", {
+  utility <- paste(
+    readLines(viewer_test_path("utility_functions.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  javascript <- paste(
+    readLines(viewer_test_path("www", "cell_views.js"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(utility, '"point_sizes"', fixed = TRUE)
+  expect_match(javascript, "space.pointSizes", fixed = TRUE)
+  expect_match(javascript, "pointSizes[i]", fixed = TRUE)
+  expect_match(javascript, "singleView._selectionReported", fixed = TRUE)
 })
 
 test_that("gene controls load transcriptome choices server-side", {

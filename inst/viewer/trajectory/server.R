@@ -39,8 +39,11 @@ trajectory_data_reactive <- reactive({
 })
 
 trajectory_cells_reactive <- reactive({
-  mergeTrajectoryWithMetaData(trajectory_data_reactive()) %>%
-    dplyr::filter(!is.na(pseudotime))
+  cells <- mergeTrajectoryWithMetaData(trajectory_data_reactive())
+  if (anyNA(cells$pseudotime)) {
+    cells <- cells[!is.na(cells$pseudotime), , drop = FALSE]
+  }
+  cells
 })
 
 source(

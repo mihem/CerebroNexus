@@ -1,18 +1,10 @@
 ##----------------------------------------------------------------------------##
 ## Update projection plot when overview_projection_data_to_plot() changes.
 ##----------------------------------------------------------------------------##
-overview_projection_started <- reactiveVal(FALSE)
 overview_projection_rendered <- reactiveVal(FALSE)
-observeEvent(
-  input[["overview_projection_render_request"]],
-  {
-    overview_projection_started(TRUE)
-  },
-  ignoreInit = TRUE
-)
 
 observe({
-  req(overview_projection_started())
+  req(input[["overview_projection_render_request"]])
   first_render <- !isolate(overview_projection_rendered())
   data <- if (first_render) {
     overview_projection_data_to_plot_raw()

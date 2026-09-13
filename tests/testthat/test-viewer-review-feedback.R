@@ -400,19 +400,20 @@ test_that("Trekker uses the shared top toolbar and settings drawer", {
 
 test_that("HLA keeps zoom-to-selection in its panel toolbar", {
   ui <- viewer_source("hla_tcr_motifs", "UI.R")
-  javascript <- viewer_source("www", "hla_motifs.js")
+  linked_ui <- viewer_source("coordinated_views", "UI.R")
+  javascript <- viewer_source("www", "cell_views.js")
 
   expect_match(
     ui,
-    'button("zsel", "Zoom to selection", "crop-simple", disabled = TRUE)',
+    'cerebroCellViewOutput("hla_motif_network")',
     fixed = TRUE
   )
-  expect_match(javascript, "action === 'zsel'", fixed = TRUE)
   expect_match(
-    javascript,
-    "button.disabled = !selectedKeys.length",
+    linked_ui,
+    'class = "cv-tbtn cv-zsel-btn"',
     fixed = TRUE
   )
+  expect_match(javascript, "zoomToSelection(pp)", fixed = TRUE)
 })
 
 test_that("Linked actions stay compact and match their scope", {
@@ -933,7 +934,7 @@ test_that("cell scatter pages debounce only complete render snapshots", {
   }
   for (path in snapshot_files) {
     source <- paste(readLines(path, warn = FALSE), collapse = "\n")
-    expect_match(source, "<- debounce(", fixed = TRUE)
+    expect_match(source, "<- debounceAfterFirst(", fixed = TRUE)
   }
 
   spatial_update <- viewer_source(

@@ -214,6 +214,19 @@ observeEvent(
   ignoreInit = TRUE
 )
 
+observeEvent(
+  input[["hla_motif_network_persistent_selection"]],
+  {
+    selection <- input[["hla_motif_network_persistent_selection"]]
+    keys <- hla_selection_values(
+      if (is.list(selection)) selection$ids else NULL
+    )
+    graph <- isolate(hla_motif_graph())
+    hla_selected_node_keys(intersect(keys, hla_graph_node_keys(graph)))
+  },
+  ignoreNULL = FALSE
+)
+
 hla_selected_cells <- reactive({
   graph <- hla_motif_graph()
   keys <- intersect(

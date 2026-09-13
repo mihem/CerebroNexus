@@ -18,8 +18,20 @@ if (is.na(repeats) || repeats < 1L) {
 }
 
 quote_r <- function(value) encodeString(value, quote = '"')
-page <- function(tab, ready = NULL, budget_ms = 2000, required = FALSE) {
-  list(tab = tab, ready = ready, budget_ms = budget_ms, required = required)
+page <- function(
+  tab,
+  ready = NULL,
+  budget_ms = 2000,
+  required = FALSE,
+  wait_idle = TRUE
+) {
+  list(
+    tab = tab,
+    ready = ready,
+    budget_ms = budget_ms,
+    required = required,
+    wait_idle = wait_idle
+  )
 }
 pages <- list(
   groups = page(
@@ -53,9 +65,13 @@ pages <- list(
   ),
   hla = page(
     "hla_tcr_motifs",
-    "#hla_plot_motifNetwork canvas",
+    paste0(
+      "#hla_motif_network_cell_view_host ",
+      "canvas:not(.cv-mini)[data-point-count]"
+    ),
     budget_ms = 3000,
-    required = TRUE
+    required = TRUE,
+    wait_idle = FALSE
   ),
   marker_genes = page("markerGenes"),
   most_expressed_genes = page("mostExpressedGenes"),
@@ -69,6 +85,15 @@ pages <- list(
   about = page("about"),
   coordinated_views = page("coordinated_views")
 )
+only <- Sys.getenv("VIEWER_PAGES_ONLY")
+if (nzchar(only)) {
+  only <- trimws(strsplit(only, ",", fixed = TRUE)[[1L]])
+  unknown <- setdiff(only, names(pages))
+  if (length(unknown)) {
+    stop("Unknown VIEWER_PAGES_ONLY page: ", unknown[[1L]], call. = FALSE)
+  }
+  pages <- pages[only]
+}
 
 page_active_js <- function(page, first) {
   ready <- if (!isTRUE(first) || is.null(page$ready)) {
@@ -76,7 +101,7 @@ page_active_js <- function(page, first) {
   } else {
     sprintf("!!p.querySelector(%s)", quote_r(page$ready))
   }
-  idle <- if (isTRUE(first)) {
+  idle <- if (isTRUE(first) && isTRUE(page$wait_idle)) {
     "!document.documentElement.classList.contains('shiny-busy')"
   } else {
     "true"

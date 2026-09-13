@@ -1,5 +1,5 @@
 ---
-title: "Benchmark the million-cell Viewer"
+title: "Benchmark the million-cell Viewer from PR0 through PR4"
 author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -10,7 +10,7 @@ output:
     self_contained: yes
     mode: selfcontained
 vignette: >
-  %\VignetteIndexEntry{Benchmark the million-cell Viewer}
+  %\VignetteIndexEntry{Benchmark the million-cell Viewer from PR0 through PR4}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -25,17 +25,48 @@ knitr::opts_chunk$set(
 
 # Purpose
 
-This guide reproduces the million-cell workload used to profile the
-CerebroNexus Viewer. It covers four separate operations:
+This guide reproduces the million-cell workload used to profile CerebroNexus from PR0 through PR4. It covers five separate operations:
 
 1. download the official 10x Genomics E18 mouse-brain matrix;
 2. build a reproducible one-million-cell Seurat object and BPCells-backed CRB;
-3. compare the 4.5.1 Canvas Viewer with the 4.6.0 WebGPU Viewer;
-4. launch the same data interactively through the bundled demo app.
+3. compare the PR0 compact CRB, PR1 backend hot paths, PR2 WebGPU Viewer, and PR3 startup changes;
+4. measure the PR4 gene-major expression layout and slow-page follow-up;
+5. launch the same data interactively through the bundled demo app.
 
-The expensive chunks are deliberately not evaluated while building the
-vignette. A package build must never download a 3.93 GiB source matrix or start
-a browser benchmark.
+The expensive chunks are deliberately not evaluated while building the vignette. A package build must never download a 3.93 GiB source matrix or start a browser benchmark.
+
+# PR0–PR4 optimization line
+
+The five PRs change different layers and therefore use separate benchmark harnesses. CRB lifecycle, R backend operations, installed-package startup, browser navigation, and renderer-only measurements must not be combined into one synthetic end-to-end number.
+
+| PR | Measurement point | Optimization layer | Main change |
+|---|---|---|---|
+| PR0 | `27303f21` | CRB persistence | Thin control payload, qs2 serialization, BPCells hydration |
+| PR1 | `1ad8abc0` | Viewer backend | Integer indexes, batched/storage-order reads, backend-native aggregation, compact bundles |
+| PR2 | `010be5fe` / `6b7dce4a` | Browser rendering | Binary transport, WebGPU, deferred hover and first-frame work |
+| PR3 | `639acb89` | Installed startup | Thin CRB schema v2, stored cell count, lazy hydration, deferred inactive servers |
+| PR4 | Working tree after `f5fc8bc9` | Expression layout and slow pages | Gene-major BPCells export, cached page state, HLA Canvas, Trajectory first-frame scheduling |
+
+The headline measurements below use the official 10x E18 mouse brain at 1,000,000 cells and 27,998 genes. PR4 page measurements additionally use a deterministic fixture containing 1,000,000 trajectory rows, 100,000 synthetic receptor rows, and 32 synthetic HLA-typed samples.
+
+| PR | Representative metric | Before | After | Change |
+|---|---|---:|---:|---:|
+| PR0 | CRB control payload | 26.829 MiB | 13.213 MiB | 50.7% smaller |
+| PR0 | CRB write median | 8,001 ms | 231 ms | 34.6x faster |
+| PR0 | CRB decode median | 1,296 ms | 41 ms | 31.6x faster |
+| PR1 | Full projection selection | 197 ms | 31 ms | 84.3% faster |
+| PR1 | RGB, 3 genes × 1M cells | 12,498 ms | 4,021 ms | 67.8% faster |
+| PR1 | Mean, 100 genes × 1M cells | 5,912 ms | 3,931 ms | 33.5% faster |
+| PR2 | First Overview, 1M cells | 48.768 s Canvas | 1.377 s WebGPU | 97.2% faster |
+| PR2 | Zoom median, 1M cells | 280.9 ms Canvas | 8.0 ms WebGPU | 35.1x faster |
+| PR3 | Process start to Data Info | 3.692 s schema v1 | 2.557 s schema v2 | 30.7% faster |
+| PR3 | Process start to Data Info vs Legacy RDS | 9.045 s | 2.557 s | 71.7% faster cumulatively |
+| PR4 | RGB, 3 genes × 1M cells | 3,984 ms column-major | 202 ms gene-major | 94.9% faster |
+| PR4 | Mean, 100 genes × 1M cells | 3,748 ms column-major | 55 ms gene-major | 98.5% faster |
+| PR4 | Trajectory first visit | 3,660 ms PR3 | 2,434 ms PR4 | 33.5% faster |
+| PR4 | HLA & TCR Motifs first frame | 5,913 ms PR3 | 2,696 ms PR4 | 54.4% faster, directional |
+
+The PR4 HLA result waits for every Canvas node and edge to be painted. The older PR3 measurement waited for the broader page-level Shiny idle state, so the HLA percentage shows the practical direction and target result rather than a publication-grade same-harness estimate. The detailed sections below preserve each benchmark's own scope and provenance.
 
 # Requirements and disk use
 
@@ -298,9 +329,72 @@ Both candidates used WebGPU. Results are medians of three alternating fresh proc
 
 Overview and Linked Views now meet the three-second navigation target. Integer vectors use the narrowest lossless wire type, reducing this dataset's initial Linked Views bundle from 28,001,836 to 15,001,832 bytes (46.4% smaller). Hover columns remain in their grouped representation and are expanded only for the point actually under the pointer. Non-render-critical hover data is sent after the first-frame work rather than competing with it.
 
-The full-million gene and RGB rows remain dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU keeps their eventual million-point render responsive and avoids browser lock-up, but it does not turn that storage scan into a three-second operation. Improving those two rows requires a separate expression-cache or pre-aggregation change and is not claimed by this Viewer-rendering release.
+At the PR2 stage, the full-million gene and RGB rows remained dominated by reading expression values from the 3.5 GiB BPCells sidecar. WebGPU kept their eventual million-point render responsive and avoided browser lock-up, but it could not accelerate the storage scan. PR4 addresses that separate storage problem with a gene-major BPCells layout.
 
 The 14-second `Data ready` values in this table use the same source-tree harness described above and are reported separately from the page-navigation target. The PR3 installed-package harness reaches Data Info in a 2.557-second median with a schema v2 thin CRB, down from the preceding 4.097-second runtime optimization point; the renderer and navigation timings begin only after that startup phase.
+
+## Measure PR4 gene-major expression and slow pages
+
+PR4 physically stores the exported BPCells matrix in row-major order so a gene query reads the requested rows instead of scanning the cell-major representation. Thin CRB schema v2 and its logical genes-by-cells API remain unchanged. The benchmark alternates the old and new artifacts, uses warm-cache medians, verifies identical dimensions and dimnames, and checks every returned expression result with `all.equal()` before recording a timing.
+
+```{bash pr4-gene-major, eval=FALSE}
+Rscript tests/bench/benchmark_bpcells_storage_order.R \
+  /path/to/column-major.crb \
+  /path/to/gene-major.crb \
+  tests/bench/results/million_cell_bpcells_quick_pr4.tsv \
+  3
+```
+
+| Operation | BPCells column-major | Gene-major | Change |
+|---|---:|---:|---:|
+| Single gene × 1M cells | 3,982 ms | 194 ms | 95.1% faster |
+| RGB, 3 genes × 1M cells | 3,984 ms | 202 ms | 94.9% faster |
+| Multi-panel, 9 genes × 1M cells | 3,970 ms | 231 ms | 94.2% faster |
+| Mean, 100 genes × 1M cells | 3,748 ms | 55 ms | 98.5% faster |
+
+PR4 also reuses spatial render state and defers inactive Viewer pages. The page benchmark uses the same gene-major CRB for PR3 and PR4 so this comparison isolates runtime code changes rather than crediting the new expression layout twice. These are exploratory single warm-cache observations, not publication medians.
+
+| Page | PR3 first visit | Initial PR4 first visit | Change | Initial PR4 target |
+|---|---:|---:|---:|---:|
+| Groups | 1,273 ms | 1,272 ms | 0.1% faster | pass `<2 s` |
+| Overview | 10,198 ms | 10,375 ms | 1.7% slower | fail `<2 s` |
+| Gene Expression | 3,620 ms | 2,135 ms | 41.0% faster | fail `<2 s` |
+| Immune Repertoire | 7,504 ms | 6,973 ms | 7.1% faster | fail `<2 s` |
+| Trajectory | 3,660 ms | 3,050 ms | 16.7% faster | fail `<3 s` by 50 ms |
+| HLA & TCR Motifs | 5,913 ms | 5,714 ms | 3.4% faster | fail `<3 s` |
+| Coordinated Views | 4,741 ms | 3,272 ms | 31.0% faster | fail `<2 s` |
+
+The focused follow-up matches cell barcodes once, vectorizes receptor parsing, constructs motif edges without a dense adjacency matrix, draws the complete HLA graph through the shared Canvas renderer, enables WebGPU for the million-point Trajectory projection, and defers its secondary panels until the primary projection flushes.
+
+| Page | PR3 first visit | Focused PR4 first visit | Change | Target |
+|---|---:|---:|---:|---:|
+| Trajectory | 3,660 ms | 2,434 ms | 33.5% faster | pass `<3 s` |
+| HLA & TCR Motifs | 5,913 ms | 2,696 ms | 54.4% faster | pass `<3 s` |
+
+| Page | Focused PR4 repeat | Repeat target |
+|---|---:|---:|
+| Trajectory | 1,266 ms | fail `<500 ms` |
+| HLA & TCR Motifs | 126 ms | pass `<500 ms` |
+
+Prepare the deterministic page fixture beside the same BPCells sidecar, then run either the complete page set or the focused HLA/Trajectory gate:
+
+```{bash pr4-pages, eval=FALSE}
+PAGES_CRB="$(dirname "$CRB")/cerebro_mouse_brain_1m_pages.crb"
+
+Rscript tests/bench/prepare_viewer_1m_pages.R \
+  . "$CRB" "$PAGES_CRB"
+
+Rscript tests/bench/benchmark_viewer_1m_pages.R \
+  . "$PAGES_CRB" \
+  /tmp/million-cell-pages.tsv 1
+
+VIEWER_PAGES_ONLY=trajectory,hla \
+  Rscript tests/bench/benchmark_viewer_1m_pages.R \
+  . "$PAGES_CRB" \
+  /tmp/million-cell-hla-trajectory.tsv 1
+```
+
+The complete raw PR4 tables are stored in `tests/bench/results/million_cell_bpcells_quick_pr4.tsv`, `tests/bench/results/million_cell_pages_quick_pr3_pr4.tsv`, and `tests/bench/results/million_cell_hla_trajectory_focused_pr4.tsv`.
 
 ## Measure the renderer alone
 

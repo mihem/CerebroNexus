@@ -33,7 +33,10 @@ trajectory_projection_prepared <- reactive({
     }),
     groups
   )
-  cells_df <- cells_df[cerebroGroupFilterMask(cells_df, group_filters), ]
+  keep <- cerebroGroupFilterMask(cells_df, group_filters)
+  if (!all(keep)) {
+    cells_df <- cells_df[keep, , drop = FALSE]
+  }
 
   ## randomly remove cells (if necessary)
   cells_df <- randomlySubsetCells(
@@ -58,8 +61,13 @@ trajectory_projection_prepared <- reactive({
     ))
   }
 
-  ## put rows in random order (so no group is drawn systematically on top)
-  cells_df <- cells_df[sample(seq_len(nrow(cells_df))), ]
+  ## Categorical payloads are split into one trace per group below, so shuffling
+  ## rows within a trace cannot change paint order. Continuous colours stay
+  ## shuffled so the original overlap behaviour is preserved.
+  color_variable <- input[["trajectory_point_color"]]
+  if (is.numeric(cells_df[[color_variable]])) {
+    cells_df <- cells_df[sample.int(nrow(cells_df)), , drop = FALSE]
+  }
 
   ## trajectory path as line-segment shapes (warm near-black, the theme title
   ## colour), drawn under the points as the structural backbone
@@ -106,7 +114,7 @@ trajectory_projection_prepared <- reactive({
     trajectory_lines = trajectory_lines,
     hover_columns = hover_columns,
     hover = hover,
-    color_variable = input[["trajectory_point_color"]],
+    color_variable = color_variable,
     point_size = input[["trajectory_point_size"]],
     point_opacity = input[["trajectory_point_opacity"]],
     group_labels = isTRUE(input[["trajectory_projection_group_labels"]]),
@@ -152,17 +160,10 @@ observeEvent(
 ##----------------------------------------------------------------------------##
 ## Observer that pushes the prepared data to the shared JS renderer.
 ##----------------------------------------------------------------------------##
-trajectory_projection_started <- reactiveVal(FALSE)
-observeEvent(
-  input[["trajectory_projection_render_request"]],
-  {
-    trajectory_projection_started(TRUE)
-  },
-  ignoreInit = TRUE
-)
+trajectory_projection_sent <- reactiveVal(FALSE)
 
 observe({
-  req(trajectory_projection_started())
+  req(input[["trajectory_projection_render_request"]])
   prepared <- trajectory_projection_prepared()
   req(prepared)
 
@@ -238,6 +239,12 @@ observe({
     payload[["hover"]],
     extra = list(shapes = prepared[["trajectory_lines"]])
   )
+  if (!isolate(trajectory_projection_sent())) {
+    session$onFlushed(
+      function() trajectory_projection_sent(TRUE),
+      once = TRUE
+    )
+  }
 })
 
 ##----------------------------------------------------------------------------##
