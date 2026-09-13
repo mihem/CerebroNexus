@@ -89,6 +89,41 @@ The PR3 startup benchmark uses the installed package, a fresh R process and brow
 
 The current 2.557-second median passes the strict `<3,000 ms` gate with 443 ms of median headroom. Relative to the prior installed-runtime optimization point of 4.097 seconds, PR3 is 37.6% faster; relative to the original 9.045-second Legacy RDS path, it is 71.7% faster. Raw observations are in `tests/bench/results/million_cell_startup_sub3_4_6_0.csv`.
 
+## PR4 quick comparison
+
+These are exploratory single warm-cache observations, not publication medians. PR3 and PR4 used the same current-schema gene-major CRB, 1,000,000 trajectory rows, 100,000 synthetic receptor rows, and 32 synthetic HLA-typed samples. The page table isolates runtime changes because both candidates use the same gene-major expression artifact.
+
+| Backend operation | BPCells column-major | Gene-major | Change |
+| --- | ---: | ---: | ---: |
+| Single gene × 1M cells | 3,982 ms | 194 ms | 95.1% faster |
+| RGB, 3 genes × 1M cells | 3,984 ms | 202 ms | 94.9% faster |
+| 9 genes × 1M cells | 3,970 ms | 231 ms | 94.2% faster |
+| Mean, 100 genes × 1M cells | 3,748 ms | 55 ms | 98.5% faster |
+
+All expression results passed equality checks.
+
+| Page | PR3 first visit | PR4 first visit | Change | PR4 target |
+| --- | ---: | ---: | ---: | ---: |
+| Groups | 1,273 ms | 1,272 ms | 0.1% faster | pass `<2 s` |
+| Overview | 10,198 ms | 10,375 ms | 1.7% slower | fail `<2 s` |
+| Gene Expression | 3,620 ms | 2,135 ms | 41.0% faster | fail `<2 s` |
+| Immune Repertoire | 7,504 ms | 6,973 ms | 7.1% faster | fail `<2 s` |
+| Trajectory | 3,660 ms | 3,050 ms | 16.7% faster | fail `<3 s` by 50 ms |
+| HLA & TCR Motifs | 5,913 ms | 5,714 ms | 3.4% faster | fail `<3 s` |
+| Coordinated Views | 4,741 ms | 3,272 ms | 31.0% faster | fail `<2 s` |
+
+| Page | PR3 repeat | PR4 repeat | PR4 target |
+| --- | ---: | ---: | ---: |
+| Groups | 117 ms | 200 ms | pass `<500 ms` |
+| Overview | 256 ms | 231 ms | pass `<500 ms` |
+| Gene Expression | 796 ms | 770 ms | fail `<500 ms` |
+| Immune Repertoire | 811 ms | 815 ms | fail `<500 ms` |
+| Trajectory | 1,460 ms | 1,436 ms | fail `<500 ms` |
+| HLA & TCR Motifs | 248 ms | 128 ms | pass `<500 ms` |
+| Coordinated Views | 130 ms | 113 ms | pass `<500 ms` |
+
+The remaining bottlenecks are page payload construction and transfer rather than gene retrieval. Overview still sends the full million-cell payload, while HLA and Immune Repertoire spend most of their first visit building derived network/repertoire state. Raw exploratory observations are in `tests/bench/results/million_cell_bpcells_quick_pr4.tsv` and `tests/bench/results/million_cell_pages_quick_pr3_pr4.tsv`.
+
 ## Environment
 
 - Apple M1 Pro, 32 GiB RAM

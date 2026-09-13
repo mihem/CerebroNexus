@@ -22,21 +22,21 @@ page <- function(tab, ready = NULL, budget_ms = 2000, required = FALSE) {
   list(tab = tab, ready = ready, budget_ms = budget_ms, required = required)
 }
 pages <- list(
-  overview = page(
-    "overview",
-    "#overview_projection_cell_view_host canvas:not(.cv-mini)",
-    required = TRUE
-  ),
-  coordinated_views = page("coordinated_views"),
   groups = page(
     "groups",
     "#groups_nUMI_plot.js-plotly-plot",
     required = TRUE
   ),
-  marker_genes = page("markerGenes"),
-  most_expressed_genes = page("mostExpressedGenes"),
-  enriched_pathways = page("enrichedPathways"),
-  extra_material = page("extra_material"),
+  overview = page(
+    "overview",
+    "#overview_projection_cell_view_host canvas:not(.cv-mini)",
+    required = TRUE
+  ),
+  gene_expression = page(
+    "geneExpression",
+    "#expression_projection_cell_view_host canvas:not(.cv-mini)",
+    required = TRUE
+  ),
   immune_repertoire = page(
     "immune_repertoire",
     paste(
@@ -51,34 +51,40 @@ pages <- list(
     budget_ms = 3000,
     required = TRUE
   ),
-  spatial = page("spatial"),
-  trekker = page("trekker"),
   hla = page(
     "hla_tcr_motifs",
     "#hla_plot_motifNetwork canvas",
     budget_ms = 3000,
     required = TRUE
   ),
-  gene_expression = page(
-    "geneExpression",
-    "#expression_projection_cell_view_host canvas:not(.cv-mini)",
-    required = TRUE
-  ),
+  marker_genes = page("markerGenes"),
+  most_expressed_genes = page("mostExpressedGenes"),
+  enriched_pathways = page("enrichedPathways"),
+  extra_material = page("extra_material"),
+  spatial = page("spatial"),
+  trekker = page("trekker"),
   gene_id_conversion = page("geneIdConversion"),
   color_management = page("color_management"),
   analysis_info = page("analysis_info"),
-  about = page("about")
+  about = page("about"),
+  coordinated_views = page("coordinated_views")
 )
 
-page_active_js <- function(page) {
-  ready <- if (is.null(page$ready)) {
+page_active_js <- function(page, first) {
+  ready <- if (!isTRUE(first) || is.null(page$ready)) {
     "true"
   } else {
     sprintf("!!p.querySelector(%s)", quote_r(page$ready))
   }
+  idle <- if (isTRUE(first)) {
+    "!document.documentElement.classList.contains('shiny-busy')"
+  } else {
+    "true"
+  }
   sprintf(
-    "(() => { const p=document.getElementById('shiny-tab-%s'); return !!p && p.classList.contains('active') && !document.documentElement.classList.contains('shiny-busy') && %s; })()",
+    "(() => { const p=document.getElementById('shiny-tab-%s'); return window.__cerebroPageBenchReady === true && !!p && p.classList.contains('active') && %s && %s; })()",
     page$tab,
+    idle,
     ready
   )
 }
@@ -88,7 +94,7 @@ page_available <- function(app, page) {
   app$get_js(sprintf("!!document.querySelector(%s)", quote_r(selector)))
 }
 
-open_page <- function(app, page) {
+open_page <- function(app, page, first = TRUE) {
   selector <- sprintf("a[href='#shiny-tab-%s']", page$tab)
   exists <- page_available(app, page)
   if (!isTRUE(exists)) {
@@ -98,9 +104,15 @@ open_page <- function(app, page) {
     return(NA_real_)
   }
   started <- proc.time()[["elapsed"]]
-  app$run_js(sprintf("document.querySelector(%s).click();", quote_r(selector)))
-  app$wait_for_js(page_active_js(page), timeout = 900000)
-  (proc.time()[["elapsed"]] - started) * 1000
+  message("opening ", page$tab)
+  app$run_js(sprintf(
+    "window.__cerebroPageBenchReady=false; document.querySelector(%s).click(); requestAnimationFrame(() => requestAnimationFrame(() => { window.__cerebroPageBenchReady=true; }));",
+    quote_r(selector)
+  ))
+  app$wait_for_js(page_active_js(page, first), timeout = 120000)
+  elapsed <- (proc.time()[["elapsed"]] - started) * 1000
+  message("ready ", page$tab, ": ", round(elapsed), " ms")
+  elapsed
 }
 
 run_once <- function(round) {
@@ -114,8 +126,7 @@ run_once <- function(round) {
       "  mode = \"closed\",",
       sprintf("  crb_file_to_load = c(\"1M pages\" = %s),", quote_r(crb)),
       "  percentage_cells_to_show = 100,",
-      "  projections_show_hover_info = TRUE,",
-      "  initial_page = \"data_info\"",
+      "  projections_show_hover_info = TRUE",
       ")"
     ),
     file.path(app_dir, "app.R")
@@ -151,24 +162,37 @@ run_once <- function(round) {
     )
   }
 
-  for (name in names(pages)) {
-    elapsed <- open_page(app, pages[[name]])
+  required <- names(pages)[vapply(pages, `[[`, logical(1), "required")]
+  optional <- setdiff(names(pages), required)
+  for (name in required) {
+    elapsed <- open_page(app, pages[[name]], first = TRUE)
     if (is.finite(elapsed)) {
       record("first", name, elapsed)
     }
   }
-  for (name in names(pages)) {
-    if (!isTRUE(page_available(app, pages[[name]]))) {
-      next
-    }
+  for (name in required) {
     app$run_js(
       "document.querySelector(\"a[href='#shiny-tab-loadData']\").click();"
     )
     app$wait_for_js(
       "document.getElementById('shiny-tab-loadData').classList.contains('active')",
-      timeout = 900000
+      timeout = 120000
     )
-    record("repeat", name, open_page(app, pages[[name]]))
+    record("repeat", name, open_page(app, pages[[name]], first = FALSE))
+  }
+  for (name in optional) {
+    if (!isTRUE(page_available(app, pages[[name]]))) {
+      next
+    }
+    record("first", name, open_page(app, pages[[name]], first = TRUE))
+    app$run_js(
+      "document.querySelector(\"a[href='#shiny-tab-loadData']\").click();"
+    )
+    app$wait_for_js(
+      "document.getElementById('shiny-tab-loadData').classList.contains('active')",
+      timeout = 120000
+    )
+    record("repeat", name, open_page(app, pages[[name]], first = FALSE))
   }
   do.call(rbind, rows)
 }
