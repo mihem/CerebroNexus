@@ -201,7 +201,7 @@ test_that("legacy fixture list bounds normalize to a numeric vector", {
       path == "" || !file.exists(path),
       message = paste(fixture, "missing")
     )
-    crb <- readRDS(path)
+    crb <- readCerebro(path)
     spatial_name <- crb$availableSpatial()[[1L]]
 
     normalized <- .normalizeSpatialDataImages(
@@ -230,7 +230,7 @@ test_that("Xenium colour demo loads images from files", {
   )
   skip_if(path == "" || !file.exists(path), message = "Xenium fixture missing")
 
-  crb <- readRDS(path)
+  crb <- readCerebro(path)
   expect_named(crb$spatial, c("fov", "fov_colour"))
 
   fov <- crb$getSpatialData("fov")

@@ -1224,7 +1224,7 @@ test_that("both pages give a clone the same size", {
   skip_if_not(have_bundle)
   skip_if_not(nzchar(tcr_crb) && file.exists(tcr_crb))
 
-  crb <- readRDS(tcr_crb)
+  crb <- readCerebro(tcr_crb)
   md <- crb$getMetaData()
   cells <- as.character(md$cell_barcode)
   ir <- crb$getImmuneRepertoire()
@@ -1342,7 +1342,7 @@ test_that("the trekker bundle carries what a placement is judged on", {
   skip_if_not(have_bundle)
   skip_if_not(file.exists(trekker_crb))
 
-  b <- cv_env$cv_build_bundle(readRDS(trekker_crb))
+  b <- cv_env$cv_build_bundle(readCerebro(trekker_crb))
   expect_false(is.null(b$trekker))
 
   ## position_confidence is a FIELD -- a colouring -- so the card reads it from
@@ -1843,7 +1843,7 @@ test_that("bundling two images of the same basename keeps both", {
   crb_two <- file.path(tmp, "demo-two.crb")
   file.copy(example, crb_one, overwrite = TRUE)
   file.copy(example, crb_two, overwrite = TRUE)
-  spatial_name <- readRDS(crb_one)$availableSpatial()[[1L]]
+  spatial_name <- readCerebro(crb_one)$availableSpatial()[[1L]]
   app_dir <- file.path(tmp, "app")
   createShinyApp(
     cerebro_data = c("ds one" = crb_one, "ds two" = crb_two),

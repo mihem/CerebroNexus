@@ -24,7 +24,7 @@ test_that("most_expressed_genes UI defines correct tabName", {
 
 test_that("example.crb most expressed genes class methods work", {
   skip_if_not(file.exists(example_crb))
-  crb <- readRDS(example_crb)
+  crb <- readCerebro(example_crb)
   groups <- crb$getGroupsWithMostExpressedGenes()
   expect_true(is.character(groups))
   expect_true(length(groups) > 0)

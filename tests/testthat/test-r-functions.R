@@ -203,7 +203,7 @@ test_that("example.crb loads successfully and has correct structure", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
   expect_true(file.exists(path))
 
-  data <- readRDS(path)
+  data <- readCerebro(path)
   expect_true(inherits(data, "Cerebro"))
 
   # groups
@@ -221,7 +221,7 @@ test_that("example.crb loads successfully and has correct structure", {
 
 test_that("example.crb contains expected groups and projections", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-  data <- readRDS(path)
+  data <- readCerebro(path)
 
   expect_true("sample" %in% data$getGroups())
   expect_true("seurat_clusters" %in% data$getGroups())
@@ -232,7 +232,7 @@ test_that("example.crb contains expected groups and projections", {
 
 test_that("example.crb sample levels are as expected", {
   path <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-  data <- readRDS(path)
+  data <- readCerebro(path)
 
   lvls <- data$getGroupLevels("sample")
   # example data is split into multiple pseudo-samples (donor_1/2/3)

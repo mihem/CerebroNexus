@@ -81,7 +81,7 @@ test_that("convertSeuratToCerebro produces a .crb carrying spatial data", {
   )
   expect_true(file.exists(crb_path))
 
-  crb <- readRDS(crb_path)
+  crb <- readCerebro(crb_path)
   expect_true(length(crb$availableSpatial()) > 0)
   sd <- crb$getSpatialData(crb$availableSpatial()[1])
   expect_true(all(c("coordinates", "expression") %in% names(sd)))
@@ -225,8 +225,8 @@ build_real_app <- function(envir = parent.frame()) {
 
   root <- withr::local_tempdir(.local_envir = envir)
   app_dir <- file.path(root, "app")
-  visium_spatial <- readRDS(visium_crb)$availableSpatial()[[1L]]
-  xenium_spatial <- readRDS(xenium_crb)$availableSpatial()
+  visium_spatial <- readCerebro(visium_crb)$availableSpatial()[[1L]]
+  xenium_spatial <- readCerebro(xenium_crb)$availableSpatial()
   createShinyApp(
     cerebro_data = c("Visium" = visium_crb, "Xenium" = xenium_crb),
     result_dir = app_dir,

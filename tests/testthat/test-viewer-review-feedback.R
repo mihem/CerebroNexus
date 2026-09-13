@@ -18,6 +18,18 @@ viewer_path <- function(...) {
   file.path(viewer_root, ...)
 }
 
+test_that("Viewer shell uses native sidebar scrolling", {
+  ui <- viewer_source("shiny_UI.R")
+  css <- viewer_source("www", "custom.css")
+
+  expect_no_match(ui, 'addClass("fixed")', fixed = TRUE)
+  expect_match(
+    css,
+    "body\\.skin-blue \\.main-sidebar \\{[^}]*position: fixed;[^}]*overflow-y: auto;",
+    perl = TRUE
+  )
+})
+
 test_that("gene conversion table escapes cell content", {
   source <- viewer_source("gene_id_conversion", "server.R")
 

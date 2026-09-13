@@ -19,6 +19,7 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = FALSE,
   .expression_resolution = NULL
@@ -111,6 +112,10 @@ concurrent writers remain outside this multi-path transaction guarantee.
 Only POSIX mode bits are set or preserved; ownership, ACLs, extended
 attributes, and security labels remain the deployment system's
 responsibility on every platform.}
+
+\item{codec}{Serialization codec for the CRB payload. Defaults to
+\code{"qs2"}; use \code{"rds"} when direct compatibility with
+\code{readRDS()} is required.}
 
 \item{spatial_images}{Optional named list mapping Seurat image names to named
 image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.

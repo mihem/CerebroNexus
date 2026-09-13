@@ -27,7 +27,8 @@ valid_args <- list(
   organism = "hg",
   groups = c("sample", "seurat_clusters"),
   nUMI = "nCount_RNA",
-  nGene = "nFeature_RNA"
+  nGene = "nFeature_RNA",
+  codec = "rds"
 )
 
 ## ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ test_that("trajectory UI defines correct tabName", {
 
 test_that("full T+B demo trajectory class methods work", {
   skip_if_not(file.exists(trajectory_crb))
-  crb <- readRDS(trajectory_crb)
+  crb <- readCerebro(trajectory_crb)
   methods <- crb$getMethodsForTrajectories()
   expect_true(is.character(methods))
   expect_true(length(methods) > 0)
@@ -47,7 +47,7 @@ test_that("full T+B demo trajectory class methods work", {
 
 test_that("full T+B demo trajectory data is accessible and complete", {
   skip_if_not(file.exists(trajectory_crb))
-  crb <- readRDS(trajectory_crb)
+  crb <- readCerebro(trajectory_crb)
   methods <- crb$getMethodsForTrajectories()
   skip_if(length(methods) == 0)
   names <- crb$getNamesOfTrajectories(methods[1])
@@ -65,7 +65,7 @@ test_that("full T+B demo trajectory data is accessible and complete", {
 })
 
 test_that("utility wrappers for trajectory exist", {
-  crb <- readRDS(trajectory_crb)
+  crb <- readCerebro(trajectory_crb)
   expect_true(is.function(crb$getMethodsForTrajectories))
   expect_true(is.function(crb$getNamesOfTrajectories))
   expect_true(is.function(crb$getTrajectory))
