@@ -281,7 +281,9 @@ test_that("Viewer resolves scatter defaults for the selected dataset", {
   options <- list(
     point_size = c(PBMC = 2, Xenium = 5),
     point_opacity = c(PBMC = 0.4, Xenium = 1),
-    percentage_cells_to_show = c(PBMC = 40, Xenium = 100)
+    percentage_cells_to_show = c(PBMC = 40, Xenium = 100),
+    expression_point_size = c(PBMC = 3, Xenium = 2),
+    expression_point_opacity = c(PBMC = 0.8, Xenium = 1)
   )
 
   expect_identical(
@@ -294,6 +296,14 @@ test_that("Viewer resolves scatter defaults for the selected dataset", {
   )
   expect_identical(
     runtime$viewerScatterDefaults(options, "Missing"),
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+  )
+  expect_identical(
+    runtime$viewerScatterDefaults(options, "Xenium", "expression"),
+    list(point_size = 2, point_opacity = 1, percentage_cells_to_show = 100)
+  )
+  expect_identical(
+    runtime$viewerScatterDefaults(options, "Missing", "expression"),
     list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
   )
 })

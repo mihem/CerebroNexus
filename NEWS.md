@@ -4,6 +4,7 @@
 
 - Refines typography, spacing, navigation, controls, responsive layouts, loading and empty states across the Viewer.
 - Improves keyboard navigation, focus handling, status announcements, labels, and reduced-motion behavior.
+- The million-cell demo now opens at 100%, gives Gene Expression full-opacity two-pixel points, and falls back from WebGPU to WebGL2 so full Projection and Gene Expression canvases remain interactive on browsers without WebGPU.
 
 # CerebroNexus 4.6.3
 

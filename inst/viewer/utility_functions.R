@@ -88,7 +88,7 @@ viewerColourGroupChoices <- function(
   )
 }
 
-viewerScatterDefaults <- function(options, dataset = NULL) {
+viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
     if (length(value) > 1L && !is.null(dataset) && !is.null(names(value))) {
@@ -107,12 +107,41 @@ viewerScatterDefaults <- function(options, dataset = NULL) {
       unname(value)
     }
   }
-  list(
+  defaults <- list(
     point_size = resolve("point_size", 5, 1, 20),
     point_opacity = resolve("point_opacity", 1, 0.1, 1),
     percentage_cells_to_show = resolve(
       "percentage_cells_to_show",
       100,
+      10,
+      100
+    )
+  )
+  if (
+    is.null(page) ||
+      length(page) != 1L ||
+      is.na(page) ||
+      !nzchar(page)
+  ) {
+    return(defaults)
+  }
+  page <- as.character(page)[[1L]]
+  list(
+    point_size = resolve(
+      paste0(page, "_point_size"),
+      defaults$point_size,
+      1,
+      20
+    ),
+    point_opacity = resolve(
+      paste0(page, "_point_opacity"),
+      defaults$point_opacity,
+      0.1,
+      1
+    ),
+    percentage_cells_to_show = resolve(
+      paste0(page, "_percentage_cells_to_show"),
+      defaults$percentage_cells_to_show,
       10,
       100
     )

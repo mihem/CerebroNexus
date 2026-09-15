@@ -19,6 +19,7 @@ test_that("the million-cell renderer is loaded before cell views", {
     collapse = "\n"
   )
   expect_match(engine, "CerebroPointRenderer.create", fixed = TRUE)
+  expect_match(engine, "replaceGpuWithWebGl", fixed = TRUE)
   expect_match(engine, "setData", fixed = TRUE)
 })
 
@@ -75,6 +76,59 @@ test_that("WebGPU failures make the renderer fall back", {
     collapse = "\n"
   )
   expect_match(engine, "renderer.failed.then", fixed = TRUE)
+  expect_match(engine, "CerebroPointRenderer.createWebGl", fixed = TRUE)
+})
+
+test_that("WebGL2 fallback submits a million points in one GPU draw", {
+  skip_if(Sys.which("node") == "", "node not on PATH")
+  renderer <- viewer_test_path("www", "cell_points_gpu.js")
+  runner <- tempfile(fileext = ".js")
+  on.exit(unlink(runner), add = TRUE)
+  writeLines(
+    c(
+      "const fs = require('fs');",
+      "const assert = require('assert');",
+      sprintf(
+        "const source = fs.readFileSync(%s, 'utf8');",
+        encodeString(renderer, quote = '"')
+      ),
+      "const calls = [];",
+      "const gl = {",
+      "  VERTEX_SHADER:1, FRAGMENT_SHADER:2, COMPILE_STATUS:3, LINK_STATUS:4,",
+      "  ARRAY_BUFFER:5, STATIC_DRAW:6, UNSIGNED_INT:7, UNSIGNED_BYTE:8,",
+      "  FLOAT:9, POINTS:10, COLOR_BUFFER_BIT:11, BLEND:12,",
+      "  SRC_ALPHA:13, ONE_MINUS_SRC_ALPHA:14, ONE:15, NO_ERROR:0, RENDERER:16,",
+      "  createShader: () => ({}), shaderSource() {}, compileShader() {},",
+      "  getShaderParameter: () => true, getShaderInfoLog: () => '',",
+      "  deleteShader() {}, createProgram: () => ({}), attachShader() {},",
+      "  linkProgram() {}, getProgramParameter: () => true,",
+      "  getProgramInfoLog: () => '', deleteProgram() {},",
+      "  getUniformLocation: (_program, name) => name, createBuffer: () => ({}),",
+      "  viewport() {}, bindBuffer() {}, bufferData() {},",
+      "  enableVertexAttribArray() {}, vertexAttribIPointer() {},",
+      "  vertexAttribPointer() {}, useProgram() {}, uniform1f() {},",
+      "  uniform2f() {}, uniform3f() {}, uniform4f() {}, clearColor() {},",
+      "  clear() {}, enable() {}, blendFuncSeparate() {}, flush() {},",
+      "  drawArrays: (mode, first, count) => calls.push([mode, first, count]),",
+      "  getError: () => 0, getParameter: () => 'mock-webgl2'",
+      "};",
+      "const canvas = {clientWidth:1280,clientHeight:720,style:{},",
+      "  addEventListener() {}, getContext:type => type === 'webgl2' ? gl : null};",
+      "Object.defineProperty(global, 'navigator', {configurable:true,value:{}});",
+      "global.window=global; global.devicePixelRatio=1; eval(source);",
+      "const count=1000000, renderer=CerebroPointRenderer.create(canvas);",
+      "renderer.setData({positions:new Float32Array(count*2),",
+      "  colors:new Uint8Array(count*4),layers:new Uint32Array(count),",
+      "  count:count,foreground:false});",
+      "assert.strictEqual(renderer.draw({pointSize:2}), true);",
+      "assert.strictEqual(renderer.stats().backend, 'webgl2');",
+      "assert.strictEqual(renderer.stats().pointCount, count);",
+      "assert.deepStrictEqual(calls, [[gl.POINTS, 0, count]]);"
+    ),
+    runner
+  )
+
+  expect_identical(system2("node", runner), 0L)
 })
 
 test_that("WebGPU fallback keeps validity from the materialized CPU unit", {
@@ -117,6 +171,7 @@ test_that("WebGPU fallback keeps validity from the materialized CPU unit", {
       "const D = {n:2};",
       "const space = {x:[0,1],y:[0,1],xRange:[0,1],yRange:[0,1]};",
       "const spaceById = {projection:space};",
+      "const isSpatialSpace = () => false;",
       "const gpuCandidate = () => true;",
       project_source,
       "const panel = {spaceId:'projection',W:100,H:100,view:null};",

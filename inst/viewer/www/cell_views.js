@@ -1536,6 +1536,59 @@
     if (D && p.spaceId) project(p, true);
   }
 
+  function replaceGpuWithWebGl(p, renderer) {
+    if (!p.gpuCanvas || p.gpu !== renderer ||
+        !window.CerebroPointRenderer ||
+        !window.CerebroPointRenderer.createWebGl) return false;
+    var stats = renderer.stats ? renderer.stats() : {};
+    if (stats.backend === 'webgl2') return false;
+    var previous = p.gpuCanvas;
+    var canvas = document.createElement('canvas');
+    canvas.className = 'cv-gpu-layer';
+    canvas.style.display = 'none';
+    canvas.setAttribute('aria-hidden', 'true');
+    if (!previous.parentNode) return false;
+    previous.parentNode.replaceChild(canvas, previous);
+    try {
+      p.gpuCanvas = canvas;
+      p.gpu = window.CerebroPointRenderer.createWebGl(canvas);
+      canvas._cerebroPointRenderer = p.gpu;
+      p.gpu.resize(p.W || canvas.clientWidth || 1,
+        p.H || canvas.clientHeight || 1, window.devicePixelRatio || 1);
+      return true;
+    } catch (error) {
+      p.gpuCanvas = canvas;
+      p.gpu = null;
+      return false;
+    }
+  }
+
+  function watchGpu(p, renderer) {
+    renderer.failed.then(function () {
+      if (p.gpu !== renderer) return;
+      if (replaceGpuWithWebGl(p, renderer)) {
+        watchGpu(p, p.gpu);
+        if (D && p.spaceId) draw(p);
+        return;
+      }
+      disableGpu(p);
+      if (D && p.spaceId) draw(p);
+    });
+    renderer.ready.then(function () {
+      if (p.gpu !== renderer) return;
+      if (D && p.spaceId) draw(p);
+    }).catch(function () {
+      if (p.gpu !== renderer) return;
+      if (replaceGpuWithWebGl(p, renderer)) {
+        watchGpu(p, p.gpu);
+        if (D && p.spaceId) draw(p);
+        return;
+      }
+      disableGpu(p);
+      if (D && p.spaceId) draw(p);
+    });
+  }
+
   function attachGpu(p) {
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     var canvas = document.createElement('canvas');
@@ -1548,19 +1601,7 @@
       p.gpu = window.CerebroPointRenderer.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
       var renderer = p.gpu;
-      renderer.failed.then(function () {
-        if (p.gpu !== renderer) return;
-        disableGpu(p);
-        if (D && p.spaceId) draw(p);
-      });
-      renderer.ready.then(function () {
-        if (p.gpu !== renderer) return;
-        if (D && p.spaceId) draw(p);
-      }).catch(function () {
-        if (p.gpu !== renderer) return;
-        disableGpu(p);
-        if (D && p.spaceId) draw(p);
-      });
+      watchGpu(p, renderer);
     } catch (error) {
       canvas.remove();
       p.gpuCanvas = null;
@@ -1671,6 +1712,11 @@
         border: border ? { color: gpuColor(border.color), width: border.width } : null
       });
     } catch (error) {
+      var failedRenderer = p.gpu;
+      if (replaceGpuWithWebGl(p, failedRenderer)) {
+        watchGpu(p, p.gpu);
+        return drawGpuPoints(p, shownMask, shownCount, border);
+      }
       disableGpu(p);
       return false;
     }

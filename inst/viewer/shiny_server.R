@@ -218,6 +218,17 @@ server <- function(input, output, session) {
     )
   })
 
+  current_expression_scatter_defaults <- reactive({
+    viewerScatterDefaults(
+      Cerebro.options,
+      viewerDatasetName(
+        available_crb_files$files,
+        available_crb_files$selected
+      ),
+      page = "expression"
+    )
+  })
+
   ## listen to selected 'input_file', initialize before UI element is loaded
   observeEvent(input[['input_file']], ignoreNULL = FALSE, {
     path_to_load <- viewerUploadPath(input[["input_file"]], Cerebro.options)
