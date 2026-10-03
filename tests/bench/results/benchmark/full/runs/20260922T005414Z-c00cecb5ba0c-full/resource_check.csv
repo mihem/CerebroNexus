@@ -1,0 +1,3 @@
+"source","n_cells","estimated_nnz","estimated_peak_mb","memory_budget_mb","source_bytes","disk_budget_bytes","memory_ok","index_ok","disk_ok","safe","reason"
+"mouse_brain_e18",1306127,2624828308,4216,89904,4216018749,1856405467955.2,TRUE,TRUE,TRUE,TRUE,"safe out-of-core plan"
+"human_pfc_hbcc",1486324,6111732728,4232,89904,14150526668,1856405467955.2,TRUE,TRUE,TRUE,TRUE,"safe out-of-core plan"

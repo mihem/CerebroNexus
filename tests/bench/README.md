@@ -1,74 +1,123 @@
 # Real-data expression-backend benchmark
 
-This directory compares the `embedded`, `bpcells`, and `h5` backends on public single-cell matrices. This page explains how to run it. Read [METHODOLOGY.md](METHODOLOGY.md) for the experimental design and [RESULTS.md](RESULTS.md) before interpreting any number.
+## Contents
 
-> **Current status:** the harness is ready for code review, but no complete `publication` run has been performed on this branch. The archived pilot is retained for provenance only and must not be cited as final evidence.
+- [Directory layout](#directory-layout)
+- [Dataset scope](#dataset-scope)
+- [Run the benchmark](#run-the-benchmark)
+- [Scale profile](#scale-profile)
+- [Script map](#script-map)
 
-## Quick start
+The backend benchmark runs two profiles in sequence. The full-source profile measures every cell in each source, then the scale profile measures the same sources at 1k, 10k, 50k, 100k, 500k, and 1m cells. Results and `CURRENT` pointers are never shared between them.
 
-```bash
-# Smallest correctness and harness check
-BENCH_PROFILE=quick tests/bench/run_sweep.sh
+This workflow measures expression backends only. Focused Viewer checks live
+under [`harnesses/viewer/`](harnesses/viewer/) and cannot pass, fail, publish,
+or replace backend evidence.
 
-# Repeated local review
-BENCH_PROFILE=standard tests/bench/run_sweep.sh
+> **Current status:** validated full-source and scale runs are selected by their
+> separate `CURRENT` pointers under `results/benchmark/`.
 
-# Repeated evidence plus staged figures
-BENCH_PROFILE=publication tests/bench/run_sweep.sh
+Start with the [documentation index](docs/README.md). Read the
+[methodology](docs/methodology.md) and [results guide](docs/results-guide.md)
+before interpreting generated values.
 
-# Explicit memory-boundary experiment; normally rejected on a 32 GiB host
-BENCH_PROFILE=stress tests/bench/run_sweep.sh
-```
+## Directory layout
 
-Limit a run to one source when developing the harness:
-
-```bash
-BENCH_SOURCES_ONLY=mouse_brain_e18 \
-  BENCH_PROFILE=quick tests/bench/run_sweep.sh
-```
-
-`BENCH_ALLOW_UNSAFE=1` bypasses the resource gate. Use it only for an intentional stress run. Normal runs must not silently skip unsafe tiers.
-
-## What happens before a download
-
-The command first:
-
-1. inspects source dimensions;
-2. records the machine and Git revision;
-3. creates the requested run plan; and
-4. checks estimated memory, sparse-index, and free-disk limits.
-
-If the plan is unsafe, it stops with the source, cell tier, estimated memory, safe budget, and reason. No complete source file or backend export has started at that point.
-
-## Profiles
-
-| profile | purpose | large boundary tiers |
-|---|---|:---:|
-| `quick` | verify the harness and correctness gate | no |
-| `standard` | repeated local comparison | no |
-| `publication` | repeated article evidence and figures | no |
-| `stress` | opt-in host memory-boundary experiment | yes |
-
-## Outputs
-
-Validated runs are immutable under `result/runs/<run-id>/`. `result/CURRENT` contains the run used by report and plotting tools. A failed or interrupted run leaves the previous pointer unchanged.
-
-The 2026-07-30 single-run pilot is retained under `result/archive/pilot-2026-07-30/`; it is superseded and cannot support current performance claims.
-
-## Plain-language script map
-
-| script | meaning |
+| path | purpose |
 |---|---|
-| `01_inspect_data.R` | find out how large the sources are |
-| `02_record_environment.R` | record the code and machine under test |
-| `03_plan_runs.R` | list the requested backend runs |
-| `04_check_resources.R` | stop before running a plan that will not fit |
-| `10_export_backend.R` | export one backend in a fresh process |
-| `20_measure_backend.R` | measure and correctness-check one backend |
-| `30_check_measurements.R` | reject incomplete or incorrect measurements |
-| `40_write_report.R` | generate the Markdown result report |
-| `41_draw_figures.R` | generate publication figures |
-| `50_check_outputs.R` | ensure the report package is complete |
-| `60_publish_results.R` | publish immutably and update `CURRENT` last |
+| `benchmark/` | current real-data benchmark implementation and launcher |
+| `acceptance/` | acceptance policy, evaluator, CLI, documentation, and fixtures |
+| `docs/` | methodology, result interpretation, and concise component findings |
+| `harnesses/` | PR0-PR5 component harnesses, with callers documented in its README |
+| `results/` | the only in-repository result root |
 
-The two default public sources are 10x mouse brain E18 (4.2 GB) and the HBCC human prefrontal-cortex atlas (14.2 GB). The MSSM cohort is opt-in through `BENCH_SOURCES_EXTRA=human_pfc_mssm`.
+Results are separated by purpose: paper runs go to `results/benchmark/`,
+acceptance records to `results/acceptance/`, and focused component comparisons
+to `results/component/<component>/`. Temporary data stays outside the checkout. See
+[`results/README.md`](results/README.md) for naming and ordering rules.
+
+## Dataset scope
+
+The default benchmark has two public million-scale sources: the complete
+1,306,127-cell 10x mouse-brain matrix and the complete 1,486,324-cell PsychAD
+HBCC human-PFC matrix. The scale profile also takes a 1,000,000-cell prefix
+from each of these same two sources; those are not additional datasets.
+
+The component Viewer/CRB harness uses one exact 1,000,000-cell subset of the
+same 10x mouse-brain source. An optional 4,140,453-cell MSSM source is registered
+for opt-in experiments, but it is not part of the default or committed results.
+
+## Run the benchmark
+
+Use a clean checkout on an exclusive high-memory Linux host with `nix-shell` available. One command starts the complete benchmark in the background; the full-source profile runs first and the six-tier scale profile runs second:
+
+```bash
+bash tests/bench/benchmark/run.sh
+```
+
+The launcher uses `$HOME/.cache/cerebronexus-benchmark/` for its source cache, scratch space, PID, exit status, and log. It preserves checksum-verified downloads and failed-run scratch directories. Optional `BENCH_THREADS`, `BENCH_SOURCE_CACHE`, `BENCH_SCRATCH_PARENT`, and `BENCH_STORAGE_DESCRIPTION` overrides remain available for unusual hosts.
+
+```bash
+bash tests/bench/benchmark/run.sh status
+tail -f "$HOME/.cache/cerebronexus-benchmark/runner/benchmark.log"
+```
+
+If measurement completed but final validation or reporting failed, publish the retained measurements without rerunning them:
+
+```bash
+bash tests/bench/benchmark/run.sh resume /path/to/cerebro-bench.XXXXXX
+```
+
+The full-source profile rejects source overrides and runs exactly this grid:
+
+| sources | cells | backends | builds | access processes |
+|---|---:|---|---:|---:|
+| 10x mouse brain E18 | 1,306,127 | bpcells, h5 | 10 | 20 |
+| PsychAD HBCC human PFC | 1,486,324 | bpcells, h5 | 10 | 20 |
+
+`embedded` is recorded as not representable because each complete matrix exceeds the 32-bit non-zero index limit of `Matrix::dgCMatrix`; it is not attempted on a smaller substitute.
+
+Each source has one frozen 12-gene query plan. Runtime measurements cover full-cell single-gene and 12-gene reads plus deterministic reverse-ordered, non-contiguous reads of up to 100,000 cells. CRBs are written with the default qs2 codec, BPCells uses CerebroNexus's production gene-major writer, and fresh-process startup uses `readCerebro()`.
+
+Every source/backend pair has five independent builds. Each built artifact is
+opened by two independent access processes. Backend order alternates by repeat.
+
+## Scale profile
+
+The scale profile follows the complete-source profile automatically. It uses BPCells and H5 at all six fixed cell-count tiers and attempts embedded storage through 500k cells, with five independent builds and two access processes per successful build. An embedded failure is retained with empty metrics and does not invalidate the mandatory BPCells/H5 results.
+
+Its immutable results are written under
+`tests/bench/results/benchmark/scale/`; it neither reads nor replaces
+`tests/bench/results/benchmark/full/`.
+
+Validated runs are published under the selected workflow's
+`results/benchmark/{scale,full}/runs/<run-id>/` directory; its own `CURRENT`
+changes last. Every published run includes `evidence_manifest.csv`, which
+records the byte size and MD5 checksum of every raw table, report, and figure
+in the committed evidence package. Transient execution logs stay in the
+external scratch directory and are not inventoried.
+
+## Script map
+
+| script | purpose |
+|---|---|
+| `benchmark/run.sh` | public background launcher for the complete benchmark |
+| `benchmark/core.R` | load the benchmark modules below |
+| `benchmark/sources.R`, `protocol.R` | source registry, profiles, and schedules |
+| `benchmark/metrics.R`, `storage_backends.R` | measurements and backend I/O |
+| `benchmark/reporting.R`, `resources.R` | summaries, figures, and capacity checks |
+| `benchmark/cli.R`, `cli_*.R` | dispatch isolated benchmark stages |
+| `acceptance/check.R` | evaluate normalized PR acceptance evidence |
+
+The reproducibility harnesses are grouped by responsibility:
+
+| path | purpose |
+|---|---|
+| `harnesses/crb/` | shared 1M fixture, CRB codec benchmark, and verification |
+| `harnesses/backend/` | expression hot paths, BPCells layout, and bundle comparison |
+| `harnesses/viewer/` | Viewer startup, page readiness, and interaction diagnostics |
+| `harnesses/renderer/` | isolated WebGPU renderer benchmark and test app |
+
+They remain because the acceptance policy and million-cell vignettes execute
+them; they are not copies kept only for history. Their imported evidence lives
+under `results/component/{crb,backend,viewer}/`.

@@ -33,6 +33,9 @@
 #' package. If set to \code{FALSE} (default), the expression matrix will be
 #' copied from the input object as is. It is recommended to use a sparse format,
 #' such as \code{dgCMatrix} from the \code{Matrix} package.
+#' @param codec Serialization codec for the CRB payload. Defaults to
+#' \code{"qs2"}; use \code{"rds"} when direct compatibility with
+#' \code{readRDS()} is required.
 #' @param verbose Set this to \code{TRUE} if you want additional log messages;
 #' defaults to \code{FALSE}.
 #'
@@ -72,11 +75,14 @@ exportFromSCE <- function(
   nGene = 'nGene',
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
+  codec = c("qs2", "rds"),
   verbose = FALSE
 ) {
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
+
+  codec <- match.arg(codec)
 
   ## check if provided object is of class "SingleCellExperiment"
   if (!inherits(object, "SingleCellExperiment")) {
@@ -790,7 +796,7 @@ exportFromSCE <- function(
   )
 
   ## save file
-  saveRDS(export, file)
+  saveCerebro(export, file, codec = codec)
 
   ## log message
   ## ... writing to file was successful

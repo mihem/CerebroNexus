@@ -1,0 +1,4 @@
+"candidate","round","library_ms","app_construct_ms","server_listen_ms","browser_load_ms","load_to_data_ms","browser_to_data_ms","process_to_data_ms"
+"v1_eager",1,1172.85895347595,195.266008377075,1609.84706878662,301.67293548584,1770.21813392639,2071.89106941223,3836.35115623474
+"v1_eager",2,1150.0,190.0,1600.0,300.0,1760.0,2060.0,3820.0
+"v1_eager",3,1160.0,192.0,1605.0,299.0,1765.0,2065.0,3830.0

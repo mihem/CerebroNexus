@@ -1,0 +1,5 @@
+visit	page	elapsed_ms	budget_ms	pass
+first	trajectory	2434	3000	TRUE
+repeat	trajectory	1266	500	FALSE
+first	hla	2696	3000	TRUE
+repeat	hla	126	500	TRUE

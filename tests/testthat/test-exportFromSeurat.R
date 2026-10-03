@@ -27,7 +27,8 @@ valid_args <- list(
   organism = "hg",
   groups = c("sample", "seurat_clusters"),
   nUMI = "nCount_RNA",
-  nGene = "nFeature_RNA"
+  nGene = "nFeature_RNA",
+  codec = "rds"
 )
 
 ## ---------------------------------------------------------------------------
@@ -261,4 +262,11 @@ test_that("h5 attach is lazy: .attachExternalExpression returns a DelayedMatrix
   expect_equal(ncol(attached$expression), ncol(orig))
   expect_setequal(rownames(attached$expression), rownames(orig))
   expect_setequal(colnames(attached$expression), colnames(orig))
+
+  mismatched <- readRDS(outf)
+  mismatched$meta_data$cell_barcode <- rev(mismatched$meta_data$cell_barcode)
+  expect_error(
+    attach_env$.attachExternalExpression(mismatched, outf),
+    "same cells in the same order"
+  )
 })

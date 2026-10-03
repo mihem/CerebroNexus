@@ -54,6 +54,14 @@
   paste0(stem, suffix)
 }
 
+.writeBpcellsGeneMajor <- function(matrix, dir) {
+  if (identical(BPCells::storage_order(matrix), "row")) {
+    BPCells::write_matrix_dir(matrix, dir = dir)
+    return(BPCells::open_matrix_dir(dir))
+  }
+  BPCells::transpose_storage_order(matrix, outdir = dir)
+}
+
 .validatePortableExportBasename <- function(final_file) {
   name <- basename(final_file)
   stem <- tools::file_path_sans_ext(name)
@@ -104,7 +112,9 @@
   if (!file.exists(final_file) || dir.exists(final_file)) {
     return(NULL)
   }
-  object <- tryCatch(readRDS(final_file), error = function(error) NULL)
+  object <- tryCatch(.readCerebroPayload(final_file), error = function(error) {
+    NULL
+  })
   if (
     !is.environment(object) ||
       !any(grepl("^Cerebro", class(object))) ||
@@ -145,7 +155,8 @@
   export,
   final_file,
   stage_dir,
-  expression_matrix_mode
+  expression_matrix_mode,
+  codec = "rds"
 ) {
   final_dir <- dirname(final_file)
   if (!dir.exists(final_dir)) {
@@ -323,6 +334,12 @@
       sidecar_mode,
       "the staged expression sidecar"
     )
+    if (identical(backend$type, "bpcells")) {
+      ## Windows cannot rename a BPCells directory while its external pointer
+      ## is open. The published path is reopened immediately after the move.
+      export$expression <- NULL
+      invisible(gc())
+    }
     if (!file.rename(stage_sidecar, final_sidecar)) {
       stop("Failed to install the staged expression sidecar.", call. = FALSE)
     }
@@ -339,7 +356,16 @@
     }
   }
 
-  saveRDS(export, stage_crb)
+  payload <- if (.recognizedCerebroObject(export)) {
+    .thinCerebroPayload(
+      export,
+      final_file,
+      sidecar = if (identical(backend$type, "bpcells")) final_sidecar else NULL
+    )
+  } else {
+    export
+  }
+  .writeCerebroPayload(payload, stage_crb, codec)
   if (!file.exists(stage_crb)) {
     stop("Failed to serialise the staged Cerebro object.", call. = FALSE)
   }
@@ -483,8 +509,11 @@
 #' Only POSIX mode bits are set or preserved; ownership, ACLs, extended
 #' attributes, and security labels remain the deployment system's
 #' responsibility on every platform.
+#' @param codec Serialization codec for the CRB payload. Defaults to
+#' \code{"qs2"}; use \code{"rds"} when direct compatibility with
+#' \code{readRDS()} is required.
 #' @param spatial_images Optional named list mapping Seurat image names to named
-#'   image paths or descriptors of the form code{list(path = ..., bounds = ...)}.
+#'   image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.
 #'   Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
 #'   derived from the exported x/y coordinate range.
 #' @param verbose Set this to \code{TRUE} if you want additional log messages;
@@ -550,6 +579,7 @@ exportFromSeurat <- function(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = FALSE,
   .expression_resolution = NULL
@@ -559,6 +589,7 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
 
   expression_matrix_mode <- match.arg(expression_matrix_mode)
+  codec <- match.arg(codec)
   if (
     !is.character(file) ||
       length(file) != 1L ||
@@ -940,13 +971,15 @@ exportFromSeurat <- function(
         bpc_storage_msg
       ))
     }
-    BPCells::write_matrix_dir(mat = bpc_iter, dir = bpc_abs)
-    mat_handle <- BPCells::open_matrix_dir(dir = bpc_abs)
-
+    ## Keep Cerebro's genes x cells dimensions, but physically store rows
+    ## contiguously so per-gene and small gene-set queries avoid a full scan.
     ## Carry the live handle (absolute path inside @dir -- BPCells normalises
     ## it on open_matrix_dir()) AND the portable relative location tag. Step
     ## 7.3's attach reads the tag, not @dir, so the crb stays portable.
-    export$setExpression(mat_handle, backend = "external")
+    export$setExpression(
+      .writeBpcellsGeneMajor(bpc_iter, bpc_abs),
+      backend = "external"
+    )
     export$setExpressionBackend(type = "bpcells", location = bpc_dirname)
   } else if (expression_matrix_mode == "h5") {
     ## Write the expression matrix to a TENxMatrix-format sparse HDF5 file
@@ -1840,7 +1873,8 @@ exportFromSeurat <- function(
     export = export,
     final_file = final_file,
     stage_dir = export_stage_dir,
-    expression_matrix_mode = expression_matrix_mode
+    expression_matrix_mode = expression_matrix_mode,
+    codec = codec
   )
 
   ## log message

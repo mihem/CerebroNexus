@@ -100,7 +100,7 @@ message(sprintf(
 ))
 
 ## ---- 2. helpers: subset + cell-type-constrained IR injection --------------
-old <- readRDS(src_crb)
+old <- readCerebro(src_crb)
 full_meta <- old$getMetaData()
 stopifnot("cell_type" %in% colnames(full_meta))
 

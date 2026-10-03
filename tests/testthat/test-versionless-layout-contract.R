@@ -64,7 +64,7 @@ test_that("every bundled Cerebro fixture uses the versionless data class", {
 
   expect_gt(length(files), 0L)
   for (path in files) {
-    object <- readRDS(path)
+    object <- readCerebro(path)
     expect_true(inherits(object, "Cerebro"), info = basename(path))
   }
 })

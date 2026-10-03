@@ -31,24 +31,13 @@ data-raw/xenium/
 Rplots.pdf
 **/Rplots.pdf
 inst/private-data/linked-view-shares.sqlite
-# The bare `result` rule near the top of this file matches a directory of that
-# name at any depth, which also swallowed the benchmark results. Those are the
-# deliverable, not scratch output, so re-include them -- the directory has to be
-# re-included first, because a file cannot be un-ignored while a parent
-# directory of it is still excluded.
-!tests/bench/result/
-!tests/bench/result/*.csv
-!tests/bench/result/summary.md
-tests/bench/result/logs/
-!tests/bench/result/CURRENT
-!tests/bench/result/runs/
-!tests/bench/result/runs/**/
-!tests/bench/result/runs/**/*.csv
-!tests/bench/result/runs/**/summary.md
-tests/bench/result/runs/**/logs/
-!tests/bench/result/archive/
-!tests/bench/result/archive/**/
-!tests/bench/result/archive/**/*.csv
-!tests/bench/result/archive/**/summary.md
-!tests/bench/result/archive/**/README.md
+# The generic `docs` rule above would otherwise hide benchmark documentation.
+!tests/bench/docs/
+!tests/bench/docs/**
+
+# Benchmark evidence is versioned; transient logs and working data are not.
+tests/bench/results/**/logs/
+tests/bench/study-work/
 tests/bench/scratch/
+tests/viewer-validation/result/
+paper/figures/output/

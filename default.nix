@@ -32,6 +32,7 @@
 #  > "pbapply",
 #  > "plotly",
 #  > "qvalue",
+#  > "qs2",
 #  > "R6",
 #  > "readxl",
 #  > "rlang",
@@ -90,6 +91,7 @@ let
       plotly
       png
       qvalue
+      qs2
       R6
       readxl
       rlang

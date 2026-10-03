@@ -1,0 +1,4 @@
+metric	scale	repeats	thin_crb_ms	thin_crb_alloc_mib	latest_ms	latest_alloc_mib	check
+Full projection selection	1,000,000 cells; all groups; 100%	3	197	199.1	31	19.1	equal
+RGB expression	3 genes x 1M cells	3	12498	461.4	4021	226.1	equal
+Mean expression	100 genes x 1M cells	3	5912	1916.8	3931	65.4	equal

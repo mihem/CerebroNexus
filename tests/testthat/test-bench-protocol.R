@@ -1,4 +1,4 @@
-bench_protocol <- file.path("..", "bench", "lib", "protocol.R")
+bench_protocol <- file.path("..", "bench", "benchmark", "core.R")
 
 skip_unless_bench_protocol <- function() {
   testthat::skip_if_not(
@@ -7,7 +7,7 @@ skip_unless_bench_protocol <- function() {
   )
 }
 
-test_that("benchmark profiles separate smoke, review, and article evidence", {
+test_that("benchmark profiles separate smoke, review, and release evidence", {
   skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
@@ -16,19 +16,26 @@ test_that("benchmark profiles separate smoke, review, and article evidence", {
   expect_equal(bench_profile("quick")$comparison_tier_mode, "smallest")
   expect_equal(bench_profile("standard")$export_repeats, 3L)
   expect_true(bench_profile("standard")$include_scale_tiers)
-  expect_equal(bench_profile("publication")$access_repeats, 2L)
-  expect_equal(bench_profile("publication")$query_genes, 12L)
-  expect_equal(bench_profile("publication")$hot_iterations, 3L)
+  expect_equal(bench_profile("full")$export_repeats, 5L)
+  expect_equal(bench_profile("full")$access_repeats, 2L)
+  expect_equal(bench_profile("full")$query_genes, 12L)
+  expect_equal(bench_profile("full")$hot_iterations, 3L)
   expect_lte(
-    (bench_profile("publication")$query_genes - 1L) *
-      bench_profile("publication")$hot_iterations,
+    (bench_profile("full")$query_genes - 1L) *
+      bench_profile("full")$hot_iterations,
     36L
   )
-  expect_false(bench_profile("standard")$article_eligible)
-  expect_true(bench_profile("publication")$article_eligible)
+  expect_false(bench_profile("standard")$evidence_grade)
+  expect_true(bench_profile("full")$evidence_grade)
+  expect_equal(bench_profile("scale")$export_repeats, 5L)
+  expect_equal(bench_profile("scale")$access_repeats, 2L)
+  expect_true(bench_profile("scale")$include_scale_tiers)
+  expect_true(bench_profile("scale")$evidence_grade)
+  expect_equal(bench_profile("full")$export_repeats, 5L)
   expect_true(bench_profile("stress")$include_scale_tiers)
-  expect_false(bench_profile("stress")$article_eligible)
-  expect_false(bench_profile("publication")$include_scale_tiers)
+  expect_false(bench_profile("stress")$evidence_grade)
+  expect_false(bench_profile("full")$include_scale_tiers)
+  expect_equal(bench_profile("panel_c2")$canonical_name, "full")
   expect_error(bench_profile("unknown"), "unknown benchmark profile")
 })
 
@@ -70,6 +77,195 @@ test_that("quick schedules run only the smallest comparison tier", {
   schedule <- bench_schedule(specs, "quick", sources = "fixture")
   expect_equal(unique(schedule$n_cells), 1000)
   expect_equal(nrow(schedule), 3L)
+})
+
+test_that("default sources share the complete scale grid", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+
+  defaults <- BENCH_SOURCES[
+    !vapply(
+      BENCH_SOURCES,
+      function(source) isTRUE(source$opt_in),
+      logical(1)
+    )
+  ]
+  expect_true(all(vapply(
+    defaults,
+    function(source) {
+      identical(
+        source$comparison_tiers,
+        c(1e3, 10e3, 50e3, 100e3, 500e3, 1e6)
+      )
+    },
+    logical(1)
+  )))
+})
+
+test_that("preview is the exact three-backend scale bridge", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+  source(bench_protocol, local = TRUE)
+
+  schedule <- bench_fixed_schedule(BENCH_SOURCES, "preview")
+
+  expect_equal(nrow(schedule), 18L)
+  expect_setequal(unique(schedule$backend), c("embedded", "bpcells", "h5"))
+  expect_equal(
+    unique(schedule$n_cells[schedule$source == "mouse_brain_e18"]),
+    400e3
+  )
+  expect_equal(
+    unique(schedule$n_cells[schedule$source == "human_pfc_hbcc"]),
+    300e3
+  )
+  expect_false(any(schedule$n_cells == 800e3))
+  expect_true(all(schedule$access_repeats == 2L))
+})
+
+test_that("full is the exact two-backend full-source schedule", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+  source(bench_protocol, local = TRUE)
+
+  schedule <- bench_fixed_schedule(BENCH_SOURCES, "full")
+
+  expect_equal(nrow(schedule), 20L)
+  expect_setequal(unique(schedule$backend), c("bpcells", "h5"))
+  expect_equal(
+    unique(schedule$n_cells[schedule$source == "mouse_brain_e18"]),
+    1306127
+  )
+  expect_equal(
+    unique(schedule$n_cells[schedule$source == "human_pfc_hbcc"]),
+    1486324
+  )
+  expect_true(all(schedule$access_repeats == 2L))
+  expect_error(
+    bench_fixed_schedule(BENCH_SOURCES, "unknown"),
+    "preview or full"
+  )
+})
+
+test_that("scale profile runs embedded through 500k", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+  source(bench_protocol, local = TRUE)
+
+  schedule <- bench_scale_schedule(BENCH_SOURCES)
+  expected_tiers <- c(1e3, 10e3, 50e3, 100e3, 500e3, 1e6)
+
+  expect_equal(nrow(schedule), 2L * (5L * 3L + 2L) * 5L)
+  expect_setequal(
+    unique(schedule$source),
+    c(
+      "mouse_brain_e18",
+      "human_pfc_hbcc"
+    )
+  )
+  expect_setequal(unique(schedule$backend), c("embedded", "bpcells", "h5"))
+  expect_identical(sort(unique(schedule$n_cells)), expected_tiers)
+  expect_true(all(schedule$n_cells[schedule$backend == "embedded"] <= 500e3))
+  expect_false(any(
+    schedule$n_cells == 1e6 & schedule$backend == "embedded"
+  ))
+  expect_setequal(
+    unique(schedule$backend[schedule$n_cells <= 500e3]),
+    c("embedded", "bpcells", "h5")
+  )
+  expect_setequal(
+    unique(schedule$backend[schedule$n_cells == 1e6]),
+    c("bpcells", "h5")
+  )
+  expect_true(all(schedule$export_repeat %in% seq_len(5L)))
+  expect_true(all(schedule$access_repeats == 2L))
+})
+
+test_that("scale profile accepts failed embedded measurements only", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+
+  specs <- list(fixture = list(tiers = 1000, comparison_tiers = 1000))
+  schedule <- bench_schedule(
+    specs,
+    "scale",
+    sources = "fixture"
+  )
+  access_for <- function(indices) {
+    do.call(
+      rbind,
+      lapply(indices, function(i) {
+        do.call(
+          rbind,
+          lapply(seq_len(schedule$access_repeats[i]), function(j) {
+            data.frame(
+              source = schedule$source[i],
+              n_cells = schedule$n_cells[i],
+              backend = schedule$backend[i],
+              export_repeat = schedule$export_repeat[i],
+              access_repeat = j,
+              status = "OK",
+              correctness = "OK",
+              row_fingerprint = "row",
+              reference_row_fingerprint = "row",
+              block_fingerprint = "block",
+              reference_block_fingerprint = "block",
+              stringsAsFactors = FALSE
+            )
+          })
+        )
+      })
+    )
+  }
+
+  exports <- transform(schedule, status = "OK", run_id = "run-1")
+  exports$status[exports$backend == "embedded"] <- "FAILED(export): limit"
+  access <- access_for(which(exports$status == "OK"))
+
+  expect_true(bench_validate_results(
+    schedule,
+    exports,
+    access,
+    profile = bench_profile("scale")
+  ))
+
+  exports$status <- "OK"
+  access <- access_for(seq_len(nrow(schedule)))
+  optional <- access$backend == "embedded"
+  access$status[optional] <- "FAILED(correctness/access): unsupported"
+  access$correctness[optional] <- NA_character_
+  access$row_fingerprint[optional] <- NA_character_
+  access$reference_row_fingerprint[optional] <- NA_character_
+  access$block_fingerprint[optional] <- NA_character_
+  access$reference_block_fingerprint[optional] <- NA_character_
+  expect_true(bench_validate_results(
+    schedule,
+    exports,
+    access,
+    profile = bench_profile("scale")
+  ))
+
+  access$status[access$backend == "bpcells"][1] <- "FAILED(access): error"
+  expect_error(
+    bench_validate_results(
+      schedule,
+      exports,
+      access,
+      profile = bench_profile("scale")
+    ),
+    "access process failed"
+  )
+
+  exports$status[exports$backend == "bpcells"][1] <- "FAILED(build): limit"
+  expect_error(
+    bench_validate_results(
+      schedule,
+      exports,
+      access,
+      profile = bench_profile("scale")
+    ),
+    "comparison tier did not complete every required backend"
+  )
 })
 
 test_that("query panels are deterministic and span expression density", {
@@ -131,11 +327,16 @@ test_that("result validation rejects missing and incorrect measurements", {
         backend = schedule$backend[i],
         export_repeat = schedule$export_repeat[i],
         access_repeat = 1L,
+        status = "OK",
         correctness = "OK",
         row_fingerprint = "same-row",
         reference_row_fingerprint = "same-row",
         block_fingerprint = "same-block",
         reference_block_fingerprint = "same-block",
+        subset_row_fingerprint = "same-subset-row",
+        reference_subset_row_fingerprint = "same-subset-row",
+        subset_block_fingerprint = "same-subset-block",
+        reference_subset_block_fingerprint = "same-subset-block",
         stringsAsFactors = FALSE
       )
     })
@@ -161,6 +362,19 @@ test_that("result validation rejects missing and incorrect measurements", {
   )
 
   broken <- access
+  broken$status[1] <- "FAILED(query)"
+  expect_error(
+    bench_validate_results(
+      schedule,
+      exports,
+      broken,
+      crashes = data.frame(),
+      profile = bench_profile("quick")
+    ),
+    "access process failed"
+  )
+
+  broken <- access
   broken$row_fingerprint[1] <- "wrong"
   expect_error(
     bench_validate_results(
@@ -174,15 +388,15 @@ test_that("result validation rejects missing and incorrect measurements", {
   )
 })
 
-test_that("only publication profiles may back the user-facing article", {
+test_that("only evidence-grade profiles may back the user-facing report", {
   skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   expect_error(
-    bench_require_article_profile(bench_profile("standard")),
-    "publication profile"
+    bench_require_evidence_profile(bench_profile("standard")),
+    "evidence-grade benchmark profile"
   )
-  expect_true(bench_require_article_profile(bench_profile("publication")))
+  expect_true(bench_require_evidence_profile(bench_profile("full")))
 })
 
 test_that("access crashes do not masquerade as duplicate export outcomes", {
@@ -198,11 +412,16 @@ test_that("access crashes do not masquerade as duplicate export outcomes", {
     backend = schedule$backend[-1],
     export_repeat = schedule$export_repeat[-1],
     access_repeat = 1L,
+    status = "OK",
     correctness = "OK",
     row_fingerprint = "row",
     reference_row_fingerprint = "row",
     block_fingerprint = "block",
     reference_block_fingerprint = "block",
+    subset_row_fingerprint = "subset-row",
+    reference_subset_row_fingerprint = "subset-row",
+    subset_block_fingerprint = "subset-block",
+    reference_subset_block_fingerprint = "subset-block",
     stringsAsFactors = FALSE
   )
   crashes <- transform(
@@ -220,5 +439,29 @@ test_that("access crashes do not masquerade as duplicate export outcomes", {
       bench_profile("quick")
     ),
     "missing access measurement"
+  )
+})
+
+test_that("result keys canonicalize scientific and integer cell counts", {
+  skip_unless_bench_protocol()
+  source(bench_protocol, local = TRUE)
+
+  scientific <- data.frame(
+    source = "fixture",
+    n_cells = 1e5,
+    backend = "bpcells",
+    export_repeat = 1L
+  )
+  integer <- data.frame(
+    source = "fixture",
+    n_cells = 100000L,
+    backend = "bpcells",
+    export_repeat = 1
+  )
+
+  expect_identical(.bench_result_key(scientific), .bench_result_key(integer))
+  expect_identical(
+    .bench_result_key(scientific),
+    "fixture|100000|bpcells|1"
   )
 })

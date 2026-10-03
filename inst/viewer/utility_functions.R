@@ -2018,10 +2018,19 @@ hasEryColumn <- function() {
   !is.null(getEryColumn())
 }
 ##----------------------------------------------------------------------------##
-## Cerebro file reader (.rds via readRDS).
+## Cerebro file reader (RDS or qs2 payload).
 ##----------------------------------------------------------------------------##
 read_cerebro_file <- function(file) {
-  readRDS(file)
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  magic <- readBin(connection, "raw", n = 4L)
+  if (!identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+    return(readRDS(file))
+  }
+  if (!requireNamespace("qs2", quietly = TRUE)) {
+    stop("A qs2 CRB requires the qs2 package.", call. = FALSE)
+  }
+  qs2::qs_read(file)
 }
 
 ##----------------------------------------------------------------------------##
@@ -2254,6 +2263,212 @@ get_or_load_crb <- function(
 ## Direct launches and uploads read only the ordinary expression_backend field;
 ## serialized getter code is never invoked by this internal loading path.
 ##----------------------------------------------------------------------------##
+.readRuntimeCrbSchema <- function(obj, crb_path) {
+  field <- "crb_schema"
+  if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
+    return(NULL)
+  }
+  if (
+    bindingIsActive(field, obj) ||
+      isTRUE(rlang::env_binding_are_lazy(obj, field))
+  ) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema <- obj[[field]]
+  if (is.null(schema)) {
+    return(NULL)
+  }
+  schema_names <- names(schema)
+  expected_names <- if (identical(schema$version, 1L)) {
+    c("version", "cell_names", "cell_names_md5", "projection_rownames")
+  } else if (identical(schema$version, 2L)) {
+    c(
+      "version",
+      "cell_names",
+      "cell_names_md5",
+      "projection_rownames",
+      "n_cells"
+    )
+  } else {
+    character()
+  }
+  valid <- is.list(schema) &&
+    !is.data.frame(schema) &&
+    length(expected_names) > 0L &&
+    length(schema) == length(expected_names) &&
+    !is.null(schema_names) &&
+    !anyDuplicated(schema_names) &&
+    setequal(schema_names, expected_names) &&
+    identical(schema$cell_names, "expression") &&
+    is.character(schema$cell_names_md5) &&
+    length(schema$cell_names_md5) == 1L &&
+    !is.na(schema$cell_names_md5) &&
+    grepl("^[[:xdigit:]]{32}$", schema$cell_names_md5) &&
+    is.character(schema$projection_rownames) &&
+    !anyNA(schema$projection_rownames) &&
+    !any(!nzchar(schema$projection_rownames)) &&
+    !anyDuplicated(schema$projection_rownames) &&
+    (identical(schema$version, 1L) ||
+      (is.integer(schema$n_cells) &&
+        length(schema$n_cells) == 1L &&
+        !is.na(schema$n_cells) &&
+        schema$n_cells >= 0L))
+  if (!valid) {
+    stop(
+      "The Cerebro data file '",
+      basename(crb_path),
+      "' has an unsupported CRB schema descriptor.",
+      call. = FALSE
+    )
+  }
+  schema
+}
+
+.bpcellsCellNamesChecksum <- function(sidecar) {
+  names_file <- file.path(sidecar, "col_names")
+  if (!file.exists(names_file) || dir.exists(names_file)) {
+    stop("The BPCells sidecar has no cell-name index.", call. = FALSE)
+  }
+  checksum <- unname(tools::md5sum(names_file))
+  if (length(checksum) != 1L || is.na(checksum) || !nzchar(checksum)) {
+    stop("Could not checksum the BPCells cell-name index.", call. = FALSE)
+  }
+  checksum
+}
+
+.runtimeCellFingerprint <- function(cells) {
+  cells <- sort(enc2utf8(cells), method = "radix")
+  stream <- paste0(nchar(cells, type = "bytes"), ":", cells, collapse = "")
+  path <- tempfile("cerebro-cell-fingerprint-")
+  on.exit(unlink(path), add = TRUE)
+  writeBin(charToRaw(stream), path)
+  paste0("md5-cell-set-v1:", unname(tools::md5sum(path)))
+}
+
+.validateExternalCellIdentity <- function(obj) {
+  cells <- colnames(obj$expression)
+  metadata <- obj$meta_data
+  metadata_cells <- if (
+    is.data.frame(metadata) && "cell_barcode" %in% names(metadata)
+  ) {
+    as.character(metadata$cell_barcode)
+  } else if (is.data.frame(metadata)) {
+    rownames(metadata)
+  } else {
+    NULL
+  }
+  if (
+    !is.character(cells) ||
+      anyNA(cells) ||
+      any(!nzchar(cells)) ||
+      anyDuplicated(cells) ||
+      !is.data.frame(metadata) ||
+      !is.character(metadata_cells) ||
+      anyNA(metadata_cells) ||
+      any(!nzchar(metadata_cells)) ||
+      anyDuplicated(metadata_cells) ||
+      !identical(metadata_cells, cells)
+  ) {
+    stop(
+      "The external expression sidecar and CRB metadata must contain the ",
+      "same cells in the same order.",
+      call. = FALSE
+    )
+  }
+  obj
+}
+
+.hydrateThinCrb <- function(obj, crb_path, sidecar, schema) {
+  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
+    stop(
+      "The BPCells cell-name index does not match CRB '",
+      basename(crb_path),
+      "'.",
+      call. = FALSE
+    )
+  }
+  cells <- colnames(obj$expression)
+  if (
+    identical(schema$version, 2L) &&
+      !identical(length(cells), schema$n_cells)
+  ) {
+    stop(
+      "The thin CRB cell count does not match its BPCells sidecar.",
+      call. = FALSE
+    )
+  }
+  if (
+    identical(schema$version, 2L) &&
+      (
+        !is.character(obj$cell_fingerprint) ||
+          length(obj$cell_fingerprint) != 1L ||
+          is.na(obj$cell_fingerprint) ||
+          !identical(
+            obj$cell_fingerprint,
+            .runtimeCellFingerprint(cells)
+          )
+      )
+  ) {
+    stop(
+      "The thin CRB cell fingerprint does not match its BPCells sidecar.",
+      call. = FALSE
+    )
+  }
+  metadata <- obj$meta_data
+  if (
+    !is.character(cells) ||
+      anyNA(cells) ||
+      any(!nzchar(cells)) ||
+      anyDuplicated(cells) ||
+      !is.data.frame(metadata) ||
+      nrow(metadata) != length(cells) ||
+      "cell_barcode" %in% names(metadata)
+  ) {
+    stop(
+      "The thin CRB and BPCells sidecar have incompatible cell metadata.",
+      call. = FALSE
+    )
+  }
+
+  missing_projections <- setdiff(
+    schema$projection_rownames,
+    names(obj$projections)
+  )
+  if (length(missing_projections)) {
+    stop(
+      "The thin CRB is missing projection '",
+      missing_projections[[1L]],
+      "'.",
+      call. = FALSE
+    )
+  }
+  for (name in schema$projection_rownames) {
+    projection <- obj$projections[[name]]
+    if (!is.data.frame(projection) || nrow(projection) != length(cells)) {
+      stop(
+        "Projection '",
+        name,
+        "' does not match the thin CRB cell index.",
+        call. = FALSE
+      )
+    }
+    rownames(projection) <- cells
+    obj$projections[[name]] <- projection
+  }
+  obj$meta_data <- data.frame(
+    cell_barcode = cells,
+    metadata,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  obj
+}
+
 .readRuntimeBackendDescriptor <- function(obj, crb_path) {
   if (!is.environment(obj)) {
     stop(
@@ -2431,6 +2646,7 @@ get_or_load_crb <- function(
   if (!any(grepl("Cerebro", class(obj)))) {
     return(obj)
   }
+  crb_schema <- .readRuntimeCrbSchema(obj, crb_path)
   configured <- !is.null(effective_backend)
   if (!configured) {
     be <- .fallbackRuntimeBackendPlan(obj, crb_path)
@@ -2439,7 +2655,14 @@ get_or_load_crb <- function(
   }
 
   if (identical(be$mode, "embedded")) {
+    if (!is.null(crb_schema)) {
+      stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
+    }
     return(obj)
+  }
+
+  if (!is.null(crb_schema) && !identical(be$type, "bpcells")) {
+    stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
   }
 
   if (identical(be$mode, "host_override")) {
@@ -2473,6 +2696,9 @@ get_or_load_crb <- function(
     }
     print(glue::glue("[{Sys.time()}] Attaching bpcells backend: {loc_abs}"))
     obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
+    if (!is.null(crb_schema)) {
+      obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema)
+    }
   } else if (be$type == "h5") {
     if (!requireNamespace("HDF5Array", quietly = TRUE)) {
       stop(
@@ -2517,6 +2743,10 @@ get_or_load_crb <- function(
       ),
       call. = FALSE
     )
+  }
+
+  if (is.null(crb_schema)) {
+    obj <- .validateExternalCellIdentity(obj)
   }
 
   obj

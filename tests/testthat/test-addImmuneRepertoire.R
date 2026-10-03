@@ -361,7 +361,7 @@ test_that("conversion follows a renamed metadata sample column", {
 
   path <- list.files(output_dir, pattern = "\\.crb$", full.names = TRUE)
   expect_length(path, 1L)
-  repertoire <- readRDS(path)$getImmuneRepertoire()
+  repertoire <- readCerebro(path)$getImmuneRepertoire()
   expect_setequal(names(repertoire), unique(object$orig.ident))
 })
 
@@ -406,7 +406,7 @@ test_that("the slot survives export as samples, not as column names", {
     verbose = FALSE
   )
 
-  loaded <- readRDS(crb_path)$getImmuneRepertoire()
+  loaded <- readCerebro(crb_path)$getImmuneRepertoire()
   expect_setequal(names(loaded), names(combined))
   ## the failure this guards against: column names standing in for samples
   expect_false(any(c("barcode", "CTgene", "CTaa") %in% names(loaded)))

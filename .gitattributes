@@ -1,0 +1,4 @@
+*.sh text eol=lf
+# Evidence manifests checksum exact bytes, so Git must not rewrite line endings.
+tests/bench/results/** -text
+tests/bench/results/**/*.png binary

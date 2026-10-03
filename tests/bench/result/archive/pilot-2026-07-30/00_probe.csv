@@ -1,3 +1,0 @@
-"source","label","kind","n_cells","n_genes","nnz","nnz_per_cell","dgc_gb_full","dgc_representable","tiers"
-"mouse_brain_e18","10x mouse brain E18","tenx",1306127,27998,2624828308,2009.6,29.33,FALSE,"50000|150000|400000|800000"
-"human_pfc_hbcc","human PFC cross-disorder (HBCC)","h5ad",1486324,34176,6111732728,4112,68.3,FALSE,"50000|150000|300000"

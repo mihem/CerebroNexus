@@ -1,0 +1,4 @@
+"candidate","rounds","size_mib","write_median_ms","decode_median_ms","hydrated_median_ms","size_reduction_pct","write_speedup","decode_speedup","hydrated_speedup"
+"pr165",5,26.829,8001,1296,1479,0,1,1,1
+"thin_rds",5,13.213,231,41,297,50.75,34.64,31.61,4.98
+"latest",5,13.215,238,40,298,50.74,33.62,32.40,4.96

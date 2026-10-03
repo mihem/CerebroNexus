@@ -1,9 +1,9 @@
-# Guards for the pure planning/ordering logic in tests/bench/lib/remote_h5.R.
+# Guards for the pure planning/ordering logic in tests/bench/benchmark/core.R.
 #
 # Only the functions that need no network are exercised here. The benchmark tree
 # is .Rbuildignore'd, so these skip when running against a built tarball.
 
-bench_lib <- file.path("..", "bench", "lib", "remote_h5.R")
+bench_lib <- file.path("..", "bench", "benchmark", "core.R")
 
 skip_unless_bench <- function() {
   testthat::skip_if_not(
@@ -49,6 +49,17 @@ test_that("chunk plans degrade gracefully at the edges", {
   # Uneven divisions still add up.
   plan <- bench_plan_chunks(1000000, 4003, n_chunks = 4L)
   expect_equal(sum(plan$size), 4003)
+})
+
+test_that("sampled feature names match Seurat normalization", {
+  skip_unless_bench()
+  source(bench_lib, local = TRUE)
+
+  genes <- c("Metazoa_SRP.34", "A|B", "A_B", "A-B")
+  expect_identical(
+    bench_seurat_feature_names(genes),
+    c("Metazoa-SRP.34", "A-B", "A-B.1", "A-B.2")
+  )
 })
 
 test_that("within-column ordering is classified correctly", {

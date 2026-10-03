@@ -868,7 +868,10 @@ dedent <- function(string) {
 
 ## Treat the ordinary field as data. The getter binding is checked only as a
 ## format marker and is never invoked during preflight.
-.readBundleBackend <- function(crb_path, object = readRDS(crb_path)) {
+.readBundleBackend <- function(
+  crb_path,
+  object = .readCerebroPayload(crb_path)
+) {
   recognized <- .isRecognizedCerebroObject(object)
   if (recognized) {
     for (method in .bundleRequiredCerebroMethods) {
@@ -1054,7 +1057,7 @@ dedent <- function(string) {
 
 .preflightBundleData <- function(
   cerebro_data,
-  read_object = readRDS,
+  read_object = .readCerebroPayload,
   inspect_backend = .readBundleBackend,
   inspect_spatial = .readBundleSpatialCatalog,
   release_object = function(object) invisible(NULL)

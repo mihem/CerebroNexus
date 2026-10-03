@@ -203,6 +203,7 @@ test_that("exportFromSeurat preserves a declared FOV image payload", {
   output <- tempfile(fileext = ".crb")
 
   exportFromSeurat(
+    codec = "rds",
     object = object,
     assay = "Spatial",
     slot = "data",
@@ -240,6 +241,7 @@ test_that("exportFromSeurat embeds named path images for multiple FOVs", {
   output <- tempfile(fileext = ".crb")
 
   exportFromSeurat(
+    codec = "rds",
     object = object,
     assay = "Spatial",
     slot = "data",

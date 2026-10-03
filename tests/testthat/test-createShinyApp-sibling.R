@@ -41,7 +41,8 @@ write_bundle_crb <- function(
   directory,
   name = "dataset.crb",
   backend = list(type = "embedded", location = NULL),
-  legacy = FALSE
+  legacy = FALSE,
+  cells = NULL
 ) {
   dir.create(directory, recursive = TRUE, showWarnings = FALSE)
   path <- file.path(directory, name)
@@ -59,6 +60,18 @@ write_bundle_crb <- function(
         type = backend$type,
         location = backend$location
       )
+    }
+  }
+  if (!is.null(cells)) {
+    metadata <- data.frame(
+      cell_barcode = cells,
+      row.names = cells,
+      stringsAsFactors = FALSE
+    )
+    if (legacy) {
+      payload$meta_data <- metadata
+    } else {
+      payload$setMetaData(metadata)
     }
   }
   saveRDS(payload, path)
@@ -2262,7 +2275,8 @@ test_that("a configured host override attaches the generated H5 plan", {
   expected <- write_real_h5_matrix(override)
   crb <- write_bundle_crb(
     file.path(root, "source"),
-    backend = list(type = "h5", location = "missing.h5")
+    backend = list(type = "h5", location = "missing.h5"),
+    cells = colnames(expected)
   )
   app <- file.path(root, "app")
 
@@ -3297,7 +3311,8 @@ test_that("old configs and legacy overrides attach through field fallback", {
   modern <- write_bundle_crb(
     modern_source,
     "modern.crb",
-    backend = list(type = "h5", location = "matrix.h5")
+    backend = list(type = "h5", location = "matrix.h5"),
+    cells = colnames(expected)
   )
   runtime <- source_bundle_runtime()
   local_cerebro_options(list())
@@ -3310,7 +3325,8 @@ test_that("old configs and legacy overrides attach through field fallback", {
   legacy <- write_bundle_crb(
     file.path(root, "legacy"),
     "legacy.crb",
-    legacy = TRUE
+    legacy = TRUE,
+    cells = colnames(expected_override)
   )
   local_cerebro_options(list(expression_matrix_h5 = override))
 
@@ -3414,6 +3430,28 @@ test_that("a bundled real BPCells backend attaches with exact data", {
   skip_if_not_installed("Matrix")
 
   expect_real_backend_bundle_roundtrip("bpcells")
+})
+
+test_that("legacy external metadata must match sidecar row names exactly", {
+  runtime <- source_bundle_runtime()
+  object <- new.env(parent = emptyenv())
+  object$expression <- matrix(
+    seq_len(4L),
+    nrow = 2L,
+    dimnames = list(c("g1", "g2"), c("c1", "c2"))
+  )
+  object$meta_data <- data.frame(
+    group = c("A", "B"),
+    row.names = c("c1", "c2")
+  )
+
+  expect_identical(runtime$.validateExternalCellIdentity(object), object)
+
+  rownames(object$meta_data) <- rev(rownames(object$meta_data))
+  expect_error(
+    runtime$.validateExternalCellIdentity(object),
+    "same cells in the same order"
+  )
 })
 
 test_that("the runtime rejects an H5 backend that is a directory", {

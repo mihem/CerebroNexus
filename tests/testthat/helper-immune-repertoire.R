@@ -76,6 +76,7 @@ export_ir <- function(object, file = tempfile(fileext = ".crb"), ...) {
     groups = c("sample", "cluster"),
     nUMI = "nCount_RNA",
     nGene = "nFeature_RNA",
+    codec = "rds",
     verbose = FALSE,
     ...
   )

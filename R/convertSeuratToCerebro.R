@@ -355,6 +355,9 @@
 #'   directory, so packaging the \code{.crb} with its sibling
 #'   \code{<stem>.bpcells/} or \code{<stem>.h5} together is enough for
 #'   portable deployment.
+#' @param codec Serialization codec for the CRB payload. Defaults to
+#'   \code{"qs2"}; use \code{"rds"} when direct compatibility with
+#'   \code{readRDS()} is required.
 #' @param spatial_images Optional manifest in
 #'   \code{spatial entry -> image label -> path} form. Spatial-entry names must
 #'   match \code{SeuratObject::Images(seurat_file)}. Each entry may contain one
@@ -452,6 +455,7 @@ convertSeuratToCerebro <- function(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
   cell_cycle = NULL,
@@ -463,6 +467,7 @@ convertSeuratToCerebro <- function(
   tcr_file = NULL
 ) {
   expression_matrix_mode <- match.arg(expression_matrix_mode)
+  codec <- match.arg(codec)
   if (inherits(seurat_file, "Seurat")) {
     seurat <- seurat_file
   } else {
@@ -1047,6 +1052,7 @@ convertSeuratToCerebro <- function(
         verbose = verbose,
         use_delayed_array = use_delayed_array,
         expression_matrix_mode = expression_matrix_mode,
+        codec = codec,
         spatial_images = spatial_images,
         .expression_resolution = expr_resolution
       )

@@ -1,3 +1,11 @@
+# CerebroNexus 4.5.0
+
+## Data format and I/O
+
+- New `saveCerebro()`, `readCerebro()`, and `convertCerebro()` APIs support codec-independent `.crb` files, automatically read legacy RDS and thin RDS/qs2 CRBs, and use qs2 by default for new files.
+- BPCells-backed thin CRBs omit duplicated cell indexes, projection row names, and live expression handles while validating the shared sidecar checksum during hydration.
+- The reproducible one-million-cell benchmark records source-to-artifact processing, physical file layouts, host and package versions, and comparisons against PR #165.
+
 # CerebroNexus 4.4.3
 
 ## Viewer
