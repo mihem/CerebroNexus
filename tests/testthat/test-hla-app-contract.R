@@ -1240,26 +1240,21 @@ test_that("HLA heavy consumers require their visible subtab", {
     collapse = "\n"
   )
 
-  network_observer <- regmatches(
+  network_observer <- r_test_observer(
     visual,
-    regexpr(
-      "observe\\(\\{[\\s\\S]{0,2600}cerebroCellViewRender",
-      visual,
-      perl = TRUE
-    )
+    "observe",
+    quote(hla_motif_last_render_signature(render_signature))
   )
-  expect_match(network_observer, 'input[["sidebar"]]', fixed = TRUE)
-  expect_match(network_observer, 'input[["hla_tabs"]]', fixed = TRUE)
-  expect_match(
+  expect_true(r_test_has_call(network_observer, quote(input[["sidebar"]])))
+  expect_true(r_test_has_call(network_observer, quote(input[["hla_tabs"]])))
+  expect_true(r_test_has_call(
     network_observer,
-    "hla_motif_network_render_request",
-    fixed = TRUE
-  )
-  expect_match(
+    quote(input[["hla_motif_network_render_request"]])
+  ))
+  expect_true(r_test_has_call(
     network_observer,
-    "hla_active_chain() %in% hla_tcr_chains()",
-    fixed = TRUE
-  )
+    quote(hla_active_chain() %in% hla_tcr_chains())
+  ))
 
   expect_match(ui, 'id = "hla_associations_mount"', fixed = TRUE)
   expect_match(client, "hla_associations_render_request", fixed = TRUE)
