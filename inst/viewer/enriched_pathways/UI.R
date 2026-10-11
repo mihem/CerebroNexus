@@ -14,6 +14,10 @@ tab_enriched_pathways <- tabItem(
     }
     "
   ),
-  cerebroResultPage("Enriched pathways", "enriched_pathways_select_method_and_table_UI",
-    "enriched_pathways_table_or_text_UI", "enriched_pathways_info")
+  cerebroResultPage(
+    "Enriched pathways",
+    "enriched_pathways_select_method_and_table_UI",
+    "enriched_pathways_table_or_text_UI",
+    "enriched_pathways_info"
+  )
 )

@@ -13,9 +13,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
     summary <- getImmuneRepertoireSummary()
     summary_chains <- as.character(summary$chains)
     raw <- if (packed_landing || length(summary_chains)) NULL else ir_data_raw()
-    if (
-      !isTRUE(summary$available)
-    ) {
+    if (!isTRUE(summary$available)) {
       return(div(
         class = "alert alert-warning",
         "No immune repertoire data available. Import data with TCR/BCR annotations first."
@@ -23,7 +21,11 @@ output$ir_main_params_UI <- shiny::bindEvent(
     }
 
     # The validated sidecar descriptor supplies these without materialization.
-    chains_present <- if (length(summary_chains)) summary_chains else detect_chains(raw)
+    chains_present <- if (length(summary_chains)) {
+      summary_chains
+    } else {
+      detect_chains(raw)
+    }
     tcr_present <- intersect(chains_present, c("TRA", "TRB", "TRG", "TRD"))
     bcr_present <- intersect(chains_present, c("IGH", "IGK", "IGL"))
     # Build a flat named vector of chain choices. A nested list mixing a
@@ -47,7 +49,10 @@ output$ir_main_params_UI <- shiny::bindEvent(
         colnames(getMetaData()),
         error = function(e) character()
       )
-      data_cols <- union(if (length(raw)) names(raw[[1]]) else character(), metadata_cols)
+      data_cols <- union(
+        if (length(raw)) names(raw[[1]]) else character(),
+        metadata_cols
+      )
       groups <- tryCatch(getGroups(), error = function(e) character(0))
       available_groups <- intersect(groups, data_cols)
     }
@@ -375,8 +380,10 @@ ir_analysis_panel <- function(more = FALSE) {
     # making the panel depend on the inputs it creates.
     current <- isolate(input[[p$id]])
     if (identical(p$type, "numeric")) {
-      valid <- is.numeric(current) && length(current) == 1L &&
-        is.finite(current) && (is.null(p$min) || current >= p$min) &&
+      valid <- is.numeric(current) &&
+        length(current) == 1L &&
+        is.finite(current) &&
+        (is.null(p$min) || current >= p$min) &&
         (is.null(p$max) || current <= p$max)
       return(numericInput(
         p$id,
@@ -388,11 +395,23 @@ ir_analysis_panel <- function(more = FALSE) {
       ))
     }
     if (identical(p$type, "checkbox")) {
-      value <- if (is.logical(current) && length(current) == 1L && !is.na(current)) current else p$value
+      value <- if (
+        is.logical(current) && length(current) == 1L && !is.na(current)
+      ) {
+        current
+      } else {
+        p$value
+      }
       return(checkboxInput(p$id, p$label, value = isTRUE(value)))
     }
     if (identical(p$type, "text")) {
-      value <- if (is.character(current) && length(current) == 1L && !is.na(current)) current else p$value
+      value <- if (
+        is.character(current) && length(current) == 1L && !is.na(current)
+      ) {
+        current
+      } else {
+        p$value
+      }
       return(textInput(p$id, p$label, value = value))
     }
     # select

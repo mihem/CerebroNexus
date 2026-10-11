@@ -105,7 +105,11 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
     embedded_images,
     external_images
   )
-  background_identity <- spatial_background_identity(dataset, spatial_name, selected_descriptor)
+  background_identity <- spatial_background_identity(
+    dataset,
+    spatial_name,
+    selected_descriptor
+  )
   image_label <- if (is.null(selected_descriptor)) {
     NULL
   } else {

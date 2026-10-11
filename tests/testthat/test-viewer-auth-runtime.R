@@ -98,7 +98,10 @@ test_that("Viewer authentication loads only its app-local secret", {
 
   Sys.unsetenv(env_name)
   unlink(app_env)
-  expect_error(load_passphrase(app_dir, env_name), "viewer-auth.env was not found")
+  expect_error(
+    load_passphrase(app_dir, env_name),
+    "viewer-auth.env was not found"
+  )
   expect_identical(Sys.getenv(env_name, unset = NA_character_), NA_character_)
 })
 
@@ -115,7 +118,10 @@ test_that("process authentication keys bypass every local-file check", {
   unlink(path)
   dir.create(path)
   expect_false(load(root, "CEREBRO_AUTH_TEST_KEY"))
-  expect_identical(Sys.getenv("CEREBRO_AUTH_TEST_KEY"), "externally supplied key")
+  expect_identical(
+    Sys.getenv("CEREBRO_AUTH_TEST_KEY"),
+    "externally supplied key"
+  )
 })
 
 test_that("local authentication content errors never disclose the content", {
@@ -125,7 +131,9 @@ test_that("local authentication content errors never disclose the content", {
   secret <- strrep("c", 64L)
   withr::local_envvar(CEREBRO_AUTH_TEST_KEY = NA)
   for (lines in list(
-    character(), "", paste0("WRONG_NAME=", secret),
+    character(),
+    "",
+    paste0("WRONG_NAME=", secret),
     paste0("export CEREBRO_AUTH_TEST_KEY=", secret),
     paste0('CEREBRO_AUTH_TEST_KEY="', secret, '"'),
     c(paste0("CEREBRO_AUTH_TEST_KEY=", secret), "extra line"),
@@ -143,7 +151,10 @@ test_that("local authentication content errors never disclose the content", {
     expect_match(message, "CEREBRO_AUTH_TEST_KEY=<64", fixed = TRUE)
     expect_false(grepl(secret, message, fixed = TRUE))
     expect_false(grepl("login-password-must-not-appear", message, fixed = TRUE))
-    expect_identical(Sys.getenv("CEREBRO_AUTH_TEST_KEY", unset = NA), NA_character_)
+    expect_identical(
+      Sys.getenv("CEREBRO_AUTH_TEST_KEY", unset = NA),
+      NA_character_
+    )
   }
 })
 
@@ -161,8 +172,10 @@ test_that("local authentication rejects directories and symbolic links", {
   target <- file.path(root, "actual-secret")
   writeLines(paste0("CEREBRO_AUTH_TEST_KEY=", strrep("d", 64L)), target)
   Sys.chmod(target, "0600", use_umask = FALSE)
-  skip_if_not(isTRUE(suppressWarnings(file.symlink(target, path))),
-              "This host cannot create a symbolic link")
+  skip_if_not(
+    isTRUE(suppressWarnings(file.symlink(target, path))),
+    "This host cannot create a symbolic link"
+  )
   expect_error(
     runtime$.viewer_auth_load_local_passphrase(root, "CEREBRO_AUTH_TEST_KEY"),
     "symbolic link"
@@ -188,10 +201,16 @@ test_that("POSIX local authentication requires exactly 0600", {
       paste0("insecure permissions: ", mode, ". Required permissions: 0600"),
       fixed = TRUE
     )
-    expect_identical(Sys.getenv("CEREBRO_AUTH_TEST_KEY", unset = NA), NA_character_)
+    expect_identical(
+      Sys.getenv("CEREBRO_AUTH_TEST_KEY", unset = NA),
+      NA_character_
+    )
   }
   Sys.chmod(path, "0600", use_umask = FALSE)
-  expect_true(runtime$.viewer_auth_load_local_passphrase(root, "CEREBRO_AUTH_TEST_KEY"))
+  expect_true(runtime$.viewer_auth_load_local_passphrase(
+    root,
+    "CEREBRO_AUTH_TEST_KEY"
+  ))
 })
 
 test_that("authentication read failures report access without leaking errors", {
@@ -214,7 +233,11 @@ test_that("authentication read failures report access without leaking errors", {
     error = identity
   )
   expect_match(conditionMessage(error), "runtime UID/GID", fixed = TRUE)
-  expect_false(grepl("sensitive-reader-error", conditionMessage(error), fixed = TRUE))
+  expect_false(grepl(
+    "sensitive-reader-error",
+    conditionMessage(error),
+    fixed = TRUE
+  ))
 })
 
 test_that("Viewer authentication supplies bundled CerebroNexus branding", {

@@ -78,9 +78,12 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
     getMetaData()[["cell_barcode"]][expression_projection_cells_to_show()]
   )
   cells_df[["cell_barcode"]] <- cells_df[["selection_key"]]
-  stable_selection <- "selection_key" %in% colnames(selected_cells) &&
-    any(!is.na(selected_cells[["selection_key"]]) &
-      nzchar(as.character(selected_cells[["selection_key"]])))
+  stable_selection <- "selection_key" %in%
+    colnames(selected_cells) &&
+    any(
+      !is.na(selected_cells[["selection_key"]]) &
+        nzchar(as.character(selected_cells[["selection_key"]]))
+    )
   identifier <- if (!stable_selection) {
     paste0(cells_df[["X1"]], "-", cells_df[["X2"]])
   } else {
@@ -95,9 +98,14 @@ output[["expression_details_selected_cells"]] <- DT::renderDataTable({
     ,
     drop = FALSE
   ] %>%
-    dplyr::select(-dplyr::any_of(c(
-      "X1", "X2", "identifier", "selection_key"
-    ))) %>%
+    dplyr::select(
+      -dplyr::any_of(c(
+        "X1",
+        "X2",
+        "identifier",
+        "selection_key"
+      ))
+    ) %>%
     dplyr::select(
       dplyr::any_of("cell_barcode"),
       dplyr::all_of(expression_columns),

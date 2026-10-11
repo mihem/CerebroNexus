@@ -93,9 +93,15 @@ test_that("hover code remapping preserves observed order and missing labels", {
   )) {
     for (registered in list(c("a", "b", "NA"), "a", character())) {
       actual <- helpers$cerebroProjectionHoverColumns(
-        data.frame(group = values), "group", function(group) registered)
+        data.frame(group = values),
+        "group",
+        function(group) registered
+      )
       expected <- helpers$cerebroProjectionHoverColumns(
-        data.frame(group = as.character(values)), "group", function(group) registered)
+        data.frame(group = as.character(values)),
+        "group",
+        function(group) registered
+      )
       expect_identical(actual, expected)
       labels <- as.character(values)
       labels[is.na(labels)] <- "NA"
@@ -289,7 +295,12 @@ test_that("deferred specialist IDs can declare trace lengths without placeholder
         ),
         hover = list(hoverinfo = "skip")
       )
-    }, dataset_context = list(epoch="wire-test",dataset_key="A",generation=1)
+    },
+    dataset_context = list(
+      epoch = "wire-test",
+      dataset_key = "A",
+      generation = 1
+    )
   )
 
   expect_identical(length(sent), 1L)
@@ -334,20 +345,40 @@ test_that("specialist views can reference validated shared coordinates", {
     order_fingerprint = "order-a"
   )
   shared <- list(
-    dataset_context = list(epoch="wire-test",dataset_key="A",generation=1),
+    dataset_context = list(
+      epoch = "wire-test",
+      dataset_key = "A",
+      generation = 1
+    ),
     dataset_fingerprint = "dataset-a",
     cell_count = 4096L,
     canonical_order_id = "order-a",
     projection = "umap"
   )
   expect_identical(
-    runtime$viewerSharedProjectionName("umap", 4096L, shared, identity, shared$dataset_context),
+    runtime$viewerSharedProjectionName(
+      "umap",
+      4096L,
+      shared,
+      identity,
+      shared$dataset_context
+    ),
     "umap"
   )
-  expect_null(runtime$viewerSharedProjectionName("umap",4096L,shared,identity,
-    list(epoch="wire-test",dataset_key="A",generation=2)))
-  expect_null(runtime$viewerSharedProjectionName("umap",4096L,shared,identity,
-    list(epoch="new-epoch",dataset_key="A",generation=1)))
+  expect_null(runtime$viewerSharedProjectionName(
+    "umap",
+    4096L,
+    shared,
+    identity,
+    list(epoch = "wire-test", dataset_key = "A", generation = 2)
+  ))
+  expect_null(runtime$viewerSharedProjectionName(
+    "umap",
+    4096L,
+    shared,
+    identity,
+    list(epoch = "new-epoch", dataset_key = "A", generation = 1)
+  ))
   expect_null(runtime$viewerSharedProjectionName(
     "umap",
     4096L,
@@ -375,7 +406,12 @@ test_that("specialist views can reference validated shared coordinates", {
       color = rep(0, 4096L),
       selection_key = keys,
       shared_zero_color = TRUE
-    ), dataset_context = list(epoch="wire-test",dataset_key="A",generation=1)
+    ),
+    dataset_context = list(
+      epoch = "wire-test",
+      dataset_key = "A",
+      generation = 1
+    )
   )
 
   first <- wire_header(sent[[1L]]$payload)
@@ -397,7 +433,12 @@ test_that("specialist views can reference validated shared coordinates", {
       color = numeric(),
       selection_key = keys,
       shared_zero_color = TRUE
-    ), dataset_context = list(epoch="wire-test",dataset_key="A",generation=1)
+    ),
+    dataset_context = list(
+      epoch = "wire-test",
+      dataset_key = "A",
+      generation = 1
+    )
   )
   unshared <- wire_header(sent[[1L]]$payload)
   expect_null(unshared$shared_projection)
@@ -531,7 +572,11 @@ test_that("JSON specialist payloads retain dataset identity", {
   )[[1L]][[1L]]
 
   expect_match(handler, "renderSingle(message)", fixed = TRUE)
-  expect_match(javascript, "datasetIdentity: message.dataset_identity", fixed = TRUE)
+  expect_match(
+    javascript,
+    "datasetIdentity: message.dataset_identity",
+    fixed = TRUE
+  )
 })
 
 test_that("zero-color specialist frames reuse shared browser geometry", {
@@ -563,15 +608,23 @@ test_that("core auxiliary identities precede full metadata and reject duplicate 
   context <- env$viewerDatasetContext("wire-test", "A", 1)
   env$viewer_loaded_dataset_context <- function() context
   env$.cerebro_cell_view_aux_pending[["gene:7"]] <- list(
-    dataset_context = context, render_token = 1,
-    id = "gene", wire_token = 7L,
+    dataset_context = context,
+    render_token = 1,
+    id = "gene",
+    wire_token = 7L,
     core_builder = function() {
       core_builds <<- core_builds + 1L
-      list(selection_key = c("a", "b"), hover = list(hoverinfo = "text", pending = TRUE))
+      list(
+        selection_key = c("a", "b"),
+        hover = list(hoverinfo = "text", pending = TRUE)
+      )
     },
     build = function() {
       full_builds <<- full_builds + 1L
-      list(selection_key = c("a", "b"), hover = list(columns = list("metadata")))
+      list(
+        selection_key = c("a", "b"),
+        hover = list(columns = list("metadata"))
+      )
     }
   )
   request <- list(id = "gene", wire_token = 7L, dataset_context = context)

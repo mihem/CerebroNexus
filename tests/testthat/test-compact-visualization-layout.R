@@ -364,7 +364,11 @@ test_that("Immune repertoire keeps its status row across subtabs", {
     ),
     collapse = "\n"
   )
-  expect_match(source, "Selection is available in Clonal projection", fixed = TRUE)
+  expect_match(
+    source,
+    "Selection is available in Clonal projection",
+    fixed = TRUE
+  )
 })
 
 test_that("immune analysis pages share the compact tab strip", {

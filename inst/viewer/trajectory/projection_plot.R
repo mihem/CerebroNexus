@@ -64,11 +64,15 @@ trajectory_projection_prepared_raw <- reactive({
   if (nrow(cells_df) == 0L) {
     return(list(
       dataset_context = dataset_context,
-      feedback = cerebroFeedbackControls("trajectory_projection", input, list(
-        trajectory_point_size = trajectory_projection_appearance$point_size,
-        trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
-        trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-      )),
+      feedback = cerebroFeedbackControls(
+        "trajectory_projection",
+        input,
+        list(
+          trajectory_point_size = trajectory_projection_appearance$point_size,
+          trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
+          trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
+        )
+      ),
       cells_df = cells_df,
       trajectory_lines = list(),
       hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
@@ -93,11 +97,15 @@ trajectory_projection_prepared_raw <- reactive({
 
   list(
     dataset_context = dataset_context,
-    feedback = cerebroFeedbackControls("trajectory_projection", input, list(
+    feedback = cerebroFeedbackControls(
+      "trajectory_projection",
+      input,
+      list(
         trajectory_point_size = trajectory_projection_appearance$point_size,
         trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
         trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-      )),
+      )
+    ),
     cells_df = cells_df,
     trajectory_lines = trajectory_lines,
     hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
@@ -215,21 +223,31 @@ trajectory_static_first_frame <- reactive({
   )
 })
 
-observeEvent(viewerDatasetIdentity()$fingerprint, {
-  appearance <- current_scatter_defaults()
-  trajectory_projection_appearance$point_size <- appearance$point_size
-  trajectory_projection_appearance$point_opacity <- appearance$point_opacity
-  trajectory_projection_appearance$percentage_cells_to_show <-
-    appearance$percentage_cells_to_show
-  trajectory_projection_appearance$group_labels <- TRUE
-  trajectory_projection_appearance$draw_border <- TRUE
-  trajectory_projection_appearance$keep_square <- FALSE
-  trajectory_projection_sent(FALSE)
-}, ignoreInit = TRUE)
+observeEvent(
+  viewerDatasetIdentity()$fingerprint,
+  {
+    appearance <- current_scatter_defaults()
+    trajectory_projection_appearance$point_size <- appearance$point_size
+    trajectory_projection_appearance$point_opacity <- appearance$point_opacity
+    trajectory_projection_appearance$percentage_cells_to_show <-
+      appearance$percentage_cells_to_show
+    trajectory_projection_appearance$group_labels <- TRUE
+    trajectory_projection_appearance$draw_border <- TRUE
+    trajectory_projection_appearance$keep_square <- FALSE
+    trajectory_projection_sent(FALSE)
+  },
+  ignoreInit = TRUE
+)
 
 observe({
   render_request <- input[["trajectory_projection_render_request"]]
-  req(is.list(render_request), viewerDatasetContextEqual(render_request$dataset_context, viewer_loaded_dataset_context()))
+  req(
+    is.list(render_request),
+    viewerDatasetContextEqual(
+      render_request$dataset_context,
+      viewer_loaded_dataset_context()
+    )
+  )
   current_context <- viewer_loaded_dataset_context()
 
   ## resolve current reset_axes, then clear it so only a trajectory switch (not
@@ -312,12 +330,18 @@ observe({
       primary,
       list(hoverinfo = "skip"),
       extra = list(shapes = static_frame$trajectory_lines),
-      deferred_aux = deferred_aux, dataset_context = current_context,
-      feedback = cerebroFeedbackControls("trajectory_projection", input, list(
-        trajectory_point_size = trajectory_projection_appearance$point_size,
-        trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
-        trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-      )))
+      deferred_aux = deferred_aux,
+      dataset_context = current_context,
+      feedback = cerebroFeedbackControls(
+        "trajectory_projection",
+        input,
+        list(
+          trajectory_point_size = trajectory_projection_appearance$point_size,
+          trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
+          trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
+        )
+      )
+    )
     if (!isolate(trajectory_projection_sent())) {
       session$onFlushed(
         function() trajectory_projection_sent(TRUE),
@@ -431,8 +455,10 @@ observe({
     payload[["data"]],
     payload[["hover"]],
     extra = list(shapes = prepared[["trajectory_lines"]]),
-    deferred_aux = deferred_aux, dataset_context = prepared[["dataset_context"]],
-    feedback = prepared[["feedback"]])
+    deferred_aux = deferred_aux,
+    dataset_context = prepared[["dataset_context"]],
+    feedback = prepared[["feedback"]]
+  )
   if (!isolate(trajectory_projection_sent())) {
     session$onFlushed(
       function() trajectory_projection_sent(TRUE),
@@ -445,7 +471,11 @@ observe({
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
 
-cerebroRegisterInfo(input, "trajectory_projection_info", trajectory_projection_info)
+cerebroRegisterInfo(
+  input,
+  "trajectory_projection_info",
+  trajectory_projection_info
+)
 
 ##----------------------------------------------------------------------------##
 ## Text in info box.
@@ -472,10 +502,11 @@ trajectory_projection_selected_cells <- reactive({
   sel <- input[["trajectory_projection_persistent_selection"]]
   if (
     !is.null(sel) &&
-      (!is.list(sel) || !viewerDatasetContextEqual(
-        sel[["dataset_context"]],
-        viewer_loaded_dataset_context()
-      ))
+      (!is.list(sel) ||
+        !viewerDatasetContextEqual(
+          sel[["dataset_context"]],
+          viewer_loaded_dataset_context()
+        ))
   ) {
     return(NULL)
   }
@@ -515,10 +546,13 @@ trajectory_projection_selected_cells <- reactive({
       barcodes = TRUE
     )
     metadata[["selection_key"]] <- as.character(metadata[["cell_barcode"]])
-    stable_selection <- "selection_key" %in% colnames(metadata) &&
+    stable_selection <- "selection_key" %in%
+      colnames(metadata) &&
       "selection_key" %in% colnames(selection) &&
-      any(!is.na(selection[["selection_key"]]) &
-        nzchar(as.character(selection[["selection_key"]])))
+      any(
+        !is.na(selection[["selection_key"]]) &
+          nzchar(as.character(selection[["selection_key"]]))
+      )
     if (!stable_selection) {
       metadata[["identifier"]] <- paste0(
         metadata[["DR_1"]],

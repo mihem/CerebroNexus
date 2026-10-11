@@ -71,28 +71,32 @@ output[["trajectory_primary_controls_UI"]] <- renderUI({
   )
 })
 
-observeEvent(input[["trajectory_selected_method"]], {
-  method <- input[["trajectory_selected_method"]]
-  available_methods <- viewerSupportedTrajectoryMethods(
-    getMethodsForTrajectories()
-  )
-  req(method %in% available_methods)
-  available_names <- getNamesOfTrajectories(method)
-  selected_name <- isolate(input[["trajectory_selected_name"]])
-  if (
-    length(selected_name) != 1L ||
-      is.na(selected_name) ||
-      !selected_name %in% available_names
-  ) {
-    selected_name <- available_names[[1L]]
-  }
-  updateSelectInput(
-    session,
-    "trajectory_selected_name",
-    choices = available_names,
-    selected = selected_name
-  )
-}, ignoreInit = TRUE)
+observeEvent(
+  input[["trajectory_selected_method"]],
+  {
+    method <- input[["trajectory_selected_method"]]
+    available_methods <- viewerSupportedTrajectoryMethods(
+      getMethodsForTrajectories()
+    )
+    req(method %in% available_methods)
+    available_names <- getNamesOfTrajectories(method)
+    selected_name <- isolate(input[["trajectory_selected_name"]])
+    if (
+      length(selected_name) != 1L ||
+        is.na(selected_name) ||
+        !selected_name %in% available_names
+    ) {
+      selected_name <- available_names[[1L]]
+    }
+    updateSelectInput(
+      session,
+      "trajectory_selected_name",
+      choices = available_names,
+      selected = selected_name
+    )
+  },
+  ignoreInit = TRUE
+)
 
 output[["trajectory_missing"]] <- renderText({
   "No trajectories available to display."

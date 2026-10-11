@@ -48,7 +48,10 @@ output[["groups_expression_metrics_UI"]] <- renderUI({
     })
     do.call(
       tabBox,
-      c(list(title = NULL, width = 12, id = "groups_expression_metrics_tabs"), tabs)
+      c(
+        list(title = NULL, width = 12, id = "groups_expression_metrics_tabs"),
+        tabs
+      )
     )
   }
   content

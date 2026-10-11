@@ -35,8 +35,14 @@ source(
 .extra_material_process_cache <- new.env(parent = emptyenv())
 
 ## Process-owned query/cache functions do not capture a browser session.
-source(file.path(Cerebro.options[["cerebro_root"]], "viewer", "msigdb.R"), local = TRUE)
-source(file.path(Cerebro.options[["cerebro_root"]], "viewer", "crb_cache.R"), local = TRUE)
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer", "msigdb.R"),
+  local = TRUE
+)
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer", "crb_cache.R"),
+  local = TRUE
+)
 .viewer_pack_process_cache <- new.env(parent = emptyenv())
 .crb_launch_state <- new.env(parent = emptyenv())
 .crb_launch_state$prototypes <- Cerebro.options[[".dataset_prototypes"]]
@@ -558,28 +564,35 @@ server <- function(input, output, session) {
   })
 
   ## listen to the dataset switcher and update the current selection
-  observeEvent(list(input[['crb_file_selector']], input[['viewer_dataset_selection']]), {
-    if (
-      !is.null(input[['crb_file_selector']]) &&
-        !is.null(available_crb_files$files)
-    ) {
-      pending <- input[['viewer_dataset_selection']]
-      nonce <- if (is.list(pending) &&
-        identical(pending$value, input[['crb_file_selector']])) {
-        as.numeric(pending$nonce)
-      } else 0
-      viewer_request_dataset(
-        selection = input[['crb_file_selector']],
-        target = viewerDatasetPath(
-          available_crb_files$files,
-          input[['crb_file_selector']]
-        ),
-        dataset_key = as.character(input[['crb_file_selector']]),
-        source = "configured",
-        selection_nonce = nonce
-      )
+  observeEvent(
+    list(input[['crb_file_selector']], input[['viewer_dataset_selection']]),
+    {
+      if (
+        !is.null(input[['crb_file_selector']]) &&
+          !is.null(available_crb_files$files)
+      ) {
+        pending <- input[['viewer_dataset_selection']]
+        nonce <- if (
+          is.list(pending) &&
+            identical(pending$value, input[['crb_file_selector']])
+        ) {
+          as.numeric(pending$nonce)
+        } else {
+          0
+        }
+        viewer_request_dataset(
+          selection = input[['crb_file_selector']],
+          target = viewerDatasetPath(
+            available_crb_files$files,
+            input[['crb_file_selector']]
+          ),
+          dataset_key = as.character(input[['crb_file_selector']]),
+          source = "configured",
+          selection_nonce = nonce
+        )
+      }
     }
-  })
+  )
 
   ## Keep the lightweight Data Info page independent of the full CRB. Opening
   ## another page, or selecting a dataset absent from the catalog, enables the
@@ -592,7 +605,13 @@ server <- function(input, output, session) {
       } else {
         NULL
       }
-      info <- viewerDatasetInfo(catalog, viewerDatasetPath(available_crb_files$files, available_crb_files$selected))
+      info <- viewerDatasetInfo(
+        catalog,
+        viewerDatasetPath(
+          available_crb_files$files,
+          available_crb_files$selected
+        )
+      )
       dataset_load_requested(viewerDatasetLoadRequired(
         isolate(input[["sidebar"]]),
         info,
@@ -612,12 +631,22 @@ server <- function(input, output, session) {
                 length(current) == 1L &&
                   identical(as.character(current), as.character(selected))
               ) {
-                path <- isolate(viewerDatasetPath(available_crb_files$files, selected))
-                start_crb_prefetch(path, .runtimeBackendCacheIdentity(
-                  .configuredRuntimeBackendPlan(path,
-                    Cerebro.options[[".bundle_backend_plan"]],
-                    unname(Cerebro.options[["crb_file_to_load"]] %||% character()))
+                path <- isolate(viewerDatasetPath(
+                  available_crb_files$files,
+                  selected
                 ))
+                start_crb_prefetch(
+                  path,
+                  .runtimeBackendCacheIdentity(
+                    .configuredRuntimeBackendPlan(
+                      path,
+                      Cerebro.options[[".bundle_backend_plan"]],
+                      unname(
+                        Cerebro.options[["crb_file_to_load"]] %||% character()
+                      )
+                    )
+                  )
+                )
               }
             })
           },
@@ -648,7 +677,10 @@ server <- function(input, output, session) {
     } else {
       NULL
     }
-    info <- viewerDatasetInfo(catalog, viewerDatasetPath(available_crb_files$files, selected))
+    info <- viewerDatasetInfo(
+      catalog,
+      viewerDatasetPath(available_crb_files$files, selected)
+    )
     if (!is.null(info)) {
       return(info)
     }
@@ -685,126 +717,139 @@ server <- function(input, output, session) {
 
   viewer_dataset_snapshot <- reactive({
     request <- viewer_dataset_request()
-    req(is.list(request), is.list(request$dataset_context), !is.null(request$target))
+    req(
+      is.list(request),
+      is.list(request$dataset_context),
+      !is.null(request$target)
+    )
     req(isTRUE(dataset_load_requested()))
     dataset_to_load <- request$target
     dataset_label <- request$dataset_context$dataset_key
     datasetLoadProgress(dataset_label, 8, "Preparing dataset")
-    tryCatch({
-    if (exists(dataset_to_load)) {
-      print(glue::glue(
-        "[{Sys.time()}] Load data set from variable: {dataset_to_load}"
-      ))
-      data <- get(dataset_to_load)
-    } else {
-      ## Clone the process-cached prototype and attach session-local backends.
-      ## Configured bundle CRBs consume the exact backend plan validated during
-      ## createShinyApp(). Uploads and older configurations fall back to the
-      ## ordinary expression_backend field; serialized getters are not called.
-      backend_plan <- if (exists("Cerebro.options")) {
-        Cerebro.options[[".bundle_backend_plan"]]
-      } else {
-        NULL
-      }
-      configured_paths <- if (
-        exists("Cerebro.options") &&
-          !is.null(Cerebro.options[["crb_file_to_load"]])
-      ) {
-        unname(Cerebro.options[["crb_file_to_load"]])
-      } else {
-        character()
-      }
-      cache_key <- normalizePath(
-        dataset_to_load,
-        winslash = "/",
-        mustWork = FALSE
-      )
-      if (is.null(.crb_process_cache[[cache_key]])) {
-        prefetch_task <- crb_prefetch_tasks[[cache_key]]
-        if (!is.null(prefetch_task)) {
-          status <- prefetch_task$status()
-          if (status %in% c("initial", "running")) {
-            datasetLoadProgress(
-              dataset_label,
-              24,
-              "Reading dataset in the background"
-            )
-            prefetch_task$result()
-          } else if (identical(status, "success")) {
-            prefetched <- prefetch_task$result()
-            req(identical(prefetched$path, as.character(dataset_to_load)))
-            effective_backend <- .configuredRuntimeBackendPlan(
-              dataset_to_load,
-              backend_plan,
-              configured_paths
-            )
-            .cacheCrbPrototype(
-              dataset_to_load,
-              prefetched$prototype,
-              .runtimeBackendCacheIdentity(effective_backend)
-            )
-            print(glue::glue(
-              "[{Sys.time()}] CRB background prefetch ready: ",
-              "{.crbLogLabel(dataset_to_load)}"
-            ))
+    tryCatch(
+      {
+        if (exists(dataset_to_load)) {
+          print(glue::glue(
+            "[{Sys.time()}] Load data set from variable: {dataset_to_load}"
+          ))
+          data <- get(dataset_to_load)
+        } else {
+          ## Clone the process-cached prototype and attach session-local backends.
+          ## Configured bundle CRBs consume the exact backend plan validated during
+          ## createShinyApp(). Uploads and older configurations fall back to the
+          ## ordinary expression_backend field; serialized getters are not called.
+          backend_plan <- if (exists("Cerebro.options")) {
+            Cerebro.options[[".bundle_backend_plan"]]
           } else {
-            tryCatch(
-              prefetch_task$result(),
-              error = function(error) {
-                warning(
-                  "CRB background prefetch failed; loading synchronously: ",
-                  conditionMessage(error),
-                  call. = FALSE
+            NULL
+          }
+          configured_paths <- if (
+            exists("Cerebro.options") &&
+              !is.null(Cerebro.options[["crb_file_to_load"]])
+          ) {
+            unname(Cerebro.options[["crb_file_to_load"]])
+          } else {
+            character()
+          }
+          cache_key <- normalizePath(
+            dataset_to_load,
+            winslash = "/",
+            mustWork = FALSE
+          )
+          if (is.null(.crb_process_cache[[cache_key]])) {
+            prefetch_task <- crb_prefetch_tasks[[cache_key]]
+            if (!is.null(prefetch_task)) {
+              status <- prefetch_task$status()
+              if (status %in% c("initial", "running")) {
+                datasetLoadProgress(
+                  dataset_label,
+                  24,
+                  "Reading dataset in the background"
+                )
+                prefetch_task$result()
+              } else if (identical(status, "success")) {
+                prefetched <- prefetch_task$result()
+                req(identical(prefetched$path, as.character(dataset_to_load)))
+                effective_backend <- .configuredRuntimeBackendPlan(
+                  dataset_to_load,
+                  backend_plan,
+                  configured_paths
+                )
+                .cacheCrbPrototype(
+                  dataset_to_load,
+                  prefetched$prototype,
+                  .runtimeBackendCacheIdentity(effective_backend)
+                )
+                print(glue::glue(
+                  "[{Sys.time()}] CRB background prefetch ready: ",
+                  "{.crbLogLabel(dataset_to_load)}"
+                ))
+              } else {
+                tryCatch(
+                  prefetch_task$result(),
+                  error = function(error) {
+                    warning(
+                      "CRB background prefetch failed; loading synchronously: ",
+                      conditionMessage(error),
+                      call. = FALSE
+                    )
+                  }
                 )
               }
-            )
+            }
+          }
+          datasetLoadProgress(dataset_label, 42, "Opening cells and metadata")
+          data <- get_or_load_crb(
+            dataset_to_load,
+            backend_plan,
+            configured_paths
+          )
+        }
+        datasetLoadProgress(dataset_label, 78, "Preparing viewer data")
+        expression_is_deferred <- is.environment(data) &&
+          exists("expression", envir = data, inherits = FALSE) &&
+          isTRUE(rlang::env_binding_are_lazy(data, "expression"))
+        if (expression_is_deferred) {
+          print(glue::glue(
+            "[{Sys.time()}] Data loaded; expression backend will attach on first use."
+          ))
+        } else {
+          message(data$print())
+          if (!is.null(data$expression)) {
+            print(glue::glue(
+              "[{Sys.time()}] Format of expression data: {class(data$expression)}"
+            ))
           }
         }
+        viewer_pack <- if (
+          is.character(dataset_to_load) &&
+            length(dataset_to_load) == 1L &&
+            file.exists(dataset_to_load)
+        ) {
+          viewerPackOpenCached(
+            dataset_to_load,
+            data,
+            .viewer_pack_process_cache
+          )
+        } else {
+          NULL
+        }
+        datasetLoadProgress(dataset_label, 94, "Finalizing the workspace")
+        attr(data, "cerebro_viewer_pack") <- viewer_pack
+        datasetLoadProgress(dataset_label, 100, "Ready", done = TRUE)
+        list(ok = TRUE, data = data, dataset_context = request$dataset_context)
+      },
+      error = function(error) {
+        if (inherits(error, "shiny.silent.error")) {
+          stop(error)
+        }
+        list(
+          ok = FALSE,
+          error = error,
+          dataset_context = request$dataset_context
+        )
       }
-      datasetLoadProgress(dataset_label, 42, "Opening cells and metadata")
-      data <- get_or_load_crb(
-        dataset_to_load,
-        backend_plan,
-        configured_paths
-      )
-    }
-    datasetLoadProgress(dataset_label, 78, "Preparing viewer data")
-    expression_is_deferred <- is.environment(data) &&
-      exists("expression", envir = data, inherits = FALSE) &&
-      isTRUE(rlang::env_binding_are_lazy(data, "expression"))
-    if (expression_is_deferred) {
-      print(glue::glue(
-        "[{Sys.time()}] Data loaded; expression backend will attach on first use."
-      ))
-    } else {
-      message(data$print())
-      if (!is.null(data$expression)) {
-        print(glue::glue(
-          "[{Sys.time()}] Format of expression data: {class(data$expression)}"
-        ))
-      }
-    }
-    viewer_pack <- if (
-      is.character(dataset_to_load) &&
-        length(dataset_to_load) == 1L &&
-        file.exists(dataset_to_load)
-    ) {
-      viewerPackOpenCached(
-        dataset_to_load,
-        data,
-        .viewer_pack_process_cache
-      )
-    } else {
-      NULL
-    }
-    datasetLoadProgress(dataset_label, 94, "Finalizing the workspace")
-    attr(data, "cerebro_viewer_pack") <- viewer_pack
-    datasetLoadProgress(dataset_label, 100, "Ready", done = TRUE)
-      list(ok = TRUE, data = data, dataset_context = request$dataset_context)
-    }, error = function(error) {
-      if (inherits(error, "shiny.silent.error")) stop(error)
-      list(ok = FALSE, error = error, dataset_context = request$dataset_context)
-    })
+    )
   })
 
   data_set <- reactive({
@@ -902,7 +947,9 @@ server <- function(input, output, session) {
   viewer_resource_prefixes <- character()
   viewer_resource_counts <- new.env(parent = emptyenv())
   viewerStaticResourcePrefix <- function(kind, directory) {
-    count <- if (exists(kind, envir = viewer_resource_counts, inherits = FALSE)) {
+    count <- if (
+      exists(kind, envir = viewer_resource_counts, inherits = FALSE)
+    ) {
       get(kind, envir = viewer_resource_counts, inherits = FALSE) + 1L
     } else {
       1L
@@ -941,10 +988,8 @@ server <- function(input, output, session) {
     if (
       !is.list(pack) ||
         !isTRUE(pack$canonical_order) ||
-        (
-          !is.null(cell_indices) &&
-            !identical(as.integer(cell_indices), seq_len(pack$cell_count))
-        )
+        (!is.null(cell_indices) &&
+          !identical(as.integer(cell_indices), seq_len(pack$cell_count)))
     ) {
       return(NULL)
     }
@@ -1073,12 +1118,10 @@ server <- function(input, output, session) {
       all(file.exists(files)) &&
       !any(dir.exists(files)) &&
       all(
-        as.numeric(file.info(files)$size) ==
-          as.numeric(assets$bytes[rows])
+        as.numeric(file.info(files)$size) == as.numeric(assets$bytes[rows])
       ) &&
       all(
-        unname(tools::md5sum(files)) ==
-          as.character(assets$checksum[rows])
+        unname(tools::md5sum(files)) == as.character(assets$checksum[rows])
       )
     if (!isTRUE(valid)) {
       return(NULL)
@@ -1092,9 +1135,10 @@ server <- function(input, output, session) {
     )
     if (
       is.null(levels) ||
-        length(levels) != suppressWarnings(as.integer(
-          assets$dimensions[[dictionary_row]]
-        ))
+        length(levels) !=
+          suppressWarnings(as.integer(
+            assets$dimensions[[dictionary_row]]
+          ))
     ) {
       return(NULL)
     }
@@ -1364,8 +1408,12 @@ server <- function(input, output, session) {
     codes_path <- paste0(prefix_path, ".codes.bin")
     dictionary_path <- paste0(prefix_path, ".dictionary.json")
     requested_levels <- if (is.null(levels)) NULL else as.character(levels)
-    key <- paste(pack$path, codes_path, paste(requested_levels, collapse = "\r"),
-      sep = "::")
+    key <- paste(
+      pack$path,
+      codes_path,
+      paste(requested_levels, collapse = "\r"),
+      sep = "::"
+    )
     if (exists(key, envir = viewer_metadata_resources, inherits = FALSE)) {
       return(get(key, envir = viewer_metadata_resources, inherits = FALSE))
     }
@@ -1548,12 +1596,13 @@ server <- function(input, output, session) {
             as.numeric(spatial_defaults$percentage_cells_to_show),
             100
           )) &&
-          spatial_names[[1L]] %in% vapply(
-            resources,
-            `[[`,
-            character(1),
-            "spatial_name"
-          )
+          spatial_names[[1L]] %in%
+            vapply(
+              resources,
+              `[[`,
+              character(1),
+              "spatial_name"
+            )
       ) {
         spatial_names[[1L]]
       } else {

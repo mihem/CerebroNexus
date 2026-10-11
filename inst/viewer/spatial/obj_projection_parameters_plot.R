@@ -18,67 +18,70 @@ spatial_projection_region_outlines <- reactiveVal(FALSE)
 ## bindings with those values are a no-op instead of causing a second 1M frame.
 spatial_projection_controls <- reactiveVal(NULL)
 
-observe({
-  req(input[["spatial_projection_render_request"]])
-  spatial_names <- availableSpatial()
-  req(length(spatial_names) > 0L)
+observe(
+  {
+    req(input[["spatial_projection_render_request"]])
+    spatial_names <- availableSpatial()
+    req(length(spatial_names) > 0L)
 
-  defaults <- current_scatter_defaults()
-  projection <- input[["spatial_projection_to_display"]]
-  if (is.null(projection) || !(projection %in% spatial_names)) {
-    projection <- spatial_names[[1L]]
-  }
-  plot_type <- input[["spatial_projection_plot_type"]]
-  if (is.null(plot_type) || !nzchar(plot_type)) {
-    plot_type <- "ImageDimPlot"
-  }
-
-  exclude_trivial <- isTRUE(as.logical(
-    Cerebro.options[["exclude_trivial_metadata"]]
-  ))
-  color_choices <- if (exclude_trivial) {
-    getGroups()
-  } else {
-    setdiff(colnames(viewerProjectionFirstFrameMetadata()), "cell_barcode")
-  }
-  color_variable <- input[["spatial_projection_point_color"]]
-  if (is.null(color_variable) || !(color_variable %in% color_choices)) {
-    req(length(color_choices) > 0L)
-    color_variable <- color_choices[[1L]]
-  }
-
-  value_or_default <- function(value, default) {
-    if (is.null(value) || !length(value) || is.na(value[[1L]])) {
-      default
-    } else {
-      value[[1L]]
+    defaults <- current_scatter_defaults()
+    projection <- input[["spatial_projection_to_display"]]
+    if (is.null(projection) || !(projection %in% spatial_names)) {
+      projection <- spatial_names[[1L]]
     }
-  }
-  controls <- list(
-    projection = as.character(projection[[1L]]),
-    plot_type = as.character(plot_type[[1L]]),
-    color_variable = as.character(color_variable[[1L]]),
-    feature_to_display = input[["spatial_projection_feature_to_display"]],
-    coexpr_r = input[["spatial_projection_coexpr_r"]],
-    coexpr_g = input[["spatial_projection_coexpr_g"]],
-    coexpr_b = input[["spatial_projection_coexpr_b"]],
-    point_size = as.numeric(value_or_default(
-      input[["spatial_projection_point_size"]],
-      defaults$point_size
-    )),
-    point_opacity = as.numeric(value_or_default(
-      input[["spatial_projection_point_opacity"]],
-      defaults$point_opacity
-    )),
-    percentage_cells_to_show = as.numeric(value_or_default(
-      input[["spatial_projection_percentage_cells_to_show"]],
-      defaults$percentage_cells_to_show
+    plot_type <- input[["spatial_projection_plot_type"]]
+    if (is.null(plot_type) || !nzchar(plot_type)) {
+      plot_type <- "ImageDimPlot"
+    }
+
+    exclude_trivial <- isTRUE(as.logical(
+      Cerebro.options[["exclude_trivial_metadata"]]
     ))
-  )
-  if (!identical(isolate(spatial_projection_controls()), controls)) {
-    spatial_projection_controls(controls)
-  }
-}, priority = 1000)
+    color_choices <- if (exclude_trivial) {
+      getGroups()
+    } else {
+      setdiff(colnames(viewerProjectionFirstFrameMetadata()), "cell_barcode")
+    }
+    color_variable <- input[["spatial_projection_point_color"]]
+    if (is.null(color_variable) || !(color_variable %in% color_choices)) {
+      req(length(color_choices) > 0L)
+      color_variable <- color_choices[[1L]]
+    }
+
+    value_or_default <- function(value, default) {
+      if (is.null(value) || !length(value) || is.na(value[[1L]])) {
+        default
+      } else {
+        value[[1L]]
+      }
+    }
+    controls <- list(
+      projection = as.character(projection[[1L]]),
+      plot_type = as.character(plot_type[[1L]]),
+      color_variable = as.character(color_variable[[1L]]),
+      feature_to_display = input[["spatial_projection_feature_to_display"]],
+      coexpr_r = input[["spatial_projection_coexpr_r"]],
+      coexpr_g = input[["spatial_projection_coexpr_g"]],
+      coexpr_b = input[["spatial_projection_coexpr_b"]],
+      point_size = as.numeric(value_or_default(
+        input[["spatial_projection_point_size"]],
+        defaults$point_size
+      )),
+      point_opacity = as.numeric(value_or_default(
+        input[["spatial_projection_point_opacity"]],
+        defaults$point_opacity
+      )),
+      percentage_cells_to_show = as.numeric(value_or_default(
+        input[["spatial_projection_percentage_cells_to_show"]],
+        defaults$percentage_cells_to_show
+      ))
+    )
+    if (!identical(isolate(spatial_projection_controls()), controls)) {
+      spatial_projection_controls(controls)
+    }
+  },
+  priority = 1000
+)
 
 spatial_update_appearance <- function(name, value) {
   if (identical(spatial_projection_appearance[[name]], value)) {
@@ -102,33 +105,49 @@ spatial_send_appearance <- function(values) {
   )
 }
 
-observeEvent(input[["spatial_projection_group_labels"]], {
-  value <- isTRUE(input[["spatial_projection_group_labels"]])
-  if (spatial_update_appearance("group_labels", value)) {
-    spatial_send_appearance(list(group_labels = value))
-  }
-}, ignoreNULL = TRUE)
+observeEvent(
+  input[["spatial_projection_group_labels"]],
+  {
+    value <- isTRUE(input[["spatial_projection_group_labels"]])
+    if (spatial_update_appearance("group_labels", value)) {
+      spatial_send_appearance(list(group_labels = value))
+    }
+  },
+  ignoreNULL = TRUE
+)
 
-observeEvent(input[["spatial_projection_point_border"]], {
-  value <- isTRUE(input[["spatial_projection_point_border"]])
-  if (spatial_update_appearance("draw_border", value)) {
-    spatial_send_appearance(list(draw_border = value))
-  }
-}, ignoreNULL = TRUE)
+observeEvent(
+  input[["spatial_projection_point_border"]],
+  {
+    value <- isTRUE(input[["spatial_projection_point_border"]])
+    if (spatial_update_appearance("draw_border", value)) {
+      spatial_send_appearance(list(draw_border = value))
+    }
+  },
+  ignoreNULL = TRUE
+)
 
-observeEvent(input[["spatial_projection_keep_square"]], {
-  value <- isTRUE(input[["spatial_projection_keep_square"]])
-  if (spatial_update_appearance("keep_square", value)) {
-    spatial_send_appearance(list(keep_square = value))
-  }
-}, ignoreNULL = TRUE)
+observeEvent(
+  input[["spatial_projection_keep_square"]],
+  {
+    value <- isTRUE(input[["spatial_projection_keep_square"]])
+    if (spatial_update_appearance("keep_square", value)) {
+      spatial_send_appearance(list(keep_square = value))
+    }
+  },
+  ignoreNULL = TRUE
+)
 
-observeEvent(input[["spatial_projection_show_region_outlines"]], {
-  value <- isTRUE(input[["spatial_projection_show_region_outlines"]])
-  if (!identical(spatial_projection_region_outlines(), value)) {
-    spatial_projection_region_outlines(value)
-  }
-}, ignoreNULL = TRUE)
+observeEvent(
+  input[["spatial_projection_show_region_outlines"]],
+  {
+    value <- isTRUE(input[["spatial_projection_show_region_outlines"]])
+    if (!identical(spatial_projection_region_outlines(), value)) {
+      spatial_projection_region_outlines(value)
+    }
+  },
+  ignoreNULL = TRUE
+)
 
 spatial_projection_parameters_plot <- reactive({
   controls <- spatial_projection_controls()

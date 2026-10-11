@@ -25,9 +25,15 @@ expression_selected_genes_input <- reactive({
         input[[paste0("expression_rgb_gene_", channel)]]
       })
       names(rgb) <- c("r", "g", "b")
-      if (!any(vapply(rgb, function(gene) {
-        !is.null(gene) && length(gene) && nzchar(gene[[1L]])
-      }, logical(1)))) {
+      if (
+        !any(vapply(
+          rgb,
+          function(gene) {
+            !is.null(gene) && length(gene) && nzchar(gene[[1L]])
+          },
+          logical(1)
+        ))
+      ) {
         previous <- head(input[["expression_genes_input"]] %||% character(), 3)
         rgb[seq_along(previous)] <- as.list(previous)
       }
@@ -75,7 +81,9 @@ expression_selected_genes_input <- reactive({
   ## Channel names must use the same dataset spelling as expression rows.
   ## Preserve channel positions (including repeated and absent genes).
   gene_sets[["rgb_genes"]] <- lapply(gene_sets[["rgb_genes"]], function(gene) {
-    if (length(gene) != 1L || is.na(gene) || !nzchar(gene)) return(NULL)
+    if (length(gene) != 1L || is.na(gene) || !nzchar(gene)) {
+      return(NULL)
+    }
     index <- match(tolower(gene), tolower(list_of_genes()))
     if (is.na(index)) NULL else unname(list_of_genes()[index])
   })

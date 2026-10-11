@@ -175,10 +175,14 @@
       curl,
       c(
         "-fL",
-        "--retry", "8",
-        "--retry-delay", "5",
-        "--continue-at", "-",
-        "-o", shQuote(partial),
+        "--retry",
+        "8",
+        "--retry-delay",
+        "5",
+        "--continue-at",
+        "-",
+        "-o",
+        shQuote(partial),
         shQuote(spec$url)
       )
     )
@@ -195,7 +199,11 @@
   }
 
   if (!.viewerRenValidateFile(partial, spec, checksum = TRUE)) {
-    stop("Downloaded file is incomplete: ", basename(destination), call. = FALSE)
+    stop(
+      "Downloaded file is incomplete: ",
+      basename(destination),
+      call. = FALSE
+    )
   }
   if (!file.rename(partial, destination)) {
     stop("Could not publish ", basename(destination), ".", call. = FALSE)
@@ -245,7 +253,10 @@
   names(table) <- .viewerRenClinicalNames(names(table))
   table <- table[grepl("^GSM[0-9]+$", table$geo_accession), , drop = FALSE]
   if (nrow(table) != 284L || anyDuplicated(table$sample_name)) {
-    stop("The Ren clinical workbook must contain 284 unique samples.", call. = FALSE)
+    stop(
+      "The Ren clinical workbook must contain 284 unique samples.",
+      call. = FALSE
+    )
   }
   required <- c(
     "sample_name",
@@ -316,17 +327,26 @@
       !all(required %in% names(annotation)) ||
       anyDuplicated(annotation$cellName)
   ) {
-    stop("The Ren annotation must describe 1,462,702 unique cells.", call. = FALSE)
+    stop(
+      "The Ren annotation must describe 1,462,702 unique cells.",
+      call. = FALSE
+    )
   }
   index <- match(cells, annotation$cellName)
   if (anyNA(index)) {
-    stop("The Ren h5ad and cell annotation barcodes do not match.", call. = FALSE)
+    stop(
+      "The Ren h5ad and cell annotation barcodes do not match.",
+      call. = FALSE
+    )
   }
   annotation <- annotation[index, required, drop = FALSE]
   clinical <- .viewerRenReadClinical(clinical_path)
   clinical_index <- match(annotation$sampleID, clinical$sample)
   if (anyNA(clinical_index)) {
-    stop("The Ren cell annotations reference an unknown clinical sample.", call. = FALSE)
+    stop(
+      "The Ren cell annotations reference an unknown clinical sample.",
+      call. = FALSE
+    )
   }
   clinical <- clinical[clinical_index, , drop = FALSE]
   metadata <- data.frame(
@@ -377,7 +397,10 @@
     projection <- t(projection)
   }
   if (nrow(projection) != length(cells) || ncol(projection) < 2L) {
-    stop("The Ren h5ad has no cell-aligned two-dimensional projection.", call. = FALSE)
+    stop(
+      "The Ren h5ad has no cell-aligned two-dimensional projection.",
+      call. = FALSE
+    )
   }
   projection <- data.frame(
     Dim_1 = as.numeric(projection[, 1L]),
@@ -390,9 +413,7 @@
 
 .viewerRenProjectionName <- function(projection) {
   source <- attr(projection, "source", exact = TRUE)
-  name <- if (
-    is.character(source) && length(source) == 1L && !is.na(source)
-  ) {
+  name <- if (is.character(source) && length(source) == 1L && !is.na(source)) {
     sub("^/obsm/X_", "", source)
   } else {
     ""
@@ -404,13 +425,20 @@
 }
 
 .viewerRenRepertoireChains <- function(repertoire) {
-  genes <- unlist(lapply(repertoire, function(table) {
-    as.character(table$CTgene)
-  }), use.names = FALSE)
+  genes <- unlist(
+    lapply(repertoire, function(table) {
+      as.character(table$CTgene)
+    }),
+    use.names = FALSE
+  )
   supported <- c("TRA", "TRB", "TRG", "TRD", "IGH", "IGK", "IGL")
-  supported[vapply(supported, function(chain) {
-    any(grepl(chain, genes, fixed = TRUE), na.rm = TRUE)
-  }, logical(1))]
+  supported[vapply(
+    supported,
+    function(chain) {
+      any(grepl(chain, genes, fixed = TRUE), na.rm = TRUE)
+    },
+    logical(1)
+  )]
 }
 
 .viewerRenReadTable <- function(path, columns) {
@@ -507,18 +535,36 @@
 
 .viewerRenRepertoire <- function(tcr_path, bcr_path, cells) {
   tcr_columns <- c(
-    "cellBarcode", "sampleID",
-    "TCRA_cgene", "TCRA_vgene", "TCRA_dgene", "TCRA_jgene",
-    "TCRA_cdr3aa", "TCRA_cdr3nt",
-    "TCRB_cgene", "TCRB_vgene", "TCRB_dgene", "TCRB_jgene",
-    "TCRB_cdr3aa", "TCRB_cdr3nt"
+    "cellBarcode",
+    "sampleID",
+    "TCRA_cgene",
+    "TCRA_vgene",
+    "TCRA_dgene",
+    "TCRA_jgene",
+    "TCRA_cdr3aa",
+    "TCRA_cdr3nt",
+    "TCRB_cgene",
+    "TCRB_vgene",
+    "TCRB_dgene",
+    "TCRB_jgene",
+    "TCRB_cdr3aa",
+    "TCRB_cdr3nt"
   )
   bcr_columns <- c(
-    "cellBarcode", "sampleID",
-    "BCRH_cgene", "BCRH_vgene", "BCRH_dgene", "BCRH_jgene",
-    "BCRH_cdr3aa", "BCRH_cdr3nt",
-    "BCRL/K_cgene", "BCRL/K_vgene", "BCRL/K_dgene", "BCRL/K_jgene",
-    "BCRL/K_cdr3aa", "BCRL/K_cdr3nt"
+    "cellBarcode",
+    "sampleID",
+    "BCRH_cgene",
+    "BCRH_vgene",
+    "BCRH_dgene",
+    "BCRH_jgene",
+    "BCRH_cdr3aa",
+    "BCRH_cdr3nt",
+    "BCRL/K_cgene",
+    "BCRL/K_vgene",
+    "BCRL/K_dgene",
+    "BCRL/K_jgene",
+    "BCRL/K_cdr3aa",
+    "BCRL/K_cdr3nt"
   )
   tcr <- .viewerRenCanonicalRepertoire(
     .viewerRenReadTable(tcr_path, tcr_columns),
@@ -533,10 +579,16 @@
   }
   repertoire <- rbind(tcr, bcr)
   if (anyDuplicated(repertoire$barcode)) {
-    stop("The Ren receptor tables assign multiple receptors to one cell.", call. = FALSE)
+    stop(
+      "The Ren receptor tables assign multiple receptors to one cell.",
+      call. = FALSE
+    )
   }
   if (any(!repertoire$barcode %in% cells)) {
-    stop("The Ren receptor tables contain unknown cell barcodes.", call. = FALSE)
+    stop(
+      "The Ren receptor tables contain unknown cell barcodes.",
+      call. = FALSE
+    )
   }
   samples <- repertoire$sample
   repertoire$sample <- NULL
@@ -577,7 +629,10 @@
     group = .viewerRenMatrixGroup(h5ad)
   )
   if (ncol(matrix) != 1462702L) {
-    stop("The Ren expression matrix must contain 1,462,702 cells.", call. = FALSE)
+    stop(
+      "The Ren expression matrix must contain 1,462,702 cells.",
+      call. = FALSE
+    )
   }
   if (identical(BPCells::storage_order(matrix), "row")) {
     BPCells::write_matrix_dir(matrix, dir = sidecar)
@@ -591,10 +646,16 @@
   matrix <- .viewerRenWriteSidecar(paths$h5ad, paths$sidecar)
   cells <- colnames(matrix)
   if (
-    !is.character(cells) || length(cells) != 1462702L ||
-      anyNA(cells) || any(!nzchar(cells)) || anyDuplicated(cells)
+    !is.character(cells) ||
+      length(cells) != 1462702L ||
+      anyNA(cells) ||
+      any(!nzchar(cells)) ||
+      anyDuplicated(cells)
   ) {
-    stop("The Ren expression matrix needs 1,462,702 unique cell names.", call. = FALSE)
+    stop(
+      "The Ren expression matrix needs 1,462,702 unique cell names.",
+      call. = FALSE
+    )
   }
 
   message("Reading Ren cell and clinical annotations...")
@@ -625,8 +686,18 @@
   object$setExpressionBackend("bpcells", basename(paths$sidecar))
   object$setMetaData(metadata)
   for (group in c(
-    "major_type", "cell_type", "sample", "patient", "dataset", "tissue",
-    "severity", "stage", "age", "sex", "sars_cov_2", "outcome"
+    "major_type",
+    "cell_type",
+    "sample",
+    "patient",
+    "dataset",
+    "tissue",
+    "severity",
+    "stage",
+    "age",
+    "sex",
+    "sars_cov_2",
+    "outcome"
   )) {
     values <- unique(as.character(metadata[[group]]))
     values <- sort(values[!is.na(values) & nzchar(values)], method = "radix")
@@ -676,7 +747,10 @@
     length(list.files(paths$sidecar, all.files = TRUE, no.. = TRUE)) > 0L &&
     file.exists(file.path(paths$sidecar, "immune_repertoire.qs2")) &&
     file.exists(paths$stamp) &&
-    identical(readLines(paths$stamp, warn = FALSE), as.character(.viewerRenVersion))
+    identical(
+      readLines(paths$stamp, warn = FALSE),
+      as.character(.viewerRenVersion)
+    )
 }
 
 prepareViewerRenDemoData <- function(cache_dir = NULL) {
@@ -693,7 +767,10 @@ prepareViewerRenDemoData <- function(cache_dir = NULL) {
   .viewerRenExtractH5ad(paths)
   ## Build privately. A failed preparation must not delete a working atlas,
   ## including the unversioned cache used by earlier Viewer revisions.
-  stage <- tempfile(paste0("cerebro-v", .viewerRenVersion, "-stage-"), paths$root)
+  stage <- tempfile(
+    paste0("cerebro-v", .viewerRenVersion, "-stage-"),
+    paths$root
+  )
   dir.create(stage)
   on.exit(unlink(stage, recursive = TRUE), add = TRUE)
   staged <- paths
@@ -701,15 +778,21 @@ prepareViewerRenDemoData <- function(cache_dir = NULL) {
     staged[[name]] <- file.path(stage, basename(paths[[name]]))
   }
   .viewerRenBuildObject(staged)
-  if (!.viewerRenComplete(staged)) stop("Ren preparation did not finish.")
+  if (!.viewerRenComplete(staged)) {
+    stop("Ren preparation did not finish.")
+  }
   target <- dirname(paths$crb)
   backup <- NULL
   if (dir.exists(target)) {
     backup <- tempfile(paste0(basename(target), "-previous-"), paths$root)
-    if (!file.rename(target, backup)) stop("Cannot preserve previous Ren cache.")
+    if (!file.rename(target, backup)) {
+      stop("Cannot preserve previous Ren cache.")
+    }
   }
   if (!file.rename(stage, target)) {
-    if (!is.null(backup)) file.rename(backup, target)
+    if (!is.null(backup)) {
+      file.rename(backup, target)
+    }
     stop("Cannot publish prepared Ren cache; previous cache was preserved.")
   }
   paths$crb

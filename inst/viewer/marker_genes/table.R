@@ -10,12 +10,16 @@
 output[["marker_genes_table_or_text_UI"]] <- renderUI({
   methods <- getMethodsForMarkerGenes()
   if (!length(methods)) {
-    return(p("Marker-gene results are not included in this data set. Choose a data set that includes marker-gene results."))
+    return(p(
+      "Marker-gene results are not included in this data set. Choose a data set that includes marker-gene results."
+    ))
   }
   method <- input[["marker_genes_selected_method"]]
   req(method %in% methods)
   if (!length(getGroupsWithMarkerGenes(method))) {
-    return(p("No marker-gene table is available for this method. Choose another method."))
+    return(p(
+      "No marker-gene table is available for this method. Choose another method."
+    ))
   }
   req(
     input[["marker_genes_selected_method"]],
@@ -31,16 +35,23 @@ output[["marker_genes_table_or_text_UI"]] <- renderUI({
   )
   if (length(results_type) > 0) {
     if (is.data.frame(results_type)) {
-      cerebroResultTableControls("marker_genes", results_type,
-        colnames(results_type)[[1L]] %in% getGroups())
+      cerebroResultTableControls(
+        "marker_genes",
+        results_type,
+        colnames(results_type)[[1L]] %in% getGroups()
+      )
     } else if (
       is.character(results_type) &&
         results_type == "no_markers_found"
     ) {
-      p("No marker genes meet the stored thresholds for this grouping variable. Choose another method or grouping variable.")
+      p(
+        "No marker genes meet the stored thresholds for this grouping variable. Choose another method or grouping variable."
+      )
     }
   } else {
-    p("No marker-gene table is available for this method and grouping variable. Choose another method or grouping variable.")
+    p(
+      "No marker-gene table is available for this method and grouping variable. Choose another method or grouping variable."
+    )
   }
 })
 

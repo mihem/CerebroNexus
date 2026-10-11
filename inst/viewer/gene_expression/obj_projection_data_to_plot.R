@@ -8,7 +8,8 @@ expression_projection_data_to_plot_raw <- reactive({
   expression_levels <- expression_projection_expression_levels()
   no_gene_selected <- length(
     expression_selected_genes()[["genes_to_display_present"]]
-  ) == 0L
+  ) ==
+    0L
   ## The primary frame needs only canonical row indices. Full metadata belongs
   ## exclusively to deferred hover/selection auxiliary data, including after a
   ## gene is selected, so never materialize it on the colour-update path.

@@ -82,7 +82,9 @@ expressionProjectionDatasetKey <- function() {
 }
 
 expressionProjectionFullCellSelection <- function(data, cells) {
-  n_cells <- tryCatch(ncol(data$expression), error = function(error) NA_integer_)
+  n_cells <- tryCatch(ncol(data$expression), error = function(error) {
+    NA_integer_
+  })
   length(n_cells) == 1L &&
     !is.na(n_cells) &&
     length(cells) == n_cells &&
@@ -110,8 +112,10 @@ expressionProjectionRowCacheSet <- function(key, value) {
       setdiff(expression_projection_row_cache_order, key),
       key
     )
-    while (length(expression_projection_row_cache_order) >
-      expression_projection_row_cache_limit) {
+    while (
+      length(expression_projection_row_cache_order) >
+        expression_projection_row_cache_limit
+    ) {
       evict <- expression_projection_row_cache_order[[1L]]
       expression_projection_row_cache_order <<-
         expression_projection_row_cache_order[-1L]
@@ -126,10 +130,16 @@ expressionProjectionCachedRows <- function(data, cells, genes) {
   dataset_key <- expressionProjectionDatasetKey()
   cacheable <- !is.null(dataset_key) &&
     expressionProjectionFullCellSelection(data, cells)
-  keys <- stats::setNames(lapply(genes, function(gene) {
-    if (cacheable) paste(dataset_key, gene, sep = "::") else NULL
-  }), genes)
-  values <- stats::setNames(lapply(keys, expressionProjectionRowCacheGet), genes)
+  keys <- stats::setNames(
+    lapply(genes, function(gene) {
+      if (cacheable) paste(dataset_key, gene, sep = "::") else NULL
+    }),
+    genes
+  )
+  values <- stats::setNames(
+    lapply(keys, expressionProjectionRowCacheGet),
+    genes
+  )
   missing <- genes[vapply(values, is.null, logical(1))]
   if (length(missing)) {
     fetched <- viewerExpressionValues(data, cells, missing)
@@ -150,10 +160,14 @@ expressionProjectionCachedRow <- function(data, cells, gene) {
 expressionProjectionRenderKey <- function(genes, display_mode) {
   present <- as.character(genes[["genes_to_display_present"]] %||% character())
   rgb <- genes[["rgb_genes"]] %||% list()
-  rgb <- vapply(c("r", "g", "b"), function(channel) {
-    value <- as.character(rgb[[channel]] %||% "")
-    if (length(value) && !is.na(value[[1L]])) value[[1L]] else ""
-  }, character(1))
+  rgb <- vapply(
+    c("r", "g", "b"),
+    function(channel) {
+      value <- as.character(rgb[[channel]] %||% "")
+      if (length(value) && !is.na(value[[1L]])) value[[1L]] else ""
+    },
+    character(1)
+  )
   paste(
     as.character(display_mode %||% "single"),
     paste(present, collapse = "\034"),
@@ -176,17 +190,25 @@ expression_projection_summary_ready <- reactive({
   )
 })
 
-observeEvent(input[["expression_projection_rendered_key"]], {
-  expressionProjectionProgressClose(
-    input[["expression_projection_rendered_key"]]
-  )
-}, ignoreInit = TRUE)
+observeEvent(
+  input[["expression_projection_rendered_key"]],
+  {
+    expressionProjectionProgressClose(
+      input[["expression_projection_rendered_key"]]
+    )
+  },
+  ignoreInit = TRUE
+)
 
-observeEvent(input[["sidebar"]], {
-  if (!identical(input[["sidebar"]], "geneExpression")) {
-    expressionProjectionProgressClose()
-  }
-}, ignoreInit = FALSE)
+observeEvent(
+  input[["sidebar"]],
+  {
+    if (!identical(input[["sidebar"]], "geneExpression")) {
+      expressionProjectionProgressClose()
+    }
+  },
+  ignoreInit = FALSE
+)
 
 if (
   exists("session", inherits = TRUE) &&
@@ -199,25 +221,29 @@ if (
 ## This keeps the fast page-open path intact while moving one-time method and
 ## backend initialization out of the user's first gene selection.
 expression_projection_backend_warmed <- reactiveVal(FALSE)
-observeEvent(input[["expression_projection_rendered_key"]], {
-  if (isTRUE(expression_projection_backend_warmed())) {
-    return()
-  }
-  genes <- expression_selected_genes()[["genes_to_display_present"]]
-  if (length(genes)) {
-    return()
-  }
-  available <- getGeneNames()
-  if (!length(available)) {
+observeEvent(
+  input[["expression_projection_rendered_key"]],
+  {
+    if (isTRUE(expression_projection_backend_warmed())) {
+      return()
+    }
+    genes <- expression_selected_genes()[["genes_to_display_present"]]
+    if (length(genes)) {
+      return()
+    }
+    available <- getGeneNames()
+    if (!length(available)) {
+      expression_projection_backend_warmed(TRUE)
+      return()
+    }
+    try(
+      viewerExpressionRow(data_set(), 1L, available[[1L]]),
+      silent = TRUE
+    )
     expression_projection_backend_warmed(TRUE)
-    return()
-  }
-  try(
-    viewerExpressionRow(data_set(), 1L, available[[1L]]),
-    silent = TRUE
-  )
-  expression_projection_backend_warmed(TRUE)
-}, ignoreInit = TRUE)
+  },
+  ignoreInit = TRUE
+)
 
 expression_projection_expression_levels <- reactive({
   req(
@@ -258,9 +284,12 @@ expression_projection_expression_levels <- reactive({
     expressionProjectionProgressClose()
   }
   success <- FALSE
-  on.exit({
-    if (!success) expressionProjectionProgressClose()
-  }, add = TRUE)
+  on.exit(
+    {
+      if (!success) expressionProjectionProgressClose()
+    },
+    add = TRUE
+  )
 
   if (length(genes_present) == 0) {
     ## No gene means one constant renderer colour, not a synthetic million-cell
@@ -273,7 +302,10 @@ expression_projection_expression_levels <- reactive({
     ## class accessors dispatch those indices across dgCMatrix, DelayedArray,
     ## and IterableMatrix without a barcode lookup.
     if (identical(display_mode, "rgb")) {
-      expressionProjectionProgressUpdate(0.3, "Calculating RGB co-expression...")
+      expressionProjectionProgressUpdate(
+        0.3,
+        "Calculating RGB co-expression..."
+      )
       rgb_genes <- genes_data[["rgb_genes"]]
       requested_genes <- intersect(
         unique(unlist(rgb_genes, use.names = FALSE)),
@@ -291,14 +323,20 @@ expression_projection_expression_levels <- reactive({
         unname(expression_values[[gene]])
       })
     } else if (identical(display_mode, "separate")) {
-      expressionProjectionProgressUpdate(0.3, "Extracting multiple gene panels...")
+      expressionProjectionProgressUpdate(
+        0.3,
+        "Extracting multiple gene panels..."
+      )
       expression_levels <- expressionProjectionCachedRows(
         data_set(),
         cells_to_show,
         genes_present
       )
     } else if (length(genes_present) == 1) {
-      expressionProjectionProgressUpdate(0.3, "Extracting single gene expression...")
+      expressionProjectionProgressUpdate(
+        0.3,
+        "Extracting single gene expression..."
+      )
       expression_levels <- expressionProjectionCachedRow(
         data_set(),
         cells_to_show,
@@ -306,7 +344,11 @@ expression_projection_expression_levels <- reactive({
       )
     } else if (length(genes_present) >= 2 && length(genes_present) <= 9L) {
       expressionProjectionProgressUpdate(0.3, "Calculating mean expression...")
-      rows <- expressionProjectionCachedRows(data_set(), cells_to_show, genes_present)
+      rows <- expressionProjectionCachedRows(
+        data_set(),
+        cells_to_show,
+        genes_present
+      )
       expression_levels <- unname(Reduce(`+`, rows) / length(rows))
     } else if (length(genes_present) >= 2) {
       expressionProjectionProgressUpdate(0.3, "Calculating mean expression...")
@@ -318,7 +360,10 @@ expression_projection_expression_levels <- reactive({
         )
       )
     }
-    expressionProjectionProgressUpdate(0.55, "Preparing colours for transfer...")
+    expressionProjectionProgressUpdate(
+      0.55,
+      "Preparing colours for transfer..."
+    )
   }
   success <- TRUE
   expression_levels

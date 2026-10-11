@@ -8,8 +8,12 @@ test_that("Spatial resolves stable keys before legacy CRB paths", {
   expect_null(spatial_dataset_name(files, NA_character_))
   expect_null(spatial_dataset_name(files, character()))
   options <- list(spatial_plot_rotation = list(second = c(fov = 90)))
-  expect_equal(spatialPlotRotation(options,
-    spatial_dataset_name(files, "second"), "fov"), 90)
-  expect_equal(spatialPlotRotation(options,
-    spatial_dataset_name(files, "first"), "fov"), 0)
+  expect_equal(
+    spatialPlotRotation(options, spatial_dataset_name(files, "second"), "fov"),
+    90
+  )
+  expect_equal(
+    spatialPlotRotation(options, spatial_dataset_name(files, "first"), "fov"),
+    0
+  )
 })

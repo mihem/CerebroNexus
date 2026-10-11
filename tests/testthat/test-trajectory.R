@@ -154,9 +154,17 @@ test_that("trajectory first frame has a static host and stable appearance", {
     collapse = "\n"
   )
 
-  expect_match(ui, 'cerebroCellViewOutput("trajectory_projection")', fixed = TRUE)
+  expect_match(
+    ui,
+    'cerebroCellViewOutput("trajectory_projection")',
+    fixed = TRUE
+  )
   expect_false(grepl('uiOutput("trajectory_projection_UI")', ui, fixed = TRUE))
-  expect_match(controls, 'output[["trajectory_primary_controls_UI"]]', fixed = TRUE)
+  expect_match(
+    controls,
+    'output[["trajectory_primary_controls_UI"]]',
+    fixed = TRUE
+  )
   expect_match(controls, '"trajectory_selected_method"', fixed = TRUE)
   expect_match(controls, '"trajectory_selected_name"', fixed = TRUE)
   expect_match(controls, '"trajectory_point_color"', fixed = TRUE)
@@ -182,20 +190,39 @@ test_that("trajectory static first frame is narrow and keeps deferred identity",
     collapse = "\n"
   )
 
-  expect_match(projection, "trajectory_static_first_frame <- reactive", fixed = TRUE)
-  expect_match(projection, "viewerTrajectoryFrameAsset(method, name)", fixed = TRUE)
+  expect_match(
+    projection,
+    "trajectory_static_first_frame <- reactive",
+    fixed = TRUE
+  )
+  expect_match(
+    projection,
+    "viewerTrajectoryFrameAsset(method, name)",
+    fixed = TRUE
+  )
   expect_match(projection, "viewerPackTrajectoryEdges(", fixed = TRUE)
-  expect_match(projection, 'identical(input[["trajectory_point_color"]], "state")', fixed = TRUE)
+  expect_match(
+    projection,
+    'identical(input[["trajectory_point_color"]], "state")',
+    fixed = TRUE
+  )
   expect_match(projection, "trajectory_frame_resource = resource", fixed = TRUE)
-  expect_match(projection, "deferred_selection_lengths = resource$cells", fixed = TRUE)
+  expect_match(
+    projection,
+    "deferred_selection_lengths = resource$cells",
+    fixed = TRUE
+  )
   expect_match(projection, "trajectory_cells_reactive(", fixed = TRUE)
-  expect_match(projection, "selection_rows = seq_len(resource$cells)", fixed = TRUE)
+  expect_match(
+    projection,
+    "selection_rows = seq_len(resource$cells)",
+    fixed = TRUE
+  )
 })
 
 test_that("trajectory summaries require their own visibility gate", {
   gates <- c(
-    distribution_along_pseudotime.R =
-      "trajectory_distribution_section_visible",
+    distribution_along_pseudotime.R = "trajectory_distribution_section_visible",
     states_by_group.R = "trajectory_states_section_visible",
     expression_metrics.R = "trajectory_expression_section_visible"
   )

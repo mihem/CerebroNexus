@@ -7,7 +7,9 @@
 ##----------------------------------------------------------------------------#
 output[["extra_material_content_UI"]] <- renderUI({
   categories <- getExtraMaterialCategories()
-  if (!length(categories)) return(p("No extra material is included in this data set."))
+  if (!length(categories)) {
+    return(p("No extra material is included in this data set."))
+  }
   req(input[["extra_material_selected_category"]] %in% categories)
   ## if selected category is `tables`
   if (input[["extra_material_selected_category"]] == 'tables') {

@@ -82,7 +82,10 @@ if (length(args) && identical(args[[1L]], "--measure")) {
   backend <- object$getExpressionBackend()$type
   if (!identical(backend, expected_backend)) {
     stop(
-      "expected ", expected_backend, " CRB, found ", backend,
+      "expected ",
+      expected_backend,
+      " CRB, found ",
+      backend,
       call. = FALSE
     )
   }
@@ -160,7 +163,8 @@ run_worker <- function(worker_args) {
   )
   if (!identical(status, 0L)) {
     stop(
-      paste(c(readLines(stdout, warn = FALSE), readLines(stderr, warn = FALSE)),
+      paste(
+        c(readLines(stdout, warn = FALSE), readLines(stderr, warn = FALSE)),
         collapse = "\n"
       ),
       call. = FALSE
@@ -186,14 +190,24 @@ for (round in seq_len(rounds)) {
     at <- at + 1L
     rows[[at]] <- readRDS(result)
     unlink(result)
-    message("Completed round ", round, ": ", backend,
-      "; first gene ", sprintf("%.3fs", rows[[at]]$first_gene_seconds),
-      "; materialized block ", sprintf("%.3fs", rows[[at]]$twelve_gene_seconds))
+    message(
+      "Completed round ",
+      round,
+      ": ",
+      backend,
+      "; first gene ",
+      sprintf("%.3fs", rows[[at]]$first_gene_seconds),
+      "; materialized block ",
+      sprintf("%.3fs", rows[[at]]$twelve_gene_seconds)
+    )
   }
 }
 results <- do.call(rbind, rows)
 if (!all(results$correctness == "OK")) {
-  stop("at least one backend returned different expression values", call. = FALSE)
+  stop(
+    "at least one backend returned different expression values",
+    call. = FALSE
+  )
 }
 tsv <- paste0(prefix, ".tsv")
 png <- paste0(prefix, ".png")
@@ -205,14 +219,17 @@ metrics <- c(
   hot_gene_p50_seconds = "Warm gene p50",
   twelve_gene_seconds = "12-gene block (materialized)"
 )
-long <- do.call(rbind, lapply(names(metrics), function(metric) {
-  data.frame(
-    backend = results$backend,
-    metric = metrics[[metric]],
-    seconds = results[[metric]],
-    stringsAsFactors = FALSE
-  )
-}))
+long <- do.call(
+  rbind,
+  lapply(names(metrics), function(metric) {
+    data.frame(
+      backend = results$backend,
+      metric = metrics[[metric]],
+      seconds = results[[metric]],
+      stringsAsFactors = FALSE
+    )
+  })
+)
 summary <- stats::aggregate(seconds ~ backend + metric, long, stats::median)
 summary$metric <- factor(summary$metric, levels = unname(metrics))
 plot <- ggplot2::ggplot(
@@ -231,7 +248,8 @@ plot <- ggplot2::ggplot(
   ggplot2::labs(
     title = "Ren v2 expression backend comparison",
     subtitle = paste0(
-      "Median of ", rounds,
+      "Median of ",
+      rounds,
       " independent warm-cache processes; identical values required"
     ),
     x = NULL,

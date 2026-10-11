@@ -489,18 +489,28 @@ test_that("Moran's I reads Spatial data only after ImageFeaturePlot is requested
         spatial_reads(shiny::isolate(spatial_reads()) + 1L)
         list(coordinates = data.frame(x = seq_len(7L), y = seq_len(7L)))
       }
-      spatial_projection_cell_index <- shiny::reactive(paste0("cell", seq_len(7L)))
+      spatial_projection_cell_index <- shiny::reactive(paste0(
+        "cell",
+        seq_len(7L)
+      ))
       viewerExpressionRow <- function(data, cells, gene) seq_along(cells)
       data_set <- shiny::reactive(list())
       morans_i <- function(x, y, values, k = 6) 0.5
       cachePlot <- function(x, ...) x
       available_crb_files <- shiny::reactiveValues(selected = "dataset.crb")
       viewer_loaded_dataset_context <- shiny::reactive(list(
-        epoch = "spatial-test", dataset_key = "dataset.crb", generation = 1L
+        epoch = "spatial-test",
+        dataset_key = "dataset.crb",
+        generation = 1L
       ))
-      viewerDatasetContextToken <- function(context) paste(
-        context$epoch, context$dataset_key, context$generation, sep = ":"
-      )
+      viewerDatasetContextToken <- function(context) {
+        paste(
+          context$epoch,
+          context$dataset_key,
+          context$generation,
+          sep = ":"
+        )
+      }
 
       sys.source(
         file.path(shiny_root, "spatial", "out_morans_i.R"),
@@ -901,7 +911,8 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   sys.source(
     file.path(
       system.file("viewer", package = "CerebroNexus"),
-      "gene_expression", "func_color_scale.R"
+      "gene_expression",
+      "func_color_scale.R"
     ),
     envir = renderer
   )
@@ -1252,14 +1263,22 @@ test_that("shared Canvas owns spatial background identity and appearance", {
     "background_identity: backgroundIdentity",
     fixed = TRUE
   )
-  expect_match(parameters, "background_opacity <- background_preset$opacity", fixed = TRUE)
+  expect_match(
+    parameters,
+    "background_opacity <- background_preset$opacity",
+    fixed = TRUE
+  )
   expect_no_match(
     parameters,
     'isolate(\n    input[["spatial_projection_background_opacity"]]',
     fixed = TRUE
   )
   expect_match(controls, "dataset_context = dataset_context", fixed = TRUE)
-  expect_match(controls, "background_identity = background_identity", fixed = TRUE)
+  expect_match(
+    controls,
+    "background_identity = background_identity",
+    fixed = TRUE
+  )
   expect_match(page_helpers, "stillCurrent(message)", fixed = TRUE)
 
   renderer_src <- paste(
@@ -1413,7 +1432,11 @@ test_that("Spatial geometry catalog is registered but fetched only on page reque
     readLines(viewer_test_path("shiny_server.R")),
     collapse = "\n"
   )
-  expect_match(server_source, "viewerSpatialGeometryCatalog <- function()", fixed = TRUE)
+  expect_match(
+    server_source,
+    "viewerSpatialGeometryCatalog <- function()",
+    fixed = TRUE
+  )
   expect_match(server_source, '"cell_view_resource_catalog"', fixed = TRUE)
   expect_match(
     server_source,
@@ -1478,7 +1501,11 @@ test_that("Spatial geometry catalog is registered but fetched only on page reque
     "if (singleRequests.has(singleRequestKey(message.id, message.dataset_context))) {",
     fixed = TRUE
   )
-  expect_false(grepl("cell_view_resource_prefetch", browser_source, fixed = TRUE))
+  expect_false(grepl(
+    "cell_view_resource_prefetch",
+    browser_source,
+    fixed = TRUE
+  ))
 })
 
 test_that("empty spatial selection returns before million-cell plot data", {
@@ -1539,21 +1566,26 @@ test_that("empty spatial selection returns before million-cell plot data", {
     collapse = "\n"
   )
   server <- function(input, output, session) {
-    dataset_context <- list(epoch="test", dataset_key="a", generation=1)
+    dataset_context <- list(epoch = "test", dataset_key = "a", generation = 1)
     viewer_loaded_dataset_context <- function() dataset_context
     viewerDatasetContextEqual <- identical
     spatial_projection_data_to_plot <- reactive({
       calls$plot_data <- calls$plot_data + 1L
-      list(cells_df = data.frame(cell_index = 1L), coordinates = data.frame(
-        x = 1,
-        y = 2
-      ))
+      list(
+        cells_df = data.frame(cell_index = 1L),
+        coordinates = data.frame(
+          x = 1,
+          y = 2
+        )
+      )
     })
     getMetaData <- function() data.frame(cell_barcode = "cell-1")
     viewerProjectionSubsetRows <- function(data, index, columns = NULL) data
-    filterSelectionByHiddenGroups <- function(...) stop(
-      "hidden-group filtering should not run in this contract"
-    )
+    filterSelectionByHiddenGroups <- function(...) {
+      stop(
+        "hidden-group filtering should not run in this contract"
+      )
+    }
     eval(parse(text = selected_reactive_source), envir = environment())
   }
 
@@ -1561,12 +1593,14 @@ test_that("empty spatial selection returns before million-cell plot data", {
     expect_null(shiny::isolate(spatial_projection_selected_cells()))
     expect_identical(calls$plot_data, 0L)
 
-    session$setInputs(spatial_projection_persistent_selection = list(
-      x = 1,
-      y = 2,
-      ids = "cell-1",
-      dataset_context = dataset_context
-    ))
+    session$setInputs(
+      spatial_projection_persistent_selection = list(
+        x = 1,
+        y = 2,
+        ids = "cell-1",
+        dataset_context = dataset_context
+      )
+    )
     selection <- shiny::isolate(spatial_projection_selected_cells())
     expect_identical(calls$plot_data, 1L)
     expect_identical(selection$selection_key, "cell-1")
@@ -1911,16 +1945,45 @@ test_that(".getSpatialData tolerates a real Slide-seq object (NA-named coord col
 
 
 test_that("Spatial background picker is in the toolbar and labels default off", {
-  shell <- paste(readLines(viewer_test_path("spatial", "UI.R")), collapse = "\n")
-  selector <- paste(readLines(viewer_test_path("spatial", "UI_projection_main_parameters.R")), collapse = "\n")
-  parameters <- paste(readLines(viewer_test_path("spatial", "obj_projection_parameters_plot.R")), collapse = "\n")
+  shell <- paste(
+    readLines(viewer_test_path("spatial", "UI.R")),
+    collapse = "\n"
+  )
+  selector <- paste(
+    readLines(viewer_test_path("spatial", "UI_projection_main_parameters.R")),
+    collapse = "\n"
+  )
+  parameters <- paste(
+    readLines(viewer_test_path("spatial", "obj_projection_parameters_plot.R")),
+    collapse = "\n"
+  )
   drawer <- regexpr("cerebroSettingsDrawer(", shell, fixed = TRUE)[[1L]]
-  picker <- regexpr('uiOutput("spatial_projection_background_selector_UI")', shell, fixed = TRUE)[[1L]]
+  picker <- regexpr(
+    'uiOutput("spatial_projection_background_selector_UI")',
+    shell,
+    fixed = TRUE
+  )[[1L]]
   expect_gt(picker, 0L)
   expect_lt(picker, drawer)
-  picker_source <- strsplit(selector, 'output[["spatial_projection_background_selector_UI"]] <- renderUI({', fixed = TRUE)[[1L]][[2L]]
-  picker_source <- strsplit(picker_source, "serverSideGeneSelector(", fixed = TRUE)[[1L]][[1L]]
-  expect_no_match(picker_source, "spatial_projection_more_render_request", fixed = TRUE)
+  picker_source <- strsplit(
+    selector,
+    'output[["spatial_projection_background_selector_UI"]] <- renderUI({',
+    fixed = TRUE
+  )[[1L]][[2L]]
+  picker_source <- strsplit(
+    picker_source,
+    "serverSideGeneSelector(",
+    fixed = TRUE
+  )[[1L]][[1L]]
+  expect_no_match(
+    picker_source,
+    "spatial_projection_more_render_request",
+    fixed = TRUE
+  )
   expect_match(parameters, "group_labels = FALSE", fixed = TRUE)
-  expect_match(parameters, 'spatial_update_appearance("group_labels", value)', fixed = TRUE)
+  expect_match(
+    parameters,
+    'spatial_update_appearance("group_labels", value)',
+    fixed = TRUE
+  )
 })

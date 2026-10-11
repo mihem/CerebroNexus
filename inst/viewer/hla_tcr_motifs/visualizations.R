@@ -210,7 +210,9 @@ hla_build_motif_visnet <- function(
   total_cells <- if (snapshot) {
     graph$total_cells
   } else {
-    tryCatch(igraph::graph_attr(graph, "total_cells"), error = function(e) NA_real_)
+    tryCatch(igraph::graph_attr(graph, "total_cells"), error = function(e) {
+      NA_real_
+    })
   }
   if (length(total_cells) != 1 || is.na(total_cells)) {
     total_cells <- NA_real_
@@ -259,8 +261,12 @@ hla_build_motif_visnet <- function(
       return(NULL)
     }
     out <- list(label = label, values = values)
-    if (!is.null(format)) out$format <- format
-    if (!is.null(digits)) out$digits <- digits
+    if (!is.null(format)) {
+      out$format <- format
+    }
+    if (!is.null(digits)) {
+      out$digits <- digits
+    }
     out
   }
   carrier_detail <- if (use_carrier && !is.null(carrier_counts)) {
@@ -287,10 +293,17 @@ hla_build_motif_visnet <- function(
         "integer"
       ),
       if (!is.na(total_cells) && total_cells > 0) {
-        hover_numeric("Fraction (%)", 100 * clone_count / total_cells, "fixed", 1)
+        hover_numeric(
+          "Fraction (%)",
+          100 * clone_count / total_cells,
+          "fixed",
+          1
+        )
       },
       hover_numeric("Neighbours", deg, "integer"),
-      if (use_carrier) hover_categorical(carrier_allele %||% "HLA carrier", group_raw),
+      if (use_carrier) {
+        hover_categorical(carrier_allele %||% "HLA carrier", group_raw)
+      },
       if (use_carrier) hover_categorical("Carrier counts", carrier_detail),
       if (!is.na(lineage_col)) hover_categorical(lineage_col, cell_dist),
       if (!color_col %in% skip_dist) hover_categorical(color_col, color_dist),
@@ -497,95 +510,111 @@ output$hla_motif_readout <- renderUI({
 hla_motif_last_render_signature <- reactiveVal(NULL)
 hla_motif_last_feedback_token <- NULL
 
-observe({
-  req(identical(input[["sidebar"]], "hla_tcr_motifs"))
-  req(identical(input[["hla_tabs"]], "Motif Network"))
-  render_request <- input[["hla_motif_network_render_request"]]
-  dataset_context <- viewer_loaded_dataset_context()
-  req(is.list(render_request), viewerDatasetContextEqual(render_request$dataset_context, dataset_context))
-  req(render_request)
-  req(hla_active_chain() %in% hla_tcr_chains())
-  req(isTRUE(hla_first_frame_graph_matches()) || hla_ready_latch())
-  vn <- hla_visnet()
-  if (is.null(vn) || is.null(vn$layout)) {
-    return()
-  }
+observe(
+  {
+    req(identical(input[["sidebar"]], "hla_tcr_motifs"))
+    req(identical(input[["hla_tabs"]], "Motif Network"))
+    render_request <- input[["hla_motif_network_render_request"]]
+    dataset_context <- viewer_loaded_dataset_context()
+    req(
+      is.list(render_request),
+      viewerDatasetContextEqual(render_request$dataset_context, dataset_context)
+    )
+    req(render_request)
+    req(hla_active_chain() %in% hla_tcr_chains())
+    req(isTRUE(hla_first_frame_graph_matches()) || hla_ready_latch())
+    vn <- hla_visnet()
+    if (is.null(vn) || is.null(vn$layout)) {
+      return()
+    }
 
-  from <- as.integer(vn$edges$from)
-  to <- as.integer(vn$edges$to)
-  point_sizes <- 2 * vn$nodes$size
-  render_signature <- list(
-    dataset_context = dataset_context,
-    dataset = available_crb_files$selected,
-    legend_title = vn$legend_title,
-    layout = vn$layout,
-    node_key = vn$nodes$node_key,
-    color = vn$nodes$color,
-    point_sizes = point_sizes,
-    hover_columns = vn$hover_columns,
-    from = from,
-    to = to
-  )
-  feedback <- cerebroFeedbackControls("hla_motif_network", input, list(
-    hla_min_nodes = if (isTRUE(hla_first_frame_graph_matches())) {
-      hla_param("hla_min_nodes", hla_default_min_nodes())
-    } else hla_min_nodes_debounced()
-  ))
-  # Input widgets and the client request lifecycle initialise independently.
-  # Several invalidations can therefore arrive with the same effective graph.
-  # Compare the actual frame, not its input controls: controls can move from a
-  # server default to the same explicit browser value without changing one pixel.
-  if (identical(hla_motif_last_render_signature(), render_signature)) {
-    cerebroSendViewFeedback("hla_motif_network", hla_motif_last_feedback_token,
-      dataset_context, feedback)
-    return()
-  }
-
-  hla_motif_last_feedback_token <<- cerebroCellViewRender(
-    "hla_motif_network",
-    meta = list(
-      color_type = "coexpression",
-      color_variable = vn$legend_title,
-      appearance = list(
-        group_labels = FALSE,
-        draw_border = TRUE,
-        keep_square = FALSE
-      ),
-      space_label = "Motif network"
-    ),
-    data = list(
-      x = vn$layout[, 1],
-      y = vn$layout[, 2],
-      selection_key = vn$nodes$node_key,
+    from <- as.integer(vn$edges$from)
+    to <- as.integer(vn$edges$to)
+    point_sizes <- 2 * vn$nodes$size
+    render_signature <- list(
+      dataset_context = dataset_context,
+      dataset = available_crb_files$selected,
+      legend_title = vn$legend_title,
+      layout = vn$layout,
+      node_key = vn$nodes$node_key,
       color = vn$nodes$color,
       point_sizes = point_sizes,
-      point_size = min(20, stats::median(point_sizes)),
-      point_opacity = 1,
-      reset_axes = FALSE
-    ),
-    hover = list(
-      hoverinfo = "text",
-      columns = vn$hover_columns
-    ),
-    extra = list(
-      interaction = list(
-        # Dense motif networks are primarily overview figures. Above this size,
-        # per-node hit testing and drag interaction are opt-in so the rest of the
-        # page stays responsive; the user can re-enable them from the notice.
-        static_above = 200L
-      ),
-      edges = list(
-        # The browser already owns the node coordinates. Integer endpoints avoid
-        # repeating four double vectors for every edge (the dominant HLA payload).
-        from = from,
-        to = to
+      hover_columns = vn$hover_columns,
+      from = from,
+      to = to
+    )
+    feedback <- cerebroFeedbackControls(
+      "hla_motif_network",
+      input,
+      list(
+        hla_min_nodes = if (isTRUE(hla_first_frame_graph_matches())) {
+          hla_param("hla_min_nodes", hla_default_min_nodes())
+        } else {
+          hla_min_nodes_debounced()
+        }
       )
-    ),
-    dataset_context = dataset_context,
-    feedback = feedback
-  )
-  hla_motif_last_render_signature(render_signature)
-}, priority = 100)
+    )
+    # Input widgets and the client request lifecycle initialise independently.
+    # Several invalidations can therefore arrive with the same effective graph.
+    # Compare the actual frame, not its input controls: controls can move from a
+    # server default to the same explicit browser value without changing one pixel.
+    if (identical(hla_motif_last_render_signature(), render_signature)) {
+      cerebroSendViewFeedback(
+        "hla_motif_network",
+        hla_motif_last_feedback_token,
+        dataset_context,
+        feedback
+      )
+      return()
+    }
+
+    hla_motif_last_feedback_token <<- cerebroCellViewRender(
+      "hla_motif_network",
+      meta = list(
+        color_type = "coexpression",
+        color_variable = vn$legend_title,
+        appearance = list(
+          group_labels = FALSE,
+          draw_border = TRUE,
+          keep_square = FALSE
+        ),
+        space_label = "Motif network"
+      ),
+      data = list(
+        x = vn$layout[, 1],
+        y = vn$layout[, 2],
+        selection_key = vn$nodes$node_key,
+        color = vn$nodes$color,
+        point_sizes = point_sizes,
+        point_size = min(20, stats::median(point_sizes)),
+        point_opacity = 1,
+        reset_axes = FALSE
+      ),
+      hover = list(
+        hoverinfo = "text",
+        columns = vn$hover_columns
+      ),
+      extra = list(
+        interaction = list(
+          # Dense motif networks are primarily overview figures. Above this size,
+          # per-node hit testing and drag interaction are opt-in so the rest of the
+          # page stays responsive; the user can re-enable them from the notice.
+          static_above = 200L
+        ),
+        edges = list(
+          # The browser already owns the node coordinates. Integer endpoints avoid
+          # repeating four double vectors for every edge (the dominant HLA payload).
+          from = from,
+          to = to
+        )
+      ),
+      dataset_context = dataset_context,
+      feedback = feedback
+    )
+    hla_motif_last_render_signature(render_signature)
+  },
+  priority = 100
+)
 
 ## ---- Export: tables + manifest ---------------------------------------- ##
 ## A screenshot of the network is not a result. This writes what the page shows
@@ -719,14 +748,16 @@ output$hla_motif_note <- renderUI({
   hla_require_active_page()
   if (!hla_has_deps()) {
     return(tags$p(
-      class = "text-muted", `data-view-state` = "empty",
+      class = "text-muted",
+      `data-view-state` = "empty",
       "The motif network requires the 'visNetwork' and 'stringdist' packages."
     ))
   }
   seg <- hla_segments()
   if (is.null(seg) || nrow(seg) == 0) {
     return(tags$p(
-      class = "text-muted", `data-view-state` = "empty",
+      class = "text-muted",
+      `data-view-state` = "empty",
       sprintf(
         "No %s cells with a complete V / J / CDR3 to build a network.",
         hla_active_chain()
@@ -740,7 +771,8 @@ output$hla_motif_note <- renderUI({
   }
   if (hla_motif_graph_ok(g) && igraph::vcount(g) > HLA_MOTIF_MAX_RENDER) {
     return(tags$p(
-      class = "text-danger", `data-view-state` = "error",
+      class = "text-danger",
+      `data-view-state` = "error",
       sprintf(
         "The filtered graph has %s nodes; interactive rendering is capped at %s. Increase motif size or filter the repertoire.",
         format(igraph::vcount(g), big.mark = ","),
@@ -750,7 +782,8 @@ output$hla_motif_note <- renderUI({
   }
   if (!hla_motif_graph_ok(g)) {
     return(tags$p(
-      class = "text-muted", `data-view-state` = "empty",
+      class = "text-muted",
+      `data-view-state` = "empty",
       paste(
         "No CDR3 motif clusters at Hamming distance 1 with the current",
         "settings. Try lowering the minimum motif size or enabling",

@@ -11,13 +11,19 @@
 ##----------------------------------------------------------------------------##
 
 spatial_dataset_name <- function(crb_files, selected) {
-  if (is.null(crb_files) || length(selected) != 1L || is.na(selected) ||
-      is.null(names(crb_files))) {
+  if (
+    is.null(crb_files) ||
+      length(selected) != 1L ||
+      is.na(selected) ||
+      is.null(names(crb_files))
+  ) {
     return(NULL)
   }
   ## The selector carries the configured dataset key. Accept paths only for
   ## legacy callers; a shared CRB file must not collapse two configured entries.
-  if (selected %in% names(crb_files)) return(as.character(selected))
+  if (selected %in% names(crb_files)) {
+    return(as.character(selected))
+  }
   index <- which(crb_files == selected)
   if (length(index) == 0L) {
     return(NULL)

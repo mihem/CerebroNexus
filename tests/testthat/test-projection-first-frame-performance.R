@@ -284,7 +284,11 @@ test_that("gene-expression first frame defers identities and hover", {
     "if (length(genes_present) == 0) {\n    ## No gene",
     fixed = TRUE
   )
-  expect_match(expression_source, "expression_levels <- numeric()", fixed = TRUE)
+  expect_match(
+    expression_source,
+    "expression_levels <- numeric()",
+    fixed = TRUE
+  )
 
   sources <- vapply(
     c(
@@ -412,7 +416,15 @@ test_that("gene-expression deferred hover selects rows and columns first", {
   ) {
     list(selection_rows = selection_rows, cell_barcodes = cell_barcodes)
   }
-  scope$cerebroCellViewRender <- function(id, meta, data, hover, extra, deferred_aux, ...) {
+  scope$cerebroCellViewRender <- function(
+    id,
+    meta,
+    data,
+    hover,
+    extra,
+    deferred_aux,
+    ...
+  ) {
     scope$aux <- deferred_aux()
   }
   sys.source(
@@ -538,9 +550,11 @@ test_that("projection rendering has one first-frame debounce entry point", {
     event_source,
     fixed = TRUE
   ))
-  expect_match(event_source,
+  expect_match(
+    event_source,
     "if (!viewerDatasetContextEqual(data$dataset_context, current_context))",
-    fixed = TRUE)
+    fixed = TRUE
+  )
 })
 
 test_that("projection can render before its dynamic controls bind", {
@@ -611,7 +625,10 @@ test_that("a new projection mount redraws unchanged data", {
   shiny::testServer(server, {
     session$setInputs(
       sidebar = "coordinated_views",
-      overview_projection_render_request = list(nonce = 1, dataset_context = context),
+      overview_projection_render_request = list(
+        nonce = 1,
+        dataset_context = context
+      ),
       late_bound_control = 1
     )
     expect_identical(session$userData$render_count(), 0L)
@@ -622,11 +639,21 @@ test_that("a new projection mount redraws unchanged data", {
     session$setInputs(late_bound_control = 2)
     expect_identical(session$userData$render_count(), 1L)
 
-    session$setInputs(overview_projection_render_request = list(nonce = 2, dataset_context = context))
+    session$setInputs(
+      overview_projection_render_request = list(
+        nonce = 2,
+        dataset_context = context
+      )
+    )
     expect_identical(session$userData$render_count(), 2L)
     stale <- context
     stale$generation <- 0L
-    session$setInputs(overview_projection_render_request = list(nonce = 3, dataset_context = stale))
+    session$setInputs(
+      overview_projection_render_request = list(
+        nonce = 3,
+        dataset_context = stale
+      )
+    )
     expect_identical(session$userData$render_count(), 2L)
   })
 })
@@ -733,10 +760,15 @@ test_that("noncanonical thin projections cannot bypass barcode alignment", {
   writeLines(cells, file.path(sidecar, "col_names"))
   object <- new.env(parent = emptyenv())
   object$meta_data <- data.frame(group = c("A", "B", "C"))
-  object$projections <- list(umap = data.frame(x = c(30, 20, 10), y = 3:1,
-    row.names = c("3", "2", "1")))
-  schema <- list(version = 2L, n_cells = 3L, projection_rownames = character(),
-    cell_names_md5 = unname(tools::md5sum(file.path(sidecar, "col_names"))))
+  object$projections <- list(
+    umap = data.frame(x = c(30, 20, 10), y = 3:1, row.names = c("3", "2", "1"))
+  )
+  schema <- list(
+    version = 2L,
+    n_cells = 3L,
+    projection_rownames = character(),
+    cell_names_md5 = unname(tools::md5sum(file.path(sidecar, "col_names")))
+  )
   scope$.deferThinCrbHydration(object, "data.crb", sidecar, schema)
   scope$data_set <- function() object
   scope$getProjection <- function(name) object$projections[[name]]

@@ -12,14 +12,22 @@
 expression_summary_group_height <- reactiveVal(NULL)
 expression_summary_show_genes <- reactiveVal(FALSE)
 observe({
-  req(identical(input[["sidebar"]], "geneExpression"),
-      input[["expression_summary_viewport_request"]],
-      expression_projection_summary_ready())
-  summary <- tryCatch(expression_summary_data(),
-    shiny.silent.error = function(e) NULL)
-  expression_summary_group_height(if (is.null(summary)) NULL else {
-    max(400, ceiling(length(summary$series) / 3) * 300)
-  })
+  req(
+    identical(input[["sidebar"]], "geneExpression"),
+    input[["expression_summary_viewport_request"]],
+    expression_projection_summary_ready()
+  )
+  summary <- tryCatch(
+    expression_summary_data(),
+    shiny.silent.error = function(e) NULL
+  )
+  expression_summary_group_height(
+    if (is.null(summary)) {
+      NULL
+    } else {
+      max(400, ceiling(length(summary$series) / 3) * 300)
+    }
+  )
   expression_summary_show_genes(!is.null(summary) && length(summary$genes) > 1)
 })
 
@@ -28,7 +36,9 @@ output[["expression_by_group_UI"]] <- renderUI({
   req(height)
   groups <- getGroups()
   selected <- isolate(input[["expression_by_group_selected_group"]])
-  if (!length(selected) || !selected %in% groups) selected <- groups[1]
+  if (!length(selected) || !selected %in% groups) {
+    selected <- groups[1]
+  }
   fluidRow(
     cerebroBox(
       title = tagList(

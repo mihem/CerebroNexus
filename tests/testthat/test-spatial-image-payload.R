@@ -14,15 +14,21 @@ normalize_test_spatial_image <- function(payload, image_name, coordinates) {
   if (.isLegacySpatialImagePayload(payload)) {
     payload <- .canonicalizeLegacySpatialImagePayload(
       payload,
-      paste0("Spatial image payload `", image_name, "` image `Tissue background`")
+      paste0(
+        "Spatial image payload `",
+        image_name,
+        "` image `Tissue background`"
+      )
     )
     payload <- list(`Tissue background` = payload)
   }
-  list(histology_images = .normalizeEmbeddedSpatialImages(
-    payload,
-    coordinates,
-    paste0("Spatial image payload `", image_name, "`")
-  ))
+  list(
+    histology_images = .normalizeEmbeddedSpatialImages(
+      payload,
+      coordinates,
+      paste0("Spatial image payload `", image_name, "`")
+    )
+  )
 }
 
 test_that("spatial image payload validation accepts a contained FOV image", {

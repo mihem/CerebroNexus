@@ -314,7 +314,10 @@
       state_dictionary_path <- paste0(prefix, ".state.dictionary.json")
       geometry <- as.matrix(frame[, c("DR_1", "DR_2"), drop = FALSE])
       if (!is.numeric(geometry)) {
-        stop("Viewer Pack trajectory coordinates must be numeric.", call. = FALSE)
+        stop(
+          "Viewer Pack trajectory coordinates must be numeric.",
+          call. = FALSE
+        )
       }
       matching_projection <- if (
         length(frame_index) && !anyDuplicated(frame_index)
@@ -409,9 +412,11 @@
         name = name,
         cells = nrow(frame),
         geometry_kind = geometry_kind,
-        geometry_path = if (
-          identical(geometry_kind, "trajectory_asset")
-        ) geometry_path else "",
+        geometry_path = if (identical(geometry_kind, "trajectory_asset")) {
+          geometry_path
+        } else {
+          ""
+        },
         projection_name = projection_name,
         subset_kind = subset_kind,
         subset_path = subset_path,
@@ -455,7 +460,10 @@
     error = function(error) character()
   )
   getter <- object$getSpatialData
-  indexes <- stats::setNames(vector("list", length(spatial_names)), spatial_names)
+  indexes <- stats::setNames(
+    vector("list", length(spatial_names)),
+    spatial_names
+  )
   frames <- list()
   assets <- NULL
   for (i in seq_along(spatial_names)) {
@@ -667,8 +675,15 @@
   function(metadata, group, metric, max_points_per_group = 4096L) {
     if (is.null(compact)) {
       scope <- new.env(parent = baseenv())
-      sys.source(system.file("viewer", "plotting_functions.R",
-        package = "CerebroNexus", mustWork = TRUE), envir = scope)
+      sys.source(
+        system.file(
+          "viewer",
+          "plotting_functions.R",
+          package = "CerebroNexus",
+          mustWork = TRUE
+        ),
+        envir = scope
+      )
       compact <<- scope$compactViolinData
     }
     do.call(compact, list(metadata, metric, group, max_points_per_group))
@@ -751,12 +766,21 @@
         stop("Viewer Pack projection is not cell-aligned.", call. = FALSE)
       }
       ids <- rownames(value)
-      if (is.null(ids) || anyNA(ids) || any(!nzchar(ids)) ||
-          anyDuplicated(ids) || !setequal(ids, cells)) {
-        stop("Viewer Pack projection requires unique, matching cell identities.",
-          call. = FALSE)
+      if (
+        is.null(ids) ||
+          anyNA(ids) ||
+          any(!nzchar(ids)) ||
+          anyDuplicated(ids) ||
+          !setequal(ids, cells)
+      ) {
+        stop(
+          "Viewer Pack projection requires unique, matching cell identities.",
+          call. = FALSE
+        )
       }
-      if (!identical(ids, cells)) value <- value[match(cells, ids), , drop = FALSE]
+      if (!identical(ids, cells)) {
+        value <- value[match(cells, ids), , drop = FALSE]
+      }
       projection_values[[i]] <- value
       assets <- rbind(
         assets,
@@ -906,10 +930,16 @@
         sum(vapply(abundance, nrow, integer(1)))
       )
     )
-    assets <- rbind(assets, .viewerPackWriteAsset(
-      stage, file.path("immune", "homeostasis.qs2"), homeostasis,
-      "table-list", sum(vapply(homeostasis, nrow, integer(1)))
-    ))
+    assets <- rbind(
+      assets,
+      .viewerPackWriteAsset(
+        stage,
+        file.path("immune", "homeostasis.qs2"),
+        homeostasis,
+        "table-list",
+        sum(vapply(homeostasis, nrow, integer(1)))
+      )
+    )
   }
   chains <- intersect(hla_detect_chains(repertoire), c("TRA", "TRB"))
   if (length(chains)) {
@@ -989,9 +1019,13 @@ validateViewerPack <- function(
   ) {
     return(.viewerPackInvalid("Viewer Pack dataset fingerprint mismatch"))
   }
-  if (length(manifest$projection_names) &&
-      !identical(manifest$projection_identity_version, 1L)) {
-    return(.viewerPackInvalid("Rebuild Viewer Pack: projection identity is unverified"))
+  if (
+    length(manifest$projection_names) &&
+      !identical(manifest$projection_identity_version, 1L)
+  ) {
+    return(.viewerPackInvalid(
+      "Rebuild Viewer Pack: projection identity is unverified"
+    ))
   }
   object <- tryCatch(readCerebro(file), error = function(error) NULL)
   if (is.null(object)) {

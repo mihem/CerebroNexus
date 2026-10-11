@@ -35,7 +35,8 @@ tab_groups <- tabItem(
         boxTitle("Composition by other group"),
         cerebroInfoButton("groups_by_other_group_info")
       ),
-      div(class = "cerebro-page-loading-region",
+      div(
+        class = "cerebro-page-loading-region",
         plotly::plotlyOutput("groups_by_other_group_plot"),
         conditionalPanel(
           condition = "input.groups_by_other_group_show_table === true",
@@ -83,8 +84,7 @@ tab_groups <- tabItem(
       observer.observe(target);
     })();
     "
-  ))
-  ,
+  )),
   tags$script(HTML(
     "
     (function () {

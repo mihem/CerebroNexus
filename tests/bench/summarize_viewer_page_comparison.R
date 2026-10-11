@@ -20,9 +20,18 @@ raw <- utils::read.delim(
 )
 
 required <- c(
-  "candidate", "round", "page", "visit", "budget_ms", "status",
-  "correctness_pass", "primary_ready_ms", "settled_ms", "benchmark_mode",
-  "performance_applicable", "pass"
+  "candidate",
+  "round",
+  "page",
+  "visit",
+  "budget_ms",
+  "status",
+  "correctness_pass",
+  "primary_ready_ms",
+  "settled_ms",
+  "benchmark_mode",
+  "performance_applicable",
+  "pass"
 )
 missing <- setdiff(required, names(raw))
 if (length(missing)) {
@@ -111,7 +120,11 @@ metric_specs <- list(
 metric_specs <- metric_specs[names(metric_specs) %in% names(raw)]
 
 groups <- unique(raw[c(
-  "candidate", "page", "visit", "budget_ms", "benchmark_mode"
+  "candidate",
+  "page",
+  "visit",
+  "budget_ms",
+  "benchmark_mode"
 )])
 summary_rows <- lapply(seq_len(nrow(groups)), function(index) {
   key <- groups[index, , drop = FALSE]
@@ -161,14 +174,19 @@ summary_rows <- lapply(seq_len(nrow(groups)), function(index) {
   result
 })
 page_summary <- do.call(rbind, summary_rows)
-page_summary$candidate <- factor(page_summary$candidate, levels = candidate_order)
+page_summary$candidate <- factor(
+  page_summary$candidate,
+  levels = candidate_order
+)
 page_summary$page <- factor(page_summary$page, levels = page_order)
 page_summary$visit <- factor(page_summary$visit, levels = visit_order)
-page_summary <- page_summary[order(
-  page_summary$page,
-  page_summary$visit,
-  page_summary$candidate
-), ]
+page_summary <- page_summary[
+  order(
+    page_summary$page,
+    page_summary$visit,
+    page_summary$candidate
+  ),
+]
 page_summary[] <- lapply(page_summary, function(value) {
   if (is.factor(value)) as.character(value) else value
 })
@@ -201,20 +219,29 @@ for (pair in pair_specs) {
   for (page in page_order) {
     for (visit in visit_order) {
       left <- raw[
-        raw$candidate == baseline & raw$page == page &
-          raw$visit == visit & raw$status == "ok" &
+        raw$candidate == baseline &
+          raw$page == page &
+          raw$visit == visit &
+          raw$status == "ok" &
           raw$benchmark_mode == "timing",
         c("round", "primary_ready_ms"),
         drop = FALSE
       ]
       right <- raw[
-        raw$candidate == candidate & raw$page == page &
-          raw$visit == visit & raw$status == "ok" &
+        raw$candidate == candidate &
+          raw$page == page &
+          raw$visit == visit &
+          raw$status == "ok" &
           raw$benchmark_mode == "timing",
         c("round", "primary_ready_ms"),
         drop = FALSE
       ]
-      paired <- merge(left, right, by = "round", suffixes = c("_base", "_candidate"))
+      paired <- merge(
+        left,
+        right,
+        by = "round",
+        suffixes = c("_base", "_candidate")
+      )
       if (!nrow(paired)) {
         next
       }
@@ -223,7 +250,11 @@ for (pair in pair_specs) {
       delta <- paired$primary_ready_ms_candidate - paired$primary_ready_ms_base
       delta <- finite_values(delta)
       comparison_index <- comparison_index + 1L
-      base_median <- if (length(base_values)) stats::median(base_values) else NA_real_
+      base_median <- if (length(base_values)) {
+        stats::median(base_values)
+      } else {
+        NA_real_
+      }
       candidate_median <- if (length(candidate_values)) {
         stats::median(candidate_values)
       } else {
@@ -243,7 +274,11 @@ for (pair in pair_specs) {
         } else {
           NA_real_
         },
-        paired_median_delta_ms = if (length(delta)) stats::median(delta) else NA_real_,
+        paired_median_delta_ms = if (length(delta)) {
+          stats::median(delta)
+        } else {
+          NA_real_
+        },
         candidate_faster_rounds = sum(delta < 0),
         candidate_slower_rounds = sum(delta > 0),
         stringsAsFactors = FALSE
@@ -268,7 +303,10 @@ markdown <- c(
   "",
   sprintf("Raw observations: `%s`", raw_path),
   "",
-  sprintf("Candidates: %s", paste(sprintf("`%s`", candidate_order), collapse = ", ")),
+  sprintf(
+    "Candidates: %s",
+    paste(sprintf("`%s`", candidate_order), collapse = ", ")
+  ),
   "",
   "Official KPI: browser click to request-bound, correctness-bound primary-ready.",
   "Timing and profiler-instrumented memory observations are never pooled.",
@@ -278,39 +316,57 @@ markdown <- c(
   "| Candidate | Page | Fresh primary P50 ms | Fresh min–max ms | Repeat primary P50 ms | Settled P50 ms | Correctness | Fresh raw ms |",
   "|---|---|---:|---:|---:|---:|---:|---|"
 )
-timing_summary <- page_summary[page_summary$benchmark_mode == "timing", , drop = FALSE]
+timing_summary <- page_summary[
+  page_summary$benchmark_mode == "timing",
+  ,
+  drop = FALSE
+]
 timing_keys <- unique(timing_summary[c("candidate", "page")])
 for (index in seq_len(nrow(timing_keys))) {
   key <- timing_keys[index, ]
   first <- timing_summary[
     timing_summary$candidate == key$candidate &
-      timing_summary$page == key$page & timing_summary$visit == "first",
-    , drop = FALSE
+      timing_summary$page == key$page &
+      timing_summary$visit == "first",
+    ,
+    drop = FALSE
   ]
   repeat_row <- timing_summary[
     timing_summary$candidate == key$candidate &
-      timing_summary$page == key$page & timing_summary$visit == "repeat",
-    , drop = FALSE
+      timing_summary$page == key$page &
+      timing_summary$visit == "repeat",
+    ,
+    drop = FALSE
   ]
-  if (!nrow(first)) next
-  markdown <- c(markdown, sprintf(
-    "| %s | %s | %s | %s–%s | %s | %s | %d/%d | %s |",
-    key$candidate,
-    key$page,
-    format_number(first$primary_ready_ms_median),
-    format_number(first$primary_ready_ms_min),
-    format_number(first$primary_ready_ms_max),
-    if (nrow(repeat_row)) format_number(repeat_row$primary_ready_ms_median) else "NA",
-    format_number(first$settled_ms_median),
-    first$correctness_pass,
-    first$ok,
-    first$primary_ready_ms_raw
-  ))
+  if (!nrow(first)) {
+    next
+  }
+  markdown <- c(
+    markdown,
+    sprintf(
+      "| %s | %s | %s | %s–%s | %s | %s | %d/%d | %s |",
+      key$candidate,
+      key$page,
+      format_number(first$primary_ready_ms_median),
+      format_number(first$primary_ready_ms_min),
+      format_number(first$primary_ready_ms_max),
+      if (nrow(repeat_row)) {
+        format_number(repeat_row$primary_ready_ms_median)
+      } else {
+        "NA"
+      },
+      format_number(first$settled_ms_median),
+      first$correctness_pass,
+      first$ok,
+      first$primary_ready_ms_raw
+    )
+  )
 }
 
 memory_summary <- page_summary[
   page_summary$benchmark_mode == "memory" & page_summary$visit == "first",
-  , drop = FALSE
+  ,
+  drop = FALSE
 ]
 markdown <- c(
   markdown,
@@ -325,17 +381,23 @@ markdown <- c(
 if (nrow(memory_summary)) {
   for (index in seq_len(nrow(memory_summary))) {
     row <- memory_summary[index, ]
-    markdown <- c(markdown, sprintf(
-      "| %s | %s | %s | %s | %s | profiler-instrumented |",
-      row$candidate,
-      row$page,
-      format_number(row$r_peak_rss_kib_median / 1024),
-      format_number(row$chrome_peak_rss_kib_median / 1024),
-      format_number(row$js_heap_used_bytes_median / 1024^2)
-    ))
+    markdown <- c(
+      markdown,
+      sprintf(
+        "| %s | %s | %s | %s | %s | profiler-instrumented |",
+        row$candidate,
+        row$page,
+        format_number(row$r_peak_rss_kib_median / 1024),
+        format_number(row$chrome_peak_rss_kib_median / 1024),
+        format_number(row$js_heap_used_bytes_median / 1024^2)
+      )
+    )
   }
 } else {
-  markdown <- c(markdown, "| — | — | NA | NA | NA | run memory mode separately |")
+  markdown <- c(
+    markdown,
+    "| — | — | NA | NA | NA | run memory mode separately |"
+  )
 }
 
 if (nrow(comparison)) {
@@ -351,19 +413,22 @@ if (nrow(comparison)) {
   )
   for (index in seq_len(nrow(comparison))) {
     row <- comparison[index, ]
-    markdown <- c(markdown, sprintf(
-      "| %s | %s | %s | %s | %s | %s | %s | %s%% | %d | %d |",
-      row$baseline,
-      row$candidate,
-      row$page,
-      row$visit,
-      format_number(row$baseline_median_ms),
-      format_number(row$candidate_median_ms),
-      format_number(row$median_delta_ms),
-      format_number(row$median_change_pct),
-      row$candidate_faster_rounds,
-      row$candidate_slower_rounds
-    ))
+    markdown <- c(
+      markdown,
+      sprintf(
+        "| %s | %s | %s | %s | %s | %s | %s | %s%% | %d | %d |",
+        row$baseline,
+        row$candidate,
+        row$page,
+        row$visit,
+        format_number(row$baseline_median_ms),
+        format_number(row$candidate_median_ms),
+        format_number(row$median_delta_ms),
+        format_number(row$median_change_pct),
+        row$candidate_faster_rounds,
+        row$candidate_slower_rounds
+      )
+    )
   }
 }
 

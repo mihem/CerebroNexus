@@ -344,16 +344,30 @@ test_that("initial cohorts retain sample order and empty declared samples", {
     sample = factor(c(rep("b", 3), rep("a", 2))),
     cdr3 = factor(paste0("CASS", seq_len(5)))
   )
-  expect_identical(hla_choose_initial_samples(
-    segments, c("empty", "a", "b"), target = 3L, max_total = 1L,
-    bin_target = 100L, max_bin = 100L
-  ), c("empty", "b"))
+  expect_identical(
+    hla_choose_initial_samples(
+      segments,
+      c("empty", "a", "b"),
+      target = 3L,
+      max_total = 1L,
+      bin_target = 100L,
+      max_bin = 100L
+    ),
+    c("empty", "b")
+  )
   segments$sample <- as.character(segments$sample)
   segments <- rbind(segments, data.frame(sample = NA_character_, cdr3 = "CASX"))
-  expect_identical(hla_choose_initial_samples(
-    segments, c("a", "b"), target = 4L, max_total = 1L,
-    bin_target = 100L, max_bin = 100L
-  ), "b")
+  expect_identical(
+    hla_choose_initial_samples(
+      segments,
+      c("a", "b"),
+      target = 4L,
+      max_total = 1L,
+      bin_target = 100L,
+      max_bin = 100L
+    ),
+    "b"
+  )
 })
 
 test_that("the graph carries igraph-computed draw coordinates", {

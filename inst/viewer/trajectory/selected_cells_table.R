@@ -63,9 +63,12 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   ## Filter by stable cell identity; the shared projection keeps barcode-backed
   ## selections across recolouring and trace rebuilds. Coordinates remain the
   ## fallback for older Plotly event payloads without customdata.
-  stable_selection <- "selection_key" %in% colnames(selected_cells) &&
-    any(!is.na(selected_cells[["selection_key"]]) &
-      nzchar(as.character(selected_cells[["selection_key"]])))
+  stable_selection <- "selection_key" %in%
+    colnames(selected_cells) &&
+    any(
+      !is.na(selected_cells[["selection_key"]]) &
+        nzchar(as.character(selected_cells[["selection_key"]]))
+    )
   identifier <- if (!stable_selection) {
     paste0(cells_df[["DR_1"]], "-", cells_df[["DR_2"]])
   } else {

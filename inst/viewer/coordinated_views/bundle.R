@@ -232,7 +232,9 @@ cv_selected_dataset_name <- function() {
       available_crb_files$files,
       available_crb_files$selected
     )
-  } else NULL
+  } else {
+    NULL
+  }
   if (is.null(nm) || !length(nm) || is.na(nm) || !nzchar(nm)) {
     NULL
   } else {
@@ -877,9 +879,14 @@ cv_build_attribute <- function(
 ## A 3-D embedding also sends its third dimension, so the client can orbit it
 ## rather than show a flattened shadow of it. `ndim` travels either way — the
 ## client needs to know which panels can rotate and which are flat.
-cv_build_projections <- function(crb, cells, only = NULL, preloaded = NULL,
-                                 canonical_projections = character(),
-                                 aligned_cache = NULL) {
+cv_build_projections <- function(
+  crb,
+  cells,
+  only = NULL,
+  preloaded = NULL,
+  canonical_projections = character(),
+  aligned_cache = NULL
+) {
   # Only unverified thin projections need canonical barcodes. Keep this lazy
   # so ordinary canonical first frames never hydrate the full metadata.
   canonical_cells <- NULL
@@ -904,15 +911,28 @@ cv_build_projections <- function(crb, cells, only = NULL, preloaded = NULL,
     aligned <- FALSE
     if (is.list(preloaded)) {
       if (nrow(pj) != length(cells)) {
-        stop("Preloaded projection does not match the canonical cell count.", call. = FALSE)
+        stop(
+          "Preloaded projection does not match the canonical cell count.",
+          call. = FALSE
+        )
       }
       if (!pn %in% canonical_projections) {
-        cached <- if (is.environment(aligned_cache)) aligned_cache[[pn]] else NULL
+        cached <- if (is.environment(aligned_cache)) {
+          aligned_cache[[pn]]
+        } else {
+          NULL
+        }
         if (is.null(cached) && is.null(canonical_cells)) {
           canonical_cells <- crb$getMetaData()$cell_barcode
         }
-        pj <- if (!is.null(cached)) cached else viewerAlignProjection(pj, canonical_cells)
-        if (is.null(cached) && is.environment(aligned_cache)) aligned_cache[[pn]] <- pj
+        pj <- if (!is.null(cached)) {
+          cached
+        } else {
+          viewerAlignProjection(pj, canonical_cells)
+        }
+        if (is.null(cached) && is.environment(aligned_cache)) {
+          aligned_cache[[pn]] <- pj
+        }
       }
       # Reaching this branch means schema-verified or barcode-aligned, not
       # merely the same row count. `cells` is the thin frame's integer index.
@@ -1588,7 +1608,11 @@ cv_build_primary_colours <- function(
   primary_group_resource = NULL
 ) {
   parameters <- tryCatch(crb$getParameters(), error = function(e) list())
-  colour_groups <- viewerColourGroupChoices(md, group_names, parameters[["main_group"]])
+  colour_groups <- viewerColourGroupChoices(
+    md,
+    group_names,
+    parameters[["main_group"]]
+  )
   group_candidates <- colour_groups$choices
   default_group <- colour_groups$selected
   groups <- list()
@@ -1596,7 +1620,9 @@ cv_build_primary_colours <- function(
   fields <- list()
   resource_kind <- primary_group_resource$kind
   resource_name <- primary_group_resource$name
-  resource_levels <- as.character(primary_group_resource$levels %||% character())
+  resource_levels <- as.character(
+    primary_group_resource$levels %||% character()
+  )
   resource_descriptor <- primary_group_resource$descriptor
   use_resource <-
     is.character(resource_name) &&
@@ -1854,7 +1880,10 @@ cv_build_bundle <- function(
       resource_projection
     } else {
       built <- list()
-      for (projection_name in unique(c(preferred_projection, projection_names))) {
+      for (projection_name in unique(c(
+        preferred_projection,
+        projection_names
+      ))) {
         built <- cv_build_projections(
           crb,
           cells,
@@ -2168,23 +2197,45 @@ cv_build_progressive_supplement <- function(
 ## canonical projection. Legacy/custom coordinate systems retain their arrays.
 cv_reference_trajectory_geometry <- function(supplement, primary, crb) {
   pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
-  if (!is.list(pack) || !identical(primary$canonical_order_id,
-      pack$manifest$cell_order_fingerprint) || primary$n != pack$cell_count) {
+  if (
+    !is.list(pack) ||
+      !identical(
+        primary$canonical_order_id,
+        pack$manifest$cell_order_fingerprint
+      ) ||
+      primary$n != pack$cell_count
+  ) {
     return(supplement)
   }
   supplement$spaces <- lapply(supplement$spaces, function(space) {
-    if (!isTRUE(space$trajectory)) return(space)
+    if (!isTRUE(space$trajectory)) {
+      return(space)
+    }
     frame <- viewerPackTrajectoryFrame(pack, space$method, space$name)
-    if (is.null(frame) || frame$geometry_kind != "canonical_projection" ||
+    if (
+      is.null(frame) ||
+        frame$geometry_kind != "canonical_projection" ||
         !frame$projection_name %in% names(primary$projections) ||
-        !identical(as.integer(primary$projections[[frame$projection_name]]$ndim), 2L) ||
-        length(space$x) != primary$n || length(space$y) != primary$n ||
-        !identical(is.na(space$x), is.na(space$y))) return(space)
+        !identical(
+          as.integer(primary$projections[[frame$projection_name]]$ndim),
+          2L
+        ) ||
+        length(space$x) != primary$n ||
+        length(space$y) != primary$n ||
+        !identical(is.na(space$x), is.na(space$y))
+    ) {
+      return(space)
+    }
     present <- is.finite(space$x) & is.finite(space$y)
-    if (sum(present) != frame$cells) return(space)
-    space$geometry_ref <- list(projection = frame$projection_name,
-      exclude = I(as.integer(which(!present) - 1L)))
-    space$x <- NULL; space$y <- NULL
+    if (sum(present) != frame$cells) {
+      return(space)
+    }
+    space$geometry_ref <- list(
+      projection = frame$projection_name,
+      exclude = I(as.integer(which(!present) - 1L))
+    )
+    space$x <- NULL
+    space$y <- NULL
     space
   })
   supplement

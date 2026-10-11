@@ -30,9 +30,7 @@ expressionPackedColor <- function(values) {
 }
 
 expressionColorDatasetKey <- function() {
-  if (
-    !exists("viewerDatasetIdentity", mode = "function", inherits = TRUE)
-  ) {
+  if (!exists("viewerDatasetIdentity", mode = "function", inherits = TRUE)) {
     return(NULL)
   }
   identity <- tryCatch(viewerDatasetIdentity(), error = function(error) NULL)
@@ -72,20 +70,29 @@ expressionColorCacheKeyForGene <- function(gene, cell_indices, n_cells) {
     return(NULL)
   }
   fingerprint <- expressionColorDatasetKey()
-  if (is.null(fingerprint)) return(NULL)
+  if (is.null(fingerprint)) {
+    return(NULL)
+  }
   paste(fingerprint, gene, n_cells, sep = "::")
 }
 
 expressionColorCacheKey <- function(color_settings, cell_indices, n_cells) {
   genes <- as.character(color_settings[["genes"]] %||% character())
-  if (length(genes) != 1L) return(NULL)
+  if (length(genes) != 1L) {
+    return(NULL)
+  }
   expressionColorCacheKeyForGene(genes[[1L]], cell_indices, n_cells)
 }
 
 expressionPackedColorKeys <- function(genes, cell_indices, n_cells) {
-  vapply(genes, function(gene) {
-    expressionColorCacheKeyForGene(gene, cell_indices, n_cells) %||% ""
-  }, character(1), USE.NAMES = TRUE)
+  vapply(
+    genes,
+    function(gene) {
+      expressionColorCacheKeyForGene(gene, cell_indices, n_cells) %||% ""
+    },
+    character(1),
+    USE.NAMES = TRUE
+  )
 }
 
 ## function to be executed to update figure
@@ -233,9 +240,17 @@ expression_projection_update_plot <- function(input) {
     }
   }
   output_hover <- list(hoverinfo = "skip", text = list(), columns = list())
-  data_snapshot <- if (exists("data_set", mode = "function")) data_set() else NULL
+  data_snapshot <- if (exists("data_set", mode = "function")) {
+    data_set()
+  } else {
+    NULL
+  }
   core_aux <- function() {
-    metadata <- if (is.null(data_snapshot)) getMetaData() else data_snapshot$getMetaData()
+    metadata <- if (is.null(data_snapshot)) {
+      getMetaData()
+    } else {
+      data_snapshot$getMetaData()
+    }
     core <- cerebroCellViewDeferredAux(
       selection_rows = seq_len(n_cells),
       cell_barcodes = metadata[["cell_barcode"]][cell_indices],
@@ -299,19 +314,39 @@ expression_projection_update_plot <- function(input) {
   }
   geometry <- list(
     dataset = if (exists("data_set", mode = "function")) data_set() else NULL,
-    coordinates = coordinates, plot_parameters = plot_parameters,
-    cells = cell_indices, trajectory = trajectory,
+    coordinates = coordinates,
+    plot_parameters = plot_parameters,
+    cells = cell_indices,
+    trajectory = trajectory,
     separate = isTRUE(separate_panels),
     request = input[["render_request"]]
   )
   send_render <- function(id, meta, data, hover, extra, deferred_aux) {
-    can_recolor <- !isTRUE(reset_axes) && !no_gene_selected &&
-      !isTRUE(separate_panels) && length(coordinates) == 2L &&
+    can_recolor <- !isTRUE(reset_axes) &&
+      !no_gene_selected &&
+      !isTRUE(separate_panels) &&
+      length(coordinates) == 2L &&
       identical(expression_projection_render_state$geometry, geometry)
     if (can_recolor) {
-      cerebroCellViewRecolor(id, meta, data, dataset_context = input[["dataset_context"]], feedback = input[["feedback"]])
+      cerebroCellViewRecolor(
+        id,
+        meta,
+        data,
+        dataset_context = input[["dataset_context"]],
+        feedback = input[["feedback"]]
+      )
     } else {
-      cerebroCellViewRender(id, meta, data, hover, extra, deferred_aux, core_aux, dataset_context = input[["dataset_context"]], feedback = input[["feedback"]])
+      cerebroCellViewRender(
+        id,
+        meta,
+        data,
+        hover,
+        extra,
+        deferred_aux,
+        core_aux,
+        dataset_context = input[["dataset_context"]],
+        feedback = input[["feedback"]]
+      )
     }
     expression_projection_render_state$geometry <- geometry
   }

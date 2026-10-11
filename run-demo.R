@@ -37,7 +37,9 @@ if (!"--ren-only" %in% args) {
 ren_crb <- prepareViewerRenDemoData()
 Sys.setenv(CEREBRO_REN_DEMO_CRB = normalizePath(ren_crb, mustWork = TRUE))
 message("Ren data version: ", .viewerRenVersion, "; file: ", ren_crb)
-if ("--prepare-only" %in% args) quit(save = "no", status = 0)
+if ("--prepare-only" %in% args) {
+  quit(save = "no", status = 0)
+}
 
 port <- tryCatch(
   httpuv::randomPort(min = 7451L, max = 7451L, n = 1L),

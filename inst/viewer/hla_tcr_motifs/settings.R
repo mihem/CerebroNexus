@@ -177,10 +177,16 @@ output$hla_more_parameters_ui <- renderUI({
   )
 })
 
-observe({
-  outputOptions(output, "hla_more_parameters_ui",
-    suspendWhenHidden = !hla_page_active())
-}, priority = 100)
+observe(
+  {
+    outputOptions(
+      output,
+      "hla_more_parameters_ui",
+      suspendWhenHidden = !hla_page_active()
+    )
+  },
+  priority = 100
+)
 
 ## ---- Cohort filters (settings drawer) --------------------------------- ##
 ## Atlas-scale repertoires open on a deterministic sample subset that stays

@@ -24,7 +24,9 @@ resolve_configured_colors <- function(
     selected_path
   } else {
     match_at <- which(unname(configured_files) == selected_path)
-    if (!length(match_at)) return(list())
+    if (!length(match_at)) {
+      return(list())
+    }
     labels[[match_at[[1L]]]]
   }
   palette <- color_config[[dataset_id]]

@@ -8,11 +8,20 @@ test_that("dataset bundle paths preserve UTF-8 MD5 identity", {
     "07117fe4a1ebd544965dc19573183da2"
   )
   targets <- vapply(ids, CerebroNexus:::.datasetBundleTarget, character(1))
-  expect_identical(unname(targets), paste0("private-data/dataset-", hashes, ".crb"))
+  expect_identical(
+    unname(targets),
+    paste0("private-data/dataset-", hashes, ".crb")
+  )
   latin1 <- iconv(ids[[5L]], from = "UTF-8", to = "latin1")
-  expect_identical(CerebroNexus:::.datasetBundleTarget(latin1), unname(targets[[5L]]))
+  expect_identical(
+    CerebroNexus:::.datasetBundleTarget(latin1),
+    unname(targets[[5L]])
+  )
   for (id in list(NULL, character(), "", NA_character_, c("a", "b"))) {
-    expect_error(CerebroNexus:::.datasetBundleTarget(id), "non-empty dataset identity")
+    expect_error(
+      CerebroNexus:::.datasetBundleTarget(id),
+      "non-empty dataset identity"
+    )
   }
 })
 

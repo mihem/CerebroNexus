@@ -706,8 +706,10 @@ test_that("{shinytest2} recording: gene_expression", {
   panel_colour_id <- app$get_js(
     "document.querySelector('select[id^=\"expression_projection_gene_color_mode_\"]').id"
   )
-  app$run_js(sprintf("document.getElementById(%s).selectize.setValue('different');",
-    jsonlite::toJSON(panel_colour_id, auto_unbox = TRUE)))
+  app$run_js(sprintf(
+    "document.getElementById(%s).selectize.setValue('different');",
+    jsonlite::toJSON(panel_colour_id, auto_unbox = TRUE)
+  ))
   app$wait_for_js(
     paste0(
       "document.querySelectorAll(",

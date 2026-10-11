@@ -54,7 +54,8 @@ cerebroResultPage <- function(title, controls_id, result_id, info_id) {
     uiOutput(controls_id, class = "cerebro-result-controls"),
     fluidRow(cerebroBox(
       title = tagList(boxTitle(title), cerebroInfoButton(info_id)),
-      div(class = "cerebro-page-loading-region",
+      div(
+        class = "cerebro-page-loading-region",
         uiOutput(result_id, class = "cerebro-result-slot")
       )
     ))
@@ -691,8 +692,11 @@ ui <- dashboardPage(
       id = "main-content",
       tabindex = "-1",
       tags$div(
-        id = "cerebro-page-loader-announcement", class = "sr-only",
-        role = "status", `aria-live` = "polite", `aria-atomic` = "true"
+        id = "cerebro-page-loader-announcement",
+        class = "sr-only",
+        role = "status",
+        `aria-live` = "polite",
+        `aria-atomic` = "true"
       ),
       tags$div(
         id = "cerebro-page-loader",

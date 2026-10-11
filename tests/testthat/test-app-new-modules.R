@@ -55,7 +55,9 @@ test_that("most_expressed_genes tab navigates and renders table", {
   expect_true(grepl("seurat_clusters", select_html))
 
   # Table renders without error
-  table_html <- app$get_value(output = "most_expressed_genes_table_or_text_UI")$html
+  table_html <- app$get_value(
+    output = "most_expressed_genes_table_or_text_UI"
+  )$html
   expect_false(grepl("no.*available|not.*found|error", tolower(table_html)))
 })
 

@@ -24,62 +24,64 @@
 ## scatter plot is never re-rendered when the user nudges the background — the
 ## dimensional-reduction plot stays a function of its own parameters alone.
 ##----------------------------------------------------------------------------##
-observeEvent(input[["spatial_projection_background_controls"]], {
-  payload <- input[["spatial_projection_background_controls"]]
-  dataset_context <- viewer_loaded_dataset_context()
-  req(
-    is.list(payload),
-    viewerDatasetContextEqual(
-      payload[["dataset_context"]],
-      dataset_context
+observeEvent(
+  input[["spatial_projection_background_controls"]],
+  {
+    payload <- input[["spatial_projection_background_controls"]]
+    dataset_context <- viewer_loaded_dataset_context()
+    req(
+      is.list(payload),
+      viewerDatasetContextEqual(
+        payload[["dataset_context"]],
+        dataset_context
+      )
     )
-  )
-  plot_parameters <- spatial_projection_parameters_plot()
-  background_identity <- plot_parameters[["background_identity"]]
-  req(
-    !is.null(background_identity),
-    spatial_background_identity_equal(
-      payload[["background_identity"]],
-      background_identity
-    ),
-    is.list(payload[["values"]])
-  )
-  values <- payload[["values"]]
-  finite_value <- function(name) {
-    value <- values[[name]]
-    if (
-      length(value) == 1L &&
-        is.numeric(value) &&
-        !is.na(value) &&
-        is.finite(value)
-    ) {
-      return(unname(as.numeric(value)))
+    plot_parameters <- spatial_projection_parameters_plot()
+    background_identity <- plot_parameters[["background_identity"]]
+    req(
+      !is.null(background_identity),
+      spatial_background_identity_equal(
+        payload[["background_identity"]],
+        background_identity
+      ),
+      is.list(payload[["values"]])
+    )
+    values <- payload[["values"]]
+    finite_value <- function(name) {
+      value <- values[[name]]
+      if (
+        length(value) == 1L &&
+          is.numeric(value) &&
+          !is.na(value) &&
+          is.finite(value)
+      ) {
+        return(unname(as.numeric(value)))
+      }
+      NULL
     }
-    NULL
-  }
-  logical_value <- function(name) {
-    value <- values[[name]]
-    if (is.logical(value) && length(value) == 1L && !is.na(value)) {
-      return(isTRUE(value))
+    logical_value <- function(name) {
+      value <- values[[name]]
+      if (is.logical(value) && length(value) == 1L && !is.na(value)) {
+        return(isTRUE(value))
+      }
+      NULL
     }
-    NULL
-  }
 
-  cerebroCellViewBackground(
-    id = "spatial_projection",
-    values = list(
-      opacity = finite_value("opacity"),
-      offsetX = finite_value("offsetX"),
-      offsetY = finite_value("offsetY"),
-      flipX = logical_value("flipX"),
-      flipY = logical_value("flipY"),
-      scaleX = finite_value("scaleX"),
-      scaleY = finite_value("scaleY"),
-      rotate = finite_value("rotate")
-    ),
-    dataset_context = dataset_context,
-    background_identity = background_identity
-  )
+    cerebroCellViewBackground(
+      id = "spatial_projection",
+      values = list(
+        opacity = finite_value("opacity"),
+        offsetX = finite_value("offsetX"),
+        offsetY = finite_value("offsetY"),
+        flipX = logical_value("flipX"),
+        flipY = logical_value("flipY"),
+        scaleX = finite_value("scaleX"),
+        scaleY = finite_value("scaleY"),
+        rotate = finite_value("rotate")
+      ),
+      dataset_context = dataset_context,
+      background_identity = background_identity
+    )
   },
   ignoreInit = TRUE
 )

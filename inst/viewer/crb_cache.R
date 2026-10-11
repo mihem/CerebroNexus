@@ -20,16 +20,26 @@ crb_prefetch_tasks <- new.env(parent = emptyenv())
   if (!is.null(cached)) {
     return(invisible(cached))
   }
-  cached <- list(object = prototype, backend_identity = backend_identity,
-                 last_used = as.numeric(Sys.time()))
+  cached <- list(
+    object = prototype,
+    backend_identity = backend_identity,
+    last_used = as.numeric(Sys.time())
+  )
   .crb_process_cache[[cache_key]] <- cached
   ## Bound retained prototypes by count: object.size(R6) cannot measure their
   ## referenced payload reliably. Active session clones remain valid on eviction.
   keys <- ls(.crb_process_cache, all.names = TRUE)
   if (length(keys) > 2L) {
     older <- setdiff(keys, cache_key)
-    ages <- vapply(older, function(key) .crb_process_cache[[key]]$last_used %||% 0, numeric(1))
-    rm(list = older[order(ages)][seq_len(length(keys) - 2L)], envir = .crb_process_cache)
+    ages <- vapply(
+      older,
+      function(key) .crb_process_cache[[key]]$last_used %||% 0,
+      numeric(1)
+    )
+    rm(
+      list = older[order(ages)][seq_len(length(keys) - 2L)],
+      envir = .crb_process_cache
+    )
   }
   invisible(cached)
 }
@@ -37,9 +47,14 @@ crb_prefetch_tasks <- new.env(parent = emptyenv())
 .checkCrbBackendIdentity <- function(key, identity) {
   previous <- .crb_backend_identities[[key]]
   cached <- .crb_process_cache[[key]]
-  if ((!is.null(previous) && !identical(previous$identity, identity)) ||
-      (!is.null(cached) && !identical(cached$backend_identity, identity))) {
-    stop("The cached CRB backend configuration changed after it was loaded. Start a new app session.", call. = FALSE)
+  if (
+    (!is.null(previous) && !identical(previous$identity, identity)) ||
+      (!is.null(cached) && !identical(cached$backend_identity, identity))
+  ) {
+    stop(
+      "The cached CRB backend configuration changed after it was loaded. Start a new app session.",
+      call. = FALSE
+    )
   }
   .crb_backend_identities[[key]] <- list(identity = identity)
 }
@@ -60,24 +75,27 @@ start_crb_prefetch <- function(path, backend_identity) {
   # Snapshot the caller's identity before asynchronous completion; retain no
   # unevaluated session expression that could observe a later dataset switch.
   force(backend_identity)
-  prefetch_task <- shiny::withReactiveDomain(NULL, shiny::ExtendedTask$new(function(path) {
-    mirai::mirai(
-      {
-        connection <- file(path, open = "rb")
-        on.exit(close(connection), add = TRUE)
-        magic <- readBin(connection, "raw", n = 4L)
-        prototype <- if (
-          identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))
-        ) {
-          qs2::qs_read(path)
-        } else {
-          readRDS(path)
-        }
-        list(path = path, prototype = prototype)
-      },
-      path = path
-    )
-  }))
+  prefetch_task <- shiny::withReactiveDomain(
+    NULL,
+    shiny::ExtendedTask$new(function(path) {
+      mirai::mirai(
+        {
+          connection <- file(path, open = "rb")
+          on.exit(close(connection), add = TRUE)
+          magic <- readBin(connection, "raw", n = 4L)
+          prototype <- if (
+            identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))
+          ) {
+            qs2::qs_read(path)
+          } else {
+            readRDS(path)
+          }
+          list(path = path, prototype = prototype)
+        },
+        path = path
+      )
+    })
+  )
   crb_prefetch_tasks[[cache_key]] <- prefetch_task
   print(glue::glue(
     "[{Sys.time()}] CRB background prefetch started: {basename(path)}"
@@ -86,21 +104,36 @@ start_crb_prefetch <- function(path, backend_identity) {
   ## Completion belongs to the process, not the first requesting session.
   ## Publish once, then release the task's retained result even when the
   ## initiating user has left the dataset or disconnected.
-  completion <- shiny::observe({
-    status <- prefetch_task$status()
-    if (!status %in% c("success", "error")) return()
-    on.exit({
-      rm(list = cache_key, envir = crb_prefetch_tasks)
-      completion$destroy()
-    }, add = TRUE)
-    if (identical(status, "success")) {
-      .cacheCrbPrototype(path, prefetch_task$result()$prototype, backend_identity)
-    } else {
-      tryCatch(prefetch_task$result(), error = function(error) {
-        warning("CRB background prefetch failed: ", conditionMessage(error), call. = FALSE)
-      })
-    }
-  }, domain = NULL)
+  completion <- shiny::observe(
+    {
+      status <- prefetch_task$status()
+      if (!status %in% c("success", "error")) {
+        return()
+      }
+      on.exit(
+        {
+          rm(list = cache_key, envir = crb_prefetch_tasks)
+          completion$destroy()
+        },
+        add = TRUE
+      )
+      if (identical(status, "success")) {
+        .cacheCrbPrototype(
+          path,
+          prefetch_task$result()$prototype,
+          backend_identity
+        )
+      } else {
+        tryCatch(prefetch_task$result(), error = function(error) {
+          warning(
+            "CRB background prefetch failed: ",
+            conditionMessage(error),
+            call. = FALSE
+          )
+        })
+      }
+    },
+    domain = NULL
+  )
   invisible(NULL)
 }
-

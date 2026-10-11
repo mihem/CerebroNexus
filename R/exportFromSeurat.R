@@ -1022,19 +1022,36 @@ exportFromSeurat <- function(
         expression_data <- methods::as(expression_data, "CsparseMatrix")
       } else if (inherits(expression_data, c("RleMatrix", "DelayedMatrix"))) {
         if (!requireNamespace("HDF5Array", quietly = TRUE)) {
-          stop("Exporting delayed expression to BPCells requires HDF5Array.", call. = FALSE)
+          stop(
+            "Exporting delayed expression to BPCells requires HDF5Array.",
+            call. = FALSE
+          )
         }
-        integer_counts <- all(unlist(DelayedArray::blockApply(expression_data, function(block) {
-          all(is.finite(block)) && all(block >= 0) &&
-            all(block <= .Machine$integer.max) && all(block == floor(block))
-        }), use.names = FALSE))
-        delayed_bridge <- tempfile("delayed-expression-", tmpdir = crb_dir, fileext = ".h5")
+        integer_counts <- all(unlist(
+          DelayedArray::blockApply(expression_data, function(block) {
+            all(is.finite(block)) &&
+              all(block >= 0) &&
+              all(block <= .Machine$integer.max) &&
+              all(block == floor(block))
+          }),
+          use.names = FALSE
+        ))
+        delayed_bridge <- tempfile(
+          "delayed-expression-",
+          tmpdir = crb_dir,
+          fileext = ".h5"
+        )
         HDF5Array::writeTENxMatrix(
-          DelayedArray::t(expression_data), delayed_bridge, group = "matrix"
+          DelayedArray::t(expression_data),
+          delayed_bridge,
+          group = "matrix"
         )
         expression_data <- t(BPCells::open_matrix_10x_hdf5(delayed_bridge))
         if (integer_counts) {
-          expression_data <- BPCells::convert_matrix_type(expression_data, type = "uint32_t")
+          expression_data <- BPCells::convert_matrix_type(
+            expression_data,
+            type = "uint32_t"
+          )
         }
       }
     }
@@ -1075,7 +1092,9 @@ exportFromSeurat <- function(
     ## Keep Cerebro's genes x cells dimensions, but physically store rows
     ## contiguously so per-gene and small gene-set queries avoid a full scan.
     mat_handle <- .writeBpcellsGeneMajor(bpc_iter, bpc_abs)
-    if (!is.null(delayed_bridge)) unlink(delayed_bridge)
+    if (!is.null(delayed_bridge)) {
+      unlink(delayed_bridge)
+    }
 
     ## Carry the live handle (absolute path inside @dir -- BPCells normalises
     ## it on open_matrix_dir()) AND the portable relative location tag. Step

@@ -25,7 +25,9 @@
 .msigdbCollectionsFunction <- function() {
   if ("msigdbr_collections" %in% getNamespaceExports("msigdbr")) {
     msigdbr::msigdbr_collections()
-  } else NULL
+  } else {
+    NULL
+  }
 }
 
 .msigdbCatalogueRows <- function() {
@@ -46,9 +48,14 @@
     if (!length(column) || !"gs_name" %in% names(table)) {
       stop("MSigDB query returned unexpected columns.")
     }
-    unique(data.frame(gs_name = table$gs_name, gs_collection = table[[column[[1L]]]]))
+    unique(data.frame(
+      gs_name = table$gs_name,
+      gs_collection = table[[column[[1L]]]]
+    ))
   })
-  if (!length(pieces)) return(NULL)
+  if (!length(pieces)) {
+    return(NULL)
+  }
   do.call(rbind, pieces)
 }
 
@@ -61,8 +68,15 @@
     cache[[key]] <- genes
     keys <- unique(c(setdiff(keys, key), key))
   }
-  while (length(keys) > 128L ||
-         sum(vapply(keys, function(k) as.numeric(object.size(cache[[k]])), numeric(1))) > 4 * 1024^2) {
+  while (
+    length(keys) > 128L ||
+      sum(vapply(
+        keys,
+        function(k) as.numeric(object.size(cache[[k]])),
+        numeric(1)
+      )) >
+        4 * 1024^2
+  ) {
     rm(list = keys[[1L]], envir = cache)
     keys <- keys[-1L]
   }
@@ -146,8 +160,11 @@ getMsigdbGenes <- function(species, gene_set) {
     return(character())
   }
   compact <- cache[["compact_collection"]]
-  if (!is.null(compact) && identical(compact$species, species) &&
-      identical(compact$collection, collection)) {
+  if (
+    !is.null(compact) &&
+      identical(compact$species, species) &&
+      identical(compact$collection, collection)
+  ) {
     genes <- compact$genes[[gene_set]]
     if (length(genes)) {
       .cacheMsigdbGenes(cache, key, genes)
@@ -188,13 +205,28 @@ getMsigdbGenes <- function(species, gene_set) {
   # Reuse only the two relevant fields for the most recent small collection.
   # Large collections are not retained, and the wide query table is never cached.
   symbols <- trimws(as.character(table[["gene_symbol"]]))
-  valid <- !is.na(returned_names) & nzchar(returned_names) & !is.na(symbols) & nzchar(symbols)
-  if (as.numeric(object.size(returned_names)) + as.numeric(object.size(symbols)) <= 8 * 1024^2) {
-    mapping <- lapply(split(symbols[valid], returned_names[valid]), function(x) sort(unique(x)))
+  valid <- !is.na(returned_names) &
+    nzchar(returned_names) &
+    !is.na(symbols) &
+    nzchar(symbols)
+  if (
+    as.numeric(object.size(returned_names)) +
+      as.numeric(object.size(symbols)) <=
+      8 * 1024^2
+  ) {
+    mapping <- lapply(
+      split(symbols[valid], returned_names[valid]),
+      function(x) sort(unique(x))
+    )
     compact <- list(species = species, collection = collection, genes = mapping)
-    cache[["compact_collection"]] <- if (as.numeric(object.size(compact)) <= 8 * 1024^2) compact else NULL
+    cache[["compact_collection"]] <- if (
+      as.numeric(object.size(compact)) <= 8 * 1024^2
+    ) {
+      compact
+    } else {
+      NULL
+    }
   }
   rm(table)
   genes
 }
-

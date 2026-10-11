@@ -109,7 +109,9 @@ test_that("colour pickers stay mounted while shared colours update", {
     Cerebro.options <- list(crb_file_to_load = files)
     available_crb_files <- reactiveValues(selected = files[["A"]])
     data_set <- reactive(available_crb_files$selected)
-    getMetaData <- function() data.frame(group = c("a", "b"), cycle = c("G1", "S"))
+    getMetaData <- function() {
+      data.frame(group = c("a", "b"), cycle = c("G1", "S"))
+    }
     getGroups <- function() "group"
     getGroupLevels <- function(group) c("a", "b")
     getCellCycle <- function() "cycle"
@@ -127,14 +129,19 @@ test_that("colour pickers stay mounted while shared colours update", {
     session$userData$renders <- function() renders
     session$userData$colors <- reactive_colors
     session$userData$id <- color_input_id
-    session$userData$select <- function(path) available_crb_files$selected <- path
+    session$userData$select <- function(path) {
+      available_crb_files$selected <- path
+    }
   }
   shiny::testServer(server, {
     first <- output$color_assignments_UI
     initial <- session$userData$renders()
     group_id <- session$userData$id("group", "a")
     cycle_id <- session$userData$id("cycle", "G1")
-    do.call(session$setInputs, stats::setNames(list("#123456", "#654321"), c(group_id, cycle_id)))
+    do.call(
+      session$setInputs,
+      stats::setNames(list("#123456", "#654321"), c(group_id, cycle_id))
+    )
     expect_identical(output$shared_colour, "#123456")
     expect_identical(session$userData$colors()$cycle[["G1"]], "#654321")
     expect_identical(output$color_assignments_UI, first)

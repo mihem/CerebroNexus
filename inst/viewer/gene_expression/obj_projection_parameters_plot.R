@@ -7,10 +7,11 @@ expression_projection_parameters_plot <- reactive({
   selected_projection <- input[["expression_projection_to_display"]]
   if (
     is.null(selected_projection) ||
-      !selected_projection %in% c(
-        available_projections,
-        available_trajectory_names
-      )
+      !selected_projection %in%
+        c(
+          available_projections,
+          available_trajectory_names
+        )
   ) {
     shared <- isolate(input[["coordviews_shared_base"]])
     selected_projection <- as.character(shared$projection %||% "")
@@ -33,7 +34,8 @@ expression_projection_parameters_plot <- reactive({
     !is.null(input[["expression_projection_keep_square"]]),
     !is.null(preferences[["use_webgl"]]),
     !is.null(preferences[["show_hover_info_in_projections"]]),
-    selected_projection %in% available_projections ||
+    selected_projection %in%
+      available_projections ||
       selected_projection %in% available_trajectory_names
   )
   if (selected_projection %in% available_projections) {

@@ -112,7 +112,10 @@ test_that("Viewer BPCells reads preserve values and canonical cell order", {
     for (cells in list(1:4, c(4L, 1L, 3L), 2L)) {
       expect_identical(
         scope$viewerExpressionValues(dataset, cells, c("g3", "g1")),
-        list(g3 = as.numeric(source["g3", cells]), g1 = as.numeric(source["g1", cells]))
+        list(
+          g3 = as.numeric(source["g3", cells]),
+          g1 = as.numeric(source["g1", cells])
+        )
       )
       expect_identical(
         scope$viewerExpressionRow(dataset, cells, "g2"),
@@ -218,55 +221,75 @@ test_that("RGB violin outliers use the channel color", {
 })
 
 test_that("gene summary hosts change only when their layout changes", {
-  shiny::testServer(function(input, output, session) {
-    groups <- reactiveVal(c("sample", "cluster"))
-    summary <- reactiveVal(NULL)
-    reads <- 0L
-    expression_summary_data <- function() {
-      reads <<- reads + 1L
-      req(summary())
-      summary()
+  shiny::testServer(
+    function(input, output, session) {
+      groups <- reactiveVal(c("sample", "cluster"))
+      summary <- reactiveVal(NULL)
+      reads <- 0L
+      expression_summary_data <- function() {
+        reads <<- reads + 1L
+        req(summary())
+        summary()
+      }
+      getGroups <- function() groups()
+      expression_projection_summary_ready <- function() TRUE
+      cerebroBox <- shiny::div
+      boxTitle <- function(x) x
+      cerebroInfoButton <- function(...) NULL
+      scope <- environment()
+      sys.source(
+        viewer_test_path("gene_expression", "UI_expression_by_group.R"),
+        scope
+      )
+      sys.source(
+        viewer_test_path("gene_expression", "UI_expression_by_gene.R"),
+        scope
+      )
+    },
+    {
+      session$setInputs(sidebar = "overview")
+      expect_identical(reads, 0L)
+      summary(list(genes = "A", series = list(1)))
+      session$setInputs(
+        sidebar = "geneExpression",
+        expression_summary_viewport_request = 1
+      )
+      first <- output$expression_by_group_UI
+      expect_match(first$html, "400px", fixed = TRUE)
+      session$setInputs(expression_by_group_selected_group = "cluster")
+      summary(list(genes = "B", series = list(2)))
+      session$flushReact()
+      expect_identical(output$expression_by_group_UI, first)
+      expect_identical(input$expression_by_group_selected_group, "cluster")
+      summary(list(genes = c("A", "B"), series = list(1, 2)))
+      session$flushReact()
+      gene_host <- output$expression_by_gene_UI
+      expect_match(gene_host$html, "expression_by_gene", fixed = TRUE)
+      summary(list(genes = c("C", "D"), series = list(3, 4)))
+      session$flushReact()
+      expect_identical(output$expression_by_gene_UI, gene_host)
+      expect_identical(output$expression_by_group_UI, first)
+      summary(list(genes = LETTERS[1:7], series = as.list(1:7)))
+      session$flushReact()
+      expect_match(output$expression_by_group_UI$html, "900px", fixed = TRUE)
+      expect_match(
+        output$expression_by_group_UI$html,
+        'value="cluster" selected',
+        fixed = TRUE
+      )
+      groups(c("batch", "condition"))
+      session$flushReact()
+      expect_match(
+        output$expression_by_group_UI$html,
+        'value="batch" selected',
+        fixed = TRUE
+      )
+      summary(NULL)
+      session$flushReact()
+      expect_null(expression_summary_group_height())
+      expect_false(expression_summary_show_genes())
     }
-    getGroups <- function() groups()
-    expression_projection_summary_ready <- function() TRUE
-    cerebroBox <- shiny::div
-    boxTitle <- function(x) x
-    cerebroInfoButton <- function(...) NULL
-    scope <- environment()
-    sys.source(viewer_test_path("gene_expression", "UI_expression_by_group.R"), scope)
-    sys.source(viewer_test_path("gene_expression", "UI_expression_by_gene.R"), scope)
-  }, {
-    session$setInputs(sidebar = "overview")
-    expect_identical(reads, 0L)
-    summary(list(genes = "A", series = list(1)))
-    session$setInputs(sidebar = "geneExpression", expression_summary_viewport_request = 1)
-    first <- output$expression_by_group_UI
-    expect_match(first$html, "400px", fixed = TRUE)
-    session$setInputs(expression_by_group_selected_group = "cluster")
-    summary(list(genes = "B", series = list(2)))
-    session$flushReact()
-    expect_identical(output$expression_by_group_UI, first)
-    expect_identical(input$expression_by_group_selected_group, "cluster")
-    summary(list(genes = c("A", "B"), series = list(1, 2)))
-    session$flushReact()
-    gene_host <- output$expression_by_gene_UI
-    expect_match(gene_host$html, "expression_by_gene", fixed = TRUE)
-    summary(list(genes = c("C", "D"), series = list(3, 4)))
-    session$flushReact()
-    expect_identical(output$expression_by_gene_UI, gene_host)
-    expect_identical(output$expression_by_group_UI, first)
-    summary(list(genes = LETTERS[1:7], series = as.list(1:7)))
-    session$flushReact()
-    expect_match(output$expression_by_group_UI$html, "900px", fixed = TRUE)
-    expect_match(output$expression_by_group_UI$html, 'value="cluster" selected', fixed = TRUE)
-    groups(c("batch", "condition"))
-    session$flushReact()
-    expect_match(output$expression_by_group_UI$html, 'value="batch" selected', fixed = TRUE)
-    summary(NULL)
-    session$flushReact()
-    expect_null(expression_summary_group_height())
-    expect_false(expression_summary_show_genes())
-  })
+  )
 })
 
 test_that("gene expression panels follow gene, selection, and display mode", {

@@ -10,6 +10,10 @@ tab_marker_genes <- tabItem(
     }
     "
   ),
-  cerebroResultPage("Marker genes", "marker_genes_select_method_and_table_UI",
-    "marker_genes_table_or_text_UI", "marker_genes_info")
+  cerebroResultPage(
+    "Marker genes",
+    "marker_genes_select_method_and_table_UI",
+    "marker_genes_table_or_text_UI",
+    "marker_genes_info"
+  )
 )

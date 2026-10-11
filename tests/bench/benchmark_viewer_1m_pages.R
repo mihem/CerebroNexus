@@ -45,7 +45,10 @@ profile <- Sys.getenv("VIEWER_BENCH_PROFILE", unset = "quick")
 benchmark_mode <- tolower(Sys.getenv("VIEWER_BENCH_MODE", unset = "timing"))
 validate_benchmark_mode(benchmark_mode)
 memory_mode <- identical(benchmark_mode, "memory")
-expected_renderer <- tolower(Sys.getenv("VIEWER_EXPECTED_RENDERER", unset = "webgpu"))
+expected_renderer <- tolower(Sys.getenv(
+  "VIEWER_EXPECTED_RENDERER",
+  unset = "webgpu"
+))
 if (!expected_renderer %in% c("webgpu", "webgl2")) {
   stop("VIEWER_EXPECTED_RENDERER must be webgpu or webgl2.", call. = FALSE)
 }
@@ -67,8 +70,9 @@ trajectory_name <- Sys.getenv(
   unset = "E18_neurogenesis"
 )
 requested_pages <- trimws(Sys.getenv("VIEWER_PAGES_ONLY", unset = ""))
-trajectory_requested <- !nzchar(requested_pages) || "trajectory" %in%
-  trimws(strsplit(requested_pages, ",", fixed = TRUE)[[1L]])
+trajectory_requested <- !nzchar(requested_pages) ||
+  "trajectory" %in%
+    trimws(strsplit(requested_pages, ",", fixed = TRUE)[[1L]])
 trajectory_contract <- if (trajectory_requested) {
   benchmark_trajectory_contract(crb, trajectory_method, trajectory_name)
 } else {
@@ -79,8 +83,9 @@ trajectory_contract <- if (trajectory_requested) {
     stringsAsFactors = FALSE
   )
 }
-spatial_requested <- !nzchar(requested_pages) || "spatial" %in%
-  trimws(strsplit(requested_pages, ",", fixed = TRUE)[[1L]])
+spatial_requested <- !nzchar(requested_pages) ||
+  "spatial" %in%
+    trimws(strsplit(requested_pages, ",", fixed = TRUE)[[1L]])
 spatial_contract <- if (spatial_requested) {
   benchmark_spatial_contract(crb)
 } else {
@@ -277,11 +282,13 @@ pages <- list(
         "e.detail.selectedGroup.length>0"
       ),
       quote_r(groups_plot_id),
-      quote_r(if (identical(groups_plot_id, "groups_nUMI_plot")) {
-        "nUMI"
-      } else {
-        "composition"
-      })
+      quote_r(
+        if (identical(groups_plot_id, "groups_nUMI_plot")) {
+          "nUMI"
+        } else {
+          "composition"
+        }
+      )
     ),
     correctness = sprintf(
       paste0(
@@ -382,7 +389,8 @@ pages <- list(
       "e.detail?.primaryReady===true&&",
       "e.detail?.benchmarkGeneration===generation&&",
       "e.detail?.datasetFingerprint===expectedFingerprint&&",
-      "Number(e.detail?.renderedPointCount)===", expected_cells
+      "Number(e.detail?.renderedPointCount)===",
+      expected_cells
     ),
     completion_ready = paste0(
       "!!window.cerebroLinkedViewsState&&",
@@ -399,7 +407,9 @@ pages <- list(
       "detail.datasetFingerprint===summary.datasetFingerprint&&",
       "detail.benchmarkGeneration===",
       "window.__cerebroPageBenchGeneration&&",
-      "Number(detail.renderedPointCount)===", expected_cells, ";})()"
+      "Number(detail.renderedPointCount)===",
+      expected_cells,
+      ";})()"
     ),
     correctness_detail = paste0(
       "(() => {const summary=window.cerebroLinkedViewsState?.summary?.()||{};",
@@ -596,7 +606,8 @@ load_benchmark_dataset <- function(app) {
   app$wait_for_js(
     paste0(
       "Number.isFinite(window.__cerebroPageBenchDatasetReadyAt)&&",
-      "window.__cerebroPageBenchDatasetDetail?.cell_count===", expected_cells,
+      "window.__cerebroPageBenchDatasetDetail?.cell_count===",
+      expected_cells,
       "&&/^md5-cell-set-v1:[0-9a-f]{32}$/.test(",
       "String(window.__cerebroPageBenchDatasetDetail?.dataset_fingerprint||''))"
     ),
@@ -785,7 +796,9 @@ page_visible_pixels <- function(app, page) {
 }
 
 start_socket_meter <- function(app) {
-  if (isTRUE(skip_socket_meter)) return(invisible(TRUE))
+  if (isTRUE(skip_socket_meter)) {
+    return(invisible(TRUE))
+  }
   app$run_js(paste0(
     "(() => {if(window.__cerebroPageBenchSocketMeter){",
     "throw new Error('Socket meter is already active');}",
@@ -832,7 +845,9 @@ cleanup_socket_meter <- function(app) {
 }
 
 stop_socket_meter <- function(app) {
-  if (isTRUE(skip_socket_meter)) return(list(sent = 0, received = 0))
+  if (isTRUE(skip_socket_meter)) {
+    return(list(sent = 0, received = 0))
+  }
   value <- app$get_js(paste0(
     "(() => {const meter=window.__cerebroPageBenchSocketMeter;",
     "if(!meter)throw new Error('Socket meter is not active');",
@@ -981,8 +996,10 @@ socket_meter_snapshot <- function(app) {
     "quietMs:performance.now()-meter.lastActivityAt};})()"
   ))
   if (
-    is.null(value$sent) || !is.finite(value$sent) ||
-      is.null(value$received) || !is.finite(value$received)
+    is.null(value$sent) ||
+      !is.finite(value$sent) ||
+      is.null(value$received) ||
+      !is.finite(value$received)
   ) {
     stop("Socket meter returned invalid byte counts.", call. = FALSE)
   }
@@ -990,7 +1007,9 @@ socket_meter_snapshot <- function(app) {
 }
 
 wait_for_socket_quiet <- function(app, quiet_ms = 1200) {
-  if (isTRUE(skip_socket_meter)) return(invisible(TRUE))
+  if (isTRUE(skip_socket_meter)) {
+    return(invisible(TRUE))
+  }
   app$wait_for_js(
     sprintf(
       paste0(
@@ -1086,7 +1105,11 @@ page_specialist_timing <- function(app) {
   }
   text <- function(name) {
     result <- value[[name]]
-    if (is.null(result) || !length(result)) NA_character_ else as.character(result)
+    if (is.null(result) || !length(result)) {
+      NA_character_
+    } else {
+      as.character(result)
+    }
   }
   flag <- function(name) {
     result <- value[[name]]
@@ -1196,12 +1219,16 @@ start_app_driver <- function(app_dir, name) {
         check_names = FALSE
       ),
       error = function(error) {
-        message <- strsplit(conditionMessage(error), "\n", fixed = TRUE)[[1L]][[1L]]
+        message <- strsplit(conditionMessage(error), "\n", fixed = TRUE)[[1L]][[
+          1L
+        ]]
         errors <<- c(errors, paste0("attempt ", attempt, ": ", message))
         retry <- browser_debug_port_error(error) &&
           attempt < browser_start_attempts
         stop_failed_app_driver(error)
-        if (!retry) stop(error)
+        if (!retry) {
+          stop(error)
+        }
         NULL
       }
     )
@@ -1288,7 +1315,9 @@ run_observation <- function(schedule_row, candidate, page, crb) {
   }
   warmed <- FALSE
   if (identical(schedule_row$visit, "repeat")) {
-    if (!isTRUE(repeat_skip_warm_socket_meter)) start_socket_meter(app)
+    if (!isTRUE(repeat_skip_warm_socket_meter)) {
+      start_socket_meter(app)
+    }
     open_page(app, page, require_event = TRUE)
     if (isTRUE(repeat_skip_warm_socket_meter)) {
       Sys.sleep(2)
@@ -1365,7 +1394,11 @@ run_observation <- function(schedule_row, candidate, page, crb) {
   } else {
     specialist_payload_snapshot(app, page$event_view)
   }
-  heap_used_bytes <- if (isTRUE(memory_mode)) js_heap_used(session) else NA_real_
+  heap_used_bytes <- if (isTRUE(memory_mode)) {
+    js_heap_used(session)
+  } else {
+    NA_real_
+  }
   websocket <- stop_socket_meter(app)
   socket_meter_active <- FALSE
   resources <- if (isTRUE(memory_mode)) {
@@ -1380,64 +1413,67 @@ run_observation <- function(schedule_row, candidate, page, crb) {
   correctness_pass <- correctness$pass &&
     (is.na(visible_pixels$pass) || visible_pixels$pass)
   log_diagnostics <- assert_clean_logs(app)
-  cbind(dataset_metrics, data.frame(
-    status = if (correctness_pass) "ok" else "error",
-    error = if (correctness_pass) "" else "Page correctness check failed.",
-    startup_attempts = startup$attempts,
-    startup_errors = paste(startup$errors, collapse = " | "),
-    elapsed_ms = elapsed_ms,
-    primary_ready_ms = primary_ready_ms,
-    performance_ms = primary_ready_ms,
-    settled_ms = settled_ms,
-    complete_elapsed_ms = settled_ms,
-    ready_event_required = require_event && !is.null(page$ready_event),
-    correctness_pass = correctness_pass,
-    rendered_point_count = correctness$point_count,
-    expected_point_count = page$expected_point_count,
-    trajectory_method = correctness$trajectory_method,
-    trajectory_name = correctness$trajectory_name,
-    expected_trajectory_method = page$expected_trajectory_method,
-    expected_trajectory_name = page$expected_trajectory_name,
-    correctness_detail = correctness$detail,
-    navigator_gpu = renderer$navigator_gpu,
-    renderer_backend = renderer$renderer_backend,
-    renderer_adapter = renderer$renderer_adapter,
-    renderer_context_lost = renderer$renderer_context_lost,
-    renderer_error = renderer$renderer_error,
-    known_dashboard_error_count =
-      log_diagnostics$known_dashboard_error_count,
-    visible_pixel_count = visible_pixels$count,
-    visible_pixels_pass = visible_pixels$pass,
-    r_peak_rss_kib = unname(resources[["r_peak_rss_kib"]]),
-    chrome_peak_rss_kib = unname(resources[["chrome_peak_rss_kib"]]),
-    js_heap_used_bytes = heap_used_bytes,
-    websocket_sent_payload_bytes = as.numeric(websocket$sent),
-    websocket_received_payload_bytes = as.numeric(websocket$received),
-    websocket_received_at_ready_bytes = as.numeric(
-      websocket_at_ready$received
+  cbind(
+    dataset_metrics,
+    data.frame(
+      status = if (correctness_pass) "ok" else "error",
+      error = if (correctness_pass) "" else "Page correctness check failed.",
+      startup_attempts = startup$attempts,
+      startup_errors = paste(startup$errors, collapse = " | "),
+      elapsed_ms = elapsed_ms,
+      primary_ready_ms = primary_ready_ms,
+      performance_ms = primary_ready_ms,
+      settled_ms = settled_ms,
+      complete_elapsed_ms = settled_ms,
+      ready_event_required = require_event && !is.null(page$ready_event),
+      correctness_pass = correctness_pass,
+      rendered_point_count = correctness$point_count,
+      expected_point_count = page$expected_point_count,
+      trajectory_method = correctness$trajectory_method,
+      trajectory_name = correctness$trajectory_name,
+      expected_trajectory_method = page$expected_trajectory_method,
+      expected_trajectory_name = page$expected_trajectory_name,
+      correctness_detail = correctness$detail,
+      navigator_gpu = renderer$navigator_gpu,
+      renderer_backend = renderer$renderer_backend,
+      renderer_adapter = renderer$renderer_adapter,
+      renderer_context_lost = renderer$renderer_context_lost,
+      renderer_error = renderer$renderer_error,
+      known_dashboard_error_count = log_diagnostics$known_dashboard_error_count,
+      visible_pixel_count = visible_pixels$count,
+      visible_pixels_pass = visible_pixels$pass,
+      r_peak_rss_kib = unname(resources[["r_peak_rss_kib"]]),
+      chrome_peak_rss_kib = unname(resources[["chrome_peak_rss_kib"]]),
+      js_heap_used_bytes = heap_used_bytes,
+      websocket_sent_payload_bytes = as.numeric(websocket$sent),
+      websocket_received_payload_bytes = as.numeric(websocket$received),
+      websocket_received_at_ready_bytes = as.numeric(
+        websocket_at_ready$received
+      ),
+      websocket_post_ready_received_bytes = as.numeric(
+        websocket$received - websocket_at_ready$received
+      ),
+      primary_payload_count_at_ready = specialist_at_ready$primary_payload_count,
+      primary_payload_bytes_at_ready = specialist_at_ready$primary_payload_meter_bytes,
+      aux_payload_count_at_ready = specialist_at_ready$aux_payload_count,
+      aux_payload_bytes_at_ready = specialist_at_ready$aux_payload_bytes,
+      primary_payload_count = specialist_final$primary_payload_count,
+      primary_payload_meter_bytes = specialist_final$primary_payload_meter_bytes,
+      aux_payload_count = specialist_final$aux_payload_count,
+      aux_payload_bytes = specialist_final$aux_payload_bytes,
+      chrome_version = session$Browser$getVersion()$product,
+      shared_projection_primed = shared_projection_primed,
+      stringsAsFactors = FALSE
     ),
-    websocket_post_ready_received_bytes = as.numeric(
-      websocket$received - websocket_at_ready$received
-    ),
-    primary_payload_count_at_ready =
-      specialist_at_ready$primary_payload_count,
-    primary_payload_bytes_at_ready =
-      specialist_at_ready$primary_payload_meter_bytes,
-    aux_payload_count_at_ready = specialist_at_ready$aux_payload_count,
-    aux_payload_bytes_at_ready = specialist_at_ready$aux_payload_bytes,
-    primary_payload_count = specialist_final$primary_payload_count,
-    primary_payload_meter_bytes = specialist_final$primary_payload_meter_bytes,
-    aux_payload_count = specialist_final$aux_payload_count,
-    aux_payload_bytes = specialist_final$aux_payload_bytes,
-    chrome_version = session$Browser$getVersion()$product,
-    shared_projection_primed = shared_projection_primed,
-    stringsAsFactors = FALSE
-  ), specialist_timing)
+    specialist_timing
+  )
 }
 
 git_args_at <- function(root, ...) {
   marker <- file.path(root, ".git")
-  if (.Platform$OS.type == "unix" && file.exists(marker) && !dir.exists(marker)) {
+  if (
+    .Platform$OS.type == "unix" && file.exists(marker) && !dir.exists(marker)
+  ) {
     pointer <- readLines(marker, warn = FALSE, n = 1L)
     git_dir <- sub("^gitdir: ", "", pointer)
     if (grepl("^[A-Za-z]:/", git_dir)) {
@@ -1445,8 +1481,13 @@ git_args_at <- function(root, ...) {
       git_dir <- paste0("/mnt/", drive, substring(git_dir, 3L))
     }
     if (dir.exists(git_dir)) {
-      return(c("-c", "core.autocrlf=true", paste0("--git-dir=", git_dir),
-        paste0("--work-tree=", root), ...))
+      return(c(
+        "-c",
+        "core.autocrlf=true",
+        paste0("--git-dir=", git_dir),
+        paste0("--work-tree=", root),
+        ...
+      ))
     }
   }
   c("-C", root, ...)

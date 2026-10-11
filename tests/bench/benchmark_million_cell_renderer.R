@@ -42,19 +42,27 @@ driver$run_js(sprintf(
     "window.__cerebroMillionResult=null;",
     "window.__cerebroMillionError=null;",
     "window.__cerebroMillionDone=false;",
-    if (force_webgl) paste0(
-      "window.__cerebroMillionFactory=CerebroPointRenderer.create;",
-      "CerebroPointRenderer.create=CerebroPointRenderer.createWebGl;"
-    ) else "",
+    if (force_webgl) {
+      paste0(
+        "window.__cerebroMillionFactory=CerebroPointRenderer.create;",
+        "CerebroPointRenderer.create=CerebroPointRenderer.createWebGl;"
+      )
+    } else {
+      ""
+    },
     "runMillionCellBenchmark({count:%d,repeats:%d})",
     ".then(function(result){window.__cerebroMillionResult=result;})",
     ".catch(function(error){window.__cerebroMillionError=String(",
     "error&&(error.stack||error.message)||error);})",
     ".finally(function(){",
-    if (force_webgl) paste0(
-      "CerebroPointRenderer.create=window.__cerebroMillionFactory;",
-      "delete window.__cerebroMillionFactory;"
-    ) else "",
+    if (force_webgl) {
+      paste0(
+        "CerebroPointRenderer.create=window.__cerebroMillionFactory;",
+        "delete window.__cerebroMillionFactory;"
+      )
+    } else {
+      ""
+    },
     "window.__cerebroMillionDone=true;});"
   ),
   count,
@@ -62,11 +70,15 @@ driver$run_js(sprintf(
 ))
 deadline <- Sys.time() + 180
 while (!isTRUE(driver$get_js("window.__cerebroMillionDone === true"))) {
-  if (Sys.time() >= deadline) stop("Timed out waiting for renderer benchmark.")
+  if (Sys.time() >= deadline) {
+    stop("Timed out waiting for renderer benchmark.")
+  }
   Sys.sleep(0.05)
 }
 error <- driver$get_js("window.__cerebroMillionError")
-if (length(error) && !is.null(error) && nzchar(error)) stop(error)
+if (length(error) && !is.null(error) && nzchar(error)) {
+  stop(error)
+}
 result <- as.data.frame(
   driver$get_js("window.__cerebroMillionResult"),
   stringsAsFactors = FALSE

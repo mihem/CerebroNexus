@@ -8,17 +8,26 @@ observe({
   mode <- input[["expression_projection_genes_in_separate_panels"]]
   req(mode)
   controls <- c(
-    "expression_analysis_mode", "expression_genes_input",
+    "expression_analysis_mode",
+    "expression_genes_input",
     "expression_projection_genes_in_separate_panels",
-    "expression_rgb_gene_r", "expression_rgb_gene_g", "expression_rgb_gene_b",
+    "expression_rgb_gene_r",
+    "expression_rgb_gene_g",
+    "expression_rgb_gene_b",
     "expression_select_gene_set"
   )
-  values <- isolate(stats::setNames(lapply(controls, function(id) {
-    as.character(input[[id]] %||% character())
-  }), controls))
-  session$sendCustomMessage("cerebro_gene_feedback", list(
-    dataset_context = context,
-    controls = values,
-    render_key = expressionProjectionRenderKey(genes, mode)
+  values <- isolate(stats::setNames(
+    lapply(controls, function(id) {
+      as.character(input[[id]] %||% character())
+    }),
+    controls
   ))
+  session$sendCustomMessage(
+    "cerebro_gene_feedback",
+    list(
+      dataset_context = context,
+      controls = values,
+      render_key = expressionProjectionRenderKey(genes, mode)
+    )
+  )
 })

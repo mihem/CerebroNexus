@@ -3667,11 +3667,20 @@ test_that("colliding CRB basenames keep each pack beside its final bundled name"
     for (i in seq_along(sources)) {
       dir.create(dirname(sources[i]))
       object <- Cerebro$new()
-      object$setMetaData(data.frame(cell_barcode = c("c1", "c2"), group = c("A", "B")))
-      object$addProjection("umap", data.frame(x = c(i, i+1), y = 2:1,
-        row.names = c("c1", "c2")))
-      saveCerebro(object, sources[i], codec = "rds",
-        viewer_binary = if (i == 1L || both) "always" else "never")
+      object$setMetaData(data.frame(
+        cell_barcode = c("c1", "c2"),
+        group = c("A", "B")
+      ))
+      object$addProjection(
+        "umap",
+        data.frame(x = c(i, i + 1), y = 2:1, row.names = c("c1", "c2"))
+      )
+      saveCerebro(
+        object,
+        sources[i],
+        codec = "rds",
+        viewer_binary = if (i == 1L || both) "always" else "never"
+      )
     }
     labels <- c("Study A", "Study B")
     app <- file.path(root, "app")
@@ -3686,7 +3695,9 @@ test_that("colliding CRB basenames keep each pack beside its final bundled name"
         expect_true(validateViewerPack(target)$valid)
         expect_false(is.null(pack))
         expect_identical(scope$viewerPackCellBarcodes(pack), c("c1", "c2"))
-      } else expect_null(pack)
+      } else {
+        expect_null(pack)
+      }
     }
   }
 })

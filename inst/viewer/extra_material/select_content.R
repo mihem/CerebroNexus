@@ -8,14 +8,23 @@
 ##----------------------------------------------------------------------------##
 output[["extra_material_select_category_and_content_UI"]] <- renderUI({
   categories <- getExtraMaterialCategories()
-  if (!length(categories)) return(p("No extra material available."))
+  if (!length(categories)) {
+    return(p("No extra material available."))
+  }
   selector <- selectInput(
-    "extra_material_selected_category", label = "Material type:",
-    choices = categories, selected = categories[[1L]], width = "100%"
+    "extra_material_selected_category",
+    label = "Material type:",
+    choices = categories,
+    selected = categories[[1L]],
+    width = "100%"
   )
   div(
     class = "cerebro-viz-toolbar",
-    if (length(categories) == 1L) div(style = "display:none", selector) else selector,
+    if (length(categories) == 1L) {
+      div(style = "display:none", selector)
+    } else {
+      selector
+    },
     uiOutput("extra_material_selected_content_UI")
   )
 })
@@ -27,7 +36,9 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
   categories <- getExtraMaterialCategories()
   req(length(categories))
   category <- input[["extra_material_selected_category"]]
-  if (is.null(category)) category <- categories[[1L]]
+  if (is.null(category)) {
+    category <- categories[[1L]]
+  }
   req(category %in% categories)
   ## if selected category is `tables`
   if (

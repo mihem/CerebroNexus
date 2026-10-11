@@ -120,13 +120,12 @@ spatial_projection_data_to_plot_raw <- reactive({
   } else {
     NULL
   }
-  background_geometry_ready <- is.null(background_descriptor) || (
-    (is.atomic(background_bounds) || is.list(background_bounds)) &&
+  background_geometry_ready <- is.null(background_descriptor) ||
+    ((is.atomic(background_bounds) || is.list(background_bounds)) &&
       all(c("xmin", "xmax", "ymin", "ymax") %in% names(background_bounds)) &&
       all(is.finite(as.numeric(unlist(
         background_bounds[c("xmin", "xmax", "ymin", "ymax")]
-      ))))
-  )
+      )))))
   resource_first_candidate <-
     identical(plot_parameters[["plot_type"]], "ImageDimPlot") &&
     is.list(geometry_resource) &&
@@ -206,7 +205,8 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## Filtered and feature frames retain their existing per-frame palette.
   if (!resource_first) {
     color_assignments <- if (
-      plot_parameters[['color_variable']] %in% colnames(metadata) &&
+      plot_parameters[['color_variable']] %in%
+        colnames(metadata) &&
         is.numeric(metadata[[plot_parameters[['color_variable']]]])
     ) {
       NULL
@@ -232,12 +232,13 @@ spatial_projection_data_to_plot_raw <- reactive({
   ## is plotted and the plot visibly jitters. We compute the range over ALL cells
   ## (in the same rotated frame) and pass it as an explicit x/y range. A small
   ## margin keeps edge points off the frame.
-  if (!resource_first && (
-    is.null(plot_parameters[["x_range"]]) ||
-      length(plot_parameters[["x_range"]]) < 2 ||
-      is.null(plot_parameters[["y_range"]]) ||
-      length(plot_parameters[["y_range"]]) < 2
-  )) {
+  if (
+    !resource_first &&
+      (is.null(plot_parameters[["x_range"]]) ||
+        length(plot_parameters[["x_range"]]) < 2 ||
+        is.null(plot_parameters[["y_range"]]) ||
+        length(plot_parameters[["y_range"]]) < 2)
+  ) {
     full_ranges <- spatial_projection_full_ranges()
     plot_parameters[["x_range"]] <- full_ranges[["x_range"]]
     plot_parameters[["y_range"]] <- full_ranges[["y_range"]]
@@ -264,7 +265,11 @@ spatial_projection_data_to_plot_raw <- reactive({
     reset_axes = reset_axes,
     plot_parameters = plot_parameters,
     color_assignments = color_assignments,
-    group_hulls = if (resource_first) list() else spatial_projection_group_hulls(),
+    group_hulls = if (resource_first) {
+      list()
+    } else {
+      spatial_projection_group_hulls()
+    },
     geometry_resource = geometry_resource,
     categorical_resource = categorical_resource,
     resource_first = resource_first,

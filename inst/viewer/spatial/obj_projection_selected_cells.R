@@ -25,11 +25,12 @@ spatial_projection_selected_cells <- reactive({
     input[["spatial_projection_persistent_selection"]],
     viewer_loaded_dataset_context()
   )
-  if (is.null(selection)) return(NULL)
+  if (is.null(selection)) {
+    return(NULL)
+  }
 
   ## Keep the empty selection path independent of million-cell plot data.
   req(spatial_projection_data_to_plot())
-
 
   ## Drop cells whose group is currently hidden via the legend, so the count and
   ## the selected-cells panels reflect only visible groups (shared helper in
@@ -57,10 +58,13 @@ spatial_projection_selected_cells <- reactive({
     } else {
       NULL
     }
-    stable_selection <- "selection_key" %in% colnames(metadata) &&
+    stable_selection <- "selection_key" %in%
+      colnames(metadata) &&
       "selection_key" %in% colnames(selection) &&
-      any(!is.na(selection[["selection_key"]]) &
-        nzchar(as.character(selection[["selection_key"]])))
+      any(
+        !is.na(selection[["selection_key"]]) &
+          nzchar(as.character(selection[["selection_key"]]))
+      )
     if (!stable_selection) {
       metadata[["identifier"]] <- paste0(
         metadata[["X1"]],

@@ -134,14 +134,20 @@ output[["spatial_projection_background_selector_UI"]] <- renderUI({
   scope <- list(dataset = dataset, spatial = current_spatial)
   previous_scope <- isolate(spatial_background_selection_scope())
   scope_changed <- !identical(previous_scope, scope)
-  if (scope_changed) spatial_background_selection_scope(scope)
+  if (scope_changed) {
+    spatial_background_selection_scope(scope)
+  }
 
   selectInput(
     "spatial_projection_background_image",
     label = "Background image",
     choices = background_choices,
     selected = normalize_spatial_background_choice(
-      if (scope_changed) NULL else isolate(input[["spatial_projection_background_image"]]),
+      if (scope_changed) {
+        NULL
+      } else {
+        isolate(input[["spatial_projection_background_image"]])
+      },
       background_choices
     )
   )

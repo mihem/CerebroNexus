@@ -40,8 +40,7 @@ trajectory_initial_appearance <- isolate(current_scatter_defaults())
 trajectory_projection_appearance <- reactiveValues(
   point_size = trajectory_initial_appearance$point_size,
   point_opacity = trajectory_initial_appearance$point_opacity,
-  percentage_cells_to_show =
-    trajectory_initial_appearance$percentage_cells_to_show,
+  percentage_cells_to_show = trajectory_initial_appearance$percentage_cells_to_show,
   group_labels = TRUE,
   draw_border = TRUE,
   keep_square = FALSE
@@ -63,7 +62,8 @@ output[["trajectory_projection_appearance_UI"]] <- renderUI({
   if (!is.null(color_variable)) {
     metadata <- trajectory_cells_reactive(color_variable)
     categorical <- identical(color_variable, "state") ||
-      (color_variable %in% colnames(metadata) &&
+      (color_variable %in%
+        colnames(metadata) &&
         !is.numeric(metadata[[color_variable]]))
   }
 
@@ -127,52 +127,76 @@ output[["trajectory_projection_data_parameters_UI"]] <- renderUI({
   )
 })
 
-observeEvent(input[["trajectory_point_size"]], {
-  trajectory_update_appearance("point_size", input[["trajectory_point_size"]])
-}, ignoreNULL = TRUE)
-observeEvent(input[["trajectory_point_opacity"]], {
-  trajectory_update_appearance(
-    "point_opacity",
-    input[["trajectory_point_opacity"]]
-  )
-}, ignoreNULL = TRUE)
-observeEvent(input[["trajectory_percentage_cells_to_show"]], {
-  trajectory_update_appearance(
-    "percentage_cells_to_show",
-    input[["trajectory_percentage_cells_to_show"]]
-  )
-}, ignoreNULL = TRUE)
-observeEvent(input[["trajectory_projection_point_border"]], {
-  trajectory_update_appearance(
-    "draw_border",
-    isTRUE(input[["trajectory_projection_point_border"]])
-  )
-}, ignoreNULL = TRUE)
-observeEvent(input[["trajectory_projection_keep_square"]], {
-  trajectory_update_appearance(
-    "keep_square",
-    isTRUE(input[["trajectory_projection_keep_square"]])
-  )
-}, ignoreNULL = TRUE)
-observeEvent(input[["trajectory_projection_group_labels"]], {
-  changed <- trajectory_update_appearance(
-    "group_labels",
-    isTRUE(input[["trajectory_projection_group_labels"]])
-  )
-  if (changed) {
-    session$sendCustomMessage(
-      "cell_view_appearance",
-      list(
-        id = "trajectory_projection",
-        dataset_context = viewer_loaded_dataset_context(),
-        dataset_fingerprint = viewerDatasetIdentity()$fingerprint,
-        values = list(
-          group_labels = trajectory_projection_appearance$group_labels
+observeEvent(
+  input[["trajectory_point_size"]],
+  {
+    trajectory_update_appearance("point_size", input[["trajectory_point_size"]])
+  },
+  ignoreNULL = TRUE
+)
+observeEvent(
+  input[["trajectory_point_opacity"]],
+  {
+    trajectory_update_appearance(
+      "point_opacity",
+      input[["trajectory_point_opacity"]]
+    )
+  },
+  ignoreNULL = TRUE
+)
+observeEvent(
+  input[["trajectory_percentage_cells_to_show"]],
+  {
+    trajectory_update_appearance(
+      "percentage_cells_to_show",
+      input[["trajectory_percentage_cells_to_show"]]
+    )
+  },
+  ignoreNULL = TRUE
+)
+observeEvent(
+  input[["trajectory_projection_point_border"]],
+  {
+    trajectory_update_appearance(
+      "draw_border",
+      isTRUE(input[["trajectory_projection_point_border"]])
+    )
+  },
+  ignoreNULL = TRUE
+)
+observeEvent(
+  input[["trajectory_projection_keep_square"]],
+  {
+    trajectory_update_appearance(
+      "keep_square",
+      isTRUE(input[["trajectory_projection_keep_square"]])
+    )
+  },
+  ignoreNULL = TRUE
+)
+observeEvent(
+  input[["trajectory_projection_group_labels"]],
+  {
+    changed <- trajectory_update_appearance(
+      "group_labels",
+      isTRUE(input[["trajectory_projection_group_labels"]])
+    )
+    if (changed) {
+      session$sendCustomMessage(
+        "cell_view_appearance",
+        list(
+          id = "trajectory_projection",
+          dataset_context = viewer_loaded_dataset_context(),
+          dataset_fingerprint = viewerDatasetIdentity()$fingerprint,
+          values = list(
+            group_labels = trajectory_projection_appearance$group_labels
+          )
         )
       )
-    )
-  }
-}, ignoreNULL = TRUE)
+    }
+  },
+  ignoreNULL = TRUE
+)
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.

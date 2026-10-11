@@ -1,12 +1,15 @@
 gene_expression_test_function <- function(file, name) {
   expressions <- parse(viewer_test_path("gene_expression", file))
-  assignment <- Filter(function(expression) {
-    is.call(expression) &&
-      identical(expression[[1L]], quote(`<-`)) &&
-      identical(as.character(expression[[2L]]), name) &&
-      is.call(expression[[3L]]) &&
-      identical(expression[[3L]][[1L]], as.name("function"))
-  }, expressions)
+  assignment <- Filter(
+    function(expression) {
+      is.call(expression) &&
+        identical(expression[[1L]], quote(`<-`)) &&
+        identical(as.character(expression[[2L]]), name) &&
+        is.call(expression[[3L]]) &&
+        identical(expression[[3L]][[1L]], as.name("function"))
+    },
+    expressions
+  )
   stopifnot(length(assignment) == 1L)
   scope <- new.env(parent = globalenv())
   eval(assignment[[1L]], envir = scope)
@@ -33,9 +36,11 @@ test_that("sparse expression colour transport is exact and density-gated", {
 
   wire <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), envir = wire)
-  sparse_wire <- wire$cv_wire_pack_message(list(data = list(
-    sparse_color = packed
-  )))
+  sparse_wire <- wire$cv_wire_pack_message(list(
+    data = list(
+      sparse_color = packed
+    )
+  ))
   dense_wire <- wire$cv_wire_pack_message(list(data = list(color = values)))
   expect_lt(length(sparse_wire), length(dense_wire) / 100)
 })
@@ -43,8 +48,13 @@ test_that("sparse expression colour transport is exact and density-gated", {
 test_that("browser hydrates Gene colours without float32 rounding", {
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- testthat::test_path("fixtures", "gene-color-f64.js")
-  expect_identical(system2("node", c(shQuote(runner),
-    shQuote(viewer_test_path("www", "cell_views.js")))), 0L)
+  expect_identical(
+    system2(
+      "node",
+      c(shQuote(runner), shQuote(viewer_test_path("www", "cell_views.js")))
+    ),
+    0L
+  )
 })
 
 test_that("binary colour payload retains R doubles", {
@@ -53,15 +63,23 @@ test_that("binary colour payload retains R doubles", {
   values <- rep(0, 4096L)
   values[[1L]] <- 1 + 2^-40
   payload <- wire$cv_wire_pack_message(list(data = list(color = values)))
-  header_length <- readBin(payload[1:4], integer(), size = 4L,
-    endian = "little")
+  header_length <- readBin(
+    payload[1:4],
+    integer(),
+    size = 4L,
+    endian = "little"
+  )
   header <- rawToChar(payload[seq.int(5L, 4L + header_length)])
   descriptor <- jsonlite::fromJSON(header)$data$color
   expect_identical(descriptor$`__cv_wire__`, "f64")
   data_start <- 5L + header_length + (4L - header_length %% 4L) %% 4L
   data_start <- data_start + descriptor$offset
-  decoded <- readBin(payload[seq.int(data_start, data_start + 7L)],
-    double(), size = 8L, endian = "little")
+  decoded <- readBin(
+    payload[seq.int(data_start, data_start + 7L)],
+    double(),
+    size = 8L,
+    endian = "little"
+  )
   expect_identical(decoded, values[[1L]])
 })
 
@@ -70,8 +88,12 @@ test_that("short JSON colour payload also retains double precision", {
   sys.source(viewer_test_path("utility_functions.R"), envir = wire)
   exact <- 1 + 2^-40
   payload <- wire$cv_wire_pack_message(list(data = list(color = c(exact, 0))))
-  header_length <- readBin(payload[1:4], integer(), size = 4L,
-    endian = "little")
+  header_length <- readBin(
+    payload[1:4],
+    integer(),
+    size = 4L,
+    endian = "little"
+  )
   header <- rawToChar(payload[seq.int(5L, 4L + header_length)])
   restored <- jsonlite::fromJSON(header)$data$color
   expect_identical(restored[[1L]], exact)
@@ -83,10 +105,12 @@ test_that("single-gene primary frames choose sparse colour transport", {
   runtime$`%||%` <- function(x, y) if (is.null(x)) y else x
   runtime$expressionColorScale <- function(...) "scale"
   runtime$expressionReverseColorScale <- function(...) FALSE
-  runtime$viewerDatasetIdentity <- function() list(
-    fingerprint = "cells",
-    pack_fingerprint = "dataset"
-  )
+  runtime$viewerDatasetIdentity <- function() {
+    list(
+      fingerprint = "cells",
+      pack_fingerprint = "dataset"
+    )
+  }
   runtime$cerebroCellViewRender <- function(
     id,
     meta,
@@ -148,10 +172,12 @@ test_that("RGB and separate panels use one packed colour map", {
   runtime$`%||%` <- function(x, y) if (is.null(x)) y else x
   runtime$expressionColorScale <- function(...) "scale"
   runtime$expressionReverseColorScale <- function(...) FALSE
-  runtime$viewerDatasetIdentity <- function() list(
-    fingerprint = "cells",
-    pack_fingerprint = "dataset"
-  )
+  runtime$viewerDatasetIdentity <- function() {
+    list(
+      fingerprint = "cells",
+      pack_fingerprint = "dataset"
+    )
+  }
   runtime$cerebroCellViewRender <- function(
     id,
     meta,
@@ -274,7 +300,11 @@ test_that("single-gene colour caches are bounded on both sides", {
     collapse = "\n"
   )
 
-  expect_match(server, "expression_projection_row_cache_limit <- 4L", fixed = TRUE)
+  expect_match(
+    server,
+    "expression_projection_row_cache_limit <- 4L",
+    fixed = TRUE
+  )
   expect_match(server, "expressionProjectionCachedRow", fixed = TRUE)
   expect_match(server, "expression_projection_backend_warmed", fixed = TRUE)
   expect_match(
@@ -289,19 +319,24 @@ test_that("single-gene colour caches are bounded on both sides", {
 })
 
 test_that("secondary expression summaries wait for the painted primary frame", {
-  summaries <- paste(vapply(
-    c(
-      "UI_expression_by_group.R",
-      "UI_expression_by_gene.R",
-      "UI_expression_in_selected_cells.R",
-      "UI_table_of_selected_cells.R"
+  summaries <- paste(
+    vapply(
+      c(
+        "UI_expression_by_group.R",
+        "UI_expression_by_gene.R",
+        "UI_expression_in_selected_cells.R",
+        "UI_table_of_selected_cells.R"
+      ),
+      function(file) {
+        paste(
+          readLines(viewer_test_path("gene_expression", file), warn = FALSE),
+          collapse = "\n"
+        )
+      },
+      character(1)
     ),
-    function(file) paste(
-      readLines(viewer_test_path("gene_expression", file), warn = FALSE),
-      collapse = "\n"
-    ),
-    character(1)
-  ), collapse = "\n")
+    collapse = "\n"
+  )
   browser <- paste(
     readLines(viewer_test_path("www", "cell_views.js"), warn = FALSE),
     collapse = "\n"

@@ -747,7 +747,11 @@ test_that("IR cold landing defers drawer controls and metadata hydration", {
   expect_match(ui, "data-cerebro-drawer-sticky-in-page", fixed = TRUE)
   expect_match(drawer, "drawerHomePageIsActive", fixed = TRUE)
   expect_match(description[[1L, "Imports"]], "scRepertoire", fixed = TRUE)
-  expect_false(grepl("scRepertoire", description[[1L, "Suggests"]], fixed = TRUE))
+  expect_false(grepl(
+    "scRepertoire",
+    description[[1L, "Suggests"]],
+    fixed = TRUE
+  ))
 })
 
 test_that("Length renderer only facets when a grouping is selected", {

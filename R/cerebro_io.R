@@ -586,16 +586,25 @@
           unlink(file, force = TRUE)
         }
         if (backed_up && file.exists(backup) && !file.rename(backup, file)) {
-          warning("Could not restore the original CRB; preserved at: ", backup,
-            call. = FALSE)
+          warning(
+            "Could not restore the original CRB; preserved at: ",
+            backup,
+            call. = FALSE
+          )
         }
         if (installed_spatial && dir.exists(spatial)) {
           unlink(spatial, recursive = TRUE, force = TRUE)
         }
-        if (backed_up_spatial && dir.exists(spatial_backup) &&
-            !file.rename(spatial_backup, spatial)) {
-          warning("Could not restore the original spatial sidecar; preserved at: ",
-            spatial_backup, call. = FALSE)
+        if (
+          backed_up_spatial &&
+            dir.exists(spatial_backup) &&
+            !file.rename(spatial_backup, spatial)
+        ) {
+          warning(
+            "Could not restore the original spatial sidecar; preserved at: ",
+            spatial_backup,
+            call. = FALSE
+          )
         }
       }
     },

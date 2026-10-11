@@ -12,12 +12,17 @@ output[["groups_controls_UI"]] <- renderUI({
   }
   selected_group <- groups[[1L]]
   primary <- selectInput(
-    "groups_selected_group", label = "Grouping variable",
-    choices = groups, selected = selected_group, width = "100%"
+    "groups_selected_group",
+    label = "Grouping variable",
+    choices = groups,
+    selected = selected_group,
+    width = "100%"
   )
   if (length(groups) == 1L) {
-    return(tagList(primary,
-      p("At least two grouping variables are needed to compare composition.")))
+    return(tagList(
+      primary,
+      p("At least two grouping variables are needed to compare composition.")
+    ))
   }
   tagList(
     primary,
@@ -59,20 +64,24 @@ output[["groups_controls_UI"]] <- renderUI({
   )
 })
 
-observeEvent(input[["groups_selected_group"]], {
-  groups <- getGroups()
-  req(length(groups) >= 2L, input[["groups_selected_group"]] %in% groups)
-  choices <- groups[groups != input[["groups_selected_group"]]]
-  current <- input[["groups_by_other_group_second_group"]]
-  selected <- if (!is.null(current) && current %in% choices) {
-    current
-  } else {
-    choices[[1L]]
-  }
-  updateSelectInput(
-    session,
-    "groups_by_other_group_second_group",
-    choices = choices,
-    selected = selected
-  )
-}, ignoreInit = TRUE)
+observeEvent(
+  input[["groups_selected_group"]],
+  {
+    groups <- getGroups()
+    req(length(groups) >= 2L, input[["groups_selected_group"]] %in% groups)
+    choices <- groups[groups != input[["groups_selected_group"]]]
+    current <- input[["groups_by_other_group_second_group"]]
+    selected <- if (!is.null(current) && current %in% choices) {
+      current
+    } else {
+      choices[[1L]]
+    }
+    updateSelectInput(
+      session,
+      "groups_by_other_group_second_group",
+      choices = choices,
+      selected = selected
+    )
+  },
+  ignoreInit = TRUE
+)

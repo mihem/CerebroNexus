@@ -1033,8 +1033,11 @@ test_that("cell scatter pages debounce only complete render snapshots", {
   }
   # Gene's prepared-value relay was removed in f4e4fe3b. It deliberately uses
   # Shiny's direct debounce; the overview/spatial first-value path is unchanged.
-  expect_match(viewer_source("gene_expression", "obj_projection_data_to_plot.R"),
-    "<- shiny::debounce(", fixed = TRUE)
+  expect_match(
+    viewer_source("gene_expression", "obj_projection_data_to_plot.R"),
+    "<- shiny::debounce(",
+    fixed = TRUE
+  )
 
   spatial_update <- viewer_source(
     "spatial",

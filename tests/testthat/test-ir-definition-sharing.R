@@ -62,8 +62,14 @@ sys.source(data_r, envir = ir_env, keep.source = FALSE)
 test_that("immune metadata joins follow only active analysis controls", {
   fields <- ir_env$ir_requested_metadata_fields
   expect_length(fields("SizeDist", "", "cell_type", "patient"), 0L)
-  expect_identical(fields("Clone Sharing", "", "cell_type", "patient"), "patient")
-  expect_identical(fields("Clonal UMAP", "", "cell_type", "patient"), "cell_type")
+  expect_identical(
+    fields("Clone Sharing", "", "cell_type", "patient"),
+    "patient"
+  )
+  expect_identical(
+    fields("Clonal UMAP", "", "cell_type", "patient"),
+    "cell_type"
+  )
   expect_identical(fields("SizeDist", "sample"), "sample")
   expect_identical(fields("Clone Sharing", "", NULL, "sample"), character())
 })
@@ -638,8 +644,14 @@ test_that("clonal expansion is independent of display filtering and pack presenc
   coords <- data.frame(x = 1:6, y = 6:1, row.names = cells)
   scope$availableProjections <- function() "umap"
   scope$getProjection <- function(...) coords
-  scope$ir_data_annotated <- function() list(sample = data.frame(
-    barcode = cells, CTgene = rep("TRB-clone", 6)))
+  scope$ir_data_annotated <- function() {
+    list(
+      sample = data.frame(
+        barcode = cells,
+        CTgene = rep("TRB-clone", 6)
+      )
+    )
+  }
   scope$ir_clonecall_col <- function(...) "CTgene"
   scope$ir_umap_chains <- function(...) "TRB"
   packed <- NULL
@@ -647,11 +659,16 @@ test_that("clonal expansion is independent of display filtering and pack presenc
   scope$viewerPackImmuneIndex <- function(...) packed
   plain <- f("umap", "TCR", cells = "c1", show_all = FALSE)
   expect_identical(as.character(plain$expansion), "Medium (5 < X <= 20)")
-  packed <- list(cell_index = 1:6, clone = rep("TRB-clone", 6),
-    expansion = as.integer(ir_env$ir_clone_expansion(rep("TRB-clone", 6))))
+  packed <- list(
+    cell_index = 1:6,
+    clone = rep("TRB-clone", 6),
+    expansion = as.integer(ir_env$ir_clone_expansion(rep("TRB-clone", 6)))
+  )
   cached <- f("umap", "TCR", cells = "c1", show_all = FALSE)
   expect_identical(cached, plain)
-  scope$viewerPackCurrent <- function() list(cells = cells, canonical_order = TRUE)
+  scope$viewerPackCurrent <- function() {
+    list(cells = cells, canonical_order = TRUE)
+  }
   scope$viewerProjectionFirstFrameCoordinates <- function(...) coords
   scope$viewerPackCellBarcodes <- function(...) cells
   indexed <- f("umap", "TCR", cells = "c1", show_all = FALSE)
@@ -661,12 +678,17 @@ test_that("clonal expansion is independent of display filtering and pack presenc
 
 
 test_that("sharing choices discover metadata fields before any field is selected", {
-  data <- list(a = data.frame(barcode = c("c3", "c1"), CTgene = "TRB-a"),
-    b = data.frame(barcode = "c2", CTgene = "TRB-a"))
-  metadata <- data.frame(cell_barcode = c("c1", "c2", "c3", "unmatched"),
+  data <- list(
+    a = data.frame(barcode = c("c3", "c1"), CTgene = "TRB-a"),
+    b = data.frame(barcode = "c2", CTgene = "TRB-a")
+  )
+  metadata <- data.frame(
+    cell_barcode = c("c1", "c2", "c3", "unmatched"),
     patient = c("p1", "p2", "p1", "p3"),
     condition = c("case", "control", "case", "other"),
-    constant = c("x", "x", "x", "different"), score = 1:4)
+    constant = c("x", "x", "x", "different"),
+    score = 1:4
+  )
   choices <- ir_env$ir_discover_sharing_units(data, metadata)
   expect_identical(choices, c("sample", "patient", "condition"))
   expect_named(data$a, c("barcode", "CTgene"))
@@ -686,19 +708,25 @@ test_that("packed and fallback clone sizes use the same unique dataset cells", {
   f <- ir_env$ir_clonal_umap_data
   environment(f) <- scope
   cells <- paste0("c", 1:5)
-  data <- list(sample = data.frame(barcode = c(cells, "c1", "outside"),
-    CTgene = rep("TRB-clone", 7)))
+  data <- list(
+    sample = data.frame(
+      barcode = c(cells, "c1", "outside"),
+      CTgene = rep("TRB-clone", 7)
+    )
+  )
   scope$availableProjections <- function() "umap"
-  scope$getProjection <- function(...) data.frame(x=1:5, y=5:1, row.names=cells)
+  scope$getProjection <- function(...) {
+    data.frame(x = 1:5, y = 5:1, row.names = cells)
+  }
   scope$ir_data_annotated <- function() data
   scope$ir_clonecall_col <- function(...) "CTgene"
   scope$ir_umap_chains <- function(...) "TRB"
   packed <- NULL
-  scope$viewerPackCurrent <- function() list(cells=cells)
+  scope$viewerPackCurrent <- function() list(cells = cells)
   scope$viewerPackImmuneIndex <- function(...) packed
-  plain <- f("umap", "TCR", cells="c1", show_all=FALSE)
+  plain <- f("umap", "TCR", cells = "c1", show_all = FALSE)
   packed <- CerebroNexus:::.viewerPackImmuneIndex(data, cells, "TCR")
-  cached <- f("umap", "TCR", cells="c1", show_all=FALSE)
+  cached <- f("umap", "TCR", cells = "c1", show_all = FALSE)
   expect_identical(cached, plain)
   expect_identical(as.character(plain$expansion), "Small (1 < X <= 5)")
 })

@@ -1119,7 +1119,11 @@ dedent <- function(string) {
   )
 }
 
-.datasetCatalogFromFiles <- function(files, retain_prototypes = FALSE, prototype_limit = 2L) {
+.datasetCatalogFromFiles <- function(
+  files,
+  retain_prototypes = FALSE,
+  prototype_limit = 2L
+) {
   if (is.null(files) || !is.character(files) || !length(files)) {
     return(list())
   }
@@ -2755,7 +2759,10 @@ createShinyApp <- function(
     character(1)
   )
   if (anyDuplicated(tolower(crb_targets))) {
-    stop("Dataset identities generated colliding bundle filenames.", call. = FALSE)
+    stop(
+      "Dataset identities generated colliding bundle filenames.",
+      call. = FALSE
+    )
   }
   for (index in seq_along(dataset_catalog)) {
     if (!is.null(dataset_catalog[[index]])) {
@@ -2841,8 +2848,13 @@ createShinyApp <- function(
       )
     ) {
       claim_target(
-        file.path(dirname(crb_targets[[index]]), paste0(
-          tools::file_path_sans_ext(basename(crb_targets[[index]])), ".viewer")),
+        file.path(
+          dirname(crb_targets[[index]]),
+          paste0(
+            tools::file_path_sans_ext(basename(crb_targets[[index]])),
+            ".viewer"
+          )
+        ),
         viewer_pack,
         "Viewer Pack",
         directory = TRUE
@@ -3093,8 +3105,12 @@ createShinyApp <- function(
         build_ops$copy(entry$source, dirname(target), recursive = TRUE)
       } else {
         dir.create(target, showWarnings = FALSE)
-        children <- list.files(entry$source, all.files = TRUE, no.. = TRUE,
-          full.names = TRUE)
+        children <- list.files(
+          entry$source,
+          all.files = TRUE,
+          no.. = TRUE,
+          full.names = TRUE
+        )
         all(build_ops$copy(children, target, recursive = TRUE))
       }
     } else {

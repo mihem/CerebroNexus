@@ -14,11 +14,16 @@ test_that("every failed CRB publication stage preserves original bytes", {
     writeLines("new", file.path(spatial_stage, "content"))
     install <- CerebroNexus:::.installCerebroPayload
     calls <- 0L
-    environment(install) <- list2env(list(file.rename = function(from, to) {
-      calls <<- calls + 1L
-      if (calls == failed_call) return(FALSE)
-      base::file.rename(from, to)
-    }), parent = environment(install))
+    environment(install) <- list2env(
+      list(file.rename = function(from, to) {
+        calls <<- calls + 1L
+        if (calls == failed_call) {
+          return(FALSE)
+        }
+        base::file.rename(from, to)
+      }),
+      parent = environment(install)
+    )
     expect_error(install(stage, file, spatial_stage, spatial), "Could not")
     expect_identical(readBin(file, "raw", 100), as.raw(1:10))
     expect_identical(readLines(file.path(spatial, "content")), "old")
@@ -35,7 +40,9 @@ test_that("public save preserves an existing CRB when its backup name is too lon
   object <- Cerebro$new()
   saveCerebro(object, file, codec = "rds")
   original <- readBin(file, "raw", file.info(file)$size)
-  expect_error(suppressWarnings(saveCerebro(object, file, codec = "rds")),
-    "Could not preserve the existing CRB")
+  expect_error(
+    suppressWarnings(saveCerebro(object, file, codec = "rds")),
+    "Could not preserve the existing CRB"
+  )
   expect_identical(readBin(file, "raw", length(original)), original)
 })

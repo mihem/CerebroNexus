@@ -44,7 +44,9 @@ most_expressed_genes_selected_table <- reactive({
 ##----------------------------------------------------------------------------##
 output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
   if (!length(most_expressed_genes_available_groups())) {
-    return(p("Expression summaries are not included in this data set. Choose a data set with stored expression summaries."))
+    return(p(
+      "Expression summaries are not included in this data set. Choose a data set with stored expression summaries."
+    ))
   }
   ## Build available metric choices based on data availability
   metric_choices <- c()
@@ -82,7 +84,11 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
         choices = metric_choices,
         selected = {
           current <- isolate(input[["most_expressed_genes_metric_type"]])
-          if (length(current) == 1L && current %in% metric_choices) current else metric_choices[[1L]]
+          if (length(current) == 1L && current %in% metric_choices) {
+            current
+          } else {
+            metric_choices[[1L]]
+          }
         }
       ),
       conditionalPanel(

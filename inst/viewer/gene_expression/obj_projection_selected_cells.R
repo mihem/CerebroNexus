@@ -20,7 +20,9 @@ expression_projection_selected_cells <- reactive({
     input[["expression_projection_persistent_selection"]],
     viewer_loaded_dataset_context()
   )
-  if (is.null(selection)) return(NULL)
+  if (is.null(selection)) {
+    return(NULL)
+  }
 
   selection
 })

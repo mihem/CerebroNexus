@@ -37,7 +37,10 @@ ir_scr_cols <- c(
 ## over the concatenated barcode vector rather than rebuilding a 1M-cell lookup
 ## for every sample.
 ir_requested_metadata_fields <- function(
-  tab, group_by = NULL, umap_group = NULL, sharing_unit = NULL
+  tab,
+  group_by = NULL,
+  umap_group = NULL,
+  sharing_unit = NULL
 ) {
   requested <- group_by
   if (identical(tab, "Clonal UMAP")) {
@@ -51,14 +54,19 @@ ir_requested_metadata_fields <- function(
 }
 
 ir_requested_metadata_columns <- reactiveVal(character())
-observe({
-  # reactiveVal only invalidates consumers when the fields actually change.
-  # This observer reads small control values, never repertoire or metadata.
-  ir_requested_metadata_columns(ir_requested_metadata_fields(
-    input[["ir_tabs"]], input[["ir_groupBy"]],
-    input[["ir_p_umap_group_by"]], input[["ir_sharing_unit"]]
-  ))
-}, priority = 100)
+observe(
+  {
+    # reactiveVal only invalidates consumers when the fields actually change.
+    # This observer reads small control values, never repertoire or metadata.
+    ir_requested_metadata_columns(ir_requested_metadata_fields(
+      input[["ir_tabs"]],
+      input[["ir_groupBy"]],
+      input[["ir_p_umap_group_by"]],
+      input[["ir_sharing_unit"]]
+    ))
+  },
+  priority = 100
+)
 
 ir_annotate_metadata <- function(data, metadata, columns = character()) {
   if (
@@ -119,7 +127,9 @@ ir_data_annotated <- reactive({
     return(NULL)
   }
   columns <- ir_requested_metadata_columns()
-  if (!length(columns)) return(data)
+  if (!length(columns)) {
+    return(data)
+  }
   md <- tryCatch(getMetaData(), error = function(e) NULL)
   ir_annotate_metadata(data, md, columns)
 })
@@ -220,30 +230,53 @@ ir_compare_groups <- reactive({
 ## non-empty value) and is not a raw scRepertoire column (ir_scr_cols). `sample`
 ## is placed first so it becomes the default selection.
 ir_discover_sharing_units <- function(data, metadata = NULL) {
-  if (!length(data)) return(character())
+  if (!length(data)) {
+    return(character())
+  }
   common <- Reduce(intersect, lapply(data, colnames))
-  candidates <- setdiff(union(common, colnames(metadata)),
-    c(ir_scr_cols, "cell_barcode"))
+  candidates <- setdiff(
+    union(common, colnames(metadata)),
+    c(ir_scr_cols, "cell_barcode")
+  )
   categorical <- function(x) is.character(x) || is.factor(x)
   # One barcode match, then inspect one candidate column at a time. No wide join.
-  indices <- if (is.data.frame(metadata) && "cell_barcode" %in% names(metadata)) {
+  indices <- if (
+    is.data.frame(metadata) && "cell_barcode" %in% names(metadata)
+  ) {
     lapply(data, function(df) match(df$barcode, metadata$cell_barcode))
-  } else rep(list(integer()), length(data))
-  keep <- vapply(candidates, function(column) {
-    seen <- character()
-    for (i in seq_along(data)) {
-      values <- if (column %in% names(data[[i]])) data[[i]][[column]] else
-        metadata[[column]][indices[[i]]]
-      if (!categorical(values)) return(FALSE)
-      values <- as.character(values)
-      values <- values[!is.na(values) & nzchar(values)]
-      seen <- unique(c(seen, unique(values)))
-    }
-    length(seen) > 1L
-  }, logical(1))
+  } else {
+    rep(list(integer()), length(data))
+  }
+  keep <- vapply(
+    candidates,
+    function(column) {
+      seen <- character()
+      for (i in seq_along(data)) {
+        values <- if (column %in% names(data[[i]])) {
+          data[[i]][[column]]
+        } else {
+          metadata[[column]][indices[[i]]]
+        }
+        if (!categorical(values)) {
+          return(FALSE)
+        }
+        values <- as.character(values)
+        values <- values[!is.na(values) & nzchar(values)]
+        seen <- unique(c(seen, unique(values)))
+      }
+      length(seen) > 1L
+    },
+    logical(1)
+  )
   choices <- candidates[keep]
-  if (length(data) > 1L) choices <- union("sample", choices)
-  if ("sample" %in% choices) c("sample", setdiff(choices, "sample")) else choices
+  if (length(data) > 1L) {
+    choices <- union("sample", choices)
+  }
+  if ("sample" %in% choices) {
+    c("sample", setdiff(choices, "sample"))
+  } else {
+    choices
+  }
 }
 
 ir_sharing_unit_choices <- reactive({
@@ -425,29 +458,45 @@ ir_clone_histogram <- function(clones, sample, keep_empty = FALSE) {
   clones <- as.character(clones)
   clones <- clones[!is.na(clones)]
   if (!length(clones)) {
-    if (!keep_empty) return(NULL)
+    if (!keep_empty) {
+      return(NULL)
+    }
     return(data.frame(sample = sample, abundance = 0L, n_clones = 0L))
   }
   bins <- table(tabulate(match(clones, unique(clones))))
-  data.frame(sample = sample, abundance = as.integer(names(bins)),
-    n_clones = as.integer(bins), stringsAsFactors = FALSE)
+  data.frame(
+    sample = sample,
+    abundance = as.integer(names(bins)),
+    n_clones = as.integer(bins),
+    stringsAsFactors = FALSE
+  )
 }
 
 ir_bind_clone_histograms <- function(rows) {
   rows <- Filter(Negate(is.null), rows)
   if (!length(rows)) {
-    return(data.frame(sample = character(), abundance = integer(), n_clones = integer()))
+    return(data.frame(
+      sample = character(),
+      abundance = integer(),
+      n_clones = integer()
+    ))
   }
   do.call(rbind, rows)
 }
 
 ir_sample_clone_histograms <- function(data, clone_col, drop_empty = FALSE) {
   samples <- names(data) %||% as.character(seq_along(data))
-  ir_bind_clone_histograms(Map(function(frame, sample) {
-    clones <- as.character(frame[[clone_col]])
-    if (drop_empty) clones <- clones[!is.na(clones) & nzchar(clones)]
-    ir_clone_histogram(clones, sample)
-  }, data, samples))
+  ir_bind_clone_histograms(Map(
+    function(frame, sample) {
+      clones <- as.character(frame[[clone_col]])
+      if (drop_empty) {
+        clones <- clones[!is.na(clones) & nzchar(clones)]
+      }
+      ir_clone_histogram(clones, sample)
+    },
+    data,
+    samples
+  ))
 }
 
 ir_clonal_abundance_counts <- function(data, clone_col) {
@@ -471,7 +520,9 @@ ir_clonal_abundance_counts <- function(data, clone_col) {
 ir_homeostasis_counts <- function(data, clone_col) {
   pack <- viewerPackCurrent()
   packed <- viewerPackReadAsset(pack, "immune/homeostasis.qs2")
-  if (!is.null(packed[[clone_col]])) return(packed[[clone_col]])
+  if (!is.null(packed[[clone_col]])) {
+    return(packed[[clone_col]])
+  }
   ir_sample_clone_histograms(data, clone_col)
 }
 
@@ -484,29 +535,51 @@ ir_grouped_homeostasis_counts <- function(data, clone_col, group_by) {
     if (!all(c(clone_col, group_by) %in% names(frame))) {
       stop("Homeostasis clone or grouping column is missing.")
     }
-    if (!nrow(frame) || all(is.na(frame[[clone_col]]))) return(NULL)
+    if (!nrow(frame) || all(is.na(frame[[clone_col]]))) {
+      return(NULL)
+    }
     frame <- frame[, unique(c(clone_col, group_by)), drop = FALSE]
     rownames(frame) <- NULL
     frame
   })
   frames <- Filter(Negate(is.null), frames)
-  if (!length(frames)) return(ir_bind_clone_histograms(list()))
+  if (!length(frames)) {
+    return(ir_bind_clone_histograms(list()))
+  }
   pooled <- do.call(rbind, unname(frames))
   groups <- split(as.character(pooled[[clone_col]]), pooled[[group_by]])
-  ir_bind_clone_histograms(Map(ir_clone_histogram, groups, names(groups),
-    MoreArgs = list(keep_empty = TRUE)))
+  ir_bind_clone_histograms(Map(
+    ir_clone_histogram,
+    groups,
+    names(groups),
+    MoreArgs = list(keep_empty = TRUE)
+  ))
 }
 
 ir_homeostasis_matrix <- function(counts, clone_size) {
   samples <- unique(counts$sample)
   bounds <- c(0, unname(clone_size))
-  labels <- paste0(names(clone_size), " (", head(bounds, -1), " < X <= ", tail(bounds, -1), ")")
-  result <- matrix(0, length(samples), length(clone_size), dimnames = list(samples, labels))
+  labels <- paste0(
+    names(clone_size),
+    " (",
+    head(bounds, -1),
+    " < X <= ",
+    tail(bounds, -1),
+    ")"
+  )
+  result <- matrix(
+    0,
+    length(samples),
+    length(clone_size),
+    dimnames = list(samples, labels)
+  )
   for (sample_index in seq_along(samples)) {
     sample <- samples[[sample_index]]
     rows <- counts[counts$sample == sample, , drop = FALSE]
     total <- sum(as.double(rows$abundance) * rows$n_clones)
-    if (total == 0) next
+    if (total == 0) {
+      next
+    }
     fraction <- rows$abundance / total
     for (i in seq_along(clone_size)) {
       keep <- fraction > bounds[[i]] & fraction <= bounds[[i + 1L]]
@@ -518,14 +591,35 @@ ir_homeostasis_matrix <- function(counts, clone_size) {
 
 ir_homeostasis_plot <- function(counts, clone_size, palette) {
   mat <- ir_homeostasis_matrix(counts, clone_size)
-  if (!nrow(mat)) return(ggplot2::ggplot() + ggplot2::theme_void())
-  frame <- data.frame(sample = rep(rownames(mat), ncol(mat)),
-    category = factor(rep(colnames(mat), each = nrow(mat)), levels = rev(colnames(mat))),
-    value = as.vector(mat))
-  ggplot2::ggplot(frame, ggplot2::aes(x = as.factor(sample), y = value, fill = category)) +
-    ggplot2::geom_bar(stat = "identity", position = "fill", colour = "black", linewidth = .25) +
-    ggplot2::scale_fill_manual(values = rev(grDevices::hcl.colors(ncol(mat), palette))) +
-    ggplot2::labs(x = "Samples", y = "Relative Abundance", fill = "Clonal Group") +
+  if (!nrow(mat)) {
+    return(ggplot2::ggplot() + ggplot2::theme_void())
+  }
+  frame <- data.frame(
+    sample = rep(rownames(mat), ncol(mat)),
+    category = factor(
+      rep(colnames(mat), each = nrow(mat)),
+      levels = rev(colnames(mat))
+    ),
+    value = as.vector(mat)
+  )
+  ggplot2::ggplot(
+    frame,
+    ggplot2::aes(x = as.factor(sample), y = value, fill = category)
+  ) +
+    ggplot2::geom_bar(
+      stat = "identity",
+      position = "fill",
+      colour = "black",
+      linewidth = .25
+    ) +
+    ggplot2::scale_fill_manual(
+      values = rev(grDevices::hcl.colors(ncol(mat), palette))
+    ) +
+    ggplot2::labs(
+      x = "Samples",
+      y = "Relative Abundance",
+      fill = "Clonal Group"
+    ) +
     ggplot2::theme_classic() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, hjust = 1))
 }
@@ -660,10 +754,16 @@ ir_size_distribution_profile <- reactive({
   data <- ir_data()
   chain <- req(input$ir_chain)
   group <- ir_param("ir_groupBy", NULL)
-  profiles <- ir_clone_size_profiles(data, chain, group,
-    ir_param("ir_p_sd_threshold", 1))
+  profiles <- ir_clone_size_profiles(
+    data,
+    chain,
+    group,
+    ir_param("ir_p_sd_threshold", 1)
+  )
   # Keep just the current compact matrix, not the large named clone counts.
-  if (!is.null(profiles)) profiles$clone_counts <- NULL
+  if (!is.null(profiles)) {
+    profiles$clone_counts <- NULL
+  }
   profiles
 })
 
@@ -1156,57 +1256,67 @@ ir_parse_segments <- function(data, chain, columns = NULL) {
   if (is.null(sample_names)) {
     sample_names <- as.character(seq_along(data))
   }
-  rows <- Map(function(df, sample_name) {
-    if (is.null(df) || !all(c("barcode", "CTgene", "CTaa") %in% colnames(df))) {
-      return(NULL)
-    }
-    # Parse each distinct CTgene/CTaa pair once. Large repertoires contain many
-    # repeated clonotypes; parsing every cell separately made Definition and
-    # Clone Sharing spend tens of seconds in strsplit() before drawing.
-    pair_key <- paste(df$CTgene, df$CTaa, sep = "\034")
-    first <- !duplicated(pair_key)
-    unique_gene <- df$CTgene[first]
-    unique_aa <- df$CTaa[first]
-    gene_parts <- strsplit(as.character(unique_gene), "_", fixed = TRUE)
-    slot_idx <- chain_slot_index(gene_parts)
-    gene_unique <- first_allele(pick_slot(unique_gene, slot_idx, gene_parts))
-    cdr3_unique <- first_allele(pick_slot(unique_aa, slot_idx))
-    pair_index <- match(pair_key, pair_key[first])
-    gene_seg <- gene_unique[pair_index]
-    cdr3 <- cdr3_unique[pair_index]
-    # From "TRBV6-2..TRBJ2-6.TRBC2" pull the V and J tokens (segs split on ".").
-    # NA gene_seg -> strsplit yields NA -> no token matches -> NA gene, dropped.
-    pull_token <- function(prefix) {
-      vapply(
-        strsplit(gene_seg, ".", fixed = TRUE),
-        function(toks) {
-          hit <- toks[grepl(paste0("^", chain, prefix), toks)]
-          if (length(hit) == 0) NA_character_ else hit[1]
-        },
-        character(1)
-      )
-    }
-    v_gene <- pull_token("V")
-    j_gene <- pull_token("J")
-    keep <- !is.na(v_gene) & !is.na(j_gene) & !is.na(cdr3) & nzchar(cdr3)
-    if (!any(keep)) {
-      return(NULL)
-    }
-    keep_columns <- if (is.null(columns)) {
-      colnames(df)
-    } else {
-      intersect(unique(c("barcode", columns)), colnames(df))
-    }
-    out <- df[keep, keep_columns, drop = FALSE]
-    if (!is.null(columns) && "sample" %in% columns && !("sample" %in% names(out))) {
-      out$sample <- sample_name
-    }
-    out$v_gene <- v_gene[keep]
-    out$j_gene <- j_gene[keep]
-    out$cdr3 <- cdr3[keep]
-    out$clone_vjc <- paste(out$v_gene, out$j_gene, out$cdr3, sep = ";")
-    out
-  }, data, sample_names)
+  rows <- Map(
+    function(df, sample_name) {
+      if (
+        is.null(df) || !all(c("barcode", "CTgene", "CTaa") %in% colnames(df))
+      ) {
+        return(NULL)
+      }
+      # Parse each distinct CTgene/CTaa pair once. Large repertoires contain many
+      # repeated clonotypes; parsing every cell separately made Definition and
+      # Clone Sharing spend tens of seconds in strsplit() before drawing.
+      pair_key <- paste(df$CTgene, df$CTaa, sep = "\034")
+      first <- !duplicated(pair_key)
+      unique_gene <- df$CTgene[first]
+      unique_aa <- df$CTaa[first]
+      gene_parts <- strsplit(as.character(unique_gene), "_", fixed = TRUE)
+      slot_idx <- chain_slot_index(gene_parts)
+      gene_unique <- first_allele(pick_slot(unique_gene, slot_idx, gene_parts))
+      cdr3_unique <- first_allele(pick_slot(unique_aa, slot_idx))
+      pair_index <- match(pair_key, pair_key[first])
+      gene_seg <- gene_unique[pair_index]
+      cdr3 <- cdr3_unique[pair_index]
+      # From "TRBV6-2..TRBJ2-6.TRBC2" pull the V and J tokens (segs split on ".").
+      # NA gene_seg -> strsplit yields NA -> no token matches -> NA gene, dropped.
+      pull_token <- function(prefix) {
+        vapply(
+          strsplit(gene_seg, ".", fixed = TRUE),
+          function(toks) {
+            hit <- toks[grepl(paste0("^", chain, prefix), toks)]
+            if (length(hit) == 0) NA_character_ else hit[1]
+          },
+          character(1)
+        )
+      }
+      v_gene <- pull_token("V")
+      j_gene <- pull_token("J")
+      keep <- !is.na(v_gene) & !is.na(j_gene) & !is.na(cdr3) & nzchar(cdr3)
+      if (!any(keep)) {
+        return(NULL)
+      }
+      keep_columns <- if (is.null(columns)) {
+        colnames(df)
+      } else {
+        intersect(unique(c("barcode", columns)), colnames(df))
+      }
+      out <- df[keep, keep_columns, drop = FALSE]
+      if (
+        !is.null(columns) &&
+          "sample" %in% columns &&
+          !("sample" %in% names(out))
+      ) {
+        out$sample <- sample_name
+      }
+      out$v_gene <- v_gene[keep]
+      out$j_gene <- j_gene[keep]
+      out$cdr3 <- cdr3[keep]
+      out$clone_vjc <- paste(out$v_gene, out$j_gene, out$cdr3, sep = ";")
+      out
+    },
+    data,
+    sample_names
+  )
   rows <- rows[!vapply(rows, is.null, logical(1))]
   if (length(rows) == 0) {
     return(NULL)

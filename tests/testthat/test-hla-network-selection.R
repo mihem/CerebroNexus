@@ -108,7 +108,11 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(client, "applyState", fixed = TRUE)
   expect_match(client, "downloadPNG", fixed = TRUE)
   expect_match(client, "cerebro:png-result", fixed = TRUE)
-  expect_match(client, "networkContextKey !== currentContextKey()", fixed = TRUE)
+  expect_match(
+    client,
+    "networkContextKey !== currentContextKey()",
+    fixed = TRUE
+  )
   expect_match(adapter, "hla_motif_network", fixed = TRUE)
   expect_match(adapter, "downloadPNG", fixed = TRUE)
   expect_match(config, "hla_motif_network", fixed = TRUE)
@@ -195,23 +199,28 @@ test_that("HLA retires drawn selection geometry on a dataset request", {
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
-  writeLines(c(
-    "const fs=require('fs'),assert=require('assert'),events={},docEvents={},handlers={};let cleared=0;",
-    "const context={epoch:'test',dataset_key:'A',generation:1};",
-    "const network={canvas:{frame:{clientWidth:800,clientHeight:600}},DOMtoCanvas:p=>p,getScale:()=>1,setOptions:()=>{},selectNodes:()=>{},unselectAll:()=>cleared++};",
-    "global.window={HTMLWidgets:{find:()=>({network})},setTimeout:()=>{},CerebroDatasetContext:{phase:()=> 'ready',current:()=>context,key:()=> 'A:1',accepts:()=>true},addEventListener:(name,fn)=>{events[name]=fn}};",
-    "global.Shiny={addCustomMessageHandler:(name,fn)=>{handlers[name]=fn},setInputValue:()=>{}};window.Shiny=Shiny;",
-    "global.document={readyState:'loading',addEventListener:(name,fn)=>{docEvents[name]=fn},getElementById:()=>null,querySelectorAll:()=>[]};",
-    sprintf("eval(fs.readFileSync(%s,'utf8'));",
-      encodeString(viewer_test_path("www", "hla_motifs.js"), quote = '"')),
-    "docEvents['shiny:connected']();handlers['hla_motif_selection_state']({node_keys:[],cells:['old-cell']});",
-    "const api=window.cerebroHlaMotifs,polygon=[[0,0],[10,0],[10,10],[0,10]];",
-    "api.applyState(null,{view:{mode:'box'},selection:{cells:['old-cell'],geometry:{polygon}}});",
-    "assert.deepStrictEqual(api.captureState().geometry.polygon,polygon);",
-    "events['cerebro:dataset-context']({detail:{phase:'ready'}});assert(api.captureState().geometry);",
-    "events['cerebro:dataset-context']({detail:{phase:'pending'}});assert.strictEqual(api.captureState(),null);assert.strictEqual(cleared,1);",
-    "console.log('HLA dataset geometry checks passed')"
-  ), runner)
+  writeLines(
+    c(
+      "const fs=require('fs'),assert=require('assert'),events={},docEvents={},handlers={};let cleared=0;",
+      "const context={epoch:'test',dataset_key:'A',generation:1};",
+      "const network={canvas:{frame:{clientWidth:800,clientHeight:600}},DOMtoCanvas:p=>p,getScale:()=>1,setOptions:()=>{},selectNodes:()=>{},unselectAll:()=>cleared++};",
+      "global.window={HTMLWidgets:{find:()=>({network})},setTimeout:()=>{},CerebroDatasetContext:{phase:()=> 'ready',current:()=>context,key:()=> 'A:1',accepts:()=>true},addEventListener:(name,fn)=>{events[name]=fn}};",
+      "global.Shiny={addCustomMessageHandler:(name,fn)=>{handlers[name]=fn},setInputValue:()=>{}};window.Shiny=Shiny;",
+      "global.document={readyState:'loading',addEventListener:(name,fn)=>{docEvents[name]=fn},getElementById:()=>null,querySelectorAll:()=>[]};",
+      sprintf(
+        "eval(fs.readFileSync(%s,'utf8'));",
+        encodeString(viewer_test_path("www", "hla_motifs.js"), quote = '"')
+      ),
+      "docEvents['shiny:connected']();handlers['hla_motif_selection_state']({node_keys:[],cells:['old-cell']});",
+      "const api=window.cerebroHlaMotifs,polygon=[[0,0],[10,0],[10,10],[0,10]];",
+      "api.applyState(null,{view:{mode:'box'},selection:{cells:['old-cell'],geometry:{polygon}}});",
+      "assert.deepStrictEqual(api.captureState().geometry.polygon,polygon);",
+      "events['cerebro:dataset-context']({detail:{phase:'ready'}});assert(api.captureState().geometry);",
+      "events['cerebro:dataset-context']({detail:{phase:'pending'}});assert.strictEqual(api.captureState(),null);assert.strictEqual(cleared,1);",
+      "console.log('HLA dataset geometry checks passed')"
+    ),
+    runner
+  )
   result <- system2("node", runner, stdout = TRUE, stderr = TRUE)
   expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
   expect_true("HLA dataset geometry checks passed" %in% result)

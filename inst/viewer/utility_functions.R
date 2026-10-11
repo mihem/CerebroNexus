@@ -154,7 +154,9 @@ viewerDatasetChoices <- function(files, display_labels = NULL) {
 }
 
 viewerSelectedDatasetName <- function() {
-  if (exists("viewer_current_dataset_key", mode = "function", inherits = TRUE)) {
+  if (
+    exists("viewer_current_dataset_key", mode = "function", inherits = TRUE)
+  ) {
     current <- tryCatch(
       viewer_current_dataset_key(),
       error = function(error) NULL
@@ -232,7 +234,10 @@ viewerColourGroupChoices <- function(
   main_group
 ) {
   if (missing(metadata)) {
-    metadata <- tryCatch(viewerProjectionFirstFrameMetadata(), error = function(e) NULL)
+    metadata <- tryCatch(
+      viewerProjectionFirstFrameMetadata(),
+      error = function(e) NULL
+    )
   }
   if (missing(groups)) {
     groups <- tryCatch(getGroups(), error = function(e) character())
@@ -456,13 +461,17 @@ debounceAfterFirst <- function(reactive, millis) {
       current <<- reactive()
       initialized <<- TRUE
       delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(delayed(), {
-        next_value <- delayed()
-        if (!identical(current, next_value)) {
-          current <<- next_value
-          revision(shiny::isolate(revision()) + 1L)
-        }
-      }, ignoreInit = TRUE)
+      shiny::observeEvent(
+        delayed(),
+        {
+          next_value <- delayed()
+          if (!identical(current, next_value)) {
+            current <<- next_value
+            revision(shiny::isolate(revision()) + 1L)
+          }
+        },
+        ignoreInit = TRUE
+      )
     }
     current
   })
@@ -516,7 +525,9 @@ viewerProjectionFirstFrameCoordinates <- function(name) {
   cache <- viewerProjectionFirstFrameCache()
   projection <- cache$projections[[name]]
   # Only the validated thin-CRB reader creates this identity-free cache.
-  if (!is.null(projection) && name %in% cache$canonical_projections) return(projection)
+  if (!is.null(projection) && name %in% cache$canonical_projections) {
+    return(projection)
+  }
   projection <- getProjection(name)
   cells <- getMetaData()[["cell_barcode"]]
   viewerAlignProjection(projection, cells)
@@ -524,12 +535,25 @@ viewerProjectionFirstFrameCoordinates <- function(name) {
 
 viewerAlignProjection <- function(projection, cells) {
   ids <- rownames(projection)
-  if (is.null(cells) || is.null(ids) || anyNA(cells) || anyNA(ids) ||
-      any(!nzchar(cells)) || any(!nzchar(ids)) || anyDuplicated(cells) ||
-      anyDuplicated(ids) || length(ids) != length(cells) || !setequal(ids, cells)) {
+  if (
+    is.null(cells) ||
+      is.null(ids) ||
+      anyNA(cells) ||
+      anyNA(ids) ||
+      any(!nzchar(cells)) ||
+      any(!nzchar(ids)) ||
+      anyDuplicated(cells) ||
+      anyDuplicated(ids) ||
+      length(ids) != length(cells) ||
+      !setequal(ids, cells)
+  ) {
     stop("Projection requires unique, matching cell identities.", call. = FALSE)
   }
-  if (identical(ids, cells)) projection else projection[match(cells, ids), , drop = FALSE]
+  if (identical(ids, cells)) {
+    projection
+  } else {
+    projection[match(cells, ids), , drop = FALSE]
+  }
 }
 
 viewerSharedProjectionName <- function(
@@ -734,7 +758,9 @@ viewerExpressionCells <- function(data_set, cells) {
       error = function(e) NULL
     ))
   ) {
-    n_cells <- tryCatch(ncol(data_set$expression), error = function(e) NA_integer_)
+    n_cells <- tryCatch(ncol(data_set$expression), error = function(e) {
+      NA_integer_
+    })
     if (
       length(n_cells) == 1L &&
         !is.na(n_cells) &&
@@ -757,10 +783,16 @@ viewerBpcellsValues <- function(data_set, cells, genes) {
   expression <- tryCatch(data_set$expression, error = function(e) NULL)
   if (
     !inherits(expression, "IterableMatrix") ||
-      !is.numeric(cells) || !length(cells) || anyNA(cells) ||
-      any(!is.finite(cells)) || any(cells < 1L) ||
-      any(cells > ncol(expression)) || any(cells != as.integer(cells)) ||
-      !is.character(genes) || !length(genes) || length(genes) > 9L ||
+      !is.numeric(cells) ||
+      !length(cells) ||
+      anyNA(cells) ||
+      any(!is.finite(cells)) ||
+      any(cells < 1L) ||
+      any(cells > ncol(expression)) ||
+      any(cells != as.integer(cells)) ||
+      !is.character(genes) ||
+      !length(genes) ||
+      length(genes) > 9L ||
       anyNA(genes)
   ) {
     return(NULL)
@@ -782,10 +814,13 @@ viewerBpcellsValues <- function(data_set, cells, genes) {
   slice <- expression[gene_indices, indices, drop = FALSE]
   dimnames(slice) <- list(NULL, NULL)
   values <- as.matrix(slice)
-  stats::setNames(lapply(seq_along(genes), function(index) {
-    value <- as.numeric(values[index, , drop = TRUE])
-    if (is.null(restore)) value else value[restore]
-  }), genes)
+  stats::setNames(
+    lapply(seq_along(genes), function(index) {
+      value <- as.numeric(values[index, , drop = TRUE])
+      if (is.null(restore)) value else value[restore]
+    }),
+    genes
+  )
 }
 
 viewerExpressionRow <- function(data_set, cells, gene) {
@@ -822,7 +857,10 @@ viewerExpressionRow <- function(data_set, cells, gene) {
   }
   cell_names <- colnames(expression_matrix)
   cell_index <- if (
-    all_cells || cell_indices || is.null(cell_names) || identical(cells, cell_names)
+    all_cells ||
+      cell_indices ||
+      is.null(cell_names) ||
+      identical(cells, cell_names)
   ) {
     seq_len(ncol(expression_matrix))
   } else {
@@ -1021,9 +1059,12 @@ cv_wire_pack_bundle <- function(
 
 cv_wire_json_strings <- function(values) {
   values <- enc2utf8(as.character(values))
-  if (!length(values)) return(charToRaw("[]"))
+  if (!length(values)) {
+    return(charToRaw("[]"))
+  }
   if (
-    !anyNA(values) && all(validUTF8(values)) &&
+    !anyNA(values) &&
+      all(validUTF8(values)) &&
       !any(grepl('["\\\\[:cntrl:]]', values, perl = TRUE))
   ) {
     return(charToRaw(paste0('["', paste(values, collapse = '","'), '"]')))
@@ -1201,9 +1242,18 @@ cerebroCellViewResolveDeferredAux <- function(message) {
   if (!isTRUE(getOption("cerebro.quiet_runtime", FALSE))) print(x)
 }
 
-cerebroCellViewRecolor <- function(id, meta, data, dataset_context, feedback = NULL) {
-  dataset_context <- viewerDatasetContext(dataset_context$epoch,
-    dataset_context$dataset_key, dataset_context$generation)
+cerebroCellViewRecolor <- function(
+  id,
+  meta,
+  data,
+  dataset_context,
+  feedback = NULL
+) {
+  dataset_context <- viewerDatasetContext(
+    dataset_context$epoch,
+    dataset_context$dataset_key,
+    dataset_context$generation
+  )
   meta$dataset_id <- dataset_context$dataset_key
   meta$dataset_generation <- dataset_context$generation
   message <- cerebroCellViewMessage(id, meta, data)
@@ -1211,13 +1261,29 @@ cerebroCellViewRecolor <- function(id, meta, data, dataset_context, feedback = N
   message$dataset_context <- dataset_context
   message$render_token <- .cerebro_cell_view_render_serial
   cerebroSendViewFeedback(id, message$render_token, dataset_context, feedback)
-  fields <- c("color", "rgb", "rgb_scaled", "rgb_genes", "colorscale",
-    "panel_colorscales", "color_range", "reversescale", "paint_order",
-    "render_key", "sparse_color", "color_cache_key", "packed_rgb",
-    "packed_rgb_cache_keys", "zero_color")
+  fields <- c(
+    "color",
+    "rgb",
+    "rgb_scaled",
+    "rgb_genes",
+    "colorscale",
+    "panel_colorscales",
+    "color_range",
+    "reversescale",
+    "paint_order",
+    "render_key",
+    "sparse_color",
+    "color_cache_key",
+    "packed_rgb",
+    "packed_rgb_cache_keys",
+    "zero_color"
+  )
   message$data <- message$data[intersect(fields, names(message$data))]
   if (isTRUE(input[["coordviews_wire_supported"]])) {
-    session$sendBinaryMessage("cell_view_recolor_binary", cv_wire_pack_message(message))
+    session$sendBinaryMessage(
+      "cell_view_recolor_binary",
+      cv_wire_pack_message(message)
+    )
   } else {
     session$sendCustomMessage("cell_view_recolor", message)
   }
@@ -1227,16 +1293,37 @@ cerebroCellViewAuxRequest <- function(request) {
   if (!is.list(request) || is.null(request$id) || is.null(request$wire_token)) {
     return(invisible(FALSE))
   }
-  if (!viewerDatasetContextEqual(request$dataset_context, viewer_loaded_dataset_context())) {
+  if (
+    !viewerDatasetContextEqual(
+      request$dataset_context,
+      viewer_loaded_dataset_context()
+    )
+  ) {
     return(invisible(FALSE))
   }
   key <- paste(request$id, request$wire_token, sep = ":")
   message <- .cerebro_cell_view_aux_pending[[key]]
-  if (is.null(message) || !viewerDatasetContextEqual(message$dataset_context, request$dataset_context)) return(invisible(FALSE))
+  if (
+    is.null(message) ||
+      !viewerDatasetContextEqual(
+        message$dataset_context,
+        request$dataset_context
+      )
+  ) {
+    return(invisible(FALSE))
+  }
   if (is.function(message$core_builder)) {
     core <- message$core_builder()
     message$core_builder <- NULL
-    message$core <- c(list(id = message$id, wire_token = message$wire_token, dataset_context = message$dataset_context, render_token = message$render_token), core)
+    message$core <- c(
+      list(
+        id = message$id,
+        wire_token = message$wire_token,
+        dataset_context = message$dataset_context,
+        render_token = message$render_token
+      ),
+      core
+    )
   }
   if (!is.null(message$core) && !isTRUE(message$core_sent)) {
     core <- message$core
@@ -1246,7 +1333,10 @@ cerebroCellViewAuxRequest <- function(request) {
     if (!isTRUE(core$hover$pending)) {
       rm(list = key, envir = .cerebro_cell_view_aux_pending)
     }
-    session$sendBinaryMessage("cell_view_aux_binary", cv_wire_pack_message(core))
+    session$sendBinaryMessage(
+      "cell_view_aux_binary",
+      cv_wire_pack_message(core)
+    )
     return(invisible(TRUE))
   }
   if (isTRUE(message$core_sent) && !identical(request$stage, "metadata")) {
@@ -1256,8 +1346,13 @@ cerebroCellViewAuxRequest <- function(request) {
   core_sent <- isTRUE(message$core_sent)
   message$core_sent <- NULL
   message <- cerebroCellViewResolveDeferredAux(message)
-  if (core_sent) message$selection_key <- NULL
-  session$sendBinaryMessage("cell_view_aux_binary", cv_wire_pack_message(message))
+  if (core_sent) {
+    message$selection_key <- NULL
+  }
+  session$sendBinaryMessage(
+    "cell_view_aux_binary",
+    cv_wire_pack_message(message)
+  )
   invisible(TRUE)
 }
 
@@ -1265,7 +1360,8 @@ cerebroCellViewAuxRequest <- function(request) {
 ## include million-cell selections and transport caches. Reads are isolated so
 ## feedback cannot add a dependency to an existing preparation path.
 cerebroFeedbackControls <- function(id, input, overrides = list()) {
-  pattern <- switch(id,
+  pattern <- switch(
+    id,
     overview_projection = "^overview_projection_(to_display|point_color|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
     expression_projection = "^expression_projection_(to_display|point_size|point_opacity|point_border|group_labels|keep_square|percentage_cells_to_show|group_filter_.+)$",
     spatial_projection = "^spatial_projection_(to_display|plot_type|point_color|point_size|point_opacity|group_labels|point_border|keep_square|percentage_cells_to_show|feature_to_display|coexpr_[rgb]|show_region_outlines|background_image|group_filter_.+)$",
@@ -1278,16 +1374,26 @@ cerebroFeedbackControls <- function(id, input, overrides = list()) {
     values <- stats::setNames(lapply(ids, function(key) input[[key]]), ids)
     values <- utils::modifyList(values, overrides, keep.null = TRUE)
     lapply(values, function(value) {
-      if (is.logical(value)) tolower(as.character(value)) else as.character(value)
+      if (is.logical(value)) {
+        tolower(as.character(value))
+      } else {
+        as.character(value)
+      }
     })
   })
 }
 
 cerebroSendViewFeedback <- function(id, token, context, controls) {
   if (!is.null(controls)) {
-    session$sendCustomMessage("cerebro_view_feedback", list(
-      id = id, renderToken = token, dataset_context = context, controls = controls
-    ))
+    session$sendCustomMessage(
+      "cerebro_view_feedback",
+      list(
+        id = id,
+        renderToken = token,
+        dataset_context = context,
+        controls = controls
+      )
+    )
   }
 }
 
@@ -1302,8 +1408,11 @@ cerebroCellViewRender <- function(
   dataset_context = NULL,
   feedback = NULL
 ) {
-  dataset_context <- viewerDatasetContext(dataset_context$epoch,
-    dataset_context$dataset_key, dataset_context$generation)
+  dataset_context <- viewerDatasetContext(
+    dataset_context$epoch,
+    dataset_context$dataset_key,
+    dataset_context$generation
+  )
   meta$dataset_id <- dataset_context$dataset_key
   meta$dataset_generation <- dataset_context$generation
   message <- cerebroCellViewMessage(id, meta, data, hover, extra)
@@ -1317,7 +1426,9 @@ cerebroCellViewRender <- function(
   message$data$deferred_selection_lengths <- NULL
   stamp_transport_profile <- function(message) {
     request_at_ms <- tryCatch(
-      suppressWarnings(as.numeric(input[[paste0(id, "_render_request")]]$nonce)),
+      suppressWarnings(as.numeric(
+        input[[paste0(id, "_render_request")]]$nonce
+      )),
       error = function(error) NA_real_
     )
     if (length(request_at_ms) != 1L || !is.finite(request_at_ms)) {
@@ -1326,9 +1437,7 @@ cerebroCellViewRender <- function(
     sent_at_ms <- as.numeric(Sys.time()) * 1000
     message$transport_profile <- list(
       request_at_ms = request_at_ms,
-      server_prepare_ms = if (
-        is.finite(request_at_ms)
-      ) {
+      server_prepare_ms = if (is.finite(request_at_ms)) {
         max(0, sent_at_ms - request_at_ms)
       } else {
         NA_real_
@@ -1400,13 +1509,9 @@ cerebroCellViewRender <- function(
       message$data$z <- NULL
       message$data$n <- n_cells
     }
-    progressive <- (
-      !is.null(selection_keys) ||
-        (
-          length(deferred_selection_lengths) &&
-            is.function(deferred_aux)
-        )
-    ) &&
+    progressive <- (!is.null(selection_keys) ||
+      (length(deferred_selection_lengths) &&
+        is.function(deferred_aux))) &&
       is.null(message$data$panels) &&
       n_cells >= 4096L
     if (progressive) {
@@ -1424,17 +1529,28 @@ cerebroCellViewRender <- function(
         cv_wire_pack_message(message)
       )
       stale <- ls(envir = .cerebro_cell_view_aux_pending, all.names = TRUE)
-      stale <- stale[vapply(stale, function(key) {
-        pending <- .cerebro_cell_view_aux_pending[[key]]
-        is.list(pending) && identical(pending$id, id)
-      }, logical(1))]
+      stale <- stale[vapply(
+        stale,
+        function(key) {
+          pending <- .cerebro_cell_view_aux_pending[[key]]
+          is.list(pending) && identical(pending$id, id)
+        },
+        logical(1)
+      )]
       if (length(stale)) {
         rm(list = stale, envir = .cerebro_cell_view_aux_pending)
       }
       .cerebro_cell_view_aux_pending[[paste(id, token, sep = ":")]] <- if (
         is.function(deferred_aux)
       ) {
-        list(id = id, wire_token = token, dataset_context = dataset_context, render_token = message$render_token, build = deferred_aux, core_builder = core_aux)
+        list(
+          id = id,
+          wire_token = token,
+          dataset_context = dataset_context,
+          render_token = message$render_token,
+          build = deferred_aux,
+          core_builder = core_aux
+        )
       } else {
         list(
           id = id,
@@ -1532,7 +1648,10 @@ cerebroCellViewScatterPayload <- function(
     cell_counts <- c(cell_counts, cell_count = as.integer(cell_count))
   }
   if (resource_coordinates) {
-    cell_counts <- c(cell_counts, coordinates = as.integer(coordinate_resource$cells))
+    cell_counts <- c(
+      cell_counts,
+      coordinates = as.integer(coordinate_resource$cells)
+    )
   } else {
     cell_counts <- c(
       cell_counts,
@@ -1540,7 +1659,10 @@ cerebroCellViewScatterPayload <- function(
     )
   }
   if (resource_categories) {
-    cell_counts <- c(cell_counts, color = as.integer(categorical_resource$cells))
+    cell_counts <- c(
+      cell_counts,
+      color = as.integer(categorical_resource$cells)
+    )
   } else {
     cell_counts <- c(cell_counts, color = length(color))
   }
@@ -1559,7 +1681,8 @@ cerebroCellViewScatterPayload <- function(
   n_cells <- unname(cell_counts[[1L]])
   continuous <- if (resource_categories) FALSE else is.numeric(color)
   has_z <- !resource_coordinates &&
-    as.integer(n_dimensions) == 3L && length(coordinates) >= 3L
+    as.integer(n_dimensions) == 3L &&
+    length(coordinates) >= 3L
   meta <- list(
     color_type = if (continuous) "continuous" else "categorical",
     color_variable = color_variable,
@@ -1575,8 +1698,16 @@ cerebroCellViewScatterPayload <- function(
     meta[["space_label"]] <- space_label
   }
   data <- list(
-    x = if (continuous && !resource_coordinates) I(coordinates[[1L]]) else list(),
-    y = if (continuous && !resource_coordinates) I(coordinates[[2L]]) else list(),
+    x = if (continuous && !resource_coordinates) {
+      I(coordinates[[1L]])
+    } else {
+      list()
+    },
+    y = if (continuous && !resource_coordinates) {
+      I(coordinates[[2L]])
+    } else {
+      list()
+    },
     selection_key = if (continuous) I(selection_keys) else list(),
     color = if (continuous) I(color) else list(),
     point_size = point_size,
@@ -1659,7 +1790,8 @@ cerebroCellViewScatterPayload <- function(
     present <- tabulate(
       factor_codes[!is.na(factor_codes)],
       nbins = length(factor_levels)
-    ) > 0L
+    ) >
+      0L
     factor_levels[present]
   } else {
     unique(as.character(color[!is.na(color)]))
@@ -2181,11 +2313,23 @@ prettifyTable <- function(
   ## identify columns which contain integer despite not being stored as
   ## integer type
   classify_values <- number_formatting || color_highlighting
-  columns_integer <- if (classify_values) findColumnsInteger(table, columns_numeric) else integer()
+  columns_integer <- if (classify_values) {
+    findColumnsInteger(table, columns_numeric)
+  } else {
+    integer()
+  }
 
   ## identify which columns might contain percentages, p-values, and logFC
-  columns_percent <- if (classify_values) findColumnsPercentage(table) else integer()
-  columns_p_value <- if (classify_values) findColumnsPValues(table) else integer()
+  columns_percent <- if (classify_values) {
+    findColumnsPercentage(table)
+  } else {
+    integer()
+  }
+  columns_p_value <- if (classify_values) {
+    findColumnsPValues(table)
+  } else {
+    integer()
+  }
   columns_logFC <- if (classify_values) findColumnsLogFC(table) else integer()
 
   ## find columns with very long (character) content so that they can be
@@ -2774,7 +2918,11 @@ assignColorsToGroups <- function(table, grouping_variable) {
 ##----------------------------------------------------------------------------##
 ## Build hover info for projections.
 ##----------------------------------------------------------------------------##
-cerebroProjectionHoverColumns <- function(table, groups = getGroups(), group_levels = getGroupLevels) {
+cerebroProjectionHoverColumns <- function(
+  table,
+  groups = getGroups(),
+  group_levels = getGroupLevels
+) {
   if (!is.data.frame(table)) {
     stop("projection hover data must be a data frame")
   }
@@ -2798,8 +2946,9 @@ cerebroProjectionHoverColumns <- function(table, groups = getGroups(), group_lev
     values <- as.character(table[[group]])
     # Registered levels are a small dictionary. Avoid hashing every string
     # again with unique() after the million-cell rows have been shuffled.
-    levels <- tryCatch(as.character(group_levels(group)),
-      error = function(e) character())
+    levels <- tryCatch(as.character(group_levels(group)), error = function(e) {
+      character()
+    })
     levels[is.na(levels)] <- "NA"
     levels <- unique(c(levels, "NA"))
     codes <- match(values, levels)
@@ -4258,7 +4407,11 @@ extra_material_table_filter <- function(row_count, column_count) {
   }
 }
 
-extra_material_table_groups <- function(external_manifest, embedded, table_index = NULL) {
+extra_material_table_groups <- function(
+  external_manifest,
+  embedded,
+  table_index = NULL
+) {
   if (missing(external_manifest)) {
     external_manifest <- if (
       exists("Cerebro.options", inherits = TRUE) &&
@@ -4272,9 +4425,14 @@ extra_material_table_groups <- function(external_manifest, embedded, table_index
   if (missing(embedded)) {
     data <- data_set()
     dataset <- viewerSelectedDatasetName()
-    if (is.null(table_index) && !is.null(dataset) &&
-        exists("Cerebro.options", inherits = TRUE)) {
-      table_index <- Cerebro.options$viewer_content[[dataset]]$extra_material_table_index
+    if (
+      is.null(table_index) &&
+        !is.null(dataset) &&
+        exists("Cerebro.options", inherits = TRUE)
+    ) {
+      table_index <- Cerebro.options$viewer_content[[
+        dataset
+      ]]$extra_material_table_index
     }
     embedded <- if (is_cerebro_dataset(data)) {
       data$getExtraMaterial()$tables
@@ -4286,29 +4444,65 @@ extra_material_table_groups <- function(external_manifest, embedded, table_index
   groups <- list()
   if (is.list(embedded) && length(embedded)) {
     valid_label <- function(value) {
-      is.character(value) && length(value) == 1L && !is.na(value) && nzchar(trimws(value))
+      is.character(value) &&
+        length(value) == 1L &&
+        !is.na(value) &&
+        nzchar(trimws(value))
     }
     for (index in seq_along(embedded)) {
       table <- embedded[[index]]
-      if (!is.data.frame(table)) next
+      if (!is.data.frame(table)) {
+        next
+      }
       name <- names(embedded)[index]
-      if (!valid_label(name)) name <- paste("Table", index)
+      if (!valid_label(name)) {
+        name <- paste("Table", index)
+      }
       record <- if (is.list(table_index)) table_index[[name]] else NULL
-      if (!is.list(record)) record <- list()
-      label <- if (valid_label(record$display_name)) record$display_name else name
-      workbook <- if (valid_label(record$workbook_name)) record$workbook_name else NULL
-      group_key <- if (is.null(workbook)) "embedded" else paste0("embedded-workbook:", workbook)
-      matches <- which(vapply(groups, function(group) identical(group$key, group_key), logical(1)))
+      if (!is.list(record)) {
+        record <- list()
+      }
+      label <- if (valid_label(record$display_name)) {
+        record$display_name
+      } else {
+        name
+      }
+      workbook <- if (valid_label(record$workbook_name)) {
+        record$workbook_name
+      } else {
+        NULL
+      }
+      group_key <- if (is.null(workbook)) {
+        "embedded"
+      } else {
+        paste0("embedded-workbook:", workbook)
+      }
+      matches <- which(vapply(
+        groups,
+        function(group) identical(group$key, group_key),
+        logical(1)
+      ))
       if (!length(matches)) {
         group_name <- if (is.null(workbook)) "Embedded tables" else workbook
-        unique_name <- make.unique(c(names(groups), group_name))[[length(groups) + 1L]]
-        groups[[unique_name]] <- list(key = group_key, label = group_name, sheets = list())
+        unique_name <- make.unique(c(names(groups), group_name))[[
+          length(groups) + 1L
+        ]]
+        groups[[unique_name]] <- list(
+          key = group_key,
+          label = group_name,
+          sheets = list()
+        )
         matches <- length(groups)
       }
       group <- matches[[1L]]
-      groups[[group]]$sheets <- append(groups[[group]]$sheets, list(list(
-        key = paste0("embedded:", index), label = label, table = table
-      )))
+      groups[[group]]$sheets <- append(
+        groups[[group]]$sheets,
+        list(list(
+          key = paste0("embedded:", index),
+          label = label,
+          table = table
+        ))
+      )
     }
   }
 
@@ -4655,7 +4849,9 @@ viewerSpatialCoordinates <- function(name) {
   if (is.null(spatial_data)) NULL else spatial_data[["coordinates"]]
 }
 canonicalGeneSelection <- function(selected, genes) {
-  if (!length(selected)) return(selected)
+  if (!length(selected)) {
+    return(selected)
+  }
   index <- match(tolower(selected), tolower(genes))
   found <- !is.na(index)
   selected[found] <- genes[index[found]]
@@ -4680,7 +4876,9 @@ serverSideGeneSelector <- function(
     extra_triggers()
     if (!isTRUE(refresh_on_activation)) {
       ## Drop the previous R6 reference even when this selector's tab is hidden.
-      if (!identical(data_set(), registered_dataset)) registered_dataset <<- NULL
+      if (!identical(data_set(), registered_dataset)) {
+        registered_dataset <<- NULL
+      }
     }
     ## The caller can gate this observer so it does nothing until its own tab is
     ## relevant. The spatial module registers this at module-source time, which
@@ -4692,8 +4890,12 @@ serverSideGeneSelector <- function(
     req(dataset)
     ## Mounted Gene controls keep their registered search endpoint on return.
     ## Re-sending choices starts an AJAX restore that can overwrite new typing.
-    if (!isTRUE(refresh_on_activation) &&
-        identical(dataset, registered_dataset)) return(invisible(NULL))
+    if (
+      !isTRUE(refresh_on_activation) &&
+        identical(dataset, registered_dataset)
+    ) {
+      return(invisible(NULL))
+    }
     genes <- sort(choices())
     req(!is.null(genes), length(genes) > 0)
 
@@ -4701,15 +4903,21 @@ serverSideGeneSelector <- function(
     send_update <- function(retry_update = FALSE) {
       ## Timers from a previous dataset/activation can run after a slow load.
       ## They must not re-register obsolete choices over the current selector.
-      if (generation != update_generation ||
-          !identical(isolate(data_set()), dataset)) return(invisible(NULL))
+      if (
+        generation != update_generation ||
+          !identical(isolate(data_set()), dataset)
+      ) {
+        return(invisible(NULL))
+      }
       selected <- isolate(input[[input_id]])
       ## A choices refresh briefly clears the browser control before its AJAX
       ## response restores the selection. Do not register that transient empty
       ## value as the selection for a retry (or overwrite a deliberate clear).
-      if (retry_update &&
+      if (
+        retry_update &&
           !identical(selected, initial_selection) &&
-          (any(nzchar(selected)) || any(nzchar(initial_selection)))) {
+          (any(nzchar(selected)) || any(nzchar(initial_selection)))
+      ) {
         return(invisible(NULL))
       }
       if (isTRUE(canonical_selection)) {
@@ -4807,9 +5015,11 @@ filterSelectionByHiddenGroups <- function(
 viewerPersistentSelection <- function(selection, dataset_context) {
   if (
     !is.null(selection) &&
-      (!is.list(selection) || !viewerDatasetContextEqual(
-        selection[["dataset_context"]], dataset_context
-      ))
+      (!is.list(selection) ||
+        !viewerDatasetContextEqual(
+          selection[["dataset_context"]],
+          dataset_context
+        ))
   ) {
     return(NULL)
   }
@@ -4819,7 +5029,9 @@ viewerPersistentSelection <- function(selection, dataset_context) {
   x <- as.numeric(selection[["x"]])
   y <- as.numeric(selection[["y"]])
   result <- data.frame(
-    x = x, y = y, identifier = paste0(x, "-", y),
+    x = x,
+    y = y,
+    identifier = paste0(x, "-", y),
     stringsAsFactors = FALSE
   )
   if (length(selection[["ids"]]) == nrow(result)) {
@@ -4830,7 +5042,11 @@ viewerPersistentSelection <- function(selection, dataset_context) {
 
 ## Prepare only the compared variable and cohort labels for distribution plots.
 prepareSelectedCellDistribution <- function(
-  coordinates, metadata, selection, color_variable, coordinate_keys = FALSE
+  coordinates,
+  metadata,
+  selection,
+  color_variable,
+  coordinate_keys = FALSE
 ) {
   cells_df <- cbind(coordinates, metadata)
   if (is.null(selection)) {
@@ -4846,12 +5062,19 @@ prepareSelectedCellDistribution <- function(
       as.character(seq_len(nrow(cells_df)))
     }
     cells_df[["group"]] <- factor(
-      ifelse(selectedCellMask(selection_key, cells_df[c("X1", "X2")], selection),
-             "selected", "not selected"),
+      ifelse(
+        selectedCellMask(selection_key, cells_df[c("X1", "X2")], selection),
+        "selected",
+        "not selected"
+      ),
       levels = c("selected", "not selected")
     )
-    if (identical(color_variable, "identifier")) cells_df[[color_variable]] <- identifier()
-    if (identical(color_variable, "selection_key")) cells_df[[color_variable]] <- selection_key
+    if (identical(color_variable, "identifier")) {
+      cells_df[[color_variable]] <- identifier()
+    }
+    if (identical(color_variable, "selection_key")) {
+      cells_df[[color_variable]] <- selection_key
+    }
   }
   cells_df[, unique(c("group", color_variable)), drop = FALSE]
 }
@@ -4859,8 +5082,12 @@ prepareSelectedCellDistribution <- function(
 selectedCellMask <- function(selection_key, identifier, selection) {
   coordinate_frame <- is.data.frame(identifier)
   if (coordinate_frame) {
-    if (ncol(identifier) != 2L) stop("Selection coordinates must have two columns.", call. = FALSE)
-    if (length(selection_key) != nrow(identifier)) stop("Selection identity vectors must have equal length.", call. = FALSE)
+    if (ncol(identifier) != 2L) {
+      stop("Selection coordinates must have two columns.", call. = FALSE)
+    }
+    if (length(selection_key) != nrow(identifier)) {
+      stop("Selection identity vectors must have equal length.", call. = FALSE)
+    }
   }
   if (is.null(selection) || !is.data.frame(selection)) {
     return(rep(FALSE, length(selection_key)))
@@ -4877,7 +5104,9 @@ selectedCellMask <- function(selection_key, identifier, selection) {
   if (is.null(identifier)) {
     return(rep(FALSE, length(selection_key)))
   }
-  if (coordinate_frame) identifier <- paste0(identifier[[1L]], "-", identifier[[2L]])
+  if (coordinate_frame) {
+    identifier <- paste0(identifier[[1L]], "-", identifier[[2L]])
+  }
   if (length(selection_key) != length(identifier)) {
     stop("Selection identity vectors must have equal length.", call. = FALSE)
   }
@@ -5002,8 +5231,10 @@ cerebroSelectedCellsTable <- function(
   }
   stable_selection <- is.data.frame(selection) &&
     "selection_key" %in% colnames(selection) &&
-    any(!is.na(selection[["selection_key"]]) &
-      nzchar(as.character(selection[["selection_key"]])))
+    any(
+      !is.na(selection[["selection_key"]]) &
+        nzchar(as.character(selection[["selection_key"]]))
+    )
   identifier <- if (!stable_selection) {
     paste0(cells_df[[1L]], "-", cells_df[[2L]])
   } else {
@@ -5019,10 +5250,13 @@ cerebroSelectedCellsTable <- function(
     return(empty_table())
   }
   if ("cell_barcode" %in% colnames(cells_df)) {
-    cells_df <- cells_df[, c(
-      "cell_barcode",
-      setdiff(colnames(cells_df), "cell_barcode")
-    ), drop = FALSE]
+    cells_df <- cells_df[,
+      c(
+        "cell_barcode",
+        setdiff(colnames(cells_df), "cell_barcode")
+      ),
+      drop = FALSE
+    ]
   }
   prettifyTable(
     cells_df,
@@ -5045,12 +5279,16 @@ cerebroSelectedCellsPlot <- function(
   fallback_key <- match.arg(fallback_key)
   cells_df <- prepareSelectedCellDistribution(
     cells_df[, 1:2, drop = FALSE],
-    cells_df[, -(1:2), drop = FALSE], selection, color_variable,
+    cells_df[, -(1:2), drop = FALSE],
+    selection,
+    color_variable,
     coordinate_keys = identical(fallback_key, "identifier")
   )
 
-  if (is.factor(cells_df[[color_variable]]) ||
-      is.character(cells_df[[color_variable]])) {
+  if (
+    is.factor(cells_df[[color_variable]]) ||
+      is.character(cells_df[[color_variable]])
+  ) {
     cells_df <- cells_df[cells_df[["group"]] == "selected", , drop = FALSE]
     if (nrow(cells_df)) {
       cells_df <- cells_df %>%
@@ -5070,10 +5308,10 @@ cerebroSelectedCellsPlot <- function(
     cells_df[[1L]] <- as.character(cells_df[[1L]])
     plot <- plotly::plot_ly(
       cells_df,
-      x = ~cells_df[[1L]],
-      y = ~cells_df[[2L]],
+      x = ~ cells_df[[1L]],
+      y = ~ cells_df[[2L]],
       type = "bar",
-      color = ~cells_df[[1L]],
+      color = ~ cells_df[[1L]],
       colors = colors_for_groups,
       source = "subset",
       showlegend = FALSE,
@@ -5085,12 +5323,12 @@ cerebroSelectedCellsPlot <- function(
     cells_df <- compactViolinData(cells_df, color_variable, "group")
     plot <- plotly::plot_ly(
       cells_df,
-      x = ~cells_df[["group"]],
-      y = ~cells_df[[color_variable]],
+      x = ~ cells_df[["group"]],
+      y = ~ cells_df[[color_variable]],
       type = "violin",
       box = list(visible = FALSE),
       meanline = list(visible = FALSE),
-      color = ~cells_df[[1L]],
+      color = ~ cells_df[[1L]],
       colors = stats::setNames(
         c("#e74c3c", "#7f8c8d"),
         c("selected", "not selected")
@@ -5177,11 +5415,18 @@ cerebroResultTableControls <- function(prefix, results_df, grouped) {
         inline = TRUE
       )
     ),
-    shiny::column(12, shiny::conditionalPanel(
-      paste0("!input.", prefix, "_table_filter_switch"),
-      cerebroResultSubgroupUI(results_df, FALSE, grouped,
-        paste0(prefix, "_table_select_group_level"))
-    )),
+    shiny::column(
+      12,
+      shiny::conditionalPanel(
+        paste0("!input.", prefix, "_table_filter_switch"),
+        cerebroResultSubgroupUI(
+          results_df,
+          FALSE,
+          grouped,
+          paste0(prefix, "_table_select_group_level")
+        )
+      )
+    ),
     shiny::column(12, DT::dataTableOutput(paste0(prefix, "_table")))
   )
 }

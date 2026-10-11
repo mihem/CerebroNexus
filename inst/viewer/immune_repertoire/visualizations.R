@@ -559,214 +559,227 @@ output[["ir_selection_status_UI"]] <- renderUI({
 ## grouping column is chosen (the faceted variant uses the static ggplot below).
 ir_clonal_umap_last_request <- reactiveVal(NULL)
 
-observe({
-  render_request <- input[["ir_clonalUMAP_projection_render_request"]]
-  dataset_context <- viewer_loaded_dataset_context()
-  req(is.list(render_request), viewerDatasetContextEqual(render_request$dataset_context, dataset_context))
-  req(render_request)
-  req(identical(input[["sidebar"]], "immune_repertoire"),
-      identical(input[["ir_tabs"]], "Clonal UMAP"))
-  group_by <- ir_param("ir_p_umap_group_by", "")
-  ## Faceting is handled by the static ggplot path; nothing to push here.
-  if (!is.null(group_by) && nzchar(group_by)) {
-    return()
-  }
+observe(
+  {
+    render_request <- input[["ir_clonalUMAP_projection_render_request"]]
+    dataset_context <- viewer_loaded_dataset_context()
+    req(
+      is.list(render_request),
+      viewerDatasetContextEqual(render_request$dataset_context, dataset_context)
+    )
+    req(render_request)
+    req(
+      identical(input[["sidebar"]], "immune_repertoire"),
+      identical(input[["ir_tabs"]], "Clonal UMAP")
+    )
+    group_by <- ir_param("ir_p_umap_group_by", "")
+    ## Faceting is handled by the static ggplot path; nothing to push here.
+    if (!is.null(group_by) && nzchar(group_by)) {
+      return()
+    }
 
-  ## Receptor and projection arrive from the visible toolbar. Show-all and the
-  ## appearance controls live in the unopened settings drawer, so use their
-  ## declared server defaults until the user opens and changes them.
-  receptor <- ir_param("ir_p_umap_receptor", {
-    choices <- ir_receptor_types()
-    if (length(choices)) unname(choices[[1L]]) else NULL
-  })
-  projection <- ir_param("ir_p_umap_projection", {
-    choices <- tryCatch(availableProjections(), error = function(e) character())
-    if (length(choices)) unname(choices[[1L]]) else NULL
-  })
-  show_all <- ir_param("ir_p_umap_show_all", TRUE)
-  req(receptor, projection)
-  group_labels <- input[["ir_clonalUMAP_group_labels"]]
-  if (is.null(group_labels)) {
-    group_labels <- TRUE
-  }
-  point_border <- isTRUE(input[["ir_clonalUMAP_point_border"]])
-  keep_square <- isTRUE(input[["ir_clonalUMAP_keep_square"]])
-  clone_call <- "gene"
-  show_all <- isTRUE(show_all)
-  cells <- ir_umap_cells_to_show()
-  dp <- tryCatch(ir_display_params(), error = function(e) list())
-  appearance <- current_scatter_defaults()
-  point_size <- suppressWarnings(as.numeric(
-    dp[["ir_d_point_size"]] %||% appearance$point_size
-  ))
-  if (length(point_size) != 1 || is.na(point_size)) {
-    point_size <- appearance$point_size
-  }
-  alpha <- suppressWarnings(as.numeric(
-    dp[["ir_d_alpha"]] %||% appearance$point_opacity
-  ))
-  if (length(alpha) != 1 || is.na(alpha)) {
-    alpha <- appearance$point_opacity
-  }
-  percentage <- suppressWarnings(as.numeric(
-    dp[["ir_d_percentage_cells_to_show"]] %||%
-      appearance$percentage_cells_to_show
-  ))
-  if (length(percentage) != 1 || !is.finite(percentage)) {
-    percentage <- appearance$percentage_cells_to_show
-  }
-  identity <- tryCatch(viewerDatasetIdentity(), error = function(e) list())
-  request_signature <- list(
-    render_request = render_request,
-    dataset_fingerprint = as.character(identity$fingerprint %||% ""),
-    cell_order_fingerprint = as.character(identity$order_fingerprint %||% ""),
-    receptor = as.character(receptor),
-    projection = as.character(projection),
-    show_all = show_all,
-    cells = cells,
-    point_size = point_size,
-    alpha = alpha,
-    percentage = percentage,
-    group_labels = isTRUE(group_labels),
-    point_border = point_border,
-    keep_square = keep_square
-  )
-  previous_signature <- ir_clonal_umap_last_request()
-  if (identical(previous_signature, request_signature)) {
-    return()
-  }
-  render_data <- ir_clonal_umap_data(
-    projection,
-    receptor,
-    clone_call,
-    show_all = show_all,
-    cells = cells,
-    percentage = percentage,
-    split_output = TRUE
-  )
-  req(!is.null(render_data), length(render_data$x) > 0L)
-  ## Grey background = cells without the selected receptor (expansion = NA);
-  ## coloured foreground = receptor cells with an expansion level. One trace per
-  ## expansion level, in canonical order, so each keeps its turbo colour.
-  trace_codes <- render_data$trace_codes
-  traces <- ifelse(
-    is.na(trace_codes),
-    "Other cells",
-    IR_CLONE_LABELS[trace_codes]
-  )
-  data_color <- ifelse(
-    is.na(trace_codes),
-    "#D9D9D9",
-    unname(IR_EXPANSION_COLORS[IR_CLONE_LABELS[trace_codes]])
-  )
-  trace_lengths <- lengths(render_data$x)
-  axes <- ir_projection_axis_names(projection)
-  req(length(traces) > 0)
-  deferred_aux <- function() {
-    data_keys <- c(
-      if (is.na(trace_codes[[1L]])) {
-        list(render_data$background_key)
+    ## Receptor and projection arrive from the visible toolbar. Show-all and the
+    ## appearance controls live in the unopened settings drawer, so use their
+    ## declared server defaults until the user opens and changes them.
+    receptor <- ir_param("ir_p_umap_receptor", {
+      choices <- ir_receptor_types()
+      if (length(choices)) unname(choices[[1L]]) else NULL
+    })
+    projection <- ir_param("ir_p_umap_projection", {
+      choices <- tryCatch(availableProjections(), error = function(e) {
+        character()
+      })
+      if (length(choices)) unname(choices[[1L]]) else NULL
+    })
+    show_all <- ir_param("ir_p_umap_show_all", TRUE)
+    req(receptor, projection)
+    group_labels <- input[["ir_clonalUMAP_group_labels"]]
+    if (is.null(group_labels)) {
+      group_labels <- TRUE
+    }
+    point_border <- isTRUE(input[["ir_clonalUMAP_point_border"]])
+    keep_square <- isTRUE(input[["ir_clonalUMAP_keep_square"]])
+    clone_call <- "gene"
+    show_all <- isTRUE(show_all)
+    cells <- ir_umap_cells_to_show()
+    dp <- tryCatch(ir_display_params(), error = function(e) list())
+    appearance <- current_scatter_defaults()
+    point_size <- suppressWarnings(as.numeric(
+      dp[["ir_d_point_size"]] %||% appearance$point_size
+    ))
+    if (length(point_size) != 1 || is.na(point_size)) {
+      point_size <- appearance$point_size
+    }
+    alpha <- suppressWarnings(as.numeric(
+      dp[["ir_d_alpha"]] %||% appearance$point_opacity
+    ))
+    if (length(alpha) != 1 || is.na(alpha)) {
+      alpha <- appearance$point_opacity
+    }
+    percentage <- suppressWarnings(as.numeric(
+      dp[["ir_d_percentage_cells_to_show"]] %||%
+        appearance$percentage_cells_to_show
+    ))
+    if (length(percentage) != 1 || !is.finite(percentage)) {
+      percentage <- appearance$percentage_cells_to_show
+    }
+    identity <- tryCatch(viewerDatasetIdentity(), error = function(e) list())
+    request_signature <- list(
+      render_request = render_request,
+      dataset_fingerprint = as.character(identity$fingerprint %||% ""),
+      cell_order_fingerprint = as.character(identity$order_fingerprint %||% ""),
+      receptor = as.character(receptor),
+      projection = as.character(projection),
+      show_all = show_all,
+      cells = cells,
+      point_size = point_size,
+      alpha = alpha,
+      percentage = percentage,
+      group_labels = isTRUE(group_labels),
+      point_border = point_border,
+      keep_square = keep_square
+    )
+    previous_signature <- ir_clonal_umap_last_request()
+    if (identical(previous_signature, request_signature)) {
+      return()
+    }
+    render_data <- ir_clonal_umap_data(
+      projection,
+      receptor,
+      clone_call,
+      show_all = show_all,
+      cells = cells,
+      percentage = percentage,
+      split_output = TRUE
+    )
+    req(!is.null(render_data), length(render_data$x) > 0L)
+    ## Grey background = cells without the selected receptor (expansion = NA);
+    ## coloured foreground = receptor cells with an expansion level. One trace per
+    ## expansion level, in canonical order, so each keeps its turbo colour.
+    trace_codes <- render_data$trace_codes
+    traces <- ifelse(
+      is.na(trace_codes),
+      "Other cells",
+      IR_CLONE_LABELS[trace_codes]
+    )
+    data_color <- ifelse(
+      is.na(trace_codes),
+      "#D9D9D9",
+      unname(IR_EXPANSION_COLORS[IR_CLONE_LABELS[trace_codes]])
+    )
+    trace_lengths <- lengths(render_data$x)
+    axes <- ir_projection_axis_names(projection)
+    req(length(traces) > 0)
+    deferred_aux <- function() {
+      data_keys <- c(
+        if (is.na(trace_codes[[1L]])) {
+          list(render_data$background_key)
+        } else {
+          list()
+        },
+        lapply(
+          render_data$coloured_rows,
+          function(rows) render_data$coloured_key[rows]
+        )
+      )
+      uses_cell_index <- identical(render_data$key_type, "cell_index")
+      key_lengths <- lengths(data_keys)
+      if (isTRUE(uses_cell_index)) {
+        flat_barcodes <- ir_clonal_umap_barcodes(data.frame(
+          cell_index = unlist(data_keys, use.names = FALSE)
+        ))
+        req(length(flat_barcodes) == sum(key_lengths))
+        barcodes_by_trace <- unname(split(
+          flat_barcodes,
+          rep(seq_along(key_lengths), key_lengths)
+        ))
+      } else {
+        barcodes_by_trace <- lapply(data_keys, as.character)
+      }
+      req(identical(lengths(barcodes_by_trace), key_lengths))
+      hover_info <- ifelse(traces == "Other cells", "skip", "text")
+      hover_text <- Map(
+        function(barcodes, x, y, label) {
+          if (identical(label, "Other cells")) {
+            return("")
+          }
+          paste0(
+            barcodes,
+            "<br>",
+            label,
+            "<br>",
+            axes[[1]],
+            ": ",
+            formatC(x, format = "f", digits = 2),
+            "<br>",
+            axes[[2]],
+            ": ",
+            formatC(y, format = "f", digits = 2)
+          )
+        },
+        barcodes_by_trace,
+        render_data$x,
+        render_data$y,
+        traces
+      )
+      list(
+        selection_key = barcodes_by_trace,
+        hover = list(hoverinfo = as.list(hover_info), text = hover_text)
+      )
+    }
+
+    output_meta <- list(
+      color_type = "categorical",
+      space_label = paste("Clonal", ir_projection_display_name(projection)),
+      traces = traces,
+      color_variable = "expansion",
+      appearance = list(
+        group_labels = isTRUE(group_labels),
+        draw_border = point_border,
+        keep_square = keep_square
+      )
+    )
+    output_data <- list(
+      x = render_data$x,
+      y = render_data$y,
+      deferred_selection_lengths = trace_lengths,
+      color = as.list(data_color),
+      point_size = point_size,
+      point_opacity = alpha,
+      point_line = if (point_border) {
+        list(color = "rgb(196,196,196)", width = 1)
       } else {
         list()
       },
-      lapply(
-        render_data$coloured_rows,
-        function(rows) render_data$coloured_key[rows]
+      reset_axes = TRUE
+    )
+    output_hover <- list(hoverinfo = "skip")
+
+    isolate(
+      cerebroCellViewRender(
+        "ir_clonalUMAP_projection",
+        output_meta,
+        output_data,
+        output_hover,
+        deferred_aux = deferred_aux,
+        dataset_context = dataset_context
       )
     )
-    uses_cell_index <- identical(render_data$key_type, "cell_index")
-    key_lengths <- lengths(data_keys)
-    if (isTRUE(uses_cell_index)) {
-      flat_barcodes <- ir_clonal_umap_barcodes(data.frame(
-        cell_index = unlist(data_keys, use.names = FALSE)
-      ))
-      req(length(flat_barcodes) == sum(key_lengths))
-      barcodes_by_trace <- unname(split(
-        flat_barcodes,
-        rep(seq_along(key_lengths), key_lengths)
-      ))
-    } else {
-      barcodes_by_trace <- lapply(data_keys, as.character)
-    }
-    req(identical(lengths(barcodes_by_trace), key_lengths))
-    hover_info <- ifelse(traces == "Other cells", "skip", "text")
-    hover_text <- Map(
-      function(barcodes, x, y, label) {
-        if (identical(label, "Other cells")) {
-          return("")
-        }
-        paste0(
-          barcodes,
-          "<br>",
-          label,
-          "<br>",
-          axes[[1]],
-          ": ",
-          formatC(x, format = "f", digits = 2),
-          "<br>",
-          axes[[2]],
-          ": ",
-          formatC(y, format = "f", digits = 2)
-        )
-      },
-      barcodes_by_trace,
-      render_data$x,
-      render_data$y,
-      traces
-    )
-    list(
-      selection_key = barcodes_by_trace,
-      hover = list(hoverinfo = as.list(hover_info), text = hover_text)
-    )
-  }
-
-  output_meta <- list(
-    color_type = "categorical",
-    space_label = paste("Clonal", ir_projection_display_name(projection)),
-    traces = traces,
-    color_variable = "expansion",
-    appearance = list(
-      group_labels = isTRUE(group_labels),
-      draw_border = point_border,
-      keep_square = keep_square
-    )
-  )
-  output_data <- list(
-    x = render_data$x,
-    y = render_data$y,
-    deferred_selection_lengths = trace_lengths,
-    color = as.list(data_color),
-    point_size = point_size,
-    point_opacity = alpha,
-    point_line = if (point_border) {
-      list(color = "rgb(196,196,196)", width = 1)
-    } else {
-      list()
-    },
-    reset_axes = TRUE
-  )
-  output_hover <- list(hoverinfo = "skip")
-
-  isolate(
-    cerebroCellViewRender(
-      "ir_clonalUMAP_projection",
-      output_meta,
-      output_data,
-      output_hover,
-      deferred_aux = deferred_aux, dataset_context = dataset_context)
-  )
-  ir_clonal_umap_last_request(request_signature)
-}, priority = 1000)
+    ir_clonal_umap_last_request(request_signature)
+  },
+  priority = 1000
+)
 
 ## ---- Clonal UMAP selection summaries ----------------------------------- ##
 output[["ir_clonalUMAP_number_of_selected_cells"]] <- renderUI({
   sel <- input[["ir_clonalUMAP_projection_persistent_selection"]]
   if (
     !is.null(sel) &&
-      (!is.list(sel) || !viewerDatasetContextEqual(
-        sel[["dataset_context"]],
-        viewer_loaded_dataset_context()
-      ))
+      (!is.list(sel) ||
+        !viewerDatasetContextEqual(
+          sel[["dataset_context"]],
+          viewer_loaded_dataset_context()
+        ))
   ) {
     sel <- NULL
   }
@@ -777,10 +790,11 @@ output[["ir_clonalUMAP_projection_composition"]] <- renderUI({
   sel <- input[["ir_clonalUMAP_projection_persistent_selection"]]
   if (
     !is.null(sel) &&
-      (!is.list(sel) || !viewerDatasetContextEqual(
-        sel[["dataset_context"]],
-        viewer_loaded_dataset_context()
-      ))
+      (!is.list(sel) ||
+        !viewerDatasetContextEqual(
+          sel[["dataset_context"]],
+          viewer_loaded_dataset_context()
+        ))
   ) {
     sel <- NULL
   }
@@ -1079,8 +1093,14 @@ ir_paired_scatter_panel <- function(
   show_title = TRUE
 ) {
   dot_size <- ir_param("ir_p_dot_size", "total")
-  needed <- unique(c(x_axis, y_axis, if (!identical(dot_size, "total")) dot_size))
-  if (length(needed) && all(needed %in% names(data))) data <- data[needed]
+  needed <- unique(c(
+    x_axis,
+    y_axis,
+    if (!identical(dot_size, "total")) dot_size
+  ))
+  if (length(needed) && all(needed %in% names(data))) {
+    data <- data[needed]
+  }
   p <- scRepertoire::clonalScatter(
     data,
     cloneCall = pars$cloneCall,
@@ -1560,16 +1580,25 @@ output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
   pars <- ir_params()
   req(pars$chain, pars$cloneCall)
   # Dataset switches can deliver the old grouping before its selector resets.
-  if (!is.null(pars$groupBy)) req(pars$groupBy %in% getGroups())
+  if (!is.null(pars$groupBy)) {
+    req(pars$groupBy %in% getGroups())
+  }
   if (identical(pars$chain, "both") && is.null(ir_order_by())) {
-    return(ir_render_ggplotly({
-      counts <- if (is.null(pars$groupBy)) {
-        ir_homeostasis_counts(ir_data(), ir_clonecall_col(pars$cloneCall))
-      } else {
-        ir_grouped_homeostasis_counts(ir_data(), ir_clonecall_col(pars$cloneCall), pars$groupBy)
-      }
-      ir_homeostasis_plot(counts, ir_clone_size(), IR_PALETTE)
-    }, "clonalHomeostasis"))
+    return(ir_render_ggplotly(
+      {
+        counts <- if (is.null(pars$groupBy)) {
+          ir_homeostasis_counts(ir_data(), ir_clonecall_col(pars$cloneCall))
+        } else {
+          ir_grouped_homeostasis_counts(
+            ir_data(),
+            ir_clonecall_col(pars$cloneCall),
+            pars$groupBy
+          )
+        }
+        ir_homeostasis_plot(counts, ir_clone_size(), IR_PALETTE)
+      },
+      "clonalHomeostasis"
+    ))
   }
   req_scRepertoire()
   data <- ir_data()

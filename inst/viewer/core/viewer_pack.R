@@ -64,14 +64,19 @@ viewerPackOpen <- function(file, object) {
   ) {
     return(NULL)
   }
-  if (length(manifest$projection_names) &&
-      !identical(manifest$projection_identity_version, 1L)) {
+  if (
+    length(manifest$projection_names) &&
+      !identical(manifest$projection_identity_version, 1L)
+  ) {
     # Keep independent metadata/IR assets; never publish unchecked coordinates.
     manifest$projection_names <- character()
     frames <- manifest$trajectory_frames
     if (is.data.frame(frames) && "geometry_kind" %in% names(frames)) {
       manifest$trajectory_frames <- frames[
-        frames$geometry_kind != "canonical_projection", , drop = FALSE]
+        frames$geometry_kind != "canonical_projection",
+        ,
+        drop = FALSE
+      ]
     }
     message("Rebuild Viewer Pack to enable verified projection assets: ", pack)
   }
@@ -266,37 +271,40 @@ viewerPackTrajectoryFrame <- function(pack, method, name) {
   frame <- as.list(frames[row, , drop = FALSE])
   frame <- lapply(frame, function(value) value[[1L]])
   frame$cells <- suppressWarnings(as.integer(frame$cells))
-  frame$geometry_kind <- as.character(if (is.null(frame$geometry_kind)) {
-    "trajectory_asset"
-  } else {
-    frame$geometry_kind
-  })
-  frame$edges_path <- as.character(if (is.null(frame$edges_path)) {
-    ""
-  } else {
-    frame$edges_path
-  })
+  frame$geometry_kind <- as.character(
+    if (is.null(frame$geometry_kind)) {
+      "trajectory_asset"
+    } else {
+      frame$geometry_kind
+    }
+  )
+  frame$edges_path <- as.character(
+    if (is.null(frame$edges_path)) {
+      ""
+    } else {
+      frame$edges_path
+    }
+  )
   required_paths <- c("state_codes_path", "state_dictionary_path")
-  geometry_valid <- if (identical(frame$geometry_kind, "canonical_projection")) {
+  geometry_valid <- if (
+    identical(frame$geometry_kind, "canonical_projection")
+  ) {
     is.character(frame$projection_name) &&
       length(frame$projection_name) == 1L &&
       !is.na(frame$projection_name) &&
       nzchar(frame$projection_name) &&
-      frame$subset_kind %in% c(
-        "identity",
-        "include_uint32",
-        "exclude_uint32"
-      ) &&
-      (
-        identical(frame$subset_kind, "identity") ||
-          (
-            is.character(frame$subset_path) &&
-              length(frame$subset_path) == 1L &&
-              !is.na(frame$subset_path) &&
-              nzchar(frame$subset_path) &&
-              identical(frame$subset_dtype, "uint32")
-          )
-      )
+      frame$subset_kind %in%
+        c(
+          "identity",
+          "include_uint32",
+          "exclude_uint32"
+        ) &&
+      (identical(frame$subset_kind, "identity") ||
+        (is.character(frame$subset_path) &&
+          length(frame$subset_path) == 1L &&
+          !is.na(frame$subset_path) &&
+          nzchar(frame$subset_path) &&
+          identical(frame$subset_dtype, "uint32")))
   } else {
     identical(frame$geometry_kind, "trajectory_asset") &&
       is.character(frame$geometry_path) &&
@@ -308,9 +316,13 @@ viewerPackTrajectoryFrame <- function(pack, method, name) {
     !is.na(frame$cells) &&
     frame$cells >= 0L &&
     geometry_valid &&
-    all(vapply(frame[required_paths], function(path) {
-      is.character(path) && length(path) == 1L && !is.na(path) && nzchar(path)
-    }, logical(1))) &&
+    all(vapply(
+      frame[required_paths],
+      function(path) {
+        is.character(path) && length(path) == 1L && !is.na(path) && nzchar(path)
+      },
+      logical(1)
+    )) &&
     frame$state_dtype %in% c("uint8", "uint16", "uint32")
   if (!isTRUE(valid)) NULL else frame
 }
@@ -331,7 +343,10 @@ viewerPackTrajectoryEdges <- function(pack, method, name) {
     validate_cell_order = FALSE
   )
   required <- c(
-    "source_dim_1", "source_dim_2", "target_dim_1", "target_dim_2"
+    "source_dim_1",
+    "source_dim_2",
+    "target_dim_1",
+    "target_dim_2"
   )
   if (!is.data.frame(edges) || !all(required %in% colnames(edges))) {
     return(NULL)
@@ -374,8 +389,11 @@ viewerPackSpatialFrame <- function(pack, name) {
 }
 
 viewerPackGroupMetric <- function(pack, group, metric) {
-  if (is.null(pack) || !is.list(pack) ||
-      !identical(pack$manifest$violin_summary_version, 1L)) {
+  if (
+    is.null(pack) ||
+      !is.list(pack) ||
+      !identical(pack$manifest$violin_summary_version, 1L)
+  ) {
     return(NULL)
   }
   frames <- pack$manifest$group_metric_frames

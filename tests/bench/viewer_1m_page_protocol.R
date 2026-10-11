@@ -87,9 +87,14 @@ read_benchmark_crb_payload <- function(file) {
 
 benchmark_trajectory_contract <- function(crb, method, name) {
   if (
-    !is.character(method) || length(method) != 1L || is.na(method) ||
-      !nzchar(method) || !is.character(name) || length(name) != 1L ||
-      is.na(name) || !nzchar(name)
+    !is.character(method) ||
+      length(method) != 1L ||
+      is.na(method) ||
+      !nzchar(method) ||
+      !is.character(name) ||
+      length(name) != 1L ||
+      is.na(name) ||
+      !nzchar(name)
   ) {
     stop("Trajectory method and name must be non-empty strings.", call. = FALSE)
   }
@@ -98,8 +103,12 @@ benchmark_trajectory_contract <- function(crb, method, name) {
     object$getTrajectory(method, name),
     error = function(error) {
       stop(
-        "Benchmark trajectory `", method, " / ", name,
-        "` is unavailable: ", conditionMessage(error),
+        "Benchmark trajectory `",
+        method,
+        " / ",
+        name,
+        "` is unavailable: ",
+        conditionMessage(error),
         call. = FALSE
       )
     }
@@ -139,7 +148,9 @@ benchmark_spatial_contract <- function(crb) {
     object$getSpatialData(name, hydrate_molecules = FALSE),
     error = function(error) {
       stop(
-        "Benchmark Spatial entry `", name, "` is unavailable: ",
+        "Benchmark Spatial entry `",
+        name,
+        "` is unavailable: ",
         conditionMessage(error),
         call. = FALSE
       )
@@ -155,7 +166,8 @@ benchmark_spatial_contract <- function(crb) {
     all(is.finite(coordinates[["y"]]))
   if (!valid) {
     stop(
-      "Benchmark Spatial entry `", name,
+      "Benchmark Spatial entry `",
+      name,
       "` must contain finite numeric x/y coordinates.",
       call. = FALSE
     )

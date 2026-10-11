@@ -151,7 +151,10 @@ test_that("Ren preparation preserves prior datasets on failure and upgrade", {
     writeLines("partial build", paths$crb)
     stop("simulated preparation failure")
   }
-  expect_error(env$prepareViewerRenDemoData(root), "simulated preparation failure")
+  expect_error(
+    env$prepareViewerRenDemoData(root),
+    "simulated preparation failure"
+  )
   expect_identical(readLines(legacy), "preserve legacy data")
   expect_identical(readLines(paths$crb), "preserve incomplete current data")
   expect_length(list.files(paths$root, pattern = "stage-"), 0L)

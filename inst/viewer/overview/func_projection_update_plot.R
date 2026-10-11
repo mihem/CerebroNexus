@@ -50,9 +50,17 @@ overview_projection_update_plot <- function(input) {
   } else {
     payload$data$selection_key
   }
-  data_snapshot <- if (exists("data_set", mode = "function")) data_set() else NULL
+  data_snapshot <- if (exists("data_set", mode = "function")) {
+    data_set()
+  } else {
+    NULL
+  }
   core_aux <- function() {
-    metadata <- if (is.null(data_snapshot)) getMetaData() else data_snapshot$getMetaData()
+    metadata <- if (is.null(data_snapshot)) {
+      getMetaData()
+    } else {
+      data_snapshot$getMetaData()
+    }
     core <- cerebroCellViewDeferredAux(
       selection_rows = selection_rows,
       cell_barcodes = metadata[["cell_barcode"]][cell_indices],
@@ -91,6 +99,8 @@ overview_projection_update_plot <- function(input) {
     payload[["data"]],
     payload[["hover"]],
     deferred_aux = deferred_aux,
-    core_aux = core_aux, dataset_context = input[["dataset_context"]],
-    feedback = input[["feedback"]])
+    core_aux = core_aux,
+    dataset_context = input[["dataset_context"]],
+    feedback = input[["feedback"]]
+  )
 }

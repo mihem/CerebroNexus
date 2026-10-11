@@ -126,7 +126,10 @@ test_that("Data Info starts a non-blocking CRB prefetch", {
     collapse = "\n"
   )
 
-  prefetch <- paste(readLines(file.path(viewer_root, "crb_cache.R")), collapse = "\n")
+  prefetch <- paste(
+    readLines(file.path(viewer_root, "crb_cache.R")),
+    collapse = "\n"
+  )
   expect_match(prefetch, "crb_prefetch_tasks <- new.env", fixed = TRUE)
   expect_match(prefetch, "shiny::ExtendedTask$new", fixed = TRUE)
   expect_match(prefetch, "mirai::mirai", fixed = TRUE)

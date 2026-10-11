@@ -123,8 +123,10 @@ hla_build_motif_graph_raw <- function(
   # Total-size guard across all unique CDR3.
   if (nrow(agg) > HLA_MOTIF_MAX_TOTAL) {
     return(guard(sprintf(
-      paste("Too many unique CDR3s (%s > %s).",
-        "Open Settings > Filters and narrow the active cohort."),
+      paste(
+        "Too many unique CDR3s (%s > %s).",
+        "Open Settings > Filters and narrow the active cohort."
+      ),
       format(nrow(agg), big.mark = ","),
       format(HLA_MOTIF_MAX_TOTAL, big.mark = ",")
     )))
@@ -139,8 +141,10 @@ hla_build_motif_graph_raw <- function(
   bin_sizes <- table(bin_key)
   if (max(bin_sizes) > HLA_MOTIF_MAX_BIN) {
     return(guard(sprintf(
-      paste("A CDR3-length bin has %s unique sequences (> %s).",
-        "Open Settings > Filters and narrow the active cohort."),
+      paste(
+        "A CDR3-length bin has %s unique sequences (> %s).",
+        "Open Settings > Filters and narrow the active cohort."
+      ),
       format(max(bin_sizes), big.mark = ","),
       format(HLA_MOTIF_MAX_BIN, big.mark = ",")
     )))

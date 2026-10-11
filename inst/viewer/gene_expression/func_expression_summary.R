@@ -74,7 +74,9 @@ expressionSummarySpec <- function(
 }
 
 plotExpressionSummary <- function(series, groups, colors) {
-  if (!length(series)) return(plotly::plotly_empty())
+  if (!length(series)) {
+    return(plotly::plotly_empty())
+  }
   plots <- lapply(series, function(item) {
     plot_data <- data.frame(
       group = groups,

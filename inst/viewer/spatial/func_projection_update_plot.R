@@ -375,7 +375,10 @@ spatial_projection_update_plot <- function(input) {
       output_hover,
       deferred_aux = function() {
         build_deferred_aux(output_data[["selection_key"]])
-      }, dataset_context = input[["dataset_context"]], feedback = input[["feedback"]])
+      },
+      dataset_context = input[["dataset_context"]],
+      feedback = input[["feedback"]]
+    )
     return(invisible(NULL))
   }
 
@@ -440,10 +443,15 @@ spatial_projection_update_plot <- function(input) {
     payload[["hover"]],
     extra = list(group_hulls = output_hulls),
     deferred_aux = function() {
-      build_deferred_aux(if (resource_first) {
-        seq_len(input[["cell_count"]])
-      } else {
-        payload[["data"]][["selection_key"]]
-      })
-    }, dataset_context = input[["dataset_context"]], feedback = input[["feedback"]])
+      build_deferred_aux(
+        if (resource_first) {
+          seq_len(input[["cell_count"]])
+        } else {
+          payload[["data"]][["selection_key"]]
+        }
+      )
+    },
+    dataset_context = input[["dataset_context"]],
+    feedback = input[["feedback"]]
+  )
 }

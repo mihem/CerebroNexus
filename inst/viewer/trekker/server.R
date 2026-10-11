@@ -135,7 +135,10 @@ observe({
   render_request <- input[["trekker_projection_render_request"]]
   req(is.list(render_request), is.list(render_request$dataset_context))
   dataset_context <- viewer_loaded_dataset_context()
-  req(viewerDatasetContextEqual(render_request$dataset_context, dataset_context))
+  req(viewerDatasetContextEqual(
+    render_request$dataset_context,
+    dataset_context
+  ))
   tk <- req(trekker_slot())
   mode <- input[["trekker_mode"]] %||% "celltype"
   view <- input[["trekker_view"]] %||% "pair"
@@ -261,10 +264,11 @@ output[["trekker_number_of_selected_cells"]] <- renderUI({
     character()
   if (
     length(selected) &&
-      (!is.list(selected) || !viewerDatasetContextEqual(
-        selected[["dataset_context"]],
-        viewer_loaded_dataset_context()
-      ))
+      (!is.list(selected) ||
+        !viewerDatasetContextEqual(
+          selected[["dataset_context"]],
+          viewer_loaded_dataset_context()
+        ))
   ) {
     selected <- character()
   }

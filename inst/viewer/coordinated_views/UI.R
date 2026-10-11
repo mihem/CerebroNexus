@@ -609,46 +609,49 @@ tab_coordinated_views <- tabItem(
     ## selected Spatial sections, Trekker and Clonal. cell_views.js
     ## assigns spaces, hides unused slots, creates extras as needed, and wraps
     ## panels automatically while keeping each canvas at least 300px wide.
-    div(class = "cerebro-page-loading-region", div(
-      class = "cv-panes",
-      cv_pane("A"),
-      cv_pane("B"),
-      cv_pane("C"),
-      cv_pane("D"),
-      ## ---- single-cell detail card ------------------------------------- ##
-      ## Clicking a cell promotes its hover tooltip into this: the same facts,
-      ## uncut, parked in the middle of the panel grid instead of chasing the
-      ## pointer — so a barcode can be copied and a full CDR3 read while the
-      ## panels stay usable. Absolutely positioned, so it never enters the grid.
-      ## The outer element owns the centring, the inner one owns the fly-in
-      ## transform; keeping those on separate elements means neither has to
-      ## reconstruct the other's translate.
+    div(
+      class = "cerebro-page-loading-region",
       div(
-        class = "cv-card-pos",
-        id = "cv-card-pos",
+        class = "cv-panes",
+        cv_pane("A"),
+        cv_pane("B"),
+        cv_pane("C"),
+        cv_pane("D"),
+        ## ---- single-cell detail card ------------------------------------- ##
+        ## Clicking a cell promotes its hover tooltip into this: the same facts,
+        ## uncut, parked in the middle of the panel grid instead of chasing the
+        ## pointer — so a barcode can be copied and a full CDR3 read while the
+        ## panels stay usable. Absolutely positioned, so it never enters the grid.
+        ## The outer element owns the centring, the inner one owns the fly-in
+        ## transform; keeping those on separate elements means neither has to
+        ## reconstruct the other's translate.
         div(
-          class = "cv-card",
-          id = "cv-card",
-          role = "dialog",
-          `aria-label` = "Cell details",
+          class = "cv-card-pos",
+          id = "cv-card-pos",
           div(
-            class = "cv-card-head",
+            class = "cv-card",
+            id = "cv-card",
+            role = "dialog",
+            `aria-label` = "Cell details",
             div(
-              tags$div(class = "cv-card-title", id = "cv-card-title", "—"),
-              tags$div(class = "cv-card-bc", id = "cv-card-bc", "")
+              class = "cv-card-head",
+              div(
+                tags$div(class = "cv-card-title", id = "cv-card-title", "—"),
+                tags$div(class = "cv-card-bc", id = "cv-card-bc", "")
+              ),
+              tags$button(
+                type = "button",
+                class = "cv-card-x",
+                id = "cv-card-x",
+                `aria-label` = "Close",
+                HTML("&times;")
+              )
             ),
-            tags$button(
-              type = "button",
-              class = "cv-card-x",
-              id = "cv-card-x",
-              `aria-label` = "Close",
-              HTML("&times;")
-            )
-          ),
-          div(class = "cv-card-body", id = "cv-card-body")
+            div(class = "cv-card-body", id = "cv-card-body")
+          )
         )
       )
-    )),
+    ),
 
     ## Selection results appear only after there is something to show, leaving
     ## the initial workspace entirely available to the visualisations.

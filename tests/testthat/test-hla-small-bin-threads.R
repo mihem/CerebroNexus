@@ -5,12 +5,19 @@ test_that("small HLA bins avoid thread startup without changing motif results", 
   on.exit(options(old), add = TRUE)
   distance <- stringdist::stringdistmatrix
   used <- integer()
-  testthat::local_mocked_bindings(stringdistmatrix = function(..., nthread) {
-    used <<- c(used, nthread)
-    distance(..., nthread = nthread)
-  }, .package = "stringdist")
-  sequences <- apply(expand.grid(rep(list(c("A", "C", "G", "T")), 5L)),
-    1L, paste0, collapse = "")
+  testthat::local_mocked_bindings(
+    stringdistmatrix = function(..., nthread) {
+      used <<- c(used, nthread)
+      distance(..., nthread = nthread)
+    },
+    .package = "stringdist"
+  )
+  sequences <- apply(
+    expand.grid(rep(list(c("A", "C", "G", "T")), 5L)),
+    1L,
+    paste0,
+    collapse = ""
+  )
   for (n in c(2L, 149L, 256L, 257L)) {
     df <- data.frame(cdr3 = sequences[seq_len(n)], stringsAsFactors = FALSE)
     actual <- hla_process_length_group(df)

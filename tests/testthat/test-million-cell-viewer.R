@@ -1013,37 +1013,54 @@ test_that("trajectory first frames expose paired static geometry and state", {
   )
 
   expect_match(server, "viewerTrajectoryFrameAsset <- function", fixed = TRUE)
-  expect_match(server, "viewerPackTrajectoryFrame(pack, method, name)", fixed = TRUE)
+  expect_match(
+    server,
+    "viewerPackTrajectoryFrame(pack, method, name)",
+    fixed = TRUE
+  )
   expect_match(
     server,
     'viewerStaticResourcePrefix(\n      "trajectory"',
     fixed = TRUE
   )
   expect_match(engine, "fetchCategoricalResource", fixed = TRUE)
-  expect_match(engine, "data.canonical_group = groupResult.values", fixed = TRUE)
+  expect_match(
+    engine,
+    "data.canonical_group = groupResult.values",
+    fixed = TRUE
+  )
   expect_match(engine, "categorical_resource", fixed = TRUE)
 })
 
 test_that("Gene projection streams canonical geometry with wire fallback", {
   data_source <- paste(
-    readLines(viewer_test_path(
-      "gene_expression",
-      "obj_projection_data_to_plot.R"
-    ), warn = FALSE),
+    readLines(
+      viewer_test_path(
+        "gene_expression",
+        "obj_projection_data_to_plot.R"
+      ),
+      warn = FALSE
+    ),
     collapse = "\n"
   )
   render_source <- paste(
-    readLines(viewer_test_path(
-      "gene_expression",
-      "func_projection_update_plot.R"
-    ), warn = FALSE),
+    readLines(
+      viewer_test_path(
+        "gene_expression",
+        "func_projection_update_plot.R"
+      ),
+      warn = FALSE
+    ),
     collapse = "\n"
   )
   event_source <- paste(
-    readLines(viewer_test_path(
-      "gene_expression",
-      "event_projection_update_plot.R"
-    ), warn = FALSE),
+    readLines(
+      viewer_test_path(
+        "gene_expression",
+        "event_projection_update_plot.R"
+      ),
+      warn = FALSE
+    ),
     collapse = "\n"
   )
 
@@ -1211,9 +1228,17 @@ test_that("specialist lifecycle owns request, ready, and auxiliary state", {
   expect_identical(
     jsonlite::fromJSON(output, simplifyVector = FALSE),
     list(
-      generation = 2L, cached = TRUE, bytes = 42L, latency = 25L,
-      activation = 20L, requested = 7L, duplicate = NULL,
-      rejected = FALSE, accepted = TRUE, pending = NULL, token = 7L
+      generation = 2L,
+      cached = TRUE,
+      bytes = 42L,
+      latency = 25L,
+      activation = 20L,
+      requested = 7L,
+      duplicate = NULL,
+      rejected = FALSE,
+      accepted = TRUE,
+      pending = NULL,
+      token = 7L
     )
   )
 })
@@ -1262,9 +1287,14 @@ test_that("canonical mapping centralizes identity, subset, and index order", {
   expect_identical(
     jsonlite::fromJSON(output, simplifyVector = FALSE),
     list(
-      identity = TRUE, badIdentity = FALSE, includeValid = TRUE,
-      duplicate = FALSE, excludeValid = TRUE, unsorted = FALSE,
-      included = list(3L, 1L), excluded = list(0L, 2L)
+      identity = TRUE,
+      badIdentity = FALSE,
+      includeValid = TRUE,
+      duplicate = FALSE,
+      excludeValid = TRUE,
+      unsorted = FALSE,
+      included = list(3L, 1L),
+      excluded = list(0L, 2L)
     )
   )
 })
@@ -1335,9 +1365,14 @@ test_that("telemetry snapshots normalize shared transport phases", {
   expect_identical(
     jsonlite::fromJSON(output, simplifyVector = FALSE),
     list(
-      bytes = 42L, serverPrepareMs = 12.5, serializeTransferMs = 100L,
-      decodeMs = 4L, serverResourceMs = 3L, serverBundleMs = NULL,
-      requestToBinaryMs = 8L, decodeToDrawMs = 6L
+      bytes = 42L,
+      serverPrepareMs = 12.5,
+      serializeTransferMs = 100L,
+      decodeMs = 4L,
+      serverResourceMs = 3L,
+      serverBundleMs = NULL,
+      requestToBinaryMs = 8L,
+      decodeToDrawMs = 6L
     )
   )
 })
@@ -1393,7 +1428,11 @@ test_that("GPU cell views split underlay, points and interaction overlay", {
     "hoverCell = i;\n    drawAll();",
     fixed = TRUE
   )
-  expect_match(javascript, "if (needsUnderlay(p)) attachUnderlay(p)", fixed = TRUE)
+  expect_match(
+    javascript,
+    "if (needsUnderlay(p)) attachUnderlay(p)",
+    fixed = TRUE
+  )
   expect_match(javascript, "drawImage(p, underlay)", fixed = TRUE)
   expect_match(javascript, "drawHulls(p, underlay)", fixed = TRUE)
   expect_match(javascript, "drawTrajectory(p, underlay)", fixed = TRUE)
@@ -1531,7 +1570,11 @@ test_that("the page benchmark has a publication-grade contract", {
     'setdiff(\n  chromote::get_chrome_args(),\n  "--disable-gpu"',
     fixed = TRUE
   )
-  expect_match(benchmark, "cerebroLinkedViewsState.primaryReady()", fixed = TRUE)
+  expect_match(
+    benchmark,
+    "cerebroLinkedViewsState.primaryReady()",
+    fixed = TRUE
+  )
   expect_match(benchmark, "completion_ready", fixed = TRUE)
   expect_match(benchmark, "primary_ready_ms", fixed = TRUE)
   expect_match(benchmark, "settled_ms", fixed = TRUE)
@@ -1845,11 +1888,13 @@ test_that("trajectory benchmark contract follows the selected trajectory", {
   object$getTrajectory <- function(method, name) {
     expect_identical(method, "marker_guided")
     expect_identical(name, "E18_neurogenesis")
-    list(meta = data.frame(
-      DR_1 = 1:5,
-      DR_2 = 6:10,
-      pseudotime = c(0, 1, NA, 3, 4)
-    ))
+    list(
+      meta = data.frame(
+        DR_1 = 1:5,
+        DR_2 = 6:10,
+        pseudotime = c(0, 1, NA, 3, 4)
+      )
+    )
   }
   artifact <- tempfile(fileext = ".crb")
   saveRDS(object, artifact)

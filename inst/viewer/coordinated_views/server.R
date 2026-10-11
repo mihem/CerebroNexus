@@ -175,8 +175,12 @@ observeEvent(input[["coordviews_spatial_image_load_error"]], {
   space <- as.character(event$space %||% "Spatial")
   image <- as.character(event$image %||% "background image")
   if (
-    length(space) != 1L || is.na(space) || !nzchar(space) ||
-      length(image) != 1L || is.na(image) || !nzchar(image)
+    length(space) != 1L ||
+      is.na(space) ||
+      !nzchar(space) ||
+      length(image) != 1L ||
+      is.na(image) ||
+      !nzchar(image)
   ) {
     return()
   }
@@ -298,28 +302,33 @@ cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
   } else {
     NULL
   }
-  supplement <- tryCatch({
-    value <- cv_build_compact_supplement(
-      data_set(),
-      primary,
-      viewerProjectionFirstFrameCache(),
-      include_clone = wants_clone && is.null(clone_spec)
-    )
-    if (is.null(value)) {
-      value <- cv_build_progressive_supplement(
+  supplement <- tryCatch(
+    {
+      value <- cv_build_compact_supplement(
         data_set(),
         primary,
+        viewerProjectionFirstFrameCache(),
         include_clone = wants_clone && is.null(clone_spec)
       )
-    }
-    value
-  },
+      if (is.null(value)) {
+        value <- cv_build_progressive_supplement(
+          data_set(),
+          primary,
+          include_clone = wants_clone && is.null(clone_spec)
+        )
+      }
+      value
+    },
     error = function(error) NULL
   )
   if (is.null(supplement)) {
     return(NULL)
   }
-  supplement <- cv_reference_trajectory_geometry(supplement, primary, data_set())
+  supplement <- cv_reference_trajectory_geometry(
+    supplement,
+    primary,
+    data_set()
+  )
   attr(supplement, "server_prepare_ms") <-
     (proc.time()[["elapsed"]] - started) * 1000
   list(primary_n = primary_n, value = supplement, clone_spec = clone_spec)
@@ -456,8 +465,14 @@ observeEvent(
     req(
       is.list(request),
       is.list(details),
-      viewerDatasetContextEqual(request$dataset_context, details$dataset_context),
-      viewerDatasetContextEqual(details$dataset_context, viewer_loaded_dataset_context()),
+      viewerDatasetContextEqual(
+        request$dataset_context,
+        details$dataset_context
+      ),
+      viewerDatasetContextEqual(
+        details$dataset_context,
+        viewer_loaded_dataset_context()
+      ),
       identical(
         as.character(request$dataset_fingerprint %||% ""),
         as.character(details$dataset_fingerprint)
@@ -678,10 +693,12 @@ observeEvent(
           "prepare"
         )
         dataset <- cv_saved_view_dataset()
-        if (!viewerDatasetContextEqual(
-          dataset$dataset_context,
-          dataset_context
-        )) {
+        if (
+          !viewerDatasetContextEqual(
+            dataset$dataset_context,
+            dataset_context
+          )
+        ) {
           return()
         }
         prepared <- cv_config_prepare(
@@ -771,10 +788,12 @@ observeEvent(
         action <- cv_config_choice(upload$action, "$.upload.action", "apply")
         text <- cv_config_read_upload(upload)
         dataset <- cv_saved_view_dataset()
-        if (!viewerDatasetContextEqual(
-          dataset$dataset_context,
-          dataset_context
-        )) {
+        if (
+          !viewerDatasetContextEqual(
+            dataset$dataset_context,
+            dataset_context
+          )
+        ) {
           return()
         }
         normalized <- cv_config_decode(
@@ -856,7 +875,10 @@ observe(
       shared <- input[["coordviews_shared_base"]]
       if (
         is.list(shared) &&
-          viewerDatasetContextEqual(shared$dataset_context, primary$dataset_context) &&
+          viewerDatasetContextEqual(
+            shared$dataset_context,
+            primary$dataset_context
+          ) &&
           identical(
             as.character(shared$dataset_fingerprint %||% ""),
             primary$dataset_fingerprint
@@ -949,7 +971,9 @@ observe(
           context = viewer_loaded_dataset_context(),
           patch = coordviews_color_patch()
         )
-        if (identical(palette, coordviews_build_log$sent_palette)) return()
+        if (identical(palette, coordviews_build_log$sent_palette)) {
+          return()
+        }
         session$sendCustomMessage("coordviews_colors", palette$patch)
         coordviews_build_log$sent_palette <- palette
       })
@@ -1030,8 +1054,14 @@ observeEvent(
     req(
       is.list(request),
       !is.null(source),
-      viewerDatasetContextEqual(request$dataset_context, source$dataset_context),
-      viewerDatasetContextEqual(source$dataset_context, viewer_loaded_dataset_context()),
+      viewerDatasetContextEqual(
+        request$dataset_context,
+        source$dataset_context
+      ),
+      viewerDatasetContextEqual(
+        source$dataset_context,
+        viewer_loaded_dataset_context()
+      ),
       identical(as.character(request$dataset_id), source$dataset_id),
       identical(
         as.character(request$dataset_fingerprint),
@@ -1066,7 +1096,7 @@ observeEvent(
       "coordviews_attribute",
       cv_wire_pack_message(list(
         dataset_id = source$dataset_id,
-    dataset_context = source$dataset_context,
+        dataset_context = source$dataset_context,
         dataset_fingerprint = viewerDatasetIdentity()$fingerprint,
         kind = kind,
         name = name,
@@ -1081,7 +1111,13 @@ observeEvent(
   input[["coordviews_asset_request"]],
   {
     request <- input[["coordviews_asset_request"]]
-    req(is.list(request), viewerDatasetContextEqual(request$dataset_context, viewer_loaded_dataset_context()))
+    req(
+      is.list(request),
+      viewerDatasetContextEqual(
+        request$dataset_context,
+        viewer_loaded_dataset_context()
+      )
+    )
     key <- as.character(request$key %||% "")
     assets <- isolate(coordviews_assets())
     req(
@@ -1149,11 +1185,19 @@ observeEvent(input[["coordviews_wire_fallback"]], {
 coordviews_selected_barcodes <- reactive({
   indices <- input[["coordviews_selection_indices"]]
   current <- viewer_loaded_dataset_context()
-  if (is.list(indices) && viewerDatasetContextEqual(indices$dataset_context, current)) {
+  if (
+    is.list(indices) &&
+      viewerDatasetContextEqual(indices$dataset_context, current)
+  ) {
     return(cv_cells_at_indices(cv_saved_view_cells(), indices$indices))
   }
   selection <- input[["coordviews_selection"]]
-  if (!is.list(selection) || !viewerDatasetContextEqual(selection$dataset_context, current)) return(NULL)
+  if (
+    !is.list(selection) ||
+      !viewerDatasetContextEqual(selection$dataset_context, current)
+  ) {
+    return(NULL)
+  }
   sel <- selection$cells
   if (is.null(sel) || !length(sel)) NULL else as.character(sel)
 })
@@ -1231,7 +1275,11 @@ output[["coordviews_selected_cells_UI"]] <- renderUI({
 
 ## Deliberately bypass the page-scoped outputOptions wrapper: only the gate
 ## above stays awake; metadata and the plot/table outputs remain demand-driven.
-shiny::outputOptions(output, "coordviews_selected_cells_UI", suspendWhenHidden = FALSE)
+shiny::outputOptions(
+  output,
+  "coordviews_selected_cells_UI",
+  suspendWhenHidden = FALSE
+)
 
 ## Plot: categorical variable -> bar of selected-cell counts per group (coloured
 ## by the SAME assignColorsToGroups() the Projection tab uses); numeric variable
@@ -1481,13 +1529,24 @@ lapply(
 
 cv_expression_feedback <- function(ok, rgb = FALSE) {
   shiny::isolate({
-    ids <- if (rgb) paste0("coordviews_gene_", c("r", "g", "b")) else
+    ids <- if (rgb) {
+      paste0("coordviews_gene_", c("r", "g", "b"))
+    } else {
       c("coordviews_gene", "coordviews_expression_mode")
-    controls <- stats::setNames(lapply(ids, function(id) as.character(input[[id]])), ids)
-    session$sendCustomMessage("cerebro_linked_expression_feedback", list(
-      controls = controls, ok = isTRUE(ok), rgb = rgb,
-      dataset_context = viewer_loaded_dataset_context()
-    ))
+    }
+    controls <- stats::setNames(
+      lapply(ids, function(id) as.character(input[[id]])),
+      ids
+    )
+    session$sendCustomMessage(
+      "cerebro_linked_expression_feedback",
+      list(
+        controls = controls,
+        ok = isTRUE(ok),
+        rgb = rgb,
+        dataset_context = viewer_loaded_dataset_context()
+      )
+    )
   })
 }
 
@@ -1837,7 +1896,10 @@ cv_fmt_value <- function(v) {
 observeEvent(input[["coordviews_cell_detail"]], {
   request <- input[["coordviews_cell_detail"]]
   dataset_context <- viewer_loaded_dataset_context()
-  req(is.list(request), viewerDatasetContextEqual(request$dataset_context, dataset_context))
+  req(
+    is.list(request),
+    viewerDatasetContextEqual(request$dataset_context, dataset_context)
+  )
   index <- if (is.list(request) && length(request$index) == 1L) {
     suppressWarnings(as.integer(request$index[[1L]]))
   } else {

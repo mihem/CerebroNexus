@@ -62,7 +62,10 @@
     error = function(condition) NULL
   ))
   if (is.null(info) || nrow(info) != 1L || is.na(info$type[[1L]])) {
-    if (.Platform$OS.type != "windows" && !isTRUE(file.access(root, mode = 1L) == 0L)) {
+    if (
+      .Platform$OS.type != "windows" &&
+        !isTRUE(file.access(root, mode = 1L) == 0L)
+    ) {
       .viewer_auth_error(paste0(
         "viewer-auth.env could not be inspected because the App directory is not accessible. ",
         "Check parent directory access for the actual Shiny/R runtime UID/GID."
@@ -71,7 +74,9 @@
     .viewer_auth_error(paste0(
       "viewer-auth.env was not found in the App directory. ",
       "Restore the file matching credentials.sqlite ",
-      "or provide ", env_name, " to the application process."
+      "or provide ",
+      env_name,
+      " to the application process."
     ))
   }
   type <- as.character(info$type[[1L]])
@@ -90,7 +95,9 @@
     mode <- bitwAnd(as.integer(info$permissions[[1L]]), 4095L)
     if (!identical(mode, 384L)) {
       .viewer_auth_error(paste0(
-        "viewer-auth.env has insecure permissions: ", sprintf("%04o", mode), ". ",
+        "viewer-auth.env has insecure permissions: ",
+        sprintf("%04o", mode),
+        ". ",
         "Required permissions: 0600. Set ownership for the actual Shiny/R runtime ",
         "UID/GID and run chmod 600 on this file. For a read-only filesystem, ",
         "correct the source file's permissions before deployment."
@@ -113,12 +120,15 @@
     readLines(path, n = 2L, warn = FALSE, encoding = "UTF-8"),
     error = function(condition) NULL
   ))
-  if (is.null(lines)) unreadable()
+  if (is.null(lines)) {
+    unreadable()
+  }
   pattern <- paste0("^", env_name, "=([0-9a-f]{64})$")
   if (length(lines) != 1L || !grepl(pattern, lines, perl = TRUE)) {
     .viewer_auth_error(paste0(
       "viewer-auth.env has invalid content. Expected exactly one line: ",
-      env_name, "=<64 lowercase hexadecimal characters>, without quotes or export. ",
+      env_name,
+      "=<64 lowercase hexadecimal characters>, without quotes or export. ",
       "Restore the original file matching credentials.sqlite; do not use a login password."
     ))
   }

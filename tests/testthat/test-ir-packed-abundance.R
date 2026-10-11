@@ -1,11 +1,20 @@
 # Execute the production renderer/control bodies without a browser. A failing
 # repertoire getter makes accidental eager sidecar hydration observable.
 ir_test_root <- testthat::test_path("../../inst/viewer/immune_repertoire")
-if (!dir.exists(ir_test_root)) ir_test_root <- system.file("viewer/immune_repertoire", package = "CerebroNexus")
+if (!dir.exists(ir_test_root)) {
+  ir_test_root <- system.file(
+    "viewer/immune_repertoire",
+    package = "CerebroNexus"
+  )
+}
 
 ir_test_call <- function(expr, name) {
-  if (!is.call(expr)) return(NULL)
-  if (identical(paste(deparse(expr[[1]]), collapse = ""), name)) return(expr)
+  if (!is.call(expr)) {
+    return(NULL)
+  }
+  if (identical(paste(deparse(expr[[1]]), collapse = ""), name)) {
+    return(expr)
+  }
   for (part in as.list(expr)[-1L]) {
     found <- ir_test_call(part, name)
     if (!is.null(found)) return(found)
@@ -15,8 +24,17 @@ ir_test_call <- function(expr, name) {
 
 ir_test_body <- function(file, output, wrapper, env) {
   exprs <- parse(file.path(ir_test_root, file))
-  expr <- Filter(function(x) is.call(x) && identical(x[[1]], as.name("<-")) &&
-    identical(paste(deparse(x[[2]]), collapse = ""), paste0("output$", output)), as.list(exprs))[[1]]
+  expr <- Filter(
+    function(x) {
+      is.call(x) &&
+        identical(x[[1]], as.name("<-")) &&
+        identical(
+          paste(deparse(x[[2]]), collapse = ""),
+          paste0("output$", output)
+        )
+    },
+    as.list(exprs)
+  )[[1]]
   body <- ir_test_call(expr[[3]], wrapper)[[2]]
   eval(call("function", as.pairlist(list()), body), env)
 }
@@ -33,7 +51,12 @@ test_that("native SizeDist does not initialize the unused analytical fallback", 
   env$ir_size_distribution_profile <- function() "compact profile"
   env$ir_size_profile_plot <- function(profiles, method) profiles
   env$ir_render_ggplotly <- function(p, ...) p
-  render <- ir_test_body("visualizations.R", "ir_plot_clonalSizeDistribution", "plotly::renderPlotly", env)
+  render <- ir_test_body(
+    "visualizations.R",
+    "ir_plot_clonalSizeDistribution",
+    "plotly::renderPlotly",
+    env
+  )
   expect_identical(render(), "compact profile")
   data <- list(A = data[[1]][1:2, , drop = FALSE])
   expect_error(render(), "analytical fallback")
@@ -42,8 +65,14 @@ test_that("native SizeDist does not initialize the unused analytical fallback", 
 test_that("Abundance renderer reads the current pack before repertoire data", {
   env <- new.env(parent = asNamespace("shiny"))
   for (expr in parse(file.path(ir_test_root, "data.R"))) {
-    if (is.call(expr) && identical(expr[[1]], as.name("<-")) &&
-        is.call(expr[[3]]) && identical(expr[[3]][[1]], as.name("function"))) eval(expr, env)
+    if (
+      is.call(expr) &&
+        identical(expr[[1]], as.name("<-")) &&
+        is.call(expr[[3]]) &&
+        identical(expr[[3]][[1]], as.name("function"))
+    ) {
+      eval(expr, env)
+    }
   }
   env$req_plot_space <- function(...) NULL
   pars <- list(chain = "both", cloneCall = "gene", groupBy = NULL)
@@ -56,7 +85,12 @@ test_that("Abundance renderer reads the current pack before repertoire data", {
   packed <- data.frame(sample = "A", abundance = 2L, n_clones = 3L)
   env$viewerPackCurrent <- function() packed
   env$viewerPackImmuneAbundance <- function(pack, column) pack
-  render <- ir_test_body("visualizations.R", "ir_plot_clonalAbundance", "plotly::renderPlotly", env)
+  render <- ir_test_body(
+    "visualizations.R",
+    "ir_plot_clonalAbundance",
+    "plotly::renderPlotly",
+    env
+  )
   expect_identical(render(), packed)
   packed <- data.frame(sample = "B", abundance = 1L, n_clones = 8L)
   expect_identical(render(), packed)
@@ -100,7 +134,11 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   expect_match(html, 'value="TRD"', fixed = TRUE)
   expect_no_match(html, 'value="IGH"', fixed = TRUE)
   summary$available <- FALSE
-  expect_match(as.character(render()), "No immune repertoire data available", fixed = TRUE)
+  expect_match(
+    as.character(render()),
+    "No immune repertoire data available",
+    fixed = TRUE
+  )
 })
 
 test_that("Homeostasis renderer defers hydration and preserves analytical fallbacks", {
@@ -118,7 +156,12 @@ test_that("Homeostasis renderer defers hydration and preserves analytical fallba
   env$IR_PALETTE <- "Harmonic"
   env$ir_render_ggplotly <- function(expr, ...) force(expr)
   env$req_scRepertoire <- function() stop("analytical fallback")
-  render <- ir_test_body("visualizations.R", "ir_plot_clonalHomeostasis", "plotly::renderPlotly", env)
+  render <- ir_test_body(
+    "visualizations.R",
+    "ir_plot_clonalHomeostasis",
+    "plotly::renderPlotly",
+    env
+  )
   expect_identical(render(), "packed counts")
   pars$chain <- NULL
   expect_error(render(), class = "shiny.silent.error")

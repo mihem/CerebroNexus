@@ -100,7 +100,8 @@
     )
   }
   scaled <- (pmin(pmax(values, limits[[1L]]), limits[[2L]]) -
-    limits[[1L]]) / diff(limits)
+    limits[[1L]]) /
+    diff(limits)
   scaled[!finite] <- NA_real_
   scaled
 }
@@ -127,7 +128,8 @@
     return(rep(0, length(values)))
   }
   scaled <- (pmin(pmax(values, limits[[1L]]), limits[[2L]]) -
-    limits[[1L]]) / diff(limits)
+    limits[[1L]]) /
+    diff(limits)
   scaled[!finite] <- 0
   scaled
 }
@@ -310,9 +312,10 @@
     .viewer1mScaleProgram
   )
   total_signal <- Reduce(`+`, developmental_scaled)
-  cell_score <- (
-    0.5 * developmental_scaled$transition + developmental_scaled$late
-  ) / pmax(total_signal, .Machine$double.eps)
+  cell_score <- (0.5 *
+    developmental_scaled$transition +
+    developmental_scaled$late) /
+    pmax(total_signal, .Machine$double.eps)
   cell_score[!is.finite(cell_score) | total_signal == 0] <- NA_real_
 
   cluster_score <- tapply(cell_score, clusters, stats::median, na.rm = TRUE)
@@ -326,7 +329,9 @@
   }
   cell_cluster_score <- unname(cluster_score[clusters])
   cell_cluster_score[!is.finite(cell_cluster_score)] <- fallback_score
-  cell_score[!is.finite(cell_score)] <- cell_cluster_score[!is.finite(cell_score)]
+  cell_score[!is.finite(cell_score)] <- cell_cluster_score[
+    !is.finite(cell_score)
+  ]
   pseudotime <- .viewer1mScale01(
     0.75 * cell_cluster_score + 0.25 * cell_score
   )
@@ -354,11 +359,15 @@
   )
   specified_branch <- terminal & branch_total > branch_cut
   state[terminal & !specified_branch] <- "Maturing neuron"
-  state[specified_branch &
-    branch_expression$excitatory >= branch_expression$inhibitory] <-
+  state[
+    specified_branch &
+      branch_expression$excitatory >= branch_expression$inhibitory
+  ] <-
     "Excitatory neuron"
-  state[specified_branch &
-    branch_expression$inhibitory > branch_expression$excitatory] <-
+  state[
+    specified_branch &
+      branch_expression$inhibitory > branch_expression$excitatory
+  ] <-
     "Inhibitory neuron"
   desired_state_levels <- c(
     "Neural progenitor",
@@ -457,7 +466,7 @@
   )
   needs_trajectory <-
     !trajectory_name %in% names_for_method ||
-      !identical(current_trajectory$provenance$version, 2L)
+    !identical(current_trajectory$provenance$version, 2L)
   if (needs_trajectory) {
     projection_names <- object$availableProjections()
     if (!length(projection_names)) {

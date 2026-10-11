@@ -229,10 +229,11 @@ observeEvent(
     selection <- input[["hla_motif_network_persistent_selection"]]
     if (
       !is.null(selection) &&
-        (!is.list(selection) || !viewerDatasetContextEqual(
-          selection[["dataset_context"]],
-          viewer_loaded_dataset_context()
-        ))
+        (!is.list(selection) ||
+          !viewerDatasetContextEqual(
+            selection[["dataset_context"]],
+            viewer_loaded_dataset_context()
+          ))
     ) {
       return()
     }

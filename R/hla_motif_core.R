@@ -125,9 +125,13 @@ hla_choose_initial_samples <- function(
     ## Prefer the richest sample that fits the hard per-bin guard. If none do,
     ## keep the sample with the smallest worst bin so the UI lands as close to
     ## a drawable cohort as the source data permits.
-    worst_bin <- vapply(sample_cdr3, function(cdr3) {
-      if (length(cdr3) == 0) 0L else max(table(nchar(cdr3)))
-    }, integer(1))
+    worst_bin <- vapply(
+      sample_cdr3,
+      function(cdr3) {
+        if (length(cdr3) == 0) 0L else max(table(nchar(cdr3)))
+      },
+      integer(1)
+    )
     eligible <- ordered[worst_bin[ordered] <= max_bin]
     keep <- if (length(eligible)) eligible[1] else names(which.min(worst_bin))
   }
@@ -152,9 +156,12 @@ hla_detect_chains <- function(data) {
   if (is.null(data) || !is.list(data) || length(data) == 0) {
     return(character(0))
   }
-  all_ct <- unique(unlist(lapply(data, function(df) {
-    if ("CTgene" %in% names(df)) as.character(df$CTgene) else character(0)
-  }), use.names = FALSE))
+  all_ct <- unique(unlist(
+    lapply(data, function(df) {
+      if ("CTgene" %in% names(df)) as.character(df$CTgene) else character(0)
+    }),
+    use.names = FALSE
+  ))
   chains <- c(HLA_TCR_CHAINS, HLA_BCR_CHAINS)
   chains[vapply(chains, function(ch) any(grepl(ch, all_ct)), logical(1))]
 }
@@ -277,7 +284,11 @@ hla_parse_ir_segments <- function(data, chain) {
     selected_slots <- gene_slots[hits]
     gene_seg <- first_gene[hits]
 
-    aa_parts <- strsplit(as.character(df$CTaa)[selected_rows], "_", fixed = TRUE)
+    aa_parts <- strsplit(
+      as.character(df$CTaa)[selected_rows],
+      "_",
+      fixed = TRUE
+    )
     aa_lengths <- lengths(aa_parts)
     aa_flat <- unlist(aa_parts, use.names = FALSE)
     aa_starts <- cumsum(c(1L, utils::head(aa_lengths, -1L)))
@@ -329,17 +340,34 @@ hla_parse_ir_segments <- function(data, chain) {
   # Uniform atomic columns can be concatenated once. rbind.data.frame grows
   # columns for each sample, repeatedly allocating and copying their contents.
   columns <- lapply(seq_along(all_cols), function(j) lapply(rows, `[[`, j))
-  uniform <- all(vapply(rows, function(df) identical(class(df), "data.frame"), logical(1))) &&
-    all(vapply(columns, function(parts) {
-      first <- parts[[1]]
-      attrs <- attributes(first)
-      simple <- is.null(attrs) || ((identical(class(first), "factor") ||
-        identical(class(first), c("ordered", "factor"))) &&
-        setequal(names(attrs), c("levels", "class")))
-      typeof(first) %in% c("logical", "integer", "double", "complex", "character", "raw") &&
-        simple && all(vapply(parts, function(x)
-        identical(typeof(x), typeof(first)) && identical(attributes(x), attrs), logical(1)))
-    }, logical(1)))
+  uniform <- all(vapply(
+    rows,
+    function(df) identical(class(df), "data.frame"),
+    logical(1)
+  )) &&
+    all(vapply(
+      columns,
+      function(parts) {
+        first <- parts[[1]]
+        attrs <- attributes(first)
+        simple <- is.null(attrs) ||
+          ((identical(class(first), "factor") ||
+            identical(class(first), c("ordered", "factor"))) &&
+            setequal(names(attrs), c("levels", "class")))
+        typeof(first) %in%
+          c("logical", "integer", "double", "complex", "character", "raw") &&
+          simple &&
+          all(vapply(
+            parts,
+            function(x) {
+              identical(typeof(x), typeof(first)) &&
+                identical(attributes(x), attrs)
+            },
+            logical(1)
+          ))
+      },
+      logical(1)
+    ))
   if (uniform) {
     out <- lapply(columns, function(parts) {
       column <- unlist(lapply(parts, unclass), use.names = FALSE)
@@ -347,8 +375,11 @@ hla_parse_ir_segments <- function(data, chain) {
       column
     })
     names(out) <- all_cols
-    out <- structure(out, class = "data.frame",
-      row.names = .set_row_names(sum(vapply(rows, nrow, integer(1)))))
+    out <- structure(
+      out,
+      class = "data.frame",
+      row.names = .set_row_names(sum(vapply(rows, nrow, integer(1))))
+    )
   } else {
     # Preserve base coercion and attribute handling for heterogeneous metadata.
     out <- do.call(rbind, c(rows, list(make.row.names = FALSE)))
@@ -416,8 +447,12 @@ hla_process_length_group <- function(df) {
   # Small bins have too little work to amortize OpenMP worker startup. Keep
   # larger bins on stringdist's configured thread count; distances are exact
   # in either case and no process-wide option is changed.
-  dist_mat <- stringdist::stringdistmatrix(seqs, seqs, method = "hamming",
-    nthread = if (n <= 256L) 1L else getOption("sd_num_thread", 1L))
+  dist_mat <- stringdist::stringdistmatrix(
+    seqs,
+    seqs,
+    method = "hamming",
+    nthread = if (n <= 256L) 1L else getOption("sd_num_thread", 1L)
+  )
   idx <- which(dist_mat == 1 & upper.tri(dist_mat), arr.ind = TRUE)
   edges <- if (nrow(idx) == 0) {
     NULL

@@ -15,16 +15,32 @@ groupsCalculateTableAB <- function(table, groupA, groupB, mode, percent) {
   values_a <- table[[groupA]]
   values_b <- table[[groupB]]
   if (is.character(values_a)) {
-    values_a <- factor(values_a, levels = sort(unique(values_a)), exclude = NULL)
+    values_a <- factor(
+      values_a,
+      levels = sort(unique(values_a)),
+      exclude = NULL
+    )
   }
   if (is.character(values_b)) {
-    values_b <- factor(values_b, levels = sort(unique(values_b)), exclude = NULL)
+    values_b <- factor(
+      values_b,
+      levels = sort(unique(values_b)),
+      exclude = NULL
+    )
   }
   if (!is.factor(values_a)) {
-    values_a <- factor(values_a, levels = sort(unique(values_a)), exclude = NULL)
+    values_a <- factor(
+      values_a,
+      levels = sort(unique(values_a)),
+      exclude = NULL
+    )
   }
   if (!is.factor(values_b)) {
-    values_b <- factor(values_b, levels = sort(unique(values_b)), exclude = NULL)
+    values_b <- factor(
+      values_b,
+      levels = sort(unique(values_b)),
+      exclude = NULL
+    )
   }
 
   factor_codes <- function(values) {
@@ -59,12 +75,24 @@ groupsCalculateTableAB <- function(table, groupA, groupB, mode, percent) {
   )
   names(counts)[1:2] <- c(groupA, groupB)
 
-  groupsFormatComposition(counts, groupA, groupB, mode, percent, levels(values_b))
+  groupsFormatComposition(
+    counts,
+    groupA,
+    groupB,
+    mode,
+    percent,
+    levels(values_b)
+  )
 }
 
-groupsFormatComposition <- function(counts, groupA, groupB, mode, percent,
-                                    levels_group_b = levels(counts[[groupB]])) {
-
+groupsFormatComposition <- function(
+  counts,
+  groupA,
+  groupB,
+  mode,
+  percent,
+  levels_group_b = levels(counts[[groupB]])
+) {
   if (isTRUE(percent)) {
     counts[["count"]] <- counts[["count"]] / counts[["total_cell_count"]]
     counts <- counts[, c(groupA, "total_cell_count", groupB, "count")]
@@ -98,14 +126,23 @@ groups_composition_counts <- reactive({
   first <- input[["groups_selected_group"]]
   second <- input[["groups_by_other_group_second_group"]]
   req(first %in% getGroups(), second %in% getGroups(), first != second)
-  groupsCalculateTableAB(groupsMetadataColumns(c(first, second)),
-    first, second, "long", FALSE)
+  groupsCalculateTableAB(
+    groupsMetadataColumns(c(first, second)),
+    first,
+    second,
+    "long",
+    FALSE
+  )
 })
 
 groupsCompositionTable <- function(mode, percent) {
-  groupsFormatComposition(groups_composition_counts(),
-    input[["groups_selected_group"]], input[["groups_by_other_group_second_group"]],
-    mode, percent)
+  groupsFormatComposition(
+    groups_composition_counts(),
+    input[["groups_selected_group"]],
+    input[["groups_by_other_group_second_group"]],
+    mode,
+    percent
+  )
 }
 
 ##----------------------------------------------------------------------------##

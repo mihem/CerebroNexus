@@ -18,8 +18,14 @@ test_that("large violins retain distribution coverage with bounded rows", {
   expect_equal(as.integer(table(compact$group)), c(100L, 100L))
   expect_equal(levels(compact$group), levels(table$group))
   exact <- attr(compact, "cerebro_violin_summary")$stats
-  expect_equal(unname(exact$mean), unname(vapply(
-    split(table$value, table$group), mean, numeric(1))))
+  expect_equal(
+    unname(exact$mean),
+    unname(vapply(
+      split(table$value, table$group),
+      mean,
+      numeric(1)
+    ))
+  )
   expect_true(all(compact$value >= min(table$value)))
   expect_true(all(compact$value <= max(table$value)))
 
@@ -33,7 +39,11 @@ test_that("large violins retain distribution coverage with bounded rows", {
     coloring_variable = "group",
     max_points_per_group = 100L
   )
-  expect_equal(attr(signed_compact, "cerebro_violin_summary")$stats$mean, 0, tolerance = 1e-12)
+  expect_equal(
+    attr(signed_compact, "cerebro_violin_summary")$stats$mean,
+    0,
+    tolerance = 1e-12
+  )
   expect_true(all(signed_compact$value >= min(signed$value)))
   expect_match(
     paste(deparse(body(plotting_env$plotlyViolin)), collapse = "\n"),
@@ -80,9 +90,18 @@ test_that("skewed violins keep measurement scale and exact full-data boxes", {
   expect_true(summary$approximate)
   packed <- CerebroNexus:::.viewerPackCompactViolinData(table, "group", "value")
   expect_identical(packed, compact)
-  expect_identical(plotting_env$compactViolinData(packed, "value", "group"), packed)
-  plot <- plotting_env$plotlyViolin(table, "value", "group", c(A = "blue"),
-    "Value", "integer")
+  expect_identical(
+    plotting_env$compactViolinData(packed, "value", "group"),
+    packed
+  )
+  plot <- plotting_env$plotlyViolin(
+    table,
+    "value",
+    "group",
+    c(A = "blue"),
+    "Value",
+    "integer"
+  )
   traces <- plotly::plotly_build(plot)$x$data
   box <- Filter(function(x) identical(x$type, "box"), traces)[[1L]]
   expect_equal(as.numeric(box$median), 5.5)
@@ -94,8 +113,12 @@ test_that("skewed violins keep measurement scale and exact full-data boxes", {
 })
 
 test_that("empty, constant and non-finite violin groups have valid exact summaries", {
-  for (x in list(rep(0, 5000), rep(-3, 5000), c(NA, Inf, -Inf),
-      c(NA, -1, 0, 1, Inf))) {
+  for (x in list(
+    rep(0, 5000),
+    rep(-3, 5000),
+    c(NA, Inf, -Inf),
+    c(NA, -1, 0, 1, Inf)
+  )) {
     table <- data.frame(group = rep("A", length(x)), value = x)
     compact <- plotting_env$compactViolinData(table, "value", "group")
     summary <- attr(compact, "cerebro_violin_summary")$stats
@@ -105,6 +128,8 @@ test_that("empty, constant and non-finite violin groups have valid exact summari
       expect_equal(summary$mean, mean(finite))
       expect_equal(summary$median, stats::median(finite))
       expect_equal(summary$n, length(finite))
-    } else expect_equal(nrow(summary), 0)
+    } else {
+      expect_equal(nrow(summary), 0)
+    }
   }
 })

@@ -45,7 +45,11 @@ overview_projection_parameters_plot <- reactive({
   } else {
     viewerProjectionFirstFrameCoordinates(projection)
   }
-  XYranges <- if (is.null(projection_data)) NULL else getXYranges(projection_data)
+  XYranges <- if (is.null(projection_data)) {
+    NULL
+  } else {
+    getXYranges(projection_data)
+  }
   parameters <- list(
     projection = projection,
     n_dimensions = if (is.list(projection_resource)) {
@@ -59,10 +63,14 @@ overview_projection_parameters_plot <- reactive({
     draw_border = isTRUE(input[["overview_projection_point_border"]]),
     group_labels = isTRUE(group_labels),
     keep_square = isTRUE(input[["overview_projection_keep_square"]]),
-    x_range = if (is.null(XYranges)) list() else {
+    x_range = if (is.null(XYranges)) {
+      list()
+    } else {
       c(XYranges$x$min, XYranges$x$max)
     },
-    y_range = if (is.null(XYranges)) list() else {
+    y_range = if (is.null(XYranges)) {
+      list()
+    } else {
       c(XYranges$y$min, XYranges$y$max)
     },
     webgl = preferences[["use_webgl"]],

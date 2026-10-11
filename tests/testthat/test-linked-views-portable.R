@@ -347,37 +347,42 @@ test_that("empty Linked selections do not build the full cell index", {
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
-  writeLines(c(
-    "const fs = require('fs'), assert = require('assert');",
-    sprintf("const source = fs.readFileSync(%s, 'utf8');",
-      encodeString(viewer_test_path("www", "cell_views.js"), quote = '"')),
-    "const start = source.indexOf('  function validateWorkspace(');",
-    "eval(source.slice(start, source.indexOf('\\n  function ', start + 1)));",
-    "const D = {projections:{umap:{}}, groups:{cell_type:{}}};",
-    "const GENE_MODE='gene', GENE_PANELS_MODE='genes', RGB_MODE='rgb';",
-    "function configFingerprint(){return 'same';}",
-    "function spatialSamples(){return [];}",
-    "function catOf(mode){return mode==='cell_type';}",
-    "function fieldForMode(){return false;}",
-    "function baseOrderedSpaces(){return ['projection::umap'];}",
-    "function configError(message){throw new Error(message);}",
-    "let indexCalls=0;",
-    "function singleIndex(){indexCalls++;return new Map([['a',0],['b',1]]);}",
-    "const config={dataset:{cell_fingerprint:'same'},selection:{cells:[]},view:{",
-    "projections:['umap'],spatial_sections:[],colour:{mode:'cell_type'},filters:{},lenses:[]}};",
-    "validateWorkspace(config); assert.strictEqual(indexCalls,0);",
-    "config.dataset.cell_fingerprint='other';",
-    "assert.throws(()=>validateWorkspace(config),/different cell population/);",
-    "assert.strictEqual(indexCalls,0); config.dataset.cell_fingerprint='same';",
-    "config.view.projections=['missing'];",
-    "assert.throws(()=>validateWorkspace(config),/projection/);",
-    "config.view.projections=['umap']; config.selection.cells=['b'];",
-    "assert.strictEqual(validateWorkspace(config).cells.get('b'),1);",
-    "assert.strictEqual(indexCalls,1); config.selection.cells=['missing'];",
-    "assert.throws(()=>validateWorkspace(config),/selects cells/);",
-    "assert.strictEqual(indexCalls,2);",
-    "console.log('selection index validation passed');"
-  ), runner)
+  writeLines(
+    c(
+      "const fs = require('fs'), assert = require('assert');",
+      sprintf(
+        "const source = fs.readFileSync(%s, 'utf8');",
+        encodeString(viewer_test_path("www", "cell_views.js"), quote = '"')
+      ),
+      "const start = source.indexOf('  function validateWorkspace(');",
+      "eval(source.slice(start, source.indexOf('\\n  function ', start + 1)));",
+      "const D = {projections:{umap:{}}, groups:{cell_type:{}}};",
+      "const GENE_MODE='gene', GENE_PANELS_MODE='genes', RGB_MODE='rgb';",
+      "function configFingerprint(){return 'same';}",
+      "function spatialSamples(){return [];}",
+      "function catOf(mode){return mode==='cell_type';}",
+      "function fieldForMode(){return false;}",
+      "function baseOrderedSpaces(){return ['projection::umap'];}",
+      "function configError(message){throw new Error(message);}",
+      "let indexCalls=0;",
+      "function singleIndex(){indexCalls++;return new Map([['a',0],['b',1]]);}",
+      "const config={dataset:{cell_fingerprint:'same'},selection:{cells:[]},view:{",
+      "projections:['umap'],spatial_sections:[],colour:{mode:'cell_type'},filters:{},lenses:[]}};",
+      "validateWorkspace(config); assert.strictEqual(indexCalls,0);",
+      "config.dataset.cell_fingerprint='other';",
+      "assert.throws(()=>validateWorkspace(config),/different cell population/);",
+      "assert.strictEqual(indexCalls,0); config.dataset.cell_fingerprint='same';",
+      "config.view.projections=['missing'];",
+      "assert.throws(()=>validateWorkspace(config),/projection/);",
+      "config.view.projections=['umap']; config.selection.cells=['b'];",
+      "assert.strictEqual(validateWorkspace(config).cells.get('b'),1);",
+      "assert.strictEqual(indexCalls,1); config.selection.cells=['missing'];",
+      "assert.throws(()=>validateWorkspace(config),/selects cells/);",
+      "assert.strictEqual(indexCalls,2);",
+      "console.log('selection index validation passed');"
+    ),
+    runner
+  )
   output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
   expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
   expect_identical(output, "selection index validation passed")

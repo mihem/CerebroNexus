@@ -1123,15 +1123,24 @@ test_that("thin preloaded primary and supplement align unverified projections on
   skip_if_not_installed("BPCells")
   root <- withr::local_tempdir()
   cells <- c("3", "1", "2") # Numeric-looking barcodes are not row indices.
-  counts <- Matrix::Matrix(matrix(1:6, 2,
-    dimnames = list(c("g1", "g2"), cells)), sparse = TRUE)
+  counts <- Matrix::Matrix(
+    matrix(1:6, 2, dimnames = list(c("g1", "g2"), cells)),
+    sparse = TRUE
+  )
   object <- Cerebro$new()
-  object$setExpression(BPCells::write_matrix_dir(counts, file.path(root, "matrix.bpcells")))
+  object$setExpression(BPCells::write_matrix_dir(
+    counts,
+    file.path(root, "matrix.bpcells")
+  ))
   object$setExpressionBackend("bpcells", "matrix.bpcells")
   object$setMetaData(data.frame(cell_barcode = cells, sample = "s"))
   object$addGroup("sample", "s")
-  for (name in c("umap", "tsne")) object$addProjection(name,
-    data.frame(x = c(30, 20, 10), y = 3:1, row.names = rev(cells)))
+  for (name in c("umap", "tsne")) {
+    object$addProjection(
+      name,
+      data.frame(x = c(30, 20, 10), y = 3:1, row.names = rev(cells))
+    )
+  }
   path <- file.path(root, "test.crb")
   saveCerebro(object, path, viewer_binary = "never")
   scope <- new.env(parent = globalenv())
@@ -1142,24 +1151,51 @@ test_that("thin preloaded primary and supplement align unverified projections on
   loaded <- scope$get_or_load_crb(path)
   frame <- scope$viewerProjectionFirstFrameCache(loaded)
   expect_length(frame$canonical_projections, 0L)
-  primary <- scope$cv_build_bundle(loaded, primary_only = TRUE, first_frame = frame)
+  primary <- scope$cv_build_bundle(
+    loaded,
+    primary_only = TRUE,
+    first_frame = frame
+  )
   expect_equal(as.numeric(primary$projections$umap$x), c(10, 20, 30))
   expect_identical(rownames(frame$aligned_projections$umap), cells)
-  attr(loaded, "cerebro_viewer_pack") <- list(manifest = list(
-    n_cells = 3L, cell_order_fingerprint = "test-order"))
+  attr(loaded, "cerebro_viewer_pack") <- list(
+    manifest = list(
+      n_cells = 3L,
+      cell_order_fingerprint = "test-order"
+    )
+  )
   primary$canonical_order_id <- "test-order"
-  supplement <- scope$cv_build_compact_supplement(loaded, primary, frame, include_clone = FALSE)
+  supplement <- scope$cv_build_compact_supplement(
+    loaded,
+    primary,
+    frame,
+    include_clone = FALSE
+  )
   expect_equal(as.numeric(supplement$projections$tsne$x), c(10, 20, 30))
-  expect_named(as.list(frame$aligned_projections), c("umap", "tsne"), ignore.order = TRUE)
+  expect_named(
+    as.list(frame$aligned_projections),
+    c("umap", "tsne"),
+    ignore.order = TRUE
+  )
   # A repeat must use the dataset-owned aligned copy, without another hydration.
   repeat_projection <- scope$cv_build_projections(
-    list(getMetaData = function() stop("repeated metadata read")), seq_len(3),
-    preloaded = frame$projections, aligned_cache = frame$aligned_projections)
+    list(getMetaData = function() stop("repeated metadata read")),
+    seq_len(3),
+    preloaded = frame$projections,
+    aligned_cache = frame$aligned_projections
+  )
   expect_equal(as.numeric(repeat_projection$umap$x), c(10, 20, 30))
   invalid <- frame$projections
   rownames(invalid$umap) <- c("missing", "1", "3")
-  expect_error(scope$cv_build_projections(loaded, seq_len(3), only = "umap",
-    preloaded = invalid), "unique, matching cell identities")
+  expect_error(
+    scope$cv_build_projections(
+      loaded,
+      seq_len(3),
+      only = "umap",
+      preloaded = invalid
+    ),
+    "unique, matching cell identities"
+  )
 })
 
 test_that("primary bundle can keep canonical projection coordinates external", {
@@ -1377,7 +1413,11 @@ test_that("supplement work starts only after the painted primary reports ready",
     'observeEvent(\n  input[["coordviews_primary_ready"]]',
     fixed = TRUE
   )[[1L]][[2L]]
-  expect_match(primary_ready, "cv_start_clone_task(prepared$clone_spec)", fixed = TRUE)
+  expect_match(
+    primary_ready,
+    "cv_start_clone_task(prepared$clone_spec)",
+    fixed = TRUE
+  )
   expect_match(client, "modalities: requestedModalities()", fixed = TRUE)
 })
 

@@ -14,14 +14,22 @@ output_dir <- normalizePath(args[[2L]], mustWork = FALSE)
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 required_packages <- c(
-  "ggplot2", "patchwork", "svglite", "ragg", "jsonlite", "systemfonts", "Cairo"
+  "ggplot2",
+  "patchwork",
+  "svglite",
+  "ragg",
+  "jsonlite",
+  "systemfonts",
+  "Cairo"
 )
-missing_packages <- required_packages[!vapply(
-  required_packages,
-  requireNamespace,
-  logical(1L),
-  quietly = TRUE
-)]
+missing_packages <- required_packages[
+  !vapply(
+    required_packages,
+    requireNamespace,
+    logical(1L),
+    quietly = TRUE
+  )
+]
 if (length(missing_packages)) {
   stop("Missing R packages: ", paste(missing_packages, collapse = ", "))
 }
@@ -32,11 +40,22 @@ library(patchwork)
 # ---- Data audit -----------------------------------------------------------
 raw <- read.delim(input, check.names = FALSE, stringsAsFactors = FALSE)
 required_columns <- c(
-  "candidate", "round", "page", "visit", "status", "error",
-  "performance_ms", "budget_ms", "r_peak_rss_kib",
-  "chrome_peak_rss_kib", "js_heap_used_bytes",
-  "websocket_received_payload_bytes", "correctness_pass", "pass",
-  "candidate_git_sha", "viewer_pack_manifest_sha256"
+  "candidate",
+  "round",
+  "page",
+  "visit",
+  "status",
+  "error",
+  "performance_ms",
+  "budget_ms",
+  "r_peak_rss_kib",
+  "chrome_peak_rss_kib",
+  "js_heap_used_bytes",
+  "websocket_received_payload_bytes",
+  "correctness_pass",
+  "pass",
+  "candidate_git_sha",
+  "viewer_pack_manifest_sha256"
 )
 missing_columns <- setdiff(required_columns, names(raw))
 if (length(missing_columns)) {
@@ -58,8 +77,11 @@ if (any(!valid & !skipped)) {
   stop("Input contains benchmark errors; inspect the raw data before plotting.")
 }
 metric_columns <- c(
-  "performance_ms", "budget_ms", "r_peak_rss_kib",
-  "chrome_peak_rss_kib", "js_heap_used_bytes",
+  "performance_ms",
+  "budget_ms",
+  "r_peak_rss_kib",
+  "chrome_peak_rss_kib",
+  "js_heap_used_bytes",
   "websocket_received_payload_bytes"
 )
 if (anyNA(raw[valid, metric_columns])) {
@@ -83,23 +105,39 @@ if (length(page_counts) != 11L || any(page_counts != 3L)) {
 
 audit <- data.frame(
   item = c(
-    "input_rows", "valid_rows", "skipped_rows", "valid_pages",
-    "replicates_per_page", "missing_key_metrics", "correctness_failures",
-    "budget_failures", "publication_3s_budget_failures",
-    "candidate_git_sha", "viewer_pack_manifest_sha256"
+    "input_rows",
+    "valid_rows",
+    "skipped_rows",
+    "valid_pages",
+    "replicates_per_page",
+    "missing_key_metrics",
+    "correctness_failures",
+    "budget_failures",
+    "publication_3s_budget_failures",
+    "candidate_git_sha",
+    "viewer_pack_manifest_sha256"
   ),
   value = c(
-    nrow(raw), sum(valid), sum(skipped), length(page_counts),
+    nrow(raw),
+    sum(valid),
+    sum(skipped),
+    length(page_counts),
     paste(sort(unique(as.integer(page_counts))), collapse = ","),
     sum(is.na(raw[valid, metric_columns])),
-    sum(!raw$correctness_pass[valid]), sum(!raw$pass[valid]),
+    sum(!raw$correctness_pass[valid]),
+    sum(!raw$pass[valid]),
     sum(raw$performance_ms[valid] > 3000),
-    unique(raw$candidate_git_sha), unique(raw$viewer_pack_manifest_sha256)
+    unique(raw$candidate_git_sha),
+    unique(raw$viewer_pack_manifest_sha256)
   ),
   stringsAsFactors = FALSE
 )
 write.csv(audit, file.path(output_dir, "data_audit.csv"), row.names = FALSE)
-write.csv(raw[skipped, ], file.path(output_dir, "skipped_observations.csv"), row.names = FALSE)
+write.csv(
+  raw[skipped, ],
+  file.path(output_dir, "skipped_observations.csv"),
+  row.names = FALSE
+)
 
 # ---- Source data ----------------------------------------------------------
 page_labels <- c(
@@ -116,11 +154,21 @@ page_labels <- c(
   trajectory = "Trajectory"
 )
 
-source_data <- raw[valid, c(
-  "round", "page", "performance_ms", "budget_ms", "r_peak_rss_kib",
-  "chrome_peak_rss_kib", "js_heap_used_bytes",
-  "websocket_received_payload_bytes", "correctness_pass", "pass"
-)]
+source_data <- raw[
+  valid,
+  c(
+    "round",
+    "page",
+    "performance_ms",
+    "budget_ms",
+    "r_peak_rss_kib",
+    "chrome_peak_rss_kib",
+    "js_heap_used_bytes",
+    "websocket_received_payload_bytes",
+    "correctness_pass",
+    "pass"
+  )
+]
 source_data$page_label <- unname(page_labels[source_data$page])
 source_data$first_frame_s <- source_data$performance_ms / 1000
 source_data$budget_s <- source_data$budget_ms / 1000
@@ -129,7 +177,8 @@ source_data$publication_budget_s <- 3
 source_data$r_peak_gib <- source_data$r_peak_rss_kib / 1024^2
 source_data$chrome_peak_gib <- source_data$chrome_peak_rss_kib / 1024^2
 source_data$js_heap_mib <- source_data$js_heap_used_bytes / 1024^2
-source_data$websocket_mib <- source_data$websocket_received_payload_bytes / 1024^2
+source_data$websocket_mib <- source_data$websocket_received_payload_bytes /
+  1024^2
 write.csv(
   source_data,
   file.path(output_dir, "figure_source_data.csv"),
@@ -140,26 +189,29 @@ median_value <- function(value) stats::median(value, na.rm = FALSE)
 q1_value <- function(value) unname(stats::quantile(value, 0.25, names = FALSE))
 q3_value <- function(value) unname(stats::quantile(value, 0.75, names = FALSE))
 
-summary_rows <- do.call(rbind, lapply(split(source_data, source_data$page), function(frame) {
-  data.frame(
-    page = frame$page[[1L]],
-    page_label = frame$page_label[[1L]],
-    n = nrow(frame),
-    first_frame_median_s = median_value(frame$first_frame_s),
-    first_frame_q1_s = q1_value(frame$first_frame_s),
-    first_frame_q3_s = q3_value(frame$first_frame_s),
-    first_frame_max_s = max(frame$first_frame_s),
-    budget_s = unique(frame$budget_s),
-    budget_ratio_median = median_value(frame$budget_ratio),
-    budget_ratio_q1 = q1_value(frame$budget_ratio),
-    budget_ratio_q3 = q3_value(frame$budget_ratio),
-    r_peak_median_gib = median_value(frame$r_peak_gib),
-    chrome_peak_median_gib = median_value(frame$chrome_peak_gib),
-    js_heap_median_mib = median_value(frame$js_heap_mib),
-    websocket_median_mib = median_value(frame$websocket_mib),
-    stringsAsFactors = FALSE
-  )
-}))
+summary_rows <- do.call(
+  rbind,
+  lapply(split(source_data, source_data$page), function(frame) {
+    data.frame(
+      page = frame$page[[1L]],
+      page_label = frame$page_label[[1L]],
+      n = nrow(frame),
+      first_frame_median_s = median_value(frame$first_frame_s),
+      first_frame_q1_s = q1_value(frame$first_frame_s),
+      first_frame_q3_s = q3_value(frame$first_frame_s),
+      first_frame_max_s = max(frame$first_frame_s),
+      budget_s = unique(frame$budget_s),
+      budget_ratio_median = median_value(frame$budget_ratio),
+      budget_ratio_q1 = q1_value(frame$budget_ratio),
+      budget_ratio_q3 = q3_value(frame$budget_ratio),
+      r_peak_median_gib = median_value(frame$r_peak_gib),
+      chrome_peak_median_gib = median_value(frame$chrome_peak_gib),
+      js_heap_median_mib = median_value(frame$js_heap_mib),
+      websocket_median_mib = median_value(frame$websocket_mib),
+      stringsAsFactors = FALSE
+    )
+  })
+)
 rownames(summary_rows) <- NULL
 summary_rows$publication_budget_s <- 3
 summary_rows <- summary_rows[order(summary_rows$first_frame_median_s), ]
@@ -201,8 +253,11 @@ memory_summary <- aggregate(
 # browser transport. All three benchmark rounds are shown for every page.
 
 okabe_ito <- c(
-  blue = "#0072B2", orange = "#E69F00", green = "#009E73",
-  vermillion = "#D55E00", grey = "#777777"
+  blue = "#0072B2",
+  orange = "#E69F00",
+  green = "#009E73",
+  vermillion = "#D55E00",
+  grey = "#777777"
 )
 
 base_theme <- theme_bw(base_size = 7, base_family = "Arial") +
@@ -308,40 +363,63 @@ p_memory <- ggplot(source_data, aes(y = page_label)) +
       x = chrome_peak_gib,
       y = as.numeric(page_label) - 0.10 + round_offset * 0.4
     ),
-    shape = 24, size = 1.15, stroke = 0.3,
-    colour = okabe_ito[["orange"]], fill = "white"
+    shape = 24,
+    size = 1.15,
+    stroke = 0.3,
+    colour = okabe_ito[["orange"]],
+    fill = "white"
   ) +
   geom_point(
     aes(
       x = r_peak_gib,
       y = as.numeric(page_label) + 0.10 + round_offset * 0.4
     ),
-    shape = 21, size = 1.15, stroke = 0.3,
-    colour = okabe_ito[["blue"]], fill = "white"
+    shape = 21,
+    size = 1.15,
+    stroke = 0.3,
+    colour = okabe_ito[["blue"]],
+    fill = "white"
   ) +
   geom_point(
     data = memory_summary,
     aes(x = peak_gib, y = page_label, colour = process, shape = process),
-    size = 2.05, stroke = 0.45,
+    size = 2.05,
+    stroke = 0.45,
     inherit.aes = FALSE
   ) +
-  scale_colour_manual(values = c(
-    "R process tree" = okabe_ito[["blue"]],
-    "Browser process tree" = okabe_ito[["orange"]]
-  ), guide = "none") +
-  scale_shape_manual(values = c(
-    "R process tree" = 16,
-    "Browser process tree" = 17
-  ), guide = "none") +
-  annotate(
-    "text", x = 0.84, y = length(page_order) + 0.55,
-    label = "Browser", hjust = 0, size = 2.15,
-    family = "Arial", colour = okabe_ito[["orange"]]
+  scale_colour_manual(
+    values = c(
+      "R process tree" = okabe_ito[["blue"]],
+      "Browser process tree" = okabe_ito[["orange"]]
+    ),
+    guide = "none"
+  ) +
+  scale_shape_manual(
+    values = c(
+      "R process tree" = 16,
+      "Browser process tree" = 17
+    ),
+    guide = "none"
   ) +
   annotate(
-    "text", x = 1.56, y = length(page_order) + 0.55,
-    label = "R", hjust = 0, size = 2.15,
-    family = "Arial", colour = okabe_ito[["blue"]]
+    "text",
+    x = 0.84,
+    y = length(page_order) + 0.55,
+    label = "Browser",
+    hjust = 0,
+    size = 2.15,
+    family = "Arial",
+    colour = okabe_ito[["orange"]]
+  ) +
+  annotate(
+    "text",
+    x = 1.56,
+    y = length(page_order) + 0.55,
+    label = "R",
+    hjust = 0,
+    size = 2.15,
+    family = "Arial",
+    colour = okabe_ito[["blue"]]
   ) +
   scale_y_discrete(drop = FALSE, expand = expansion(add = c(0.45, 0.9))) +
   scale_x_continuous(
@@ -389,7 +467,9 @@ panel_design <- "
 AABC
 "
 
-figure <- p_time + p_memory + p_transport +
+figure <- p_time +
+  p_memory +
+  p_transport +
   plot_layout(design = panel_design) +
   plot_annotation(
     tag_levels = "a",
@@ -397,8 +477,12 @@ figure <- p_time + p_memory + p_transport +
     tag_suffix = ")",
     theme = theme(
       plot.tag = element_text(
-        family = "Arial", size = 8, face = "bold", colour = "black",
-        hjust = 0, vjust = 1
+        family = "Arial",
+        size = 8,
+        face = "bold",
+        colour = "black",
+        hjust = 0,
+        vjust = 1
       ),
       plot.tag.position = c(0.015, 0.985)
     )
@@ -412,10 +496,17 @@ height_in <- height_mm / 25.4
 prefix <- file.path(output_dir, "latest_viewer_performance")
 
 skill_root <- file.path(
-  Sys.getenv("USERPROFILE"), ".codex", "skills", "nature-figure"
+  Sys.getenv("USERPROFILE"),
+  ".codex",
+  "skills",
+  "nature-figure"
 )
 alignment_helper <- file.path(skill_root, "scripts", "panel_alignment.R")
-alignment_auditor <- file.path(skill_root, "scripts", "audit_panel_alignment.py")
+alignment_auditor <- file.path(
+  skill_root,
+  "scripts",
+  "audit_panel_alignment.py"
+)
 if (!file.exists(alignment_helper) || !file.exists(alignment_auditor)) {
   stop("nature-figure panel-alignment tools are unavailable.")
 }
@@ -425,22 +516,38 @@ source(alignment_helper)
 # which yields zero-size panels on this Windows R build. Measure each resolved
 # panel viewport on the final-size device while retaining the same JSON audit.
 write_patchwork_panel_layout <- function(
-  plot, manifest_path, width_in, height_in, panel_ids = NULL,
-  row_groups = NULL, column_groups = NULL, exemptions = list()
+  plot,
+  manifest_path,
+  width_in,
+  height_in,
+  panel_ids = NULL,
+  row_groups = NULL,
+  column_groups = NULL,
+  exemptions = list()
 ) {
   probe_path <- tempfile(fileext = ".pdf")
   grDevices::cairo_pdf(
-    probe_path, width = width_in, height = height_in,
-    family = "Arial", onefile = TRUE
+    probe_path,
+    width = width_in,
+    height = height_in,
+    family = "Arial",
+    onefile = TRUE
   )
   device_open <- TRUE
-  on.exit({
-    if (device_open) grDevices::dev.off()
-    unlink(probe_path)
-  }, add = TRUE)
+  on.exit(
+    {
+      if (device_open) {
+        grDevices::dev.off()
+      }
+      unlink(probe_path)
+    },
+    add = TRUE
+  )
   grob <- patchwork::patchworkGrob(plot)
   panel_rows <- .nature_alignment_panel_rows(grob)
-  if (is.null(panel_ids)) panel_ids <- letters[seq_len(nrow(panel_rows))]
+  if (is.null(panel_ids)) {
+    panel_ids <- letters[seq_len(nrow(panel_rows))]
+  }
   if (length(panel_ids) != nrow(panel_rows)) {
     stop("panel_ids must match the measured patchwork panels.")
   }
@@ -451,25 +558,38 @@ write_patchwork_panel_layout <- function(
   panels <- lapply(seq_len(nrow(panel_rows)), function(index) {
     row <- panel_rows[index, ]
     viewport_name <- sprintf(
-      "%s.%d-%d-%d-%d", row$name, row$t, row$r, row$b, row$l
+      "%s.%d-%d-%d-%d",
+      row$name,
+      row$t,
+      row$r,
+      row$b,
+      row$l
     )
     grid::seekViewport(viewport_name)
     lower_left <- grid::deviceLoc(
-      grid::unit(0, "npc"), grid::unit(0, "npc"), valueOnly = TRUE
+      grid::unit(0, "npc"),
+      grid::unit(0, "npc"),
+      valueOnly = TRUE
     )
     upper_right <- grid::deviceLoc(
-      grid::unit(1, "npc"), grid::unit(1, "npc"), valueOnly = TRUE
+      grid::unit(1, "npc"),
+      grid::unit(1, "npc"),
+      valueOnly = TRUE
     )
     grid::upViewport(0)
     list(
       id = panel_ids[[index]],
       bbox_pt = unname(c(
-        lower_left$x * 72, lower_left$y * 72,
-        upper_right$x * 72, upper_right$y * 72
+        lower_left$x * 72,
+        lower_left$y * 72,
+        upper_right$x * 72,
+        upper_right$y * 72
       )),
       grid_id = "patchwork-grid-1",
-      row_start = as.integer(row$t - 1), row_stop = as.integer(row$b),
-      col_start = as.integer(row$l - 1), col_stop = as.integer(row$r)
+      row_start = as.integer(row$t - 1),
+      row_stop = as.integer(row$b),
+      col_start = as.integer(row$l - 1),
+      col_stop = as.integer(row$r)
     )
   })
 
@@ -480,12 +600,18 @@ write_patchwork_panel_layout <- function(
     panels = panels,
     exemptions = exemptions
   )
-  if (!is.null(row_groups)) manifest$row_groups <- .nature_alignment_groups(row_groups)
+  if (!is.null(row_groups)) {
+    manifest$row_groups <- .nature_alignment_groups(row_groups)
+  }
   if (!is.null(column_groups)) {
     manifest$column_groups <- .nature_alignment_groups(column_groups)
   }
   jsonlite::write_json(
-    manifest, manifest_path, auto_unbox = TRUE, pretty = TRUE, digits = NA
+    manifest,
+    manifest_path,
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    digits = NA
   )
   grDevices::dev.off()
   device_open <- FALSE
@@ -509,28 +635,41 @@ require_patchwork_panel_alignment(
 )
 
 svglite::svglite(
-  paste0(prefix, ".svg"), width = width_in, height = height_in
+  paste0(prefix, ".svg"),
+  width = width_in,
+  height = height_in
 )
 print(figure)
 dev.off()
 
 Cairo::CairoPDF(
-  paste0(prefix, ".pdf"), width = width_in, height = height_in,
-  family = "Arial", onefile = TRUE
+  paste0(prefix, ".pdf"),
+  width = width_in,
+  height = height_in,
+  family = "Arial",
+  onefile = TRUE
 )
 print(figure)
 dev.off()
 
 ragg::agg_tiff(
-  paste0(prefix, ".tiff"), width = width_in, height = height_in,
-  units = "in", res = 350, background = "white"
+  paste0(prefix, ".tiff"),
+  width = width_in,
+  height = height_in,
+  units = "in",
+  res = 350,
+  background = "white"
 )
 print(figure)
 dev.off()
 
 ragg::agg_png(
-  paste0(prefix, ".preview.png"), width = width_in, height = height_in,
-  units = "in", res = 350, background = "white"
+  paste0(prefix, ".preview.png"),
+  width = width_in,
+  height = height_in,
+  units = "in",
+  res = 350,
+  background = "white"
 )
 print(figure)
 dev.off()
@@ -556,7 +695,8 @@ panel_qa <- data.frame(
     "Pass; aligned with panels (a) and (b)"
   ),
   visual_collision_and_crop = rep(
-    sprintf("Pass at final %d x %d mm size", width_mm, height_mm), 3
+    sprintf("Pass at final %d x %d mm size", width_mm, height_mm),
+    3
   ),
   pass = rep(TRUE, 3),
   stringsAsFactors = FALSE

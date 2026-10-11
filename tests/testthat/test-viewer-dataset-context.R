@@ -380,16 +380,30 @@ test_that("server rejects stale auxiliary requests before consuming payloads", {
   runtime$session <- list(sendBinaryMessage = function(type, value) {
     sent[[length(sent) + 1L]] <<- value
   })
-  message <- list(id = "overview_projection", wire_token = 1L,
-    dataset_context = context, render_token = 1,
-    selection_key = c("B-1", "B-2"), hover = list())
+  message <- list(
+    id = "overview_projection",
+    wire_token = 1L,
+    dataset_context = context,
+    render_token = 1,
+    selection_key = c("B-1", "B-2"),
+    hover = list()
+  )
   runtime$.cerebro_cell_view_aux_pending[["overview_projection:1"]] <- message
   expect_false(runtime$cerebroCellViewAuxRequest(list(
-    id = "overview_projection", wire_token = 1L, dataset_context = old)))
+    id = "overview_projection",
+    wire_token = 1L,
+    dataset_context = old
+  )))
   expect_length(sent, 0L)
-  expect_identical(runtime$.cerebro_cell_view_aux_pending[["overview_projection:1"]], message)
+  expect_identical(
+    runtime$.cerebro_cell_view_aux_pending[["overview_projection:1"]],
+    message
+  )
   expect_true(runtime$cerebroCellViewAuxRequest(list(
-    id = "overview_projection", wire_token = 1L, dataset_context = context)))
+    id = "overview_projection",
+    wire_token = 1L,
+    dataset_context = context
+  )))
   expect_length(sent, 1L)
   expect_identical(sent[[1]]$dataset_context, context)
   expect_null(runtime$.cerebro_cell_view_aux_pending[["overview_projection:1"]])
@@ -493,7 +507,11 @@ test_that("reconnects fail closed until the server replays its snapshot", {
   expect_match(client, "currentPhase = 'pending'", fixed = TRUE)
   expect_match(client, "viewer_dataset_context_sync", fixed = TRUE)
   expect_match(server, 'input[["viewer_dataset_context_sync"]]', fixed = TRUE)
-  expect_match(server, "snapshot <- isolate(viewer_dataset_snapshot())", fixed = TRUE)
+  expect_match(
+    server,
+    "snapshot <- isolate(viewer_dataset_snapshot())",
+    fixed = TRUE
+  )
   expect_match(
     server,
     'if (isTRUE(snapshot$ok)) "ready" else "error"',
@@ -529,30 +547,48 @@ test_that("portable-view requests and responses use one captured context", {
     fixed = TRUE
   )
   expect_gte(
-    sum(gregexpr(
-      "viewerDatasetContextEqual(request_context, current_context)",
-      server,
-      fixed = TRUE
-    )[[1L]] > 0),
+    sum(
+      gregexpr(
+        "viewerDatasetContextEqual(request_context, current_context)",
+        server,
+        fixed = TRUE
+      )[[1L]] >
+        0
+    ),
     2L
   )
   expect_match(server, "dataset_context = dataset_context", fixed = TRUE)
   # Restrict this contract to portable-view handlers and their response helper.
   # The synchronous expression-feedback helper legitimately captures live context.
-  config_expressions <- Filter(function(expr) {
-    if (!is.call(expr)) return(FALSE)
-    if (identical(expr[[1L]], as.name("<-"))) {
-      return(identical(expr[[2L]], as.name("cv_config_send_result")))
-    }
-    identical(expr[[1L]], as.name("observeEvent")) &&
-      any(vapply(c("coordviews_config_request", "coordviews_config_upload_request"),
-        function(id) grepl(id, paste(deparse(expr[[2L]]), collapse = ""), fixed = TRUE),
-        logical(1)))
-  }, as.list(parse(text = server)))
+  config_expressions <- Filter(
+    function(expr) {
+      if (!is.call(expr)) {
+        return(FALSE)
+      }
+      if (identical(expr[[1L]], as.name("<-"))) {
+        return(identical(expr[[2L]], as.name("cv_config_send_result")))
+      }
+      identical(expr[[1L]], as.name("observeEvent")) &&
+        any(vapply(
+          c("coordviews_config_request", "coordviews_config_upload_request"),
+          function(id) {
+            grepl(id, paste(deparse(expr[[2L]]), collapse = ""), fixed = TRUE)
+          },
+          logical(1)
+        ))
+    },
+    as.list(parse(text = server))
+  )
   expect_length(config_expressions, 3L)
   expect_no_match(
-    paste(vapply(config_expressions, function(expr) paste(deparse(expr), collapse = "\n"),
-      character(1)), collapse = "\n"),
+    paste(
+      vapply(
+        config_expressions,
+        function(expr) paste(deparse(expr), collapse = "\n"),
+        character(1)
+      ),
+      collapse = "\n"
+    ),
     "dataset_context = viewer_loaded_dataset_context()",
     fixed = TRUE
   )
@@ -642,8 +678,14 @@ test_that("a rapid selector A/B/A sequence rejects stale ready messages", {
     "console.log(JSON.stringify({blockedImmediately,staleRejected,staleARejected,finalAccepted,fresh:C.accepts(msg(a3))}));"
   ))
   expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
-  expect_identical(jsonlite::fromJSON(output), list(
-    blockedImmediately = TRUE, staleRejected = TRUE,
-    staleARejected = TRUE, finalAccepted = TRUE, fresh = TRUE
-  ))
+  expect_identical(
+    jsonlite::fromJSON(output),
+    list(
+      blockedImmediately = TRUE,
+      staleRejected = TRUE,
+      staleARejected = TRUE,
+      finalAccepted = TRUE,
+      fresh = TRUE
+    )
+  )
 })

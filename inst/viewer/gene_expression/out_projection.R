@@ -1,7 +1,11 @@
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
 ##----------------------------------------------------------------------------##
-cerebroRegisterInfo(input, "expression_projection_info", expression_projection_info)
+cerebroRegisterInfo(
+  input,
+  "expression_projection_info",
+  expression_projection_info
+)
 
 ##----------------------------------------------------------------------------##
 ## Text in info box.

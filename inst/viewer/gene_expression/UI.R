@@ -95,16 +95,24 @@ tab_gene_expression <- tabItem(
         offset = 0,
         class = "cerebro-viz-col",
         div(
-          id = "expression_feedback", class = "cerebro-view-feedback",
-          role = "status", `aria-live` = "polite", `aria-atomic` = "true",
+          id = "expression_feedback",
+          class = "cerebro-view-feedback",
+          role = "status",
+          `aria-live` = "polite",
+          `aria-atomic` = "true",
           "Choose a gene to explore expression."
         ),
         cerebroCellViewOutput("expression_projection")
       )
     )
   ),
-  div(id = "expression_selection_feedback", class = "cerebro-secondary-status",
-    role = "status", `aria-live` = "polite", hidden = "hidden"),
+  div(
+    id = "expression_selection_feedback",
+    class = "cerebro-secondary-status",
+    role = "status",
+    `aria-live` = "polite",
+    hidden = "hidden"
+  ),
   uiOutput("expression_details_selected_cells_UI"),
   uiOutput("expression_in_selected_cells_UI"),
   div(

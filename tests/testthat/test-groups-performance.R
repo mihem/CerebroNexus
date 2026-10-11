@@ -28,15 +28,20 @@ test_that("Groups reads only the active columns after its viewport gate", {
 
 groups_test_function <- function(name) {
   expressions <- parse(viewer_test_path("groups", "composition.R"))
-  assignment <- Filter(function(expression) {
-    is.call(expression) &&
-      identical(expression[[1L]], quote(`<-`)) &&
-      identical(as.character(expression[[2L]]), name)
-  }, expressions)
+  assignment <- Filter(
+    function(expression) {
+      is.call(expression) &&
+        identical(expression[[1L]], quote(`<-`)) &&
+        identical(as.character(expression[[2L]]), name)
+    },
+    expressions
+  )
   stopifnot(length(assignment) == 1L)
   scope <- new.env(parent = globalenv())
   if (!identical(name, "groupsFormatComposition")) {
-    scope$groupsFormatComposition <- groups_test_function("groupsFormatComposition")
+    scope$groupsFormatComposition <- groups_test_function(
+      "groupsFormatComposition"
+    )
   }
   eval(assignment[[1L]], envir = scope)
   scope[[name]]
@@ -57,7 +62,11 @@ test_that("Groups builds its first-frame controls without a renderUI cascade", {
   )
 
   expect_false(grepl("groups_composition_UI", composition, fixed = TRUE))
-  expect_false(grepl("groups_by_other_group_output_UI", composition, fixed = TRUE))
+  expect_false(grepl(
+    "groups_by_other_group_output_UI",
+    composition,
+    fixed = TRUE
+  ))
   expect_match(controls, "groups_controls_UI", fixed = TRUE)
   expect_match(ui, "plotlyOutput(\"groups_by_other_group_plot\")", fixed = TRUE)
   expect_match(ui, "groups_plotly_dependencies", fixed = TRUE)
@@ -134,37 +143,56 @@ test_that("single-group controls keep expression metrics usable across dataset c
   controls <- viewer_test_path("groups", "select_group.R")
   metrics <- viewer_test_path("groups", "expression_metrics.R")
   plots <- viewer_test_path("plotting_functions.R")
-  shiny::testServer(function(input, output, session) {
-    groups <- reactiveVal(c("sample", "condition"))
-    getGroups <- function() groups()
-    metadata <- data.frame(sample = c("A", "A", "B"), nUMI = c(1, 3, 7))
-    viewerProjectionFirstFrameMetadata <- function() metadata
-    viewerPackCurrent <- function() NULL
-    viewerPackGroupMetric <- function(...) NULL
-    groupsMetadataColumns <- function(columns) metadata[, columns, drop = FALSE]
-    reactive_group_colors <- function(...) c(A = "red", B = "blue")
-    cachePlot <- function(x, ...) x
-    cerebroRegisterInfo <- function(...) NULL
-    available_crb_files <- list(selected = "fixture")
-    sys.source(plots, environment())
-    sys.source(controls, environment())
-    sys.source(metrics, environment())
-  }, {
-    session$flushReact()
-    expect_match(output$groups_controls_UI$html, "groups_by_other_group_second_group")
-    groups("sample")
-    session$flushReact()
-    expect_match(output$groups_controls_UI$html, "groups_selected_group")
-    expect_false(grepl("groups_by_other_group_second_group", output$groups_controls_UI$html))
-    session$setInputs(groups_selected_group = "sample",
-      groups_expression_metrics_render_request = 1,
-      groups_expression_metrics_tabs = "Number of transcripts")
-    rendered <- jsonlite::fromJSON(output$groups_nUMI_plot, simplifyVector = FALSE)
-    boxes <- Filter(function(trace) identical(trace$type, "box"), rendered$x$data)
-    expect_length(boxes, 1)
-    expect_equal(unlist(boxes[[1L]]$median), c(2, 7))
-    groups(character())
-    session$flushReact()
-    expect_match(output$groups_controls_UI$html, "No grouping variables")
-  })
+  shiny::testServer(
+    function(input, output, session) {
+      groups <- reactiveVal(c("sample", "condition"))
+      getGroups <- function() groups()
+      metadata <- data.frame(sample = c("A", "A", "B"), nUMI = c(1, 3, 7))
+      viewerProjectionFirstFrameMetadata <- function() metadata
+      viewerPackCurrent <- function() NULL
+      viewerPackGroupMetric <- function(...) NULL
+      groupsMetadataColumns <- function(columns) {
+        metadata[, columns, drop = FALSE]
+      }
+      reactive_group_colors <- function(...) c(A = "red", B = "blue")
+      cachePlot <- function(x, ...) x
+      cerebroRegisterInfo <- function(...) NULL
+      available_crb_files <- list(selected = "fixture")
+      sys.source(plots, environment())
+      sys.source(controls, environment())
+      sys.source(metrics, environment())
+    },
+    {
+      session$flushReact()
+      expect_match(
+        output$groups_controls_UI$html,
+        "groups_by_other_group_second_group"
+      )
+      groups("sample")
+      session$flushReact()
+      expect_match(output$groups_controls_UI$html, "groups_selected_group")
+      expect_false(grepl(
+        "groups_by_other_group_second_group",
+        output$groups_controls_UI$html
+      ))
+      session$setInputs(
+        groups_selected_group = "sample",
+        groups_expression_metrics_render_request = 1,
+        groups_expression_metrics_tabs = "Number of transcripts"
+      )
+      rendered <- jsonlite::fromJSON(
+        output$groups_nUMI_plot,
+        simplifyVector = FALSE
+      )
+      boxes <- Filter(
+        function(trace) identical(trace$type, "box"),
+        rendered$x$data
+      )
+      expect_length(boxes, 1)
+      expect_equal(unlist(boxes[[1L]]$median), c(2, 7))
+      groups(character())
+      session$flushReact()
+      expect_match(output$groups_controls_UI$html, "No grouping variables")
+    }
+  )
 })

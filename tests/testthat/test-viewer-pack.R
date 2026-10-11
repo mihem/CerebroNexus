@@ -106,21 +106,39 @@ test_that("packed projections and first frames align shuffled cell identities", 
   saveCerebro(object, crb, codec = "rds")
   pack <- buildViewerPack(crb, viewer_binary = "always")
   expect_true(validateViewerPack(crb)$valid)
-  actual <- matrix(readBin(file.path(pack, "projections/001.bin"),
-    numeric(), n = 6, size = 4, endian = "little"), ncol = 2, byrow = TRUE)
+  actual <- matrix(
+    readBin(
+      file.path(pack, "projections/001.bin"),
+      numeric(),
+      n = 6,
+      size = 4,
+      endian = "little"
+    ),
+    ncol = 2,
+    byrow = TRUE
+  )
   expect_equal(unname(actual), unname(as.matrix(expected)))
   scope <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), scope)
   scope$getProjection <- function(name) object$projections[[name]]
   scope$getMetaData <- function() object$getMetaData()
-  expect_identical(scope$viewerProjectionFirstFrameCoordinates("umap"), expected)
+  expect_identical(
+    scope$viewerProjectionFirstFrameCoordinates("umap"),
+    expected
+  )
   for (ids in list(NULL, c("x", "y", "z"), c("1", "1", "3"))) {
     bad <- as.matrix(expected)
     rownames(bad) <- ids
     object$projections$umap <- bad
     saveCerebro(object, crb, codec = "rds")
-    expect_error(buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE), "cell identities")
-    expect_error(scope$viewerProjectionFirstFrameCoordinates("umap"), "cell identities")
+    expect_error(
+      buildViewerPack(crb, viewer_binary = "always", overwrite = TRUE),
+      "cell identities"
+    )
+    expect_error(
+      scope$viewerProjectionFirstFrameCoordinates("umap"),
+      "cell identities"
+    )
   }
 })
 
@@ -137,9 +155,15 @@ test_that("old packs retain independent assets but cannot publish unchecked proj
   expect_match(validateViewerPack(crb)$reason, "Rebuild Viewer Pack")
   scope <- new.env(parent = globalenv())
   sys.source(viewer_test_path("core", "viewer_pack.R"), scope)
-  expect_message(opened <- scope$viewerPackOpen(crb, readCerebro(crb)), "Rebuild")
+  expect_message(
+    opened <- scope$viewerPackOpen(crb, readCerebro(crb)),
+    "Rebuild"
+  )
   expect_length(opened$manifest$projection_names, 0)
-  expect_identical(scope$viewerPackCellBarcodes(opened), readCerebro(crb)$getMetaData()$cell_barcode)
+  expect_identical(
+    scope$viewerPackCellBarcodes(opened),
+    readCerebro(crb)$getMetaData()$cell_barcode
+  )
   expect_false(is.null(scope$viewerPackImmuneIndex(opened, "TCR")))
 })
 
@@ -279,7 +303,10 @@ test_that("Viewer Pack links exact trajectory geometry to canonical projection",
   expect_identical(frame$geometry_kind, "canonical_projection")
   expect_identical(frame$projection_name, "umap")
   expect_identical(frame$subset_kind, "exclude_uint32")
-  expect_false(file.exists(file.path(descriptor$path, "trajectory/001.geometry.bin")))
+  expect_false(file.exists(file.path(
+    descriptor$path,
+    "trajectory/001.geometry.bin"
+  )))
   excluded <- readBin(
     file.path(descriptor$path, frame$subset_path),
     what = integer(),
@@ -519,7 +546,9 @@ test_that("Viewer Pack runtime loads HLA assets with exact fallback", {
   expect_null(first_frame$lineage_col)
   expect_s3_class(first_frame$graph_raw, "igraph")
   expect_identical(first_frame$default_min_nodes, 2L)
-  expect_true(is.null(first_frame$graph_snapshot) || is.list(first_frame$graph_snapshot))
+  expect_true(
+    is.null(first_frame$graph_snapshot) || is.list(first_frame$graph_snapshot)
+  )
   if (!is.null(first_frame$graph_snapshot)) {
     expect_identical(first_frame$graph_snapshot$version, 1L)
     expect_type(first_frame$graph_snapshot$vertex_attrs, "list")
@@ -809,7 +838,11 @@ test_that("packed violin summaries survive serialization without altering statis
   root <- tempfile("pack-violin-")
   dir.create(root)
   on.exit(unlink(root, recursive = TRUE), add = TRUE)
-  crb <- viewer_pack_fixture(file.path(root, "data.crb"), n = 10000L, groups = TRUE)
+  crb <- viewer_pack_fixture(
+    file.path(root, "data.crb"),
+    n = 10000L,
+    groups = TRUE
+  )
   object <- readCerebro(crb)
   object$meta_data$nUMI <- rep(1:10, 1000)
   object$meta_data$nUMI[10000] <- 1e9
@@ -819,8 +852,11 @@ test_that("packed violin summaries survive serialization without altering statis
   sys.source(viewer_test_path("core", "viewer_pack.R"), scope)
   pack <- scope$viewerPackOpen(crb, object)
   value <- scope$viewerPackGroupMetric(pack, "group", "nUMI")
-  expected <- CerebroNexus:::.viewerPackCompactViolinData(object$getMetaData(),
-    "group", "nUMI")
+  expected <- CerebroNexus:::.viewerPackCompactViolinData(
+    object$getMetaData(),
+    "group",
+    "nUMI"
+  )
   expect_identical(value, expected)
   pack$manifest$violin_summary_version <- NULL
   expect_null(scope$viewerPackGroupMetric(pack, "group", "nUMI"))

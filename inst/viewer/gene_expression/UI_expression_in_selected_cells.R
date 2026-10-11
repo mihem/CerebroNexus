@@ -51,9 +51,12 @@ output[["expression_in_selected_cells"]] <- plotly::renderPlotly({
   cells_df[["selection_key"]] <- as.character(
     getMetaData()[["cell_barcode"]][expression_projection_cells_to_show()]
   )
-  stable_selection <- "selection_key" %in% colnames(selected_cells) &&
-    any(!is.na(selected_cells[["selection_key"]]) &
-      nzchar(as.character(selected_cells[["selection_key"]])))
+  stable_selection <- "selection_key" %in%
+    colnames(selected_cells) &&
+    any(
+      !is.na(selected_cells[["selection_key"]]) &
+        nzchar(as.character(selected_cells[["selection_key"]]))
+    )
   identifier <- if (!stable_selection) {
     paste0(cells_df[["X1"]], "-", cells_df[["X2"]])
   } else {
