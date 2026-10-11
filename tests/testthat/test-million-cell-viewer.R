@@ -501,11 +501,16 @@ test_that("canonical projections use validated static assets with wire fallback"
     "projection_resource <- viewerProjectionAsset(",
     fixed = TRUE
   )
-  expect_match(
+  expect_true(r_test_has_call(
     parameters,
-    "XYranges <- if (is.null(projection_data)) NULL else getXYranges",
-    fixed = TRUE
-  )
+    quote(
+      XYranges <- if (is.null(projection_data)) {
+        NULL
+      } else {
+        getXYranges(projection_data)
+      }
+    )
+  ))
   expect_match(server, "viewerProjectionCatalog <- function", fixed = TRUE)
   expect_match(server, 'id = "overview_projection"', fixed = TRUE)
   expect_match(
