@@ -9,7 +9,7 @@ object to visualize in Cerebro."><meta property="og:image" content="https://mihe
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,12 +33,15 @@ object to visualize in Cerebro."><meta property="og:image" content="https://mihe
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
-    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Expression backend benchmark: embedded vs bpcells vs h5 at scale</a></li>
+    <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
+    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
     <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
@@ -94,6 +97,9 @@ object to visualize in Cerebro.</p>
 <span>  nGene <span class="op">=</span> <span class="st">"nGene"</span>,</span>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  codec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"qs2"</span>, <span class="st">"rds"</span><span class="op">)</span>,</span>
+<span>  viewer_binary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
+<span>  viewer_binary_threshold <span class="op">=</span> <span class="fl">500000L</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -163,6 +169,22 @@ copied from the input object as is. It is recommended to use a sparse format,
 such as <code>dgCMatrix</code> from the <code>Matrix</code> package.</p></dd>
 
 
+<dt id="arg-codec">codec<a class="anchor" aria-label="anchor" href="#arg-codec"></a></dt>
+<dd><p>Serialization codec for the CRB payload. Defaults to
+<code>"qs2"</code>; use <code>"rds"</code> when direct compatibility with
+<code><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS()</a></code> is required.</p></dd>
+
+
+<dt id="arg-viewer-binary">viewer_binary<a class="anchor" aria-label="anchor" href="#arg-viewer-binary"></a></dt>
+<dd><p>Build the derived Viewer Pack <code>"auto"</code>matically
+for large datasets, <code>"always"</code>, or <code>"never"</code>.</p></dd>
+
+
+<dt id="arg-viewer-binary-threshold">viewer_binary_threshold<a class="anchor" aria-label="anchor" href="#arg-viewer-binary-threshold"></a></dt>
+<dd><p>Dataset-level cell threshold used by
+<code>viewer_binary = "auto"</code>.</p></dd>
+
+
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>Set this to <code>TRUE</code> if you want additional log messages;
 defaults to <code>FALSE</code>.</p></dd>
@@ -188,15 +210,15 @@ defaults to <code>FALSE</code>.</p></dd>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Will export the following dimensional reductions: UMAP</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Will export the following dimensional reductions: UMAP</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 4.4.3</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.0.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -215,8 +237,8 @@ defaults to <code>FALSE</code>.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Saving Cerebro object to: /tmp/nix-shell-4138-1455709614/RtmpCgoqLJ/pbmc_SCE.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [09:52:29] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Saving Cerebro object to: /tmp/nix-shell-4413-3406383353/RtmpzO8h31/pbmc_SCE.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:21:53] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

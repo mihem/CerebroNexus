@@ -1,5 +1,62 @@
 # Changelog
 
+## CerebroNexus 5.0.0
+
+### Viewer
+
+- Adds a shared accelerated renderer with WebGPU and WebGL2 fallback for
+  large projections, Linked Views, Gene Expression, Spatial, Trajectory
+  and repertoire views, preserving zoom, hover and coordinated
+  selection.
+- Uses compact binary transport, canonical cell indices, reusable
+  geometry and deferred metadata to reduce large-dataset transfer and
+  preparation costs.
+- Fixes remounted views, Gene selection summaries and tables, progress
+  lifecycle, pinned tooltips and stale-result rejection when switching
+  datasets.
+- Refines navigation, typography, responsive layouts, loading and empty
+  states; improves keyboard access, focus, status announcements and
+  reduced motion.
+- Restores colored sidebar icons and provides a default-on Linked cell
+  hover switch in the toolbar, independent of zoom, selection and Data
+  Info settings.
+- Avoids repeated IR preparation and metadata joins, reuses Groups
+  counts, and computes exact native Abundance, SizeDist and Homeostasis
+  summaries where supported while preserving analytical fallbacks.
+- Defers inactive-page work and optional trajectory/IR content; bounds
+  process caches and shared prefetch tasks without changing expression
+  precision.
+- Includes an opt-in million-cell mouse-brain demo and reproducible
+  benchmarks. Historical timing series retain their original source and
+  readiness boundaries; they are not a universal page-loading guarantee.
+
+### Data format and I/O
+
+- Adds
+  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md),
+  [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+  and
+  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  with automatic legacy RDS compatibility and qs2 support. Thin CRB v2
+  and Viewer Packs preserve lazy backend access, stable cell
+  fingerprints and portable first-frame assets.
+- Supports gene-major BPCells storage and batch expression reads,
+  restoring canonical cell order after storage-order access; existing
+  backends remain compatible.
+- Supports lazy large-repertoire sidecars and compact repeated metadata,
+  including the Ren atlas’s paired TCR/BCR repertoire and published
+  t-SNE projection.
+- Streams delayed-matrix exports without whole-matrix dense realization,
+  and bounds external enrichment request time and error handling.
+
+### Packaging
+
+- Removes application-specific container recipes and the direct OpenSSL
+  package dependency. Dataset bundle filenames remain unchanged.
+- Consolidates this PR’s development NEWS entries into one 5.0.0
+  release; earlier released versions below are unchanged. Nix remains
+  the CI environment.
+
 ## CerebroNexus 4.4.3
 
 ### Viewer

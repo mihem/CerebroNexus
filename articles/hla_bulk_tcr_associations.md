@@ -285,7 +285,7 @@ saveRDS(crb, "demo_hla_tcr_bulk_toy.crb")
 **Confirm the contracts round-trip** — reload and read them back:
 
 ``` r
-x <- readRDS("demo_hla_tcr_bulk_toy.crb")
+x <- readCerebro("demo_hla_tcr_bulk_toy.crb")
 x$technical_info$observation_unit      # what a "row" is
 x$technical_info$tcr_selection         # the positive-control flag
 nrow(x$expression)                     # number of genes

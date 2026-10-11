@@ -40,19 +40,24 @@ Bioconductor):
 BiocManager::install("scRepertoire")
 ```
 
-Because loading `scRepertoire`’s namespace pulls in a large dependency
-tree (~90 packages and several seconds of `lazyLoadDBfetch`),
-CerebroNexus does **not** load it at app startup. Availability is probed
-cheaply with [`system.file()`](https://rdrr.io/r/base/system.file.html),
-and the namespace is loaded lazily on the first *scRepertoire-backed*
-plot — self-made plots (Clone Sharing, Definition) and the default
-Clonal UMAP do not need it and never trigger the load. That first
-scRepertoire plot therefore pays a one-time load of several seconds;
-because a namespace is process-wide, every plot afterwards is warm for
-every session sharing that R worker (and that first load briefly blocks
-those other sessions). There is no background prewarm — it cannot be
-made non-blocking on Shiny’s single R thread. Repertoire figures are
-still computed by `scRepertoire`; only the timing of the load changed.
+Installation and namespace loading are separate: `scRepertoire` is
+required for standard installations and exported apps that expose the
+complete immune module. The Viewer checks availability with
+[`system.file()`](https://rdrr.io/r/base/system.file.html) and loads its
+namespace only when an analysis calls it. Native Clonal Projection,
+Clone Sharing, Definition, and supported native count summaries do not
+trigger that namespace load; they still belong to the supported
+installation with the dependency present. A first scRepertoire-backed
+analysis may therefore incur a process-wide loading cost. Moving the
+package between `Imports` and `Suggests` does not eliminate it. Nix
+environments include the same required dependency.
+
+Clonal Projection expansion categories use the complete repertoire for
+the chosen receptor and clone definition; filtering or sampling
+displayed cells does not redefine clone sizes. Clone Sharing can select
+categorical cell metadata (such as patient or condition) without first
+selecting it as a grouping variable. Only requested metadata columns are
+joined to the receptor tables.
 
 The full scRepertoire workflow is documented in its vignettes — [Loading
 data](https://www.borch.dev/uploads/screpertoire/articles/loading) and

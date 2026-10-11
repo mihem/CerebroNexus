@@ -83,7 +83,7 @@ h5_output <- file.path(output_dir, "pbmc.h5")
 file.exists(crb_output)
 file.exists(h5_output)
 
-crb <- readRDS(crb_output)
+crb <- readCerebro(crb_output)
 crb$getExpressionBackend()
 #> $type
 #> [1] "h5"
@@ -144,7 +144,7 @@ crb_input <- system.file(
   "extdata/examples/example.crb",
   package = "CerebroNexus"
 )
-crb <- readRDS(crb_input)
+crb <- readCerebro(crb_input)
 
 legacy_dir <- file.path(tempdir(), "cerebro-legacy-h5")
 dir.create(legacy_dir, recursive = TRUE, showWarnings = FALSE)
@@ -169,7 +169,7 @@ crb$setExpressionBackend(
   location = basename(h5_output)
 )
 crb_output <- file.path(legacy_dir, "example.crb")
-saveRDS(crb, crb_output)
+saveCerebro(crb, crb_output)
 ```
 
 The converted `.crb` is now self-describing. Keep it beside `example.h5`

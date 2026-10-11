@@ -15,7 +15,8 @@ hla_aggregate_cdr3_nodes(
   meta_cols = character(0),
   context_col = NULL,
   by_v = FALSE,
-  context_summary = hla_context_summary
+  context_summary = hla_context_summary,
+  .keys = NULL
 )
 ```
 
@@ -48,6 +49,10 @@ hla_aggregate_cdr3_nodes(
   hardcoded call because these columns share one property that the plain
   mode destroys: a node spanning BOTH values is the finding, not a tie
   to be broken.
+
+- .keys:
+
+  Precomputed node keys for internal graph construction.
 
 ## Value
 

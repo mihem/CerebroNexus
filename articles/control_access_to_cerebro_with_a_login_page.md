@@ -42,11 +42,12 @@ install.packages("shinymanager")
 library(CerebroNexus)
 ```
 
-Generate a database passphrase on a trusted machine:
+Generate a database passphrase from the operating system random source
+on a trusted Linux machine:
 
 ``` bash
 # Terminal — run this command and save the result privately.
-openssl rand -base64 32
+head -c 32 /dev/urandom | base64
 ```
 
 Prepare the private and App directories first. Run this once as the
@@ -207,6 +208,9 @@ App URL and test valid and invalid login.
 
 Publish the App and secret separately:
 
+For access beyond the local host, use a TLS-terminating reverse proxy in
+front of Shiny Server and expose only its HTTPS endpoint.
+
 ``` bash
 # Terminal — run these commands on the Shiny Server host.
 sudo cp -R /srv/cerebro/apps/my_app /srv/shiny-server/
@@ -239,90 +243,6 @@ sudo systemctl restart shiny-server
 sudo systemctl status shiny-server
 sudo journalctl -u shiny-server -f
 ```
-
-## Deploy with Docker Compose
-
-**Run this as:** a user allowed to run Docker.
-
-**Run it on:** the host that contains `my-deployment/` and the external
-env file.
-
-**What happens:** Docker Compose reads `compose.yaml`, builds a runtime
-containing CerebroNexus and `shinymanager`, injects the env-file
-assignments into the container, and maps host port 3838 to the App.
-
-**Verify:** open <http://localhost:3838>, test valid and invalid login,
-and check `docker compose logs -f cerebro` for startup errors.
-
-You need Docker Engine with Docker Compose. Put these files in one
-deployment directory:
-
-``` text
-my-deployment/
-├── Dockerfile
-├── compose.yaml
-└── my_app/
-```
-
-The Dockerfile packages the App, not the secret:
-
-``` dockerfile
-# Dockerfile — save this as `my-deployment/Dockerfile`.
-FROM rocker/shiny:latest
-RUN R -q -e 'install.packages(c("remotes", "shinymanager")); remotes::install_github("mihem/CerebroNexus", dependencies=TRUE)'
-COPY my_app /srv/shiny-server/my_app
-RUN chown -R shiny:shiny /srv/shiny-server/my_app
-USER shiny
-CMD ["R", "-q", "-e", "shiny::runApp('/srv/shiny-server/my_app', host='0.0.0.0', port=3838)"]
-```
-
-Save the following as `compose.yaml` beside the Dockerfile:
-
-``` yaml
-# compose.yaml — save this as `my-deployment/compose.yaml` beside Dockerfile.
-services:
-  cerebro:
-    build: .
-    env_file:
-      - /absolute/private/viewer-auth.env
-    ports:
-      - "127.0.0.1:3838:3838"
-```
-
-`env_file` is an absolute path on the host that runs Docker Compose. The
-file stays outside `my-deployment/`; Compose reads it and passes the
-assignment into the container environment without copying the file into
-the image. The port is bound only to loopback: place a TLS-terminating
-reverse proxy in front of it before exposing the Viewer to other
-machines.
-
-Start the service from the deployment directory:
-
-``` bash
-# Terminal — run these commands from the deployment host.
-cd /path/to/my-deployment
-docker compose up --build
-```
-
-Open <http://localhost:3838>. To run in the background, add `-d`:
-
-``` bash
-# Terminal — run this from `my-deployment/` for background mode.
-docker compose up --build -d
-```
-
-Inspect the App logs or stop the service with:
-
-``` bash
-# Terminal — run these commands from `my-deployment/` to inspect or stop it.
-docker compose logs -f cerebro
-
-# Stop and remove the Compose containers and network.
-docker compose down
-```
-
-Keep `viewer-auth.env` outside the build context, restrict its host
-permissions, and add a defensive `.dockerignore` rule.
 
 ## Run on another machine
 
@@ -390,7 +310,6 @@ rollback window.
 | Database cannot decrypt | Load the secret paired with that database |
 | Deployed App stops | Inspect the service environment, not your shell |
 | Database is not accessible | Give the runtime account read and directory traversal access |
-| Docker rebuild loses auth | Inject the external file at runtime |
 
 ## Security checklist
 

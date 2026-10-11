@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,12 +39,15 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
-    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Expression backend benchmark: embedded vs bpcells vs h5 at scale</a></li>
+    <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
+    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
     <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
@@ -123,6 +126,8 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  auth <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  extra_tables <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  extra_tables_sheets <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  dataset_labels <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  initial_dataset <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  initial_page <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -134,8 +139,13 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <dl><dt id="arg-cerebro-data">cerebro_data<a class="anchor" aria-label="anchor" href="#arg-cerebro-data"></a></dt>
 <dd><p>Non-empty named character vector or list of <code>.crb</code>
 (or <code>.rds</code>) file paths. Names must be non-missing and unique and are
-used as dataset labels. Every path must resolve to a distinct canonical
-source file.</p></dd>
+used as stable dataset identities. Paths must resolve to distinct files.</p></dd>
+
+
+<dt id="arg-dataset-labels">dataset_labels<a class="anchor" aria-label="anchor" href="#arg-dataset-labels"></a></dt>
+<dd><p>Optional named character vector mapping every dataset
+identity in <code>cerebro_data</code> to its display label. Values must be non-empty
+but may repeat. When omitted, dataset identities are also used as labels.</p></dd>
 
 
 <dt id="arg-result-dir">result_dir<a class="anchor" aria-label="anchor" href="#arg-result-dir"></a></dt>
@@ -207,6 +217,12 @@ directory is rejected before any files are written.</p></dd>
 <dt id="arg-show-upload-ui">show_upload_ui<a class="anchor" aria-label="anchor" href="#arg-show-upload-ui"></a></dt>
 <dd><p>One non-missing logical controlling whether users may
 upload their own data; defaults to <code>FALSE</code>.</p></dd>
+
+
+<dt id="arg-initial-dataset">initial_dataset<a class="anchor" aria-label="anchor" href="#arg-initial-dataset"></a></dt>
+<dd><p>Optional exact dataset identity to load initially. This
+does not change the order of <code>cerebro_data</code>. URL selection and a
+session's current selection take precedence.</p></dd>
 
 
 <dt id="arg-initial-page">initial_page<a class="anchor" aria-label="anchor" href="#arg-initial-page"></a></dt>

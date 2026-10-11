@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,12 +45,15 @@
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
-    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Expression backend benchmark: embedded vs bpcells vs h5 at scale</a></li>
+    <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
+    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
     <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
@@ -158,9 +161,10 @@ invalid login locally.</p>
 <code class="sourceCode R"><span><span class="co"># R console — run this once to install and load the authentication tools.</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"shinymanager"</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
-<p>Generate a database passphrase on a trusted machine:</p>
+<p>Generate a database passphrase from the operating system random
+source on a trusted Linux machine:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Terminal — run this command and save the result privately.</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="ex">openssl</span> rand <span class="at">-base64</span> 32</span></code></pre></div>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">head</span> <span class="at">-c</span> 32 /dev/urandom <span class="kw">|</span> <span class="fu">base64</span></span></code></pre></div>
 <p>Prepare the private and App directories first. Run this once as the
 server operator; it makes the release account the owner so the
 subsequent R commands can write under <code>/srv</code> without elevated
@@ -332,6 +336,8 @@ the service.</p>
 <p><strong>Verify:</strong> inspect service status and logs, then open
 the real HTTPS App URL and test valid and invalid login.</p>
 <p>Publish the App and secret separately:</p>
+<p>For access beyond the local host, use a TLS-terminating reverse proxy
+in front of Shiny Server and expose only its HTTPS endpoint.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Terminal — run these commands on the Shiny Server host.</span></span>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">sudo</span> cp <span class="at">-R</span> /srv/cerebro/apps/my_app /srv/shiny-server/</span>
 <span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">sudo</span> chown <span class="at">-R</span> shiny:shiny /srv/shiny-server/my_app/private-data/auth</span>
@@ -354,67 +360,6 @@ the real HTTPS App URL and test valid and invalid login.</p>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="fu">sudo</span> journalctl <span class="at">-u</span> shiny-server <span class="at">-f</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="deploy-with-docker-compose">Deploy with Docker Compose<a class="anchor" aria-label="anchor" href="#deploy-with-docker-compose"></a>
-</h2>
-<p><strong>Run this as:</strong> a user allowed to run Docker.</p>
-<p><strong>Run it on:</strong> the host that contains
-<code>my-deployment/</code> and the external env file.</p>
-<p><strong>What happens:</strong> Docker Compose reads
-<code>compose.yaml</code>, builds a runtime containing CerebroNexus and
-<code>shinymanager</code>, injects the env-file assignments into the
-container, and maps host port 3838 to the App.</p>
-<p><strong>Verify:</strong> open <a href="http://localhost:3838" class="external-link uri">http://localhost:3838</a>, test valid and invalid login, and
-check <code>docker compose logs -f cerebro</code> for startup
-errors.</p>
-<p>You need Docker Engine with Docker Compose. Put these files in one
-deployment directory:</p>
-<pre class="text"><code>my-deployment/
-├── Dockerfile
-├── compose.yaml
-└── my_app/</code></pre>
-<p>The Dockerfile packages the App, not the secret:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode dockerfile"><code class="sourceCode dockerfile"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Dockerfile — save this as `my-deployment/Dockerfile`.</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a><span class="kw">FROM</span> rocker/shiny:latest</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">R</span> <span class="at">-q</span> <span class="at">-e</span> <span class="st">'install.packages(c("remotes", "shinymanager")); remotes::install_github("mihem/CerebroNexus", dependencies=TRUE)'</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="kw">COPY</span> my_app /srv/shiny-server/my_app</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="kw">RUN</span> <span class="fu">chown</span> <span class="at">-R</span> shiny:shiny /srv/shiny-server/my_app</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="kw">USER</span> shiny</span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="kw">CMD</span> [<span class="st">"R"</span>, <span class="st">"-q"</span>, <span class="st">"-e"</span>, <span class="st">"shiny::runApp('/srv/shiny-server/my_app', host='0.0.0.0', port=3838)"</span>]</span></code></pre></div>
-<p>Save the following as <code>compose.yaml</code> beside the
-Dockerfile:</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># compose.yaml — save this as `my-deployment/compose.yaml` beside Dockerfile.</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">services</span><span class="kw">:</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="at">  </span><span class="fu">cerebro</span><span class="kw">:</span></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> .</span></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="at">    </span><span class="fu">env_file</span><span class="kw">:</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> /absolute/private/viewer-auth.env</span></span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a><span class="at">    </span><span class="fu">ports</span><span class="kw">:</span></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">"127.0.0.1:3838:3838"</span></span></code></pre></div>
-<p><code>env_file</code> is an absolute path on the host that runs
-Docker Compose. The file stays outside <code>my-deployment/</code>;
-Compose reads it and passes the assignment into the container
-environment without copying the file into the image. The port is bound
-only to loopback: place a TLS-terminating reverse proxy in front of it
-before exposing the Viewer to other machines.</p>
-<p>Start the service from the deployment directory:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># Terminal — run these commands from the deployment host.</span></span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="bu">cd</span> /path/to/my-deployment</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">--build</span></span></code></pre></div>
-<p>Open <a href="http://localhost:3838" class="external-link uri">http://localhost:3838</a>. To run in the background, add
-<code>-d</code>:</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># Terminal — run this from `my-deployment/` for background mode.</span></span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">--build</span> <span class="at">-d</span></span></code></pre></div>
-<p>Inspect the App logs or stop the service with:</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># Terminal — run these commands from `my-deployment/` to inspect or stop it.</span></span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="ex">docker</span> compose logs <span class="at">-f</span> cerebro</span>
-<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a></span>
-<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="co"># Stop and remove the Compose containers and network.</span></span>
-<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a><span class="ex">docker</span> compose down</span></code></pre></div>
-<p>Keep <code>viewer-auth.env</code> outside the build context, restrict
-its host permissions, and add a defensive <code>.dockerignore</code>
-rule.</p>
-</div>
-<div class="section level2">
 <h2 id="run-on-another-machine">Run on another machine<a class="anchor" aria-label="anchor" href="#run-on-another-machine"></a>
 </h2>
 <p><strong>Run this as:</strong> the operator of the destination
@@ -427,7 +372,7 @@ same variable name and value used when the App database was built.</p>
 changing the old release.</p>
 <p>Transfer the App and secret through separate encrypted channels,
 then:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># R console — run this on the destination host to start the copied App.</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron</a></span><span class="op">(</span><span class="st">"/protected/path/viewer-auth.env"</span><span class="op">)</span></span>
 <span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="st">"/srv/cerebronexus/my_app"</span><span class="op">)</span></span></code></pre></div>
@@ -498,10 +443,6 @@ deployed</td>
 <tr class="odd">
 <td>Database is not accessible</td>
 <td>Give the runtime account read and directory traversal access</td>
-</tr>
-<tr class="even">
-<td>Docker rebuild loses auth</td>
-<td>Inject the external file at runtime</td>
 </tr>
 </tbody>
 </table>

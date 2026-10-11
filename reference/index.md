@@ -39,8 +39,12 @@
   : Add immune repertoire data to a Seurat object
 - [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md)
   : Add percentage of mitochondrial and ribosomal transcripts.
+- [`buildViewerPack()`](https://mihem.github.io/CerebroNexus/reference/buildViewerPack.md)
+  : Build a derived Viewer Pack for an existing CRB
 - [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md)
   : Calculate percentage of transcripts of gene list.
+- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  : Convert a Cerebro data file
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
@@ -68,3 +72,11 @@
   : Launch CerebroNexus
 - [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   : Perform gene set enrichment analysis with GSVA.
+- [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+  : Read a Cerebro data file
+- [`readViewerPack()`](https://mihem.github.io/CerebroNexus/reference/readViewerPack.md)
+  : Read a valid Viewer Pack descriptor
+- [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  : Save a Cerebro data file
+- [`validateViewerPack()`](https://mihem.github.io/CerebroNexus/reference/validateViewerPack.md)
+  : Validate a Viewer Pack

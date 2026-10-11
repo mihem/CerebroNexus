@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">4.4.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -31,12 +31,15 @@
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
     <li><a class="dropdown-item" href="../articles/create_expression_matrix_in_h5_format.html">Store the expression matrix in H5 format</a></li>
-    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Expression backend benchmark: embedded vs bpcells vs h5 at scale</a></li>
+    <li><a class="dropdown-item" href="../articles/million_cell_crb_artifacts.html">Working with large datasets</a></li>
     <li><a class="dropdown-item" href="../articles/launch_cerebro_with_pre-loaded_data_set.html">Launch Cerebro with pre-loaded data set</a></li>
     <li><a class="dropdown-item" href="../articles/multi_crb.html">Loading multiple data sets (multi-crb) with a dataset switcher</a></li>
     <li><a class="dropdown-item" href="../articles/export_and_visualize_custom_tables_and_plots.html">Export and visualize custom tables and plots</a></li>
     <li><a class="dropdown-item" href="../articles/control_access_to_cerebro_with_a_login_page.html">Control access to CerebroNexus with a login page</a></li>
     <li><a class="dropdown-item" href="../articles/host_cerebro_on_shinyapps.html">Host Cerebro on shinyapps.io</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Benchmarks</h6></li>
+    <li><a class="dropdown-item" href="../articles/expression_backend_benchmark.html">Large-dataset benchmarks: expression, storage and Viewer</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Modules</h6></li>
     <li><a class="dropdown-item" href="../articles/most_expressed_genes.html">Most Expressed Genes</a></li>
@@ -72,6 +75,32 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.0.0" id="cerebronexus-500">CerebroNexus 5.0.0<a class="anchor" aria-label="anchor" href="#cerebronexus-500"></a></h2>
+<div class="section level3">
+<h3 id="viewer-5-0-0">Viewer<a class="anchor" aria-label="anchor" href="#viewer-5-0-0"></a></h3>
+<ul><li>Adds a shared accelerated renderer with WebGPU and WebGL2 fallback for large projections, Linked Views, Gene Expression, Spatial, Trajectory and repertoire views, preserving zoom, hover and coordinated selection.</li>
+<li>Uses compact binary transport, canonical cell indices, reusable geometry and deferred metadata to reduce large-dataset transfer and preparation costs.</li>
+<li>Fixes remounted views, Gene selection summaries and tables, progress lifecycle, pinned tooltips and stale-result rejection when switching datasets.</li>
+<li>Refines navigation, typography, responsive layouts, loading and empty states; improves keyboard access, focus, status announcements and reduced motion.</li>
+<li>Restores colored sidebar icons and provides a default-on Linked cell hover switch in the toolbar, independent of zoom, selection and Data Info settings.</li>
+<li>Avoids repeated IR preparation and metadata joins, reuses Groups counts, and computes exact native Abundance, SizeDist and Homeostasis summaries where supported while preserving analytical fallbacks.</li>
+<li>Defers inactive-page work and optional trajectory/IR content; bounds process caches and shared prefetch tasks without changing expression precision.</li>
+<li>Includes an opt-in million-cell mouse-brain demo and reproducible benchmarks. Historical timing series retain their original source and readiness boundaries; they are not a universal page-loading guarantee.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="data-format-and-io-5-0-0">Data format and I/O<a class="anchor" aria-label="anchor" href="#data-format-and-io-5-0-0"></a></h3>
+<ul><li>Adds <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code>, <code><a href="../reference/readCerebro.html">readCerebro()</a></code> and <code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> with automatic legacy RDS compatibility and qs2 support. Thin CRB v2 and Viewer Packs preserve lazy backend access, stable cell fingerprints and portable first-frame assets.</li>
+<li>Supports gene-major BPCells storage and batch expression reads, restoring canonical cell order after storage-order access; existing backends remain compatible.</li>
+<li>Supports lazy large-repertoire sidecars and compact repeated metadata, including the Ren atlas’s paired TCR/BCR repertoire and published t-SNE projection.</li>
+<li>Streams delayed-matrix exports without whole-matrix dense realization, and bounds external enrichment request time and error handling.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="packaging-5-0-0">Packaging<a class="anchor" aria-label="anchor" href="#packaging-5-0-0"></a></h3>
+<ul><li>Removes application-specific container recipes and the direct OpenSSL package dependency. Dataset bundle filenames remain unchanged.</li>
+<li>Consolidates this PR’s development NEWS entries into one 5.0.0 release; earlier released versions below are unchanged. Nix remains the CI environment.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="4.4.3" id="cerebronexus-443">CerebroNexus 4.4.3<a class="anchor" aria-label="anchor" href="#cerebronexus-443"></a></h2>
 <div class="section level3">

@@ -406,7 +406,7 @@ performed. The wide genotype table you wrote in Step 1 has become a tidy
 prefix normalised back on and provenance stamped:
 
 ``` r
-crb <- readRDS("demo_hla_tcr_toy.crb")
+crb <- readCerebro("demo_hla_tcr_toy.crb")
 head(crb$getHLATyping()[, c("sample", "donor_id", "locus", "copy", "allele", "source_type")], 4)
 ```
 

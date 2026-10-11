@@ -41,6 +41,8 @@ createShinyApp(
   auth = NULL,
   extra_tables = NULL,
   extra_tables_sheets = NULL,
+  dataset_labels = NULL,
+  initial_dataset = NULL,
   initial_page = NULL
 )
 ```
@@ -50,8 +52,14 @@ createShinyApp(
 - cerebro_data:
 
   Non-empty named character vector or list of `.crb` (or `.rds`) file
-  paths. Names must be non-missing and unique and are used as dataset
-  labels. Every path must resolve to a distinct canonical source file.
+  paths. Names must be non-missing and unique and are used as stable
+  dataset identities. Paths must resolve to distinct files.
+
+- dataset_labels:
+
+  Optional named character vector mapping every dataset identity in
+  `cerebro_data` to its display label. Values must be non-empty but may
+  repeat. When omitted, dataset identities are also used as labels.
 
 - result_dir:
 
@@ -124,6 +132,12 @@ createShinyApp(
 
   One non-missing logical controlling whether users may upload their own
   data; defaults to `FALSE`.
+
+- initial_dataset:
+
+  Optional exact dataset identity to load initially. This does not
+  change the order of `cerebro_data`. URL selection and a session's
+  current selection take precedence.
 
 - initial_page:
 

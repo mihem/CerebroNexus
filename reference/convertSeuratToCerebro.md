@@ -22,6 +22,7 @@ convertSeuratToCerebro(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
   cell_cycle = NULL,
@@ -118,6 +119,12 @@ convertSeuratToCerebro(
   runtime re-resolves both backends relative to the `.crb`'s parent
   directory, so packaging the `.crb` with its sibling `<stem>.bpcells/`
   or `<stem>.h5` together is enough for portable deployment.
+
+- codec:
+
+  Serialization codec for the CRB payload. Defaults to `"qs2"`; use
+  `"rds"` when direct compatibility with
+  [`readRDS()`](https://rdrr.io/r/base/readRDS.html) is required.
 
 - spatial_images:
 

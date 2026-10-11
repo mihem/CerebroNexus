@@ -19,6 +19,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/index.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/million_cell_crb_artifacts.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/most_expressed_genes.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/multi_crb.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.html</loc></url>
@@ -36,7 +37,9 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/HLA_NODE_SCALE_MIN.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/buildViewerPack.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/convertCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/createShinyApp.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/dot-read_GMT_file.html</loc></url>
@@ -98,5 +101,9 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/index.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/launchCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/readCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/readViewerPack.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/saveCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/validateViewerPack.html</loc></url>
 </urlset>
 

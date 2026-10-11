@@ -59,6 +59,25 @@ A new `Cerebro` object.
   `expression_backend = NULL`; `getExpressionBackend()` treats that as
   `"embedded"` for backward compatibility.
 
+- `crb_schema`:
+
+  Description of fields omitted from a thin CRB and restored from its
+  external expression sidecar. Legacy and embedded CRBs leave this as
+  `NULL`.
+
+- `spatial_molecule_backend`:
+
+  Descriptor for molecule tables stored in a sibling spatial sidecar.
+  The runtime-only `root` member is populated by
+  [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+  or the generated Viewer and is never required for legacy CRBs with
+  embedded molecule tables.
+
+- `cell_fingerprint`:
+
+  Stable identity of the cell population used by portable saved views.
+  Older CRBs leave this as `NULL`.
+
 - `meta_data`:
 
   `data.frame` that contains cell meta data.
@@ -745,8 +764,8 @@ given set of cells.
 
 - `cells`:
 
-  Names/barcodes of cells to extract; defaults to `NULL`, which will
-  return all cells.
+  Names/barcodes or one-based column indices of cells to extract;
+  defaults to `NULL`, which will return all cells.
 
 - `genes`:
 
@@ -772,8 +791,8 @@ Retrieve transcript count matrix.
 
 - `cells`:
 
-  Names/barcodes of cells to extract; defaults to `NULL`, which will
-  return all cells.
+  Names/barcodes or one-based column indices of cells to extract;
+  defaults to `NULL`, which will return all cells.
 
 - `genes`:
 
@@ -805,7 +824,8 @@ materialising a 1 x N dense matrix first is wasteful.
 
 - `cells`:
 
-  Names/barcodes of cells to extract; `NULL` returns all cells.
+  Names/barcodes or one-based column indices of cells to extract; `NULL`
+  returns all cells.
 
 #### Returns
 
@@ -835,7 +855,8 @@ etc.) fast instead of densifying just to aggregate.
 
 - `cells`:
 
-  Names/barcodes of cells to extract; `NULL` returns all cells.
+  Names/barcodes or one-based column indices of cells to extract; `NULL`
+  returns all cells.
 
 #### Returns
 

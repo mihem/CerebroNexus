@@ -22,7 +22,7 @@ This is the recommended path when you want to hand a colleague a
 runnable copy of Cerebro pre-loaded with a specific data set without
 making them install the package themselves, pin the Shiny sources at a
 known revision alongside the data, or deploy to a host that doesn’t run
-R interactively (`shinyapps.io`, Docker images, etc.).
+R interactively (Shiny Server or `shinyapps.io`, for example).
 
 ## Setup
 

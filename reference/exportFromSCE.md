@@ -18,6 +18,9 @@ exportFromSCE(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
+  codec = c("qs2", "rds"),
+  viewer_binary = c("auto", "always", "never"),
+  viewer_binary_threshold = 500000L,
   verbose = FALSE
 )
 ```
@@ -87,6 +90,21 @@ exportFromSCE(
   copied from the input object as is. It is recommended to use a sparse
   format, such as `dgCMatrix` from the `Matrix` package.
 
+- codec:
+
+  Serialization codec for the CRB payload. Defaults to `"qs2"`; use
+  `"rds"` when direct compatibility with
+  [`readRDS()`](https://rdrr.io/r/base/readRDS.html) is required.
+
+- viewer_binary:
+
+  Build the derived Viewer Pack `"auto"`matically for large datasets,
+  `"always"`, or `"never"`.
+
+- viewer_binary_threshold:
+
+  Dataset-level cell threshold used by `viewer_binary = "auto"`.
+
 - verbose:
 
   Set this to `TRUE` if you want additional log messages; defaults to
@@ -112,15 +130,15 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [09:52:29] Initializing Cerebro object...
-#> [09:52:29] Collecting available meta data...
-#> [09:52:29] Extracting all meta data columns...
-#> [09:52:29] Extracting dimensional reductions...
-#> [09:52:29] Will export the following dimensional reductions: UMAP
-#> [09:52:29] No trajectories to extract...
-#> [09:52:29] Overview of Cerebro object:
+#> [15:21:53] Initializing Cerebro object...
+#> [15:21:53] Collecting available meta data...
+#> [15:21:53] Extracting all meta data columns...
+#> [15:21:53] Extracting dimensional reductions...
+#> [15:21:53] Will export the following dimensional reductions: UMAP
+#> [15:21:53] No trajectories to extract...
+#> [15:21:53] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 4.4.3
+#> exporter package version: 5.0.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
@@ -139,6 +157,6 @@ exportFromSCE(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [09:52:29] Saving Cerebro object to: /tmp/nix-shell-4138-1455709614/RtmpCgoqLJ/pbmc_SCE.crb
-#> [09:52:29] Done!
+#> [15:21:53] Saving Cerebro object to: /tmp/nix-shell-4413-3406383353/RtmpzO8h31/pbmc_SCE.crb
+#> [15:21:53] Done!
 ```
