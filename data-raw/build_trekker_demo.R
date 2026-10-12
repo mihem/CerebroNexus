@@ -538,11 +538,11 @@ trekker <- list(
 )
 
 ##----------------------------------------------------------------------------##
-## inject + re-save (xz for the smallest .crb)
+## inject + re-save through the current CRB codec
 ##----------------------------------------------------------------------------##
-crb <- readRDS(CRB)
+crb <- readCerebro(CRB)
 crb$addTrekker(trekker)
-saveRDS(crb, CRB, compress = "xz")
+saveCerebro(crb, CRB)
 
 sz <- file.size(CRB) / 1e6
 message(sprintf(

@@ -17,6 +17,36 @@ This directory reproducibly rebuilds every demo `.crb` shipped in `inst/extdata/
 
 `DATASETS.md` is the single source of truth for provenance across all data types. The per-type notes files (`spatial.md`, `immune_repertoire.md`, `trajectory.md`) carry only design and rebuild details and link back to it. This keeps citations in one place and avoids duplicating source info per file.
 
+## CRB format and lossless release compaction
+
+The nine currently shipped CRBs use qs2. Active demo builders use `readCerebro()`
+and `saveCerebro()` for CRB inputs and outputs; ordinary upstream `.rds` inputs
+still use `readRDS()`. After building (including the trajectory augmentation of
+the IR demo), optionally compact the release artifacts:
+
+```sh
+Rscript data-raw/compact_demo_crbs.R inst/extdata/examples /path/to/new-staging-dir
+```
+
+This offline tool uses qs2 compression level 19 with one thread. It never changes
+the source files, never overwrites an existing output directory, and compares the
+complete decoded payload using R serialization before publishing each staged
+file. It retains the original bytes if compression does not reduce the size.
+After review and regression tests, copy only the verified CRBs back to their
+original locations. Keep their existing HDF5 sidecars and image assets alongside
+them: the staging directory is not a standalone runnable dataset bundle.
+
+Compaction does not change cells, genes, numeric precision, coordinates, metadata,
+images, or the application's default serialization settings. It does not rerun
+normalization, clustering or UMAP. See `tests/bench/demo-storage/RESULTS.md` for
+the measured size and read-time comparison.
+
+The 2026-10-12 update repacked existing artifacts; it did not rerun every raw-data
+pipeline. The environment of record below describes historical data generation,
+not a promise of byte-identical regeneration across dependency versions. IR
+rebuilding still depends on the checked-in `example.crb`; its older preparation
+documents require path/environment updates before they form a one-command build.
+
 ## Data families
 
 | Family | Datasets | Build script | Runs | Notes |

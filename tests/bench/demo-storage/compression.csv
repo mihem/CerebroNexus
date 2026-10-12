@@ -1,0 +1,10 @@
+"file","before_bytes","after_bytes","repacked","identical_payload"
+"demo_full_tcr_bcr.crb",1087521,894319,TRUE,TRUE
+"demo_hla_tcr_dextramer.crb",9470726,7545312,TRUE,TRUE
+"demo_spatial_merfish.crb",1910360,1744849,TRUE,TRUE
+"demo_spatial_slideseq.crb",1547491,1256723,TRUE,TRUE
+"demo_spatial_visium.crb",6019213,4752104,TRUE,TRUE
+"demo_spatial_xenium.crb",2849122,2196216,TRUE,TRUE
+"demo_spatial.crb",647188,513730,TRUE,TRUE
+"demo_trekker.crb",7120765,5663085,TRUE,TRUE
+"example.crb",1076755,884694,TRUE,TRUE

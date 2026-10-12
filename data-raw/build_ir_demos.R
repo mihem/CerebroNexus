@@ -277,12 +277,12 @@ full$immune_repertoire <- split_ir_by_sample(full_ir, full$getMetaData())
 ## ---- 6. save + verify ------------------------------------------------------
 message("[5/5] Saving and verifying ...")
 dir.create(dirname(out_full), recursive = TRUE, showWarnings = FALSE)
-saveRDS(healthy, out_healthy)
-saveRDS(bcell, out_bcell)
-saveRDS(full, out_full)
+saveCerebro(healthy, out_healthy)
+saveCerebro(bcell, out_bcell)
+saveCerebro(full, out_full)
 
 verify <- function(path) {
-  o <- readRDS(path)
+  o <- readCerebro(path)
   m <- o$getMetaData()
   ir <- o$immune_repertoire
   ct <- unlist(lapply(ir, function(d) d$CTgene))

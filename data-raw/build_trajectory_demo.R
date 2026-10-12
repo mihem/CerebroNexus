@@ -190,5 +190,5 @@ message(
   paste(crb$getNamesOfTrajectories("monocle2"), collapse = ", ")
 )
 
-saveRDS(crb, crb_path)
+saveCerebro(crb, crb_path)
 message("Wrote ", crb_path)
