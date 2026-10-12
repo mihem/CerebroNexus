@@ -94,7 +94,12 @@ test_that("HLA exposes the shared cohort controls and a network saved-view adapt
   expect_match(ui, '"hla_motif_network"', fixed = TRUE)
   expect_match(visual, "node_key", fixed = TRUE)
   expect_match(visual, "cerebroCellViewRender(", fixed = TRUE)
-  expect_match(visual, "}, priority = 100)", fixed = TRUE)
+  observer <- r_test_observer(
+    visual,
+    "observe",
+    quote(hla_motif_last_render_signature(render_signature))
+  )
+  expect_identical(observer$priority, 100)
   expect_match(server, "hla_motif_selected_keys", fixed = TRUE)
   expect_match(server, "if (!length(keys))", fixed = TRUE)
   expect_match(server, "if (!length(selected))", fixed = TRUE)

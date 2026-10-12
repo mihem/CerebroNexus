@@ -1055,11 +1055,20 @@ test_that("spatial hull geometry is prepared outside the renderer", {
     "spatial_projection_group_hulls <- reactive({",
     fixed = TRUE
   )
-  expect_match(
-    data_flow,
-    "group_hulls = if (resource_first) list() else spatial_projection_group_hulls()",
-    fixed = TRUE
+  hull_lists <- Filter(
+    function(node) "group_hulls" %in% names(node),
+    r_test_calls(data_flow, "list")
   )
+  expect_true(any(vapply(
+    hull_lists,
+    function(node) {
+      identical(
+        r_test_normalize(node$group_hulls),
+        quote(if (resource_first) list() else spatial_projection_group_hulls())
+      )
+    },
+    logical(1)
+  )))
   expect_no_match(renderer, "compute_group_hulls(", fixed = TRUE)
 })
 
@@ -1169,7 +1178,12 @@ test_that("first Spatial frame uses deduplicated server-side control defaults", 
     "if (!identical(isolate(spatial_projection_controls()), controls))",
     fixed = TRUE
   )
-  expect_match(parameters, "}, priority = 1000)", fixed = TRUE)
+  observer <- r_test_observer(
+    parameters,
+    "observe",
+    quote(spatial_projection_controls(controls))
+  )
+  expect_identical(observer$priority, 1000)
   expect_match(
     parameters,
     "controls <- spatial_projection_controls()",
@@ -1516,24 +1530,25 @@ test_that("empty spatial selection returns before million-cell plot data", {
     )),
     collapse = "\n"
   )
-  selection_read <- regexpr(
-    'selection <- viewerPersistentSelection(',
-    selected_source,
-    fixed = TRUE
-  )[[1L]]
-  empty_return <- regexpr(
-    'if (is.null(selection)) return(NULL)',
-    selected_source,
-    fixed = TRUE
-  )[[1L]]
-  plot_data_read <- regexpr(
-    "req(spatial_projection_data_to_plot())",
-    selected_source,
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(selection_read, 0L)
-  expect_gt(empty_return, selection_read)
-  expect_gt(plot_data_read, empty_return)
+  selection_reactive <- r_test_calls(selected_source, "reactive")[[1L]]
+  scope <- new.env(parent = baseenv())
+  scope$input <- list(spatial_projection_persistent_selection = NULL)
+  scope$viewer_loaded_dataset_context <- function() list(generation = 1L)
+  scope$viewerPersistentSelection <- function(selection, context) selection
+  scope$req <- function(value) force(value)
+  scope$spatial_projection_data_to_plot <- function() {
+    stop("plot data was forced")
+  }
+  selected_cells <- eval(
+    call("function", pairlist(), selection_reactive[[2L]]),
+    scope
+  )
+  expect_null(selected_cells())
+  # The same body must reach plot data for a nonempty selection.
+  scope$input$spatial_projection_persistent_selection <- data.frame(
+    cell_index = 1L
+  )
+  expect_error(selected_cells(), "plot data was forced")
 
   summary_source <- paste(
     readLines(viewer_test_path(

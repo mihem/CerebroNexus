@@ -487,7 +487,12 @@ test_that("Clonal projection reuses grouped renderer data without placeholder ID
   expect_no_match(block, "fg <- df[", fixed = TRUE)
   expect_match(block, "ir_projection_axis_names\\(projection\\)")
   expect_match(block, "deferred_aux = deferred_aux", fixed = TRUE)
-  expect_match(block, "}, priority = 1000)", fixed = TRUE)
+  observer <- r_test_observer(
+    content,
+    "observe",
+    quote(ir_clonal_umap_last_request(request_signature))
+  )
+  expect_identical(observer$priority, 1000)
   expect_match(
     block,
     "deferred_selection_lengths = trace_lengths",
