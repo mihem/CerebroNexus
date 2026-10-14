@@ -212,14 +212,15 @@ encode_jpeg <- function(path, max_px = 620L, quality = 68L) {
 }
 ```
 
-### Step 5 — sub-sample (whole genes, force-include evidence)
+### Step 5 — sample nuclei and retain a demo gene panel
 
-The object is 21,374 genes × 7,420 nuclei. Embedding whole-transcriptome
-expression for all of them blows a sensible size budget (measured: ~3.8
-MB at 2,500 nuclei, before images). “Whole transcriptome” is the point,
-so we keep **all genes** and down-sample **nuclei** instead — stratified
-by cluster — and **force-include the 50 nuclei that carry an evidence
-image**, so the drill-down still works.
+The source is 21,374 genes × 7,420 nuclei. The existing stratified
+sampling force-includes the 50 nuclei carrying evidence images. The
+shipped artifact retains its 2,536 nuclei. After analysis, the builder
+limits expression to 1,500 genes, protecting marker, myelination and
+upstream Moran genes and filling the remaining budget by
+normalized-expression variance. This narrows gene search; it does not
+recompute UMAP, QC or per-cell scores, or alter retained values.
 
 ``` r
 strat <- integer(0)
@@ -281,14 +282,15 @@ trekker <- list(
 
 crb <- readCerebro("inst/extdata/examples/demo_trekker.crb")
 crb$addTrekker(trekker)
-saveRDS(crb, "inst/extdata/examples/demo_trekker.crb", compress = "xz")
+source("data-raw/demo_gene_panel.R")
+save_demo_crb(crb, "inst/extdata/examples/demo_trekker.crb")
 ```
 
 The whole build is one command:
 
 ``` r
 # TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R
-# -> inst/extdata/examples/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,
+# -> inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 1,500 genes,
 #                                         50 embedded evidence images)
 ```
 

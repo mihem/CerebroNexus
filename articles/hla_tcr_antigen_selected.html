@@ -100,7 +100,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">12 October, 2026</h4>
+            <h4 data-toc-skip class="date">14 October, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/hla_tcr_antigen_selected.Rmd" class="external-link"><code>vignettes/hla_tcr_antigen_selected.Rmd</code></a></small>
       <div class="d-none name"><code>hla_tcr_antigen_selected.Rmd</code></div>
@@ -637,7 +637,8 @@ shipped.</p>
 <span>  lineage_column <span class="op">=</span> <span class="st">"cell_type"</span>   <span class="co"># declared, so the app never has to guess</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addHLATyping</span><span class="op">(</span><span class="va">donor_typing</span>, source_type <span class="op">=</span> <span class="st">"genotyped"</span>, <span class="va">...</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_hla_tcr_dextramer.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"data-raw/demo_gene_panel.R"</span><span class="op">)</span></span>
+<span><span class="fu">save_demo_crb</span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_hla_tcr_dextramer.crb"</span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="the-declared-contracts-and-why-each-one">The declared contracts, and why each one<a class="anchor" aria-label="anchor" href="#the-declared-contracts-and-why-each-one"></a>
 </h3>
@@ -697,8 +698,9 @@ core, and every number it measures is an <strong>assertion</strong>.
 Only if all of them hold does the staged file replace the shipped
 <code>.crb</code>:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="va">staged</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span>
-<span><span class="va">check</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">staged</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"data-raw/demo_gene_panel.R"</span><span class="op">)</span></span>
+<span><span class="fu">save_demo_crb</span><span class="op">(</span><span class="va">crb</span>, <span class="va">staged</span><span class="op">)</span></span>
+<span><span class="va">check</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/readCerebro.html">readCerebro</a></span><span class="op">(</span><span class="va">staged</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
 <span>  <span class="st">"donors are not balanced"</span>            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">m</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span> <span class="op">==</span> <span class="va">CELLS_PER_DONOR</span><span class="op">)</span>,</span>
@@ -722,7 +724,7 @@ dextramer cross-reactivity ever vanished from this data, the binder
 calls would have stopped being raw 10x calls and every caveat in this
 vignette would need rewriting — so the caveat is asserted rather than
 assumed.</p>
-<p>On the shipped object the gate prints:</p>
+<p>Historical gate output before the 1,500-gene panel update:</p>
 <pre><code>   cells: 12000 in 4 donors, balanced
    expression: dgCMatrix 2000x12000, 40.2 MiB in memory
    repertoire: 12000 observations, all paired; chains TRA, TRB
@@ -731,9 +733,12 @@ assumed.</p>
    HLA: 4 donors, 12 alleles, source_type=genotyped
    binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
    PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)</code></pre>
-<p>12,000 dextramer-selected cells (3,000 per donor, every one paired
-αβ), 2,000 variable genes, <strong>5.2 MB</strong> — it was 7.9 MB while
-the expression block was stored dense.</p>
+<p>The current demo retains all 12,000 dextramer-selected cells and caps
+expression at 1,500 genes after analysis, protecting available immune
+markers and filling by normalized-expression variance. Gene search is
+limited to that panel; UMAP, full-input QC, receptors, donor genotypes
+and dextramer calls are unchanged. See <code>data-raw/README.md</code>
+for current measured sizes.</p>
 </div>
 <div class="section level2">
 <h2 id="what-you-see-in-the-app">What you see in the app<a class="anchor" aria-label="anchor" href="#what-you-see-in-the-app"></a>

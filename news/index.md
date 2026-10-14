@@ -2,6 +2,25 @@
 
 ## CerebroNexus 5.0.0
 
+### Unreleased changes since 5.0.0
+
+- Reduces the nine bundled demo CRBs from 30.26 to 21.22 MiB (about 30%)
+  through stronger build-time compression and a maximum of 1,500
+  expression genes per demo. Smaller panels remain whole; available
+  demonstration markers, myelination genes and Trekker Moran genes are
+  protected.
+- Preserves all demo cells, UMAP and spatial coordinates, metadata,
+  precomputed analyses, images and exact expression values for retained
+  genes. Gene search and new gene-set analyses are limited to the
+  exported panel. User-supplied datasets and application codec defaults
+  are unaffected.
+- Shares the final export policy across active demo builders, uses the
+  public CRB reader/writer and fixes Spatial background-image insertion
+  to use the named image collection.
+- Replaces formatting-sensitive Viewer test assertions with parsed R
+  expression checks and a behavioral check for Spatial’s empty-selection
+  early return.
+
 ### Viewer
 
 - Adds a shared accelerated renderer with WebGPU and WebGL2 fallback for

@@ -415,7 +415,8 @@ crb$technical_info <- list(
   lineage_column = "cell_type"   # declared, so the app never has to guess
 )
 crb$addHLATyping(donor_typing, source_type = "genotyped", ...)
-saveRDS(crb, "inst/extdata/examples/demo_hla_tcr_dextramer.crb", compress = "xz")
+source("data-raw/demo_gene_panel.R")
+save_demo_crb(crb, "inst/extdata/examples/demo_hla_tcr_dextramer.crb")
 ```
 
 ### The declared contracts, and why each one
@@ -440,8 +441,9 @@ it measures is an **assertion**. Only if all of them hold does the
 staged file replace the shipped `.crb`:
 
 ``` r
-saveRDS(crb, staged, compress = "xz")
-check <- readRDS(staged)
+source("data-raw/demo_gene_panel.R")
+save_demo_crb(crb, staged)
+check <- readCerebro(staged)
 
 stopifnot(
   "donors are not balanced"            = all(table(m$sample) == CELLS_PER_DONOR),
@@ -467,7 +469,7 @@ cross-reactivity ever vanished from this data, the binder calls would
 have stopped being raw 10x calls and every caveat in this vignette would
 need rewriting — so the caveat is asserted rather than assumed.
 
-On the shipped object the gate prints:
+Historical gate output before the 1,500-gene panel update:
 
        cells: 12000 in 4 donors, balanced
        expression: dgCMatrix 2000x12000, 40.2 MiB in memory
@@ -478,9 +480,12 @@ On the shipped object the gate prints:
        binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
        PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)
 
-12,000 dextramer-selected cells (3,000 per donor, every one paired αβ),
-2,000 variable genes, **5.2 MB** — it was 7.9 MB while the expression
-block was stored dense.
+The current demo retains all 12,000 dextramer-selected cells and caps
+expression at 1,500 genes after analysis, protecting available immune
+markers and filling by normalized-expression variance. Gene search is
+limited to that panel; UMAP, full-input QC, receptors, donor genotypes
+and dextramer calls are unchanged. See `data-raw/README.md` for current
+measured sizes.
 
 ## What you see in the app
 

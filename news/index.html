@@ -78,6 +78,13 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.0.0" id="cerebronexus-500">CerebroNexus 5.0.0<a class="anchor" aria-label="anchor" href="#cerebronexus-500"></a></h2>
 <div class="section level3">
+<h3 id="unreleased-changes-since-5-0-0">Unreleased changes since 5.0.0<a class="anchor" aria-label="anchor" href="#unreleased-changes-since-5-0-0"></a></h3>
+<ul><li>Reduces the nine bundled demo CRBs from 30.26 to 21.22 MiB (about 30%) through stronger build-time compression and a maximum of 1,500 expression genes per demo. Smaller panels remain whole; available demonstration markers, myelination genes and Trekker Moran genes are protected.</li>
+<li>Preserves all demo cells, UMAP and spatial coordinates, metadata, precomputed analyses, images and exact expression values for retained genes. Gene search and new gene-set analyses are limited to the exported panel. User-supplied datasets and application codec defaults are unaffected.</li>
+<li>Shares the final export policy across active demo builders, uses the public CRB reader/writer and fixes Spatial background-image insertion to use the named image collection.</li>
+<li>Replaces formatting-sensitive Viewer test assertions with parsed R expression checks and a behavioral check for Spatial’s empty-selection early return.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="viewer-5-0-0">Viewer<a class="anchor" aria-label="anchor" href="#viewer-5-0-0"></a></h3>
 <ul><li>Adds a shared accelerated renderer with WebGPU and WebGL2 fallback for large projections, Linked Views, Gene Expression, Spatial, Trajectory and repertoire views, preserving zoom, hover and coordinated selection.</li>
 <li>Uses compact binary transport, canonical cell indices, reusable geometry and deferred metadata to reduce large-dataset transfer and preparation costs.</li>

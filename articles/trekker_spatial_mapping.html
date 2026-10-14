@@ -100,7 +100,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">12 October, 2026</h4>
+            <h4 data-toc-skip class="date">14 October, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/trekker_spatial_mapping.Rmd" class="external-link"><code>vignettes/trekker_spatial_mapping.Rmd</code></a></small>
       <div class="d-none name"><code>trekker_spatial_mapping.Rmd</code></div>
@@ -377,15 +377,15 @@ self-contained <code>.crb</code>.</p>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="step-5-sub-sample-whole-genes-force-include-evidence">Step 5 — sub-sample (whole genes, force-include evidence)<a class="anchor" aria-label="anchor" href="#step-5-sub-sample-whole-genes-force-include-evidence"></a>
+<h3 id="step-5-sample-nuclei-and-retain-a-demo-gene-panel">Step 5 — sample nuclei and retain a demo gene panel<a class="anchor" aria-label="anchor" href="#step-5-sample-nuclei-and-retain-a-demo-gene-panel"></a>
 </h3>
-<p>The object is 21,374 genes × 7,420 nuclei. Embedding
-whole-transcriptome expression for all of them blows a sensible size
-budget (measured: ~3.8 MB at 2,500 nuclei, before images). “Whole
-transcriptome” is the point, so we keep <strong>all genes</strong> and
-down-sample <strong>nuclei</strong> instead — stratified by cluster —
-and <strong>force-include the 50 nuclei that carry an evidence
-image</strong>, so the drill-down still works.</p>
+<p>The source is 21,374 genes × 7,420 nuclei. The existing stratified
+sampling force-includes the 50 nuclei carrying evidence images. The
+shipped artifact retains its 2,536 nuclei. After analysis, the builder
+limits expression to 1,500 genes, protecting marker, myelination and
+upstream Moran genes and filling the remaining budget by
+normalized-expression variance. This narrows gene search; it does not
+recompute UMAP, QC or per-cell scores, or alter retained values.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">strat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">integer</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">lv</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">clab</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -443,11 +443,12 @@ matrix’s internal column order.</p>
 <span></span>
 <span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/readCerebro.html">readCerebro</a></span><span class="op">(</span><span class="st">"inst/extdata/examples/demo_trekker.crb"</span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addTrekker</span><span class="op">(</span><span class="va">trekker</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_trekker.crb"</span>, compress <span class="op">=</span> <span class="st">"xz"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"data-raw/demo_gene_panel.R"</span><span class="op">)</span></span>
+<span><span class="fu">save_demo_crb</span><span class="op">(</span><span class="va">crb</span>, <span class="st">"inst/extdata/examples/demo_trekker.crb"</span><span class="op">)</span></span></code></pre></div>
 <p>The whole build is one command:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R</span></span>
-<span><span class="co"># -&gt; inst/extdata/examples/demo_trekker.crb  (~4.7 MB, 2,532 nuclei x 21,374 genes,</span></span>
+<span><span class="co"># -&gt; inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 1,500 genes,</span></span>
 <span><span class="co">#                                         50 embedded evidence images)</span></span></code></pre></div>
 </div>
 </div>
