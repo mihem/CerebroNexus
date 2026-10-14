@@ -1,8 +1,6 @@
 # Changelog
 
-## CerebroNexus 5.0.0
-
-### Unreleased changes since 5.0.0
+## CerebroNexus 5.0.1
 
 - Reduces the nine bundled demo CRBs from 30.26 to 21.22 MiB (about 30%)
   through stronger build-time compression and a maximum of 1,500
@@ -20,6 +18,8 @@
 - Replaces formatting-sensitive Viewer test assertions with parsed R
   expression checks and a behavioral check for Spatial’s empty-selection
   early return.
+
+## CerebroNexus 5.0.0
 
 ### Viewer
 
