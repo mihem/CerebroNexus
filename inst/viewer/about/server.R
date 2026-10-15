@@ -42,7 +42,9 @@ output[["about"]] <- renderText({
     <b>Citation</b><br>
     If you used CerebroNexus for your research, please cite:<br>
     Michael Heming, Xuesong Wang.
-    <i>CerebroNexus</i> [software]. Version ', htmltools::htmlEscape(version), '.
+    <i>CerebroNexus</i> [software]. Version ',
+    htmltools::htmlEscape(version),
+    '.
     <a href="https://github.com/mihem/CerebroNexus" target="_blank" rel="noopener noreferrer">https://github.com/mihem/CerebroNexus</a>.
     <br>
     <b>License</b><br>
