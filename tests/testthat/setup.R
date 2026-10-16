@@ -11,7 +11,10 @@ options(shinytest2.load_timeout = 60 * 1000)
 ## starts the same headroom, and fail CI setup if Chrome cannot start instead
 ## of letting shinytest2 silently skip browser coverage.
 options(chromote.timeout = 60)
-if (identical(Sys.getenv("CI"), "true") && identical(Sys.getenv("NOT_CRAN"), "true")) {
+if (
+  identical(Sys.getenv("CI"), "true") &&
+    identical(Sys.getenv("NOT_CRAN"), "true")
+) {
   local({
     browser <- chromote::default_chromote_object()$new_session()
     browser$close()
