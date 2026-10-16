@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,17 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.0.2" id="cerebronexus-502">CerebroNexus 5.0.2<a class="anchor" aria-label="anchor" href="#cerebronexus-502"></a></h2>
+<ul><li>Completes the source-test cleanup across Viewer modules, transport, dataset lifecycle, authentication and benchmark tools. Tests now execute renderers, Shiny consumers, browser interactions and command-line stages; JavaScript fixtures execute complete scripts instead of matching source formatting (<a href="https://github.com/mihem/CerebroNexus/issues/163" class="external-link">#163</a>).</li>
+<li>Reuses the shared Share button in Linked Views, removes duplicate toolbar and button styling, and simplifies overlay dragging and responsive sizing.</li>
+<li>Replaces compact-layout source assertions with component output and browser checks across all eight visualization pages, including sharing, selection clearing, HLA focus, IR sharing visibility and drag cancellation (<a href="https://github.com/mihem/CerebroNexus/issues/163" class="external-link">#163</a>).</li>
+<li>Exercises dataset loading progress, hidden HLA/Trekker consumers, deferred Trajectory panels and benchmark correctness with runtime tests instead of assertions about source spelling (<a href="https://github.com/mihem/CerebroNexus/issues/163" class="external-link">#163</a>).</li>
+<li>Keeps Share buttons disabled while a dataset switch or reconnect waits for a current plot. Adds runtime coverage for HLA allele synchronization, reordered Trajectory data, stale frames and reconnect recovery.</li>
+<li>Keeps settings drawers open during global Shiny value notifications; only replacement of their containing output closes them.</li>
+<li>Honors disabled per-cell hover while still loading cell IDs on demand.</li>
+<li>Removes the optional JavaScript parser dependency from tests and keeps browser checks in development mode while package checks respect CRAN settings.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.0.1" id="cerebronexus-501">CerebroNexus 5.0.1<a class="anchor" aria-label="anchor" href="#cerebronexus-501"></a></h2>
 <ul><li>Reduces the nine bundled demo CRBs from 30.26 to 21.22 MiB (about 30%) through stronger build-time compression and a maximum of 1,500 expression genes per demo. Smaller panels remain whole; available demonstration markers, myelination genes and Trekker Moran genes are protected.</li>

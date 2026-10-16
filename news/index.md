@@ -1,5 +1,36 @@
 # Changelog
 
+## CerebroNexus 5.0.2
+
+- Completes the source-test cleanup across Viewer modules, transport,
+  dataset lifecycle, authentication and benchmark tools. Tests now
+  execute renderers, Shiny consumers, browser interactions and
+  command-line stages; JavaScript fixtures execute complete scripts
+  instead of matching source formatting
+  ([\#163](https://github.com/mihem/CerebroNexus/issues/163)).
+- Reuses the shared Share button in Linked Views, removes duplicate
+  toolbar and button styling, and simplifies overlay dragging and
+  responsive sizing.
+- Replaces compact-layout source assertions with component output and
+  browser checks across all eight visualization pages, including
+  sharing, selection clearing, HLA focus, IR sharing visibility and drag
+  cancellation
+  ([\#163](https://github.com/mihem/CerebroNexus/issues/163)).
+- Exercises dataset loading progress, hidden HLA/Trekker consumers,
+  deferred Trajectory panels and benchmark correctness with runtime
+  tests instead of assertions about source spelling
+  ([\#163](https://github.com/mihem/CerebroNexus/issues/163)).
+- Keeps Share buttons disabled while a dataset switch or reconnect waits
+  for a current plot. Adds runtime coverage for HLA allele
+  synchronization, reordered Trajectory data, stale frames and reconnect
+  recovery.
+- Keeps settings drawers open during global Shiny value notifications;
+  only replacement of their containing output closes them.
+- Honors disabled per-cell hover while still loading cell IDs on demand.
+- Removes the optional JavaScript parser dependency from tests and keeps
+  browser checks in development mode while package checks respect CRAN
+  settings.
+
 ## CerebroNexus 5.0.1
 
 - Reduces the nine bundled demo CRBs from 30.26 to 21.22 MiB (about 30%)
