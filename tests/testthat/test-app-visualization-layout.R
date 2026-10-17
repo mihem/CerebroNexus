@@ -21,54 +21,16 @@ test_that("all visualization pages keep usable controls, legends and canvases", 
   expect_true(app$get_js(
     "document.getElementById('cerebro-page-loader-announcement').getAttribute('aria-live') === 'polite'"
   ))
-  # Exercise the browser's actual change listener and progress-message handler.
+  # Exercise the browser's actual change listener. Re-dispatching a change for
+  # the already selected data set is a no-op: the loader stays hidden instead of
+  # flashing for a load that never starts. The overlay itself only accepts
+  # progress from the data set being loaded, so its card and progress mapping are
+  # covered by test-dataset-loading-progress.R rather than from here.
   app$run_js(
     "document.getElementById('crb_file_selector').dispatchEvent(new Event('change',{bubbles:true}))"
   )
   app$wait_for_js(
-    "document.getElementById('cerebro-dataset-loading')?.hidden === false"
-  )
-  progress <- function(percent, done = FALSE) {
-    message <- list(
-      custom = list(
-        cerebro_dataset_load = list(
-          label = "Tiny <dataset>",
-          detail = "Reading cells",
-          percent = percent,
-          done = done
-        )
-      )
-    )
-    app$run_js(sprintf(
-      "Shiny.shinyapp.dispatchMessage(%s)",
-      jsonlite::toJSON(
-        jsonlite::toJSON(message, auto_unbox = TRUE),
-        auto_unbox = TRUE
-      )
-    ))
-  }
-  progress(37)
-  app$wait_for_js(
-    "document.querySelector('.cerebro-dataset-loading-percent')?.textContent === '37%'"
-  )
-  expect_identical(
-    app$get_js(
-      "document.querySelector('.cerebro-dataset-loading-label').textContent"
-    ),
-    "Tiny <dataset>"
-  )
-  expect_true(app$get_js(
-    "document.querySelector('#cerebro-dataset-loading [role=status]').getAttribute('aria-live') === 'polite'"
-  ))
-  expect_true(app$get_js(
-    "(() => {const r=document.querySelector('.cerebro-dataset-loading-card').getBoundingClientRect();return r.width>0 && Math.abs(r.left+r.width/2-innerWidth/2)<2 && Math.abs(r.top+r.height/2-innerHeight/2)<2;})()"
-  ))
-  app$wait_for_js(
-    "parseFloat(document.querySelector('.cerebro-dataset-loading-elapsed').textContent)>0"
-  )
-  progress(100, TRUE)
-  app$wait_for_js(
-    "document.getElementById('cerebro-dataset-loading').hidden && !document.body.classList.contains('cerebro-dataset-is-loading')"
+    "document.getElementById('cerebro-dataset-loading')?.hidden === true"
   )
   probe <- paste(
     readLines(testthat::test_path("fixtures", "viewer-layout.js")),
@@ -94,6 +56,20 @@ test_that("all visualization pages keep usable controls, legends and canvases", 
     if (pages[[page]] != previous) {
       app$set_inputs(crb_file_selector = pages[[page]], wait_ = FALSE)
       previous <- pages[[page]]
+      # A page the outgoing data set had may not exist in the new one, and the
+      # server then moves the selection to Data info. That fallback can land
+      # after a click that races it, so wait until the selected sidebar entry is
+      # one the new data set still offers before choosing the page.
+      app$wait_for_js(
+        paste0(
+          "(() => {const li=document.querySelector(",
+          "'.sidebar-menu li.active');",
+          "return !!li && li.style.display !== 'none' && ",
+          "!!li.querySelector('a[data-toggle=\"tab\"]');})()"
+        ),
+        timeout = 30000
+      )
+      app$wait_for_idle(timeout = 30000)
     }
     selector <- paste0('a[href="#shiny-tab-', page, '"]')
     app$wait_for_js(

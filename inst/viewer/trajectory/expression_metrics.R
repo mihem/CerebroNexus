@@ -334,6 +334,6 @@ cerebroRegisterInfo(
 trajectory_expression_metrics_info <- list(
   title = "Number of transcripts",
   text = HTML(
-    "Violin plots showing the number of transcripts (nUMI/nCounts), the number of expressed genes (nGene/nFeature), as well as the percentage of transcripts coming from mitochondrial, ribosomal, and erythrocyte/hemoglobin genes in each state."
+    "Compare transcripts (nUMI/nCounts), expressed genes (nGene/nFeature), and mitochondrial, ribosomal or hemoglobin transcript percentages by state."
   )
 )

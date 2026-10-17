@@ -1,0 +1,2 @@
+# The Linux deployment entry point must remain runnable after a Windows checkout.
+inst/viewer/start-linux.sh text eol=lf

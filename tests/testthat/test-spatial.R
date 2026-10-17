@@ -528,7 +528,7 @@ test_that("Visium ships its H&E as an EXTERNAL image, not embedded", {
     file.path(
       system.file("viewer", package = "CerebroNexus"),
       "spatial",
-      "func_projection_update_plot.R"
+      "func_spatial_helpers.R"
     ),
     envir = renderer
   )
@@ -566,6 +566,14 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
       system.file("viewer", package = "CerebroNexus"),
       "gene_expression",
       "func_color_scale.R"
+    ),
+    envir = renderer
+  )
+  sys.source(
+    file.path(
+      system.file("viewer", package = "CerebroNexus"),
+      "spatial",
+      "func_spatial_helpers.R"
     ),
     envir = renderer
   )
@@ -668,34 +676,54 @@ test_that("renderer uses selected descriptor bounds without changing cell axes",
   expect_identical(as.numeric(rendered$data$y), c(30, 70))
 })
 
-test_that("external spatial image encoding is cached by file version", {
+test_that("external spatial images are streamed from session-private files", {
   renderer <- new.env(parent = globalenv())
   sys.source(
-    viewer_test_path("spatial", "func_projection_update_plot.R"),
+    viewer_test_path("utility_functions.R"),
     envir = renderer
   )
   image <- tempfile(fileext = ".png")
   withr::defer(unlink(image))
-  writeBin(as.raw(1:4), image)
-  calls <- 0L
-  encode <- function(path) {
-    calls <<- calls + 1L
-    paste0("encoded-", file.info(path)$size)
+  bytes <- c(
+    as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)),
+    as.raw(1:12)
+  )
+  writeBin(bytes, image)
+  callback <- NULL
+  session <- new.env(parent = emptyenv())
+  session$userData <- new.env(parent = emptyenv())
+  session$registerDataObj <- function(name, data, handler) {
+    callback <<- function() handler(data, NULL)
+    paste0("session/", name)
   }
 
-  first <- renderer$spatialBackgroundDataUri(image, encode)
-  second <- renderer$spatialBackgroundDataUri(image, encode)
-  writeBin(as.raw(1:5), image)
-  third <- renderer$spatialBackgroundDataUri(image, encode)
+  first <- renderer$viewerPrivateImageUrl(image, session)
+  second <- renderer$viewerPrivateImageUrl(image, session)
+  response <- callback()
 
   expect_identical(first, second)
-  expect_false(identical(second, third))
-  expect_identical(calls, 2L)
+  expect_match(first, "^session/cerebro-image-")
+  expect_identical(response$status, 200L)
+  expect_identical(response$content_type, "image/png")
+  expect_identical(
+    response$content,
+    list(
+      file = normalizePath(image, winslash = "/", mustWork = TRUE),
+      owned = FALSE
+    )
+  )
+  expect_false(startsWith(first, "data:"))
+
+  Sys.sleep(1.1)
+  writeBin(c(bytes, as.raw(0)), image)
+  changed <- callback()
+  expect_identical(changed$status, 404L)
 })
 
 test_that("spatial first frames replace only exact flat geometry with an asset", {
   renderer <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), envir = renderer)
+  sys.source(viewer_test_path("spatial", "func_spatial_helpers.R"), envir = renderer)
   sys.source(
     viewer_test_path("spatial", "func_projection_update_plot.R"),
     envir = renderer
@@ -889,7 +917,8 @@ test_that("empty spatial selection returns before million-cell plot data", {
     selection <- shiny::isolate(spatial_projection_selected_cells())
     expect_identical(calls$plot_data, 1L)
     expect_identical(selection$selection_key, "cell-1")
-    expect_identical(selection$identifier, "1-2")
+    ## A complete stable ID needs no coordinate identifier.
+    expect_null(selection$identifier)
   })
 })
 
@@ -952,7 +981,7 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
     )
     session$flushReact()
     main_html <- as.character(
-      output$spatial_projection_main_parameters_UI$html
+      output$spatial_projection_scene_UI$html
     )
     background_html <- as.character(
       output$spatial_projection_background_selector_UI$html
@@ -963,6 +992,24 @@ test_that("multi-spatial main UI preserves sliceB and uses its image choices", {
     expect_false(grepl("embedded::H&amp;E", background_html, fixed = TRUE))
     expect_false(grepl("external::DAPI", background_html, fixed = TRUE))
     expect_identical(getSpatialData("sliceB")$coordinates$x, 101:102)
+
+    ## Switching FOV updates only the scene selectors; the plot type and gene
+    ## pickers stay mounted.
+    controls_html <- as.character(
+      output$spatial_projection_main_parameters_UI$html
+    )
+    session$setInputs(spatial_projection_plot_type = "ImageFeaturePlot")
+    session$setInputs(spatial_projection_to_display = "sliceA")
+    session$flushReact()
+    expect_identical(
+      as.character(output$spatial_projection_main_parameters_UI$html),
+      controls_html
+    )
+    expect_match(
+      as.character(output$spatial_projection_scene_UI$html),
+      'value="sliceA" selected',
+      fixed = TRUE
+    )
   })
 })
 
@@ -1194,4 +1241,207 @@ test_that(".getSpatialData tolerates a real Slide-seq object (NA-named coord col
   expect_true(nrow(res$coordinates) > 0)
   # the NA-named column must not have leaked through the sanitiser
   expect_false(any(is.na(colnames(res$coordinates))))
+})
+
+test_that("standalone Viewer utilities provide their null fallback operator", {
+  expressions <- parse(file.path(shiny_root, "utility_functions.R"))
+  assignment <- Filter(
+    function(expression) {
+      is.call(expression) &&
+        identical(expression[[1L]], as.name("<-")) &&
+        identical(expression[[2L]], as.name("%||%"))
+    },
+    as.list(expressions)
+  )
+  expect_length(assignment, 1L)
+  runtime <- new.env(parent = baseenv())
+  eval(assignment[[1L]], runtime)
+  expect_identical(runtime$`%||%`(NULL, "fallback"), "fallback")
+  expect_identical(runtime$`%||%`("value", "fallback"), "value")
+})
+
+test_that("cell boundary payloads are validated and capped by complete cells", {
+  boundaries <- data.frame(
+    cell_barcode = rep(c("cell-1", "cell-2"), each = 4L),
+    x = c(0, 1, 1, 0, 2, 3, 3, 2),
+    y = c(0, 0, 1, 1, 2, 2, 3, 3),
+    part = "1",
+    stringsAsFactors = FALSE
+  )
+
+  payload <- spatial_cell_boundaries(boundaries, c("cell-1", "cell-2"), 4L)
+  expect_named(payload, c("cell_barcode", "part", "x", "y"))
+  expect_identical(unique(payload$cell_barcode), "cell-1")
+  expect_length(payload$x, 4L)
+  expect_identical(spatial_cell_boundaries(list(), "cell-1"), list())
+  expect_identical(
+    spatial_cell_boundaries(boundaries, "cell-1", Inf),
+    list()
+  )
+})
+
+test_that("spatial hierarchy resolves sample and ROI values by barcode", {
+  metadata <- data.frame(
+    cell_barcode = c("c1", "c2", "c3"),
+    sample = c("S1", "S1", "S2"),
+    roi_id = c("R1", "R2", "R3"),
+    stringsAsFactors = FALSE
+  )
+
+  sample <- spatial_metadata_facet(metadata, c("c3", "c1"), "sample")
+  roi <- spatial_metadata_facet(
+    metadata,
+    c("c3", "c1"),
+    c("roi", "roi_id")
+  )
+
+  expect_identical(sample$field, "sample")
+  expect_identical(sample$by_cell, c(c3 = "S2", c1 = "S1"))
+  expect_identical(roi$values, c("R3", "R1"))
+})
+
+test_that("ROI rotation pivots use the selected sample and ROI field", {
+  metadata <- data.frame(
+    cell_barcode = c("a1", "a2", "b1", "b2"),
+    sample = c("A", "A", "B", "B"),
+    cell_type = c("T", "B", "T", "B"),
+    sample_roi = "lesion",
+    stringsAsFactors = FALSE
+  )
+  coordinates <- data.frame(
+    x = c(0, 2, 100, 102),
+    y = 0,
+    row.names = metadata$cell_barcode
+  )
+
+  context <- spatial_roi_transform_context(
+    coordinates,
+    metadata,
+    sample_value = "A"
+  )
+
+  expect_identical(context$scoped_cells, c("a1", "a2"))
+  expect_identical(
+    context$roi_by_cell,
+    stats::setNames(
+      rep("lesion", 4L),
+      metadata$cell_barcode
+    )
+  )
+  expect_equal(context$pivots$lesion, c(x = 1, y = 0))
+})
+
+test_that("spatial sampling is scoped to the selected FOV, sample, and ROI", {
+  cells_file <- file.path(
+    system.file("viewer", package = "CerebroNexus"),
+    "spatial",
+    "obj_projection_cells_to_show.R"
+  )
+  metadata <- data.frame(
+    cell_barcode = paste0("c", 1:5),
+    sample = c("S1", "S1", "S1", "S2", "S2"),
+    roi_id = c("R1", "R1", "R2", "R1", "R1"),
+    cluster = "A",
+    stringsAsFactors = FALSE
+  )
+  rownames(metadata) <- metadata$cell_barcode
+  atlas <- list(
+    fov1 = list(
+      coordinates = data.frame(
+        x = 1:3,
+        y = 4:6,
+        row.names = paste0("c", 1:3)
+      )
+    ),
+    fov2 = list(
+      coordinates = data.frame(
+        x = 7:8,
+        y = 9:10,
+        row.names = paste0("c", 4:5)
+      )
+    )
+  )
+  server <- function(input, output, session) {
+    getGroups <- function() character()
+    getMetaData <- function() metadata
+    getSpatialData <- function(name) atlas[[name]]
+    availableSpatial <- function() names(atlas)
+    viewerSpatialCoordinates <- function(name) atlas[[name]]$coordinates
+    viewerPackCurrent <- function() NULL
+    viewerPackSpatialIndex <- function(...) NULL
+    viewerProjectionFirstFrameMetadata <- function() metadata
+    spatial_projection_selected_sample <- function() {
+      input$spatial_projection_sample %||% ""
+    }
+    spatial_projection_controls <- reactive(list(
+      projection = input$spatial_projection_to_display,
+      percentage_cells_to_show = input$spatial_projection_percentage_cells_to_show
+    ))
+    spatial_projection_parameters_plot <- reactive(list(
+      projection = input$spatial_projection_to_display,
+      sample = input$spatial_projection_sample,
+      roi = input$spatial_projection_roi
+    ))
+    sys.source(cells_file, envir = environment())
+  }
+
+  shiny::testServer(server, {
+    session$setInputs(
+      spatial_projection_percentage_cells_to_show = 100,
+      spatial_projection_to_display = "fov1",
+      spatial_projection_sample = "S1",
+      spatial_projection_roi = "R1"
+    )
+    expect_setequal(spatial_projection_cells_to_show(), 1:2)
+
+    # Dynamic controls disappear when the next data set has no matching sample
+    # or ROI field, but Shiny can retain their previous input values. Those
+    # stale values must not filter every cell out of the new spatial scene.
+    session$setInputs(
+      spatial_projection_to_display = "fov2",
+      spatial_projection_sample = "S1",
+      spatial_projection_roi = "missing"
+    )
+    expect_setequal(spatial_projection_cells_to_show(), 4:5)
+  })
+})
+
+test_that("molecule overlays accept one gene and cap browser points", {
+  molecules <- list(
+    data = data.frame(
+      gene = c("Gene1", "Gene2", "Gene1", "Gene1"),
+      x = c(1, 2, 3, 4),
+      y = c(5, 6, 7, 8),
+      stringsAsFactors = FALSE
+    ),
+    genes = c("Gene1", "Gene2"),
+    total_count = 4L,
+    exported_count = 4L,
+    truncated = FALSE
+  )
+
+  overlay <- spatial_molecule_overlay(molecules, "Gene1", 2L)
+  expect_named(overlay, c("x", "y"))
+  expect_length(overlay$x, 2L)
+  expect_identical(spatial_molecule_overlay(molecules, "missing"), list())
+  expect_identical(
+    spatial_molecule_overlay(molecules, "Gene1", scoped = TRUE),
+    list()
+  )
+
+  ## Molecules without a gene label are dropped, not returned as NA rows.
+  molecules$data$gene[[2L]] <- NA_character_
+  overlay <- spatial_molecule_overlay(molecules, "Gene1")
+  expect_identical(overlay$x, c(1, 3, 4))
+})
+
+test_that("ROI pivots use column centres for matrix and data frame input", {
+  coordinates <- cbind(x = c(0, 10, 100, 120), y = c(0, 20, 200, 240))
+  rois <- c("A", "A", "B", "B")
+  expected <- list(A = c(x = 5, y = 10), B = c(x = 110, y = 220))
+  expect_identical(spatialRoiPivots(coordinates, rois), expected)
+  expect_identical(
+    spatialRoiPivots(as.data.frame(coordinates), rois),
+    expected
+  )
 })

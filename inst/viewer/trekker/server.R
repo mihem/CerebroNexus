@@ -192,16 +192,31 @@ observe({
     color <- rep(0, length(keys))
   }
   alignment <- tk$histology_alignment %||% list()
-  image_preset <- list(
-    opacity = alignment$image_opacity %||% 0.6,
-    offsetX = alignment$offset_x %||% 0,
-    offsetY = alignment$offset_y %||% 0,
-    scaleX = alignment$scale_x %||% 1,
-    scaleY = alignment$scale_y %||% 1,
-    flipX = isTRUE(alignment$flip_x),
-    flipY = isTRUE(alignment$flip_y),
-    rotation = alignment$rotation %||% 0
-  )
+  external_histology <- viewerTrekkerExternalImage()
+  image_preset <- if (is.list(external_histology$preset)) {
+    external_histology$preset
+  } else {
+    list(
+      # Match Spatial and Linked views: a saved opacity applies, else 0.5.
+      opacity = {
+        saved <- suppressWarnings(as.numeric(alignment$image_opacity))
+        if (length(saved) == 1L && is.finite(saved) && saved >= 0 && saved <= 1) {
+          saved
+        } else {
+          0.5
+        }
+      },
+      offsetX = alignment$offset_x %||% 0,
+      offsetY = alignment$offset_y %||% 0,
+      scaleX = alignment$scale_x %||% 1,
+      scaleY = alignment$scale_y %||% 1,
+      flipX = isTRUE(alignment$flip_x),
+      flipY = isTRUE(alignment$flip_y),
+      rotation = alignment$rotation %||% 0
+    )
+  }
+  background_image <- external_histology$uri %||% tk$histology_image
+  image_bounds <- external_histology$bounds %||% tk$histology_image_bounds
   spatial_panel <- list(
     id = "trekker",
     label = if (identical(view, "morph")) "UMAP → Spatial" else "Spatial",
@@ -209,8 +224,8 @@ observe({
     x = as.numeric(tk$x),
     y = as.numeric(tk$y),
     spatial = TRUE,
-    background_image = tk$histology_image,
-    image_bounds = as.list(tk$histology_image_bounds),
+    background_image = background_image,
+    image_bounds = as.list(image_bounds),
     image_preset = image_preset
   )
   if (identical(view, "morph")) {

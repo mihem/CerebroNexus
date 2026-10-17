@@ -92,6 +92,6 @@ observeEvent(input[["color_assignments_info"]], {
 color_assignments_info <- list(
   title = "Colours for groups",
   text = p(
-    "Using this interface, you can assign new colours to each of the groups which will then be used across all tabs in CerebroNexus."
+    "Set group colours for all Viewer pages."
   )
 )

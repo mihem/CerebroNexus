@@ -12,9 +12,13 @@
 expression_summary_group_height <- reactiveVal(NULL)
 expression_summary_show_genes <- reactiveVal(FALSE)
 observe({
+  ## Subscribe to visibility only while waiting. Scrolling a finished summary
+  ## out of view must not invalidate it; later data changes will check again.
+  if (!isTRUE(isolate(input[["expression_summary_viewport_request"]]))) {
+    req(input[["expression_summary_viewport_request"]], cancelOutput = TRUE)
+  }
   req(
     identical(input[["sidebar"]], "geneExpression"),
-    input[["expression_summary_viewport_request"]],
     expression_projection_summary_ready()
   )
   summary <- tryCatch(
@@ -67,8 +71,10 @@ output[["expression_by_group_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 
 output[["expression_by_group"]] <- plotly::renderPlotly({
+  if (!isTRUE(isolate(input[["expression_summary_viewport_request"]]))) {
+    req(input[["expression_summary_viewport_request"]], cancelOutput = TRUE)
+  }
   req(
-    input[["expression_summary_viewport_request"]],
     expression_projection_summary_ready(),
     expression_projection_data(),
     expression_summary_data(),

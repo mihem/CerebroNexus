@@ -83,7 +83,8 @@ test_that("prefetch is shared across sessions and releases completed task result
   shiny::withReactiveDomain(second, start(files[3]))
   expect_length(ls(env$crb_prefetch_tasks), 2)
   first$close() # the initiating session must not own process completion
-  deadline <- Sys.time() + 15
+  ## Shared CI runners can take far longer to start the background worker.
+  deadline <- Sys.time() + 60
   while (length(env$crb_prefetch_tasks) && Sys.time() < deadline) {
     later::run_now(0.05)
     shiny:::flushReact()
@@ -101,7 +102,7 @@ test_that("prefetch is shared across sessions and releases completed task result
   writeLines("invalid CRB", files[3])
   start(files[3])
   warnings <- character()
-  deadline <- Sys.time() + 15
+  deadline <- Sys.time() + 60
   withCallingHandlers(
     {
       while (length(env$crb_prefetch_tasks) && Sys.time() < deadline) {
@@ -120,7 +121,7 @@ test_that("prefetch is shared across sessions and releases completed task result
   expect_null(env$.crb_process_cache[[normalizePath(files[3], winslash = "/")]])
   saveRDS(list(marker = 3L), files[3])
   start(files[3])
-  deadline <- Sys.time() + 15
+  deadline <- Sys.time() + 60
   while (length(env$crb_prefetch_tasks) && Sys.time() < deadline) {
     later::run_now(0.05)
     shiny:::flushReact()

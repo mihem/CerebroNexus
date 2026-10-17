@@ -38,7 +38,7 @@ module.exports = function runtime(root) {
   };
   scope.window = scope;
   vm.createContext(scope);
-  for (const name of ['dataset-context.js', 'cell_views_state.js', 'cell_views_wire.js', 'cell_views.js']) {
+  for (const name of ['dataset-context.js', 'background-model.js', 'cell_views_state.js', 'cell_views_wire.js', 'cell_views.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, name), 'utf8'), scope, {filename:name});
   }
   const context = {epoch:'test-session',dataset_key:'A',generation:1};

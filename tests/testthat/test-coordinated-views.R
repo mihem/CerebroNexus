@@ -32,9 +32,47 @@ have_bundle <- nzchar(bundle_file) &&
   file.exists(utility_file)
 if (have_bundle) {
   sys.source(utility_file, envir = cv_env)
+  sys.source(file.path(dirname(bundle_file), "..", "spatial", "func_spatial_helpers.R"), envir = cv_env)
   sys.source(contract_file, envir = cv_env)
   sys.source(bundle_file, envir = cv_env)
 }
+
+new_cv_image_session <- function() {
+  callbacks <- new.env(parent = emptyenv())
+  session <- new.env(parent = emptyenv())
+  session$userData <- new.env(parent = emptyenv())
+  session$callbacks <- callbacks
+  session$registerDataObj <- function(name, data, handler) {
+    assign(name, function() handler(data, NULL), envir = callbacks)
+    paste0("session/", name)
+  }
+  session
+}
+
+test_that("linked spatial images report decode failures and reject stale completions", {
+  js <- paste(
+    readLines(file.path(dirname(bundle_file), "..", "www", "cell_views.js")),
+    collapse = "\n"
+  )
+  server <- paste(
+    readLines(file.path(dirname(bundle_file), "server.R")),
+    collapse = "\n"
+  )
+
+  expect_match(js, "im.onerror = function", fixed = TRUE)
+  expect_match(js, "if (!stillCurrent()) return;", fixed = TRUE)
+  expect_match(
+    js,
+    "coordviews_spatial_image_load_error",
+    fixed = TRUE
+  )
+  expect_match(
+    server,
+    'input[["coordviews_spatial_image_load_error"]]',
+    fixed = TRUE
+  )
+  expect_match(server, "The browser could not decode", fixed = TRUE)
+})
 
 test_that("Viewer Colour by honours registered groups and main group", {
   skip_if_not(have_bundle)
@@ -637,6 +675,9 @@ test_that("thin preloaded primary and supplement align unverified projections on
   scope <- new.env(parent = globalenv())
   sys.source(file.path(dirname(utility_file), "crb_cache.R"), scope)
   sys.source(utility_file, scope)
+  ## The bundle resolves author display defaults; installed checks cannot
+  ## reach the package's internal copy of these helpers.
+  sys.source(viewer_test_path("core", "viewer_content_contract.R"), scope)
   sys.source(contract_file, scope)
   sys.source(bundle_file, scope)
   loaded <- scope$get_or_load_crb(path)
@@ -1350,6 +1391,7 @@ test_that("Linked views consumes the selected dataset point appearance", {
     viewer_content = list(
       ds = list(
         default_projection = "tsne",
+        initial_projections = c("tsne", "umap"),
         default_trajectory = NULL
       )
     )
@@ -1980,10 +2022,10 @@ test_that("each section offers only its own configured backgrounds", {
   writeBin(px, png)
   writeBin(px, png2)
   skip_if_not(file.exists(png) && file.exists(png2))
-  skip_if_not_installed("base64enc")
 
   ## The builders read these two app-scope objects when they exist; this is the
   ## same shape the running app provides.
+  cv_env$session <- new_cv_image_session()
   cv_env$Cerebro.options <- list(
     cerebro_root = tmp,
     spatial_images = list(
@@ -1991,7 +2033,8 @@ test_that("each section offers only its own configured backgrounds", {
         `section-a` = list(
           `H&E` = list(
             path = "spatial-assets/a/he.png",
-            bounds = c(xmin = 1, xmax = 11, ymin = 2, ymax = 12)
+            bounds = c(xmin = 1, xmax = 11, ymin = 2, ymax = 12),
+            viewport_bounds = c(xmin = -5, xmax = 15, ymin = -2, ymax = 14)
           )
         ),
         `section-b` = c(`H&E` = "spatial-assets/b/he.png")
@@ -2022,6 +2065,7 @@ test_that("each section offers only its own configured backgrounds", {
   )
   on.exit(
     {
+      rm("session", envir = cv_env)
       rm("Cerebro.options", envir = cv_env)
       rm("available_crb_files", envir = cv_env)
     },
@@ -2046,6 +2090,10 @@ test_that("each section offers only its own configured backgrounds", {
     unlist(first[[1L]]$bounds, use.names = TRUE),
     c(xmin = 1, xmax = 11, ymin = 2, ymax = 12)
   )
+  expect_equal(
+    unlist(first[[1L]]$viewport, use.names = TRUE),
+    c(xmin = -5, xmax = 15, ymin = -2, ymax = 14)
+  )
   expect_identical(
     first[[1L]]$preset,
     list(
@@ -2067,8 +2115,8 @@ test_that("per-image settings also apply to embedded backgrounds", {
   crb <- list(getSpatialData = function(name) {
     list(
       coordinates = data.frame(
-        x = c(1, 2),
-        y = c(3, 4),
+        x = c(1.123456789, 2.987654321),
+        y = c(3.246813579, 4.135792468),
         row.names = cells
       ),
       histology_images = list(
@@ -2090,8 +2138,20 @@ test_that("per-image settings also apply to embedded backgrounds", {
             flip_y = FALSE,
             image_opacity = 0.7,
             point_opacity = 0.35,
-            point_size = 9
+            point_size = 9,
+            viewport_bounds = list(
+              xmin = -2,
+              xmax = 4,
+              ymin = -1,
+              ymax = 6
+            )
           )
+        ),
+        `ROI only` = list(
+          histology_image = "data:image/png;base64,AA==",
+          histology_image_bounds = c(xmin = 0, xmax = 1, ymin = 0, ymax = 1),
+          roi_field = "sample_roi",
+          roi_value = "lesion"
         )
       ),
       histology_alignment = list(
@@ -2103,6 +2163,13 @@ test_that("per-image settings also apply to embedded backgrounds", {
     )
   })
   cv_env$Cerebro.options <- list(
+    viewer_content = list(
+      ds = list(
+        spatial_point_appearance = list(
+          fov = list(point_opacity = 0.42, point_size = 8)
+        )
+      )
+    ),
     spatial_image_settings = list(
       ds = list(
         fov = list(
@@ -2124,6 +2191,13 @@ test_that("per-image settings also apply to embedded backgrounds", {
   )
 
   built <- cv_env$cv_spatial_one(crb, cells, "fov", allow_external = TRUE)
+  expect_length(built$images, 1L)
+  expect_identical(built$x, c(1.123456789, 2.987654321))
+  expect_identical(built$y, c(3.246813579, 4.135792468))
+  expect_identical(built$x_range, c(-2, 4))
+  expect_identical(built$y_range, c(-1, 6))
+  expect_identical(built$builder_point_opacity, 0.42)
+  expect_identical(built$builder_point_size, 8)
   expect_identical(
     built$images[[1L]]$preset,
     list(
@@ -2195,6 +2269,56 @@ test_that("legacy spatial images share identity and point appearance", {
       percentage_cells_to_show = 100
     )
   )
+})
+
+test_that("Linked views keeps the all-ROI coordinate layout unchanged", {
+  skip_if_not(have_bundle)
+  cells <- c("c1", "c2")
+  crb <- list(getSpatialData = function(name) {
+    list(
+      coordinates = data.frame(
+        x = c(0, 2),
+        y = c(0, 0),
+        row.names = cells
+      )
+    )
+  })
+  cv_env$Cerebro.options <- list(
+    viewer_content = list(
+      ds = list(
+        spatial_roi_settings = list(
+          fov = list(
+            roi = list(
+              rotation_degrees = 90,
+              point_opacity = 0.8,
+              point_size = 5
+            )
+          )
+        )
+      )
+    )
+  )
+  cv_env$available_crb_files <- list(
+    selected = "f.crb",
+    files = c(ds = "f.crb")
+  )
+  on.exit(
+    {
+      rm("Cerebro.options", envir = cv_env)
+      rm("available_crb_files", envir = cv_env)
+    },
+    add = TRUE
+  )
+
+  built <- cv_env$cv_spatial_one(
+    crb,
+    cells,
+    "fov",
+    allow_external = FALSE
+  )
+
+  expect_identical(built$x, c(0, 2))
+  expect_identical(built$y, c(0, 0))
 })
 
 test_that("bundling two images of the same basename keeps both", {
@@ -2326,7 +2450,6 @@ test_that("Linked labels remain reachable in Settings", {
 
 test_that("external backgrounds require matching PNG or JPEG magic bytes", {
   skip_if_not(have_bundle)
-  skip_if_not_installed("base64enc")
   tmp <- file.path(tempdir(), "cv_external_magic")
   unlink(tmp, recursive = TRUE)
   assets <- file.path(tmp, "spatial-assets")
@@ -2337,6 +2460,7 @@ test_that("external backgrounds require matching PNG or JPEG magic bytes", {
   writeBin(jpeg_magic, file.path(assets, "valid.jpg"))
   writeLines("not an image", file.path(assets, "text.png"))
   writeBin(png_magic, file.path(assets, "mismatch.jpg"))
+  cv_env$session <- new_cv_image_session()
   cv_env$Cerebro.options <- list(
     cerebro_root = tmp,
     spatial_images = list(
@@ -2356,6 +2480,7 @@ test_that("external backgrounds require matching PNG or JPEG magic bytes", {
   )
   on.exit(
     {
+      rm("session", envir = cv_env)
       rm("Cerebro.options", envir = cv_env)
       rm("available_crb_files", envir = cv_env)
     },
@@ -2367,6 +2492,140 @@ test_that("external backgrounds require matching PNG or JPEG magic bytes", {
     vapply(images, `[[`, character(1), "label"),
     c("png", "jpeg")
   )
-  expect_match(images[[1L]]$uri, "^data:image/png;base64,")
-  expect_match(images[[2L]]$uri, "^data:image/jpeg;base64,")
+  urls <- vapply(images, `[[`, character(1), "uri")
+  expect_true(all(grepl("^session/cerebro-image-", urls)))
+  expect_false(any(startsWith(urls, "data:")))
+  responses <- lapply(urls, function(url) {
+    get(sub("^session/", "", url), envir = cv_env$session$callbacks)()
+  })
+  expect_identical(
+    responses[[1L]]$content,
+    list(
+      file = normalizePath(
+        file.path(assets, "valid.png"),
+        winslash = "/",
+        mustWork = TRUE
+      ),
+      owned = FALSE
+    )
+  )
+  expect_identical(
+    responses[[2L]]$content,
+    list(
+      file = normalizePath(
+        file.path(assets, "valid.jpg"),
+        winslash = "/",
+        mustWork = TRUE
+      ),
+      owned = FALSE
+    )
+  )
+})
+
+test_that("Linked spatial scenes use Spatial ROI geometry and image ownership", {
+  skip_if_not(have_bundle)
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "spatial-assets"))
+  # The resolver reads only the PNG signature; rendering is tested in-browser.
+  writeBin(as.raw(c(137,80,78,71,13,10,26,10)), file.path(root,"spatial-assets","roi.png"))
+  cells <- paste0("c",1:5)
+  metadata <- data.frame(cell_barcode=cells, sample="S", sample_roi=c("A","A","B","B",NA))
+  coordinates <- data.frame(x=c(0,2,10,12),y=c(0,0,0,0),row.names=cells[1:4])
+  sd <- list(coordinates=coordinates)
+  crb <- list(
+    getMetaData=function() metadata,
+    availableSpatial=function() c("fov", "fov.2"),
+    getSpatialData=function(name) if(name=="fov") sd else list(coordinates=coordinates[1:2,,drop=FALSE])
+  )
+  bounds <- c(xmin=0,xmax=2,ymin=-1,ymax=1)
+  image <- list(path="spatial-assets/roi.png", bounds=bounds, label="Histology A",
+                roi_field="sample_roi",roi_value="A")
+  settings <- list(A=list(rotation_degrees=90,point_opacity=.8,point_size=5),
+                   B=list(rotation_degrees=180,point_opacity=.9,point_size=7))
+  options <- list(cerebro_root=root,
+    spatial_images=list(ds=list(fov=list(HE=image), fov.2=list(HE=image))),
+    spatial_image_settings=list(ds=list(fov=list(HE=list(rotation=12)),fov.2=list(HE=list(rotation=12)))),
+    viewer_content=list(ds=list(spatial_roi_settings=list(fov=settings,fov.2=settings)))
+  )
+  cv_env$Cerebro.options <- options
+  cv_env$available_crb_files <- list(selected="ds", files=c(ds="file.crb"))
+  on.exit(rm(list=c("Cerebro.options", "available_crb_files"), envir=cv_env), add=TRUE)
+  overview <- cv_env$cv_spatial_one(crb,cells,"fov",TRUE)
+  expect_length(overview$images,0)
+  expect_null(overview$image)
+  expect_equal(overview$x,c(0,2,10,12,NA))
+  roi <- cv_env$cv_spatial_one(crb,cells,"fov",TRUE,"A")
+  context <- cv_env$spatial_roi_transform_context(coordinates,metadata,"S")
+  expected <- cv_env$rotateSpatialCoordinatesByRoi(coordinates[1:2,,drop=FALSE],
+    c("A","A"),settings,pivots=context$pivots)
+  expect_equal(roi$x,c(expected$x,NA,NA,NA))
+  expect_equal(roi$y,c(expected$y,NA,NA,NA))
+  expect_equal(roi$builder_point_size,5)
+  expect_equal(roi$builder_point_opacity,.8)
+  external <- cv_env$configured_spatial_images(options,"ds","fov","A")
+  descriptor <- cv_env$resolve_spatial_background("external::HE",list(),external)
+  expect_equal(roi$images[[1]]$bounds,as.list(descriptor$bounds))
+  expect_equal(roi$images[[1]]$label,descriptor$label)
+  expect_equal(roi$images[[1]]$preset,
+    cv_env$spatial_background_preset(options,"ds","fov",descriptor))
+  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",TRUE,"B")$images,0)
+  single <- cv_env$cv_spatial_one(crb,cells,"fov.2",TRUE)
+  expect_equal(single$x,roi$x)
+  expect_equal(single$y,roi$y)
+  expect_length(single$images,1)
+  scenes <- cv_env$cv_build_spatial(crb,cells)$samples
+  expect_identical(vapply(scenes,`[[`,character(1),"name"),
+    c("fov","fov::roi::A","fov::roi::B","fov.2"))
+  expect_identical(vapply(scenes,`[[`,character(1),"label"),
+    c("fov · All ROIs (spatial)", "fov · A (spatial)",
+      "fov · B (spatial)", "fov.2 · A (spatial)"))
+  expect_identical(vapply(scenes,`[[`,logical(1),"is_roi_overview"),
+    c(TRUE,FALSE,FALSE,FALSE))
+  expect_length(scenes[[1]]$images,0)
+  expect_equal(scenes[[2]]$x,structure(roi$x,class="AsIs"))
+  expect_length(scenes[[3]]$images,0)
+  one <- crb
+  one$availableSpatial <- function() "fov.2"
+  single_space <- cv_env$cv_build_spatial(one,cells)
+  expect_identical(single_space$name,"fov.2")
+  expect_false(single_space$is_roi_overview)
+  expect_identical(single_space$label,"fov.2 · A (spatial)")
+  # Multiple matching images keep declaration order, independent of labels.
+  cv_env$Cerebro.options$spatial_images$ds$fov.2 <- list(Zebra=image,Alpha=image)
+  multi_image <- cv_env$cv_spatial_one(crb,cells,"fov.2",TRUE)
+  expect_match(multi_image$image$id,":Zebra$",perl=TRUE)
+  expect_match(multi_image$images[[2]]$id,":Alpha$",perl=TRUE)
+
+  # Embedded ROI declarations follow the same scope precedence as externals.
+  embedded <- list(coordinates=coordinates,histology_images=list(
+    A=list(histology_image="data:image/png;base64,AA==",histology_image_bounds=bounds,
+           roi_field="sample_roi",roi_value="A")))
+  crb$getSpatialData <- function(name) embedded
+  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE)$images,0)
+  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE,"A")$images,1)
+  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE,"B")$images,0)
+})
+
+test_that("supplement projections served by the Viewer Pack are sent as descriptors", {
+  built_names <- NULL
+  build <- function(names) {
+    built_names <<- names
+    stats::setNames(
+      lapply(names, function(name) list(ndim = 2L, x = I(c(1, 2)), y = I(c(3, 4)))),
+      names
+    )
+  }
+  descriptor <- list(url = "tsne.bin", cells = 2L, dimensions = 2L)
+  projections <- cv_env$cv_supplement_projections(
+    c("pca", "tsne", "umap3d"),
+    list(tsne = descriptor, umap3d = list(url = "bad", cells = 5L, dimensions = 2L)),
+    2L,
+    build
+  )
+  ## Valid resources are not built; invalid ones fall back to arrays.
+  expect_identical(built_names, c("pca", "umap3d"))
+  expect_identical(names(projections), c("pca", "tsne", "umap3d"))
+  expect_identical(projections$tsne$projection_resource, descriptor)
+  expect_null(projections$tsne$x)
+  expect_identical(projections$pca$x, I(c(1, 2)))
 })

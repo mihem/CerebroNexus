@@ -13,8 +13,8 @@ test_that("persistent selection preserves cell identity at coincident coordinate
     ),
     context
   )
-  expect_identical(result$x, c(1, 1, 2))
-  expect_identical(result$identifier, c("1-3", "1-3", "2-4"))
+  ## Complete stable IDs need no coordinate identifiers.
+  expect_identical(names(result), "selection_key")
   expect_identical(result$selection_key, c("ROI1/甲", "ROI2/乙", "cell-3"))
   expect_identical(
     selection_env$selectedCellMask(
@@ -36,7 +36,21 @@ test_that("empty and stale selection messages cannot acquire another dataset", {
   expect_null(f(input, modifyList(context, list(dataset_key = "second"))))
   expect_null(f(input, modifyList(context, list(generation = 2))))
   expect_null(f(input, modifyList(context, list(epoch = "new session"))))
-  expect_null(f(modifyList(input, list(x = numeric(), y = numeric())), context))
+  expect_null(f(
+    modifyList(input, list(x = numeric(), y = numeric(), ids = character())),
+    context
+  ))
+  ## IDs alone are a complete selection: the browser omits coordinates then.
+  expect_identical(
+    f(modifyList(input, list(x = numeric(), y = numeric())), context),
+    data.frame(selection_key = "cell", stringsAsFactors = FALSE)
+  )
+  ## A cell without an ID keeps the coordinate fallback for the selection.
+  fallback <- f(
+    modifyList(input, list(x = c(1, 2), y = c(3, 4), ids = c("cell", ""))),
+    context
+  )
+  expect_identical(fallback$identifier, c("1-3", "2-4"))
 })
 
 test_that("coordinate-only selection keeps its legacy fallback", {

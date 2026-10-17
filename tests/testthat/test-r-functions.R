@@ -653,8 +653,17 @@ test_that("launchCerebro builds dataset information for configured files", {
     prototypes[[crb]]$getMetaData()$cell_barcode,
     cells
   )
+  entry <- catalog[[crb]]
   expect_identical(
-    catalog[[crb]],
+    entry[c(
+      "label",
+      "path",
+      "cells",
+      "organism",
+      "date",
+      "immune_repertoire",
+      "tcr_repertoire"
+    )],
     list(
       label = "Ren",
       path = crb,
@@ -662,18 +671,24 @@ test_that("launchCerebro builds dataset information for configured files", {
       organism = "Homo sapiens",
       date = "2026-09-17",
       immune_repertoire = TRUE,
-      tcr_repertoire = TRUE,
-      capabilities = list(
-        marker_genes = FALSE,
-        most_expressed_genes = FALSE,
-        enriched_pathways = FALSE,
-        extra_material = FALSE,
-        trajectory = FALSE,
-        spatial = FALSE,
-        trekker = FALSE
-      )
+      tcr_repertoire = TRUE
     )
   )
+  expect_identical(
+    entry$capabilities,
+    list(
+      marker_genes = FALSE,
+      most_expressed_genes = FALSE,
+      enriched_pathways = FALSE,
+      extra_material = FALSE,
+      trajectory = FALSE,
+      spatial = FALSE,
+      trekker = FALSE
+    )
+  )
+  ## The catalog also carries the projection list and the overview summary the
+  ## sidebar reads before a data set is opened.
+  expect_true(all(c("projection_names", "overview") %in% names(entry)))
 })
 
 ## ---------------------------------------------------------------------------

@@ -499,3 +499,58 @@ test_that("core auxiliary identities precede full metadata and reject duplicate 
   request$wire_token <- 6L
   expect_false(env$cerebroCellViewAuxRequest(request))
 })
+
+test_that("renders with delivered cells name the barcodes the browser holds", {
+  skip_if_not_installed("jsonlite")
+  runtime <- new.env(parent = globalenv())
+  sys.source(utility_file, envir = runtime)
+  sent <- list()
+  runtime$input <- list(coordviews_wire_supported = TRUE)
+  runtime$session <- list(
+    sendBinaryMessage = function(type, payload) {
+      sent[[length(sent) + 1L]] <<- list(type = type, payload = payload)
+    },
+    sendCustomMessage = function(type, payload) NULL
+  )
+  context <- runtime$viewerDatasetContext("wire-test", "dataset-a", 1L)
+  runtime$viewer_loaded_dataset_context <- function() context
+  keys <- sprintf("cell-%04d", seq_len(4096L))
+  core_builds <- 0L
+  render <- function(color, cells) {
+    runtime$cerebroCellViewRender(
+      "overview_projection",
+      meta = list(color_type = "categorical", traces = "A"),
+      data = list(
+        x = list(I(as.numeric(seq_along(keys)))),
+        y = list(I(as.numeric(seq_along(keys)))),
+        color = list(color),
+        deferred_selection_lengths = length(keys)
+      ),
+      deferred_aux = function() list(selection_key = keys),
+      core_aux = function() {
+        core_builds <<- core_builds + 1L
+        list(selection_key = keys, hover = list(pending = FALSE))
+      },
+      dataset_context = context,
+      aux_key = list(cell_indices = cells, hover = FALSE)
+    )
+    header <- wire_header(tail(sent, 1L)[[1L]]$payload)
+    header$data
+  }
+  first <- render("#123456", seq_along(keys))
+  expect_null(first$aux_reuse)
+  ## Nothing was delivered yet, so a recolour cannot reuse anything.
+  expect_null(render("#654321", seq_along(keys))$aux_reuse)
+  second_token <- runtime$.cerebro_cell_view_wire_serial
+  expect_true(runtime$cerebroCellViewAuxRequest(list(
+    id = "overview_projection",
+    wire_token = second_token,
+    dataset_context = context
+  )))
+  expect_identical(core_builds, 1L)
+  expect_identical(render("#abcdef", seq_along(keys))$aux_reuse, second_token)
+  ## A different cell set or dataset generation must download its barcodes.
+  expect_null(render("#abcdef", rev(seq_along(keys)))$aux_reuse)
+  context <- runtime$viewerDatasetContext("wire-test", "dataset-a", 2L)
+  expect_null(render("#abcdef", seq_along(keys))$aux_reuse)
+})

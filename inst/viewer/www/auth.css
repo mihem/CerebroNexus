@@ -1,124 +1,117 @@
+/* Login uses the Viewer light theme without loading the full application CSS. */
 .panel-auth {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
-  background: linear-gradient(145deg, #f8fafb 0%, #eef2f4 100%);
+  padding: 32px 16px;
+  background: #f7f7f9;
+  color: #242424;
+  font-family: "Source Sans Pro", "Segoe UI", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color-scheme: light;
 }
-
+.panel-auth#auth-auth-mod { background-color: #f7f7f9; overflow-y: auto; }
 .panel-auth > br,
-.panel-auth > div[style*="height: 70px"] {
-  display: none;
-}
-
-.panel-auth > .row {
-  width: 100%;
-  margin-right: 0;
-  margin-left: 0;
-}
-
-.panel-auth > .row > [class*="col-"] {
-  width: 100%;
-  margin-left: 0;
-}
-
+.panel-auth > div[style*="height: 70px"],
+.panel-auth .panel-body > br,
+.panel-auth #auth-container-btn-ok > br { display: none; }
+.panel-auth > .row { width: 100%; margin: 0; }
+.panel-auth > .row > [class*="col-"] { width: 100%; margin-left: 0; padding: 0; }
 .panel-auth .panel {
   width: 100%;
-  max-width: 448px;
+  max-width: 432px;
   margin: 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid #e5e5e8;
   border-radius: 14px;
-  box-shadow: 0 22px 55px rgba(24, 35, 46, 0.13);
+  background: #fff;
+  box-shadow: 0 8px 28px #20202008;
 }
-
-.panel-auth .panel-body {
-  padding: 36px 32px 30px;
-}
-
-.cerebro-auth-brand {
-  margin: 0 auto 8px;
-  color: #222b33;
-  text-align: center;
-}
-
-.cerebro-auth-brand svg {
-  display: inline-block;
-  width: min(100%, 262px);
-  height: auto;
-}
-
-.cerebro-auth-eyebrow {
-  margin-top: 16px;
-  color: #ea6a0f;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.panel-auth h3 {
-  margin-top: 8px;
-  color: #222b33;
+.panel-auth .panel-body { padding: 36px; }
+.cerebro-auth-brand { margin: 0 0 28px; text-align: left; }
+.cerebro-auth-brand svg { display: block; width: 232px; max-width: 100%; height: auto; }
+.panel-auth h1 {
+  margin: 0 0 8px;
+  color: #242424;
+  font-family: inherit;
+  font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  text-align: left;
 }
-
+.cerebro-auth-intro { margin: 0 0 28px; color: #626269; font-size: 16px; text-align: left; }
+.panel-auth .form-group { margin-bottom: 20px; }
+.panel-auth label { margin-bottom: 8px; font-weight: 600; }
 .panel-auth .form-control {
-  min-height: 44px;
-  border-color: #cdd6de;
+  height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #929298;
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #fff;
+  color: #242424;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 16px;
 }
-
-.panel-auth .form-control:focus {
-  border-color: #176fa6;
-  box-shadow: 0 0 0 3px rgba(23, 111, 166, 0.15);
-}
-
+.panel-auth .form-control:focus { border-color: #bd4800; box-shadow: 0 0 0 3px #ff780026; }
 .panel-auth .form-control:focus-visible,
 .panel-auth .btn:focus-visible,
-.panel-auth a:focus-visible {
-  outline: 3px solid #176fa6;
-  outline-offset: 2px;
-}
-
+.panel-auth a:focus-visible { outline: 2px solid #bd4800; outline-offset: 3px; }
 .panel-auth .btn {
-  min-height: 44px;
+  min-height: 46px;
   border-radius: 8px;
-  font-weight: 700;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  touch-action: manipulation;
 }
-
-.panel-auth .btn-primary {
-  border-color: #222b33;
-  background: #222b33;
-  box-shadow: 0 8px 18px rgba(34, 43, 51, 0.18);
+.panel-auth .btn-primary { border-color: #ff7800; background: #ff7800; color: #242424; }
+.panel-auth .btn-primary:hover,
+.panel-auth .btn-primary:focus { border-color: #f06e00; background: #f06e00; color: #242424; }
+.panel-auth .btn-primary:active { border-color: #e66400; background: #e66400; color: #242424; }
+.panel-auth .btn[disabled] { opacity: .65; cursor: wait; }
+/* Keep the provider's GIF out of the layout; feedback lives in the button. */
+.panel-auth #auth-spinner_msg_ok { display: none !important; }
+.panel-auth #auth-go_auth {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
 }
-
-.panel-auth .alert {
-  border-radius: 8px;
-  overflow-wrap: anywhere;
+.panel-auth #auth-go_auth > span { grid-area: 1 / 1; }
+.panel-auth .cerebro-auth-busy-label { visibility: hidden; }
+.panel-auth #auth-go_auth.is-signing-in { opacity: 1; cursor: progress; }
+.panel-auth #auth-go_auth.is-signing-in .action-label { visibility: hidden; }
+.panel-auth #auth-go_auth.is-signing-in .cerebro-auth-busy-label { visibility: visible; }
+.panel-auth #auth-go_auth.is-signing-in::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  height: 3px;
+  background: #24242440;
+  animation: cerebro-auth-progress 1.2s ease-in-out infinite;
 }
-
-.cerebro-auth-footer {
-  color: #7c8894;
-  font-size: 11px;
-  font-weight: 650;
-  text-align: center;
+@keyframes cerebro-auth-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(350%); }
 }
-
-@media (max-width: 576px) {
-  .panel-auth {
-    align-items: flex-start;
-    padding: 12px;
-  }
-
-  .panel-auth .panel-body {
-    padding: 26px 21px 23px;
-  }
-
-  .cerebro-auth-brand svg {
-    width: min(100%, 230px);
-  }
+@media (prefers-reduced-motion: reduce) {
+  .panel-auth #auth-go_auth.is-signing-in::after { animation: none; width: 100%; }
 }
+.panel-auth #auth-result_auth:empty { display: none; }
+.panel-auth .alert { margin: 16px 0 0; border-radius: 8px; overflow-wrap: anywhere; }
+.panel-auth .alert-danger { background: #fff2f1; border-color: #efc8c4; color: #963a30; }
+.panel-auth hr { margin: 26px 0 20px; border-color: #ededf0; }
+.cerebro-auth-footer { color: #626269; font-size: 14px; line-height: 1.5; text-align: left; }
+@media (max-width: 480px) {
+  .panel-auth { padding: 24px 12px; }
+  .panel-auth .panel-body { padding: 28px 24px; }
+  .cerebro-auth-brand svg { width: 216px; }
+}
+@media (max-height: 600px) { .panel-auth { justify-content: flex-start; } }

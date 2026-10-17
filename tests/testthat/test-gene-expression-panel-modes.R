@@ -292,6 +292,35 @@ test_that("gene summary hosts change only when their layout changes", {
   )
 })
 
+## Summaries update only while visible (expression_summary_viewport_request).
+## Scroll on every poll: the page may still grow and push the gate back out.
+viewer_show_expression_summary <- function(app) {
+  app$wait_for_js(
+    paste0(
+      "(() => {document.getElementById('expression_summary_gate')",
+      "?.scrollIntoView();",
+      "return Shiny.shinyapp.$inputValues",
+      ".expression_summary_viewport_request === true;})()"
+    ),
+    timeout = 60000
+  )
+}
+
+## Wait for summary content. A repaint (e.g. switching to RGB) can resize the
+## projection after the summary was scrolled into view and push it out again,
+## where it intentionally stops updating; keep it in view while waiting.
+viewer_wait_expression_summary <- function(app, condition) {
+  app$wait_for_js(
+    paste0(
+      "(() => {document.getElementById('expression_summary_gate')",
+      "?.scrollIntoView();",
+      "const text=document.getElementById('expression_by_group')?.innerText||'';",
+      "return (", condition, ");})()"
+    ),
+    timeout = 60000
+  )
+}
+
 test_that("gene expression panels follow gene, selection, and display mode", {
   skip_if_not_installed("shinytest2")
   inst_dir <- viewer_app_test_path()
@@ -304,6 +333,13 @@ test_that("gene expression panels follow gene, selection, and display mode", {
     load_timeout = 60000
   )
   withr::defer(app$stop())
+
+  app$run_js(paste0(
+    "window.genePanelErrors = [];",
+    "window.addEventListener('error', e => genePanelErrors.push(e.message));",
+    "window.addEventListener('unhandledrejection', ",
+    "e => genePanelErrors.push(String(e.reason)));"
+  ))
 
   app$click(selector = 'a[href="#shiny-tab-geneExpression"]')
   app$wait_for_js(
@@ -325,16 +361,7 @@ test_that("gene expression panels follow gene, selection, and display mode", {
     ),
     timeout = 60000
   )
-  app$run_js(
-    "document.getElementById('expression_summary_gate')?.scrollIntoView()"
-  )
-  app$wait_for_js(
-    paste0(
-      "Number.isFinite(Number(window.Shiny?.shinyapp?.$inputValues?",
-      ".expression_summary_viewport_request))"
-    ),
-    timeout = 60000
-  )
+  viewer_show_expression_summary(app)
   app$wait_for_js(
     "document.querySelector('#expression_by_group_UI h3') !== null",
     timeout = 60000
@@ -364,7 +391,7 @@ test_that("gene expression panels follow gene, selection, and display mode", {
   app$wait_for_js(
     paste0(
       "(window.Shiny?.shinyapp?.$inputValues?",
-      ".expression_projection_persistent_selection?.x?.length || 0) > 0"
+      ".expression_projection_persistent_selection?.ids?.length || 0) > 0"
     ),
     timeout = 60000
   )
@@ -405,11 +432,18 @@ test_that("gene expression panels follow gene, selection, and display mode", {
   )
   app$wait_for_js(
     paste0(
-      "document.getElementById('expression_by_group')?.innerText",
-      ".includes('MS4A1')"
+      "(() => {const panes = Array.from(document.querySelectorAll(",
+      "'#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));",
+      "return panes.length === 2 && panes.every(p => ",
+      "Number(p.querySelector('.cv-canvas-wrap > canvas:not(.cv-mini)')",
+      "?.dataset.pointCount) > 0) && ",
+      "String(Shiny.shinyapp.$inputValues.expression_projection_rendered_key)",
+      ".startsWith('separate');})()"
     ),
-    timeout = 60000
+    timeout = 20000
   )
+  ## The box selection above scrolled the projection into view.
+  viewer_wait_expression_summary(app, "text.includes('MS4A1')")
   panel_text <- app$get_js(
     "document.getElementById('expression_by_group').innerText"
   )
@@ -427,13 +461,9 @@ test_that("gene expression panels follow gene, selection, and display mode", {
   viewer_set_selectize(app, "expression_rgb_gene_r", "MS4A1")
   viewer_set_selectize(app, "expression_rgb_gene_g", "CD3D")
   viewer_set_selectize(app, "expression_rgb_gene_b", "")
-  app$wait_for_js(
-    paste0(
-      "(() => {const text=document.getElementById(",
-      "'expression_by_group')?.innerText || '';",
-      "return text.includes('R · MS4A1') && ",
-      "text.includes('G · CD3D') && !text.includes('B ·');})()"
-    ),
-    timeout = 60000
-  )
+  viewer_wait_expression_summary(app, paste0(
+    "text.includes('R · MS4A1') && text.includes('G · CD3D') && ",
+    "!text.includes('B ·')"
+  ))
+  expect_length(app$get_js("genePanelErrors"), 0L)
 })

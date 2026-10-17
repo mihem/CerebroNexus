@@ -17,7 +17,18 @@ test_that("trajectory static frames fall back when filters or resources change",
         state = list(url = "state", levels = c("start", "end")),
         subset = list(url = "index")
       )
-      viewerTrajectoryFrameAsset <- function(method, name) resource
+      viewerTrajectoryFrameAsset <- function(method, name) {
+        if (isTRUE(input$canonical)) {
+          return(c(resource, list(geometry_kind = "canonical_projection")))
+        }
+        resource
+      }
+      getGroupLevels <- function(group) c("A", "B")
+      reactive_group_colors <- function(group) c(A = "#111111", B = "#222222")
+      viewerMetadataCodesAsset <- function(name, levels) {
+        if (!isTRUE(input$codes)) return(NULL)
+        list(url = "codes", cells = 4L, levels = I(levels))
+      }
       viewerPackCurrent <- function() NULL
       edges <- data.frame(
         source_dim_1 = 0,
@@ -78,6 +89,16 @@ test_that("trajectory static frames fall back when filters or resources change",
       expect_null(trajectory_static_first_frame())
       trajectory_projection_appearance$percentage_cells_to_show <- 100
       expect_identical(trajectory_static_first_frame()$resource, resource)
+      ## A metadata group on a canonical frame uses its Viewer Pack codes.
+      session$setInputs(trajectory_point_color = "group", canonical = TRUE)
+      expect_null(trajectory_static_first_frame())
+      session$setInputs(codes = TRUE)
+      frame <- trajectory_static_first_frame()
+      expect_identical(frame$color_variable, "group")
+      expect_identical(frame$levels, c("A", "B"))
+      expect_identical(unname(frame$colors), c("#111111", "#222222"))
+      expect_identical(frame$resource$group$url, "codes")
+      expect_identical(frame$resource$state, resource$state)
     }
   )
 })
@@ -109,6 +130,7 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
         scope,
         names = c(
           "trajectory_projection_lines",
+          "trajectory_projection_active",
           "trajectory_projection_prepared_raw",
           "trajectory_projection_prepared"
         )
@@ -119,21 +141,33 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
       })
     },
     {
-      session$setInputs(trajectory_point_color = "group")
-      expect_equal(tail(scope$seen, 1)[[1]]$point_size, 3)
+      session$setInputs(sidebar = "trajectory", trajectory_point_color = "group")
+      percentage <- function(frame) {
+        frame$feedback$trajectory_percentage_cells_to_show
+      }
+      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "100")
+      ## Point size is a renderer patch: no new frame.
+      frames <- length(scope$seen)
       trajectory_projection_appearance$point_size <- 4
       session$flushReact()
-      session$elapse(50)
-      trajectory_projection_appearance$point_size <- 8
-      session$flushReact()
-      expect_equal(tail(scope$seen, 1)[[1]]$point_size, 3)
       session$elapse(1000)
-      expect_equal(tail(scope$seen, 1)[[1]]$point_size, 8)
+      expect_length(scope$seen, frames)
+      trajectory_projection_appearance$percentage_cells_to_show <- 60
+      session$flushReact()
+      session$elapse(50)
+      trajectory_projection_appearance$percentage_cells_to_show <- 50
+      session$flushReact()
+      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "100")
+      session$elapse(1000)
+      expect_equal(percentage(tail(scope$seen, 1)[[1]]), "50")
       expect_false(any(vapply(
         scope$seen,
-        function(frame) frame$point_size == 4,
+        function(frame) identical(percentage(frame), "60"),
         logical(1)
       )))
+      trajectory_projection_appearance$percentage_cells_to_show <- 100
+      session$flushReact()
+      session$elapse(1000)
       session$setInputs(trajectory_projection_group_filter_group = character())
       session$elapse(1000)
       expect_equal(nrow(tail(scope$seen, 1)[[1]]$cells_df), 0)
@@ -248,6 +282,12 @@ test_that("supplementary trajectory controls appear only after projection and vi
     scope <- viewer_ui_test_env()
     scope$output <- list()
     scope$renderUI <- function(expr) eval(substitute(expr), parent.frame())
+    ## Supplementary panels read the author display defaults for their page; the
+    ## deployment here configures none, so the builder defaults apply.
+    sys.source(viewer_test_path("core", "viewer_content_contract.R"), scope)
+    scope$current_page_display_defaults <- function(page) {
+      viewerPageDisplayDefaults(list(), "tiny", page)
+    }
     scope$trajectory_projection_sent <- function() ready
     scope$trajectory_selection_ok <- function() TRUE
     scope$getVariableToCompareChoices <- scope$getGroups <- function() "group"

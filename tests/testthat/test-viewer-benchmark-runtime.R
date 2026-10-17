@@ -3,6 +3,7 @@ viewer_benchmark_scope <- function() {
   skip_if_not(file.exists(file), "benchmark tree not present")
   scope <- new.env(parent = globalenv())
   sys.source(test_path("..", "bench", "viewer_1m_page_protocol.R"), scope)
+  sys.source(test_path("..", "bench", "lib", "viewer_launch.R"), scope)
   for (expression in parse(file)) {
     if (
       is.call(expression) &&
@@ -131,4 +132,68 @@ test_that("benchmark browser retries clean up failures and preserve real errors"
   )
   expect_equal(starts, 1)
   expect_equal(stops, 1)
+})
+
+test_that("page benchmarks launch installed candidates by default", {
+  scope <- viewer_benchmark_scope()
+  candidate <- c(label = "current", root = "/src/cerebro", library = "/tmp/lib")
+  installed <- scope$viewer_app_lines(candidate, "/data/1m.crb", "installed")
+  expect_identical(
+    installed[[1L]],
+    'library(CerebroNexus, lib.loc = "/tmp/lib")'
+  )
+  expect_false(any(grepl("load_all", installed, fixed = TRUE)))
+  expect_true(any(grepl('"1M pages" = "/data/1m.crb"', installed, fixed = TRUE)))
+  source_tree <- scope$viewer_app_lines(candidate, "/data/1m.crb", "load_all")
+  expect_identical(
+    source_tree[[1L]],
+    'devtools::load_all("/src/cerebro", quiet = TRUE)'
+  )
+  expect_error(scope$validate_viewer_load_mode("source"), "VIEWER_BENCH_LOAD")
+})
+
+test_that("page benchmarks read the Data info cell count inside the overview", {
+  skip_on_cran()
+  skip_if_not_installed("chromote")
+  scope <- viewer_benchmark_scope()
+  browser <- chromote::ChromoteSession$new()
+  on.exit(browser$close(), add = TRUE)
+  js <- function(code) {
+    browser$Runtime$evaluate(code, returnByValue = TRUE)$result$value
+  }
+  expect_null(js(scope$data_info_cells_js()))
+  js(paste0(
+    "document.body.innerHTML='<div id=load_data_overview><div class=dataset-stat ",
+    "id=load_data_number_of_cells><strong>1,000,000</strong> <span>Cells</span>",
+    "</div></div>'"
+  ))
+  expect_match(js(scope$data_info_cells_js()), "1,000,000", fixed = TRUE)
+})
+
+test_that("browser benchmarks share installed launches and Data info waits", {
+  scope <- viewer_benchmark_scope()
+  candidate <- c(label = "a b", root = "/src/a", library = "/lib/a")
+  expect_identical(
+    scope$viewer_load_line(candidate, "installed"),
+    'library(CerebroNexus, lib.loc = "/lib/a")'
+  )
+  expect_identical(
+    scope$viewer_load_line(candidate, "load_all"),
+    'devtools::load_all("/src/a", quiet = TRUE)'
+  )
+  ## Source-tree mode installs nothing.
+  candidates <- list(a = c(label = "a", root = "/src/a"))
+  expect_identical(
+    scope$prepare_viewer_candidates(candidates, "load_all"),
+    candidates
+  )
+  waited <- character()
+  app <- list(
+    wait_for_js = function(script, timeout) waited <<- c(waited, script),
+    get_js = function(script) "1,000,000 Cells"
+  )
+  expect_identical(scope$wait_for_data_info_cells(app, "1,000,000"), "1,000,000 Cells")
+  expect_length(waited, 1L)
+  expect_error(scope$wait_for_data_info_cells(app, "2,000,000"), "2,000,000")
+  expect_identical(scope$wait_for_data_info_cells(app), "1,000,000 Cells")
 })

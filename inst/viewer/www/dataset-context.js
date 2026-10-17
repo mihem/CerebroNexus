@@ -55,6 +55,14 @@
     return currentPhase === 'ready' && same(currentContext, fromMessage(message));
   }
 
+  // Progress may arrive during pending, but never from an earlier selection,
+  // including A -> B -> A where the dataset key alone cannot identify a load.
+  function acceptsProgress(message) {
+    return currentPhase !== 'error' && same(currentContext, fromMessage(message)) &&
+      (pendingSelection === null || (message.selection === pendingSelection &&
+        message.selection_nonce === selectionSequence));
+  }
+
   function current() {
     return currentContext;
   }
@@ -209,7 +217,7 @@
   }
 
   function beginSelection(value) {
-    if (typeof value !== 'string' || value === selectedValue) return;
+    if (typeof value !== 'string' || !value || value === selectedValue) return;
     selectedValue = value;
     if (!currentContext) return;
     pendingSelection = value;
@@ -235,6 +243,7 @@
     same: same,
     fromMessage: fromMessage,
     accepts: accepts,
+    acceptsProgress: acceptsProgress,
     current: current,
     phase: phase,
     snapshot: snapshot,

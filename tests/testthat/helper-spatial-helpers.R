@@ -13,6 +13,14 @@ utility_helpers_file <- file.path(
   "viewer",
   "utility_functions.R"
 )
+viewer_contract_file <- file.path(
+  "..",
+  "..",
+  "inst",
+  "viewer",
+  "core",
+  "viewer_content_contract.R"
+)
 
 if (!file.exists(spatial_helpers_file)) {
   spatial_helpers_file <- system.file(
@@ -26,7 +34,14 @@ if (!file.exists(utility_helpers_file)) {
     package = "CerebroNexus"
   )
 }
+if (!file.exists(viewer_contract_file)) {
+  viewer_contract_file <- system.file(
+    "viewer/core/viewer_content_contract.R",
+    package = "CerebroNexus"
+  )
+}
 
+sys.source(viewer_contract_file, envir = environment())
 sys.source(utility_helpers_file, envir = environment())
 sys.source(spatial_helpers_file, envir = environment())
 

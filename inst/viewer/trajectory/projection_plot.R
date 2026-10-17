@@ -24,7 +24,10 @@ trajectory_projection_lines <- function(trajectory_edges) {
 ## parameters (filtering, subsetting, hover, colours). One source of truth so
 ## the coordinates sent to the plot match those used for selection and hover.
 ##----------------------------------------------------------------------------##
+## shiny::debounce() evaluates this eagerly; only the visible page may pay for it.
+trajectory_projection_active <- function() identical(input[["sidebar"]], "trajectory")
 trajectory_projection_prepared_raw <- reactive({
+  req(trajectory_projection_active())
   dataset_context <- viewer_loaded_dataset_context()
   req(
     trajectory_selection_ok(),
@@ -68,8 +71,8 @@ trajectory_projection_prepared_raw <- reactive({
         "trajectory_projection",
         input,
         list(
-          trajectory_point_size = trajectory_projection_appearance$point_size,
-          trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
+          trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
+          trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
           trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
         )
       ),
@@ -77,8 +80,8 @@ trajectory_projection_prepared_raw <- reactive({
       trajectory_lines = list(),
       hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
       color_variable = input[["trajectory_point_color"]],
-      point_size = trajectory_projection_appearance$point_size,
-      point_opacity = trajectory_projection_appearance$point_opacity,
+      point_size = isolate(trajectory_projection_appearance$point_size),
+      point_opacity = isolate(trajectory_projection_appearance$point_opacity),
       draw_border = trajectory_projection_appearance$draw_border,
       keep_square = trajectory_projection_appearance$keep_square
     ))
@@ -101,8 +104,8 @@ trajectory_projection_prepared_raw <- reactive({
       "trajectory_projection",
       input,
       list(
-        trajectory_point_size = trajectory_projection_appearance$point_size,
-        trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
+        trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
+        trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
         trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
       )
     ),
@@ -110,8 +113,8 @@ trajectory_projection_prepared_raw <- reactive({
     trajectory_lines = trajectory_lines,
     hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
     color_variable = color_variable,
-    point_size = trajectory_projection_appearance$point_size,
-    point_opacity = trajectory_projection_appearance$point_opacity,
+    point_size = isolate(trajectory_projection_appearance$point_size),
+    point_opacity = isolate(trajectory_projection_appearance$point_opacity),
     draw_border = trajectory_projection_appearance$draw_border,
     keep_square = trajectory_projection_appearance$keep_square
   )
@@ -124,7 +127,8 @@ trajectory_projection_prepared_raw <- reactive({
 ## apply to their parameter/data reactives.
 trajectory_projection_prepared <- debounceAfterFirst(
   trajectory_projection_prepared_raw,
-  200
+  200,
+  active = trajectory_projection_active
 )
 
 ##----------------------------------------------------------------------------##
@@ -162,9 +166,11 @@ trajectory_projection_sent <- reactiveVal(FALSE)
 ## the established R construction path below.
 trajectory_static_first_frame <- reactive({
   req(trajectory_selection_ok())
+  color_variable <- input[["trajectory_point_color"]]
+  groups <- getGroups()
   if (
     !isTRUE(input[["coordviews_wire_supported"]]) ||
-      !identical(input[["trajectory_point_color"]], "state") ||
+      !(identical(color_variable, "state") || isTRUE(color_variable %in% groups)) ||
       !isTRUE(all.equal(
         as.numeric(trajectory_projection_appearance$percentage_cells_to_show),
         100
@@ -172,7 +178,6 @@ trajectory_static_first_frame <- reactive({
   ) {
     return(NULL)
   }
-  groups <- getGroups()
   filters <- lapply(groups, function(group) {
     input[[paste0("trajectory_projection_group_filter_", group)]]
   })
@@ -198,10 +203,28 @@ trajectory_static_first_frame <- reactive({
   ) {
     return(NULL)
   }
-  levels <- as.character(resource$state$levels)
+  if (identical(color_variable, "state")) {
+    levels <- as.character(resource$state$levels)
+  } else {
+    ## A metadata group (e.g. the default main group) is coloured from its
+    ## canonical Viewer Pack codes, mapped to the trajectory rows by the frame's
+    ## canonical subset in the browser. Other geometries have no such mapping.
+    if (!identical(as.character(resource$geometry_kind), "canonical_projection")) {
+      return(NULL)
+    }
+    group_resource <- viewerMetadataCodesAsset(
+      color_variable,
+      getGroupLevels(color_variable)
+    )
+    if (is.null(group_resource)) {
+      return(NULL)
+    }
+    resource$group <- group_resource
+    levels <- as.character(group_resource$levels)
+  }
   colors <- stats::setNames(cerebro_group_colors(length(levels)), levels)
-  if ("state" %in% groups) {
-    configured <- reactive_group_colors("state")
+  if (color_variable %in% groups) {
+    configured <- reactive_group_colors(color_variable)
     if (all(levels %in% names(configured))) {
       colors <- configured[levels]
     }
@@ -216,6 +239,7 @@ trajectory_static_first_frame <- reactive({
   }
   list(
     resource = resource,
+    color_variable = color_variable,
     levels = levels,
     colors = colors,
     hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
@@ -231,15 +255,47 @@ observeEvent(
     trajectory_projection_appearance$point_opacity <- appearance$point_opacity
     trajectory_projection_appearance$percentage_cells_to_show <-
       appearance$percentage_cells_to_show
-    trajectory_projection_appearance$group_labels <- TRUE
-    trajectory_projection_appearance$draw_border <- TRUE
-    trajectory_projection_appearance$keep_square <- FALSE
+    display <- current_page_display_defaults("trajectory")
+    trajectory_projection_appearance$group_labels <- display$group_labels
+    trajectory_projection_appearance$draw_border <- display$draw_border
+    trajectory_projection_appearance$keep_square <- display$keep_square
     trajectory_projection_sent(FALSE)
   },
   ignoreInit = TRUE
 )
 
+## Point size and opacity are renderer patches, as on Spatial: changing them
+## must not resample or rebuild the frame. Other pages' edits reach this view
+## through the shared scatter defaults and the next render.
+observeEvent(
+  list(
+    trajectory_projection_appearance$point_size,
+    trajectory_projection_appearance$point_opacity
+  ),
+  {
+    req(trajectory_projection_active(), isTRUE(trajectory_projection_sent()))
+    identity <- viewerDatasetIdentity()
+    req(identity$fingerprint)
+    session$sendCustomMessage(
+      "cell_view_appearance",
+      list(
+        id = "trajectory_projection",
+        dataset_context = viewer_loaded_dataset_context(),
+        dataset_fingerprint = identity$fingerprint,
+        values = list(
+          point_size = trajectory_projection_appearance$point_size,
+          point_opacity = trajectory_projection_appearance$point_opacity
+        )
+      )
+    )
+  },
+  ignoreInit = TRUE
+)
+
 observe({
+  ## Shared point defaults change from other pages; do not rebuild and send
+  ## this page's frame in the background.
+  req(trajectory_projection_active())
   render_request <- input[["trajectory_projection_render_request"]]
   req(
     is.list(render_request),
@@ -267,7 +323,7 @@ observe({
     }
     meta <- list(
       color_type = "categorical",
-      color_variable = "state",
+      color_variable = static_frame$color_variable,
       traces = as.list(static_frame$levels),
       appearance = list(
         group_labels = isTRUE(trajectory_projection_appearance$group_labels),
@@ -278,8 +334,8 @@ observe({
     )
     primary <- list(
       color = as.list(unname(static_frame$colors)),
-      point_size = trajectory_projection_appearance$point_size,
-      point_opacity = trajectory_projection_appearance$point_opacity,
+      point_size = isolate(trajectory_projection_appearance$point_size),
+      point_opacity = isolate(trajectory_projection_appearance$point_opacity),
       point_line = point_line,
       x_range = list(),
       y_range = list(),
@@ -336,8 +392,8 @@ observe({
         "trajectory_projection",
         input,
         list(
-          trajectory_point_size = trajectory_projection_appearance$point_size,
-          trajectory_point_opacity = trajectory_projection_appearance$point_opacity,
+          trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
+          trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
           trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
         )
       )
@@ -397,8 +453,10 @@ observe({
     color = color_input,
     color_variable = color_variable,
     selection_keys = seq_len(nrow(cells_df)),
-    point_size = prepared[["point_size"]],
-    point_opacity = prepared[["point_opacity"]],
+    ## Point size and opacity are patched in place; send their current values
+    ## rather than those cached with the prepared frame.
+    point_size = isolate(trajectory_projection_appearance$point_size),
+    point_opacity = isolate(trajectory_projection_appearance$point_opacity),
     group_labels = isolate(trajectory_projection_appearance$group_labels),
     keep_square = prepared[["keep_square"]],
     point_line = point_line,
@@ -457,7 +515,14 @@ observe({
     extra = list(shapes = prepared[["trajectory_lines"]]),
     deferred_aux = deferred_aux,
     dataset_context = prepared[["dataset_context"]],
-    feedback = prepared[["feedback"]]
+    feedback = utils::modifyList(prepared[["feedback"]], list(
+      trajectory_point_size = as.character(
+        isolate(trajectory_projection_appearance$point_size)
+      ),
+      trajectory_point_opacity = as.character(
+        isolate(trajectory_projection_appearance$point_opacity)
+      )
+    ))
   )
   if (!isolate(trajectory_projection_sent())) {
     session$onFlushed(
@@ -484,7 +549,7 @@ cerebroRegisterInfo(
 trajectory_projection_info <- list(
   title = "Trajectory",
   text = p(
-    "This plot shows cells projected into trajectory space, coloured by the specified meta info, e.g. sample or cluster. The path of the trajectory is shown as a black line. Specific to this analysis, every cell has a 'pseudotime' and a transcriptional 'state' which corresponds to its position along the trajectory path."
+    "Cells are coloured by the selected metadata. The black line shows the trajectory; pseudotime and state describe each cell's position along it."
   )
 )
 
@@ -510,17 +575,9 @@ trajectory_projection_selected_cells <- reactive({
   ) {
     return(NULL)
   }
-  if (is.null(sel) || is.null(sel[["x"]]) || length(sel[["x"]]) == 0) {
+  selection <- viewerPersistentSelection(sel, viewer_loaded_dataset_context())
+  if (is.null(selection)) {
     return(NULL)
-  }
-  selection <- data.frame(
-    x = as.numeric(sel[["x"]]),
-    y = as.numeric(sel[["y"]]),
-    identifier = paste0(as.numeric(sel[["x"]]), '-', as.numeric(sel[["y"]])),
-    stringsAsFactors = FALSE
-  )
-  if (length(sel[["ids"]]) == nrow(selection)) {
-    selection[["selection_key"]] <- as.character(sel[["ids"]])
   }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and

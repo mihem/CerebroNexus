@@ -27,14 +27,17 @@ source(
   file.path(repo_root, "tests", "bench", "prepare_viewer_ren_data.R"),
   local = TRUE
 )
+source(file.path(repo_root, "tests", "bench", "prepare_viewer_pack.R"), local = TRUE)
 
 if (!"--ren-only" %in% args) {
   crb <- prepareViewer1mBenchmarkData()
+  prepareDemoViewerPack(crb)
   Sys.setenv(CEREBRO_1M_DEMO_CRB = normalizePath(crb, mustWork = TRUE))
 } else {
   Sys.unsetenv("CEREBRO_1M_DEMO_CRB")
 }
 ren_crb <- prepareViewerRenDemoData()
+prepareDemoViewerPack(ren_crb)
 Sys.setenv(CEREBRO_REN_DEMO_CRB = normalizePath(ren_crb, mustWork = TRUE))
 message("Ren data version: ", .viewerRenVersion, "; file: ", ren_crb)
 if ("--prepare-only" %in% args) {

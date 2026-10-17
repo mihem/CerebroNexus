@@ -24,6 +24,40 @@
     }
   }
 
+  // A first server flush (or a conditional page becoming available) can arrive
+  // after the reader has already navigated. Author defaults must not undo that
+  // choice. Record intent in the browser, including clicks before Shiny connects.
+  function installInitialNavigation() {
+    var navigated = false;
+    var installed = false;
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (target && target.closest &&
+          target.closest('.main-sidebar a[data-toggle="tab"]')) {
+        navigated = true;
+      }
+    }, true);
+    function install() {
+      if (installed || !window.Shiny || !window.Shiny.addCustomMessageHandler) return;
+      installed = true;
+      window.Shiny.addCustomMessageHandler("cerebro_initial_page", function (message) {
+        if (navigated || !message || typeof message.selected !== "string") return;
+        var links = document.querySelectorAll('.main-sidebar a[data-toggle="tab"]');
+        for (var i = 0; i < links.length; i++) {
+          if (links[i].getAttribute("data-value") === message.selected) {
+            window.jQuery(links[i]).tab("show");
+            break;
+          }
+        }
+      });
+    }
+    if (window.jQuery) {
+      window.jQuery(document).on("shiny:connected.cerebroInitialNavigation", install);
+    }
+    install();
+  }
+  ready(installInitialNavigation);
+
   ready(function () {
     var body = document.body;
     var sidebar = document.querySelector(".main-sidebar");
@@ -450,12 +484,13 @@
 
     var activePane = null;
     var slowTimer = null;
+    var showTimer = null;
     var hideTimer = null;
     var settleToken = 0;
     var shinyBusy = false;
-    var localPages = new Set(['groups', 'markerGenes', 'mostExpressedGenes',
+    var localPages = new Set(['loadData', 'groups', 'markerGenes', 'mostExpressedGenes',
       'enrichedPathways', 'extra_material']);
-    var delivered = new WeakSet();
+    var delivered = new Set();
     var drawnTables = new WeakSet();
     var drawnPlots = new WeakSet();
     var controlValues = new Map();
@@ -474,7 +509,7 @@
       return pane && pane.id ? pane.id.replace(/^shiny-tab-/, "") : "";
     }
     function pageLabel(pane) {
-      return ({ overview: 'Overview', geneExpression: 'Gene expression',
+      return ({ overview: 'Projection', geneExpression: 'Gene expression',
         coordinated_views: 'Linked views', trajectory: 'Trajectory', spatial: 'Spatial',
         hla_tcr_motifs: 'HLA / TCR motifs', groups: 'Groups',
         markerGenes: 'Marker genes', mostExpressedGenes: 'Most expressed genes',
@@ -496,10 +531,35 @@
       localFinishPending = false;
     }
     function localCompletion(pane) {
+      // Open mode without a selected dataset still needs to expose its upload
+      // UI. There is no dataset-ready event to wait for in that case.
+      if (paneName(pane) === 'loadData') {
+        return !!window.CerebroDatasetContext && window.CerebroDatasetContext.phase() !== 'idle';
+      }
       return pane && localPages.has(paneName(pane));
     }
+    // Shiny re-applies an output's last value when a renderUI re-render
+    // replaces its element (bindOutput() feeds the cached value straight to the
+    // binding), so the replacement is filled without another `shiny:value`
+    // event. Delivery therefore belongs to the output, not to whichever DOM
+    // node happened to receive the value first. A value cached before the
+    // current dataset was selected is still rejected: the reset clears it.
+    function outputKey(element) {
+      return element && typeof element.id === "string" && element.id
+        ? element.id
+        : null;
+    }
+    function markDelivered(element) {
+      var key = outputKey(element);
+      if (key) delivered.add(key);
+    }
+    function clearDelivered(element) {
+      var key = outputKey(element);
+      if (key) delivered.delete(key);
+    }
     function outputSettled(element) {
-      if (!element || !delivered.has(element) ||
+      var key = outputKey(element);
+      if (!key || !delivered.has(key) ||
           element.classList.contains('recalculating') ||
           element.getAttribute('aria-busy') === 'true') return false;
       if (element.classList.contains('shiny-output-error')) return true;
@@ -518,11 +578,22 @@
         element.id === 'groups_by_other_group_plot' || element.id === 'groups_by_other_group_table';
     }
     function localResultSettled(pane) {
-      if (window.CerebroDatasetContext && window.CerebroDatasetContext.phase() !== 'ready') return false;
+      var phase = window.CerebroDatasetContext && window.CerebroDatasetContext.phase();
+      if (paneName(pane) === 'loadData') {
+        // A catalog describes the selection without loading it, so Data info
+        // also settles while pending. resetPages() clears every delivery when
+        // the context changes, so the overview below belongs to this selection.
+        if (phase && phase !== 'ready' && phase !== 'pending') return false;
+        // Overview includes the initial annotation bars in the same response.
+        // A later child-output binding must not hold the entire workspace shut.
+        return outputSettled(document.getElementById('load_data_overview'));
+      }
+      if (phase && phase !== 'ready') return false;
       var controls = pane.querySelector('.cerebro-result-controls, .cerebro-groups-controls');
       if (!outputSettled(controls)) return false;
       if (paneName(pane) === 'groups') {
         // Missing grouping variables is an explicit terminal result.
+        if (controls.querySelector('[data-composition-unavailable]')) return true;
         if (!controls.querySelector('select')) return !!controls.textContent.trim();
         var plot = document.getElementById('groups_by_other_group_plot');
         if (!outputSettled(plot)) return false;
@@ -540,11 +611,14 @@
     function finish(pane) {
       if (!pane) return;
       cancelScheduledFinish();
-      pane.dataset.cerebroPageReady = "true";
+      window.CerebroPageLifecycle.setReady(pane);
+      pane.classList.remove('cerebro-page-initializing');
       setBusy(pane, false);
+      window.dispatchEvent(new CustomEvent("cerebro:page-ready"));
       if (pane !== activePane) return;
       if (announcement) announcement.textContent = '';
       window.clearTimeout(slowTimer);
+      window.clearTimeout(showTimer);
       window.clearTimeout(hideTimer);
       loader.classList.remove("is-visible");
       hideTimer = window.setTimeout(function () {
@@ -556,8 +630,9 @@
       if (!pane) return;
       cancelScheduledFinish();
       window.clearTimeout(slowTimer);
+      window.clearTimeout(showTimer);
       window.clearTimeout(hideTimer);
-      if (pane.dataset.cerebroPageReady === "true") {
+      if (window.CerebroPageLifecycle.isReady(pane)) {
         if (activePane && activePane !== pane) setBusy(activePane, false);
         activePane = pane;
         finish(pane);
@@ -565,7 +640,8 @@
       }
       if (activePane && activePane !== pane) setBusy(activePane, false);
       activePane = pane;
-      if (pane.querySelector('.cerebro-page-feedback.is-terminal')) {
+      if (window.CerebroPageLifecycle.isTerminal(pane)) {
+        pane.classList.remove('cerebro-page-initializing');
         if (announcement) announcement.textContent = '';
         setBusy(pane, false);
         loader.classList.remove('is-visible'); loader.hidden = true;
@@ -573,10 +649,25 @@
         return;
       }
       setBusy(pane, true);
+      pane.classList.add('cerebro-page-initializing');
+      // Data info only refreshes lightweight metadata. Dataset loading already
+      // owns its progress UI; a second page card before/after it adds no signal.
+      // Keep busy/settled tracking so returning to the page still works normally.
+      if (paneName(pane) === "loadData") {
+        if (announcement) announcement.textContent = "";
+        loader.classList.remove("is-visible");
+        loader.hidden = true;
+        return;
+      }
       mountLoader(pane);
-      showDetail("Loading " + pageLabel(pane) + "…");
-      loader.hidden = false;
-      loader.classList.add("is-visible");
+      loader.hidden = true;
+      loader.classList.remove("is-visible");
+      showTimer = window.setTimeout(function () {
+        if (pane !== activePane) return;
+        showDetail("Loading " + pageLabel(pane) + "…");
+        loader.hidden = false;
+        loader.classList.add("is-visible");
+      }, 180);
       slowTimer = window.setTimeout(function () {
         if (pane === activePane) {
           showDetail("Still loading " + pageLabel(pane) + "…");
@@ -616,13 +707,14 @@
       }, 180);
     }
     function resetPages() {
-      delivered = new WeakSet();
+      delivered = new Set();
       drawnTables = new WeakSet();
       drawnPlots = new WeakSet();
       controlValues.clear();
       document.querySelectorAll('.tab-pane[id^="shiny-tab-"]').forEach(
         function (pane) {
-          delete pane.dataset.cerebroPageReady;
+          window.CerebroPageLifecycle.reset(pane);
+          pane.classList.remove('cerebro-page-initializing');
           pane.removeAttribute("aria-busy");
         }
       );
@@ -645,7 +737,10 @@
         if (localCompletion(pane) || !shinyBusy) scheduleFinish(pane);
       })
       .on("shiny:inputchanged.cerebroPageLoader", function (event) {
-        if (event.name === "crb_file_selector") { resetPages(); return; }
+        // Dataset context owns resets, including optimistic user selections.
+        // Initial Selectize binding can arrive after the overview response;
+        // resetting again here would discard its completed output forever.
+        if (event.name === "crb_file_selector") return;
         var input = event.el || document.getElementById(event.name);
         if (!activePane || !localCompletion(activePane) || !input ||
             !activePane.contains(input) || !input.matches('select, input') ||
@@ -663,7 +758,7 @@
         if (paneName(activePane) === 'groups' && !input.closest('#groups_controls_UI')) return;
         cancelScheduledFinish();
         activePane.querySelectorAll('.datatables, .plotly, .shiny-plot-output').forEach(function (output) {
-          delivered.delete(output); drawnTables.delete(output); drawnPlots.delete(output);
+          clearDelivered(output); drawnTables.delete(output); drawnPlots.delete(output);
         });
       })
       .on("shiny:busy.cerebroPageLoader", function () {
@@ -677,7 +772,7 @@
         scheduleFinish(pane);
       })
       .on("shiny:value.cerebroPageLoader", function (event) {
-        delivered.add(event.target);
+        markDelivered(event.target);
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         var pane = paneFor(event.target);
@@ -690,7 +785,7 @@
         }
       })
       .on('shiny:outputinvalidated.cerebroPageLoader', function (event) {
-        delivered.delete(event.target);
+        clearDelivered(event.target);
         drawnTables.delete(event.target);
         drawnPlots.delete(event.target);
         if (paneFor(event.target) === activePane && localCompletion(activePane) && ownsOutput(activePane, event.target)) cancelScheduledFinish();
@@ -711,7 +806,7 @@
       })
       .on("shiny:error.cerebroPageLoader", function (event) {
         // Silent req() conditions are not terminal results.
-        if (event.error && event.error.message) delivered.add(event.target);
+        if (event.error && event.error.message) markDelivered(event.target);
         var pane = paneFor(event.target);
         if (pane && pane === currentPane() && ownsOutput(pane, event.target)) {
           cancelScheduledFinish();
@@ -743,7 +838,7 @@
       if (pane && pane === currentPane()) finish(pane);
     });
     window.addEventListener("cerebro:linkedviews-ready", function (event) {
-      if (!event.detail || !event.detail.primaryReady || !event.detail.painted) return;
+      if (!event.detail || !event.detail.complete || !event.detail.painted) return;
       if (window.CerebroDatasetContext && !window.CerebroDatasetContext.accepts(event.detail)) return;
       var pane = document.getElementById("shiny-tab-coordinated_views");
       if (pane && pane === currentPane()) finish(pane);
@@ -752,7 +847,8 @@
       var pane = document.getElementById('shiny-tab-' + event.detail.page);
       if (!pane || pane !== activePane) return;
       cancelScheduledFinish();
-      window.clearTimeout(slowTimer); window.clearTimeout(hideTimer);
+      window.clearTimeout(slowTimer); window.clearTimeout(hideTimer); window.clearTimeout(showTimer);
+      pane.classList.remove('cerebro-page-initializing');
       setBusy(pane, false);
       if (announcement) announcement.textContent = '';
       loader.classList.remove('is-visible'); loader.hidden = true;
@@ -908,7 +1004,28 @@
     var startedAt = 0;
     var elapsedTimer = null;
     var hideTimer = null;
+    var revealTimer = null;
+    var visibleAt = 0;
+    var fadingOut = false;
     var installed = false;
+    var completion = null;
+    var viewTimer = null;
+    // A page that never reports readiness must not leave the workspace inert.
+    var VIEW_READY_TIMEOUT_MS = 20000;
+
+    function workspaceBusy(busy) {
+      var content = document.getElementById("main-content");
+      if (content) {
+        content.inert = busy;
+        if (busy) content.setAttribute("aria-busy", "true");
+        else content.removeAttribute("aria-busy");
+      }
+    }
+
+    function pageReady() {
+      var pane = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
+      return !pane || window.CerebroPageLifecycle.isSettled(pane);
+    }
 
     function ensureOverlay() {
       if (overlay) return overlay;
@@ -940,9 +1057,23 @@
     function begin(label, detail) {
       var element = ensureOverlay();
       window.clearTimeout(hideTimer);
-      if (element.hidden) startedAt = window.performance.now();
-      element.hidden = false;
+      if (element.hidden) {
+        startedAt = window.performance.now();
+        element.hidden = false;
+        // Avoid a flash for cached or near-instant loads. The transparent layer
+        // still blocks interaction with the outgoing dataset while waiting.
+        revealTimer = window.setTimeout(function () {
+          revealTimer = null;
+          visibleAt = window.performance.now();
+          element.classList.add("is-visible");
+        }, 150);
+      } else if (fadingOut) {
+        // A second switch during the exit continues the same visual layer.
+        element.classList.add("is-visible");
+      }
+      fadingOut = false;
       document.body.classList.add("cerebro-dataset-is-loading");
+      workspaceBusy(true);
       var labelNode = element.querySelector(".cerebro-dataset-loading-label");
       var detailNode = element.querySelector(".cerebro-dataset-loading-detail");
       // Do not re-announce an unchanged stage on every progress update.
@@ -958,8 +1089,15 @@
 
     function update(message) {
       message = message || {};
+      var context = window.CerebroDatasetContext;
+      if (context && !context.acceptsProgress(message)) return;
       begin(message.label, message.detail);
-      var percent = Math.max(0, Math.min(100, Number(message.percent) || 0));
+      var awaitingView = message.done && !message.failed &&
+        !message.viewTimedOut && !pageReady();
+      // File-load stages are not an end-to-end percentage. Reserve the last
+      // part for the painted page instead of displaying 100% while waiting.
+      var percent = message.done && !awaitingView ? 100 :
+        Math.max(0, Math.min(90, (Number(message.percent) || 0) * 0.9));
       overlay.querySelector(".cerebro-dataset-loading-track span").style.width =
         percent + "%";
       overlay.querySelector(".cerebro-dataset-loading-percent").textContent =
@@ -967,11 +1105,44 @@
       overlay.querySelector(".cerebro-dataset-loading-elapsed").textContent =
         elapsedText();
       if (message.done) {
+        // The object being loaded is not yet a painted visualization. Let the
+        // existing page readiness events own this boundary (including empties).
+        if (awaitingView) {
+          completion = message;
+          overlay.querySelector(".cerebro-dataset-loading-detail").textContent =
+            "Preparing the current view…";
+          window.clearTimeout(viewTimer);
+          viewTimer = window.setTimeout(function () {
+            if (completion !== message) return;
+            completion = null;
+            update(Object.assign({}, message, { viewTimedOut: true }));
+          }, VIEW_READY_TIMEOUT_MS);
+          return;
+        }
+        completion = null;
+        window.clearTimeout(viewTimer);
         window.clearInterval(elapsedTimer);
-        hideTimer = window.setTimeout(function () {
+        var hide = function () {
           overlay.hidden = true;
+          overlay.classList.remove("is-visible");
+          fadingOut = false;
           document.body.classList.remove("cerebro-dataset-is-loading");
-        }, 350);
+          workspaceBusy(false);
+        };
+        if (revealTimer !== null) {
+          window.clearTimeout(revealTimer);
+          revealTimer = null;
+          hide();
+          return;
+        }
+        // Once shown, give the progress card time to read before fading out.
+        hideTimer = window.setTimeout(function () {
+          fadingOut = true;
+          overlay.classList.remove("is-visible");
+          var reducedMotion = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          hideTimer = window.setTimeout(hide, reducedMotion ? 0 : 120);
+        }, Math.max(0, 240 - (window.performance.now() - visibleAt)));
       }
     }
 
@@ -988,12 +1159,41 @@
         install
       );
     }
+    window.addEventListener("cerebro:dataset-context", function (event) {
+      var detail = event.detail || {};
+      if (detail.selectionPending) {
+        completion = null;
+        var input = document.getElementById("crb_file_selector");
+        var selected = input && input.options[input.selectedIndex];
+        begin(selected ? selected.textContent : "Dataset", "Updating dataset…");
+        overlay.querySelector(".cerebro-dataset-loading-track span").style.width = "0%";
+        overlay.querySelector(".cerebro-dataset-loading-percent").textContent = "0%";
+      } else if (detail.phase === "error") {
+        completion = null;
+        // This event has already passed the context/selection freshness gate.
+        window.clearTimeout(hideTimer);
+        window.clearTimeout(revealTimer);
+        window.clearInterval(elapsedTimer);
+        revealTimer = null;
+        if (overlay) { overlay.hidden = true; overlay.classList.remove("is-visible"); }
+        document.body.classList.remove("cerebro-dataset-is-loading");
+        workspaceBusy(false);
+      }
+    });
+    function finishPage() {
+      if (completion) update(completion);
+    }
+    window.addEventListener("cerebro:page-ready", finishPage);
+    window.addEventListener("cerebro:view-terminal", finishPage);
     document.addEventListener("change", function (event) {
       var input = event.target;
       if (!input || (input.id !== "crb_file_selector" && input.id !== "input_file")) {
         return;
       }
       if (input.id === "input_file" && !(input.files && input.files.length)) return;
+      // Selectize emits Shiny input events; beginSelection supplies immediate,
+      // deduplicated feedback for keyboard, mouse, and programmatic changes.
+      if (input.id === "crb_file_selector") return;
       var selected = input.id === "crb_file_selector" &&
         input.options[input.selectedIndex];
       begin(selected ? selected.textContent : "Dataset", "Waiting for the server");

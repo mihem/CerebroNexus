@@ -22,13 +22,16 @@ output[["expression_by_gene_UI"]] <- renderUI({
 ## Bar plot.
 ##----------------------------------------------------------------------------##
 output[["expression_by_gene"]] <- plotly::renderPlotly({
+  if (!isTRUE(isolate(input[["expression_summary_viewport_request"]]))) {
+    req(input[["expression_summary_viewport_request"]], cancelOutput = TRUE)
+  }
   req(
-    input[["expression_summary_viewport_request"]],
     expression_projection_summary_ready(),
     expression_projection_parameters_color(),
     expression_summary_data()
   )
-  expression_levels <- data_set()$getMeanExpressionForGenes(
+  expression_levels <- expressionProjectionGeneMeans(
+    data_set(),
     expression_summary_data()$genes
   ) %>%
     dplyr::slice_max(expression, n = 50)

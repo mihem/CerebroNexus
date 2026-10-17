@@ -279,10 +279,21 @@ ir_discover_sharing_units <- function(data, metadata = NULL) {
   }
 }
 
+## Discovery scans the whole repertoire and metadata (seconds for large data)
+## and depends only on the loaded dataset, not on the visit to this tab.
+ir_sharing_unit_memo <- new.env(parent = emptyenv())
 ir_sharing_unit_choices <- reactive({
   req(identical(input[["ir_tabs"]], "Clone Sharing"))
   # Discovery is independent of ir_data_annotated and the selected sharing unit.
-  ir_discover_sharing_units(ir_data_raw(), getMetaData())
+  dataset <- data_set()
+  if (!identical(ir_sharing_unit_memo$dataset, dataset)) {
+    ir_sharing_unit_memo$value <- ir_discover_sharing_units(
+      ir_data_raw(),
+      getMetaData()
+    )
+    ir_sharing_unit_memo$dataset <- dataset
+  }
+  ir_sharing_unit_memo$value
 })
 
 ## ---- Reactive: parameters --------------------------------------------- ##
@@ -806,6 +817,10 @@ ir_size_profile_plot <- function(profiles, method = "ward.D2") {
   if (!(method %in% allowed)) {
     method <- "ward.D2"
   }
+  shiny::validate(shiny::need(
+    requireNamespace("ggdendro", quietly = TRUE),
+    "Install the ggdendro package to cluster clone-size profiles."
+  ))
   tree <- stats::hclust(stats::dist(profile), method = method)
   dendro <- ggdendro::dendro_data(tree, type = "rectangle")
   ggplot2::ggplot() +
@@ -1279,15 +1294,20 @@ ir_parse_segments <- function(data, chain, columns = NULL) {
       cdr3 <- cdr3_unique[pair_index]
       # From "TRBV6-2..TRBJ2-6.TRBC2" pull the V and J tokens (segs split on ".").
       # NA gene_seg -> strsplit yields NA -> no token matches -> NA gene, dropped.
+      # Tokenize each distinct segment once and map back to the cells.
+      segments <- unique(gene_unique)
+      segment_tokens <- strsplit(segments, ".", fixed = TRUE)
+      segment_index <- match(gene_seg, segments)
       pull_token <- function(prefix) {
+        pattern <- paste0("^", chain, prefix)
         vapply(
-          strsplit(gene_seg, ".", fixed = TRUE),
+          segment_tokens,
           function(toks) {
-            hit <- toks[grepl(paste0("^", chain, prefix), toks)]
+            hit <- toks[grepl(pattern, toks)]
             if (length(hit) == 0) NA_character_ else hit[1]
           },
           character(1)
-        )
+        )[segment_index]
       }
       v_gene <- pull_token("V")
       j_gene <- pull_token("J")
@@ -1426,11 +1446,18 @@ ir_sharing_classify <- function(seg, unit_col, group_col = NULL) {
   # Vectorised over all clonotypes at once via unique-then-tabulate, instead of
   # splitting per clonotype and building a one-row data.frame each time.
   clones <- factor(seg$clone_vjc)
+  clone_codes <- as.integer(clones)
   n_distinct_by_clone <- function(col) {
     vals <- as.character(seg[[col]])
     ok <- !is.na(vals)
-    pairs <- !duplicated(data.frame(c = clones[ok], v = vals[ok]))
-    tabulate(clones[ok][pairs], nbins = nlevels(clones))
+    # Encode (clone, value) pairs as one exact double instead of letting
+    # duplicated.data.frame() paste every row into a string.
+    value_levels <- unique(vals[ok])
+    value_codes <- match(vals[ok], value_levels)
+    pair_codes <- (as.double(clone_codes[ok]) - 1) *
+      (length(value_levels) + 1) + value_codes
+    pairs <- !duplicated(pair_codes)
+    tabulate(clone_codes[ok][pairs], nbins = nlevels(clones))
   }
   n_units <- n_distinct_by_clone(unit_col)
   n_groups <- if (has_group) n_distinct_by_clone(group_col) else 0L

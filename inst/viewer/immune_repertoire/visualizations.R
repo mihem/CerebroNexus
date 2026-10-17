@@ -594,35 +594,23 @@ observe(
     show_all <- ir_param("ir_p_umap_show_all", TRUE)
     req(receptor, projection)
     group_labels <- input[["ir_clonalUMAP_group_labels"]]
+    display <- current_page_display_defaults("ir")
     if (is.null(group_labels)) {
-      group_labels <- TRUE
+      group_labels <- display$group_labels
     }
-    point_border <- isTRUE(input[["ir_clonalUMAP_point_border"]])
-    keep_square <- isTRUE(input[["ir_clonalUMAP_keep_square"]])
+    point_border <- isTRUE(
+      input[["ir_clonalUMAP_point_border"]] %||% display$draw_border
+    )
+    keep_square <- isTRUE(
+      input[["ir_clonalUMAP_keep_square"]] %||% display$keep_square
+    )
     clone_call <- "gene"
     show_all <- isTRUE(show_all)
     cells <- ir_umap_cells_to_show()
-    dp <- tryCatch(ir_display_params(), error = function(e) list())
     appearance <- current_scatter_defaults()
-    point_size <- suppressWarnings(as.numeric(
-      dp[["ir_d_point_size"]] %||% appearance$point_size
-    ))
-    if (length(point_size) != 1 || is.na(point_size)) {
-      point_size <- appearance$point_size
-    }
-    alpha <- suppressWarnings(as.numeric(
-      dp[["ir_d_alpha"]] %||% appearance$point_opacity
-    ))
-    if (length(alpha) != 1 || is.na(alpha)) {
-      alpha <- appearance$point_opacity
-    }
-    percentage <- suppressWarnings(as.numeric(
-      dp[["ir_d_percentage_cells_to_show"]] %||%
-        appearance$percentage_cells_to_show
-    ))
-    if (length(percentage) != 1 || !is.finite(percentage)) {
-      percentage <- appearance$percentage_cells_to_show
-    }
+    point_size <- appearance$point_size
+    alpha <- appearance$point_opacity
+    percentage <- appearance$percentage_cells_to_show
     identity <- tryCatch(viewerDatasetIdentity(), error = function(e) list())
     request_signature <- list(
       render_request = render_request,
@@ -809,15 +797,16 @@ output$ir_plot_clonalUMAP_static <- renderImage(
     req(nzchar(group_by))
     clone_call <- "gene"
     show_all <- isTRUE(ir_param("ir_p_umap_show_all", TRUE))
+    ## Do not read ir_display_params() here: it follows the active tab, and
+    ## this image does not use it, so returning to the tab would redraw it.
     cells <- ir_umap_cells_to_show()
-    dp <- tryCatch(ir_display_params(), error = function(e) list())
     df <- ir_clonal_umap_data(
       projection,
       receptor,
       clone_call,
       show_all = show_all,
       cells = cells,
-      percentage = dp[["ir_d_percentage_cells_to_show"]] %||% 100
+      percentage = current_scatter_defaults()$percentage_cells_to_show
     )
 
     plot <- safeRenderPlot(
@@ -846,14 +835,8 @@ output$ir_plot_clonalUMAP_static <- renderImage(
           !is.null(df) && nrow(df) > 0,
           "No cells match this grouping."
         ))
-        point_size <- suppressWarnings(as.numeric(dp[["ir_d_point_size"]]))
-        if (length(point_size) != 1 || is.na(point_size)) {
-          point_size <- 1
-        }
-        alpha <- suppressWarnings(as.numeric(dp[["ir_d_alpha"]]))
-        if (length(alpha) != 1 || is.na(alpha)) {
-          alpha <- 0.8
-        }
+        point_size <- current_scatter_defaults()$point_size
+        alpha <- current_scatter_defaults()$point_opacity
         n_groups <- length(levels(df$.umap_group))
         layout <- isolate(ir_umap_split_layout(
           n_groups,
@@ -961,7 +944,7 @@ output$ir_ui_pairedScatter <- renderUI({
   if (length(groups) < 2) {
     return(div(
       class = "alert alert-info",
-      "Paired scatter requires at least two groups to compare. Use Compare by to choose a metadata column with multiple levels."
+      "Paired scatter needs at least two groups. Choose a multi-group column in Compare by."
     ))
   }
   meta <- ir_sample_meta()
@@ -1245,6 +1228,10 @@ output$ir_plot_pairedScatter_facet <- renderPlot({
           cex = 0.9
         )
       } else {
+        shiny::validate(shiny::need(
+          requireNamespace("patchwork", quietly = TRUE),
+          "Install the patchwork package to show faceted paired scatter plots."
+        ))
         ncol_p <- min(4L, length(panels))
         patchwork::wrap_plots(panels, ncol = ncol_p)
       }

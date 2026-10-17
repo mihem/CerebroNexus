@@ -259,6 +259,6 @@ cerebroRegisterInfo(
 groups_by_other_group_info <- list(
   title = "Composition of group by another group",
   text = HTML(
-    "This plot allows to see how cell groups are related to each other. This can be represented as a bar char or a Sankey plot. Optionally, a table can be shown below. To highlight composition in very small cell groups, results can be shown as percentages rather than actual cell counts. Groups can be removed from the plot by clicking on them in the legend."
+    "Compare cell groups as bars, a Sankey plot, or a table. Use percentages to compare groups of different sizes. Click a legend item to hide or show a group."
   )
 )

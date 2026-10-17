@@ -676,6 +676,7 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
       "point_opacity",
       "group_labels",
       "cell_borders",
+      "background_images",
       "selection_mode",
       "clone_layout",
       "keep_square"
@@ -792,6 +793,11 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
             display$cell_borders,
             "$.view.display.cell_borders"
           )
+        },
+        background_images = if (is.null(display$background_images)) {
+          TRUE
+        } else {
+          cv_config_logical(display$background_images, "$.view.display.background_images")
         },
         selection_mode = cv_config_choice(
           display$selection_mode,

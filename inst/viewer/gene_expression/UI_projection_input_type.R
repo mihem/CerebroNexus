@@ -59,50 +59,63 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
           class = "cerebro-gene-rgb-channel",
           channel_input("b", "Blue channel")
         )
+      ),
+      tags$small(
+        "RGB starts with the first three available genes; your full gene list is kept. ",
+        "Each channel uses its own maximum, so brightness is not comparable across genes."
       )
     ),
     conditionalPanel(
       "input.expression_analysis_mode == 'Gene set'",
       uiOutput("expression_select_gene_set_UI")
     ),
-    tags$script(HTML(
-      "
-      (function () {
-        if (!window.jQuery) return;
-        var modeSelector = '#expression_projection_genes_in_separate_panels';
-        var geneSelector = '#expression_genes_input';
-        function copyGenesToRgb() {
-          var source = document.getElementById('expression_genes_input');
-          var genes = source && source.selectize
-            ? source.selectize.getValue() : [];
-          if (!Array.isArray(genes)) genes = genes ? [genes] : [];
-          ['r', 'g', 'b'].forEach(function (channel, index) {
-            var input = document.getElementById(
-              'expression_rgb_gene_' + channel
-            );
-            var control = input && input.selectize;
-            if (!control) return;
-            var gene = genes[index] || '';
+    tags$script(HTML("
+    (function () {
+      // Leaving RGB appends the channel genes to the gene list.
+      Shiny.addCustomMessageHandler('cerebro_expression_gene_list', function (message) {
+        var attempts = 0;
+        function apply() {
+          if (!window.CerebroDatasetContext?.accepts(message)) return;
+          var source = document.getElementById('expression_genes_input')?.selectize;
+          if (!source || typeof source.settings.load !== 'function' || source.loading) {
+            if (++attempts < 400) setTimeout(apply, 25);
+            return;
+          }
+          message.genes.forEach(function (gene) {
+            var option = {};
+            option[source.settings.valueField] = gene;
+            option[source.settings.labelField] = gene;
+            source.addOption(option);
+          });
+          source.setValue(message.genes);
+        }
+        setTimeout(apply, 0);
+      });
+      var revision = 0;
+      Shiny.addCustomMessageHandler('cerebro_expression_rgb_seed', function (message) {
+        var token = ++revision;
+        function apply() {
+          if (token !== revision || !window.CerebroDatasetContext?.accepts(message)) return;
+          var source = document.getElementById('expression_genes_input')?.selectize;
+          if (!source || JSON.stringify(source.getValue() || []) !== JSON.stringify(message.source)) return;
+          var controls = ['r', 'g', 'b'].map(function (channel) {
+            return document.getElementById('expression_rgb_gene_' + channel)?.selectize;
+          });
+          // A late initial search response must not clear the seeded channels.
+          if (controls.some(c => !c || typeof c.settings.load !== 'function' || c.loading)) {
+            setTimeout(apply, 25);
+            return;
+          }
+          controls.forEach(function (control, i) {
+            var gene = message.genes[i] || '';
             if (gene) control.addOption({value: gene, label: gene, text: gene});
             control.setValue(gene);
           });
         }
-        window.jQuery(document)
-          .off('change.cerebroExpressionRgb', modeSelector)
-          .on('change.cerebroExpressionRgb', modeSelector, function () {
-            if (this.value !== 'rgb') return;
-            copyGenesToRgb();
-          })
-          .off('change.cerebroExpressionRgbPrefill', geneSelector)
-          .on('change.cerebroExpressionRgbPrefill', geneSelector, function () {
-            var mode = document.getElementById(
-              'expression_projection_genes_in_separate_panels'
-            );
-            if (!mode || mode.value !== 'rgb') copyGenesToRgb();
-          });
-      })();
-      "
-    ))
+        setTimeout(apply, 0);
+      });
+    })();
+    "))
   )
 })
 
@@ -111,9 +124,7 @@ output[["expression_select_gene_set_UI"]] <- renderUI({
   selectizeInput(
     "expression_select_gene_set",
     label = "Gene set",
-    choices = data.table::as.data.table(
-      data.frame("Gene sets" = c("-", getGeneSetNames()))
-    ),
+    choices = list("Gene sets" = as.list(c("-", getGeneSetNames()))),
     multiple = FALSE
   )
 })
@@ -136,6 +147,9 @@ observeEvent(
           id,
           canonical_selection = TRUE,
           refresh_on_activation = FALSE,
+          ## These controls are already mounted. Do not schedule repeated URL
+          ## registrations while a large dataset is still being prepared.
+          retry = FALSE,
           active = function() identical(input[["sidebar"]], "geneExpression")
         )
       })

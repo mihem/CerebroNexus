@@ -30,6 +30,17 @@ viewer_r_assignment <- function(path, name) {
     },
     as.list(parse(path))
   )
+  ## A file may re-assign the name after defining it (shiny_server.R byte
+  ## compiles its server at the end), so prefer the single definition.
+  definitions <- Filter(
+    function(x) {
+      is.call(x[[3]]) && identical(as.character(x[[3]][[1]])[1], "function")
+    },
+    statements
+  )
+  if (length(definitions) == 1L) {
+    return(definitions[[1]])
+  }
   if (length(statements) != 1L) {
     stop(
       "Expected one R declaration for ",

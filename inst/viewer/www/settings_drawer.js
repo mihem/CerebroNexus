@@ -4,6 +4,77 @@
   var activeDrawer = null;
   var activeButton = null;
   var inertBackground = [];
+  var horizontalPositions = Object.create(null);
+  var drag = null;
+
+  function horizontalRoom(drawer) {
+    return Math.max(0, document.documentElement.clientWidth - drawer.offsetWidth);
+  }
+
+  function positionDrawer(drawer) {
+    var right = isModal() ? 0 : (horizontalPositions[drawer.id] || 0) * horizontalRoom(drawer);
+    drawer.style.setProperty('--cerebro-drawer-right', right + 'px');
+    drawer.classList.toggle('is-floating', right > 0.5);
+  }
+
+  function moveDrawer(drawer, right) {
+    var room = horizontalRoom(drawer);
+    right = Math.max(0, Math.min(room, right));
+    horizontalPositions[drawer.id] = room ? right / room : 0;
+    positionDrawer(drawer);
+  }
+
+  function finishDrag() {
+    if (!drag) return;
+    var previous = drag;
+    drag = null;
+    previous.drawer.classList.remove('is-dragging');
+    if (previous.handle.hasPointerCapture(previous.pointer)) {
+      previous.handle.releasePointerCapture(previous.pointer);
+    }
+  }
+
+  function ensureDragHandle(drawer) {
+    var titlebar = drawer.querySelector('.cerebro-settings-titlebar');
+    if (!titlebar || titlebar.querySelector('.cerebro-settings-drag')) return;
+    var handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'cerebro-settings-drag';
+    handle.setAttribute('aria-label', 'Move Settings panel horizontally');
+    var tip = document.createElement('span');
+    tip.className = 'cerebro-settings-drag-tip';
+    tip.id = drawer.id + '_drag_tip';
+    tip.setAttribute('role', 'tooltip');
+    tip.textContent = 'Drag to move · or use ← → keys';
+    handle.setAttribute('aria-describedby', tip.id);
+    handle.appendChild(tip);
+    titlebar.appendChild(handle);
+    handle.addEventListener('pointerdown', function (event) {
+      if (event.button !== 0 || activeDrawer !== drawer || isModal()) return;
+      finishDrag();
+      drag = { drawer: drawer, handle: handle, pointer: event.pointerId,
+        startX: event.clientX, right: (horizontalPositions[drawer.id] || 0) * horizontalRoom(drawer) };
+      handle.setPointerCapture(event.pointerId);
+      drawer.classList.add('is-dragging');
+      handle.focus({ preventScroll: true });
+      event.preventDefault();
+    });
+    handle.addEventListener('pointermove', function (event) {
+      if (!drag || drag.pointer !== event.pointerId) return;
+      moveDrawer(drawer, drag.right - (event.clientX - drag.startX));
+    });
+    handle.addEventListener('pointerup', finishDrag);
+    handle.addEventListener('pointercancel', finishDrag);
+    handle.addEventListener('lostpointercapture', finishDrag);
+    handle.addEventListener('keydown', function (event) {
+      if (isModal() || activeDrawer !== drawer || !/^(ArrowLeft|ArrowRight|Home|End)$/.test(event.key)) return;
+      var room = horizontalRoom(drawer);
+      var right = (horizontalPositions[drawer.id] || 0) * room;
+      moveDrawer(drawer, event.key === 'Home' ? room : event.key === 'End' ? 0 :
+        right + (event.key === 'ArrowLeft' ? 24 : -24));
+      event.preventDefault();
+    });
+  }
 
   function isModal() {
     return window.matchMedia('(max-width: 900px)').matches;
@@ -45,6 +116,7 @@
 
   function closeDrawer(restoreFocus, immediate) {
     if (!activeDrawer) return;
+    finishDrag();
     var drawer = activeDrawer;
     var button = activeButton;
     drawer.classList.remove('is-open');
@@ -84,7 +156,9 @@
       document.body.appendChild(drawer);
     }
     setModalMode(drawer);
+    ensureDragHandle(drawer);
     drawer.classList.add('is-mounted');
+    positionDrawer(drawer);
     void drawer.offsetWidth;
     drawer.classList.add('is-open');
     drawer.setAttribute('aria-hidden', 'false');
@@ -219,7 +293,11 @@
   });
 
   window.addEventListener('resize', function () {
-    if (activeDrawer) setModalMode(activeDrawer);
+    finishDrag();
+    if (activeDrawer) {
+      setModalMode(activeDrawer);
+      positionDrawer(activeDrawer);
+    }
   });
 
   window.jQuery(document).on(

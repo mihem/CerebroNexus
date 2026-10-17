@@ -14,6 +14,11 @@ source(file.path(
   dirname(normalizePath(sub("^--file=", "", script_argument))),
   "viewer_1m_page_protocol.R"
 ))
+source(file.path(
+  dirname(normalizePath(sub("^--file=", "", script_argument))),
+  "lib",
+  "viewer_launch.R"
+))
 if (length(args) < 3L) {
   stop(
     paste(
@@ -25,6 +30,19 @@ if (length(args) < 3L) {
 }
 
 quote_r <- function(value) encodeString(value, quote = '"')
+
+viewer_app_lines <- function(candidate, crb, load_mode) {
+  c(
+    viewer_load_line(candidate, load_mode),
+    "launchCerebro(",
+    "  mode = \"closed\",",
+    sprintf("  crb_file_to_load = c(\"1M pages\" = %s),", quote_r(crb)),
+    "  percentage_cells_to_show = 100,",
+    "  projections_show_hover_info = TRUE",
+    ")"
+  )
+}
+
 
 parse_candidate <- function(value, default_label = "candidate") {
   separator <- regexpr("=", value, fixed = TRUE)
@@ -113,6 +131,8 @@ if (any(!nzchar(candidate_labels)) || anyDuplicated(candidate_labels)) {
   stop("Candidate labels must be non-empty and unique.", call. = FALSE)
 }
 names(candidate_specs) <- candidate_labels
+viewer_load_mode <- viewer_bench_load_mode()
+candidate_specs <- prepare_viewer_candidates(candidate_specs, viewer_load_mode)
 
 viewer_pack_manifest <- file.path(
   dirname(crb),
@@ -1244,18 +1264,7 @@ run_observation <- function(schedule_row, candidate, page, crb) {
   dir.create(app_dir)
   on.exit(unlink(app_dir, recursive = TRUE, force = TRUE), add = TRUE)
   writeLines(
-    c(
-      sprintf(
-        "devtools::load_all(%s, quiet = TRUE)",
-        quote_r(candidate[["root"]])
-      ),
-      "launchCerebro(",
-      "  mode = \"closed\",",
-      sprintf("  crb_file_to_load = c(\"1M pages\" = %s),", quote_r(crb)),
-      "  percentage_cells_to_show = 100,",
-      "  projections_show_hover_info = TRUE",
-      ")"
-    ),
+    viewer_app_lines(candidate, crb, viewer_load_mode),
     file.path(app_dir, "app.R")
   )
   suppressWarnings(shinytest2::local_app_support(app_dir))
@@ -1273,17 +1282,12 @@ run_observation <- function(schedule_row, candidate, page, crb) {
     },
     add = TRUE
   )
-  app$wait_for_value(output = "load_data_number_of_cells", timeout = 900000)
-  count <- app$get_value(output = "load_data_number_of_cells")
-  expected_label <- format(
+  wait_for_data_info_cells(app, format(
     expected_cells,
     big.mark = ",",
     scientific = FALSE,
     trim = TRUE
-  )
-  if (is.null(count$html) || !grepl(expected_label, count$html, fixed = TRUE)) {
-    stop("Data Info did not report ", expected_label, " cells.", call. = FALSE)
-  }
+  ))
   dataset_metrics <- load_benchmark_dataset(app)
   if (!isTRUE(page_available(app, page))) {
     if (isTRUE(page$required)) {
@@ -1537,6 +1541,7 @@ provenance <- do.call(
         benchmark_mode = benchmark_mode,
         expected_renderer = expected_renderer,
         profiler_instrumented = isTRUE(memory_mode),
+        viewer_load_mode = viewer_load_mode,
         rounds = rounds,
         stringsAsFactors = FALSE
       ),

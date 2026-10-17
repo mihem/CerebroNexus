@@ -262,11 +262,13 @@ cv_selected_viewer_content <- function() {
   configured[[dataset]]
 }
 
-## Bounds already contain Builder geometry; only background opacity belongs to
-## image alignment. Cell point appearance is dataset-wide.
 cv_alignment_appearance <- function(alignment) {
   if (!is.list(alignment)) {
-    return(list(image_opacity = NULL))
+    return(list(
+      image_opacity = NULL,
+      point_opacity = NULL,
+      point_size = NULL
+    ))
   }
   number <- function(key, lower, upper, lower_open = FALSE) {
     value <- suppressWarnings(as.numeric(alignment[[key]]))
@@ -283,7 +285,34 @@ cv_alignment_appearance <- function(alignment) {
       unname(value)
     }
   }
-  list(image_opacity = number("image_opacity", 0, 1))
+  list(
+    image_opacity = number("image_opacity", 0, 1),
+    point_opacity = number("point_opacity", 0, 1),
+    point_size = number("point_size", 0, 20, lower_open = TRUE)
+  )
+}
+
+cv_viewport_bounds <- function(value) {
+  required <- c("xmin", "xmax", "ymin", "ymax")
+  if (
+    is.null(value) || is.null(names(value)) || !all(required %in% names(value))
+  ) {
+    return(NULL)
+  }
+  numbers <- suppressWarnings(as.numeric(unlist(
+    value[required],
+    use.names = FALSE
+  )))
+  if (
+    length(numbers) != 4L ||
+      anyNA(numbers) ||
+      any(!is.finite(numbers)) ||
+      numbers[[1L]] >= numbers[[2L]] ||
+      numbers[[3L]] >= numbers[[4L]]
+  ) {
+    return(NULL)
+  }
+  stats::setNames(as.list(numbers), required)
 }
 
 ## Convert one public per-image settings leaf to the JavaScript transform
@@ -298,48 +327,12 @@ cv_image_preset <- function(spatial_name, image_label) {
   )
 }
 
-## Overlay the alignment stored beside one embedded image onto the generic
-## Viewer preset. Embedded CRBs are self-contained, so their per-image leaf is
-## the authority for every transform, not just appearance. Keeping this mapping
-## here also makes the embedded and external JavaScript contracts identical.
-cv_embedded_alignment_preset <- function(preset, alignment) {
-  if (!is.list(alignment)) {
-    return(preset)
-  }
-  number <- function(key, fallback) {
-    value <- suppressWarnings(as.numeric(alignment[[key]]))
-    if (length(value) != 1L || is.na(value) || !is.finite(value)) {
-      fallback
-    } else {
-      unname(value)
-    }
-  }
-  preset$offsetX <- number("dx", preset$offsetX)
-  preset$offsetY <- number("dy", preset$offsetY)
-  embedded_scale <- number("scale", preset$scaleX)
-  preset$scaleX <- embedded_scale
-  preset$scaleY <- embedded_scale
-  preset$rotation <- number("rotation", preset$rotation)
-  if (!is.null(alignment[["flip_x"]])) {
-    preset$flipX <- isTRUE(alignment[["flip_x"]])
-  }
-  if (!is.null(alignment[["flip_y"]])) {
-    preset$flipY <- isTRUE(alignment[["flip_y"]])
-  }
-  preset$opacity <- number("image_opacity", preset$opacity)
-  ## The Builder serializes embedded pixels after applying this geometry and
-  ## writes their final data-space bounds. Viewer controls still expose the
-  ## saved calibration, but drawing must apply only changes relative to it.
-  preset$geometryBaked <- TRUE
-  preset
-}
-
 ## Resolve EXTERNAL histology images for one spatial entry of the selected data
 ## set. createShinyApp() stores them as dataset -> FOV -> image, with each leaf
 ## either a relative path or a descriptor containing path + coordinate bounds.
 ## The output is base64-encoded so the browser never receives a filesystem path.
 ## Linked Views defers that encoding until the selected image is requested.
-cv_external_images <- function(spatial_name = NULL, defer = FALSE) {
+cv_external_images <- function(spatial_name = NULL, defer = FALSE, roi_value = NULL) {
   if (
     !exists("Cerebro.options") ||
       is.null(Cerebro.options[["spatial_images"]])
@@ -370,7 +363,9 @@ cv_external_images <- function(spatial_name = NULL, defer = FALSE) {
   ) {
     return(list())
   }
-  configured <- images_by_spatial[[spatial_name]]
+  configured <- configured_spatial_images(
+    Cerebro.options, dataset, spatial_name, roi_value
+  )
   if (is.null(configured) || !length(configured)) {
     return(list())
   }
@@ -445,18 +440,24 @@ cv_external_images <- function(spatial_name = NULL, defer = FALSE) {
       next
     }
     base <- basename(path)
-    label <- if (!is.null(labels) && nzchar(labels[[i]] %||% "")) {
+    key <- if (!is.null(labels) && nzchar(labels[[i]] %||% "")) {
       labels[[i]]
     } else {
       base
     }
+    label <- if (is.list(descriptor)) descriptor$label %||% key else key
     image <- list(
       ## Section + position + label keep equal basenames and equal labels on
       ## different FOVs distinct, while remaining stable across bundle pushes.
-      id = paste0("external:", spatial_name, ":", i, ":", label),
+      id = paste0("external:", spatial_name, ":", i, ":", key),
       label = label,
       bounds = bounds,
-      preset = cv_image_preset(spatial_name, label)
+      viewport = if (is.list(descriptor)) {
+        normalize_bounds(descriptor$viewport_bounds)
+      } else {
+        NULL
+      },
+      preset = cv_image_preset(spatial_name, key)
     )
     if (isTRUE(defer)) {
       image$asset_path <- img_path
@@ -465,12 +466,13 @@ cv_external_images <- function(spatial_name = NULL, defer = FALSE) {
       if (!requireNamespace("base64enc", quietly = TRUE)) {
         next
       }
-      image$uri <- paste0(
-        "data:",
-        mime,
-        ";base64,",
-        base64enc::base64encode(img_path)
-      )
+      image$uri <- viewerPrivateImageUrl(img_path) %||%
+        paste0(
+          "data:",
+          mime,
+          ";base64,",
+          base64enc::base64encode(img_path)
+        )
     }
     out[[length(out) + 1L]] <- image
   }
@@ -977,7 +979,7 @@ cv_build_projections <- function(
 }
 
 ## One spatial SAMPLE: its per-cell x/y (aligned to `cells`, NA off-sample) plus
-## its histology image. Two image sources, ONE contract: a base64 data URI + the
+## its histology image. Two image sources, ONE contract: an image reference + the
 ## data-space bounds it covers + an alignment preset (offset in DATA units, scale
 ## unitless, flip). The client maps the bounds to screen with the same transform
 ## as the cells, so the image aligns; preset/user transforms adjust on top.
@@ -1000,9 +1002,10 @@ cv_spatial_data <- function(crb, nm) {
   getter(nm)
 }
 
-cv_spatial_one <- function(crb, cells, nm, allow_external) {
+cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
+                           metadata = NULL, spatial_data = NULL) {
   sd <- tryCatch(
-    cv_spatial_data(crb, nm),
+    spatial_data %||% cv_spatial_data(crb, nm),
     error = function(e) NULL
   )
   co <- if (!is.null(sd)) sd$coordinates else NULL
@@ -1014,7 +1017,31 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
     cv_selected_dataset_name(),
     nm
   )
-  co <- rotateSpatialCoordinates(co, rotation)
+  if (is.null(metadata)) {
+    metadata <- tryCatch(crb$getMetaData(), error = function(error) NULL)
+  }
+  context <- spatial_roi_transform_context(co, metadata, degrees = rotation)
+  rois <- unique(as.character(context$roi_by_cell))
+  rois <- rois[!is.na(rois) & nzchar(rois)]
+  ## A single-ROI FOV has the same default scene as Spatial's single-ROI view.
+  ## Multi-ROI overview coordinates stay intact; separately selectable ROI
+  ## scenes below use the saved rotations and their own image declarations.
+  if (is.null(roi_value)) roi_value <- if (length(rois) == 1L) rois else ""
+  roi_value <- spatial_roi_value(roi_value)
+  if (nzchar(roi_value)) {
+    keep <- !is.na(context$roi_by_cell) & context$roi_by_cell == roi_value
+    co <- co[keep, , drop = FALSE]
+    if (!nrow(co)) return(NULL)
+    co <- rotateSpatialCoordinatesByRoi(
+      co, as.character(context$roi_by_cell[rownames(co)]),
+      spatialRoiSettings(
+        if (exists("Cerebro.options")) Cerebro.options else NULL,
+        cv_selected_dataset_name(), nm
+      ), rotation, pivots = context$pivots
+    )
+  } else {
+    co <- rotateSpatialCoordinates(co, rotation)
+  }
   spatial_cells <- cv_cell_ids(
     rownames(co),
     paste0("Spatial section `", nm, "`")
@@ -1035,17 +1062,34 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
   )
   span <- c(diff(xr), diff(yr))
   images <- list()
-  embedded <- sd[["histology_images", exact = TRUE]]
-  if (is.null(embedded) || !length(embedded)) {
-    legacy_image <- sd[["histology_image", exact = TRUE]]
-    embedded <- if (!is.null(legacy_image)) {
-      list("Tissue background" = legacy_image)
-    } else {
-      list()
-    }
-  }
+  ## Use Spatial's canonical histology_images/legacy-image normalization and
+  ## ROI precedence, so both pages offer the same set of eligible images.
+  embedded <- embedded_spatial_images(sd, roi_value)
   alignment <- sd[["histology_alignment", exact = TRUE]]
   appearance <- cv_alignment_appearance(alignment)
+  section_appearance <- spatialPointAppearance(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    cv_selected_dataset_name(),
+    nm
+  )
+  roi_appearance <- spatialRoiSetting(
+    if (exists("Cerebro.options")) Cerebro.options else NULL,
+    cv_selected_dataset_name(), nm, roi_value
+  )
+  if (!is.null(roi_appearance)) {
+    section_appearance <- roi_appearance[c("point_opacity", "point_size")]
+  }
+  if (is.null(section_appearance) && isTRUE(alignment$builder_managed)) {
+    if (
+      length(appearance$point_opacity) == 1L &&
+        length(appearance$point_size) == 1L
+    ) {
+      section_appearance <- appearance[c("point_opacity", "point_size")]
+    }
+  }
+  spatial_defaults <- viewerScatterDefaults(
+    if (exists("Cerebro.options")) Cerebro.options else list(),
+    cv_selected_dataset_name(), "spatial")
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
     embedded_names <- names(embedded)
@@ -1064,7 +1108,7 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
       b <- entry$histology_image_bounds %||%
         entry$bounds %||%
         sd[["histology_image_bounds", exact = TRUE]]
-      label <- entry$label %||% entry_name
+      label <- entry$image_label %||% entry$label %||% entry_name
     } else {
       emb <- entry
       b <- sd[["histology_image_bounds", exact = TRUE]]
@@ -1083,17 +1127,14 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
         paste("Embedded histology", embedded_index)
       }
     }
-    preset <- cv_image_preset(nm, label)
+    preset <- cv_image_preset(nm, entry_name)
     entry_alignment <- if (is.list(entry)) {
       entry$histology_alignment %||% entry$alignment
     } else {
       NULL
     }
-    preset <- cv_embedded_alignment_preset(preset, entry_alignment)
-    entry_appearance <- cv_alignment_appearance(entry_alignment)
-    if (length(entry_appearance$image_opacity) == 1L) {
-      preset$opacity <- entry_appearance$image_opacity
-    }
+    preset <- spatialEmbeddedImagePreset(preset, entry_alignment)
+    ## A section-level alignment names the image it was saved for.
     alignment_source <- if (is.list(alignment)) {
       as.character(alignment$source %||% character())
     } else {
@@ -1124,12 +1165,13 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
         ymin = as.numeric(b[["ymin"]]),
         ymax = as.numeric(b[["ymax"]])
       ),
+      viewport = cv_viewport_bounds(entry_alignment$viewport_bounds),
       preset = preset,
       coord_span = span
     )
   }
   if (allow_external) {
-    for (ex in cv_external_images(nm, defer = TRUE)) {
+    for (ex in cv_external_images(nm, defer = TRUE, roi_value = roi_value)) {
       images[[length(images) + 1]] <- list(
         id = ex$id,
         label = ex$label,
@@ -1137,13 +1179,15 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
         asset_path = ex$asset_path,
         asset_mime = ex$asset_mime,
         bounds = ex$bounds %||% bounds_default,
+        viewport = ex$viewport,
         preset = ex$preset,
         coord_span = span
       )
     }
   }
   ## The default background, as a REFERENCE rather than a copy. A histology
-  ## image is megabytes of base64; carrying the same one under both `image` and
+  ## image reference can point to a multi-megabyte payload; carrying the same one
+  ## under both `image` and
   ## `images[1]` doubled it, and once more again for the space's own default --
   ## measured at 1.6 MB per copy on the Xenium demo, in a 3.6 MB bundle. Older
   ## readers of the singular field get the id and can look it up.
@@ -1152,6 +1196,7 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
       id = images[[1]]$id,
       label = images[[1]]$label,
       bounds = images[[1]]$bounds,
+      viewport = images[[1]]$viewport,
       preset = images[[1]]$preset,
       coord_span = images[[1]]$coord_span
     )
@@ -1159,10 +1204,39 @@ cv_spatial_one <- function(crb, cells, nm, allow_external) {
     NULL
   }
 
+  viewport <- if (length(images)) images[[1L]]$viewport else NULL
   list(
     name = nm,
-    x = round(as.numeric(co[sidx, 1]), 3),
-    y = round(as.numeric(co[sidx, 2]), 3),
+    label = paste0(nm, if (nzchar(roi_value)) {
+      paste0(" · ", roi_value)
+    } else if (length(rois) > 1L) {
+      " · All ROIs"
+    } else {
+      ""
+    }, " (spatial)"),
+    roi = if (nzchar(roi_value)) roi_value else NULL,
+    is_roi_overview = !nzchar(roi_value) && length(rois) > 1L,
+    x = as.numeric(co[sidx, 1]),
+    y = as.numeric(co[sidx, 2]),
+    x_range = if (is.null(viewport)) {
+      NULL
+    } else {
+      unname(unlist(viewport[c(
+        "xmin",
+        "xmax"
+      )]))
+    },
+    y_range = if (is.null(viewport)) {
+      NULL
+    } else {
+      unname(unlist(viewport[c(
+        "ymin",
+        "ymax"
+      )]))
+    },
+    builder_point_opacity = section_appearance$point_opacity %||% spatial_defaults$point_opacity,
+    builder_point_size = section_appearance$point_size %||% spatial_defaults$point_size,
+    builder_percentage_cells = spatial_defaults$percentage_cells_to_show,
     ## `image` is the default one, kept so anything reading the older singular
     ## contract still works; `images` is the list the picker is built from.
     image = image,
@@ -1180,12 +1254,27 @@ cv_build_spatial <- function(crb, cells) {
   if (!length(sp_names)) {
     return(NULL)
   }
-  built <- lapply(
-    seq_along(sp_names),
-    ## Every section resolves only its own dataset -> FOV -> image declarations.
-    ## The client remembers the selected background and calibration per section.
-    function(i) cv_spatial_one(crb, cells, sp_names[i], allow_external = TRUE)
-  )
+  metadata <- tryCatch(crb$getMetaData(), error = function(error) NULL)
+  built <- list()
+  for (nm in sp_names) {
+    sd <- tryCatch(cv_spatial_data(crb, nm), error = function(error) NULL)
+    if (is.null(sd)) next
+    scene <- cv_spatial_one(crb, cells, nm, TRUE, metadata = metadata, spatial_data = sd)
+    if (is.null(scene)) next
+    built[[length(built) + 1L]] <- scene
+    rois <- spatial_metadata_facet(
+      metadata, rownames(sd$coordinates),
+      c("sample_roi", "roi", "roi_id", "region_of_interest")
+    )$values
+    if (length(rois) > 1L) {
+      for (roi in rois) {
+        scene <- cv_spatial_one(crb, cells, nm, TRUE, roi, metadata, sd)
+        if (is.null(scene)) next
+        scene$name <- paste0(nm, "::roi::", roi)
+        built[[length(built) + 1L]] <- scene
+      }
+    }
+  }
   built <- Filter(Negate(is.null), built)
   if (!length(built)) {
     return(NULL)
@@ -1193,13 +1282,23 @@ cv_build_spatial <- function(crb, cells) {
   first <- built[[1]]
   space <- cv_space(
     "spatial",
-    paste0(first$name, " (spatial)"),
+    first$label,
     first$x,
     first$y
   )
+  ## Labels describe FOV/ROI scope; the persisted selection key stays stable.
+  space$name <- first$name
+  space$is_roi_overview <- first$is_roi_overview
   if (!is.null(first$image)) {
     space$image <- first$image
   }
+  if (!is.null(first$x_range)) {
+    space$x_range <- I(first$x_range)
+    space$y_range <- I(first$y_range)
+  }
+  space$builder_point_opacity <- first$builder_point_opacity
+  space$builder_point_size <- first$builder_point_size
+  space$builder_percentage_cells <- first$builder_percentage_cells
   ## Only when there is no `samples` list to hold them: with one, the space's
   ## default section IS samples[[1]] and repeating its images here would send
   ## every one of them twice.
@@ -1210,9 +1309,15 @@ cv_build_spatial <- function(crb, cells) {
     space$samples <- lapply(built, function(s) {
       list(
         name = s$name,
-        label = paste0(s$name, " (spatial)"),
+        is_roi_overview = s$is_roi_overview,
+        label = s$label %||% paste0(s$name, " (spatial)"),
         x = I(s$x),
         y = I(s$y),
+        x_range = if (is.null(s$x_range)) NULL else I(s$x_range),
+        y_range = if (is.null(s$y_range)) NULL else I(s$y_range),
+        builder_point_opacity = s$builder_point_opacity,
+        builder_point_size = s$builder_point_size,
+        builder_percentage_cells = s$builder_percentage_cells,
         image = s$image,
         images = I(s$images)
       )
@@ -1250,7 +1355,9 @@ cv_build_trekker <- function(crb, cells, md) {
   )
   alignment <- tk[["histology_alignment", exact = TRUE]]
   appearance <- cv_alignment_appearance(alignment)
-  histology <- tk[["histology_image", exact = TRUE]]
+  external_histology <- viewerTrekkerExternalImage()
+  histology <- external_histology$uri %||%
+    tk[["histology_image", exact = TRUE]]
   if (
     is.character(histology) &&
       length(histology) == 1L &&
@@ -1271,7 +1378,8 @@ cv_build_trekker <- function(crb, cells, md) {
       centre <- if (length(finite_y)) finite_y[[1L]] else 0
       yr <- c(centre - 0.5, centre + 0.5)
     }
-    bounds <- tk[["histology_image_bounds", exact = TRUE]]
+    bounds <- external_histology$bounds %||%
+      tk[["histology_image_bounds", exact = TRUE]]
     required_bounds <- c("xmin", "xmax", "ymin", "ymax")
     valid_bounds <- !is.null(bounds) &&
       !is.null(names(bounds)) &&
@@ -1293,20 +1401,33 @@ cv_build_trekker <- function(crb, cells, md) {
     } else {
       character()
     }
-    label <- if (length(source) == 1L && !is.na(source) && nzchar(source)) {
+    label <- if (
+      is.character(external_histology$label) &&
+        length(external_histology$label) == 1L &&
+        !is.na(external_histology$label) &&
+        nzchar(external_histology$label)
+    ) {
+      external_histology$label
+    } else if (length(source) == 1L && !is.na(source) && nzchar(source)) {
       basename(source)
     } else {
       "Trekker background"
     }
-    preset <- cv_image_preset("trekker", label)
-    if (length(appearance$image_opacity) == 1L) {
+    preset <- external_histology$preset %||%
+      cv_image_preset("trekker", label)
+    if (is.null(external_histology) && length(appearance$image_opacity) == 1L) {
       preset$opacity <- appearance$image_opacity
     }
     image_entry <- list(
-      id = "trekker-embedded",
+      id = if (is.null(external_histology)) {
+        "trekker-embedded"
+      } else {
+        "trekker-external"
+      },
       label = label,
       uri = histology,
       bounds = as.list(bounds),
+      viewport = cv_viewport_bounds(external_histology$viewport_bounds),
       preset = preset,
       coord_span = c(diff(xr), diff(yr))
     )
@@ -1314,6 +1435,7 @@ cv_build_trekker <- function(crb, cells, md) {
       "id",
       "label",
       "bounds",
+      "viewport",
       "preset",
       "coord_span"
     )]
@@ -1839,10 +1961,13 @@ cv_build_bundle <- function(
   ## Every modality is independently useful. Linked views adds a coordinated
   ## workspace without changing the dedicated Projection/Spatial/Trekker pages.
   viewer_content <- cv_selected_viewer_content()
-  appearance <- viewerScatterDefaults(
-    if (exists("Cerebro.options")) Cerebro.options else list(),
-    cv_selected_dataset_name()
-  )
+  initial_projections <- character()
+  appearance <- if (exists("current_scatter_defaults", mode = "function")) {
+    shiny::isolate(current_scatter_defaults())
+  } else {
+    viewerScatterDefaults(if (exists("Cerebro.options")) Cerebro.options else list(),
+      cv_selected_dataset_name())
+  }
   default_point_size <- appearance$point_size
   default_percentage_cells_to_show <- appearance$percentage_cells_to_show
   default_point_opacity <- appearance$point_opacity
@@ -1904,6 +2029,16 @@ cv_build_bundle <- function(
   default_projection <- NULL
   spaces <- list()
   if (length(projections)) {
+    configured_initial <- viewer_content[["initial_projections"]]
+    if (is.character(configured_initial) && !is.object(configured_initial)) {
+      configured_initial <- unique(configured_initial[
+        !is.na(configured_initial) &
+          nzchar(trimws(configured_initial)) &
+          configured_initial %in% names(projections)
+      ])
+    } else {
+      configured_initial <- character()
+    }
     default_projection <- if (
       is.character(configured_projection) &&
         length(configured_projection) == 1L &&
@@ -1911,11 +2046,17 @@ cv_build_bundle <- function(
         configured_projection %in% names(projections)
     ) {
       configured_projection
+    } else if (length(configured_initial)) {
+      configured_initial[[1L]]
     } else if ("umap" %in% names(projections)) {
       "umap"
     } else {
       names(projections)[1]
     }
+    initial_projections <- c(
+      default_projection,
+      configured_initial[configured_initial != default_projection]
+    )
     ## Coordinates live in `projections`; the client rebuilds this descriptor
     ## from there. Keeping another x/y/z copy doubles the largest part of a
     ## million-cell wire payload.
@@ -2011,10 +2152,12 @@ cv_build_bundle <- function(
     default_group = default_group,
     available_modalities = I(cv_progressive_modalities(crb, projection_names)),
     default_point_size = default_point_size,
+    display_defaults = builderViewerDisplayDefaults(viewer_content$display),
     default_percentage_cells_to_show = default_percentage_cells_to_show,
     default_point_opacity = default_point_opacity,
     projections = projections,
     default_projection = default_projection,
+    initial_projections = initial_projections,
     trajectories = trajectories,
     spaces = spaces,
     clone = clone_bundle,
@@ -2070,11 +2213,39 @@ cv_build_deferred_metadata <- function(crb, md, primary) {
 ## the already-loaded thin first-frame metadata and the Viewer Pack's canonical
 ## immune index, so the supplement never materialises barcodes, per-cell strings,
 ## or metadata codes merely to discard them before transport.
+## Supplement projections that the Viewer Pack serves as static resources are
+## sent as descriptors: the browser fetches and caches them over HTTP instead of
+## receiving every coordinate in one websocket message, and R builds no arrays
+## for them. Returns the projections in `names` order.
+cv_supplement_projections <- function(
+  names,
+  projection_resources,
+  n,
+  build,
+  first_projections = NULL
+) {
+  resourced <- list()
+  for (name in intersect(names, names(projection_resources))) {
+    entry <- cv_resource_projection(
+      list(name = name, descriptor = projection_resources[[name]]),
+      first_projections[[name]],
+      n
+    )
+    if (length(entry)) {
+      resourced[[name]] <- entry[[1L]]
+    }
+  }
+  built <- build(setdiff(names, names(resourced)))
+  projections <- c(built, resourced)
+  projections[intersect(names, names(projections))]
+}
+
 cv_build_compact_supplement <- function(
   crb,
   primary,
   first_frame,
-  include_clone = TRUE
+  include_clone = TRUE,
+  projection_resources = list()
 ) {
   pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
   valid <- is.list(pack) &&
@@ -2122,13 +2293,21 @@ cv_build_compact_supplement <- function(
     cat_extra = metadata$cat_extra,
     fields = metadata$fields,
     cat_skipped = metadata$cat_skipped,
-    projections = cv_build_projections(
-      crb,
-      seq_len(primary$n),
+    projections = cv_supplement_projections(
       setdiff(projection_names, names(primary$projections)),
-      first_frame$projections,
-      canonical_projections = first_frame$canonical_projections,
-      aligned_cache = first_frame$aligned_projections
+      projection_resources,
+      primary$n,
+      function(names) {
+        cv_build_projections(
+          crb,
+          seq_len(primary$n),
+          names,
+          first_frame$projections,
+          canonical_projections = first_frame$canonical_projections,
+          aligned_cache = first_frame$aligned_projections
+        )
+      },
+      first_frame$projections
     ),
     spaces = if (is.null(clone)) list() else list(clone$space),
     clone = if (is.null(clone)) NULL else clone$bundle,
@@ -2142,7 +2321,8 @@ cv_build_compact_supplement <- function(
 cv_build_progressive_supplement <- function(
   crb,
   primary,
-  include_clone = TRUE
+  include_clone = TRUE,
+  projection_resources = list()
 ) {
   md <- cv_canonical_metadata(crb$getMetaData())
   if (is.null(md) || !identical(as.integer(nrow(md)), as.integer(primary$n))) {
@@ -2182,10 +2362,11 @@ cv_build_progressive_supplement <- function(
     cat_extra = metadata$cat_extra,
     fields = metadata$fields,
     cat_skipped = metadata$cat_skipped,
-    projections = cv_build_projections(
-      crb,
-      cells,
-      setdiff(projection_names, names(primary$projections))
+    projections = cv_supplement_projections(
+      setdiff(projection_names, names(primary$projections)),
+      projection_resources,
+      primary$n,
+      function(names) cv_build_projections(crb, cells, names)
     ),
     spaces = spaces,
     clone = if (is.null(clone)) NULL else clone$bundle,

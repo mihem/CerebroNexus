@@ -247,6 +247,35 @@ test_that("the first reactive value bypasses debounce", {
   })
 })
 
+test_that("page-gated debounced values stay idle off the page", {
+  utility_env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), envir = utility_env)
+  compute_count <- 0L
+  server <- function(input, output, session) {
+    active <- function() identical(input$sidebar, "page")
+    raw <- shiny::reactive({
+      shiny::req(active(), input$value)
+      compute_count <<- compute_count + 1L
+      input$value
+    })
+    ready <- utility_env$debounceAfterFirst(raw, 10000, active = active)
+  }
+
+  shiny::testServer(server, {
+    session$setInputs(sidebar = "page", value = "first")
+    expect_identical(ready(), "first")
+    session$setInputs(sidebar = "other")
+    count <- compute_count
+    ## Edits made elsewhere do not compute this page's value.
+    session$setInputs(value = "second")
+    session$setInputs(value = "third")
+    expect_identical(compute_count, count)
+    ## Returning reads the current value at once, not the one held before.
+    session$setInputs(sidebar = "page")
+    expect_identical(ready(), "third")
+  })
+})
+
 test_that("hidden outputs resolve to their owning sidebar tabs", {
   utility_env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), envir = utility_env)

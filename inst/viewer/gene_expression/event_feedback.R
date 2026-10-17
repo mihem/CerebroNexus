@@ -6,6 +6,7 @@ observe({
   context <- viewer_loaded_dataset_context()
   genes <- expression_selected_genes_input()
   mode <- input[["expression_projection_genes_in_separate_panels"]]
+  rgb_layout <- input[["expression_rgb_layout"]]
   req(mode)
   controls <- c(
     "expression_analysis_mode",
@@ -14,7 +15,8 @@ observe({
     "expression_rgb_gene_r",
     "expression_rgb_gene_g",
     "expression_rgb_gene_b",
-    "expression_select_gene_set"
+    "expression_select_gene_set",
+    "expression_rgb_layout"
   )
   values <- isolate(stats::setNames(
     lapply(controls, function(id) {
@@ -27,7 +29,7 @@ observe({
     list(
       dataset_context = context,
       controls = values,
-      render_key = expressionProjectionRenderKey(genes, mode)
+      render_key = expressionProjectionRenderKey(genes, mode, rgb_layout)
     )
   )
 })

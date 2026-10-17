@@ -35,11 +35,7 @@ overviewProjectionUI <- function() {
                 uiOutput("overview_projection_additional_parameters_UI"),
                 uiOutput("overview_projection_show_group_label_UI"),
                 uiOutput("overview_projection_point_border_UI"),
-                checkboxInput(
-                  "overview_projection_keep_square",
-                  "Keep plots square",
-                  value = FALSE
-                )
+                uiOutput("overview_projection_keep_square_UI")
               ),
               cerebroInfoButton(
                 "overview_projection_additional_parameters_info"

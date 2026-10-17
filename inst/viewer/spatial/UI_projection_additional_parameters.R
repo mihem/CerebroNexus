@@ -5,7 +5,26 @@
 ## selected background image. This preserves users' point-size, opacity and
 ## sampling choices while moving among backgrounds.
 output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
-  appearance <- current_scatter_defaults()
+  appearance <- current_spatial_scatter_defaults()
+  section_appearance <- spatialPointAppearance(
+    Cerebro.options,
+    viewer_current_dataset_key(),
+    input[["spatial_projection_to_display"]]
+  )
+  if (!is.null(section_appearance)) {
+    appearance$point_size <- section_appearance$point_size
+    appearance$point_opacity <- section_appearance$point_opacity
+  }
+  roi_appearance <- spatialRoiSetting(
+    Cerebro.options,
+    viewer_current_dataset_key(),
+    input[["spatial_projection_to_display"]],
+    spatial_roi_value(input[["spatial_projection_roi"]] %||% "")
+  )
+  if (!is.null(roi_appearance)) {
+    appearance$point_size <- roi_appearance$point_size
+    appearance$point_opacity <- roi_appearance$point_opacity
+  }
 
   tagList(
     sliderInput(
@@ -19,7 +38,7 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
     sliderInput(
       "spatial_projection_point_opacity",
       label = "Point opacity",
-      min = preferences[["cell_point_opacity"]][["min"]],
+      min = 0,
       max = preferences[["cell_point_opacity"]][["max"]],
       step = preferences[["cell_point_opacity"]][["step"]],
       value = appearance$point_opacity
@@ -28,12 +47,12 @@ output[["spatial_projection_scatter_parameters_UI"]] <- renderUI({
 })
 
 output[["spatial_projection_data_parameters_UI"]] <- renderUI({
-  appearance <- current_scatter_defaults()
+  appearance <- current_spatial_scatter_defaults()
 
   tagList(
     sliderInput(
       "spatial_projection_percentage_cells_to_show",
-      label = "Show % of cells",
+      label = "Show % of observations",
       min = preferences[["cell_percentage_cells_to_show"]][[
         "min"
       ]],
@@ -85,42 +104,22 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   ## Seed appearance from the exact dataset / spatial / image leaf. Because this
   ## renderUI reads the selected source-tagged image key, changing either spatial
   ## entry or image recreates every control with that image's own defaults.
-  spatial_name <- input[["spatial_projection_to_display"]]
-  dataset <- spatial_dataset_name(
-    if (exists("available_crb_files")) available_crb_files$files else NULL,
-    if (exists("available_crb_files")) available_crb_files$selected else NULL
-  )
-  spatial_data <- tryCatch(
-    getSpatialData(spatial_name),
-    error = function(e) list()
-  )
-  embedded_images <- embedded_spatial_images(spatial_data)
-  external_images <- configured_spatial_images(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    dataset,
-    spatial_name
-  )
-  selected_descriptor <- resolve_spatial_background(
-    input[["spatial_projection_background_image"]],
-    embedded_images,
-    external_images
-  )
-  background_identity <- spatial_background_identity(
-    dataset,
-    spatial_name,
-    selected_descriptor
-  )
-  image_label <- if (is.null(selected_descriptor)) {
-    NULL
-  } else {
-    selected_descriptor$label
+  target <- spatial_background_edit_target()
+  if (is.null(target)) return(tags$p(class = "help-block", "No background image selected."))
+  background_identity <- target$identity
+  preset <- spatial_background_edit_preset(target)
+  targets <- Filter(function(x) !is.null(x$descriptor),
+    spatial_background_edit_model()$roi_backgrounds)
+  target_picker <- if (length(targets)) {
+    labels <- vapply(names(targets), function(roi) {
+      paste(roi, targets[[roi]]$descriptor$label, sep = " · ")
+    }, character(1))
+    tags$div(class = "cerebro-settings-full",
+      selectInput("spatial_projection_background_target", "Adjust background",
+        choices = stats::setNames(names(targets), labels), selected = target$roi,
+        width = "100%"),
+      tags$p(class = "help-block", "Changes apply only to this session."))
   }
-  preset <- spatialImagePreset(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    dataset,
-    spatial_name,
-    image_label
-  )
   ## Seed MOVE and FLIP from the preset so the controls honestly reflect the
   ## shipped alignment (checkbox ticked, sliders positioned). Both are read by
   ## the JS as single-source interaction state (dataset.offsetX / dataset.flipY),
@@ -197,14 +196,12 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
       auto_unbox = TRUE,
       null = "null"
     ),
+    target_picker,
     ## Background-image adjustments. Shown only when an image is selected. Every
     ## control here is DECOUPLED from the scatter plot: it re-styles the image
     ## <div> via the independent JS channel and never re-renders the points.
     conditionalPanel(
-      condition = paste0(
-        "input.spatial_projection_background_image && ",
-        "input.spatial_projection_background_image !== 'none'"
-      ),
+      condition = "true",
       slider_number_input(
         "spatial_projection_background_opacity",
         "Opacity",
@@ -377,9 +374,9 @@ spatial_projection_additional_parameters_info <- list(
     "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
-      <li><b>Point size:</b> Controls how large the cells should be.</li>
-      <li><b>Point opacity:</b> Controls the transparency of the cells.</li>
-      <li><b>Show % of cells:</b> Using the slider, you can randomly remove a fraction of cells from the plot. This can be useful for large data sets and/or computers with limited resources.</li>
+      <li><b>Point size:</b> Controls how large the observations should be.</li>
+      <li><b>Point opacity:</b> Controls the transparency of the observations.</li>
+      <li><b>Show % of observations:</b> Randomly subsamples cells or spots after the active Sample, FOV / section, ROI, and group filters.</li>
     </ul>
     "
   )

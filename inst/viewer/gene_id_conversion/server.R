@@ -24,9 +24,11 @@ output[["gene_info"]] <- DT::renderDataTable({
     selection = "multiple",
     escape = TRUE,
     rownames = FALSE,
+    extensions = "Buttons",
     options = list(
       scrollX = TRUE,
       dom = "Bfrtip",
+      buttons = c("copy", "excel", "csv", "print"),
       lengthMenu = c(15, 30, 50, 100),
       pageLength = 50
     )
@@ -44,6 +46,6 @@ cerebroRegisterInfo(input, "geneIdConversion_info", geneIdConversion_info)
 geneIdConversion_info <- list(
   title = "Gene ID/symbol conversion",
   text = p(
-    "Conversion table containing Gencode identifiers, Ensembl identifiers, Havana identifiers, gene symbol and gene type for mouse (version M16) and human (version 27)."
+    "Map Gencode, Ensembl and Havana IDs to gene symbols and types. References: mouse M16; human 27."
   )
 )

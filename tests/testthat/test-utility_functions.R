@@ -105,20 +105,24 @@ test_that("Data Info uses the catalog before the full dataset", {
       current_dataset_info <- function() {
         list(cells = 12345L, organism = "hg", date = "2026-01-02")
       }
-      sys.source(viewer_test_path("load_data", "sample_info.R"), environment())
+      ## Data info now sources its overview panel from the deployment root. Load
+      ## the helpers it uses, then the page itself.
+      Cerebro.options <- list(cerebro_root = viewer_app_test_path())
+      sys.source(viewer_test_path("core", "dataset_overview.R"), environment())
+      sys.source(viewer_test_path("load_data", "overview_ui.R"), environment())
+      source(
+        viewer_test_path("load_data", "sample_info.R"),
+        local = TRUE
+      )
     },
     {
-      expect_match(
-        output$load_data_number_of_cells$html,
-        "12,345",
-        fixed = TRUE
-      )
-      expect_match(output$load_data_organism$html, ">hg<", fixed = TRUE)
-      expect_match(
-        output$load_data_date_of_export$html,
-        "2026-01-02",
-        fixed = TRUE
-      )
+      ## The overview panel carries the catalog figures as elements now, instead
+      ## of one output per statistic.
+      overview <- output$load_data_overview$html
+      expect_match(overview, "load_data_number_of_cells", fixed = TRUE)
+      expect_match(overview, "12,345", fixed = TRUE)
+      expect_match(overview, "Human", fixed = TRUE)
+      expect_match(overview, "2026-01-02", fixed = TRUE)
     }
   )
 })
@@ -1028,4 +1032,72 @@ test_that("cachePlot caches by key and invalidates on key or dataset change", {
     expect_equal(cached(), "nUMI datasetB")
     expect_equal(compute_count, first + 2)
   })
+})
+
+test_that("Spatial sections are normalized once per loaded dataset", {
+  env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), env)
+  reads <- 0L
+  make_dataset <- function() {
+    dataset <- new.env()
+    dataset$getSpatialData <- function(name, hydrate_molecules = TRUE) {
+      reads <<- reads + 1L
+      list(coordinates = data.frame(x = 1, y = 2), name = name)
+    }
+    class(dataset) <- c("Cerebro_v1.3", "environment")
+    dataset
+  }
+  current <- make_dataset()
+  env$data_set <- function() current
+  expect_identical(env$getSpatialData("slice")$name, "slice")
+  expect_identical(env$getSpatialData("slice")$name, "slice")
+  expect_identical(reads, 1L)
+  env$getSpatialData("other")
+  expect_identical(reads, 2L)
+  current <- make_dataset()
+  env$getSpatialData("slice")
+  expect_identical(reads, 3L)
+})
+
+test_that("single-entry memos recompute only for a different key", {
+  env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), env)
+  memo <- env$viewerMemoOne()
+  calls <- 0L
+  compute <- function() {
+    calls <<- calls + 1L
+    calls
+  }
+  expect_identical(memo(list("a", 1), compute), 1L)
+  expect_identical(memo(list("a", 1), compute), 1L)
+  expect_identical(memo(list("a", 2), compute), 2L)
+  expect_identical(memo(list("a", 1), compute), 3L)
+})
+
+test_that("embedded Spatial images are served once per session by URL", {
+  env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), env)
+  registered <- 0L
+  ended <- list()
+  mock <- list(
+    userData = new.env(),
+    registerDataObj = function(name, data, filter) {
+      registered <<- registered + 1L
+      paste0("session/", name)
+    },
+    onSessionEnded = function(callback) ended[[length(ended) + 1L]] <<- callback
+  )
+  png <- paste0(
+    "data:image/png;base64,",
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+  )
+  url <- env$viewerEmbeddedImageUrl(png, session = mock)
+  expect_match(url, "^session/cerebro-image-")
+  expect_identical(env$viewerEmbeddedImageUrl(png, session = mock), url)
+  expect_identical(registered, 1L)
+  ## Other formats keep their data URI.
+  svg <- "data:image/svg+xml;base64,PHN2Zy8+"
+  expect_identical(env$viewerEmbeddedImageUrl(svg, session = mock), svg)
+  expect_identical(env$viewerEmbeddedImageUrl(png, session = NULL), png)
+  expect_length(ended, 1L)
 })

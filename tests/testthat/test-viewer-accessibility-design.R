@@ -17,7 +17,13 @@ test_that("preferences expose labelled checkbox controls", {
           control,
           "ancestor::label"
         )))))
+        row <- xml2::xml_find_first(control, "ancestor::*[@data-help]")
+        expect_true(nzchar(xml2::xml_attr(row, "data-help")))
       }
+      ## Renderer details live in the GPU switch tooltip, not a heading badge.
+      expect_length(
+        xml2::xml_find_all(doc, ".//*[@id='cerebro-renderer-status']"), 0L
+      )
     }
   )
 })

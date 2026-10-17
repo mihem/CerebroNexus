@@ -346,9 +346,12 @@ test_that("Viewer resolves scatter defaults for the selected dataset", {
     runtime$viewerScatterDefaults(options, "Missing"),
     list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
   )
+  ## Ordinary projection views share one author configuration: the legacy
+  ## page-specific overrides above must not shadow it. test-shared-scatter-
+  ## settings.R pins the same rule directly.
   expect_identical(
     runtime$viewerScatterDefaults(options, "Xenium", "expression"),
-    list(point_size = 2, point_opacity = 1, percentage_cells_to_show = 100)
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
   )
   expect_identical(
     runtime$viewerScatterDefaults(options, "Missing", "expression"),
@@ -413,8 +416,17 @@ test_that("createShinyApp freezes compact dataset information", {
   configured <- unname(config$crb_file_to_load)
 
   expect_named(config[[".dataset_catalog"]], configured)
+  entry <- config[[".dataset_catalog"]][[configured[[1L]]]]
   expect_identical(
-    config[[".dataset_catalog"]][[configured[[1L]]]],
+    entry[c(
+      "label",
+      "path",
+      "cells",
+      "organism",
+      "date",
+      "immune_repertoire",
+      "tcr_repertoire"
+    )],
     list(
       label = "Human",
       path = configured[[1L]],
@@ -422,18 +434,24 @@ test_that("createShinyApp freezes compact dataset information", {
       organism = "Homo sapiens",
       date = "2026-09-17",
       immune_repertoire = FALSE,
-      tcr_repertoire = FALSE,
-      capabilities = list(
-        marker_genes = FALSE,
-        most_expressed_genes = FALSE,
-        enriched_pathways = FALSE,
-        extra_material = FALSE,
-        trajectory = FALSE,
-        spatial = FALSE,
-        trekker = FALSE
-      )
+      tcr_repertoire = FALSE
     )
   )
+  expect_identical(
+    entry$capabilities,
+    list(
+      marker_genes = FALSE,
+      most_expressed_genes = FALSE,
+      enriched_pathways = FALSE,
+      extra_material = FALSE,
+      trajectory = FALSE,
+      spatial = FALSE,
+      trekker = FALSE
+    )
+  )
+  ## The catalog also carries the projection list and the overview summary the
+  ## sidebar reads before a data set is opened.
+  expect_true(all(c("projection_names", "overview") %in% names(entry)))
   expect_identical(
     config[[".dataset_catalog"]][[configured[[2L]]]]$cells,
     3L
@@ -443,16 +461,44 @@ test_that("createShinyApp freezes compact dataset information", {
   )
 })
 
+## External backgrounds are delivered as session-private URLs, so the renderer
+## needs a session. This stand-in records what it registers: the file stays on
+## disk behind a revalidating handler and the browser only ever sees the URL.
+fake_private_session <- function() {
+  registered <- new.env(parent = emptyenv())
+  session <- list(
+    userData = new.env(parent = emptyenv()),
+    registerDataObj = function(name, data, filter) {
+      registered$name <- name
+      registered$data <- data
+      registered$filter <- filter
+      paste0("session/", name)
+    }
+  )
+  attr(session, "registered") <- registered
+  session
+}
+
 render_bundle_spatial_background <- function(
   app,
   config,
   background_image,
-  background_image_allowlist
+  background_image_allowlist,
+  session = NULL
 ) {
   renderer <- new.env(parent = globalenv())
   renderer$Cerebro.options <- config
+  if (!is.null(session)) {
+    ## viewerPrivateImageUrl() falls back to a `session` binding in the frame
+    ## that called it, which is this renderer environment.
+    renderer$session <- session
+  }
   sys.source(
     file.path(app, "viewer", "utility_functions.R"),
+    envir = renderer
+  )
+  sys.source(
+    file.path(app, "viewer", "spatial", "func_spatial_helpers.R"),
     envir = renderer
   )
   sys.source(
@@ -3142,7 +3188,7 @@ test_that("external spatial images render from disk without an HTTP mapping", {
   root <- withr::local_tempdir()
   crb <- write_spatial_bundle_crb(file.path(root, "source"))
   image <- file.path(root, "histology.png")
-  writeBin(as.raw(c(0x89, 0x50, 0x4e, 0x47)), image)
+  writeBin(as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)), image)
   app <- file.path(root, "app")
 
   build_test_app(
@@ -3163,15 +3209,29 @@ test_that("external spatial images render from disk without an HTTP mapping", {
     )
   )
 
+  session <- fake_private_session()
   rendered_meta <- render_bundle_spatial_background(
     app,
     config,
     stored,
-    stored
+    stored,
+    session = session
   )
 
-  expect_match(rendered_meta$background_image, "^data:image/png;base64,")
-  expect_gt(nchar(rendered_meta$background_image), 22L)
+  registered <- attr(session, "registered")
+  ## The image is served from its bundled file through a session-scoped URL:
+  ## never as a data URI, and never as a filesystem path the browser could read.
+  expect_identical(
+    rendered_meta$background_image,
+    paste0("session/cerebro-image-", registered$data$md5)
+  )
+  expect_false(grepl(app, rendered_meta$background_image, fixed = TRUE))
+  expect_identical(
+    registered$data$path,
+    normalizePath(file.path(app, stored), winslash = "/")
+  )
+  expect_identical(registered$data$mime, "image/png")
+  expect_gt(registered$data$bytes, 0)
 })
 
 test_that("forged spatial backgrounds cannot read unconfigured files", {
@@ -3179,7 +3239,7 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
   root <- withr::local_tempdir()
   crb <- write_spatial_bundle_crb(file.path(root, "source"))
   image <- file.path(root, "histology.png")
-  writeBin(as.raw(c(0x89, 0x50, 0x4e, 0x47)), image)
+  writeBin(as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)), image)
   app <- file.path(root, "app")
 
   build_test_app(
@@ -3204,11 +3264,14 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
     "spatial-assets/unconfigured.png" = allowed
   )
   for (attack in names(attacks)) {
+    ## With a session available the refusal has to come from the allowlist and
+    ## the containment check, not from a missing private-URL handler.
     rendered_meta <- render_bundle_spatial_background(
       app,
       config,
       attack,
-      attacks[[attack]]
+      attacks[[attack]],
+      session = fake_private_session()
     )
     expect_null(
       rendered_meta$background_image,
@@ -3222,7 +3285,8 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
       app,
       config,
       "spatial-assets/linked.png",
-      c(allowed, "spatial-assets/linked.png")
+      c(allowed, "spatial-assets/linked.png"),
+      session = fake_private_session()
     )
     expect_null(
       rendered_meta$background_image,

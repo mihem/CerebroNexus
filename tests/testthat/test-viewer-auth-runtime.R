@@ -1,6 +1,6 @@
 viewer_auth_runtime_environment <- function() {
   runtime <- new.env(parent = globalenv())
-  source_file <- test_path("..", "..", "inst", "viewer", "auth.R")
+  source_file <- viewer_test_path("auth.R")
   if (!file.exists(source_file)) {
     source_file <- system.file(
       "viewer/auth.R",
@@ -26,6 +26,7 @@ viewer_auth_runtime_brand_assets <- function(root) {
     ".panel-auth { min-height: 100vh; }",
     file.path(www, "auth.css")
   )
+  writeLines("/* Login interaction */", file.path(www, "auth.js"))
   writeLines(
     paste0(
       '<svg xmlns="http://www.w3.org/2000/svg">',
@@ -289,8 +290,22 @@ test_that("Viewer authentication supplies bundled CerebroNexus branding", {
   expect_match(rendered, "min-height: 100vh", fixed = TRUE)
   expect_match(rendered, "cerebro-auth-brand", fixed = TRUE)
   expect_match(rendered, "CerebroNexus", fixed = TRUE)
-  expect_match(rendered, "Secure viewer", fixed = TRUE)
-  expect_match(rendered, "Protected access", fixed = TRUE)
+  expect_match(rendered, 'aria-label="CerebroNexus"', fixed = TRUE)
+  expect_match(rendered, "Need access? Contact the person who shared this app.", fixed = TRUE)
+})
+
+test_that("Viewer login presentation preserves provider inputs and improves semantics", {
+  skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
+  runtime <- viewer_auth_runtime_environment()
+  rendered <- as.character(runtime$.viewer_auth_present(shinymanager::auth_ui("auth")))
+  expect_match(rendered, '<h1 id="auth-shinymanager-auth-head">Sign in</h1>', fixed = TRUE)
+  expect_match(rendered, 'id="auth-user_id"', fixed = TRUE)
+  expect_match(rendered, 'autocomplete="username"', fixed = TRUE)
+  expect_match(rendered, 'autocomplete="current-password"', fixed = TRUE)
+  expect_match(rendered, 'aria-live="polite"', fixed = TRUE)
+  expect_false(grepl("autofocus", rendered, fixed = TRUE))
+  ui <- shiny::fluidPage(shiny::h1("Viewer"))
+  expect_identical(runtime$.viewer_auth_present(ui), ui)
 })
 
 test_that("Viewer authentication fails closed when branding is incomplete", {

@@ -40,4 +40,5 @@ observe({
   overview_projection_last_feedback_token <<- overview_projection_update_plot(
     data
   )
+  overview_projection_parameters_other[["reset_axes"]] <- FALSE
 })

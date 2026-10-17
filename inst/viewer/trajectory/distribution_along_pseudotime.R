@@ -15,6 +15,7 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
     input[["trajectory_selected_method"]],
     input[["trajectory_selected_name"]]
   )
+  display_defaults <- current_page_display_defaults("trajectory")
 
   fluidRow(
     cerebroBox(
@@ -35,13 +36,13 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
                 min = 0,
                 max = 1,
                 step = 0.1,
-                value = 0.6
+                value = display_defaults$density_opacity
               ),
               hr(),
               shinyWidgets::awesomeCheckbox(
                 inputId = "trajectory_distribution_along_pseudotime_show_trend_line",
                 label = "Show trend line",
-                value = TRUE
+                value = display_defaults$show_trend_line
               ),
               sliderInput(
                 "trajectory_distribution_along_pseudotime_trend_line_bandwidth",
@@ -57,7 +58,7 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
                 min = 1,
                 max = 10,
                 step = 1,
-                value = 2
+                value = display_defaults$trend_line_width
               )
             )
           ),
@@ -95,7 +96,9 @@ output[[
     input[["trajectory_selected_name"]],
     input[["trajectory_distribution_along_pseudotime_select_variable"]],
     input[["trajectory_distribution_along_pseudotime_opacity"]],
-    input[["trajectory_distribution_along_pseudotime_show_trend_line"]],
+    !is.null(input[[
+      "trajectory_distribution_along_pseudotime_show_trend_line"
+    ]]),
     input[["trajectory_distribution_along_pseudotime_trend_line_bandwidth"]],
     input[["trajectory_distribution_along_pseudotime_trend_line_width"]]
   )

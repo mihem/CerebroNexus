@@ -319,12 +319,14 @@ expression_projection_update_plot <- function(input) {
     cells = cell_indices,
     trajectory = trajectory,
     separate = isTRUE(separate_panels),
+    rgb_layout = if (identical(display_mode, "rgb")) input[["rgb_layout"]] else NULL,
     request = input[["render_request"]]
   )
   send_render <- function(id, meta, data, hover, extra, deferred_aux) {
     can_recolor <- !isTRUE(reset_axes) &&
       !no_gene_selected &&
       !isTRUE(separate_panels) &&
+      !(identical(display_mode, "rgb") && identical(input[["rgb_layout"]], "separate")) &&
       length(coordinates) == 2L &&
       identical(expression_projection_render_state$geometry, geometry)
     if (can_recolor) {
@@ -364,7 +366,9 @@ expression_projection_update_plot <- function(input) {
       "expression_projection",
       list(
         color_type = "rgb",
+        rgb_layout = if (identical(input[["rgb_layout"]], "separate")) "separate" else "composite",
         color_variable = "RGB co-expression",
+        show_color_scale = TRUE,
         space_label = plot_parameters[["projection"]],
         appearance = appearance
       ),
@@ -383,7 +387,9 @@ expression_projection_update_plot <- function(input) {
     output_data[['z']] <- coordinates[[3]]
   }
   if (n_dimensions == 3 || !is.list(input[["expression_levels"]]) || multi) {
-    legend_label <- if (is.list(expression_levels)) {
+    legend_label <- if (no_gene_selected) {
+      plot_parameters[["projection"]]
+    } else if (is.list(expression_levels)) {
       "Expression"
     } else if (length(color_settings[["genes"]]) == 1) {
       color_settings[["genes"]][[1]]
@@ -396,6 +402,7 @@ expression_projection_update_plot <- function(input) {
       list(
         color_type = "continuous",
         color_variable = legend_label,
+        show_color_scale = !no_gene_selected,
         space_label = plot_parameters[["projection"]],
         appearance = appearance
       ),

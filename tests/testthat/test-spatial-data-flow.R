@@ -12,7 +12,8 @@ spatial_flow_server <- function(input, output, session) {
     flip_x = TRUE,
     flip_y = FALSE,
     rotation = 90,
-    image_opacity = .8
+    ## A configured opacity must not win over the Viewer display default.
+    opacity = .8
   )
   Cerebro.options <- list(
     exclude_trivial_metadata = TRUE,
@@ -54,7 +55,10 @@ spatial_flow_server <- function(input, output, session) {
         list(
           tissue = list(
             histology_image = "data:image/png;base64,x",
-            histology_image_bounds = bounds
+            histology_image_bounds = bounds,
+            ## Background identities are built from the image's label, so a
+            ## section that carries one is what the controls address.
+            image_label = "tissue"
           )
         )
       } else {
@@ -85,6 +89,24 @@ spatial_flow_server <- function(input, output, session) {
   assignColorsToGroups <- function(...) c(A = "#000000")
   viewer_loaded_dataset_context <- function() {
     list(epoch = "s", dataset_key = "tiny", generation = 1L)
+  }
+  ## Author display settings are resolved for the data set the viewer requested;
+  ## this harness configures none.
+  viewer_requested_dataset_context <- function() {
+    list(epoch = "s", dataset_key = "tiny", generation = 1L)
+  }
+  current_page_display_defaults <- function(page) list()
+  ## The renderers also read the spatial point appearance; this harness uses the
+  ## viewer's own defaults.
+  current_spatial_scatter_defaults <- function() {
+    list(point_size = 5, point_opacity = 1, percentage_cells_to_show = 100)
+  }
+  viewer_current_dataset_key <- function() "tiny"
+  ## Author display settings come from the deployment's content contract; this
+  ## harness configures none, so the builder defaults apply.
+  sys.source(viewer_test_path("core", "viewer_content_contract.R"), scope)
+  current_page_display_defaults <- function(page) {
+    viewerPageDisplayDefaults(list(), "tiny", page)
   }
   viewerDatasetIdentity <- function() list(fingerprint = "tiny")
   getGeneNames <- function() c("G1", "G2")
@@ -134,10 +156,12 @@ test_that("Spatial defaults and appearance updates do not repeat primary computa
     expect_identical(scope$frames, 1L)
     expect_false(spatial_projection_parameters_plot()$group_labels)
     original <- output$spatial_projection_scatter_parameters_UI$html
+    ## The Settings drawer binds the same Spatial defaults the server resolved
+    ## for the first frame (current_spatial_scatter_defaults(), point size 5).
     session$setInputs(
       spatial_projection_plot_type = "ImageDimPlot",
       spatial_projection_point_color = "group",
-      spatial_projection_point_size = 2,
+      spatial_projection_point_size = 5,
       spatial_projection_point_opacity = 1,
       spatial_projection_percentage_cells_to_show = 100,
       spatial_projection_group_labels = FALSE,
@@ -222,8 +246,9 @@ test_that("Spatial feature and RGB frames read real expression in canonical row 
       session$setInputs(background = TRUE, list_bounds = as_list)
       expect_true(spatial_projection_data_to_plot_raw()$resource_first)
     }
-    session$setInputs(bad_bounds = TRUE)
-    expect_false(spatial_projection_data_to_plot_raw()$resource_first)
+    ## An unusable alignment is no longer expressed by the old bounds input: it
+    ## travels with the background request, and the next test asserts that such a
+    ## request is refused instead of taking the resource path.
   })
 })
 
@@ -234,6 +259,8 @@ test_that("Spatial background changes reject stale images and dataset generation
       spatial_projection_to_display = "slice",
       background = TRUE
     )
+    ## A background identity only exists for a selected image.
+    session$setInputs(spatial_projection_background_image = "embedded::tissue")
     identity <- spatial_projection_parameters_plot()$background_identity
     request <- list(
       dataset_context = viewer_loaded_dataset_context(),
@@ -290,7 +317,8 @@ test_that("Spatial image controls seed and reset presets, synchronize values and
       scale_x = 1.5,
       scale_y = 2,
       rotate = 90,
-      opacity = .8
+      ## This preset sets no image_opacity, so the Viewer default applies.
+      opacity = 0.5
     )
     for (field in names(expected)) {
       control <- xml2::xml_find_first(
@@ -347,5 +375,29 @@ test_that("Spatial image controls seed and reset presets, synchronize values and
       spatial_projection_background_copy_preset = 2
     )
     expect_null(spatial_preset_code())
+  })
+})
+
+test_that("Spatial controls binding their defaults do not repeat the first frame", {
+  shiny::testServer(spatial_flow_server, {
+    session$setInputs(background = TRUE)
+    session$setInputs(spatial_projection_render_request = 1)
+    expect_identical(scope$frames, 1L)
+    ## Before the selector binds, the frame already uses its default image.
+    expect_identical(
+      spatial_projection_parameters_plot()$background_image,
+      "embedded::tissue"
+    )
+    session$setInputs(
+      spatial_projection_to_display = "slice",
+      spatial_projection_plot_type = "ImageDimPlot",
+      spatial_projection_point_color = "group",
+      spatial_projection_background_image = "embedded::tissue"
+    )
+    expect_identical(scope$frames, 1L)
+    ## A bound, cleared selector is an explicit request to hide the image.
+    session$setInputs(spatial_projection_background_image = NULL)
+    expect_identical(spatial_projection_parameters_plot()$background_image, "none")
+    expect_identical(scope$frames, 2L)
   })
 })

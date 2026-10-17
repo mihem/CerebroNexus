@@ -6,6 +6,10 @@ let count = 0;
 function check(value, message) { assert.ok(value, message); count++; }
 function scenario(page = 'markerGenes') {
   const nodes = {}, handlers = {}, events = {}, timers = [], frames = [];
+  function listen(name, fn) {
+    const previous = events[name];
+    events[name] = event => { if (previous) previous(event); fn(event); };
+  }
   let active, observer, phase = 'ready';
   class Node {
     constructor(id, classes = '', parent) {
@@ -47,19 +51,22 @@ function scenario(page = 'markerGenes') {
   const controls = new Node(page === 'groups' ? 'groups_controls_UI' : 'controls', 'shiny-bound-output cerebro-result-controls', pane);
   const select = new Node('select', '', controls); select.tagName = 'SELECT';
   const region = new Node('region', 'cerebro-page-loading-region', pane);
-  const slot = new Node('slot', 'shiny-bound-output cerebro-result-slot', region);
+  const slot = new Node(page === 'loadData' ? 'load_data_overview' : 'slot', 'shiny-bound-output cerebro-result-slot', region);
   const table = new Node('table', 'shiny-bound-output datatables', slot);
   const tableDom = new Node('table-dom', '', table); tableDom.tagName = 'TABLE';
   const jq = {on(names, selector, callback) { const fn=callback || selector; names.split(' ').forEach(n=>(handlers[n.split('.')[0]] ||= []).push(fn)); return jq; }};
   const window = {
     jQuery:()=>jq, setTimeout:(fn,ms)=>{ const t={fn,ms};timers.push(t);return t; }, clearTimeout:t=>{if(t)t.cancel=true;},
-    requestAnimationFrame:fn=>frames.push(fn), addEventListener:(n,f)=>events[n]=f,
+    requestAnimationFrame:fn=>frames.push(fn), addEventListener:listen,
+    dispatchEvent:e=>events[e.type]?.(e),
     CerebroDatasetContext:{phase:()=>phase,accepts:()=>false},
     MutationObserver:class { constructor(fn) {observer=fn;} observe() {} }
   };
-  const document = {getElementById:id=>nodes[id],querySelector:s=>s.includes(".tab-pane")?active:null,addEventListener:(n,f)=>events[n]=f,
+  const document = {getElementById:id=>nodes[id],querySelector:s=>s.includes(".tab-pane")?active:null,addEventListener:listen,
     querySelectorAll:s=>s.includes(".tab-pane")?Object.values(nodes).filter(n=>n.id.startsWith('shiny-tab-')):[]};
-  vm.runInNewContext(source,{window,document,ready:fn=>fn(),MutationObserver:window.MutationObserver,Set,WeakSet,Array});
+vm.runInNewContext(fs.readFileSync(require('path').join(require('path').dirname(process.argv[2] || require('path').resolve(__dirname, '../../../inst/viewer/www/viewer-shell.js')), 'page-lifecycle.js'), 'utf8'), {window});
+  vm.runInNewContext(source,{window,document,ready:fn=>fn(),MutationObserver:window.MutationObserver,Set,WeakSet,Array,
+    CustomEvent:class {constructor(type, options={}) {this.type=type;this.detail=options.detail;}}});
   function emit(name,target=table,extra={}) { for(const f of handlers[name] || [])f({target,...extra}); }
   function flush() { const batch=timers.splice(0);batch.forEach(t=>{if(!t.cancel&&t.ms<1000)t.fn();}); }
   function frame() { frames.splice(0).forEach(f=>f()); }
@@ -70,14 +77,14 @@ function scenario(page = 'markerGenes') {
     phase:v=>phase=v,active:v=>active=v,focus:v=>document.activeElement=v,Node};
 }
 {
-  const s=scenario();s.start();
+  const s=scenario();s.start();s.flush();
   check(s.loader.parentElement===s.region,'page card belongs to the result region');
   check(!s.slot.contains(s.loader),'renderUI cannot replace the shared card');
   check(!s.pane.contains(s.announcement) && s.announcement.textContent==='Loading Marker genes…',
     'stage announcement is outside the busy pane');
   const next = new s.Node('shiny-tab-geneExpression', 'tab-pane active', s.pane.parent);
   const nextRegion = new s.Node('next-region', 'cerebro-page-loading-region', next);
-  s.active(next);s.emit('shown',next);
+  s.active(next);s.emit('shown',next);s.flush();
   check(s.loader.parentElement===nextRegion && !s.region.contains(s.loader),'navigation moves one card to the next result region');
   check(s.announcement.textContent==='Loading Gene expression…','navigation announces the new page');
 }
@@ -147,6 +154,39 @@ for (const page of ['markerGenes','mostExpressedGenes','enrichedPathways','extra
   s.emit('shiny:inputchanged',s.nodes.select,{name:'select',el:s.nodes.select,value:'a'});
   s.frame();s.flush();check(s.loader.hidden,'unchanged input rebinding does not invalidate a finished draw');
 }
+// A renderUI re-render can replace the element that already received a value.
+// Shiny replays the last value onto the replacement through bindOutput()
+// without another shiny:value event, so completion must follow the output, not
+// the DOM node that happened to receive the value first.
+function replaceTable(s) {
+  const replacement = new s.Node('table', 'shiny-bound-output datatables', s.slot);
+  const replacementDom = new s.Node('table-dom', '', replacement);
+  replacementDom.tagName = 'TABLE';
+  s.slot.children = s.slot.children.filter(n => n !== s.table);
+  return {replacement, replacementDom};
+}
+{
+  const s=scenario('extra_material');s.start();s.values();s.emit('draw',s.tableDom);s.frame();s.frame();s.flush();
+  check(s.loader.hidden,'extra material settles before the dataset switch');
+  s.phase('pending');s.events['cerebro:dataset-context']({detail:{changed:true,phase:'pending'}});
+  s.phase('ready');s.frame();s.flush();
+  check(!s.loader.hidden,'dataset switch reopens the page card');
+  s.values();s.flush();
+  const {replacementDom}=replaceTable(s);
+  s.emit('draw',replacementDom);s.flush();s.frame();s.frame();s.flush();
+  check(s.loader.hidden,'a value replayed onto a replaced element still completes the page');
+}
+{
+  const s=scenario('extra_material');s.start();s.values();s.emit('draw',s.tableDom);s.frame();s.frame();s.flush();
+  s.phase('pending');s.events['cerebro:dataset-context']({detail:{changed:true,phase:'pending'}});
+  s.phase('ready');s.frame();s.flush();
+  const {replacement,replacementDom}=replaceTable(s);
+  s.emit('shiny:value',s.controls);s.emit('shiny:value',s.slot);
+  s.emit('draw',replacementDom);s.flush();s.frame();s.frame();s.flush();
+  check(!s.loader.hidden,'the previous dataset value replayed on bind is not a new result');
+  s.emit('shiny:value',replacement);s.emit('draw',replacementDom);s.flush();s.frame();s.frame();s.flush();
+  check(s.loader.hidden,'a fresh value for the replaced element settles the page');
+}
 {
   const s=scenario('groups');s.controls.classList.add('cerebro-groups-controls');s.table.visible=false;
   const plot=new s.Node('groups_by_other_group_plot','plotly shiny-bound-output',s.pane);
@@ -173,5 +213,25 @@ for (const page of ['markerGenes','mostExpressedGenes','enrichedPathways','extra
   check(!s.loader.hidden,'Extra PNG waits for image load');
   img.complete=true;img.naturalWidth=500;s.events.load({target:img});s.frame();s.frame();s.flush();
   check(s.loader.hidden,'Extra PNG completes after load and two frames');
+}
+// Data info uses dataset progress only, including resets and returns from a
+// still-loading result page. Other page loaders retain their own lifecycle.
+{
+  const s=scenario('loadData');s.start();
+  check(s.loader.hidden,'Data info entry does not show a second loading card');
+  check(s.announcement.textContent==='','Data info does not announce a duplicate page loader');
+  check(s.pane.getAttribute('aria-busy')==='true','metadata still reports busy state');
+  s.emit('shiny:inputchanged',s.controls,{name:'crb_file_selector'});
+  s.events['cerebro:dataset-context']({detail:{changed:true,phase:'pending'}});
+  check(s.loader.hidden,'dataset changes do not reveal a Data info card');
+  s.values();s.emit('shiny:idle');s.flush();s.frame();s.frame();s.flush();
+  check(s.pane.getAttribute('aria-busy')===null,'metadata completion clears busy state');
+  const next = new s.Node('shiny-tab-spatial','tab-pane active',s.pane.parent);
+  new s.Node('spatial-region','cerebro-page-loading-region',next);
+  s.active(next);s.emit('shown',next);s.flush();
+  check(!s.loader.hidden,'Spatial retains its standalone loading card');
+  delete s.pane.dataset.cerebroPageReady;
+  s.active(s.pane);s.emit('shown',s.pane);
+  check(s.loader.hidden,'returning from a loading plot hides the old card');
 }
 console.log(count+' result page loader assertions passed');

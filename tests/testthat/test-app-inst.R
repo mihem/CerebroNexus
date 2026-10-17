@@ -103,13 +103,13 @@ test_that("{shinytest2} recording: overview", {
   app$wait_for_idle(timeout = 20000)
 
   ## Data Info tab: verify key values from the loaded example.crb
-  cells_box <- retry_get_value(app, output = "load_data_number_of_cells")
+  cells_box <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("1,?476", cells_box$html))
 
-  organism_box <- retry_get_value(app, output = "load_data_organism")
-  expect_true(grepl("hg", organism_box$html))
+  organism_box <- retry_get_value(app, output = "load_data_overview")
+  expect_true(grepl("Human", organism_box$html))
 
-  date_box <- retry_get_value(app, output = "load_data_date_of_export")
+  date_box <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("[0-9]{4}-[0-9]{2}-[0-9]{2}", date_box$html))
 
   app$stop()
@@ -204,6 +204,9 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     "anterior1"
   )
+  ## The picker holds one removable chip per eligible image; "no background" is
+  ## the empty selection rather than an entry of its own, so the deployment's
+  ## external image is the only option for this scope.
   expect_identical(
     unlist(
       app$get_js(paste0(
@@ -212,7 +215,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
       )),
       use.names = FALSE
     ),
-    c("none", "external::Tissue background")
+    "external::Tissue background"
   )
   app$wait_for_js(
     paste0(
@@ -283,7 +286,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
       )),
       use.names = FALSE
     ),
-    c("none", "external::Pink stain", "external::Fluorescent yellow")
+    c("external::Pink stain", "external::Fluorescent yellow")
   )
   app$set_inputs(
     spatial_projection_background_image = "external::Fluorescent yellow",
@@ -301,12 +304,10 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     wait_ = FALSE
   )
   app$wait_for_idle(timeout = 30000)
-  wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
+  ## Slide-seq ships no background image, and a data set without images renders
+  ## no picker at all: the previous selection cannot survive into one.
   app$wait_for_js(
-    paste0(
-      "document.getElementById('spatial_projection_background_image').value ",
-      "=== 'none'"
-    ),
+    "document.getElementById('spatial_projection_background_image') === null",
     timeout = 30000
   )
   expect_identical(
@@ -317,16 +318,6 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
       validate = function(value) identical(value, "image")
     ),
     "image"
-  )
-  expect_identical(
-    unlist(
-      app$get_js(paste0(
-        "Object.keys(document.getElementById(",
-        "'spatial_projection_background_image').selectize.options)"
-      )),
-      use.names = FALSE
-    ),
-    "none"
   )
   app$wait_for_js(
     paste0(
@@ -364,13 +355,19 @@ test_that("Linked views resets the active background to its preset", {
     "document.getElementById('cv-pick-spatial').selectize",
     ".setValue(['fov', 'fov_colour']);"
   ))
+  ## Backgrounds are scoped by a section picker now: the section that carries
+  ## the Xenium colour image is the one the old tab strip used to select.
   app$wait_for_js(
-    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]') !== null",
+    paste0(
+      "(() => {const s=document.getElementById('cv-bg-space-select');",
+      "return !!(s&&s.selectize&&",
+      "Object.keys(s.selectize.options).includes('spatial::fov_colour'));})()"
+    ),
     timeout = 30000
   )
   app$run_js(paste0(
-    "document.querySelector('[data-cv-bg-tab=\"spatial::fov_colour\"]')",
-    ".click();"
+    "document.getElementById('cv-bg-space-select')",
+    ".selectize.setValue('spatial::fov_colour');"
   ))
   app$wait_for_js(
     "document.getElementById('cv-img-rotate-number') !== null",
@@ -879,7 +876,7 @@ test_that("createShinyApp bundles a working app", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  cells <- retry_get_value(app, output = "load_data_number_of_cells")
+  cells <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("1,?476", cells$html))
 
   app$stop()

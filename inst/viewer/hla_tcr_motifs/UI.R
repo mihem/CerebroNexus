@@ -35,30 +35,33 @@ tab_hla_tcr_motifs <- tabItem(
           cerebroSettingsButton("hla_more_button", "hla_more"),
           cerebroShareButton("hla_motif_network")
         ),
-        cerebroSettingsDrawer(
-          "hla_more",
-          cerebroSettingsSection(
-            "Filters",
-            uiOutput("hla_group_filters_ui"),
-            cerebroInfoButton("hla_group_filters_info")
-          ),
-          cerebroSettingsSection(
-            "Appearance",
-            uiOutput("hla_additional_params_ui"),
-            cerebroInfoButton("hla_additional_parameters_info")
-          ),
-          cerebroSettingsSection(
-            "Analysis",
-            uiOutput("hla_more_parameters_ui")
-          ),
-          cerebroSettingsSection(
-            "Evidence status",
-            div(
-              class = "cerebro-settings-full",
-              uiOutput("hla_status_ui")
+        tagAppendAttributes(
+          cerebroSettingsDrawer(
+            "hla_more",
+            cerebroSettingsSection(
+              "Filters",
+              uiOutput("hla_group_filters_ui"),
+              cerebroInfoButton("hla_group_filters_info")
             ),
-            cerebroInfoButton("hla_status_info")
-          )
+            cerebroSettingsSection(
+              "Appearance",
+              uiOutput("hla_additional_params_ui"),
+              cerebroInfoButton("hla_additional_parameters_info")
+            ),
+            cerebroSettingsSection(
+              "Analysis",
+              uiOutput("hla_more_parameters_ui")
+            ),
+            cerebroSettingsSection(
+              "Evidence status",
+              div(
+                class = "cerebro-settings-full",
+                uiOutput("hla_status_ui")
+              ),
+              cerebroInfoButton("hla_status_info")
+            )
+          ),
+          `data-cerebro-drawer-sticky-in-page` = ""
         ),
         cerebroSelectionStatus(
           "hla_motif_network",

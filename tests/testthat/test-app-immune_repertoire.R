@@ -328,7 +328,7 @@ test_that("immune_repertoire module loads without breaking main app", {
   app$wait_for_idle(timeout = 20000)
 
   # Data info tab should still render normally (1476 cells in the new example)
-  cells_box <- app$get_value(output = "load_data_number_of_cells")
+  cells_box <- app$get_value(output = "load_data_overview")
   expect_true(grepl("1,?476", cells_box$html))
 })
 

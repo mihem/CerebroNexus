@@ -16,6 +16,12 @@
 ## cv_build_bundle() and every cv_build_* / cv_* helper is in scope for the
 ## reactive below. Kept in a separate file so the builders can be unit-tested
 ## without a running session (tests/testthat/test-coordinated-views.R).
+## Both pages resolve ROI membership, image scope and coordinate pivots through
+## the same pure Spatial helpers, even when Spatial has not been opened yet.
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer/spatial/func_spatial_helpers.R"),
+  local = TRUE
+)
 source(
   paste0(
     Cerebro.options[["cerebro_root"]],
@@ -302,19 +308,31 @@ cv_prepare_progressive_supplement <- function(primary, primary_n, modalities) {
   } else {
     NULL
   }
+  projection_names <- tryCatch(
+    data_set()$availableProjections(),
+    error = function(error) character()
+  )
+  projection_resources <- Filter(
+    is.list,
+    lapply(stats::setNames(projection_names, projection_names), function(name) {
+      tryCatch(viewerProjectionAsset(name), error = function(error) NULL)
+    })
+  )
   supplement <- tryCatch(
     {
       value <- cv_build_compact_supplement(
         data_set(),
         primary,
         viewerProjectionFirstFrameCache(),
-        include_clone = wants_clone && is.null(clone_spec)
+        include_clone = wants_clone && is.null(clone_spec),
+        projection_resources = projection_resources
       )
       if (is.null(value)) {
         value <- cv_build_progressive_supplement(
           data_set(),
           primary,
-          include_clone = wants_clone && is.null(clone_spec)
+          include_clone = wants_clone && is.null(clone_spec),
+          projection_resources = projection_resources
         )
       }
       value
@@ -1733,6 +1751,7 @@ output[["coordviews_image_ui"]] <- renderUI({
       tags$input(
         type = "range",
         id = id,
+        `aria-label` = label,
         min = mn,
         max = mx,
         value = val,
@@ -1787,16 +1806,16 @@ output[["coordviews_image_ui"]] <- renderUI({
     div(
       class = "cv-img-ctl",
       tags$label(`for` = "cv-img-opacity-number", "Opacity"),
-      rng("cv-img-opacity", "Opacity", 0, 1, pr$opacity %||% 0.6, "any")
+      rng("cv-img-opacity", "Opacity", 0, 1, pr$opacity %||% 0.5, "any")
     ),
     div(
       class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-offx-number", "Move X"),
+      tags$label(`for` = "cv-img-offx-number", "Horizontal"),
       rng("cv-img-offx", "Move X", -sx, sx, pr$offsetX %||% 0, "any")
     ),
     div(
       class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-offy-number", "Move Y"),
+      tags$label(`for` = "cv-img-offy-number", "Vertical"),
       rng("cv-img-offy", "Move Y", -sy, sy, pr$offsetY %||% 0, "any")
     ),
     ## Two scales, not one. A preset can carry scaleX != scaleY -- a calibration
@@ -1830,7 +1849,7 @@ output[["coordviews_image_ui"]] <- renderUI({
     ),
     div(
       class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-rotate-number", "Rotate"),
+      tags$label(`for` = "cv-img-rotate-number", "Rotation"),
       rng(
         "cv-img-rotate",
         "Rotate",
@@ -1842,14 +1861,14 @@ output[["coordviews_image_ui"]] <- renderUI({
     ),
     div(
       class = "cv-img-checks",
-      chk("cv-img-show", "Show", TRUE),
+      chk("cv-img-show", "Show this image", TRUE),
       chk(
         "cv-img-lock",
-        "Lock aspect",
+        "Lock aspect ratio",
         isTRUE(is.null(pr$scaleY) || identical(pr$scaleY, pr$scaleX))
       ),
-      chk("cv-img-flipx", "Flip X", isTRUE(pr$flipX)),
-      chk("cv-img-flipy", "Flip Y", isTRUE(pr$flipY))
+      chk("cv-img-flipx", "Flip horizontally", isTRUE(pr$flipX)),
+      chk("cv-img-flipy", "Flip vertically", isTRUE(pr$flipY))
     ),
     ## Alignment is fiddly and easy to lose; the preset is the state the data set
     ## shipped with, so there has to be a way back to it that is not "reload".
@@ -1862,78 +1881,6 @@ output[["coordviews_image_ui"]] <- renderUI({
   )
 })
 outputOptions(output, "coordviews_image_ui", suspendWhenHidden = FALSE)
-
-##----------------------------------------------------------------------------##
-## Single-cell detail card — the complete meta row for one clicked cell.
-##
-## The bundle deliberately does not carry this: it holds categorical LEVELS and
-## numerics quantised for colouring, which is right for drawing and wrong for
-## reading. A card that shows a cell's meta data should show the values the data
-## set actually holds, so the client asks for the row when a card opens (one
-## small round-trip per click, and the card is already on screen meanwhile).
-##----------------------------------------------------------------------------##
-cv_fmt_value <- function(v) {
-  if (length(v) != 1 || is.na(v)) {
-    return("NA")
-  }
-  if (is.numeric(v)) {
-    ## integers plain, otherwise enough decimals to stay meaningful — the same
-    ## reading the "Table of selected cells" gives, without its column-wide
-    ## type inference (a single value carries no column to infer from).
-    if (abs(v - round(v)) < 1e-9) {
-      return(format(round(v), big.mark = ",", scientific = FALSE, trim = TRUE))
-    }
-    return(format(
-      signif(v, 5),
-      big.mark = ",",
-      scientific = FALSE,
-      trim = TRUE
-    ))
-  }
-  as.character(v)
-}
-
-observeEvent(input[["coordviews_cell_detail"]], {
-  request <- input[["coordviews_cell_detail"]]
-  dataset_context <- viewer_loaded_dataset_context()
-  req(
-    is.list(request),
-    viewerDatasetContextEqual(request$dataset_context, dataset_context)
-  )
-  index <- if (is.list(request) && length(request$index) == 1L) {
-    suppressWarnings(as.integer(request$index[[1L]]))
-  } else {
-    NA_integer_
-  }
-  bc <- if (!is.na(index)) {
-    cv_cells_at_indices(cv_saved_view_cells(), index)
-  } else {
-    as.character(request$cell)
-  }
-  if (length(bc) != 1L || is.na(bc) || !nzchar(bc)) {
-    return()
-  }
-  md <- tryCatch(
-    cv_cell_metadata(getMetaData(), bc),
-    error = function(e) NULL
-  )
-  if (is.null(md)) {
-    return()
-  }
-  cols <- setdiff(colnames(md), "cell_barcode")
-  rows <- lapply(cols, function(cn) {
-    list(k = cn, v = cv_fmt_value(md[[cn]][1L]))
-  })
-  session$sendCustomMessage(
-    "coordviews_cell_meta",
-    list(
-      dataset_context = dataset_context,
-      index = if (is.na(index)) NULL else index,
-      cell = as.character(bc),
-      rows = rows
-    )
-  )
-})
 
 ##----------------------------------------------------------------------------##
 ## Info modal

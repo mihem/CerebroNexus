@@ -45,7 +45,7 @@ output[["enriched_pathways_table_or_text_UI"]] <- renderUI({
   req(method %in% methods)
   if (!length(getGroupsWithEnrichedPathways(method))) {
     return(p(
-      "No enrichment table is available for this method. Choose another method."
+      "No enrichment results. Choose another method."
     ))
   }
   req(
@@ -64,7 +64,7 @@ output[["enriched_pathways_table_or_text_UI"]] <- renderUI({
       results_type == "no_markers_found"
   ) {
     p(
-      "Enrichr cannot run because this grouping variable has no stored marker genes. Choose another method or grouping variable."
+      "Enrichr needs saved marker genes. Choose another method or grouping."
     )
   } else if (
     is.character(results_type) &&
@@ -78,7 +78,7 @@ output[["enriched_pathways_table_or_text_UI"]] <- renderUI({
       results_type == "no_gene_sets_enriched"
   ) {
     p(
-      "No gene sets meet the stored GSVA thresholds for this grouping variable. Choose another method or grouping variable."
+      "No gene sets meet the saved GSVA thresholds. Choose another method or grouping."
     )
   } else if (is.data.frame(results_type)) {
     cerebroResultTableControls(
@@ -88,7 +88,7 @@ output[["enriched_pathways_table_or_text_UI"]] <- renderUI({
     )
   } else {
     p(
-      "No enrichment table is available for this method and grouping variable. Choose another method or grouping variable."
+      "No enrichment results for this grouping. Choose another method or grouping."
     )
   }
 })

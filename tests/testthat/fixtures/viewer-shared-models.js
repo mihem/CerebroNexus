@@ -1,0 +1,40 @@
+const assert = require('assert/strict'), fs = require('fs'), vm = require('vm'), path = require('path');
+const window = {};
+for (const name of ['page-lifecycle.js', 'background-model.js']) {
+  vm.runInNewContext(fs.readFileSync(path.join(process.argv[2],name),'utf8'),{window});
+}
+const life = window.CerebroPageLifecycle, pane = {dataset:{}};
+assert(!life.isSettled(pane));
+life.setReady(pane); assert(life.isReady(pane)); assert(life.isSettled(pane));
+life.setTerminal(pane,true); assert(!life.isReady(pane)); assert(life.isTerminal(pane));
+life.setReady(pane); assert(!life.isTerminal(pane));
+life.reset(pane); assert(!life.isSettled(pane));
+assert(!life.isSettled(null));
+// No markup or CSS classes are required for completion.
+console.log('PASS page lifecycle: ready, error, recovery, reset');
+const model = window.CerebroBackgroundModel;
+const image = {id:'same-image',uri:'pixels',preset:{rotation:30,offsetX:20,scaleX:2,scaleY:3,opacity:.4}};
+const second = {id:'second',uri:'other'};
+const first = {id:'fov-a',_spatialSample:true,images:[image,second]};
+const other = {id:'fov-b',_spatialSample:true,images:[image]};
+const before = JSON.stringify([image,first,other]);
+assert.equal(model.currentImage(first),image);
+assert.equal(model.currentImage({...first,_customImageId:'second'}),second);
+assert.equal(model.currentImage({...first,_customImageId:model.NONE}),null);
+assert.equal(model.currentImage({...first,_customImageId:'stale'}),image);
+assert.notEqual(model.imageKey(first,image),model.imageKey(other,image));
+assert.notEqual(model.imageKey(first,image),model.imageKey({...first,_spatialSample:false},image));
+assert.equal(model.currentImage({samples:[{name:'a',images:[image]},{name:'b',images:[second]}],_sampleName:'b'}),second);
+assert.equal(model.currentImage({image}),image);
+assert.equal(model.currentImage({image:{id:'missing-pixels'}}),null);
+const state = model.presetState(image);
+assert.equal(state.rotate,30); assert.equal(state.opacity,.4); assert(!state.lock);
+state.rotate=99;state.opacity=.9;
+assert.equal(JSON.stringify([image,first,other]),before);
+assert.equal(model.presetState(image).rotate,30);
+assert.equal(model.presetState(null).opacity,.6);
+const baked={...image,preset:{...image.preset,geometryBaked:true}};
+const rendered=model.renderState(baked,model.presetState(baked));
+assert.equal(rendered.rotate,0); assert.equal(rendered.offsetX,0);
+assert.equal(rendered.scaleX,1); assert.equal(rendered.scaleY,1);
+console.log('PASS backgrounds: first/multiple/none, ROI isolation, legacy images and immutable presets');

@@ -1,6 +1,10 @@
 ##----------------------------------------------------------------------------##
 ## Upload policy.
 ##----------------------------------------------------------------------------##
+`%||%` <- function(value, fallback) {
+  if (is.null(value)) fallback else value
+}
+
 viewerUploadsEnabled <- function(options) {
   is.list(options) && identical(options[["mode"]], "open")
 }
@@ -33,6 +37,41 @@ viewerInitialPageDecision <- function(
     applied = TRUE,
     selected = if (isTRUE(should_show)) tab_name else NULL
   )
+}
+
+## NULL means an older catalog does not describe its projections yet. Never
+## interpret an incomplete catalog or the first progressive frame as absence.
+viewerLinkedViewsAvailable <- function(info = NULL, object = NULL) {
+  if (!is.null(object)) {
+    read <- function(value) tryCatch(force(value), error = function(e) NULL)
+    projections <- as.character(read(object$availableProjections()))
+    projections <- unique(projections[!is.na(projections) & nzchar(projections)])
+    if (length(projections) > 1L) return(TRUE)
+    if (length(read(object$availableSpatial())) > 0L) return(TRUE)
+    if (any(vapply(
+      as.character(read(object$getMethodsForTrajectories())),
+      function(method) length(read(object$getNamesOfTrajectories(method))) > 0L,
+      logical(1)
+    ))) return(TRUE)
+    if (length(read(object$getTrekker())) > 0L) return(TRUE)
+    return(isTRUE(read(viewerImmuneRepertoireSummary(object))$available))
+  }
+  if (!is.list(info)) return(NULL)
+  extra <- list(
+    spatial = info$capabilities$spatial,
+    trajectory = info$capabilities$trajectory,
+    trekker = info$capabilities$trekker,
+    immune_repertoire = info$immune_repertoire
+  )
+  if (any(vapply(extra, isTRUE, logical(1)))) return(TRUE)
+  projections <- info$projection_names
+  if (!is.character(projections)) return(NULL)
+  projections <- unique(projections[!is.na(projections) & nzchar(projections)])
+  if (length(projections) > 1L) return(TRUE)
+  if (!all(vapply(extra, function(x) identical(x, FALSE), logical(1)))) {
+    return(NULL)
+  }
+  FALSE
 }
 
 viewerDatasetName <- function(files, selected) {
@@ -151,6 +190,18 @@ viewerDatasetChoices <- function(files, display_labels = NULL) {
     labels <- ids
   }
   stats::setNames(ids, unname(labels))
+}
+
+## Presentation only: stable dataset ids continue to own switching and caches.
+viewerDatasetLabel <- function(files, selected, display_labels = NULL) {
+  if (is.null(names(files)) || length(selected) != 1L || is.na(selected)) {
+    return("Dataset")
+  }
+  choices <- viewerDatasetChoices(files, display_labels)
+  index <- match(selected, unname(choices))
+  if (is.na(index)) return("Dataset")
+  label <- names(choices)[[index]]
+  if (is.na(label) || !nzchar(trimws(label))) "Dataset" else label
 }
 
 viewerSelectedDatasetName <- function() {
@@ -275,7 +326,7 @@ viewerColourGroupChoices <- function(
 viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   resolve <- function(key, fallback, minimum, maximum) {
     value <- options[[key]]
-    if (length(value) > 1L && !is.null(dataset) && !is.null(names(value))) {
+    if (!is.null(dataset) && !is.null(names(value))) {
       value <- value[dataset]
     }
     value <- suppressWarnings(as.numeric(value))
@@ -301,34 +352,13 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
       100
     )
   )
-  if (
-    is.null(page) ||
-      length(page) != 1L ||
-      is.na(page) ||
-      !nzchar(page)
-  ) {
-    return(defaults)
-  }
-  page <- as.character(page)[[1L]]
+  # Ordinary projection views share one author configuration. Legacy page
+  # overrides (e.g. expression_point_size) must not shadow it.
+  if (!identical(page, "spatial")) return(defaults)
   list(
-    point_size = resolve(
-      paste0(page, "_point_size"),
-      defaults$point_size,
-      1,
-      20
-    ),
-    point_opacity = resolve(
-      paste0(page, "_point_opacity"),
-      defaults$point_opacity,
-      0.1,
-      1
-    ),
-    percentage_cells_to_show = resolve(
-      paste0(page, "_percentage_cells_to_show"),
-      defaults$percentage_cells_to_show,
-      10,
-      100
-    )
+    point_size = resolve("spatial_point_size", 5, 1, 20),
+    point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
+    percentage_cells_to_show = resolve("spatial_percentage_cells_to_show", 100, 10, 100)
   )
 }
 
@@ -341,7 +371,7 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
     flipX = FALSE,
     flipY = FALSE,
     rotation = 0,
-    opacity = 0.6
+    opacity = 0.5
   )
   keys <- list(dataset, spatial_name, image_label)
   if (
@@ -388,6 +418,41 @@ spatialImagePreset <- function(options, dataset, spatial_name, image_label) {
   )
 }
 
+spatialEmbeddedImagePreset <- function(preset, alignment) {
+  if (!is.list(alignment)) {
+    return(preset)
+  }
+  number <- function(key, fallback) {
+    value <- suppressWarnings(as.numeric(alignment[[key]]))
+    if (length(value) != 1L || is.na(value) || !is.finite(value)) {
+      fallback
+    } else {
+      unname(value)
+    }
+  }
+  preset$offsetX <- number("dx", preset$offsetX)
+  preset$offsetY <- number("dy", preset$offsetY)
+  embedded_scale <- number("scale", preset$scaleX)
+  preset$scaleX <- embedded_scale
+  preset$scaleY <- embedded_scale
+  preset$rotation <- number("rotation", preset$rotation)
+  if (!is.null(alignment[["flip_x"]])) {
+    preset$flipX <- isTRUE(alignment[["flip_x"]])
+  }
+  if (!is.null(alignment[["flip_y"]])) {
+    preset$flipY <- isTRUE(alignment[["flip_y"]])
+  }
+  opacity <- number("image_opacity", preset$opacity)
+  if (opacity >= 0 && opacity <= 1) {
+    preset$opacity <- opacity
+  }
+  # Existing embedded CRBs store transformed pixels and their final bounds.
+  # Retain master's relative-edit drawing contract to avoid applying the saved
+  # calibration twice; external images use spatialImagePreset() instead.
+  preset$geometryBaked <- TRUE
+  preset
+}
+
 spatialPlotRotation <- function(options, dataset, spatial_name) {
   configured <- if (is.list(options)) {
     options[["spatial_plot_rotation"]]
@@ -413,15 +478,142 @@ spatialPlotRotation <- function(options, dataset, spatial_name) {
   }
 }
 
-rotateSpatialCoordinates <- function(coordinates, degrees) {
+spatialPointAppearance <- function(options, dataset, spatial_name) {
+  setting <- if (
+    is.list(options) &&
+      is.character(dataset) &&
+      length(dataset) == 1L &&
+      !is.na(dataset) &&
+      nzchar(dataset) &&
+      is.character(spatial_name) &&
+      length(spatial_name) == 1L &&
+      !is.na(spatial_name) &&
+      nzchar(spatial_name)
+  ) {
+    options[["viewer_content"]][[dataset]][["spatial_point_appearance"]][[
+      spatial_name
+    ]]
+  } else {
+    NULL
+  }
+  viewerSpatialPointSetting(setting)
+}
+
+spatialRoiSettings <- function(options, dataset, spatial_name) {
+  settings <- if (
+    is.list(options) &&
+      is.character(dataset) &&
+      length(dataset) == 1L &&
+      !is.na(dataset) &&
+      nzchar(dataset) &&
+      is.character(spatial_name) &&
+      length(spatial_name) == 1L &&
+      !is.na(spatial_name) &&
+      nzchar(spatial_name)
+  ) {
+    options[["viewer_content"]][[dataset]][["spatial_roi_settings"]][[
+      spatial_name
+    ]]
+  } else {
+    NULL
+  }
+  if (is.list(settings) && !is.object(settings)) settings else list()
+}
+
+spatialRoiSetting <- function(options, dataset, spatial_name, roi) {
+  if (
+    !is.character(roi) ||
+      length(roi) != 1L ||
+      is.na(roi) ||
+      !nzchar(roi)
+  ) {
+    return(NULL)
+  }
+  setting <- spatialRoiSettings(options, dataset, spatial_name)[[roi]]
+  viewerSpatialPointSetting(setting, roi = TRUE)
+}
+
+rotateSpatialCoordinates <- function(coordinates, degrees, pivot = c(0, 0)) {
   if (is.null(coordinates) || identical(degrees, 0)) {
     return(coordinates)
   }
   theta <- degrees * pi / 180
-  x <- coordinates[, 1]
-  y <- coordinates[, 2]
-  coordinates[, 1] <- x * cos(theta) - y * sin(theta)
-  coordinates[, 2] <- x * sin(theta) + y * cos(theta)
+  x <- coordinates[, 1] - pivot[[1L]]
+  y <- coordinates[, 2] - pivot[[2L]]
+  coordinates[, 1] <- x * cos(theta) - y * sin(theta) + pivot[[1L]]
+  coordinates[, 2] <- x * sin(theta) + y * cos(theta) + pivot[[2L]]
+  coordinates
+}
+
+spatialRoiPivots <- function(coordinates, roi_values, degrees = 0) {
+  coordinates <- rotateSpatialCoordinates(coordinates, degrees)
+  if (is.null(coordinates) || length(roi_values) != nrow(coordinates)) {
+    return(list())
+  }
+  rois <- unique(as.character(roi_values))
+  rois <- rois[!is.na(rois) & nzchar(rois)]
+  pivots <- lapply(rois, function(roi) {
+    selected <- !is.na(roi_values) & as.character(roi_values) == roi
+    ## Index columns explicitly: vapply over a matrix iterates its cells.
+    block <- coordinates[selected, 1:2, drop = FALSE]
+    pivot <- vapply(
+      1:2,
+      function(column) mean(range(block[, column], na.rm = TRUE)),
+      numeric(1)
+    )
+    names(pivot) <- colnames(block)
+    if (any(!is.finite(pivot))) NULL else pivot
+  })
+  valid <- !vapply(pivots, is.null, logical(1))
+  stats::setNames(pivots[valid], rois[valid])
+}
+
+rotateSpatialCoordinatesByRoi <- function(
+  coordinates,
+  roi_values,
+  settings,
+  degrees = 0,
+  pivots = NULL
+) {
+  coordinates <- rotateSpatialCoordinates(coordinates, degrees)
+  if (
+    is.null(coordinates) ||
+      !is.list(settings) ||
+      !length(settings) ||
+      length(roi_values) != nrow(coordinates)
+  ) {
+    return(coordinates)
+  }
+  if (is.null(pivots)) {
+    pivots <- spatialRoiPivots(coordinates, roi_values)
+  }
+  if (!is.list(pivots)) {
+    pivots <- list()
+  }
+  for (roi in intersect(unique(as.character(roi_values)), names(settings))) {
+    rotation <- suppressWarnings(as.numeric(
+      settings[[roi]][["rotation_degrees"]]
+    ))
+    if (length(rotation) != 1L || is.na(rotation) || !is.finite(rotation)) {
+      next
+    }
+    selected <- !is.na(roi_values) & as.character(roi_values) == roi
+    roi_coordinates <- coordinates[selected, , drop = FALSE]
+    pivot <- pivots[[roi]]
+    if (
+      !is.numeric(pivot) ||
+        length(pivot) != 2L ||
+        anyNA(pivot) ||
+        any(!is.finite(pivot))
+    ) {
+      next
+    }
+    coordinates[selected, ] <- rotateSpatialCoordinates(
+      roi_coordinates,
+      rotation,
+      pivot
+    )
+  }
   coordinates
 }
 
@@ -451,12 +643,30 @@ cachePlot <- function(x, ...) {
 
 ## Return the first complete reactive value immediately; debounce only later
 ## invalidations caused by interactive controls.
-debounceAfterFirst <- function(reactive, millis) {
+##
+## shiny::debounce() evaluates its source eagerly on every invalidation, so a
+## page-owned `reactive` should req() its page itself. Pass the same predicate
+## as `active`: returning to the page then reads the source immediately instead
+## of first replaying the value held from before the page was left.
+debounceAfterFirst <- function(reactive, millis, active = NULL) {
   initialized <- FALSE
   current <- NULL
   revision <- shiny::reactiveVal(0L)
+  was_inactive <- FALSE
+  if (is.function(active)) {
+    shiny::observe({
+      if (!isTRUE(active())) was_inactive <<- TRUE
+    })
+  }
   shiny::reactive({
     revision()
+    if (is.function(active)) {
+      shiny::req(isTRUE(active()))
+      if (initialized && was_inactive) {
+        current <<- reactive()
+      }
+      was_inactive <<- FALSE
+    }
     if (!initialized) {
       current <<- reactive()
       initialized <<- TRUE
@@ -475,6 +685,22 @@ debounceAfterFirst <- function(reactive, millis) {
     }
     current
   })
+}
+
+## Single-entry memo for values recomputed with identical inputs within and
+## across flushes. Put any data_set() reference in `key`.
+viewerMemoOne <- function() {
+  state <- new.env(parent = emptyenv())
+  function(key, compute) {
+    if (isTRUE(state$set) && identical(state$key, key)) {
+      return(state$value)
+    }
+    value <- compute()
+    state$key <- key
+    state$value <- value
+    state$set <- TRUE
+    value
+  }
 }
 
 viewerOutputTab <- function(ids) {
@@ -634,13 +860,15 @@ viewerProjectionCellIndices <- function(
   percentage = input[[paste0(prefix, "_percentage_cells_to_show")]]
 ) {
   groups <- getGroups()
+  filter_ids <- paste0(prefix, "_group_filter_", groups)
+  bound_inputs <- shiny::isolate(names(input))
   filter_inputs <- stats::setNames(
     lapply(groups, function(group) {
       input[[paste0(prefix, "_group_filter_", group)]]
     }),
     groups
   )
-  if (!length(groups) || all(vapply(filter_inputs, is.null, logical(1)))) {
+  if (!length(groups) || !any(filter_ids %in% bound_inputs)) {
     cell_count <- nrow(metadata)
     if (!cell_count) {
       return(integer())
@@ -654,7 +882,15 @@ viewerProjectionCellIndices <- function(
   filters <- stats::setNames(
     lapply(groups, function(group) {
       value <- filter_inputs[[group]]
-      if (is.null(value)) getGroupLevels(group) else value
+      ## Shiny decodes a checkbox group's empty array as NULL. Only an input
+      ## that has not been bound yet means "all"; a bound NULL means None.
+      if (is.null(value)) {
+        if (paste0(prefix, "_group_filter_", group) %in% bound_inputs) {
+          character()
+        } else {
+          getGroupLevels(group)
+        }
+      } else value
     }),
     groups
   )
@@ -1191,6 +1427,9 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
 .cerebro_cell_view_wire_serial <- 0L
 .cerebro_cell_view_render_serial <- 0
 .cerebro_cell_view_aux_pending <- new.env(parent = emptyenv())
+## Last core aux actually delivered per view: its cell key and wire token. A
+## later render with the same cells lets the browser reuse those barcodes.
+.cerebro_cell_view_aux_served <- new.env(parent = emptyenv())
 
 cerebroCellViewDeferredAux <- function(
   selection_rows,
@@ -1332,6 +1571,13 @@ cerebroCellViewAuxRequest <- function(request) {
     .cerebro_cell_view_aux_pending[[key]] <- message
     if (!isTRUE(core$hover$pending)) {
       rm(list = key, envir = .cerebro_cell_view_aux_pending)
+      if (!is.null(message$aux_key)) {
+        .cerebro_cell_view_aux_served[[message$id]] <- list(
+          key = message$aux_key,
+          wire_token = message$wire_token,
+          dataset_context = message$dataset_context
+        )
+      }
     }
     session$sendBinaryMessage(
       "cell_view_aux_binary",
@@ -1359,6 +1605,22 @@ cerebroCellViewAuxRequest <- function(request) {
 ## Small UI snapshots only. Never enumerate values of all Shiny inputs: those
 ## include million-cell selections and transport caches. Reads are isolated so
 ## feedback cannot add a dependency to an existing preparation path.
+## Pure display toggles patch the mounted renderer, without fetching geometry.
+cerebroObserveLocalAppearance <- function(id, input, session) {
+  ids <- c(group_labels = paste0(id, "_group_labels"),
+           draw_border = paste0(id, "_point_border"),
+           keep_square = paste0(id, "_keep_square"))
+  shiny::observeEvent(lapply(ids, function(key) input[[key]]), {
+    values <- lapply(ids, function(key) input[[key]])
+    values <- values[!vapply(values, is.null, logical(1))]
+    identity <- viewerDatasetIdentity()
+    shiny::req(identity$fingerprint, length(values))
+    session$sendCustomMessage("cell_view_appearance", list(
+      id = id, dataset_context = viewer_loaded_dataset_context(),
+      dataset_fingerprint = identity$fingerprint, values = values))
+  }, ignoreInit = TRUE)
+}
+
 cerebroFeedbackControls <- function(id, input, overrides = list()) {
   pattern <- switch(
     id,
@@ -1406,7 +1668,8 @@ cerebroCellViewRender <- function(
   deferred_aux = NULL,
   core_aux = NULL,
   dataset_context = NULL,
-  feedback = NULL
+  feedback = NULL,
+  aux_key = NULL
 ) {
   dataset_context <- viewerDatasetContext(
     dataset_context$epoch,
@@ -1520,6 +1783,16 @@ cerebroCellViewRender <- function(
       token <- .cerebro_cell_view_wire_serial
       message$data$n <- n_cells
       message$data$wire_token <- token
+      ## Same dataset and cells as the barcodes the browser already holds:
+      ## name that delivery so it can skip requesting them again.
+      served <- if (!is.null(aux_key)) .cerebro_cell_view_aux_served[[id]]
+      if (
+        is.list(served) &&
+          identical(served$key, aux_key) &&
+          viewerDatasetContextEqual(served$dataset_context, dataset_context)
+      ) {
+        message$data$aux_reuse <- served$wire_token
+      }
       message$data$selection_key <- NULL
       full_hover <- message$hover
       message$hover <- list(hoverinfo = "skip")
@@ -1549,7 +1822,8 @@ cerebroCellViewRender <- function(
           dataset_context = dataset_context,
           render_token = message$render_token,
           build = deferred_aux,
-          core_builder = core_aux
+          core_builder = core_aux,
+          aux_key = aux_key
         )
       } else {
         list(
@@ -1614,7 +1888,7 @@ cerebroCellViewScatterPayload <- function(
   selection_keys,
   point_size,
   point_opacity,
-  group_labels = TRUE,
+  group_labels = FALSE,
   keep_square = FALSE,
   color_assignments = NULL,
   hover_info = NULL,
@@ -4300,7 +4574,9 @@ get_or_load_crb <- function(
       obj$expression <- BPCells::open_matrix_dir(dir = loc_abs)
     }
   } else if (be$type == "h5") {
-    if (!requireNamespace("HDF5Array", quietly = TRUE)) {
+    ## Check installation without loading the namespace (seconds when cold);
+    ## pages that never read expression must not pay for it.
+    if (!nzchar(system.file(package = "HDF5Array"))) {
       stop(
         "h5-backed crb requires the HDF5Array package; please install it ",
         "via BiocManager::install(\"HDF5Array\").",
@@ -4322,18 +4598,23 @@ get_or_load_crb <- function(
         call. = FALSE
       )
     }
-    print(glue::glue(
-      "[{Sys.time()}] Attaching h5 backend (lazy TENxMatrix): {loc_abs}"
-    ))
-
     ## On-disk layout is cells x genes (TENxMatrix orientation, optimised for
     ## per-gene column reads). Cerebro's internal layout is genes x cells, so
     ## we transpose lazily — DelayedArray::t() is O(1), no data is read.
     ## The matrix is never materialised into a dgCMatrix at attach time;
     ## queries stream from disk through the DelayedMatrix path in
-    ## getExpressionRow / getExpressionBlock.
-    m_disk <- HDF5Array::TENxMatrix(loc_abs, group = "expression")
-    obj$expression <- t(m_disk)
+    ## getExpressionRow / getExpressionBlock. Attach on first expression use.
+    delayedAssign(
+      "expression",
+      {
+        print(glue::glue(
+          "[{Sys.time()}] Attaching h5 backend (lazy TENxMatrix): {loc_abs}"
+        ))
+        t(HDF5Array::TENxMatrix(loc_abs, group = "expression"))
+      },
+      eval.env = environment(),
+      assign.env = obj
+    )
   } else {
     stop(
       sprintf(
@@ -4425,6 +4706,10 @@ extra_material_table_groups <- function(
   if (missing(embedded)) {
     data <- data_set()
     dataset <- viewerSelectedDatasetName()
+    stored_index <- tryCatch(
+      data$getTechnicalInfo()$extra_material_table_index,
+      error = function(error) NULL
+    )
     if (
       is.null(table_index) &&
         !is.null(dataset) &&
@@ -4433,6 +4718,10 @@ extra_material_table_groups <- function(
       table_index <- Cerebro.options$viewer_content[[
         dataset
       ]]$extra_material_table_index
+    }
+    # Per-app overrides win; unmodified records keep their portable CRB labels.
+    if (is.list(stored_index)) {
+      table_index <- utils::modifyList(stored_index, table_index %||% list())
     }
     embedded <- if (is_cerebro_dataset(data)) {
       data$getExtraMaterial()$tables
@@ -4678,7 +4967,11 @@ getImmuneRepertoire <- function() {
 }
 
 getImmuneRepertoireSummary <- function() {
-  ds <- data_set()
+  viewerImmuneRepertoireSummary(data_set())
+}
+
+## File-backed repertoires describe themselves without reading every sample.
+viewerImmuneRepertoireSummary <- function(ds) {
   if (is.null(ds)) {
     return(list(available = FALSE, samples = character(), chains = character()))
   }
@@ -4772,11 +5065,33 @@ availableSpatial <- function() {
   }
   tryCatch(ds$availableSpatial(), error = function(e) character(0))
 }
+## The public getter validates and normalizes coordinates and every embedded
+## image (about a second for large images). Its result depends only on the
+## loaded object, so keep it per section until data_set() changes.
+.viewer_spatial_data_cache <- new.env(parent = emptyenv())
 getSpatialData <- function(name) {
   ds <- data_set()
   if (!any(grepl("Cerebro", class(ds)))) {
     return(NULL)
   }
+  cache <- .viewer_spatial_data_cache
+  if (!identical(cache$dataset, ds)) {
+    rm(list = ls(cache, all.names = TRUE), envir = cache)
+    cache$dataset <- ds
+  }
+  key <- if (is.character(name) && length(name) == 1L && !is.na(name)) {
+    paste0("section:", name)
+  }
+  if (!is.null(key) && !is.null(cache[[key]])) {
+    return(cache[[key]])
+  }
+  value <- viewerReadSpatialData(ds, name)
+  if (!is.null(key) && !is.null(value)) {
+    assign(key, value, envir = cache)
+  }
+  value
+}
+viewerReadSpatialData <- function(ds, name) {
   getter <- ds$getSpatialData
   tryCatch(
     {
@@ -4858,6 +5173,9 @@ canonicalGeneSelection <- function(selected, genes) {
   selected
 }
 
+## Gene expression registers four selectors on the same gene list; a locale
+## sort of a whole transcriptome takes about half a second. Share one.
+.viewer_sorted_gene_choices <- viewerMemoOne()
 serverSideGeneSelector <- function(
   session,
   input_id,
@@ -4896,7 +5214,11 @@ serverSideGeneSelector <- function(
     ) {
       return(invisible(NULL))
     }
-    genes <- sort(choices())
+    choice_values <- choices()
+    genes <- .viewer_sorted_gene_choices(
+      list(choice_values),
+      function() sort(choice_values)
+    )
     req(!is.null(genes), length(genes) > 0)
 
     initial_selection <- isolate(input[[input_id]])
@@ -4946,7 +5268,10 @@ serverSideGeneSelector <- function(
       later::later(function() send_update(TRUE), delay = 0.3)
       later::later(function() send_update(TRUE), delay = 1.0)
     } else {
-      later::later(function() send_update(TRUE), delay = 0.3)
+      ## This is the only registration for the dataset. Skipping it when the
+      ## selection moved (e.g. an RGB seed) would leave the control searching
+      ## the previous dataset; send_update() already uses the current value.
+      later::later(function() send_update(), delay = 0.3)
     }
   })
 }
@@ -5023,7 +5348,21 @@ viewerPersistentSelection <- function(selection, dataset_context) {
   ) {
     return(NULL)
   }
-  if (is.null(selection) || !length(selection[["x"]])) {
+  if (is.null(selection)) {
+    return(NULL)
+  }
+  ## Stable cell IDs identify a selection on their own. Coordinate identifiers
+  ## are only the fallback for cells without one; formatting them for every
+  ## selected cell took seconds for large selections.
+  ids <- as.character(unlist(selection[["ids"]], use.names = FALSE))
+  complete_ids <- length(ids) &&
+    !anyNA(ids) &&
+    all(nzchar(ids)) &&
+    (!length(selection[["x"]]) || length(ids) == length(selection[["x"]]))
+  if (complete_ids) {
+    return(data.frame(selection_key = ids, stringsAsFactors = FALSE))
+  }
+  if (!length(selection[["x"]])) {
     return(NULL)
   }
   x <- as.numeric(selection[["x"]])
@@ -5153,7 +5492,7 @@ cerebroSelectedCellsPlotInfo <- function() {
   list(
     title = "Plot of selected cells",
     text = shiny::p(
-      "Depending on the variable selected to colour cells in the dimensional reduction, this plot will show different things. If you select a categorical variable, e.g. 'sample' or 'cluster', you will get a bar plot showing which groups the cells selected with the box or lasso tool come from. Instead, if you select a continuous variable, e.g. the number of transcripts (nUMI), you will see a violin/box plot showing the distribution of that variable in the selected vs. non-selected cells."
+      "For categorical colours, bars show the groups in the selected cells. For continuous colours, violin/box plots compare selected and unselected cells."
     )
   )
 }
@@ -5377,16 +5716,29 @@ cerebroProjectionInfo <- function() {
   )
 }
 
-registerCellViewPointBorder <- function(output, prefix) {
+registerCellViewPointBorder <- function(
+  output,
+  prefix,
+  defaults = function() list(draw_border = FALSE, keep_square = FALSE)
+) {
   output_id <- paste0(prefix, "_point_border_UI")
   output[[output_id]] <- shiny::renderUI({
     shiny::checkboxInput(
       inputId = paste0(prefix, "_point_border"),
       label = "Draw border around cells",
-      value = FALSE
+      value = defaults()$draw_border
     )
   })
   shiny::outputOptions(output, output_id, suspendWhenHidden = FALSE)
+  square_id <- paste0(prefix, "_keep_square_UI")
+  output[[square_id]] <- shiny::renderUI({
+    shiny::checkboxInput(
+      inputId = paste0(prefix, "_keep_square"),
+      label = "Keep plots square",
+      value = defaults()$keep_square
+    )
+  })
+  shiny::outputOptions(output, square_id, suspendWhenHidden = FALSE)
 }
 
 cerebroResultTableControls <- function(prefix, results_df, grouped) {
@@ -5531,4 +5883,303 @@ trajectorySelectionValid <- function(
     return(FALSE)
   }
   name %in% names_for_method
+}
+
+viewerImageMime <- function(path) {
+  if (!isTRUE(file_test("-f", path))) {
+    return(NULL)
+  }
+  ext <- tolower(tools::file_ext(path))
+  if (!ext %in% c("png", "jpg", "jpeg")) {
+    return(NULL)
+  }
+  bytes <- tryCatch(
+    readBin(path, what = "raw", n = 8L),
+    error = function(error) raw()
+  )
+  png_magic <- as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))
+  jpeg_magic <- as.raw(c(0xff, 0xd8, 0xff))
+  if (identical(ext, "png") && identical(bytes, png_magic)) {
+    return("image/png")
+  }
+  if (
+    ext %in%
+      c("jpg", "jpeg") &&
+      length(bytes) >= length(jpeg_magic) &&
+      identical(bytes[seq_along(jpeg_magic)], jpeg_magic)
+  ) {
+    return("image/jpeg")
+  }
+  NULL
+}
+
+# Serve trusted image bytes through a session-scoped route. Filesystem paths and
+# Base64 payloads never enter the browser response model.
+
+## Embedded Spatial images are data URIs carried inside every frame (tens of MB
+## for large images). Decode each once per session into a private file and send
+## its URL instead; the browser fetches and caches it once. Formats the private
+## image route does not serve keep their data URI.
+viewerEmbeddedImageUrl <- function(data_uri, session = NULL) {
+  if (is.null(session)) {
+    session <- get0("session", envir = parent.frame(), inherits = TRUE)
+  }
+  if (
+    !is.character(data_uri) ||
+      length(data_uri) != 1L ||
+      is.na(data_uri) ||
+      is.null(session) ||
+      !is.environment(session$userData)
+  ) {
+    return(data_uri)
+  }
+  header <- regmatches(
+    substr(data_uri, 1L, 40L),
+    regexec("^data:image/(png|jpeg|jpg);base64,", substr(data_uri, 1L, 40L))
+  )[[1L]]
+  if (!length(header)) {
+    return(data_uri)
+  }
+  if (is.null(session$userData$cerebro_embedded_image_urls)) {
+    session$userData$cerebro_embedded_image_urls <- new.env(parent = emptyenv())
+  }
+  cache <- session$userData$cerebro_embedded_image_urls
+  key <- rlang::hash(data_uri)
+  url <- get0(key, envir = cache, inherits = FALSE)
+  if (!is.null(url)) {
+    return(url)
+  }
+  file <- tempfile(
+    "cerebro-embedded-",
+    fileext = if (identical(header[[2L]], "png")) ".png" else ".jpg"
+  )
+  written <- tryCatch(
+    {
+      writeBin(
+        base64enc::base64decode(substring(data_uri, nchar(header[[1L]]) + 1L)),
+        file
+      )
+      TRUE
+    },
+    error = function(error) FALSE
+  )
+  url <- if (written) viewerPrivateImageUrl(file, session = session) else NULL
+  if (is.null(url)) {
+    unlink(file)
+    return(data_uri)
+  }
+  assign(key, url, envir = cache)
+  if (is.function(session$onSessionEnded)) {
+    session$onSessionEnded(function() unlink(file))
+  }
+  url
+}
+
+viewerPrivateImageUrl <- function(path, session = NULL, expected_md5 = NULL) {
+  if (is.null(session)) {
+    session <- get0("session", envir = parent.frame(), inherits = TRUE)
+  }
+  if (is.null(session) || !is.function(session$registerDataObj)) {
+    return(NULL)
+  }
+  path <- tryCatch(
+    normalizePath(path, winslash = "/", mustWork = TRUE),
+    error = function(error) NULL
+  )
+  mime <- if (is.null(path)) NULL else viewerImageMime(path)
+  if (is.null(path) || is.null(mime)) {
+    return(NULL)
+  }
+  info <- suppressWarnings(file.info(path))
+  bytes <- if (nrow(info) == 1L) {
+    unname(as.numeric(info$size[[1L]]))
+  } else {
+    NA_real_
+  }
+  modified <- if (nrow(info) == 1L) {
+    unname(as.numeric(info$mtime[[1L]]))
+  } else {
+    NA_real_
+  }
+  if (!is.finite(bytes) || !is.finite(modified) || isTRUE(info$isdir[[1L]])) {
+    return(NULL)
+  }
+  ## Background frames resend this descriptor; hash a file version once.
+  if (is.null(session$userData$cerebro_private_image_md5)) {
+    session$userData$cerebro_private_image_md5 <- new.env(parent = emptyenv())
+  }
+  md5_cache <- session$userData$cerebro_private_image_md5
+  md5_key <- paste(path, bytes, format(modified, digits = 17), sep = "\r")
+  md5 <- get0(md5_key, envir = md5_cache, inherits = FALSE)
+  if (is.null(md5)) {
+    md5 <- tryCatch(
+      unname(as.character(tools::md5sum(path))),
+      error = function(error) NA_character_
+    )
+    if (!is.na(md5)) assign(md5_key, md5, envir = md5_cache)
+  }
+  if (
+    is.na(md5) ||
+      (!is.null(expected_md5) && !identical(as.character(expected_md5), md5))
+  ) {
+    return(NULL)
+  }
+  if (is.null(session$userData$cerebro_private_image_urls)) {
+    session$userData$cerebro_private_image_urls <- new.env(parent = emptyenv())
+  }
+  cache <- session$userData$cerebro_private_image_urls
+  cached <- get0(md5, envir = cache, inherits = FALSE)
+  if (!is.null(cached)) {
+    return(cached)
+  }
+  data <- list(
+    path = path,
+    mime = mime,
+    md5 = md5,
+    bytes = bytes,
+    modified = modified
+  )
+  url <- session$registerDataObj(
+    paste0("cerebro-image-", md5),
+    data,
+    function(data, request) {
+      current <- suppressWarnings(file.info(data$path))
+      current_bytes <- if (nrow(current) == 1L) {
+        unname(as.numeric(current$size[[1L]]))
+      } else {
+        NA_real_
+      }
+      current_modified <- if (nrow(current) == 1L) {
+        unname(as.numeric(current$mtime[[1L]]))
+      } else {
+        NA_real_
+      }
+      if (
+        !identical(current_bytes, data$bytes) ||
+          !identical(current_modified, data$modified) ||
+          isTRUE(current$isdir[[1L]])
+      ) {
+        return(shiny::httpResponse(404L, "text/plain", "Not found"))
+      }
+      shiny::httpResponse(
+        200L,
+        data$mime,
+        list(file = data$path, owned = FALSE),
+        headers = list(
+          "Cache-Control" = "private, max-age=31536000, immutable",
+          "ETag" = paste0('"', data$md5, '"'),
+          "X-Content-Type-Options" = "nosniff"
+        )
+      )
+    }
+  )
+  assign(md5, url, envir = cache)
+  url
+}
+
+viewerTrekkerExternalImage <- function() {
+  if (!exists("Cerebro.options", inherits = TRUE)) {
+    return(NULL)
+  }
+  options <- get("Cerebro.options", inherits = TRUE)
+  dataset <- viewerSelectedDatasetName()
+  images <- options[["spatial_images"]]
+  if (
+    is.null(dataset) ||
+      !is.list(images) ||
+      !dataset %in% names(images) ||
+      !is.list(images[[dataset]])
+  ) {
+    return(NULL)
+  }
+  configured <- images[[dataset]][["trekker"]]
+  if (!is.list(configured) || !length(configured)) {
+    return(NULL)
+  }
+  configured_names <- names(configured)
+  descriptor <- configured[[1L]]
+  relative <- if (is.list(descriptor)) descriptor$path else descriptor
+  label <- if (
+    !is.null(configured_names) &&
+      length(configured_names) >= 1L &&
+      !is.na(configured_names[[1L]]) &&
+      nzchar(configured_names[[1L]])
+  ) {
+    configured_names[[1L]]
+  } else if (is.character(relative) && length(relative) == 1L) {
+    basename(relative)
+  } else {
+    "Trekker background"
+  }
+  root <- options[["cerebro_root"]]
+  path <- authorized_spatial_image_path(relative, relative, root)
+  if (is.null(path)) {
+    return(NULL)
+  }
+  url <- viewerPrivateImageUrl(path)
+  if (is.null(url)) {
+    return(NULL)
+  }
+  list(
+    uri = url,
+    bounds = if (is.list(descriptor)) descriptor$bounds else NULL,
+    viewport_bounds = if (is.list(descriptor)) {
+      descriptor$viewport_bounds
+    } else {
+      NULL
+    },
+    preset = spatialImagePreset(options, dataset, "trekker", label),
+    label = if (is.list(descriptor)) descriptor$label %||% label else label
+  )
+}
+
+centerOfGroups <- function(coordinates, df, n_dimensions, group) {
+  ## Guard against a missing grouping column: callers occasionally pass a
+  ## group that isn't present in df (e.g. a metadata column dropped for a
+  ## selected-cells slice), which would otherwise make df[[group]] NULL and
+  ## crash the tibble construction. Return a typed empty result instead.
+  if (is.null(group) || !group %in% colnames(df)) {
+    return(tidyr::tibble(
+      group = character(),
+      x_median = numeric(),
+      y_median = numeric(),
+      z_median = numeric()
+    ))
+  }
+  ## check number of dimenions in projection
+  ## ... 2 dimensions
+  if (n_dimensions == 2) {
+    ## calculate center for groups and return
+    tidyr::tibble(
+      x = coordinates[[1]],
+      y = coordinates[[2]],
+      group = df[[group]]
+    ) %>%
+      dplyr::group_by(.data$group) %>%
+      dplyr::summarise(
+        x_median = median(x),
+        y_median = median(y),
+        .groups = 'drop_last'
+      ) %>%
+      dplyr::ungroup() %>%
+      return()
+    ## ... 3 dimensions
+  } else if (n_dimensions == 3 && is.numeric(coordinates[, 3])) {
+    ## calculate center for groups and return
+    tidyr::tibble(
+      x = coordinates[[1]],
+      y = coordinates[[2]],
+      z = coordinates[[3]],
+      group = df[[group]]
+    ) %>%
+      dplyr::group_by(.data$group) %>%
+      dplyr::summarise(
+        x_median = median(x),
+        y_median = median(y),
+        z_median = median(z),
+        .groups = 'drop_last'
+      ) %>%
+      dplyr::ungroup() %>%
+      return()
+  }
 }

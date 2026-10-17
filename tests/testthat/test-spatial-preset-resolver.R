@@ -103,12 +103,44 @@ test_that("configured images fail closed without leaking neighbouring leaves", {
   expect_identical(configured_spatial_images(NULL, "Atlas", "sliceA"), list())
 })
 
+test_that("Viewer chooses FOV or matching ROI images", {
+  images <- list(
+    Overview = list(path = "overview.png", roi_value = NULL),
+    Lesion = list(path = "lesion.png", roi_value = "lesion"),
+    Border = list(path = "border.png", roi_value = "border")
+  )
+
+  expect_named(spatial_images_for_roi(images, ""), "Overview")
+  expect_named(spatial_images_for_roi(images, "__all__"), "Overview")
+  expect_named(
+    spatial_images_for_roi(images, "__separate__"),
+    c("Overview", "Lesion", "Border")
+  )
+  expect_named(spatial_images_for_roi(images, "lesion"), "Lesion")
+  expect_named(
+    spatial_images_for_roi(
+      images,
+      spatial_default_roi_selection("lesion")
+    ),
+    "Lesion"
+  )
+  expect_named(spatial_images_for_roi(images, "normal"), "Overview")
+})
+
 test_that("embedded images expose canonical labels and normalize singular legacy", {
   canonical <- list(
     histology_images = list(
       `H&E` = list(
         histology_image = "data:image/png;base64,HE",
-        histology_image_bounds = c(xmin = 0, xmax = 10, ymin = 0, ymax = 20)
+        histology_image_bounds = c(xmin = 0, xmax = 10, ymin = 0, ymax = 20),
+        histology_alignment = list(
+          dx = 12,
+          dy = -4,
+          scale = 1.5,
+          rotation = 90,
+          flip_x = TRUE,
+          image_opacity = 0.7
+        )
       ),
       DAPI = list(histology_image = "data:image/png;base64,DAPI")
     ),
@@ -118,6 +150,28 @@ test_that("embedded images expose canonical labels and normalize singular legacy
   expect_identical(
     embedded_spatial_images(canonical)$DAPI$image,
     "data:image/png;base64,DAPI"
+  )
+  expect_identical(
+    spatial_background_preset(
+      NULL,
+      NULL,
+      NULL,
+      c(
+        list(source = "embedded", key = "H&E", label = "H&E"),
+        embedded_spatial_images(canonical)[["H&E"]]
+      )
+    ),
+    list(
+      offsetX = 12,
+      offsetY = -4,
+      scaleX = 1.5,
+      scaleY = 1.5,
+      flipX = TRUE,
+      flipY = FALSE,
+      rotation = 90,
+      opacity = 0.7,
+      geometryBaked = TRUE
+    )
   )
 
   legacy <- list(
@@ -156,7 +210,7 @@ test_that("one preset resolver owns every image setting and default", {
       flipX = FALSE,
       flipY = FALSE,
       rotation = 90,
-      opacity = 0.6
+      opacity = 0.5
     )
   )
   expect_identical(
@@ -178,11 +232,10 @@ test_that("background choices keep labels separate from source-tagged identity",
   external <- configured_spatial_images(spatial_options, "Atlas", "sliceA")
   choices <- spatial_background_choices(embedded, external)
 
-  expect_identical(names(choices), c("No Background", "H&E", "H&E", "DAPI"))
+  expect_identical(names(choices), c("H&E", "H&E", "DAPI"))
   expect_identical(
     unname(choices),
     c(
-      "none",
       "embedded::H&E",
       "external::H&E",
       "external::DAPI"
@@ -197,7 +250,37 @@ test_that("background choices keep labels separate from source-tagged identity",
   ))
 })
 
-test_that("stale selections reset to the first current image or none", {
+test_that("background choices hide image suffixes without changing identity", {
+  choices <- spatial_background_choices(
+    list(
+      `section.preview.TIFF` = list(
+        image = "data:image/tiff;base64,PREVIEW"
+      )
+    ),
+    list(
+      `2019-042.jpg` = list(path = "spatial-assets/2019-042.jpg"),
+      original = list(
+        path = "spatial-assets/original.png",
+        label = "2525-12.jpeg"
+      )
+    )
+  )
+
+  expect_identical(
+    names(choices),
+    c("section.preview", "2019-042", "2525-12")
+  )
+  expect_identical(
+    unname(choices),
+    c(
+      "embedded::section.preview.TIFF",
+      "external::2019-042.jpg",
+      "external::original"
+    )
+  )
+})
+
+test_that("missing and stale selections resolve to no background", {
   slice_a_choices <- spatial_background_choices(
     list(),
     configured_spatial_images(spatial_options, "Atlas", "sliceA")
@@ -215,7 +298,7 @@ test_that("stale selections reset to the first current image or none", {
   )
   expect_identical(
     normalize_spatial_background_choice(old, slice_b_choices),
-    "external::IF"
+    "none"
   )
   expect_identical(
     normalize_spatial_background_choice(old, slice_c_choices),
@@ -266,6 +349,7 @@ test_that("background identity includes its full logical image location", {
       dataset = "Atlas",
       spatial_name = "sliceA",
       source = "embedded",
+      key = "H&E",
       label = "H&E"
     )
   )
@@ -312,7 +396,7 @@ test_that("copy preset formatter emits exact canonical image settings", {
       offset_x = 2,
       offset_y = -3,
       rotation = 90,
-      image_opacity = 0.6
+      image_opacity = 0.5
     )
   )
   expect_false(grepl("spatial_images_offset_x", code, fixed = TRUE))
@@ -331,4 +415,69 @@ test_that("copy preset formatter rejects a missing image target", {
     flip_y = FALSE,
     rotation = 0
   ))
+})
+
+
+test_that("embedded image presets retain already-applied calibration", {
+  preset <- spatialImagePreset(NULL, "data", "fov", "image")
+  aligned <- spatialEmbeddedImagePreset(
+    preset,
+    list(
+      dx = 12,
+      dy = -4,
+      scale = 2,
+      rotation = 90,
+      flip_x = TRUE,
+      flip_y = FALSE,
+      image_opacity = 0.6
+    )
+  )
+  expect_true(aligned$geometryBaked)
+  expect_equal(
+    aligned[c("offsetX", "offsetY", "scaleX", "scaleY", "rotation")],
+    list(offsetX = 12, offsetY = -4, scaleX = 2, scaleY = 2, rotation = 90)
+  )
+  expect_true(aligned$flipX)
+  expect_false(aligned$flipY)
+  expect_equal(aligned$opacity, 0.6)
+  expect_identical(spatialEmbeddedImagePreset(preset, NULL), preset)
+})
+
+
+test_that("configured image opacity sets the initial opacity of every image", {
+  for (saved_opacity in c(0, 0.2, 0.8, 1)) {
+    options <- spatial_options
+    options$spatial_image_settings$Atlas$sliceA$`H&E`$image_opacity <- saved_opacity
+    external <- spatial_background_preset(
+      options, "Atlas", "sliceA",
+      list(source = "external", key = "H&E", label = "H&E")
+    )
+    embedded <- spatial_background_preset(
+      options, "Atlas", "sliceA",
+      list(source = "embedded", key = "H&E", label = "H&E",
+           alignment = list(rotation = 35))
+    )
+    expect_equal(external$opacity, saved_opacity)
+    expect_equal(embedded$opacity, saved_opacity)
+    expect_equal(external$offsetX, 11)
+    expect_equal(embedded$rotation, 35)
+  }
+
+  ## An embedded image's saved alignment can carry its own opacity, like its
+  ## geometry; out-of-range values fall back.
+  embedded <- spatial_background_preset(
+    NULL, NULL, NULL,
+    list(source = "embedded", key = "H&E", label = "H&E",
+         alignment = list(image_opacity = 0.9))
+  )
+  expect_equal(embedded$opacity, 0.9)
+  embedded <- spatial_background_preset(
+    NULL, NULL, NULL,
+    list(source = "embedded", key = "H&E", label = "H&E",
+         alignment = list(image_opacity = 1.5))
+  )
+  expect_equal(embedded$opacity, 0.5)
+  options <- spatial_options
+  options$spatial_image_settings$Atlas$sliceA$`H&E`$image_opacity <- 1.5
+  expect_equal(spatialImagePreset(options, "Atlas", "sliceA", "H&E")$opacity, 0.5)
 })

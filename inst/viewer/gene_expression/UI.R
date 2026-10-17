@@ -41,12 +41,18 @@ tab_gene_expression <- tabItem(
               )
             ),
             uiOutput("expression_projection_genes_in_separate_panels_UI"),
+            conditionalPanel(
+              "input.expression_projection_genes_in_separate_panels == 'rgb'",
+              selectInput("expression_rgb_layout", "RGB layout",
+                choices = c("Composite RGB" = "composite", "Separate channels" = "separate"),
+                selected = "composite")
+            ),
+            uiOutput("expression_projection_gene_color_mode_UI"),
             uiOutput("expression_projection_select_projection_UI"),
             uiOutput(
               "expression_projection_input_type_UI",
               class = "cerebro-gene-input-output"
             ),
-            uiOutput("expression_projection_gene_color_mode_UI"),
             uiOutput("expression_genes_displayed")
           ),
           cerebroToolbarActions(
@@ -63,11 +69,7 @@ tab_gene_expression <- tabItem(
               tagList(
                 uiOutput("expression_projection_additional_parameters_UI"),
                 uiOutput("expression_projection_point_border_UI"),
-                checkboxInput(
-                  "expression_projection_keep_square",
-                  "Keep plots square",
-                  value = FALSE
-                )
+                uiOutput("expression_projection_keep_square_UI")
               ),
               cerebroInfoButton(
                 "expression_projection_additional_parameters_info"
@@ -100,7 +102,7 @@ tab_gene_expression <- tabItem(
           role = "status",
           `aria-live` = "polite",
           `aria-atomic` = "true",
-          "Choose a gene to explore expression."
+          hidden = NA
         ),
         cerebroCellViewOutput("expression_projection")
       )
@@ -127,16 +129,22 @@ tab_gene_expression <- tabItem(
       var target = document.getElementById('expression_summary_gate');
       if (!target || target.dataset.observed) return;
       target.dataset.observed = 'true';
+      // The observer reports the initial state before Shiny has connected;
+      // keep the latest state and publish it once the input API exists.
+      var visible = null;
+      function publish() {
+        if (visible === null || !window.Shiny ||
+            typeof Shiny.setInputValue !== 'function') return;
+        Shiny.setInputValue('expression_summary_viewport_request', visible);
+      }
       var observer = new IntersectionObserver(function (entries) {
-        if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
-        Shiny.setInputValue(
-          'expression_summary_viewport_request',
-          Date.now(),
-          {priority: 'event'}
-        );
-        observer.disconnect();
+        visible = entries.some(function (entry) {
+          return entry.isIntersecting && entry.intersectionRatio >= 0.25;
+        });
+        publish();
       }, {threshold: 0.25});
       observer.observe(target);
+      if (window.jQuery) window.jQuery(document).on('shiny:connected', publish);
     })();
     "
   )) #,

@@ -45,6 +45,88 @@ window.viewerScenarios = {
     t.check(paints.length>0&&paints.every(e=>e.renderToken===b.render_token),'Stale paint cannot announce readiness');
     return true;
   },
+  async genePanels() {
+    const t = viewerTest, errors = [];
+    const onError = event => errors.push(event.message || String(event.reason));
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onError);
+    t.dataset();
+    try {
+      for (const binary of [false, true]) {
+        for (const packed of [false, true]) {
+          // Every transition receives exactly one frame: a later update must
+          // not be needed to recover from a failed first paint.
+          for (const genes of [[], ['A', 'B'], ['B', 'C', 'D'], ['C'], []]) {
+            const values = Object.fromEntries(genes.map((gene, i) =>
+              [gene, [i, i + 1, i + 2]]));
+            const data = genes.length ? packed ? {
+              color: null,
+              packed_colors: Object.fromEntries(Object.entries(values).map(([gene, color]) =>
+                [gene, {protocol: 'dense-f64-v1', length: 3, color}]))
+            } : {color: values} : {color: [0, 1, 2]};
+            t.resetPaint();
+            const frame = await t.render(data, {space_label: 'UMAP'},
+              'expression_projection', {}, binary);
+            const panes = Array.from(document.querySelectorAll(
+              '#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));
+            t.equal(panes.map(p => p.querySelector('.cv-ptitle').textContent),
+              genes.length ? genes : ['GENE'], 'Visible gene panels');
+            for (const pane of panes) {
+              const canvas = pane.querySelector('.cv-canvas-wrap > canvas:not(.cv-mini)');
+              t.check(t.arcs(canvas.id).length >= 3, 'Each panel paints its cells');
+            }
+            t.check(t.events.some(e => e.name === 'cerebro:cell-view-ready' &&
+              e.painted && e.renderToken === frame.render_token), 'First frame completes');
+            t.equal(errors, [], 'No errors while changing panel count');
+          }
+        }
+      }
+    } finally {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onError);
+    }
+    return true;
+  },
+  async rgbLayouts() {
+    const t = viewerTest; t.dataset();
+    const channels = ['r', 'g', 'b'];
+    const values = {r: [0, 2, 4], g: [0, 10, 20], b: [0, 2, 4]};
+    const genes = {r: 'A', g: 'B', b: 'A'};
+    const pixels = id => t.arcs(id).slice(-3).map(p => p.fill);
+    const reference = {};
+    for (const channel of channels) {
+      t.resetPaint();
+      await t.render({rgb: {[channel]: values[channel]}, rgb_genes: {[channel]: genes[channel]}},
+        {color_type: 'rgb', rgb_layout: 'composite'});
+      reference[channel] = pixels('cv-cv-a');
+    }
+    for (const binary of [false, true]) {
+      const packed_rgb = Object.fromEntries(channels.map(channel => [channel,
+        {protocol: 'dense-f64-v1', length: 3, color: values[channel]}]));
+      for (const layout of ['composite', 'separate', 'composite', 'separate']) {
+        t.resetPaint();
+        const frame = await t.render({packed_rgb, rgb_genes: genes},
+          {color_type: 'rgb', rgb_layout: layout}, 'expression_projection', {}, binary);
+        const panes = Array.from(document.querySelectorAll(
+          '#expression_projection_cell_view_host .cv-pane:not(.cv-hidden)'));
+        t.equal(panes.length, layout === 'separate' ? 3 : 1);
+        t.check(t.events.some(e => e.painted && e.renderToken === frame.render_token), 'Layout paint completes');
+        if (layout === 'separate') {
+          t.equal(panes.map(p => p.querySelector('.cv-ptitle').textContent), ['R · A', 'G · B', 'B · A']);
+          channels.forEach((channel, i) => t.equal(pixels('cv-cv-' + String.fromCharCode(97 + i)),
+            reference[channel], 'Split channel uses composite intensities and colours'));
+          t.check(document.getElementById('cv-legend').textContent.includes('G · B: 0–20.0'),
+            'Separate channels publish their own numeric ranges');
+        }
+      }
+      await t.render({packed_rgb, rgb_genes: {r: 'A', g: '', b: 'A'}},
+        {color_type: 'rgb', rgb_layout: 'separate'}, 'expression_projection', {}, binary);
+      t.equal(Array.from(document.querySelectorAll(
+        '#expression_projection_cell_view_host .cv-pane:not(.cv-hidden) .cv-ptitle')).map(p => p.textContent),
+        ['R · A', 'B · A'], 'Empty channels omitted, repeated genes retain channel identity');
+    }
+    return true;
+  },
   async geometry() {
     const t=viewerTest;t.dataset();
     for(const [width,height] of [[620,220],[220,620]]) {

@@ -76,6 +76,12 @@ let
       biomaRt
       callr
       chromote
+      data_table
+      ggdendro
+      patchwork
+      fs
+      jsonlite
+      htmltools
       colourpicker
       devtools
       dplyr

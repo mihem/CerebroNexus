@@ -203,8 +203,18 @@ if (window.jQuery) {
     pendingFrame = schedule(function () { sendSnapshot(scope, source); });
   }
 
-  document.addEventListener('input', scheduleSnapshot, true);
-  document.addEventListener('change', scheduleSnapshot, true);
+  // Shiny/ionRangeSlider emit jQuery change events for drags and server-side
+  // updates (including Reset). Native listeners cannot see those events.
+  // jQuery also forwards native input/change, so use one path to avoid doubles.
+  if (window.jQuery) {
+    window.jQuery(document).on(
+      'input.cerebroSpatialBackground change.cerebroSpatialBackground',
+      scheduleSnapshot
+    );
+  } else {
+    document.addEventListener('input', scheduleSnapshot, true);
+    document.addEventListener('change', scheduleSnapshot, true);
+  }
 })();
 
 // The button says Copy, so copy the generated preset instead of only revealing
@@ -246,7 +256,8 @@ if (window.jQuery) {
       window.cerebroCellViews.summary &&
       window.cerebroCellViews.summary('spatial_projection');
     return !summary || !summary.ready ||
-      summary.backgroundIdentity === incomingIdentity;
+      summary.backgroundIdentity === incomingIdentity ||
+      (summary.backgroundIdentities || []).indexOf(incomingIdentity) >= 0;
   }
 
   function copyText(text) {

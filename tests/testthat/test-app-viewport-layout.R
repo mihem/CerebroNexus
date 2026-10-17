@@ -319,11 +319,16 @@ test_that("shared selection actions and layouts survive navigation and resize", 
     "(() => {",
     "const sidebar=document.querySelector('.main-sidebar').getBoundingClientRect();",
     "const content=document.querySelector('.content-wrapper').getBoundingClientRect();",
-    "return {overflow:getComputedStyle(document.querySelector('.sidebar-menu')).overflow,",
+    "const menu=getComputedStyle(document.querySelector('.sidebar-menu'));",
+    "return {overflowX:menu.overflowX,overflowY:menu.overflowY,",
     "sidebarLeft:sidebar.left,sidebarRight:sidebar.right,contentLeft:content.left};",
     "})()"
   ))
-  expect_identical(sidebar_hover$overflow, "hidden")
+  ## The menu scrolls vertically inside the flex column, with the preferences
+  ## block pinned below it. Hovering must still not introduce a horizontal
+  ## scrollbar or shift the sidebar, which the position checks below own.
+  expect_identical(sidebar_hover$overflowX, "hidden")
+  expect_true(sidebar_hover$overflowY %in% c("auto", "scroll"))
   expect_equal(
     sidebar_hover$sidebarLeft,
     sidebar_open$sidebarLeft,

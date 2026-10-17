@@ -122,6 +122,11 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   env$getGroups <- function() c("group", "missing")
   env$input <- list(ir_groupBy = "group")
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  viewer_server_load(
+    viewer_server_statements("immune_repertoire", "settings.R"),
+    env,
+    names = "ir_keep_selection"
+  )
   render <- ir_test_body("settings.R", "ir_main_params_UI", "renderUI", env)
   html <- as.character(render())
   expect_match(html, 'value="TRB"', fixed = TRUE)
@@ -182,4 +187,32 @@ test_that("Homeostasis renderer defers hydration and preserves analytical fallba
   pars$groupBy <- NULL
   order <- "alphanumeric"
   expect_error(render(), "analytical fallback")
+})
+
+test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
+  env <- new.env(parent = asNamespace("shiny"))
+  env$has_scRepertoire <- function() TRUE
+  env$ir_param <- function(...) "Abundance"
+  env$getImmuneRepertoireSummary <- function() {
+    list(available = TRUE, chains = c("TRA", "TRB"))
+  }
+  env$ir_data_raw <- function() stop("unexpected sidecar hydration")
+  env$detect_chains <- function(raw) character()
+  env$ir_global_control_visible <- function(...) TRUE
+  env$getMetaData <- function() data.frame(group = character())
+  env$getGroups <- function() "group"
+  env$input <- list(ir_groupBy = "group", ir_cloneCall = "aa", ir_chain = "TRB")
+  env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  viewer_server_load(
+    viewer_server_statements("immune_repertoire", "settings.R"),
+    env,
+    names = "ir_keep_selection"
+  )
+  render <- ir_test_body("settings.R", "ir_main_params_UI", "renderUI", env)
+  html <- as.character(render())
+  expect_match(html, '<option value="aa" selected>', fixed = TRUE)
+  expect_match(html, '<option value="TRB" selected>', fixed = TRUE)
+  ## A chain the new dataset lacks falls back to all chains.
+  env$input$ir_chain <- "IGH"
+  expect_match(as.character(render()), '<option value="both" selected>', fixed = TRUE)
 })

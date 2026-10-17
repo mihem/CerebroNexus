@@ -338,7 +338,7 @@ output$hla_additional_params_ui <- renderUI({
       "Node size:",
       min = HLA_NODE_SCALE_MIN,
       max = HLA_NODE_SCALE_MAX,
-      value = 1,
+      value = current_page_display_defaults("hla")$node_scale,
       step = 0.1
     ),
     tags$p(

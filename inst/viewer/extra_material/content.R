@@ -174,8 +174,8 @@ extra_material_info <- list(
   title = "Extra material",
   text = HTML(
     "
-    Here, additional material related to the data set can be stored. At the moment, only tables and plots made with ggplot2 are supported, but depending on user requests, support for others types of content can be added in the future.<br>
+    Browse tables and ggplot2 plots included with this dataset.<br>
     <br>
-    For an explanation of the specific content, please refer to the person who exported this data set."
+    Ask the dataset author for details about this material."
   )
 )

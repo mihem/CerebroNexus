@@ -297,11 +297,54 @@ body.skin-blue .main-sidebar {
   border-right: 1px solid var(--c-border) !important;
   box-shadow: none !important;
 }
-body.skin-blue .sidebar { padding-top: 4px; }
-body.skin-blue .sidebar-menu:hover { overflow: hidden; }
+body.skin-blue .sidebar {
+  display: flex; flex-direction: column; height: 100% !important;
+  min-height: 0; padding-top: 4px; padding-bottom: 0;
+}
+body.skin-blue .sidebar > .cerebro-brand,
+body.skin-blue .sidebar > .cerebro-dataset-switcher { flex-shrink: 0; }
+body.skin-blue .sidebar > .sidebar-menu {
+  flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto !important;
+}
+.cerebro-sidebar-preferences {
+  flex: 0 0 auto; margin: 8px 14px 0; padding: 12px 0 14px;
+  border-top: 1px solid var(--c-border);
+}
+.cerebro-preferences-heading {
+  margin-bottom: 7px; color: var(--c-text-2); font-size: 12px; font-weight: 600;
+}
+body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
+  width: 100%; min-width: 0; margin: 0; padding: 0;
+}
+.cerebro-sidebar-preferences .checkbox { margin: 0; }
+.cerebro-sidebar-preferences .checkbox label {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; min-height: 34px; padding: 0; font-size: 13px;
+  color: var(--c-text); font-weight: 400; cursor: pointer;
+}
+.cerebro-sidebar-preferences input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; position: relative;
+  order: 2; flex: 0 0 30px; width: 30px; height: 18px; margin: 0;
+  border: 1px solid var(--c-border); border-radius: 10px;
+  background: #d1d5db; cursor: pointer; transition: background .15s ease;
+}
+.cerebro-sidebar-preferences input[type=checkbox]::before {
+  content: ''; display: block; width: 14px; height: 14px; margin: 1px;
+  border-radius: 50%; background: white; transition: transform .15s ease;
+}
+.cerebro-sidebar-preferences input[type=checkbox]:checked {
+  background: var(--c-amber); border-color: var(--c-amber);
+}
+.cerebro-sidebar-preferences input[type=checkbox]:checked::before { transform: translateX(12px); }
+.cerebro-sidebar-preferences input:focus-visible { outline: 2px solid var(--c-amber); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-sidebar-preferences input[type=checkbox],
+  .cerebro-sidebar-preferences input[type=checkbox]::before { transition: none; }
+}
 /* Brand block at the top of the sidebar. The inline SVG wordmark inherits the
    sidebar text colour, with an accent on "Nexus". */
 body.skin-blue .sidebar .cerebro-brand {
+  position: relative;
   color: var(--c-text) !important;
   padding: 18px 20px 12px;
   margin-bottom: 2px;
@@ -311,8 +354,58 @@ body.skin-blue .sidebar .cerebro-brand .cerebro-logo {
   width: 188px;
   height: auto;
 }
+/* Fit the version into the existing bottom padding without moving the menu. */
+body.skin-blue .sidebar .cerebro-brand-version {
+  position: absolute;
+  left: 20px;
+  bottom: 0;
+  width: 188px;
+  color: var(--c-text-2);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 11px;
+  text-align: right;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .cerebro-nav-close,
 #cerebro-nav-scrim { display: none; }
+/* Preserve canvas dimensions for progressive loading, then reveal the complete
+   Linked workspace. A lone primary projection is not the finished layout. */
+.linked-views-page.cv-workspace-pending .cv-panes,
+.linked-views-page.cv-workspace-pending #cv-legend,
+.linked-views-page.cv-workspace-pending #cv-cbar { visibility: hidden; }
+
+/* Global dataset control uses the same selectize surface as page controls. */
+.cerebro-dataset-switcher:not(:empty) {
+  margin: 0 14px 10px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--c-border);
+}
+body .sidebar .cerebro-dataset-switcher .shiny-input-container {
+  margin: 0; padding: 0; width: 100%;
+}
+.cerebro-dataset-switcher .selectize-control {
+  min-width: 0; max-width: 100%; margin-bottom: 0;
+}
+body .sidebar .cerebro-dataset-switcher label {
+  color: var(--c-text-2); font-size: 12px; font-weight: 600;
+  margin-bottom: 6px;
+}
+body .cerebro-dataset-switcher .selectize-input {
+  display: flex; align-items: center; flex-wrap: nowrap;
+  min-height: 40px; padding-right: 28px !important;
+}
+body .cerebro-dataset-switcher .selectize-input > .item {
+  display: block; flex: 0 1 auto; max-width: 100%;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body .cerebro-dataset-switcher .selectize-dropdown .option {
+  height: auto; max-height: none; line-height: 1.45;
+  white-space: normal; overflow-wrap: anywhere; word-break: normal;
+  overflow: visible; text-overflow: clip;
+}
+.cerebro-dataset-switcher { --cerebro-select-menu-max-height: 240px; }
 body.skin-blue .sidebar-menu > li { position: relative; }
 body.skin-blue .sidebar-menu > li > a {
   color: var(--c-text) !important;
@@ -528,7 +621,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .cerebro-viz-primary {
   display: flex;
-  flex: 1 1 0;
+  flex: 1 1 640px;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
@@ -538,23 +631,22 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   display: contents;
 }
 .cerebro-gene-rgb-row {
-  display: grid; grid-template-columns: repeat(3, minmax(132px, 1fr));
-  gap: 8px; flex: 1 1 430px; min-width: min(430px, 100%);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr));
+  gap: 8px; min-width: 0;
 }
 .cerebro-gene-rgb-channel,
 .cerebro-gene-rgb-row .form-group { min-width: 0; margin-bottom: 0; }
-.cerebro-viz-toolbar .form-group,
-.coordviews-page .cv-topbar > .cv-ctl {
-  flex: 0 1 var(--c-control-width);
-  width: var(--c-control-width);
+.cerebro-viz-toolbar .form-group {
+  flex: 1 1 180px;
+  width: 100%;
   min-width: min(var(--c-select-min-width), 100%);
   max-width: 100%;
   margin-bottom: 0;
 }
-.cerebro-viz-toolbar .form-group.cerebro-multiselect-host.cerebro-multiselect-expanded,
-.coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host.cerebro-multiselect-expanded {
-  flex-basis: var(--cerebro-multiselect-width, var(--c-control-width));
-  width: var(--cerebro-multiselect-width, var(--c-control-width));
+/* Multi-value fields get more of each row; CSS also reacts to drawer/sidebar
+   and container resizing without measuring every selected chip in JavaScript. */
+.cerebro-viz-toolbar .form-group:has(select[multiple]) {
+  flex: 3 1 280px;
 }
 .cerebro-viz-toolbar .cerebro-multiselect,
 .coordviews-page .cv-topbar .cerebro-multiselect {
@@ -565,14 +657,21 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   align-self: center;
 }
 .cerebro-viz-toolbar .shiny-panel-conditional {
-  flex: 1 1 auto;
+  flex: 1 1 180px;
   min-width: 0;
 }
 .cerebro-viz-toolbar .shiny-panel-conditional:has(> .form-group) {
-  flex: 0 1 var(--c-control-width);
-  width: var(--c-control-width);
+  /* Keep a real box: Shiny uses jQuery visibility checks when toggling it. */
+  flex: 1 1 180px;
   min-width: min(var(--c-select-min-width), 100%);
   max-width: 100%;
+}
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .form-group select[multiple]) {
+  flex: 3 1 280px;
+}
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .cerebro-gene-rgb-row) {
+  flex: 3 1 430px;
+  min-width: min(430px, 100%);
 }
 .cerebro-viz-toolbar .spatial-rgb-controls {
   display: flex;
@@ -582,8 +681,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .cerebro-viz-toolbar .spatial-rgb-controls .form-group {
   flex: 1 1 180px;
-  min-width: 180px;
-  max-width: 240px;
+  min-width: min(180px, 100%);
 }
 .cerebro-viz-toolbar .control-label,
 .coordviews-page .cv-ctl > label {
@@ -676,8 +774,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .cerebro-viz-primary .ir-flow-control-item {
   flex: 1 1 180px !important;
-  min-width: 180px !important;
-  max-width: 240px;
+  min-width: min(180px, 100%) !important;
 }
 .cerebro-gene-validation {
   display: inline-flex;
@@ -794,6 +891,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   position: fixed;
   z-index: 1600;
   inset: 0 0 0 auto;
+  right: var(--cerebro-drawer-right, 0px);
   width: clamp(400px, 30vw, 480px);
   max-width: calc(100vw - 24px);
   height: 100vh;
@@ -802,7 +900,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   border: 1px solid var(--c-border);
   border-radius: 12px 0 0 12px;
   background: var(--c-surface);
-  background: color-mix(in srgb, var(--c-surface) 90%, transparent);
   box-shadow: -12px 0 34px rgba(0, 0, 0, .16);
   opacity: 0;
   pointer-events: none;
@@ -816,7 +913,14 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   opacity: 1;
   pointer-events: auto;
 }
+@media (min-width: 901px) {
+  .cerebro-settings-drawer.is-floating {
+    border-radius: 12px;
+    box-shadow: 0 4px 28px rgba(0, 0, 0, .14);
+  }
+}
 .cerebro-settings-titlebar {
+  position: relative;
   display: flex;
   flex: 0 0 52px;
   align-items: center;
@@ -825,6 +929,58 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   font-size: 14px;
   font-weight: 700;
 }
+.cerebro-settings-drag {
+  position: absolute;
+  top: 0;
+  left: calc(50% - 44px);
+  width: 88px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.cerebro-settings-drag::before {
+  content: '';
+  display: block;
+  width: 46px;
+  height: 5px;
+  margin: auto;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--c-border), 0 1px 3px rgba(0, 0, 0, .12);
+}
+.cerebro-settings-drag:hover::before,
+.cerebro-settings-drag:focus-visible::before {
+  background: var(--c-amber-700);
+  box-shadow: none;
+}
+.cerebro-settings-drag:focus-visible { outline: 2px solid var(--c-amber-700); outline-offset: -2px; }
+.cerebro-settings-drawer.is-dragging .cerebro-settings-drag { cursor: grabbing; }
+.cerebro-settings-drag-tip {
+  position: absolute;
+  top: 33px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--c-text);
+  color: var(--c-surface);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+  z-index: 2;
+}
+.cerebro-settings-drag:hover .cerebro-settings-drag-tip,
+.cerebro-settings-drag:focus-visible .cerebro-settings-drag-tip { visibility: visible; }
+.cerebro-settings-drawer.is-dragging .cerebro-settings-drag-tip { visibility: hidden; }
 .cerebro-settings-close {
   width: 32px;
   height: 32px;
@@ -878,7 +1034,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .cerebro-settings-content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
   gap: 14px 22px;
   align-items: start;
 }
@@ -891,6 +1047,8 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 }
 .cerebro-settings-content .form-group,
 .cerebro-settings-content .checkbox {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   margin: 0;
 }
@@ -1081,6 +1239,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   border-radius: 50%;
 }
 @media (max-width: 900px) {
+  .cerebro-settings-drag { display: none; }
   .cerebro-settings-drawer {
     inset: 0;
     width: 100vw;
@@ -1619,6 +1778,14 @@ body .bootstrap-select {
   overflow: visible !important;
   white-space: normal !important;
 }
+/* Selected labels remain in flow, including names wider than the control. */
+.cerebro-viz-toolbar .selectize-control.multi .selectize-input > .item,
+.coordviews-page .cv-topbar .selectize-control.multi .selectize-input > .item {
+  flex: 0 1 auto !important;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 /* The dropdown is an overlay: give BOTH the outer panel and its inner content
    a solid white fill and a high z-index, or the options render over a
    see-through panel (page content shows through) and clicks miss. */
@@ -1684,19 +1851,6 @@ body .selectize-control.plugin-remove_button .item .remove {
 }
 body .selectize-control.plugin-remove_button .item .remove:hover {
   background: var(--c-amber-100);
-}
-
-@media (max-width: 767px) {
-  .cerebro-viz-toolbar .form-group,
-  .cerebro-viz-toolbar .form-group.cerebro-multiselect-host,
-  .cerebro-viz-toolbar .form-group.cerebro-multiselect-host.cerebro-multiselect-expanded,
-  .coordviews-page .cv-topbar > .cv-ctl,
-  .coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host,
-  .coordviews-page .cv-topbar > .cv-ctl.cerebro-multiselect-host.cerebro-multiselect-expanded {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: none;
-  }
 }
 
 body label, body .control-label {
@@ -2024,9 +2178,21 @@ body .shiny-progress-container .progress-detail  { color: var(--c-text-2) !impor
 .cerebro-dataset-loading {
   position: fixed; inset: 0; z-index: 20000;
   display: grid; place-items: center; padding: 24px;
-  background: var(--c-bg);
+  /* Keep the workspace recognisable instead of replacing it with a blank page. */
+  background: rgba(20, 24, 32, .10);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .12s ease-out;
 }
+.cerebro-dataset-loading.is-visible { opacity: 1; }
 .cerebro-dataset-loading[hidden] { display: none; }
+/* Keep the global picker and navigation available during a dataset change. */
+@media (min-width: 768px) {
+  body:not(.sidebar-collapse) .cerebro-dataset-loading { left: 230px; }
+}
+html body.skin-blue.cerebro-dataset-is-loading .main-header { z-index: 20003 !important; }
+html body.skin-blue.cerebro-dataset-is-loading .main-sidebar { z-index: 20004 !important; }
+html body.skin-blue.cerebro-dataset-is-loading #cerebro-nav-scrim { z-index: 20002 !important; }
 .cerebro-dataset-loading-card {
   box-sizing: border-box; width: min(430px, calc(100vw - 48px));
   padding: 24px 26px 20px;
@@ -2050,7 +2216,7 @@ body .shiny-progress-container .progress-detail  { color: var(--c-text-2) !impor
 }
 .cerebro-dataset-loading-track span {
   display: block; width: 0; height: 100%; border-radius: inherit;
-  background: var(--c-amber); transition: width .2s var(--ease);
+  background: var(--c-amber);
 }
 .cerebro-dataset-loading-meta {
   display: flex; justify-content: space-between; margin-top: 8px;
@@ -2123,6 +2289,33 @@ body .shiny-spinner-output-container > .load-container {
   border-bottom: 1px solid var(--c-border);
   margin: -4px 0 10px;
   min-height: 44px;
+}
+.cerebro-feedback-region { position: relative; }
+.cerebro-local-feedback {
+  position: absolute;
+  z-index: 25;
+  top: 48px;
+  right: 12px;
+  max-width: min(440px, calc(100% - 24px));
+  min-height: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  pointer-events: none;
+}
+.cerebro-local-feedback[hidden] { display: none; }
+.cerebro-local-feedback.is-error { pointer-events: auto; }
+body .cerebro-local-feedback.is-pending::before {
+  width: 12px; height: 12px; vertical-align: -2px; margin-right: 6px;
+}
+.cerebro-view-terminal > .cerebro-local-feedback { visibility: visible; }
+.cerebro-page-initializing .cerebro-local-feedback,
+body.cerebro-dataset-is-loading .cerebro-local-feedback,
+.tab-pane.active:has(.cerebro-page-loader.is-visible) .cerebro-local-feedback.is-pending {
+  visibility: hidden;
 }
 .cerebro-view-feedback.is-error { color: #a13a2b; }
 .cerebro-view-terminal { visibility: hidden; }
@@ -2231,7 +2424,16 @@ body .shiny-progress-container .progress-detail {
   visibility: hidden;
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .cerebro-dataset-loading {
+    background: transparent;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .cerebro-dataset-loading,
+  .cerebro-dataset-loading-track span { transition: none; }
+  .cerebro-dataset-loading-kicker::before { animation: none; }
   .cerebro-page-loader { transition: none; }
   .cerebro-page-loader-spinner { animation: none; }
   .cerebro-view-feedback { transition: none; }
@@ -2825,14 +3027,8 @@ body .shiny-bound-output.cerebro-output-waiting {
   flex: 1;
   min-width: 0;
 }
-.ir-plot-help-title {
-  color: var(--c-text);
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.3;
-}
 .ir-plot-help-summary {
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--c-text-3);
   font-size: 11.5px;
   line-height: 1.35;
@@ -2979,6 +3175,21 @@ body .shiny-bound-output.cerebro-output-waiting {
    Reserve real layout space, without an animated skeleton or a reveal gate. */
 .cerebro-groups-controls { min-height: 246px; }
 .cerebro-result-controls { min-height: 90px; }
+.cerebro-groups-controls:not(:empty) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 0;
+}
+.cerebro-groups-controls > .form-group {
+  flex: 1 1 240px;
+}
+.cerebro-groups-controls > .row,
+.cerebro-groups-controls > p { flex: 1 1 100%; margin-inline: 0; }
+.cerebro-groups-controls .form-group,
+.cerebro-result-controls .form-group {
+  width: 100%; min-width: 0; max-width: 100%; margin-inline: 0;
+}
 .cerebro-result-slot { min-height: 460px; }
 .cerebro-result-slot:has(> p:only-child) { min-height: 0; }
 .cerebro-dataset-stats .shiny-html-output { min-height: 104px; }
@@ -3007,4 +3218,125 @@ body .shiny-bound-output.cerebro-output-waiting {
 @media (max-width: 767px) {
   .cerebro-groups-controls { min-height: 320px; }
   .cerebro-result-controls { min-height: 170px; }
+}
+
+.cerebro-viz-toolbar .shiny-panel-conditional:has(> .spatial-image-dim-controls) {
+  flex: 2 1 370px;
+}
+.cerebro-viz-toolbar .spatial-image-dim-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.cerebro-viz-toolbar .spatial-image-dim-controls .form-group {
+  flex: 1 1 180px;
+}
+.cerebro-viz-toolbar .spatial-roi-background-picker {
+  flex: 0 1 var(--c-control-width);
+  width: var(--c-control-width);
+  min-width: min(var(--c-select-min-width), 100%);
+}
+
+/* Background chips use the space beside actions before adding vertical rows.
+   Flex wrapping follows the actual container, including sidebar changes. */
+.cerebro-spatial-background-row {
+  display: flex; flex: 1 0 100%; flex-wrap: wrap;
+  align-items: flex-end; gap: 10px; min-width: 0; max-width: 100%;
+}
+.cerebro-spatial-background-row > #spatial_projection_background_selector_UI {
+  display: block; flex: 1 1 280px; min-width: min(280px, 100%);
+}
+.cerebro-viz-toolbar .cerebro-spatial-background-row .spatial-roi-background-picker,
+.cerebro-viz-toolbar .cerebro-spatial-background-row .form-group {
+  flex: 1 1 auto; width: 100%; min-width: 0; max-width: 100%;
+}
+
+/* Layout controls follow Info in the heading, wrapping only when needed. */
+.cerebro-page-feedback { display: flex; align-items: center; gap: 12px; }
+.cerebro-page-feedback[hidden] { display: none; }
+.cerebro-page-initializing .cerebro-viz-toolbar,
+.cerebro-page-initializing .cv-controls { visibility: hidden; }
+.cerebro-page-initializing .cerebro-page-feedback,
+.cerebro-page-initializing #expression_feedback { display: none; }
+#shiny-tab-groups:has([data-composition-unavailable]) > .row:has(#groups_by_other_group_plot) {
+  display: none;
+}
+.cerebro-starting .cerebro-dataset-loading { visibility: hidden; }
+#cerebro-startup [hidden] { display: none !important; }
+#cerebro-startup svg { width: 200px; height: auto; display: block; }
+.cerebro-groups-controls:has([data-composition-unavailable]) { min-height: 0; }
+.cerebro-feedback-text { flex: 1; min-width: 0; }
+.cerebro-viz-page-heading:has(.cerebro-page-feedback:not([hidden])) {
+  flex-wrap: wrap;
+}
+.cerebro-viz-page-heading > .cerebro-page-feedback {
+  flex: 0 0 auto; min-height: 0; max-width: 100%; margin: 0; padding: 0;
+  border: 0; background: transparent; box-shadow: none;
+}
+.cerebro-layout-switch {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  max-width: 100%; color: var(--c-text-2); font-size: 12px;
+}
+.cerebro-layout-label { font-weight: 500; white-space: nowrap; }
+.cerebro-layout-segments {
+  display: inline-flex; gap: 3px; padding: 3px; border-radius: 8px;
+  border: 1px solid var(--c-border); background: var(--c-surface);
+}
+.cerebro-layout-segments button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 28px; padding: 4px 9px; border: 1px solid transparent;
+  border-radius: 5px; background: transparent; color: var(--c-text-2);
+  cursor: pointer; font: inherit; font-weight: 500; line-height: 1.2;
+  touch-action: manipulation; white-space: nowrap;
+}
+.cerebro-layout-segments button[aria-pressed="true"] {
+  border-color: var(--c-amber-200); background: var(--c-amber-50); color: var(--c-amber-700);
+}
+.cerebro-layout-segments button:hover { color: var(--c-amber-700); }
+.cerebro-layout-segments button:focus-visible { outline: 2px solid var(--c-amber-700); outline-offset: 2px; }
+.cerebro-layout-icon {
+  display: inline-block; box-sizing: border-box; flex-shrink: 0;
+  width: 14px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px;
+}
+.cerebro-layout-icon.is-square { width: 12px; height: 12px; }
+@media (max-width: 767px) {
+  .cerebro-viz-page-heading > .cerebro-page-feedback { grid-column: 1 / -1; grid-row: 3; }
+}
+@media (pointer: coarse) {
+  .cerebro-layout-segments button { min-height: 44px; }
+}
+/* Dataset overview: compact metadata, lightweight HTML composition bars. */
+.dataset-overview { margin-top: 22px; color: #292b30; }
+.dataset-summary-heading h2 { margin: 0 0 10px; font-size: 26px; font-weight: 650; overflow-wrap: anywhere; }
+.dataset-description, .dataset-source p { white-space: pre-line; overflow-wrap: anywhere; max-width: 85ch; line-height: 1.6; }
+.dataset-meta { display: flex; flex-wrap: wrap; gap: 8px 22px; color: #656872; font-size: 14px; }
+.dataset-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1px; margin: 24px 0; border: 1px solid #e6e6ea; border-radius: 14px; background: #e6e6ea; overflow: hidden; }
+.dataset-stat { background: #fff; padding: 20px 24px; display: flex; flex-direction: column; gap: 4px; }
+.dataset-stat strong { font-size: clamp(26px, 2.7vw, 36px); line-height: 1.2; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dataset-stat > span { color: #656872; font-size: 14px; }
+.dataset-compositions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 20px; align-items: start; }
+.dataset-panel { min-width: 0; background: #fff; border: 1px solid #e6e6ea; border-radius: 14px; padding: 22px 24px; }
+.dataset-overview h3 { margin: 0 0 14px; font-size: 17px; font-weight: 650; }
+.dataset-note { color: #6a6c75; font-size: 13px; margin: 6px 0 16px; }
+.dataset-panel .form-group { margin-bottom: 18px; }
+.dataset-bars { display: grid; gap: 11px; }
+.dataset-bar-row { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(55px, 1.35fr) 100px; gap: 14px; align-items: center; }
+.dataset-bar-label { font-size: 13px; overflow-wrap: anywhere; }
+.dataset-bar-track { background: #f2f2f5; height: 8px; border-radius: 4px; overflow: hidden; }
+.dataset-bar-track > span { display: block; background: #ef944e; height: 100%; border-radius: inherit; }
+.dataset-bar-value { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dataset-bar-value small { display: inline-block; color: #6a6c75; min-width: 44px; margin-left: 8px; }
+.dataset-explore, .dataset-source { margin-top: 28px; }
+.dataset-explore-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.dataset-explore-link { position: relative; display: block; padding: 16px 40px 16px 18px; color: #34363d !important; background: #fff; border: 1px solid #e6e6ea; border-radius: 10px; }
+.dataset-explore-link strong, .dataset-explore-link small { display: block; overflow-wrap: anywhere; }
+.dataset-explore-link small { color: #6a6c75; margin-top: 4px; font-size: 13px; }
+.dataset-link-arrow { position: absolute; right: 17px; top: 18px; color: #b94f05; }
+.dataset-explore-link:hover { border-color: #f0ba92; background: #fff8f3; }
+.dataset-explore-link:focus-visible { outline: 2px solid #c85a0b; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .dataset-panel { padding: 18px 16px; }
+  .dataset-stat { padding: 16px; }
+  .dataset-bar-row { gap: 8px; grid-template-columns: minmax(70px, 1fr) minmax(40px, 1fr) 92px; }
 }

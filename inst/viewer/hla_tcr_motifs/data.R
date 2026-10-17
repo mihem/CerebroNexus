@@ -57,7 +57,9 @@ hla_ir_annotated <- reactive({
     tryCatch(getMetaData(), error = function(e) NULL)
   )
 }) %>%
-  hla_bindCache(available_crb_files$selected)
+  ## Packed segments are per chain; without the chain in the key a chain
+  ## switch returned the previous chain's segments.
+  hla_bindCache(hla_active_chain(), available_crb_files$selected)
 
 ## ---- Analysis cohort filters ----------------------------------------- ##
 ## Motif construction is quadratic within CDR3-length bins, so an atlas-scale
@@ -276,6 +278,10 @@ hla_ir_samples <- reactive({
 ## ---- Read a build/display parameter with a default -------------------- ##
 hla_param <- function(id, default = NULL) {
   v <- input[[id]]
+  if (id %in% c("hla_legend_mode", "hla_node_scale")) {
+    display <- current_page_display_defaults("hla")
+    default <- display[[sub("^hla_", "", id)]]
+  }
   if (is.null(v)) default else v
 }
 

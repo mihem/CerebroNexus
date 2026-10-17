@@ -24,6 +24,53 @@
 ## scatter plot is never re-rendered when the user nudges the background — the
 ## dimensional-reduction plot stays a function of its own parameters alone.
 ##----------------------------------------------------------------------------##
+## Session-local overrides, keyed by dataset generation and the complete image
+## identity. Never assign into Cerebro.options, CRB data, or image descriptors.
+spatial_background_edits <- new.env(parent = emptyenv())
+spatial_background_edit_key <- function(identity) {
+  as.character(jsonlite::toJSON(list(
+    context = viewer_loaded_dataset_context(),
+    image = identity[sort(names(identity))]
+  ), auto_unbox = TRUE, null = "null"))
+}
+## Publish only background scope changes. Sampling, colours and point styling
+## may invalidate plot parameters, but must not replace mounted image controls.
+spatial_background_edit_model <- reactiveVal(NULL)
+observe({
+  parameters <- spatial_projection_parameters_plot()
+  model <- parameters[c("roi_mode", "roi_backgrounds", "background_identity",
+                         "background_descriptor", "projection")]
+  if (!identical(isolate(spatial_background_edit_model()), model)) {
+    spatial_background_edit_model(model)
+  }
+}, priority = 900)
+spatial_background_edit_target <- reactive({
+  parameters <- spatial_background_edit_model()
+  if (identical(parameters$roi_mode, "separate")) {
+    targets <- Filter(function(x) !is.null(x$descriptor), parameters$roi_backgrounds)
+    if (!length(targets)) return(NULL)
+    selected <- input[["spatial_projection_background_target"]]
+    if (is.null(selected) || !selected %in% names(targets)) selected <- names(targets)[[1L]]
+    target <- targets[[selected]]
+    target$roi <- selected
+    return(target)
+  }
+  if (is.null(parameters$background_identity)) return(NULL)
+  list(identity = parameters$background_identity,
+       descriptor = parameters$background_descriptor,
+       preset = spatial_background_preset(Cerebro.options,
+         viewer_current_dataset_key(), input[["spatial_projection_to_display"]],
+         parameters$background_descriptor))
+})
+spatial_background_edit_preset <- function(target) {
+  if (is.null(target)) return(NULL)
+  edit <- spatial_background_edits[[spatial_background_edit_key(target$identity)]]
+  if (is.null(edit)) return(target$preset)
+  edit$rotation <- edit$rotate
+  edit$rotate <- NULL
+  utils::modifyList(target$preset, edit)
+}
+
 observeEvent(
   input[["spatial_projection_background_controls"]],
   {
@@ -36,8 +83,7 @@ observeEvent(
         dataset_context
       )
     )
-    plot_parameters <- spatial_projection_parameters_plot()
-    background_identity <- plot_parameters[["background_identity"]]
+    background_identity <- spatial_background_edit_target()$identity
     req(
       !is.null(background_identity),
       spatial_background_identity_equal(
@@ -67,9 +113,7 @@ observeEvent(
       NULL
     }
 
-    cerebroCellViewBackground(
-      id = "spatial_projection",
-      values = list(
+    clean_values <- list(
         opacity = finite_value("opacity"),
         offsetX = finite_value("offsetX"),
         offsetY = finite_value("offsetY"),
@@ -78,7 +122,12 @@ observeEvent(
         scaleX = finite_value("scaleX"),
         scaleY = finite_value("scaleY"),
         rotate = finite_value("rotate")
-      ),
+      )
+    clean_values <- Filter(Negate(is.null), clean_values)
+    spatial_background_edits[[spatial_background_edit_key(background_identity)]] <- clean_values
+    cerebroCellViewBackground(
+      id = "spatial_projection",
+      values = clean_values,
       dataset_context = dataset_context,
       background_identity = background_identity
     )
@@ -119,35 +168,15 @@ observeEvent(input[["spatial_projection_background_scale"]], {
 ## Reset every background-image adjustment to the shared preset.
 ##----------------------------------------------------------------------------##
 observeEvent(input[["spatial_projection_background_reset"]], {
-  spatial_name <- input[["spatial_projection_to_display"]]
-  dataset <- spatial_dataset_name(
-    if (exists("available_crb_files")) available_crb_files$files else NULL,
-    if (exists("available_crb_files")) available_crb_files$selected else NULL
-  )
-  spatial_data <- tryCatch(
-    getSpatialData(spatial_name),
-    error = function(e) list()
-  )
-  selected_descriptor <- resolve_spatial_background(
-    input[["spatial_projection_background_image"]],
-    embedded_spatial_images(spatial_data),
-    configured_spatial_images(
-      if (exists("Cerebro.options")) Cerebro.options else NULL,
-      dataset,
-      spatial_name
-    )
-  )
-  image_label <- if (is.null(selected_descriptor)) {
-    NULL
-  } else {
-    selected_descriptor$label
-  }
-  preset <- spatialImagePreset(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    dataset,
-    spatial_name,
-    image_label
-  )
+  target <- spatial_background_edit_target()
+  req(target)
+  preset <- target$preset
+  values <- preset
+  values$rotate <- values$rotation
+  values$rotation <- NULL
+  spatial_background_edits[[spatial_background_edit_key(target$identity)]] <- values
+  cerebroCellViewBackground(id = "spatial_projection", values = values,
+    dataset_context = viewer_loaded_dataset_context(), background_identity = target$identity)
   updateSliderInput(
     session,
     "spatial_projection_background_opacity",
@@ -271,15 +300,15 @@ local({
 ## Copy alignment as preset.
 ##
 ## Reads the exact current dataset / spatial / image identity and renders one
-## canonical spatial_image_settings leaf. No Background has no image identity,
-## so it deliberately produces no snippet.
+## canonical spatial_image_settings leaf. An empty selection has no image
+## identity, so it deliberately produces no snippet.
 ##----------------------------------------------------------------------------##
 spatial_preset_code <- reactiveVal(NULL)
 
 observeEvent(
   list(
     viewer_loaded_dataset_context(),
-    spatial_projection_parameters_plot()[["background_identity"]]
+    spatial_background_edit_target()$identity
   ),
   spatial_preset_code(NULL),
   ignoreInit = TRUE
@@ -288,32 +317,11 @@ observeEvent(
 observeEvent(input[["spatial_projection_background_copy_preset"]], {
   dataset_context <- viewer_loaded_dataset_context()
   spatial_name <- input[["spatial_projection_to_display"]]
-  dataset <- spatial_dataset_name(
-    if (exists("available_crb_files")) available_crb_files$files else NULL,
-    if (exists("available_crb_files")) available_crb_files$selected else NULL
-  )
-  spatial_data <- tryCatch(
-    getSpatialData(spatial_name),
-    error = function(e) list()
-  )
-  descriptor <- resolve_spatial_background(
-    input[["spatial_projection_background_image"]],
-    embedded_spatial_images(spatial_data),
-    configured_spatial_images(
-      if (exists("Cerebro.options")) Cerebro.options else NULL,
-      dataset,
-      spatial_name
-    )
-  )
-  if (is.null(descriptor)) {
-    spatial_preset_code(NULL)
-    return()
-  }
-  background_identity <- spatial_background_identity(
-    dataset,
-    spatial_name,
-    descriptor
-  )
+  dataset_context <- viewer_loaded_dataset_context()
+  dataset <- dataset_context$dataset_key
+  target <- spatial_background_edit_target()
+  descriptor <- target$descriptor
+  background_identity <- target$identity
   if (is.null(background_identity)) {
     spatial_preset_code(NULL)
     return()
@@ -335,7 +343,7 @@ observeEvent(input[["spatial_projection_background_copy_preset"]], {
   code <- format_spatial_preset_code(
     dataset = dataset,
     spatial_name = spatial_name,
-    image_label = descriptor$label,
+    image_label = descriptor$key %||% descriptor$label,
     offset_x = null_to(input[["spatial_projection_background_offset_x"]], 0),
     offset_y = null_to(input[["spatial_projection_background_offset_y"]], 0),
     scale_x = null_to(scale_x, 1),
@@ -345,7 +353,7 @@ observeEvent(input[["spatial_projection_background_copy_preset"]], {
     rotation = null_to(input[["spatial_projection_background_rotate"]], 0),
     image_opacity = null_to(
       input[["spatial_projection_background_opacity"]],
-      0.6
+      0.5
     )
   )
   spatial_preset_code(code)

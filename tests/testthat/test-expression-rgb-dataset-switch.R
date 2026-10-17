@@ -202,3 +202,34 @@ test_that("obsolete selector retries cannot replace a new dataset's choices", {
     }
   )
 })
+
+test_that("a single-shot gene selector registers even when the selection moved", {
+  scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("utility_functions.R"), scope)
+  updates <- list()
+  scope$updateSelectizeInput <- function(session, inputId, choices, selected, ...) {
+    updates[[length(updates) + 1L]] <<- list(choices = choices, selected = selected)
+  }
+  shiny::testServer(
+    function(input, output, session) {
+      data_set <- shiny::reactiveVal("first")
+      environment(scope$serverSideGeneSelector) <- environment()
+      updateSelectizeInput <- scope$updateSelectizeInput
+      canonicalGeneSelection <- scope$canonicalGeneSelection
+      scope$serverSideGeneSelector(session, "expression_rgb_gene_r",
+        choices = function() c("SNAP25", "GAD1"), retry = FALSE,
+        canonical_selection = TRUE, refresh_on_activation = FALSE)
+    },
+    {
+      session$setInputs(expression_rgb_gene_r = "")
+      session$flushReact()
+      ## An RGB seed changes the channel before the delayed registration.
+      session$setInputs(expression_rgb_gene_r = "Snap25")
+      Sys.sleep(0.4)
+      later::run_now(0)
+      expect_length(updates, 1L)
+      expect_identical(updates[[1]]$selected, "SNAP25")
+      expect_identical(updates[[1]]$choices, c("GAD1", "SNAP25"))
+    }
+  )
+})

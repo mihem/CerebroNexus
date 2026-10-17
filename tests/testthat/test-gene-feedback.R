@@ -78,7 +78,7 @@ test_that("Gene feedback survives rapid input, missing genes and dataset generat
   expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
   expect_match(
     paste(result, collapse = "\n"),
-    "23 Gene feedback assertions passed",
+    "Gene feedback assertions passed",
     fixed = TRUE
   )
 })

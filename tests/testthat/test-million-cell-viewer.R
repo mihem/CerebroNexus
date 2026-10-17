@@ -876,6 +876,7 @@ test_that("Gene no-gene primary frame defers metadata until auxiliary data", {
     captured$dataset_context <- dataset_context
     captured$core_aux <- core_aux
     captured$data <- data
+    captured$meta <- meta
     captured$deferred_aux <- deferred_aux
   }
   sys.source(
@@ -916,6 +917,8 @@ test_that("Gene no-gene primary frame defers metadata until auxiliary data", {
 
   expect_identical(captured$data$selection_key, 1:3)
   expect_true(captured$data$shared_zero_color)
+  expect_identical(captured$meta$color_variable, "UMAP")
+  expect_false(captured$meta$show_color_scale)
   expect_identical(
     as.character(captured$deferred_aux()$selection_key),
     c("c3", "c1", "c2")

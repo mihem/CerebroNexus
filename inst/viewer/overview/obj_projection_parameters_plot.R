@@ -1,6 +1,7 @@
 ##----------------------------------------------------------------------------##
 ## Collect parameters for projection plot.
 ##----------------------------------------------------------------------------##
+cerebroObserveLocalAppearance("overview_projection", input, session)
 overview_projection_parameters_plot <- reactive({
   metadata <- viewerProjectionFirstFrameMetadata()
   projections <- availableProjections()
@@ -17,23 +18,17 @@ overview_projection_parameters_plot <- reactive({
   if (is.null(color_variable) || !color_variable %in% colnames(metadata)) {
     color_variable <- defaults$color_variable
   }
-  appearance <- current_scatter_defaults()
-  point_size <- input[["overview_projection_point_size"]]
-  if (is.null(point_size)) {
-    point_size <- appearance$point_size
-  }
-  point_opacity <- input[["overview_projection_point_opacity"]]
-  if (is.null(point_opacity)) {
-    point_opacity <- appearance$point_opacity
-  }
-  group_labels <- input[["overview_projection_group_labels"]]
+  appearance <- isolate(current_scatter_defaults())
+  display <- current_page_display_defaults("projection")
+  point_size <- appearance$point_size
+  point_opacity <- appearance$point_opacity
+  group_labels <- isolate(input[["overview_projection_group_labels"]])
   if (is.null(group_labels)) {
-    group_labels <- TRUE
+    group_labels <- display$group_labels
   }
   req(
     projection,
     color_variable,
-    !is.null(preferences[["use_webgl"]]),
     !is.null(preferences[["show_hover_info_in_projections"]])
   )
   projection_resource <- viewerProjectionAsset(
@@ -60,9 +55,13 @@ overview_projection_parameters_plot <- reactive({
     color_variable = color_variable,
     point_size = point_size,
     point_opacity = point_opacity,
-    draw_border = isTRUE(input[["overview_projection_point_border"]]),
+    draw_border = isTRUE(
+      isolate(input[["overview_projection_point_border"]]) %||% display$draw_border
+    ),
     group_labels = isTRUE(group_labels),
-    keep_square = isTRUE(input[["overview_projection_keep_square"]]),
+    keep_square = isTRUE(
+      isolate(input[["overview_projection_keep_square"]]) %||% display$keep_square
+    ),
     x_range = if (is.null(XYranges)) {
       list()
     } else {
@@ -73,7 +72,6 @@ overview_projection_parameters_plot <- reactive({
     } else {
       c(XYranges$y$min, XYranges$y$max)
     },
-    webgl = preferences[["use_webgl"]],
     hover_info = preferences[["show_hover_info_in_projections"]]
   )
   return(parameters)

@@ -4,27 +4,29 @@
 
 ##
 output[["preferences_options"]] <- renderUI({
+  preference <- function(id, label, value, help) {
+    control <- checkboxInput(id, label, value)
+    control <- htmltools::tagQuery(control)$find("input")$addAttrs(
+      role = "switch", `aria-describedby` = paste0(id, "_help")
+    )$allTags()
+    div(
+      class = "cerebro-preference", title = help, `data-help` = help,
+      control,
+      tags$span(id = paste0(id, "_help"), class = "sr-only", help)
+    )
+  }
   tagList(
-    h3(
-      "Preferences",
-      tags$span(class = "cerebro-advanced-tag", "advanced")
-    ),
-    tags$p(
-      class = "cerebro-advanced-hint",
-      "Optional performance settings — the defaults work well for most users."
-    ),
-    checkboxInput(
+    div(class = "cerebro-preferences-heading", "Preferences"),
+    preference(
       "webgl_checkbox",
-      label = "Use WebGL rendering",
-      value = TRUE
+      "GPU acceleration", TRUE,
+      "Automatically uses WebGPU or WebGL for supported plots. Turn off to use CPU rendering. Small or unsupported cell views may use Canvas."
     ),
-    helpText("Improves performance but may not work in every browser."),
-    checkboxInput(
+    preference(
       "hover_info_in_projections_checkbox",
-      label = "Show cell details on hover",
-      value = Cerebro.options[['projections_show_hover_info']]
-    ),
-    helpText("Shows additional cell metadata and may increase plotting time.")
+      "Cell tooltips", isTRUE(Cerebro.options[['projections_show_hover_info']] %||% TRUE),
+      "Show brief information on hover in all cell views and the HLA motif network. Click a cell to pin its summary and open Details, even when tooltips are off. Cross-view highlighting is controlled separately."
+    )
   )
 })
 
@@ -33,7 +35,9 @@ output[["preferences_options"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 observeEvent(input[["webgl_checkbox"]], {
   preferences[["use_webgl"]] <- input[["webgl_checkbox"]]
-  print(glue::glue("[{Sys.time()}] WebGL status: {preferences[['use_webgl']]}"))
+  session$sendCustomMessage("cerebro_gpu_acceleration", list(
+    enabled = isTRUE(input[["webgl_checkbox"]])
+  ))
 })
 
 ##----------------------------------------------------------------------------##
@@ -41,10 +45,7 @@ observeEvent(input[["webgl_checkbox"]], {
 ##----------------------------------------------------------------------------##
 
 observeEvent(input[["hover_info_in_projections_checkbox"]], {
-  preferences[["show_hover_info_in_projections"]] <- input[[
-    "hover_info_in_projections_checkbox"
-  ]]
-  print(glue::glue(
-    "[{Sys.time()}] Show hover info status: {preferences[['show_hover_info_in_projections']]}"
+  session$sendCustomMessage("cerebro_cell_tooltips", list(
+    enabled = isTRUE(input[["hover_info_in_projections_checkbox"]])
   ))
 })

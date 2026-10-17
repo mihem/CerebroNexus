@@ -172,7 +172,7 @@ cv_pane <- function(key) {
 tab_coordinated_views <- tabItem(
   tabName = "coordinated_views",
   div(
-    class = "coordviews-page linked-views-page",
+    class = "coordviews-page linked-views-page cv-workspace-pending",
     cerebroVizPageHeader(
       "Linked views",
       "coordinated_views_info",
@@ -183,166 +183,186 @@ tab_coordinated_views <- tabItem(
     div(
       class = "cv-topbar",
       div(
-        class = "cv-ctl",
-        tags$label("Colour by", `for` = "cv-pick-color"),
-        tags$select(id = "cv-pick-color")
-      ),
-      ## Projections are a multi-select. Every selected embedding receives its
-      ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
-      ## All coordinates already travel in the bundle, so this stays client-side.
-      div(
-        class = "cv-ctl cv-multiselect-ctl",
-        id = "cv-proj-ctl",
-        tags$label("Projection", `for` = "cv-pick-proj"),
-        tags$select(id = "cv-pick-proj", multiple = "multiple")
-      ),
-      ## Spatial sections are a multi-select. Every selected section receives an
-      ## independent linked canvas; all sections still share colour, filtering,
-      ## brushing and hover state.
-      div(
-        class = "cv-ctl cv-multiselect-ctl",
-        id = "cv-spatial-ctl",
-        style = "display:none",
-        tags$label("Spatial data"),
-        tags$select(id = "cv-pick-spatial", multiple = "multiple")
-      ),
-      ## Mean/per-gene expression picker. Per-gene mode expands the linked
-      ## spaces into a gene x space grid; the client enforces a 12-panel cap.
-      div(
-        class = "cv-ctl",
-        id = "cv-gene-ctl",
-        style = "display:none",
-        tags$label("Gene(s)"),
-        selectizeInput(
-          "coordviews_gene",
-          label = NULL,
-          choices = NULL,
-          multiple = TRUE,
-          options = list(
-            maxOptions = 1000,
-            placeholder = "select genes...",
-            create = FALSE,
-            plugins = list("remove_button"),
-            loadThrottle = 300
-          )
-        )
-      ),
-      div(
-        class = "cv-ctl",
-        id = "cv-gene-panel-color-ctl",
-        style = "display:none",
-        tags$label("Panel colours"),
-        tags$select(
-          id = "cv-gene-panel-color",
-          tags$option(value = "shared", "Shared scale"),
-          tags$option(value = "distinct", "Distinct colours")
-        )
-      ),
-      ## Three-gene co-expression: one gene per RGB channel, shown only in
-      ## "Co-expression (RGB)" mode.
-      div(
-        class = "cv-ctl cv-rgb-ctl",
-        id = "cv-rgb-ctl",
-        style = "display:none",
-        tags$label("Co-expression (R / G / B)"),
+        class = "cv-filters",
         div(
-          class = "cv-rgb-row",
-          selectizeInput(
-            "coordviews_gene_r",
-            label = NULL,
-            choices = NULL,
-            options = list(
-              maxOptions = 1000,
-              placeholder = "red gene...",
-              create = FALSE,
-              loadThrottle = 300
-            )
-          ),
-          selectizeInput(
-            "coordviews_gene_g",
-            label = NULL,
-            choices = NULL,
-            options = list(
-              maxOptions = 1000,
-              placeholder = "green gene...",
-              create = FALSE,
-              loadThrottle = 300
-            )
-          ),
-          selectizeInput(
-            "coordviews_gene_b",
-            label = NULL,
-            choices = NULL,
-            options = list(
-              maxOptions = 1000,
-              placeholder = "blue gene...",
-              create = FALSE,
-              loadThrottle = 300
-            )
-          )
-        )
-      ),
-      ## Clonal-panel layout switch. Shown only when the data set carries an
-      ## immune axis (a "clone" space). The clone panel's X/Y are abstract, so
-      ## unlike UMAP/Spatial it draws labelled axes and can be re-laid-out
-      ## client-side between representations without touching the server.
-      div(
-        ## cv-collapse (opacity 0) as the initial hidden state so the FIRST reveal
-        ## also fades in, matching subsequent switches (revealEl toggles it).
-        class = "cv-ctl cv-collapse",
-        id = "cv-clone-layout-ctl",
-        style = "display:none",
-        tags$label("Clonal layout"),
-        div(
-          class = "cv-seg",
-          id = "cv-clone-layout",
-          tags$button(
-            type = "button",
-            class = "cv-seg-btn is-on",
-            `data-mode` = "stack",
-            tags$span("Rank", tags$br(), "stack")
-          ),
-          tags$button(
-            type = "button",
-            class = "cv-seg-btn",
-            `data-mode` = "bands",
-            tags$span("Expansion", tags$br(), "bands")
-          )
-        )
-      ),
-      ## Linked hover stays beside the layout controls. Disabling it leaves
-      ## zoom, brushing and selection available.
-      div(
-        class = "cv-linked-hover",
-        shinyWidgets::materialSwitch(
-          inputId = "cv-hover",
-          label = "Show linked cell hover:",
-          value = TRUE,
-          status = "primary",
-          inline = TRUE
-        )
-      ),
-      ## Share and Settings stay together as the right-aligned action group.
-      cerebroToolbarActions(
-        cerebroSettingsButton(
-          "cv-more-btn",
-          "cv-more"
+          class = "cv-ctl",
+          tags$label("Colour by", `for` = "cv-pick-color"),
+          tags$select(id = "cv-pick-color")
         ),
-        cerebroShareButton(
-          "linked_views",
-          id = "cv-config-open",
-          class = "cv-config-open cv-share-open cerebro-toolbar-share",
-          title = "The linked workspace is waiting for its plots"
+        ## Projections are a multi-select. Every selected embedding receives its
+        ## own linked card in the same responsive grid as Spatial, Trekker and TCR.
+        ## All coordinates already travel in the bundle, so this stays client-side.
+        div(
+          class = "cv-ctl cv-multiselect-ctl",
+          id = "cv-proj-ctl",
+          tags$label("Projection", `for` = "cv-pick-proj"),
+          tags$select(id = "cv-pick-proj", multiple = "multiple")
+        ),
+        ## Spatial sections are a multi-select. Every selected section receives an
+        ## independent linked canvas; all sections still share colour, filtering,
+        ## brushing and hover state.
+        div(
+          class = "cv-ctl cv-multiselect-ctl",
+          id = "cv-spatial-ctl",
+          style = "display:none",
+          tags$label("Spatial data"),
+          tags$select(id = "cv-pick-spatial", multiple = "multiple")
+        ),
+        ## Mean/per-gene expression picker. Per-gene mode expands the linked
+        ## spaces into a gene x space grid; the client enforces a 12-panel cap.
+        div(
+          class = "cv-ctl",
+          id = "cv-gene-ctl",
+          style = "display:none",
+          tags$label("Gene(s)"),
+          selectizeInput(
+            "coordviews_gene",
+            label = NULL,
+            choices = NULL,
+            multiple = TRUE,
+            options = list(
+              maxOptions = 1000,
+              placeholder = "select genes...",
+              create = FALSE,
+              plugins = list("remove_button"),
+              loadThrottle = 300
+            )
+          )
+        ),
+        div(
+          class = "cv-ctl",
+          id = "cv-gene-panel-color-ctl",
+          style = "display:none",
+          tags$label("Panel colours"),
+          tags$select(
+            id = "cv-gene-panel-color",
+            tags$option(value = "shared", "Shared scale"),
+            tags$option(value = "distinct", "Distinct colours")
+          )
+        ),
+        ## Three-gene co-expression: one gene per RGB channel, shown only in
+        ## "Co-expression (RGB)" mode.
+        div(
+          class = "cv-ctl cv-rgb-ctl",
+          id = "cv-rgb-ctl",
+          style = "display:none",
+          tags$label("Co-expression (R / G / B)"),
+          div(
+            class = "cv-rgb-row",
+            selectizeInput(
+              "coordviews_gene_r",
+              label = NULL,
+              choices = NULL,
+              options = list(
+                maxOptions = 1000,
+                placeholder = "red gene...",
+                create = FALSE,
+                loadThrottle = 300
+              )
+            ),
+            selectizeInput(
+              "coordviews_gene_g",
+              label = NULL,
+              choices = NULL,
+              options = list(
+                maxOptions = 1000,
+                placeholder = "green gene...",
+                create = FALSE,
+                loadThrottle = 300
+              )
+            ),
+            selectizeInput(
+              "coordviews_gene_b",
+              label = NULL,
+              choices = NULL,
+              options = list(
+                maxOptions = 1000,
+                placeholder = "blue gene...",
+                create = FALSE,
+                loadThrottle = 300
+              )
+            )
+          )
+        ),
+        ## Clonal-panel layout switch. Shown only when the data set carries an
+        ## immune axis (a "clone" space). The clone panel's X/Y are abstract, so
+        ## unlike UMAP/Spatial it draws labelled axes and can be re-laid-out
+        ## client-side between representations without touching the server.
+        div(
+          ## cv-collapse (opacity 0) as the initial hidden state so the FIRST reveal
+          ## also fades in, matching subsequent switches (revealEl toggles it).
+          class = "cv-ctl cv-collapse",
+          id = "cv-clone-layout-ctl",
+          style = "display:none",
+          tags$label("Clonal layout"),
+          div(
+            class = "cv-seg",
+            id = "cv-clone-layout",
+            tags$button(
+              type = "button",
+              class = "cv-seg-btn is-on",
+              `data-mode` = "stack",
+              tags$span("Rank", tags$br(), "stack")
+            ),
+            tags$button(
+              type = "button",
+              class = "cv-seg-btn",
+              `data-mode` = "bands",
+              tags$span("Expansion", tags$br(), "bands")
+            )
+          )
         )
       ),
-      ## Right-aligned global filter/subsample readout. Cohort actions belong to
-      ## the Active cohort bar below, not to this settings row.
       div(
-        class = "cv-topbar-right",
-        ## Live "showing N / M cells" readout — hidden unless a filter/subsample
-        ## reduces the view, so filtering is visible even when the panels are
-        ## coloured by a different variable than the one being filtered.
-        tags$span(class = "cv-shown", id = "cv-shown")
+        class = "cv-actions-row",
+        ## Cross-view highlighting is independent of the global cell tooltips.
+        div(
+          class = "cv-linked-hover",
+          title = "Highlight the same cell in other linked plots. Cell tooltips are controlled in Preferences; clicking and selection remain available.",
+          shinyWidgets::materialSwitch(
+            inputId = "cv-hover",
+            label = "Cross-view highlight",
+            value = TRUE,
+            status = "primary",
+            inline = TRUE
+          )
+        ),
+        div(
+          class = "cv-linked-hover",
+          title = paste(
+            "Show or hide backgrounds in linked views.",
+            "Each view uses the first image matched to its FOV or ROI."
+          ),
+          shinyWidgets::materialSwitch(
+            inputId = "cv-backgrounds",
+            label = "Background images",
+            value = TRUE,
+            status = "primary",
+            inline = TRUE
+          )
+        ),
+        ## Share and Settings stay together as the right-aligned action group.
+        cerebroToolbarActions(
+          cerebroSettingsButton(
+            "cv-more-btn",
+            "cv-more"
+          ),
+          cerebroShareButton(
+            "linked_views",
+            id = "cv-config-open",
+            class = "cv-config-open cv-share-open cerebro-toolbar-share",
+            title = "The linked workspace is waiting for its plots"
+          )
+        ),
+        ## Right-aligned global filter/subsample readout. Cohort actions belong to
+        ## the Active cohort bar below, not to this settings row.
+        div(
+          class = "cv-topbar-right",
+          ## Live "showing N / M cells" readout — hidden unless a filter/subsample
+          ## reduces the view, so filtering is visible even when the panels are
+          ## coloured by a different variable than the one being filtered.
+          tags$span(class = "cv-shown", id = "cv-shown")
+        )
       ),
 
       ## ---- shared advanced-settings drawer ----------------------------- ##
@@ -374,7 +394,7 @@ tab_coordinated_views <- tabItem(
               checkboxInput(
                 "cv-labels",
                 "Group labels",
-                value = TRUE
+                value = FALSE
               ),
               checkboxInput(
                 "cv-borders",
@@ -429,13 +449,14 @@ tab_coordinated_views <- tabItem(
                   class = "cv-bg-settings",
                   div(
                     class = "cv-bg-display",
-                    tags$div(class = "cv-bg-display-title", "Display"),
+                    tags$label(class = "cv-bg-display-title", `for` = "cv-bg-image-select", "Image"),
                     tags$select(
                       id = "cv-bg-image-select",
                       class = "form-control"
                     )
                   ),
-                  uiOutput("coordviews_image_ui")
+                  uiOutput("coordviews_image_ui"),
+                  tags$p(id = "cv-bg-session-note", class = "cv-bg-session-note", "Changes apply only to this session.")
                 )
               )
             ),

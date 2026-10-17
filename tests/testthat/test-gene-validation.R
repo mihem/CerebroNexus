@@ -11,13 +11,20 @@ test_that("gene validation reports missing names and clears when they resolve", 
     },
     {
       session$setInputs(missing = character())
-      expect_null(output$expression_genes_displayed)
+      ## The notice container is always rendered (the separate-panels fallback
+      ## shares it), so an empty selection has to render no notice at all.
+      feedback <- output$expression_genes_displayed$html
+      expect_false(grepl("Not found in this data set:", feedback, fixed = TRUE))
       session$setInputs(missing = c("UnknownGeneA", "UnknownGeneB"))
       feedback <- output$expression_genes_displayed$html
       expect_match(feedback, "Not found in this data set:", fixed = TRUE)
       expect_match(feedback, "UnknownGeneA, UnknownGeneB", fixed = TRUE)
       session$setInputs(missing = character())
-      expect_null(output$expression_genes_displayed)
+      expect_false(grepl(
+        "Not found in this data set:",
+        output$expression_genes_displayed$html,
+        fixed = TRUE
+      ))
     }
   )
 })

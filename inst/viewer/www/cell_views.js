@@ -22,6 +22,12 @@
 (function () {
   'use strict';
 
+  // Shared by Spatial and Linked views; helpers never mutate saved presets.
+  var backgrounds = window.CerebroBackgroundModel;
+  var spatialImages = backgrounds.images, currentImage = backgrounds.currentImage;
+  var backgroundStateKey = backgrounds.stateKey, imgKey = backgrounds.imageKey;
+  var presetState = backgrounds.presetState, imageRenderState = backgrounds.renderState;
+
   var D = null;                 // the data bundle
   var linkedBundle = null;      // cached while a dedicated page owns the canvas
   // Specialist payloads and requests are scoped to one exact server-session
@@ -36,6 +42,9 @@
   var singleActive = null;      // plot id currently using the shared surface
   var singleIndexCells = null;  // cells array behind the cached barcode index
   var singleIndexMap = null;
+  // Last barcode (core aux) message per view. A render whose cells match a
+  // delivered one names it in data.aux_reuse, so it is not downloaded again.
+  var singleAuxCache = {};
   var singleSpaceIds = [];      // one space, or one per gene in multi-panel mode
   var singleSpaceModes = {};    // space id -> categorical/continuous colour mode
   var singleColorCache = new Map();
@@ -48,6 +57,7 @@
   var pendingAssets = new Set();
   var pendingCloneDetails = new Set();
   var pendingCloneSupplement = null;
+  var deferredLinkedSupplements = [];
   var transportMetrics = {};
   var linkedRequestTiming = {};
   var singleTiming = Object.create(null);
@@ -75,6 +85,7 @@
     metric.byId[key].bytes += Number(bytes) || 0;
   }
   var panels = [];              // [{key, canvas, ctx, spaceId, W, H, sx, sy, lasso, drag, moved}]
+  var gpuAcceleration = true;   // session preference, independent of data/page
   var sel = null;               // Set of selected cell indices (null = none)
   var selectionZoomed = false;
   var selectionSource = null;   // label of the lens that created the active cohort
@@ -88,7 +99,10 @@
   // in the others -- that is how the eye carries a position in the embedding over
   // to a position in tissue. Null when the cursor is not on a cell.
   var hoverCell = null;
+  var hoverPanel = null;
+  var cellTooltipsOn = true;
   var linkedHoverOn = true;
+  var linkedBackgroundsOn = true;
   // The gene a reply is still wanted for. Set when one is asked for and cleared by
   // the reply, so a late answer for a gene the user has moved on from is dropped
   // rather than drawn under the current gene's name.
@@ -132,7 +146,7 @@
   var pointOpacity = 1;         // base draw opacity (no-selection view)
   var bordersOn = false;        // outline cell points in the active view
   var keepPlotsSquare = false;  // fluid rectangles use the workspace by default
-  // Point appearance is dataset-wide; these flags preserve live user edits.
+  // A live user edit overrides Builder's per-spatial-section starting values.
   var pointSizeEdited = false;
   var pointOpacityEdited = false;
   var hidden = new Set();       // hidden level indices for the active group
@@ -140,6 +154,60 @@
   // state remains global, while viewport and 3-D rotation live on the panel.
   var selectedProjections = [];
   var pctShow = 100;            // % of cells to render
+  var sharedScatter = null;
+  var scatterUserEdit = null;
+  var scatterControlFields = {
+    'cv-ps': 'point_size', 'cv-opacity': 'point_opacity',
+    'cv-pct': 'percentage_cells_to_show',
+    'ir_d_point_size': 'point_size', 'ir_d_alpha': 'point_opacity',
+    'ir_d_percentage_cells_to_show': 'percentage_cells_to_show'
+  };
+  ['overview_projection', 'expression_projection', 'trajectory'].forEach(function (prefix) {
+    ['point_size', 'point_opacity', 'percentage_cells_to_show'].forEach(function (field) {
+      scatterControlFields[prefix + '_' + field] = field;
+    });
+  });
+  function sharedScatterValues() {
+    return sharedScatter && sameDatasetContext(sharedScatter.dataset_context,
+      currentDatasetContext()) ? sharedScatter.values : null;
+  }
+  function syncSharedScatter() {
+    var values = sharedScatterValues();
+    if (!values) return;
+    if (linkedBundle) {
+      linkedBundle.default_point_size = values.point_size;
+      linkedBundle.default_point_opacity = values.point_opacity;
+      linkedBundle.default_percentage_cells_to_show = values.percentage_cells_to_show;
+    }
+    if (linkedState && linkedState.view) Object.assign(linkedState.view.display, {
+      point_size: values.point_size, point_opacity: values.point_opacity,
+      percentage_cells: values.percentage_cells_to_show
+    });
+    // Spatial has its own section/ROI settings. Never apply projection edits.
+    if (singleActive === 'spatial_projection') return;
+    ps = values.point_size; pointOpacity = values.point_opacity;
+    if (!singleActive || singleClientPercentage()) {
+      pctShow = values.percentage_cells_to_show;
+      rebuildPctMask();
+    }
+  }
+  // Single views whose frame carries every cell and leaves "% of cells" to
+  // the browser (Overview with a Viewer Pack).
+  function singleClientPercentage() {
+    var view = singleActive && singleView(singleActive);
+    return !!(view && view.data && view.data.client_percentage);
+  }
+  function publishScatterEdit(field, value) {
+    if (!field || !currentDatasetContext()) return;
+    var known = sharedScatterValues();
+    var values = Object.assign({}, known || {});
+    values[field] = value;
+    if (known) sharedScatter = {dataset_context: currentDatasetContext(), values: values};
+    Shiny.setInputValue('viewer_scatter_edit', {
+      dataset_context: currentDatasetContext(), values: values,
+      nonce: Date.now()
+    }, {priority: 'event'});
+  }
   var pctMask = null;           // Uint8Array subsample mask, or null (all shown)
   var groupFilter = {};         // groupName -> Set(allowed level idx); absent = all
   var spaceById = {};
@@ -214,21 +282,18 @@
   }
 
   function prepareCanvasSemantics(p) {
-    var ids = (p.canvas.getAttribute('aria-describedby') || '').trim().split(/\s+/)
-      .filter(Boolean);
-    var description = null;
-    ids.some(function (id) {
-      description = document.getElementById(id);
-      return !!description;
-    });
+    // Cloned panels inherit the original canvas' attributes. A description
+    // belongs to this canvas, never to the panel it was cloned from.
+    var descriptionId = p.canvas.id.replace(/^cv-cv-/, 'cv-description-');
+    var description = document.getElementById(descriptionId);
+    if (description && description.parentNode !== p.canvas.parentNode) description = null;
     if (!description) {
       description = document.createElement('span');
-      description.id = p.canvas.id + '-description';
+      description.id = descriptionId;
       description.className = 'sr-only';
       p.canvas.parentNode.insertBefore(description, p.canvas.nextSibling);
-      ids.push(description.id);
-      p.canvas.setAttribute('aria-describedby', ids.join(' '));
     }
+    p.canvas.setAttribute('aria-describedby', descriptionId);
     p.description = description;
     if (p.mini) p.mini.setAttribute('aria-hidden', 'true');
     updateCanvasDescription(p);
@@ -721,9 +786,21 @@
       var f = fieldForMode(mode);
       if (f && f.paintOrder !== false) { vals = f.v; span = f.scale || 255; }
     }
-    // Values are already quantised. A stable counting sort preserves the old
-    // missing-first, low-to-high paint order without sorting 1M JS numbers.
-    var ord = vals ? quantisedOrder(vals, span) : null;
+    // Expression fields keep full-precision values: match Seurat's ascending
+    // order, with missing values first and stable ties. Quantised-only sources
+    // retain their counting-sort path.
+    var ord;
+    if (vals && f && f.raw) {
+      var raw = f.raw;
+      ord = Array.from({ length: raw.length }, function (_, i) { return i; });
+      ord.sort(function (a, b) {
+        var av = raw[a], bv = raw[b];
+        var am = av == null || isNaN(av), bm = bv == null || isNaN(bv);
+        return am !== bm ? (am ? -1 : 1) : am ? a - b : (av - bv || a - b);
+      });
+    } else {
+      ord = vals ? quantisedOrder(vals, span) : null;
+    }
     _ordD = D; _ordKey = key; _ordVal = ord;
     return ord;
   }
@@ -826,8 +903,21 @@
   // A cell is "active" when it survives the group filters AND the % subsample.
   // Inactive cells are drawn in no panel and are not selectable, matching the
   // Overview page's group-filter + "show % of cells" behaviour.
-  function activeCell(i) {
-    if (pctMask && !pctMask[i]) return false;
+  function panelPctMask(p) {
+    var space = p && spaceById[p.spaceId];
+    if (singleActive || !isSpatialSpace(space)) return pctMask;
+    var percentage = Number(space.builder_percentage_cells);
+    if (!isFinite(percentage) || percentage >= 100) return null;
+    if (!space._pctMask || space._pctMask.length !== D.n) {
+      space._pctMask = new Uint8Array(D.n);
+      for (var j = 0; j < D.n; j++)
+        space._pctMask[j] = (Math.imul(j + 1, 2654435761) >>> 0) / 4294967296 < percentage / 100 ? 1 : 0;
+    }
+    return space._pctMask;
+  }
+  function activeCell(i, p) {
+    var mask = panelPctMask(p);
+    if (mask && !mask[i]) return false;
     // Trekker: dissolve the least-confidently-positioned nuclei.
     if (dissolveThresh != null && D.trekker && D.trekker.conf) {
       var cf = D.trekker.conf[i];
@@ -862,7 +952,7 @@
     dissolveThresh = vals[Math.min(k, vals.length - 1)];
   }
   // Legend-visible AND filter-active — the single gate every render/hit-test uses.
-  function shown(i, p) { return visible(i, p) && activeCell(i); }
+  function shown(i, p) { return visible(i, p) && activeCell(i, p); }
   // Stable per-cell subsample: the same subset persists across redraws/toggles
   // (deterministic hash), so lowering "% of cells" never reshuffles the view.
   function rebuildPctMask() {
@@ -879,7 +969,7 @@
   function applyActiveChange() {
     if (sel) {
       var s = new Set();
-      sel.forEach(function (i) { if (activeCell(i)) s.add(i); });
+      sel.forEach(function (i) { if (panels.some(function (p) { return p.spaceId && shown(i, p); })) s.add(i); });
       setSelection(s.size ? s : null);
     } else {
       drawAll();
@@ -1105,7 +1195,10 @@
     var dpr = window.devicePixelRatio || 1;
     p.W = width; p.H = height;
     resizePanelLayers(p, width, height, dpr);
-    if (p.pane) p.pane.classList.toggle('cv-narrow', width < 420);
+    if (p.pane) {
+      p.pane.classList.toggle('cv-narrow', width < 420);
+      p.pane.classList.toggle('cv-square-plot', keepPlotsSquare);
+    }
     project(p);
   }
 
@@ -1155,23 +1248,6 @@
   // Draw the histology image behind the points of the spatial panel. The image's
   // data-space bounds are mapped to screen with the SAME transform as the cells,
   // so it aligns; opacity/offset/scale/flip/rotate then adjust it on top.
-  function imageRenderState(img, state) {
-    var pr = (img && img.preset) || {};
-    if (!pr.geometryBaked) return state;
-    var baseScaleX = Number(pr.scaleX) || 1;
-    var baseScaleY = Number(pr.scaleY) || baseScaleX;
-    return {
-      show: state.show,
-      opacity: state.opacity,
-      offsetX: state.offsetX - (Number(pr.offsetX) || 0),
-      offsetY: state.offsetY - (Number(pr.offsetY) || 0),
-      scaleX: state.scaleX / baseScaleX,
-      scaleY: state.scaleY / baseScaleY,
-      flipX: !!state.flipX !== !!pr.flipX,
-      flipY: !!state.flipY !== !!pr.flipY,
-      rotate: state.rotate - (Number(pr.rotation) || 0)
-    };
-  }
   function rotateDataPoint(x, y, degrees) {
     if (!degrees) return [x, y];
     var theta = degrees * Math.PI / 180;
@@ -1179,21 +1255,22 @@
       x * Math.sin(theta) + y * Math.cos(theta)];
   }
   function drawImage(p, context) {
+    if (!singleActive && !linkedBackgroundsOn) return;
     var sp = spaceById[p.spaceId];
     var cimg = currentImage(sp);
     var state = sp && sp._imgState;
     if (!sp || !cimg || !sp._imgEl || !sp._imgReady || !state || !state.show) return;
     var b = cimg.bounds;
     if (!b) return;
+    // Embedded images already carry their saved calibration in the pixels.
     state = imageRenderState(cimg, state);
-    var tlData = rotateDataPoint(b.xmin, b.ymax, state.rotate);
-    var trData = rotateDataPoint(b.xmax, b.ymax, state.rotate);
-    var blData = rotateDataPoint(b.xmin, b.ymin, state.rotate);
-    var centerData = rotateDataPoint(
+    var tlData = [b.xmin, b.ymax];
+    var trData = [b.xmax, b.ymax];
+    var blData = [b.xmin, b.ymin];
+    var centerData = [
       (Number(b.xmin) + Number(b.xmax)) / 2,
-      (Number(b.ymin) + Number(b.ymax)) / 2,
-      state.rotate
-    );
+      (Number(b.ymin) + Number(b.ymax)) / 2
+    ];
     var tl = dataToScreen(p, tlData[0], tlData[1]);
     var tr = dataToScreen(p, trData[0], trData[1]);
     var bl = dataToScreen(p, blData[0], blData[1]);
@@ -1209,6 +1286,7 @@
     c.save();
     c.globalAlpha = state.opacity;
     c.translate(center[0] + offSX, center[1] + offSY);
+    c.rotate(-state.rotate * Math.PI / 180);
     c.scale(state.scaleX * (state.flipX ? -1 : 1),
       state.scaleY * (state.flipY ? -1 : 1));
     c.transform(tr[0] - tl[0], tr[1] - tl[1],
@@ -1336,7 +1414,7 @@
   // it — a median over n cells must never run on the drag-redraw path. The
   // positions deliberately ignore the group filters: a label that jumps every
   // time a filter changes is worse than one that stays where the group is.
-  var labelsOn = true;
+  var labelsOn = false;
   var _lblCache = { d: null };
   function middleValue(values) {
     if (!values.length) return null;
@@ -1502,7 +1580,7 @@
   }
 
   function drawGroupLabels(p) {
-    // Below ~260px a label chip covers a meaningful share of the panel.
+    // Below ~260px cluster names crowd the data.
     if (!labelsOn || p.W < 260) return;
     var L = groupLabelsFor(p); if (!L || !L.length) return;
     var c = p.ctx, v = p.view, SX = p._SX, SY = p._SY,
@@ -1510,7 +1588,11 @@
     if (!SX || !SY) return;
     c.save();
     c.globalAlpha = 1;
-    c.font = '600 11px system-ui, -apple-system, "Segoe UI", sans-serif';
+    var authorDisplay = D.display_defaults || {};
+    var labelSize = Math.max(8, Math.min(24, Number(authorDisplay.label_size) || 11));
+    var labelFamily = ['Arial', 'Georgia'].indexOf(authorDisplay.font_family) >= 0
+      ? authorDisplay.font_family : 'system-ui, -apple-system, "Segoe UI", sans-serif';
+    c.font = '600 ' + labelSize + 'px ' + labelFamily;
     c.textAlign = 'center'; c.textBaseline = 'middle';
     var u3 = spaceById[p.spaceId] && spaceById[p.spaceId]._unit;
     var rot = (u3 && u3.nz) ? p.rot : null;
@@ -1530,8 +1612,10 @@
       if (x < ox || x > ox + SX || y < oy || y > oy + SY) return;
       var t = o.text.length > 18 ? o.text.slice(0, 17) + '…' : o.text;
       var w = c.measureText(t).width;
-      c.fillStyle = 'rgba(255,255,255,.80)';
-      c.fillRect(x - w / 2 - 4, y - 8, w + 8, 16);
+      // Keep larger author-selected labels inside the canvas at cluster edges.
+      x = Math.max(w / 2 + 6, Math.min(p.W - w / 2 - 6, x));
+      y = Math.max((labelSize + 5) / 2 + 2,
+        Math.min(p.H - (labelSize + 5) / 2 - 2, y));
       c.fillStyle = '#1c1c1e';
       c.fillText(t, x, y);
     });
@@ -1599,9 +1683,17 @@
   // but not of different alphas, so shading by opacity would cost the batching
   // exactly where it matters most.
   function pointSizeOf(p) {
+    var sp = spaceById[p.spaceId];
+    if ((!pointSizeEdited || !singleActive) && sp && sp.builder_point_size != null) {
+      return Math.max(1, Math.min(20, Number(sp.builder_point_size)));
+    }
     return ps;
   }
   function pointOpacityOf(p) {
+    var sp = spaceById[p.spaceId];
+    if ((!pointOpacityEdited || !singleActive) && sp && sp.builder_point_opacity != null) {
+      return Math.max(0, Math.min(1, Number(sp.builder_point_opacity)));
+    }
     return pointOpacity;
   }
   function radiusOf(p, i) {
@@ -1629,7 +1721,7 @@
 
   var allShownData = null, allShownMask = null;
   function shownState(p) {
-    var filtered = pctMask || dissolveThresh != null || hidden.size;
+    var filtered = panelPctMask(p) || dissolveThresh != null || hidden.size;
     if (!filtered) {
       for (var name in groupFilter) {
         if (groupFilter[name]) { filtered = true; break; }
@@ -1700,7 +1792,7 @@
       fieldConstantColor: field && field.constantColor,
       groupValues: group && group.values,
       groupColors: group && group.colors && group.colors.join(','),
-      pctMask: pctMask,
+      pctMask: panelPctMask(p),
       dissolve: dissolveThresh,
       filter: gpuFilterKey(),
       selection: sel,
@@ -1716,7 +1808,7 @@
   }
 
   function gpuCandidate(p) {
-    if (!p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
+    if (!gpuAcceleration || !p.gpu || !D || D.n < GPU_MIN_CELLS) return false;
     var space = spaceById[p.spaceId], unit = space && space._unit;
     // Images, hulls and trajectories live on the CPU underlay; axes, labels and
     // interaction marks live on the CPU overlay. Only features that change the
@@ -1796,7 +1888,9 @@
   }
 
   function attachGpu(p) {
+    if (!gpuAcceleration || p.gpu) return;
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
+    if (p.gpuCanvas) p.gpuCanvas.remove();
     var canvas = document.createElement('canvas');
     canvas.className = 'cv-gpu-layer';
     canvas.style.display = 'none';
@@ -1806,12 +1900,63 @@
       p.gpuCanvas = canvas;
       p.gpu = window.CerebroPointRenderer.create(canvas);
       canvas._cerebroPointRenderer = p.gpu;
+      if (p.W && p.H) p.gpu.resize(p.W, p.H, window.devicePixelRatio || 1);
       var renderer = p.gpu;
       watchGpu(p, renderer);
     } catch (error) {
       canvas.remove();
       p.gpuCanvas = null;
     }
+  }
+
+  function setGpuAcceleration(enabled) {
+    enabled = enabled !== false;
+    if (gpuAcceleration === enabled) { reportRendererStatus(); return; }
+    gpuAcceleration = enabled;
+    panels.forEach(function (p) {
+      // Keep a working renderer available for a later toggle. Redrawing the
+      // same panel preserves the camera, filters, brush and cell identities.
+      if (enabled) attachGpu(p); else hideGpu(p);
+      p.cloneBase = null;
+      if (D && p.spaceId) project(p, !enabled);
+    });
+    if (D) drawAll();
+    reportRendererStatus();
+  }
+
+  // The active backends are appended to the GPU acceleration tooltip so the
+  // switch explains what is currently drawing without a separate badge.
+  function reportRendererStatus() {
+    var checkbox = document.getElementById('webgl_checkbox');
+    var row = checkbox && checkbox.closest('.cerebro-preference');
+    if (!row) return;
+    var backends = [];
+    panels.forEach(function (p) {
+      if (!p.spaceId || !p.canvas.offsetParent ||
+          getComputedStyle(p.canvas).visibility === 'hidden') return;
+      var stats = p.gpu && p.gpuCanvas && p.gpuCanvas.style.display !== 'none'
+        && p.gpu.stats ? p.gpu.stats() : null;
+      var backend = stats && stats.backend === 'webgpu' ? 'WebGPU'
+        : stats && stats.backend === 'webgl2' ? 'WebGL2' : 'Canvas';
+      if (backends.indexOf(backend) < 0) backends.push(backend);
+    });
+    // Plotly-backed pages still honour the same server-side preference.
+    if (!backends.length) {
+      document.querySelectorAll('.tab-pane.active .js-plotly-plot').forEach(function (plot) {
+        if (!plot.offsetParent || !plot._fullData) return;
+        plot._fullData.forEach(function (trace) {
+          if (trace.visible === false || trace.visible === 'legendonly') return;
+          var backend = /gl$|3d$|^(surface|mesh3d|volume|isosurface|splom|parcoords)$/.test(trace.type)
+            ? 'WebGL' : 'SVG';
+          if (backends.indexOf(backend) < 0) backends.push(backend);
+        });
+      });
+    }
+    var title = (row.dataset.help || '') + (backends.length
+      ? ' Current plots: ' + backends.join(', ') + '.' : '');
+    if (row.title !== title) row.title = title;
+    var help = document.getElementById('webgl_checkbox_help');
+    if (help && help.textContent !== title) help.textContent = title;
   }
 
   function attachUnderlay(p) {
@@ -1848,7 +1993,11 @@
 
   function needsUnderlay(p) {
     var space = spaceById[p.spaceId];
-    return !!(space && (space.background_scope || space.trajectory ||
+    // Linked and Trekker scenes can carry images without background_scope.
+    // Keep every image below both GPU points and Canvas points, including
+    // images whose pixels are still loading.
+    return !!(space && (space.background_scope || space.image ||
+      (space.images && space.images.length) || space.trajectory ||
       (space.hulls && space.hulls.length)));
   }
 
@@ -2060,6 +2209,14 @@
           if (view._auxPending === token) view._auxPending = null;
           return;
         }
+        var cached = singleAuxCache[id], reuse = view.data.aux_reuse;
+        if (reuse != null && cached && Number(cached.aux_origin_token) === Number(reuse) &&
+            sameDatasetContext(cached.dataset_context, view.dataset_context)) {
+          applySingleAux(Object.assign({}, cached, {
+            wire_token: token, render_token: view.aux_render_token
+          }));
+          if (view._auxToken === token) return;
+        }
         Shiny.setInputValue('cell_view_aux_request', {id:id, wire_token:token, dataset_context:view.dataset_context}, {priority:'event'});
       });
     });
@@ -2169,10 +2326,14 @@
     if (!pointsDrawn && p.gpuTransformOnly) return;
     if (!pointsDrawn) ensureScreenProjection(p);
     var ord = pointsDrawn ? null : paintOrder(p);
+    // Colour buckets reorder interleaved cells. Preserve input order for
+    // unsorted expression fields, including the Canvas fallback on large data.
+    var orderedField = fieldForMode(panelColorMode(p));
+    var preserveInputOrder = orderedField && orderedField.paintOrder === false;
     for (var layer = 0; !pointsDrawn && layer < 2; layer++) {
       var alpha = hiSet ? (layer === 1 ? 0.95 : 0.05)
         : rgb ? (layer === 1 ? 1 : 0.5 * panelPointOpacity) : panelPointOpacity;
-      if (n >= BATCH_MIN) {
+      if (n >= BATCH_MIN && !preserveInputOrder) {
         var buckets = null;
         for (var oi = 0; oi < n; oi++) {
           i = ord ? ord[oi] : oi;
@@ -2276,6 +2437,7 @@
     if (!c) return;
     c.clearRect(0, 0, p.W, p.H);
     if (hoverCell == null || hoverCell === pick || !p.ok || !p.ok[hoverCell]) return;
+    if (!singleActive && !linkedHoverOn && p !== hoverPanel) return;
     // Thinner and cooler than the pick ring so hover and selection never read
     // as the same state.
     c.globalAlpha = 1; c.strokeStyle = '#0f172a'; c.lineWidth = 1.6;
@@ -3073,8 +3235,13 @@
     }
     if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
       if (singleActive) {
+        // Stable IDs identify the selection on their own. Send coordinates
+        // only as the fallback key when some selected cell has no ID.
         var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
-        if (arr && sp) sel.forEach(function (i) {
+        var needCoordinates = arr && arr.some(function (id) {
+          return id == null || id === '';
+        });
+        if (needCoordinates && sp) sel.forEach(function (i) {
           x.push(sp.x[i]); y.push(sp.y[i]);
         });
         // Large specialist views paint before their stable cell IDs arrive.
@@ -3091,6 +3258,10 @@
         });
         var renderKey = activeView && activeView.data && activeView.data.render_key;
         if (eventKind === 'primary' && renderKey != null) {
+          Shiny.setInputValue(singleActive + '_rendered_state', {
+            render_key: String(renderKey),
+            dataset_context: activeView.dataset_context
+          }, { priority: 'event' });
           Shiny.setInputValue(
             singleActive + '_rendered_key',
             String(renderKey),
@@ -3611,7 +3782,12 @@
       var scale = document.createElement('span');
       scale.className = 'cv-panel-scale';
       scale.style.background = 'linear-gradient(90deg,' + stops.join(',') + ')';
-      scale.title = field.label + ' colour scale; numeric range shared across panels';
+      scale.title = field.rgbChannel
+        ? field.label + ': 0 to ' + field.max + ' (channel maximum)'
+        : field.label + ' colour scale; numeric range shared across panels';
+      if (field.rgbChannel) {
+        scale.setAttribute('aria-label', scale.title);
+      }
       var title = panel.pane.querySelector('.cv-ptitle');
       if (title) title.insertAdjacentElement('afterend', scale);
     });
@@ -3639,6 +3815,11 @@
     L.style.fontSize = isFinite(singleFontSize) && singleFontSize > 0
       ? singleFontSize + 'px' : '';
     L.innerHTML = '';
+    if (singlePayload && singlePayload.meta && singlePayload.meta.show_color_scale === false) {
+      renderColorbar(false);
+      renderPanelScales(false);
+      return;
+    }
     var distinctPanels = !!(singlePayload && singlePayload.data &&
       singlePayload.data.panel_colorscales &&
       Object.keys(singlePayload.data.panel_colorscales).length > 1);
@@ -3665,6 +3846,19 @@
       return;
     }
     var fld = fieldOf();
+    if (fld && fld.rgbChannel) {
+      renderColorbar(false);
+      renderPanelScales(true);
+      panels.forEach(function (panel) {
+        var field = fieldOf(panel);
+        if (!panel.spaceId || !field || !field.rgbChannel) return;
+        var range = document.createElement('span');
+        range.className = 'cv-lg';
+        range.textContent = field.label + ': 0–' + Number(field.max).toPrecision(3);
+        L.appendChild(range);
+      });
+      return;
+    }
     if (distinctPanels && fld) {
       renderSharedExpressionRange(fld);
       return;
@@ -3796,7 +3990,42 @@
     }
     return String(value);
   }
-  function hoverHtml(i, pinned) {
+  function hoverHtml(i, pinned, panel) {
+    var actions = pinned ? '<div class="cv-tip-act">' +
+      '<button type="button" class="cv-tip-btn cv-tip-details">Details</button>' +
+      '<button type="button" class="cv-tip-btn cv-tip-close" aria-label="Close">Close</button></div>' : '';
+    if (singleActive && singleActive !== 'hla_motif_network') {
+      var view = singleView(singleActive), mode = panelColorMode(panel);
+      var lines = [];
+      var cell = Array.isArray(D && D.cells) && D.cells[i];
+      lines.push(cell ? 'Cell: ' + cell : 'Cell identifier available in Details');
+      // The dictionary already present on the client for this view IS the
+      // tooltip's content: pinning adds the Details/Close actions, it must not
+      // decide whether the columns are shown. Nothing is requested here.
+      var space = panel && spaceById[panel.spaceId] || spaceById[singleSpaceIds[0]];
+      var awaiting = !!(view && view.hover && view.hover.pending);
+      var columns = space && space._hoverColumns;
+      if (!awaiting && Array.isArray(columns) && columns.length) {
+        columns.slice(0, HOVER_MAX_GROUPS).forEach(function (column) {
+          var line = column.label + ': ' + singleHoverColumnValue(column, i, space);
+          if (lines.indexOf(line) < 0) lines.push(line);
+        });
+        return '<div class="cv-tip-row">' + esc(lines.join('\n')).replace(/\n/g, '<br>') + '</div>' + actions;
+      }
+      // Without a dictionary, summarise what the client already knows: the
+      // active level and the continuous variable in play.
+      var category = catOf(mode), field = fieldOf(panel);
+      if (category && category.values) {
+        var level = category.levels[category.values[i]];
+        lines.push(((view && view.meta && view.meta.color_variable) || groupLabel(mode)) +
+          ': ' + (level == null ? 'NA' : level));
+      }
+      if (field) {
+        var number = fieldValue(field, i);
+        if (number != null) lines.push(field.label + ': ' + fmtVal(number));
+      }
+      return '<div class="cv-tip-row">' + esc(lines.join('\n')).replace(/\n/g, '<br>') + '</div>' + actions;
+    }
     if (singleActive) {
       var singleSpace = spaceById[singleSpaceIds[0]];
       var activeSingleView = singleView(singleActive);
@@ -3831,12 +4060,13 @@
       return '<div class="cv-tip-row">' + esc(text).replace(/\n/g, '<br>') + '</div>';
     }
     var rows = [];
-    var g = catOf(colorBy);
+    var g = catOf(panelColorMode(panel));
     // headline = the active categorical level, else the barcode
     var head = g ? g.levels[g.values[i]] : cellLabel(i);
     var h = '<div class="cv-tip-row"><b>' + esc(head) + '</b></div>';
+    if (g) rows.push(['Cell', cellLabel(i)]);
     // the continuous variable in play, at its true value
-    var fld = fieldOf();
+    var fld = fieldOf(panel);
     if (fld) rows.push([fld.label, fmtVal(fieldValue(fld, i))]);
     if (colorBy === GENE_MODE && D.gene) {
       rows.push([D.gene.gene, fmtVal(D.gene.v[i] / 255 * D.gene.max)]);
@@ -3866,10 +4096,7 @@
       // panels at the moment a Trekker user was clicking nuclei to read their
       // niche. Close dismisses this tooltip and nothing else: the pick it came
       // from stays, because the niche readout is what the click was for.
-      h += '<div class="cv-tip-act">' +
-        '<button type="button" class="cv-tip-btn cv-tip-details">Details</button>' +
-        '<button type="button" class="cv-tip-btn cv-tip-close" ' +
-        'aria-label="Close">Close</button></div>';
+      h += actions;
     }
     return h;
   }
@@ -3885,6 +4112,27 @@
   // exactly the kind of thing worth being exact about.
   var cardCell = null;          // cell index the card is showing, or null
   var cardMeta = null;          // { cell, rows } from the server, when it lands
+  var cardRequest = null, cardRequestSerial = 0;
+
+  function requestCardMetadata() {
+    if (!cardOpen() || !D || (cardRequest && cardRequest.sent)) return;
+    var cell = Array.isArray(D.cells) && D.cells[cardCell];
+    if (cell == null) { requestSingleAux(); return; }
+    var request = cardRequest = {
+      request_id: ++cardRequestSerial, cell: String(cell), client_index: cardCell,
+      view_id: singleActive || 'linked', dataset_context: D.dataset_context, sent: true
+    };
+    Shiny.setInputValue('coordviews_cell_detail', request, { priority: 'event' });
+  }
+
+  function receiveCardMetadata(message) {
+    if (!D || !cardOpen() || !cardRequest || !message || !datasetMessageFresh(message) ||
+        !sameDatasetContext(message.dataset_context, D.dataset_context) ||
+        message.request_id !== cardRequest.request_id || message.view_id !== (singleActive || 'linked') ||
+        message.cell !== cardRequest.cell || Number(message.client_index) !== cardCell) return;
+    cardMeta = { index: cardCell, cell: message.cell, rows: message.rows || [], error: message.error };
+    renderCard();
+  }
 
   function cardOpen() { return cardCell != null; }
 
@@ -4019,7 +4267,8 @@
     // the full meta row, or a placeholder until the server answers
     var metaHtml = '';
     if (cardMeta && cardMeta.index === i && cardMeta.rows) {
-      metaHtml = kvHtml(cardMeta.rows.map(function (r) { return [r.k, r.v]; }));
+      metaHtml = cardMeta.error ? '<div class="cv-card-sub">' + esc(cardMeta.error) + '</div>' :
+        kvHtml(cardMeta.rows.map(function (r) { return [r.k, r.v]; }));
     } else {
       metaHtml = '<div class="cv-card-skel"><span></span><span></span><span></span></div>';
     }
@@ -4114,34 +4363,30 @@
       return;
     }
     cardCell = i;
+    cardRequest = null;
     if (!cardMeta || cardMeta.index !== i) cardMeta = null;
     renderCard();
     // The tooltip has just been promoted into the card — leaving it up would
     // show the same cell twice, once truncated. It returns on the next hover.
-    var tip = p && $(p.tipId);
-    if (tip) tip.style.opacity = 0;
+    unpinTip();
     cardFlyFrom(p, i);
     // ask for the exact meta row; the card is already on screen either way
-    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-      Shiny.setInputValue('coordviews_cell_detail', { index: i, dataset_context:D.dataset_context },
-        { priority: 'event' });
-    }
+    requestCardMetadata();
   }
 
   function openTrekkerInspector(i) {
     cardCell = i;
+    cardRequest = null;
     if (!cardMeta || cardMeta.index !== i) cardMeta = null;
     renderCard();
     openTrekkerInsights('cell');
-    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-      Shiny.setInputValue('coordviews_cell_detail', { index: i, dataset_context:D.dataset_context },
-        { priority: 'event' });
-    }
+    requestCardMetadata();
   }
 
   function closeCard() {
     var card = $('cv-card');
     cardCell = null;
+    cardRequest = null;
     var empty = $('cv-tk-cell-empty'), content = $('cv-tk-cell-content');
     if (empty) empty.style.display = '';
     if (content) content.style.display = 'none';
@@ -4178,7 +4423,7 @@
     var tip = $(p.tipId); if (!tip) return;
     pinnedTip = { panel: p, cell: i };
     tip.classList.add('cv-tip-pinned');
-    tip.innerHTML = hoverHtml(i, true);
+    tip.innerHTML = hoverHtml(i, true, p);
     var detailHandled = false;
     var runDetails = function (e) {
       e.preventDefault(); e.stopPropagation();
@@ -4243,7 +4488,7 @@
   }
 
   function syncLinkedHoverDefault(dataChanged) {
-    if (dataChanged) linkedHoverOn = true;
+    // This is a user preference, not a dataset display default.
     var control = $('cv-hover');
     if (control) control.checked = linkedHoverOn;
   }
@@ -4251,12 +4496,39 @@
   function setLinkedHover(enabled) {
     linkedHoverOn = !!enabled;
     syncLinkedHoverDefault(false);
-    if (!linkedHoverOn) {
-      panels.forEach(function (panel) {
-        var tip = $(panel.tipId);
-        if (tip && pinnedTip.panel !== panel) tip.style.opacity = 0;
-      });
-      setHoverCell(null);
+    setHoverCell(null);
+    panels.forEach(refreshPanelHover);
+  }
+
+  function setCellTooltips(enabled) {
+    cellTooltipsOn = !!enabled;
+    var control = $('hover_info_in_projections_checkbox');
+    if (control) control.checked = cellTooltipsOn;
+    panels.forEach(function (panel) {
+      var tip = $(panel.tipId);
+      if (!cellTooltipsOn && pinnedTip.panel !== panel && tip) {
+        tip.style.opacity = 0;
+      }
+    });
+    setHoverCell(null);
+    panels.forEach(refreshPanelHover);
+  }
+
+  function syncLinkedBackgroundsDefault(dataChanged) {
+    if (dataChanged) linkedBackgroundsOn = true;
+    var control = $('cv-backgrounds');
+    if (control) control.checked = linkedBackgroundsOn;
+  }
+
+  function setLinkedBackgrounds(enabled) {
+    linkedBackgroundsOn = !!enabled;
+    syncLinkedBackgroundsDefault(false);
+    if (!singleActive) {
+      panels.forEach(function (panel) { panel.miniBg = null; });
+      renderImagePicker();
+      drawAll();
+      viewOperation('linked', linkedBackgroundsOn
+        ? 'Background images shown' : 'Background images hidden');
     }
   }
 
@@ -4267,14 +4539,16 @@
       return;
     }
     if (interactionIsStatic()) return;
-    // Linked hover is optional; specialist pages retain their own settings.
-    // Return before nearest-point lookup. Click and brush handlers stay active.
-    if (!singleActive && !linkedHoverOn) return;
+    // Point tooltips, including HLA motif nodes, share the global preference.
+    // Cross-view highlighting remains independent of tooltip text.
+    var showText = cellTooltipsOn;
+    var crossHighlight = !singleActive && linkedHoverOn;
+    if (!showText && !crossHighlight) {
+      if (tip && pinnedTip.panel !== p) tip.style.opacity = 0;
+      setHoverCell(null); return;
+    }
     var space = singleActive && spaceById[p.spaceId];
-    var demandView = (singleActive === 'expression_projection' || singleActive === 'trajectory_projection') && singleView(singleActive);
-    var pendingIds = demandView && demandView.data && demandView.data.wire_token != null &&
-      demandView._auxToken !== demandView.data.wire_token;
-    if (space && space._hoverEnabled === false && !pendingIds) {
+    if (singleActive === 'hla_motif_network' && space && space._hoverEnabled === false) {
       tip.style.opacity = 0; setHoverCell(null); return;
     }
     var r = p.canvas.getBoundingClientRect();
@@ -4282,25 +4556,26 @@
     // A pinned tooltip owns this panel's tooltip element until it is closed —
     // but the cross-panel mark still follows the cursor.
     var own = pinnedTip.panel !== p;
-    if (p.drag || p.panning) {
+    if (p.drag || p.panning || p.orbiting) {
       if (own) tip.style.opacity = 0;
       setHoverCell(null);
       return;
     }
     var i = nearest(p, mx, my);
-    // These views paint with indices before stable IDs are needed. A real
-    // point hover must request IDs even while hover content is pending.
-    if (i >= 0 && demandView) requestSingleAux();
-    if (i < 0 || (space && !singleHoverEnabledAt(space, i))) {
+    if (i < 0 || (singleActive === 'hla_motif_network' && space && !singleHoverEnabledAt(space, i))) {
       if (own) tip.style.opacity = 0;
       setHoverCell(null);
       return;
     }
+    // These views paint with indices before stable IDs are needed. A real point
+    // hover must request them, and requestAux() deduplicates while one is in
+    // flight, so sweeping the pointer across the cloud asks once.
     requestSingleAux();
+    if (hoverPanel !== p) { hoverPanel = p; drawHoverAll(); }
     setHoverCell(i);
-    scheduleSingleMetadata(singleActive, true);
     if (!own) return;
-    tip.innerHTML = hoverHtml(i, false); tip.style.opacity = 1;
+    if (!showText) { tip.style.opacity = 0; return; }
+    tip.innerHTML = hoverHtml(i, false, p); tip.style.opacity = 1;
     placeTip(p, tip, i);
   }
 
@@ -4312,6 +4587,7 @@
     });
     p.canvas.addEventListener('mouseleave', function () {
       p.hoverPointer = null;
+      hoverPanel = null;
       setHoverCell(null);
       if (pinnedTip.panel === p) return;
       tip.style.opacity = 0;
@@ -4319,15 +4595,53 @@
   }
 
   // ---- brush + pick --------------------------------------------------------
+  function pickCell(p, index) {
+    requestSingleAux();
+    pick = index >= 0 && index !== pick ? index : null;
+    closeCard(); unpinTip();
+    if (pick != null) pinTip(p, pick);
+    // Picking still drives Trekker's niche readout. Full metadata is opened
+    // deliberately through Details, as on the other cell views.
+    rebuildNiche(); updateSelActions(); renderSelbar(); drawAll();
+    if (!sel) renderReadout();
+  }
+
+  function clearTransientHover() {
+    hoverPanel = null;
+    setHoverCell(null);
+    panels.forEach(function (panel) {
+      panel.hoverPointer = null;
+      var tip = $(panel.tipId);
+      if (tip && pinnedTip.panel !== panel) tip.style.opacity = 0;
+    });
+  }
+
   function wireBrush(p) {
     var brushTarget = p.pane || p.canvas;
     var pos = function (e) {
       var r = p.canvas.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top];
     };
+    // A tap pins a cell without consuming the touch gesture used to scroll.
+    // Ignore the browser's subsequent compatibility mouse events for that tap.
+    p.canvas.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch' || e.isPrimary === false || interactionIsStatic()) return;
+      p.touchStart = {x:e.clientX,y:e.clientY,id:e.pointerId};
+      clearTransientHover();
+    });
+    p.canvas.addEventListener('pointercancel', function () { p.touchStart = null; });
+    p.canvas.addEventListener('pointerup', function (e) {
+      var start = p.touchStart; p.touchStart = null;
+      if (!start || start.id !== e.pointerId) return;
+      p.ignoreMouseUntil = Date.now() + 700;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) return;
+      var point = pos(e); pickCell(p, nearest(p, point[0], point[1]));
+    });
     brushTarget.addEventListener('mousedown', function (e) {
+      if (Date.now() < (p.ignoreMouseUntil || 0)) return;
       if (interactionIsStatic()) return;
       if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
+      clearTransientHover();
       requestSingleAux();
       if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
       // A rotatable panel NAVIGATES; it does not select. Selection here is done
@@ -4351,6 +4665,7 @@
       if (dragKind === 'orbit') {
         e.preventDefault();
         p.orbiting = true; p.orbitFrom = pos(e);
+        p.moved = false;
         p.orbitBase = p.rot ? { rx: p.rot.rx, ry: p.rot.ry } : { rx: 0, ry: 0 };
         p.canvas.classList.add('cv-grabbing');
         return;
@@ -4362,6 +4677,7 @@
       if (dragKind === 'pan') {
         e.preventDefault();
         p.panning = true; p.panFrom = pos(e);
+        p.moved = false;
         p.panView = p.view
           ? { cx: p.view.cx, cy: p.view.cy, span: p.view.span }
           : { cx: 0.5, cy: 0.5, span: 1 };
@@ -4378,6 +4694,7 @@
     window.addEventListener('mousemove', function (e) {
       if (p.orbiting) {
         var oq = pos(e), RAD = 0.009;   // radians per pixel dragged
+        if (Math.hypot(oq[0] - p.orbitFrom[0], oq[1] - p.orbitFrom[1]) > 4) p.moved = true;
         p.rot = {
           ry: p.orbitBase.ry + (oq[0] - p.orbitFrom[0]) * RAD,
           // Pitch stops short of ±90°: past vertical the cloud reads as
@@ -4390,6 +4707,7 @@
       }
       if (p.panning) {
         var pq = pos(e), SX = p._SX || 1, SY = p._SY || 1, v = p.panView;
+        if (Math.hypot(pq[0] - p.panFrom[0], pq[1] - p.panFrom[1]) > 4) p.moved = true;
         // screen delta -> view units; y is inverted (canvas y grows downward).
         // Clamped, so dragging on past the edge simply stops instead of sailing
         // off into blank canvas.
@@ -4428,12 +4746,14 @@
         p.canvas.classList.remove('cv-grabbing');
         p.miniBg = null;    // the thumbnail is of the old angle
         drawAll();
+        if (!p.moved) { var orbitPoint = pos(e); pickCell(p, nearest(p, orbitPoint[0], orbitPoint[1])); }
         return;
       }
       if (p.panning) {
         p.panning = false;
         p.canvas.classList.remove('cv-grabbing');
         drawAll();
+        if (!p.moved) { var panPoint = pos(e); pickCell(p, nearest(p, panPoint[0], panPoint[1])); }
         return;
       }
       if (!p.drag) return;
@@ -4463,20 +4783,7 @@
         //
         // Clicking the picked cell again drops the pick, so the click that made
         // it is also the click that undoes it.
-        var again = (k >= 0 && k === pick);
-        pick = (k >= 0 && !again) ? k : null;
-        // Any open card described a cell the user has now moved on from.
-        if (cardOpen()) closeCard();
-        unpinTip();
-        if (pick != null) {
-          pinTip(p, pick);
-          if (D.trekker) openTrekkerInspector(pick);
-        }
-        rebuildNiche();              // Trekker: cells within the picked niche
-        updateSelActions();          // niche pick → show the (animated) Clear button
-        renderSelbar();               // expose the shared Active cell state
-        drawAll();
-        if (!sel) renderReadout();   // Trekker niche readout for the picked cell
+        pickCell(p, k);
       }
       if (!keep) { p.lasso = null; p.lassoData = null; }
       draw(p);
@@ -4794,9 +5101,74 @@
     }
   }
 
+  function trekkerStatsGrid(q) {
+    var pass2p = q.pct_2plus < 20;
+    return [
+      ['Total nuclei', fmt(q.total_nuclei), 'single-nuclei library', ''],
+      ['In Trekker library', q.pct_in_lib.toFixed(2) + '%', fmt(q.in_lib) + ' nuclei · ref >95%', q.pct_in_lib > 95 ? 'ok' : 'warn'],
+      ['Valid spatial barcodes', q.pct_valid_sb.toFixed(2) + '%', 'ref >95%', q.pct_valid_sb > 95 ? 'ok' : 'warn'],
+      ['At least 1 location', q.pct_positioned.toFixed(2) + '%', fmt(q.positioned) + ' nuclei · ref >60%', q.pct_positioned > 60 ? 'ok' : 'warn'],
+      ['Confidently positioned', q.pct_conf.toFixed(2) + '%', fmt(q.conf) + ' nuclei · ref >40%', q.pct_conf > 40 ? 'ok' : 'warn'],
+      ['2+ locations', q.pct_2plus.toFixed(2) + '%', 'ref <20% ' + (pass2p ? '' : '← over'), pass2p ? 'ok' : 'warn']
+    ].map(function (r) {
+      return '<div class="tk-stat ' + r[3] + '"><div class="tk-k">' + r[0] + '</div><div class="tk-v">' +
+        r[1] + '</div><div class="tk-m">' + r[2] + '</div></div>';
+    }).join('');
+  }
+
+  function trekkerPositionTable(q) {
+    var total = q.total_nuclei;
+    return [
+      ['0 (unpositioned)', q.n_0, 'Excluded · coordinate is the <code>0,0</code> sentinel'],
+      ['1', q.n_1, '<b>Imported</b> (incl. salvaged)'],
+      ['2', q.n_2, 'Excluded'], ['3', q.n_3, 'Excluded'], ['≥4', q.n_4p, 'Excluded']
+    ].map(function (r) {
+      return '<tr><td>' + r[0] + '</td><td class="num">' + fmt(r[1]) + '</td><td class="num">' +
+        (r[1] / total * 100).toFixed(2) + '%</td><td class="tk-muted">' + r[2] + '</td></tr>';
+    }).join('');
+  }
+
+  function trekkerSalvageFlag(q) {
+    var salvaged = q.salv_2 + q.salv_3;
+    return '<b>Confidently positioned ≠ exactly one location.</b> The ' +
+      fmt(q.n_1) + ' imported nuclei = native single-location ' + fmt(q.o_1) +
+      ' + vendor-salvaged from 2 (' + esc(q.salv_2) + ') + from 3 (' + esc(q.salv_3) +
+      '), i.e. <b>' + esc(salvaged) +
+      ' (' + (salvaged / q.n_1 * 100).toFixed(2) + '%)</b> are upstream-salvaged multi-location nuclei. ' +
+      'The label must be <code>vendor_confidently_positioned</code>.';
+  }
+
+  function trekkerProvenance(q) {
+    return [
+      ['Platform / assay', esc(q.assay)], ['Sample ID', esc(q.sample_id)], ['Tile ID', esc(q.tile_id)],
+      ['Pipeline version', '<span class="tk-muted">missing (metric absent)</span>'],
+      ['Coordinate source', 'Location CSV (canonical)'],
+      ['Coordinate unit', 'µm <span class="tk-muted">(per manual; not declared in file)</span>'],
+      ['DBSCAN eps', esc(q.eps)], ['minPts', esc(q.min_sb)],
+      ['Histology image', '<span class="tk-muted">none (not provided in bundle)</span>'],
+      ['Moran\'s I source', '<span class="tk-badge tk-badge-soft" style="font-size:10px">Upstream</span>']
+    ].map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  }
+
+  function trekkerRangeFlag(q) {
+    return '<b>The vendor\'s own demo crosses the vendor\'s own reference line.</b> ' +
+      'The 2+ location rate ' + esc(q.pct_2plus) + '% &gt; the manual\'s suggested &lt;20%. The app should only show ' +
+      '"below vendor reference range" and must not adjudicate sample usability for the user.';
+  }
+
+  function trekkerMoranRows(moran, linkable) {
+    return moran.map(function (r) {
+      var link = linkable
+        ? '<td><a href="#" class="tk-link" data-g="' + esc(r.gene) + '">Show in plot →</a></td>'
+        : '';
+      return '<tr><td class="num tk-muted">' + esc(r.rank) + '</td>' +
+        '<td style="font-weight:600">' + esc(r.gene) + '</td><td class="num">' + r.I.toFixed(4) + '</td>' +
+        link + '</tr>';
+    }).join('');
+  }
+
   function fillTrekkerInsights() {
-    var CT = window.CerebroTrekker;
-    if (!CT || !D || !D.trekker) return;
+    if (!D || !D.trekker) return;
     var q = D.trekker.qc || {};
     // Each box is filled independently. The builders read a couple of dozen QC
     // fields and throw on one that is absent, so a .crb carrying a partial QC
@@ -4806,17 +5178,17 @@
       var el = $(id); if (!el) return;
       try { el.innerHTML = build(q); } catch (err) { el.innerHTML = ''; }
     };
-    fill('cv-tk-stats', CT.buildStatsGrid);
-    fill('cv-tk-postbl', CT.buildPositionTable);
-    fill('cv-tk-salvflag', CT.buildSalvFlag);
-    fill('cv-tk-prov', CT.buildProvenanceDl);
-    fill('cv-tk-rangeflag', CT.buildRangeFlag);
+    fill('cv-tk-stats', trekkerStatsGrid);
+    fill('cv-tk-postbl', trekkerPositionTable);
+    fill('cv-tk-salvflag', trekkerSalvageFlag);
+    fill('cv-tk-prov', trekkerProvenance);
+    fill('cv-tk-rangeflag', trekkerRangeFlag);
     // Linkable: the table names the genes whose expression is spatially
     // structured, and this workspace can colour by a gene, so each row is one
     // click from the map that makes the number mean something. It was built
     // unlinked back when there was no gene mode here to send it to.
     $('cv-tk-morantbl').innerHTML = D.trekker.moran
-      ? CT.buildMoranRows(D.trekker.moran, true) : '';
+      ? trekkerMoranRows(D.trekker.moran, true) : '';
     Array.prototype.forEach.call(
       $('cv-tk-morantbl').querySelectorAll('a[data-g]'),
       function (a) {
@@ -5350,7 +5722,7 @@
   // and its own calibration. These read whichever is currently chosen.
   // The picker's value for "no background", kept out of the id space a builder
   // can produce.
-  var IMG_NONE = '__none__';
+  var IMG_NONE = window.CerebroBackgroundModel.NONE;
   function isSpatialSpace(sp) {
     return !!(sp && (sp._spatialSample || sp.background_scope));
   }
@@ -5368,71 +5740,6 @@
     if (activeSpatialId && spaceById[activeSpatialId]) return spaceById[activeSpatialId];
     for (var id in spaceById) if (isSpatialSpace(spaceById[id])) return spaceById[id];
     return null;
-  }
-  function spatialImages(sp) {
-    if (!sp) return [];
-    if (sp.images && sp.images.length) return sp.images;
-    // Multi-section bundles keep the large image payload on each sample rather
-    // than duplicating the opening sample's base64 data at the space level.
-    // Before the picker has changed section, `_sampleName` is unset and the
-    // opening sample is the active one.
-    var samples = sp.samples || [];
-    var name = sp._sampleName || (samples[0] && samples[0].name);
-    var sample = samples.filter(function (s) { return s.name === name; })[0];
-    if (sample && sample.images && sample.images.length) return sample.images;
-    if (sample && sample.image && sample.image.uri) return [sample.image];
-    // `image` is a reference to the default, without the pixels -- it names an
-    // entry of `images`. Only a bundle predating that carries a usable one.
-    return (sp.image && sp.image.uri) ? [sp.image] : [];
-  }
-  function currentImage(sp) {
-    var list = spatialImages(sp);
-    if (!list.length) return null;
-    var wanted = sp && sp._customImageId;
-    if (wanted === IMG_NONE) return null;
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].id === wanted) return list[i];
-    }
-    return list[0];
-  }
-  function spatialName(sp) {
-    return sp && (sp._sampleName ||
-      (sp.samples && sp.samples[0] && sp.samples[0].name) || sp.id);
-  }
-  // Visible labels are not state identities: a FOV may itself be named
-  // "Trekker", so modality plus stable space id namespaces its background.
-  function backgroundStateKey(sp) {
-    if (!sp) return null;
-    if (sp._spatialSample) return 'fov:' + (sp.id || spatialName(sp));
-    return 'space:' + (sp.id || 'unknown') + ':' + spatialName(sp);
-  }
-  // The key a calibration is stored under. Both halves matter: the same image
-  // against a different section is a different alignment problem.
-  function imgKey(sp, img) {
-    if (!sp || !img) return null;
-    // The section name has to resolve the same way BEFORE the first switch as
-    // after it. `_sampleName` is only set when the picker is used, so falling
-    // back to the space id gave the opening section one key and the same
-    // section a different one on return -- and the alignment stored under the
-    // first was never found again.
-    return backgroundStateKey(sp) + '|' + (img.id || 'image');
-  }
-  function presetState(img) {
-    var pr = (img && img.preset) || {};
-    return {
-      show: true,
-      opacity: (pr.opacity != null ? pr.opacity : 0.6),
-      offsetX: (pr.offsetX != null ? pr.offsetX : 0),
-      offsetY: (pr.offsetY != null ? pr.offsetY : 0),
-      scaleX: (pr.scaleX != null ? pr.scaleX : 1),
-      scaleY: (pr.scaleY != null ? pr.scaleY : 1),
-      flipX: !!pr.flipX, flipY: !!pr.flipY,
-      rotate: (pr.rotation != null ? pr.rotation : 0),
-      // Part of the state, not of the controls: unlocking while X and Y happen
-      // to be equal is a decision, and reading the lock back off the checkbox
-      // silently re-made it as "locked" on the next visit.
-      lock: (pr.scaleX == null || pr.scaleY == null || pr.scaleX === pr.scaleY)
-    };
   }
   // Put away what the user has done to the image currently on screen, so coming
   // back to it returns their work rather than the preset. Losing it on every
@@ -5472,7 +5779,12 @@
       return;
     }
     var feedbackId = singleActive || 'linked';
-    viewOperation(feedbackId, 'Loading background: ' + (space.label || space.id) + '…');
+    // Select the image's own transform before deferred pixels arrive. Otherwise
+    // the editor briefly shows (and can overwrite) the previous image's values.
+    var k = imgKey(space, img);
+    space._imgState = (k && imgStates[k]) ? imgStates[k] : presetState(img);
+    viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
+      ? 'Background images hidden' : 'Loading background: ' + (space.label || space.id) + '…');
     if (!img.uri && img.asset_key) {
       requestDeferredAsset(img.asset_key);
       return;
@@ -5481,8 +5793,6 @@
       viewOperation(feedbackId, 'Background unavailable: ' + (space.label || space.id));
       return;
     }
-    var k = imgKey(space, img);
-    space._imgState = (k && imgStates[k]) ? imgStates[k] : presetState(img);
     // Only the newest request may paint. Without the token a large image chosen
     // first can finish decoding after a small one chosen second and replace it.
     var mine = space._imgToken;
@@ -5499,7 +5809,8 @@
     im.onload = function () {
       if (!stillCurrent()) return;
       space._imgReady = true; drawAll();
-      viewOperation(feedbackId, 'Background loaded: ' + (space.label || space.id));
+      viewOperation(feedbackId, feedbackId === 'linked' && !linkedBackgroundsOn
+        ? 'Background images hidden' : 'Background loaded: ' + (space.label || space.id));
     };
     im.onerror = function () {
       if (!stillCurrent()) return;
@@ -5592,32 +5903,46 @@
     if (section) section.style.display = visible ? '' : 'none';
   }
 
-  // The background picker is scoped to the selected spatial section. Its tabs
-  // stay at the top of the Background image section so the mode below and the
-  // Image alignment bar both read as settings for that chosen section.
+  // Only sections carrying images are editable. Scope adjustments by stable
+  // section/image identities; never modify the bundle's saved presets.
   function renderImagePicker() {
     var ctl = $('cv-img-pick-ctl'), select = $('cv-bg-image-select');
     var tabs = $('cv-bg-space-tabs');
     if (!ctl || !select) return;
-    var allSpaces = backgroundSpaces();
+    var allSpaces = backgroundSpaces().filter(function (sp) { return spatialImages(sp).length > 0; });
     var active = activeSpatial();
     if (!active || allSpaces.indexOf(active) < 0) active = allSpaces[0] || null;
+    if (active) activeSpatialId = active.id;
     var section = ctl.closest('.cerebro-settings-section');
     if (section) section.style.display = active ? '' : 'none';
     ctl.style.display = active ? '' : 'none';
     if (tabs) {
-      tabs.innerHTML = allSpaces.map(function (sp) {
-        return '<button type="button" class="cv-bg-space-tab' + (sp === active ? ' is-on' : '') +
-          '" data-cv-bg-tab="' + esc(sp.id) + '">' +
-          esc(sp._sampleName || sp.label || sp.id) + '</button>';
-      }).join('');
-      Array.prototype.forEach.call(tabs.querySelectorAll('[data-cv-bg-tab]'), function (tab) {
-        tab.onclick = function () {
-          backgroundScopePulse = true;
-          activateSpatial(tab.getAttribute('data-cv-bg-tab'));
-          renderImagePicker();
-        };
+      var scope = $('cv-bg-space-select');
+      if (!scope) {
+        tabs.innerHTML = '<label for="cv-bg-space-select">Adjust background</label>' +
+          '<select id="cv-bg-space-select" class="form-control"></select>';
+        scope = $('cv-bg-space-select');
+      }
+      var scopeOptions = allSpaces.map(function (sp) {
+        return { value: sp.id, text: (sp.label || sp._sampleName || sp.id).replace(/ \(spatial\)$/, '') };
       });
+      if (!scope.selectize && window.jQuery && window.jQuery.fn && window.jQuery.fn.selectize) {
+        window.jQuery(scope).selectize({ persist: false, onChange: function (id) {
+          if (id) { backgroundScopePulse = true; activateSpatial(id); }
+        } });
+      }
+      if (scope.selectize) {
+        scope.selectize.clear(true);
+        scope.selectize.clearOptions(true);
+        scope.selectize.addOption(scopeOptions);
+        scope.selectize.setValue(active ? active.id : '', true);
+      } else {
+        scope.innerHTML = scopeOptions.map(function (option) {
+          return '<option value="' + esc(option.value) + '">' + esc(option.text) + '</option>';
+        }).join('');
+        scope.value = active ? active.id : '';
+        scope.onchange = function () { activateSpatial(scope.value); };
+      }
       if (backgroundScopePulse) {
         var settings = ctl.querySelector('.cv-bg-settings');
         if (settings) {
@@ -5628,6 +5953,10 @@
         backgroundScopePulse = false;
       }
     }
+    var note = $('cv-bg-session-note');
+    if (note) note.textContent = !singleActive && !linkedBackgroundsOn
+      ? 'Background images are hidden. Enable Background images to preview changes.'
+      : 'Changes apply only to this session.';
     var images = active ? spatialImages(active) : [];
     var options = images.map(function (im) {
       return { value: im.id, text: im.label || im.id };
@@ -5642,6 +5971,9 @@
       });
     }
     if (select.selectize) {
+      // Selectize retains the selected option in clearOptions(). Clear the
+      // value first so an image from the previous ROI cannot remain selectable.
+      select.selectize.clear(true);
       select.selectize.clearOptions(true);
       select.selectize.addOption(options);
       select.selectize.setValue(value, true);
@@ -5654,6 +5986,7 @@
       select.value = value;
       select.onchange = function () { setSpatialImage(select.value, active); };
     }
+    seedImgControls();
   }
 
   // Switch background. The cells have not moved -- only what is behind them --
@@ -5662,6 +5995,7 @@
   function setSpatialImage(id, sp) {
     sp = sp || activeSpatial();
     if (!sp || !id) return;
+    if (id !== IMG_NONE && !spatialImages(sp).some(function (image) { return image.id === id; })) return;
     stashImgState(sp);
     sp._customImageId = id;
     imgChoice[backgroundStateKey(sp)] = id;
@@ -5763,10 +6097,16 @@
       return spatialTemplate.samples;
     }
     return [{
-      name: spatialTemplate.label.replace(/ \(spatial\)$/, ''),
+      name: spatialTemplate.name || spatialTemplate.label.replace(/ \(spatial\)$/, ''),
       label: spatialTemplate.label,
+      is_roi_overview: spatialTemplate.is_roi_overview,
       x: spatialTemplate.x,
       y: spatialTemplate.y,
+      x_range: spatialTemplate.x_range,
+      y_range: spatialTemplate.y_range,
+      builder_point_opacity: spatialTemplate.builder_point_opacity,
+      builder_point_size: spatialTemplate.builder_point_size,
+      builder_percentage_cells: spatialTemplate.builder_percentage_cells,
       image: spatialTemplate.image,
       images: spatialTemplate.images || []
     }];
@@ -5791,6 +6131,11 @@
         label: sample.label || (sample.name + ' (spatial)'),
         x: sample.x,
         y: sample.y,
+        xRange: sample.x_range || null,
+        yRange: sample.y_range || null,
+        builder_point_opacity: sample.builder_point_opacity,
+        builder_point_size: sample.builder_point_size,
+        builder_percentage_cells: sample.builder_percentage_cells,
         image: sample.image || null,
         images: images,
         _sampleName: sample.name,
@@ -5818,7 +6163,8 @@
     }
     ctl.style.display = samples.length > 1 ? '' : 'none';
     selEl.innerHTML = samples.map(function (s) {
-      return '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>';
+      var label = (s.label || s.name).replace(/ \(spatial\)$/, '');
+      return '<option value="' + esc(s.name) + '">' + esc(label) + '</option>';
     }).join('');
     Array.prototype.forEach.call(selEl.options, function (option) {
       option.selected = selectedSpatial.indexOf(option.value) >= 0;
@@ -6317,6 +6663,20 @@
     updateFocusButtons();
     drawAll();
     if ((sel && sel.size) || (pick != null && nicheSet)) renderSelbar();
+    // Layout advice uses canvas CSS dimensions, never the spread of the cells.
+    var hintView = singleActive && singleView(singleActive);
+    var hintId = singleActive || 'linked';
+    var hintPanels = vis.filter(function (p) {
+      var space = spaceById[p.spaceId];
+      var name = hintView ? hintView.meta && hintView.meta.space_label : space && space._projectionName;
+      return space && !space.z && (hintId === 'trajectory_projection' ||
+          /umap/i.test(String(name || '')));
+    });
+    window.dispatchEvent(new CustomEvent('cerebro:plot-layout', { detail: {
+      id: hintId, dataset_context: currentDatasetContext(), square: keepPlotsSquare,
+      eligible: hintPanels.length > 0,
+      wide: hintPanels.some(function (p) { return p.W > 0 && p.H > 0 && p.W / p.H > 1.6; })
+    } }));
     return true;
   }
 
@@ -6503,6 +6863,7 @@
   }
   function resetSingleViews() {
     restoreLinkedSurface();
+    singleAuxCache = {};
     Object.keys(singleViews).forEach(function (cacheKey) {
       var view = singleViews[cacheKey];
       if (view && view._auxTimer) clearTimeout(view._auxTimer);
@@ -6538,6 +6899,7 @@
     });
   }
   function invalidateDatasetViewState(detail) {
+    setLinkedPresentationReady(false);
     resetSingleViews();
     clearStaticResourceCaches();
     // Deferred image keys include the exact generation; retired entries cannot
@@ -6558,6 +6920,7 @@
     geneWanted = null;
     pendingColorPatch = null;
     progressiveRequestedKey = null;
+    deferredLinkedSupplements = [];
     linkedBundle = null;
     sel = null;
     selectionSource = null;
@@ -7127,6 +7490,14 @@
     var projection = resource && resource.projection;
     var subset = resource && resource.subset;
     var state = resource && resource.state;
+    // Optional colouring by a metadata group: canonical codes for every cell,
+    // mapped to the trajectory rows through the canonical subset below.
+    var group = resource && resource.group || null;
+    if (group && (geometryKind !== 'canonical_projection' || !group.url ||
+        group.protocol !== 'canonical-metadata-codes-v1' ||
+        Number(group.cells) !== Number(resource.canonical_cells))) {
+      throw new Error('Trajectory group resource mismatch');
+    }
     if (!window.CBViewState.resourceDescriptor.validate(resource, {
           protocol: 'trajectory-frame-v1', cells: expectedCells,
           identity: identity
@@ -7151,7 +7522,26 @@
     } else {
       throw new Error('Trajectory geometry kind mismatch');
     }
-    return {projection: projection, subset: subset, state: state};
+    return {projection: projection, subset: subset, state: state, group: group};
+  }
+  function materializeCanonicalCodes(values, subset, expectedCells) {
+    if (subset.kind === 'identity') {
+      if (values.length !== expectedCells) {
+        throw new Error('Canonical code identity mismatch');
+      }
+      return values;
+    }
+    var out = new values.constructor(expectedCells), next = 0;
+    window.CBViewState.canonicalMapping.forEachIndex(
+      {kind: subset.kind, canonicalCells: values.length, cells: expectedCells},
+      subset.indices,
+      function (canonicalIndex) {
+        if (next >= expectedCells) throw new Error('Canonical code overflow');
+        out[next++] = values[canonicalIndex];
+      }
+    );
+    if (next !== expectedCells) throw new Error('Canonical code count mismatch');
+    return out;
   }
   function hydrateSingleProjectionResource(message) {
     var data = message && message.data || {};
@@ -7165,7 +7555,9 @@
     }
     var resource = frame ? frame.projection : data.projection_resource;
     var subsetResource = frame ? frame.subset : data.projection_subset_resource;
-    var groupResource = frame ? frame.state : data.categorical_resource;
+    var canonicalGroup = frame && frame.group;
+    var groupResource = frame
+      ? (canonicalGroup || frame.state) : data.categorical_resource;
     if ((!resource || !resource.url) &&
         (!groupResource || !groupResource.url)) {
       return Promise.resolve(message);
@@ -7182,7 +7574,8 @@
     var groupsPromise = groupResource && groupResource.url
       ? (groupResource.protocol === 'canonical-metadata-codes-v1'
         ? fetchValidatedMetadataCodesResource(
-          groupResource, data.n, message && message.dataset_identity
+          groupResource, canonicalGroup ? groupResource.cells : data.n,
+          message && message.dataset_identity
         )
         : fetchCategoricalResource(groupResource, data.n))
       : Promise.resolve(null);
@@ -7207,7 +7600,13 @@
         if (coordinates.xRange) data.x_range = coordinates.xRange;
         if (coordinates.yRange) data.y_range = coordinates.yRange;
       }
-      if (groupResult) data.canonical_group = groupResult.values;
+      if (groupResult) {
+        data.canonical_group = canonicalGroup
+          ? materializeCanonicalCodes(
+            groupResult.values, subsetResult, Number(data.n)
+          )
+          : groupResult.values;
+      }
       delete data.projection_resource;
       delete data.projection_subset_resource;
       delete data.categorical_resource;
@@ -7607,7 +8006,7 @@
       );
     }
     return { label: label, v: q, raw: values, min: min, max: max, scale: 1000,
-      paintOrder: !data || data.paint_order !== 'natural',
+      paintOrder: !!data && data.paint_order === 'highest',
       unclipped: true,
       palette: singlePalette(panelScale || (data && data.colorscale),
         panelScale ? false : data && data.reversescale) };
@@ -7627,7 +8026,7 @@
   }
   function singleRgbData(data, aligned) {
     var index = aligned ? null : singleIndex(), keys = Array.isArray(data.selection_key)
-      ? data.selection_key : [], raw = data.rgb || {}, out = {};
+      ? data.selection_key : [], raw = data.rgb || {}, out = {maxima: {}};
     var direct = !keys.length || aligned;
     ['r', 'g', 'b'].forEach(function (channel) {
       var source = raw[channel] || [], maximum = 0;
@@ -7646,6 +8045,7 @@
         }
       }
       out[channel] = scaled;
+      out.maxima[channel] = maximum;
     });
     var genes = data.rgb_genes || {};
     out.genes = ['r', 'g', 'b'].map(function (channel) {
@@ -7669,6 +8069,40 @@
       return [Number(shape.x0), Number(shape.y0), Number(shape.x1), Number(shape.y1)];
     });
   }
+  function singleCellBoundaries(extra) {
+    var raw = extra && extra.cell_boundaries;
+    if (!raw || !Array.isArray(raw.cell_barcode) ||
+      !Array.isArray(raw.part) || !Array.isArray(raw.x) ||
+      !Array.isArray(raw.y)) return [];
+    var n = Math.min(raw.cell_barcode.length, raw.part.length,
+      raw.x.length, raw.y.length);
+    var boundaries = [], current = null, currentKey = null;
+    for (var i = 0; i < n; i++) {
+      var x = Number(raw.x[i]), y = Number(raw.y[i]);
+      if (!isFinite(x) || !isFinite(y)) continue;
+      var cell = String(raw.cell_barcode[i]);
+      var key = cell + '\u0000' + String(raw.part[i]);
+      if (key !== currentKey) {
+        current = { cell: cell, points: [] };
+        boundaries.push(current);
+        currentKey = key;
+      }
+      current.points.push([x, y]);
+    }
+    return boundaries.filter(function (boundary) {
+      return boundary.points.length >= 3;
+    });
+  }
+  function singleMolecules(extra) {
+    var raw = extra && extra.molecule_points;
+    if (!raw || !Array.isArray(raw.x) || !Array.isArray(raw.y)) return [];
+    var n = Math.min(raw.x.length, raw.y.length), points = [];
+    for (var i = 0; i < n; i++) {
+      var x = Number(raw.x[i]), y = Number(raw.y[i]);
+      if (isFinite(x) && isFinite(y)) points.push([x, y]);
+    }
+    return points;
+  }
   function singleHulls(extra) {
     var raw = extra && extra.group_hulls;
     if (!raw || !Array.isArray(raw.x) || !Array.isArray(raw.y)) return [];
@@ -7688,9 +8122,11 @@
     return out;
   }
   function buildSpecialistPanels(id, payload) {
-    var meta = payload.meta || {}, data = payload.data || {};
+    var meta = payload.meta || {}, data = payload.data || {},
+      extra = payload.extra || {};
     if (!Array.isArray(data.panels) || !data.panels.length) return null;
     var keys = Array.isArray(data.selection_key) ? data.selection_key : [];
+    var cellBoundaries = singleCellBoundaries(extra);
     var spaces = [], modes = {}, mode;
     if (meta.color_type === 'categorical') {
       var levels = Array.isArray(meta.traces) ? meta.traces.map(String) : [];
@@ -7742,6 +8178,12 @@
         _hoverEnabled: true,
         _hoverMask: emptyVector(true)
       };
+      if (cellBoundaries.length) {
+        var panelCells = new Set(panelKeys.map(String));
+        space.cellBoundaries = cellBoundaries.filter(function (boundary) {
+          return panelCells.has(boundary.cell);
+        });
+      }
       if (Array.isArray(panel.from_x) && Array.isArray(panel.to_x)) {
         var fromX = alignFlatValues(panelKeys, panel.from_x, null);
         var fromY = alignFlatValues(panelKeys, panel.from_y, null);
@@ -7760,14 +8202,35 @@
       if (panel.spatial) {
         space.background_scope = panel.label || 'Trekker';
         space._sampleName = panel.label || 'Trekker';
+        space._preserveAspect = !!panel.preserve_aspect;
       }
-      if (panel.background_image && panel.image_bounds) {
+      space.builder_point_size = panel.builder_point_size;
+      space.builder_point_opacity = panel.builder_point_opacity;
+      space.xRange = panel.x_range;
+      space.yRange = panel.y_range;
+      var panelImage = panel.background_image || meta.background_image;
+      space._backgroundIdentity = canonicalIdentity(panel.image_identity || meta.background_identity);
+      var panelBounds = panel.image_bounds || meta.image_bounds;
+      if (panelImage && panelBounds) {
+        var opacity = Number(meta.background_opacity);
         space.images = [{
-          id: panel.image_id || 'trekker-background',
-          label: panel.image_label || 'Trekker background',
-          uri: panel.background_image,
-          bounds: panel.image_bounds,
-          preset: panel.image_preset || {}
+          id: panel.image_id || (panel.image_identity
+            ? JSON.stringify(panel.image_identity)
+            : meta.background_identity
+            ? JSON.stringify(meta.background_identity) : 'trekker-background'),
+          label: panel.image_label || meta.image_label || 'Tissue background',
+          uri: panelImage,
+          bounds: panelBounds,
+          preset: panel.image_preset || {
+            opacity: isFinite(opacity) ? opacity : 0.5,
+            offsetX: Number(meta.background_offset_x) || 0,
+            offsetY: Number(meta.background_offset_y) || 0,
+            scaleX: Number(meta.background_scale_x) || 1,
+            scaleY: Number(meta.background_scale_y) || 1,
+            flipX: !!meta.background_flip_x,
+            flipY: !!meta.background_flip_y,
+            rotation: Number(meta.background_rotation) || 0
+          }
         }];
         space._customImageId = space.images[0].id;
       }
@@ -7798,6 +8261,8 @@
         data.point_sizes,
         null
       ) : null;
+    var cellBoundaries = singleCellBoundaries(extra);
+    var molecules = singleMolecules(extra);
     var hasZ = aligned.z !== null;
     var hasHover = aligned.hoverEnabled.some(Boolean);
     var makeSpace = function (spaceId, label) {
@@ -7828,6 +8293,8 @@
       }
       if (pointSizes) space.pointSizes = pointSizes;
       if (hulls.length) space.hulls = hulls;
+      if (cellBoundaries.length) space.cellBoundaries = cellBoundaries;
+      if (molecules.length) space.molecules = molecules;
       if (meta.is_spatial) {
         space.background_scope = id;
         space._sampleName = meta.image_label || 'Spatial';
@@ -7840,7 +8307,7 @@
             id: imageId, label: meta.image_label || 'Tissue background',
             uri: meta.background_image, bounds: bounds,
             preset: {
-              opacity: isFinite(opacity) ? opacity : 0.6,
+              opacity: isFinite(opacity) ? opacity : 0.5,
               offsetX: Number(meta.background_offset_x) || 0,
               offsetY: Number(meta.background_offset_y) || 0,
               scaleX: Number(meta.background_scale_x) || 1,
@@ -7866,8 +8333,33 @@
       modes[baseId] = groupName;
     } else if (meta.color_type === 'rgb') {
       D.rgb = singleRgbData(data);
-      makeSpace(baseId, meta.space_label || id);
-      modes[baseId] = RGB_MODE;
+      if (meta.rgb_layout === 'separate' && D.rgb.genes.some(Boolean)) {
+        ['r', 'g', 'b'].forEach(function (channel, index) {
+          var gene = D.rgb.genes[index];
+          if (!gene) return;
+          var label = channel.toUpperCase() + ' · ' + gene;
+          var maximum = D.rgb.maxima[channel];
+          var field = quantisedField(label, data.rgb[channel] || [], data.selection_key || [],
+            {color_range: [0, maximum], paint_order: data.paint_order});
+          // Use the same 8-bit intensities and low-expression threshold as
+          // the composite, with only this channel enabled. Keep raw values
+          // for hover and selection summaries.
+          field.v = D.rgb[channel]; field.scale = 255;
+          field.min = 0; field.max = maximum; field.rgbChannel = channel;
+          field.palette = Array.from({length: 256}, function (_, value) {
+            var color = rgbGpuColor(channel === 'r' ? value : 0,
+              channel === 'g' ? value : 0, channel === 'b' ? value : 0);
+            return 'rgb(' + (color & 255) + ',' + ((color >> 8) & 255) + ',' + ((color >> 16) & 255) + ')';
+          });
+          var fieldName = 'single:' + id + ':rgb:' + channel;
+          var spaceId = baseId + ':rgb:' + channel;
+          D.fields[fieldName] = field;
+          makeSpace(spaceId, label); modes[spaceId] = FIELD_PREFIX + fieldName;
+        });
+      } else {
+        makeSpace(baseId, meta.space_label || id);
+        modes[baseId] = RGB_MODE;
+      }
     } else if (meta.color_type === 'coexpression') {
       var directName = 'single:' + id + ':rgb';
       D.fields[directName] = directColorField(
@@ -7954,7 +8446,43 @@
       });
     });
   }
-  function activateSingle(id, resetAxes, preserveTargetState, eventKind) {
+  function sameSingleLayout(previous, meta, data) {
+    if (!previous || !previous.data || !previous.meta || data.reset_axes) return false;
+    if (previous.meta.space_label !== meta.space_label || !!previous.data.z !== !!data.z) return false;
+    if (previous.meta.rgb_layout !== meta.rgb_layout) return false;
+    if (meta.rgb_layout === 'separate' &&
+        JSON.stringify(previous.data.rgb_genes) !== JSON.stringify(data.rgb_genes)) return false;
+    // Flat continuous payloads also describe multiple panels through a named
+    // colour map. Reusing a single mean-expression panel for that map leaves
+    // its space ID pointing at geometry that no longer exists.
+    function colourPanels(value) {
+      // Incoming packets have not been hydrated by buildSingleSpaces yet.
+      // Their gene names already identify the layout, without decoding values.
+      var color = value.packed_colors || value.color;
+      return color && typeof color === 'object' && !Array.isArray(color) &&
+        !ArrayBuffer.isView(color) ? Object.keys(color) : [];
+    }
+    if (JSON.stringify(colourPanels(previous.data)) !==
+        JSON.stringify(colourPanels(data))) return false;
+    function layout(value) {
+      return (value.panels || []).map(function (panel) {
+        return [panel.id, panel.label, !!panel.spatial, !!panel.projection, !!panel.z];
+      });
+    }
+    return JSON.stringify(layout(previous.data)) === JSON.stringify(layout(data));
+  }
+
+  function sameSingleImages(left, right) {
+    left = left || []; right = right || [];
+    return left.length === right.length && left.every(function (image, index) {
+      var other = right[index];
+      return image.id === other.id && image.uri === other.uri && image.asset_key === other.asset_key &&
+        JSON.stringify(image.bounds) === JSON.stringify(other.bounds) &&
+        JSON.stringify(image.preset) === JSON.stringify(other.preset);
+    });
+  }
+
+  function activateSingle(id, resetAxes, preserveTargetState, eventKind, reuseSurface, refreshFilters) {
     var activationStarted = performance.now();
     var timing = CBViewState.specialistLifecycle.activate(
       singleTiming, id, activationStarted
@@ -7963,7 +8491,7 @@
     if (!payload || rebuildingBase ||
         !sameDatasetContext(payload.dataset_context, currentDatasetContext())) return false;
     if (!singleActive && linkedBundle && D && !linkedState) {
-      linkedState = exportWorkspace();
+      linkedState = exportRuntimeWorkspace();
     }
     if (CBViewState.shouldStashSingleState(
       singleActive,
@@ -7973,10 +8501,12 @@
       stashSingleState();
     }
     if (resetAxes) payload.lenses = [];
-    restoreLinkedSurface();
+    var previousSpaces = reuseSurface ? spaceById : null;
+    var previousFocus = reuseSurface ? focusPanel : null;
+    if (!reuseSurface) restoreLinkedSurface();
     singleActive = id; singleSpaceIds = []; singleSpaceModes = {};
-    setSelectionZoomed(false);
-    if (!mountSingleSurface(id)) { singleActive = null; return false; }
+    if (!reuseSurface) setSelectionZoomed(false);
+    if (!reuseSurface && !mountSingleSurface(id)) { singleActive = null; return false; }
     var base = singlePayloadBundle(id, payload);
     D = Object.assign({}, base, {
       fields: Object.assign({}, base.fields),
@@ -7997,7 +8527,17 @@
     singleSpaceIds = built.spaces; singleSpaceModes = built.modes;
     sanitiseColors(D);
     singleSpaceIds.forEach(function (spaceId) {
-      var space = spaceById[spaceId]; if (isSpatialSpace(space)) loadSpaceImage(space);
+      var space = spaceById[spaceId], old = previousSpaces && previousSpaces[spaceId];
+      if (!isSpatialSpace(space)) return;
+      // Cell sampling/recolouring does not invalidate a decoded background.
+      if (old && sameSingleImages(old.images, space.images)) {
+        ['_imgEl', '_imgReady', '_imgState', '_imgToken'].forEach(function (key) {
+          space[key] = old[key];
+        });
+        // A pending decode callback belongs to the old space; reload only then.
+        if (space._imgReady || !currentImage(space)) return;
+      }
+      loadSpaceImage(space);
     });
     if (payload.backgroundState) updateSingleBackground({
       id: id,
@@ -8005,13 +8545,19 @@
       background_identity: payload.background_identity_value,
       values: payload.backgroundState
     });
+    Object.keys(payload.backgroundEdits || {}).forEach(function (key) {
+      var edit = payload.backgroundEdits[key];
+      updateSingleBackground({ id: id, dataset_context: payload.dataset_context,
+        background_identity: edit.identity, values: edit.values });
+    });
     colorBy = singleSpaceModes[singleSpaceIds[0]] || colorBy;
     hidden = new Set(); groupFilter = {}; sel = null; selectionSource = null;
     selectionSourceSpace = null;
-    pick = null; hoverCell = null; focusPanel = null;
-    var appearance = payload.meta.appearance;
+    pick = null; hoverCell = null; focusPanel = previousFocus;
+    var appearance = payload.meta.appearance || payload.appearanceOverrides
+      ? Object.assign({}, payload.meta.appearance || {}, payload.appearanceOverrides || {}) : null;
     if (appearance) {
-      labelsOn = appearance.group_labels !== false;
+      labelsOn = appearance.group_labels === true;
       bordersOn = !!appearance.draw_border;
       keepPlotsSquare = !!appearance.keep_square;
     } else {
@@ -8022,9 +8568,11 @@
       if (bordersControl) bordersOn = !!bordersControl.checked;
       if (squareControl) keepPlotsSquare = !!squareControl.checked;
     }
-    var incomingPercentage = Number(
-      payload.data && payload.data.percentage_cells_to_show
-    );
+    var shared = payload.data && payload.data.client_percentage
+      ? sharedScatterValues() : null;
+    var incomingPercentage = Number(shared
+      ? shared.percentage_cells_to_show
+      : payload.data && payload.data.percentage_cells_to_show);
     pctShow = isFinite(incomingPercentage)
       ? Math.max(10, Math.min(100, incomingPercentage)) : 100;
     pctMask = null; rebuildPctMask();
@@ -8040,13 +8588,44 @@
     if (isFinite(incomingPointSize) && incomingPointSize >= 1) {
       ps = Math.min(20, incomingPointSize);
     }
-    pointOpacity = Math.max(0.05,
-      Math.min(1, Number(payload.data && payload.data.point_opacity) || pointOpacity));
-    psSeeded = pointSizeEdited = pointOpacityEdited = true;
-    ensurePanelSlots(singleSpaceIds.length); buildPanels(); layoutPanels();
+    var incomingOpacity = Number(payload.data && payload.data.point_opacity);
+    if (isFinite(incomingOpacity)) pointOpacity = Math.max(0, Math.min(1, incomingOpacity));
+    var panelPointSize = Array.isArray(payload.data && payload.data.panels) &&
+      payload.data.panels.some(function (panel) {
+        return panel && panel.builder_point_size != null;
+      });
+    var panelPointOpacity = Array.isArray(payload.data && payload.data.panels) &&
+      payload.data.panels.some(function (panel) {
+        return panel && panel.builder_point_opacity != null;
+      });
+    psSeeded = true;
+    pointSizeEdited = !panelPointSize;
+    pointOpacityEdited = !panelPointOpacity;
+    if (payload.pointAppearance) {
+      if (Number.isFinite(payload.pointAppearance.point_size)) {
+        ps = payload.pointAppearance.point_size; pointSizeEdited = true;
+      }
+      if (Number.isFinite(payload.pointAppearance.point_opacity)) {
+        pointOpacity = payload.pointAppearance.point_opacity; pointOpacityEdited = true;
+      }
+    }
+    syncSharedScatter();
+    if (reuseSurface) {
+      panels.forEach(function (panel) {
+        if (!panel.spaceId) return;
+        panel.colorBy = singleSpaceModes[panel.spaceId] || null;
+        panel.miniBg = null; panel.miniUnit = null;
+        updateCanvasDescription(panel);
+        project(panel);
+      });
+    } else {
+      ensurePanelSlots(singleSpaceIds.length); buildPanels(); layoutPanels();
+    }
     updateSingleInteractionMode();
-    renderGroupFilters();
-    updateSpaceScopedControls();
+    if (!reuseSurface || refreshFilters) {
+      renderGroupFilters();
+      updateSpaceScopedControls();
+    }
     setTrekkerSettingsVisible(!!D.trekker);
     var trekkerInsights = $('cv-tk-insights');
     if (trekkerInsights) trekkerInsights.style.display = D.trekker ? '' : 'none';
@@ -8076,10 +8655,9 @@
     timing.firstDrawMs = performance.now() - drawStarted;
     timing.activationMs = performance.now() - activationStarted;
     reportSingleHiddenGroups(); reportSelection(eventKind || 'interaction');
-    // Gene's selection core is requested by hover or brush. Sending all cell
+    // Gene's selection core is requested by click or brush. Sending all cell
     // IDs here competes with the user's first gene operation on the R thread.
     if (id !== 'expression_projection' && id !== 'trajectory_projection') requestSingleAux();
-    scheduleSingleMetadata(id);
     // Canvas drawing is synchronous, but the browser does not composite it
     // until a later frame. Keep the page loader in place until that first
     // painted frame is actually visible; otherwise users see a blank gap
@@ -8116,7 +8694,16 @@
       rebuildingBase = false;
     }
     if (state) restoreWorkspace(state);
+    syncSharedScatter();
+    syncPointControls();
+    drawAll();
     linkedState = null;
+    var pending = deferredLinkedSupplements;
+    deferredLinkedSupplements = [];
+    pending.forEach(function (item) {
+      if (item.buffer) onBinarySupplement(item.buffer);
+      else applyHydratedSupplement(item.extra, item.metric);
+    });
   }
 
   function registerSingle(id, context) {
@@ -8169,6 +8756,11 @@
       else delete host.dataset.backgroundIdentity;
     }
     var changedGroup = previous.meta && previous.meta.color_variable !== meta.color_variable;
+    var reuseSurface = singleActive === id && visibleSingleId() === id &&
+      ['overview_projection', 'expression_projection', 'spatial_projection'].indexOf(id) >= 0 &&
+      previous.meta.color_type === meta.color_type &&
+      sameSingleLayout(previous, meta, data);
+    if (!sameSingleLayout(previous, meta, data)) previous.pointAppearance = null;
     singleViews[cacheKey] = Object.assign(previous, {
       id: id, meta: meta || {}, data: data || {}, hover: hover || {},
       extra: extra || {}, dataset_context: context,
@@ -8184,7 +8776,7 @@
       singleViews[cacheKey].pendingSavedState = null;
       applySingleState(id, pending);
     } else if (visibleSingleId() === id) {
-      activateSingle(id, !!data.reset_axes, false, 'primary');
+      activateSingle(id, !!data.reset_axes, false, 'primary', reuseSurface, changedGroup);
     }
     return true;
   }
@@ -8265,7 +8857,6 @@
     // against the retained geometry and refresh values after the colour change.
     activePanels.forEach(refreshPanelHover);
     reportSinglePainted(id, view, D);
-    scheduleSingleMetadata(id);
 
     return true;
   }
@@ -8365,9 +8956,14 @@
       generation: context && context.generation || null,
       epoch: context && context.epoch || null,
       pointCount: isFinite(pointCount) ? pointCount : 0,
+      pointSize: ready ? (singleActive === id ? ps : view.data.point_size) : null,
+      pointOpacity: ready ? (singleActive === id ? pointOpacity : view.data.point_opacity) : null,
       xExtent: ready ? numericExtent(view.data.x) : null,
       yExtent: ready ? numericExtent(view.data.y) : null,
       backgroundIdentity: ready ? view.background_identity || null : null,
+      backgroundIdentities: ready ? (view.data.panels || []).map(function (panel) {
+        return canonicalIdentity(panel.image_identity);
+      }).filter(Boolean) : [],
       wireToken: ready && view.data.wire_token != null
         ? view.data.wire_token : null
     });
@@ -8417,17 +9013,25 @@
     var id = message.id;
     var view = singleView(id); if (!view) return false;
     var incomingIdentity = canonicalIdentity(message.background_identity);
-    if (!incomingIdentity || incomingIdentity !== view.background_identity) return false;
+    var panelMatch = (view.data && view.data.panels || []).some(function (panel) {
+      return canonicalIdentity(panel.image_identity) === incomingIdentity;
+    });
+    if (!incomingIdentity || (incomingIdentity !== view.background_identity && !panelMatch)) return false;
     var values = message.values || {};
     var names = {
       opacity: 'opacity', offsetX: 'offsetX', offsetY: 'offsetY',
       scaleX: 'scaleX', scaleY: 'scaleY', flipX: 'flipX',
       flipY: 'flipY', rotate: 'rotate'
     };
-    view.backgroundState = Object.assign({}, view.backgroundState || {}, values);
+    view.backgroundEdits = view.backgroundEdits || {};
+    var oldEdit = view.backgroundEdits[incomingIdentity];
+    view.backgroundEdits[incomingIdentity] = { identity: message.background_identity,
+      values: Object.assign({}, oldEdit && oldEdit.values || {}, values) };
+    if (!panelMatch) view.backgroundState = Object.assign({}, view.backgroundState || {}, values);
     if (singleActive !== id) return true;
     singleSpaceIds.forEach(function (spaceId) {
       var space = spaceById[spaceId]; if (!space || !space._imgState) return;
+      if (panelMatch && space._backgroundIdentity !== incomingIdentity) return;
       Object.keys(names).forEach(function (name) {
         if (values[name] != null) space._imgState[names[name]] = values[name];
       });
@@ -8626,10 +9230,22 @@
     return true;
   }
 
+  function linkedSupplementFresh(extra) {
+    return !!(extra && linkedBundle && datasetMessageFresh(extra) &&
+      sameDatasetContext(extra.dataset_context, linkedBundle.dataset_context) &&
+      extra.dataset_id === linkedBundle.dataset_id &&
+      extra.dataset_fingerprint === configFingerprint() &&
+      extra.progressive_token === linkedBundle.progressive_token);
+  }
+
   function applyHydratedSupplement(extra, metric) {
-    if (!datasetMessageFresh(extra) || !D || !sameDatasetContext(extra.dataset_context, D.dataset_context) || extra.dataset_id !== D.dataset_id ||
-        extra.dataset_fingerprint !== configFingerprint() ||
-        extra.progressive_token !== D.progressive_token) return;
+    if (!linkedSupplementFresh(extra)) return;
+    // A clone supplement can arrive here in a later animation frame, after
+    // navigation has mounted another page's data in the shared renderer.
+    if (D !== linkedBundle) {
+      deferredLinkedSupplements.push({ extra: extra, metric: metric });
+      return;
+    }
     var drawStarted = performance.now();
     try {
       var structural = !!(extra.clone || extra.trekker ||
@@ -8643,7 +9259,8 @@
         if (extra.progressive_complete !== false) D.progressive = false;
         reportWorkspaceReady();
       } else if (structural) {
-        var saved = exportWorkspace();
+        var saved = exportRuntimeWorkspace();
+        var hadSpatial = !!spatialTemplate;
         var merged = Object.assign({}, D, {
           groups: Object.assign({}, D.groups, extra.groups),
           cat_extra: Object.assign({}, D.cat_extra, extra.cat_extra),
@@ -8659,6 +9276,12 @@
         drawAllDeferred = true;
         try {
           applyData(merged);
+          // The primary frame has no Spatial choice to restore. Keep the
+          // default arriving sections, but preserve an explicit empty choice
+          // when Spatial was already available before this supplement.
+          if (!hadSpatial && spatialTemplate && saved.view) {
+            saved.view.spatial_sections = selectedSpatial.slice();
+          }
           restoreWorkspace(saved);
         } finally {
           drawAllDeferred = false;
@@ -8704,23 +9327,71 @@
     try {
       var extra = window.CBViewWire.unpack(buffer);
       var decodedAt = performance.now();
-      if (!D || !datasetMessageFresh(extra)) return;
       if (!extra) throw new Error('Linked views supplement is empty');
-      if (extra.dataset_id !== D.dataset_id ||
-          extra.dataset_fingerprint !== configFingerprint() ||
-          extra.progressive_token !== D.progressive_token) return;
-      extra = hydrateSparseLinked(hydrateLinkedGeometry(extra));
-      var metric = CBViewState.telemetry.transport(
-        extra.transport_profile,
-        {bytes: buffer.byteLength, decodeMs: decodedAt - started},
-        false,
-        Date.now()
-      );
-      if (extra.progressive_complete === false && D.progressive) {
-        pendingCloneSupplement = { extra: extra, metric: metric };
+      if (!linkedSupplementFresh(extra)) return;
+      // Hydration and drawing use D. Keep the wire payload until the Linked
+      // bundle is mounted again, instead of dropping it on a specialist tab.
+      if (D !== linkedBundle) {
+        deferredLinkedSupplements.push({ buffer: buffer });
         return;
       }
-      applyHydratedSupplement(extra, metric);
+      var finish = function () {
+        if (!linkedSupplementFresh(extra)) return;
+        if (D !== linkedBundle) {
+          deferredLinkedSupplements.push({ buffer: buffer });
+          return;
+        }
+        extra = hydrateSparseLinked(hydrateLinkedGeometry(extra));
+        var metric = CBViewState.telemetry.transport(
+          extra.transport_profile,
+          {bytes: buffer.byteLength, decodeMs: decodedAt - started},
+          false,
+          Date.now()
+        );
+        if (extra.progressive_complete === false && D.progressive) {
+          pendingCloneSupplement = { extra: extra, metric: metric };
+          return;
+        }
+        applyHydratedSupplement(extra, metric);
+      };
+      // Projections the Viewer Pack serves arrive as descriptors; fetch them
+      // (shared HTTP cache) before merging. Any failure takes the full bundle.
+      var resourced = Object.keys(extra.projections || {}).filter(function (name) {
+        var projection = extra.projections[name];
+        return projection && projection.projection_resource &&
+          projection.projection_resource.url;
+      });
+      if (!resourced.length) {
+        finish();
+        return;
+      }
+      var bundle = linkedBundle;
+      Promise.all(resourced.map(function (name) {
+        var projection = extra.projections[name];
+        return fetchValidatedProjectionResource(
+          projection.projection_resource,
+          { dataset_identity: linkedBundleResourceIdentity(bundle) },
+          bundle.n
+        ).then(function (result) {
+          var coordinates = result.coordinates;
+          projection.x = coordinates.x;
+          projection.y = coordinates.y;
+          if (coordinates.z) projection.z = coordinates.z;
+          if (coordinates.xRange) projection.xRange = coordinates.xRange;
+          if (coordinates.yRange) projection.yRange = coordinates.yRange;
+          delete projection.projection_resource;
+        });
+      })).then(function () {
+        try {
+          finish();
+        } catch (error) {
+          requestWireFallback(D && D.dataset_id, D && configFingerprint());
+        }
+      }, function () {
+        if (linkedSupplementFresh(extra)) {
+          requestWireFallback(bundle.dataset_id, configFingerprint());
+        }
+      });
     } catch (error) {
       requestWireFallback(D && D.dataset_id, D && configFingerprint());
     }
@@ -8804,11 +9475,20 @@
   }
 
   function onSingleAuxBinary(buffer) {
+    var message;
     try {
-      var message = window.CBViewWire.unpack(buffer);
-      if (message && message.id) {
-        recordSpecialistPayload('aux', message.id, buffer.byteLength);
-      }
+      message = window.CBViewWire.unpack(buffer);
+    } catch (error) {
+      return;
+    }
+    if (message && message.id) {
+      recordSpecialistPayload('aux', message.id, buffer.byteLength);
+    }
+    applySingleAux(message);
+  }
+
+  function applySingleAux(message) {
+    try {
       if (!datasetMessageFresh(message)) return;
       var view = message && singleView(message.id, message.dataset_context);
       if (!view || !sameDatasetContext(view.dataset_context, message.dataset_context) ||
@@ -8816,6 +9496,12 @@
       if (!CBViewState.specialistLifecycle.acceptAux(view, message)) return;
       var hasCells = message.selection_key != null;
       if (hasCells) view.data.selection_key = message.selection_key;
+      if (hasCells && !(message.hover && message.hover.pending)) {
+        singleAuxCache[message.id] = Object.assign({}, message, {
+          aux_origin_token: message.aux_origin_token != null
+            ? message.aux_origin_token : message.wire_token
+        });
+      }
       view.hover = message.hover || {};
       if (singleActive !== message.id) return;
       var canonicalGroups = view.data.canonical_group;
@@ -8873,32 +9559,14 @@
         var tip = $(panel.tipId);
         var cell = pinnedTip.panel === panel ? pinnedTip.cell : hoverCell;
         if (tip && cell != null && Number(tip.style.opacity) > 0) {
-          tip.innerHTML = hoverHtml(cell, pinnedTip.panel === panel);
+          if (pinnedTip.panel === panel) pinTip(panel, cell);
+          else tip.innerHTML = hoverHtml(cell, false, panel);
         }
       });
-      scheduleSingleMetadata(message.id);
+      if (cardOpen()) requestCardMetadata();
     } catch (error) {
       return;
     }
-  }
-
-  function scheduleSingleMetadata(id, fromHover) {
-    var view = singleView(id), token = view && view.data && view.data.wire_token;
-    if (!view || !view.hover || !view.hover.pending || token == null ||
-        view._metadataRequested === token || singleActive !== id) return;
-    // Gene changes need expression colors, not every cell's hover columns.
-    // Preserve the selection core and fetch the exact metadata on first hover.
-    if ((id === 'expression_projection' || id === 'trajectory_projection') && fromHover !== true) return;
-    view._metadataRequested = token;
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        if (singleView(id) !== view || view.data.wire_token !== token) return;
-        if (singleActive !== id) { view._metadataRequested = null; return; }
-        Shiny.setInputValue('cell_view_aux_request', {
-          id: id, wire_token: token, stage: 'metadata', dataset_context: view.dataset_context
-        }, { priority: 'event' });
-      });
-    });
   }
 
   function applyData(bundle) {
@@ -8937,7 +9605,9 @@
     var datasetIdentity = datasetContextApi().key(D.dataset_context);
     var dataChanged = datasetIdentity !== dataShown;
     syncLinkedHoverDefault(dataChanged);
+    syncLinkedBackgroundsDefault(dataChanged);
     var previousSelected = selectedSpatial.slice();
+    var hadSpatial = !!spatialTemplate;
     var previousProjections = selectedProjections.slice();
     var previousActiveName = activeSpatial() && activeSpatial()._sampleName;
     if (dataChanged) {
@@ -8946,6 +9616,7 @@
       imgChoice = {};
       pendingCloneDetails.clear();
       pendingCloneSupplement = null;
+      deferredLinkedSupplements = [];
     }
     dataShown = datasetIdentity;
     imgToken++;
@@ -8964,7 +9635,16 @@
       }
     });
     var projectionNames = D.projections ? Object.keys(D.projections) : [];
-    selectedProjections = dataChanged ? [] : previousProjections.filter(function (name) {
+    var configuredInitialProjections = Array.isArray(D.initial_projections)
+      ? D.initial_projections
+      : (typeof D.initial_projections === 'string' ? [D.initial_projections] : []);
+    configuredInitialProjections = configuredInitialProjections.filter(function (name, index) {
+      return projectionNames.indexOf(name) >= 0 &&
+        configuredInitialProjections.indexOf(name) === index;
+    });
+    selectedProjections = dataChanged
+      ? configuredInitialProjections
+      : previousProjections.filter(function (name) {
       return projectionNames.indexOf(name) >= 0;
     });
     if (!selectedProjections.length && projectionNames.length) {
@@ -8978,8 +9658,13 @@
     selectedSpatial = dataChanged ? [] : previousSelected.filter(function (name) {
       return availableSamples.indexOf(name) >= 0;
     });
-    if (!selectedSpatial.length && initialSamples.length) {
-      selectedSpatial = [initialSamples[0].name];
+    // Show individual FOV/ROI scenes by default, without their duplicate
+    // All ROIs overviews. Use scene metadata, never dataset names or labels.
+    // Later bundles preserve manual choices, including overviews or none.
+    if ((dataChanged || !hadSpatial) && initialSamples.length) {
+      selectedSpatial = initialSamples.filter(function (sample) {
+        return sample.is_roi_overview !== true;
+      }).map(function (sample) { return sample.name; });
     }
     var activeName = !dataChanged && selectedSpatial.indexOf(previousActiveName) >= 0
       ? previousActiveName : selectedSpatial[0];
@@ -9005,9 +9690,14 @@
     // can be re-sent after returning to the tab; that refresh must not discard
     // the user's shared override.
     if (dataChanged) {
-      labelsOn = true;
-      bordersOn = false;
-      keepPlotsSquare = false;
+      var authorDisplay = D.display_defaults || {};
+      labelsOn = authorDisplay.group_labels === true;
+      bordersOn = authorDisplay.draw_border === true;
+      keepPlotsSquare = authorDisplay.keep_square === true;
+      colorClip = [0, 0.01, 0.02, 0.05].indexOf(authorDisplay.color_clip) >= 0
+        ? authorDisplay.color_clip : 0.01;
+      var clipControl = $('cv-clip');
+      if (clipControl) clipControl.value = String(colorClip);
       groupFilter = {};
       var labelsControl = $('cv-labels');
       if (labelsControl) labelsControl.checked = labelsOn;
@@ -9034,6 +9724,8 @@
       rebuildPctMask();
       setLinkedSliderValue('cv-pct', pctShow, 10);
     }
+    syncSharedScatter();
+    syncPointControls();
     closeMore();   // a new data set starts with advanced settings closed
     // Trekker controls reset
     dissolvePct = 0; dissolveThresh = null; evidenceOn = false; nicheRadius = 250;
@@ -9229,6 +9921,19 @@
     });
   }
 
+  function exportRuntimeWorkspace() {
+    var config = exportWorkspace();
+    // Internal navigation/progressive redraws must retain author defaults.
+    // Keep this out of the portable JSON schema; imported views still apply
+    // their explicitly saved display settings.
+    Object.defineProperty(config, '_pointOverrides', {
+      value: { size: pointSizeEdited, opacity: pointOpacityEdited }
+    });
+    return config;
+  }
+  function workspacePointOverrides(config) {
+    return config._pointOverrides || { size: true, opacity: true };
+  }
   function exportWorkspace() {
     if (!D) throw new Error('Load a data set before saving a linked view.');
     var active = activeSpatial();
@@ -9274,6 +9979,7 @@
           percentage_cells: pctShow,
           group_labels: labelsOn,
           cell_borders: bordersOn,
+          background_images: linkedBackgroundsOn,
           selection_mode: selectMode === 'box' ? 'box' : 'lasso',
           clone_layout: CLONE_MODE,
           keep_square: keepPlotsSquare
@@ -9455,9 +10161,14 @@
     ps = finiteNumber(display.point_size, ps, 0, 20);
     pointOpacity = finiteNumber(display.point_opacity, pointOpacity, 0, 1);
     pctShow = finiteNumber(display.percentage_cells, pctShow, 5, 100);
-    psSeeded = pointSizeEdited = pointOpacityEdited = true;
-    labelsOn = display.group_labels !== false;
+    psSeeded = true;
+    var overrides = workspacePointOverrides(config);
+    pointSizeEdited = overrides.size;
+    pointOpacityEdited = overrides.opacity;
+    labelsOn = display.group_labels === true;
     bordersOn = !!display.cell_borders;
+    linkedBackgroundsOn = display.background_images !== false;
+    syncLinkedBackgroundsDefault(false);
     keepPlotsSquare = !!display.keep_square;
     selectMode = display.selection_mode;
     applyCloneLayout(display.clone_layout);
@@ -9521,7 +10232,8 @@
   }
 
   function workspaceSummary() {
-    var primaryPanel = D && panels.filter(function (panel) {
+    var ownsWorkspace = !singleActive && D && D === linkedBundle && datasetMessageFresh(D);
+    var primaryPanel = ownsWorkspace && panels.filter(function (panel) {
       return panel.spaceId && Number(panel.canvas.dataset.pointCount) === D.n;
     })[0];
     var rendered = !!(D && configFingerprint() && primaryPanel);
@@ -9590,6 +10302,11 @@
   }
 
   var linkedReadyPaintToken = 0;
+
+  function setLinkedPresentationReady(ready) {
+    var root = document.querySelector('.linked-views-page');
+    if (root) root.classList.toggle('cv-workspace-pending', !ready);
+  }
 
   function linkedWorkspacePainted() {
     var meta = $('cv-meta');
@@ -9706,6 +10423,9 @@
 
   function reportWorkspaceReady(eventKind) {
     var summary = workspaceSummary();
+    // Primary UMAP delivery starts the supplement request, but is not yet the
+    // linked layout. Keep its pixels concealed without interrupting rendering.
+    if (!summary.complete) setLinkedPresentationReady(false);
     var token = ++linkedReadyPaintToken;
     if (!summary.primaryReady) {
       dispatchWorkspaceReady(summary, false, eventKind);
@@ -9720,6 +10440,7 @@
         if (token !== linkedReadyPaintToken || D !== paintedData) return;
         var settled = workspaceSummary();
         if (settled.datasetFingerprint !== paintedFingerprint) return;
+        setLinkedPresentationReady(settled.complete);
         dispatchWorkspaceReady(settled, linkedWorkspacePainted(), eventKind);
       });
     });
@@ -9752,6 +10473,61 @@
     if (booted) return true;
     if (typeof Shiny === 'undefined' || !Shiny.addCustomMessageHandler) return false;
     booted = true;
+    var tooltipControl = $('hover_info_in_projections_checkbox');
+    if (tooltipControl) cellTooltipsOn = tooltipControl.checked;
+    Shiny.addCustomMessageHandler('cerebro_cell_tooltips', function (message) {
+      if (message) setCellTooltips(!!message.enabled);
+    });
+    document.addEventListener('change', function (event) {
+      if (event.target.id === 'hover_info_in_projections_checkbox') setCellTooltips(event.target.checked);
+    });
+    Shiny.addCustomMessageHandler('cerebro_scatter_defaults', function (message) {
+      if (!message || !sameDatasetContext(message.dataset_context, currentDatasetContext())) return;
+      sharedScatter = message;
+      Object.keys(scatterControlFields).forEach(function (id) {
+        setLinkedSliderValue(id, message.values[scatterControlFields[id]]);
+      });
+      syncSharedScatter();
+      if (D && (!singleActive || singleClientPercentage())) { applyActiveChange(); }
+      else if (D && singleActive !== 'spatial_projection') { drawAll(); }
+    });
+    // Input bindings also emit on mount and on server updates. Accept ordinary
+    // slider changes only after pointer/keyboard interaction with that control.
+    function markScatterInteraction(event) {
+      var container = event.target && event.target.closest &&
+        event.target.closest('.shiny-input-container');
+      var control = container && container.querySelector('input');
+      if (control && scatterControlFields[control.id]) scatterUserEdit = {
+        id: control.id, context: currentDatasetContext(), time: Date.now()
+      };
+    }
+    document.addEventListener('pointerdown', markScatterInteraction, true);
+    document.addEventListener('keydown', markScatterInteraction, true);
+    window.jQuery(document).on('shiny:inputchanged.cerebroScatter', function (event) {
+      var edit = scatterUserEdit, field = scatterControlFields[event.name];
+      if (!edit || !field || event.name.indexOf('cv-') === 0 || edit.id !== event.name ||
+          Date.now() - edit.time > 30000 || !sameDatasetContext(edit.context, currentDatasetContext()) ||
+          (event.el && event.el._cvSyncing)) return;
+      var values = sharedScatterValues();
+      if (values && Number(event.value) === values[field]) return;
+      publishScatterEdit(field, Number(event.value));
+    });
+    // Newly rendered hidden drawers receive the latest values without causing
+    // a second user edit or replacing their DOM on every slider movement.
+    window.jQuery(document).on('shiny:bound.cerebroScatter', function (event) {
+      var values = sharedScatterValues(), field = scatterControlFields[event.target.id];
+      if (values && field) setLinkedSliderValue(event.target.id, values[field]);
+    });
+    Shiny.addCustomMessageHandler('cerebro_gpu_acceleration', function (message) {
+      if (message) setGpuAcceleration(message.enabled);
+    });
+    document.addEventListener('change', function (event) {
+      if (event.target && event.target.id === 'webgl_checkbox') {
+        setGpuAcceleration(event.target.checked);
+      }
+    });
+    var gpuPreference = document.getElementById('webgl_checkbox');
+    if (gpuPreference) setGpuAcceleration(gpuPreference.checked);
     Shiny.addCustomMessageHandler('coordviews_data', onData);
     Shiny.addCustomMessageHandler('coordviews_binary', onBinaryData);
     Shiny.addCustomMessageHandler('coordviews_attribute', onBinaryAttribute);
@@ -9848,9 +10624,23 @@
         view.meta.appearance || {},
         message.values
       );
+      view.appearanceOverrides = Object.assign({}, view.appearanceOverrides || {}, message.values);
+      ['point_size', 'point_opacity'].forEach(function (key) {
+        if (Number.isFinite(message.values[key])) {
+          view.data[key] = message.values[key];
+          view.pointAppearance = view.pointAppearance || {};
+          view.pointAppearance[key] = message.values[key];
+        }
+      });
       if (singleActive !== message.id) return;
+      if (Number.isFinite(message.values.point_size)) {
+        ps = Math.max(1, Math.min(20, message.values.point_size)); pointSizeEdited = true;
+      }
+      if (Number.isFinite(message.values.point_opacity)) {
+        pointOpacity = Math.max(0, Math.min(1, message.values.point_opacity)); pointOpacityEdited = true;
+      }
       if (Object.prototype.hasOwnProperty.call(message.values, 'group_labels')) {
-        labelsOn = message.values.group_labels !== false;
+        labelsOn = message.values.group_labels === true;
       }
       if (Object.prototype.hasOwnProperty.call(message.values, 'draw_border')) {
         bordersOn = !!message.values.draw_border;
@@ -9858,8 +10648,7 @@
       if (Object.prototype.hasOwnProperty.call(message.values, 'keep_square')) {
         keepPlotsSquare = !!message.values.keep_square;
       }
-      renderLegend();
-      resizeAll();
+      if (Object.prototype.hasOwnProperty.call(message.values, 'keep_square')) resizeAll();
       drawAll();
       window.dispatchEvent(new CustomEvent('cerebro:view-appearance', { detail: {
         id: message.id, values: message.values, dataset_context: message.dataset_context
@@ -9943,11 +10732,7 @@
     // The exact meta row behind the open detail card. Ignored if the card has
     // since moved on to another cell (or closed) — a slow reply must not
     // repaint a card that is now describing something else.
-    Shiny.addCustomMessageHandler('coordviews_cell_meta', function (m) {
-      if (!m || m.index == null || !m.cell) return;
-      cardMeta = { index: Number(m.index), cell: m.cell, rows: m.rows || [] };
-      if (cardOpen() && cardCell === cardMeta.index) renderCard();
-    });
+    Shiny.addCustomMessageHandler('coordviews_cell_meta', receiveCardMetadata);
     // Three 0-255 channels for RGB co-expression.
     Shiny.addCustomMessageHandler('coordviews_rgbval', function (m) {
       if (!D || !m || !datasetMessageFresh(m) ||
@@ -10030,6 +10815,7 @@
       return host && host.dataset.cellViewId || null;
     }
     function reportVisibility() {
+      reportRendererStatus();
       var el = $('cv-meta');
       var linkedVis = !!(el && el.offsetParent !== null);
       var singleId = visibleSingleId();
@@ -10040,7 +10826,7 @@
       var mounted = !singleId || !!(surfaceHome && surface &&
         surface.contains(surfaceHome.panes));
       if (key === lastVis && mounted) return;
-      var enteringCachedLinked = linkedVis && !!(D && workspaceSummary().primaryReady);
+      if (key !== lastVis) { clearTransientHover(); unpinTip(); closeCard(); }
       lastVis = key;
       requestSingleView(singleId);
       if (singleId && singleView(singleId)) {
@@ -10052,16 +10838,24 @@
         cachedTiming.clickToRequestMs = isFinite(window.__cerebroPageBenchClickStart)
           ? cachedAt - window.__cerebroPageBenchClickStart : null;
         activateSingle(singleId, false, false, 'cached');
+      } else if (linkedVis && linkedBundle && (singleActive || D !== linkedBundle)) {
+        // A non-canvas tab clears singleActive but leaves the specialist data
+        // mounted in D. Restore the Linked bundle on return through those tabs
+        // too, before its projection controls operate on the shared renderer.
+        activateLinked();
+      } else if (linkedVis && !linkedBundle) {
+        stashSingleState();
+        showUnavailable('Loading linked views…');
+        restoreLinkedSurface();
+        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+        setLinkedPresentationReady(false);
       } else if (singleActive) {
-        if (linkedVis && linkedBundle) {
-          activateLinked();
-        } else {
-          restoreLinkedSurface();
-          singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
-          if (linkedVis) showUnavailable('Loading linked views…');
-        }
+        stashSingleState();
+        restoreLinkedSurface();
+        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+        if (linkedVis) showUnavailable('Loading linked views…');
       }
-      if (enteringCachedLinked && !singleActive) {
+      if (linkedVis && !singleActive && workspaceSummary().primaryReady) {
         reportWorkspaceReady('cached');
       }
       if (Shiny.setInputValue) {
@@ -10230,8 +11024,7 @@
         return;
       }
       if (t && t.closest && t.closest('#cv-card-x')) {
-        pick = null; unpinTip(); closeCard(); drawAll();
-        if (!sel) { rebuildNiche(); renderReadout(); }
+        closeCard();
         return;
       }
       if (t && t.closest && t.closest('#cv-clear')) {
@@ -10281,6 +11074,7 @@
       if (!target || target._cvSyncing) return;
       var id = target.id, value = Number(target.value);
       if (!isFinite(value)) return;
+      if (scatterControlFields[id]) publishScatterEdit(scatterControlFields[id], value);
       if (id === 'cv-ps') {
         psSeeded = true;
         pointSizeEdited = true;
@@ -10308,6 +11102,10 @@
       var id = target && target.id;
       if (id === 'cv-hover') {
         setLinkedHover(target.checked);
+        return true;
+      }
+      if (id === 'cv-backgrounds') {
+        setLinkedBackgrounds(target.checked);
         return true;
       }
       if (id === 'cv-labels') {
@@ -10411,14 +11209,8 @@
     // drawer and its group-filter menus.
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
-      if (!cardOpen()) return;
-      pick = null; unpinTip(); closeCard(); drawAll();
-      if (!sel) {
-        rebuildNiche();
-        updateSelActions();
-        renderSelbar();
-        renderReadout();
-      }
+      if (cardOpen()) closeCard();
+      else if (pinnedTip.panel) unpinTip();
     });
     window.addEventListener('resize', function () {
       if (D) resizeAll();

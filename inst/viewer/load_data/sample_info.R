@@ -1,70 +1,24 @@
-##----------------------------------------------------------------------------##
-## Sample info.
-##----------------------------------------------------------------------------##
+source(file.path(Cerebro.options[["cerebro_root"]], "viewer/load_data/overview_ui.R"), local = TRUE)
 
-##----------------------------------------------------------------------------##
-## UI elements that show some basic information about the loaded data set.
-##----------------------------------------------------------------------------##
-#
-##----------------------------------------------------------------------------##
-## Value boxes that show:
-## - number of cells in data set
-## - organism
-## - date of export
-##----------------------------------------------------------------------------##
-
-##number of cells
-output[["load_data_number_of_cells"]] <- renderValueBox({
-  info <- current_dataset_info()
-  valueBox(
-    value = formatC(
-      info$cells,
-      format = "f",
-      big.mark = ",",
-      digits = 0
-    ),
-    subtitle = "Cells",
-    color = "light-blue",
-    icon = icon("list"),
-  )
+output$load_data_overview <- renderUI({
+  viewerOverviewUI(current_dataset_info())
 })
 
-## organism
-output[["load_data_organism"]] <- renderValueBox({
-  info <- current_dataset_info()
-  organism <- info$organism
-  if (length(organism) != 1L || is.na(organism) || !nzchar(organism)) {
-    organism <- "not available"
-  }
-  if (organism == "hg") {
-    valueBox(
-      value = organism,
-      subtitle = "Organism",
-      color = "yellow",
-      icon = icon("user")
-    )
-  } else {
-    valueBox(
-      value = organism,
-      subtitle = "Organism",
-      color = "yellow",
-      icon = icon("paw")
-    )
-  }
+output$load_data_annotation_plot <- renderUI({
+  annotations <- current_dataset_info()$overview$annotations
+  if (!length(annotations)) return(NULL)
+  selected <- input$load_data_annotation
+  if (is.null(selected) || !selected %in% names(annotations)) selected <- names(annotations)[1L]
+  viewerOverviewBars(annotations[[selected]])
 })
 
-## date of export
-## as.character() because the date is otherwise converted to interger
-output[["load_data_date_of_export"]] <- renderValueBox({
-  info <- current_dataset_info()
-  date <- info$date
-  if (length(date) != 1L || is.na(date) || !nzchar(date)) {
-    date <- "not available"
-  }
-  valueBox(
-    value = as.character(date),
-    subtitle = "Date",
-    color = "green",
-    icon = icon("calendar-day")
-  )
-})
+for (destination in c("overview", "geneExpression", "groups", "spatial",
+                      "trajectory", "immune_repertoire", "markerGenes",
+                      "enrichedPathways", "extra_material")) {
+  local({
+    target <- destination
+    observeEvent(input[[paste0("dataset_open_", target)]], {
+      updateTabItems(session, "sidebar", selected = target)
+    }, ignoreInit = TRUE)
+  })
+}

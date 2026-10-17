@@ -291,7 +291,8 @@ plotlyBarChart <- function(
       color = ~ .[[second_grouping_variable]],
       colors = colors,
       hoverinfo = "text",
-      text = hover_info
+      hovertext = hover_info,
+      textposition = "none"
     ) %>%
     plotly::layout(
       xaxis = cerebro_plotly_axis(title = "", mirror = FALSE),

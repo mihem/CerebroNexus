@@ -40,6 +40,7 @@ test_that("current Linked views state round-trips through the JSON validator", {
         point_opacity = 0.8,
         group_labels = TRUE,
         cell_borders = TRUE,
+        background_images = FALSE,
         selection_mode = "box",
         clone_layout = "stack",
         keep_square = TRUE
@@ -64,6 +65,12 @@ test_that("current Linked views state round-trips through the JSON validator", {
 
   expect_true(restored$view$display$keep_square)
   expect_true(restored$view$display$cell_borders)
+  expect_false(restored$view$display$background_images)
+  config$view$display$background_images <- NULL
+  legacy <- helpers$cv_config_decode(helpers$cv_config_prepare(config, cells = cells)$json, cells = cells)
+  expect_true(legacy$view$display$background_images)
+  config$view$display$background_images <- "off"
+  expect_error(helpers$cv_config_prepare(config, cells = cells), "background_images")
   expect_identical(restored$view$colour$genes, "CD3D")
   expect_identical(restored$view$focus_space, "projection::umap")
   expect_identical(restored$view$hidden_levels[[1]]$levels, "T cells")

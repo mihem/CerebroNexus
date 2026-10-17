@@ -36,12 +36,32 @@ if (
   stop("REPEATS and PERCENT must be positive and PERCENT at most 100.")
 }
 Sys.setenv(NOT_CRAN = "true")
+## chromote disables GPU acceleration by default; the canvas validation below
+## requires the production WebGPU renderer.
+chromote::set_chrome_args(setdiff(
+  chromote::get_chrome_args(),
+  "--disable-gpu"
+))
 overview_only <- identical(
   Sys.getenv("CEREBRO_VIEWER_BENCH_OVERVIEW_ONLY"),
   "1"
 )
 
 quote_r <- function(value) encodeString(value, quote = '"')
+script_argument <- grep("^--file=", commandArgs(), value = TRUE)[[1L]]
+source(file.path(
+  dirname(normalizePath(sub("^--file=", "", script_argument))),
+  "lib",
+  "viewer_launch.R"
+))
+load_mode <- viewer_bench_load_mode()
+candidates <- prepare_viewer_candidates(
+  list(
+    a = c(label = "a", root = roots[["a"]]),
+    b = c(label = "b", root = roots[["b"]])
+  ),
+  load_mode
+)
 
 run_once <- function(candidate, root, round) {
   has_gpu_renderer <- file.exists(
@@ -52,7 +72,7 @@ run_once <- function(candidate, root, round) {
   on.exit(unlink(app_dir, recursive = TRUE, force = TRUE), add = TRUE)
   writeLines(
     c(
-      sprintf("devtools::load_all(%s, quiet = TRUE)", quote_r(root)),
+      viewer_load_line(candidates[[candidate]], load_mode),
       "launchCerebro(",
       "  mode = \"closed\",",
       sprintf("  crb_file_to_load = c(\"1M mouse brain\" = %s),", quote_r(crb)),
@@ -80,14 +100,7 @@ run_once <- function(candidate, root, round) {
   app$run_js(
     "document.querySelector('a[href=\"#shiny-tab-loadData\"]').click()"
   )
-  app$wait_for_value(output = "load_data_number_of_cells", timeout = 900000)
-  cell_count <- app$get_value(output = "load_data_number_of_cells")
-  if (
-    is.null(cell_count$html) ||
-      !grepl("1,000,000", cell_count$html, fixed = TRUE)
-  ) {
-    stop("Data Info did not report 1,000,000 cells.", call. = FALSE)
-  }
+  wait_for_data_info_cells(app, "1,000,000")
   data_ready <- proc.time()[["elapsed"]]
   message(candidate, " data ready")
 

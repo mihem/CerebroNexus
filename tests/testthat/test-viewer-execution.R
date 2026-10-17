@@ -38,6 +38,10 @@ test_that("Gene recoloring preserves viewport and selection and rejects stale pa
   viewer_browser_test("incremental")
 })
 
+test_that("Gene display modes paint every panel on the first frame", {
+  viewer_browser_test("genePanels")
+})
+
 test_that("Canvas draws physical coordinates, per-cell radii and trajectory edges", {
   viewer_browser_test("geometry")
 })

@@ -251,6 +251,9 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
         list(point_size = 7, point_opacity = .6, percentage_cells_to_show = 100)
       }
       ir_display_params <- function() list()
+      ## The clonal renderer reads the author display defaults through a
+      ## server-level helper; this harness answers "no configured defaults".
+      current_page_display_defaults <- function(page) list()
       viewerDatasetIdentity <- function() list(fingerprint = "A")
       builds <- barcode_reads <- 0L
       ir_clonal_umap_data <- function(projection, receptor, clone_call, ...) {

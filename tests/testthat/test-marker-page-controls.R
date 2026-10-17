@@ -87,7 +87,7 @@ test_that("marker result shell distinguishes missing and empty results", {
       session$setInputs(marker_genes_selected_method = "A")
       expect_match(
         output$marker_genes_table_or_text_UI$html,
-        "No marker-gene table",
+        "No marker results",
         fixed = TRUE
       )
       expect_identical(scope$reads, 0L)
@@ -102,7 +102,7 @@ test_that("marker result shell distinguishes missing and empty results", {
       session$flushReact()
       expect_match(
         output$marker_genes_table_or_text_UI$html,
-        "No marker-gene table",
+        "No marker results",
         fixed = TRUE
       )
       result(data.frame(gene = "Gad1"))

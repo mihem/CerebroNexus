@@ -18,7 +18,7 @@ output[["marker_genes_table_or_text_UI"]] <- renderUI({
   req(method %in% methods)
   if (!length(getGroupsWithMarkerGenes(method))) {
     return(p(
-      "No marker-gene table is available for this method. Choose another method."
+      "No marker results. Choose another method."
     ))
   }
   req(
@@ -45,12 +45,12 @@ output[["marker_genes_table_or_text_UI"]] <- renderUI({
         results_type == "no_markers_found"
     ) {
       p(
-        "No marker genes meet the stored thresholds for this grouping variable. Choose another method or grouping variable."
+        "No marker genes meet the saved thresholds. Choose another method or grouping."
       )
     }
   } else {
     p(
-      "No marker-gene table is available for this method and grouping variable. Choose another method or grouping variable."
+      "No marker results for this grouping. Choose another method or grouping."
     )
   }
 })

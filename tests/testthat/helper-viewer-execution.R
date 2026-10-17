@@ -71,6 +71,7 @@ viewer_browser_test <- function(scenario) {
   }
   for (file in c(
     "dataset-context.js",
+    "background-model.js",
     "cell_views_state.js",
     "cell_views_wire.js",
     "cv-geom.js",

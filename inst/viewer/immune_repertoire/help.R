@@ -147,7 +147,7 @@ ir_tab_help <- list(
   ),
   "Clonal UMAP" = list(
     short = "Clonal expansion on the selected cell projection",
-    summary = "Overlays each cell's clone-expansion level onto the existing cell projection (UMAP/tSNE), so you can see where expanded T/B clones sit.",
+    summary = "Overlays each cell's clone-expansion level on the current cell projection, so you can see where expanded T/B clones sit.",
     detail = paste(
       "This reuses the selected cell projection and colours each cell by how large its clonotype is.",
       "",
@@ -560,7 +560,8 @@ output$ir_help_panel <- renderUI({
     class = "ir-plot-help",
     div(
       class = "ir-plot-help-copy",
-      tags$strong(class = "ir-plot-help-title", info$short),
+      ## The tab link already carries `short` as its tooltip, so repeating it
+      ## here only restated the tab name. The block is the summary alone.
       tags$p(
         class = "ir-plot-help-summary",
         info$summary

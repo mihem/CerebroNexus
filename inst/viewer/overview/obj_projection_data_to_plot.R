@@ -1,7 +1,10 @@
 ##----------------------------------------------------------------------------##
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
+## shiny::debounce() evaluates this eagerly; only the visible page may pay for it.
+overview_projection_active <- function() identical(input[["sidebar"]], "overview")
 overview_projection_data_to_plot_raw <- reactive({
+  req(overview_projection_active())
   dataset_context <- viewer_loaded_dataset_context()
   plot_parameters <- overview_projection_parameters_plot()
   req(plot_parameters)
@@ -59,11 +62,13 @@ overview_projection_data_to_plot_raw <- reactive({
     color_assignments = color_assignments,
     projection_resource = projection_resource,
     categorical_resource = categorical_resource,
-    resource_coordinates = resource_coordinates
+    resource_coordinates = resource_coordinates,
+    client_percentage = isTRUE(overview_projection_client_percentage())
   )
 })
 
 overview_projection_data_to_plot <- debounceAfterFirst(
   overview_projection_data_to_plot_raw,
-  150
+  150,
+  active = overview_projection_active
 )

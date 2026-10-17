@@ -20,13 +20,24 @@ chromote::set_chrome_args(c(
   "--use-angle=swiftshader"
 ))
 quote_r <- function(value) encodeString(value, quote = '"')
+script_argument <- grep("^--file=", commandArgs(), value = TRUE)[[1L]]
+source(file.path(
+  dirname(normalizePath(sub("^--file=", "", script_argument))),
+  "lib",
+  "viewer_launch.R"
+))
+load_mode <- viewer_bench_load_mode()
+candidate <- prepare_viewer_candidates(
+  list(candidate = c(label = "candidate", root = root)),
+  load_mode
+)[["candidate"]]
 
 app_dir <- tempfile("ren-linked-transport-")
 dir.create(app_dir)
 on.exit(unlink(app_dir, recursive = TRUE, force = TRUE), add = TRUE)
 writeLines(
   c(
-    sprintf("devtools::load_all(%s, quiet = TRUE)", quote_r(root)),
+    viewer_load_line(candidate, load_mode),
     "launchCerebro(",
     "  mode = \"closed\",",
     sprintf("  crb_file_to_load = c(\"Ren\" = %s),", quote_r(crb)),
@@ -48,7 +59,7 @@ app <- shinytest2::AppDriver$new(
   check_names = FALSE
 )
 on.exit(app$stop(), add = TRUE)
-app$wait_for_value(output = "load_data_number_of_cells", timeout = 900000)
+wait_for_data_info_cells(app)
 
 click_tab <- function(tab) {
   app$run_js(sprintf(

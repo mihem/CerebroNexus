@@ -17,7 +17,40 @@
   position: relative;
 }
 .coordviews-page .cv-ctl { display: flex; flex-direction: column; gap: 0; }
-.coordviews-page .cv-topbar > .cv-ctl > .selectize-control {
+/* Let actual container width decide the rows, independent of selection count. */
+.coordviews-page .cv-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px;
+  flex: 1 0 100%; width: 100%; min-width: 0;
+}
+.coordviews-page .cv-filters > .cv-ctl {
+  flex: 1 1 210px; width: auto;
+  min-width: min(210px, 100%); max-width: 100%; margin: 0;
+}
+.coordviews-page .cv-filters > #cv-spatial-ctl {
+  flex: 2 1 320px; min-width: min(320px, 100%);
+}
+.coordviews-page .cv-filters > .cv-ctl > .form-group {
+  width: 100%; max-width: 100%; margin: 0;
+}
+.coordviews-page .cv-actions-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  flex: 1 0 100%; width: 100%; min-width: 0;
+}
+.coordviews-page .cv-actions-row > .cv-linked-hover {
+  flex: 0 0 auto; align-self: center;
+}
+.coordviews-page .cv-actions-row > .cerebro-toolbar-actions {
+  align-self: center;
+}
+.coordviews-page .cv-actions-row > .cv-topbar-right {
+  min-width: 0; max-width: 100%;
+}
+.coordviews-page .cv-actions-row .cv-shown { white-space: normal; }
+.coordviews-page .cv-actions-row > .cv-topbar-right:has(.cv-shown:empty) {
+  display: none;
+}
+
+.coordviews-page .cv-filters > .cv-ctl > .selectize-control {
   width: 100%;
 }
 .coordviews-page .cv-topbar select {
@@ -49,8 +82,17 @@
 }
 .coordviews-page .cv-bg-display .selectize-control { width: 100%; }
 .coordviews-page .cv-bg-space-tabs {
-  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+  display: block; margin-bottom: 12px;
 }
+.coordviews-page .cv-bg-space-tabs > label { display: block; margin-bottom: 7px; font-size: 12px; }
+.coordviews-page .cv-bg-space-tabs .selectize-control { width: 100%; min-width: 0; }
+.coordviews-page .cv-bg-space-tabs .selectize-input > .item {
+  max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.coordviews-page .cv-bg-space-tabs .selectize-dropdown .option {
+  white-space: normal; overflow-wrap: anywhere;
+}
+.coordviews-page .cv-bg-session-note { color: var(--c-text-2); font-size: 12px; margin: 12px 0 0; }
 .coordviews-page .cv-bg-space-tab {
   max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 6px 10px; border: 1px solid var(--c-border); border-radius: 6px;
@@ -519,6 +561,14 @@
   position: relative; margin: auto 0; align-self: center;
   background: var(--c-surface); border-radius: 6px;
 }
+/* Square-mode mat reveals the actual canvas without changing its dimensions,
+   pointer coordinates or exported pixels. Fluid mode uses the normal surface. */
+.coordviews-page .cv-pane.cv-square-plot {
+  background: var(--c-bg);
+}
+.coordviews-page .cv-square-plot .cv-canvas-wrap {
+  outline: 1px solid var(--c-border);
+}
 .coordviews-page canvas {
   /* JS fits the canvas inside its panel without distorting spatial geometry. */
   display: block; background: var(--c-surface);
@@ -858,7 +908,7 @@
 }
 
 /* ---- RGB co-expression channel row -------------------------------------- */
-.coordviews-page .cv-topbar > #cv-rgb-ctl {
+.coordviews-page .cv-filters > #cv-rgb-ctl {
   flex: 0 1 408px; width: 408px; min-width: min(408px, 100%);
 }
 .coordviews-page .cv-rgb-ctl .cv-rgb-row {
@@ -884,7 +934,9 @@
 }
 .coordviews-page .cv-topbar .selectize-control .selectize-input input,
 .coordviews-page .cv-topbar .selectize-dropdown { font-size: 14px !important; }
-.coordviews-page .cv-topbar .selectize-control { height: var(--c-toolbar-control-height); }
+.coordviews-page .cv-topbar .selectize-control {
+  height: auto; min-height: var(--c-toolbar-control-height);
+}
 .coordviews-page .cv-topbar .selectize-control .selectize-input > .item {
   flex: 0 0 auto; margin: 0 3px 0 0 !important; line-height: 18px !important;
 }

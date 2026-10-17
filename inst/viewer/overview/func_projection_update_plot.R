@@ -93,6 +93,12 @@ overview_projection_update_plot <- function(input) {
     )
   }
 
+  if (isTRUE(input[["client_percentage"]])) {
+    ## The browser applies "% of cells" to this full frame; later slider edits
+    ## arrive through the shared scatter defaults without a new frame.
+    payload$data$client_percentage <- TRUE
+    payload$data$percentage_cells_to_show <- isolate(current_scatter_percentage())
+  }
   cerebroCellViewRender(
     "overview_projection",
     payload[["meta"]],
@@ -101,6 +107,13 @@ overview_projection_update_plot <- function(input) {
     deferred_aux = deferred_aux,
     core_aux = core_aux,
     dataset_context = input[["dataset_context"]],
-    feedback = input[["feedback"]]
+    feedback = input[["feedback"]],
+    ## Barcodes depend only on these. A colour or appearance change keeps them,
+    ## so the browser need not download every barcode again.
+    aux_key = list(
+      cell_indices = cell_indices,
+      selection_rows = selection_rows,
+      hover = isTRUE(plot_parameters[["hover_info"]])
+    )
   )
 }

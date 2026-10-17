@@ -7,7 +7,7 @@ output[["overview_projection_show_group_label_UI"]] <- renderUI({
     checkboxInput(
       inputId = "overview_projection_group_labels",
       label = "Group labels",
-      value = TRUE
+      value = current_page_display_defaults("projection")$group_labels
     )
   }
 })

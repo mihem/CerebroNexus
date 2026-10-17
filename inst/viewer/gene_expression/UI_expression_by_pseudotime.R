@@ -21,6 +21,7 @@ output[["expression_by_pseudotime_UI"]] <- renderUI({
     selection[1] %in% getMethodsForTrajectories(),
     selection[2] %in% getNamesOfTrajectories(selection[1])
   )
+  display_defaults <- current_page_display_defaults("gene")
   fluidRow(
     cerebroBox(
       title = tagList(
@@ -36,7 +37,7 @@ output[["expression_by_pseudotime_UI"]] <- renderUI({
               shinyWidgets::awesomeCheckbox(
                 inputId = "expression_by_pseudotime_show_trend_line",
                 label = HTML("Show trend line"),
-                value = TRUE
+                value = display_defaults$show_trend_line
               ),
               sliderInput(
                 "expression_by_pseudotime_trend_line_bandwidth",
@@ -52,7 +53,7 @@ output[["expression_by_pseudotime_UI"]] <- renderUI({
                 min = 1,
                 max = 10,
                 step = 1,
-                value = 2
+                value = display_defaults$trend_line_width
               )
             )
           ),

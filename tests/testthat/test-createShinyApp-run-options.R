@@ -185,7 +185,8 @@ test_that("new run options preserve historical positional arguments", {
 
   expect_identical(arguments[[14L]], "show_upload_ui")
   expect_identical(arguments[[15L]], "welcome_message")
-  expect_identical(tail(arguments, 1L), "initial_page")
+  expect_identical(tail(arguments, 5L), c("initial_page", "initial_projections",
+    "spatial_point_appearance", "spatial_roi_settings", "spatial_percentage_cells_to_show"))
 })
 
 test_that("createShinyApp freezes typed run options into config", {
@@ -447,4 +448,31 @@ test_that("createShinyApp accepts boundary and whole-valued ports", {
       as.integer(ports[[index]])
     )
   }
+})
+
+test_that("initial_projections configures initial Linked views panels", {
+  fixture <- run_options_test_fixture()
+  second <- file.path(dirname(fixture$crb), "dataset-b.crb")
+  saveRDS(Cerebro$new(), second)
+  app <- file.path(fixture$root, "app-initial-projections")
+
+  createShinyApp(
+    cerebro_data = c(A = fixture$crb, B = second),
+    result_dir = app,
+    launch_browser = FALSE,
+    verbose = FALSE,
+    initial_projections = list(
+      A = c("umap", "pca"),
+      B = "tsne"
+    )
+  )
+
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+  expect_identical(
+    config$viewer_content,
+    list(
+      A = list(initial_projections = c("umap", "pca")),
+      B = list(initial_projections = "tsne")
+    )
+  )
 })

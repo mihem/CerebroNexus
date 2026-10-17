@@ -19,6 +19,6 @@ registerGroupFiltersInfo(
   "spatial_projection",
   title = "Group filters for projection",
   text = HTML(
-    "The elements in this panel allow you to select which cells should be plotted based on the group(s) they belong to. For each grouping variable, you can activate or deactivate group levels. Only cells that are pass all filters (for each grouping variable) are shown in the projection."
+    "Choose the group levels to display. Cells must pass every grouping filter to appear in the projection."
   )
 )

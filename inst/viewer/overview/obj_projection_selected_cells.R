@@ -4,8 +4,10 @@
 ##----------------------------------------------------------------------------##
 overview_projection_selected_cells <- reactive({
   ## make sure plot parameters are set because it means that the plot can be
-  ## generated
-  req(overview_projection_data_to_plot())
+  ## generated. Isolated: a recolour must not rebuild a large selection (its
+  ## coordinate identifiers are formatted for every selected cell); the browser
+  ## republishes the selection whenever it changes.
+  req(isolate(overview_projection_data_to_plot()))
 
   ## The selection is held persistently on the JS side (shared
   ## cell_views.js) and pushed here as {x, y, ids} under

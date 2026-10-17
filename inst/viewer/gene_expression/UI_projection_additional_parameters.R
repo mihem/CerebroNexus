@@ -2,7 +2,8 @@
 ## UI elements to set additional plotting parameters.
 ##----------------------------------------------------------------------------##
 output[["expression_projection_additional_parameters_UI"]] <- renderUI({
-  appearance <- current_expression_scatter_defaults()
+  viewer_requested_dataset_context()
+  appearance <- isolate(current_scatter_defaults())
 
   tagList(
     sliderInput(
@@ -25,14 +26,15 @@ output[["expression_projection_additional_parameters_UI"]] <- renderUI({
 })
 
 output[["expression_projection_data_parameters_UI"]] <- renderUI({
-  appearance <- current_expression_scatter_defaults()
+  viewer_requested_dataset_context()
+  appearance <- isolate(current_scatter_defaults())
 
   tagList(
-    selectInput(
+    checkboxInput(
       "expression_projection_plotting_order",
-      label = "Plotting order",
-      choices = c("Random", "Highest expression on top"),
-      selected = "Highest expression on top"
+      label = "Highest expression on top",
+      value = identical(current_page_display_defaults("gene")$plotting_order,
+                        "Highest expression on top")
     ),
     sliderInput(
       "expression_projection_percentage_cells_to_show",
@@ -81,7 +83,7 @@ expression_projection_additional_parameters_info <- list(
     "
     The elements in this panel allow you to control what and how results are displayed across the whole tab.
     <ul>
-      <li><b>Plotting order:</b> Cells can be plotted in random order or so that cells with highest expression are on top.</li>
+      <li><b>Highest expression on top:</b> Off preserves the input cell order, like Seurat FeaturePlot(order = FALSE). On draws cells from low to high expression.</li>
       <li><b>Point size:</b> Controls how large the cells should be.</li>
       <li><b>Point opacity:</b> Controls the transparency of the cells.</li>
       <li><b>Show % of cells:</b> Using the slider, you can randomly remove a fraction of cells from the plot. This can be useful for large data sets and/or computers with limited resources.</li>

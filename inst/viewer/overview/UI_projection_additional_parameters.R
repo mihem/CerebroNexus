@@ -2,7 +2,8 @@
 ## UI elements to set additional parameters for the projection.
 ##----------------------------------------------------------------------------##
 output[["overview_projection_additional_parameters_UI"]] <- renderUI({
-  appearance <- current_scatter_defaults()
+  viewer_requested_dataset_context()
+  appearance <- isolate(current_scatter_defaults())
 
   tagList(
     sliderInput(
@@ -25,7 +26,8 @@ output[["overview_projection_additional_parameters_UI"]] <- renderUI({
 })
 
 output[["overview_projection_data_parameters_UI"]] <- renderUI({
-  appearance <- current_scatter_defaults()
+  viewer_requested_dataset_context()
+  appearance <- isolate(current_scatter_defaults())
 
   tagList(
     sliderInput(
