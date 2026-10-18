@@ -1,5 +1,17 @@
 # Changelog
 
+## CerebroNexus 5.1.2
+
+- Fixes embedded background images above about 750 KB being cut short,
+  which left their last rows transparent.
+- Fixes Spatial sessions ending when a gene was chosen before Gene
+  expression had been opened, or when a dataset switch left a gene the
+  new dataset lacks; a session that ends can no longer stop the whole
+  app.
+- Moves the expression colour scales shared by Spatial and Gene
+  expression to `viewer/core/`, and the deferred-page test now also
+  catches calls made by string or function reference.
+
 ## CerebroNexus 5.1.1
 
 - Background images now open at full opacity (1.0) instead of 50% in

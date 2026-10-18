@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,12 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.1.2" id="cerebronexus-512">CerebroNexus 5.1.2<a class="anchor" aria-label="anchor" href="#cerebronexus-512"></a></h2>
+<ul><li>Fixes embedded background images above about 750 KB being cut short, which left their last rows transparent.</li>
+<li>Fixes Spatial sessions ending when a gene was chosen before Gene expression had been opened, or when a dataset switch left a gene the new dataset lacks; a session that ends can no longer stop the whole app.</li>
+<li>Moves the expression colour scales shared by Spatial and Gene expression to <code>viewer/core/</code>, and the deferred-page test now also catches calls made by string or function reference.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.1.1" id="cerebronexus-511">CerebroNexus 5.1.1<a class="anchor" aria-label="anchor" href="#cerebronexus-511"></a></h2>
 <ul><li>Background images now open at full opacity (1.0) instead of 50% in Spatial, Linked views and Trekker. A configured or saved <code>image_opacity</code> still applies.</li>
