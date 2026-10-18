@@ -43,9 +43,15 @@ tab_gene_expression <- tabItem(
             uiOutput("expression_projection_genes_in_separate_panels_UI"),
             conditionalPanel(
               "input.expression_projection_genes_in_separate_panels == 'rgb'",
-              selectInput("expression_rgb_layout", "RGB layout",
-                choices = c("Composite RGB" = "composite", "Separate channels" = "separate"),
-                selected = "composite")
+              selectInput(
+                "expression_rgb_layout",
+                "RGB layout",
+                choices = c(
+                  "Composite RGB" = "composite",
+                  "Separate channels" = "separate"
+                ),
+                selected = "composite"
+              )
             ),
             uiOutput("expression_projection_gene_color_mode_UI"),
             uiOutput("expression_projection_select_projection_UI"),

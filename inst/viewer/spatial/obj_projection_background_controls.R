@@ -28,44 +28,76 @@
 ## identity. Never assign into Cerebro.options, CRB data, or image descriptors.
 spatial_background_edits <- new.env(parent = emptyenv())
 spatial_background_edit_key <- function(identity) {
-  as.character(jsonlite::toJSON(list(
-    context = viewer_loaded_dataset_context(),
-    image = identity[sort(names(identity))]
-  ), auto_unbox = TRUE, null = "null"))
+  as.character(jsonlite::toJSON(
+    list(
+      context = viewer_loaded_dataset_context(),
+      image = identity[sort(names(identity))]
+    ),
+    auto_unbox = TRUE,
+    null = "null"
+  ))
 }
 ## Publish only background scope changes. Sampling, colours and point styling
 ## may invalidate plot parameters, but must not replace mounted image controls.
 spatial_background_edit_model <- reactiveVal(NULL)
-observe({
-  parameters <- spatial_projection_parameters_plot()
-  model <- parameters[c("roi_mode", "roi_backgrounds", "background_identity",
-                         "background_descriptor", "projection")]
-  if (!identical(isolate(spatial_background_edit_model()), model)) {
-    spatial_background_edit_model(model)
-  }
-}, priority = 900)
+observe(
+  {
+    parameters <- spatial_projection_parameters_plot()
+    model <- parameters[c(
+      "roi_mode",
+      "roi_backgrounds",
+      "background_identity",
+      "background_descriptor",
+      "projection"
+    )]
+    if (!identical(isolate(spatial_background_edit_model()), model)) {
+      spatial_background_edit_model(model)
+    }
+  },
+  priority = 900
+)
 spatial_background_edit_target <- reactive({
   parameters <- spatial_background_edit_model()
   if (identical(parameters$roi_mode, "separate")) {
-    targets <- Filter(function(x) !is.null(x$descriptor), parameters$roi_backgrounds)
-    if (!length(targets)) return(NULL)
+    targets <- Filter(
+      function(x) !is.null(x$descriptor),
+      parameters$roi_backgrounds
+    )
+    if (!length(targets)) {
+      return(NULL)
+    }
     selected <- input[["spatial_projection_background_target"]]
-    if (is.null(selected) || !selected %in% names(targets)) selected <- names(targets)[[1L]]
+    if (is.null(selected) || !selected %in% names(targets)) {
+      selected <- names(targets)[[1L]]
+    }
     target <- targets[[selected]]
     target$roi <- selected
     return(target)
   }
-  if (is.null(parameters$background_identity)) return(NULL)
-  list(identity = parameters$background_identity,
-       descriptor = parameters$background_descriptor,
-       preset = spatial_background_preset(Cerebro.options,
-         viewer_current_dataset_key(), input[["spatial_projection_to_display"]],
-         parameters$background_descriptor))
+  if (is.null(parameters$background_identity)) {
+    return(NULL)
+  }
+  list(
+    identity = parameters$background_identity,
+    descriptor = parameters$background_descriptor,
+    preset = spatial_background_preset(
+      Cerebro.options,
+      viewer_current_dataset_key(),
+      input[["spatial_projection_to_display"]],
+      parameters$background_descriptor
+    )
+  )
 })
 spatial_background_edit_preset <- function(target) {
-  if (is.null(target)) return(NULL)
-  edit <- spatial_background_edits[[spatial_background_edit_key(target$identity)]]
-  if (is.null(edit)) return(target$preset)
+  if (is.null(target)) {
+    return(NULL)
+  }
+  edit <- spatial_background_edits[[spatial_background_edit_key(
+    target$identity
+  )]]
+  if (is.null(edit)) {
+    return(target$preset)
+  }
   edit$rotation <- edit$rotate
   edit$rotate <- NULL
   utils::modifyList(target$preset, edit)
@@ -114,17 +146,19 @@ observeEvent(
     }
 
     clean_values <- list(
-        opacity = finite_value("opacity"),
-        offsetX = finite_value("offsetX"),
-        offsetY = finite_value("offsetY"),
-        flipX = logical_value("flipX"),
-        flipY = logical_value("flipY"),
-        scaleX = finite_value("scaleX"),
-        scaleY = finite_value("scaleY"),
-        rotate = finite_value("rotate")
-      )
+      opacity = finite_value("opacity"),
+      offsetX = finite_value("offsetX"),
+      offsetY = finite_value("offsetY"),
+      flipX = logical_value("flipX"),
+      flipY = logical_value("flipY"),
+      scaleX = finite_value("scaleX"),
+      scaleY = finite_value("scaleY"),
+      rotate = finite_value("rotate")
+    )
     clean_values <- Filter(Negate(is.null), clean_values)
-    spatial_background_edits[[spatial_background_edit_key(background_identity)]] <- clean_values
+    spatial_background_edits[[spatial_background_edit_key(
+      background_identity
+    )]] <- clean_values
     cerebroCellViewBackground(
       id = "spatial_projection",
       values = clean_values,
@@ -174,9 +208,15 @@ observeEvent(input[["spatial_projection_background_reset"]], {
   values <- preset
   values$rotate <- values$rotation
   values$rotation <- NULL
-  spatial_background_edits[[spatial_background_edit_key(target$identity)]] <- values
-  cerebroCellViewBackground(id = "spatial_projection", values = values,
-    dataset_context = viewer_loaded_dataset_context(), background_identity = target$identity)
+  spatial_background_edits[[spatial_background_edit_key(
+    target$identity
+  )]] <- values
+  cerebroCellViewBackground(
+    id = "spatial_projection",
+    values = values,
+    dataset_context = viewer_loaded_dataset_context(),
+    background_identity = target$identity
+  )
   updateSliderInput(
     session,
     "spatial_projection_background_opacity",

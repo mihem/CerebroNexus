@@ -143,7 +143,11 @@ test_that("page benchmarks launch installed candidates by default", {
     'library(CerebroNexus, lib.loc = "/tmp/lib")'
   )
   expect_false(any(grepl("load_all", installed, fixed = TRUE)))
-  expect_true(any(grepl('"1M pages" = "/data/1m.crb"', installed, fixed = TRUE)))
+  expect_true(any(grepl(
+    '"1M pages" = "/data/1m.crb"',
+    installed,
+    fixed = TRUE
+  )))
   source_tree <- scope$viewer_app_lines(candidate, "/data/1m.crb", "load_all")
   expect_identical(
     source_tree[[1L]],
@@ -192,7 +196,10 @@ test_that("browser benchmarks share installed launches and Data info waits", {
     wait_for_js = function(script, timeout) waited <<- c(waited, script),
     get_js = function(script) "1,000,000 Cells"
   )
-  expect_identical(scope$wait_for_data_info_cells(app, "1,000,000"), "1,000,000 Cells")
+  expect_identical(
+    scope$wait_for_data_info_cells(app, "1,000,000"),
+    "1,000,000 Cells"
+  )
   expect_length(waited, 1L)
   expect_error(scope$wait_for_data_info_cells(app, "2,000,000"), "2,000,000")
   expect_identical(scope$wait_for_data_info_cells(app), "1,000,000 Cells")

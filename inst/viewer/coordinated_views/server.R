@@ -19,7 +19,10 @@
 ## Both pages resolve ROI membership, image scope and coordinate pivots through
 ## the same pure Spatial helpers, even when Spatial has not been opened yet.
 source(
-  file.path(Cerebro.options[["cerebro_root"]], "viewer/spatial/func_spatial_helpers.R"),
+  file.path(
+    Cerebro.options[["cerebro_root"]],
+    "viewer/spatial/func_spatial_helpers.R"
+  ),
   local = TRUE
 )
 source(

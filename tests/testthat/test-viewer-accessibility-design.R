@@ -22,7 +22,8 @@ test_that("preferences expose labelled checkbox controls", {
       }
       ## Renderer details live in the GPU switch tooltip, not a heading badge.
       expect_length(
-        xml2::xml_find_all(doc, ".//*[@id='cerebro-renderer-status']"), 0L
+        xml2::xml_find_all(doc, ".//*[@id='cerebro-renderer-status']"),
+        0L
       )
     }
   )

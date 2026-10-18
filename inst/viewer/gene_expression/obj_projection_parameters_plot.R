@@ -58,8 +58,14 @@ expression_projection_parameters_plot <- reactive({
     is_trajectory = is_trajectory,
     point_size = isolate(current_scatter_defaults()$point_size),
     point_opacity = isolate(current_scatter_defaults()$point_opacity),
-    draw_border = isTRUE(isolate(input[["expression_projection_point_border"]]) %||% display$draw_border),
-    keep_square = isTRUE(isolate(input[["expression_projection_keep_square"]]) %||% display$keep_square),
+    draw_border = isTRUE(
+      isolate(input[["expression_projection_point_border"]]) %||%
+        display$draw_border
+    ),
+    keep_square = isTRUE(
+      isolate(input[["expression_projection_keep_square"]]) %||%
+        display$keep_square
+    ),
     x_range = c(XYranges$x$min, XYranges$x$max),
     y_range = c(XYranges$y$min, XYranges$y$max),
     hover_info = preferences[["show_hover_info_in_projections"]]

@@ -105,20 +105,34 @@ output[["spatial_projection_background_parameters_UI"]] <- renderUI({
   ## renderUI reads the selected source-tagged image key, changing either spatial
   ## entry or image recreates every control with that image's own defaults.
   target <- spatial_background_edit_target()
-  if (is.null(target)) return(tags$p(class = "help-block", "No background image selected."))
+  if (is.null(target)) {
+    return(tags$p(class = "help-block", "No background image selected."))
+  }
   background_identity <- target$identity
   preset <- spatial_background_edit_preset(target)
-  targets <- Filter(function(x) !is.null(x$descriptor),
-    spatial_background_edit_model()$roi_backgrounds)
+  targets <- Filter(
+    function(x) !is.null(x$descriptor),
+    spatial_background_edit_model()$roi_backgrounds
+  )
   target_picker <- if (length(targets)) {
-    labels <- vapply(names(targets), function(roi) {
-      paste(roi, targets[[roi]]$descriptor$label, sep = " · ")
-    }, character(1))
-    tags$div(class = "cerebro-settings-full",
-      selectInput("spatial_projection_background_target", "Adjust background",
-        choices = stats::setNames(names(targets), labels), selected = target$roi,
-        width = "100%"),
-      tags$p(class = "help-block", "Changes apply only to this session."))
+    labels <- vapply(
+      names(targets),
+      function(roi) {
+        paste(roi, targets[[roi]]$descriptor$label, sep = " · ")
+      },
+      character(1)
+    )
+    tags$div(
+      class = "cerebro-settings-full",
+      selectInput(
+        "spatial_projection_background_target",
+        "Adjust background",
+        choices = stats::setNames(names(targets), labels),
+        selected = target$roi,
+        width = "100%"
+      ),
+      tags$p(class = "help-block", "Changes apply only to this session.")
+    )
   }
   ## Seed MOVE and FLIP from the preset so the controls honestly reflect the
   ## shipped alignment (checkbox ticked, sliders positioned). Both are read by

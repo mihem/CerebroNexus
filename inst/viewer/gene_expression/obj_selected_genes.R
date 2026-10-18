@@ -2,7 +2,10 @@
 ## Reactive data that holds genes provided by user or in selected gene set.
 ##----------------------------------------------------------------------------##
 expressionInputGenes <- function(value) {
-  genes <- unique(trimws(unlist(strsplit(as.character(value), "[,;[:space:]]+"))))
+  genes <- unique(trimws(unlist(strsplit(
+    as.character(value),
+    "[,;[:space:]]+"
+  ))))
   genes[!is.na(genes) & nzchar(genes)]
 }
 
@@ -10,23 +13,34 @@ expressionInputGenes <- function(value) {
 ## returning to RGB must preserve manual channel assignments, including blanks.
 expression_rgb_seed <- NULL
 observeEvent(
-  list(input[["expression_projection_genes_in_separate_panels"]],
-    input[["expression_genes_input"]], list_of_genes()),
+  list(
+    input[["expression_projection_genes_in_separate_panels"]],
+    input[["expression_genes_input"]],
+    list_of_genes()
+  ),
   {
-    req(identical(input[["expression_projection_genes_in_separate_panels"]], "rgb"))
+    req(identical(
+      input[["expression_projection_genes_in_separate_panels"]],
+      "rgb"
+    ))
     source <- input[["expression_genes_input"]]
     req(!is.null(source))
     source <- expressionInputGenes(source)
     available <- list_of_genes()
     genes <- unique(available[match(tolower(source), tolower(available))])
     genes <- genes[!is.na(genes)]
-    if (identical(expression_rgb_seed, genes)) return()
+    if (identical(expression_rgb_seed, genes)) {
+      return()
+    }
     expression_rgb_seed <<- genes
-    session$sendCustomMessage("cerebro_expression_rgb_seed", list(
-      dataset_context = viewer_loaded_dataset_context(),
-      source = as.list(as.character(input[["expression_genes_input"]])),
-      genes = as.list(head(genes, 3L))
-    ))
+    session$sendCustomMessage(
+      "cerebro_expression_rgb_seed",
+      list(
+        dataset_context = viewer_loaded_dataset_context(),
+        source = as.list(as.character(input[["expression_genes_input"]])),
+        genes = as.list(head(genes, 3L))
+      )
+    )
   }
 )
 
@@ -42,9 +56,14 @@ observeEvent(
     previous <- expression_previous_display_mode
     expression_previous_display_mode <<- mode
     req(identical(previous, "rgb"), !identical(mode, "rgb"))
-    channels <- unlist(lapply(c("r", "g", "b"), function(channel) {
-      as.character(input[[paste0("expression_rgb_gene_", channel)]] %||% character())
-    }), use.names = FALSE)
+    channels <- unlist(
+      lapply(c("r", "g", "b"), function(channel) {
+        as.character(
+          input[[paste0("expression_rgb_gene_", channel)]] %||% character()
+        )
+      }),
+      use.names = FALSE
+    )
     channels <- unique(channels[!is.na(channels) & nzchar(channels)])
     current <- expressionInputGenes(input[["expression_genes_input"]])
     missing <- channels[!tolower(channels) %in% tolower(current)]
@@ -53,10 +72,13 @@ observeEvent(
     available <- list_of_genes()
     seeded <- unique(available[match(tolower(genes), tolower(available))])
     expression_rgb_seed <<- seeded[!is.na(seeded)]
-    session$sendCustomMessage("cerebro_expression_gene_list", list(
-      dataset_context = viewer_loaded_dataset_context(),
-      genes = as.list(genes)
-    ))
+    session$sendCustomMessage(
+      "cerebro_expression_gene_list",
+      list(
+        dataset_context = viewer_loaded_dataset_context(),
+        genes = as.list(genes)
+      )
+    )
   }
 )
 
@@ -127,7 +149,10 @@ expression_selected_genes_input <- reactive({
 ## Let a multi-select gesture settle before any million-cell expression read.
 ## The first value still initializes immediately.
 expression_selection_snapshot <- debounceAfterFirst(
-  reactive(list(available = list_of_genes(), value = expression_selected_genes_input())),
+  reactive(list(
+    available = list_of_genes(),
+    value = expression_selected_genes_input()
+  )),
   200
 )
 expression_selected_genes_current <- reactive({
@@ -148,15 +173,18 @@ expression_selection_unavailable <- structure(
   class = "cerebro_selection_unavailable"
 )
 expression_selected_genes_state <- reactiveVal(expression_selection_unavailable)
-observe({
-  value <- tryCatch(
-    expression_selected_genes_current(),
-    error = function(error) expression_selection_unavailable
-  )
-  if (!identical(isolate(expression_selected_genes_state()), value)) {
-    expression_selected_genes_state(value)
-  }
-}, priority = 200)
+observe(
+  {
+    value <- tryCatch(
+      expression_selected_genes_current(),
+      error = function(error) expression_selection_unavailable
+    )
+    if (!identical(isolate(expression_selected_genes_state()), value)) {
+      expression_selected_genes_state(value)
+    }
+  },
+  priority = 200
+)
 expression_selected_genes <- reactive({
   value <- expression_selected_genes_state()
   req(!inherits(value, "cerebro_selection_unavailable"))

@@ -200,7 +200,9 @@ observe({
       # Match Spatial and Linked views: a saved opacity applies, else 0.5.
       opacity = {
         saved <- suppressWarnings(as.numeric(alignment$image_opacity))
-        if (length(saved) == 1L && is.finite(saved) && saved >= 0 && saved <= 1) {
+        if (
+          length(saved) == 1L && is.finite(saved) && saved >= 0 && saved <= 1
+        ) {
           saved
         } else {
           0.5

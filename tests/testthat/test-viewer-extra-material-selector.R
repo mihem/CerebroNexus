@@ -110,10 +110,15 @@ test_that("embedded table display labels preserve identity and dataset isolation
     names(tables)
   )
   crb$addTechnicalInfo("extra_material_table_index", labels)
-  expect_identical(runtime$extra_material_table_groups()[[1L]]$label, "Clinical results")
-  runtime$Cerebro.options$viewer_content$b <- list(extra_material_table_index = list(
-    "old-one" = list(workbook_name = "App override")
-  ))
+  expect_identical(
+    runtime$extra_material_table_groups()[[1L]]$label,
+    "Clinical results"
+  )
+  runtime$Cerebro.options$viewer_content$b <- list(
+    extra_material_table_index = list(
+      "old-one" = list(workbook_name = "App override")
+    )
+  )
   overridden <- runtime$extra_material_table_groups()
   expect_identical(overridden[[1L]]$label, "App override")
   expect_identical(overridden[[1L]]$sheets[[1L]]$label, "Patients")

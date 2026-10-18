@@ -25,7 +25,9 @@ trajectory_projection_lines <- function(trajectory_edges) {
 ## the coordinates sent to the plot match those used for selection and hover.
 ##----------------------------------------------------------------------------##
 ## shiny::debounce() evaluates this eagerly; only the visible page may pay for it.
-trajectory_projection_active <- function() identical(input[["sidebar"]], "trajectory")
+trajectory_projection_active <- function() {
+  identical(input[["sidebar"]], "trajectory")
+}
 trajectory_projection_prepared_raw <- reactive({
   req(trajectory_projection_active())
   dataset_context <- viewer_loaded_dataset_context()
@@ -71,8 +73,12 @@ trajectory_projection_prepared_raw <- reactive({
         "trajectory_projection",
         input,
         list(
-          trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
-          trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
+          trajectory_point_size = isolate(
+            trajectory_projection_appearance$point_size
+          ),
+          trajectory_point_opacity = isolate(
+            trajectory_projection_appearance$point_opacity
+          ),
           trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
         )
       ),
@@ -104,8 +110,12 @@ trajectory_projection_prepared_raw <- reactive({
       "trajectory_projection",
       input,
       list(
-        trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
-        trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
+        trajectory_point_size = isolate(
+          trajectory_projection_appearance$point_size
+        ),
+        trajectory_point_opacity = isolate(
+          trajectory_projection_appearance$point_opacity
+        ),
         trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
       )
     ),
@@ -170,7 +180,8 @@ trajectory_static_first_frame <- reactive({
   groups <- getGroups()
   if (
     !isTRUE(input[["coordviews_wire_supported"]]) ||
-      !(identical(color_variable, "state") || isTRUE(color_variable %in% groups)) ||
+      !(identical(color_variable, "state") ||
+        isTRUE(color_variable %in% groups)) ||
       !isTRUE(all.equal(
         as.numeric(trajectory_projection_appearance$percentage_cells_to_show),
         100
@@ -209,7 +220,9 @@ trajectory_static_first_frame <- reactive({
     ## A metadata group (e.g. the default main group) is coloured from its
     ## canonical Viewer Pack codes, mapped to the trajectory rows by the frame's
     ## canonical subset in the browser. Other geometries have no such mapping.
-    if (!identical(as.character(resource$geometry_kind), "canonical_projection")) {
+    if (
+      !identical(as.character(resource$geometry_kind), "canonical_projection")
+    ) {
       return(NULL)
     }
     group_resource <- viewerMetadataCodesAsset(
@@ -392,8 +405,12 @@ observe({
         "trajectory_projection",
         input,
         list(
-          trajectory_point_size = isolate(trajectory_projection_appearance$point_size),
-          trajectory_point_opacity = isolate(trajectory_projection_appearance$point_opacity),
+          trajectory_point_size = isolate(
+            trajectory_projection_appearance$point_size
+          ),
+          trajectory_point_opacity = isolate(
+            trajectory_projection_appearance$point_opacity
+          ),
           trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
         )
       )
@@ -515,14 +532,17 @@ observe({
     extra = list(shapes = prepared[["trajectory_lines"]]),
     deferred_aux = deferred_aux,
     dataset_context = prepared[["dataset_context"]],
-    feedback = utils::modifyList(prepared[["feedback"]], list(
-      trajectory_point_size = as.character(
-        isolate(trajectory_projection_appearance$point_size)
-      ),
-      trajectory_point_opacity = as.character(
-        isolate(trajectory_projection_appearance$point_opacity)
+    feedback = utils::modifyList(
+      prepared[["feedback"]],
+      list(
+        trajectory_point_size = as.character(
+          isolate(trajectory_projection_appearance$point_size)
+        ),
+        trajectory_point_opacity = as.character(
+          isolate(trajectory_projection_appearance$point_opacity)
+        )
       )
-    ))
+    )
   )
   if (!isolate(trajectory_projection_sent())) {
     session$onFlushed(

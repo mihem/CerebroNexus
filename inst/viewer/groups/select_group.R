@@ -8,7 +8,10 @@
 output[["groups_controls_UI"]] <- renderUI({
   groups <- getGroups()
   if (!length(groups)) {
-    return(p(`data-composition-unavailable` = "true", "No grouping variables are available."))
+    return(p(
+      `data-composition-unavailable` = "true",
+      "No grouping variables are available."
+    ))
   }
   selected_group <- groups[[1L]]
   primary <- selectInput(
@@ -21,8 +24,10 @@ output[["groups_controls_UI"]] <- renderUI({
   if (length(groups) == 1L) {
     return(tagList(
       primary,
-      p(`data-composition-unavailable` = "true",
-        "At least two grouping variables are needed to compare composition.")
+      p(
+        `data-composition-unavailable` = "true",
+        "At least two grouping variables are needed to compare composition."
+      )
     ))
   }
   tagList(

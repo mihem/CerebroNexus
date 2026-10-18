@@ -1086,18 +1086,43 @@ dedent <- function(string) {
   experiment <- object$getExperiment()
   metadata <- object$getMetaData()
   overview_helpers <- new.env(parent = baseenv())
-  sys.source(system.file("viewer", "core", "dataset_overview.R", package = "CerebroNexus"), overview_helpers)
+  sys.source(
+    system.file(
+      "viewer",
+      "core",
+      "dataset_overview.R",
+      package = "CerebroNexus"
+    ),
+    overview_helpers
+  )
   overview <- overview_helpers$viewerDatasetOverview(object)
   # Thin CRBs omit expression. Read only the external matrix dimensions here.
   if (is.null(overview$genes)) {
-    overview["genes"] <- list(tryCatch({
-      descriptor <- .readBundleBackend(path, object)
-      if (descriptor$type == "bpcells" && requireNamespace("BPCells", quietly = TRUE)) {
-        as.integer(nrow(BPCells::open_matrix_dir(.cerebroSidecar(path, descriptor))))
-      } else if (descriptor$type == "h5" && requireNamespace("HDF5Array", quietly = TRUE)) {
-        as.integer(ncol(HDF5Array::TENxMatrix(.cerebroSidecar(path, descriptor), group = "expression")))
-      } else NULL
-    }, error = function(error) NULL))
+    overview["genes"] <- list(tryCatch(
+      {
+        descriptor <- .readBundleBackend(path, object)
+        if (
+          descriptor$type == "bpcells" &&
+            requireNamespace("BPCells", quietly = TRUE)
+        ) {
+          as.integer(nrow(BPCells::open_matrix_dir(.cerebroSidecar(
+            path,
+            descriptor
+          ))))
+        } else if (
+          descriptor$type == "h5" &&
+            requireNamespace("HDF5Array", quietly = TRUE)
+        ) {
+          as.integer(ncol(HDF5Array::TENxMatrix(
+            .cerebroSidecar(path, descriptor),
+            group = "expression"
+          )))
+        } else {
+          NULL
+        }
+      },
+      error = function(error) NULL
+    ))
   }
   backend <- tryCatch(object$immune_repertoire_backend, error = function(e) {
     NULL
@@ -2834,12 +2859,22 @@ createShinyApp <- function(
   }
   spatial_catalogs <- preflight_data$spatial_catalogs
   spatial_point_appearance <- .normalizeAppSpatialPointSettings(
-    spatial_point_appearance, spatial_catalogs, roi = FALSE)
+    spatial_point_appearance,
+    spatial_catalogs,
+    roi = FALSE
+  )
   spatial_roi_settings <- .normalizeAppSpatialPointSettings(
-    spatial_roi_settings, spatial_catalogs, roi = TRUE)
+    spatial_roi_settings,
+    spatial_catalogs,
+    roi = TRUE
+  )
   spatial_percentage_cells_to_show <- .normalizeDatasetNumericOption(
-    spatial_percentage_cells_to_show, names(cerebro_data),
-    "spatial_percentage_cells_to_show", 10, 100)
+    spatial_percentage_cells_to_show,
+    names(cerebro_data),
+    "spatial_percentage_cells_to_show",
+    10,
+    100
+  )
   spatial_plot_rotation <- .normalizeAppSpatialPlotRotation(
     spatial_plot_rotation,
     spatial_catalogs
@@ -3362,7 +3397,9 @@ createShinyApp <- function(
       cerebro_options$viewer_content[[dataset]][[field]] <- values[[dataset]]
     }
   }
-  cerebro_options[["spatial_percentage_cells_to_show"]] <- spatial_percentage_cells_to_show
+  cerebro_options[[
+    "spatial_percentage_cells_to_show"
+  ]] <- spatial_percentage_cells_to_show
   cerebro_options[["point_size"]] <- point_size
   cerebro_options[["point_opacity"]] <- point_opacity
   cerebro_options[["percentage_cells_to_show"]] <- percentage_cells_to_show

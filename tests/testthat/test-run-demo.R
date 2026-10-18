@@ -110,16 +110,28 @@ test_that("demo preparation reuses valid packs and rebuilds missing or stale fir
     },
     .package = "CerebroNexus"
   )
-  expect_message(env$prepareDemoViewerPack("fixture.crb"), "Preparing Viewer Pack")
+  expect_message(
+    env$prepareDemoViewerPack("fixture.crb"),
+    "Preparing Viewer Pack"
+  )
   expect_identical(builds, 1L)
-  result <- list(valid = TRUE, path = "fixture.viewer", manifest = list(
-    hla_chains = c("TRA", "TRB"),
-    assets = data.frame(path = c("hla_tcr/TRA.first.qs2", "hla_tcr/TRB.first.qs2"))
-  ))
+  result <- list(
+    valid = TRUE,
+    path = "fixture.viewer",
+    manifest = list(
+      hla_chains = c("TRA", "TRB"),
+      assets = data.frame(
+        path = c("hla_tcr/TRA.first.qs2", "hla_tcr/TRB.first.qs2")
+      )
+    )
+  )
   expect_identical(env$prepareDemoViewerPack("fixture.crb"), "fixture.viewer")
   expect_identical(builds, 1L)
   result$manifest$assets <- result$manifest$assets[1L, , drop = FALSE]
-  expect_message(env$prepareDemoViewerPack("fixture.crb"), "Preparing Viewer Pack")
+  expect_message(
+    env$prepareDemoViewerPack("fixture.crb"),
+    "Preparing Viewer Pack"
+  )
   expect_identical(builds, 2L)
   result$manifest$hla_chains <- character()
   expect_identical(env$prepareDemoViewerPack("fixture.crb"), "fixture.viewer")

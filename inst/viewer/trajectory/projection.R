@@ -132,7 +132,9 @@ output[["trajectory_projection_data_parameters_UI"]] <- renderUI({
 
 observe({
   appearance <- current_scatter_defaults()
-  for (field in names(appearance)) trajectory_update_appearance(field, appearance[[field]])
+  for (field in names(appearance)) {
+    trajectory_update_appearance(field, appearance[[field]])
+  }
 })
 observeEvent(
   input[["trajectory_projection_point_border"]],

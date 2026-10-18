@@ -291,14 +291,24 @@ test_that("Viewer authentication supplies bundled CerebroNexus branding", {
   expect_match(rendered, "cerebro-auth-brand", fixed = TRUE)
   expect_match(rendered, "CerebroNexus", fixed = TRUE)
   expect_match(rendered, 'aria-label="CerebroNexus"', fixed = TRUE)
-  expect_match(rendered, "Need access? Contact the person who shared this app.", fixed = TRUE)
+  expect_match(
+    rendered,
+    "Need access? Contact the person who shared this app.",
+    fixed = TRUE
+  )
 })
 
 test_that("Viewer login presentation preserves provider inputs and improves semantics", {
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   runtime <- viewer_auth_runtime_environment()
-  rendered <- as.character(runtime$.viewer_auth_present(shinymanager::auth_ui("auth")))
-  expect_match(rendered, '<h1 id="auth-shinymanager-auth-head">Sign in</h1>', fixed = TRUE)
+  rendered <- as.character(runtime$.viewer_auth_present(shinymanager::auth_ui(
+    "auth"
+  )))
+  expect_match(
+    rendered,
+    '<h1 id="auth-shinymanager-auth-head">Sign in</h1>',
+    fixed = TRUE
+  )
   expect_match(rendered, 'id="auth-user_id"', fixed = TRUE)
   expect_match(rendered, 'autocomplete="username"', fixed = TRUE)
   expect_match(rendered, 'autocomplete="current-password"', fixed = TRUE)

@@ -207,8 +207,17 @@ test_that("a single-shot gene selector registers even when the selection moved",
   scope <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), scope)
   updates <- list()
-  scope$updateSelectizeInput <- function(session, inputId, choices, selected, ...) {
-    updates[[length(updates) + 1L]] <<- list(choices = choices, selected = selected)
+  scope$updateSelectizeInput <- function(
+    session,
+    inputId,
+    choices,
+    selected,
+    ...
+  ) {
+    updates[[length(updates) + 1L]] <<- list(
+      choices = choices,
+      selected = selected
+    )
   }
   shiny::testServer(
     function(input, output, session) {
@@ -216,9 +225,14 @@ test_that("a single-shot gene selector registers even when the selection moved",
       environment(scope$serverSideGeneSelector) <- environment()
       updateSelectizeInput <- scope$updateSelectizeInput
       canonicalGeneSelection <- scope$canonicalGeneSelection
-      scope$serverSideGeneSelector(session, "expression_rgb_gene_r",
-        choices = function() c("SNAP25", "GAD1"), retry = FALSE,
-        canonical_selection = TRUE, refresh_on_activation = FALSE)
+      scope$serverSideGeneSelector(
+        session,
+        "expression_rgb_gene_r",
+        choices = function() c("SNAP25", "GAD1"),
+        retry = FALSE,
+        canonical_selection = TRUE,
+        refresh_on_activation = FALSE
+      )
     },
     {
       session$setInputs(expression_rgb_gene_r = "")

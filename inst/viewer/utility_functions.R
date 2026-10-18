@@ -45,29 +45,51 @@ viewerLinkedViewsAvailable <- function(info = NULL, object = NULL) {
   if (!is.null(object)) {
     read <- function(value) tryCatch(force(value), error = function(e) NULL)
     projections <- as.character(read(object$availableProjections()))
-    projections <- unique(projections[!is.na(projections) & nzchar(projections)])
-    if (length(projections) > 1L) return(TRUE)
-    if (length(read(object$availableSpatial())) > 0L) return(TRUE)
-    if (any(vapply(
-      as.character(read(object$getMethodsForTrajectories())),
-      function(method) length(read(object$getNamesOfTrajectories(method))) > 0L,
-      logical(1)
-    ))) return(TRUE)
-    if (length(read(object$getTrekker())) > 0L) return(TRUE)
+    projections <- unique(projections[
+      !is.na(projections) & nzchar(projections)
+    ])
+    if (length(projections) > 1L) {
+      return(TRUE)
+    }
+    if (length(read(object$availableSpatial())) > 0L) {
+      return(TRUE)
+    }
+    if (
+      any(vapply(
+        as.character(read(object$getMethodsForTrajectories())),
+        function(method) {
+          length(read(object$getNamesOfTrajectories(method))) > 0L
+        },
+        logical(1)
+      ))
+    ) {
+      return(TRUE)
+    }
+    if (length(read(object$getTrekker())) > 0L) {
+      return(TRUE)
+    }
     return(isTRUE(read(viewerImmuneRepertoireSummary(object))$available))
   }
-  if (!is.list(info)) return(NULL)
+  if (!is.list(info)) {
+    return(NULL)
+  }
   extra <- list(
     spatial = info$capabilities$spatial,
     trajectory = info$capabilities$trajectory,
     trekker = info$capabilities$trekker,
     immune_repertoire = info$immune_repertoire
   )
-  if (any(vapply(extra, isTRUE, logical(1)))) return(TRUE)
+  if (any(vapply(extra, isTRUE, logical(1)))) {
+    return(TRUE)
+  }
   projections <- info$projection_names
-  if (!is.character(projections)) return(NULL)
+  if (!is.character(projections)) {
+    return(NULL)
+  }
   projections <- unique(projections[!is.na(projections) & nzchar(projections)])
-  if (length(projections) > 1L) return(TRUE)
+  if (length(projections) > 1L) {
+    return(TRUE)
+  }
   if (!all(vapply(extra, function(x) identical(x, FALSE), logical(1)))) {
     return(NULL)
   }
@@ -199,7 +221,9 @@ viewerDatasetLabel <- function(files, selected, display_labels = NULL) {
   }
   choices <- viewerDatasetChoices(files, display_labels)
   index <- match(selected, unname(choices))
-  if (is.na(index)) return("Dataset")
+  if (is.na(index)) {
+    return("Dataset")
+  }
   label <- names(choices)[[index]]
   if (is.na(label) || !nzchar(trimws(label))) "Dataset" else label
 }
@@ -354,11 +378,18 @@ viewerScatterDefaults <- function(options, dataset = NULL, page = NULL) {
   )
   # Ordinary projection views share one author configuration. Legacy page
   # overrides (e.g. expression_point_size) must not shadow it.
-  if (!identical(page, "spatial")) return(defaults)
+  if (!identical(page, "spatial")) {
+    return(defaults)
+  }
   list(
     point_size = resolve("spatial_point_size", 5, 1, 20),
     point_opacity = resolve("spatial_point_opacity", 1, 0.1, 1),
-    percentage_cells_to_show = resolve("spatial_percentage_cells_to_show", 100, 10, 100)
+    percentage_cells_to_show = resolve(
+      "spatial_percentage_cells_to_show",
+      100,
+      10,
+      100
+    )
   )
 }
 
@@ -890,7 +921,9 @@ viewerProjectionCellIndices <- function(
         } else {
           getGroupLevels(group)
         }
-      } else value
+      } else {
+        value
+      }
     }),
     groups
   )
@@ -1607,18 +1640,30 @@ cerebroCellViewAuxRequest <- function(request) {
 ## feedback cannot add a dependency to an existing preparation path.
 ## Pure display toggles patch the mounted renderer, without fetching geometry.
 cerebroObserveLocalAppearance <- function(id, input, session) {
-  ids <- c(group_labels = paste0(id, "_group_labels"),
-           draw_border = paste0(id, "_point_border"),
-           keep_square = paste0(id, "_keep_square"))
-  shiny::observeEvent(lapply(ids, function(key) input[[key]]), {
-    values <- lapply(ids, function(key) input[[key]])
-    values <- values[!vapply(values, is.null, logical(1))]
-    identity <- viewerDatasetIdentity()
-    shiny::req(identity$fingerprint, length(values))
-    session$sendCustomMessage("cell_view_appearance", list(
-      id = id, dataset_context = viewer_loaded_dataset_context(),
-      dataset_fingerprint = identity$fingerprint, values = values))
-  }, ignoreInit = TRUE)
+  ids <- c(
+    group_labels = paste0(id, "_group_labels"),
+    draw_border = paste0(id, "_point_border"),
+    keep_square = paste0(id, "_keep_square")
+  )
+  shiny::observeEvent(
+    lapply(ids, function(key) input[[key]]),
+    {
+      values <- lapply(ids, function(key) input[[key]])
+      values <- values[!vapply(values, is.null, logical(1))]
+      identity <- viewerDatasetIdentity()
+      shiny::req(identity$fingerprint, length(values))
+      session$sendCustomMessage(
+        "cell_view_appearance",
+        list(
+          id = id,
+          dataset_context = viewer_loaded_dataset_context(),
+          dataset_fingerprint = identity$fingerprint,
+          values = values
+        )
+      )
+    },
+    ignoreInit = TRUE
+  )
 }
 
 cerebroFeedbackControls <- function(id, input, overrides = list()) {

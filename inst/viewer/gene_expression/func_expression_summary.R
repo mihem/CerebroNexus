@@ -81,8 +81,10 @@ plotExpressionSummary <- function(series, groups, colors) {
   # points for every patient/sample in a large atlas. Exact summaries below
   # still use every finite observation, independently of the density budget.
   group_count <- max(1L, length(unique(groups[!is.na(groups)])))
-  density_points <- max(32L, min(4096L,
-    floor(65536 / (group_count * length(series)))))
+  density_points <- max(
+    32L,
+    min(4096L, floor(65536 / (group_count * length(series))))
+  )
   plots <- lapply(series, function(item) {
     plot_data <- data.frame(
       group = groups,

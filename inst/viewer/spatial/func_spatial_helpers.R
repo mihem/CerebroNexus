@@ -560,8 +560,10 @@ spatial_molecule_overlay <- function(
   ) {
     return(list())
   }
-  keep <- !is.na(data$gene) & data$gene == gene &
-    is.finite(data$x) & is.finite(data$y)
+  keep <- !is.na(data$gene) &
+    data$gene == gene &
+    is.finite(data$x) &
+    is.finite(data$y)
   data <- data[keep, , drop = FALSE]
   if (!nrow(data)) {
     return(list())

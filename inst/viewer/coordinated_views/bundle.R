@@ -332,7 +332,11 @@ cv_image_preset <- function(spatial_name, image_label) {
 ## either a relative path or a descriptor containing path + coordinate bounds.
 ## The output is base64-encoded so the browser never receives a filesystem path.
 ## Linked Views defers that encoding until the selected image is requested.
-cv_external_images <- function(spatial_name = NULL, defer = FALSE, roi_value = NULL) {
+cv_external_images <- function(
+  spatial_name = NULL,
+  defer = FALSE,
+  roi_value = NULL
+) {
   if (
     !exists("Cerebro.options") ||
       is.null(Cerebro.options[["spatial_images"]])
@@ -364,7 +368,10 @@ cv_external_images <- function(spatial_name = NULL, defer = FALSE, roi_value = N
     return(list())
   }
   configured <- configured_spatial_images(
-    Cerebro.options, dataset, spatial_name, roi_value
+    Cerebro.options,
+    dataset,
+    spatial_name,
+    roi_value
   )
   if (is.null(configured) || !length(configured)) {
     return(list())
@@ -1002,8 +1009,15 @@ cv_spatial_data <- function(crb, nm) {
   getter(nm)
 }
 
-cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
-                           metadata = NULL, spatial_data = NULL) {
+cv_spatial_one <- function(
+  crb,
+  cells,
+  nm,
+  allow_external,
+  roi_value = NULL,
+  metadata = NULL,
+  spatial_data = NULL
+) {
   sd <- tryCatch(
     spatial_data %||% cv_spatial_data(crb, nm),
     error = function(e) NULL
@@ -1026,18 +1040,26 @@ cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
   ## A single-ROI FOV has the same default scene as Spatial's single-ROI view.
   ## Multi-ROI overview coordinates stay intact; separately selectable ROI
   ## scenes below use the saved rotations and their own image declarations.
-  if (is.null(roi_value)) roi_value <- if (length(rois) == 1L) rois else ""
+  if (is.null(roi_value)) {
+    roi_value <- if (length(rois) == 1L) rois else ""
+  }
   roi_value <- spatial_roi_value(roi_value)
   if (nzchar(roi_value)) {
     keep <- !is.na(context$roi_by_cell) & context$roi_by_cell == roi_value
     co <- co[keep, , drop = FALSE]
-    if (!nrow(co)) return(NULL)
+    if (!nrow(co)) {
+      return(NULL)
+    }
     co <- rotateSpatialCoordinatesByRoi(
-      co, as.character(context$roi_by_cell[rownames(co)]),
+      co,
+      as.character(context$roi_by_cell[rownames(co)]),
       spatialRoiSettings(
         if (exists("Cerebro.options")) Cerebro.options else NULL,
-        cv_selected_dataset_name(), nm
-      ), rotation, pivots = context$pivots
+        cv_selected_dataset_name(),
+        nm
+      ),
+      rotation,
+      pivots = context$pivots
     )
   } else {
     co <- rotateSpatialCoordinates(co, rotation)
@@ -1074,7 +1096,9 @@ cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
   )
   roi_appearance <- spatialRoiSetting(
     if (exists("Cerebro.options")) Cerebro.options else NULL,
-    cv_selected_dataset_name(), nm, roi_value
+    cv_selected_dataset_name(),
+    nm,
+    roi_value
   )
   if (!is.null(roi_appearance)) {
     section_appearance <- roi_appearance[c("point_opacity", "point_size")]
@@ -1089,7 +1113,9 @@ cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
   }
   spatial_defaults <- viewerScatterDefaults(
     if (exists("Cerebro.options")) Cerebro.options else list(),
-    cv_selected_dataset_name(), "spatial")
+    cv_selected_dataset_name(),
+    "spatial"
+  )
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
     embedded_names <- names(embedded)
@@ -1207,13 +1233,17 @@ cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
   viewport <- if (length(images)) images[[1L]]$viewport else NULL
   list(
     name = nm,
-    label = paste0(nm, if (nzchar(roi_value)) {
-      paste0(" · ", roi_value)
-    } else if (length(rois) > 1L) {
-      " · All ROIs"
-    } else {
-      ""
-    }, " (spatial)"),
+    label = paste0(
+      nm,
+      if (nzchar(roi_value)) {
+        paste0(" · ", roi_value)
+      } else if (length(rois) > 1L) {
+        " · All ROIs"
+      } else {
+        ""
+      },
+      " (spatial)"
+    ),
     roi = if (nzchar(roi_value)) roi_value else NULL,
     is_roi_overview = !nzchar(roi_value) && length(rois) > 1L,
     x = as.numeric(co[sidx, 1]),
@@ -1234,8 +1264,10 @@ cv_spatial_one <- function(crb, cells, nm, allow_external, roi_value = NULL,
         "ymax"
       )]))
     },
-    builder_point_opacity = section_appearance$point_opacity %||% spatial_defaults$point_opacity,
-    builder_point_size = section_appearance$point_size %||% spatial_defaults$point_size,
+    builder_point_opacity = section_appearance$point_opacity %||%
+      spatial_defaults$point_opacity,
+    builder_point_size = section_appearance$point_size %||%
+      spatial_defaults$point_size,
     builder_percentage_cells = spatial_defaults$percentage_cells_to_show,
     ## `image` is the default one, kept so anything reading the older singular
     ## contract still works; `images` is the list the picker is built from.
@@ -1258,18 +1290,32 @@ cv_build_spatial <- function(crb, cells) {
   built <- list()
   for (nm in sp_names) {
     sd <- tryCatch(cv_spatial_data(crb, nm), error = function(error) NULL)
-    if (is.null(sd)) next
-    scene <- cv_spatial_one(crb, cells, nm, TRUE, metadata = metadata, spatial_data = sd)
-    if (is.null(scene)) next
+    if (is.null(sd)) {
+      next
+    }
+    scene <- cv_spatial_one(
+      crb,
+      cells,
+      nm,
+      TRUE,
+      metadata = metadata,
+      spatial_data = sd
+    )
+    if (is.null(scene)) {
+      next
+    }
     built[[length(built) + 1L]] <- scene
     rois <- spatial_metadata_facet(
-      metadata, rownames(sd$coordinates),
+      metadata,
+      rownames(sd$coordinates),
       c("sample_roi", "roi", "roi_id", "region_of_interest")
     )$values
     if (length(rois) > 1L) {
       for (roi in rois) {
         scene <- cv_spatial_one(crb, cells, nm, TRUE, roi, metadata, sd)
-        if (is.null(scene)) next
+        if (is.null(scene)) {
+          next
+        }
         scene$name <- paste0(nm, "::roi::", roi)
         built[[length(built) + 1L]] <- scene
       }
@@ -1965,8 +2011,10 @@ cv_build_bundle <- function(
   appearance <- if (exists("current_scatter_defaults", mode = "function")) {
     shiny::isolate(current_scatter_defaults())
   } else {
-    viewerScatterDefaults(if (exists("Cerebro.options")) Cerebro.options else list(),
-      cv_selected_dataset_name())
+    viewerScatterDefaults(
+      if (exists("Cerebro.options")) Cerebro.options else list(),
+      cv_selected_dataset_name()
+    )
   }
   default_point_size <- appearance$point_size
   default_percentage_cells_to_show <- appearance$percentage_cells_to_show

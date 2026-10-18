@@ -2,7 +2,9 @@
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
 ## shiny::debounce() evaluates this eagerly; only the visible page may pay for it.
-overview_projection_active <- function() identical(input[["sidebar"]], "overview")
+overview_projection_active <- function() {
+  identical(input[["sidebar"]], "overview")
+}
 overview_projection_data_to_plot_raw <- reactive({
   req(overview_projection_active())
   dataset_context <- viewer_loaded_dataset_context()

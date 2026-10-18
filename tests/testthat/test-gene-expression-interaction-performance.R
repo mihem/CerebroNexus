@@ -98,8 +98,12 @@ test_that("Gene projection host is present before dynamic controls bind", {
         data.frame(x = 1:2, y = 2:1)
       }
       Cerebro.options <- list(point_size = 5, point_opacity = 1)
-      current_page_display_defaults <- function(...) list(draw_border = FALSE, keep_square = TRUE)
-      current_scatter_defaults <- function() list(point_size = 5, point_opacity = 1)
+      current_page_display_defaults <- function(...) {
+        list(draw_border = FALSE, keep_square = TRUE)
+      }
+      current_scatter_defaults <- function() {
+        list(point_size = 5, point_opacity = 1)
+      }
       available_crb_files <- list(selected = "tiny")
       sys.source(
         viewer_test_path("gene_expression", "obj_projection_parameters_plot.R"),

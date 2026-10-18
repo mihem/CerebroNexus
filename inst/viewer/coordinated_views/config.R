@@ -797,7 +797,10 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
         background_images = if (is.null(display$background_images)) {
           TRUE
         } else {
-          cv_config_logical(display$background_images, "$.view.display.background_images")
+          cv_config_logical(
+            display$background_images,
+            "$.view.display.background_images"
+          )
         },
         selection_mode = cv_config_choice(
           display$selection_mode,

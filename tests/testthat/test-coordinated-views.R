@@ -32,7 +32,10 @@ have_bundle <- nzchar(bundle_file) &&
   file.exists(utility_file)
 if (have_bundle) {
   sys.source(utility_file, envir = cv_env)
-  sys.source(file.path(dirname(bundle_file), "..", "spatial", "func_spatial_helpers.R"), envir = cv_env)
+  sys.source(
+    file.path(dirname(bundle_file), "..", "spatial", "func_spatial_helpers.R"),
+    envir = cv_env
+  )
   sys.source(contract_file, envir = cv_env)
   sys.source(bundle_file, envir = cv_env)
 }
@@ -2527,83 +2530,154 @@ test_that("Linked spatial scenes use Spatial ROI geometry and image ownership", 
   root <- withr::local_tempdir()
   dir.create(file.path(root, "spatial-assets"))
   # The resolver reads only the PNG signature; rendering is tested in-browser.
-  writeBin(as.raw(c(137,80,78,71,13,10,26,10)), file.path(root,"spatial-assets","roi.png"))
-  cells <- paste0("c",1:5)
-  metadata <- data.frame(cell_barcode=cells, sample="S", sample_roi=c("A","A","B","B",NA))
-  coordinates <- data.frame(x=c(0,2,10,12),y=c(0,0,0,0),row.names=cells[1:4])
-  sd <- list(coordinates=coordinates)
-  crb <- list(
-    getMetaData=function() metadata,
-    availableSpatial=function() c("fov", "fov.2"),
-    getSpatialData=function(name) if(name=="fov") sd else list(coordinates=coordinates[1:2,,drop=FALSE])
+  writeBin(
+    as.raw(c(137, 80, 78, 71, 13, 10, 26, 10)),
+    file.path(root, "spatial-assets", "roi.png")
   )
-  bounds <- c(xmin=0,xmax=2,ymin=-1,ymax=1)
-  image <- list(path="spatial-assets/roi.png", bounds=bounds, label="Histology A",
-                roi_field="sample_roi",roi_value="A")
-  settings <- list(A=list(rotation_degrees=90,point_opacity=.8,point_size=5),
-                   B=list(rotation_degrees=180,point_opacity=.9,point_size=7))
-  options <- list(cerebro_root=root,
-    spatial_images=list(ds=list(fov=list(HE=image), fov.2=list(HE=image))),
-    spatial_image_settings=list(ds=list(fov=list(HE=list(rotation=12)),fov.2=list(HE=list(rotation=12)))),
-    viewer_content=list(ds=list(spatial_roi_settings=list(fov=settings,fov.2=settings)))
+  cells <- paste0("c", 1:5)
+  metadata <- data.frame(
+    cell_barcode = cells,
+    sample = "S",
+    sample_roi = c("A", "A", "B", "B", NA)
+  )
+  coordinates <- data.frame(
+    x = c(0, 2, 10, 12),
+    y = c(0, 0, 0, 0),
+    row.names = cells[1:4]
+  )
+  sd <- list(coordinates = coordinates)
+  crb <- list(
+    getMetaData = function() metadata,
+    availableSpatial = function() c("fov", "fov.2"),
+    getSpatialData = function(name) {
+      if (name == "fov") {
+        sd
+      } else {
+        list(coordinates = coordinates[1:2, , drop = FALSE])
+      }
+    }
+  )
+  bounds <- c(xmin = 0, xmax = 2, ymin = -1, ymax = 1)
+  image <- list(
+    path = "spatial-assets/roi.png",
+    bounds = bounds,
+    label = "Histology A",
+    roi_field = "sample_roi",
+    roi_value = "A"
+  )
+  settings <- list(
+    A = list(rotation_degrees = 90, point_opacity = .8, point_size = 5),
+    B = list(rotation_degrees = 180, point_opacity = .9, point_size = 7)
+  )
+  options <- list(
+    cerebro_root = root,
+    spatial_images = list(
+      ds = list(fov = list(HE = image), fov.2 = list(HE = image))
+    ),
+    spatial_image_settings = list(
+      ds = list(
+        fov = list(HE = list(rotation = 12)),
+        fov.2 = list(HE = list(rotation = 12))
+      )
+    ),
+    viewer_content = list(
+      ds = list(spatial_roi_settings = list(fov = settings, fov.2 = settings))
+    )
   )
   cv_env$Cerebro.options <- options
-  cv_env$available_crb_files <- list(selected="ds", files=c(ds="file.crb"))
-  on.exit(rm(list=c("Cerebro.options", "available_crb_files"), envir=cv_env), add=TRUE)
-  overview <- cv_env$cv_spatial_one(crb,cells,"fov",TRUE)
-  expect_length(overview$images,0)
+  cv_env$available_crb_files <- list(
+    selected = "ds",
+    files = c(ds = "file.crb")
+  )
+  on.exit(
+    rm(list = c("Cerebro.options", "available_crb_files"), envir = cv_env),
+    add = TRUE
+  )
+  overview <- cv_env$cv_spatial_one(crb, cells, "fov", TRUE)
+  expect_length(overview$images, 0)
   expect_null(overview$image)
-  expect_equal(overview$x,c(0,2,10,12,NA))
-  roi <- cv_env$cv_spatial_one(crb,cells,"fov",TRUE,"A")
-  context <- cv_env$spatial_roi_transform_context(coordinates,metadata,"S")
-  expected <- cv_env$rotateSpatialCoordinatesByRoi(coordinates[1:2,,drop=FALSE],
-    c("A","A"),settings,pivots=context$pivots)
-  expect_equal(roi$x,c(expected$x,NA,NA,NA))
-  expect_equal(roi$y,c(expected$y,NA,NA,NA))
-  expect_equal(roi$builder_point_size,5)
-  expect_equal(roi$builder_point_opacity,.8)
-  external <- cv_env$configured_spatial_images(options,"ds","fov","A")
-  descriptor <- cv_env$resolve_spatial_background("external::HE",list(),external)
-  expect_equal(roi$images[[1]]$bounds,as.list(descriptor$bounds))
-  expect_equal(roi$images[[1]]$label,descriptor$label)
-  expect_equal(roi$images[[1]]$preset,
-    cv_env$spatial_background_preset(options,"ds","fov",descriptor))
-  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",TRUE,"B")$images,0)
-  single <- cv_env$cv_spatial_one(crb,cells,"fov.2",TRUE)
-  expect_equal(single$x,roi$x)
-  expect_equal(single$y,roi$y)
-  expect_length(single$images,1)
-  scenes <- cv_env$cv_build_spatial(crb,cells)$samples
-  expect_identical(vapply(scenes,`[[`,character(1),"name"),
-    c("fov","fov::roi::A","fov::roi::B","fov.2"))
-  expect_identical(vapply(scenes,`[[`,character(1),"label"),
-    c("fov · All ROIs (spatial)", "fov · A (spatial)",
-      "fov · B (spatial)", "fov.2 · A (spatial)"))
-  expect_identical(vapply(scenes,`[[`,logical(1),"is_roi_overview"),
-    c(TRUE,FALSE,FALSE,FALSE))
-  expect_length(scenes[[1]]$images,0)
-  expect_equal(scenes[[2]]$x,structure(roi$x,class="AsIs"))
-  expect_length(scenes[[3]]$images,0)
+  expect_equal(overview$x, c(0, 2, 10, 12, NA))
+  roi <- cv_env$cv_spatial_one(crb, cells, "fov", TRUE, "A")
+  context <- cv_env$spatial_roi_transform_context(coordinates, metadata, "S")
+  expected <- cv_env$rotateSpatialCoordinatesByRoi(
+    coordinates[1:2, , drop = FALSE],
+    c("A", "A"),
+    settings,
+    pivots = context$pivots
+  )
+  expect_equal(roi$x, c(expected$x, NA, NA, NA))
+  expect_equal(roi$y, c(expected$y, NA, NA, NA))
+  expect_equal(roi$builder_point_size, 5)
+  expect_equal(roi$builder_point_opacity, .8)
+  external <- cv_env$configured_spatial_images(options, "ds", "fov", "A")
+  descriptor <- cv_env$resolve_spatial_background(
+    "external::HE",
+    list(),
+    external
+  )
+  expect_equal(roi$images[[1]]$bounds, as.list(descriptor$bounds))
+  expect_equal(roi$images[[1]]$label, descriptor$label)
+  expect_equal(
+    roi$images[[1]]$preset,
+    cv_env$spatial_background_preset(options, "ds", "fov", descriptor)
+  )
+  expect_length(cv_env$cv_spatial_one(crb, cells, "fov", TRUE, "B")$images, 0)
+  single <- cv_env$cv_spatial_one(crb, cells, "fov.2", TRUE)
+  expect_equal(single$x, roi$x)
+  expect_equal(single$y, roi$y)
+  expect_length(single$images, 1)
+  scenes <- cv_env$cv_build_spatial(crb, cells)$samples
+  expect_identical(
+    vapply(scenes, `[[`, character(1), "name"),
+    c("fov", "fov::roi::A", "fov::roi::B", "fov.2")
+  )
+  expect_identical(
+    vapply(scenes, `[[`, character(1), "label"),
+    c(
+      "fov · All ROIs (spatial)",
+      "fov · A (spatial)",
+      "fov · B (spatial)",
+      "fov.2 · A (spatial)"
+    )
+  )
+  expect_identical(
+    vapply(scenes, `[[`, logical(1), "is_roi_overview"),
+    c(TRUE, FALSE, FALSE, FALSE)
+  )
+  expect_length(scenes[[1]]$images, 0)
+  expect_equal(scenes[[2]]$x, structure(roi$x, class = "AsIs"))
+  expect_length(scenes[[3]]$images, 0)
   one <- crb
   one$availableSpatial <- function() "fov.2"
-  single_space <- cv_env$cv_build_spatial(one,cells)
-  expect_identical(single_space$name,"fov.2")
+  single_space <- cv_env$cv_build_spatial(one, cells)
+  expect_identical(single_space$name, "fov.2")
   expect_false(single_space$is_roi_overview)
-  expect_identical(single_space$label,"fov.2 · A (spatial)")
+  expect_identical(single_space$label, "fov.2 · A (spatial)")
   # Multiple matching images keep declaration order, independent of labels.
-  cv_env$Cerebro.options$spatial_images$ds$fov.2 <- list(Zebra=image,Alpha=image)
-  multi_image <- cv_env$cv_spatial_one(crb,cells,"fov.2",TRUE)
-  expect_match(multi_image$image$id,":Zebra$",perl=TRUE)
-  expect_match(multi_image$images[[2]]$id,":Alpha$",perl=TRUE)
+  cv_env$Cerebro.options$spatial_images$ds$fov.2 <- list(
+    Zebra = image,
+    Alpha = image
+  )
+  multi_image <- cv_env$cv_spatial_one(crb, cells, "fov.2", TRUE)
+  expect_match(multi_image$image$id, ":Zebra$", perl = TRUE)
+  expect_match(multi_image$images[[2]]$id, ":Alpha$", perl = TRUE)
 
   # Embedded ROI declarations follow the same scope precedence as externals.
-  embedded <- list(coordinates=coordinates,histology_images=list(
-    A=list(histology_image="data:image/png;base64,AA==",histology_image_bounds=bounds,
-           roi_field="sample_roi",roi_value="A")))
+  embedded <- list(
+    coordinates = coordinates,
+    histology_images = list(
+      A = list(
+        histology_image = "data:image/png;base64,AA==",
+        histology_image_bounds = bounds,
+        roi_field = "sample_roi",
+        roi_value = "A"
+      )
+    )
+  )
   crb$getSpatialData <- function(name) embedded
-  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE)$images,0)
-  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE,"A")$images,1)
-  expect_length(cv_env$cv_spatial_one(crb,cells,"fov",FALSE,"B")$images,0)
+  expect_length(cv_env$cv_spatial_one(crb, cells, "fov", FALSE)$images, 0)
+  expect_length(cv_env$cv_spatial_one(crb, cells, "fov", FALSE, "A")$images, 1)
+  expect_length(cv_env$cv_spatial_one(crb, cells, "fov", FALSE, "B")$images, 0)
 })
 
 test_that("supplement projections served by the Viewer Pack are sent as descriptors", {
@@ -2611,14 +2685,19 @@ test_that("supplement projections served by the Viewer Pack are sent as descript
   build <- function(names) {
     built_names <<- names
     stats::setNames(
-      lapply(names, function(name) list(ndim = 2L, x = I(c(1, 2)), y = I(c(3, 4)))),
+      lapply(names, function(name) {
+        list(ndim = 2L, x = I(c(1, 2)), y = I(c(3, 4)))
+      }),
       names
     )
   }
   descriptor <- list(url = "tsne.bin", cells = 2L, dimensions = 2L)
   projections <- cv_env$cv_supplement_projections(
     c("pca", "tsne", "umap3d"),
-    list(tsne = descriptor, umap3d = list(url = "bad", cells = 5L, dimensions = 2L)),
+    list(
+      tsne = descriptor,
+      umap3d = list(url = "bad", cells = 5L, dimensions = 2L)
+    ),
     2L,
     build
   )

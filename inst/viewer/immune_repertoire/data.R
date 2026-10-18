@@ -1455,7 +1455,8 @@ ir_sharing_classify <- function(seg, unit_col, group_col = NULL) {
     value_levels <- unique(vals[ok])
     value_codes <- match(vals[ok], value_levels)
     pair_codes <- (as.double(clone_codes[ok]) - 1) *
-      (length(value_levels) + 1) + value_codes
+      (length(value_levels) + 1) +
+      value_codes
     pairs <- !duplicated(pair_codes)
     tabulate(clone_codes[ok][pairs], nbins = nlevels(clones))
   }

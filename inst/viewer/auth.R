@@ -172,27 +172,42 @@
 # Only customize the provider's login form; retain its authentication lifecycle.
 .viewer_auth_present <- function(ui) {
   query <- htmltools::tagQuery(shiny::tags$div(ui))
-  if (!length(query$find("#auth-auth-mod")$selectedTags())) return(ui)
+  if (!length(query$find("#auth-auth-mod")$selectedTags())) {
+    return(ui)
+  }
   query$find("#auth-auth-mod")$addAttrs(role = "main")
   query$find("#auth-shinymanager-auth-head")$replaceWith(shiny::tagList(
     shiny::tags$h1(id = "auth-shinymanager-auth-head", "Sign in"),
-    shiny::tags$p(class = "cerebro-auth-intro",
-      "Use the account provided for this app.")
+    shiny::tags$p(
+      class = "cerebro-auth-intro",
+      "Use the account provided for this app."
+    )
   ))
   query$find("#auth-user_id")$addAttrs(
-    name = "username", autocomplete = "username",
-    autocapitalize = "none", spellcheck = "false"
+    name = "username",
+    autocomplete = "username",
+    autocapitalize = "none",
+    spellcheck = "false"
   )$removeAttrs("autofocus")
   query$find("#auth-user_pwd")$addAttrs(
-    name = "password", autocomplete = "current-password"
+    name = "password",
+    autocomplete = "current-password"
   )
   query$find("#auth-go_auth")$append(shiny::tags$span(
-    class = "cerebro-auth-busy-label", `aria-hidden` = "true", "Signing in\u2026"
+    class = "cerebro-auth-busy-label",
+    `aria-hidden` = "true",
+    "Signing in\u2026"
   ))
   query$find("#auth-container-btn-ok")$append(shiny::tags$span(
-    id = "cerebro-auth-status", class = "sr-only", role = "status", `aria-live` = "polite"
+    id = "cerebro-auth-status",
+    class = "sr-only",
+    role = "status",
+    `aria-live` = "polite"
   ))
-  query$find("#auth-result_auth")$addAttrs(`aria-live` = "polite", `aria-atomic` = "true")
+  query$find("#auth-result_auth")$addAttrs(
+    `aria-live` = "polite",
+    `aria-atomic` = "true"
+  )
   shiny::tagList(query$allTags()$children)
 }
 
@@ -267,13 +282,16 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
   }
   brand <- .viewer_auth_brand(root)
   # Use the provider's labels so its initial language update preserves our copy.
-  shinymanager::set_labels("en", list(
-    "Please authenticate" = "Sign in",
-    "Login" = "Sign in",
-    "Username:" = "Username",
-    "Password:" = "Password",
-    "Username or password are incorrect" = "Username or password is incorrect. Check your details and try again."
-  ))
+  shinymanager::set_labels(
+    "en",
+    list(
+      "Please authenticate" = "Sign in",
+      "Login" = "Sign in",
+      "Username:" = "Username",
+      "Password:" = "Password",
+      "Username or password are incorrect" = "Username or password is incorrect. Check your details and try again."
+    )
+  )
 
   secured_server <- function(input, output, session) {
     auth <- shinymanager::secure_server(
@@ -354,16 +372,18 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
   }
 
   secured_ui <- shinymanager::secure_app(
-      ui,
-      enable_admin = FALSE,
-      head_auth = brand$head,
-      tags_top = brand$top,
-      tags_bottom = brand$bottom
-    )
+    ui,
+    enable_admin = FALSE,
+    head_auth = brand$head,
+    tags_top = brand$top,
+    tags_bottom = brand$bottom
+  )
   list(
     ui = if (is.function(secured_ui)) {
       function(request) .viewer_auth_present(secured_ui(request))
-    } else secured_ui,
+    } else {
+      secured_ui
+    },
     server = compiler::cmpfun(secured_server)
   )
 }

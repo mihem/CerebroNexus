@@ -3,36 +3,61 @@
 
 ## Coordinate appearance has one typed contract for authoring and rendering.
 viewerNamedSettings <- function(value) {
-  is.list(value) && !is.object(value) &&
-    (!length(value) || (!is.null(names(value)) && !anyNA(names(value)) &&
-      all(nzchar(names(value))) && !anyDuplicated(names(value))))
+  is.list(value) &&
+    !is.object(value) &&
+    (!length(value) ||
+      (!is.null(names(value)) &&
+        !anyNA(names(value)) &&
+        all(nzchar(names(value))) &&
+        !anyDuplicated(names(value))))
 }
 
 viewerSpatialPointSetting <- function(value, roi = FALSE) {
   fields <- c(if (roi) "rotation_degrees", "point_opacity", "point_size")
-  if (!viewerNamedSettings(value) || !setequal(names(value), fields) ||
-      !all(vapply(value, function(x) is.numeric(x) && length(x) == 1L &&
-        is.finite(x), logical(1))) ||
-      value$point_size < 1 || value$point_size > 20 ||
-      value$point_opacity < 0 || value$point_opacity > 1) return(NULL)
+  if (
+    !viewerNamedSettings(value) ||
+      !setequal(names(value), fields) ||
+      !all(vapply(
+        value,
+        function(x) is.numeric(x) && length(x) == 1L && is.finite(x),
+        logical(1)
+      )) ||
+      value$point_size < 1 ||
+      value$point_size > 20 ||
+      value$point_opacity < 0 ||
+      value$point_opacity > 1
+  ) {
+    return(NULL)
+  }
   lapply(value[fields], as.numeric)
 }
 
 ## Extra-material labels are presentation metadata keyed by immutable table IDs.
 ## Discard unavailable labels and unrelated source-file metadata.
 viewerExtraMaterialTableIndex <- function(value = NULL, table_names = NULL) {
-  if (!is.list(value) || is.object(value) || is.null(names(value))) return(list())
+  if (!is.list(value) || is.object(value) || is.null(names(value))) {
+    return(list())
+  }
   keys <- names(value)
   keep <- !is.na(keys) & nzchar(trimws(keys)) & !duplicated(keys)
-  if (!is.null(table_names)) keep <- keep & keys %in% table_names
+  if (!is.null(table_names)) {
+    keep <- keep & keys %in% table_names
+  }
   result <- list()
   for (key in keys[keep]) {
     record <- value[[key]]
-    if (!is.list(record) || is.object(record)) next
+    if (!is.list(record) || is.object(record)) {
+      next
+    }
     labels <- list()
     for (field in c("workbook_name", "display_name")) {
       text <- record[[field]]
-      if (is.character(text) && length(text) == 1L && !is.na(text) && nzchar(trimws(text))) {
+      if (
+        is.character(text) &&
+          length(text) == 1L &&
+          !is.na(text) &&
+          nzchar(trimws(text))
+      ) {
         labels[[field]] <- trimws(text)
       }
     }
@@ -117,7 +142,11 @@ builderViewerDisplayDefaults <- function(value = NULL) {
     gene_palette = c("cerebro_orange", "blues", "greens", "viridis"),
     gene_panel_mode = c("shared", "distinct"),
     gene_panel_palette = c("default", "soft"),
-    gene_plotting_order = c("Input order", "Random", "Highest expression on top"),
+    gene_plotting_order = c(
+      "Input order",
+      "Random",
+      "Highest expression on top"
+    ),
     hla_legend_mode = c("auto", "always", "never")
   )
   ranges <- list(

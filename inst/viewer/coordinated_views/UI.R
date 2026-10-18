@@ -449,14 +449,22 @@ tab_coordinated_views <- tabItem(
                   class = "cv-bg-settings",
                   div(
                     class = "cv-bg-display",
-                    tags$label(class = "cv-bg-display-title", `for` = "cv-bg-image-select", "Image"),
+                    tags$label(
+                      class = "cv-bg-display-title",
+                      `for` = "cv-bg-image-select",
+                      "Image"
+                    ),
                     tags$select(
                       id = "cv-bg-image-select",
                       class = "form-control"
                     )
                   ),
                   uiOutput("coordviews_image_ui"),
-                  tags$p(id = "cv-bg-session-note", class = "cv-bg-session-note", "Changes apply only to this session.")
+                  tags$p(
+                    id = "cv-bg-session-note",
+                    class = "cv-bg-session-note",
+                    "Changes apply only to this session."
+                  )
                 )
               )
             ),

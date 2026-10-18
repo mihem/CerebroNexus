@@ -214,5 +214,9 @@ test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
   expect_match(html, '<option value="TRB" selected>', fixed = TRUE)
   ## A chain the new dataset lacks falls back to all chains.
   env$input$ir_chain <- "IGH"
-  expect_match(as.character(render()), '<option value="both" selected>', fixed = TRUE)
+  expect_match(
+    as.character(render()),
+    '<option value="both" selected>',
+    fixed = TRUE
+  )
 })

@@ -375,7 +375,9 @@ test_that("secondary expression summaries wait for the painted primary frame", {
         expression_projection_data <- expression_projection_parameters_color <- read_data
         expression_projection_render_key <- function() "current"
         sys.source(viewer_test_path("utility_functions.R"), scope)
-        viewer_loaded_dataset_context <- function() viewerDatasetContext("session", "A", 1)
+        viewer_loaded_dataset_context <- function() {
+          viewerDatasetContext("session", "A", 1)
+        }
         viewer_server_load(
           viewer_server_statements(
             "gene_expression",
@@ -399,7 +401,8 @@ test_that("secondary expression summaries wait for the painted primary frame", {
         session$setInputs(
           expression_summary_viewport_request = 1,
           expression_projection_rendered_state = list(
-            render_key = "old", dataset_context = viewer_loaded_dataset_context()
+            render_key = "old",
+            dataset_context = viewer_loaded_dataset_context()
           )
         )
         expect_error(output[[id]], class = "shiny.silent.error")
@@ -408,7 +411,8 @@ test_that("secondary expression summaries wait for the painted primary frame", {
           session$setInputs(
             expression_summary_viewport_request = NULL,
             expression_projection_rendered_state = list(
-              render_key = "current", dataset_context = viewer_loaded_dataset_context()
+              render_key = "current",
+              dataset_context = viewer_loaded_dataset_context()
             )
           )
           expect_error(output[[id]], class = "shiny.silent.error")
@@ -417,7 +421,8 @@ test_that("secondary expression summaries wait for the painted primary frame", {
         session$setInputs(
           expression_summary_viewport_request = 1,
           expression_projection_rendered_state = list(
-            render_key = "current", dataset_context = viewer_loaded_dataset_context()
+            render_key = "current",
+            dataset_context = viewer_loaded_dataset_context()
           )
         )
         expect_error(output[[id]], "summary data reached")

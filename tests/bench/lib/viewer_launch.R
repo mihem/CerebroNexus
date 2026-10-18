@@ -30,7 +30,11 @@ install_candidate_package <- function(candidate, library_root) {
   status <- system2(
     file.path(R.home("bin"), "R"),
     c(
-      "CMD", "INSTALL", "--no-docs", "--no-multiarch", "--no-test-load",
+      "CMD",
+      "INSTALL",
+      "--no-docs",
+      "--no-multiarch",
+      "--no-test-load",
       paste0("--library=", shQuote(library)),
       shQuote(candidate[["root"]])
     ),
@@ -39,7 +43,10 @@ install_candidate_package <- function(candidate, library_root) {
   )
   if (!identical(as.integer(status), 0L)) {
     stop(
-      "Installing candidate '", candidate[["label"]], "' failed; see ", log,
+      "Installing candidate '",
+      candidate[["label"]],
+      "' failed; see ",
+      log,
       call. = FALSE
     )
   }
@@ -90,8 +97,11 @@ data_info_cells_js <- function() {
 
 # Wait until Data info shows its cell count; check it when expected_label is
 # given (e.g. "1,000,000").
-wait_for_data_info_cells <- function(app, expected_label = NULL,
-                                     timeout = 900000) {
+wait_for_data_info_cells <- function(
+  app,
+  expected_label = NULL,
+  timeout = 900000
+) {
   app$wait_for_js(paste0(data_info_cells_js(), " !== null"), timeout = timeout)
   count <- app$get_js(data_info_cells_js())
   if (

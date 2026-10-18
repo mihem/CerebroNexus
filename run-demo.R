@@ -27,7 +27,10 @@ source(
   file.path(repo_root, "tests", "bench", "prepare_viewer_ren_data.R"),
   local = TRUE
 )
-source(file.path(repo_root, "tests", "bench", "prepare_viewer_pack.R"), local = TRUE)
+source(
+  file.path(repo_root, "tests", "bench", "prepare_viewer_pack.R"),
+  local = TRUE
+)
 
 if (!"--ren-only" %in% args) {
   crb <- prepareViewer1mBenchmarkData()

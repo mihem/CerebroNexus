@@ -185,8 +185,16 @@ test_that("new run options preserve historical positional arguments", {
 
   expect_identical(arguments[[14L]], "show_upload_ui")
   expect_identical(arguments[[15L]], "welcome_message")
-  expect_identical(tail(arguments, 5L), c("initial_page", "initial_projections",
-    "spatial_point_appearance", "spatial_roi_settings", "spatial_percentage_cells_to_show"))
+  expect_identical(
+    tail(arguments, 5L),
+    c(
+      "initial_page",
+      "initial_projections",
+      "spatial_point_appearance",
+      "spatial_roi_settings",
+      "spatial_percentage_cells_to_show"
+    )
+  )
 })
 
 test_that("createShinyApp freezes typed run options into config", {

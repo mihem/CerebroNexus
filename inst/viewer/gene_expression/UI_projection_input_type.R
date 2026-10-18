@@ -69,7 +69,8 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
       "input.expression_analysis_mode == 'Gene set'",
       uiOutput("expression_select_gene_set_UI")
     ),
-    tags$script(HTML("
+    tags$script(HTML(
+      "
     (function () {
       // Leaving RGB appends the channel genes to the gene list.
       Shiny.addCustomMessageHandler('cerebro_expression_gene_list', function (message) {
@@ -115,7 +116,8 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
         setTimeout(apply, 0);
       });
     })();
-    "))
+    "
+    ))
   )
 })
 

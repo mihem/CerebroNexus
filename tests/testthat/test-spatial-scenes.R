@@ -128,7 +128,10 @@ test_that("Viewer keeps split-by on the shared interactive Canvas", {
 test_that("Separate ROI panels carry their saved point appearance", {
   renderer <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), envir = renderer)
-  sys.source(viewer_test_path("spatial", "func_spatial_helpers.R"), envir = renderer)
+  sys.source(
+    viewer_test_path("spatial", "func_spatial_helpers.R"),
+    envir = renderer
+  )
   sys.source(
     viewer_test_path("spatial", "func_projection_update_plot.R"),
     envir = renderer
@@ -229,7 +232,10 @@ test_that("Separate ROI panels use full extents for camera and background", {
 
   renderer <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), envir = renderer)
-  sys.source(viewer_test_path("spatial", "func_spatial_helpers.R"), envir = renderer)
+  sys.source(
+    viewer_test_path("spatial", "func_spatial_helpers.R"),
+    envir = renderer
+  )
   sys.source(
     viewer_test_path("spatial", "func_projection_update_plot.R"),
     envir = renderer

@@ -687,8 +687,12 @@ ui <- dashboardPage(
     ##  - trekker.css     : Trekker insight/QC presentation shared with Linked views.
     ##  - hla_motifs.*    : modebar over the visNetwork motif network.
     tags$head(
-      tags$style(HTML("html, body { background: #f7f7f9; } .cerebro-starting .wrapper { visibility: hidden; } #cerebro-startup { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: #f7f7f9; color: #51545c; font: 16px Arial, sans-serif; transition: opacity .12s ease-out; } #cerebro-startup > div { text-align: center; } #cerebro-startup button { margin-top: 16px; } @media (prefers-reduced-motion: reduce) { #cerebro-startup { transition: none; } }")),
-      tags$script(HTML("document.documentElement.classList.add('cerebro-starting');")),
+      tags$style(HTML(
+        "html, body { background: #f7f7f9; } .cerebro-starting .wrapper { visibility: hidden; } #cerebro-startup { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: #f7f7f9; color: #51545c; font: 16px Arial, sans-serif; transition: opacity .12s ease-out; } #cerebro-startup > div { text-align: center; } #cerebro-startup button { margin-top: 16px; } @media (prefers-reduced-motion: reduce) { #cerebro-startup { transition: none; } }"
+      )),
+      tags$script(HTML(
+        "document.documentElement.classList.add('cerebro-starting');"
+      )),
       cerebro_js("page-lifecycle.js", defer = TRUE),
       cerebro_js("startup.js", defer = TRUE),
       cerebro_css("custom.css"),
@@ -768,13 +772,33 @@ ui$children <- tagList(
   tags$div(
     id = "cerebro-startup",
     tags$div(
-      tags$div(style = "width:200px;margin:0 auto 24px", `aria-hidden` = "true",
-        HTML(paste(readLines(file.path(Cerebro.options[["cerebro_root"]],
-          "viewer/www/cerebronexus.svg"), warn = FALSE), collapse = "\n"))),
-      tags$div(role = "status", `aria-live` = "polite",
-        `data-startup-message` = "", "Opening workspace\u2026"),
-      tags$button(type = "button", class = "btn btn-default",
-        `data-startup-retry` = "", hidden = "hidden", "Reload")
+      tags$div(
+        style = "width:200px;margin:0 auto 24px",
+        `aria-hidden` = "true",
+        HTML(paste(
+          readLines(
+            file.path(
+              Cerebro.options[["cerebro_root"]],
+              "viewer/www/cerebronexus.svg"
+            ),
+            warn = FALSE
+          ),
+          collapse = "\n"
+        ))
+      ),
+      tags$div(
+        role = "status",
+        `aria-live` = "polite",
+        `data-startup-message` = "",
+        "Opening workspace\u2026"
+      ),
+      tags$button(
+        type = "button",
+        class = "btn btn-default",
+        `data-startup-retry` = "",
+        hidden = "hidden",
+        "Reload"
+      )
     )
   ),
   tags$a(
@@ -785,5 +809,8 @@ ui$children <- tagList(
   ui$children
 )
 
-source(file.path(Cerebro.options[["cerebro_root"]], "viewer/static_ui.R"), local = TRUE)
+source(
+  file.path(Cerebro.options[["cerebro_root"]], "viewer/static_ui.R"),
+  local = TRUE
+)
 ui <- viewerStaticUI(ui)

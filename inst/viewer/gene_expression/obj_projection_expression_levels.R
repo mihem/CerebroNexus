@@ -163,9 +163,14 @@ expressionProjectionGeneMeans <- function(data, genes) {
   rows <- stats::setNames(
     lapply(genes, function(gene) {
       expressionProjectionRowCacheGet(
-        if (!is.null(dataset_key)) paste(dataset_key, gene, sep = "::") else NULL
+        if (!is.null(dataset_key)) {
+          paste(dataset_key, gene, sep = "::")
+        } else {
+          NULL
+        }
       )
-    }), genes
+    }),
+    genes
   )
   # Never densify an uncached gene set just to compute its means. The native
   # backend reduction remains the fallback for subsets and larger gene sets.
@@ -179,7 +184,11 @@ expressionProjectionGeneMeans <- function(data, genes) {
   )
 }
 
-expressionProjectionRenderKey <- function(genes, display_mode, rgb_layout = "composite") {
+expressionProjectionRenderKey <- function(
+  genes,
+  display_mode,
+  rgb_layout = "composite"
+) {
   present <- as.character(genes[["genes_to_display_present"]] %||% character())
   rgb <- genes[["rgb_genes"]] %||% list()
   rgb <- vapply(
@@ -197,8 +206,11 @@ expressionProjectionRenderKey <- function(genes, display_mode, rgb_layout = "com
     sep = "\035"
   )
   if (identical(display_mode, "rgb")) {
-    key <- paste(key, if (identical(rgb_layout, "separate")) "separate" else "composite",
-      sep = "\035")
+    key <- paste(
+      key,
+      if (identical(rgb_layout, "separate")) "separate" else "composite",
+      sep = "\035"
+    )
   }
   key
 }
@@ -214,7 +226,10 @@ expression_projection_render_key <- reactive({
 expressionProjectionPaintedCurrent <- function() {
   painted <- input[["expression_projection_rendered_state"]]
   is.list(painted) &&
-    viewerDatasetContextEqual(painted$dataset_context, viewer_loaded_dataset_context()) &&
+    viewerDatasetContextEqual(
+      painted$dataset_context,
+      viewer_loaded_dataset_context()
+    ) &&
     identical(painted$render_key, expression_projection_render_key())
 }
 
@@ -222,16 +237,21 @@ expressionProjectionPaintedCurrent <- function() {
 ## of an unchanged key. Summaries, selected-cell outputs and their million-value
 ## reads must follow readiness changes only.
 expression_projection_summary_ready_state <- reactiveVal(FALSE)
-observe({
-  ## Not ready while its inputs are unavailable (e.g. before a dataset loads).
-  ready <- isTRUE(tryCatch(
-    expressionProjectionPaintedCurrent(),
-    error = function(error) FALSE
-  ))
-  if (!identical(isolate(expression_projection_summary_ready_state()), ready)) {
-    expression_projection_summary_ready_state(ready)
-  }
-}, priority = 100)
+observe(
+  {
+    ## Not ready while its inputs are unavailable (e.g. before a dataset loads).
+    ready <- isTRUE(tryCatch(
+      expressionProjectionPaintedCurrent(),
+      error = function(error) FALSE
+    ))
+    if (
+      !identical(isolate(expression_projection_summary_ready_state()), ready)
+    ) {
+      expression_projection_summary_ready_state(ready)
+    }
+  },
+  priority = 100
+)
 expression_projection_summary_ready <- reactive({
   expression_projection_summary_ready_state()
 })

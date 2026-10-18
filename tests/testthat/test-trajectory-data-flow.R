@@ -26,7 +26,9 @@ test_that("trajectory static frames fall back when filters or resources change",
       getGroupLevels <- function(group) c("A", "B")
       reactive_group_colors <- function(group) c(A = "#111111", B = "#222222")
       viewerMetadataCodesAsset <- function(name, levels) {
-        if (!isTRUE(input$codes)) return(NULL)
+        if (!isTRUE(input$codes)) {
+          return(NULL)
+        }
         list(url = "codes", cells = 4L, levels = I(levels))
       }
       viewerPackCurrent <- function() NULL
@@ -141,7 +143,10 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
       })
     },
     {
-      session$setInputs(sidebar = "trajectory", trajectory_point_color = "group")
+      session$setInputs(
+        sidebar = "trajectory",
+        trajectory_point_color = "group"
+      )
       percentage <- function(frame) {
         frame$feedback$trajectory_percentage_cells_to_show
       }

@@ -102,9 +102,22 @@ source(
   assign(key, value, envir = .viewer_cell_fingerprint_cache)
   value
 }
-source(file.path(Cerebro.options[["cerebro_root"]], "viewer/core/dataset_overview.R"), local = TRUE)
-.overview_file <- file.path(Cerebro.options[["cerebro_root"]], "viewer/dataset_overviews.rds")
-.saved_overviews <- if (file.exists(.overview_file)) readRDS(.overview_file) else list()
+source(
+  file.path(
+    Cerebro.options[["cerebro_root"]],
+    "viewer/core/dataset_overview.R"
+  ),
+  local = TRUE
+)
+.overview_file <- file.path(
+  Cerebro.options[["cerebro_root"]],
+  "viewer/dataset_overviews.rds"
+)
+.saved_overviews <- if (file.exists(.overview_file)) {
+  readRDS(.overview_file)
+} else {
+  list()
+}
 .crb_launch_state <- new.env(parent = emptyenv())
 .crb_launch_state$prototypes <- Cerebro.options[[".dataset_prototypes"]]
 if (!is.list(.crb_launch_state$prototypes)) {
@@ -356,13 +369,16 @@ server <- function(input, output, session) {
     info <- viewerDatasetInfo(catalog, target)
     saved_overview <- if (!is.null(info)) {
       info$overview %||% viewerSavedOverview(.saved_overviews, info$path)
-    } else NULL
-    viewerOverviewTruncated(saved_overview) || viewerDatasetLoadRequired(
-      isolate(input[["sidebar"]]),
-      info,
-      initial_tab,
-      isolate(initial_page_applied())
-    )
+    } else {
+      NULL
+    }
+    viewerOverviewTruncated(saved_overview) ||
+      viewerDatasetLoadRequired(
+        isolate(input[["sidebar"]]),
+        info,
+        initial_tab,
+        isolate(initial_page_applied())
+      )
   }
 
   viewer_request_dataset <- function(
@@ -433,42 +449,76 @@ server <- function(input, output, session) {
     scatter_session[[key]] %||% viewerScatterDefaults(Cerebro.options, key)
   })
   current_scatter_percentage <- reactiveVal(100)
-  observe({
-    percentage <- current_scatter_defaults()$percentage_cells_to_show
-    if (!identical(isolate(current_scatter_percentage()), percentage)) {
-      current_scatter_percentage(percentage)
-    }
-  }, priority = 1000)
+  observe(
+    {
+      percentage <- current_scatter_defaults()$percentage_cells_to_show
+      if (!identical(isolate(current_scatter_percentage()), percentage)) {
+        current_scatter_percentage(percentage)
+      }
+    },
+    priority = 1000
+  )
   current_spatial_scatter_defaults <- reactive({
-    viewerScatterDefaults(Cerebro.options,
-      viewer_requested_dataset_context()$dataset_key, page = "spatial")
+    viewerScatterDefaults(
+      Cerebro.options,
+      viewer_requested_dataset_context()$dataset_key,
+      page = "spatial"
+    )
   })
-  observeEvent(input$viewer_scatter_edit, {
-    event <- input$viewer_scatter_edit
-    context <- viewer_requested_dataset_context()
-    if (!viewerDatasetContextEqual(event$dataset_context, context)) return()
-    limits <- list(point_size = c(1, 20), point_opacity = c(0.1, 1),
-      percentage_cells_to_show = c(10, 100))
-    values <- event$values
-    if (is.null(values) && is.character(event$field) && length(event$field) == 1L) {
-      values <- stats::setNames(list(event$value), event$field)
-    }
-    if (!is.list(values) || !length(values) || is.null(names(values)) ||
-        anyDuplicated(names(values)) || !all(names(values) %in% names(limits))) return()
-    appearance <- current_scatter_defaults()
-    for (field in names(values)) {
-      value <- suppressWarnings(as.numeric(values[[field]]))
-      if (length(value) != 1L || !is.finite(value) ||
-          value < limits[[field]][1] || value > limits[[field]][2]) return()
-      appearance[[field]] <- value
-    }
-    scatter_session[[context$dataset_key]] <- appearance
-  }, priority = 100)
+  observeEvent(
+    input$viewer_scatter_edit,
+    {
+      event <- input$viewer_scatter_edit
+      context <- viewer_requested_dataset_context()
+      if (!viewerDatasetContextEqual(event$dataset_context, context)) {
+        return()
+      }
+      limits <- list(
+        point_size = c(1, 20),
+        point_opacity = c(0.1, 1),
+        percentage_cells_to_show = c(10, 100)
+      )
+      values <- event$values
+      if (
+        is.null(values) &&
+          is.character(event$field) &&
+          length(event$field) == 1L
+      ) {
+        values <- stats::setNames(list(event$value), event$field)
+      }
+      if (
+        !is.list(values) ||
+          !length(values) ||
+          is.null(names(values)) ||
+          anyDuplicated(names(values)) ||
+          !all(names(values) %in% names(limits))
+      ) {
+        return()
+      }
+      appearance <- current_scatter_defaults()
+      for (field in names(values)) {
+        value <- suppressWarnings(as.numeric(values[[field]]))
+        if (
+          length(value) != 1L ||
+            !is.finite(value) ||
+            value < limits[[field]][1] ||
+            value > limits[[field]][2]
+        ) {
+          return()
+        }
+        appearance[[field]] <- value
+      }
+      scatter_session[[context$dataset_key]] <- appearance
+    },
+    priority = 100
+  )
   observe({
     context <- viewer_requested_dataset_context()
     appearance <- current_scatter_defaults()
-    session$sendCustomMessage("cerebro_scatter_defaults",
-      list(dataset_context = context, values = appearance))
+    session$sendCustomMessage(
+      "cerebro_scatter_defaults",
+      list(dataset_context = context, values = appearance)
+    )
   })
 
   current_page_display_defaults <- function(page) {
@@ -701,9 +751,11 @@ server <- function(input, output, session) {
       if (
         !is.null(input[['crb_file_selector']]) &&
           !is.null(available_crb_files$files) &&
-          input[['crb_file_selector']] %in% unname(viewerDatasetChoices(
-            available_crb_files$files, available_crb_files$labels
-          ))
+          input[['crb_file_selector']] %in%
+            unname(viewerDatasetChoices(
+              available_crb_files$files,
+              available_crb_files$labels
+            ))
       ) {
         pending <- input[['viewer_dataset_selection']]
         nonce <- if (
@@ -810,8 +862,11 @@ server <- function(input, output, session) {
       viewerDatasetPath(available_crb_files$files, selected)
     )
     if (!is.null(info)) {
-      info$label <- viewerDatasetLabel(available_crb_files$files, selected,
-                                       available_crb_files$labels)
+      info$label <- viewerDatasetLabel(
+        available_crb_files$files,
+        selected,
+        available_crb_files$labels
+      )
       if (is.null(info$overview)) {
         info$overview <- viewerSavedOverview(.saved_overviews, info$path)
       }
@@ -834,8 +889,11 @@ server <- function(input, output, session) {
       as.character(value)
     }
     list(
-      label = viewerDatasetLabel(available_crb_files$files, selected,
-                                 available_crb_files$labels),
+      label = viewerDatasetLabel(
+        available_crb_files$files,
+        selected,
+        available_crb_files$labels
+      ),
       path = selected,
       cells = .runtimeCerebroCellCount(data),
       overview = viewerDatasetOverview(data),
@@ -867,9 +925,14 @@ server <- function(input, output, session) {
     req(is.list(request), !isTRUE(dataset_load_requested()))
     req(current_dataset_info())
     datasetLoadProgress(
-      viewerDatasetLabel(available_crb_files$files, request$selection,
-                        available_crb_files$labels),
-      100, "Dataset information ready", done = TRUE
+      viewerDatasetLabel(
+        available_crb_files$files,
+        request$selection,
+        available_crb_files$labels
+      ),
+      100,
+      "Dataset information ready",
+      done = TRUE
     )
   })
 
@@ -1025,8 +1088,10 @@ server <- function(input, output, session) {
     snapshot <- viewer_dataset_snapshot()
     ## A failed dataset is recoverable through the global selector. A regular
     ## error escaping a downstream observer would close the whole Shiny session.
-    validate(need(isTRUE(snapshot$ok),
-      "The dataset could not be loaded. Choose another dataset."))
+    validate(need(
+      isTRUE(snapshot$ok),
+      "The dataset could not be loaded. Choose another dataset."
+    ))
     snapshot$data
   })
 
@@ -1054,7 +1119,9 @@ server <- function(input, output, session) {
         viewer_send_dataset_phase("error", snapshot$dataset_context)
         showNotification(
           "The dataset could not be loaded. Choose another dataset or reload the app.",
-          type = "error", duration = NULL, id = "dataset-load-error"
+          type = "error",
+          duration = NULL,
+          id = "dataset-load-error"
         )
       }
     },
@@ -1912,13 +1979,20 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
-  toggleConditionalTab <- function(tab_name, check_fn, catalog_field = NULL,
-    catalog_check = NULL, fallback_tab = "loadData") {
+  toggleConditionalTab <- function(
+    tab_name,
+    check_fn,
+    catalog_field = NULL,
+    catalog_check = NULL,
+    fallback_tab = "loadData"
+  ) {
     item_id <- paste0("sidebar_item_", tab_name)
     show_reactive <- reactive({
       if (!is.null(catalog_check)) {
         result <- catalog_check(current_dataset_info())
-        if (!is.null(result)) return(isTRUE(result))
+        if (!is.null(result)) {
+          return(isTRUE(result))
+        }
         ## Legacy catalogs lack projection names. Keep navigation reachable
         ## until the full selected object is available, without loading it just
         ## to paint the lightweight Data info page.
@@ -1944,7 +2018,9 @@ server <- function(input, output, session) {
     observe({
       should_show <- show_reactive()
       shinyjs::toggle(id = item_id, condition = should_show)
-      if (!isTRUE(should_show) && identical(isolate(input[["sidebar"]]), tab_name)) {
+      if (
+        !isTRUE(should_show) && identical(isolate(input[["sidebar"]]), tab_name)
+      ) {
         updateTabItems(session, "sidebar", selected = fallback_tab)
         showNotification(
           if (identical(fallback_tab, "overview")) {
@@ -1952,7 +2028,8 @@ server <- function(input, output, session) {
           } else {
             "This page is unavailable for the selected dataset. Showing Data info."
           },
-          id = "dataset-page-unavailable", duration = 6
+          id = "dataset-page-unavailable",
+          duration = 6
         )
       }
       decision <- viewerInitialPageDecision(
@@ -2063,18 +2140,27 @@ server <- function(input, output, session) {
   )
 
   source(
-    file.path(Cerebro.options[["cerebro_root"]], "viewer/core/viewer_content_contract.R"),
+    file.path(
+      Cerebro.options[["cerebro_root"]],
+      "viewer/core/viewer_content_contract.R"
+    ),
     local = TRUE
   )
   ## Shared geometry/image helpers are needed by Linked views and asset routes;
   ## Spatial's controls and observers can wait until its page is requested.
   source(
-    file.path(Cerebro.options[["cerebro_root"]], "viewer/spatial/func_spatial_helpers.R"),
+    file.path(
+      Cerebro.options[["cerebro_root"]],
+      "viewer/spatial/func_spatial_helpers.R"
+    ),
     local = TRUE
   )
 
   source(
-    file.path(Cerebro.options[["cerebro_root"]], "viewer/core/cell_inspection.R"),
+    file.path(
+      Cerebro.options[["cerebro_root"]],
+      "viewer/core/cell_inspection.R"
+    ),
     local = TRUE
   )
 

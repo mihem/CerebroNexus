@@ -379,9 +379,13 @@ output[["spatial_projection_background_selector_UI"]] <- renderUI({
     input_id <- "spatial_projection_roi_background_images"
     selected_input <- if (scope_changed) {
       # Each separate ROI starts with its first matching image, in source order.
-      unname(vapply(roi_background_groups, function(group) {
-        unname(group$tokens[[1L]])
-      }, character(1)))
+      unname(vapply(
+        roi_background_groups,
+        function(group) {
+          unname(group$tokens[[1L]])
+        },
+        character(1)
+      ))
     } else {
       isolate(input[[input_id]]) %||% character()
     }

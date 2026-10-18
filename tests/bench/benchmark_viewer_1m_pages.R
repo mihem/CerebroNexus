@@ -1282,12 +1282,15 @@ run_observation <- function(schedule_row, candidate, page, crb) {
     },
     add = TRUE
   )
-  wait_for_data_info_cells(app, format(
-    expected_cells,
-    big.mark = ",",
-    scientific = FALSE,
-    trim = TRUE
-  ))
+  wait_for_data_info_cells(
+    app,
+    format(
+      expected_cells,
+      big.mark = ",",
+      scientific = FALSE,
+      trim = TRUE
+    )
+  )
   dataset_metrics <- load_benchmark_dataset(app)
   if (!isTRUE(page_available(app, page))) {
     if (isTRUE(page$required)) {

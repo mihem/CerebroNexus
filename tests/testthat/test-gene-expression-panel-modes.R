@@ -315,7 +315,9 @@ viewer_wait_expression_summary <- function(app, condition) {
       "(() => {document.getElementById('expression_summary_gate')",
       "?.scrollIntoView();",
       "const text=document.getElementById('expression_by_group')?.innerText||'';",
-      "return (", condition, ");})()"
+      "return (",
+      condition,
+      ");})()"
     ),
     timeout = 60000
   )
@@ -461,9 +463,12 @@ test_that("gene expression panels follow gene, selection, and display mode", {
   viewer_set_selectize(app, "expression_rgb_gene_r", "MS4A1")
   viewer_set_selectize(app, "expression_rgb_gene_g", "CD3D")
   viewer_set_selectize(app, "expression_rgb_gene_b", "")
-  viewer_wait_expression_summary(app, paste0(
-    "text.includes('R · MS4A1') && text.includes('G · CD3D') && ",
-    "!text.includes('B ·')"
-  ))
+  viewer_wait_expression_summary(
+    app,
+    paste0(
+      "text.includes('R · MS4A1') && text.includes('G · CD3D') && ",
+      "!text.includes('B ·')"
+    )
+  )
   expect_length(app$get_js("genePanelErrors"), 0L)
 })

@@ -56,11 +56,13 @@ overview_projection_parameters_plot <- reactive({
     point_size = point_size,
     point_opacity = point_opacity,
     draw_border = isTRUE(
-      isolate(input[["overview_projection_point_border"]]) %||% display$draw_border
+      isolate(input[["overview_projection_point_border"]]) %||%
+        display$draw_border
     ),
     group_labels = isTRUE(group_labels),
     keep_square = isTRUE(
-      isolate(input[["overview_projection_keep_square"]]) %||% display$keep_square
+      isolate(input[["overview_projection_keep_square"]]) %||%
+        display$keep_square
     ),
     x_range = if (is.null(XYranges)) {
       list()
