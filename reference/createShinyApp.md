@@ -223,12 +223,11 @@ createShinyApp(
   `dataset -> spatial entry -> image label -> settings` form. Settings
   may contain only `flip_x`, `flip_y`, `scale_x`, `scale_y`, `offset_x`,
   `offset_y`, and `rotation`. `image_opacity` may additionally set the
-  initial image opacity from 0 through 1 (default 0.5). A leaf may
-  target an embedded or external image available under that exact
-  dataset and spatial entry. The image label must exist in the union of
-  the CRB's embedded images and this call's `spatial_images`; unknown
-  identities are rejected. Labels are user-facing names, not protocol
-  names.
+  initial image opacity from 0 through 1 (default 1). A leaf may target
+  an embedded or external image available under that exact dataset and
+  spatial entry. The image label must exist in the union of the CRB's
+  embedded images and this call's `spatial_images`; unknown identities
+  are rejected. Labels are user-facing names, not protocol names.
 
 - spatial_images_flip_x:
 

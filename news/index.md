@@ -1,5 +1,23 @@
 # Changelog
 
+## CerebroNexus 5.1.1
+
+- Background images now open at full opacity (1.0) instead of 50% in
+  Spatial, Linked views and Trekker. A configured or saved
+  `image_opacity` still applies.
+- Fixes background images drifting away from their cells in a rotated
+  scene, such as the MERFISH demo. The image rotates in data space about
+  the origin, the same way `spatial_plot_rotation` rotates the cell
+  coordinates.
+- Declares only the packages the code uses: `httr` is now a Suggests
+  entry, and the unused `formattable` and `reshape2` are no longer
+  listed. The Nix environment (`create_env.R`, `default.nix`) drops
+  `data.table`, `formattable` and `shinyvalidate`, and `create_env.R`
+  groups its packages by role.
+- Internal clean-up with no change in behaviour: shared helpers replace
+  duplicated code in Spatial, Linked views, Trekker and `cell_views.js`,
+  and unused reactives, outputs and CSS rules are removed.
+
 ## CerebroNexus 5.1.0
 
 - Adds Viewer Packs:

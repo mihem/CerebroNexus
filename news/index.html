@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.1.1" id="cerebronexus-511">CerebroNexus 5.1.1<a class="anchor" aria-label="anchor" href="#cerebronexus-511"></a></h2>
+<ul><li>Background images now open at full opacity (1.0) instead of 50% in Spatial, Linked views and Trekker. A configured or saved <code>image_opacity</code> still applies.</li>
+<li>Fixes background images drifting away from their cells in a rotated scene, such as the MERFISH demo. The image rotates in data space about the origin, the same way <code>spatial_plot_rotation</code> rotates the cell coordinates.</li>
+<li>Declares only the packages the code uses: <code>httr</code> is now a Suggests entry, and the unused <code>formattable</code> and <code>reshape2</code> are no longer listed. The Nix environment (<code>create_env.R</code>, <code>default.nix</code>) drops <code>data.table</code>, <code>formattable</code> and <code>shinyvalidate</code>, and <code>create_env.R</code> groups its packages by role.</li>
+<li>Internal clean-up with no change in behaviour: shared helpers replace duplicated code in Spatial, Linked views, Trekker and <code>cell_views.js</code>, and unused reactives, outputs and CSS rules are removed.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.1.0" id="cerebronexus-510">CerebroNexus 5.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-510"></a></h2>
 <ul><li>Adds Viewer Packs: <code><a href="../reference/buildViewerPack.html">buildViewerPack()</a></code> writes a sidecar directory next to a <code>.crb</code> file so that large data sets skip re-reading the object on every session, and <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> builds one automatically above 500,000 cells.</li>
