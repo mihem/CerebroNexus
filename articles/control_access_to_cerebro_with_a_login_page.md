@@ -318,6 +318,8 @@ rollback window.
 - Pair each App release with exactly one matching secret.
 - Verify valid login, invalid login, runtime read access, and rollback.
 - Add monitoring and rate limiting.
+- Generated Apps include a brief offline deployment checklist in
+  `viewer/AUTHENTICATION-DEPLOYMENT.md`.
 
 ## See also
 

@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -128,7 +128,11 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  extra_tables_sheets <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  dataset_labels <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  initial_dataset <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  initial_page <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  initial_page <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  initial_projections <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_point_appearance <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_roi_settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_percentage_cells_to_show <span class="op">=</span> <span class="fl">100</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -246,20 +250,42 @@ after restoration.</p></dd>
 <dt id="arg-point-size">point_size<a class="anchor" aria-label="anchor" href="#arg-point-size"></a></dt>
 <dd><p>Point size from 1 through 20. Supply one number for every
 dataset, or a named numeric vector/list whose names exactly match
-<code>cerebro_data</code>. The value initializes every cell scatter view.</p></dd>
+<code>cerebro_data</code>. Applies across ordinary projection views, including
+Gene expression and Linked views; Spatial is configured independently.</p></dd>
 
 
 <dt id="arg-point-opacity">point_opacity<a class="anchor" aria-label="anchor" href="#arg-point-opacity"></a></dt>
 <dd><p>Point opacity from 0.1 through 1. Supply one number for
 every dataset, or a named numeric vector/list whose names exactly match
-<code>cerebro_data</code>. The value initializes every cell scatter view.</p></dd>
+<code>cerebro_data</code>. Applies across ordinary projection views, including
+Gene expression and Linked views; Spatial is configured independently.</p></dd>
 
 
 <dt id="arg-percentage-cells-to-show">percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-percentage-cells-to-show"></a></dt>
 <dd><p>Percentage of cells from 10 through 100.
 Supply one number for every dataset, or a named numeric vector/list whose
 names exactly match <code>cerebro_data</code>. The value initializes every cell
-scatter view; subsequent UI changes remain page-local.</p></dd>
+projection view. Viewer edits are shared by projection pages for the current
+dataset; Spatial uses its own coordinate settings.</p></dd>
+
+
+<dt id="arg-spatial-point-appearance">spatial_point_appearance<a class="anchor" aria-label="anchor" href="#arg-spatial-point-appearance"></a></dt>
+<dd><p>Optional named list in
+<code>dataset -&gt; FOV -&gt; list(point_size, point_opacity)</code> form. Point size
+is from 1 to 20 and opacity from 0 to 1. Used by Spatial and spatial panels
+in Linked views, independently of projection appearance.</p></dd>
+
+
+<dt id="arg-spatial-roi-settings">spatial_roi_settings<a class="anchor" aria-label="anchor" href="#arg-spatial-roi-settings"></a></dt>
+<dd><p>Optional named list in
+<code>dataset -&gt; FOV -&gt; ROI -&gt; list(rotation_degrees, point_size, point_opacity)</code>
+form, matching Builder Coordinate settings. Rotation is a Viewer rotation
+after any coordinate transform baked into the exported CRB.</p></dd>
+
+
+<dt id="arg-spatial-percentage-cells-to-show">spatial_percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-spatial-percentage-cells-to-show"></a></dt>
+<dd><p>Independent spatial sampling percentage
+from 10 to 100; one number or a numeric vector named by dataset. Defaults to 100.</p></dd>
 
 
 <dt id="arg-variable-to-compare">variable_to_compare<a class="anchor" aria-label="anchor" href="#arg-variable-to-compare"></a></dt>
@@ -284,7 +310,7 @@ when that CRB has exactly one spatial entry.</p></dd>
 may contain only <code>flip_x</code>, <code>flip_y</code>, <code>scale_x</code>,
 <code>scale_y</code>, <code>offset_x</code>, <code>offset_y</code>, and <code>rotation</code>.
 <code>image_opacity</code> may additionally set the initial image opacity from
-0 through 1.
+0 through 1 (default 0.5).
 A leaf may target an embedded or external image available under that exact
 dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's <code>spatial_images</code>; unknown
@@ -342,6 +368,13 @@ are listed separately and loaded only when selected in the Viewer.</p></dd>
 <dd><p>Optional named list of Excel sheet renames keyed
 by <code>extra_tables</code> labels. Each entry maps displayed names to source
 sheet names; unmapped sheets remain available.</p></dd>
+
+
+<dt id="arg-initial-projections">initial_projections<a class="anchor" aria-label="anchor" href="#arg-initial-projections"></a></dt>
+<dd><p>Optional projection names to show when Linked
+views first opens. A character vector applies to every data set. A named
+list configures individual <code>cerebro_data</code> labels; omitted labels keep
+the Viewer's default single-projection behavior.</p></dd>
 
 </dl></div>
     <div class="section level2">

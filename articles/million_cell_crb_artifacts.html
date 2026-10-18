@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -242,20 +242,59 @@ observations to force an equal mean.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span>crb_file_to_load <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
 <span>  <span class="st">"extdata"</span>, <span class="st">"examples"</span>, <span class="st">"example.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="the-complete-large-data-demo">The complete large-data demo<a class="anchor" aria-label="anchor" href="#the-complete-large-data-demo"></a>
+</h3>
 <p>The optional complete large-data launcher requires a repository
-checkout:</p>
+checkout. Use a checkout of a published release tag for reproducible
+results, and record the printed commit ID when reporting them. The
+launcher loads that checkout directly.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/mihem/CerebroNexus.git</span>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="bu">cd</span> CerebroNexus</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">"install.packages(c('remotes', 'pkgload')); remotes::install_local('.', dependencies = TRUE)"</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--prepare-only</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--no-browser</span></span></code></pre></div>
-<p>Omit <code>--ren-only</code> to prepare both mouse-million and Ren
-data. The launcher prints the URL, exact source directory and dataset
-version, and reuses compatible prepared caches. Preparation can download
-large files and take substantial time; see the <a href="expression_backend_benchmark.html">benchmark guide</a> before
-starting. Set <code>CEREBRO_LARGE_CACHE</code> to choose an external
-cache location. The marker-guided mouse trajectory is a labelled
-demonstration, not a formal inference result.</p>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">git</span> rev-parse HEAD</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">"install.packages(c('remotes', 'pkgload')); remotes::install_local('.', dependencies = TRUE)"</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R</span></code></pre></div>
+<p>Open <code>http://127.0.0.1:7451</code>. The first run downloads and
+prepares the official 10x one-million-neuron matrix and the Ren et al.
+<a href="https://explore.data.humancellatlas.org/projects/5f607e50-ba22-4598-b1e9-f3d9d7a35dcc" class="external-link">COVID-19
+immune atlas</a> (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE158055" class="external-link">GEO
+GSE158055</a>; 1,462,702 cells, all 64 published cell populations,
+sample/patient clinical metadata, and 220,968 paired-TCR plus 282,464
+paired-BCR cells). The initial compressed downloads total about 18 GB;
+allow at least 100 GB of free cache space for the extracted matrices and
+BPCells artifacts. Source and prepared files are cached outside the
+repository (set <code>CEREBRO_LARGE_CACHE</code> to choose the
+location), so later runs reuse them.</p>
+<p>To test Ren without the 10x dataset, and to separate
+download/preparation failures from Viewer errors
+(<code>--prepare-only</code> exits before starting Shiny):</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--prepare-only</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--no-browser</span></span></code></pre></div>
+<p>The launcher prints the URL, the source directory and the Ren data
+version (currently 2), and reuses a complete compatible cache. Keep each
+<code>.crb</code> and its <code>.bpcells/</code> directory together.
+Prepared versions use separate directories
+(<code>ren/cerebro-v2/</code>); preparation never upgrades the earlier
+<code>ren/cerebro/</code> atlas in place, failed builds are not
+published, and source downloads are shared between versions.</p>
+<p>The launcher also builds each data set’s Viewer Pack and rebuilds it
+when it is missing or predates an asset the viewer reads. Without a
+pack, the HLA &amp; TCR motifs page spends about 15 s (about 25 s for
+the whole first entry) building the CDR3 Hamming-1 graph at Ren’s scale;
+with one, the same entry settles in under two seconds. If you start the
+viewer against a prepared <code>.crb</code> yourself, build the pack
+once (about a minute for Ren) with
+<code>buildViewerPack("path/to/data.crb", overwrite = TRUE)</code>;
+rerunning it after re-preparing a CRB is also the repair.</p>
+<p>The 10x marker-guided E18 neurogenesis path excludes endothelial,
+microglial and oligodendrocyte programs, orders the remaining neural
+lineage with early, transitional and late markers, and separates
+excitatory and inhibitory terminal branches. It is a labelled
+demonstration, not a formal trajectory-inference result. The same app
+also includes the bundled PBMC, immune-repertoire, trajectory, spatial,
+Trekker and HLA/TCR demos. See the <a href="expression_backend_benchmark.html">benchmark guide</a> before
+starting.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="troubleshooting">Troubleshooting<a class="anchor" aria-label="anchor" href="#troubleshooting"></a>

@@ -43,7 +43,11 @@ createShinyApp(
   extra_tables_sheets = NULL,
   dataset_labels = NULL,
   initial_dataset = NULL,
-  initial_page = NULL
+  initial_page = NULL,
+  initial_projections = NULL,
+  spatial_point_appearance = NULL,
+  spatial_roi_settings = NULL,
+  spatial_percentage_cells_to_show = 100
 )
 ```
 
@@ -160,20 +164,42 @@ createShinyApp(
 
   Point size from 1 through 20. Supply one number for every dataset, or
   a named numeric vector/list whose names exactly match `cerebro_data`.
-  The value initializes every cell scatter view.
+  Applies across ordinary projection views, including Gene expression
+  and Linked views; Spatial is configured independently.
 
 - point_opacity:
 
   Point opacity from 0.1 through 1. Supply one number for every dataset,
   or a named numeric vector/list whose names exactly match
-  `cerebro_data`. The value initializes every cell scatter view.
+  `cerebro_data`. Applies across ordinary projection views, including
+  Gene expression and Linked views; Spatial is configured independently.
 
 - percentage_cells_to_show:
 
   Percentage of cells from 10 through 100. Supply one number for every
   dataset, or a named numeric vector/list whose names exactly match
-  `cerebro_data`. The value initializes every cell scatter view;
-  subsequent UI changes remain page-local.
+  `cerebro_data`. The value initializes every cell projection view.
+  Viewer edits are shared by projection pages for the current dataset;
+  Spatial uses its own coordinate settings.
+
+- spatial_point_appearance:
+
+  Optional named list in
+  `dataset -> FOV -> list(point_size, point_opacity)` form. Point size
+  is from 1 to 20 and opacity from 0 to 1. Used by Spatial and spatial
+  panels in Linked views, independently of projection appearance.
+
+- spatial_roi_settings:
+
+  Optional named list in
+  `dataset -> FOV -> ROI -> list(rotation_degrees, point_size, point_opacity)`
+  form, matching Builder Coordinate settings. Rotation is a Viewer
+  rotation after any coordinate transform baked into the exported CRB.
+
+- spatial_percentage_cells_to_show:
+
+  Independent spatial sampling percentage from 10 to 100; one number or
+  a numeric vector named by dataset. Defaults to 100.
 
 - variable_to_compare:
 
@@ -197,11 +223,12 @@ createShinyApp(
   `dataset -> spatial entry -> image label -> settings` form. Settings
   may contain only `flip_x`, `flip_y`, `scale_x`, `scale_y`, `offset_x`,
   `offset_y`, and `rotation`. `image_opacity` may additionally set the
-  initial image opacity from 0 through 1. A leaf may target an embedded
-  or external image available under that exact dataset and spatial
-  entry. The image label must exist in the union of the CRB's embedded
-  images and this call's `spatial_images`; unknown identities are
-  rejected. Labels are user-facing names, not protocol names.
+  initial image opacity from 0 through 1 (default 0.5). A leaf may
+  target an embedded or external image available under that exact
+  dataset and spatial entry. The image label must exist in the union of
+  the CRB's embedded images and this call's `spatial_images`; unknown
+  identities are rejected. Labels are user-facing names, not protocol
+  names.
 
 - spatial_images_flip_x:
 
@@ -256,6 +283,13 @@ createShinyApp(
   Optional named list of Excel sheet renames keyed by `extra_tables`
   labels. Each entry maps displayed names to source sheet names;
   unmapped sheets remain available.
+
+- initial_projections:
+
+  Optional projection names to show when Linked views first opens. A
+  character vector applies to every data set. A named list configures
+  individual `cerebro_data` labels; omitted labels keep the Viewer's
+  default single-projection behavior.
 
 ## Value
 

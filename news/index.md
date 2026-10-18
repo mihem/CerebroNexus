@@ -1,5 +1,91 @@
 # Changelog
 
+## CerebroNexus 5.1.0
+
+- Adds Viewer Packs:
+  [`buildViewerPack()`](https://mihem.github.io/CerebroNexus/reference/buildViewerPack.md)
+  writes a sidecar directory next to a `.crb` file so that large data
+  sets skip re-reading the object on every session, and
+  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  builds one automatically above 500,000 cells.
+- Spatial scenes are grouped by sample and ROI, and background images
+  are delivered per session: the browser receives a private URL for the
+  file it is allowed to see instead of a data URI or a filesystem path.
+  The Background image picker holds one removable chip and is hidden for
+  data sets that configure no image.
+- Background images open at 50% opacity unless `image_opacity` is set in
+  `spatial_image_settings` or saved with an embedded image’s alignment;
+  the setting applies in Spatial, Linked views and Trekker.
+- Linked views selects the section whose background is adjusted from a
+  picker instead of a tab strip, with one switch that shows or hides
+  every background image.
+- Ordinary projection views share one author configuration: legacy
+  per-page overrides such as `expression_point_size` no longer shadow
+  it, while `spatial_*` settings still apply to Spatial.
+- The data set selector drives one data set context, so progress,
+  results and hover metadata started for a previous data set are
+  discarded instead of being applied to the new one.
+- Keeps the “UMAP layout” shortcut on Immune repertoire once its plot is
+  painted. The values Shiny reports for re-created tab and grouping
+  controls are no longer mistaken for edits, which used to hide the
+  shortcut for the rest of the visit.
+- Fixes the page loader staying on “Preparing the current view…” after a
+  dataset switch rebuilt a page’s result once its value had already
+  arrived, which left Extra material tables rendered but unreachable
+  until another page was opened.
+- Fixes an uncaught client error for an output that fails without a
+  bound element. It aborted the rest of Shiny’s message frame, so a page
+  that became unavailable for a dataset announced the return to Data
+  info without performing it.
+- Keeps Gene expression selections stable while switching datasets,
+  rejects late gene-search results, and confirms a finished plot only
+  for the current dataset generation. Defers updates to off-screen
+  expression summaries until they are visible, while retaining already
+  computed plots during scrolling.
+- Makes visualization parameter bars fill available space automatically,
+  giving multi-select fields more room and wrapping controls on narrower
+  screens. Groups selectors and Settings fields also fill their
+  available space. Removes JavaScript chip-width measurements in favour
+  of responsive CSS.
+- Adds Composite RGB and Separate channels layouts to Gene expression.
+  RGB starts with the first three available selected genes, retains
+  manual channel assignments across display-mode switches, and preserves
+  the full gene list. Genes chosen in the channels are added to the gene
+  list when leaving RGB. Separate channels retains the composite’s
+  per-channel intensity scaling.
+- Fixes switching from mean expression to packed multi-gene panels
+  getting stuck before the first paint completes.
+- Speeds up loading and switching data sets. Data info shows a catalog
+  data set without reading the whole `.crb`, each data set is loaded
+  once per request, cell fingerprints and Viewer Pack checksums are
+  computed once per process, and HDF5 expression is attached on first
+  use.
+- Pages stop computing in the background once left: Overview, Gene
+  expression and Trajectory no longer rebuild their frames or read
+  expression for a page that is not shown.
+- Reduces work on common interactions with large data: Overview reuses
+  downloaded cell IDs for recolours and applies “% of cells” in the
+  browser when a Viewer Pack is present; selections are identified by
+  cell IDs instead of coordinate strings; Gene expression keeps
+  expression values across plot option changes and refreshes summaries
+  only when their inputs change; Trajectory and Spatial apply point size
+  and opacity without a new frame.
+- Spatial computes its first frame once, normalizes sections and ROI
+  scopes once per input, and serves embedded background images by
+  private URL instead of resending them with every frame.
+- Trajectory colours its default (main group) view from the Viewer Pack,
+  and Linked views loads further projections from the Viewer Pack over
+  HTTP instead of the websocket.
+- Speeds up Immune repertoire Clone Sharing parsing and stops tab visits
+  from recomputing settled results; toolbar choices are kept when
+  switching tabs.
+- Fixes HLA/TCR motifs reusing the previous chain’s segments after a
+  chain switch, and an uncaught client error when Gene expression loads
+  before Shiny connects.
+- The browser benchmarks in `tests/bench` run installed candidates by
+  default (`VIEWER_BENCH_LOAD=load_all` keeps the source-tree mode) and
+  no longer stall on Data info.
+
 ## CerebroNexus 5.0.2
 
 - Completes the source-test cleanup across Viewer modules, transport,

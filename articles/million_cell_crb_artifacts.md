@@ -131,25 +131,70 @@ launchCerebro(crb_file_to_load = system.file(
   "extdata", "examples", "example.crb", package = "CerebroNexus"))
 ```
 
+### The complete large-data demo
+
 The optional complete large-data launcher requires a repository
-checkout:
+checkout. Use a checkout of a published release tag for reproducible
+results, and record the printed commit ID when reporting them. The
+launcher loads that checkout directly.
 
 ``` bash
 git clone https://github.com/mihem/CerebroNexus.git
 cd CerebroNexus
+git rev-parse HEAD
 Rscript -e "install.packages(c('remotes', 'pkgload')); remotes::install_local('.', dependencies = TRUE)"
+Rscript run-demo.R
+```
+
+Open `http://127.0.0.1:7451`. The first run downloads and prepares the
+official 10x one-million-neuron matrix and the Ren et al. [COVID-19
+immune
+atlas](https://explore.data.humancellatlas.org/projects/5f607e50-ba22-4598-b1e9-f3d9d7a35dcc)
+([GEO
+GSE158055](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE158055);
+1,462,702 cells, all 64 published cell populations, sample/patient
+clinical metadata, and 220,968 paired-TCR plus 282,464 paired-BCR
+cells). The initial compressed downloads total about 18 GB; allow at
+least 100 GB of free cache space for the extracted matrices and BPCells
+artifacts. Source and prepared files are cached outside the repository
+(set `CEREBRO_LARGE_CACHE` to choose the location), so later runs reuse
+them.
+
+To test Ren without the 10x dataset, and to separate
+download/preparation failures from Viewer errors (`--prepare-only` exits
+before starting Shiny):
+
+``` bash
 Rscript run-demo.R --ren-only --prepare-only
 Rscript run-demo.R --ren-only --no-browser
 ```
 
-Omit `--ren-only` to prepare both mouse-million and Ren data. The
-launcher prints the URL, exact source directory and dataset version, and
-reuses compatible prepared caches. Preparation can download large files
-and take substantial time; see the [benchmark
+The launcher prints the URL, the source directory and the Ren data
+version (currently 2), and reuses a complete compatible cache. Keep each
+`.crb` and its `.bpcells/` directory together. Prepared versions use
+separate directories (`ren/cerebro-v2/`); preparation never upgrades the
+earlier `ren/cerebro/` atlas in place, failed builds are not published,
+and source downloads are shared between versions.
+
+The launcher also builds each data set’s Viewer Pack and rebuilds it
+when it is missing or predates an asset the viewer reads. Without a
+pack, the HLA & TCR motifs page spends about 15 s (about 25 s for the
+whole first entry) building the CDR3 Hamming-1 graph at Ren’s scale;
+with one, the same entry settles in under two seconds. If you start the
+viewer against a prepared `.crb` yourself, build the pack once (about a
+minute for Ren) with
+`buildViewerPack("path/to/data.crb", overwrite = TRUE)`; rerunning it
+after re-preparing a CRB is also the repair.
+
+The 10x marker-guided E18 neurogenesis path excludes endothelial,
+microglial and oligodendrocyte programs, orders the remaining neural
+lineage with early, transitional and late markers, and separates
+excitatory and inhibitory terminal branches. It is a labelled
+demonstration, not a formal trajectory-inference result. The same app
+also includes the bundled PBMC, immune-repertoire, trajectory, spatial,
+Trekker and HLA/TCR demos. See the [benchmark
 guide](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md)
-before starting. Set `CEREBRO_LARGE_CACHE` to choose an external cache
-location. The marker-guided mouse trajectory is a labelled
-demonstration, not a formal inference result.
+before starting.
 
 ## Troubleshooting
 
