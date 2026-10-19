@@ -1132,6 +1132,20 @@ hla_min_nodes_debounced <- shiny::debounce(
   millis = 250
 )
 
+## The build parameters every motif-graph cache is keyed on. `scope_key` is
+## hla_scope_key() for the drawn graph and "all" for the allele-independent one.
+## Called inside the bindCache key expression, so it is re-read reactively.
+hla_graph_cache_key <- function(scope_key) {
+  list(
+    hla_active_chain(),
+    hla_param("hla_by_v", hla_by_v_default()),
+    paste(hla_node_meta_cols(), collapse = ","),
+    scope_key,
+    hla_filter_key(),
+    available_crb_files$selected
+  )
+}
+
 ## The EXPENSIVE half, cached on the BUILD parameters alone (chain, by_v,
 ## metadata, scope, dataset) and NOT on min_nodes / show_isolated. Sweeping the
 ## threshold therefore never rebuilds the Hamming distance matrix or the layout:
@@ -1145,14 +1159,7 @@ hla_motif_graph_raw_cached <- reactive({
   }
   hla_build_graph_raw_from(hla_scoped_segments())
 }) %>%
-  hla_bindCache(
-    hla_active_chain(),
-    hla_param("hla_by_v", hla_by_v_default()),
-    paste(hla_node_meta_cols(), collapse = ","),
-    hla_scope_key(),
-    hla_filter_key(),
-    available_crb_files$selected
-  )
+  hla_bindCache(hla_graph_cache_key(hla_scope_key()))
 
 ## The CHEAP half: filter the cached full graph by minimum size / isolated and
 ## relabel clusters. Cached on those two so returning to a value is instant; on a
@@ -1165,14 +1172,9 @@ hla_motif_graph_cached <- reactive({
   )
 }) %>%
   hla_bindCache(
-    hla_active_chain(),
-    hla_param("hla_by_v", hla_by_v_default()),
+    hla_graph_cache_key(hla_scope_key()),
     hla_min_nodes_debounced(),
-    hla_param("hla_show_isolated", FALSE),
-    paste(hla_node_meta_cols(), collapse = ","),
-    hla_scope_key(),
-    hla_filter_key(),
-    available_crb_files$selected
+    hla_param("hla_show_isolated", FALSE)
   )
 
 hla_motif_graph <- reactive({
@@ -1221,14 +1223,7 @@ hla_global_motif_graph_raw_cached <- reactive({
   }
   hla_build_graph_raw_from(hla_segments())
 }) %>%
-  hla_bindCache(
-    hla_active_chain(),
-    hla_param("hla_by_v", hla_by_v_default()),
-    paste(hla_node_meta_cols(), collapse = ","),
-    "all",
-    hla_filter_key(),
-    available_crb_files$selected
-  )
+  hla_bindCache(hla_graph_cache_key("all"))
 
 ## Filtered to the same minimum size / isolated rule as the drawn graph.
 hla_global_motif_graph_cached <- reactive({
@@ -1239,14 +1234,9 @@ hla_global_motif_graph_cached <- reactive({
   )
 }) %>%
   hla_bindCache(
-    hla_active_chain(),
-    hla_param("hla_by_v", hla_by_v_default()),
+    hla_graph_cache_key("all"),
     hla_min_nodes_debounced(),
-    hla_param("hla_show_isolated", FALSE),
-    paste(hla_node_meta_cols(), collapse = ","),
-    "all",
-    hla_filter_key(),
-    available_crb_files$selected
+    hla_param("hla_show_isolated", FALSE)
   )
 
 hla_global_motif_graph <- reactive({
