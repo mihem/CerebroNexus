@@ -89,6 +89,17 @@ cv_colors_for <- function(levels) {
   cv_palette[((seq_len(n) - 1) %% length(cv_palette)) + 1]
 }
 
+## Default colours for one group's levels: the app palette when it is loaded,
+## otherwise the stable fallback above (unit tests source this file alone). The
+## user-editable palette travels separately as cv_color_patch(), so changing one
+## colour cannot rebuild a bundle.
+cv_group_colors <- function(group_name, levels) {
+  tryCatch(
+    cerebro_group_colors(length(levels)),
+    error = function(error) cv_colors_for(levels)
+  )
+}
+
 ## Per-cell clone identity + human label (CTaa) from the IR list, aligned to
 ## `cells`. NA where a cell carries no receptor of the selected class.
 ##
@@ -874,11 +885,9 @@ cv_spatial_one <- function(
   if (is.null(co)) {
     return(NULL)
   }
-  rotation <- spatialPlotRotation(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    cv_selected_dataset_name(),
-    nm
-  )
+  opts <- if (exists("Cerebro.options")) Cerebro.options else NULL
+  dataset_name <- cv_selected_dataset_name()
+  rotation <- spatialPlotRotation(opts, dataset_name, nm)
   if (is.null(metadata)) {
     metadata <- tryCatch(crb$getMetaData(), error = function(error) NULL)
   }
@@ -901,11 +910,7 @@ cv_spatial_one <- function(
     co <- rotateSpatialCoordinatesByRoi(
       co,
       as.character(context$roi_by_cell[rownames(co)]),
-      spatialRoiSettings(
-        if (exists("Cerebro.options")) Cerebro.options else NULL,
-        cv_selected_dataset_name(),
-        nm
-      ),
+      spatialRoiSettings(opts, dataset_name, nm),
       rotation,
       pivots = context$pivots
     )
@@ -937,17 +942,8 @@ cv_spatial_one <- function(
   embedded <- embedded_spatial_images(sd, roi_value)
   alignment <- sd[["histology_alignment", exact = TRUE]]
   appearance <- cv_alignment_appearance(alignment)
-  section_appearance <- spatialPointAppearance(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    cv_selected_dataset_name(),
-    nm
-  )
-  roi_appearance <- spatialRoiSetting(
-    if (exists("Cerebro.options")) Cerebro.options else NULL,
-    cv_selected_dataset_name(),
-    nm,
-    roi_value
-  )
+  section_appearance <- spatialPointAppearance(opts, dataset_name, nm)
+  roi_appearance <- spatialRoiSetting(opts, dataset_name, nm, roi_value)
   if (!is.null(roi_appearance)) {
     section_appearance <- roi_appearance[c("point_opacity", "point_size")]
   }
@@ -959,11 +955,7 @@ cv_spatial_one <- function(
       section_appearance <- appearance[c("point_opacity", "point_size")]
     }
   }
-  spatial_defaults <- viewerScatterDefaults(
-    if (exists("Cerebro.options")) Cerebro.options else list(),
-    cv_selected_dataset_name(),
-    "spatial"
-  )
+  spatial_defaults <- viewerScatterDefaults(opts, dataset_name, "spatial")
   for (embedded_index in seq_along(embedded)) {
     entry <- embedded[[embedded_index]]
     embedded_names <- names(embedded)
@@ -1804,15 +1796,6 @@ cv_build_bundle <- function(
   cells <- if (use_first_frame) seq_len(nrow(md)) else md$cell_barcode
   n <- length(cells)
 
-  ## Seed a stable fallback here. The user-editable palette travels separately
-  ## as cv_color_patch(), so changing one colour cannot rebuild this bundle.
-  cv_group_colors <- function(group_name, lev) {
-    tryCatch(
-      cerebro_group_colors(length(lev)),
-      error = function(e) cv_colors_for(lev)
-    )
-  }
-
   parameters <- tryCatch(crb$getParameters(), error = function(e) NULL)
   colour_groups <- viewerColourGroupChoices(
     md,
@@ -1952,14 +1935,10 @@ cv_build_bundle <- function(
     spaces[[length(spaces) + 1L]] <- expression_space
   }
 
-  trajectories <- list()
   trekker_bundle <- NULL
   clone_bundle <- NULL
   if (!isTRUE(primary_only)) {
-    trajectories <- cv_build_trajectories(crb, cells)
-    if (length(trajectories)) {
-      spaces <- c(spaces, trajectories)
-    }
+    spaces <- c(spaces, cv_build_trajectories(crb, cells))
 
     ## Standard spatial and the Trekker physical mapping are independent spaces.
     sp <- cv_build_spatial(crb, cells)
@@ -2043,7 +2022,6 @@ cv_build_bundle <- function(
     projections = projections,
     default_projection = default_projection,
     initial_projections = initial_projections,
-    trajectories = trajectories,
     spaces = spaces,
     clone = clone_bundle,
     trekker = trekker_bundle
@@ -2051,12 +2029,6 @@ cv_build_bundle <- function(
 }
 
 cv_build_deferred_metadata <- function(crb, md, primary) {
-  colors_for <- function(name, levels) {
-    tryCatch(
-      cerebro_group_colors(length(levels)),
-      error = function(e) cv_colors_for(levels)
-    )
-  }
   deferred_group <- function(name, value) {
     levels <- if (is.factor(value)) {
       levels(value)
@@ -2070,7 +2042,7 @@ cv_build_deferred_metadata <- function(crb, md, primary) {
     list(
       values = NULL,
       levels = I(levels),
-      colors = I(colors_for(name, levels)),
+      colors = I(cv_group_colors(name, levels)),
       deferred = TRUE
     )
   }
@@ -2122,6 +2094,36 @@ cv_supplement_projections <- function(
   projections[intersect(names, names(projections))]
 }
 
+## One progressive supplement message: the primary frame's identity plus the
+## colour attributes, projections and spaces that frame did not carry. Extra
+## named fields (progressive_complete, transport_profile) are appended as given.
+cv_supplement <- function(
+  primary,
+  metadata,
+  projections = list(),
+  spaces = list(),
+  clone = NULL,
+  trekker = NULL,
+  progressive_token = primary$progressive_token,
+  ...
+) {
+  list(
+    dataset_id = primary$dataset_id,
+    dataset_context = primary$dataset_context,
+    dataset_fingerprint = primary$dataset_fingerprint,
+    progressive_token = progressive_token,
+    groups = metadata$groups,
+    cat_extra = metadata$cat_extra %||% list(),
+    fields = metadata$fields %||% list(),
+    cat_skipped = metadata$cat_skipped,
+    projections = projections,
+    spaces = spaces,
+    clone = clone,
+    trekker = trekker,
+    ...
+  )
+}
+
 cv_build_compact_supplement <- function(
   crb,
   primary,
@@ -2166,15 +2168,9 @@ cv_build_compact_supplement <- function(
   if (!is.null(clone)) {
     metadata$groups[["clone_expansion"]] <- clone$group
   }
-  list(
-    dataset_id = primary$dataset_id,
-    dataset_context = primary$dataset_context,
-    dataset_fingerprint = primary$dataset_fingerprint,
-    progressive_token = primary$progressive_token,
-    groups = metadata$groups,
-    cat_extra = metadata$cat_extra,
-    fields = metadata$fields,
-    cat_skipped = metadata$cat_skipped,
+  cv_supplement(
+    primary,
+    metadata,
     projections = cv_supplement_projections(
       setdiff(projection_names, names(primary$projections)),
       projection_resources,
@@ -2192,8 +2188,7 @@ cv_build_compact_supplement <- function(
       first_frame$projections
     ),
     spaces = if (is.null(clone)) list() else list(clone$space),
-    clone = if (is.null(clone)) NULL else clone$bundle,
-    trekker = NULL
+    clone = clone$bundle
   )
 }
 
@@ -2235,15 +2230,9 @@ cv_build_progressive_supplement <- function(
     spaces[[length(spaces) + 1L]] <- clone$space
     metadata$groups[["clone_expansion"]] <- clone$group
   }
-  list(
-    dataset_id = primary$dataset_id,
-    dataset_context = primary$dataset_context,
-    dataset_fingerprint = primary$dataset_fingerprint,
-    progressive_token = primary$progressive_token,
-    groups = metadata$groups,
-    cat_extra = metadata$cat_extra,
-    fields = metadata$fields,
-    cat_skipped = metadata$cat_skipped,
+  cv_supplement(
+    primary,
+    metadata,
     projections = cv_supplement_projections(
       setdiff(projection_names, names(primary$projections)),
       projection_resources,
@@ -2251,8 +2240,8 @@ cv_build_progressive_supplement <- function(
       function(names) cv_build_projections(crb, cells, names)
     ),
     spaces = spaces,
-    clone = if (is.null(clone)) NULL else clone$bundle,
-    trekker = if (is.null(trekker)) NULL else trekker$bundle
+    clone = clone$bundle,
+    trekker = trekker$bundle
   )
 }
 

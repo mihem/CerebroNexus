@@ -435,18 +435,12 @@ observe({
     label = deferred_clone$details$label,
     n_cdr3 = deferred_clone$details$n_cdr3
   ))
-  supplement <- list(
-    dataset_id = source$dataset_id,
-    dataset_context = source$dataset_context,
-    dataset_fingerprint = source$dataset_fingerprint,
-    progressive_token = sent_primary_n,
-    groups = list(clone_expansion = clone$group),
-    cat_extra = list(),
-    fields = list(),
-    projections = list(),
+  supplement <- cv_supplement(
+    source,
+    list(groups = list(clone_expansion = clone$group)),
     spaces = list(clone$space),
     clone = clone$bundle,
-    trekker = NULL,
+    progressive_token = sent_primary_n,
     progressive_complete = FALSE,
     transport_profile = list(
       server_prepare_ms = result$server_prepare_ms,
@@ -1093,12 +1087,7 @@ observeEvent(
       metadata,
       kind,
       name,
-      function(group_name, levels) {
-        tryCatch(
-          cerebro_group_colors(length(levels)),
-          error = function(error) cv_colors_for(levels)
-        )
-      }
+      cv_group_colors
     )
     req(!is.null(value))
     session$sendBinaryMessage(
@@ -1737,38 +1726,44 @@ output[["coordviews_image_ui"]] <- renderUI({
   if (is.null(span) || length(span) < 2) {
     span <- c(400, 400)
   }
-  rng <- function(id, label, mn, mx, val, step) {
+  ## One labelled range + number pair; `label` names it for assistive tech.
+  ctl <- function(id, heading, label, mn, mx, val) {
+    number_id <- paste0(id, "-number")
     div(
-      class = "cv-img-range",
-      tags$input(
-        type = "range",
-        id = id,
-        `aria-label` = label,
-        min = mn,
-        max = mx,
-        value = val,
-        step = step
-      ),
-      tags$input(
-        type = "number",
-        id = paste0(id, "-number"),
-        class = "cv-img-number",
-        min = mn,
-        max = mx,
-        value = val,
-        step = step,
-        `aria-label` = paste(label, "value")
+      class = "cv-img-ctl",
+      tags$label(`for` = number_id, heading),
+      div(
+        class = "cv-img-range",
+        tags$input(
+          type = "range",
+          id = id,
+          `aria-label` = label,
+          min = mn,
+          max = mx,
+          value = val,
+          step = "any"
+        ),
+        tags$input(
+          type = "number",
+          id = number_id,
+          class = "cv-img-number",
+          min = mn,
+          max = mx,
+          value = val,
+          step = "any",
+          `aria-label` = paste(label, "value")
+        )
       )
     )
   }
   chk <- function(id, label, on) {
     tags$label(
       class = "cv-chk",
-      if (isTRUE(on)) {
-        tags$input(type = "checkbox", id = id, checked = "checked")
-      } else {
-        tags$input(type = "checkbox", id = id)
-      },
+      tags$input(
+        type = "checkbox",
+        id = id,
+        checked = if (isTRUE(on)) "checked"
+      ),
       label
     )
   }
@@ -1779,78 +1774,27 @@ output[["coordviews_image_ui"]] <- renderUI({
   ## the alignment silently becoming one nobody chose.
   sx <- signif(max(span[1] * 1.2, abs(pr$offsetX %||% 0) * 1.1), 3)
   sy <- signif(max(span[2] * 1.2, abs(pr$offsetY %||% 0) * 1.1), 3)
-  scale_lo <- min(
-    0.3,
-    (pr$scaleX %||% 1) * 0.9,
-    (pr$scaleY %||% pr$scaleX %||% 1) * 0.9
-  )
-  scale_hi <- max(
-    3,
-    (pr$scaleX %||% 1) * 1.1,
-    (pr$scaleY %||% pr$scaleX %||% 1) * 1.1
-  )
+  scale_x <- pr$scaleX %||% 1
+  scale_y <- pr$scaleY %||% scale_x
+  scale_lo <- min(0.3, scale_x * 0.9, scale_y * 0.9)
+  scale_hi <- max(3, scale_x * 1.1, scale_y * 1.1)
   div(
     class = "cv-imgbar",
     div(
       class = "cv-imgbar-heading",
       tags$span(class = "cv-imgbar-title", "Alignment")
     ),
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-opacity-number", "Opacity"),
-      rng("cv-img-opacity", "Opacity", 0, 1, pr$opacity %||% 1, "any")
-    ),
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-offx-number", "Horizontal"),
-      rng("cv-img-offx", "Move X", -sx, sx, pr$offsetX %||% 0, "any")
-    ),
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-offy-number", "Vertical"),
-      rng("cv-img-offy", "Move Y", -sy, sy, pr$offsetY %||% 0, "any")
-    ),
+    ctl("cv-img-opacity", "Opacity", "Opacity", 0, 1, pr$opacity %||% 1),
+    ctl("cv-img-offx", "Horizontal", "Move X", -sx, sx, pr$offsetX %||% 0),
+    ctl("cv-img-offy", "Vertical", "Move Y", -sy, sy, pr$offsetY %||% 0),
     ## Two scales, not one. A preset can carry scaleX != scaleY -- a calibration
     ## that is genuinely non-uniform -- and a single slider had to pick a number
     ## for both, so touching ANY control in this bar silently squared the image
     ## up and threw that calibration away. Locked together by default, since a
     ## uniform scale is the common case and two sliders to drag is a worse one.
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-scalex-number", "Scale X"),
-      rng(
-        "cv-img-scalex",
-        "Scale X",
-        scale_lo,
-        scale_hi,
-        pr$scaleX %||% 1,
-        "any"
-      )
-    ),
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-scaley-number", "Scale Y"),
-      rng(
-        "cv-img-scaley",
-        "Scale Y",
-        scale_lo,
-        scale_hi,
-        pr$scaleY %||% pr$scaleX %||% 1,
-        "any"
-      )
-    ),
-    div(
-      class = "cv-img-ctl",
-      tags$label(`for` = "cv-img-rotate-number", "Rotation"),
-      rng(
-        "cv-img-rotate",
-        "Rotate",
-        -180,
-        180,
-        pr$rotation %||% 0,
-        "any"
-      )
-    ),
+    ctl("cv-img-scalex", "Scale X", "Scale X", scale_lo, scale_hi, scale_x),
+    ctl("cv-img-scaley", "Scale Y", "Scale Y", scale_lo, scale_hi, scale_y),
+    ctl("cv-img-rotate", "Rotation", "Rotate", -180, 180, pr$rotation %||% 0),
     div(
       class = "cv-img-checks",
       chk("cv-img-show", "Show this image", TRUE),
