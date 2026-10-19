@@ -10,50 +10,6 @@ observeEvent(input$ir_tabs, {
   }
 })
 
-## ---- Tab change: update cloneCall choices ----------------------------- ##
-observeEvent(input$ir_tabs, {
-  req(has_scRepertoire())
-  tab <- input$ir_tabs
-  if (tab %in% c("Length", "K-mer")) {
-    updateSelectInput(
-      session,
-      "ir_cloneCall",
-      choices = c("nt", "aa"),
-      selected = if (input$ir_cloneCall %in% c("nt", "aa")) {
-        input$ir_cloneCall
-      } else {
-        "aa"
-      }
-    )
-  } else if (
-    tab %in%
-      c(
-        "Gene usage",
-        "vizGenes",
-        "percentGenes",
-        "percentVJ",
-        "AA %",
-        "Entropy",
-        "Isotype",
-        "SHM Proxy",
-        "Paired Scatter",
-        "Definition",
-        "Clone Sharing"
-      )
-  ) {
-    updateSelectInput(session, "ir_cloneCall", choices = NULL, selected = NULL)
-  } else {
-    updateSelectInput(
-      session,
-      "ir_cloneCall",
-      choices = c("gene", "nt", "aa", "strict"),
-      selected = input$ir_cloneCall
-    )
-  }
-  # Scatter / Compare sample selectors are shown/hidden by conditionalPanel
-  # (see settings.R) keyed on input$ir_tabs, so no manual toggling is needed.
-})
-
 ## ---- Attach tooltips to tab links via JS ------------------------------ ##
 observe({
   tab <- input$ir_tabs

@@ -62,88 +62,6 @@ expect_nonempty_ggplot <- function(p, label) {
   expect_gt(n, 0)
 }
 
-# Source the (reactive-free) length helper so its pure plot builder is testable.
-length_helpers <- viewer_test_path("immune_repertoire", "length_helpers.R")
-
-test_that("ir_length_facet_plot draws one panel per group", {
-  skip_if_not(file.exists(example_crb))
-  source(length_helpers, local = TRUE)
-  ir <- load_ir()
-
-  tbl <- scRepertoire::clonalLength(
-    ir,
-    cloneCall = "aa",
-    group.by = "sample",
-    exportTable = TRUE
-  )
-  n_groups <- length(unique(as.character(tbl$values)))
-  expect_gt(n_groups, 1)
-
-  p <- ir_length_facet_plot(tbl, scale = FALSE)
-  expect_nonempty_ggplot(p, "ir_length_facet_plot")
-
-  # One facet panel per group (the whole point: separate plots per sample).
-  built <- ggplot2::ggplot_build(p)
-  expect_equal(nrow(built$layout$layout), n_groups)
-})
-
-test_that("ir_length_facet_plot scale=TRUE yields within-group proportions", {
-  skip_if_not(file.exists(example_crb))
-  source(length_helpers, local = TRUE)
-  ir <- load_ir()
-
-  tbl <- scRepertoire::clonalLength(
-    ir,
-    cloneCall = "aa",
-    group.by = "sample",
-    exportTable = TRUE
-  )
-  p <- ir_length_facet_plot(tbl, scale = TRUE)
-  built <- ggplot2::ggplot_build(p)
-  # Proportions: every bar height is within [0, 1].
-  ys <- unlist(lapply(built$data, function(d) d$y[!is.na(d$y)]))
-  expect_true(all(ys >= 0 & ys <= 1))
-})
-
-test_that("ir_length_facet_plot preserves export table group order", {
-  source(length_helpers, local = TRUE)
-  tbl <- data.frame(
-    length = c(10, 11, 10, 12),
-    values = factor(
-      c("zeta", "zeta", "alpha", "alpha"),
-      levels = c("zeta", "alpha")
-    ),
-    stringsAsFactors = FALSE
-  )
-
-  p <- ir_length_facet_plot(tbl, scale = FALSE)
-
-  expect_identical(levels(p$data$group), c("zeta", "alpha"))
-})
-
-test_that("ir_length_facet_plot can facet by the selected group column", {
-  source(length_helpers, local = TRUE)
-  tbl <- data.frame(
-    length = c(10, 11, 12, 13),
-    values = c("sample_1", "sample_1", "sample_2", "sample_2"),
-    cell_type = c("T cells", "Monocytes", "T cells", "Monocytes"),
-    stringsAsFactors = FALSE
-  )
-
-  p <- ir_length_facet_plot(
-    tbl,
-    scale = FALSE,
-    group_col = "cell_type",
-    group_levels = c("Monocytes", "T cells")
-  )
-
-  expect_identical(levels(p$data$group), c("Monocytes", "T cells"))
-  expect_identical(
-    as.character(ggplot2::ggplot_build(p)$layout$layout$group),
-    c("Monocytes", "T cells")
-  )
-})
-
 test_that("core clonal plots render a non-empty ggplot on example.crb", {
   skip_if_not(file.exists(example_crb))
   ir <- load_ir()
@@ -159,14 +77,6 @@ test_that("core clonal plots render a non-empty ggplot on example.crb", {
       group.by = "sample"
     ),
     "clonalHomeostasis"
-  )
-  expect_nonempty_ggplot(
-    scRepertoire::clonalLength(ir, cloneCall = "aa", group.by = "sample"),
-    "clonalLength"
-  )
-  expect_nonempty_ggplot(
-    scRepertoire::clonalProportion(ir, cloneCall = "gene", group.by = "sample"),
-    "clonalProportion"
   )
 })
 
@@ -225,22 +135,6 @@ test_that("clonalHomeostasis accepts a custom cloneSize binning", {
   )
 })
 
-test_that("vizGenes accepts a y.axis for paired gene usage", {
-  skip_if_not(file.exists(example_crb))
-  ir <- load_ir()
-
-  expect_nonempty_ggplot(
-    scRepertoire::vizGenes(
-      ir,
-      x.axis = "TRBV",
-      y.axis = "TRBJ",
-      group.by = "sample",
-      plot = "heatmap"
-    ),
-    "vizGenes-yaxis"
-  )
-})
-
 test_that("paired scatter manual fallback renders on example.crb", {
   skip_if_not(file.exists(example_crb))
   ir <- load_ir()
@@ -283,46 +177,11 @@ test_that("paired scatter renders after splitting by a metadata category", {
   )
 })
 
-test_that("gene-usage and CDR3 plots render on example.crb", {
+test_that("bundled BCR data carries the heavy chains the isotype plot needs", {
   skip_if_not(file.exists(example_crb))
-  ir <- load_ir()
-
-  expect_nonempty_ggplot(
-    scRepertoire::percentAA(
-      ir,
-      chain = "TRB",
-      aa.length = 20,
-      group.by = "sample"
-    ),
-    "percentAA"
-  )
-  expect_nonempty_ggplot(
-    scRepertoire::percentGenes(
-      ir,
-      chain = "TRB",
-      gene = "Vgene",
-      group.by = "sample"
-    ),
-    "percentGenes"
-  )
-  expect_nonempty_ggplot(
-    scRepertoire::percentVJ(ir, chain = "TRB", group.by = "sample"),
-    "percentVJ"
-  )
-})
-
-test_that("BCR isotype/SHM helpers produce a plot for the bundled BCR data", {
-  skip_if_not(file.exists(example_crb))
-  # source the BCR helpers in an environment with the needed deps
-  helper_src <- viewer_test_path("immune_repertoire", "server.R")
-  skip_if_not(file.exists(helper_src))
-  # bcr_isotype_plot / bcr_shm_proxy_plot are defined inside server(); verify the
-  # bundled data has the BCR columns those helpers require.
   ir <- load_ir()
   all_ct <- paste(unlist(lapply(ir, function(d) d$CTgene)), collapse = ";")
   expect_true(grepl("IGH", all_ct)) # isotype needs IGH heavy-chain genes
-  has_cols <- all(c("CTnt", "CTstrict") %in% colnames(ir[[1]]))
-  expect_true(has_cols) # SHM proxy needs CTnt + CTstrict
 })
 
 test_that("BCR isotype extraction preserves sample names from the IR list", {

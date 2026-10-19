@@ -12,7 +12,7 @@
 ##   type    : "select" | "numeric" | "checkbox"
 ##   choices : for select — either a character vector, or one of the dynamic
 ##             tokens "<<groups>>" (metadata grouping columns) /
-##             "<<genes>>" (gene-segment families)
+##             "<<receptors>>" / "<<projections>>"
 ##   value   : default value (must match the scRepertoire default)
 ##   min/max/step : for numeric
 ## ---------------------------------------------------------------------------
@@ -23,21 +23,8 @@ IR_GLOBAL_CONTROL_HIDDEN <- list(
   # Clonal UMAP colours by clone size and uses its own Receptor selector; the
   # global Clone call is intentionally fixed there so hidden state cannot affect
   # the plot. The other tabs either do not use cloneCall or enforce their own.
-  ir_cloneCall = c(
-    "Clonal UMAP",
-    "Isotype",
-    "SHM Proxy",
-    "Gene usage",
-    "vizGenes",
-    "percentGenes",
-    "percentVJ",
-    "AA %",
-    "Entropy",
-    "Property",
-    "Definition",
-    "Clone Sharing"
-  ),
-  ir_chain = c("vizGenes", "Clonal UMAP"),
+  ir_cloneCall = c("Clonal UMAP", "Isotype", "Clone Sharing"),
+  ir_chain = c("Clonal UMAP"),
   ir_groupBy = c("Clonal UMAP")
 )
 
@@ -57,32 +44,6 @@ ir_visible_global_ids <- function(tab) {
     tab = tab
   )]
 }
-
-IR_SCATTER_SPEC <- list(
-  list(
-    id = "ir_p_graph",
-    label = "Graph:",
-    type = "select",
-    choices = c("proportion", "count"),
-    value = "proportion"
-  ),
-  list(
-    id = "ir_p_dot_size",
-    label = "Dot size:",
-    type = "select",
-    choices = c("total", "x", "y"),
-    value = "total"
-  )
-)
-
-IR_SCALE_SPEC <- list(
-  list(
-    id = "ir_p_scale",
-    label = "Scale (proportion):",
-    type = "checkbox",
-    value = FALSE
-  )
-)
 
 IR_PARAM_SPEC <- list(
   # Clonal UMAP: overlay clone expansion on the cell projection. Receptor and
@@ -157,69 +118,20 @@ IR_PARAM_SPEC <- list(
     )
   ),
 
-  "Scatter" = IR_SCATTER_SPEC,
-
-  "Paired Scatter" = IR_SCATTER_SPEC,
-
-  "vizGenes" = list(
+  "Paired Scatter" = list(
     list(
-      id = "ir_p_vg_x_axis",
-      label = "X axis (gene):",
+      id = "ir_p_graph",
+      label = "Graph:",
       type = "select",
-      choices = "<<genes>>",
-      value = "TRBV"
+      choices = c("proportion", "count"),
+      value = "proportion"
     ),
     list(
-      id = "ir_p_vg_plot",
-      label = "Plot:",
+      id = "ir_p_dot_size",
+      label = "Dot size:",
       type = "select",
-      choices = c("heatmap", "barplot"),
-      value = "heatmap"
-    ),
-    list(
-      id = "ir_p_vg_summary",
-      label = "Summary:",
-      type = "select",
-      choices = c("percent", "proportion", "count"),
-      value = "percent"
-    )
-  ),
-
-  "Overlap" = list(
-    list(
-      id = "ir_p_overlap_method",
-      label = "Method:",
-      type = "select",
-      choices = c("overlap", "morisita", "jaccard", "cosine", "raw"),
-      value = "overlap"
-    )
-  ),
-
-  "K-mer" = list(
-    list(
-      id = "ir_p_motif_length",
-      label = "Motif length:",
-      type = "numeric",
-      value = 3,
-      min = 1,
-      max = 6,
-      step = 1
-    ),
-    list(
-      id = "ir_p_min_depth",
-      label = "Min depth:",
-      type = "numeric",
-      value = 3,
-      min = 1,
-      max = 20,
-      step = 1
-    ),
-    list(
-      id = "ir_p_top_motifs",
-      label = "Top motifs:",
-      type = "select",
-      choices = c("10", "20", "25", "30", "50", "75", "100"),
-      value = "30"
+      choices = c("total", "x", "y"),
+      value = "total"
     )
   ),
 
@@ -232,53 +144,15 @@ IR_PARAM_SPEC <- list(
     )
   ),
 
-  ## ---- scale-only plots -------------------------------------------------
-  "Abundance" = IR_SCALE_SPEC,
-  "Length" = IR_SCALE_SPEC,
-  "Quant" = IR_SCALE_SPEC,
+  "Abundance" = list(
+    list(
+      id = "ir_p_scale",
+      label = "Scale (proportion):",
+      type = "checkbox",
+      value = FALSE
+    )
+  ),
 
-  ## ---- clonal structure -------------------------------------------------
-  "Proportion" = list(
-    list(
-      id = "ir_p_clonal_split",
-      label = "Clonal split (comma-separated):",
-      type = "text",
-      value = "10, 100, 1000, 10000, 30000, 100000"
-    )
-  ),
-  "Rarefaction" = list(
-    list(
-      id = "ir_p_rare_plot_type",
-      label = "Plot type:",
-      type = "select",
-      choices = c(
-        "Sample-size" = "1",
-        "Coverage" = "2",
-        "Sample completeness" = "3"
-      ),
-      value = "1"
-    ),
-    list(
-      id = "ir_p_hill_numbers",
-      label = "Hill number (q):",
-      type = "select",
-      choices = c(
-        "Richness (q=0)" = "0",
-        "Shannon (q=1)" = "1",
-        "Simpson (q=2)" = "2"
-      ),
-      value = "0"
-    ),
-    list(
-      id = "ir_p_rare_n_boots",
-      label = "Bootstrap iterations:",
-      type = "numeric",
-      value = 20,
-      min = 3,
-      max = 100,
-      step = 1
-    )
-  ),
   "SizeDist" = list(
     list(
       id = "ir_p_sd_method",
@@ -322,117 +196,6 @@ IR_PARAM_SPEC <- list(
       max = 50,
       step = 1
     )
-  ),
-
-  ## ---- gene usage -------------------------------------------------------
-  "Gene usage" = list(
-    list(
-      id = "ir_p_gu_genes",
-      label = "Genes:",
-      type = "select",
-      choices = "<<genes>>",
-      value = "TRBV"
-    ),
-    list(
-      id = "ir_p_gu_plot_type",
-      label = "Plot type:",
-      type = "select",
-      choices = c("heatmap", "barplot"),
-      value = "heatmap"
-    ),
-    list(
-      id = "ir_p_gu_summary",
-      label = "Summary:",
-      type = "select",
-      choices = c("percent", "proportion", "count"),
-      value = "percent"
-    )
-  ),
-  "percentGenes" = list(
-    list(
-      id = "ir_p_pg_gene",
-      label = "Gene segment:",
-      type = "select",
-      choices = c("Vgene", "Dgene", "Jgene"),
-      value = "Vgene"
-    ),
-    list(
-      id = "ir_p_pg_summary",
-      label = "Summary:",
-      type = "select",
-      choices = c("percent", "proportion", "count"),
-      value = "percent"
-    )
-  ),
-  "percentVJ" = list(
-    list(
-      id = "ir_p_vj_summary",
-      label = "Summary:",
-      type = "select",
-      choices = c("percent", "proportion", "count"),
-      value = "percent"
-    )
-  ),
-
-  ## ---- CDR3 amino-acid composition --------------------------------------
-  "AA %" = list(
-    list(
-      id = "ir_p_aa_length",
-      label = "AA length:",
-      type = "numeric",
-      value = 20,
-      min = 5,
-      max = 40,
-      step = 1
-    )
-  ),
-  "Entropy" = list(
-    list(
-      id = "ir_p_pe_aa_length",
-      label = "AA length:",
-      type = "numeric",
-      value = 20,
-      min = 5,
-      max = 40,
-      step = 1
-    ),
-    list(
-      id = "ir_p_pe_method",
-      label = "Method:",
-      type = "select",
-      choices = c(
-        "shannon",
-        "inv.simpson",
-        "gini.simpson",
-        "norm.entropy",
-        "pielou",
-        "hill0",
-        "hill1",
-        "hill2"
-      ),
-      value = "norm.entropy"
-    )
-  ),
-  # Property: method choices are detected at runtime (immApex availability),
-  # resolved via the "<<property_methods>>" token in the settings panel. The id
-  # stays ir_property_method so the existing renderer keeps working.
-  "Property" = list(
-    list(
-      id = "ir_property_method",
-      label = "Property method:",
-      type = "select",
-      choices = "<<property_methods>>",
-      value = NULL
-    ),
-    list(
-      id = "ir_p_pp_aa_length",
-      label = "AA length:",
-      type = "numeric",
-      value = 20,
-      min = 5,
-      max = 40,
-      step = 1
-    )
   )
 )
 
@@ -466,7 +229,7 @@ IR_DISPLAY_SCATTER <- list(
 )
 
 ## Tabs whose plots are point clouds (scatter-type): get the scatter extras.
-IR_SCATTER_TABS <- c("Clonal UMAP", "Scatter", "Paired Scatter")
+IR_SCATTER_TABS <- c("Clonal UMAP", "Paired Scatter")
 
 ## ---------------------------------------------------------------------------
 ## order.by — a generic "Order groups" control, reused across every tab whose
@@ -485,29 +248,11 @@ IR_ORDER_BY_PARAM <- list(
 )
 
 ## Tabs whose scRepertoire function accepts order.by.
-IR_ORDER_BY_TABS <- c(
-  "Abundance",
-  "Length",
-  "Diversity",
-  "Homeostasis",
-  "Compare",
-  "vizGenes",
-  "Gene usage",
-  "percentGenes",
-  "percentVJ",
-  "AA %",
-  "Entropy",
-  "Property"
-)
+IR_ORDER_BY_TABS <- c("Abundance", "Diversity", "Homeostasis", "Compare")
 
 ## Low-frequency analysis controls live in More settings. Everything else in
 ## IR_PARAM_SPEC remains in the top bar because it directly defines the plot.
-IR_MORE_PARAM_IDS <- c(
-  "ir_p_umap_show_all",
-  "ir_p_n_boots",
-  "ir_p_rare_n_boots",
-  "ir_p_order_by"
-)
+IR_MORE_PARAM_IDS <- c("ir_p_umap_show_all", "ir_p_n_boots", "ir_p_order_by")
 
 ## Assemble the display params applicable to a given tab.
 ir_display_params_for <- function(tab) {
@@ -532,16 +277,11 @@ ir_display_params_for <- function(tab) {
   params
 }
 
-IR_DESC_SUMMARY <- "How values are scaled: percent or proportion (share within each group) or raw count."
-IR_DESC_HEATMAP_BARPLOT <- "Heatmap (compact overview of many genes/groups) or barplot (easier to read exact values for few genes)."
-IR_DESC_AA_LENGTH <- "CDR3 length (in amino acids) to analyse position-by-position. Sequences of a different length are excluded."
-
 ## ---------------------------------------------------------------------------
 ## IR_PARAM_DESC — plain-language help for every control, keyed by input id.
 ##
 ## Single source of truth for the info dialogs (see ir_param_help_cards in
-## settings.R). Kept central (not per IR_PARAM_SPEC entry) because many params
-## are reused across tabs (scale, bootstrap, summary, aa_length ...), so each is
+## settings.R). Kept central (not per IR_PARAM_SPEC entry) so each param is
 ## explained once. Covers the global controls, the per-tab analysis params, and
 ## the display options. Written for a biologist who is not a scRepertoire user:
 ## say what the control does and how reading the plot changes, not the API.
@@ -563,37 +303,12 @@ IR_PARAM_DESC <- list(
   ir_p_x_axis = "A metadata column to spread the groups along the x-axis (e.g. condition), so diversity is compared across that variable.",
   ir_p_n_boots = "How many bootstrap resamples to average over for the diversity estimate and its spread. More iterations give a smoother, more stable estimate but take longer.",
 
-  ## ---- Scatter ----
+  ## ---- Paired Scatter ----
   ir_p_graph = "Whether the axes show each clone's proportion (share of the repertoire) or raw count. Proportion makes samples of different sizes comparable.",
   ir_p_dot_size = "What the dot size encodes: the clone's total size, or its size on the x or the y sample only.",
 
-  ## ---- vizGenes / gene usage ----
-  ir_p_vg_x_axis = "Which gene-segment family to put on the x-axis (e.g. TRBV for TCR beta V genes).",
-  ir_p_vg_plot = IR_DESC_HEATMAP_BARPLOT,
-  ir_p_vg_summary = IR_DESC_SUMMARY,
-  ir_p_gu_genes = "Which gene-segment family to summarise (e.g. TRBV, IGHV).",
-  ir_p_gu_plot_type = IR_DESC_HEATMAP_BARPLOT,
-  ir_p_gu_summary = IR_DESC_SUMMARY,
-  ir_p_pg_gene = "Which gene segment to break down: V, D or J gene.",
-  ir_p_pg_summary = IR_DESC_SUMMARY,
-  ir_p_vj_summary = IR_DESC_SUMMARY,
-
-  ## ---- Overlap ----
-  ir_p_overlap_method = "How clonotype sharing between two groups is scored. overlap/jaccard/cosine/morisita differ in how they weight clone sizes; raw is the count of shared clones. Higher means the groups share more of their repertoire.",
-
-  ## ---- K-mer ----
-  ir_p_motif_length = "Length (in amino acids) of the short CDR3 sub-sequences (k-mers) to count. Longer motifs are more specific but rarer.",
-  ir_p_min_depth = "Minimum number of times a motif must occur to be kept, filtering out noise.",
-  ir_p_top_motifs = "How many of the most frequent motifs to display.",
-
-  ## ---- scale-only / structure ----
+  ## ---- Abundance ----
   ir_p_scale = "Show proportions (share of the repertoire) instead of raw cell counts, so samples of different sizes are comparable.",
-  ir_p_clonal_split = "The size thresholds (comma-separated) that bin clones into proportion categories, from rare to expanded.",
-
-  ## ---- Rarefaction ----
-  ir_p_rare_plot_type = "What the rarefaction curve shows: diversity vs sample size, vs sequencing coverage, or sample completeness.",
-  ir_p_hill_numbers = "Which diversity order (Hill number q) to plot: q=0 counts clones (richness), q=1 weights by Shannon, q=2 emphasises the dominant clones.",
-  ir_p_rare_n_boots = "Bootstrap resamples for the rarefaction confidence band. More is smoother but slower.",
 
   ## ---- SizeDist ----
   ir_p_sd_method = "Linkage method for clustering samples by their clone-size distribution (ward.D2 is a common default).",
@@ -602,13 +317,6 @@ IR_PARAM_DESC <- list(
   ## ---- Compare ----
   ir_p_compare_prop = "Plot each clone's proportion instead of raw counts, so groups of different sizes are comparable.",
   ir_p_top_clones = "How many of the largest clones to track across the groups.",
-
-  ## ---- CDR3 amino-acid composition ----
-  ir_p_aa_length = IR_DESC_AA_LENGTH,
-  ir_p_pe_aa_length = IR_DESC_AA_LENGTH,
-  ir_p_pe_method = "Which entropy/diversity measure to compute at each CDR3 position.",
-  ir_property_method = "The amino-acid property scale to profile along the CDR3 (e.g. Atchley, Kidera) — captures physico-chemical character such as hydrophobicity.",
-  ir_p_pp_aa_length = IR_DESC_AA_LENGTH,
 
   ## ---- Display options ----
   ir_d_point_size = "Diameter of the scatter points.",
