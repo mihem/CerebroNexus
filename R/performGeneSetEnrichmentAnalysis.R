@@ -269,7 +269,7 @@ performGeneSetEnrichmentAnalysis <- function(
           'p_value',
           'q_value'
         )) %>%
-        dplyr::rename(!!current_group := .data$group)
+        dplyr::rename(!!current_group := "group")
 
       ## factorize group column
       group_levels_with_results <- group_levels[

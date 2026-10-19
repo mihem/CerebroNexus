@@ -222,7 +222,7 @@ getMarkerGenes <- function(
       ## - move "gene" column further to the front, if it exists
       if ("cluster" %in% colnames(results)) {
         results <- results %>%
-          dplyr::rename(!!current_group := .data$cluster) %>%
+          dplyr::rename(!!current_group := "cluster") %>%
           dplyr::select(
             tidyselect::all_of(current_group),
             tidyselect::any_of("gene"),
