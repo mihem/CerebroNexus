@@ -964,18 +964,6 @@ hla_build_motif_graph_raw <- function(
   if (is.null(agg) || nrow(agg) == 0) {
     return(NULL)
   }
-
-  # Total-size guard across all unique CDR3.
-  if (nrow(agg) > HLA_MOTIF_MAX_TOTAL) {
-    return(guard(sprintf(
-      paste(
-        "Too many unique CDR3s (%s > %s).",
-        "Open Settings > Filters and narrow the active cohort."
-      ),
-      format(nrow(agg), big.mark = ","),
-      format(HLA_MOTIF_MAX_TOTAL, big.mark = ",")
-    )))
-  }
   # Per-bin guard: the O(k^2) distance matrix is built per length bin (and per
   # V gene when by_v). Both grouping vectors must be length nrow(agg).
   bin_key <- if (by_v) {
@@ -1085,39 +1073,27 @@ hla_finalize_motif_graph <- function(
     return(raw)
   }
   g <- raw
-  degree <- igraph::degree(g)
+  is_isolated <- igraph::degree(g) == 0
   if (!isTRUE(show_isolated)) {
-    connected <- degree > 0
-    if (!any(connected)) {
+    if (all(is_isolated)) {
       return(NULL)
     }
     # Avoid cloning the complete igraph (including every vertex attribute) when
     # the filter keeps every node. Large HLA first frames commonly take this
     # path, and two no-op induced_subgraph calls otherwise dominate activation.
-    if (!all(connected)) {
-      g <- igraph::induced_subgraph(g, igraph::V(g)[connected])
+    if (any(is_isolated)) {
+      g <- igraph::induced_subgraph(g, igraph::V(g)[!is_isolated])
     }
+    is_isolated <- FALSE
+  }
+  comp <- igraph::components(g)
+  keep <- is_isolated | comp$csize[comp$membership] >= min_nodes
+  if (!any(keep)) {
+    return(NULL)
+  }
+  if (!all(keep)) {
+    g <- igraph::induced_subgraph(g, igraph::V(g)[keep])
     comp <- igraph::components(g)
-    keep <- comp$csize[comp$membership] >= min_nodes
-    if (!any(keep)) {
-      return(NULL)
-    }
-    if (!all(keep)) {
-      g <- igraph::induced_subgraph(g, igraph::V(g)[keep])
-      comp <- igraph::components(g)
-    }
-  } else {
-    comp <- igraph::components(g)
-    is_isolated <- degree == 0
-    keep_cluster <- comp$csize[comp$membership] >= min_nodes
-    keep <- is_isolated | keep_cluster
-    if (!any(keep)) {
-      return(NULL)
-    }
-    if (!all(keep)) {
-      g <- igraph::induced_subgraph(g, igraph::V(g)[keep])
-      comp <- igraph::components(g)
-    }
   }
   if (igraph::vcount(g) == 0) {
     return(NULL)
