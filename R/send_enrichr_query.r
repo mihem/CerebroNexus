@@ -109,22 +109,10 @@
     ##
     return(r)
   }
-  result <- if (requireNamespace("future.apply", quietly = TRUE)) {
-    future.apply::future_sapply(
-      databases,
-      enrichr_export_fun,
-      USE.NAMES = TRUE,
-      simplify = FALSE
-    )
-  } else {
-    sapply(
-      databases,
-      enrichr_export_fun,
-      USE.NAMES = TRUE,
-      simplify = FALSE
-    )
-  }
-
-  ##
-  return(result)
+  future.apply::future_sapply(
+    databases,
+    enrichr_export_fun,
+    USE.NAMES = TRUE,
+    simplify = FALSE
+  )
 }
