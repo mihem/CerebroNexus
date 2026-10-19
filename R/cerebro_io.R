@@ -1,3 +1,24 @@
+## The CRB reading contract shared with the Viewer runtime; load it once per
+## R process.
+.crbContract <- local({
+  contract <- NULL
+  function() {
+    if (is.null(contract)) {
+      contract <<- new.env(parent = baseenv())
+      sys.source(
+        system.file(
+          "viewer",
+          "core",
+          "crb_contract.R",
+          package = "CerebroNexus"
+        ),
+        contract
+      )
+    }
+    contract
+  }
+})
+
 .storedCerebroField <- function(object, field) {
   is.environment(object) &&
     exists(field, envir = object, inherits = FALSE) &&
@@ -81,18 +102,6 @@
     )
   }
   sidecar
-}
-
-.bpcellsCellNamesChecksum <- function(sidecar) {
-  names_file <- file.path(sidecar, "col_names")
-  if (!file.exists(names_file) || dir.exists(names_file)) {
-    stop("The BPCells sidecar has no cell-name index.", call. = FALSE)
-  }
-  checksum <- unname(tools::md5sum(names_file))
-  if (length(checksum) != 1L || is.na(checksum) || !nzchar(checksum)) {
-    stop("Could not checksum the BPCells cell-name index.", call. = FALSE)
-  }
-  checksum
 }
 
 .immuneRepertoireBackend <- function(object, file) {
@@ -246,73 +255,11 @@
   payload$crb_schema <- list(
     version = 2L,
     cell_names = "expression",
-    cell_names_md5 = .bpcellsCellNamesChecksum(sidecar),
+    cell_names_md5 = .crbContract()$.bpcellsCellNamesChecksum(sidecar),
     projection_rownames = compact_projections,
     n_cells = length(cells)
   )
   payload
-}
-
-.readCrbSchema <- function(object, file) {
-  if (!exists("crb_schema", envir = object, inherits = FALSE)) {
-    return(NULL)
-  }
-  if (!.storedCerebroField(object, "crb_schema")) {
-    stop(
-      "The Cerebro data file '",
-      basename(file),
-      "' has an unsupported CRB schema descriptor.",
-      call. = FALSE
-    )
-  }
-  schema <- object[["crb_schema"]]
-  if (is.null(schema)) {
-    return(NULL)
-  }
-  schema_names <- names(schema)
-  expected_names <- if (identical(schema$version, 1L)) {
-    c("version", "cell_names", "cell_names_md5", "projection_rownames")
-  } else if (identical(schema$version, 2L)) {
-    c(
-      "version",
-      "cell_names",
-      "cell_names_md5",
-      "projection_rownames",
-      "n_cells"
-    )
-  } else {
-    character()
-  }
-  valid <- is.list(schema) &&
-    !is.data.frame(schema) &&
-    length(expected_names) > 0L &&
-    length(schema) == length(expected_names) &&
-    !is.null(schema_names) &&
-    !anyDuplicated(schema_names) &&
-    setequal(schema_names, expected_names) &&
-    identical(schema$cell_names, "expression") &&
-    is.character(schema$cell_names_md5) &&
-    length(schema$cell_names_md5) == 1L &&
-    !is.na(schema$cell_names_md5) &&
-    grepl("^[[:xdigit:]]{32}$", schema$cell_names_md5) &&
-    is.character(schema$projection_rownames) &&
-    !anyNA(schema$projection_rownames) &&
-    !any(!nzchar(schema$projection_rownames)) &&
-    !anyDuplicated(schema$projection_rownames) &&
-    (identical(schema$version, 1L) ||
-      (is.integer(schema$n_cells) &&
-        length(schema$n_cells) == 1L &&
-        !is.na(schema$n_cells) &&
-        schema$n_cells >= 0L))
-  if (!valid) {
-    stop(
-      "The Cerebro data file '",
-      basename(file),
-      "' has an unsupported CRB schema descriptor.",
-      call. = FALSE
-    )
-  }
-  schema
 }
 
 .attachCerebroExpression <- function(object, file, backend) {
@@ -342,7 +289,8 @@
     stop("A thin CRB requires a BPCells expression backend.", call. = FALSE)
   }
   sidecar <- .cerebroSidecar(file, backend)
-  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
+  checksum <- .crbContract()$.bpcellsCellNamesChecksum(sidecar)
+  if (!identical(checksum, schema$cell_names_md5)) {
     stop(
       "The BPCells cell-name index does not match CRB '",
       basename(file),
@@ -749,7 +697,7 @@ readCerebro <- function(file) {
   file <- normalizePath(file, mustWork = TRUE)
   serialized <- .readCerebroPayload(file)
   backend <- .cerebroBackend(serialized)
-  schema <- .readCrbSchema(serialized, file)
+  schema <- .crbContract()$.readRuntimeCrbSchema(serialized, file)
   object <- .currentCerebroCopy(serialized)
   object <- .attachCerebroExpression(object, file, backend)
   object <- .hydrateThinCerebro(object, file, backend, schema)

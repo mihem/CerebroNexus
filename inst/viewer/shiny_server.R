@@ -20,6 +20,7 @@ source(cerebro_root_path("viewer/plotting_functions.R"), local = TRUE)
 source(cerebro_root_path("viewer/color_config.R"), local = TRUE)
 source(cerebro_root_path("viewer/source_cache.R"), local = TRUE)
 source(cerebro_root_path("viewer/core/viewer_pack.R"), local = TRUE)
+source(cerebro_root_path("viewer/core/crb_contract.R"), local = TRUE)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -943,7 +944,7 @@ server <- function(input, output, session) {
                 )
                 print(glue::glue(
                   "[{Sys.time()}] CRB background prefetch ready: ",
-                  "{.crbLogLabel(dataset_to_load)}"
+                  "{basename(dataset_to_load)}"
                 ))
               } else {
                 tryCatch(

@@ -234,46 +234,15 @@ dedent <- function(string) {
 
 # Portable bundle paths ----------------------------------------------------
 
-.windowsPathSegmentInvalid <- function(parts) {
-  grepl("[[:cntrl:]<>:\"|?*]", parts) |
-    grepl("[. ]$", parts) |
-    grepl(
-      "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])($|\\.)",
-      parts,
-      ignore.case = TRUE
-    )
-}
-
 .portableBundlePath <- function(path, subject) {
-  valid <- is.character(path) &&
-    length(path) == 1L &&
-    !is.na(path) &&
-    nzchar(path) &&
-    !grepl("/$", path) &&
-    !grepl("\\\\", path) &&
-    !grepl("^(/|~|[A-Za-z]:)", path)
-  parts <- if (valid) {
-    strsplit(path, "/", fixed = TRUE)[[1L]]
-  } else {
-    character()
-  }
-  windows_invalid <- length(parts) > 0L &&
-    any(.windowsPathSegmentInvalid(parts))
-  if (
-    !valid ||
-      length(parts) == 0L ||
-      any(!nzchar(parts)) ||
-      any(parts %in% c(".", "..")) ||
-      windows_invalid
-  ) {
-    stop(
-      subject,
-      " must be one portable relative path using forward slashes, without ",
-      "empty, '.', '..', or Windows-incompatible segments.",
-      call. = FALSE
+  .crbContract()$.runtimePortableBackendPath(
+    path,
+    subject,
+    paste0(
+      "must be one portable relative path using forward slashes, without ",
+      "empty, '.', '..', or Windows-incompatible segments."
     )
-  }
-  paste(parts, collapse = "/")
+  )
 }
 
 # Native path resolution ---------------------------------------------------
@@ -572,7 +541,7 @@ dedent <- function(string) {
       "/",
       fixed = TRUE
     )[[1L]]
-    if (any(.windowsPathSegmentInvalid(unc_root_parts))) {
+    if (any(.crbContract()$.runtimeWindowsPathSegmentInvalid(unc_root_parts))) {
       stop(
         "Native Windows paths cannot contain Windows-incompatible segments.",
         call. = FALSE
@@ -615,7 +584,7 @@ dedent <- function(string) {
     }
     if (
       identical(os_type, "windows") &&
-        .windowsPathSegmentInvalid(part)
+        .crbContract()$.runtimeWindowsPathSegmentInvalid(part)
     ) {
       stop(
         "Native Windows paths cannot contain Windows-incompatible segments.",
@@ -867,7 +836,8 @@ dedent <- function(string) {
 }
 
 ## Treat the ordinary field as data. The getter binding is checked only as a
-## format marker and is never invoked during preflight.
+## format marker and is never invoked during preflight. Callers check the
+## location's portability with their own message.
 .readBundleBackend <- function(
   crb_path,
   object = .readCerebroPayload(crb_path)
@@ -894,74 +864,11 @@ dedent <- function(string) {
       call. = FALSE
     )
   }
-  getter_name <- "getExpressionBackend"
-  backend_field <- "expression_backend"
-  getter_exists <- exists(getter_name, envir = object, inherits = FALSE)
-  field_exists <- exists(backend_field, envir = object, inherits = FALSE)
-  getter_is_active <- getter_exists && bindingIsActive(getter_name, object)
-  field_is_active <- field_exists && bindingIsActive(backend_field, object)
-  getter_is_lazy <- getter_exists &&
-    !getter_is_active &&
-    isTRUE(rlang::env_binding_are_lazy(object, getter_name))
-  field_is_lazy <- field_exists &&
-    !field_is_active &&
-    isTRUE(rlang::env_binding_are_lazy(object, backend_field))
-  if (
-    getter_is_active ||
-      field_is_active ||
-      getter_is_lazy ||
-      field_is_lazy
-  ) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  if (!getter_exists && !field_exists) {
-    return(list(type = "embedded", location = NULL, legacy = TRUE))
-  }
-  if (
-    !getter_exists ||
-      !field_exists ||
-      !is.function(object[[getter_name]])
-  ) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  backend <- object[[backend_field]]
-  if (is.null(backend)) {
-    return(list(type = "embedded", location = NULL, legacy = FALSE))
-  }
-  valid_type <- is.list(backend) &&
-    is.character(backend$type) &&
-    length(backend$type) == 1L &&
-    !is.na(backend$type) &&
-    backend$type %in% c("embedded", "h5", "bpcells")
-  valid_location <- valid_type &&
-    if (identical(backend$type, "embedded")) {
-      is.null(backend$location)
-    } else {
-      is.character(backend$location) &&
-        length(backend$location) == 1L &&
-        !is.na(backend$location) &&
-        nzchar(backend$location)
-    }
-  if (!valid_type || !valid_location) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  backend$legacy <- FALSE
-  backend
+  .crbContract()$.readRuntimeBackendDescriptor(
+    object,
+    crb_path,
+    portable = FALSE
+  )
 }
 
 .readBundleSpatialCatalog <- function(object, dataset) {
@@ -1335,56 +1242,6 @@ dedent <- function(string) {
   }
   digest <- .bundlePathDigest(charToRaw(enc2utf8(dataset_id)))
   paste0("private-data/dataset-", digest, ".crb")
-}
-
-.bundleBackendOverrideKey <- function(backend, cerebro_options) {
-  if (isTRUE(backend$legacy)) {
-    if (!is.null(cerebro_options[["expression_matrix_h5"]])) {
-      return("expression_matrix_h5")
-    }
-    if (!is.null(cerebro_options[["expression_matrix_BPCells"]])) {
-      return("expression_matrix_BPCells")
-    }
-    return(NULL)
-  }
-  if (identical(backend$type, "embedded")) {
-    return(NULL)
-  }
-  key <- switch(
-    backend$type,
-    h5 = "expression_matrix_h5",
-    bpcells = "expression_matrix_BPCells"
-  )
-  if (is.null(cerebro_options[[key]])) {
-    return(NULL)
-  }
-  key
-}
-
-## Compute the post-override decision once; the caller serializes it so runtime
-## consumes the same decision that preflight validated.
-.effectiveBundleBackendPlan <- function(backend, cerebro_options) {
-  override_key <- .bundleBackendOverrideKey(backend, cerebro_options)
-  if (!is.null(override_key)) {
-    type <- if (isTRUE(backend$legacy)) {
-      switch(
-        override_key,
-        expression_matrix_h5 = "h5",
-        expression_matrix_BPCells = "bpcells"
-      )
-    } else {
-      backend$type
-    }
-    return(list(
-      type = type,
-      mode = "host_override",
-      location = cerebro_options[[override_key]]
-    ))
-  }
-  if (isTRUE(backend$legacy) || identical(backend$type, "embedded")) {
-    return(list(type = "embedded", mode = "embedded", location = NULL))
-  }
-  list(type = backend$type, mode = "bundled", location = backend$location)
 }
 
 # Native path identity and symbolic-link inspection -----------------------
@@ -3094,7 +2951,10 @@ createShinyApp <- function(
   )
   for (index in seq_along(backends)) {
     backend <- backends[[index]]
-    override_key <- .bundleBackendOverrideKey(backend, cerebro_options)
+    override_key <- .crbContract()$.runtimeBackendOverrideKey(
+      backend,
+      cerebro_options
+    )
     if (!is.null(override_key)) {
       override_users[[override_key]] <- c(
         override_users[[override_key]],
@@ -3134,7 +2994,12 @@ createShinyApp <- function(
         )
       )
     }
-    effective <- .effectiveBundleBackendPlan(backend, cerebro_options)
+    ## Compute the post-override decision once and serialize it, so runtime
+    ## consumes the same decision that preflight validated.
+    effective <- .crbContract()$.effectiveRuntimeBackendPlan(
+      backend,
+      cerebro_options
+    )
     target <- crb_targets[[index]]
     existing <- effective_backend_entries[[target]]
     if (!is.null(existing) && !identical(existing, effective)) {

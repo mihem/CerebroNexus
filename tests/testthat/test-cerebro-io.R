@@ -125,6 +125,7 @@ test_that("spatial molecules are loaded one FOV at a time from a sidecar", {
   expect_identical(restored$spatial$fov1$molecules, molecules)
 
   runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = runtime)
   sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
   runtime_object <- runtime$read_cerebro_file(path)
   runtime_object <- runtime$.attachSpatialMoleculeBackend(runtime_object, path)
@@ -230,10 +231,8 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   expect_cerebro_fields(qs_object, fixture)
 
   runtime <- new.env(parent = globalenv())
-  sys.source(
-    viewer_test_path("utility_functions.R"),
-    envir = runtime
-  )
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = runtime)
+  sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
   runtime_object <- runtime$read_cerebro_file(qs)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, qs)
   expect_true(rlang::env_binding_are_lazy(runtime_object, "meta_data"))
@@ -332,10 +331,8 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
 
 test_that("Data Info reads the v2 cell count without forcing metadata", {
   runtime <- new.env(parent = globalenv())
-  sys.source(
-    viewer_test_path("utility_functions.R"),
-    envir = runtime
-  )
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = runtime)
+  sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
   object <- new.env(parent = emptyenv())
   object$crb_schema <- list(version = 2L, n_cells = 4L)
   delayedAssign(
@@ -363,6 +360,7 @@ test_that("thin schema v2 hydrates row-major BPCells sidecars", {
   expect_cerebro_fields(readCerebro(path), fixture)
 
   runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = runtime)
   sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
   runtime_object <- runtime$read_cerebro_file(path)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, path)
