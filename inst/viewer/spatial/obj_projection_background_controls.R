@@ -215,61 +215,33 @@ observeEvent(input[["spatial_projection_background_reset"]], {
     dataset_context = viewer_loaded_dataset_context(),
     background_identity = target$identity
   )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_opacity",
-    value = preset$opacity
-  )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_offset_x",
-    value = preset$offsetX
-  )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_offset_y",
-    value = preset$offsetY
-  )
   ## Move, flip and scale all reset to their preset (the shipped alignment),
   ## matching how the UI seeds them, so Reset restores the aligned overlay rather
   ## than a bare image. Scale is single-source now, so it too returns to preset.
-  scale_x_reset <- preset$scaleX
-  scale_y_reset <- preset$scaleY
-  updateCheckboxInput(
-    session,
-    "spatial_projection_background_scale_lock",
-    value = isTRUE(all.equal(scale_x_reset, scale_y_reset) == TRUE)
+  controls <- list(
+    opacity = preset$opacity,
+    offset_x = preset$offsetX,
+    offset_y = preset$offsetY,
+    scale_lock = isTRUE(all.equal(preset$scaleX, preset$scaleY) == TRUE),
+    scale = preset$scaleX,
+    scale_x = preset$scaleX,
+    scale_y = preset$scaleY,
+    rotate = preset$rotation,
+    flip_x = preset$flipX,
+    flip_y = preset$flipY
   )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_scale",
-    value = scale_x_reset
-  )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_scale_x",
-    value = scale_x_reset
-  )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_scale_y",
-    value = scale_y_reset
-  )
-  updateSliderInput(
-    session,
-    "spatial_projection_background_rotate",
-    value = preset$rotation
-  )
-  updateCheckboxInput(
-    session,
-    "spatial_projection_background_flip_x",
-    value = preset$flipX
-  )
-  updateCheckboxInput(
-    session,
-    "spatial_projection_background_flip_y",
-    value = preset$flipY
-  )
+  for (name in names(controls)) {
+    update <- if (name %in% c("scale_lock", "flip_x", "flip_y")) {
+      updateCheckboxInput
+    } else {
+      updateSliderInput
+    }
+    update(
+      session,
+      paste0("spatial_projection_background_", name),
+      value = controls[[name]]
+    )
+  }
 })
 
 ##----------------------------------------------------------------------------##
@@ -304,33 +276,12 @@ local({
       updateSliderInput(session, slider_id, value = new_val)
     })
   }
-  sync_slider_numeric(
-    "spatial_projection_background_opacity",
-    "spatial_projection_background_opacity_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_offset_x",
-    "spatial_projection_background_offset_x_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_offset_y",
-    "spatial_projection_background_offset_y_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_scale",
-    "spatial_projection_background_scale_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_scale_x",
-    "spatial_projection_background_scale_x_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_scale_y",
-    "spatial_projection_background_scale_y_num"
-  )
-  sync_slider_numeric(
-    "spatial_projection_background_rotate",
-    "spatial_projection_background_rotate_num"
+  lapply(
+    c("opacity", "offset_x", "offset_y", "scale", "scale_x", "scale_y", "rotate"),
+    function(name) {
+      slider_id <- paste0("spatial_projection_background_", name)
+      sync_slider_numeric(slider_id, paste0(slider_id, "_num"))
+    }
   )
 })
 
@@ -353,7 +304,6 @@ observeEvent(
 )
 
 observeEvent(input[["spatial_projection_background_copy_preset"]], {
-  dataset_context <- viewer_loaded_dataset_context()
   spatial_name <- input[["spatial_projection_to_display"]]
   dataset_context <- viewer_loaded_dataset_context()
   dataset <- dataset_context$dataset_key
