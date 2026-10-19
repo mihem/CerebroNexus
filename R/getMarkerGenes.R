@@ -86,7 +86,7 @@ getMarkerGenes <- function(
 
   ## check if organism is among compatible ones
   ## ... organism is not "hg" or "mm" -> not compatible
-  if (organism %in% c('hg', 'mm') == FALSE) {
+  if (length(organism) != 1L || !organism %in% c('hg', 'mm')) {
     ## show log message
     message(
       paste0(
