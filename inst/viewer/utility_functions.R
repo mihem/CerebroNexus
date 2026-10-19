@@ -6194,3 +6194,162 @@ viewerTrekkerBackground <- function(tk) {
     bounds = external$bounds %||% tk[["histology_image_bounds", exact = TRUE]]
   )
 }
+
+## Server side of a stored-result page (Marker genes, Enriched pathways): a
+## method/grouping selector pair, the table-or-message shell and the table.
+## Getters and messages are arguments, so each page passes its own and tests
+## can stub them. `statuses` maps a stored status string to its message;
+## `progress` wraps the table in withProgress; `columns_hide(df)` returns the
+## columns hidden by default.
+cerebroResultPageServer <- function(
+  input,
+  output,
+  session,
+  prefix,
+  methods,
+  groups,
+  results,
+  messages,
+  statuses = list(),
+  progress = NULL,
+  columns_hide = function(results_df) NULL
+) {
+  id <- function(suffix) paste0(prefix, "_", suffix)
+  method_id <- id("selected_method")
+  table_id <- id("selected_table")
+  ## Resolve both initial selectors together. Changing the method updates only
+  ## the group choices, so the surrounding controls do not disappear and rebind.
+  output[[id("select_method_and_table_UI")]] <- shiny::renderUI({
+    available <- methods()
+    if (!length(available)) {
+      return(shiny::p(messages$no_methods))
+    }
+    shiny::fluidRow(
+      shiny::column(
+        6,
+        shiny::selectInput(
+          method_id,
+          label = "Method",
+          choices = available,
+          selected = available[[1L]],
+          width = "100%"
+        )
+      ),
+      shiny::column(
+        6,
+        shiny::selectInput(
+          table_id,
+          label = "Grouping variable",
+          choices = groups(available[[1L]]),
+          width = "100%"
+        )
+      )
+    )
+  })
+  shiny::observeEvent(
+    input[[method_id]],
+    {
+      method <- input[[method_id]]
+      shiny::req(method %in% methods())
+      choices <- groups(method)
+      current <- shiny::isolate(input[[table_id]])
+      selected <- if (length(current) == 1L && current %in% choices) {
+        current
+      } else if (length(choices)) {
+        choices[[1L]]
+      } else {
+        character()
+      }
+      shiny::updateSelectInput(
+        session,
+        table_id,
+        choices = choices,
+        selected = selected
+      )
+    },
+    ignoreInit = TRUE
+  )
+  ## The stored table for the selected method and grouping; shared by the
+  ## shell and the table so a selection reads it once.
+  selected_result <- shiny::reactive({
+    shiny::req(
+      input[[method_id]],
+      input[[table_id]],
+      input[[method_id]] %in% methods(),
+      input[[table_id]] %in% groups(input[[method_id]])
+    )
+    results(input[[method_id]], input[[table_id]])
+  })
+  ## Table controls, or a message when the data set has no such results.
+  output[[id("table_or_text_UI")]] <- shiny::renderUI({
+    available <- methods()
+    if (!length(available)) {
+      return(shiny::p(messages$not_included))
+    }
+    method <- input[[method_id]]
+    shiny::req(method %in% available)
+    if (!length(groups(method))) {
+      return(shiny::p(messages$no_groups))
+    }
+    result <- selected_result()
+    if (is.data.frame(result)) {
+      cerebroResultTableControls(
+        prefix,
+        result,
+        colnames(result)[[1L]] %in% getGroups()
+      )
+    } else if (
+      is.character(result) &&
+        length(result) == 1L &&
+        result %in% names(statuses)
+    ) {
+      shiny::p(statuses[[result]])
+    } else {
+      shiny::p(messages$no_results)
+    }
+  })
+  output[[id("table")]] <- DT::renderDataTable({
+    shiny::req(
+      input[[method_id]],
+      input[[table_id]],
+      input[[table_id]] %in% groups(input[[method_id]])
+    )
+    step <- if (is.null(progress)) function(...) NULL else shiny::incProgress
+    render <- function() {
+      results_df <- selected_result()
+      shiny::req(is.data.frame(results_df))
+      step(0.3, detail = "Filtering data...")
+      ## Filter for one subgroup only if the user asked for it.
+      grouped <- colnames(results_df)[[1L]] %in% getGroups()
+      if (!isTRUE(input[[id("table_filter_switch")]]) && grouped) {
+        shiny::req(input[[id("table_select_group_level")]])
+      }
+      results_df <- cerebroFilterResultRows(
+        results_df,
+        input[[id("table_filter_switch")]],
+        grouped,
+        input[[id("table_select_group_level")]]
+      )
+      step(0.6, detail = "Rendering table...")
+      cerebroResultTable(
+        results_df,
+        paste0(
+          prefix,
+          "_by_",
+          input[[method_id]],
+          "_",
+          input[[table_id]]
+        ),
+        number_formatting = input[[id("table_number_formatting")]],
+        color_highlighting = input[[id("table_color_highlighting")]],
+        columns_hide = columns_hide(results_df)
+      )
+    }
+    if (is.null(progress)) {
+      render()
+    } else {
+      shiny::withProgress(message = progress, value = 0, render())
+    }
+  })
+  invisible(NULL)
+}

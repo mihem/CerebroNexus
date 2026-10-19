@@ -7,7 +7,7 @@ example_crb <- system.file(
 )
 
 test_that("enriched_pathways module files parse without errors", {
-  mod_files <- c("UI.R", "server.R", "table.R", "select_content.R")
+  mod_files <- c("UI.R", "server.R")
   for (f in mod_files) {
     fpath <- file.path(shiny_root, "enriched_pathways", f)
     skip_if_not(file.exists(fpath), message = paste("Missing:", f))
