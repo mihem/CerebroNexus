@@ -101,4 +101,5 @@ Config/testthat/parallel: true
 Config/testthat/start-first: app-immune_repertoire, app-inst,
   app-parameter-layout, ren-backend-benchmark, app-dataset-lifecycle,
   app-visualization-layout, createShinyApp-auth, addImmuneRepertoire,
-  gene-display-transitions, smoke-production, createShinyApp-sibling
+  gene-display-transitions, smoke-production, createShinyApp-sibling,
+  viewer-execution, resource-boundaries

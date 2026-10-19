@@ -9,10 +9,10 @@ tests/
 ├── testthat.R             # entry point picked up by R CMD check
 ├── testthat/              # actual unit + shinytest2 suite (committed)
 │   ├── setup.R            # browser timeouts; respects the caller's CRAN settings
+│   ├── helper-portability.R # Node/Chrome skips and a Windows-safe system2(env=)
 │   ├── test-app-inst.R    # shinytest2 end-to-end smoke tests against inst/
 │   ├── test-exportFromSeurat.R
-│   ├── test-r-functions.R
-│   └── _snaps/            # testthat snapshot fixtures
+│   └── test-r-functions.R
 └── smoke/                 # local dev scratch (gitignored, see its own README)
 ```
 
@@ -43,11 +43,20 @@ lightweight R/Shiny and available Node tests run. The R-CMD-check workflow build
 the source tarball and checks it outside the checkout, without `NODE_PATH`,
 `NOT_CRAN` or `CI`. Node's global module search is disabled as well.
 
+The suite uses testthat's third edition and runs test files in parallel
+(`Config/testthat/parallel` in `DESCRIPTION`). Parallelism applies when testthat
+loads the package itself: `devtools::test()`, `testthat::test_local()` and
+`R CMD check`, but not `testthat::test_dir()` after a manual `load_all()`. Set
+`TESTTHAT_CPUS` to choose the number of workers (testthat defaults to two; CI
+uses four). Each file runs in one worker, so a file's shared AppDriver and
+fixtures stay within that file. The slowest browser files are listed in
+`Config/testthat/start-first` so they do not finish last.
+
 On Linux/WSL, reproduce both modes from the repository root:
 
 ```bash
-NOT_CRAN=true Rscript -e \
-  'devtools::load_all("."); testthat::test_dir("tests/testthat", stop_on_failure=TRUE)'
+NOT_CRAN=true TESTTHAT_CPUS=4 Rscript -e \
+  'testthat::test_local(".", stop_on_failure=TRUE)'
 
 source_dir="$PWD"
 check_dir=$(mktemp -d)
@@ -193,21 +202,13 @@ for deployment and Windows-to-Linux transfer limitations. Generated Apps retain
 a brief offline checklist.
 
 
-### How `inst_dir` is resolved in `test-app-inst.R`
+### How the app directory is resolved in browser tests
 
-```r
-inst_dir <- system.file(package = "CerebroNexus")
-if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
-  inst_dir <- testthat::test_path("../../inst")
-}
-```
-
-In practice `system.file(package = "CerebroNexus")` always resolves to something with `app.R` at its root:
-
-- Under `devtools::test()`, `pkgload::load_all()` redirects `system.file()` to `<project>/inst/` (the source tree itself acts as the "installed root").
-- Under `Rscript tests/testthat.R` or `testthat::test_dir()`, `library(CerebroNexus)` has already loaded the installed package, so `system.file()` returns its install location.
-
-The fallback to `testthat::test_path("../../inst")` is effectively dead code — none of the supported entry points reach it. (`library(CerebroNexus)` aborts before the test file is sourced when the package is not installed; under `devtools::test()` the first branch already succeeds.)
+Browser tests call `viewer_app_test_path()` (`helper-viewer-path.R`): the source
+tree's `inst/` when it exists, otherwise the installed package root. Files whose
+tests only navigate the default data set share one AppDriver through
+`viewer_shared_app()`; a test that asserts pristine startup state or switches
+data sets boots its own.
 
 If you edit `inst/` and want the change reflected:
 
@@ -244,15 +245,6 @@ If you interrupt a shinytest2 run mid-flight, the headless Chrome and the spawne
 ```bash
 pkill -f chromote
 pkill -f 'shiny::runApp'
-```
-
-### Snapshot tests under `_snaps/`
-
-`testthat::expect_snapshot()` writes golden files into `tests/testthat/_snaps/`. Review diffs with:
-
-```r
-testthat::snapshot_review()
-testthat::snapshot_accept()   # only after you've confirmed the new output is correct
 ```
 
 ---
