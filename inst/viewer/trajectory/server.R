@@ -111,52 +111,14 @@ trajectory_cells_reactive <- function(columns = character(), barcodes = FALSE) {
   cells
 }
 
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/select_method_and_name.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/projection.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/projection_plot.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/selected_cells_table.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/distribution_along_pseudotime.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/states_by_group.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/trajectory/expression_metrics.R"
-  ),
-  local = TRUE
-)
+for (module_file in c(
+  "select_method_and_name.R",
+  "projection.R",
+  "projection_plot.R",
+  "selected_cells_table.R",
+  "distribution_along_pseudotime.R",
+  "states_by_group.R",
+  "expression_metrics.R"
+)) {
+  source(cerebro_root_path("viewer", "trajectory", module_file), local = TRUE)
+}

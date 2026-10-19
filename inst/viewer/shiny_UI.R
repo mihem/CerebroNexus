@@ -430,94 +430,30 @@ idleTimer();",
 ##----------------------------------------------------------------------------##
 ## Load UI content for each tab.
 ##----------------------------------------------------------------------------##
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/load_data/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/overview/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/groups/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/marker_genes/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/gene_expression/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/gene_id_conversion/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/color_management/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/about/UI.R"),
-  local = TRUE
-)
-
-## Enhanced module UIs.
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/most_expressed_genes/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/enriched_pathways/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/extra_material/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/trajectory/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/spatial/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/trekker/UI.R"),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/coordinated_views/UI.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/hla_tcr_motifs/UI.R"),
-  local = TRUE
-)
+for (ui_page in c(
+  "load_data",
+  "overview",
+  "groups",
+  "marker_genes",
+  "gene_expression",
+  "gene_id_conversion",
+  "color_management",
+  "about",
+  "most_expressed_genes",
+  "enriched_pathways",
+  "extra_material",
+  "immune_repertoire",
+  "trajectory",
+  "spatial",
+  "trekker",
+  "coordinated_views",
+  "hla_tcr_motifs"
+)) {
+  source(
+    file.path(Cerebro.options[["cerebro_root"]], "viewer", ui_page, "UI.R"),
+    local = TRUE
+  )
+}
 
 ##----------------------------------------------------------------------------##
 ## Create dashboard with different tabs.

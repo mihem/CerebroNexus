@@ -19,13 +19,7 @@
 ## Both pages resolve ROI membership, image scope and coordinate pivots through
 ## the same pure Spatial helpers, which shiny_server.R sources once per session
 ## so they are available even when Spatial has not been opened yet.
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/coordinated_views/bundle.R"
-  ),
-  local = TRUE
-)
+source(cerebro_root_path("viewer/coordinated_views/bundle.R"), local = TRUE)
 
 ## Always resolves to something sendable: the bundle, or a list(error = <text>)
 ## describing why this data set has no linked views. Never NULL — see the observe

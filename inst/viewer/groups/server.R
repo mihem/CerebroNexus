@@ -1,21 +1,10 @@
 ##----------------------------------------------------------------------------##
 ## Tab: Groups
 ##----------------------------------------------------------------------------##
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/groups/select_group.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/groups/composition.R"),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/groups/expression_metrics.R"
-  ),
-  local = TRUE
-)
+for (module_file in c(
+  "select_group.R",
+  "composition.R",
+  "expression_metrics.R"
+)) {
+  source(cerebro_root_path("viewer", "groups", module_file), local = TRUE)
+}

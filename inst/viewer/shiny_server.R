@@ -2,6 +2,12 @@
 ## Server function for Cerebro.
 ##----------------------------------------------------------------------------##
 
+## A path below the viewer's root directory. Server modules use it too: they
+## run inside server(), within this file's scope.
+cerebro_root_path <- function(...) {
+  file.path(Cerebro.options[["cerebro_root"]], ...)
+}
+
 ## plotting_functions.R holds only pure plot-builder functions (no reactive /
 ## input / output / session references), so source it ONCE at process startup
 ## instead of re-evaluating every definition on every new browser session. It
@@ -10,39 +16,18 @@
 ## utility_functions.R stay inside server(): the former defines a top-level
 ## reactive (reactive_colors); the latter's helpers close over session-scope
 ## reactives (data_set(), preferences, ...).
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/plotting_functions.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/color_config.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/source_cache.R"),
-  local = TRUE
-)
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/core/viewer_pack.R"),
-  local = TRUE
-)
+source(cerebro_root_path("viewer/plotting_functions.R"), local = TRUE)
+source(cerebro_root_path("viewer/color_config.R"), local = TRUE)
+source(cerebro_root_path("viewer/source_cache.R"), local = TRUE)
+source(cerebro_root_path("viewer/core/viewer_pack.R"), local = TRUE)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
 .extra_material_process_cache <- new.env(parent = emptyenv())
 
 ## Process-owned query/cache functions do not capture a browser session.
-source(
-  file.path(Cerebro.options[["cerebro_root"]], "viewer", "msigdb.R"),
-  local = TRUE
-)
-source(
-  file.path(Cerebro.options[["cerebro_root"]], "viewer", "crb_cache.R"),
-  local = TRUE
-)
+source(cerebro_root_path("viewer/msigdb.R"), local = TRUE)
+source(cerebro_root_path("viewer/crb_cache.R"), local = TRUE)
 .viewer_pack_process_cache <- new.env(parent = emptyenv())
 ## CRBs without a stored cell fingerprint would otherwise hash every barcode on
 ## each session's load. The value depends only on the file's cells.
@@ -101,13 +86,7 @@ source(
   assign(key, value, envir = .viewer_cell_fingerprint_cache)
   value
 }
-source(
-  file.path(
-    Cerebro.options[["cerebro_root"]],
-    "viewer/core/dataset_overview.R"
-  ),
-  local = TRUE
-)
+source(cerebro_root_path("viewer/core/dataset_overview.R"), local = TRUE)
 .crb_launch_state <- new.env(parent = emptyenv())
 .crb_launch_state$prototypes <- Cerebro.options[[".dataset_prototypes"]]
 if (!is.list(.crb_launch_state$prototypes)) {
@@ -135,17 +114,8 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Load color setup and utility functions.
   ##--------------------------------------------------------------------------##
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/color_setup.R"),
-    local = TRUE
-  )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/utility_functions.R"
-    ),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/color_setup.R"), local = TRUE)
+  source(cerebro_root_path("viewer/utility_functions.R"), local = TRUE)
   if (length(.crb_launch_state$prototypes)) {
     backend_plan <- Cerebro.options[[".bundle_backend_plan"]]
     configured_paths <- unname(
@@ -165,13 +135,7 @@ server <- function(input, output, session) {
     }
     .crb_launch_state$prototypes <- NULL
   }
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/coordinated_views/config.R"
-    ),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/coordinated_views/config.R"), local = TRUE)
   observeEvent(
     input[["cell_view_aux_request"]],
     {
@@ -180,13 +144,7 @@ server <- function(input, output, session) {
     },
     ignoreInit = TRUE
   )
-  source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/clone_contract.R"
-    ),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/clone_contract.R"), local = TRUE)
 
   ##--------------------------------------------------------------------------##
   ## Central parameters.
@@ -1944,16 +1902,10 @@ server <- function(input, output, session) {
   ## Tabs.
   ##--------------------------------------------------------------------------##
   source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/module/group_filters/group_filters_widget.R"
-    ),
+    cerebro_root_path("viewer/module/group_filters/group_filters_widget.R"),
     local = TRUE
   )
-  source(
-    paste0(Cerebro.options[["cerebro_root"]], "/viewer/load_data/server.R"),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/load_data/server.R"), local = TRUE)
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
@@ -2118,38 +2070,20 @@ server <- function(input, output, session) {
   )
 
   source(
-    file.path(
-      Cerebro.options[["cerebro_root"]],
-      "viewer/core/viewer_content_contract.R"
-    ),
+    cerebro_root_path("viewer/core/viewer_content_contract.R"),
     local = TRUE
   )
   ## Shared geometry/image helpers are needed by Linked views and asset routes;
   ## Spatial's controls and observers can wait until its page is requested.
   source(
-    file.path(
-      Cerebro.options[["cerebro_root"]],
-      "viewer/spatial/func_spatial_helpers.R"
-    ),
+    cerebro_root_path("viewer/spatial/func_spatial_helpers.R"),
     local = TRUE
   )
   ## Spatial and Gene expression share these colour scales, so they cannot
   ## depend on one page having been opened.
-  source(
-    file.path(
-      Cerebro.options[["cerebro_root"]],
-      "viewer/core/func_color_scale.R"
-    ),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/core/func_color_scale.R"), local = TRUE)
 
-  source(
-    file.path(
-      Cerebro.options[["cerebro_root"]],
-      "viewer/core/cell_inspection.R"
-    ),
-    local = TRUE
-  )
+  source(cerebro_root_path("viewer/core/cell_inspection.R"), local = TRUE)
 
   deferred_viewer_server_files <- c(
     spatial = "spatial/server.R",

@@ -9,67 +9,20 @@
 ##----------------------------------------------------------------------------##
 
 if (!exists("hla_detect_chains", inherits = TRUE)) {
+  source(cerebro_root_path("viewer/hla_tcr_motifs/core_shim.R"), local = TRUE)
+}
+for (module_file in c(
+  "data.R",
+  "settings.R",
+  "visualizations.R",
+  "network_table.R",
+  "data_qc.R",
+  "associations.R",
+  "help.R",
+  "help_guide.R"
+)) {
   source(
-    paste0(
-      Cerebro.options[["cerebro_root"]],
-      "/viewer/hla_tcr_motifs/core_shim.R"
-    ),
+    cerebro_root_path("viewer", "hla_tcr_motifs", module_file),
     local = TRUE
   )
 }
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/data.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/settings.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/visualizations.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/network_table.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/data_qc.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/associations.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/help.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/hla_tcr_motifs/help_guide.R"
-  ),
-  local = TRUE
-)

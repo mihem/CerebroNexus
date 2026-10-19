@@ -440,80 +440,21 @@ ir_bindCache <- function(x, ..., cache = "session") {
   )
 }
 
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/param_spec.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/data.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/settings.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/tabs.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/help_demo_helpers.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/help.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/help_guide.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/paired_scatter_helpers.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/length_helpers.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/compare_helpers.R"
-  ),
-  local = TRUE
-)
-source(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/immune_repertoire/visualizations.R"
-  ),
-  local = TRUE
-)
+for (module_file in c(
+  "param_spec.R",
+  "data.R",
+  "settings.R",
+  "tabs.R",
+  "help_demo_helpers.R",
+  "help.R",
+  "help_guide.R",
+  "paired_scatter_helpers.R",
+  "length_helpers.R",
+  "compare_helpers.R",
+  "visualizations.R"
+)) {
+  source(
+    cerebro_root_path("viewer", "immune_repertoire", module_file),
+    local = TRUE
+  )
+}

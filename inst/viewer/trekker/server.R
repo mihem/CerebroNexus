@@ -11,10 +11,7 @@
 ## Pure helpers (trekker_gene_suggest, trekker_numeric_meta_cols) live in a
 ## side-effect-free file so they can be unit-tested; source it here so the
 ## bare-name calls below resolve at runtime (packaged or via runApp('inst')).
-source(
-  paste0(Cerebro.options[["cerebro_root"]], "/viewer/trekker/helpers.R"),
-  local = TRUE
-)
+source(cerebro_root_path("viewer/trekker/helpers.R"), local = TRUE)
 
 trekker_slot <- reactive({
   req(data_set())
