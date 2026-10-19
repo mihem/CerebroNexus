@@ -83,6 +83,26 @@ hla_guide_seq <- function(seq, y, x0 = 118, dx = 15, hl = integer(0)) {
   )
 }
 
+## One filled circle. Default: a graph node styled by .hg-node. `swatch = TRUE`
+## is the smaller key dot in a table row, outlined inline instead.
+hla_guide_dot <- function(cx, cy, r, fill, swatch = FALSE) {
+  paste0(
+    "<circle ",
+    if (!swatch) "class='hg-node' ",
+    "cx='",
+    cx,
+    "' cy='",
+    cy,
+    "' r='",
+    r,
+    "' ",
+    if (swatch) "stroke='#333' stroke-width='0.8' ",
+    "fill='",
+    fill,
+    "'/>"
+  )
+}
+
 hla_guide_svg_defs <- paste0(
   "<defs><marker id='hgarrow' markerWidth='8' markerHeight='8' refX='6' ",
   "refY='3' orient='auto'><path d='M0,0 L6,3 L0,6 Z' fill='#c2410c'/>",
@@ -183,30 +203,16 @@ hla_guide_svg_network <- hla_guide_svg(paste0(
   "<line class='hg-edge' x1='215' y1='120' x2='275' y2='90'/>",
   "<line class='hg-edge' x1='275' y1='90' x2='330' y2='120'/>",
   # hub (big = many cells) + leaves
-  "<circle class='hg-node' cx='150' cy='120' r='16' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='95' cy='75' r='6' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='95' cy='165' r='6' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='150' cy='55' r='6' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='215' cy='120' r='8' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='275' cy='90' r='7' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
-  "<circle class='hg-node' cx='330' cy='120' r='7' fill='",
-  HLA_GUIDE_NEUTRAL,
-  "'/>",
+  hla_guide_dot(150, 120, 16, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(95, 75, 6, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(95, 165, 6, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(150, 55, 6, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(215, 120, 8, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(275, 90, 7, HLA_GUIDE_NEUTRAL),
+  hla_guide_dot(330, 120, 7, HLA_GUIDE_NEUTRAL),
   # Isolated node, filtered out. Parked top-right: at bottom-right it collided
   # with the "3 mismatches from the hub" annotation.
-  "<circle class='hg-node' cx='418' cy='58' r='5' fill='#cfcfcf'/>",
+  hla_guide_dot(418, 58, 5, "#cfcfcf"),
   "<text class='hg-sub' x='372' y='80'>filtered out</text>",
   # annotations
   "<path class='hg-arrow' d='M150,190 L150,140'/>",
@@ -231,13 +237,9 @@ hla_guide_svg_scope <- hla_guide_svg(
   paste0(
     "<text class='hg-lbl' x='14' y='18'>Scope decides which cells build the graph</text>",
     # Key: what the two colours mean, before either panel uses them.
-    "<circle class='hg-node' cx='22' cy='40' r='7' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(22, 40, 7, HLA_GUIDE_CARRIER),
     "<text class='hg-sub' x='36' y='44'>CDR3 from a donor who CARRIES HLA-A*02:01</text>",
-    "<circle class='hg-node' cx='22' cy='62' r='7' fill='",
-    HLA_GUIDE_NONCARRIER,
-    "'/>",
+    hla_guide_dot(22, 62, 7, HLA_GUIDE_NONCARRIER),
     "<text class='hg-sub' x='36' y='66'>CDR3 from a donor who does NOT carry it</text>",
     "<line x1='14' y1='80' x2='446' y2='80' stroke='#ececec'/>",
     # divider between the two panels
@@ -247,18 +249,10 @@ hla_guide_svg_scope <- hla_guide_svg(
     "<line class='hg-edge' x1='62' y1='138' x2='118' y2='164'/>",
     "<line class='hg-edge' x1='118' y1='164' x2='78' y2='204'/>",
     "<line class='hg-edge' x1='118' y1='164' x2='168' y2='200'/>",
-    "<circle class='hg-node' cx='62' cy='138' r='8' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
-    "<circle class='hg-node' cx='118' cy='164' r='8' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
-    "<circle class='hg-node' cx='78' cy='204' r='8' fill='",
-    HLA_GUIDE_NONCARRIER,
-    "'/>",
-    "<circle class='hg-node' cx='168' cy='200' r='8' fill='",
-    HLA_GUIDE_NONCARRIER,
-    "'/>",
+    hla_guide_dot(62, 138, 8, HLA_GUIDE_CARRIER),
+    hla_guide_dot(118, 164, 8, HLA_GUIDE_CARRIER),
+    hla_guide_dot(78, 204, 8, HLA_GUIDE_NONCARRIER),
+    hla_guide_dot(168, 200, 8, HLA_GUIDE_NONCARRIER),
     # Point at the midpoint of the red(118,164)-blue(78,204) edge.
     "<path class='hg-arrow' d='M62,252 L94,188'/>",
     "<text class='hg-ann' x='14' y='268'>this edge joins a carrier</text>",
@@ -266,12 +260,8 @@ hla_guide_svg_scope <- hla_guide_svg(
     # ---- right: rebuilt on the allele's carriers ----
     "<text class='hg-lbl' x='250' y='108'>Scoped to HLA-A*02:01</text>",
     "<line class='hg-edge' x1='292' y1='138' x2='348' y2='164'/>",
-    "<circle class='hg-node' cx='292' cy='138' r='8' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
-    "<circle class='hg-node' cx='348' cy='164' r='8' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(292, 138, 8, HLA_GUIDE_CARRIER),
+    hla_guide_dot(348, 164, 8, HLA_GUIDE_CARRIER),
     # Cut line ABOVE the ghosts: what is kept stays above it, what the scope
     # removed sits below. With the line under them it read as if the ghosts had
     # survived and something else was cut.
@@ -326,17 +316,13 @@ hla_guide_svg_worked <- hla_guide_svg(
     "<text class='hg-lbl' x='14' y='202'>Carrier axis (HLA-A*02:01)</text>",
     "<text class='hg-sub' x='14' y='220'>looks at the DONORS: 03 and 07.</text>",
     "<text class='hg-sub' x='14' y='236'>Both carry it, none lacks it.</text>",
-    "<circle class='hg-node' cx='24' cy='262' r='9' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(24, 262, 9, HLA_GUIDE_CARRIER),
     "<text class='hg-ann' x='40' y='266'>&#8594; Carrier</text>",
     # right verdict: context axis
     "<text class='hg-lbl' x='250' y='202'>MHC context axis (lineage)</text>",
     "<text class='hg-sub' x='250' y='220'>looks at the CELLS: CD8, CD4, CD8.</text>",
     "<text class='hg-sub' x='250' y='236'>Class I and Class II both present.</text>",
-    "<circle class='hg-node' cx='260' cy='262' r='9' fill='",
-    HLA_GUIDE_MIXED,
-    "'/>",
+    hla_guide_dot(260, 262, 9, HLA_GUIDE_MIXED),
     "<text class='hg-ann' x='276' y='266'>&#8594; Mixed</text>",
     "<line x1='14' y1='282' x2='446' y2='282' stroke='#ececec'/>",
     "<text class='hg-ann' x='14' y='302'>The SAME node: Carrier on one axis, Mixed on the other.</text>"
@@ -357,22 +343,14 @@ hla_guide_svg_colour <- hla_guide_svg(
     # left: carrier axis
     "<text class='hg-lbl' x='14' y='20'>Carrier status of ONE allele</text>",
     "<text class='hg-sub' x='14' y='36'>asks about the DONOR\'s genotype</text>",
-    "<circle class='hg-node' cx='30' cy='62' r='9' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(30, 62, 9, HLA_GUIDE_CARRIER),
     "<text class='hg-sub' x='48' y='66'>seen only in carriers</text>",
-    "<circle class='hg-node' cx='30' cy='92' r='9' fill='",
-    HLA_GUIDE_NONCARRIER,
-    "'/>",
+    hla_guide_dot(30, 92, 9, HLA_GUIDE_NONCARRIER),
     "<text class='hg-sub' x='48' y='96'>seen only in non-carriers</text>",
-    "<circle class='hg-node' cx='30' cy='122' r='9' fill='",
-    HLA_GUIDE_MIXED,
-    "'/>",
+    hla_guide_dot(30, 122, 9, HLA_GUIDE_MIXED),
     "<text class='hg-sub' x='48' y='126'>seen in BOTH</text>",
     "<text class='hg-ann' x='48' y='140'>= &quot;Mixed&quot;</text>",
-    "<circle class='hg-node' cx='30' cy='162' r='9' fill='",
-    HLA_GUIDE_UNTYPED,
-    "'/>",
+    hla_guide_dot(30, 162, 9, HLA_GUIDE_UNTYPED),
     "<text class='hg-sub' x='48' y='166'>no carrying donor was typed</text>",
     "<text class='hg-sub' x='48' y='180'>= &quot;Untyped&quot;</text>",
     # divider
@@ -380,22 +358,14 @@ hla_guide_svg_colour <- hla_guide_svg(
     # right: MHC context axis
     "<text class='hg-lbl' x='250' y='20'>MHC context (lineage)</text>",
     "<text class='hg-sub' x='250' y='36'>asks about the CELL\'s lineage</text>",
-    "<circle class='hg-node' cx='266' cy='62' r='9' fill='",
-    HLA_GUIDE_CLASS_I,
-    "'/>",
+    hla_guide_dot(266, 62, 9, HLA_GUIDE_CLASS_I),
     "<text class='hg-sub' x='284' y='66'>CD8 cells only &#8594; Class I</text>",
-    "<circle class='hg-node' cx='266' cy='92' r='9' fill='",
-    HLA_GUIDE_CLASS_II,
-    "'/>",
+    hla_guide_dot(266, 92, 9, HLA_GUIDE_CLASS_II),
     "<text class='hg-sub' x='284' y='96'>CD4 / Treg only &#8594; Class II</text>",
-    "<circle class='hg-node' cx='266' cy='122' r='9' fill='",
-    HLA_GUIDE_CTX_MIXED,
-    "'/>",
+    hla_guide_dot(266, 122, 9, HLA_GUIDE_CTX_MIXED),
     "<text class='hg-sub' x='284' y='126'>cells of BOTH lineages</text>",
     "<text class='hg-ann' x='284' y='140'>= &quot;Mixed&quot; too</text>",
-    "<circle class='hg-node' cx='266' cy='162' r='9' fill='",
-    HLA_GUIDE_UNTYPED,
-    "'/>",
+    hla_guide_dot(266, 162, 9, HLA_GUIDE_UNTYPED),
     "<text class='hg-sub' x='284' y='166'>lineage not CD4/CD8</text>",
     "<text class='hg-sub' x='284' y='180'>= &quot;Unknown&quot;</text>",
     # The crosstalk warning. Three short lines, not one long one: at 11px a
@@ -423,21 +393,13 @@ hla_guide_svg_shared <- hla_guide_svg(
   paste0(
     "<text class='hg-lbl' x='14' y='18'>Sample origin: only BLACK has a fixed meaning</text>",
     # key: the arbitrary sample hues
-    "<circle class='hg-node' cx='26' cy='44' r='7' fill='",
-    HLA_GUIDE_SAMPLE[1],
-    "'/>",
-    "<circle class='hg-node' cx='48' cy='44' r='7' fill='",
-    HLA_GUIDE_SAMPLE[2],
-    "'/>",
-    "<circle class='hg-node' cx='70' cy='44' r='7' fill='",
-    HLA_GUIDE_SAMPLE[3],
-    "'/>",
+    hla_guide_dot(26, 44, 7, HLA_GUIDE_SAMPLE[1]),
+    hla_guide_dot(48, 44, 7, HLA_GUIDE_SAMPLE[2]),
+    hla_guide_dot(70, 44, 7, HLA_GUIDE_SAMPLE[3]),
     "<text class='hg-sub' x='90' y='41'>one hue per sample, assigned per data set.</text>",
     "<text class='hg-sub' x='90' y='55'>Arbitrary: no order, no meaning, not comparable across data sets.</text>",
     # key: the one fixed level
-    "<circle class='hg-node' cx='26' cy='84' r='9' fill='",
-    HLA_GUIDE_SHARED,
-    "'/>",
+    hla_guide_dot(26, 84, 9, HLA_GUIDE_SHARED),
     "<text class='hg-ann' x='90' y='81'>the IDENTICAL CDR3 seen in &#8805;2 samples</text>",
     "<text class='hg-sub' x='90' y='95'>= &quot;Shared&quot; &#8212; a public clonotype</text>",
     "<line x1='14' y1='112' x2='446' y2='112' stroke='#ececec'/>",
@@ -446,21 +408,11 @@ hla_guide_svg_shared <- hla_guide_svg(
     "<line class='hg-edge' x1='150' y1='172' x2='212' y2='142'/>",
     "<line class='hg-edge' x1='150' y1='172' x2='150' y2='222'/>",
     "<line class='hg-edge' x1='212' y1='142' x2='262' y2='186'/>",
-    "<circle class='hg-node' cx='96' cy='142' r='7' fill='",
-    HLA_GUIDE_SAMPLE[1],
-    "'/>",
-    "<circle class='hg-node' cx='212' cy='142' r='7' fill='",
-    HLA_GUIDE_SAMPLE[2],
-    "'/>",
-    "<circle class='hg-node' cx='150' cy='222' r='7' fill='",
-    HLA_GUIDE_SAMPLE[3],
-    "'/>",
-    "<circle class='hg-node' cx='262' cy='186' r='7' fill='",
-    HLA_GUIDE_SAMPLE[1],
-    "'/>",
-    "<circle class='hg-node' cx='150' cy='172' r='13' fill='",
-    HLA_GUIDE_SHARED,
-    "'/>",
+    hla_guide_dot(96, 142, 7, HLA_GUIDE_SAMPLE[1]),
+    hla_guide_dot(212, 142, 7, HLA_GUIDE_SAMPLE[2]),
+    hla_guide_dot(150, 222, 7, HLA_GUIDE_SAMPLE[3]),
+    hla_guide_dot(262, 186, 7, HLA_GUIDE_SAMPLE[1]),
+    hla_guide_dot(150, 172, 13, HLA_GUIDE_SHARED),
     "<text class='hg-ann' x='300' y='140'>identical CDR3 found</text>",
     "<text class='hg-ann' x='300' y='154'>across &#8805;2 samples</text>",
     "<path class='hg-arrow' d='M296,164 L170,174'/>",
@@ -496,15 +448,9 @@ hla_guide_svg_assoc <- hla_guide_svg(
     # the locked feature
     "<line class='hg-edge' x1='62' y1='72' x2='104' y2='58'/>",
     "<line class='hg-edge' x1='62' y1='72' x2='104' y2='92'/>",
-    "<circle class='hg-node' cx='62' cy='72' r='9' fill='",
-    HLA_GUIDE_NEUTRAL,
-    "'/>",
-    "<circle class='hg-node' cx='104' cy='58' r='6' fill='",
-    HLA_GUIDE_NEUTRAL,
-    "'/>",
-    "<circle class='hg-node' cx='104' cy='92' r='6' fill='",
-    HLA_GUIDE_NEUTRAL,
-    "'/>",
+    hla_guide_dot(62, 72, 9, HLA_GUIDE_NEUTRAL),
+    hla_guide_dot(104, 58, 6, HLA_GUIDE_NEUTRAL),
+    hla_guide_dot(104, 92, 6, HLA_GUIDE_NEUTRAL),
     "<rect x='40' y='40' width='88' height='66' fill='none' ",
     "stroke='#c2410c' stroke-dasharray='4 3' rx='4'/>",
     "<text class='hg-ann' x='40' y='124'>locked motif</text>",
@@ -526,25 +472,19 @@ hla_guide_svg_assoc <- hla_guide_svg(
     # receptor belongs to a carrier. The dots below are the exact carrier hues
     # the live network uses, on the rows the table actually splits donors into.
     "<rect x='192' y='62' width='256' height='22' fill='#fff' stroke='#ddd'/>",
-    "<circle cx='202' cy='73' r='4' stroke='#333' stroke-width='0.8' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(202, 73, 4, HLA_GUIDE_CARRIER, swatch = TRUE),
     "<text class='hg-sub' x='214' y='77'>carrier</text>",
     "<text class='hg-sub' x='300' y='77'>15</text>",
     "<text class='hg-sub' x='346' y='77'>11</text>",
     "<text class='hg-sub' text-anchor='end' x='442' y='77'>73%</text>",
     "<rect x='192' y='84' width='256' height='22' fill='#fff' stroke='#ddd'/>",
-    "<circle cx='202' cy='95' r='4' stroke='#333' stroke-width='0.8' fill='",
-    HLA_GUIDE_NONCARRIER,
-    "'/>",
+    hla_guide_dot(202, 95, 4, HLA_GUIDE_NONCARRIER, swatch = TRUE),
     "<text class='hg-sub' x='214' y='99'>non-carrier</text>",
     "<text class='hg-sub' x='300' y='99'>15</text>",
     "<text class='hg-sub' x='348' y='99'>3</text>",
     "<text class='hg-sub' text-anchor='end' x='442' y='99'>20%</text>",
     "<rect x='192' y='106' width='256' height='22' fill='#fff' stroke='#ddd'/>",
-    "<circle cx='202' cy='117' r='4' stroke='#333' stroke-width='0.8' fill='",
-    HLA_GUIDE_UNTYPED,
-    "'/>",
+    hla_guide_dot(202, 117, 4, HLA_GUIDE_UNTYPED, swatch = TRUE),
     "<text class='hg-sub' x='214' y='121'>untyped</text>",
     "<text class='hg-sub' x='300' y='121'>0</text>",
     "<text class='hg-sub' x='346' y='121'>&#8212;</text>",
@@ -632,9 +572,7 @@ hla_guide_svg_limits <- hla_guide_svg(
     "<text class='hg-aa' x='130' y='116' style='text-anchor:start'>C*07:02</text>",
     "<text class='hg-warn' x='26' y='138'>six alleles, all class I</text>",
     "<path class='hg-arrow' d='M198,90 L240,90'/>",
-    "<circle class='hg-node' cx='276' cy='90' r='14' fill='",
-    HLA_GUIDE_CARRIER,
-    "'/>",
+    hla_guide_dot(276, 90, 14, HLA_GUIDE_CARRIER),
     "<text class='hg-sub' x='300' y='78'>this CD8 cell\'s TCR is</text>",
     "<text class='hg-sub' x='300' y='92'>restricted by ONE of them</text>",
     "<text class='hg-warn' x='300' y='110'>&#8212; unknown which</text>",
@@ -1341,38 +1279,27 @@ hla_guide_content <- list(
 )
 
 hla_guide_tab_content <- function(tab) {
+  # Only ever called with a name from HLA_GUIDE_TABS, and every entry of
+  # hla_guide_content defines all four parts.
   spec <- hla_guide_content[[tab]]
-  if (is.null(spec)) {
-    return(NULL)
-  }
   tagList(
-    if (!is.null(spec$svg)) {
-      div(
-        style = paste0(
-          "background:#fafafa;border:1px solid #ececec;border-radius:8px;",
-          "padding:12px;margin-bottom:14px;"
-        ),
-        spec$svg
-      )
-    },
-    if (!is.null(spec$summary)) {
-      tags$p(style = "font-weight:600;font-size:14px;", spec$summary)
-    },
+    div(
+      style = paste0(
+        "background:#fafafa;border:1px solid #ececec;border-radius:8px;",
+        "padding:12px;margin-bottom:14px;"
+      ),
+      spec$svg
+    ),
+    tags$p(style = "font-weight:600;font-size:14px;", spec$summary),
     # `detail` is structured markup (headings / paragraphs / callouts), not a
     # pre-line string, so it must NOT be wrapped in white-space:pre-line.
-    if (!is.null(spec$detail)) {
-      div(style = "margin-bottom:12px;", spec$detail)
-    },
-    if (!is.null(spec$elements)) {
-      tagList(
-        tags$hr(),
-        tags$p(
-          style = "font-weight:600;font-size:13px;margin-bottom:4px;",
-          "How to read it"
-        ),
-        spec$elements
-      )
-    }
+    div(style = "margin-bottom:12px;", spec$detail),
+    tags$hr(),
+    tags$p(
+      style = "font-weight:600;font-size:13px;margin-bottom:4px;",
+      "How to read it"
+    ),
+    spec$elements
   )
 }
 
