@@ -31,15 +31,10 @@ test_that("Groups reads only the active columns after its viewport gate", {
         plotly::plot_ly(x = table[[1]], y = table[[2]], type = "bar")
       }
       available_crb_files <- list(selected = "tiny")
-      viewer_server_load(
-        viewer_server_statements("groups", "expression_metrics.R"),
-        scope,
-        names = c(
-          "groupsMetricData",
-          "output$groups_nUMI_plot",
-          "output$groups_nGene_plot"
-        )
-      )
+      cerebroRegisterInfo <- function(...) NULL
+      ## The metric outputs are created in a loop, which viewer_server_load()
+      ## skips, so source the whole file.
+      sys.source(viewer_test_path("groups", "expression_metrics.R"), scope)
     },
     {
       session$setInputs(

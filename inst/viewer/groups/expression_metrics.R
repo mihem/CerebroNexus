@@ -14,19 +14,27 @@ groupsMetricData <- function(group, metric) {
 groups_metric_specs <- list(
   nUMI = list(
     title = "Number of transcripts",
-    output = "groups_nUMI_plot"
+    output = "groups_nUMI_plot",
+    y_title = "Number of transcripts",
+    mode = "integer"
   ),
   nGene = list(
     title = "Number of expressed genes",
-    output = "groups_nGene_plot"
+    output = "groups_nGene_plot",
+    y_title = "Number of expressed genes",
+    mode = "integer"
   ),
   percent_mt = list(
     title = "Mitochondrial gene expression",
-    output = "groups_percent_mt_plot"
+    output = "groups_percent_mt_plot",
+    y_title = "Percentage of transcripts",
+    mode = "percent"
   ),
   percent_ribo = list(
     title = "Ribosomal gene expression",
-    output = "groups_percent_ribo_plot"
+    output = "groups_percent_ribo_plot",
+    y_title = "Percentage of transcripts",
+    mode = "percent"
   )
 )
 
@@ -57,105 +65,34 @@ output[["groups_expression_metrics_UI"]] <- renderUI({
   content
 })
 
-output[["groups_nUMI_plot"]] <- plotly::renderPlotly({
-  req(
-    input[["groups_expression_metrics_render_request"]],
-    identical(
-      input[["groups_expression_metrics_tabs"]],
-      "Number of transcripts"
-    ),
-    input[["groups_selected_group"]] %in% getGroups()
-  )
-  plotlyViolin(
-    table = groupsMetricData(input[["groups_selected_group"]], "nUMI"),
-    metric = "nUMI",
-    coloring_variable = input[["groups_selected_group"]],
-    colors = reactive_group_colors(input[["groups_selected_group"]]),
-    y_title = "Number of transcripts",
-    mode = "integer"
-  )
-}) %>%
-  cachePlot(
-    input[["groups_selected_group"]],
-    "nUMI",
-    reactive_group_colors(input[["groups_selected_group"]]),
-    available_crb_files$selected
-  )
-
-output[["groups_nGene_plot"]] <- plotly::renderPlotly({
-  req(
-    input[["groups_expression_metrics_render_request"]],
-    identical(
-      input[["groups_expression_metrics_tabs"]],
-      "Number of expressed genes"
-    ),
-    input[["groups_selected_group"]] %in% getGroups()
-  )
-  plotlyViolin(
-    table = groupsMetricData(input[["groups_selected_group"]], "nGene"),
-    metric = "nGene",
-    coloring_variable = input[["groups_selected_group"]],
-    colors = reactive_group_colors(input[["groups_selected_group"]]),
-    y_title = "Number of expressed genes",
-    mode = "integer"
-  )
-}) %>%
-  cachePlot(
-    input[["groups_selected_group"]],
-    "nGene",
-    reactive_group_colors(input[["groups_selected_group"]]),
-    available_crb_files$selected
-  )
-
-output[["groups_percent_mt_plot"]] <- plotly::renderPlotly({
-  req(
-    input[["groups_expression_metrics_render_request"]],
-    identical(
-      input[["groups_expression_metrics_tabs"]],
-      "Mitochondrial gene expression"
-    ),
-    input[["groups_selected_group"]] %in% getGroups()
-  )
-  plotlyViolin(
-    table = groupsMetricData(input[["groups_selected_group"]], "percent_mt"),
-    metric = "percent_mt",
-    coloring_variable = input[["groups_selected_group"]],
-    colors = reactive_group_colors(input[["groups_selected_group"]]),
-    y_title = "Percentage of transcripts",
-    mode = "percent"
-  )
-}) %>%
-  cachePlot(
-    input[["groups_selected_group"]],
-    "percent_mt",
-    reactive_group_colors(input[["groups_selected_group"]]),
-    available_crb_files$selected
-  )
-
-output[["groups_percent_ribo_plot"]] <- plotly::renderPlotly({
-  req(
-    input[["groups_expression_metrics_render_request"]],
-    identical(
-      input[["groups_expression_metrics_tabs"]],
-      "Ribosomal gene expression"
-    ),
-    input[["groups_selected_group"]] %in% getGroups()
-  )
-  plotlyViolin(
-    table = groupsMetricData(input[["groups_selected_group"]], "percent_ribo"),
-    metric = "percent_ribo",
-    coloring_variable = input[["groups_selected_group"]],
-    colors = reactive_group_colors(input[["groups_selected_group"]]),
-    y_title = "Percentage of transcripts",
-    mode = "percent"
-  )
-}) %>%
-  cachePlot(
-    input[["groups_selected_group"]],
-    "percent_ribo",
-    reactive_group_colors(input[["groups_selected_group"]]),
-    available_crb_files$selected
-  )
+## One violin plot per metric; each renders only while its tab is shown.
+for (metric in names(groups_metric_specs)) {
+  local({
+    metric <- metric
+    spec <- groups_metric_specs[[metric]]
+    output[[spec$output]] <- plotly::renderPlotly({
+      req(
+        input[["groups_expression_metrics_render_request"]],
+        identical(input[["groups_expression_metrics_tabs"]], spec$title),
+        input[["groups_selected_group"]] %in% getGroups()
+      )
+      plotlyViolin(
+        table = groupsMetricData(input[["groups_selected_group"]], metric),
+        metric = metric,
+        coloring_variable = input[["groups_selected_group"]],
+        colors = reactive_group_colors(input[["groups_selected_group"]]),
+        y_title = spec$y_title,
+        mode = spec$mode
+      )
+    }) %>%
+      cachePlot(
+        input[["groups_selected_group"]],
+        metric,
+        reactive_group_colors(input[["groups_selected_group"]]),
+        available_crb_files$selected
+      )
+  })
+}
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.
