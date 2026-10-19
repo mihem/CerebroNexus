@@ -15,31 +15,7 @@ output[["trajectory_selected_cells_table_UI"]] <- renderUI({
     trajectory_projection_selected_cells()
   )
 
-  fluidRow(
-    cerebroBox(
-      title = tagList(
-        boxTitle("Table of selected cells"),
-        cerebroInfoButton("trajectory_details_selected_cells_table_info")
-      ),
-      tagList(
-        shinyWidgets::materialSwitch(
-          inputId = "trajectory_details_selected_cells_table_number_formatting",
-          label = "Automatically format numbers:",
-          value = TRUE,
-          status = "primary",
-          inline = TRUE
-        ),
-        shinyWidgets::materialSwitch(
-          inputId = "trajectory_details_selected_cells_table_color_highlighting",
-          label = "Highlight values with colours:",
-          value = TRUE,
-          status = "primary",
-          inline = TRUE
-        ),
-        DT::dataTableOutput("trajectory_details_selected_cells_table")
-      )
-    )
-  )
+  cerebroSelectedCellsTableUI("trajectory")
 })
 
 ##----------------------------------------------------------------------------##
@@ -51,66 +27,29 @@ output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
   ## lazily and must not prevent a selected-cell table from rendering.
   req(trajectory_selection_ok())
 
-  ## get info of selected cells and create identifier from X-Y coordinates
   selected_cells <- trajectory_projection_selected_cells()
-
-  ## extract cells for table
   cells_df <- trajectory_cells_reactive(
     colnames(viewerProjectionFirstFrameMetadata()),
     barcodes = TRUE
   )
 
-  ## Filter by stable cell identity; the shared projection keeps barcode-backed
-  ## selections across recolouring and trace rebuilds. Coordinates remain the
-  ## fallback for older Plotly event payloads without customdata.
-  stable_selection <- "selection_key" %in%
-    colnames(selected_cells) &&
-    any(
-      !is.na(selected_cells[["selection_key"]]) &
-        nzchar(as.character(selected_cells[["selection_key"]]))
-    )
-  identifier <- if (!stable_selection) {
-    paste0(cells_df[["DR_1"]], "-", cells_df[["DR_2"]])
-  } else {
-    NULL
-  }
-  cells_df <- cells_df[
-    selectedCellMask(
-      cells_df[["cell_barcode"]],
-      identifier,
-      selected_cells
-    ),
-    ,
-    drop = FALSE
-  ] %>%
-    dplyr::select(cell_barcode, everything())
-
-  ## check how many cells are left after filtering
-  ## ... no cells are left
-  if (nrow(cells_df) == 0) {
-    ## prepare empty table
-    getMetaData() %>%
-      dplyr::slice(0) %>%
-      prepareEmptyTable()
-
-    ## ... at least 1 cell is left
-  } else {
-    ## prepare proper table
-    prettifyTable(
-      cells_df,
-      filter = list(position = "top", clear = TRUE),
-      dom = "Brtlip",
-      show_buttons = TRUE,
-      number_formatting = input[[
-        "trajectory_details_selected_cells_table_number_formatting"
-      ]],
-      color_highlighting = input[[
-        "trajectory_details_selected_cells_table_color_highlighting"
-      ]],
-      hide_long_columns = TRUE,
-      download_file_name = "trajectory_details_of_selected_cells"
-    )
-  }
+  ## The shared table expects the coordinates as its first two columns and
+  ## drops them from the output; the trajectory's own DR_1/DR_2 stay in place.
+  ## Selections match by barcode, falling back to "DR_1-DR_2" coordinates for
+  ## older Plotly event payloads without a stable selection_key.
+  cerebroSelectedCellsTable(
+    cells_df = cbind(cells_df[, c("DR_1", "DR_2"), drop = FALSE], cells_df),
+    empty_data = getMetaData(),
+    selection = selected_cells,
+    fallback_key = "identifier",
+    number_formatting = input[[
+      "trajectory_details_selected_cells_table_number_formatting"
+    ]],
+    color_highlighting = input[[
+      "trajectory_details_selected_cells_table_color_highlighting"
+    ]],
+    download_file_name = "trajectory_details_of_selected_cells"
+  )
 })
 
 ##----------------------------------------------------------------------------##
