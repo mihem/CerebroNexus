@@ -488,9 +488,6 @@ exportFromSCE <- function(
     length(projections_available) == 1 &&
       length(projections_available_pca) == 1
   ) {
-    SingleCellExperiment::reducedDims(export$expression)[[
-      projections_available
-    ]] <- SingleCellExperiment::reducedDims(object)[[projections_available]]
     export$addProjection(
       projections_available,
       as.data.frame(
