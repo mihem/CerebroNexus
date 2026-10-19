@@ -7,21 +7,21 @@ run_dataset_context_node <- function(body) {
     info = "dataset-context.js not found"
   )
   run_node_script(c(
-      "const fs = require('fs');",
-      "const events = []; const handlers = {}; const inputs = [];",
-      "global.window = global;",
-      "global.document = {addEventListener: () => {}};",
-      "global.CustomEvent = function(type, options) {",
-      "  this.type = type; this.detail = options && options.detail;",
-      "};",
-      "window.dispatchEvent = event => { events.push(event); return true; };",
-      "window.setTimeout = () => 0;",
-      "global.Shiny = window.Shiny = {",
-      "  addCustomMessageHandler: (name, handler) => { handlers[name] = handler; },",
-      "  setInputValue: (name, value) => { inputs.push({name:name,value:value}); }",
-      "};",
-      js_eval_file(dataset_context_javascript),
-      body
+    "const fs = require('fs');",
+    "const events = []; const handlers = {}; const inputs = [];",
+    "global.window = global;",
+    "global.document = {addEventListener: () => {}};",
+    "global.CustomEvent = function(type, options) {",
+    "  this.type = type; this.detail = options && options.detail;",
+    "};",
+    "window.dispatchEvent = event => { events.push(event); return true; };",
+    "window.setTimeout = () => 0;",
+    "global.Shiny = window.Shiny = {",
+    "  addCustomMessageHandler: (name, handler) => { handlers[name] = handler; },",
+    "  setInputValue: (name, value) => { inputs.push({name:name,value:value}); }",
+    "};",
+    js_eval_file(dataset_context_javascript),
+    body
   ))
 }
 

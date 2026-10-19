@@ -4,10 +4,10 @@ run_state_node <- function(body) {
   skip_if_no_node()
   expect_true(file.exists(state_file), info = "cell_views_state.js not found")
   run_node_script(c(
-      "const fs = require('fs');",
-      "global.window = {};",
-      js_eval_file(state_file),
-      body
+    "const fs = require('fs');",
+    "global.window = {};",
+    js_eval_file(state_file),
+    body
   ))
 }
 

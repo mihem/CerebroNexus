@@ -2,10 +2,10 @@ viewer_dir <- viewer_test_path()
 
 run_geom_node <- function(body) {
   run_node_script(c(
-      "const fs = require('fs');",
-      "global.window = {};",
-      js_eval_file(file.path(viewer_dir, "www", "cv-geom.js")),
-      body
+    "const fs = require('fs');",
+    "global.window = {};",
+    js_eval_file(file.path(viewer_dir, "www", "cv-geom.js")),
+    body
   ))
 }
 

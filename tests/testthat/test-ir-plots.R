@@ -63,16 +63,7 @@ expect_nonempty_ggplot <- function(p, label) {
 }
 
 # Source the (reactive-free) length helper so its pure plot builder is testable.
-length_helpers <- file.path(
-  local_inst,
-  "viewer/immune_repertoire/length_helpers.R"
-)
-if (is.na(local_inst)) {
-  length_helpers <- system.file(
-    "viewer/immune_repertoire/length_helpers.R",
-    package = "CerebroNexus"
-  )
-}
+length_helpers <- viewer_test_path("immune_repertoire", "length_helpers.R")
 
 test_that("ir_length_facet_plot draws one panel per group", {
   skip_if_not(file.exists(example_crb))
@@ -322,13 +313,8 @@ test_that("gene-usage and CDR3 plots render on example.crb", {
 
 test_that("BCR isotype/SHM helpers produce a plot for the bundled BCR data", {
   skip_if_not(file.exists(example_crb))
-  shiny_root <- if (!is.na(local_inst)) {
-    file.path(local_inst, "viewer")
-  } else {
-    system.file("viewer", package = "CerebroNexus")
-  }
   # source the BCR helpers in an environment with the needed deps
-  helper_src <- file.path(shiny_root, "immune_repertoire", "server.R")
+  helper_src <- viewer_test_path("immune_repertoire", "server.R")
   skip_if_not(file.exists(helper_src))
   # bcr_isotype_plot / bcr_shm_proxy_plot are defined inside server(); verify the
   # bundled data has the BCR columns those helpers require.
@@ -340,7 +326,7 @@ test_that("BCR isotype/SHM helpers produce a plot for the bundled BCR data", {
 })
 
 test_that("BCR isotype extraction preserves sample names from the IR list", {
-  server_file <- file.path(local_inst, "viewer/immune_repertoire/server.R")
+  server_file <- viewer_test_path("immune_repertoire", "server.R")
   skip_if_not(file.exists(server_file))
   definition <- viewer_r_assignment(server_file, "bcr_extract_isotype")
   env <- new.env(parent = globalenv())
