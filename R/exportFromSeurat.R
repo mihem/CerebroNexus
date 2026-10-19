@@ -59,7 +59,12 @@
     BPCells::write_matrix_dir(matrix, dir = dir)
     return(BPCells::open_matrix_dir(dir))
   }
-  BPCells::transpose_storage_order(matrix, outdir = dir)
+  transposed <- BPCells::transpose_storage_order(matrix, outdir = dir)
+  ## The transpose leaves file handles inside `dir` open until its internal
+  ## writers are garbage collected. Windows cannot rename a directory that
+  ## holds open files, and the staged sidecar is renamed into place next.
+  invisible(gc(verbose = FALSE))
+  transposed
 }
 
 .validatePortableExportBasename <- function(final_file) {
