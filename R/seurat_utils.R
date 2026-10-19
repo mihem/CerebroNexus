@@ -1155,8 +1155,6 @@
   slot_name %in% methods::slotNames(obj)
 }
 
-`%||%` <- function(a, b) if (is.null(a)) b else a
-
 # Extract spatial coordinates and expression from a Seurat object --------------
 #
 # Multi-strategy extraction supporting Visium, FOV, Xenium, and generic images:
@@ -1554,7 +1552,7 @@
   # 1. Expression matrix ------------------------------------------------------
   if (!is.null(expression_data)) {
     expr_data <- expression_data
-  } else if (exists(".getExpressionMatrix", mode = "function")) {
+  } else {
     expr_data <- .getExpressionMatrix(
       seurat = object,
       assay = assay,
@@ -1562,14 +1560,6 @@
       join_samples = join_samples,
       verbose = verbose
     )
-  } else {
-    seurat_version <- as.character(utils::packageVersion("Seurat"))
-    is_v5 <- utils::compareVersion(seurat_version, "5.0.0") >= 0
-    expr_data <- if (is_v5) {
-      Seurat::GetAssayData(object, assay = assay, layer = slot)
-    } else {
-      Seurat::GetAssayData(object, assay = assay, slot = slot)
-    }
   }
 
   valid_cells <- colnames(expr_data)
