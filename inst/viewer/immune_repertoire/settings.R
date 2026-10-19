@@ -627,8 +627,8 @@ ir_umap_cells_to_show <- reactive({
 })
 
 ## ---- Info dialogs: explain the parameters shown on the current tab ---- ##
-## The top bar and drawer info buttons explain the controls visible on the
-## current tab. Text comes from IR_PARAM_DESC so it cannot drift from the UI.
+## The drawer info buttons explain the controls visible on the current tab.
+## Text comes from IR_PARAM_DESC so it cannot drift from the UI.
 
 ## Render a list of param ids as styled help cards (bold name + plain text).
 ir_param_help_cards <- function(ids) {
@@ -652,13 +652,9 @@ ir_param_help_cards <- function(ids) {
   div(class = "ir-help-cards", do.call(tagList, cards))
 }
 
-## Lookup: input id -> human label (from IR_PARAM_SPEC / display / globals).
+## Lookup: input id -> human label (from IR_PARAM_SPEC / display params).
 IR_PARAM_LABELS <- local({
-  labs <- list(
-    ir_cloneCall = "Clone call",
-    ir_chain = "Chain",
-    ir_groupBy = "Group by"
-  )
+  labs <- list()
   for (tab in names(IR_PARAM_SPEC)) {
     for (p in IR_PARAM_SPEC[[tab]]) {
       labs[[p$id]] <- sub(":\\s*$", "", p$label)
@@ -669,24 +665,6 @@ IR_PARAM_LABELS <- local({
   }
   labs[[IR_ORDER_BY_PARAM$id]] <- sub(":\\s*$", "", IR_ORDER_BY_PARAM$label)
   labs
-})
-
-## Main parameters info: global controls + top-bar analysis params.
-observeEvent(input$ir_main_parameters_info, {
-  tab <- input$ir_tabs
-  spec_ids <- vapply(
-    ir_analysis_spec(tab, more = FALSE),
-    function(p) p$id,
-    character(1)
-  )
-  ids <- c(ir_visible_global_ids(tab), spec_ids)
-  showModal(modalDialog(
-    title = paste0("Main parameters", if (!is.null(tab)) paste0(" — ", tab)),
-    ir_param_help_cards(ids),
-    easyClose = TRUE,
-    footer = modalButton("Close"),
-    size = "l"
-  ))
 })
 
 observeEvent(input$ir_more_analysis_info, {

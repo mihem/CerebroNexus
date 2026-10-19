@@ -18,7 +18,6 @@
 ## ---------------------------------------------------------------------------
 
 ## ---- Global control visibility ----------------------------------------- ##
-IR_GLOBAL_CONTROL_IDS <- c("ir_cloneCall", "ir_chain", "ir_groupBy")
 IR_GLOBAL_CONTROL_HIDDEN <- list(
   # Clonal UMAP colours by clone size and uses its own Receptor selector; the
   # global Clone call is intentionally fixed there so hidden state cannot affect
@@ -34,15 +33,6 @@ ir_global_control_visible <- function(id, tab) {
     hidden <- character(0)
   }
   is.null(tab) || !(tab %in% hidden)
-}
-
-ir_visible_global_ids <- function(tab) {
-  IR_GLOBAL_CONTROL_IDS[vapply(
-    IR_GLOBAL_CONTROL_IDS,
-    ir_global_control_visible,
-    logical(1),
-    tab = tab
-  )]
 }
 
 IR_PARAM_SPEC <- list(
@@ -278,54 +268,22 @@ ir_display_params_for <- function(tab) {
 }
 
 ## ---------------------------------------------------------------------------
-## IR_PARAM_DESC — plain-language help for every control, keyed by input id.
+## IR_PARAM_DESC — plain-language help for the settings-drawer controls,
+## keyed by input id.
 ##
-## Single source of truth for the info dialogs (see ir_param_help_cards in
-## settings.R). Kept central (not per IR_PARAM_SPEC entry) so each param is
-## explained once. Covers the global controls, the per-tab analysis params, and
+## Single source of truth for the drawer info dialogs (see ir_param_help_cards
+## in settings.R): the low-frequency analysis params (IR_MORE_PARAM_IDS) and
 ## the display options. Written for a biologist who is not a scRepertoire user:
 ## say what the control does and how reading the plot changes, not the API.
 ## ---------------------------------------------------------------------------
 IR_PARAM_DESC <- list(
-  ## ---- Global controls ----
-  ir_cloneCall = "How a 'clone' is defined when counting cells. gene = same V(D)J genes; nt = identical CDR3 nucleotide sequence; aa = identical CDR3 amino-acid sequence; strict = same genes AND same CDR3 nucleotides (most specific). Stricter definitions split near-identical cells into separate clones.",
-  ir_chain = "Which receptor chain to analyse. 'All chains' combines them; otherwise restrict to one chain (e.g. TRB for the T-cell beta chain, IGH for the B-cell heavy chain). Choose a single chain when a plot should reflect just that chain's diversity or genes.",
-  ir_groupBy = "Metadata column that defines the comparison units. None uses the loaded samples (the repertoire list elements); choosing a column (sample, condition, treatment, cell type, ...) makes that column's levels the units scRepertoire compares. On Paired Scatter this is shown as Compare by and directly defines the X/Y candidates.",
-
-  ## ---- Clonal UMAP ----
-  ir_p_umap_receptor = "Which receptor to colour by: TCR (T cells) or BCR (B cells). Only the types present in your data are offered.",
-  ir_p_umap_projection = "The cell map to draw on — the same UMAP/t-SNE/PCA projections used elsewhere in the app. Pick which one to overlay the clones on.",
-  ir_p_umap_group_by = "Optional metadata column used to split the clonal projection into static square panels. None keeps the default interactive projection.",
   ir_p_umap_show_all = "When on, every cell is drawn: cells without the selected receptor appear light grey, so the coloured (expanded) clones stand out in context. When off, only cells carrying the receptor are shown.",
-
-  ## ---- Diversity ----
-  ir_p_metric = "The diversity index. shannon/norm.entropy balance richness and evenness; inv.simpson/gini.simpson emphasise the dominant clones; chao1/ace estimate unseen clones; d50 is how many clones make up half the cells. Higher usually means a broader, more even repertoire.",
-  ir_p_x_axis = "A metadata column to spread the groups along the x-axis (e.g. condition), so diversity is compared across that variable.",
   ir_p_n_boots = "How many bootstrap resamples to average over for the diversity estimate and its spread. More iterations give a smoother, more stable estimate but take longer.",
-
-  ## ---- Paired Scatter ----
-  ir_p_graph = "Whether the axes show each clone's proportion (share of the repertoire) or raw count. Proportion makes samples of different sizes comparable.",
-  ir_p_dot_size = "What the dot size encodes: the clone's total size, or its size on the x or the y sample only.",
-
-  ## ---- Abundance ----
-  ir_p_scale = "Show proportions (share of the repertoire) instead of raw cell counts, so samples of different sizes are comparable.",
-
-  ## ---- SizeDist ----
-  ir_p_sd_method = "Linkage method for clustering samples by their clone-size distribution (ward.D2 is a common default).",
-  ir_p_sd_threshold = "Minimum clone size considered when fitting the distribution.",
-
-  ## ---- Compare ----
-  ir_p_compare_prop = "Plot each clone's proportion instead of raw counts, so groups of different sizes are comparable.",
-  ir_p_top_clones = "How many of the largest clones to track across the groups.",
+  ir_p_order_by = "The order the groups appear along the axis. Default keeps scRepertoire's own ordering; Alphanumeric sorts them by name.",
 
   ## ---- Display options ----
   ir_d_point_size = "Diameter of the scatter points.",
   ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily.",
-  ir_d_percentage_cells_to_show = "Percentage of cells sampled for the clonal projection. Lower values can improve performance for large datasets.",
-
-  ## ---- Homeostasis ----
-  ir_p_clone_size = "The upper bounds (as a fraction of the repertoire) that bin clones into Rare / Small / Medium / Large / Hyperexpanded. Five increasing numbers, comma-separated. Leave as-is for scRepertoire's defaults.",
-
-  ## ---- Generic ----
-  ir_p_order_by = "The order the groups appear along the axis. Default keeps scRepertoire's own ordering; Alphanumeric sorts them by name."
+  ir_d_percentage_cells_to_show = "Percentage of cells sampled for the clonal projection. Lower values can improve performance for large datasets."
 )
+
