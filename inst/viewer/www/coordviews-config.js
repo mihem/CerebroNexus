@@ -287,20 +287,16 @@
     var input = event && event.currentTarget;
     var file = input && input.files && input.files.length === 1
       ? input.files[0] : null;
+    function reject(message) {
+      if (input) input.value = '';
+      status(message, 'error');
+    }
     if (pending || typeof Shiny === 'undefined' || !Shiny.setInputValue) {
-      if (input) input.value = '';
-      status('The connection is not ready. Try again in a moment.', 'error');
-      return;
+      return reject('The connection is not ready. Try again in a moment.');
     }
-    if (!file || !/[.]json$/i.test(file.name || '')) {
-      if (input) input.value = '';
-      status('Choose one JSON file.', 'error');
-      return;
-    }
+    if (!file || !/[.]json$/i.test(file.name || '')) return reject('Choose one JSON file.');
     if (!isFinite(file.size) || file.size > 5 * 1024 * 1024) {
-      if (input) input.value = '';
-      status('The configuration is larger than 5 MiB.', 'error');
-      return;
+      return reject('The configuration is larger than 5 MiB.');
     }
     var nonce = nextNonce();
     startPending(nonce, 'apply');
@@ -312,8 +308,7 @@
       if (!pending || pending.nonce !== nonce) return;
       clearPending();
       setUploadLoading(false);
-      if (input) input.value = '';
-      status('The file could not be read. Try again.', 'error');
+      reject('The file could not be read. Try again.');
     };
     reader.onload = function () {
       if (!pending || pending.nonce !== nonce) return;
