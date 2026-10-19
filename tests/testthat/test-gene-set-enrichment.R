@@ -34,3 +34,37 @@ test_that("a single-level group is skipped with a clean message", {
   )
   expect_null(result@misc$enriched_pathways$cerebro_GSVA$orig.ident)
 })
+
+test_that("enriched gene sets list their genes without stray spaces", {
+  result <- suppressMessages(performGeneSetEnrichmentAnalysis(
+    object = gsea_pbmc(),
+    GMT_file = gsea_gmt,
+    groups = "seurat_clusters",
+    thresh_p_val = 1,
+    thresh_q_val = 1
+  ))
+  table <- result@misc$enriched_pathways$cerebro_GSVA$seurat_clusters
+  gene_sets <- .read_GMT_file(gsea_gmt)
+  expected <- vapply(gene_sets$genesets, paste, character(1), collapse = ",")
+  names(expected) <- gene_sets$geneset.names
+
+  expect_s3_class(table, "data.frame")
+  expect_identical(
+    colnames(table),
+    c(
+      "seurat_clusters",
+      "name",
+      "description",
+      "length",
+      "genes",
+      "enrichment_score",
+      "p_value",
+      "q_value"
+    )
+  )
+  expect_identical(table$genes, unname(expected[table$name]))
+  expect_identical(
+    table$length,
+    lengths(gene_sets$genesets)[match(table$name, gene_sets$geneset.names)]
+  )
+})

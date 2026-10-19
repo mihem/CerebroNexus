@@ -152,20 +152,13 @@ performGeneSetEnrichmentAnalysis <- function(
   names(gene_sets$genesets) <- gene_sets$geneset.names
 
   ## make tibble that contains name and description for each set
+  ## with the number of genes and the collapsed gene list of each set
   gene_sets_tibble <- tibble::tibble(
     name = gene_sets$geneset.names,
     description = gene_sets$geneset.description,
-    length = NA,
-    genes = NA
+    length = unname(lengths(gene_sets$genesets)),
+    genes = unname(vapply(gene_sets$genesets, paste, '', collapse = ','))
   )
-
-  ## add number of genes and collapsed gene list to tibble of gene sets
-  for (i in seq_along(gene_sets$genesets)) {
-    gene_sets_tibble$length[i] <- gene_sets$genesets[[i]] %>% length()
-    gene_sets_tibble$genes[i] <- gene_sets$genesets[[i]] %>%
-      unlist() %>%
-      paste(.data, collapse = ',')
-  }
 
   ## log message
   message(
