@@ -59,6 +59,24 @@ crb_prefetch_tasks <- new.env(parent = emptyenv())
   .crb_backend_identities[[key]] <- list(identity = identity)
 }
 
+## nanonext attaches a mirai's promise callback without synchronising with
+## task completion, so a task that finishes while the callback is attached
+## leaves its promise pending forever. Windows scheduling makes this frequent
+## for fast reads. Poll instead, and convert only a resolved mirai, which
+## as.promise() settles synchronously with mirai's own error semantics.
+.miraiPromise <- function(task, interval = 0.05) {
+  promises::promise(function(resolve, reject) {
+    check <- function() {
+      if (mirai::unresolved(task)) {
+        later::later(check, interval)
+      } else {
+        resolve(promises::as.promise(task))
+      }
+    }
+    check()
+  })
+}
+
 start_crb_prefetch <- function(path, backend_identity) {
   path <- as.character(path[[1L]])
   if (!file.exists(path)) {
@@ -78,7 +96,7 @@ start_crb_prefetch <- function(path, backend_identity) {
   prefetch_task <- shiny::withReactiveDomain(
     NULL,
     shiny::ExtendedTask$new(function(path) {
-      mirai::mirai(
+      task <- mirai::mirai(
         {
           connection <- file(path, open = "rb")
           on.exit(close(connection), add = TRUE)
@@ -94,6 +112,7 @@ start_crb_prefetch <- function(path, backend_identity) {
         },
         path = path
       )
+      .miraiPromise(task)
     })
   )
   crb_prefetch_tasks[[cache_key]] <- prefetch_task

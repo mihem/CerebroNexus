@@ -49,6 +49,7 @@ Imports:
   msigdbr (>= 6.2.1),
   pbapply (>= 1.4),
   plotly (>= 4.9.0),
+  promises,
   qvalue (>= 2.14.0),
   qs2,
   R6 (>= 2.4.0),
