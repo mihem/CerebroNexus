@@ -776,41 +776,34 @@ convertSeuratToCerebro <- function(
         )
       }
     } else if (is.list(most_expressed_genes)) {
-      # Check if list elements are data.frames and handle unnamed elements
-      unnamed_count <- 0
-      for (i in seq_along(most_expressed_genes)) {
-        # Check if element is a data.frame
-        if (!is.data.frame(most_expressed_genes[[i]])) {
-          warning(paste0(
-            "Element ",
-            i,
-            " in most_expressed_genes is not a data.frame and will be skipped."
+      # Skip elements that are not data.frames and name unnamed ones. Work on
+      # the original indices; deleting inside the loop shifted them.
+      is_table <- vapply(most_expressed_genes, is.data.frame, logical(1))
+      for (i in which(!is_table)) {
+        warning(paste0(
+          "Element ",
+          i,
+          " in most_expressed_genes is not a data.frame and will be skipped."
+        ))
+      }
+      table_names <- names(most_expressed_genes)
+      if (is.null(table_names)) {
+        table_names <- character(length(most_expressed_genes))
+      }
+      unnamed <- which(is_table & (is.na(table_names) | table_names == ""))
+      for (j in seq_along(unnamed)) {
+        table_names[unnamed[j]] <- paste0("unknown", j)
+        if (verbose) {
+          message(paste0(
+            "[INFO] Assigned name 'unknown",
+            j,
+            "' to unnamed element ",
+            unnamed[j]
           ))
-          most_expressed_genes[[i]] <- NULL
-          next
-        }
-
-        # Handle unnamed elements
-        if (
-          is.null(names(most_expressed_genes)[i]) ||
-            names(most_expressed_genes)[i] == ""
-        ) {
-          unnamed_count <- unnamed_count + 1
-          names(most_expressed_genes)[i] <- paste0("unknown", unnamed_count)
-          if (verbose) {
-            message(paste0(
-              "[INFO] Assigned name 'unknown",
-              unnamed_count,
-              "' to unnamed element ",
-              i
-            ))
-          }
         }
       }
-      # Remove NULL elements (those that weren't data.frames)
-      most_expressed_genes <- most_expressed_genes[
-        !sapply(most_expressed_genes, is.null)
-      ]
+      names(most_expressed_genes) <- table_names
+      most_expressed_genes <- most_expressed_genes[is_table]
     } else {
       stop(
         "most_expressed_genes must be either a data.frame or a list of data.frames.",
