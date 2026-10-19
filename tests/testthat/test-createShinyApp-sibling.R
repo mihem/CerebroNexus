@@ -2950,10 +2950,11 @@ test_that("spatial image targets bound long logical names and filenames", {
   expect_true(all(
     nchar(strsplit(target, "/", fixed = TRUE)[[1L]], type = "bytes") <= 255L
   ))
-  ## Keep enough headroom for an ordinary Windows app directory beneath the
-  ## historical 260-character full-path limit. Per-segment validity alone is
-  ## insufficient when four encoded logical identifiers are nested.
-  expect_lte(nchar(target, type = "bytes"), 180L)
+  ## Keep enough headroom for an ordinary Windows app directory, plus its
+  ## sibling staging directory, beneath the 260-character MAX_PATH limit.
+  ## Per-segment validity alone is insufficient when four encoded logical
+  ## identifiers are nested.
+  expect_lte(nchar(target, type = "bytes"), 120L)
   expect_match(target, "\\.png$")
 })
 

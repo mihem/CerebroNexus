@@ -1267,7 +1267,10 @@ dedent <- function(string) {
   unname(tools::md5sum(path))
 }
 
-.spatialImageBundlePathComponent <- function(value, maximum_bytes = 40L) {
+## Each component stays short because a Windows build nests four of them
+## beneath the app's staging directory, and the whole path must fit the
+## 260-character MAX_PATH limit unless long paths are enabled system-wide.
+.spatialImageBundlePathComponent <- function(value, maximum_bytes = 24L) {
   if (
     !is.character(value) ||
       length(value) != 1L ||
@@ -1287,7 +1290,7 @@ dedent <- function(string) {
   if (nchar(encoded, type = "bytes") <= maximum_bytes) {
     return(encoded)
   }
-  digest <- .bundlePathDigest(bytes)
+  digest <- substr(.bundlePathDigest(bytes), 1L, 16L)
   prefix_length <- maximum_bytes - nchar(digest, type = "bytes") - 1L
   paste0(substr(encoded, 1L, prefix_length), "-", digest)
 }
@@ -1302,7 +1305,7 @@ dedent <- function(string) {
   extension_is_safe <- grepl("^[A-Za-z0-9]{1,16}$", extension)
   encoded_filename <- .spatialImageBundlePathComponent(
     filename,
-    40L - if (extension_is_safe) nchar(extension, type = "bytes") + 1L else 0L
+    24L - if (extension_is_safe) nchar(extension, type = "bytes") + 1L else 0L
   )
   if (extension_is_safe) {
     encoded_filename <- paste0(encoded_filename, ".", extension)
