@@ -32,11 +32,6 @@ run_specialist_state_node <- function(body) {
 }
 
 test_that("HLA node selection maps cleanly between motif keys and cells", {
-  runtime <- new.env(parent = globalenv())
-  sys.source(
-    viewer_test_path("hla_tcr_motifs", "core", "hla_visual_helpers.R"),
-    envir = runtime
-  )
   segments <- data.frame(
     barcode = c("cell-1", "cell-2", "cell-3"),
     v_gene = c("TRBV1", "TRBV1", "TRBV2"),
@@ -45,19 +40,19 @@ test_that("HLA node selection maps cleanly between motif keys and cells", {
   )
 
   expect_identical(
-    runtime$hla_segment_node_keys(segments, by_v = FALSE),
+    hla_segment_node_keys(segments, by_v = FALSE),
     c("CASSA", "CASSA", "CASSB")
   )
   expect_identical(
-    runtime$hla_segment_node_keys(segments, by_v = TRUE),
+    hla_segment_node_keys(segments, by_v = TRUE),
     c("TRBV1::CASSA", "TRBV1::CASSA", "TRBV2::CASSB")
   )
   expect_identical(
-    runtime$hla_cells_for_node_keys(segments, "CASSA", by_v = FALSE),
+    hla_cells_for_node_keys(segments, "CASSA", by_v = FALSE),
     c("cell-1", "cell-2")
   )
   expect_identical(
-    runtime$hla_node_keys_for_cells(segments, "cell-3", by_v = TRUE),
+    hla_node_keys_for_cells(segments, "cell-3", by_v = TRUE),
     "TRBV2::CASSB"
   )
 })

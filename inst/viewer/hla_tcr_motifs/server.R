@@ -4,8 +4,8 @@
 ## Sources the module's server pieces into the app server scope (this file is
 ## itself sourced with local = TRUE inside the server function, so bare source()
 ## calls here land in the same scope and `output$...` reaches the app output).
-## Core algorithms live in the installed package (hla_motif_core.R /
-## hla_typing.R); these files only wire reactives, renderers and UI.
+## Core algorithms live in the package R/hla_*.R files, bound by core_shim.R;
+## these files only wire reactives, renderers and UI.
 ##----------------------------------------------------------------------------##
 
 if (!exists("hla_detect_chains", inherits = TRUE)) {

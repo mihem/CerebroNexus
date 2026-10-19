@@ -592,10 +592,10 @@ test_that("launchCerebro loads the installed Viewer", {
   app <- launchCerebro(mode = "closed")
 
   expect_s3_class(app, "shiny.appobj")
-  expect_identical(
-    get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)$mode,
-    "closed"
-  )
+  launch_options <- get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
+  expect_identical(launch_options$mode, "closed")
+  # The installed Viewer ships no HLA core source; core_shim.R binds this.
+  expect_identical(launch_options$.hla_core, .viewerHLACore())
 })
 
 test_that("launchCerebro builds dataset information for configured files", {

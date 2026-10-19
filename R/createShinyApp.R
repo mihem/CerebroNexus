@@ -3286,6 +3286,12 @@ createShinyApp <- function(
   if (!build_ops$copy(shiny_source, stage_result_dir, recursive = TRUE)) {
     stop("Failed to copy Shiny source files.", call. = FALSE)
   }
+  hla_core_dir <- file.path(stage_result_dir, "viewer/hla_tcr_motifs/core")
+  dir.create(hla_core_dir, showWarnings = FALSE)
+  build_ops$write_lines(
+    .viewerHLACoreSource(),
+    file.path(hla_core_dir, "hla_core.R")
+  )
 
   if (verbose) {
     cat("Copying data artifacts...\n")
@@ -3380,6 +3386,7 @@ createShinyApp <- function(
   cerebro_options[["crb_file_to_load"]] <- crb_files
   cerebro_options[["cerebro_root"]] <- "."
   internal_option_names <- c(
+    ".hla_core",
     ".bundle_backend_plan",
     ".bundle_run_options",
     ".dataset_catalog",

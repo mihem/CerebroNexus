@@ -6,11 +6,59 @@ hla_inst_file <- function(...) {
   testthat::test_path("../../inst", ...)
 }
 
+## ---- HLA core resolution in every launch mode -------------------------- ##
+## The core is authored only in R/hla_*.R. core_shim.R binds it into the module
+## scope from whichever source the launch mode provides: the checkout's R/
+## (repository launch), Cerebro.options$.hla_core (launchCerebro), or the
+## generated viewer/hla_tcr_motifs/core/ (createShinyApp bundle). A function
+## the module calls by bare name but the shim cannot bind surfaces only as
+## "could not find function" in a running app, so pin each path here.
+
+hla_shim_env <- function(options) {
+  env <- new.env(parent = globalenv())
+  env$Cerebro.options <- options
+  sys.source(hla_inst_file("viewer/hla_tcr_motifs/core_shim.R"), env)
+  env
+}
+
+## An app root holding only what createShinyApp() writes for the HLA core.
+hla_bundle_root <- function(envir = parent.frame()) {
+  root <- withr::local_tempdir(.local_envir = envir)
+  core <- file.path(root, "viewer/hla_tcr_motifs/core")
+  dir.create(core, recursive = TRUE)
+  writeLines(.viewerHLACoreSource(), file.path(core, "hla_core.R"))
+  root
+}
+
+test_that("the handed-over HLA core is every object R/hla_*.R defines", {
+  r_dir <- testthat::test_path("../../R")
+  testthat::skip_if_not(
+    dir.exists(r_dir),
+    "R/ source tree not present (installed-package layout)"
+  )
+  defined <- unlist(lapply(
+    list.files(r_dir, pattern = "^hla_.*[.]R$", full.names = TRUE),
+    function(file) {
+      exprs <- parse(file, keep.source = FALSE)
+      unlist(lapply(exprs, function(e) {
+        if (
+          is.call(e) &&
+            (identical(e[[1L]], as.name("<-")) ||
+              identical(e[[1L]], as.name("="))) &&
+            is.name(e[[2L]])
+        ) {
+          as.character(e[[2L]])
+        }
+      }))
+    }
+  ))
+  # .viewerHLACore() selects by the hla_ / HLA_ prefix, so a core object
+  # without it would be missing from installed launches and bundles, and a
+  # prefixed object defined elsewhere would be shipped without its file.
+  expect_setequal(names(.viewerHLACore()), defined)
+})
+
 test_that("core shim binds locally without polluting globalenv", {
-  local_env <- new.env(parent = globalenv())
-  # The shim reads Cerebro.options[["cerebro_root"]] to locate its bundled core/
-  # directory; supply it so the source path resolves in this isolated env.
-  local_env$Cerebro.options <- list(cerebro_root = hla_inst_file())
   global_names <- c("hla_detect_chains", "hla_descriptive_feature_overlap")
   for (nm in global_names) {
     if (exists(nm, envir = .GlobalEnv, inherits = FALSE)) {
@@ -18,43 +66,23 @@ test_that("core shim binds locally without polluting globalenv", {
     }
   }
 
-  source(
-    hla_inst_file("viewer/hla_tcr_motifs/core_shim.R"),
-    local = local_env
-  )
+  local_env <- hla_shim_env(list(cerebro_root = hla_bundle_root()))
 
-  expect_true(exists("hla_detect_chains", envir = local_env, inherits = FALSE))
-  expect_true(exists(
-    "hla_descriptive_feature_overlap",
-    envir = local_env,
-    inherits = FALSE
-  ))
-  expect_false(exists(
-    "hla_detect_chains",
-    envir = .GlobalEnv,
-    inherits = FALSE
-  ))
-  expect_false(exists(
-    "hla_descriptive_feature_overlap",
-    envir = .GlobalEnv,
-    inherits = FALSE
-  ))
+  for (nm in global_names) {
+    expect_true(exists(nm, envir = local_env, inherits = FALSE))
+    expect_false(exists(nm, envir = .GlobalEnv, inherits = FALSE))
+  }
 })
 
-test_that("bundled core shim resolves without an installed package", {
+test_that("repository launch sources the checkout's R/ without the package", {
   repo_root <- normalizePath(testthat::test_path("../.."), mustWork = TRUE)
   app_root <- file.path(repo_root, "inst")
-  shim_path <- file.path(
-    app_root,
-    "viewer/hla_tcr_motifs/core_shim.R"
-  )
-  # The shim sources its bundled core/ copies with no package on the search
-  # path -- the exact condition of a createShinyApp bundle. Run it in a --vanilla
-  # subprocess to prove no CerebroNexus install is needed. Under R CMD check
-  # the source `inst/` tree is not at this path, so there is nothing to test --
-  # skip rather than fail on the missing file.
+  shim_path <- file.path(app_root, "viewer/hla_tcr_motifs/core_shim.R")
+  # runApp("inst") sets cerebro_root to inst/, whose sibling R/ holds the core.
+  # Run it in a --vanilla subprocess to prove no CerebroNexus install is
+  # needed. Under R CMD check there is no source tree to launch from.
   testthat::skip_if_not(
-    file.exists(shim_path),
+    file.exists(shim_path) && dir.exists(file.path(repo_root, "R")),
     "source tree not present (installed-package layout)"
   )
   expression <- paste0(
@@ -65,10 +93,10 @@ test_that("bundled core shim resolves without an installed package", {
     "sys.source(",
     deparse(shim_path),
     ", envir = e); ",
-    "stopifnot(",
-    "exists('hla_distinct_colors', envir = e, inherits = FALSE), ",
-    "exists('hla_descriptive_feature_overlap', envir = e, inherits = FALSE)",
-    ")"
+    "missing <- setdiff(",
+    paste(deparse(names(.viewerHLACore())), collapse = ""),
+    ", ls(e, all.names = TRUE)); ",
+    "if (length(missing)) stop('unbound: ', toString(missing))"
   )
   output <- system2(
     file.path(R.home("bin"), "Rscript"),
@@ -82,6 +110,57 @@ test_that("bundled core shim resolves without an installed package", {
   }
 
   expect_equal(status, 0L, info = paste(output, collapse = "\n"))
+})
+
+test_that("installed launch binds the namespace core launchCerebro hands over", {
+  core <- .viewerHLACore()
+  env <- hla_shim_env(list(
+    cerebro_root = withr::local_tempdir(),
+    .hla_core = core
+  ))
+
+  for (name in names(core)) {
+    expect_identical(env[[name]], core[[name]], info = name)
+  }
+})
+
+test_that("an exported app's generated core reproduces the namespace core", {
+  root <- hla_bundle_root()
+  source_lines <- readLines(file.path(
+    root,
+    "viewer/hla_tcr_motifs/core/hla_core.R"
+  ))
+  # The bundle runs without the package, so the generated source must not
+  # reach for it.
+  expect_false(any(grepl(
+    "CerebroNexus::|getFromNamespace|requireNamespace|asNamespace|loadNamespace",
+    source_lines
+  )))
+
+  env <- hla_shim_env(list(cerebro_root = root))
+  core <- .viewerHLACore()
+  for (name in names(core)) {
+    expected <- core[[name]]
+    actual <- env[[name]]
+    if (is.function(expected)) {
+      expect_identical(environment(actual), env, info = name)
+      expected <- utils::removeSource(expected)
+      actual <- utils::removeSource(actual)
+    }
+    expect_true(
+      identical(actual, expected, ignore.environment = TRUE),
+      info = paste(name, "changed when deparsed into the bundle")
+    )
+  }
+})
+
+test_that("core shim fails loudly when no HLA core is reachable", {
+  root <- file.path(withr::local_tempdir(), "app")
+  dir.create(root)
+  expect_error(
+    hla_shim_env(list(cerebro_root = root)),
+    "HLA core not found"
+  )
 })
 
 ## ---- shipped demo contracts ------------------------------------------- ##
@@ -285,68 +364,6 @@ test_that("the shipped demo ships its CC-BY attribution beside the data", {
   txt <- viewer_test_text(att)
   expect_match(txt, "CC-BY", fixed = TRUE)
   expect_match(txt, "abf5835", fixed = TRUE) # the source paper
-})
-
-## ---- core_shim sources every core file, byte-for-byte ------------------ ##
-## The shim sys.source()s a hardcoded list of the bundled core/ files -- no
-## namespace fallback, so the bundle never names CerebroNexus. A core file
-## present in R/ but missing from that list is never sourced, so its functions
-## surface as "could not find function" in a running app while unit tests (which
-## reach R/ directly) stay green. Pin the file list here, and pin the bundled
-## copies byte-for-byte against R/ in the next test -- together they guarantee
-## every R/hla_*.R function is reachable at runtime, in every launch mode.
-
-test_that("core_shim sources every R/hla_*.R core file", {
-  expected <- new.env(parent = globalenv())
-  core <- hla_inst_file("viewer/hla_tcr_motifs/core")
-  for (file in list.files(core, pattern = "[.]R$", full.names = TRUE)) {
-    sys.source(file, expected)
-  }
-  actual <- new.env(parent = globalenv())
-  actual$Cerebro.options <- list(cerebro_root = hla_inst_file())
-  sys.source(hla_inst_file("viewer/hla_tcr_motifs/core_shim.R"), actual)
-  expect_true(all(ls(expected) %in% ls(actual)))
-})
-
-test_that("bundled HLA core/ is byte-identical to the R/ source", {
-  r_dir <- testthat::test_path("../../R")
-  core_dir <- hla_inst_file("viewer/hla_tcr_motifs/core")
-  # The shim sources these copies at runtime; they exist only so the module is
-  # self-contained in a createShinyApp bundle (no R/, no package). If they drift
-  # from R/, the bundle silently runs stale core code. This guard needs the
-  # package R/ source tree, absent under the installed-package test layout --
-  # skip there rather than fail.
-  testthat::skip_if_not(
-    dir.exists(r_dir) &&
-      length(list.files(r_dir, pattern = "^hla_.*[.]R$")) > 0,
-    "R/ source tree not present (installed-package layout)"
-  )
-  core_files <- c(
-    "hla_typing.R",
-    "hla_motif_core.R",
-    "hla_association_core.R",
-    "hla_visual_helpers.R",
-    "hla_export.R"
-  )
-  for (f in core_files) {
-    inst_copy <- file.path(core_dir, f)
-    r_src <- file.path(r_dir, f)
-    expect_true(
-      file.exists(inst_copy),
-      info = paste("missing bundled core copy:", f)
-    )
-    expect_identical(
-      readLines(inst_copy, warn = FALSE),
-      readLines(r_src, warn = FALSE),
-      info = paste0(
-        "inst/viewer/hla_tcr_motifs/core/",
-        f,
-        " drifted from R/",
-        f,
-        " -- re-copy R/hla_*.R into the module's core/ directory."
-      )
-    )
-  }
 })
 
 test_that("the network caption states area encoding and the cap", {

@@ -169,6 +169,18 @@ Cerebro.options <<- list(
   "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = TRUE
 )
+## core_shim.R sources the HLA core from a checkout's ../R/hla_*.R. The
+## installed copy of this app (runApp(system.file("app.R", package = ...))) has
+## no R/ sources beside it, so take the core from the package it came with.
+if (
+  length(list.files("../R", pattern = "^hla_.*[.]R$")) == 0L &&
+    requireNamespace("CerebroNexus", quietly = TRUE)
+) {
+  Cerebro.options <<- c(
+    Cerebro.options,
+    list(".hla_core" = CerebroNexus:::.viewerHLACore())
+  )
+}
 Cerebro.options <<- viewerAddMillionCellDemo(Cerebro.options)
 Cerebro.options <<- viewerAddRenDemo(Cerebro.options)
 
