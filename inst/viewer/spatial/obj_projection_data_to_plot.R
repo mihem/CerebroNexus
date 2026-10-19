@@ -191,7 +191,9 @@ spatial_projection_data_to_plot_raw <- reactive({
     isTRUE(background_geometry_ready) &&
     !roi_rotation_needed &&
     !isTRUE(plot_parameters[["show_region_outlines"]])
-  color_assignments <- if (is.numeric(full_color)) {
+  ## Only the resource-first path uses these; the others assign colours from
+  ## the plotted frame below.
+  color_assignments <- if (!resource_first_candidate) {
     NULL
   } else if (length(full_color)) {
     assignColorsToGroups(full_metadata, color_variable)

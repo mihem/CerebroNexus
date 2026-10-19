@@ -49,13 +49,6 @@ test_that("IR renderers update parameters and isolate their session caches", {
     function(...) {
       args <- list(...)
       calls[[length(calls) + 1L]] <<- list(name = name, args = args)
-      if (isTRUE(args$exportTable)) {
-        return(data.frame(
-          length = c(10, 12),
-          values = c("A", "B"),
-          sample = c("A", "B")
-        ))
-      }
       ggplot2::ggplot(data.frame(x = 1:2, y = 2:3), ggplot2::aes(x, y)) +
         ggplot2::geom_point()
     }
@@ -63,11 +56,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
   functions <- c(
     "clonalAbundance",
     "clonalHomeostasis",
-    "clonalLength",
-    "clonalSizeDistribution",
-    "vizGenes",
-    "percentAA",
-    "positionalEntropy"
+    "clonalSizeDistribution"
   )
   mocks <- setNames(lapply(functions, record), functions)
   do.call(
@@ -106,8 +95,6 @@ test_that("IR renderers update parameters and isolate their session caches", {
       )
     }
     ir_render_ggplotly <- function(expr, ...) expr
-    default_gene_family <- function() "TRBV"
-    sys.source(viewer_test_path("immune_repertoire", "length_helpers.R"), scope)
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "visualizations.R"),
       scope,
@@ -151,14 +138,6 @@ test_that("IR renderers update parameters and isolate their session caches", {
       expect_identical(latest()[[1]][[1]]$barcode, c("B1", "B2"))
       value("clonalHomeostasis")
       expect_equal(unname(latest()$cloneSize), c(.01, .05, .1, .5, 1))
-      value("clonalLength")
-      expect_identical(latest()$cloneCall, "aa")
-      expect_true(latest()$exportTable)
-      session$setInputs(ir_groupBy = "", ir_cloneCall = "nt")
-      ungrouped <- value("clonalLength")
-      expect_identical(latest()$cloneCall, "nt")
-      expect_false(latest()$exportTable)
-      expect_equal(nrow(ggplot2::ggplot_build(ungrouped)$layout$layout), 1L)
       session$setInputs(ir_p_sd_threshold = -10)
       value("clonalSizeDistribution")
       expect_identical(latest()$cloneCall, "strict")
@@ -167,25 +146,6 @@ test_that("IR renderers update parameters and isolate their session caches", {
       value("clonalSizeDistribution")
       expect_equal(latest()$threshold, 3)
       expect_identical(latest()$method, "complete")
-      session$setInputs(
-        ir_p_vg_x_axis = "TRAV",
-        ir_p_vg_plot = "bar",
-        ir_p_vg_summary = "count"
-      )
-      value("vizGenes")
-      expect_identical(latest()$x.axis, "TRAV")
-      expect_null(latest()$y.axis)
-      expect_identical(latest()$summary.fun, "count")
-      for (length in c(-1, NA, 13)) {
-        session$setInputs(ir_p_aa_length = length, ir_p_pe_aa_length = length)
-        for (name in c("percentAA", "positionalEntropy")) {
-          value(name)
-          expect_equal(
-            latest()$aa.length,
-            if (is.na(length) || length < 1) 20 else length
-          )
-        }
-      }
     })
   }
   exercise()
@@ -255,6 +215,7 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
       current_page_display_defaults <- function(page) list()
       viewerDatasetIdentity <- function() list(fingerprint = "A")
       builds <- barcode_reads <- 0L
+      ir_data_annotated <- function() NULL
       ir_clonal_umap_data <- function(projection, receptor, clone_call, ...) {
         builds <<- builds + 1L
         stopifnot(projection == "umap", receptor == "TCR", clone_call == "gene")
@@ -290,7 +251,8 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
           "IR_EXPANSION_COLORS",
           "ir_projection_axis_names",
           "ir_projection_display_name",
-          "ir_clonal_umap_last_request"
+          "ir_clonal_umap_last_request",
+          "ir_clonal_umap_data_memo"
         ),
         events = "ir_clonalUMAP_projection_render_request"
       )
@@ -324,6 +286,8 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
       expect_length(scope$sent, 2)
       expect_true(scope$sent[[2]]$meta$appearance$draw_border)
       expect_false(scope$sent[[2]]$meta$appearance$group_labels)
+      ## Appearance-only changes repaint without rebuilding the coordinates.
+      expect_equal(scope$builds, 1)
       session$setInputs(ir_p_umap_group_by = "sample")
       expect_length(scope$sent, 2)
     }

@@ -70,35 +70,20 @@ output[["extra_material_table"]] <- DT::renderDataTable({
   results_df <- selection$sheet$table
   ## don't proceed if input is not a data frame
   req(is.data.frame(results_df))
-  ## if the table is empty, skip the processing and show and empty table
-  ## (otherwise the procedure would result in an error)
-  if (nrow(results_df) == 0) {
-    results_df %>%
-      as.data.frame() %>%
-      dplyr::slice(0) %>%
-      prepareEmptyTable()
-    ## if there is at least 1 row, create proper table
-  } else {
-    prettifyTable(
-      results_df,
-      filter = extra_material_table_filter(nrow(results_df), ncol(results_df)),
-      dom = "Bfrtlip",
-      show_buttons = TRUE,
-      number_formatting = input[["extra_material_table_number_formatting"]],
-      color_highlighting = input[["extra_material_table_color_highlighting"]],
-      hide_long_columns = TRUE,
-      download_file_name = paste0(
-        "extra_material_tables_",
-        gsub(
-          "[^[:alnum:]_-]+",
-          "_",
-          paste(selection$group$label, selection$sheet$label, sep = "_")
-        )
-      ),
-      page_length_default = 20,
-      page_length_menu = c(20, 50, 100)
-    )
-  }
+  cerebroResultTable(
+    results_df,
+    paste0(
+      "extra_material_tables_",
+      gsub(
+        "[^[:alnum:]_-]+",
+        "_",
+        paste(selection$group$label, selection$sheet$label, sep = "_")
+      )
+    ),
+    number_formatting = input[["extra_material_table_number_formatting"]],
+    color_highlighting = input[["extra_material_table_color_highlighting"]],
+    filter = extra_material_table_filter(nrow(results_df), ncol(results_df))
+  )
 })
 
 ##----------------------------------------------------------------------------##

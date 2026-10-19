@@ -142,3 +142,20 @@ viewer_server_load <- function(
   }
   invisible(NULL)
 }
+
+## Load a stored-result page (marker_genes, enriched_pathways) into `scope`.
+## The shared cerebroResultPageServer() is evaluated in `scope` too, so stubs
+## defined there (getters, cerebroResultTableControls, ...) are the ones used.
+viewer_result_page_load <- function(page, scope) {
+  eval(
+    viewer_r_assignment(
+      viewer_test_path("utility_functions.R"),
+      "cerebroResultPageServer"
+    ),
+    scope
+  )
+  if (!exists("cerebroRegisterInfo", scope, inherits = FALSE)) {
+    scope$cerebroRegisterInfo <- function(...) invisible(NULL)
+  }
+  sys.source(viewer_test_path(page, "server.R"), scope)
+}

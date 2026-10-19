@@ -114,8 +114,8 @@ test_that("immune_repertoire tab is present with example data (has TCR)", {
 })
 
 test_that("Group by is visible on plots whose grouping it drives", {
-  # Group by is a real scRepertoire parameter for Scatter, and the custom BCR
-  # Isotype/SHM Proxy renderers also use it as their grouping column. It should
+  # Group by is a real scRepertoire parameter, and the custom BCR Isotype
+  # renderer also uses it as its grouping column. It should
   # only be hidden on Paired Scatter, where comparison is controlled by the
   # paired sample metadata selectors.
   local_app_support(inst_dir)

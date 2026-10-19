@@ -5554,19 +5554,10 @@
     var on = (colorBy === GENE_MODE) || !!fieldOf();
     el.style.display = on ? '' : 'none';
   }
+  // Only registered groups arrive deferred (values fetched on first use).
   function deferredColor(mode) {
-    var name = mode;
-    var kind = null;
-    var value = null;
-    if (mode && mode.indexOf(FIELD_PREFIX) === 0) {
-      name = mode.slice(FIELD_PREFIX.length);
-      kind = 'fields'; value = D.fields && D.fields[name];
-    } else if (D.groups && D.groups[name]) {
-      kind = 'groups'; value = D.groups[name];
-    } else if (D.cat_extra && D.cat_extra[name]) {
-      kind = 'cat_extra'; value = D.cat_extra[name];
-    }
-    return value && value.deferred ? { kind: kind, name: name, value: value } : null;
+    var value = D.groups && D.groups[mode];
+    return value && value.deferred ? { kind: 'groups', name: mode, value: value } : null;
   }
   function setColorBy(mode) {
     var deferred = deferredColor(mode);
@@ -9402,12 +9393,10 @@
       var message = window.CBViewWire.unpack(buffer);
       if (!datasetMessageFresh(message) || !D || !message || message.dataset_id !== D.dataset_id ||
           message.dataset_fingerprint !== configFingerprint()) return;
-      var target = D[message.kind];
+      var target = message.kind === 'groups' && D.groups;
       if (!target || !target[message.name] || !message.value) return;
       target[message.name] = message.value;
-      var mode = message.kind === 'fields'
-        ? FIELD_PREFIX + message.name : message.name;
-      setColorBy(mode);
+      setColorBy(message.name);
     } catch (error) {
       requestWireFallback(D && D.dataset_id, D && configFingerprint());
     }

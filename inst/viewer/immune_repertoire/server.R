@@ -12,7 +12,7 @@
 ## only resolves the package directory on disk — no .onLoad, no dependency
 ## cascade — so startup stays cheap. The real load happens lazily on the first
 ## scRepertoire::fn() call, i.e. the first scRepertoire-backed plot; self-made
-## IR plots (Clone Sharing, Definition) and the default Clonal UMAP never
+## IR plots (Clone Sharing) and the default Clonal UMAP never
 ## trigger it.
 has_scRepertoire <- function() {
   nzchar(system.file(package = "scRepertoire"))
@@ -75,8 +75,7 @@ ir_scRepertoire_missing_ui <- function() {
 ## ---- tab switches when the output container has zero/tiny dimensions. req()
 ## ---- silently halts rendering; Shiny re-triggers once the container has real
 ## ---- space. Both width AND height must clear the floor: base-graphics and
-## ---- grid prints (e.g. clonalRarefaction via ggiNEXT) call plot.new(), which
-## ---- throws "figure margins too large" when either dimension leaves no room
+## ---- grid prints call plot.new(), which throws "figure margins too large" when either dimension leaves no room
 ## ---- for the fixed margins (~1 inch). 72px ≈ 1 inch at the default device
 ## ---- resolution, so require a comfortable margin above that.
 req_plot_space <- function(output_id, min_px = 80L) {
@@ -84,30 +83,6 @@ req_plot_space <- function(output_id, min_px = 80L) {
   w <- cd[[paste0("output_", output_id, "_width")]]
   h <- cd[[paste0("output_", output_id, "_height")]]
   shiny::req(isTRUE(w >= min_px), isTRUE(h >= min_px))
-}
-
-## ---- Muffle known-harmless upstream warnings -------------------------- ##
-## scRepertoire::clonalRarefaction delegates bootstrapping to iNEXT, whose
-## internals (iNEXT:::invChat -> matrix(apply(Abun.Mat, 2, ...))) emit
-## "data length [N] is not a sub-multiple or multiple of the number of rows"
-## whenever bootstrap resamples yield unequal qD vector lengths. This is benign
-## iNEXT noise we cannot fix at source, and it floods the console. Muffle ONLY
-## these specific patterns; every other warning still propagates so real issues
-## stay visible.
-IR_NOISE_WARNINGS <- paste(
-  "is not a sub-multiple or multiple of the number of rows",
-  "aes_string\\(\\) was deprecated",
-  sep = "|"
-)
-ir_quiet_inext <- function(expr) {
-  withCallingHandlers(
-    expr,
-    warning = function(w) {
-      if (grepl(IR_NOISE_WARNINGS, conditionMessage(w))) {
-        invokeRestart("muffleWarning")
-      }
-    }
-  )
 }
 
 safeRenderPlot <- function(expr, plot_name = "unknown") {
@@ -286,78 +261,6 @@ bcr_isotype_plot <- function(combined, group_col = "sample") {
     )
 }
 
-## ---- BCR-specific: SHM proxy plot --------------------------------------- ##
-bcr_shm_proxy_plot <- function(
-  combined_BCR,
-  group_col = "sample",
-  clone_call_col = "CTstrict"
-) {
-  diversity <- dplyr::bind_rows(lapply(combined_BCR, function(df) {
-    needed <- c(clone_call_col, "CTnt", group_col)
-    if (is.null(df) || !all(needed %in% colnames(df))) {
-      return(NULL)
-    }
-    parts <- strsplit(df$CTnt, "_", fixed = TRUE)
-    igh_nt <- vapply(
-      parts,
-      function(p) {
-        if (length(p) == 0) {
-          return(NA_character_)
-        }
-        p[1]
-      },
-      character(1)
-    )
-
-    tib <- tibble::as_tibble(df[, group_col, drop = FALSE])
-    tib$.clone <- df[[clone_call_col]]
-    tib$.cdr3_nt <- igh_nt
-    tib <- tib[!is.na(tib$.clone) & !is.na(tib$.cdr3_nt), , drop = FALSE]
-    if (nrow(tib) == 0L) {
-      return(NULL)
-    }
-
-    tib %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(c(
-        group_col,
-        ".clone"
-      )))) %>%
-      dplyr::summarise(
-        n_cells = dplyr::n(),
-        n_unique_cdr3nt = dplyr::n_distinct(.cdr3_nt),
-        .groups = "drop"
-      ) %>%
-      dplyr::filter(n_cells >= 2L)
-  }))
-
-  if (is.null(diversity) || nrow(diversity) == 0L) {
-    return(NULL)
-  }
-
-  diversity[[group_col]] <- factor(
-    diversity[[group_col]],
-    levels = unique(diversity[[group_col]])
-  )
-
-  ggplot2::ggplot(
-    diversity,
-    ggplot2::aes(x = .data[[group_col]], y = n_unique_cdr3nt)
-  ) +
-    ggplot2::geom_boxplot(outlier.size = 0.4, fill = "#4c72a6", alpha = 0.55) +
-    ggplot2::scale_y_continuous(
-      trans = "log1p",
-      breaks = c(1, 2, 3, 5, 10, 20, 50, 100)
-    ) +
-    ggplot2::labs(
-      x = group_col,
-      y = "Unique CDR3-H3 nt per clone (size >=2)"
-    ) +
-    ggplot2::theme_classic(base_size = 11) +
-    ggplot2::theme(
-      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, vjust = 0.5)
-    )
-}
-
 ## ---- Helper: per-sample metadata (columns constant within each sample) -- ##
 sample_level_meta <- function(data) {
   shared_cols <- Reduce(intersect, lapply(data, colnames))
@@ -401,29 +304,12 @@ detect_chains <- function(data) {
   all_ct <- unlist(lapply(sample_dfs, function(df) {
     if ("CTgene" %in% names(df)) as.character(df$CTgene) else character(0)
   }))
-  chains <- character(0)
-  if (any(grepl("TRA", all_ct))) {
-    chains <- c(chains, "TRA")
-  }
-  if (any(grepl("TRB", all_ct))) {
-    chains <- c(chains, "TRB")
-  }
-  if (any(grepl("TRG", all_ct))) {
-    chains <- c(chains, "TRG")
-  }
-  if (any(grepl("TRD", all_ct))) {
-    chains <- c(chains, "TRD")
-  }
-  if (any(grepl("IGH", all_ct))) {
-    chains <- c(chains, "IGH")
-  }
-  if (any(grepl("IGK", all_ct))) {
-    chains <- c(chains, "IGK")
-  }
-  if (any(grepl("IGL", all_ct))) {
-    chains <- c(chains, "IGL")
-  }
-  chains
+  chains <- c("TRA", "TRB", "TRG", "TRD", "IGH", "IGK", "IGL")
+  chains[vapply(
+    chains,
+    function(chain) any(grepl(chain, all_ct, fixed = TRUE)),
+    logical(1)
+  )]
 }
 
 ## cache = "session" ensures caches are NOT shared across users/sessions.
@@ -449,7 +335,6 @@ for (module_file in c(
   "help.R",
   "help_guide.R",
   "paired_scatter_helpers.R",
-  "length_helpers.R",
   "compare_helpers.R",
   "visualizations.R"
 )) {

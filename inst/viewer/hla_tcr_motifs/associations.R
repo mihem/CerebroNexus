@@ -327,10 +327,48 @@ output$hla_associations_ui <- renderUI({
 ## swaps the rows in place without rebuilding the widget. Their dimensions are
 ## stable (summary = 3 status rows; breadth = one row per analysis unit), so
 ## replaceData is always a clean row-for-row swap.
+##
+## `skeleton` is the empty data frame the widget is rendered from; `headers`,
+## when given, is called inside the render so it may read reactives. Returns the
+## proxy.
+hla_overlap_live_table <- function(
+  id,
+  data,
+  skeleton,
+  options,
+  headers = NULL
+) {
+  output[[id]] <- DT::renderDataTable(
+    DT::datatable(
+      style = "bootstrap",
+      skeleton,
+      rownames = FALSE,
+      colnames = if (is.null(headers)) colnames(skeleton) else headers(),
+      class = "display nowrap",
+      options = options
+    )
+  )
+  proxy <- DT::dataTableProxy(id)
+  observeEvent(
+    {
+      req(hla_association_consumer_ready())
+      data()
+    },
+    {
+      DT::replaceData(
+        proxy,
+        data(),
+        resetPaging = FALSE,
+        rownames = FALSE
+      )
+    }
+  )
+  proxy
+}
 
 ## ---- Observed overlap summary ---------------------------------------------- ##
-hla_overlap_summary_data <- reactive({
-  empty <- data.frame(
+hla_overlap_summary_skeleton <- function() {
+  data.frame(
     "HLA status" = character(),
     "Analysis units" = integer(),
     "Units with feature" = integer(),
@@ -338,9 +376,12 @@ hla_overlap_summary_data <- reactive({
     check.names = FALSE,
     stringsAsFactors = FALSE
   )
+}
+
+hla_overlap_summary_data <- reactive({
   df <- hla_overlap_table()
   if (is.null(df) || nrow(df) == 0) {
-    return(empty)
+    return(hla_overlap_summary_skeleton())
   }
   statuses <- c("carrier", "non-carrier", "untyped")
   do.call(
@@ -363,39 +404,14 @@ hla_overlap_summary_data <- reactive({
   )
 })
 
-output$hla_overlap_summary <- DT::renderDataTable(
-  # scrollX: this table grows a column per carrier status and its headers are
-  # named after the data set's own unit, so its width is not something this
-  # layout can assume. Without it the table pushes the page sideways.
-  DT::datatable(
-    style = "bootstrap",
-    data.frame(
-      "HLA status" = character(),
-      "Analysis units" = integer(),
-      "Units with feature" = integer(),
-      "Observed feature prevalence" = character(),
-      check.names = FALSE,
-      stringsAsFactors = FALSE
-    ),
-    rownames = FALSE,
-    class = "display nowrap",
-    options = list(dom = "t", scrollX = TRUE)
-  )
-)
-hla_overlap_summary_proxy <- DT::dataTableProxy("hla_overlap_summary")
-observeEvent(
-  {
-    req(hla_association_consumer_ready())
-    hla_overlap_summary_data()
-  },
-  {
-    DT::replaceData(
-      hla_overlap_summary_proxy,
-      hla_overlap_summary_data(),
-      resetPaging = FALSE,
-      rownames = FALSE
-    )
-  }
+# scrollX: this table grows a column per carrier status and its headers are
+# named after the data set's own unit, so its width is not something this
+# layout can assume. Without it the table pushes the page sideways.
+hla_overlap_summary_proxy <- hla_overlap_live_table(
+  "hla_overlap_summary",
+  hla_overlap_summary_data,
+  hla_overlap_summary_skeleton(),
+  options = list(dom = "t", scrollX = TRUE)
 )
 
 ## ---- Per-unit breadth and cell fraction ------------------------------------ ##
@@ -428,37 +444,21 @@ hla_overlap_breadth_data <- reactive({
   df
 })
 
-output$hla_overlap_table <- DT::renderDataTable({
+hla_overlap_table_proxy <- hla_overlap_live_table(
+  "hla_overlap_table",
+  hla_overlap_breadth_data,
+  hla_overlap_breadth_skeleton(),
+  options = list(pageLength = 15, dom = "tip", scrollX = TRUE),
   # The core keeps neutral column names; the header names them for what this
   # data set actually holds, so bulk rows are never presented as cells. noun is
   # stable per data set, so this render fires once, not on Feature-type switches.
-  noun <- hla_unit_noun()
-  headers <- colnames(hla_overlap_breadth_skeleton())
-  headers[headers == "n_cells"] <- sprintf("n_%ss", noun)
-  headers[headers == "n_feature_cells"] <- sprintf("n_feature_%ss", noun)
-  headers[headers == "cell_fraction"] <- sprintf("%s_fraction", noun)
-  DT::datatable(
-    style = "bootstrap",
-    hla_overlap_breadth_skeleton(),
-    rownames = FALSE,
-    colnames = headers,
-    class = "display nowrap",
-    options = list(pageLength = 15, dom = "tip", scrollX = TRUE)
-  )
-})
-hla_overlap_table_proxy <- DT::dataTableProxy("hla_overlap_table")
-observeEvent(
-  {
-    req(hla_association_consumer_ready())
-    hla_overlap_breadth_data()
-  },
-  {
-    DT::replaceData(
-      hla_overlap_table_proxy,
-      hla_overlap_breadth_data(),
-      resetPaging = FALSE,
-      rownames = FALSE
-    )
+  headers = function() {
+    noun <- hla_unit_noun()
+    headers <- colnames(hla_overlap_breadth_skeleton())
+    headers[headers == "n_cells"] <- sprintf("n_%ss", noun)
+    headers[headers == "n_feature_cells"] <- sprintf("n_feature_%ss", noun)
+    headers[headers == "cell_fraction"] <- sprintf("%s_fraction", noun)
+    headers
   }
 )
 

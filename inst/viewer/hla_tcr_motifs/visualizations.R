@@ -369,17 +369,6 @@ hla_build_motif_visnet <- function(
     )
   }
 
-  n_multi <- if (snapshot) {
-    sum(graph$component_sizes >= 2L)
-  } else {
-    sum(igraph::components(graph)$csize >= 2L)
-  }
-  subtitle <- sprintf(
-    "%d CDR3 in %d motif(s). Edge = Hamming distance 1.",
-    n,
-    n_multi
-  )
-
   # Draw coordinates, computed once by igraph when the graph was built (see
   # hla_motif_layout) and carried on the vertices ever since. NULL only for a
   # graph built before this existed, in which case the renderer falls back to
@@ -409,9 +398,7 @@ hla_build_motif_visnet <- function(
       "MHC context"
     } else {
       color_col
-    },
-    subtitle = subtitle,
-    n_render = n
+    }
   )
 }
 

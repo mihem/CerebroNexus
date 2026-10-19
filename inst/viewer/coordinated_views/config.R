@@ -117,6 +117,55 @@ cv_config_logical <- function(value, path) {
   isTRUE(value)
 }
 
+## Field readers for one validated record; errors name `path.field`.
+cv_config_fields <- function(record, path) {
+  at <- function(field) cv_config_path(path, field)
+  lgl <- function(field) cv_config_logical(record[[field]], at(field))
+  list(
+    num = function(field, min = -Inf, max = Inf) {
+      cv_config_number(record[[field]], at(field), min, max)
+    },
+    lgl = lgl,
+    opt_lgl = function(field, default) {
+      if (is.null(record[[field]])) default else lgl(field)
+    }
+  )
+}
+
+cv_config_reject <- function(condition, message) {
+  if (isTRUE(condition)) {
+    cv_config_abort("invalid_reference", message)
+  }
+}
+
+## An array of records: each item is checked against `fields`, normalised by
+## `normalize(item, item_path)`, and identified by its `key` field.
+cv_config_record_array <- function(
+  value,
+  path,
+  fields,
+  normalize,
+  key,
+  duplicate_message,
+  max_items = 256L
+) {
+  items <- cv_config_array_values(value, path)
+  if (length(items) > max_items) {
+    cv_config_abort("too_many_items", paste0(path, " has too many items."))
+  }
+  out <- lapply(seq_along(items), function(index) {
+    item_path <- paste0(path, "[", index, "]")
+    normalize(
+      cv_config_record(items[[index]], fields, path = item_path),
+      item_path
+    )
+  })
+  if (anyDuplicated(vapply(out, `[[`, character(1), key))) {
+    cv_config_abort("duplicate_item", duplicate_message)
+  }
+  out
+}
+
 cv_config_array_values <- function(value, path) {
   if (is.null(value)) {
     return(list())
@@ -379,10 +428,11 @@ cv_config_dataset <- function(value, cells, fingerprint, mismatch_message) {
 
 cv_config_normalize_viewport <- function(value, path) {
   value <- cv_config_record(value, c("cx", "cy", "span"), path = path)
+  f <- cv_config_fields(value, path)
   list(
-    cx = cv_config_number(value$cx, cv_config_path(path, "cx"), -1e9, 1e9),
-    cy = cv_config_number(value$cy, cv_config_path(path, "cy"), -1e9, 1e9),
-    span = cv_config_number(value$span, cv_config_path(path, "span"), 1e-6, 1e6)
+    cx = f$num("cx", -1e9, 1e9),
+    cy = f$num("cy", -1e9, 1e9),
+    span = f$num("span", 1e-6, 1e6)
   )
 }
 
@@ -391,44 +441,35 @@ cv_config_normalize_rotation <- function(value, path) {
     return(NULL)
   }
   value <- cv_config_record(value, c("rx", "ry"), path = path)
-  list(
-    rx = cv_config_number(value$rx, cv_config_path(path, "rx"), -1e6, 1e6),
-    ry = cv_config_number(value$ry, cv_config_path(path, "ry"), -1e6, 1e6)
-  )
+  f <- cv_config_fields(value, path)
+  list(rx = f$num("rx", -1e6, 1e6), ry = f$num("ry", -1e6, 1e6))
 }
 
 cv_config_normalize_lenses <- function(value, path) {
-  items <- cv_config_array_values(value, path)
-  if (length(items) > 512L) {
-    cv_config_abort("too_many_items", paste0(path, " has too many items."))
-  }
-  out <- lapply(seq_along(items), function(index) {
-    item_path <- paste0(path, "[", index, "]")
-    item <- cv_config_record(
-      items[[index]],
-      c("space", "viewport", "rotation"),
-      path = item_path
-    )
-    list(
-      space = cv_config_string(item$space, cv_config_path(item_path, "space")),
-      viewport = cv_config_normalize_viewport(
-        item$viewport,
-        cv_config_path(item_path, "viewport")
-      ),
-      rotation = cv_config_normalize_rotation(
-        item$rotation,
-        cv_config_path(item_path, "rotation")
+  cv_config_record_array(
+    value,
+    path,
+    c("space", "viewport", "rotation"),
+    function(item, item_path) {
+      list(
+        space = cv_config_string(
+          item$space,
+          cv_config_path(item_path, "space")
+        ),
+        viewport = cv_config_normalize_viewport(
+          item$viewport,
+          cv_config_path(item_path, "viewport")
+        ),
+        rotation = cv_config_normalize_rotation(
+          item$rotation,
+          cv_config_path(item_path, "rotation")
+        )
       )
-    )
-  })
-  spaces <- vapply(out, `[[`, character(1), "space")
-  if (anyDuplicated(spaces)) {
-    cv_config_abort(
-      "duplicate_item",
-      paste0(path, " has duplicate lens identities.")
-    )
-  }
-  out
+    },
+    key = "space",
+    duplicate_message = paste0(path, " has duplicate lens identities."),
+    max_items = 512L
+  )
 }
 
 cv_config_normalize_filters <- function(value, path) {
@@ -458,31 +499,26 @@ cv_config_normalize_filters <- function(value, path) {
 }
 
 cv_config_normalize_hidden_levels <- function(value, path) {
-  items <- cv_config_array_values(value, path)
-  if (length(items) > 256L) {
-    cv_config_abort("too_many_items", paste0(path, " has too many items."))
-  }
-  out <- lapply(seq_along(items), function(index) {
-    item_path <- paste0(path, "[", index, "]")
-    item <- cv_config_record(
-      items[[index]],
-      c("group", "levels"),
-      path = item_path
-    )
-    list(
-      group = cv_config_string(item$group, cv_config_path(item_path, "group")),
-      levels = cv_config_string_array(
-        item$levels,
-        cv_config_path(item_path, "levels"),
-        max_items = 65536L
+  cv_config_record_array(
+    value,
+    path,
+    c("group", "levels"),
+    function(item, item_path) {
+      list(
+        group = cv_config_string(
+          item$group,
+          cv_config_path(item_path, "group")
+        ),
+        levels = cv_config_string_array(
+          item$levels,
+          cv_config_path(item_path, "levels"),
+          max_items = 65536L
+        )
       )
-    )
-  })
-  groups <- vapply(out, `[[`, character(1), "group")
-  if (anyDuplicated(groups)) {
-    cv_config_abort("duplicate_item", paste0(path, " has duplicate groups."))
-  }
-  out
+    },
+    key = "group",
+    duplicate_message = paste0(path, " has duplicate groups.")
+  )
 }
 
 cv_config_normalize_alignment <- function(value, path) {
@@ -501,90 +537,50 @@ cv_config_normalize_alignment <- function(value, path) {
     ),
     path = path
   )
+  f <- cv_config_fields(value, path)
   list(
-    offset_x = cv_config_number(
-      value$offset_x,
-      cv_config_path(path, "offset_x"),
-      -1e12,
-      1e12
-    ),
-    offset_y = cv_config_number(
-      value$offset_y,
-      cv_config_path(path, "offset_y"),
-      -1e12,
-      1e12
-    ),
-    scale_x = cv_config_number(
-      value$scale_x,
-      cv_config_path(path, "scale_x"),
-      1e-6,
-      1e6
-    ),
-    scale_y = cv_config_number(
-      value$scale_y,
-      cv_config_path(path, "scale_y"),
-      1e-6,
-      1e6
-    ),
-    rotation = cv_config_number(
-      value$rotation,
-      cv_config_path(path, "rotation"),
-      -1e6,
-      1e6
-    ),
-    lock_aspect = cv_config_logical(
-      value$lock_aspect,
-      cv_config_path(path, "lock_aspect")
-    ),
-    flip_x = cv_config_logical(value$flip_x, cv_config_path(path, "flip_x")),
-    flip_y = cv_config_logical(value$flip_y, cv_config_path(path, "flip_y")),
-    show = cv_config_logical(value$show, cv_config_path(path, "show"))
+    offset_x = f$num("offset_x", -1e12, 1e12),
+    offset_y = f$num("offset_y", -1e12, 1e12),
+    scale_x = f$num("scale_x", 1e-6, 1e6),
+    scale_y = f$num("scale_y", 1e-6, 1e6),
+    rotation = f$num("rotation", -1e6, 1e6),
+    lock_aspect = f$lgl("lock_aspect"),
+    flip_x = f$lgl("flip_x"),
+    flip_y = f$lgl("flip_y"),
+    show = f$lgl("show")
   )
 }
 
 cv_config_normalize_backgrounds <- function(value, path) {
-  items <- cv_config_array_values(value, path)
-  if (length(items) > 256L) {
-    cv_config_abort("too_many_items", paste0(path, " has too many items."))
-  }
-  out <- lapply(seq_along(items), function(index) {
-    item_path <- paste0(path, "[", index, "]")
-    item <- cv_config_record(
-      items[[index]],
-      c("section", "mode", "image_id", "opacity", "alignment"),
-      path = item_path
-    )
-    list(
-      section = cv_config_string(
-        item$section,
-        cv_config_path(item_path, "section")
-      ),
-      mode = cv_config_choice(
-        item$mode,
-        cv_config_path(item_path, "mode"),
-        c("auto", "none", "image")
-      ),
-      image_id = cv_config_nullable_string(
-        item$image_id,
-        cv_config_path(item_path, "image_id")
-      ),
-      opacity = cv_config_number(
-        item$opacity,
-        cv_config_path(item_path, "opacity"),
-        0,
-        1
-      ),
-      alignment = cv_config_normalize_alignment(
-        item$alignment,
-        cv_config_path(item_path, "alignment")
+  cv_config_record_array(
+    value,
+    path,
+    c("section", "mode", "image_id", "opacity", "alignment"),
+    function(item, item_path) {
+      list(
+        section = cv_config_string(
+          item$section,
+          cv_config_path(item_path, "section")
+        ),
+        mode = cv_config_choice(
+          item$mode,
+          cv_config_path(item_path, "mode"),
+          c("auto", "none", "image")
+        ),
+        image_id = cv_config_nullable_string(
+          item$image_id,
+          cv_config_path(item_path, "image_id")
+        ),
+        opacity = cv_config_fields(item, item_path)$num("opacity", 0, 1),
+        alignment = cv_config_normalize_alignment(
+          item$alignment,
+          cv_config_path(item_path, "alignment")
+        )
       )
-    )
-  })
-  sections <- vapply(out, `[[`, character(1), "section")
-  if (anyDuplicated(sections)) {
-    cv_config_abort("duplicate_item", paste0(path, " has duplicate sections."))
-  }
-  out
+    },
+    key = "section",
+    duplicate_message = paste0(path, " has duplicate sections.")
+  )
 }
 
 cv_config_normalize <- function(config, cells, fingerprint = NULL) {
@@ -696,6 +692,8 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
     c("dissolve_percentage", "evidence", "niche_radius"),
     path = "$.view.trekker"
   )
+  d <- cv_config_fields(display, "$.view.display")
+  tk <- cv_config_fields(trekker, "$.view.trekker")
 
   normalized <- list(
     schema = schema,
@@ -764,44 +762,12 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
         "$.view.hidden_levels"
       ),
       display = list(
-        percentage_cells = cv_config_number(
-          display$percentage_cells,
-          "$.view.display.percentage_cells",
-          5,
-          100
-        ),
-        point_size = cv_config_number(
-          display$point_size,
-          "$.view.display.point_size",
-          0,
-          20
-        ),
-        point_opacity = cv_config_number(
-          display$point_opacity,
-          "$.view.display.point_opacity",
-          0,
-          1
-        ),
-        group_labels = cv_config_logical(
-          display$group_labels,
-          "$.view.display.group_labels"
-        ),
-        cell_borders = if (is.null(display$cell_borders)) {
-          FALSE
-        } else {
-          cv_config_logical(
-            display$cell_borders,
-            "$.view.display.cell_borders"
-          )
-        },
-        background_images = if (is.null(display$background_images)) {
-          TRUE
-        } else {
-          cv_config_logical(
-            display$background_images,
-            "$.view.display.background_images"
-          )
-        },
+        percentage_cells = d$num("percentage_cells", 5, 100),
+        point_size = d$num("point_size", 0, 20),
+        point_opacity = d$num("point_opacity", 0, 1),
+        group_labels = d$lgl("group_labels"),
+        cell_borders = d$opt_lgl("cell_borders", FALSE),
+        background_images = d$opt_lgl("background_images", TRUE),
         selection_mode = cv_config_choice(
           display$selection_mode,
           "$.view.display.selection_mode",
@@ -812,14 +778,7 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
           "$.view.display.clone_layout",
           c("stack", "bands")
         ),
-        keep_square = if (is.null(display$keep_square)) {
-          FALSE
-        } else {
-          cv_config_logical(
-            display$keep_square,
-            "$.view.display.keep_square"
-          )
-        }
+        keep_square = d$opt_lgl("keep_square", FALSE)
       ),
       focus_space = cv_config_nullable_string(
         view$focus_space,
@@ -831,130 +790,69 @@ cv_config_normalize <- function(config, cells, fingerprint = NULL) {
         "$.view.spatial_backgrounds"
       ),
       trekker = list(
-        dissolve_percentage = cv_config_number(
-          trekker$dissolve_percentage,
-          "$.view.trekker.dissolve_percentage",
-          0,
-          95
-        ),
-        evidence = cv_config_logical(
-          trekker$evidence,
-          "$.view.trekker.evidence"
-        ),
-        niche_radius = cv_config_number(
-          trekker$niche_radius,
-          "$.view.trekker.niche_radius",
-          50,
-          500
-        )
+        dissolve_percentage = tk$num("dissolve_percentage", 0, 95),
+        evidence = tk$lgl("evidence"),
+        niche_radius = tk$num("niche_radius", 50, 500)
       )
     )
   )
 
   normalized_view <- normalized$view
-  if (
+  sections <- normalized_view$spatial_sections
+  lens_spaces <- vapply(normalized_view$lenses, `[[`, character(1), "space")
+  cv_config_reject(
     !is.null(normalized_view$active_spatial) &&
-      !normalized_view$active_spatial %in% normalized_view$spatial_sections
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "The active Spatial section is not part of this workspace."
-    )
-  }
-  lens_spaces <- vapply(
-    normalized_view$lenses,
-    `[[`,
-    character(1),
-    "space"
+      !normalized_view$active_spatial %in% sections,
+    "The active Spatial section is not part of this workspace."
   )
-  if (
+  cv_config_reject(
     !is.null(normalized_view$focus_space) &&
-      !normalized_view$focus_space %in% lens_spaces
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "The focused lens is not part of this workspace."
-    )
-  }
-  if (
+      !normalized_view$focus_space %in% lens_spaces,
+    "The focused lens is not part of this workspace."
+  )
+  cv_config_reject(
     !is.null(normalized$selection$geometry) &&
-      !normalized$selection$geometry$space %in% lens_spaces
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "The selection region is not part of this workspace."
+      !normalized$selection$geometry$space %in% lens_spaces,
+    "The selection region is not part of this workspace."
+  )
+  for (background in normalized_view$spatial_backgrounds) {
+    cv_config_reject(
+      !background$section %in% sections,
+      "A Spatial background refers to a section outside this workspace."
+    )
+    cv_config_reject(
+      identical(background$mode, "image") && is.null(background$image_id),
+      "An image background must identify its image."
     )
   }
-  if (length(normalized_view$spatial_backgrounds)) {
-    for (background in normalized_view$spatial_backgrounds) {
-      if (!background$section %in% normalized_view$spatial_sections) {
-        cv_config_abort(
-          "invalid_reference",
-          "A Spatial background refers to a section outside this workspace."
-        )
-      }
-      if (identical(background$mode, "image") && is.null(background$image_id)) {
-        cv_config_abort(
-          "invalid_reference",
-          "An image background must identify its image."
-        )
-      }
-    }
-  }
-  if (
-    identical(normalized_view$colour$mode, "__gene__") &&
-      is.null(normalized_view$colour$gene)
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "Gene colour mode must identify a gene."
-    )
-  }
-  if (
-    identical(normalized_view$colour$mode, "__rgb__") &&
-      length(normalized_view$colour$rgb_genes) != 3L
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "RGB colour mode requires exactly three genes."
-    )
-  }
-  if (
-    !identical(normalized_view$colour$mode, "__gene__") &&
-      !is.null(normalized_view$colour$gene)
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "Only gene colour mode may carry a selected gene."
-    )
-  }
-  if (
-    !identical(normalized_view$colour$mode, "__rgb__") &&
-      length(normalized_view$colour$rgb_genes)
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "Only RGB colour mode may carry RGB genes."
-    )
-  }
-  if (
-    identical(normalized_view$colour$mode, "__gene_panels__") &&
-      !length(normalized_view$colour$genes)
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "Per-gene panels must identify at least one gene."
-    )
-  }
-  if (
-    !normalized_view$colour$mode %in% c("__gene__", "__gene_panels__") &&
-      length(normalized_view$colour$genes)
-  ) {
-    cv_config_abort(
-      "invalid_reference",
-      "Only gene colour modes may carry genes."
-    )
-  }
+  chosen <- normalized_view$colour
+  gene_mode <- identical(chosen$mode, "__gene__")
+  rgb_mode <- identical(chosen$mode, "__rgb__")
+  cv_config_reject(
+    gene_mode && is.null(chosen$gene),
+    "Gene colour mode must identify a gene."
+  )
+  cv_config_reject(
+    rgb_mode && length(chosen$rgb_genes) != 3L,
+    "RGB colour mode requires exactly three genes."
+  )
+  cv_config_reject(
+    !gene_mode && !is.null(chosen$gene),
+    "Only gene colour mode may carry a selected gene."
+  )
+  cv_config_reject(
+    !rgb_mode && length(chosen$rgb_genes) > 0L,
+    "Only RGB colour mode may carry RGB genes."
+  )
+  cv_config_reject(
+    identical(chosen$mode, "__gene_panels__") && !length(chosen$genes),
+    "Per-gene panels must identify at least one gene."
+  )
+  cv_config_reject(
+    !chosen$mode %in% c("__gene__", "__gene_panels__") &&
+      length(chosen$genes) > 0L,
+    "Only gene colour modes may carry genes."
+  )
 
   normalized
 }
@@ -1118,18 +1016,11 @@ cv_specialist_canvas_viewport <- function(value, path) {
   }
   keys <- names(value)
   if (!is.null(keys) && all(c("x0", "x1", "y0", "y1") %in% keys)) {
-    legacy <- cv_config_record(value, c("x0", "x1", "y0", "y1"), path = path)
-    x0 <- cv_config_number(legacy$x0, cv_config_path(path, "x0"), -1e6, 1e6)
-    x1 <- cv_config_number(legacy$x1, cv_config_path(path, "x1"), -1e6, 1e6)
-    y0 <- cv_config_number(legacy$y0, cv_config_path(path, "y0"), -1e6, 1e6)
-    y1 <- cv_config_number(legacy$y1, cv_config_path(path, "y1"), -1e6, 1e6)
-    if (x0 >= x1 || y0 >= y1) {
-      cv_config_abort("invalid_value", "The saved viewport is invalid.")
-    }
+    box <- cv_specialist_network_viewport(value, path)
     return(list(
-      cx = (x0 + x1) / 2,
-      cy = (y0 + y1) / 2,
-      span = max(x1 - x0, y1 - y0)
+      cx = (box$x0 + box$x1) / 2,
+      cy = (box$y0 + box$y1) / 2,
+      span = max(box$x1 - box$x0, box$y1 - box$y0)
     ))
   }
   cv_config_normalize_viewport(value, path)
@@ -1141,11 +1032,12 @@ cv_specialist_network_viewport <- function(value, path) {
     c("x0", "x1", "y0", "y1"),
     path = path
   )
+  f <- cv_config_fields(viewport, path)
   normalized <- list(
-    x0 = cv_config_number(viewport$x0, cv_config_path(path, "x0"), -1e6, 1e6),
-    x1 = cv_config_number(viewport$x1, cv_config_path(path, "x1"), -1e6, 1e6),
-    y0 = cv_config_number(viewport$y0, cv_config_path(path, "y0"), -1e6, 1e6),
-    y1 = cv_config_number(viewport$y1, cv_config_path(path, "y1"), -1e6, 1e6)
+    x0 = f$num("x0", -1e6, 1e6),
+    x1 = f$num("x1", -1e6, 1e6),
+    y0 = f$num("y0", -1e6, 1e6),
+    y1 = f$num("y1", -1e6, 1e6)
   )
   if (normalized$x0 >= normalized$x1 || normalized$y0 >= normalized$y1) {
     cv_config_abort("invalid_value", "The saved viewport is invalid.")
@@ -1199,24 +1091,20 @@ cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
   )
   page_id <- cv_config_string(page$id, "$.page.id", 80L)
   page_spec <- cv_specialist_page_specs[[page_id]]
-  if (is.null(page_spec)) {
-    cv_config_abort(
-      "invalid_reference",
-      "This page is not supported by saved views."
-    )
-  }
+  cv_config_reject(
+    is.null(page_spec),
+    "This page is not supported by saved views."
+  )
   normalized_page <- list(
     id = page_id,
     label = cv_config_string(page$label, "$.page.label", 80L),
     tab = cv_config_string(page$tab, "$.page.tab", 80L),
     engine = cv_config_string(page$engine, "$.page.engine", 20L)
   )
-  if (!identical(normalized_page[names(page_spec)[1:3]], page_spec[1:3])) {
-    cv_config_abort(
-      "invalid_reference",
-      "The saved-view page identity is invalid."
-    )
-  }
+  cv_config_reject(
+    !identical(normalized_page[names(page_spec)[1:3]], page_spec[1:3]),
+    "The saved-view page identity is invalid."
+  )
 
   selection <- cv_config_record(
     config$selection,
@@ -1287,45 +1175,48 @@ cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
     c("x", "y"),
     path = "$.view.rotation"
   )
+  r <- cv_config_fields(rotation, "$.view.rotation")
 
-  raw_controls <- cv_config_array_values(config$controls, "$.controls")
-  if (length(raw_controls) > 256L) {
-    cv_config_abort("too_many_items", "$.controls has too many items.")
-  }
-  controls <- lapply(seq_along(raw_controls), function(index) {
-    path <- paste0("$.controls[", index, "]")
-    control <- cv_config_record(
-      raw_controls[[index]],
-      c("id", "value_type", "multiple", "values"),
-      path = path
-    )
-    id <- cv_config_string(control$id, paste0(path, ".id"), 128L)
-    if (!startsWith(id, page_spec$prefix)) {
-      cv_config_abort(
-        "invalid_reference",
+  controls <- cv_config_record_array(
+    config$controls,
+    "$.controls",
+    c("id", "value_type", "multiple", "values"),
+    function(control, path) {
+      id <- cv_config_string(control$id, paste0(path, ".id"), 128L)
+      cv_config_reject(
+        !startsWith(id, page_spec$prefix),
         paste0(id, " is not allowed on this page.")
       )
-    }
-    value_type <- cv_config_choice(
-      control$value_type,
-      paste0(path, ".value_type"),
-      c("string", "number", "logical")
-    )
-    multiple <- cv_config_logical(control$multiple, paste0(path, ".multiple"))
-    values <- cv_specialist_control_values(
-      control$values,
-      value_type,
-      paste0(path, ".values")
-    )
-    if (!multiple && length(values) != 1L) {
-      cv_config_abort("invalid_value", paste0(path, " must contain one value."))
-    }
-    list(id = id, value_type = value_type, multiple = multiple, values = values)
-  })
-  control_ids <- vapply(controls, `[[`, character(1), "id")
-  if (anyDuplicated(control_ids)) {
-    cv_config_abort("duplicate_item", "$.controls contains duplicate inputs.")
-  }
+      value_type <- cv_config_choice(
+        control$value_type,
+        paste0(path, ".value_type"),
+        c("string", "number", "logical")
+      )
+      multiple <- cv_config_logical(
+        control$multiple,
+        paste0(path, ".multiple")
+      )
+      values <- cv_specialist_control_values(
+        control$values,
+        value_type,
+        paste0(path, ".values")
+      )
+      if (!multiple && length(values) != 1L) {
+        cv_config_abort(
+          "invalid_value",
+          paste0(path, " must contain one value.")
+        )
+      }
+      list(
+        id = id,
+        value_type = value_type,
+        multiple = multiple,
+        values = values
+      )
+    },
+    key = "id",
+    duplicate_message = "$.controls contains duplicate inputs."
+  )
 
   list(
     schema = CV_SPECIALIST_CONFIG_SCHEMA,
@@ -1336,10 +1227,7 @@ cv_specialist_normalize <- function(config, cells, fingerprint = NULL) {
     selection = list(cells = selected_cells, geometry = geometry),
     view = list(
       viewport = normalized_viewport,
-      rotation = list(
-        x = cv_config_number(rotation$x, "$.view.rotation.x", -1e6, 1e6),
-        y = cv_config_number(rotation$y, "$.view.rotation.y", -1e6, 1e6)
-      ),
+      rotation = list(x = r$num("x", -1e6, 1e6), y = r$num("y", -1e6, 1e6)),
       mode = cv_config_choice(
         view$mode,
         "$.view.mode",

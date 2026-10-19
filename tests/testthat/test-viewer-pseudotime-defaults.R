@@ -5,8 +5,6 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
     environment()
   )
   defaults <- builderViewerDisplayDefaults(list(
-    gene_show_trend_line = FALSE,
-    gene_trend_line_width = 4,
     trajectory_density_opacity = .3,
     trajectory_show_trend_line = FALSE,
     trajectory_trend_line_width = 5
@@ -23,11 +21,7 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
     boxTitle <- shiny::tags$span
     cerebroInfoButton <- function(...) NULL
     cerebroRegisterInfo <- function(...) invisible(NULL)
-    expression_projection_summary_ready <- function() TRUE
     trajectory_projection_sent <- function() TRUE
-    availableProjections <- function() "umap"
-    getMethodsForTrajectories <- function() "method"
-    getNamesOfTrajectories <- function(method) "path"
     getVariableToCompareChoices <- function() "score"
     preferences <- list(use_webgl = FALSE)
     cells <- data.frame(
@@ -47,22 +41,16 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
     cerebro_plotly_toolbar <- identity
     `%>%` <- dplyr::`%>%`
     sys.source(
-      viewer_test_path("gene_expression", "UI_expression_by_pseudotime.R"),
-      environment()
-    )
-    sys.source(
       viewer_test_path("trajectory", "distribution_along_pseudotime.R"),
       environment()
     )
   }
   shiny::testServer(server, {
     session$setInputs(
-      expression_projection_to_display = "method // path",
       trajectory_distribution_section_visible = TRUE,
       trajectory_selected_method = "method",
       trajectory_selected_name = "path"
     )
-    gene <- output$expression_by_pseudotime_UI$html
     traj <- output$trajectory_distribution_along_pseudotime_UI$html
     attr <- function(doc, id, name) {
       inputs <- regmatches(doc, gregexpr("<input\\b[^>]*>", doc, perl = TRUE))[[
@@ -76,19 +64,6 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
       )[[1L]]
       if (length(match)) match[[2L]] else NA_character_
     }
-    expect_true(is.na(attr(
-      gene,
-      "expression_by_pseudotime_show_trend_line",
-      "checked"
-    )))
-    expect_equal(
-      as.numeric(attr(
-        gene,
-        "expression_by_pseudotime_trend_line_width",
-        "data-from"
-      )),
-      4
-    )
     expect_true(is.na(attr(
       traj,
       "trajectory_distribution_along_pseudotime_show_trend_line",

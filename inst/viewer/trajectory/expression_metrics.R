@@ -79,243 +79,104 @@ output[["trajectory_expression_metrics_UI"]] <- renderUI({
 })
 
 ##----------------------------------------------------------------------------##
-## Number of transcripts.
+## One UI/text/plot output triple per metric. The spec name is both the output
+## ID infix (trajectory_states_<name>_*) and the plot cache key.
 ##----------------------------------------------------------------------------##
 
-output[["trajectory_states_nUMI_UI"]] <- renderUI({
-  if ("nUMI" %in% colnames(viewerProjectionFirstFrameMetadata())) {
-    plotly::plotlyOutput("trajectory_states_nUMI_plot")
-  } else {
-    textOutput("trajectory_states_nUMI_text")
-  }
-})
-
-output[["trajectory_states_nUMI_text"]] <- renderText({
-  "Column with number of transcript per cell not available."
-})
-
-output[["trajectory_states_nUMI_plot"]] <- plotly::renderPlotly({
-  ##
-  req(trajectory_selection_ok())
-
-  ## collect trajectory data
-  trajectory_data <- trajectory_data_reactive()[["meta"]]
-
-  ##
-  state_colors <- setNames(
-    cerebro_group_colors(length(levels(trajectory_data$state))),
-    levels(trajectory_data$state)
-  )
-
-  ##
-  plotlyViolin(
-    table = trajectory_cells_reactive("nUMI"),
-    metric = "nUMI",
-    coloring_variable = "state",
-    colors = state_colors,
+trajectory_expression_metric_specs <- list(
+  nUMI = list(
+    available = function() {
+      "nUMI" %in% colnames(viewerProjectionFirstFrameMetadata())
+    },
+    column = function() "nUMI",
+    missing = "Column with number of transcript per cell not available.",
     y_title = "Number of transcripts",
     mode = "integer"
-  )
-}) %>%
-  cachePlot(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    "nUMI",
-    available_crb_files$selected
-  )
-
-##----------------------------------------------------------------------------##
-## Number of expressed genes.
-##----------------------------------------------------------------------------##
-
-output[["trajectory_states_nGene_UI"]] <- renderUI({
-  if ("nGene" %in% colnames(viewerProjectionFirstFrameMetadata())) {
-    plotly::plotlyOutput("trajectory_states_nGene_plot")
-  } else {
-    textOutput("trajectory_states_nGene_text")
-  }
-})
-
-output[["trajectory_states_nGene_text"]] <- renderText({
-  "Column with number of expressed genes per cell not available."
-})
-
-output[["trajectory_states_nGene_plot"]] <- plotly::renderPlotly({
-  ##
-  req(trajectory_selection_ok())
-
-  ## collect trajectory data
-  trajectory_data <- trajectory_data_reactive()[["meta"]]
-
-  ##
-  state_colors <- setNames(
-    cerebro_group_colors(length(levels(trajectory_data$state))),
-    levels(trajectory_data$state)
-  )
-
-  ##
-  plotlyViolin(
-    table = trajectory_cells_reactive("nGene"),
-    metric = "nGene",
-    coloring_variable = "state",
-    colors = state_colors,
+  ),
+  nGene = list(
+    available = function() {
+      "nGene" %in% colnames(viewerProjectionFirstFrameMetadata())
+    },
+    column = function() "nGene",
+    missing = "Column with number of expressed genes per cell not available.",
     y_title = "Number of expressed genes",
     mode = "integer"
-  )
-}) %>%
-  cachePlot(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    "nGene",
-    available_crb_files$selected
-  )
-
-##----------------------------------------------------------------------------##
-## Expression from mitochondrial genes.
-##----------------------------------------------------------------------------##
-
-output[["trajectory_states_percent_mt_UI"]] <- renderUI({
-  if (hasMitoColumn()) {
-    plotly::plotlyOutput("trajectory_states_percent_mt_plot")
-  } else {
-    textOutput("trajectory_states_percent_mt_text")
-  }
-})
-
-output[["trajectory_states_percent_mt_text"]] <- renderText({
-  "Column with percentage of mitochondrial expression not available."
-})
-
-output[["trajectory_states_percent_mt_plot"]] <- plotly::renderPlotly({
-  ##
-  req(trajectory_selection_ok())
-
-  mito_col <- getMitoColumn()
-  req(mito_col)
-
-  ## collect trajectory data
-  trajectory_data <- trajectory_data_reactive()[["meta"]]
-
-  ##
-  state_colors <- setNames(
-    cerebro_group_colors(length(levels(trajectory_data$state))),
-    levels(trajectory_data$state)
-  )
-
-  ##
-  plotlyViolin(
-    table = trajectory_cells_reactive(mito_col),
-    metric = mito_col,
-    coloring_variable = "state",
-    colors = state_colors,
+  ),
+  percent_mt = list(
+    available = function() hasMitoColumn(),
+    column = function() getMitoColumn(),
+    missing = "Column with percentage of mitochondrial expression not available.",
+    y_title = "Percentage of transcripts",
+    mode = "percent"
+  ),
+  percent_ribo = list(
+    available = function() hasRiboColumn(),
+    column = function() getRiboColumn(),
+    missing = "Column with percentage of ribosomal expression not available.",
+    y_title = "Percentage of transcripts",
+    mode = "percent"
+  ),
+  percent_ery = list(
+    available = function() hasEryColumn(),
+    column = function() getEryColumn(),
+    missing = "Column with percentage of erythrocyte/hemoglobin expression not available.",
     y_title = "Percentage of transcripts",
     mode = "percent"
   )
-}) %>%
-  cachePlot(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    "percent_mt",
-    available_crb_files$selected
-  )
+)
 
-##----------------------------------------------------------------------------##
-## Expression from ribosomal genes.
-##----------------------------------------------------------------------------##
+for (trajectory_metric in names(trajectory_expression_metric_specs)) {
+  local({
+    metric <- trajectory_metric
+    spec <- trajectory_expression_metric_specs[[metric]]
+    output_id <- paste0("trajectory_states_", metric)
 
-output[["trajectory_states_percent_ribo_UI"]] <- renderUI({
-  if (hasRiboColumn()) {
-    plotly::plotlyOutput("trajectory_states_percent_ribo_plot")
-  } else {
-    textOutput("trajectory_states_percent_ribo_text")
-  }
-})
+    output[[paste0(output_id, "_UI")]] <- renderUI({
+      if (spec$available()) {
+        plotly::plotlyOutput(paste0(output_id, "_plot"))
+      } else {
+        textOutput(paste0(output_id, "_text"))
+      }
+    })
 
-output[["trajectory_states_percent_ribo_text"]] <- renderText({
-  "Column with percentage of ribosomal expression not available."
-})
+    output[[paste0(output_id, "_text")]] <- renderText({
+      spec$missing
+    })
 
-output[["trajectory_states_percent_ribo_plot"]] <- plotly::renderPlotly({
-  ##
-  req(trajectory_selection_ok())
+    output[[paste0(output_id, "_plot")]] <- plotly::renderPlotly({
+      ##
+      req(trajectory_selection_ok())
 
-  ribo_col <- getRiboColumn()
-  req(ribo_col)
+      column <- spec$column()
+      req(column)
 
-  ## collect trajectory data
-  trajectory_data <- trajectory_data_reactive()[["meta"]]
+      ## collect trajectory data
+      trajectory_data <- trajectory_data_reactive()[["meta"]]
 
-  ##
-  state_colors <- setNames(
-    cerebro_group_colors(length(levels(trajectory_data$state))),
-    levels(trajectory_data$state)
-  )
+      ##
+      state_colors <- setNames(
+        cerebro_group_colors(length(levels(trajectory_data$state))),
+        levels(trajectory_data$state)
+      )
 
-  ##
-  plotlyViolin(
-    table = trajectory_cells_reactive(ribo_col),
-    metric = ribo_col,
-    coloring_variable = "state",
-    colors = state_colors,
-    y_title = "Percentage of transcripts",
-    mode = "percent"
-  )
-}) %>%
-  cachePlot(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    "percent_ribo",
-    available_crb_files$selected
-  )
-
-##----------------------------------------------------------------------------##
-## Expression from erythrocyte/hemoglobin genes.
-##----------------------------------------------------------------------------##
-
-output[["trajectory_states_percent_ery_UI"]] <- renderUI({
-  if (hasEryColumn()) {
-    plotly::plotlyOutput("trajectory_states_percent_ery_plot")
-  } else {
-    textOutput("trajectory_states_percent_ery_text")
-  }
-})
-
-output[["trajectory_states_percent_ery_text"]] <- renderText({
-  "Column with percentage of erythrocyte/hemoglobin expression not available."
-})
-
-output[["trajectory_states_percent_ery_plot"]] <- plotly::renderPlotly({
-  ##
-  req(trajectory_selection_ok())
-
-  ery_col <- getEryColumn()
-  req(ery_col)
-
-  ## collect trajectory data
-  trajectory_data <- trajectory_data_reactive()[["meta"]]
-
-  ##
-  state_colors <- setNames(
-    cerebro_group_colors(length(levels(trajectory_data$state))),
-    levels(trajectory_data$state)
-  )
-
-  ##
-  plotlyViolin(
-    table = trajectory_cells_reactive(ery_col),
-    metric = ery_col,
-    coloring_variable = "state",
-    colors = state_colors,
-    y_title = "Percentage of transcripts",
-    mode = "percent"
-  )
-}) %>%
-  cachePlot(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
-    "percent_ery",
-    available_crb_files$selected
-  )
+      ##
+      plotlyViolin(
+        table = trajectory_cells_reactive(column),
+        metric = column,
+        coloring_variable = "state",
+        colors = state_colors,
+        y_title = spec$y_title,
+        mode = spec$mode
+      )
+    }) %>%
+      cachePlot(
+        input[["trajectory_selected_method"]],
+        input[["trajectory_selected_name"]],
+        metric,
+        available_crb_files$selected
+      )
+  })
+}
 
 ##----------------------------------------------------------------------------##
 ## Info box that gets shown when pressing the "info" button.

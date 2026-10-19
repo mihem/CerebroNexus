@@ -5,34 +5,6 @@
 ##----------------------------------------------------------------------------##
 
 ##----------------------------------------------------------------------------##
-## Info box that gets shown when pressing the "info" button.
-##----------------------------------------------------------------------------##
-
-cerebroRegisterInfo(
-  input,
-  "trajectory_projection_main_parameters_info",
-  trajectory_projection_main_parameters_info
-)
-
-##----------------------------------------------------------------------------##
-## Text in info box.
-##----------------------------------------------------------------------------##
-
-trajectory_projection_main_parameters_info <- list(
-  title = "Main parameters for projection of trajectory",
-  text = HTML(
-    "
-    The elements in this panel allow you to control what and how results are displayed across the whole tab.
-    <ul>
-      <li><b>Choose a method:</b> Select the trajectory method.</li>
-      <li><b>Choose a trajectory:</b> Select the trajectory to display.</li>
-      <li><b>Colour by:</b> Select a trajectory measure or one of the data set's registered grouping variables.</li>
-    </ul>
-    "
-  )
-)
-
-##----------------------------------------------------------------------------##
 ## UI elements for additional parameters of projection plot.
 ##----------------------------------------------------------------------------##
 

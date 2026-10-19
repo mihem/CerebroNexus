@@ -38,10 +38,7 @@ test_that("enrichment method changes preserve valid choices and reject stale met
           empty = character()
         )
       }
-      sys.source(
-        viewer_test_path("enriched_pathways", "select_content.R"),
-        scope
-      )
+      viewer_result_page_load("enriched_pathways", scope)
     },
     {
       session$flushReact()

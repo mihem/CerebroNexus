@@ -429,6 +429,7 @@ test_that("every scrolling table keeps its cells on one line", {
       hla_has_typing <- function() TRUE
       hla_ir_samples <- function() c("s1", "s2")
       hla_unit_noun <- function() "cell"
+      hla_association_consumer_ready <- function() FALSE
       viewer_server_load(
         viewer_server_statements("hla_tcr_motifs", "data_qc.R"),
         scope,
@@ -443,9 +444,13 @@ test_that("every scrolling table keeps its cells on one line", {
         viewer_server_statements("hla_tcr_motifs", "associations.R"),
         scope,
         names = c(
+          "hla_overlap_live_table",
+          "hla_overlap_summary_skeleton",
           "hla_overlap_breadth_skeleton",
-          "output$hla_overlap_summary",
-          "output$hla_overlap_table",
+          "hla_overlap_summary_data",
+          "hla_overlap_breadth_data",
+          "hla_overlap_summary_proxy",
+          "hla_overlap_table_proxy",
           "output$hla_allele_matrix"
         )
       )

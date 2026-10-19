@@ -234,7 +234,7 @@ test_that("embedded Extra material escapes CRB-controlled HTML", {
       return(list())
     }
     found <- if (
-      is.call(node) && identical(node[[1L]], as.name("prettifyTable"))
+      is.call(node) && identical(node[[1L]], as.name("cerebroResultTable"))
     ) {
       list(node)
     } else {
@@ -258,7 +258,7 @@ test_that("embedded Extra material escapes CRB-controlled HTML", {
     selection = selection,
     input = input,
     extra_material_table_filter = function(...) "none",
-    prettifyTable = prettifyTable
+    cerebroResultTable = utils_env$cerebroResultTable
   ))
 
   widget <- eval(calls[[1L]], envir = evaluation)

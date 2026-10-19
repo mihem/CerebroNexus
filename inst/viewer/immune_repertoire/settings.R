@@ -11,8 +11,8 @@ ir_keep_selection <- function(previous, choices, default) {
 ## ---- Main parameters (left column, box 1) ----------------------------- ##
 ## Core controls needed to select a plot: the global cloneCall / chain /
 ## group-by (shown only on tabs they apply to) plus the current tab's
-## function-specific analysis parameters (IR_PARAM_SPEC). Scatter / Compare
-## sample selectors live here too, scoped to their tabs.
+## function-specific analysis parameters (IR_PARAM_SPEC). The Compare sample
+## selector lives here too, scoped to its tab.
 output$ir_main_params_UI <- shiny::bindEvent(
   renderUI({
     if (!has_scRepertoire()) {
@@ -118,7 +118,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
         ""
       }
       group_label <- if (
-        !is.null(tab) && tab %in% c("Paired Scatter", "Scatter", "Compare")
+        !is.null(tab) && tab %in% c("Paired Scatter", "Compare")
       ) {
         "Compare by:"
       } else {
@@ -143,11 +143,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
       ir_flow_controls(controls),
       # High-frequency analysis parameters for the current tab.
       uiOutput("ir_primary_param_panel"),
-      # Scatter / Compare sample selectors only on their own tabs.
-      conditionalPanel(
-        condition = "input.ir_tabs == 'Scatter'",
-        uiOutput("ir_scatter_settings")
-      ),
+      # Compare sample selector only on its own tab.
       conditionalPanel(
         condition = "input.ir_tabs == 'Compare'",
         uiOutput("ir_compare_settings")
@@ -243,41 +239,6 @@ ir_flow_controls_inline <- function(controls, min_width = "160px") {
   )
 }
 
-## ---- Scatter sample selectors (Scatter tab only) --------------------- ##
-output$ir_scatter_settings <- renderUI({
-  available_samples <- ir_compare_groups()
-  if (length(available_samples) < 2) {
-    return(helpText(
-      "Clonal scatter compares two groups. Use 'Group by' above to",
-      "divide the data into at least two groups."
-    ))
-  }
-  fluidRow(
-    column(
-      6,
-      # selectize = FALSE: see ir_chain — selectize widgets rendered inside a
-      # hidden conditionalPanel drop all but the selected option.
-      selectInput(
-        "ir_scatter_x",
-        "Scatter: X axis",
-        choices = available_samples,
-        selected = available_samples[1],
-        selectize = FALSE
-      )
-    ),
-    column(
-      6,
-      selectInput(
-        "ir_scatter_y",
-        "Scatter: Y axis",
-        choices = available_samples,
-        selected = available_samples[2],
-        selectize = FALSE
-      )
-    )
-  )
-})
-
 ## ---- Compare sample selector (Compare tab only) ---------------------- ##
 output$ir_compare_settings <- renderUI({
   available_samples <- ir_compare_groups()
@@ -323,35 +284,6 @@ output$ir_compare_settings <- renderUI({
       ))
     )
   )
-})
-
-## ---- Available gene-segment families (for vizGenes x.axis) ------------ ##
-ir_gene_families <- reactive({
-  raw <- ir_data_raw()
-  fams <- c(
-    "TRAV",
-    "TRAJ",
-    "TRBV",
-    "TRBD",
-    "TRBJ",
-    "TRGV",
-    "TRGJ",
-    "TRDV",
-    "TRDJ",
-    "IGHV",
-    "IGHD",
-    "IGHJ",
-    "IGKV",
-    "IGKJ",
-    "IGLV",
-    "IGLJ"
-  )
-  if (is.null(raw)) {
-    return(fams)
-  }
-  all_ct <- paste(unlist(lapply(raw, function(d) d$CTgene)), collapse = ";")
-  present <- fams[vapply(fams, function(f) grepl(f, all_ct), logical(1))]
-  if (length(present) == 0) fams else present
 })
 
 ## ---- Function-specific parameter panels (driven by IR_PARAM_SPEC) ----- ##
@@ -440,14 +372,6 @@ ir_analysis_panel <- function(more = FALSE) {
     if (identical(choices, "<<groups>>")) {
       groups <- tryCatch(getGroups(), error = function(e) character(0))
       choices <- c("None" = "", groups)
-    } else if (identical(choices, "<<genes>>")) {
-      choices <- ir_gene_families()
-    } else if (identical(choices, "<<property_methods>>")) {
-      # detected at runtime (immApex availability)
-      choices <- names(available_property_methods())
-      if (is.null(selected) || !selected %in% choices) {
-        selected <- choices[1]
-      }
     } else if (identical(choices, "<<receptors>>")) {
       # TCR / BCR — only the receptor classes present in the data.
       choices <- ir_receptor_types()
@@ -703,8 +627,8 @@ ir_umap_cells_to_show <- reactive({
 })
 
 ## ---- Info dialogs: explain the parameters shown on the current tab ---- ##
-## The top bar and drawer info buttons explain the controls visible on the
-## current tab. Text comes from IR_PARAM_DESC so it cannot drift from the UI.
+## The drawer info buttons explain the controls visible on the current tab.
+## Text comes from IR_PARAM_DESC so it cannot drift from the UI.
 
 ## Render a list of param ids as styled help cards (bold name + plain text).
 ir_param_help_cards <- function(ids) {
@@ -728,13 +652,9 @@ ir_param_help_cards <- function(ids) {
   div(class = "ir-help-cards", do.call(tagList, cards))
 }
 
-## Lookup: input id -> human label (from IR_PARAM_SPEC / display / globals).
+## Lookup: input id -> human label (from IR_PARAM_SPEC / display params).
 IR_PARAM_LABELS <- local({
-  labs <- list(
-    ir_cloneCall = "Clone call",
-    ir_chain = "Chain",
-    ir_groupBy = "Group by"
-  )
+  labs <- list()
   for (tab in names(IR_PARAM_SPEC)) {
     for (p in IR_PARAM_SPEC[[tab]]) {
       labs[[p$id]] <- sub(":\\s*$", "", p$label)
@@ -745,24 +665,6 @@ IR_PARAM_LABELS <- local({
   }
   labs[[IR_ORDER_BY_PARAM$id]] <- sub(":\\s*$", "", IR_ORDER_BY_PARAM$label)
   labs
-})
-
-## Main parameters info: global controls + top-bar analysis params.
-observeEvent(input$ir_main_parameters_info, {
-  tab <- input$ir_tabs
-  spec_ids <- vapply(
-    ir_analysis_spec(tab, more = FALSE),
-    function(p) p$id,
-    character(1)
-  )
-  ids <- c(ir_visible_global_ids(tab), spec_ids)
-  showModal(modalDialog(
-    title = paste0("Main parameters", if (!is.null(tab)) paste0(" — ", tab)),
-    ir_param_help_cards(ids),
-    easyClose = TRUE,
-    footer = modalButton("Close"),
-    size = "l"
-  ))
 })
 
 observeEvent(input$ir_more_analysis_info, {

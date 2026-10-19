@@ -67,6 +67,7 @@ test_that("HLA graphs recover from unbound controls and cache by the actual coho
           "hla_params_ready",
           "hla_bindCache",
           "hla_min_nodes_debounced",
+          "hla_graph_cache_key",
           "hla_motif_graph_raw_cached",
           "hla_motif_graph_cached",
           "hla_motif_graph",

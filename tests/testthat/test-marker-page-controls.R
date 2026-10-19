@@ -14,7 +14,7 @@ test_that("marker selectors start together and follow valid method choices", {
       getMethodsForMarkerGenes <- function() names(catalog())
       getGroupsWithMarkerGenes <- function(method) catalog()[[method]]
       getMetaData <- function() stop("control creation must not read metadata")
-      sys.source(viewer_test_path("marker_genes", "select_content.R"), scope)
+      viewer_result_page_load("marker_genes", scope)
     },
     {
       session$flushReact()
@@ -56,10 +56,6 @@ test_that("marker selectors start together and follow valid method choices", {
 })
 
 test_that("marker result shell distinguishes missing and empty results", {
-  result_ui <- viewer_r_assignment(
-    viewer_test_path("marker_genes", "table.R"),
-    "output.marker_genes_table_or_text_UI"
-  )
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
@@ -73,7 +69,7 @@ test_that("marker result shell distinguishes missing and empty results", {
         result()
       }
       cerebroResultTableControls <- function(...) p("Table controls")
-      eval(result_ui, scope)
+      viewer_result_page_load("marker_genes", scope)
     },
     {
       session$flushReact()

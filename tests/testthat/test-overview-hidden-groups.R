@@ -78,3 +78,47 @@ test_that("hidden groups not present in the data are ignored", {
   out <- f(fx$selection, fx$metadata, "sample", "sample_ZZZ")
   expect_equal(out, fx$selection)
 })
+
+test_that("viewerVisibleSelection reads cells only when a group is hidden", {
+  env <- new.env()
+  sys.source(viewer_test_path("utility_functions.R"), envir = env)
+  context <- list(epoch = "s", dataset_key = "A", generation = 1)
+  reads <- 0L
+  cells <- function() {
+    reads <<- reads + 1L
+    data.frame(
+      group = c("a", "b", "a"),
+      DR_1 = c(1, 2, 3),
+      DR_2 = c(4, 5, 6)
+    )
+  }
+  selection <- data.frame(identifier = c("1-4", "2-5", "3-6"))
+  visible <- function(request) {
+    env$viewerVisibleSelection(
+      selection,
+      request,
+      context,
+      "group",
+      cells,
+      coordinates = c("DR_1", "DR_2")
+    )
+  }
+  expect_identical(visible(NULL), selection)
+  expect_identical(
+    visible(list(
+      groups = "a",
+      dataset_context = modifyList(
+        context,
+        list(generation = 2)
+      )
+    )),
+    selection
+  )
+  expect_identical(reads, 0L)
+  expect_identical(
+    visible(list(groups = "a", dataset_context = context))$identifier,
+    "2-5"
+  )
+  expect_null(visible(list(groups = c("a", "b"), dataset_context = context)))
+  expect_identical(reads, 2L)
+})

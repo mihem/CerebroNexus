@@ -6,27 +6,11 @@ IR_HELP_DEMO_KINDS <- c(
   "Abundance" = "backed",
   "Diversity" = "backed",
   "Homeostasis" = "backed",
-  "Length" = "backed",
-  "Proportion" = "backed",
-  "Quant" = "backed",
-  "Rarefaction" = "backed",
-  "Gene usage" = "backed",
-  "vizGenes" = "backed",
-  "percentGenes" = "backed",
-  "percentVJ" = "backed",
-  "AA %" = "backed",
-  "Entropy" = "backed",
-  "Property" = "backed",
-  "K-mer" = "backed",
   "Compare" = "backed",
-  "Overlap" = "backed",
-  "Scatter" = "backed",
   "Paired Scatter" = "backed",
   "SizeDist" = "backed",
-  "Definition" = "local_tcr",
   "Clone Sharing" = "local_tcr",
-  "Isotype" = "local_bcr",
-  "SHM Proxy" = "local_bcr"
+  "Isotype" = "local_bcr"
 )
 
 ir_help_demo_kind <- function(tab) {
