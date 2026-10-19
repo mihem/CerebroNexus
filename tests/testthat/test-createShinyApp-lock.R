@@ -615,8 +615,12 @@ test_that("stage cleanup errors cannot strand the build lock", {
   )
   withr::local_options(warn = 2L)
 
-  expect_error(
-    lock_test_build(crb, result),
+  ## The cleanup error replaces the injected build failure as the build
+  ## unwinds. expect_error() sees the first error under the third edition, so
+  ## catch the one that leaves the call.
+  failure <- tryCatch(lock_test_build(crb, result), error = identity)
+  expect_match(
+    conditionMessage(failure),
     "Failed to remove the private app staging directory"
   )
   expect_false(dir.exists(.bundleLockPath(result)))
