@@ -929,12 +929,13 @@ exportFromSeurat <- function(
     }
 
     if (verbose) {
-      message(sprintf(
-        "[%s] Writing expression matrix to BPCells directory: %s [%s]",
-        format(Sys.time(), "%H:%M:%S"),
+      .logStep(
+        "Writing expression matrix to BPCells directory: ",
         bpc_abs,
-        bpc_storage_msg
-      ))
+        " [",
+        bpc_storage_msg,
+        "]"
+      )
     }
     ## Keep Cerebro's genes x cells dimensions, but physically store rows
     ## contiguously so per-gene and small gene-set queries avoid a full scan.
@@ -973,11 +974,7 @@ exportFromSeurat <- function(
     }
 
     if (verbose) {
-      message(sprintf(
-        "[%s] Writing expression matrix to TENx HDF5 file: %s",
-        format(Sys.time(), "%H:%M:%S"),
-        h5_abs
-      ))
+      .logStep("Writing expression matrix to TENx HDF5 file: ", h5_abs)
     }
 
     if (file.exists(h5_abs)) {

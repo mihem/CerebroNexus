@@ -622,10 +622,8 @@
   }
 
   if (verbose) {
-    message(
-      "[",
-      format(Sys.time(), "%H:%M:%S"),
-      "] Joining layer partition for `",
+    .logStep(
+      "Joining layer partition for `",
       requested_layer,
       "`: ",
       paste(partition$layers, collapse = ", ")
@@ -1134,7 +1132,7 @@
 
 .spx_msg <- function(..., verbose = FALSE) {
   if (isTRUE(verbose)) {
-    message("[", format(Sys.time(), "%H:%M:%S"), "] ", ...)
+    .logStep(...)
   }
 }
 

@@ -144,14 +144,12 @@ performGeneSetEnrichmentAnalysis <- function(
       current_group
     )
 
-    ## log message
-    message(
-      glue::glue(
-        '[',
-        format(Sys.time(), '%H:%M:%S'),
-        '] Performing analysis for ',
-        '{length(group_levels)} subgroups of group `{current_group}`...'
-      )
+    .logStep(
+      'Performing analysis for ',
+      length(group_levels),
+      ' subgroups of group `',
+      current_group,
+      '`...'
     )
 
     ## check number of group levels
@@ -198,14 +196,6 @@ performGeneSetEnrichmentAnalysis <- function(
         )
       }
 
-      ## log message
-      # message(
-      #   paste0(
-      #     '[', format(Sys.time(), '%H:%M:%S'), '] Filtering results based on ',
-      #     'specified thresholds...'
-      #   )
-      # )
-
       ## create empty tibble for results
       results <- tibble::tibble(
         group = character(),
@@ -240,14 +230,6 @@ performGeneSetEnrichmentAnalysis <- function(
 
           ## ... at least 2 gene sets are available
         } else if (nrow(temp_results) >= 2) {
-          ## log message
-          # message(
-          #   paste0(
-          #     '[', format(Sys.time(), '%H:%M:%S'), '] Filtering results based ',
-          #     'on specified thresholds...'
-          #   )
-          # )
-
           ## calculate p- and q-values
           temp_p_values <- stats::pnorm(
             -abs(scale(temp_results$enrichment_score)[, 1])
@@ -299,13 +281,11 @@ performGeneSetEnrichmentAnalysis <- function(
       )
 
       ## print number of enriched gene sets
-      message(
-        glue::glue(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] {nrow(results)} gene sets ',
-          'passed the thresholds across all subgroups of group `{current_group}`.'
-        )
+      .logStep(
+        nrow(results),
+        ' gene sets passed the thresholds across all subgroups of group `',
+        current_group,
+        '`.'
       )
 
       ## test if any gene sets passed the filtering
