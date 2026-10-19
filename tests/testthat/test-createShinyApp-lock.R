@@ -402,7 +402,7 @@ test_that("metadata directories are never deleted as owned lock files", {
   expect_identical(readLines(foreign), "FOREIGN")
 
   unlink(foreign)
-  expect_true(file.remove(owner_path))
+  expect_identical(unlink(owner_path, recursive = TRUE), 0L)
   writeLines(owner, owner_path)
   expect_true(.releaseBundleLock(lock))
 })

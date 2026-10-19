@@ -1553,6 +1553,38 @@ dedent <- function(string) {
   file.rename(from, to)
 }
 
+## Remove `path` only while it is an empty directory, so a lock that gained
+## contents is preserved rather than deleted recursively. POSIX remove()
+## already refuses non-empty directories, but on Windows file.remove() cannot
+## delete any directory and unlink() only deletes them recursively; cmd's
+## rmdir without /S has the POSIX semantics.
+.removeEmptyDirectory <- function(path) {
+  if (.Platform$OS.type != "windows") {
+    return(file.remove(path))
+  }
+  status <- system2(
+    Sys.getenv("COMSPEC", "cmd.exe"),
+    c(
+      "/d",
+      "/c",
+      "rmdir",
+      shQuote(normalizePath(path, winslash = "\\", mustWork = FALSE), "cmd")
+    ),
+    stdout = FALSE,
+    stderr = FALSE
+  )
+  if (!identical(as.integer(status), 0L)) {
+    warning(
+      "cannot remove directory '",
+      path,
+      "': it is not empty or not accessible",
+      call. = FALSE
+    )
+    return(FALSE)
+  }
+  TRUE
+}
+
 # Target preparation and build locks --------------------------------------
 
 .bundleLockName <- function(name) {
@@ -1727,7 +1759,7 @@ dedent <- function(string) {
     if (any(regular_files)) {
       file.remove(metadata_paths[regular_files])
     }
-    file.remove(lock_path)
+    .removeEmptyDirectory(lock_path)
     if (.bundlePathExists(lock_path)) {
       stop(
         "Failed to initialize the build lock. An incomplete lock remains at '",
@@ -1893,7 +1925,7 @@ dedent <- function(string) {
   }
 
   remove_dir_attempt <- .attemptBundleOperation(function() {
-    file.remove(release_path)
+    .removeEmptyDirectory(release_path)
   })
   if (.bundlePathExists(release_path)) {
     warning(
