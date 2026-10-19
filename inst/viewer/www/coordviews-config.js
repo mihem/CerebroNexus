@@ -119,7 +119,7 @@
     }, 10000);
   }
 
-  function setReadyFor(viewId, ready, selectedCells) {
+  function setReadyFor(viewId, ready) {
     var buttons = document.querySelectorAll(
       '.cv-config-open[data-view-id="' + viewId + '"], ' +
       '.cerebro-config-open[data-view-id="' + viewId + '"]'
@@ -134,14 +134,9 @@
     refreshExportControls();
   }
 
-  function refreshActiveState() {
-    var state = adapter();
-    var summary = state && state.summary ? state.summary() : null;
-    setReadyFor(
-      activeViewId,
-      !!(state && state.ready && state.ready()),
-      summary && summary.selectedCells
-    );
+  function refreshReady(viewId) {
+    var state = adapterFor(viewId);
+    setReadyFor(viewId, !!(state && state.ready && state.ready()));
   }
 
   function updateDialogCopy() {
@@ -167,7 +162,7 @@
     if (!dialog || dialog.open) return;
     status('');
     updateDialogCopy();
-    refreshActiveState();
+    refreshReady(activeViewId);
     setUploadLoading(false);
     lastFocus = document.activeElement;
     dialog.showModal();
@@ -393,7 +388,7 @@
       if (cellViews && cellViews.attachDatasetIdentity) {
         cellViews.attachDatasetIdentity(identity);
       }
-      refreshActiveState();
+      refreshReady(activeViewId);
     });
     return true;
   }
@@ -440,23 +435,14 @@
     });
     window.addEventListener('cerebro:linkedviews-ready', function (event) {
       var detail = event.detail || {};
-      setReadyFor('linked_views', !!detail.ready, detail.selectedCells);
+      setReadyFor('linked_views', !!detail.ready);
     });
     window.addEventListener('cerebro:linkedviews-selection', function () {
-      var state = adapterFor('linked_views');
-      var summary = state && state.summary ? state.summary() : null;
-      setReadyFor(
-        'linked_views',
-        !!(state && state.ready && state.ready()),
-        summary && summary.selectedCells
-      );
+      refreshReady('linked_views');
     });
     window.addEventListener('cerebro:specialist-state', function (event) {
       var detail = event.detail || {};
-      window.setTimeout(function () {
-        var state = adapterFor(detail.viewId);
-        setReadyFor(detail.viewId, !!(state && state.ready()), detail.selectedCells);
-      }, 0);
+      window.setTimeout(function () { refreshReady(detail.viewId); }, 0);
     });
     window.addEventListener('cerebro:dataset-context', function (event) {
       var detail = event && event.detail || {};
@@ -465,11 +451,11 @@
       exportReady = false;
       refreshExportControls();
       document.querySelectorAll('.cv-config-open, .cerebro-config-open').forEach(function (button) {
-        setReadyFor(button.getAttribute('data-view-id'), false, 0);
+        setReadyFor(button.getAttribute('data-view-id'), false);
       });
     });
     window.addEventListener('cerebro:png-result', announceExternalPNG);
-    refreshActiveState();
+    refreshReady(activeViewId);
   }
 
   if (document.readyState === 'loading') {

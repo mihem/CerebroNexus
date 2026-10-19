@@ -224,28 +224,9 @@
           }, delay);
         });
         return { selectedCells: (config.selection.cells || []).length };
-      },
-      summary: function () {
-        var api = engine(spec);
-        var state = currentState(id, api);
-        var identity = window.cerebroSavedViewDataset || {};
-        var datasetContext = contextApi() && contextApi().current();
-        return {
-          ready: !!state,
-          datasetFingerprint: identity.cell_fingerprint || null,
-          datasetKey: datasetContext && datasetContext.dataset_key || null,
-          generation: datasetContext && datasetContext.generation || null,
-          selectedCells: state ? state.cells.length : 0,
-          page: spec.label
-        };
       }
     };
   }
 
-  window.cerebroSpecialistViews = Object.freeze({
-    get: adapter,
-    fromConfig: function (config) {
-      return config && config.page ? adapter(config.page.id) : null;
-    }
-  });
+  window.cerebroSpecialistViews = Object.freeze({ get: adapter });
 })();
