@@ -14,7 +14,6 @@
   var selectionFocused = false;
   var pendingState = null;
   var networkContextKey = '';
-  var syncingSelection = false;
   var shinyBound = false;
   var associationObserver = null;
   var associationRequested = false;
@@ -99,19 +98,6 @@
   function point(event) {
     var rect = overlay.getBoundingClientRect();
     return [event.clientX - rect.left, event.clientY - rect.top];
-  }
-  function pointInPolygon(x, y, polygon) {
-    if (window.CBGeom && window.CBGeom.inPoly) {
-      return window.CBGeom.inPoly(x, y, polygon);
-    }
-    var inside = false;
-    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      var xi = polygon[i][0], yi = polygon[i][1];
-      var xj = polygon[j][0], yj = polygon[j][1];
-      if (((yi > y) !== (yj > y)) &&
-          x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
   }
   function boxPolygon(a, b) {
     return [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
@@ -201,11 +187,9 @@
       var position = positions[id];
       if (!position) return false;
       var p = network.canvasToDOM(position);
-      return pointInPolygon(p.x, p.y, polygon);
+      return window.CBGeom.inPoly(p.x, p.y, polygon);
     });
-    syncingSelection = true;
     network.selectNodes(chosen, false);
-    syncingSelection = false;
     selectedKeys = nodeKeysFromIds(network, chosen);
     sendSelectedKeys(selectedKeys);
   }
@@ -246,9 +230,7 @@
       var clickPoint = point(event);
       var clicked = network && network.getNodeAt({ x: clickPoint[0], y: clickPoint[1] });
       committedCanvas = null;
-      syncingSelection = true;
       if (network) network.selectNodes(clicked == null ? [] : [clicked], false);
-      syncingSelection = false;
       selectedKeys = clicked == null ? [] : nodeKeysFromIds(network, [clicked]);
       sendSelectedKeys(selectedKeys);
     } else {
@@ -484,11 +466,7 @@
     var active = document.getElementById('hla_motif_network_selection_active');
     if (guide) guide.classList.toggle('cerebro-selection-status-hidden', !!selectedCells.length);
     if (active) active.classList.toggle('cerebro-selection-status-hidden', !selectedCells.length);
-    if (network) {
-      syncingSelection = true;
-      network.selectNodes(idsFromNodeKeys(network, selectedKeys), false);
-      syncingSelection = false;
-    }
+    if (network) network.selectNodes(idsFromNodeKeys(network, selectedKeys), false);
     syncModeButtons();
     applyPendingState();
     reportState();
@@ -536,25 +514,14 @@
   window.cerebroHlaMotifs = {
     captureState: captureState,
     applyState: applyState,
-    downloadPNG: function () {
-      return downloadPNG();
-    },
-    handleNativeSelection: function (ids) {
-      if (syncingSelection) return;
-      committedCanvas = null;
-      selectedKeys = nodeKeysFromIds(net(), ids || []);
-      sendSelectedKeys(selectedKeys);
-      drawOverlay();
-    },
+    downloadPNG: downloadPNG,
     onDraw: function () {
       var network = net();
       var changed = drawNet !== network;
       drawNet = network;
       ensureOverlay(network);
       if (changed && network && selectedKeys.length) {
-        syncingSelection = true;
         network.selectNodes(idsFromNodeKeys(network, selectedKeys), false);
-        syncingSelection = false;
       }
       applyPendingState();
       drawOverlay();
