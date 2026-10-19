@@ -904,29 +904,21 @@ test_that("deferred metadata builds only the requested attribute", {
     "cell_type",
     colors
   )
-  extra <- cv_env$cv_build_attribute(
+
+  expect_identical(as.integer(group$values), c(0L, 1L, 0L))
+  ## Only registered groups are deferred; other kinds are never materialised.
+  expect_null(cv_env$cv_build_attribute(
     crb,
     metadata,
     "cat_extra",
     "donor",
     colors
-  )
-  field <- cv_env$cv_build_attribute(
-    crb,
-    metadata,
-    "fields",
-    "meta:score",
-    colors
-  )
-
-  expect_identical(as.integer(group$values), c(0L, 1L, 0L))
-  expect_identical(as.integer(extra$values), c(0L, 0L, 1L))
-  expect_identical(as.integer(field$v), c(0L, 333L, 1000L))
+  ))
   expect_null(cv_env$cv_build_attribute(
     crb,
     metadata,
     "fields",
-    "meta:ignored_missing",
+    "meta:score",
     colors
   ))
 })
@@ -1229,69 +1221,6 @@ test_that("both clone pages read one definition of a clone", {
   expect_equal(length(cv_env$CEREBRO_CLONE_LABELS), 5)
   expect_match(cv_env$CEREBRO_CLONE_LABELS[5], "Hyperexpanded")
   expect_equal(cv_env$cerebro_clonecall_col(), "CTgene")
-})
-
-test_that("cv_build_fields turns every numeric meta column into a colouring", {
-  skip_if_not(have_bundle)
-  md <- data.frame(
-    cell_barcode = c("c1", "c2", "c3"),
-    cluster = c("a", "b", "a"),
-    nUMI = c(100, 200, 300),
-    percent.mt = c(1.5, NA, 3.5),
-    constant = c(7, 7, 7),
-    stringsAsFactors = FALSE
-  )
-  f <- cv_env$cv_build_fields(md)
-  ## QC-looking columns are exactly what users colour by — they must be offered.
-  expect_true("meta:nUMI" %in% names(f))
-  expect_true("meta:percent.mt" %in% names(f))
-  ## no colouring can be built from a constant column or a non-numeric one
-  expect_false("meta:constant" %in% names(f))
-  expect_false("meta:cluster" %in% names(f))
-  expect_false("meta:cell_barcode" %in% names(f))
-  ## the quantised vector is aligned to the rows, spans the full scale, and
-  ## carries the true range so the client can show real values, not 0-255.
-  fu <- f[["meta:nUMI"]]
-  expect_length(fu$v, nrow(md))
-  expect_equal(as.integer(fu$v), c(0L, fu$scale %/% 2L, fu$scale))
-  expect_equal(fu$min, 100)
-  expect_equal(fu$max, 300)
-  ## NA stays NA so the client can draw it as "no value" rather than as zero.
-  expect_true(is.na(f[["meta:percent.mt"]]$v[2]))
-})
-
-test_that("cv_build_extra_groups covers categorical columns that are not groups", {
-  skip_if_not(have_bundle)
-  md <- data.frame(
-    cell_barcode = c("c1", "c2", "c3"),
-    cluster = c("a", "b", "a"),
-    dextramer_allele = c("A*02:01", "A*02:01", "B*07:02"),
-    stringsAsFactors = FALSE
-  )
-  eg <- cv_env$cv_build_extra_groups(md, "cluster", function(g, lev) {
-    cv_env$cv_colors_for(lev)
-  })
-  ## registered groups stay out (they are already offered, and they own the
-  ## group filters); unregistered categorical columns come in.
-  expect_false("cluster" %in% names(eg$groups))
-  expect_true("dextramer_allele" %in% names(eg$groups))
-  expect_equal(
-    as.character(eg$groups$dextramer_allele$levels),
-    c("A*02:01", "B*07:02")
-  )
-  expect_equal(as.integer(eg$groups$dextramer_allele$values), c(0L, 0L, 1L))
-  expect_length(eg$skipped, 0)
-
-  ## A column with as many levels as cells is an identifier, not a grouping —
-  ## not colourable, but REPORTED rather than dropped, so the picker can say why
-  ## a column the Projection tab offers is missing here.
-  md$barcode_copy <- md$cell_barcode
-  eg2 <- cv_env$cv_build_extra_groups(md, "cluster", function(g, lev) {
-    cv_env$cv_colors_for(lev)
-  })
-  expect_false("barcode_copy" %in% names(eg2$groups))
-  expect_true("barcode_copy" %in% names(eg2$skipped))
-  expect_equal(eg2$skipped$barcode_copy, 3L)
 })
 
 test_that("cv_build_projections records dimensionality instead of dropping it", {

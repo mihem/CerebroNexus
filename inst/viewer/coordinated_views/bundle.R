@@ -706,81 +706,10 @@ cv_build_groups <- function(crb, md, colors_fn, only = NULL) {
   groups
 }
 
-## Encode numeric metadata as a continuous field for specialist payloads. The
-## main Viewer Colour by controls deliberately do not call this helper: their
-## metadata choices come only from registered groups.
-cv_build_fields <- function(md, skip = "cell_barcode", only = NULL) {
-  fields <- list()
-  field_names <- if (is.null(only)) {
-    colnames(md)
-  } else {
-    intersect(only, colnames(md))
-  }
-  for (mc in field_names) {
-    if (mc %in% skip) {
-      next
-    }
-    v <- md[[mc]]
-    if (!is.numeric(v)) {
-      next
-    }
-    rng <- suppressWarnings(range(v, na.rm = TRUE))
-    if (!all(is.finite(rng)) || rng[2] <= rng[1]) {
-      next
-    }
-    q <- as.integer(round((v - rng[1]) / (rng[2] - rng[1]) * cv_field_scale))
-    fields[[paste0("meta:", mc)]] <- cv_field(
-      mc,
-      q,
-      round(rng[1], 4),
-      round(rng[2], 4)
-    )
-  }
-  fields
-}
-
-## Encode unregistered categorical metadata for specialist payloads. The main
-## Linked views bundle keeps `cat_extra` empty so Builder group registration is
-## authoritative for metadata colouring.
-cv_build_extra_groups <- function(md, group_names, colors_fn, only = NULL) {
-  n <- nrow(md)
-  max_levels <- max(2L, min(60L, as.integer(n / 2)))
-  extra <- list()
-  skipped <- list()
-  extra_names <- if (is.null(only)) {
-    colnames(md)
-  } else {
-    intersect(only, colnames(md))
-  }
-  for (mc in extra_names) {
-    if (mc == "cell_barcode" || mc %in% group_names) {
-      next
-    }
-    v <- md[[mc]]
-    if (!(is.character(v) || is.factor(v) || is.logical(v))) {
-      next
-    }
-    lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
-    lev <- lev[!is.na(lev)]
-    if (!length(lev)) {
-      next
-    }
-    if (length(lev) > max_levels) {
-      skipped[[mc]] <- length(lev)
-      next
-    }
-    extra[[mc]] <- cv_group(
-      match(as.character(v), lev) - 1L,
-      lev,
-      colors_fn(mc, lev)
-    )
-  }
-  list(groups = extra, skipped = skipped)
-}
-
 ## Materialise exactly one deferred colour attribute. The first-frame transport
-## carries descriptors for every metadata column, but choosing one must not
+## carries descriptors for every registered group, but choosing one must not
 ## rebuild projections, spatial images, clones, Trekker data, or gene names.
+## Only registered groups are ever deferred (see cv_build_deferred_metadata).
 cv_build_attribute <- function(
   crb,
   md,
@@ -789,9 +718,7 @@ cv_build_attribute <- function(
   colors_fn = function(group_name, levels) cv_colors_for(levels)
 ) {
   if (
-    !is.character(kind) ||
-      length(kind) != 1L ||
-      is.na(kind) ||
+    !identical(kind, "groups") ||
       !is.character(name) ||
       length(name) != 1L ||
       is.na(name) ||
@@ -799,25 +726,7 @@ cv_build_attribute <- function(
   ) {
     return(NULL)
   }
-  if (identical(kind, "groups")) {
-    return(cv_build_groups(crb, md, colors_fn, only = name)[[name]])
-  }
-  if (identical(kind, "cat_extra")) {
-    group_names <- tryCatch(crb$getGroups(), error = function(error) {
-      character()
-    })
-    return(cv_build_extra_groups(
-      md,
-      group_names,
-      colors_fn,
-      only = name
-    )$groups[[name]])
-  }
-  if (identical(kind, "fields")) {
-    column <- sub("^meta:", "", name)
-    return(cv_build_fields(md, only = column)[[name]])
-  }
-  NULL
+  cv_build_groups(crb, md, colors_fn, only = name)[[name]]
 }
 
 ## Every projection's coordinates travel in the bundle, keyed by name, so the
@@ -2174,14 +2083,11 @@ cv_build_deferred_metadata <- function(crb, md, primary) {
     group <- deferred_group(name, md[[name]])
     if (!is.null(group)) groups[[name]] <- group
   }
-  cat_extra <- list()
-  cat_skipped <- list()
-  fields <- list()
   list(
     groups = groups,
-    cat_extra = cat_extra,
-    cat_skipped = cat_skipped,
-    fields = fields
+    cat_extra = list(),
+    cat_skipped = list(),
+    fields = list()
   )
 }
 
