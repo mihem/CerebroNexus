@@ -51,18 +51,6 @@ cv_selected_metadata <- function(metadata, cells) {
   metadata[metadata$cell_barcode %in% as.character(cells), , drop = FALSE]
 }
 
-cv_cell_metadata <- function(metadata, cell) {
-  metadata <- cv_canonical_metadata(metadata)
-  if (is.null(metadata)) {
-    return(NULL)
-  }
-  index <- match(as.character(cell), metadata$cell_barcode)
-  if (is.na(index)) {
-    return(NULL)
-  }
-  metadata[index, , drop = FALSE]
-}
-
 cv_cells_at_indices <- function(cells, indices) {
   if (is.null(indices) || !length(indices)) {
     return(NULL)

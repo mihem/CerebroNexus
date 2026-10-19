@@ -32,40 +32,6 @@ viewerSpatialPointSetting <- function(value, roi = FALSE) {
   lapply(value[fields], as.numeric)
 }
 
-## Extra-material labels are presentation metadata keyed by immutable table IDs.
-## Discard unavailable labels and unrelated source-file metadata.
-viewerExtraMaterialTableIndex <- function(value = NULL, table_names = NULL) {
-  if (!is.list(value) || is.object(value) || is.null(names(value))) {
-    return(list())
-  }
-  keys <- names(value)
-  keep <- !is.na(keys) & nzchar(trimws(keys)) & !duplicated(keys)
-  if (!is.null(table_names)) {
-    keep <- keep & keys %in% table_names
-  }
-  result <- list()
-  for (key in keys[keep]) {
-    record <- value[[key]]
-    if (!is.list(record) || is.object(record)) {
-      next
-    }
-    labels <- list()
-    for (field in c("workbook_name", "display_name")) {
-      text <- record[[field]]
-      if (
-        is.character(text) &&
-          length(text) == 1L &&
-          !is.na(text) &&
-          nzchar(trimws(text))
-      ) {
-        labels[[field]] <- trimws(text)
-      }
-    }
-    if (length(labels)) result[[key]] <- labels
-  }
-  result
-}
-
 ## Author defaults, independent of transient browsing selections. Keep the
 ## schema small and typed; arbitrary CSS and executable font URLs are excluded.
 builderViewerDisplayDefaults <- function(value = NULL) {

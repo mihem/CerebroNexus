@@ -815,27 +815,6 @@ test_that("spatial first frames replace only exact flat geometry with an asset",
   expect_null(rendered$data[["canonical_group"]])
 })
 
-test_that("Spatial first-frame data bypasses the legacy full accessor", {
-  runtime <- new.env(parent = globalenv())
-  sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
-  coordinates <- data.frame(x = 1:3, y = 4:6)
-  stored <- list(
-    coordinates = coordinates,
-    histology_images = list(),
-    molecules = structure(list(), class = "large-unrelated-payload")
-  )
-  dataset <- structure(list(spatial = list(slice = stored)), class = "Cerebro")
-  runtime$data_set <- function() dataset
-  runtime$getSpatialData <- function(name) {
-    stop("legacy accessor should not run")
-  }
-
-  result <- runtime$viewerSpatialFirstFrameData("slice")
-  expect_identical(result$coordinates, coordinates)
-  expect_identical(result$histology_images, list())
-  expect_false("molecules" %in% names(result))
-})
-
 test_that("Spatial geometry catalog is registered but fetched only on page request", {
   scope <- new.env(parent = globalenv())
   sys.source(viewer_test_path("utility_functions.R"), scope)

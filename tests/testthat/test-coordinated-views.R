@@ -1059,7 +1059,7 @@ test_that("canonical zero-based indices resolve only requested cell IDs", {
   expect_null(cv_env$cv_cells_at_indices(cells, NULL))
 })
 
-test_that("rownames-only metadata supports selection and cell details", {
+test_that("rownames-only metadata supports selection", {
   skip_if_not(have_bundle)
   metadata <- data.frame(
     cluster = c("A", "B", "A"),
@@ -1070,12 +1070,9 @@ test_that("rownames-only metadata supports selection and cell details", {
 
   canonical <- cv_env$cv_canonical_metadata(metadata)
   selected <- cv_env$cv_selected_metadata(metadata, c("c3", "c1"))
-  detail <- cv_env$cv_cell_metadata(metadata, "c2")
 
   expect_identical(canonical$cell_barcode, c("c1", "c2", "c3"))
   expect_identical(selected$cell_barcode, c("c1", "c3"))
-  expect_identical(detail$cell_barcode, "c2")
-  expect_identical(detail$score, 2)
 })
 
 test_that("explicit cell barcodes remain authoritative", {

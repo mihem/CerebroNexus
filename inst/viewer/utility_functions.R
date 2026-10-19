@@ -5183,33 +5183,6 @@ viewerReadSpatialData <- function(ds, name) {
   )
 }
 
-## The first Spatial frame only needs coordinates and embedded-image metadata.
-## Read those fields directly from canonical storage so a tab click does not
-## normalize or copy molecule payloads and other unrelated Spatial content.
-## Legacy or malformed entries retain the validated public accessor fallback.
-viewerSpatialFirstFrameData <- function(name) {
-  ds <- data_set()
-  if (!any(grepl("Cerebro", class(ds)))) {
-    return(NULL)
-  }
-  stored <- tryCatch(ds$spatial[[name]], error = function(error) NULL)
-  coordinates <- if (is.list(stored)) stored[["coordinates"]] else NULL
-  valid_coordinates <- is.data.frame(coordinates) &&
-    all(c("x", "y") %in% colnames(coordinates)) &&
-    is.numeric(coordinates[["x"]]) &&
-    is.numeric(coordinates[["y"]]) &&
-    nrow(coordinates) > 0L
-  if (!isTRUE(valid_coordinates)) {
-    return(getSpatialData(name))
-  }
-  list(
-    coordinates = coordinates,
-    histology_images = stored[["histology_images"]],
-    histology_image = stored[["histology_image"]],
-    histology_image_bounds = stored[["histology_image_bounds"]]
-  )
-}
-
 ## Coordinate-only Spatial consumers run after spatial_projection_parameters_plot
 ## has validated the exact current dataset + entry through getSpatialData().
 ## Reuse the canonical stored coordinate reference there instead of invoking the
@@ -6220,55 +6193,4 @@ viewerTrekkerBackground <- function(tk) {
     uri = external$uri %||% tk[["histology_image", exact = TRUE]],
     bounds = external$bounds %||% tk[["histology_image_bounds", exact = TRUE]]
   )
-}
-
-centerOfGroups <- function(coordinates, df, n_dimensions, group) {
-  ## Guard against a missing grouping column: callers occasionally pass a
-  ## group that isn't present in df (e.g. a metadata column dropped for a
-  ## selected-cells slice), which would otherwise make df[[group]] NULL and
-  ## crash the tibble construction. Return a typed empty result instead.
-  if (is.null(group) || !group %in% colnames(df)) {
-    return(tidyr::tibble(
-      group = character(),
-      x_median = numeric(),
-      y_median = numeric(),
-      z_median = numeric()
-    ))
-  }
-  ## check number of dimenions in projection
-  ## ... 2 dimensions
-  if (n_dimensions == 2) {
-    ## calculate center for groups and return
-    tidyr::tibble(
-      x = coordinates[[1]],
-      y = coordinates[[2]],
-      group = df[[group]]
-    ) %>%
-      dplyr::group_by(.data$group) %>%
-      dplyr::summarise(
-        x_median = median(x),
-        y_median = median(y),
-        .groups = 'drop_last'
-      ) %>%
-      dplyr::ungroup() %>%
-      return()
-    ## ... 3 dimensions
-  } else if (n_dimensions == 3 && is.numeric(coordinates[, 3])) {
-    ## calculate center for groups and return
-    tidyr::tibble(
-      x = coordinates[[1]],
-      y = coordinates[[2]],
-      z = coordinates[[3]],
-      group = df[[group]]
-    ) %>%
-      dplyr::group_by(.data$group) %>%
-      dplyr::summarise(
-        x_median = median(x),
-        y_median = median(y),
-        z_median = median(z),
-        .groups = 'drop_last'
-      ) %>%
-      dplyr::ungroup() %>%
-      return()
-  }
 }
