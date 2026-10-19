@@ -1773,7 +1773,7 @@
       rgbG: D.rgb && D.rgb.g,
       rgbB: D.rgb && D.rgb.b,
       fieldValues: field && field.v,
-      fieldColors: field && field.colors && field.colors.join(','),
+      fieldColors: field && field.colors,
       fieldPalette: field && field.palette && field.palette.join(','),
       fieldConstantColor: field && field.constantColor,
       groupValues: group && group.values,
@@ -10099,7 +10099,9 @@
     var primaryPanel = ownsWorkspace && panels.filter(function (panel) {
       return panel.spaceId && Number(panel.canvas.dataset.pointCount) === D.n;
     })[0];
-    var rendered = !!(D && configFingerprint() && primaryPanel);
+    // Without stored fingerprints this hashes every cell ID: compute it once.
+    var fingerprint = configFingerprint();
+    var rendered = !!(D && fingerprint && primaryPanel);
     var complete = !!(rendered && !D.progressive);
     var gpuUploadMs = 0;
     var gpuPositionUploads = 0;
@@ -10114,7 +10116,7 @@
       primaryReady: rendered,
       ready: complete,
       complete: complete,
-      datasetFingerprint: D ? configFingerprint() : null,
+      datasetFingerprint: D ? fingerprint : null,
       renderedPointCount: primaryPanel && D ? Number(D.n) : 0,
       selectedCells: sel ? sel.size : 0,
       selectedCellBarcodes: selectedCellIds(),
@@ -10203,14 +10205,15 @@
       }
     }));
     if (summary.primaryReady && D.progressive && Shiny.setInputValue) {
-      var key = String(D.dataset_id || '') + '\u0000' + configFingerprint() +
+      var fingerprint = configFingerprint();
+      var key = String(D.dataset_id || '') + '\u0000' + fingerprint +
         '\u0000' + String(D.progressive_token || '');
       if (progressiveRequestedKey !== key) {
         progressiveRequestedKey = key;
         Shiny.setInputValue('coordviews_primary_ready', {
           dataset_context: D.dataset_context,
           dataset_id: D.dataset_id,
-          dataset_fingerprint: configFingerprint(),
+          dataset_fingerprint: fingerprint,
           progressive_token: D.progressive_token,
           modalities: requestedModalities(),
           nonce: Date.now()
