@@ -250,16 +250,7 @@
   function singleRequestKey(id, context) {
     return singleCacheKey(id, context);
   }
-  function canonicalIdentity(value) {
-    if (value == null) return '';
-    if (typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) {
-      return '[' + value.map(canonicalIdentity).join(',') + ']';
-    }
-    return '{' + Object.keys(value).sort().map(function (name) {
-      return JSON.stringify(name) + ':' + canonicalIdentity(value[name]);
-    }).join(',') + '}';
-  }
+  var canonicalIdentity = backgrounds.canonicalIdentity;
 
   // Categorical fallback palette (mirrors the app).
   var PAL = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3',
