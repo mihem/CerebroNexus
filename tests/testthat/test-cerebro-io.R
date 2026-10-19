@@ -288,6 +288,7 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
   duplicated <- .currentCerebroCopy(payload)
   duplicated_path <- file.path(root, "duplicated-index.crb")
   names_file <- file.path(fixture$sidecar, "col_names")
+  original_names <- readBin(names_file, "raw", file.size(names_file))
   writeLines(
     c(fixture$cells[[1L]], fixture$cells[[1L]], fixture$cells[3:4]),
     names_file,
@@ -305,7 +306,7 @@ test_that("thin RDS and qs2 CRBs share one validated BPCells sidecar", {
     duplicated_runtime$meta_data,
     "incompatible cell metadata"
   )
-  writeLines(fixture$cells, names_file, useBytes = TRUE)
+  writeBin(original_names, names_file)
 
   missing_root <- file.path(root, "missing-sidecar")
   dir.create(missing_root)
