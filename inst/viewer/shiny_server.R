@@ -1183,50 +1183,31 @@ server <- function(input, output, session) {
     if (exists(key, envir = viewer_projection_resources, inherits = FALSE)) {
       return(get(key, envir = viewer_projection_resources, inherits = FALSE))
     }
-    assets <- pack$manifest$assets
-    asset_row <- which(as.character(assets$path) == asset_path)
-    dimensions <- if (length(asset_row) == 1L) {
-      suppressWarnings(as.integer(strsplit(
-        as.character(assets$dimensions[[asset_row]]),
-        "x",
-        fixed = TRUE
-      )[[1L]]))
-    } else {
-      integer()
-    }
-    file <- file.path(pack$path, asset_path)
-    valid <- length(asset_row) == 1L &&
-      identical(as.character(assets$dtype[[asset_row]]), "float32") &&
-      length(dimensions) == 2L &&
-      identical(dimensions[[1L]], as.integer(pack$cell_count)) &&
-      dimensions[[2L]] %in% c(2L, 3L) &&
-      file.exists(file) &&
-      !dir.exists(file) &&
-      identical(
-        as.numeric(file.info(file)$size),
-        as.numeric(assets$bytes[[asset_row]])
-      ) &&
-      identical(
-        unname(.viewerFileMd5(file)),
-        as.character(assets$checksum[[asset_row]])
-      )
-    if (!valid) {
+    asset <- viewerPackVerifiedAsset(
+      pack,
+      asset_path,
+      .viewerFileMd5,
+      function(asset) {
+        identical(asset$dtype, "float32") &&
+          length(asset$dimensions) == 2L &&
+          identical(asset$dimensions[[1L]], as.integer(pack$cell_count)) &&
+          asset$dimensions[[2L]] %in% c(2L, 3L)
+      }
+    )
+    if (is.null(asset)) {
       return(NULL)
     }
-    prefix <- viewerStaticResourcePrefix(
-      "projection",
-      dirname(file)
-    )
+    prefix <- viewerStaticResourcePrefix("projection", dirname(asset$file))
     descriptor <- c(
       list(
         protocol = "canonical-projection-v1",
         projection_name = as.character(name),
-        url = paste0(prefix, "/", basename(file)),
-        cells = dimensions[[1L]],
-        dimensions = dimensions[[2L]],
+        url = paste0(prefix, "/", basename(asset$file)),
+        cells = asset$dimensions[[1L]],
+        dimensions = asset$dimensions[[2L]],
         dtype = "float32",
-        bytes = as.numeric(assets$bytes[[asset_row]]),
-        checksum = as.character(assets$checksum[[asset_row]])
+        bytes = asset$bytes,
+        checksum = asset$checksum
       ),
       viewerCanonicalResourceIdentity(pack)
     )
@@ -1249,6 +1230,14 @@ server <- function(input, output, session) {
   ## The binding is published only by the Viewer Pack builder after exact
   ## coordinate comparison. Older packs and non-matching frames retain their
   ## dedicated geometry asset.
+  ## A verified Float32 x/y coordinate asset for `cells` cells.
+  viewerXYGeometryAsset <- function(pack, path, cells) {
+    viewerPackVerifiedAsset(pack, path, .viewerFileMd5, function(asset) {
+      identical(asset$dtype, "float32") &&
+        identical(asset$dimensions, c(cells, 2L)) &&
+        identical(asset$bytes, as.numeric(cells) * 2 * 4)
+    })
+  }
   viewer_trajectory_resources <- new.env(parent = emptyenv())
   viewerTrajectoryFrameAsset <- function(method, name) {
     pack <- viewerPackCurrent()
@@ -1263,60 +1252,37 @@ server <- function(input, output, session) {
     if (exists(key, envir = viewer_trajectory_resources, inherits = FALSE)) {
       return(get(key, envir = viewer_trajectory_resources, inherits = FALSE))
     }
-    assets <- pack$manifest$assets
-    asset_row <- function(path) {
-      which(as.character(assets$path) == as.character(path))
-    }
-    codes_row <- asset_row(frame$state_codes_path)
-    dictionary_row <- asset_row(frame$state_dictionary_path)
-    if (length(codes_row) != 1L || length(dictionary_row) != 1L) {
-      return(NULL)
-    }
-    code_dimensions <- suppressWarnings(as.integer(
-      as.character(assets$dimensions[[codes_row]])
-    ))
-    dtype <- as.character(assets$dtype[[codes_row]])
-    bytes_per_code <- switch(
-      dtype,
-      uint8 = 1L,
-      uint16 = 2L,
-      uint32 = 4L,
-      NA_integer_
+    codes <- viewerPackVerifiedAsset(
+      pack,
+      frame$state_codes_path,
+      .viewerFileMd5,
+      function(asset) {
+        bytes_per_code <- switch(
+          asset$dtype,
+          uint8 = 1L,
+          uint16 = 2L,
+          uint32 = 4L,
+          NA_integer_
+        )
+        identical(asset$dimensions, frame$cells) &&
+          !is.na(bytes_per_code) &&
+          identical(asset$bytes, as.numeric(frame$cells) * bytes_per_code)
+      }
     )
-    paths <- c(frame$state_codes_path, frame$state_dictionary_path)
-    rows <- c(codes_row, dictionary_row)
-    files <- file.path(pack$path, paths)
-    valid <- identical(code_dimensions, frame$cells) &&
-      !is.na(bytes_per_code) &&
-      identical(
-        as.numeric(assets$bytes[[codes_row]]),
-        as.numeric(frame$cells) * bytes_per_code
-      ) &&
-      all(file.exists(files)) &&
-      !any(dir.exists(files)) &&
-      all(
-        as.numeric(file.info(files)$size) == as.numeric(assets$bytes[rows])
-      ) &&
-      all(
-        unname(.viewerFileMd5(files)) == as.character(assets$checksum[rows])
-      )
-    if (!isTRUE(valid)) {
+    dictionary <- if (!is.null(codes)) {
+      viewerPackVerifiedAsset(pack, frame$state_dictionary_path, .viewerFileMd5)
+    }
+    if (is.null(dictionary)) {
       return(NULL)
     }
     levels <- tryCatch(
       as.character(jsonlite::read_json(
-        files[[2L]],
+        dictionary$file,
         simplifyVector = TRUE
       )),
       error = function(error) NULL
     )
-    if (
-      is.null(levels) ||
-        length(levels) !=
-          suppressWarnings(as.integer(
-            assets$dimensions[[dictionary_row]]
-          ))
-    ) {
+    if (is.null(levels) || !identical(length(levels), dictionary$dimensions)) {
       return(NULL)
     }
     geometry_kind <- as.character(frame$geometry_kind)
@@ -1350,84 +1316,32 @@ server <- function(input, output, session) {
         checksum = ""
       )
       if (!identical(subset_kind, "identity")) {
-        subset_row <- asset_row(frame$subset_path)
-        if (length(subset_row) != 1L) {
+        subset_asset <- viewerPackVerifiedAsset(
+          pack,
+          frame$subset_path,
+          .viewerFileMd5,
+          function(asset) {
+            identical(asset$dtype, "uint32") &&
+              identical(asset$dimensions, subset_count) &&
+              identical(asset$bytes, as.numeric(subset_count) * 4)
+          }
+        )
+        if (is.null(subset_asset)) {
           return(NULL)
         }
-        subset_dimensions <- suppressWarnings(as.integer(
-          as.character(assets$dimensions[[subset_row]])
-        ))
-        subset_file <- file.path(pack$path, frame$subset_path)
-        subset_valid <- identical(
-          as.character(assets$dtype[[subset_row]]),
-          "uint32"
-        ) &&
-          identical(subset_dimensions, subset_count) &&
-          identical(
-            as.numeric(assets$bytes[[subset_row]]),
-            as.numeric(subset_count) * 4
-          ) &&
-          file.exists(subset_file) &&
-          !dir.exists(subset_file) &&
-          identical(
-            as.numeric(file.info(subset_file)$size),
-            as.numeric(assets$bytes[[subset_row]])
-          ) &&
-          identical(
-            unname(.viewerFileMd5(subset_file)),
-            as.character(assets$checksum[[subset_row]])
-          )
-        if (!isTRUE(subset_valid)) {
-          return(NULL)
-        }
-        paths <- c(paths, frame$subset_path)
-        files <- c(files, subset_file)
-        rows <- c(rows, subset_row)
-        subset$bytes <- as.numeric(assets$bytes[[subset_row]])
-        subset$checksum <- as.character(assets$checksum[[subset_row]])
+        subset$bytes <- subset_asset$bytes
+        subset$checksum <- subset_asset$checksum
       }
     } else {
-      geometry_row <- asset_row(frame$geometry_path)
-      if (length(geometry_row) != 1L) {
+      geometry <- viewerXYGeometryAsset(pack, frame$geometry_path, frame$cells)
+      if (is.null(geometry)) {
         return(NULL)
       }
-      geometry_dimensions <- suppressWarnings(as.integer(strsplit(
-        as.character(assets$dimensions[[geometry_row]]),
-        "x",
-        fixed = TRUE
-      )[[1L]]))
-      geometry_file <- file.path(pack$path, frame$geometry_path)
-      geometry_valid <- length(geometry_dimensions) == 2L &&
-        identical(geometry_dimensions, c(frame$cells, 2L)) &&
-        identical(as.character(assets$dtype[[geometry_row]]), "float32") &&
-        identical(
-          as.numeric(assets$bytes[[geometry_row]]),
-          as.numeric(frame$cells) * 2 * 4
-        ) &&
-        file.exists(geometry_file) &&
-        !dir.exists(geometry_file) &&
-        identical(
-          as.numeric(file.info(geometry_file)$size),
-          as.numeric(assets$bytes[[geometry_row]])
-        ) &&
-        identical(
-          unname(.viewerFileMd5(geometry_file)),
-          as.character(assets$checksum[[geometry_row]])
-        )
-      if (!isTRUE(geometry_valid)) {
-        return(NULL)
-      }
-      paths <- c(paths, frame$geometry_path)
-      files <- c(files, geometry_file)
-      rows <- c(rows, geometry_row)
     }
-    prefix <- viewerStaticResourcePrefix(
-      "trajectory",
-      dirname(files[[1L]])
-    )
+    prefix <- viewerStaticResourcePrefix("trajectory", dirname(codes$file))
     resource_url <- function(file) paste0(prefix, "/", basename(file))
     if (!is.null(subset) && !identical(subset$kind, "identity")) {
-      subset$url <- resource_url(subset_file)
+      subset$url <- resource_url(subset_asset$file)
     }
     descriptor <- c(
       list(
@@ -1439,21 +1353,21 @@ server <- function(input, output, session) {
           projection
         } else {
           list(
-            url = resource_url(geometry_file),
+            url = resource_url(geometry$file),
             cells = frame$cells,
             dimensions = 2L,
             dtype = "float32",
-            bytes = as.numeric(assets$bytes[[geometry_row]]),
-            checksum = as.character(assets$checksum[[geometry_row]])
+            bytes = geometry$bytes,
+            checksum = geometry$checksum
           )
         },
         subset = subset,
         state = list(
-          url = resource_url(file.path(pack$path, frame$state_codes_path)),
+          url = resource_url(codes$file),
           cells = frame$cells,
-          dtype = dtype,
-          bytes = as.numeric(assets$bytes[[codes_row]]),
-          checksum = as.character(assets$checksum[[codes_row]]),
+          dtype = codes$dtype,
+          bytes = codes$bytes,
+          checksum = codes$checksum,
           levels = I(levels)
         )
       ),
@@ -1489,51 +1403,21 @@ server <- function(input, output, session) {
     if (exists(key, envir = viewer_spatial_resources, inherits = FALSE)) {
       return(get(key, envir = viewer_spatial_resources, inherits = FALSE))
     }
-    assets <- pack$manifest$assets
-    asset_row <- which(
-      as.character(assets$path) == as.character(frame$geometry_path)
-    )
-    dimensions <- if (length(asset_row) == 1L) {
-      suppressWarnings(as.integer(strsplit(
-        as.character(assets$dimensions[[asset_row]]),
-        "x",
-        fixed = TRUE
-      )[[1L]]))
-    } else {
-      integer()
-    }
-    file <- file.path(pack$path, frame$geometry_path)
-    valid <- length(asset_row) == 1L &&
-      identical(as.character(assets$dtype[[asset_row]]), "float32") &&
-      identical(dimensions, c(frame$cells, 2L)) &&
-      identical(
-        as.numeric(assets$bytes[[asset_row]]),
-        as.numeric(frame$cells) * 2 * 4
-      ) &&
-      file.exists(file) &&
-      !dir.exists(file) &&
-      identical(
-        as.numeric(file.info(file)$size),
-        as.numeric(assets$bytes[[asset_row]])
-      ) &&
-      identical(
-        unname(.viewerFileMd5(file)),
-        as.character(assets$checksum[[asset_row]])
-      )
-    if (!isTRUE(valid)) {
+    asset <- viewerXYGeometryAsset(pack, frame$geometry_path, frame$cells)
+    if (is.null(asset)) {
       return(NULL)
     }
-    prefix <- viewerStaticResourcePrefix("spatial", dirname(file))
+    prefix <- viewerStaticResourcePrefix("spatial", dirname(asset$file))
     descriptor <- c(
       list(
         protocol = "spatial-geometry-v1",
         spatial_name = as.character(name),
-        url = paste0(prefix, "/", basename(file)),
+        url = paste0(prefix, "/", basename(asset$file)),
         cells = frame$cells,
         dimensions = 2L,
         dtype = "float32",
-        bytes = as.numeric(assets$bytes[[asset_row]]),
-        checksum = as.character(assets$checksum[[asset_row]])
+        bytes = asset$bytes,
+        checksum = asset$checksum
       ),
       viewerCanonicalResourceIdentity(pack)
     )
@@ -1594,57 +1478,32 @@ server <- function(input, output, session) {
     if (exists(key, envir = viewer_metadata_resources, inherits = FALSE)) {
       return(get(key, envir = viewer_metadata_resources, inherits = FALSE))
     }
-    assets <- pack$manifest$assets
-    codes_row <- which(as.character(assets$path) == codes_path)
-    dictionary_row <- which(as.character(assets$path) == dictionary_path)
-    if (length(codes_row) != 1L || length(dictionary_row) != 1L) {
-      return(NULL)
+    codes <- viewerPackVerifiedAsset(
+      pack,
+      codes_path,
+      .viewerFileMd5,
+      function(asset) {
+        bytes_per_code <- c(uint8 = 1L, uint16 = 2L)[asset$dtype]
+        length(bytes_per_code) == 1L &&
+          !is.na(bytes_per_code) &&
+          identical(asset$dimensions, as.integer(pack$cell_count)) &&
+          identical(
+            asset$bytes,
+            as.numeric(pack$cell_count) * unname(bytes_per_code)
+          )
+      }
+    )
+    dictionary_asset <- if (!is.null(codes)) {
+      viewerPackVerifiedAsset(pack, dictionary_path, .viewerFileMd5)
     }
-    dtype <- as.character(assets$dtype[[codes_row]])
-    dimensions <- suppressWarnings(as.integer(
-      as.character(assets$dimensions[[codes_row]])
-    ))
-    codes_file <- file.path(pack$path, codes_path)
-    dictionary_file <- file.path(pack$path, dictionary_path)
-    bytes_per_code <- if (identical(dtype, "uint8")) {
-      1L
-    } else if (identical(dtype, "uint16")) {
-      2L
-    } else {
-      NA_integer_
-    }
-    valid_files <- !is.na(bytes_per_code) &&
-      length(dimensions) == 1L &&
-      identical(dimensions, as.integer(pack$cell_count)) &&
-      file.exists(codes_file) &&
-      !dir.exists(codes_file) &&
-      file.exists(dictionary_file) &&
-      !dir.exists(dictionary_file) &&
-      identical(
-        as.numeric(file.info(codes_file)$size),
-        as.numeric(assets$bytes[[codes_row]])
-      ) &&
-      identical(
-        as.numeric(file.info(codes_file)$size),
-        as.numeric(pack$cell_count) * bytes_per_code
-      ) &&
-      identical(
-        as.numeric(file.info(dictionary_file)$size),
-        as.numeric(assets$bytes[[dictionary_row]])
-      ) &&
-      identical(
-        unname(.viewerFileMd5(codes_file)),
-        as.character(assets$checksum[[codes_row]])
-      ) &&
-      identical(
-        unname(.viewerFileMd5(dictionary_file)),
-        as.character(assets$checksum[[dictionary_row]])
-      )
-    if (!valid_files) {
+    if (is.null(dictionary_asset)) {
       return(NULL)
     }
     dictionary <- tryCatch(
-      as.character(jsonlite::read_json(dictionary_file, simplifyVector = TRUE)),
+      as.character(jsonlite::read_json(
+        dictionary_asset$file,
+        simplifyVector = TRUE
+      )),
       error = function(error) NULL
     )
     target_levels <- if (is.null(requested_levels)) {
@@ -1655,23 +1514,23 @@ server <- function(input, output, session) {
     remap <- match(dictionary, target_levels) - 1L
     if (
       is.null(dictionary) ||
-        length(dictionary) != as.integer(assets$dimensions[[dictionary_row]]) ||
+        !identical(length(dictionary), dictionary_asset$dimensions) ||
         anyNA(remap)
     ) {
       return(NULL)
     }
     resource_prefix <- viewerStaticResourcePrefix(
       "metadata",
-      dirname(codes_file)
+      dirname(codes$file)
     )
     descriptor <- c(
       list(
         protocol = "canonical-metadata-codes-v1",
-        url = paste0(resource_prefix, "/", basename(codes_file)),
+        url = paste0(resource_prefix, "/", basename(codes$file)),
         cells = as.integer(pack$cell_count),
-        dtype = dtype,
-        bytes = as.numeric(assets$bytes[[codes_row]]),
-        checksum = as.character(assets$checksum[[codes_row]])
+        dtype = codes$dtype,
+        bytes = codes$bytes,
+        checksum = codes$checksum
       ),
       viewerCanonicalResourceIdentity(pack),
       list(

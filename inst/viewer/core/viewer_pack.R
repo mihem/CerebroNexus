@@ -150,6 +150,44 @@ viewerPackOpenCached <- function(file, object, cache) {
   pack
 }
 
+## The manifest entry of `path` when its file matches the recorded size and
+## checksum, else NULL. `accept(asset)` vets the manifest fields (dtype,
+## dimensions, bytes) before any file IO, so a mismatch never hashes the file.
+viewerPackVerifiedAsset <- function(
+  pack,
+  path,
+  md5 = tools::md5sum,
+  accept = NULL
+) {
+  assets <- pack$manifest$assets
+  row <- which(as.character(assets$path) == as.character(path))
+  if (length(row) != 1L) {
+    return(NULL)
+  }
+  asset <- list(
+    file = file.path(pack$path, path),
+    dtype = as.character(assets$dtype[[row]]),
+    bytes = as.numeric(assets$bytes[[row]]),
+    checksum = as.character(assets$checksum[[row]]),
+    dimensions = if ("dimensions" %in% names(assets)) {
+      suppressWarnings(as.integer(strsplit(
+        as.character(assets$dimensions[[row]]),
+        "x",
+        fixed = TRUE
+      )[[1L]]))
+    }
+  )
+  if (!is.null(accept) && !isTRUE(accept(asset))) {
+    return(NULL)
+  }
+  file <- asset$file
+  valid <- file.exists(file) &&
+    !dir.exists(file) &&
+    identical(as.numeric(file.info(file)$size), asset$bytes) &&
+    identical(unname(md5(file)), asset$checksum)
+  if (valid) asset else NULL
+}
+
 viewerPackValidateCellOrder <- function(pack) {
   if (isTRUE(pack$canonical_order)) {
     return(TRUE)
@@ -159,24 +197,11 @@ viewerPackValidateCellOrder <- function(pack) {
     return(isTRUE(get(key, envir = pack$cache, inherits = FALSE)))
   }
   path <- "common/cell_order.qs2"
-  assets <- pack$manifest$assets
-  row <- which(as.character(assets$path) == path)
-  file <- file.path(pack$path, path)
-  valid <- length(row) == 1L &&
-    file.exists(file) &&
-    !dir.exists(file) &&
-    identical(
-      as.numeric(file.info(file)$size),
-      as.numeric(assets$bytes[[row]])
-    ) &&
-    identical(
-      unname(tools::md5sum(file)),
-      as.character(assets$checksum[[row]])
-    )
-  stored <- if (valid) {
-    tryCatch(qs2::qs_read(file), error = function(error) NULL)
-  } else {
+  asset <- viewerPackVerifiedAsset(pack, path)
+  stored <- if (is.null(asset)) {
     NULL
+  } else {
+    tryCatch(qs2::qs_read(asset$file), error = function(error) NULL)
   }
   valid <- is.character(stored) && identical(stored, pack$cells)
   if (valid) {
@@ -196,23 +221,11 @@ viewerPackReadAsset <- function(pack, path, validate_cell_order = TRUE) {
   if (exists(path, envir = pack$cache, inherits = FALSE)) {
     return(get(path, envir = pack$cache, inherits = FALSE))
   }
-  assets <- pack$manifest$assets
-  row <- which(as.character(assets$path) == path)
-  if (length(row) != 1L) {
+  asset <- viewerPackVerifiedAsset(pack, path)
+  if (is.null(asset)) {
     return(NULL)
   }
-  file <- file.path(pack$path, path)
-  valid <- file.exists(file) &&
-    !dir.exists(file) &&
-    identical(
-      as.numeric(file.info(file)$size),
-      as.numeric(assets$bytes[[row]])
-    ) &&
-    identical(unname(tools::md5sum(file)), as.character(assets$checksum[[row]]))
-  if (!valid) {
-    return(NULL)
-  }
-  value <- tryCatch(qs2::qs_read(file), error = function(error) NULL)
+  value <- tryCatch(qs2::qs_read(asset$file), error = function(error) NULL)
   if (!is.null(value)) {
     assign(path, value, envir = pack$cache)
   }
