@@ -20,22 +20,3 @@ if (
     browser$close()
   })
 }
-
-## The bundled app lives at the installed package root, so shiny::loadSupport()
-## warns about the package layout even though sourcing these files is intended.
-local_app_support <- function(app_dir, envir = rlang::caller_env()) {
-  withCallingHandlers(
-    shinytest2::local_app_support(app_dir, envir = envir),
-    warning = function(warning) {
-      if (
-        grepl(
-          "Loading R/ subdirectory for Shiny application",
-          conditionMessage(warning),
-          fixed = TRUE
-        )
-      ) {
-        invokeRestart("muffleWarning")
-      }
-    }
-  )
-}

@@ -16,6 +16,57 @@ viewer_app_test_path <- function() {
   system.file(package = "CerebroNexus")
 }
 
+## The bundled app lives at the installed package root, so shiny::loadSupport()
+## warns about the package layout even though sourcing these files is intended.
+local_app_support <- function(app_dir, envir = rlang::caller_env()) {
+  withCallingHandlers(
+    shinytest2::local_app_support(app_dir, envir = envir),
+    warning = function(warning) {
+      if (
+        grepl(
+          "Loading R/ subdirectory for Shiny application",
+          conditionMessage(warning),
+          fixed = TRUE
+        )
+      ) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
+## Returns a function giving the file's shared AppDriver: created on first use,
+## stopped when the calling file finishes. Booting dominates browser tests, so
+## tests that navigate to the tab they assert on share it. A test that asserts
+## pristine startup state, leaves a modal open or switches data sets keeps its
+## own AppDriver.
+viewer_shared_app <- function(
+  name,
+  app_dir = viewer_app_test_path(),
+  envir = parent.frame()
+) {
+  driver <- NULL
+  function() {
+    if (is.null(driver)) {
+      local_app_support(app_dir, envir = envir)
+      driver <<- shinytest2::AppDriver$new(
+        app_dir,
+        name = name,
+        height = 950,
+        width = 1619,
+        load_timeout = 120000
+      )
+      withr::defer(driver$stop(), envir = envir)
+      driver$wait_for_idle(timeout = 20000)
+    }
+    ## An AppDriver booted by a test in between opens a newer Chrome tab and
+    ## leaves this page hidden, where Chrome stops animation frames and pages
+    ## that wait for them never render.
+    driver$get_chromote_session()$Page$bringToFront()
+    driver
+  }
+}
+
 viewer_drag_mouse <- function(app, x1, y1, x2, y2) {
   mouse <- app$get_chromote_session()$Input$dispatchMouseEvent
   mouse(

@@ -7,44 +7,9 @@
 skip_if_not_installed("shinytest2")
 library(shinytest2)
 
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-inst_dir <- inst_candidates[file.exists(file.path(inst_candidates, "app.R"))][1]
-if (is.na(inst_dir)) {
-  inst_dir <- system.file(package = "CerebroNexus")
-}
-if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
-  inst_dir <- testthat::test_path("../../inst")
-}
-
-## All three tests below run against the same default data set, and booting the
-## app costs far more than the assertions do, so they share one driver created on
-## first use and stopped when the file finishes.
-##
-## Each test navigates to the tab it asserts on instead of inheriting whatever
-## tab a previous test left active, so the tests stay order-independent. A test
-## that needs a pristine app (e.g. asserting something has NOT loaded yet) must
-## create its own AppDriver rather than call shared_app().
-shared_driver <- NULL
-shared_driver_env <- environment()
-shared_app <- function() {
-  if (is.null(shared_driver)) {
-    local_app_support(inst_dir, envir = shared_driver_env)
-    shared_driver <<- AppDriver$new(
-      inst_dir,
-      name = "trajectory_shared",
-      height = 950,
-      width = 1619,
-      load_timeout = 60000
-    )
-    withr::defer(shared_driver$stop(), envir = shared_driver_env)
-    shared_driver$wait_for_idle(timeout = 20000)
-  }
-  shared_driver
-}
+## All three tests below run against the same default data set and navigate to
+## the tab they assert on, so they share one driver.
+shared_app <- viewer_shared_app("trajectory_shared")
 
 test_that("Trajectory tab is present on the default (full T+B) data set", {
   app <- shared_app()

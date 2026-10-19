@@ -75,22 +75,7 @@ activate_ir_tab <- function(app, timeout = 60000) {
 ##   * the info-dialog test — it leaves a modal open over the page;
 ##   * the "does not break the main app" test — it reads the Data info tab of an
 ##     app that has never opened the repertoire page.
-shared_driver <- NULL
-shared_driver_env <- environment()
-shared_app <- function() {
-  if (is.null(shared_driver)) {
-    local_app_support(inst_dir, envir = shared_driver_env)
-    shared_driver <<- AppDriver$new(
-      inst_dir,
-      name = "ir_shared",
-      height = 950,
-      width = 1619,
-      load_timeout = 60000
-    )
-    withr::defer(shared_driver$stop(), envir = shared_driver_env)
-  }
-  shared_driver
-}
+shared_app <- viewer_shared_app("ir_shared", inst_dir)
 
 test_that("first IR plot tab is Clonal UMAP", {
   # The default/landing tab should be the Clonal UMAP overview, so the first

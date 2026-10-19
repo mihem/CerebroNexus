@@ -3,36 +3,9 @@
 skip_if_not_installed("shinytest2")
 library(shinytest2)
 
-inst_dir <- system.file(package = "CerebroNexus")
-if (!nzchar(inst_dir) || !file.exists(file.path(inst_dir, "app.R"))) {
-  inst_dir <- testthat::test_path("../../inst")
-}
-
-## Booting the app dominates these recordings: every test below only reads from
-## the DOM of the same freshly-loaded example.crb, so a driver per test spent
-## almost all its time on startup. They share one driver instead, created on
-## first use and stopped when the file finishes.
-##
-## Sharing is safe here because each test navigates to the tab it asserts on
-## rather than relying on where a previous test left the app. Keep that property
-## when adding a test: if a new test needs a pristine app (e.g. asserting that
-## something has NOT been loaded yet), give it its own AppDriver instead.
-shared_driver <- NULL
-shared_driver_env <- environment()
-shared_app <- function() {
-  if (is.null(shared_driver)) {
-    local_app_support(inst_dir, envir = shared_driver_env)
-    shared_driver <<- AppDriver$new(
-      inst_dir,
-      name = "new_modules_shared",
-      height = 950,
-      width = 1619
-    )
-    withr::defer(shared_driver$stop(), envir = shared_driver_env)
-    shared_driver$wait_for_idle(timeout = 20000)
-  }
-  shared_driver
-}
+## Every test below only reads from the DOM of the default data set and
+## navigates to the tab it asserts on, so they share one driver.
+shared_app <- viewer_shared_app("new_modules_shared")
 
 test_that("most_expressed_genes tab navigates and renders table", {
   app <- shared_app()
