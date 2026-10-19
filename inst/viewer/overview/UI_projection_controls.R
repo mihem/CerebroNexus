@@ -22,9 +22,27 @@ registerGroupFiltersInfo(
   )
 )
 
+registerCellViewPointBorder(output, "overview_projection", function() {
+  current_page_display_defaults("projection")
+})
+
 ##----------------------------------------------------------------------------##
-## example for implementation of nested checkboxes with shinyTree for selection
-## of group levels to show; works similar to cellxgene; anyway decided against
-## it because it creates a new dependency and isn't as aesthetically pleasing as
-## the existing solution
+## UI elements with switch to show group labels in projection.
 ##----------------------------------------------------------------------------##
+output[["overview_projection_show_group_label_UI"]] <- renderUI({
+  req(input[["overview_projection_point_color"]])
+  if (input[["overview_projection_point_color"]] %in% getGroups()) {
+    checkboxInput(
+      inputId = "overview_projection_group_labels",
+      label = "Group labels",
+      value = current_page_display_defaults("projection")$group_labels
+    )
+  }
+})
+
+## make sure elements are loaded even though the box is collapsed
+outputOptions(
+  output,
+  "overview_projection_show_group_label_UI",
+  suspendWhenHidden = FALSE
+)
