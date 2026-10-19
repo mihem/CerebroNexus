@@ -299,13 +299,6 @@
     updateCanvasDescription(p);
   }
 
-  function cssEscape(value) {
-    if (window.CSS && typeof window.CSS.escape === 'function') {
-      return window.CSS.escape(String(value));
-    }
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  }
-
   // RGB co-expression: cells whose max channel is <= RGB_MIN form a light-grey
   // substrate; the rest blend FROM that grey toward their full-brightness hue by
   // intensity (max/255), so weak co-expression stays faint (≈grey). Cells above
@@ -1006,7 +999,7 @@
         }
       }
     }
-    p._SX = SX; p._SY = SY; p._S = Math.min(SX, SY);
+    p._SX = SX; p._SY = SY;
     p._sox = ox; p._soy = oy;                // for dataToScreen (image bounds)
     if (!forceCpu && gpuCandidate(p)) {
       p.ok = u.ok;
@@ -1102,6 +1095,11 @@
     if (p.gpuTransformOnly) project(p, true);
   }
 
+  // The panel's data rectangle on screen, as CBGeom and the GPU renderers take it.
+  function panelRect(p) {
+    return { x: p._sox, y: p._soy, width: p._SX, height: p._SY };
+  }
+
   // A committed brush is part of the data conversation, not a decoration at a
   // particular canvas pixel. Keep it in unit coordinates so a Focus reflow (or
   // any other resize) sends the outline through the exact same projection as
@@ -1109,17 +1107,13 @@
   // moving, because hit testing happens against the already-projected cells.
   function lassoToUnit(p, lasso) {
     if (!lasso || !p._SX || !p._SY) return null;
-    return CBGeom.screenToUnit(p.view, {
-      x: p._sox, y: p._soy, width: p._SX, height: p._SY
-    }, lasso);
+    return CBGeom.screenToUnit(p.view, panelRect(p), lasso);
   }
   function lassoToScreen(p) {
     var lasso = p.lassoData || p.lasso;
     if (!lasso || !p._SX || !p._SY) return lasso;
     if (!p.lassoData) return lasso;
-    return CBGeom.unitToScreen(p.view, {
-      x: p._sox, y: p._soy, width: p._SX, height: p._SY
-    }, lasso);
+    return CBGeom.unitToScreen(p.view, panelRect(p), lasso);
   }
 
   // The rotation project() applies, as a function. Anything that has to land
@@ -1842,11 +1836,8 @@
     var stats = renderer.stats ? renderer.stats() : {};
     if (stats.backend === 'webgl2') return false;
     var previous = p.gpuCanvas;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-gpu-layer';
-    canvas.style.display = 'none';
-    canvas.setAttribute('aria-hidden', 'true');
     if (!previous.parentNode) return false;
+    var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {
       p.gpuCanvas = canvas;
@@ -1862,41 +1853,31 @@
     }
   }
 
+  // Swaps the panel's failed renderer for WebGL2, or drops it to Canvas.
+  // Returns whether a GPU renderer is still attached.
+  function failOver(p) {
+    if (replaceGpuWithWebGl(p, p.gpu)) { watchGpu(p, p.gpu); return true; }
+    disableGpu(p);
+    return false;
+  }
+
   function watchGpu(p, renderer) {
-    renderer.failed.then(function () {
+    function failed() {
       if (p.gpu !== renderer) return;
-      if (replaceGpuWithWebGl(p, renderer)) {
-        watchGpu(p, p.gpu);
-        if (D && p.spaceId) draw(p);
-        return;
-      }
-      disableGpu(p);
+      failOver(p);
       if (D && p.spaceId) draw(p);
-    });
+    }
+    renderer.failed.then(failed);
     renderer.ready.then(function () {
-      if (p.gpu !== renderer) return;
-      if (D && p.spaceId) draw(p);
-    }).catch(function () {
-      if (p.gpu !== renderer) return;
-      if (replaceGpuWithWebGl(p, renderer)) {
-        watchGpu(p, p.gpu);
-        if (D && p.spaceId) draw(p);
-        return;
-      }
-      disableGpu(p);
-      if (D && p.spaceId) draw(p);
-    });
+      if (p.gpu === renderer && D && p.spaceId) draw(p);
+    }).catch(failed);
   }
 
   function attachGpu(p) {
     if (!gpuAcceleration || p.gpu) return;
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-gpu-layer';
-    canvas.style.display = 'none';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-gpu-layer');
     try {
       p.gpuCanvas = canvas;
       p.gpu = window.CerebroPointRenderer.create(canvas);
@@ -1960,12 +1941,20 @@
     if (help && help.textContent !== title) help.textContent = title;
   }
 
+  // A canvas layer hidden from assistive technology; given a panel, it is
+  // stacked directly above that panel's canvas. GPU layers start hidden.
+  function createLayerCanvas(p, cls) {
+    var canvas = document.createElement('canvas');
+    canvas.className = cls;
+    canvas.setAttribute('aria-hidden', 'true');
+    if (cls === 'cv-gpu-layer') canvas.style.display = 'none';
+    if (p) p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    return canvas;
+  }
+
   function attachUnderlay(p) {
     if (p.underlayCanvas) return;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-underlay-layer';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-underlay-layer');
     p.underlayCanvas = canvas;
     p.underlayCtx = canvas.getContext('2d');
     syncPanelOverlay(p);
@@ -1980,10 +1969,7 @@
   // trajectory's complete edge set and point cloud.
   function attachInteractionLayer(p) {
     if (p.interactionCanvas) return;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-interaction-layer';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-interaction-layer');
     p.interactionCanvas = canvas;
     p.interactionCtx = canvas.getContext('2d');
     if (p.W && p.H) {
@@ -2181,18 +2167,12 @@
       p.gpu.setData(data);
       ok = p.gpu.draw({
         view: p.view || { cx: 0.5, cy: 0.5, span: 1 },
-        rect: { x: p._sox, y: p._soy, width: p._SX, height: p._SY },
+        rect: panelRect(p),
         pointSize: p._renderPointSize,
         border: border ? { color: gpuColor(border.color), width: border.width } : null
       });
     } catch (error) {
-      var failedRenderer = p.gpu;
-      if (replaceGpuWithWebGl(p, failedRenderer)) {
-        watchGpu(p, p.gpu);
-        return drawGpuPoints(p, shownMask, shownCount, border);
-      }
-      disableGpu(p);
-      return false;
+      return failOver(p) && drawGpuPoints(p, shownMask, shownCount, border);
     }
     if (!ok) { disableGpu(p); return false; }
     setGpuLayerVisible(p, true);
@@ -2587,9 +2567,8 @@
     // at query time, so filters, hidden groups and selections stay current.
     if (D.n >= GPU_MIN_CELLS && unit && !unit.nz && !unit._pending &&
         unit.nx && unit.ny && unit.ok && p._SX > 0 && p._SY > 0) {
-      return CBGeom.nearestInGrid(CBGeom.pointGrid(unit, D.n), p.view, {
-        x: p._sox, y: p._soy, width: p._SX, height: p._SY
-      }, mx, my, function (i) { return shown(i, p); });
+      return CBGeom.nearestInGrid(CBGeom.pointGrid(unit, D.n), p.view,
+        panelRect(p), mx, my, function (i) { return shown(i, p); });
     }
     ensureScreenProjection(p);
     var best = -1, bd = 200, n = D.n, i;
@@ -3219,110 +3198,88 @@
   function reportSelection(eventKind) {
     eventKind = eventKind || 'interaction';
     var hasSelection = !!(sel && sel.size);
-    var specialistReport = singleActive
-      ? window.CBViewState.specialistSelectionReport(
-        sel,
-        D && D.cells,
-        D && D.n
-      )
-      : null;
-    var pendingStableSelection = !!(specialistReport && specialistReport.pending);
-    var arr = null;
-    if (specialistReport) {
-      arr = specialistReport.ids;
-    } else if (hasSelection && Array.isArray(D && D.cells)) {
-      arr = [];
-      sel.forEach(function (i) { arr.push(D.cells[i]); });
-    }
-    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-      if (singleActive) {
-        // Stable IDs identify the selection on their own. Send coordinates
-        // only as the fallback key when some selected cell has no ID.
-        var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
-        var needCoordinates = arr && arr.some(function (id) {
-          return id == null || id === '';
-        });
-        if (needCoordinates && sp) sel.forEach(function (i) {
-          x.push(sp.x[i]); y.push(sp.y[i]);
-        });
-        // Large specialist views paint before their stable cell IDs arrive.
-        // Publish null during that window so every selected-cell result UI is
-        // gated off instead of retaining stale/empty Plot and Table shells.
-        // onSingleAuxBinary() reports only the then-current selection as soon
-        // as the deferred IDs have been attached.
-        var activeView = singleView(singleActive);
-        Shiny.setInputValue(singleActive + '_persistent_selection', {
-          x: pendingStableSelection || !arr ? [] : x,
-          y: pendingStableSelection || !arr ? [] : y,
-          ids: pendingStableSelection || !arr ? [] : arr,
-          dataset_context: activeView && activeView.dataset_context
-        });
-        var renderKey = activeView && activeView.data && activeView.data.render_key;
-        if (eventKind === 'primary' && renderKey != null) {
-          Shiny.setInputValue(singleActive + '_rendered_state', {
-            render_key: String(renderKey),
-            dataset_context: activeView.dataset_context
-          }, { priority: 'event' });
-          Shiny.setInputValue(
-            singleActive + '_rendered_key',
-            String(renderKey),
-            { priority: 'event' }
-          );
-        }
-      } else {
+    var shiny = typeof Shiny !== 'undefined' && Shiny.setInputValue;
+    if (!singleActive) {
+      if (shiny) {
         Shiny.setInputValue('coordviews_selection_indices', {indices:hasSelection ? Array.from(sel) : [], dataset_context:D && D.dataset_context});
       }
+      window.dispatchEvent(new CustomEvent('cerebro:linkedviews-selection', {
+        detail: { selectedCells: hasSelection ? sel.size : 0, dataset_context: D && D.dataset_context }
+      }));
+      return;
     }
-    if (singleActive) {
-      var guide = $(singleActive + '_selection_guide');
-      var active = $(singleActive + '_selection_active');
-      if (guide) guide.classList.toggle('cerebro-selection-status-hidden', hasSelection);
-      if (active) active.classList.toggle('cerebro-selection-status-hidden', !hasSelection);
+    var specialistReport = window.CBViewState.specialistSelectionReport(
+      sel, D && D.cells, D && D.n
+    );
+    var pendingStableSelection = specialistReport.pending;
+    var arr = specialistReport.ids;
+    if (shiny) {
+      // Stable IDs identify the selection on their own. Send coordinates
+      // only as the fallback key when some selected cell has no ID.
+      var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
+      var needCoordinates = arr && arr.some(function (id) {
+        return id == null || id === '';
+      });
+      if (needCoordinates && sp) sel.forEach(function (i) {
+        x.push(sp.x[i]); y.push(sp.y[i]);
+      });
+      // Large specialist views paint before their stable cell IDs arrive.
+      // Publish null during that window so every selected-cell result UI is
+      // gated off instead of retaining stale/empty Plot and Table shells.
+      // onSingleAuxBinary() reports only the then-current selection as soon
+      // as the deferred IDs have been attached.
+      var activeView = singleView(singleActive);
+      Shiny.setInputValue(singleActive + '_persistent_selection', {
+        x: pendingStableSelection || !arr ? [] : x,
+        y: pendingStableSelection || !arr ? [] : y,
+        ids: pendingStableSelection || !arr ? [] : arr,
+        dataset_context: activeView && activeView.dataset_context
+      });
+      var renderKey = activeView && activeView.data && activeView.data.render_key;
+      if (eventKind === 'primary' && renderKey != null) {
+        Shiny.setInputValue(singleActive + '_rendered_state', {
+          render_key: String(renderKey),
+          dataset_context: activeView.dataset_context
+        }, { priority: 'event' });
+        Shiny.setInputValue(
+          singleActive + '_rendered_key',
+          String(renderKey),
+          { priority: 'event' }
+        );
+      }
     }
-    var datasetFingerprint = singleActive && D
+    var guide = $(singleActive + '_selection_guide');
+    var active = $(singleActive + '_selection_active');
+    if (guide) guide.classList.toggle('cerebro-selection-status-hidden', hasSelection);
+    if (active) active.classList.toggle('cerebro-selection-status-hidden', !hasSelection);
+    var datasetFingerprint = D
       ? String(D.dataset_fingerprint || D.cell_fingerprint || '')
       : '';
-    if (singleActive &&
-        !/^md5-cell-set-v1:[0-9a-f]{32}$/.test(datasetFingerprint)) return;
-    var specialistTiming = null;
-    if (singleActive) {
-      var timing = singleTiming[singleActive] || {};
-      var readyAt = performance.now();
-      specialistTiming = CBViewState.specialistLifecycle.ready(
-        singleTiming, singleActive, readyAt
-      );
-    }
-    var renderedPointCount = 0;
-    if (singleActive) {
-      var renderedPanel = panels.filter(function (panel) {
-        return panel && panel.spaceId && panel.canvas;
-      })[0];
-      renderedPointCount = Number(
+    if (!/^md5-cell-set-v1:[0-9a-f]{32}$/.test(datasetFingerprint)) return;
+    var timing = singleTiming[singleActive] || {};
+    var specialistTiming = CBViewState.specialistLifecycle.ready(
+      singleTiming, singleActive, performance.now()
+    );
+    var renderedPanel = panels.filter(function (panel) {
+      return panel && panel.spaceId && panel.canvas;
+    })[0];
+    window.dispatchEvent(new CustomEvent('cerebro:specialist-state', { detail: {
+      viewId: singleActive,
+      dataset_context: activeView && activeView.dataset_context,
+      selectedCells: specialistReport.selectedCells,
+      selectionPending: pendingStableSelection,
+      datasetFingerprint: datasetFingerprint,
+      eventKind: eventKind,
+      renderKey: renderKey == null ? null : String(renderKey),
+      generation: Number(timing.generation) || 0,
+      benchmarkGeneration:
+        Number(window.__cerebroPageBenchGeneration) || 0,
+      renderRequestSent: !!timing.renderRequestSent,
+      renderedPointCount: Number(
         renderedPanel && renderedPanel.canvas.dataset.pointCount
-      ) || 0;
-    }
-    window.dispatchEvent(new CustomEvent(
-      singleActive ? 'cerebro:specialist-state' : 'cerebro:linkedviews-selection',
-      { detail: singleActive
-        ? {
-          viewId: singleActive,
-          dataset_context: activeView && activeView.dataset_context,
-          selectedCells: specialistReport
-            ? specialistReport.selectedCells
-            : (hasSelection ? sel.size : 0),
-          selectionPending: pendingStableSelection,
-          datasetFingerprint: datasetFingerprint,
-          eventKind: eventKind,
-          renderKey: renderKey == null ? null : String(renderKey),
-          generation: Number(timing.generation) || 0,
-          benchmarkGeneration:
-            Number(window.__cerebroPageBenchGeneration) || 0,
-          renderRequestSent: !!timing.renderRequestSent,
-          renderedPointCount: renderedPointCount,
-          timing: specialistTiming
-        }
-        : { selectedCells: hasSelection ? sel.size : 0, dataset_context: D && D.dataset_context } }
-    ));
+      ) || 0,
+      timing: specialistTiming
+    } }));
   }
 
   function attachSingleDatasetIdentity(identity) {
@@ -3825,12 +3782,17 @@
       singlePayload.data.panel_colorscales &&
       Object.keys(singlePayload.data.panel_colorscales).length > 1);
     renderPanelScales(distinctPanels);
+    function item(className, html) {
+      var d = document.createElement('div');
+      d.className = className;
+      d.innerHTML = html;
+      L.appendChild(d);
+      return d;
+    }
     function appendEvidenceLegend() {
-      if (!evidenceOn) return;
-      var e = document.createElement('div');
-      e.className = 'cv-lg cv-rgb-lg';
-      e.innerHTML = '<span class="cv-evidence-dot"></span>Positioning evidence';
-      L.appendChild(e);
+      if (evidenceOn) {
+        item('cv-lg cv-rgb-lg', '<span class="cv-evidence-dot"></span>Positioning evidence');
+      }
     }
     // Continuous modes: colourbar for a single gene; nothing for RGB.
     if (colorBy === GENE_MODE) {
@@ -3867,10 +3829,8 @@
     if (fld && fld.colors) {
       renderColorbar(false);
       (fld.channelLabels || []).forEach(function (label, index) {
-        var d = document.createElement('div'); d.className = 'cv-lg cv-rgb-lg';
-        d.innerHTML = '<span class="cv-dot" style="background:' +
-          cssColor((fld.channelColors || [])[index]) + '"></span>' + esc(label);
-        L.appendChild(d);
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          cssColor((fld.channelColors || [])[index]) + '"></span>' + esc(label));
       });
       return;
     }
@@ -3887,25 +3847,17 @@
       var genes = (D.rgb && D.rgb.genes) || ['', '', ''];
       chans.forEach(function (ch, k) {
         var gene = genes[k] || '';
-        var d = document.createElement('div');
-        d.className = 'cv-lg cv-rgb-lg' + (gene ? '' : ' off');
-        d.innerHTML = '<span class="cv-dot" style="background:' + ch[1] + '"></span>' +
+        item('cv-lg cv-rgb-lg' + (gene ? '' : ' off'),
+          '<span class="cv-dot" style="background:' + ch[1] + '"></span>' +
           '<b style="color:' + ch[1] + '">' + ch[0] + '</b> ' +
-          (gene ? esc(gene) : '<span class="cv-rgb-none">not set</span>');
-        L.appendChild(d);
+          (gene ? esc(gene) : '<span class="cv-rgb-none">not set</span>'));
       });
       [
-        ['Low expression', RGB_GREY, ''],
-        ['R + G', '#ffff00', ''],
-        ['R + B', '#ff00ff', ''],
-        ['G + B', '#00ffff', ''],
-        ['R + G + B', '#000000', '']
+        ['Low expression', RGB_GREY], ['R + G', '#ffff00'], ['R + B', '#ff00ff'],
+        ['G + B', '#00ffff'], ['R + G + B', '#000000']
       ].forEach(function (blend) {
-        var d = document.createElement('div');
-        d.className = 'cv-lg cv-rgb-lg';
-        d.innerHTML = '<span class="cv-dot' + blend[2] + '" style="background:' +
-          blend[1] + '"></span>' + blend[0];
-        L.appendChild(d);
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          blend[1] + '"></span>' + blend[0]);
       });
       var note = document.createElement('div');
       note.className = 'cv-rgb-note';
@@ -3921,15 +3873,13 @@
     for (var i = 0; i < D.n; i++) counts[g.values[i]] = (counts[g.values[i]] || 0) + 1;
     g.levels.forEach(function (nm, li) {
       var col = cssColor((g.colors && g.colors[li]) || PAL[li % PAL.length]);
-      var d = document.createElement('div');
-      d.className = 'cv-lg' + (hidden.has(li) ? ' off' : '');
-      d.innerHTML = '<span class="cv-dot" style="background:' + col + '"></span>' +
-        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>';
-      d.onclick = function () {
+      item('cv-lg' + (hidden.has(li) ? ' off' : ''),
+        '<span class="cv-dot" style="background:' + col + '"></span>' +
+        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>'
+      ).onclick = function () {
         if (hidden.has(li)) hidden.delete(li); else hidden.add(li);
         reportSingleHiddenGroups(); renderLegend(); drawAll();
       };
-      L.appendChild(d);
     });
     appendEvidenceLegend();
   }
@@ -4359,28 +4309,20 @@
   }
 
   function openCard(p, i) {
+    cardCell = i;
+    cardRequest = null;
+    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
+    renderCard();
     if (D && D.trekker) {
-      openTrekkerInspector(i);
-      return;
+      // Trekker shows the cell in its insights inspector, not a floating card.
+      openTrekkerInsights('cell');
+    } else {
+      // The tooltip has just been promoted into the card — leaving it up would
+      // show the same cell twice, once truncated. It returns on the next hover.
+      unpinTip();
+      cardFlyFrom(p, i);
     }
-    cardCell = i;
-    cardRequest = null;
-    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
-    renderCard();
-    // The tooltip has just been promoted into the card — leaving it up would
-    // show the same cell twice, once truncated. It returns on the next hover.
-    unpinTip();
-    cardFlyFrom(p, i);
     // ask for the exact meta row; the card is already on screen either way
-    requestCardMetadata();
-  }
-
-  function openTrekkerInspector(i) {
-    cardCell = i;
-    cardRequest = null;
-    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
-    renderCard();
-    openTrekkerInsights('cell');
     requestCardMetadata();
   }
 
@@ -4644,7 +4586,6 @@
       if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
       clearTransientHover();
       requestSingleAux();
-      if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
       // A rotatable panel NAVIGATES; it does not select. Selection here is done
       // on screen coordinates, and once the cloud has depth those stop being a
       // faithful key to it: cells at different depths overlap on screen, so a
@@ -4820,6 +4761,24 @@
     }
   }
 
+  // Pane-level gestures: any press in a spatial pane makes its section the
+  // active one; its title (click) or plot (double-click) focuses the panel.
+  function wirePane(p) {
+    p.pane.addEventListener('mousedown', function () {
+      if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
+    });
+    p.pane.addEventListener('click', function (e) {
+      if (e.target.closest('.cv-ptitle') && canFocusPanel() && p.spaceId) {
+        setFocusPanel(p.key);
+      }
+    });
+    p.pane.addEventListener('dblclick', function (e) {
+      if (!e.target.closest('.cv-canvas-wrap') || !canFocusPanel() || !p.spaceId) return;
+      e.preventDefault();
+      setFocusPanel(p.key);
+    });
+  }
+
   // The canvas elements persist across dataset switches, so panel objects and
   // their event listeners are created EXACTLY ONCE. Re-wiring on every onData
   // would stack duplicate listeners whose stale closures fire on unprojected
@@ -4853,37 +4812,7 @@
       }
       panels.push(p);
       wireHover(p); wireBrush(p);
-      if (p.pane) {
-        p.pane.addEventListener('mousedown', function () {
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (found && isSpatialSpace(spaceById[found.spaceId])) {
-            activateSpatial(found.spaceId);
-          }
-        });
-        p.pane.addEventListener('click', function (e) {
-          if (!e.target.closest('.cv-ptitle')) return;
-          if (!canFocusPanel()) return;
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (found && found.spaceId) setFocusPanel(found.key);
-        });
-        p.pane.addEventListener('dblclick', function (e) {
-          if (!e.target.closest('.cv-canvas-wrap')) return;
-          if (!canFocusPanel()) return;
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (!found || !found.spaceId) return;
-          e.preventDefault();
-          setFocusPanel(found.key);
-        });
-      }
+      if (p.pane) wirePane(p);
       if (resizeObserver && p.pane) resizeObserver.observe(p.pane);
     }
     // Re-project + redraw whenever the panes gain/lose size — critically, when

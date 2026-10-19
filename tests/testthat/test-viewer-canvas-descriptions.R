@@ -8,7 +8,7 @@ test_that("cloned panels own distinct accessible descriptions", {
     "const nodes={}; const document={getElementById:id=>nodes[id]||null, createElement:()=>({})};",
     "const D={n:180}, sel=new Set(), spaceById={a:{label:'UMAP'},b:{label:'Clonal expansion'}};",
     "function panel(id,space){const parent={insertBefore(node){node.parentNode=this;nodes[node.id]=node;}};return {spaceId:space,canvas:{id,parentNode:parent,attrs:{'aria-describedby':'cv-a-description'},setAttribute(k,v){this.attrs[k]=v;},getAttribute(k){return this.attrs[k];}}};}",
-    "eval(source.slice(source.indexOf('  function updateCanvasDescription('),source.indexOf('  function cssEscape(')));",
+    "eval(source.slice(source.indexOf('  function updateCanvasDescription('),source.indexOf('  // RGB co-expression:')));",
     "const first=panel('cv-cv-a','a'); const initial={parentNode:first.canvas.parentNode,textContent:'waiting'}; nodes['cv-description-a']=initial; prepareCanvasSemantics(first);",
     "assert.strictEqual(first.description,initial);",
     "const clone=panel('cv-cv-b','b'); const cloned={parentNode:clone.canvas.parentNode,textContent:initial.textContent}; nodes['cv-description-b']=cloned; prepareCanvasSemantics(clone);",
