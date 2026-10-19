@@ -208,7 +208,7 @@
     }
     extensions <- tolower(tools::file_ext(input))
 
-    if (all(extensions == "rds")) {
+    input <- if (all(extensions == "rds")) {
       if (length(input) != 1) {
         stop(
           argument_label,
@@ -217,30 +217,24 @@
           call. = FALSE
         )
       }
-      loaded <- .loadImmuneRepertoireData(input, receptor, verbose)
-      .validateImmuneRepertoire(loaded, source_label = argument_label)
-      return(loaded)
-    }
-
-    if (all(extensions == "csv")) {
-      combined <- .combineContigAnnotations(
+      .loadImmuneRepertoireData(input, receptor, verbose)
+    } else if (all(extensions == "csv")) {
+      .combineContigAnnotations(
         input,
         receptor = receptor,
         sample_names = sample_names,
         verbose = verbose
       )
-      .validateImmuneRepertoire(combined, source_label = argument_label)
-      return(combined)
+    } else {
+      stop(
+        argument_label,
+        " holds file paths that are neither all .rds nor all .csv: ",
+        paste(unique(extensions), collapse = ", "),
+        ". Pass a .rds holding a named list, Cell Ranger ",
+        "filtered_contig_annotations.csv files, or the list itself.",
+        call. = FALSE
+      )
     }
-
-    stop(
-      argument_label,
-      " holds file paths that are neither all .rds nor all .csv: ",
-      paste(unique(extensions), collapse = ", "),
-      ". Pass a .rds holding a named list, Cell Ranger ",
-      "filtered_contig_annotations.csv files, or the list itself.",
-      call. = FALSE
-    )
   }
 
   .validateImmuneRepertoire(input, source_label = argument_label)
