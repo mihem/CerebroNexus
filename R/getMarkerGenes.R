@@ -88,13 +88,9 @@ getMarkerGenes <- function(
   ## ... organism is not "hg" or "mm" -> not compatible
   if (length(organism) != 1L || !organism %in% c('hg', 'mm')) {
     ## show log message
-    message(
-      paste0(
-        '[',
-        format(Sys.time(), '%H:%M:%S'),
-        '] No information about genes on cell surface because organism is ',
-        'either not specified or not human/mouse.'
-      )
+    .logStep(
+      'No information about genes on cell surface because organism is ',
+      'either not specified or not human/mouse.'
     )
 
     ## ... organism is either "hg" or "mm" -> compatible
@@ -111,14 +107,6 @@ getMarkerGenes <- function(
       temp_dataset <- 'mmusculus_gene_ensembl'
     }
 
-    ## check that biomaRt is installed before querying Ensembl
-    if (!requireNamespace("biomaRt", quietly = TRUE)) {
-      stop(
-        "Package 'biomaRt' is required for this function. Install it with install.packages(\"biomaRt\") (or BiocManager::install(\"biomaRt\") for Bioconductor packages: biomaRt, GSVA, qvalue).",
-        call. = FALSE
-      )
-    }
-
     ## try up to 3 times to retrieve genes in "cell surface" GO term
     for (attempt in seq_len(3L)) {
       try(
@@ -132,21 +120,17 @@ getMarkerGenes <- function(
         },
         silent = TRUE
       )
-      if (exists('genes_on_cell_surface')) {
+      if (exists('genes_on_cell_surface', inherits = FALSE)) {
         break
       }
     }
 
     ## if genes could not be retrieved, show log message
-    if (!exists('genes_on_cell_surface')) {
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Genes in GO term "cell surface" (GO:0009986) could not be ',
-          'retrieved, possibly due to the server not being reachable at the ',
-          'moment.'
-        )
+    if (!exists('genes_on_cell_surface', inherits = FALSE)) {
+      .logStep(
+        'Genes in GO term "cell surface" (GO:0009986) could not be ',
+        'retrieved, possibly due to the server not being reachable at the ',
+        'moment.'
       )
     }
   }
@@ -163,44 +147,10 @@ getMarkerGenes <- function(
     ## get current group
     current_group <- groups[i]
 
-    ## collect group levels
-    ## ... column contains factors
-    if (is.factor(object@meta.data[[current_group]])) {
-      ## get factor levels
-      group_levels <- levels(object@meta.data[[current_group]])
-
-      ## ... column contains characters
-    } else if (is.character(object@meta.data[[current_group]])) {
-      ## get unique entries in column
-      group_levels <- unique(object@meta.data[[current_group]])
-
-      ## check for NA values
-      ## ... if at least 1 group level is NA
-      if (any(is.na(group_levels))) {
-        ## get number of cells with NA as group assignment
-        number_of_cells_without_group_assignment <- object@meta.data[[
-          current_group
-        ]] %>%
-          is.na() %>%
-          which(. == TRUE) %>%
-          length()
-
-        ## remove NA entries from group levels
-        group_levels <- stats::na.omit(group_levels)
-
-        ## issue warning to user
-        warning(
-          paste0(
-            'Found ',
-            number_of_cells_without_group_assignment,
-            ' cell(s) without group assignment (NA) for `',
-            current_group,
-            '`. These cells will be ignored during the analysis.'
-          ),
-          call. = FALSE
-        )
-      }
-    }
+    group_levels <- .seuratGroupLevels(
+      object@meta.data[[current_group]],
+      current_group
+    )
 
     ## check number of group levels
     ## ... if only 1 group level is present, show warning and move to next
@@ -218,16 +168,12 @@ getMarkerGenes <- function(
       ## ... more than 1 group level is available
     } else if (length(group_levels) > 1) {
       ## log message
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Get marker genes for ',
-          length(group_levels),
-          ' groups in `',
-          current_group,
-          '`...'
-        )
+      .logStep(
+        'Get marker genes for ',
+        length(group_levels),
+        ' groups in `',
+        current_group,
+        '`...'
       )
 
       ## set cell identities to current grouping variable
@@ -250,14 +196,10 @@ getMarkerGenes <- function(
       ## ... no marker genes were found
       if (nrow(results) == 0) {
         ## log message and set result to specific string
-        message(
-          paste0(
-            '[',
-            format(Sys.time(), '%H:%M:%S'),
-            '] No marker genes found for any of the level of `',
-            current_group,
-            '`.'
-          )
+        .logStep(
+          'No marker genes found for any of the level of `',
+          current_group,
+          '`.'
         )
         results <- 'no_markers_found'
 
@@ -265,7 +207,7 @@ getMarkerGenes <- function(
       } else if (nrow(results) > 0) {
         ## intersect marker genes with cell surface genes if info is available
         if (
-          exists('genes_on_cell_surface') &&
+          exists('genes_on_cell_surface', inherits = FALSE) &&
             "gene" %in% colnames(results)
         ) {
           results <- results %>%

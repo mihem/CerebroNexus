@@ -76,3 +76,29 @@
   }
   invisible(TRUE)
 }
+
+## Levels of a grouping column: the factor levels, otherwise the unique values
+## without NA, with a warning about the cells that have none. `na_text` is the
+## warning text between the cell count and the group name.
+.seuratGroupLevels <- function(
+  values,
+  group,
+  na_text = ' cell(s) without group assignment (NA) for `'
+) {
+  if (is.factor(values)) {
+    return(levels(values))
+  }
+  levels <- unique(values)
+  if (anyNA(levels)) {
+    levels <- stats::na.omit(levels)
+    warning(
+      'Found ',
+      sum(is.na(values)),
+      na_text,
+      group,
+      '`. These cells will be ignored during the analysis.',
+      call. = FALSE
+    )
+  }
+  levels
+}

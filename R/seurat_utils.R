@@ -1100,6 +1100,34 @@
   return(expr_matrix)
 }
 
+## `.getExpressionMatrix()` with split Seurat v5 layers joined, followed by the
+## check that the matrix covers exactly the object's cells. Returns the
+## resolution with the validated matrix in `data`. `.getExpressionMatrix()`
+## already stops on a missing or empty matrix.
+.getValidatedExpression <- function(
+  seurat,
+  assay,
+  slot,
+  allow_cross_semantic_fallback = FALSE
+) {
+  resolution <- .getExpressionMatrix(
+    seurat = seurat,
+    assay = assay,
+    slot = slot,
+    join_samples = TRUE,
+    allow_cross_semantic_fallback = allow_cross_semantic_fallback,
+    return_resolution = TRUE
+  )
+  resolution$data <- .validate_expression_cells(
+    expression_data = resolution$data,
+    object_cells = colnames(seurat),
+    assay = assay,
+    requested_layer = resolution$requested,
+    resolved_layer = resolution$resolved
+  )
+  resolution
+}
+
 # Internal utilities shared across extraction helpers ---------------------------
 #' @keywords internal
 #' @noRd

@@ -43,222 +43,80 @@ getMostExpressedGenes <- function(
   .checkSeuratObject(object)
   .checkSeuratAssay(object, assay)
 
-  ## Resolve split Seurat v5 assays through the shared layer resolver. This
-  ## consumer requires raw counts and therefore never crosses semantic classes.
-  counts_resolution <- .getExpressionMatrix(
-    seurat = object,
-    assay = assay,
-    slot = "counts",
-    join_samples = TRUE,
-    allow_cross_semantic_fallback = FALSE,
-    return_resolution = TRUE
-  )
-  counts_matrix <- .validate_expression_cells(
-    expression_data = counts_resolution$data,
-    object_cells = colnames(object),
-    assay = assay,
-    requested_layer = counts_resolution$requested,
-    resolved_layer = counts_resolution$resolved
-  )
-
-  ## check if `counts` matrix exist in provided assay
-  if (is.null(counts_matrix) || nrow(counts_matrix) == 0) {
-    stop(
-      paste0(
-        '`counts` matrix could not be found in `',
-        assay,
-        '` assay slot of the provided Seurat object.'
-      ),
-      call. = FALSE
-    )
-  }
+  ## This consumer requires raw counts and therefore never crosses semantic
+  ## classes.
+  counts_matrix <- .getValidatedExpression(object, assay, "counts")$data
 
   .checkSeuratGroups(object, groups)
-
-  ##--------------------------------------------------------------------------##
-  ## create slot for results in Seurat object if not already existing
-  ##--------------------------------------------------------------------------##
 
   if (is.null(object@misc$most_expressed_genes)) {
     object@misc$most_expressed_genes <- list()
   }
 
-  ##--------------------------------------------------------------------------##
-  ## get most expressed genes for each group level in every group
-  ##--------------------------------------------------------------------------##
-
-  ##
-  for (i in seq_along(groups)) {
-    current_group <- groups[i]
-
-    ## collect group levels
-    ## ... column contains factors
-    if (is.factor(object@meta.data[[current_group]])) {
-      ## get factor levels
-      group_levels <- levels(object@meta.data[[current_group]])
-
-      ## ... column contains characters
-    } else if (is.character(object@meta.data[[current_group]])) {
-      ## get unique entries in column
-      group_levels <- unique(object@meta.data[[current_group]])
-
-      ## check for NA values
-      ## ... if at least 1 group level is NA
-      if (any(is.na(group_levels))) {
-        ## get number of cells with NA as group assignment
-        number_of_cells_without_group_assignment <- object@meta.data[[
-          current_group
-        ]] %>%
-          is.na() %>%
-          which(. == TRUE) %>%
-          length()
-
-        ## remove NA entries from group levels
-        group_levels <- stats::na.omit(group_levels)
-
-        ## issue warning to user
-        warning(
-          paste0(
-            'Found ',
-            number_of_cells_without_group_assignment,
-            ' cell(s) without group assignment  (NA) for `',
-            current_group,
-            '`. These cells will be ignored during the analysis.'
-          ),
-          call. = FALSE
-        )
-      }
+  ## top 100 genes by share of all transcripts in `cells`; NULL means all cells
+  top_genes <- function(level, cells = NULL) {
+    counts <- if (is.null(cells)) {
+      counts_matrix
+    } else {
+      counts_matrix[, cells, drop = FALSE]
     }
-
-    ## check number of group levels
-    ## ... if only 1 group level is present, show warning and move to next
-    ##     grouping variable
-    if (length(group_levels) == 1) {
-      ## log message
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Group `',
-          current_group,
-          '` contains only one subgroup. Will calculate most expressed genes ',
-          'across all cells of this group...'
-        )
-      )
-
-      ## calculate sums for all genes
-      transcripts_counts_per_gene <- Matrix::rowSums(counts_matrix)
-
-      ## calculate transcript count across all cells of current group level
-      total_transcript_count <- sum(transcripts_counts_per_gene)
-
-      ## transform transcript counts per gene to percentage of all transcripts
-      transcripts_percent_per_gene <- transcripts_counts_per_gene /
-        total_transcript_count
-
-      ## sort percentage values decreasingly
-      transcripts_percent_per_gene <- sort(
-        transcripts_percent_per_gene,
-        decreasing = TRUE
-      )
-
-      ## build data frame with results
-      table <- tibble::tibble(
-        group = group_levels,
-        gene = names(transcripts_percent_per_gene)[1:100],
-        pct = transcripts_percent_per_gene[1:100]
-      )
-
-      ## factorize group levels and rename first column
-      most_expressed_genes <- table %>%
-        dplyr::mutate(group = factor(group, levels = group_levels)) %>%
-        dplyr::rename(!!current_group := group)
-
-      ## add results to Seurat object
-      object@misc[["most_expressed_genes"]][[
-        current_group
-      ]] <- most_expressed_genes
-
-      ## ... if at least 2 group levels are present, perform analysis
-    } else if (length(group_levels) > 1) {
-      ## log message
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Get most expressed genes for ',
-          length(group_levels),
-          ' groups in `',
-          current_group,
-          '`...'
-        )
-      )
-
-      ##
-      mostexpr_fun <- function(x) {
-        ## get names of cells belonging to current group level
-        cells_of_current_group_level <- rownames(object@meta.data)[which(
-          object@meta.data[[current_group]] == x
-        )]
-
-        ## subset transcript count matrix for
-        transcript_count_matrix <- counts_matrix[, cells_of_current_group_level]
-
-        ## check how many cells are present in the matrix
-        ## ... only a single cell, which returns transcript counts as vector
-        ##     instead of a matrix
-        if (is.vector(transcript_count_matrix) == TRUE) {
-          ## take the transcript counts from that cell
-          transcripts_counts_per_gene <- transcript_count_matrix
-
-          ## ... at least 2 cells
-        } else {
-          ## calculate sums for all genes
-          transcripts_counts_per_gene <- Matrix::rowSums(
-            transcript_count_matrix
-          )
-        }
-
-        ## calculate transcript count across all cells of current group level
-        total_transcript_count <- sum(transcripts_counts_per_gene)
-
-        ## transform transcript counts per gene to percentage of all transcripts
-        transcripts_percent_per_gene <- transcripts_counts_per_gene /
-          total_transcript_count
-
-        ## sort percentage values decreasingly
-        transcripts_percent_per_gene <- sort(
-          transcripts_percent_per_gene,
-          decreasing = TRUE
-        )
-
-        ## build data frame with results
-        table <- tibble::tibble(
-          group = x,
-          gene = names(transcripts_percent_per_gene)[1:100],
-          pct = transcripts_percent_per_gene[1:100]
-        )
-      }
-      results <- if (requireNamespace("pbapply", quietly = TRUE)) {
-        pbapply::pblapply(group_levels, mostexpr_fun)
-      } else {
-        lapply(group_levels, mostexpr_fun)
-      }
-
-      ## merge tables with results and factorize group levels
-      most_expressed_genes <- do.call(rbind, results) %>%
-        dplyr::mutate(group = factor(group, levels = group_levels)) %>%
-        dplyr::rename(!!current_group := group)
-
-      ## add results to Seurat object
-      object@misc[["most_expressed_genes"]][[
-        current_group
-      ]] <- most_expressed_genes
-    }
+    transcripts_counts_per_gene <- Matrix::rowSums(counts)
+    transcripts_percent_per_gene <- sort(
+      transcripts_counts_per_gene / sum(transcripts_counts_per_gene),
+      decreasing = TRUE
+    )
+    tibble::tibble(
+      group = level,
+      gene = names(transcripts_percent_per_gene)[1:100],
+      pct = transcripts_percent_per_gene[1:100]
+    )
   }
 
-  ##--------------------------------------------------------------------------##
-  ## return Seurat object
-  ##--------------------------------------------------------------------------##
+  ## get most expressed genes for each group level in every group
+  for (current_group in groups) {
+    group_levels <- .seuratGroupLevels(
+      object@meta.data[[current_group]],
+      current_group,
+      ' cell(s) without group assignment  (NA) for `'
+    )
+
+    ## ... if only 1 group level is present, use all cells
+    if (length(group_levels) == 1) {
+      .logStep(
+        'Group `',
+        current_group,
+        '` contains only one subgroup. Will calculate most expressed genes ',
+        'across all cells of this group...'
+      )
+      results <- list(top_genes(group_levels))
+    } else if (length(group_levels) > 1) {
+      .logStep(
+        'Get most expressed genes for ',
+        length(group_levels),
+        ' groups in `',
+        current_group,
+        '`...'
+      )
+      results <- pbapply::pblapply(group_levels, function(x) {
+        top_genes(
+          x,
+          rownames(object@meta.data)[which(
+            object@meta.data[[current_group]] == x
+          )]
+        )
+      })
+    } else {
+      next
+    }
+
+    ## merge tables with results and factorize group levels
+    object@misc[["most_expressed_genes"]][[current_group]] <- do.call(
+      rbind,
+      results
+    ) %>%
+      dplyr::mutate(group = factor(group, levels = group_levels)) %>%
+      dplyr::rename(!!current_group := group)
+  }
+
   return(object)
 }
