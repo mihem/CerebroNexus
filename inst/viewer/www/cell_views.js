@@ -5138,7 +5138,7 @@
     D.gene = null;
     clipRange();
     if (colorBy === GENE_MODE) {
-      renderColorbar(true, null, 'loading ' + esc(gene) + '…');
+      renderColorbar(true, null, 'loading ' + gene + '…');
     }
   }
 
@@ -10539,7 +10539,7 @@
         window.CBViewState.clearExpression(D, 'gene');
         clipRange();
         if (colorBy === GENE_MODE) {
-          renderColorbar(true, null, esc(m.gene) + ' — not available');
+          renderColorbar(true, null, m.gene + ' — not available');
           drawAll(); updateMoranBadges();
         }
         return;
