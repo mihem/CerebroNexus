@@ -156,26 +156,10 @@ hla_allele_status_by_unit <- function(
 #' @return Character vector, one status per node.
 #' @keywords internal
 hla_node_carrier_status <- function(samples_all, typing, samples, allele) {
-  n <- length(samples_all)
-  if (n == 0) {
-    return(character(0))
-  }
-  status <- tryCatch(
-    hla_allele_status_by_unit(typing, samples, allele),
-    error = function(e) NULL
-  )
-  if (is.null(status) || nrow(status) == 0) {
-    return(rep("Untyped", n))
-  }
-  # Samples map to analysis units (donor when donor mapping is complete), so
-  # resolve each node's samples through the same unit map the tables use.
-  unit_map <- hla_analysis_unit_map(typing, samples)
-  sample_to_unit <- stats::setNames(unit_map$analysis_unit, unit_map$sample)
-  unit_status <- stats::setNames(status$hla_status, status$analysis_unit)
-
-  counts <- hla_node_carrier_counts(samples_all, typing, samples, allele)
   # The label is a thin function of the counts, so the two can never disagree.
-  out <- rep("Untyped", n)
+  # Samples resolve to analysis units the same way the tables do.
+  counts <- hla_node_carrier_counts(samples_all, typing, samples, allele)
+  out <- rep("Untyped", length(samples_all))
   has_c <- counts$n_carrier > 0
   has_n <- counts$n_noncarrier > 0
   out[has_c] <- "Carrier"
