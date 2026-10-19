@@ -518,28 +518,3 @@ outputOptions(
   "spatial_projection_background_selector_UI",
   suspendWhenHidden = TRUE
 )
-##----------------------------------------------------------------------------##
-## Info box that gets shown when pressing the "info" button.
-##----------------------------------------------------------------------------##
-cerebroRegisterInfo(
-  input,
-  "spatial_projection_main_parameters_info",
-  spatial_projection_main_parameters_info
-)
-##----------------------------------------------------------------------------##
-## Text in info box.
-##----------------------------------------------------------------------------##
-spatial_projection_main_parameters_info <- list(
-  title = "Main parameters for projection",
-  text = HTML(
-    "
-    The elements in this panel allow you to control what and how results are displayed across the whole tab.
-    <ul>
-      <li><b>Sample:</b> Limit the available spatial scenes to one biological sample.</li>
-      <li><b>FOV / section:</b> Select the spatial coordinate system to display.</li>
-      <li><b>ROI:</b> Limit cells or spots within the selected spatial scene.</li>
-      <li><b>Colour by:</b> Select one of the data set's registered grouping variables.</li>
-    </ul>
-    "
-  )
-)
