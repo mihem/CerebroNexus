@@ -200,9 +200,7 @@ test_that("table classification is skipped only when neither feature uses it", {
   env$`%>%` <- dplyr::`%>%`
   for (name in c(
     "findColumnsInteger",
-    "findColumnsPercentage",
-    "findColumnsPValues",
-    "findColumnsLogFC"
+    "findColumnsMatching"
   )) {
     env[[name]] <- function(...) stop("classification requested")
   }

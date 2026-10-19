@@ -286,12 +286,7 @@ viewerDatasetLoadRequired <- function(
   if (!isTRUE(initial_page_applied) && !is.null(initial_tab)) {
     tab <- initial_tab
   }
-  is.null(info) ||
-    (is.character(tab) &&
-      length(tab) == 1L &&
-      !is.na(tab) &&
-      nzchar(tab) &&
-      !identical(tab, "loadData"))
+  is.null(info) || viewerDatasetLoadOnTab(FALSE, tab)
 }
 
 viewerDatasetLoadOnTab <- function(current, tab) {
@@ -917,6 +912,14 @@ viewerProjectionCellIndices <- function(
   metadata = getMetaData(),
   percentage = input[[paste0(prefix, "_percentage_cells_to_show")]]
 ) {
+  ## A `percentage` random sample of the given cells.
+  sample_of <- function(indices) {
+    if (!length(indices) || percentage >= 100) {
+      return(indices)
+    }
+    size <- ceiling(length(indices) * percentage / 100)
+    indices[sample.int(length(indices), size)]
+  }
   groups <- getGroups()
   filter_ids <- paste0(prefix, "_group_filter_", groups)
   bound_inputs <- shiny::isolate(names(input))
@@ -927,15 +930,7 @@ viewerProjectionCellIndices <- function(
     groups
   )
   if (!length(groups) || !any(filter_ids %in% bound_inputs)) {
-    cell_count <- nrow(metadata)
-    if (!cell_count) {
-      return(integer())
-    }
-    if (percentage < 100) {
-      size <- ceiling(cell_count * percentage / 100)
-      return(sample.int(cell_count, size))
-    }
-    return(seq_len(cell_count))
+    return(sample_of(seq_len(nrow(metadata))))
   }
   filters <- stats::setNames(
     lapply(groups, function(group) {
@@ -976,26 +971,9 @@ viewerProjectionCellIndices <- function(
     )
   ]
   if (!length(filters)) {
-    cell_count <- nrow(metadata)
-    if (!cell_count) {
-      return(integer())
-    }
-    if (percentage < 100) {
-      size <- ceiling(cell_count * percentage / 100)
-      return(sample.int(cell_count, size))
-    }
-    return(seq_len(cell_count))
+    return(sample_of(seq_len(nrow(metadata))))
   }
-  indices <- which(cerebroGroupFilterMask(metadata, filters))
-  if (!length(indices)) {
-    return(indices)
-  }
-  size <- if (percentage < 100) {
-    ceiling(length(indices) * percentage / 100)
-  } else {
-    return(indices)
-  }
-  indices[sample.int(length(indices), size)]
+  sample_of(which(cerebroGroupFilterMask(metadata, filters)))
 }
 
 viewerProjectionMetadataColumns <- function(
@@ -1376,10 +1354,11 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
   chunks <- list()
   data_size <- 0L
   pack <- function(values, type) {
+    ## Element size, which is also the chunk's alignment.
+    size <- switch(type, i8 = 1L, i16 = 2L, i32 = 4L, f32 = 4L, f64 = 8L, 1L)
     bytes <- if (identical(type, "json")) {
       cv_wire_json_strings(values)
     } else {
-      size <- switch(type, i8 = 1L, i16 = 2L, i32 = 4L, f32 = 4L, f64 = 8L)
       writeBin(
         if (startsWith(type, "i")) as.integer(values) else as.numeric(values),
         raw(),
@@ -1387,16 +1366,7 @@ cv_wire_pack_message <- function(message, min_length = 4096L) {
         endian = "little"
       )
     }
-    alignment <- switch(
-      type,
-      i8 = 1L,
-      i16 = 2L,
-      i32 = 4L,
-      f32 = 4L,
-      f64 = 8L,
-      1L
-    )
-    offset <- data_size + ((alignment - data_size %% alignment) %% alignment)
+    offset <- data_size + ((size - data_size %% size) %% size)
     chunks[[length(chunks) + 1L]] <<- list(offset = offset, bytes = bytes)
     data_size <<- offset + length(bytes)
     list(
@@ -1535,10 +1505,6 @@ cerebroCellViewResolveDeferredAux <- function(message) {
     message[[name]] <- resolved[[name]]
   }
   message
-}
-
-.runtimeDiagnostic <- function(x) {
-  if (!isTRUE(getOption("cerebro.quiet_runtime", FALSE))) print(x)
 }
 
 cerebroCellViewRecolor <- function(
@@ -1759,28 +1725,6 @@ cerebroCellViewRender <- function(
     message$data$deferred_selection_lengths
   ))
   message$data$deferred_selection_lengths <- NULL
-  stamp_transport_profile <- function(message) {
-    request_at_ms <- tryCatch(
-      suppressWarnings(as.numeric(
-        input[[paste0(id, "_render_request")]]$nonce
-      )),
-      error = function(error) NA_real_
-    )
-    if (length(request_at_ms) != 1L || !is.finite(request_at_ms)) {
-      request_at_ms <- NA_real_
-    }
-    sent_at_ms <- as.numeric(Sys.time()) * 1000
-    message$transport_profile <- list(
-      request_at_ms = request_at_ms,
-      server_prepare_ms = if (is.finite(request_at_ms)) {
-        max(0, sent_at_ms - request_at_ms)
-      } else {
-        NA_real_
-      },
-      sent_at_ms = sent_at_ms
-    )
-    message
-  }
   if (exists("viewerDatasetIdentity", mode = "function", inherits = TRUE)) {
     identity <- tryCatch(viewerDatasetIdentity(), error = function(error) NULL)
     if (
@@ -1801,10 +1745,9 @@ cerebroCellViewRender <- function(
       )
     }
   }
-  if (
-    isTRUE(input[["coordviews_wire_supported"]]) &&
-      exists("cv_wire_pack_message", mode = "function", inherits = TRUE)
-  ) {
+  wire <- isTRUE(input[["coordviews_wire_supported"]])
+  progressive <- FALSE
+  if (wire) {
     selection_keys <- message$data$selection_key
     key_groups <- if (is.list(selection_keys)) {
       selection_keys
@@ -1849,84 +1792,83 @@ cerebroCellViewRender <- function(
         is.function(deferred_aux))) &&
       is.null(message$data$panels) &&
       n_cells >= 4096L
-    if (progressive) {
-      .cerebro_cell_view_wire_serial <<-
-        .cerebro_cell_view_wire_serial + 1L
-      token <- .cerebro_cell_view_wire_serial
-      message$data$n <- n_cells
-      message$data$wire_token <- token
-      ## Same dataset and cells as the barcodes the browser already holds:
-      ## name that delivery so it can skip requesting them again.
-      served <- if (!is.null(aux_key)) .cerebro_cell_view_aux_served[[id]]
-      if (
-        is.list(served) &&
-          identical(served$key, aux_key) &&
-          viewerDatasetContextEqual(served$dataset_context, dataset_context)
-      ) {
-        message$data$aux_reuse <- served$wire_token
-      }
-      message$data$selection_key <- NULL
-      full_hover <- message$hover
-      message$hover <- list(hoverinfo = "skip")
-      message <- stamp_transport_profile(message)
-      session$sendBinaryMessage(
-        "cell_view_binary",
-        cv_wire_pack_message(message)
-      )
-      stale <- ls(envir = .cerebro_cell_view_aux_pending, all.names = TRUE)
-      stale <- stale[vapply(
-        stale,
-        function(key) {
-          pending <- .cerebro_cell_view_aux_pending[[key]]
-          is.list(pending) && identical(pending$id, id)
-        },
-        logical(1)
-      )]
-      if (length(stale)) {
-        rm(list = stale, envir = .cerebro_cell_view_aux_pending)
-      }
-      .cerebro_cell_view_aux_pending[[paste(id, token, sep = ":")]] <- if (
-        is.function(deferred_aux)
-      ) {
-        list(
-          id = id,
-          wire_token = token,
-          dataset_context = dataset_context,
-          render_token = message$render_token,
-          build = deferred_aux,
-          core_builder = core_aux,
-          aux_key = aux_key
-        )
-      } else {
-        list(
-          id = id,
-          wire_token = token,
-          dataset_context = dataset_context,
-          render_token = message$render_token,
-          selection_key = selection_keys,
-          hover = full_hover
-        )
-      }
+  }
+  if (progressive) {
+    .cerebro_cell_view_wire_serial <<-
+      .cerebro_cell_view_wire_serial + 1L
+    token <- .cerebro_cell_view_wire_serial
+    message$data$n <- n_cells
+    message$data$wire_token <- token
+    ## Same dataset and cells as the barcodes the browser already holds:
+    ## name that delivery so it can skip requesting them again.
+    served <- if (!is.null(aux_key)) .cerebro_cell_view_aux_served[[id]]
+    if (
+      is.list(served) &&
+        identical(served$key, aux_key) &&
+        viewerDatasetContextEqual(served$dataset_context, dataset_context)
+    ) {
+      message$data$aux_reuse <- served$wire_token
+    }
+    message$data$selection_key <- NULL
+    full_hover <- message$hover
+    message$hover <- list(hoverinfo = "skip")
+  } else if (is.function(deferred_aux)) {
+    auxiliary <- deferred_aux()
+    message$data$selection_key <- auxiliary$selection_key
+    message$hover <- auxiliary$hover
+  }
+
+  request_at_ms <- tryCatch(
+    suppressWarnings(as.numeric(
+      input[[paste0(id, "_render_request")]]$nonce
+    )),
+    error = function(error) NA_real_
+  )
+  if (length(request_at_ms) != 1L || !is.finite(request_at_ms)) {
+    request_at_ms <- NA_real_
+  }
+  sent_at_ms <- as.numeric(Sys.time()) * 1000
+  message$transport_profile <- list(
+    request_at_ms = request_at_ms,
+    server_prepare_ms = if (is.finite(request_at_ms)) {
+      max(0, sent_at_ms - request_at_ms)
     } else {
-      if (is.function(deferred_aux)) {
-        auxiliary <- deferred_aux()
-        message$data$selection_key <- auxiliary$selection_key
-        message$hover <- auxiliary$hover
-      }
-      message <- stamp_transport_profile(message)
-      session$sendBinaryMessage(
-        "cell_view_binary",
-        cv_wire_pack_message(message)
-      )
-    }
+      NA_real_
+    },
+    sent_at_ms = sent_at_ms
+  )
+  if (wire) {
+    session$sendBinaryMessage("cell_view_binary", cv_wire_pack_message(message))
   } else {
-    if (is.function(deferred_aux)) {
-      auxiliary <- deferred_aux()
-      message$data$selection_key <- auxiliary$selection_key
-      message$hover <- auxiliary$hover
-    }
-    message <- stamp_transport_profile(message)
     session$sendCustomMessage("cell_view_render", message)
+  }
+
+  if (progressive) {
+    stale <- ls(envir = .cerebro_cell_view_aux_pending, all.names = TRUE)
+    stale <- stale[vapply(
+      stale,
+      function(key) {
+        pending <- .cerebro_cell_view_aux_pending[[key]]
+        is.list(pending) && identical(pending$id, id)
+      },
+      logical(1)
+    )]
+    if (length(stale)) {
+      rm(list = stale, envir = .cerebro_cell_view_aux_pending)
+    }
+    .cerebro_cell_view_aux_pending[[paste(id, token, sep = ":")]] <- c(
+      list(
+        id = id,
+        wire_token = token,
+        dataset_context = dataset_context,
+        render_token = message$render_token
+      ),
+      if (is.function(deferred_aux)) {
+        list(build = deferred_aux, core_builder = core_aux, aux_key = aux_key)
+      } else {
+        list(selection_key = selection_keys, hover = full_hover)
+      }
+    )
   }
   invisible(message$render_token)
 }
@@ -2516,59 +2458,20 @@ findColumnsInteger <- function(df, columns_to_test) {
   return(columns_indices)
 }
 
-findColumnsPercentage <- function(df) {
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(colnames(df)[i], pattern = "pct|percent|%", ignore.case = TRUE) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        min(df[[i]], na.rm = TRUE) >= 0 &&
-        max(df[[i]], na.rm = TRUE) <= 100
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
-}
-
-findColumnsPValues <- function(df) {
-  pattern_columns_p_value <- "pval|p_val|p-val|p.val|padj|p_adj|p-adj|p.adj|adjp|adj_p|adj-p|adj.p|FDR|qval|q_val|q-val|q.val"
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(
-        colnames(df)[i],
-        pattern = pattern_columns_p_value,
-        ignore.case = TRUE
-      ) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        min(df[[i]], na.rm = TRUE) >= 0 &&
-        max(df[[i]], na.rm = TRUE) <= 1
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
-}
-
-findColumnsLogFC <- function(df) {
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(
-        colnames(df)[i],
-        pattern = "logFC|log-FC|log_FC|log.FC",
-        ignore.case = TRUE
-      ) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]])
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
+## Numeric columns without NA whose name matches `pattern` and whose values lie
+## within [lower, upper].
+findColumnsMatching <- function(df, pattern, lower = -Inf, upper = Inf) {
+  which(vapply(
+    seq_along(df),
+    function(i) {
+      values <- df[[i]]
+      grepl(colnames(df)[i], pattern = pattern, ignore.case = TRUE) &&
+        !anyNA(values) &&
+        is.numeric(values) &&
+        all(values >= lower & values <= upper)
+    },
+    logical(1)
+  ))
 }
 
 ##----------------------------------------------------------------------------##
@@ -2667,16 +2570,25 @@ prettifyTable <- function(
 
   ## identify which columns might contain percentages, p-values, and logFC
   columns_percent <- if (classify_values) {
-    findColumnsPercentage(table)
+    findColumnsMatching(table, "pct|percent|%", 0, 100)
   } else {
     integer()
   }
   columns_p_value <- if (classify_values) {
-    findColumnsPValues(table)
+    findColumnsMatching(
+      table,
+      "pval|p_val|p-val|p.val|padj|p_adj|p-adj|p.adj|adjp|adj_p|adj-p|adj.p|FDR|qval|q_val|q-val|q.val",
+      0,
+      1
+    )
   } else {
     integer()
   }
-  columns_logFC <- if (classify_values) findColumnsLogFC(table) else integer()
+  columns_logFC <- if (classify_values) {
+    findColumnsMatching(table, "logFC|log-FC|log_FC|log.FC")
+  } else {
+    integer()
+  }
 
   ## find columns with very long (character) content so that they can be
   ## hidden
@@ -2695,9 +2607,7 @@ prettifyTable <- function(
   }
 
   ## add manually specified column types
-  if (is.null(columns_percentage) == FALSE) {
-    columns_percent <- c(columns_percent, columns_percentage)
-  }
+  columns_percent <- c(columns_percent, columns_percentage)
 
   ## check whether percentage values were given on a 0-100 scale and convert
   ## them to 0-1 if so. Selected-cells slices often carry NA in percent_mt /
@@ -2850,10 +2760,7 @@ prettifyTable <- function(
   ##   significant decimals
   if (number_formatting == TRUE) {
     ## integer values
-    if (
-      !is.null(columns_integer) &&
-        length(columns_integer) > 0
-    ) {
+    if (length(columns_integer)) {
       table <- table %>%
         DT::formatRound(
           columns = columns_integer,
@@ -2864,51 +2771,27 @@ prettifyTable <- function(
     }
 
     ## p-values
-    if (
-      !is.null(columns_p_value) &&
-        length(columns_p_value) > 0
-    ) {
+    if (length(columns_p_value)) {
       table <- table %>%
-        DT::formatSignif(
-          columns = columns_p_value,
-          digits = 3
-        )
+        DT::formatSignif(columns = columns_p_value, digits = 3)
     }
 
     ## logFC
-    if (
-      !is.null(columns_logFC) &&
-        length(columns_logFC) > 0
-    ) {
+    if (length(columns_logFC)) {
       table <- table %>%
-        DT::formatRound(
-          columns = columns_logFC,
-          digits = 3
-        )
+        DT::formatRound(columns = columns_logFC, digits = 3)
     }
 
     ## percentage
-    if (
-      !is.null(columns_percent) &&
-        length(columns_percent) > 0
-    ) {
+    if (length(columns_percent)) {
       table <- table %>%
-        DT::formatPercentage(
-          columns = columns_percent,
-          digits = 2
-        )
+        DT::formatPercentage(columns = columns_percent, digits = 2)
     }
 
     ## numeric but none of the above
-    if (
-      !is.null(columns_only_numeric) &&
-        length(columns_only_numeric) > 0
-    ) {
+    if (length(columns_only_numeric)) {
       table <- table %>%
-        DT::formatSignif(
-          columns = columns_only_numeric,
-          digits = 3
-        )
+        DT::formatSignif(columns = columns_only_numeric, digits = 3)
     }
   }
 
@@ -2924,13 +2807,12 @@ prettifyTable <- function(
     up_col <- if (is.null(chart_theme)) "#4c9a6b" else chart_theme$up
     down_col <- if (is.null(chart_theme)) "#c05b5b" else chart_theme$down
 
-    ## integer
-    if (
-      !is.null(columns_integer) &&
-        length(columns_integer) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_integer) {
+    ## 101-step white-to-accent background over each column's own range.
+    ramp <- function(table, columns) {
+      if (nrow(table_original) <= 1) {
+        return(table)
+      }
+      for (i in columns) {
         range <- range(table_original[[i]])
         if (range[1] != range[2]) {
           table <- table %>%
@@ -2943,85 +2825,46 @@ prettifyTable <- function(
             )
         }
       }
+      table
     }
-
-    ## p-values
-    if (
-      !is.null(columns_p_value) &&
-        length(columns_p_value) > 0
-    ) {
-      table <- table %>%
+    bar <- function(table, columns, data_range) {
+      if (!length(columns)) {
+        return(table)
+      }
+      table %>%
         DT::formatStyle(
-          columns = columns_p_value,
-          background = DT::styleColorBar(c(1, 0), bar_col),
+          columns = columns,
+          background = DT::styleColorBar(data_range, bar_col),
           backgroundSize = '98% 88%',
           backgroundRepeat = 'no-repeat',
           backgroundPosition = 'center'
         )
     }
-
-    ## logFC
-    if (
-      !is.null(columns_logFC) &&
-        length(columns_logFC) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_logFC) {
-        range <- range(table_original[[i]])
-        if (range[1] != range[2]) {
+    ## Columns whose values all have a colour in the named palette.
+    palette_colors <- function(table, palettes) {
+      for (i in which(colnames(table_original) %in% palettes)) {
+        colors <- reactive_colors()[[colnames(table_original)[i]]]
+        if (all(unique(table_original[[i]]) %in% names(colors))) {
           table <- table %>%
             DT::formatStyle(
-              columns = i,
-              backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
-              )
+              i,
+              backgroundColor = DT::styleEqual(names(colors), colors),
+              fontWeight = 'bold'
             )
         }
       }
+      table
     }
 
-    ## percentage
-    if (
-      !is.null(columns_percent) &&
-        length(columns_percent) > 0
-    ) {
-      table <- table %>%
-        DT::formatStyle(
-          columns = columns_percent,
-          background = DT::styleColorBar(c(0, 1), bar_col),
-          backgroundSize = '98% 88%',
-          backgroundRepeat = 'no-repeat',
-          backgroundPosition = 'center'
-        )
-    }
-
-    ## numeric values that are non of the above
-    if (
-      !is.null(columns_only_numeric) &&
-        length(columns_only_numeric) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_only_numeric) {
-        range <- range(table_original[[i]])
-        if (range[1] != range[2]) {
-          table <- table %>%
-            DT::formatStyle(
-              columns = i,
-              backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
-              )
-            )
-        }
-      }
-    }
+    ## Keep this order: a column can receive a ramp and a later bar.
+    table <- ramp(table, columns_integer)
+    table <- bar(table, columns_p_value, c(1, 0))
+    table <- ramp(table, columns_logFC)
+    table <- bar(table, columns_percent, c(0, 1))
+    table <- ramp(table, columns_only_numeric)
 
     ## logicals
-    if (
-      !is.null(columns_logical) &&
-        length(columns_logical) > 0
-    ) {
+    if (length(columns_logical)) {
       table <- table %>%
         DT::formatStyle(
           columns_logical,
@@ -3030,51 +2873,9 @@ prettifyTable <- function(
         )
     }
 
-    ## grouping variables
-    columns_groups <- which(colnames(table_original) %in% getGroups())
-    if (length(columns_groups) > 0) {
-      for (i in columns_groups) {
-        group <- colnames(table_original)[i]
-        if (
-          all(
-            unique(table_original[[i]]) %in% names(reactive_colors()[[group]])
-          )
-        ) {
-          table <- table %>%
-            DT::formatStyle(
-              i,
-              backgroundColor = DT::styleEqual(
-                names(reactive_colors()[[group]]),
-                reactive_colors()[[group]]
-              ),
-              fontWeight = 'bold'
-            )
-        }
-      }
-    }
-
-    ## cell cycle assignments
-    columns_cell_cycle <- which(colnames(table_original) %in% getCellCycle())
-    if (length(columns_cell_cycle) > 0) {
-      for (i in columns_cell_cycle) {
-        method <- colnames(table_original)[i]
-        if (
-          all(
-            unique(table_original[[i]]) %in% names(reactive_colors()[[method]])
-          )
-        ) {
-          table <- table %>%
-            DT::formatStyle(
-              i,
-              backgroundColor = DT::styleEqual(
-                names(reactive_colors()[[method]]),
-                reactive_colors()[[method]]
-              ),
-              fontWeight = 'bold'
-            )
-        }
-      }
-    }
+    ## grouping variables and cell cycle assignments
+    table <- palette_colors(table, getGroups())
+    table <- palette_colors(table, getCellCycle())
   }
 
   ## return the table
@@ -3448,27 +3249,9 @@ getGenesForGeneSet <- function(gene_set) {
 ##----------------------------------------------------------------------------##
 ## Helper: match a URL dataset token against available .crb files.
 ##
-## Returns the matched file path or '' if no match.
+## Returns the matched dataset id (by id, basename, or basename without
+## extension) or '' if no match.
 ##----------------------------------------------------------------------------##
-match_dataset_by_url <- function(url_dataset, files, file_names = NULL) {
-  ## Case A: Match by Name (if names exist)
-  if (!is.null(file_names) && url_dataset %in% file_names) {
-    return(files[[url_dataset]])
-  }
-  ## Case B: Match by Filename (basename)
-  basenames <- basename(files)
-  idx <- which(basenames == url_dataset)
-  if (length(idx) == 0) {
-    basenames_no_ext <- tools::file_path_sans_ext(basenames)
-    idx <- which(basenames_no_ext == url_dataset)
-  }
-  if (length(idx) > 0) {
-    return(files[[idx[1]]])
-  }
-  ## No match
-  return('')
-}
-
 match_dataset_id_by_url <- function(url_dataset, files) {
   ids <- names(files)
   if (
@@ -3502,26 +3285,41 @@ is_cerebro_dataset <- function(object) {
     any(startsWith(class(object), "Cerebro"))
 }
 
-getExperiment <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExperiment())
+## Getters that forward to the loaded data set's method of the same name and
+## return NULL while no data set is loaded.
+.viewerForwardGetter <- function(method) {
+  force(method)
+  function(...) {
+    if (is_cerebro_dataset(data_set())) {
+      return(data_set()[[method]](...))
+    }
   }
 }
-getParameters <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getParameters())
-  }
+for (getter in c(
+  "getExperiment",
+  "getParameters",
+  "getGroups",
+  "getCellCycle",
+  "getMetaData",
+  "getProjection",
+  "getMethodsForMarkerGenes",
+  "getGroupsWithMarkerGenes",
+  "getMarkerGenes",
+  "getMethodsForTrajectories",
+  "getNamesOfTrajectories",
+  "getTrajectory",
+  "getGroupsWithMostExpressedGenes",
+  "getMethodsForEnrichedPathways",
+  "getGroupsWithEnrichedPathways",
+  "getEnrichedPathways",
+  "checkForExtraPlots",
+  "getNamesOfExtraPlots",
+  "getExtraPlot"
+)) {
+  assign(getter, .viewerForwardGetter(getter))
 }
-getTechnicalInfo <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getTechnicalInfo())
-  }
-}
-getGeneLists <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGeneLists())
-  }
-}
+rm(getter)
+viewerGetMostExpressedGenes <- .viewerForwardGetter("getMostExpressedGenes")
 getGeneNames <- function() {
   cache <- viewerProjectionFirstFrameCache()
   if (!is.null(cache$gene_names)) {
@@ -3529,11 +3327,6 @@ getGeneNames <- function() {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$getGeneNames())
-  }
-}
-getGroups <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroups())
   }
 }
 getGroupLevels <- function(group) {
@@ -3544,16 +3337,6 @@ getGroupLevels <- function(group) {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$getGroupLevels(group))
-  }
-}
-getCellCycle <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getCellCycle())
-  }
-}
-getMetaData <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMetaData())
   }
 }
 .runtimeCerebroCellCount <- function(object) {
@@ -3586,41 +3369,6 @@ availableProjections <- function() {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$availableProjections())
-  }
-}
-getProjection <- function(name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getProjection(name))
-  }
-}
-getMethodsForMarkerGenes <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForMarkerGenes())
-  }
-}
-getGroupsWithMarkerGenes <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithMarkerGenes(method))
-  }
-}
-getMarkerGenes <- function(method, group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMarkerGenes(method, group))
-  }
-}
-getMethodsForTrajectories <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForTrajectories())
-  }
-}
-getNamesOfTrajectories <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getNamesOfTrajectories(method))
-  }
-}
-getTrajectory <- function(method, name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getTrajectory(method, name))
   }
 }
 
@@ -3698,9 +3446,20 @@ getVariableToCompareChoices <- function() {
   return(all_cols)
 }
 
-getMitoColumn <- function() {
+## The first metadata column that matches the earliest of `patterns`, or NULL.
+firstColumnMatching <- function(patterns) {
   cols <- colnames(getMetaData())
-  patterns <- c(
+  for (pattern in patterns) {
+    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
+    if (length(matches) > 0) {
+      return(matches[1])
+    }
+  }
+  NULL
+}
+
+getMitoColumn <- function() {
+  firstColumnMatching(c(
     "^percent[_.]?mt$",
     "^percent[_.]?mito$",
     "^percent[_.]?mitochondrial$",
@@ -3712,14 +3471,7 @@ getMitoColumn <- function() {
     "^mitochondrial[_.]?percent$",
     "^mito[_.]?pct$",
     "^mt[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasMitoColumn <- function() {
@@ -3727,8 +3479,7 @@ hasMitoColumn <- function() {
 }
 
 getRiboColumn <- function() {
-  cols <- colnames(getMetaData())
-  patterns <- c(
+  firstColumnMatching(c(
     "^percent[_.]?ribo$",
     "^percent[_.]?ribosomal$",
     "^pct[_.]?ribo$",
@@ -3737,14 +3488,7 @@ getRiboColumn <- function() {
     "^ribosomal[_.]?percent$",
     "^ribo[_.]?pct$",
     "^ribosomal[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasRiboColumn <- function() {
@@ -3752,8 +3496,7 @@ hasRiboColumn <- function() {
 }
 
 getEryColumn <- function() {
-  cols <- colnames(getMetaData())
-  patterns <- c(
+  firstColumnMatching(c(
     "^percent[_.]?ery$",
     "^percent[_.]?erythrocyte$",
     "^percent[_.]?hb$",
@@ -3775,14 +3518,7 @@ getEryColumn <- function() {
     "^ery[_.]?pct$",
     "^hb[_.]?pct$",
     "^hgb[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasEryColumn <- function() {
@@ -3831,10 +3567,6 @@ read_cerebro_file <- function(file) {
   object
 }
 
-.crbLogLabel <- function(path) {
-  basename(path)
-}
-
 .runtimeBackendPlanError <- function(message, crb_path = NULL) {
   suffix <- if (is.null(crb_path)) {
     ""
@@ -3842,43 +3574,6 @@ read_cerebro_file <- function(file) {
     paste0(" for CRB '", crb_path, "'")
   }
   stop("The backend plan ", message, suffix, ".", call. = FALSE)
-}
-
-.runtimeWindowsPathSegmentInvalid <- function(parts) {
-  grepl("[[:cntrl:]<>:\"|?*]", parts) |
-    grepl("[. ]$", parts) |
-    grepl(
-      "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])($|\\.)",
-      parts,
-      ignore.case = TRUE
-    )
-}
-
-.runtimePortableBackendPath <- function(path, context) {
-  valid <- is.character(path) &&
-    length(path) == 1L &&
-    !is.na(path) &&
-    nzchar(path) &&
-    !grepl("/$", path) &&
-    !grepl("\\\\", path) &&
-    !grepl("^(/|~|[A-Za-z]:)", path)
-  parts <- if (valid) {
-    strsplit(path, "/", fixed = TRUE)[[1L]]
-  } else {
-    character()
-  }
-  windows_invalid <- length(parts) > 0L &&
-    any(.runtimeWindowsPathSegmentInvalid(parts))
-  if (
-    !valid ||
-      length(parts) == 0L ||
-      any(!nzchar(parts)) ||
-      any(parts %in% c(".", "..")) ||
-      windows_invalid
-  ) {
-    stop(context, " must be a portable relative path.", call. = FALSE)
-  }
-  paste(parts, collapse = "/")
 }
 
 .runtimeAbsoluteBackendPath <- function(path) {
@@ -4017,11 +3712,11 @@ get_or_load_crb <- function(
   .checkCrbBackendIdentity(cache_key, cache_identity)
   cached <- .touchCrbPrototype(cache_key)
   if (!is.null(cached)) {
-    print(glue::glue("[{Sys.time()}] CRB cache hit: {.crbLogLabel(path)}"))
+    print(glue::glue("[{Sys.time()}] CRB cache hit: {basename(path)}"))
     prototype <- cached$object
   } else {
     print(glue::glue(
-      "[{Sys.time()}] CRB cache miss, loading: {.crbLogLabel(path)}"
+      "[{Sys.time()}] CRB cache miss, loading: {basename(path)}"
     ))
     prototype <- read_cerebro_file(path)
     .cacheCrbPrototype(path, prototype, cache_identity)
@@ -4031,8 +3726,18 @@ get_or_load_crb <- function(
   ## R6 clone() forces delayed fields, which previously attached BPCells while
   ## the user was still on Data Info and also mutated the shared prototype.
   obj <- .cloneCachedCrb(prototype)
-  obj <- .attachExternalExpression(obj, path, effective_backend)
-  obj <- .attachImmuneRepertoireBackend(obj, path, effective_backend)
+  ## Resolve the backend plan once, and only if an attach step needs it.
+  ## .configuredRuntimeBackendPlan() has already validated a configured entry.
+  delayedAssign(
+    "backend",
+    if (is.null(effective_backend)) {
+      .fallbackRuntimeBackendPlan(obj, path)
+    } else {
+      effective_backend
+    }
+  )
+  obj <- .attachExternalExpression(obj, path, effective_backend, backend)
+  obj <- .attachImmuneRepertoireBackend(obj, path, backend)
   obj <- .attachSpatialMoleculeBackend(obj, path)
   obj
 }
@@ -4040,7 +3745,7 @@ get_or_load_crb <- function(
 .attachImmuneRepertoireBackend <- function(
   obj,
   crb_path,
-  effective_backend = NULL
+  expression_backend = .runtimeBackendPlan(obj, crb_path)
 ) {
   field <- "immune_repertoire_backend"
   if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
@@ -4068,11 +3773,6 @@ get_or_load_crb <- function(
     length(backend$md5) == 1L &&
     !is.na(backend$md5) &&
     grepl("^[[:xdigit:]]{32}$", backend$md5)
-  expression_backend <- if (is.null(effective_backend)) {
-    .fallbackRuntimeBackendPlan(obj, crb_path)
-  } else {
-    .validateRuntimeBackendEntry(effective_backend, crb_path)
-  }
   valid <- valid && identical(expression_backend$type, "bpcells")
   if (!valid) {
     stop("The immune repertoire sidecar descriptor is invalid.", call. = FALSE)
@@ -4148,96 +3848,6 @@ get_or_load_crb <- function(
   obj
 }
 
-##----------------------------------------------------------------------------##
-## Resolve an external expression backend at load time (B3).
-##
-## bpcells crbs ship a sibling <stem>.bpcells/ directory; the IterableMatrix
-## handle persisted into the crb carries the writer's absolute @dir, which
-## breaks once the crb is moved. This helper rebuilds the handle from a path
-## rooted at the caller's view of the filesystem.
-##
-## Configured bundle CRBs receive the build-validated effective backend entry.
-## Direct launches and uploads read only the ordinary expression_backend field;
-## serialized getter code is never invoked by this internal loading path.
-##----------------------------------------------------------------------------##
-.readRuntimeCrbSchema <- function(obj, crb_path) {
-  field <- "crb_schema"
-  if (!is.environment(obj) || !exists(field, envir = obj, inherits = FALSE)) {
-    return(NULL)
-  }
-  if (
-    bindingIsActive(field, obj) ||
-      isTRUE(rlang::env_binding_are_lazy(obj, field))
-  ) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported CRB schema descriptor.",
-      call. = FALSE
-    )
-  }
-  schema <- obj[[field]]
-  if (is.null(schema)) {
-    return(NULL)
-  }
-  schema_names <- names(schema)
-  expected_names <- if (identical(schema$version, 1L)) {
-    c("version", "cell_names", "cell_names_md5", "projection_rownames")
-  } else if (identical(schema$version, 2L)) {
-    c(
-      "version",
-      "cell_names",
-      "cell_names_md5",
-      "projection_rownames",
-      "n_cells"
-    )
-  } else {
-    character()
-  }
-  valid <- is.list(schema) &&
-    !is.data.frame(schema) &&
-    length(expected_names) > 0L &&
-    length(schema) == length(expected_names) &&
-    !is.null(schema_names) &&
-    !anyDuplicated(schema_names) &&
-    setequal(schema_names, expected_names) &&
-    identical(schema$cell_names, "expression") &&
-    is.character(schema$cell_names_md5) &&
-    length(schema$cell_names_md5) == 1L &&
-    !is.na(schema$cell_names_md5) &&
-    grepl("^[[:xdigit:]]{32}$", schema$cell_names_md5) &&
-    is.character(schema$projection_rownames) &&
-    !anyNA(schema$projection_rownames) &&
-    !any(!nzchar(schema$projection_rownames)) &&
-    !anyDuplicated(schema$projection_rownames) &&
-    (identical(schema$version, 1L) ||
-      (is.integer(schema$n_cells) &&
-        length(schema$n_cells) == 1L &&
-        !is.na(schema$n_cells) &&
-        schema$n_cells >= 0L))
-  if (!valid) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported CRB schema descriptor.",
-      call. = FALSE
-    )
-  }
-  schema
-}
-
-.bpcellsCellNamesChecksum <- function(sidecar) {
-  names_file <- file.path(sidecar, "col_names")
-  if (!file.exists(names_file) || dir.exists(names_file)) {
-    stop("The BPCells sidecar has no cell-name index.", call. = FALSE)
-  }
-  checksum <- unname(tools::md5sum(names_file))
-  if (length(checksum) != 1L || is.na(checksum) || !nzchar(checksum)) {
-    stop("Could not checksum the BPCells cell-name index.", call. = FALSE)
-  }
-  checksum
-}
-
 .validateThinCrbShape <- function(metadata, projections, schema) {
   expected_cells <- if (identical(schema$version, 2L)) {
     schema$n_cells
@@ -4311,28 +3921,16 @@ get_or_load_crb <- function(
   )
 }
 
-.hydrateThinCrb <- function(obj, crb_path, sidecar, schema, cells = NULL) {
-  if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
-    stop(
-      "The BPCells cell-name index does not match CRB '",
-      basename(crb_path),
-      "'.",
-      call. = FALSE
-    )
+## Check a thin CRB against its BPCells sidecar. Version 1 files are hydrated
+## now; version 2 files defer barcode hydration until meta_data/projections
+## are first read, and expose their first-frame fields immediately.
+.hydrateThinCrb <- function(obj, crb_path, sidecar, schema) {
+  deferred <- identical(schema$version, 2L)
+  ## Version 1 reads the cell index first, as it always has: a missing index
+  ## keeps failing with the read error.
+  cells <- if (!deferred) {
+    readLines(file.path(sidecar, "col_names"), warn = FALSE)
   }
-  if (is.null(cells)) {
-    cells <- colnames(obj$expression)
-  }
-  metadata <- obj$meta_data
-  projections <- obj$projections
-  .validateThinCrbShape(metadata, projections, schema)
-  hydrated <- .hydrateThinCrbFields(metadata, projections, schema, cells)
-  obj$meta_data <- hydrated$meta_data
-  obj$projections <- hydrated$projections
-  obj
-}
-
-.deferThinCrbHydration <- function(obj, crb_path, sidecar, schema) {
   if (!identical(.bpcellsCellNamesChecksum(sidecar), schema$cell_names_md5)) {
     stop(
       "The BPCells cell-name index does not match CRB '",
@@ -4344,6 +3942,12 @@ get_or_load_crb <- function(
   metadata <- obj$meta_data
   projections <- obj$projections
   .validateThinCrbShape(metadata, projections, schema)
+  if (!deferred) {
+    hydrated <- .hydrateThinCrbFields(metadata, projections, schema, cells)
+    obj$meta_data <- hydrated$meta_data
+    obj$projections <- hydrated$projections
+    return(obj)
+  }
   gene_names_file <- file.path(sidecar, "row_names")
   gene_names <- if (
     file.exists(gene_names_file) && !dir.exists(gene_names_file)
@@ -4389,87 +3993,6 @@ get_or_load_crb <- function(
   obj
 }
 
-.readRuntimeBackendDescriptor <- function(obj, crb_path) {
-  if (!is.environment(obj)) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  getter_name <- "getExpressionBackend"
-  field_name <- "expression_backend"
-  getter_exists <- exists(getter_name, envir = obj, inherits = FALSE)
-  field_exists <- exists(field_name, envir = obj, inherits = FALSE)
-  getter_active <- getter_exists && bindingIsActive(getter_name, obj)
-  field_active <- field_exists && bindingIsActive(field_name, obj)
-  getter_lazy <- getter_exists &&
-    !getter_active &&
-    isTRUE(rlang::env_binding_are_lazy(obj, getter_name))
-  field_lazy <- field_exists &&
-    !field_active &&
-    isTRUE(rlang::env_binding_are_lazy(obj, field_name))
-  invalid <- getter_active ||
-    field_active ||
-    getter_lazy ||
-    field_lazy ||
-    xor(getter_exists, field_exists)
-  if (invalid) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  if (!getter_exists && !field_exists) {
-    return(list(type = "embedded", location = NULL, legacy = TRUE))
-  }
-  getter <- get(getter_name, envir = obj, inherits = FALSE)
-  if (!is.function(getter)) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  backend <- get(field_name, envir = obj, inherits = FALSE)
-  if (is.null(backend)) {
-    return(list(type = "embedded", location = NULL, legacy = FALSE))
-  }
-  valid_type <- is.list(backend) &&
-    is.character(backend$type) &&
-    length(backend$type) == 1L &&
-    !is.na(backend$type) &&
-    backend$type %in% c("embedded", "h5", "bpcells")
-  valid_location <- valid_type &&
-    if (identical(backend$type, "embedded")) {
-      is.null(backend$location)
-    } else {
-      is.character(backend$location) &&
-        length(backend$location) == 1L &&
-        !is.na(backend$location) &&
-        nzchar(backend$location)
-    }
-  if (!valid_type || !valid_location) {
-    stop(
-      "The Cerebro data file '",
-      basename(crb_path),
-      "' has an unsupported expression-backend descriptor.",
-      call. = FALSE
-    )
-  }
-  if (!identical(backend$type, "embedded")) {
-    backend$location <- .runtimePortableBackendPath(
-      backend$location,
-      paste0("The ", backend$type, " backend location")
-    )
-  }
-  list(type = backend$type, location = backend$location, legacy = FALSE)
-}
-
 .runtimeCerebroOptions <- function() {
   if (!exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)) {
     return(list())
@@ -4496,39 +4019,17 @@ get_or_load_crb <- function(
 .fallbackRuntimeBackendPlan <- function(obj, crb_path) {
   backend <- .readRuntimeBackendDescriptor(obj, crb_path)
   options <- .runtimeCerebroOptions()
-  override_key <- NULL
-  if (isTRUE(backend$legacy)) {
-    if (!is.null(options[["expression_matrix_h5"]])) {
-      override_key <- "expression_matrix_h5"
-      backend$type <- "h5"
-    } else if (!is.null(options[["expression_matrix_BPCells"]])) {
-      override_key <- "expression_matrix_BPCells"
-      backend$type <- "bpcells"
-    }
-  } else if (!identical(backend$type, "embedded")) {
-    candidate <- switch(
-      backend$type,
-      h5 = "expression_matrix_h5",
-      bpcells = "expression_matrix_BPCells"
-    )
-    if (!is.null(options[[candidate]])) {
-      override_key <- candidate
-    }
+  .effectiveRuntimeBackendPlan(backend, options, .normalizeRuntimeOverride)
+}
+
+## The validated backend plan of a CRB: its configured bundle entry, else the
+## descriptor stored in the file plus any host override.
+.runtimeBackendPlan <- function(obj, crb_path, effective_backend = NULL) {
+  if (is.null(effective_backend)) {
+    .fallbackRuntimeBackendPlan(obj, crb_path)
+  } else {
+    .validateRuntimeBackendEntry(effective_backend, crb_path)
   }
-  if (!is.null(override_key)) {
-    return(list(
-      type = backend$type,
-      mode = "host_override",
-      location = .normalizeRuntimeOverride(
-        options[[override_key]],
-        override_key
-      )
-    ))
-  }
-  if (isTRUE(backend$legacy) || identical(backend$type, "embedded")) {
-    return(list(type = "embedded", mode = "embedded", location = NULL))
-  }
-  list(type = backend$type, mode = "bundled", location = backend$location)
 }
 
 .runtimeBackendRecoveryAdvice <- function(backend, configured) {
@@ -4558,21 +4059,29 @@ get_or_load_crb <- function(
   )
 }
 
+##----------------------------------------------------------------------------##
+## Resolve an external expression backend at load time (B3).
+##
+## bpcells crbs ship a sibling <stem>.bpcells/ directory; the IterableMatrix
+## handle persisted into the crb carries the writer's absolute @dir, which
+## breaks once the crb is moved. This helper rebuilds the handle from a path
+## rooted at the caller's view of the filesystem.
+##
+## Configured bundle CRBs receive the build-validated effective backend entry.
+## Direct launches and uploads read only the ordinary expression_backend field;
+## serialized getter code is never invoked by this internal loading path.
+##----------------------------------------------------------------------------##
 .attachExternalExpression <- function(
   obj,
   crb_path,
-  effective_backend = NULL
+  effective_backend = NULL,
+  be = .runtimeBackendPlan(obj, crb_path, effective_backend)
 ) {
   if (!any(grepl("Cerebro", class(obj)))) {
     return(obj)
   }
   crb_schema <- .readRuntimeCrbSchema(obj, crb_path)
   configured <- !is.null(effective_backend)
-  if (!configured) {
-    be <- .fallbackRuntimeBackendPlan(obj, crb_path)
-  } else {
-    be <- .validateRuntimeBackendEntry(effective_backend, crb_path)
-  }
 
   if (identical(be$mode, "embedded")) {
     if (!is.null(crb_schema)) {
@@ -4609,12 +4118,7 @@ get_or_load_crb <- function(
       )
     }
     if (!is.null(crb_schema)) {
-      if (identical(crb_schema$version, 2L)) {
-        obj <- .deferThinCrbHydration(obj, crb_path, loc_abs, crb_schema)
-      } else {
-        cells <- readLines(file.path(loc_abs, "col_names"), warn = FALSE)
-        obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema, cells)
-      }
+      obj <- .hydrateThinCrb(obj, crb_path, loc_abs, crb_schema)
       delayedAssign(
         "expression",
         {
@@ -4713,33 +4217,6 @@ getGroupsWithMeanExpression <- function() {
     return(character(0))
   }
   tryCatch(ds$getGroupsWithMeanExpression(), error = function(e) character(0))
-}
-getGroupsWithMostExpressedGenes <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithMostExpressedGenes())
-  }
-}
-viewerGetMostExpressedGenes <- function(group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMostExpressedGenes(group))
-  }
-}
-
-## Wrapper functions for enriched_pathways module.
-getMethodsForEnrichedPathways <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForEnrichedPathways())
-  }
-}
-getGroupsWithEnrichedPathways <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithEnrichedPathways(method))
-  }
-}
-getEnrichedPathways <- function(method, group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getEnrichedPathways(method, group))
-  }
 }
 
 ## Wrapper functions for extra_material module. Generated external tables are
@@ -5012,21 +4489,6 @@ getExtraMaterialCategories <- function() {
 }
 checkForExtraTables <- function() {
   length(extra_material_table_groups()) > 0L
-}
-checkForExtraPlots <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$checkForExtraPlots())
-  }
-}
-getNamesOfExtraPlots <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getNamesOfExtraPlots())
-  }
-}
-getExtraPlot <- function(name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExtraPlot(name))
-  }
 }
 
 ## Wrapper for immune repertoire module.
@@ -5389,16 +4851,12 @@ filterSelectionByHiddenGroups <- function(
 
 viewerPersistentSelection <- function(selection, dataset_context) {
   if (
-    !is.null(selection) &&
-      (!is.list(selection) ||
-        !viewerDatasetContextEqual(
-          selection[["dataset_context"]],
-          dataset_context
-        ))
+    !is.list(selection) ||
+      !viewerDatasetContextEqual(
+        selection[["dataset_context"]],
+        dataset_context
+      )
   ) {
-    return(NULL)
-  }
-  if (is.null(selection)) {
     return(NULL)
   }
   ## Stable cell IDs identify a selection on their own. Coordinate identifiers

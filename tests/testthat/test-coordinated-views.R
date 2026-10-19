@@ -669,6 +669,7 @@ test_that("thin preloaded primary and supplement align unverified projections on
   saveCerebro(object, path, viewer_binary = "never")
   scope <- new.env(parent = globalenv())
   sys.source(file.path(dirname(utility_file), "crb_cache.R"), scope)
+  sys.source(file.path(dirname(utility_file), "core", "crb_contract.R"), scope)
   sys.source(utility_file, scope)
   ## The bundle resolves author display defaults; installed checks cannot
   ## reach the package's internal copy of these helpers.

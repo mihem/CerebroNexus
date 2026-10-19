@@ -566,6 +566,10 @@ source_bundle_runtime <- function(app = NULL) {
   stopifnot(file.exists(utility))
   runtime <- new.env(parent = globalenv())
   sys.source(file.path(dirname(utility), "crb_cache.R"), envir = runtime)
+  sys.source(
+    file.path(dirname(utility), "core", "crb_contract.R"),
+    envir = runtime
+  )
   sys.source(utility, envir = runtime)
   runtime
 }
@@ -1104,7 +1108,10 @@ test_that("build and runtime share the backend override decision contract", {
       case$backend[c("type", "location")],
       legacy = isTRUE(case$backend$legacy)
     )
-    build <- .effectiveBundleBackendPlan(case$backend, case$options)
+    build <- .crbContract()$.effectiveRuntimeBackendPlan(
+      case$backend,
+      case$options
+    )
     assign("Cerebro.options", case$options, envir = .GlobalEnv)
     app_runtime <- runtime$.fallbackRuntimeBackendPlan(
       object,
@@ -3669,23 +3676,7 @@ test_that("process cache clones keep thin BPCells expression lazy", {
 
 test_that("the runtime rejects an H5 backend that is a directory", {
   skip_if_not_installed("HDF5Array")
-  runtime <- new.env(parent = globalenv())
-  source_path <- testthat::test_path(
-    "..",
-    "..",
-    "inst",
-    "viewer",
-    "utility_functions.R"
-  )
-  if (!file.exists(source_path)) {
-    source_path <- system.file(
-      "viewer",
-      "utility_functions.R",
-      package = "CerebroNexus"
-    )
-  }
-  expect_true(file.exists(source_path))
-  sys.source(source_path, envir = runtime)
+  runtime <- source_bundle_runtime()
   root <- withr::local_tempdir()
   dir.create(file.path(root, "matrix.h5"))
   object <- new.env(parent = emptyenv())

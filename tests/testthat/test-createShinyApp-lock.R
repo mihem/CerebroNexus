@@ -646,11 +646,16 @@ test_that("the bundle lock excludes a second R process", {
     "R",
     "createShinyApp.R"
   )
+  contract_source <- test_path("..", "..", "inst", "viewer", "core")
+  contract_source <- file.path(contract_source, "crb_contract.R")
   worker <- callr::r_bg(
-    function(implementation_source, result, ready, release) {
+    function(implementation_source, contract_source, result, ready, release) {
       implementation <- if (file.exists(implementation_source)) {
         environment <- new.env(parent = globalenv())
         sys.source(implementation_source, envir = environment)
+        contract <- new.env(parent = baseenv())
+        sys.source(contract_source, envir = contract)
+        environment$.crbContract <- function() contract
         environment
       } else {
         loadNamespace("CerebroNexus")
@@ -669,7 +674,7 @@ test_that("the bundle lock excludes a second R process", {
       }
       invisible(TRUE)
     },
-    args = list(implementation_source, result, ready, release),
+    args = list(implementation_source, contract_source, result, ready, release),
     libpath = .libPaths(),
     supervise = TRUE
   )

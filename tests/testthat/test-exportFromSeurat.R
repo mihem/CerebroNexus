@@ -226,6 +226,10 @@ test_that("h5 attach is lazy: .attachExternalExpression returns a DelayedMatrix
   }
   ## load only the symbol we need into a fresh env to avoid namespace pollution
   attach_env <- new.env(parent = globalenv())
+  source(
+    file.path(dirname(inst_util), "core", "crb_contract.R"),
+    local = attach_env
+  )
   source(inst_util, local = attach_env, echo = FALSE)
   skip_if_not(
     is.function(attach_env$.attachExternalExpression),

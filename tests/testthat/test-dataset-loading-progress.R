@@ -207,6 +207,7 @@ test_that("catalog Data info decides loading with the request and loads once", {
         names = c(
           "viewer_send_dataset_phase",
           "viewer_clear_cell_view_aux",
+          "viewer_catalog_info",
           "viewer_dataset_load_required",
           "viewer_request_dataset",
           "datasetLoadProgress",

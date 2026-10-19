@@ -317,6 +317,7 @@ test_that("cached BPCells gene names do not force the expression backend", {
 
 test_that("thin BPCells first-frame cache includes its small gene index", {
   scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = scope)
   sys.source(viewer_test_path("utility_functions.R"), envir = scope)
   sidecar <- tempfile("bpcells-gene-index-")
   dir.create(sidecar)
@@ -333,7 +334,7 @@ test_that("thin BPCells first-frame cache includes its small gene index", {
     projection_rownames = "umap"
   )
 
-  object <- scope$.deferThinCrbHydration(
+  object <- scope$.hydrateThinCrb(
     object,
     "dataset.crb",
     sidecar,
@@ -498,6 +499,7 @@ test_that("thin CRBs discard duplicate metadata row names", {
   expect_identical(restored$meta_data$cell_barcode, cells)
 
   runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "crb_contract.R"), envir = runtime)
   sys.source(viewer_test_path("utility_functions.R"), envir = runtime)
   runtime_object <- runtime$read_cerebro_file(crb)
   runtime_object <- runtime$.attachExternalExpression(runtime_object, crb)
@@ -508,6 +510,7 @@ test_that("thin CRBs discard duplicate metadata row names", {
 
 test_that("noncanonical thin projections cannot bypass barcode alignment", {
   scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "crb_contract.R"), scope)
   sys.source(viewer_test_path("utility_functions.R"), scope)
   sidecar <- tempfile("thin-shuffled-")
   dir.create(sidecar)
@@ -525,7 +528,7 @@ test_that("noncanonical thin projections cannot bypass barcode alignment", {
     projection_rownames = character(),
     cell_names_md5 = unname(tools::md5sum(file.path(sidecar, "col_names")))
   )
-  scope$.deferThinCrbHydration(object, "data.crb", sidecar, schema)
+  scope$.hydrateThinCrb(object, "data.crb", sidecar, schema)
   scope$data_set <- function() object
   scope$getProjection <- function(name) object$projections[[name]]
   scope$getMetaData <- function() object$meta_data
