@@ -38,13 +38,16 @@ jobs:
       - name: Install R package dependencies
         run: nix-shell default.nix --run "echo 'R package dependencies installed'"
 
-      ## Run all tests — load package from source, then run every test_*.R.
+      ## Run all tests from source. test_local() loads the package in each
+      ## worker, so DESCRIPTION's Config/testthat/parallel takes effect; the
+      ## runner's four cores run four test files at a time.
       - name: Run all unit/integration tests
+        env:
+          TESTTHAT_CPUS: "4"
         run: |
           nix-shell default.nix --run "Rscript -e \"
-            devtools::load_all('.')
-            testthat::test_dir(
-              path = 'tests/testthat',
+            testthat::test_local(
+              '.',
               reporter = testthat::default_reporter(),
               stop_on_failure = TRUE
             )

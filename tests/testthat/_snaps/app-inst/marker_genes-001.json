@@ -1,7 +1,0 @@
-{
-  "input": {
-    "marker_genes_selected_method": "cerebro_seurat",
-    "marker_genes_selected_table": "seurat_clusters",
-    "marker_genes_table_filter_switch": false
-  }
-}
