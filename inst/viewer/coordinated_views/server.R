@@ -1652,6 +1652,7 @@ observeEvent(
   ),
   {
     req(coordviews_visible())
+    dataset_context <- viewer_loaded_dataset_context()
     cells <- cv_expression_cells()
     n <- getNumberOfCells()
     zero <- rep(0L, n)
@@ -1672,14 +1673,14 @@ observeEvent(
     if (!nzchar(r$gene) && !nzchar(g$gene) && !nzchar(bl$gene)) {
       session$sendCustomMessage(
         "coordviews_rgbval",
-        cv_context_payload(list(ok = FALSE), b$dataset_context)
+        cv_context_payload(list(ok = FALSE), dataset_context)
       )
       cv_expression_feedback(FALSE, rgb = TRUE)
       return()
     }
     session$sendCustomMessage(
       "coordviews_rgbval",
-      cv_context_payload(cv_rgb_message(r, g, bl), b$dataset_context)
+      cv_context_payload(cv_rgb_message(r, g, bl), dataset_context)
     )
     cv_expression_feedback(TRUE, rgb = TRUE)
   },
