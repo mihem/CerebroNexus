@@ -304,29 +304,12 @@ detect_chains <- function(data) {
   all_ct <- unlist(lapply(sample_dfs, function(df) {
     if ("CTgene" %in% names(df)) as.character(df$CTgene) else character(0)
   }))
-  chains <- character(0)
-  if (any(grepl("TRA", all_ct))) {
-    chains <- c(chains, "TRA")
-  }
-  if (any(grepl("TRB", all_ct))) {
-    chains <- c(chains, "TRB")
-  }
-  if (any(grepl("TRG", all_ct))) {
-    chains <- c(chains, "TRG")
-  }
-  if (any(grepl("TRD", all_ct))) {
-    chains <- c(chains, "TRD")
-  }
-  if (any(grepl("IGH", all_ct))) {
-    chains <- c(chains, "IGH")
-  }
-  if (any(grepl("IGK", all_ct))) {
-    chains <- c(chains, "IGK")
-  }
-  if (any(grepl("IGL", all_ct))) {
-    chains <- c(chains, "IGL")
-  }
-  chains
+  chains <- c("TRA", "TRB", "TRG", "TRD", "IGH", "IGK", "IGL")
+  chains[vapply(
+    chains,
+    function(chain) any(grepl(chain, all_ct, fixed = TRUE)),
+    logical(1)
+  )]
 }
 
 ## cache = "session" ensures caches are NOT shared across users/sessions.

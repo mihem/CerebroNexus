@@ -305,45 +305,32 @@ output$ir_help_panel <- renderUI({
   )
 })
 
-## ---- Demo data (lazy, cached) ----------------------------------------- ##
-ir_demo_data <- reactiveVal(NULL)
-
-.get_demo_data <- function() {
-  if (!is.null(ir_demo_data())) {
-    return(ir_demo_data())
+## ---- Demo data (lazy, cached per session) ----------------------------- ##
+## Build each example data set on first use and keep it for the session.
+ir_demo_cache <- function(build) {
+  demo <- NULL
+  function() {
+    if (is.null(demo)) {
+      demo <<- build()
+    }
+    demo
   }
+}
+
+## scRepertoire's built-in TCR contigs (backed examples).
+.get_demo_data <- ir_demo_cache(function() {
   data("contig_list", package = "scRepertoire", envir = environment())
-  demo <- scRepertoire::combineTCR(
+  scRepertoire::combineTCR(
     contig_list[1:2],
     samples = c("Healthy", "Disease")
   )
-  ir_demo_data(demo)
-  demo
-}
+})
 
-## ---- BCR demo data (synthetic — scRepertoire has no built-in BCR) ---- ##
-ir_bcr_demo_data <- reactiveVal(NULL)
+## Synthetic BCR demo (scRepertoire has no built-in BCR data).
+.get_bcr_demo_data <- ir_demo_cache(ir_make_bcr_demo_data)
 
-.get_bcr_demo_data <- function() {
-  if (!is.null(ir_bcr_demo_data())) {
-    return(ir_bcr_demo_data())
-  }
-  demo <- ir_make_bcr_demo_data()
-  ir_bcr_demo_data(demo)
-  demo
-}
-
-## ---- TCR demo data (synthetic — for SELF-MADE plots, no scRepertoire) - ##
-ir_tcr_demo_data <- reactiveVal(NULL)
-
-.get_tcr_demo_data <- function() {
-  if (!is.null(ir_tcr_demo_data())) {
-    return(ir_tcr_demo_data())
-  }
-  demo <- ir_make_tcr_demo_data()
-  ir_tcr_demo_data(demo)
-  demo
-}
+## Synthetic TCR demo for the self-made plots (no scRepertoire needed).
+.get_tcr_demo_data <- ir_demo_cache(ir_make_tcr_demo_data)
 
 ## ---- Example modal ---------------------------------------------------- ##
 observeEvent(input$ir_help_example_btn, {

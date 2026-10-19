@@ -1049,52 +1049,22 @@ ir_clonal_umap_data <- function(
     return(out)
   }
 
-  coloured <- if (length(idx) > 0) {
-    out <- data.frame(
-      x = as.numeric(coord_x[idx]),
-      y = as.numeric(coord_y[idx]),
-      expansion = factor(expansion, levels = IR_CLONE_LABELS),
-      stringsAsFactors = FALSE
-    )
-    if (indexed_pack) {
-      out$cell_index <- coord_index
-    } else {
-      out$barcode <- barcodes
-    }
-    out
-  } else {
-    NULL
-  }
-  background <- if (length(bg_idx) > 0L) {
-    out <- data.frame(
-      x = as.numeric(coord_x[bg_idx]),
-      y = as.numeric(coord_y[bg_idx]),
-      expansion = factor(NA, levels = IR_CLONE_LABELS),
-      stringsAsFactors = FALSE
-    )
-    if (indexed_pack) {
-      out$cell_index <- bg_idx
-    } else {
-      out$barcode <- coord_bc[bg_idx]
-    }
-    out
-  } else {
-    NULL
-  }
-
+  # One frame: grey background rows (expansion = NA) first, then the coloured
+  # receptor rows.
+  rows <- c(bg_idx, idx)
   out <- data.frame(
-    x = c(background$x, coloured$x),
-    y = c(background$y, coloured$y),
+    x = as.numeric(coord_x[rows]),
+    y = as.numeric(coord_y[rows]),
     expansion = factor(
-      c(as.character(background$expansion), as.character(coloured$expansion)),
+      c(rep(NA_character_, length(bg_idx)), as.character(expansion)),
       levels = IR_CLONE_LABELS
     ),
     stringsAsFactors = FALSE
   )
   if (indexed_pack) {
-    out$cell_index <- c(background$cell_index, coloured$cell_index)
+    out$cell_index <- c(bg_idx, coord_index)
   } else {
-    out$barcode <- c(background$barcode, coloured$barcode)
+    out$barcode <- c(coord_bc[bg_idx], barcodes)
   }
   out
 }

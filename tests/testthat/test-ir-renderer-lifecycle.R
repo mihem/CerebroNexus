@@ -215,6 +215,7 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
       current_page_display_defaults <- function(page) list()
       viewerDatasetIdentity <- function() list(fingerprint = "A")
       builds <- barcode_reads <- 0L
+      ir_data_annotated <- function() NULL
       ir_clonal_umap_data <- function(projection, receptor, clone_call, ...) {
         builds <<- builds + 1L
         stopifnot(projection == "umap", receptor == "TCR", clone_call == "gene")
@@ -250,7 +251,8 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
           "IR_EXPANSION_COLORS",
           "ir_projection_axis_names",
           "ir_projection_display_name",
-          "ir_clonal_umap_last_request"
+          "ir_clonal_umap_last_request",
+          "ir_clonal_umap_data_memo"
         ),
         events = "ir_clonalUMAP_projection_render_request"
       )
@@ -284,6 +286,8 @@ test_that("Clonal projection paints before drawer binding and defers cell identi
       expect_length(scope$sent, 2)
       expect_true(scope$sent[[2]]$meta$appearance$draw_border)
       expect_false(scope$sent[[2]]$meta$appearance$group_labels)
+      ## Appearance-only changes repaint without rebuilding the coordinates.
+      expect_equal(scope$builds, 1)
       session$setInputs(ir_p_umap_group_by = "sample")
       expect_length(scope$sent, 2)
     }
