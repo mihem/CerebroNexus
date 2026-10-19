@@ -325,3 +325,106 @@ test_that("supplementary trajectory controls appear only after projection and vi
     expect_equal(tags$find(paste0("#", panel[3]))$length(), 1L, info = file)
   }
 })
+
+test_that("trajectory expression metric outputs keep their IDs, messages and cache keys", {
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      cache_keys <- list()
+      violins <- list()
+      ## The metric outputs are created in a top-level loop, which
+      ## viewer_server_load() skips, so source the whole file.
+      cachePlot <- function(x, ...) {
+        scope$cache_keys[[length(scope$cache_keys) + 1L]] <- rlang::enquos(...)
+        x
+      }
+      viewerProjectionFirstFrameMetadata <- function() data.frame(nUMI = 1)
+      hasMitoColumn <- hasEryColumn <- function() TRUE
+      hasRiboColumn <- function() FALSE
+      getMitoColumn <- function() "percent.mt"
+      getRiboColumn <- function() NULL
+      getEryColumn <- function() "percent.hb"
+      trajectory_selection_ok <- function() TRUE
+      trajectory_data_reactive <- function() {
+        list(meta = data.frame(state = factor(c("early", "late"))))
+      }
+      cerebro_group_colors <- function(n) rep("#000000", n)
+      trajectory_cells_reactive <- function(column) data.frame(state = "early")
+      plotlyViolin <- function(table, metric, y_title, mode, ...) {
+        scope$violins[[metric]] <- c(y_title = y_title, mode = mode)
+        plotly::plot_ly(x = 1, y = 1, type = "scatter", mode = "markers")
+      }
+      available_crb_files <- reactiveValues(selected = "demo.crb")
+      cerebroRegisterInfo <- function(...) invisible(NULL)
+      sys.source(viewer_test_path("trajectory", "expression_metrics.R"), scope)
+    },
+    {
+      session$setInputs(
+        trajectory_selected_method = "m",
+        trajectory_selected_name = "p"
+      )
+      metrics <- c("nUMI", "nGene", "percent_mt", "percent_ribo", "percent_ery")
+      shown <- c(
+        nUMI = "plot",
+        nGene = "text",
+        percent_mt = "plot",
+        percent_ribo = "text",
+        percent_ery = "plot"
+      )
+      for (metric in metrics) {
+        id <- paste0("trajectory_states_", metric)
+        expect_match(
+          as.character(output[[paste0(id, "_UI")]]$html),
+          paste0('id="', id, "_", shown[[metric]], '"'),
+          fixed = TRUE,
+          info = metric
+        )
+      }
+      expect_identical(
+        output$trajectory_states_nUMI_text,
+        "Column with number of transcript per cell not available."
+      )
+      expect_identical(
+        output$trajectory_states_nGene_text,
+        "Column with number of expressed genes per cell not available."
+      )
+      expect_identical(
+        output$trajectory_states_percent_mt_text,
+        "Column with percentage of mitochondrial expression not available."
+      )
+      expect_identical(
+        output$trajectory_states_percent_ribo_text,
+        "Column with percentage of ribosomal expression not available."
+      )
+      expect_identical(
+        output$trajectory_states_percent_ery_text,
+        "Column with percentage of erythrocyte/hemoglobin expression not available."
+      )
+
+      for (metric in c("nUMI", "nGene", "percent_mt", "percent_ery")) {
+        output[[paste0("trajectory_states_", metric, "_plot")]]
+      }
+      expect_identical(
+        scope$violins,
+        list(
+          nUMI = c(y_title = "Number of transcripts", mode = "integer"),
+          nGene = c(y_title = "Number of expressed genes", mode = "integer"),
+          percent.mt = c(y_title = "Percentage of transcripts", mode = "percent"),
+          percent.hb = c(y_title = "Percentage of transcripts", mode = "percent")
+        )
+      )
+      expect_error(
+        output$trajectory_states_percent_ribo_plot,
+        class = "shiny.silent.error"
+      )
+
+      keys <- shiny::isolate(lapply(scope$cache_keys, function(quos) {
+        unname(lapply(quos, rlang::eval_tidy))
+      }))
+      expect_identical(
+        keys,
+        lapply(metrics, function(metric) list("m", "p", metric, "demo.crb"))
+      )
+    }
+  )
+})
