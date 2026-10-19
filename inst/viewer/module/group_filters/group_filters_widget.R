@@ -139,14 +139,9 @@ registerGroupFiltersUI <- function(
 #' @param title Modal title.
 #' @param text Modal body (typically `HTML("...")`).
 registerGroupFiltersInfo <- function(input, prefix, title, text) {
-  info_id <- paste0(prefix, "_group_filters_info")
-  shiny::observeEvent(input[[info_id]], {
-    shiny::showModal(shiny::modalDialog(
-      text,
-      title = title,
-      easyClose = TRUE,
-      footer = NULL,
-      size = "l"
-    ))
-  })
+  cerebroRegisterInfo(
+    input,
+    paste0(prefix, "_group_filters_info"),
+    list(title = title, text = text)
+  )
 }
