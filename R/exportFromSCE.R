@@ -792,26 +792,12 @@ exportFromSCE <- function(
     viewer_binary_threshold = viewer_binary_threshold
   )
 
-  ## log message
-  ## ... writing to file was successful
-  if (file.exists(file)) {
-    message(
-      paste0(
-        '[',
-        format(Sys.time(), '%H:%M:%S'),
-        '] Done!'
-      )
+  ## saveCerebro() and .publishCerebroExport() stop when the file is missing
+  message(
+    paste0(
+      '[',
+      format(Sys.time(), '%H:%M:%S'),
+      '] Done!'
     )
-    ## ... target file doesn't exist
-  } else {
-    stop(
-      paste0(
-        '[',
-        format(Sys.time(), '%H:%M:%S'),
-        '] Something went wrong while ',
-        'saving the file.'
-      ),
-      .call = FALSE
-    )
-  }
+  )
 }
