@@ -6354,3 +6354,60 @@ cerebroResultPageServer <- function(
   })
   invisible(NULL)
 }
+
+## Drop selected cells whose group the legend hides, so counts and the
+## selected-cells panels reflect visible groups only. `hidden_request` is a
+## page's <plot_id>_hidden_groups input; a request for another data set is
+## ignored. `metadata_fn()` returns the plotted cells and is called only when a
+## group is hidden; its `coordinates` columns key cells for selections without
+## a stable selection_key. Returns NULL when no selected cell is left.
+viewerVisibleSelection <- function(
+  selection,
+  hidden_request,
+  dataset_context,
+  color_variable,
+  metadata_fn,
+  coordinates = 1:2
+) {
+  hidden_groups <- if (
+    is.list(hidden_request) &&
+      viewerDatasetContextEqual(
+        hidden_request[["dataset_context"]],
+        dataset_context
+      )
+  ) {
+    as.character(hidden_request[["groups"]] %||% character())
+  } else {
+    character()
+  }
+  if (!length(hidden_groups)) {
+    return(selection)
+  }
+  metadata <- metadata_fn()
+  metadata[["selection_key"]] <- if ("cell_barcode" %in% colnames(metadata)) {
+    as.character(metadata[["cell_barcode"]])
+  } else {
+    NULL
+  }
+  stable_selection <- "selection_key" %in%
+    colnames(metadata) &&
+    "selection_key" %in% colnames(selection) &&
+    any(
+      !is.na(selection[["selection_key"]]) &
+        nzchar(as.character(selection[["selection_key"]]))
+    )
+  if (!stable_selection) {
+    metadata[["identifier"]] <- paste0(
+      metadata[[coordinates[[1L]]]],
+      "-",
+      metadata[[coordinates[[2L]]]]
+    )
+  }
+  selection <- filterSelectionByHiddenGroups(
+    selection,
+    metadata,
+    color_variable,
+    hidden_groups
+  )
+  if (is.null(selection) || nrow(selection) == 0) NULL else selection
+}

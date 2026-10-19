@@ -27,55 +27,17 @@ overview_projection_selected_cells <- reactive({
   ## Drop cells whose group is currently hidden via the legend, so the count and
   ## the selected-cells panels reflect only visible groups. The shared JS pushes
   ## the hidden group names under <plot_id>_hidden_groups; the grouping variable
-  ## is whatever the projection is coloured by. Cells are mapped to their group
-  ## through an `identifier` (X1-X2) built the same way as the selection key.
-  hidden_request <- input[["overview_projection_hidden_groups"]]
-  hidden_groups <- if (
-    is.list(hidden_request) &&
-      viewerDatasetContextEqual(
-        hidden_request[["dataset_context"]],
-        viewer_loaded_dataset_context()
-      )
-  ) {
-    as.character(hidden_request[["groups"]] %||% character())
-  } else {
-    character()
-  }
-  if (length(hidden_groups) > 0) {
-    color_variable <- input[["overview_projection_point_color"]]
-    projection <- getProjection(input[["overview_projection_to_display"]])
-    metadata <- cbind(projection, getMetaData())
-    metadata <- metadata %>%
-      dplyr::rename(X1 = 1, X2 = 2)
-    metadata[["selection_key"]] <- if ("cell_barcode" %in% colnames(metadata)) {
-      as.character(metadata[["cell_barcode"]])
-    } else {
-      NULL
-    }
-    stable_selection <- "selection_key" %in%
-      colnames(metadata) &&
-      "selection_key" %in% colnames(selection) &&
-      any(
-        !is.na(selection[["selection_key"]]) &
-          nzchar(as.character(selection[["selection_key"]]))
-      )
-    if (!stable_selection) {
-      metadata[["identifier"]] <- paste0(
-        metadata[["X1"]],
-        "-",
-        metadata[["X2"]]
+  ## is whatever the projection is coloured by.
+  viewerVisibleSelection(
+    selection,
+    input[["overview_projection_hidden_groups"]],
+    viewer_loaded_dataset_context(),
+    input[["overview_projection_point_color"]],
+    function() {
+      cbind(
+        getProjection(input[["overview_projection_to_display"]]),
+        getMetaData()
       )
     }
-    selection <- filterSelectionByHiddenGroups(
-      selection,
-      metadata,
-      color_variable,
-      hidden_groups
-    )
-    if (is.null(selection) || nrow(selection) == 0) {
-      return(NULL)
-    }
-  }
-
-  selection
+  )
 })

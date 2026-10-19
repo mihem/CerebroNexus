@@ -557,52 +557,22 @@ trajectory_projection_selected_cells <- reactive({
   }
 
   ## Drop cells whose group is currently hidden via the legend, so the count and
-  ## the selected-cells panels reflect only visible groups (shared helper in
-  ## utility_functions.R). Coordinates come from the trajectory's DR_1 / DR_2,
-  ## keyed the same way as the selection and the selected-cells table.
-  hidden_request <- input[["trajectory_projection_hidden_groups"]]
-  hidden_groups <- if (
-    is.list(hidden_request) &&
-      viewerDatasetContextEqual(
-        hidden_request[["dataset_context"]],
-        viewer_loaded_dataset_context()
+  ## the selected-cells panels reflect only visible groups. Coordinates come
+  ## from the trajectory's DR_1 / DR_2, keyed the same way as the selection and
+  ## the selected-cells table.
+  viewerVisibleSelection(
+    selection,
+    input[["trajectory_projection_hidden_groups"]],
+    viewer_loaded_dataset_context(),
+    input[["trajectory_point_color"]],
+    function() {
+      trajectory_cells_reactive(
+        input[["trajectory_point_color"]],
+        barcodes = TRUE
       )
-  ) {
-    as.character(hidden_request[["groups"]] %||% character())
-  } else {
-    character()
-  }
-  if (length(hidden_groups) > 0) {
-    color_variable <- input[["trajectory_point_color"]]
-    metadata <- trajectory_cells_reactive(
-      color_variable,
-      barcodes = TRUE
-    )
-    metadata[["selection_key"]] <- as.character(metadata[["cell_barcode"]])
-    stable_selection <- "selection_key" %in% colnames(selection) &&
-      any(
-        !is.na(selection[["selection_key"]]) &
-          nzchar(as.character(selection[["selection_key"]]))
-      )
-    if (!stable_selection) {
-      metadata[["identifier"]] <- paste0(
-        metadata[["DR_1"]],
-        "-",
-        metadata[["DR_2"]]
-      )
-    }
-    selection <- filterSelectionByHiddenGroups(
-      selection,
-      metadata,
-      color_variable,
-      hidden_groups
-    )
-    if (is.null(selection) || nrow(selection) == 0) {
-      return(NULL)
-    }
-  }
-
-  selection
+    },
+    coordinates = c("DR_1", "DR_2")
+  )
 })
 
 ##----------------------------------------------------------------------------##
