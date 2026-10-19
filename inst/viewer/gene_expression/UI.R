@@ -153,6 +153,5 @@ tab_gene_expression <- tabItem(
       if (window.jQuery) window.jQuery(document).on('shiny:connected', publish);
     })();
     "
-  )) #,
-  # uiOutput("expression_by_pseudotime_UI")
+  ))
 )
