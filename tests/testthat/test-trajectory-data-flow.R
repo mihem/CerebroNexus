@@ -132,6 +132,7 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
         scope,
         names = c(
           "trajectory_projection_lines",
+          "trajectory_projection_feedback",
           "trajectory_projection_active",
           "trajectory_projection_prepared_raw",
           "trajectory_projection_prepared"

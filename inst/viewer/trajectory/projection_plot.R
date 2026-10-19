@@ -19,6 +19,56 @@ trajectory_projection_lines <- function(trajectory_edges) {
   })
 }
 
+## Slider feedback sent with every frame. Point size and opacity are isolated
+## (they are renderer patches); "% of cells" stays a dependency of the caller.
+trajectory_projection_feedback <- function() {
+  cerebroFeedbackControls(
+    "trajectory_projection",
+    input,
+    list(
+      trajectory_point_size = isolate(
+        trajectory_projection_appearance$point_size
+      ),
+      trajectory_point_opacity = isolate(
+        trajectory_projection_appearance$point_opacity
+      ),
+      trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
+    )
+  )
+}
+
+trajectory_projection_point_line <- function(draw_border) {
+  if (draw_border) {
+    list(color = cerebro_plotly_theme()$axis, width = 1)
+  } else {
+    list()
+  }
+}
+
+## Hover columns shared by the static and the R-built frame: the projection's
+## standard columns plus the trajectory state and pseudotime.
+trajectory_projection_hover_columns <- function(hover_cells) {
+  state <- as.character(hover_cells[["state"]])
+  state[is.na(state)] <- "NA"
+  state_levels <- unique(state)
+  c(
+    cerebroProjectionHoverColumns(hover_cells),
+    list(
+      list(
+        label = "State",
+        levels = state_levels,
+        values = match(state, state_levels) - 1L
+      ),
+      list(
+        label = "Pseudotime",
+        format = "fixed",
+        digits = 2L,
+        values = unname(as.numeric(hover_cells[["pseudotime"]]))
+      )
+    )
+  )
+}
+
 ##----------------------------------------------------------------------------##
 ## Reactive that prepares the cells + trajectory-line data for the current
 ## parameters (filtering, subsetting, hover, colours). One source of truth so
@@ -64,61 +114,25 @@ trajectory_projection_prepared_raw <- reactive({
     trajectory_projection_appearance$percentage_cells_to_show
   )
 
-  ## Send an explicit empty payload so clearing every filter cannot leave the
-  ## previous Canvas frame visible.
-  if (nrow(cells_df) == 0L) {
-    return(list(
-      dataset_context = dataset_context,
-      feedback = cerebroFeedbackControls(
-        "trajectory_projection",
-        input,
-        list(
-          trajectory_point_size = isolate(
-            trajectory_projection_appearance$point_size
-          ),
-          trajectory_point_opacity = isolate(
-            trajectory_projection_appearance$point_opacity
-          ),
-          trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-        )
-      ),
-      cells_df = cells_df,
-      trajectory_lines = list(),
-      hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
-      color_variable = input[["trajectory_point_color"]],
-      point_size = isolate(trajectory_projection_appearance$point_size),
-      point_opacity = isolate(trajectory_projection_appearance$point_opacity),
-      draw_border = trajectory_projection_appearance$draw_border,
-      keep_square = trajectory_projection_appearance$keep_square
-    ))
-  }
+  ## An empty frame is still sent, without trajectory lines, so clearing every
+  ## filter cannot leave the previous Canvas frame visible.
+  trajectory_lines <- list()
+  if (nrow(cells_df) > 0L) {
+    ## Categorical payloads are split into one trace per group below, so
+    ## shuffling rows within a trace cannot change paint order. Continuous
+    ## colours stay shuffled so the original overlap behaviour is preserved.
+    if (is.numeric(cells_df[[color_variable]])) {
+      cells_df <- cells_df[sample.int(nrow(cells_df)), , drop = FALSE]
+    }
 
-  ## Categorical payloads are split into one trace per group below, so shuffling
-  ## rows within a trace cannot change paint order. Continuous colours stay
-  ## shuffled so the original overlap behaviour is preserved.
-  if (is.numeric(cells_df[[color_variable]])) {
-    cells_df <- cells_df[sample.int(nrow(cells_df)), , drop = FALSE]
+    ## trajectory path as line-segment shapes (warm near-black, the theme title
+    ## colour), drawn under the points as the structural backbone
+    trajectory_lines <- trajectory_projection_lines(trajectory_data[["edges"]])
   }
-
-  ## trajectory path as line-segment shapes (warm near-black, the theme title
-  ## colour), drawn under the points as the structural backbone
-  trajectory_lines <- trajectory_projection_lines(trajectory_data[["edges"]])
 
   list(
     dataset_context = dataset_context,
-    feedback = cerebroFeedbackControls(
-      "trajectory_projection",
-      input,
-      list(
-        trajectory_point_size = isolate(
-          trajectory_projection_appearance$point_size
-        ),
-        trajectory_point_opacity = isolate(
-          trajectory_projection_appearance$point_opacity
-        ),
-        trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-      )
-    ),
+    feedback = trajectory_projection_feedback(),
     cells_df = cells_df,
     trajectory_lines = trajectory_lines,
     hover = isTRUE(preferences[["show_hover_info_in_projections"]]),
@@ -329,11 +343,6 @@ observe({
   static_frame <- trajectory_static_first_frame()
   if (!is.null(static_frame)) {
     resource <- static_frame$resource
-    point_line <- if (trajectory_projection_appearance$draw_border) {
-      list(color = cerebro_plotly_theme()$axis, width = 1)
-    } else {
-      list()
-    }
     meta <- list(
       color_type = "categorical",
       color_variable = static_frame$color_variable,
@@ -349,7 +358,9 @@ observe({
       color = as.list(unname(static_frame$colors)),
       point_size = isolate(trajectory_projection_appearance$point_size),
       point_opacity = isolate(trajectory_projection_appearance$point_opacity),
-      point_line = point_line,
+      point_line = trajectory_projection_point_line(
+        trajectory_projection_appearance$draw_border
+      ),
       x_range = list(),
       y_range = list(),
       reset_axes = reset_axes_now,
@@ -364,32 +375,14 @@ observe({
       if (nrow(hover_cells) != resource$cells) {
         stop("Trajectory Viewer Pack frame no longer matches trajectory rows.")
       }
-      hover_columns <- list()
-      if (static_frame$hover) {
-        state <- as.character(hover_cells[["state"]])
-        state[is.na(state)] <- "NA"
-        state_levels <- unique(state)
-        hover_columns <- c(
-          cerebroProjectionHoverColumns(hover_cells),
-          list(
-            list(
-              label = "State",
-              levels = state_levels,
-              values = match(state, state_levels) - 1L
-            ),
-            list(
-              label = "Pseudotime",
-              format = "fixed",
-              digits = 2L,
-              values = unname(as.numeric(hover_cells[["pseudotime"]]))
-            )
-          )
-        )
-      }
       cerebroCellViewDeferredAux(
         selection_rows = seq_len(resource$cells),
         cell_barcodes = as.character(hover_cells[["cell_barcode"]]),
-        hover_columns = hover_columns,
+        hover_columns = if (static_frame$hover) {
+          trajectory_projection_hover_columns(hover_cells)
+        } else {
+          list()
+        },
         hover = static_frame$hover
       )
     }
@@ -401,19 +394,7 @@ observe({
       extra = list(shapes = static_frame$trajectory_lines),
       deferred_aux = deferred_aux,
       dataset_context = current_context,
-      feedback = cerebroFeedbackControls(
-        "trajectory_projection",
-        input,
-        list(
-          trajectory_point_size = isolate(
-            trajectory_projection_appearance$point_size
-          ),
-          trajectory_point_opacity = isolate(
-            trajectory_projection_appearance$point_opacity
-          ),
-          trajectory_percentage_cells_to_show = trajectory_projection_appearance$percentage_cells_to_show
-        )
-      )
+      feedback = trajectory_projection_feedback()
     )
     if (!isolate(trajectory_projection_sent())) {
       session$onFlushed(
@@ -441,12 +422,6 @@ observe({
   ## The projection coordinates come directly from the compact trajectory meta.
   coordinates <- list(cells_df[["DR_1"]], cells_df[["DR_2"]])
   color_input <- cells_df[[color_variable]]
-
-  point_line <- if (prepared[["draw_border"]]) {
-    list(color = cerebro_plotly_theme()$axis, width = 1)
-  } else {
-    list()
-  }
 
   color_assignments <- if (nrow(cells_df) == 0L) {
     character(0)
@@ -476,7 +451,7 @@ observe({
     point_opacity = isolate(trajectory_projection_appearance$point_opacity),
     group_labels = isolate(trajectory_projection_appearance$group_labels),
     keep_square = prepared[["keep_square"]],
-    point_line = point_line,
+    point_line = trajectory_projection_point_line(prepared[["draw_border"]]),
     reset_axes = reset_axes_now,
     color_assignments = color_assignments,
     hover_columns = list(),
@@ -494,33 +469,14 @@ observe({
       ,
       drop = FALSE
     ]
-    cell_barcodes <- as.character(hover_cells[["cell_barcode"]])
-    hover_columns <- list()
-    if (prepared[["hover"]]) {
-      state <- as.character(hover_cells[["state"]])
-      state[is.na(state)] <- "NA"
-      state_levels <- unique(state)
-      hover_columns <- c(
-        cerebroProjectionHoverColumns(hover_cells),
-        list(
-          list(
-            label = "State",
-            levels = state_levels,
-            values = match(state, state_levels) - 1L
-          ),
-          list(
-            label = "Pseudotime",
-            format = "fixed",
-            digits = 2L,
-            values = unname(as.numeric(hover_cells[["pseudotime"]]))
-          )
-        )
-      )
-    }
     cerebroCellViewDeferredAux(
       selection_rows = selection_rows,
-      cell_barcodes = cell_barcodes,
-      hover_columns = hover_columns,
+      cell_barcodes = as.character(hover_cells[["cell_barcode"]]),
+      hover_columns = if (prepared[["hover"]]) {
+        trajectory_projection_hover_columns(hover_cells)
+      } else {
+        list()
+      },
       hover = prepared[["hover"]]
     )
   }
@@ -623,9 +579,7 @@ trajectory_projection_selected_cells <- reactive({
       barcodes = TRUE
     )
     metadata[["selection_key"]] <- as.character(metadata[["cell_barcode"]])
-    stable_selection <- "selection_key" %in%
-      colnames(metadata) &&
-      "selection_key" %in% colnames(selection) &&
+    stable_selection <- "selection_key" %in% colnames(selection) &&
       any(
         !is.na(selection[["selection_key"]]) &
           nzchar(as.character(selection[["selection_key"]]))
