@@ -27,7 +27,7 @@
     stop(
       paste0(
         "Provided object is of class `",
-        class(object),
+        paste(class(object), collapse = ", "),
         "` but must be of class 'Seurat'."
       ),
       call. = FALSE
