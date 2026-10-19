@@ -1,13 +1,5 @@
-versionless_inst_dir <- function() {
-  installed <- system.file(package = "CerebroNexus")
-  if (nzchar(installed) && file.exists(file.path(installed, "app.R"))) {
-    return(installed)
-  }
-  testthat::test_path("..", "..", "inst")
-}
-
 test_that("runtime and example directories do not encode a product version", {
-  inst_dir <- versionless_inst_dir()
+  inst_dir <- viewer_app_test_path()
   legacy_viewer_version <- paste0("v1", ".4")
 
   expect_true(dir.exists(file.path(inst_dir, "viewer")))
@@ -59,7 +51,7 @@ test_that("the package exposes a versionless Cerebro data class", {
 })
 
 test_that("every bundled Cerebro fixture uses the versionless data class", {
-  example_dir <- file.path(versionless_inst_dir(), "extdata", "examples")
+  example_dir <- file.path(viewer_app_test_path(), "extdata", "examples")
   files <- sort(list.files(example_dir, pattern = "[.]crb$", full.names = TRUE))
 
   expect_gt(length(files), 0L)

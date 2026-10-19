@@ -117,7 +117,9 @@ Set `CEREBRO_LAYOUT_ARTIFACTS` to an output directory when running
 `app-visualization-layout` to save screenshots and measured geometry for visual
 review. The test waits for geometry to settle; it does not compare entire HTML
 or freeze incidental pixel values into snapshots.
-Shared file reads and viewer paths live in `helper-viewer-path.R`. Drawer
+Paths into `inst/` live in `helper-paths.R`; shared file reads and AppDriver
+helpers in `helper-viewer-driver.R`, Node runners in
+`helper-viewer-execution.R`. Drawer
 accessibility, reduced motion and panel placement are checked on rendered output.
 
 `helper-viewer-server.R` loads real R declarations and subscriptions into small
@@ -204,10 +206,10 @@ a brief offline checklist.
 
 ### How the app directory is resolved in browser tests
 
-Browser tests call `viewer_app_test_path()` (`helper-viewer-path.R`): the source
+Browser tests call `viewer_app_test_path()` (`helper-paths.R`): the source
 tree's `inst/` when it exists, otherwise the installed package root. Files whose
 tests only navigate the default data set share one AppDriver through
-`viewer_shared_app()`; a test that asserts pristine startup state or switches
+`viewer_shared_app()` (`helper-viewer-driver.R`); a test that asserts pristine startup state or switches
 data sets boots its own.
 
 If you edit `inst/` and want the change reflected:

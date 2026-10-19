@@ -1,14 +1,8 @@
+skip_if_no_bench()
+
 bench_protocol <- file.path("..", "bench", "lib", "protocol.R")
 
-skip_unless_bench_protocol <- function() {
-  testthat::skip_if_not(
-    file.exists(bench_protocol),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-}
-
 test_that("benchmark profiles separate smoke, review, and article evidence", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   expect_equal(bench_profile("quick")$export_repeats, 1L)
@@ -33,7 +27,6 @@ test_that("benchmark profiles separate smoke, review, and article evidence", {
 })
 
 test_that("comparison schedules balance backend order positions", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   specs <- list(
@@ -58,7 +51,6 @@ test_that("comparison schedules balance backend order positions", {
 })
 
 test_that("quick schedules run only the smallest comparison tier", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   specs <- list(
@@ -73,7 +65,6 @@ test_that("quick schedules run only the smallest comparison tier", {
 })
 
 test_that("query panels are deterministic and span expression density", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   genes <- paste0("g", seq_len(12))
@@ -94,7 +85,6 @@ test_that("query panels are deterministic and span expression density", {
 })
 
 test_that("numeric fingerprints are stable and value-sensitive", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   x <- matrix(c(0, 1.25, 2.5, NA_real_), nrow = 2)
@@ -110,7 +100,6 @@ test_that("numeric fingerprints are stable and value-sensitive", {
 })
 
 test_that("result validation rejects missing and incorrect measurements", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   specs <- list(
@@ -175,7 +164,6 @@ test_that("result validation rejects missing and incorrect measurements", {
 })
 
 test_that("only publication profiles may back the user-facing article", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   expect_error(
@@ -186,7 +174,6 @@ test_that("only publication profiles may back the user-facing article", {
 })
 
 test_that("access crashes do not masquerade as duplicate export outcomes", {
-  skip_unless_bench_protocol()
   source(bench_protocol, local = TRUE)
 
   specs <- list(fixture = list(tiers = 1000, comparison_tiers = 1000))

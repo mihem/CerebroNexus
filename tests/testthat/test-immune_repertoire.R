@@ -5,25 +5,8 @@
 # single donor is partitioned into three demo samples; sample labels do not
 # represent distinct biological donors.
 
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-local_inst <- inst_candidates[file.exists(file.path(
-  inst_candidates,
-  "viewer"
-))][1]
-if (!is.na(local_inst)) {
-  shiny_root <- file.path(local_inst, "viewer")
-  example_crb <- file.path(local_inst, "extdata/examples/example.crb")
-} else {
-  shiny_root <- system.file("viewer", package = "CerebroNexus")
-  example_crb <- system.file(
-    "extdata/examples/example.crb",
-    package = "CerebroNexus"
-  )
-}
+shiny_root <- viewer_test_path()
+example_crb <- inst_test_path("extdata", "examples", "example.crb")
 
 test_that("immune_repertoire UI defines correct tabName", {
   scope <- viewer_ui_test_env()

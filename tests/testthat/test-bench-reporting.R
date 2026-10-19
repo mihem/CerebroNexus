@@ -1,16 +1,10 @@
+skip_if_no_bench()
+
 bench_protocol <- file.path("..", "bench", "lib", "protocol.R")
 bench_reporting <- file.path("..", "bench", "lib", "reporting.R")
 bench_root <- normalizePath(file.path("..", "bench"), mustWork = FALSE)
 
-skip_unless_bench_reporting <- function() {
-  testthat::skip_if_not(
-    file.exists(bench_protocol) && file.exists(bench_reporting),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-}
-
 test_that("metric summaries retain independent-repeat uncertainty", {
-  skip_unless_bench_reporting()
   source(bench_protocol, local = TRUE)
   source(bench_reporting, local = TRUE)
 
@@ -37,7 +31,6 @@ test_that("metric summaries retain independent-repeat uncertainty", {
 })
 
 test_that("metric summaries ignore failed rows but not missing values", {
-  skip_unless_bench_reporting()
   source(bench_reporting, local = TRUE)
 
   x <- data.frame(
@@ -52,7 +45,6 @@ test_that("metric summaries ignore failed rows but not missing values", {
 })
 
 test_that("interval formatting exposes range and sample count", {
-  skip_unless_bench_reporting()
   source(bench_reporting, local = TRUE)
 
   expect_equal(
@@ -66,7 +58,6 @@ test_that("interval formatting exposes range and sample count", {
 })
 
 test_that("evidence labels prevent quick runs from sounding definitive", {
-  skip_unless_bench_reporting()
   source(bench_protocol, local = TRUE)
   source(bench_reporting, local = TRUE)
 
@@ -81,7 +72,6 @@ test_that("evidence labels prevent quick runs from sounding definitive", {
 })
 
 test_that("current result resolution is safe and backward compatible", {
-  skip_unless_bench_reporting()
   source(bench_reporting, local = TRUE)
 
   root <- tempfile("bench-result-root-")
@@ -101,7 +91,6 @@ test_that("current result resolution is safe and backward compatible", {
 })
 
 test_that("report and plots consume repeated publication rows", {
-  skip_unless_bench_reporting()
   testthat::skip_if_not_installed("ggplot2")
   testthat::skip_if_not_installed("patchwork")
 

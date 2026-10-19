@@ -1,14 +1,8 @@
+skip_if_no_bench()
+
 bench_resources <- file.path("..", "bench", "lib", "resource_planning.R")
 
-skip_unless_bench_resources <- function() {
-  testthat::skip_if_not(
-    file.exists(bench_resources),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-}
-
 test_that("resource planning explains safe and unsafe memory tiers", {
-  skip_unless_bench_resources()
   source(bench_resources, local = TRUE)
   inventory <- data.frame(
     source = c("mouse", "human"),
@@ -38,7 +32,6 @@ test_that("resource planning explains safe and unsafe memory tiers", {
 })
 
 test_that("resource planning checks disk and sparse-index limits", {
-  skip_unless_bench_resources()
   source(bench_resources, local = TRUE)
   inventory <- data.frame(
     source = "fixture",
@@ -69,7 +62,6 @@ test_that("resource planning checks disk and sparse-index limits", {
 })
 
 test_that("unsafe plans fail unless explicitly overridden", {
-  skip_unless_bench_resources()
   source(bench_resources, local = TRUE)
   assessment <- data.frame(
     source = "fixture",
@@ -82,7 +74,6 @@ test_that("unsafe plans fail unless explicitly overridden", {
 })
 
 test_that("resource checker rejects unsafe plans before a run", {
-  skip_unless_bench_resources()
   bench_root <- normalizePath(file.path("..", "bench"))
   stage <- tempfile("bench-resource-stage-")
   dir.create(stage)

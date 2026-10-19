@@ -1,16 +1,10 @@
+skip_if_no_bench()
+skip_if_not_installed("Matrix")
+
 bench_protocol <- file.path("..", "bench", "lib", "protocol.R")
 bench_access_metrics <- file.path("..", "bench", "lib", "access_metrics.R")
 
-skip_unless_bench_access <- function() {
-  testthat::skip_if_not(
-    file.exists(bench_protocol) && file.exists(bench_access_metrics),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-  testthat::skip_if_not_installed("Matrix")
-}
-
 test_that("query plans stratify genes and fingerprint source values", {
-  skip_unless_bench_access()
   source(bench_protocol, local = TRUE)
   source(bench_access_metrics, local = TRUE)
 
@@ -38,7 +32,6 @@ test_that("query plans stratify genes and fingerprint source values", {
 })
 
 test_that("the first backend call is the timed fresh-process query", {
-  skip_unless_bench_access()
   source(bench_protocol, local = TRUE)
   source(bench_access_metrics, local = TRUE)
 
@@ -90,7 +83,6 @@ test_that("the first backend call is the timed fresh-process query", {
 })
 
 test_that("backend measurements fail closed on wrong values", {
-  skip_unless_bench_access()
   source(bench_protocol, local = TRUE)
   source(bench_access_metrics, local = TRUE)
 
@@ -121,7 +113,6 @@ test_that("backend measurements fail closed on wrong values", {
 })
 
 test_that("fingerprints materialize BPCells blocks canonically", {
-  skip_unless_bench_access()
   testthat::skip_if_not_installed("BPCells")
   source(bench_protocol, local = TRUE)
 

@@ -4,21 +4,7 @@
 # at app runtime, not exported from the package). We source that file directly
 # so the helper can be tested in isolation, without launching the full app.
 
-# Prefer the source tree copy (always current); fall back to the installed
-# package location when tests run against an installed build.
-ir_utils_candidates <- c(
-  testthat::test_path("../../inst/viewer/utility_functions.R"),
-  file.path(
-    system.file(package = "CerebroNexus"),
-    "viewer",
-    "utility_functions.R"
-  )
-)
-ir_utils <- ir_utils_candidates[file.exists(ir_utils_candidates)][1]
-testthat::skip_if(
-  is.na(ir_utils),
-  "utility_functions.R not found in source tree or installed package"
-)
+ir_utils <- viewer_test_path("utility_functions.R")
 
 # Load a parsed declaration, independent of layout and braces in comments.
 match_dataset_by_url <- eval(

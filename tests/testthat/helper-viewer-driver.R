@@ -1,21 +1,3 @@
-viewer_test_path <- function(...) {
-  source_path <- testthat::test_path("..", "..", "inst", "viewer", ...)
-  if (file.exists(source_path)) {
-    return(source_path)
-  }
-
-  system.file("viewer", ..., package = "CerebroNexus")
-}
-
-viewer_app_test_path <- function() {
-  source_path <- testthat::test_path("..", "..", "inst")
-  if (file.exists(file.path(source_path, "app.R"))) {
-    return(source_path)
-  }
-
-  system.file(package = "CerebroNexus")
-}
-
 ## The bundled app lives at the installed package root, so shiny::loadSupport()
 ## warns about the package layout even though sourcing these files is intended.
 local_app_support <- function(app_dir, envir = rlang::caller_env()) {

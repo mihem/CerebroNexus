@@ -3,19 +3,14 @@
 # Only the functions that need no network are exercised here. The benchmark tree
 # is .Rbuildignore'd, so these skip when running against a built tarball.
 
+skip_if_no_bench()
+skip_if_not_installed("rhdf5")
+skip_if_not_installed("Matrix")
+
+
 bench_lib <- file.path("..", "bench", "lib", "remote_h5.R")
 
-skip_unless_bench <- function() {
-  testthat::skip_if_not(
-    file.exists(bench_lib),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-  testthat::skip_if_not_installed("rhdf5")
-  testthat::skip_if_not_installed("Matrix")
-}
-
 test_that("chunk plans cover the requested cells without overlapping", {
-  skip_unless_bench()
   source(bench_lib, local = TRUE)
 
   plan <- bench_plan_chunks(1000000, 40000, n_chunks = 4L)
@@ -32,7 +27,6 @@ test_that("chunk plans cover the requested cells without overlapping", {
 })
 
 test_that("chunk plans degrade gracefully at the edges", {
-  skip_unless_bench()
   source(bench_lib, local = TRUE)
 
   # Asking for more cells than exist yields the whole file, once.
@@ -52,7 +46,6 @@ test_that("chunk plans degrade gracefully at the edges", {
 })
 
 test_that("within-column ordering is classified correctly", {
-  skip_unless_bench()
   source(bench_lib, local = TRUE)
 
   # Three columns of four entries each.
@@ -71,7 +64,6 @@ test_that("within-column ordering is classified correctly", {
 })
 
 test_that("reversing a descending matrix preserves its contents", {
-  skip_unless_bench()
   source(bench_lib, local = TRUE)
 
   # Reference matrix, ascending within columns.

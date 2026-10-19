@@ -1,20 +1,8 @@
 # test-ir-help-demo-helpers.R — pure contracts for IR help-example data.
 
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-local_inst <- inst_candidates[file.exists(file.path(
-  inst_candidates,
-  "viewer"
-))][1]
-if (is.na(local_inst)) {
-  local_inst <- system.file(package = "CerebroNexus")
-}
-help_demo_file <- file.path(
-  local_inst,
-  "viewer/immune_repertoire/help_demo_helpers.R"
+help_demo_file <- viewer_test_path(
+  "immune_repertoire",
+  "help_demo_helpers.R"
 )
 help_demo_exists <- file.exists(help_demo_file)
 

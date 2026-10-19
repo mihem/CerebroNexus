@@ -6,27 +6,6 @@
 ## overview module; source it directly here so it can be unit-tested without a
 ## Shiny session.
 
-repo_file <- function(...) {
-  parts <- c(...)
-  stripped <- if (length(parts) && identical(parts[[1L]], "inst")) {
-    parts[-1L]
-  } else {
-    parts
-  }
-  # 1) installed package (R CMD check) or load_all-shimmed source location
-  if (length(stripped)) {
-    p <- system.file(
-      do.call(file.path, as.list(stripped)),
-      package = "CerebroNexus"
-    )
-    if (nzchar(p)) {
-      return(p)
-    }
-  }
-  # 2) fall back to the source tree (devtools::test_dir run from the repo)
-  testthat::test_path("..", "..", ...)
-}
-
 # The shared helper lives in utility_functions.R (sourced once at server start).
 # Source it into a throwaway environment and return the function. The file only
 # DEFINES functions at top level (Shiny / later calls happen inside them), so
@@ -34,7 +13,7 @@ repo_file <- function(...) {
 load_filter <- function() {
   env <- new.env()
   sys.source(
-    repo_file("inst", "viewer", "utility_functions.R"),
+    viewer_test_path("utility_functions.R"),
     envir = env
   )
   env[["filterSelectionByHiddenGroups"]]

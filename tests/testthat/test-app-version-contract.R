@@ -1,11 +1,3 @@
-repo_file <- function(...) {
-  installed <- system.file(..., package = "CerebroNexus")
-  if (nzchar(installed)) {
-    return(installed)
-  }
-  testthat::test_path("..", "..", "inst", ...)
-}
-
 test_that("About renders configured versions and an explicit missing-version fallback", {
   for (version in list("9.8.7", "custom-build", NULL, "", NA_character_)) {
     shiny::testServer(

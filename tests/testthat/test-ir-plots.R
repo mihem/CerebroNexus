@@ -8,19 +8,7 @@
 
 skip_if_not_installed("scRepertoire")
 
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-local_inst <- inst_candidates[
-  file.exists(file.path(inst_candidates, "extdata/examples/example.crb"))
-][1]
-example_crb <- if (!is.na(local_inst)) {
-  file.path(local_inst, "extdata/examples/example.crb")
-} else {
-  system.file("extdata/examples/example.crb", package = "CerebroNexus")
-}
+example_crb <- inst_test_path("extdata", "examples", "example.crb")
 
 # Annotate the IR list with cell metadata by barcode (mirrors ir_data_annotated
 # in the module) so group.by columns are available.

@@ -1,17 +1,11 @@
+skip_if_no_bench()
+
 bench_root <- normalizePath(
   file.path("..", "bench"),
   mustWork = FALSE
 )
 
-skip_unless_bench_cli <- function() {
-  testthat::skip_if_not(
-    dir.exists(bench_root),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-}
-
 test_that("sweep publishes after validation and cleans up on every exit", {
-  skip_unless_bench_cli()
   skip_if(
     .Platform$OS.type != "unix" || Sys.which("bash") == "",
     "requires bash"
@@ -120,7 +114,6 @@ run_bench_rscript <- function(script, args = character(), env = character()) {
 }
 
 test_that("schedule CLI emits a complete quick-profile grid", {
-  skip_unless_bench_cli()
   result <- tempfile(fileext = ".csv")
   on.exit(unlink(result), add = TRUE)
 
@@ -149,7 +142,6 @@ test_that("schedule CLI emits a complete quick-profile grid", {
 })
 
 test_that("manifest CLI records source revision and runtime", {
-  skip_unless_bench_cli()
   result <- tempfile(fileext = ".csv")
   on.exit(unlink(result), add = TRUE)
 
@@ -169,7 +161,6 @@ test_that("manifest CLI records source revision and runtime", {
 })
 
 test_that("validator CLI accepts complete results and rejects drift", {
-  skip_unless_bench_cli()
   stage <- tempfile("bench-stage-")
   dir.create(stage)
   on.exit(unlink(stage, recursive = TRUE), add = TRUE)

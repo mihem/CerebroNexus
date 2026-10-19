@@ -6,31 +6,10 @@
 ## method. The pure predicate below is req()-ed at every getTrajectory() site so
 ## the guard fails cleanly instead.
 
-repo_file <- function(...) {
-  parts <- c(...)
-  stripped <- if (length(parts) && identical(parts[[1L]], "inst")) {
-    parts[-1L]
-  } else {
-    parts
-  }
-  # 1) installed package (R CMD check) or load_all-shimmed source location
-  if (length(stripped)) {
-    p <- system.file(
-      do.call(file.path, as.list(stripped)),
-      package = "CerebroNexus"
-    )
-    if (nzchar(p)) {
-      return(p)
-    }
-  }
-  # 2) fall back to the source tree (devtools::test_dir run from the repo)
-  testthat::test_path("..", "..", ...)
-}
-
 load_predicate <- function() {
   env <- new.env()
   sys.source(
-    repo_file("inst", "viewer", "utility_functions.R"),
+    viewer_test_path("utility_functions.R"),
     envir = env
   )
   env[["trajectorySelectionValid"]]

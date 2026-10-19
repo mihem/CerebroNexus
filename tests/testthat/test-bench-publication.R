@@ -1,11 +1,6 @@
-bench_root <- normalizePath(file.path("..", "bench"), mustWork = FALSE)
+skip_if_no_bench()
 
-skip_unless_bench_publication <- function() {
-  testthat::skip_if_not(
-    file.exists(file.path(bench_root, "src", "60_publish_results.R")),
-    "benchmark tree not present (expected when checking a built package)"
-  )
-}
+bench_root <- normalizePath(file.path("..", "bench"), mustWork = FALSE)
 
 run_publisher <- function(stage, target, run_id, fail_at = "") {
   out <- tempfile("bench-publish-stdout-")
@@ -31,7 +26,6 @@ run_publisher <- function(stage, target, run_id, fail_at = "") {
 }
 
 test_that("failed publication preserves the prior current result", {
-  skip_unless_bench_publication()
   root <- tempfile("bench-results-")
   stage <- tempfile("bench-stage-")
   dir.create(file.path(root, "runs", "old-run"), recursive = TRUE)
@@ -64,7 +58,6 @@ test_that("failed publication preserves the prior current result", {
 })
 
 test_that("publisher rejects unsafe and conflicting run identities", {
-  skip_unless_bench_publication()
   root <- tempfile("bench-results-")
   stage <- tempfile("bench-stage-")
   dir.create(root)
@@ -88,7 +81,6 @@ test_that("publisher rejects unsafe and conflicting run identities", {
 })
 
 test_that("output checker requires report and publication figures", {
-  skip_unless_bench_publication()
   stage <- tempfile("bench-output-stage-")
   dir.create(stage)
   on.exit(unlink(stage, recursive = TRUE), add = TRUE)

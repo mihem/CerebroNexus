@@ -7,24 +7,7 @@
 # ir_sharing_classify) are plain functions. We source data.R inside a throwaway
 # environment that stubs the reactive machinery, then lift just the helpers out.
 
-# Locate data.R in both the source tree (fast local run) and the installed
-# package (R CMD check runs from a temp install, where the inst/ candidates do
-# not exist — there we fall back to system.file). Skip if neither resolves, so
-# a missing path can never produce an "NA/shiny/..." error.
-rel_data_r <- "viewer/immune_repertoire/data.R"
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-local_inst <- inst_candidates[
-  file.exists(file.path(inst_candidates, rel_data_r))
-][1]
-data_r <- if (!is.na(local_inst)) {
-  file.path(local_inst, rel_data_r)
-} else {
-  system.file(rel_data_r, package = "CerebroNexus")
-}
+data_r <- viewer_test_path("immune_repertoire", "data.R")
 testthat::skip_if_not(
   nzchar(data_r) && file.exists(data_r),
   "immune_repertoire/data.R not found (source tree or installed package)"
