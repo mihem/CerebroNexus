@@ -345,6 +345,7 @@ test_that("dataset switches invalidate old generations and reconnects replay the
     function(input, output, session) {
       scope <- environment()
       sys.source(viewer_test_path("utility_functions.R"), scope)
+      Cerebro.options <- list()
       sent <- list()
       session$sendCustomMessage <- function(type, message) {
         sent[[length(sent) + 1L]] <<- list(type = type, message = message)
@@ -374,6 +375,7 @@ test_that("dataset switches invalidate old generations and reconnects replay the
         scope,
         names = c(
           "viewer_send_dataset_phase",
+          "viewer_catalog_info",
           "viewer_dataset_load_required",
           "viewer_request_dataset"
         ),

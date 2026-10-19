@@ -117,21 +117,24 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   source(cerebro_root_path("viewer/color_setup.R"), local = TRUE)
   source(cerebro_root_path("viewer/utility_functions.R"), local = TRUE)
-  if (length(.crb_launch_state$prototypes)) {
-    backend_plan <- Cerebro.options[[".bundle_backend_plan"]]
-    configured_paths <- unname(
-      Cerebro.options[["crb_file_to_load"]] %||% character()
+  ## Catalog summary of a dataset target, or NULL.
+  viewer_catalog_info <- function(target) {
+    viewerDatasetInfo(Cerebro.options[[".dataset_catalog"]], target)
+  }
+  ## Configured bundle CRBs use the backend plan createShinyApp() validated.
+  viewer_backend_plan <- function(path) {
+    .configuredRuntimeBackendPlan(
+      path,
+      Cerebro.options[[".bundle_backend_plan"]],
+      unname(Cerebro.options[["crb_file_to_load"]] %||% character())
     )
+  }
+  if (length(.crb_launch_state$prototypes)) {
     for (prototype_path in names(.crb_launch_state$prototypes)) {
-      effective_backend <- .configuredRuntimeBackendPlan(
-        prototype_path,
-        backend_plan,
-        configured_paths
-      )
       .cacheCrbPrototype(
         prototype_path,
         .crb_launch_state$prototypes[[prototype_path]],
-        .runtimeBackendCacheIdentity(effective_backend)
+        .runtimeBackendCacheIdentity(viewer_backend_plan(prototype_path))
       )
     }
     .crb_launch_state$prototypes <- NULL
@@ -310,12 +313,7 @@ server <- function(input, output, session) {
   ## Whether a request must materialize the full CRB: always outside Data info,
   ## and on Data info only without a usable catalog summary.
   viewer_dataset_load_required <- function(target) {
-    catalog <- if (exists("Cerebro.options")) {
-      Cerebro.options[[".dataset_catalog"]]
-    } else {
-      NULL
-    }
-    info <- viewerDatasetInfo(catalog, target)
+    info <- viewer_catalog_info(target)
     viewerOverviewTruncated(info$overview) ||
       viewerDatasetLoadRequired(
         isolate(input[["sidebar"]]),
@@ -490,10 +488,7 @@ server <- function(input, output, session) {
       available_crb_files$labels <- NULL
       ## take path or object from 'Cerebro.options' if it is set and points to an
       ## existing file or object
-    } else if (
-      exists('Cerebro.options') &&
-        !is.null(Cerebro.options[["crb_file_to_load"]])
-    ) {
+    } else if (!is.null(Cerebro.options[["crb_file_to_load"]])) {
       file_to_load <- Cerebro.options[["crb_file_to_load"]]
       ## Older launch configurations could provide more than one unnamed path.
       ## Give those entries deterministic opaque ids rather than falling back to
@@ -726,18 +721,10 @@ server <- function(input, output, session) {
   observeEvent(
     available_crb_files$selected,
     {
-      catalog <- if (exists("Cerebro.options")) {
-        Cerebro.options[[".dataset_catalog"]]
-      } else {
-        NULL
-      }
-      info <- viewerDatasetInfo(
-        catalog,
-        viewerDatasetPath(
-          available_crb_files$files,
-          available_crb_files$selected
-        )
-      )
+      info <- viewer_catalog_info(viewerDatasetPath(
+        available_crb_files$files,
+        available_crb_files$selected
+      ))
       selected <- available_crb_files$selected
       if (!is.null(info) && length(selected) == 1L) {
         session$onFlushed(
@@ -757,15 +744,7 @@ server <- function(input, output, session) {
                 ))
                 start_crb_prefetch(
                   path,
-                  .runtimeBackendCacheIdentity(
-                    .configuredRuntimeBackendPlan(
-                      path,
-                      Cerebro.options[[".bundle_backend_plan"]],
-                      unname(
-                        Cerebro.options[["crb_file_to_load"]] %||% character()
-                      )
-                    )
-                  )
+                  .runtimeBackendCacheIdentity(viewer_backend_plan(path))
                 )
               }
             })
@@ -792,15 +771,10 @@ server <- function(input, output, session) {
   current_dataset_info <- reactive({
     req(!is.null(available_crb_files$selected))
     selected <- available_crb_files$selected
-    catalog <- if (exists("Cerebro.options")) {
-      Cerebro.options[[".dataset_catalog"]]
-    } else {
-      NULL
-    }
-    info <- viewerDatasetInfo(
-      catalog,
-      viewerDatasetPath(available_crb_files$files, selected)
-    )
+    info <- viewer_catalog_info(viewerDatasetPath(
+      available_crb_files$files,
+      selected
+    ))
     if (!is.null(info)) {
       info$label <- viewerDatasetLabel(
         available_crb_files$files,
@@ -900,19 +874,6 @@ server <- function(input, output, session) {
           ## Configured bundle CRBs consume the exact backend plan validated during
           ## createShinyApp(). Uploads and older configurations fall back to the
           ## ordinary expression_backend field; serialized getters are not called.
-          backend_plan <- if (exists("Cerebro.options")) {
-            Cerebro.options[[".bundle_backend_plan"]]
-          } else {
-            NULL
-          }
-          configured_paths <- if (
-            exists("Cerebro.options") &&
-              !is.null(Cerebro.options[["crb_file_to_load"]])
-          ) {
-            unname(Cerebro.options[["crb_file_to_load"]])
-          } else {
-            character()
-          }
           cache_key <- normalizePath(
             dataset_to_load,
             winslash = "/",
@@ -932,15 +893,12 @@ server <- function(input, output, session) {
               } else if (identical(status, "success")) {
                 prefetched <- prefetch_task$result()
                 req(identical(prefetched$path, as.character(dataset_to_load)))
-                effective_backend <- .configuredRuntimeBackendPlan(
-                  dataset_to_load,
-                  backend_plan,
-                  configured_paths
-                )
                 .cacheCrbPrototype(
                   dataset_to_load,
                   prefetched$prototype,
-                  .runtimeBackendCacheIdentity(effective_backend)
+                  .runtimeBackendCacheIdentity(
+                    viewer_backend_plan(dataset_to_load)
+                  )
                 )
                 print(glue::glue(
                   "[{Sys.time()}] CRB background prefetch ready: ",
@@ -963,8 +921,8 @@ server <- function(input, output, session) {
           datasetLoadProgress(dataset_label, 42, "Opening cells and metadata")
           data <- get_or_load_crb(
             dataset_to_load,
-            backend_plan,
-            configured_paths
+            Cerebro.options[[".bundle_backend_plan"]],
+            unname(Cerebro.options[["crb_file_to_load"]] %||% character())
           )
         }
         datasetLoadProgress(dataset_label, 78, "Preparing viewer data")
@@ -1577,29 +1535,28 @@ server <- function(input, output, session) {
       dataset$cell_fingerprint,
       error = function(error) NULL
     )
-    if (
+    cell_identity <- if (
       is.character(stored_fingerprint) &&
         length(stored_fingerprint) == 1L &&
         !is.na(stored_fingerprint) &&
         grepl("^md5-cell-set-v1:[[:xdigit:]]{32}$", stored_fingerprint)
     ) {
-      return(list(
-        cell_count = getNumberOfCells(),
-        fingerprint = stored_fingerprint,
-        order_fingerprint = order_fingerprint,
-        pack_fingerprint = pack_fingerprint
-      ))
+      list(cell_count = getNumberOfCells(), fingerprint = stored_fingerprint)
+    } else {
+      .viewerCellFingerprintCached(
+        attr(dataset, "cerebro_dataset_path", exact = TRUE),
+        function() {
+          cells <- cv_saved_view_cells()
+          list(
+            cell_count = length(cells),
+            fingerprint = cv_config_dataset_fingerprint(
+              cells,
+              stored_fingerprint
+            )
+          )
+        }
+      )
     }
-    cell_identity <- .viewerCellFingerprintCached(
-      attr(dataset, "cerebro_dataset_path", exact = TRUE),
-      function() {
-        cells <- cv_saved_view_cells()
-        list(
-          cell_count = length(cells),
-          fingerprint = cv_config_dataset_fingerprint(cells, stored_fingerprint)
-        )
-      }
-    )
     list(
       cell_count = cell_identity$cell_count,
       fingerprint = cell_identity$fingerprint,
@@ -1698,36 +1655,14 @@ server <- function(input, output, session) {
   # list of available trajectories
   available_trajectories <- reactive({
     req(!is.null(data_set()))
-    ## collect available trajectories across all methods and create selectable
-    ## options
-    available_trajectories <- c()
-    available_trajectory_method <- getMethodsForTrajectories()
-    ## check if at least 1 trajectory method exists
-    if (length(available_trajectory_method) > 0) {
-      ## cycle through trajectory methods
-      for (i in seq_along(available_trajectory_method)) {
-        ## get current method and names of trajectories for this method
-        current_method <- available_trajectory_method[i]
-        available_trajectories_for_this_method <- getNamesOfTrajectories(
-          current_method
-        )
-        ## check if at least 1 trajectory is available for this method
-        if (length(available_trajectories_for_this_method) > 0) {
-          ## cycle through trajectories for this method
-          for (j in seq_along(available_trajectories_for_this_method)) {
-            ## create selectable combination of method and trajectory name and add
-            ## it to the available trajectories
-            current_trajectory <- available_trajectories_for_this_method[j]
-            available_trajectories <- c(
-              available_trajectories,
-              glue::glue("{current_method} // {current_trajectory}")
-            )
-          }
-        }
-      }
-    }
-    # message(str(available_trajectories))
-    return(available_trajectories)
+    ## "method // name" for every trajectory of every method
+    unlist(
+      lapply(getMethodsForTrajectories(), function(method) {
+        trajectories <- getNamesOfTrajectories(method)
+        if (length(trajectories)) paste(method, "//", trajectories)
+      }),
+      use.names = FALSE
+    )
   })
 
   # available genes
