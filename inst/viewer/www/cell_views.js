@@ -10763,9 +10763,7 @@
       lastVis = null;
       reportVisibility();
     };
-    var jq = window.jQuery;
-    if (jq) { jq(document).on('shiny:connected', onConnected); }
-    else { document.addEventListener('shiny:connected', onConnected); }
+    window.jQuery(document).on('shiny:connected', onConnected);
 
     // The alignment controls are server-rendered after the client bundle. When
     // Shiny replaces that small fragment, populate its section tabs again; the

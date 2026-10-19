@@ -57,11 +57,7 @@
   }
 
   function isVisible(el) {
-    return Boolean(
-      el &&
-      typeof el.getClientRects === "function" &&
-      el.getClientRects().length > 0
-    );
+    return Boolean(el && el.getClientRects().length > 0);
   }
 
   /* Anchor the fill to its unscrolled position inside the app's scrollport.
@@ -189,20 +185,14 @@
   }
 
   var ro = null;
-  var observedTargets = typeof window.WeakSet === "function" ?
-    new window.WeakSet() : null;
+  var observedTargets = new window.WeakSet();
 
   function observeLayout(el) {
-    if (!ro) {
-      return;
-    }
     var targets = layoutTargets(el);
     for (var i = 0; i < targets.length; i++) {
-      if (!observedTargets || !observedTargets.has(targets[i])) {
+      if (!observedTargets.has(targets[i])) {
         ro.observe(targets[i]);
-        if (observedTargets) {
-          observedTargets.add(targets[i]);
-        }
+        observedTargets.add(targets[i]);
       }
     }
   }
@@ -234,9 +224,7 @@
      wraps to another row, a caveat banner appears, the tab strip changes. Watch
      the fill's content ancestry so those local changes re-measure it without
      making unrelated changes elsewhere in the app schedule every plot. */
-  if (typeof window.ResizeObserver === "function") {
-    ro = new window.ResizeObserver(scheduleSize);
-  }
+  ro = new window.ResizeObserver(scheduleSize);
 
   /* Shiny re-renders outputs and swaps tab panes after the initial paint, so a
      fill element can arrive (or become visible) well after load. Re-measure when
