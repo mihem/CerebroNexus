@@ -69,7 +69,10 @@
 
 .validatePortableExportBasename <- function(final_file) {
   name <- basename(final_file)
-  stem <- tools::file_path_sans_ext(name)
+  ## Not tools::file_path_sans_ext(), which keeps ".crb" whole, so its stem is
+  ## never empty. Only R >= 4.6 rejects ".crb" earlier, because its
+  ## tools::file_ext() no longer reads a leading dot as an extension.
+  stem <- sub("[.][[:alnum:]]+$", "", name)
   windows_stem <- toupper(trimws(
     sub("\\..*$", "", name),
     which = "right"
