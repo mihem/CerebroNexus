@@ -42,3 +42,16 @@ test_that("exportFromSCE exports a PCA-only object", {
     as.data.frame(SingleCellExperiment::reducedDim(sce, "PCA"))
   )
 })
+
+test_that("exportFromSCE honours use_delayed_array", {
+  skip_if_not_installed("DelayedArray")
+  sce <- sce_example()
+
+  crb <- export_sce(sce, use_delayed_array = TRUE)
+
+  expect_s4_class(crb$expression, "RleMatrix")
+  expect_identical(
+    as.matrix(crb$expression),
+    as.matrix(SummarizedExperiment::assay(sce, "logcounts"))
+  )
+})

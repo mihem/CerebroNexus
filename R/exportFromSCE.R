@@ -216,23 +216,8 @@ exportFromSCE <- function(
   ## add transcript counts
   ##--------------------------------------------------------------------------##
 
-  ## get expression data
-  expression_data <- try(
-    SummarizedExperiment::assay(object, i = assay),
-    silent = TRUE
-  )
-
-  ## check if provided slot exists in provided assay
-  if (inherits(expression_data, 'try-error')) {
-    stop(
-      paste0(
-        'Assay `',
-        assay,
-        '` could not be found.'
-      ),
-      call. = FALSE
-    )
-  }
+  ## get expression data; the assay was checked above
+  expression_data <- SummarizedExperiment::assay(object, assay)
 
   ## convert expression data to "RleArray" if requested, if it is "dgCMatrix" or
   ## "matrix" format, and if the "DelayedArray" package is available
@@ -256,7 +241,7 @@ exportFromSCE <- function(
   }
 
   ## add expression data
-  export$setExpression(SummarizedExperiment::assay(object, assay))
+  export$setExpression(expression_data)
 
   ##--------------------------------------------------------------------------##
   ## collect some more data if present
