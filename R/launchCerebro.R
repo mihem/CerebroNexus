@@ -100,44 +100,31 @@ launchCerebro <- function(
       call. = FALSE
     )
   }
-  if (
-    !is.numeric(point_size) ||
-      length(point_size) != 1L ||
-      is.na(point_size) ||
-      !is.finite(point_size) ||
-      point_size < 1 ||
-      point_size > 20
-  ) {
-    stop(
-      "'point_size' parameter must be between 1 and 20",
-      call. = FALSE
-    )
-  }
-  if (
-    !is.numeric(point_opacity) ||
-      length(point_opacity) != 1L ||
-      is.na(point_opacity) ||
-      !is.finite(point_opacity) ||
-      point_opacity < 0.1 ||
-      point_opacity > 1
-  ) {
-    stop(
-      "'point_opacity' parameter must be between 0.1 and 1",
-      call. = FALSE
-    )
-  }
-  if (
-    !is.numeric(percentage_cells_to_show) ||
-      length(percentage_cells_to_show) != 1L ||
-      is.na(percentage_cells_to_show) ||
-      !is.finite(percentage_cells_to_show) ||
-      percentage_cells_to_show < 10 ||
-      percentage_cells_to_show > 100
-  ) {
-    stop(
-      "'percentage_cells_to_show' parameter must be between 10 and 100",
-      call. = FALSE
-    )
+  limits <- list(
+    point_size = c(1, 20),
+    point_opacity = c(0.1, 1),
+    percentage_cells_to_show = c(10, 100)
+  )
+  for (name in names(limits)) {
+    value <- get(name, inherits = FALSE)
+    limit <- limits[[name]]
+    if (
+      !is.numeric(value) ||
+        length(value) != 1L ||
+        !is.finite(value) ||
+        value < limit[[1]] ||
+        value > limit[[2]]
+    ) {
+      stop(
+        "'",
+        name,
+        "' parameter must be between ",
+        limit[[1]],
+        " and ",
+        limit[[2]],
+        call. = FALSE
+      )
+    }
   }
   if (projections_show_hover_info %in% c(TRUE, FALSE) == FALSE) {
     stop(
