@@ -84,8 +84,21 @@
       rotate: state.rotate - (Number(pr.rotation) || 0)
     };
   }
+  // Order-independent text for a background identity, so two equal identities
+  // compare equal however their object keys were ordered.
+  function canonicalIdentity(value) {
+    if (value == null) return '';
+    if (typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) {
+      return '[' + value.map(canonicalIdentity).join(',') + ']';
+    }
+    return '{' + Object.keys(value).sort().map(function (name) {
+      return JSON.stringify(name) + ':' + canonicalIdentity(value[name]);
+    }).join(',') + '}';
+  }
   window.CerebroBackgroundModel = Object.freeze({
     NONE: IMG_NONE,
+    canonicalIdentity: canonicalIdentity,
     images: spatialImages,
     currentImage: currentImage,
     stateKey: backgroundStateKey,

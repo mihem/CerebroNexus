@@ -37,8 +37,7 @@
 
   function currentContextKey() {
     var api = contextApi();
-    return api && api.key && api.phase && api.phase() === 'ready'
-      ? api.key(api.current()) : '';
+    return api ? api.readyKey() : '';
   }
 
   function currentState(id, api) {
@@ -53,8 +52,7 @@
       var id = detail && detail.viewId;
       var api = contextApi();
       var eventContext = detail && detail.dataset_context;
-      if (id && SPECS[id] && api && api.same &&
-          api.phase() === 'ready' && api.same(eventContext, api.current())) {
+      if (id && SPECS[id] && api && api.same(eventContext, api.readyContext())) {
         readyContexts[id] = api.key(eventContext);
       }
     });
@@ -226,28 +224,9 @@
           }, delay);
         });
         return { selectedCells: (config.selection.cells || []).length };
-      },
-      summary: function () {
-        var api = engine(spec);
-        var state = currentState(id, api);
-        var identity = window.cerebroSavedViewDataset || {};
-        var datasetContext = contextApi() && contextApi().current();
-        return {
-          ready: !!state,
-          datasetFingerprint: identity.cell_fingerprint || null,
-          datasetKey: datasetContext && datasetContext.dataset_key || null,
-          generation: datasetContext && datasetContext.generation || null,
-          selectedCells: state ? state.cells.length : 0,
-          page: spec.label
-        };
       }
     };
   }
 
-  window.cerebroSpecialistViews = Object.freeze({
-    get: adapter,
-    fromConfig: function (config) {
-      return config && config.page ? adapter(config.page.id) : null;
-    }
-  });
+  window.cerebroSpecialistViews = Object.freeze({ get: adapter });
 })();

@@ -194,13 +194,8 @@ if (window.jQuery) {
     if (!source || watchedIds.indexOf(source.id) < 0) return;
     const scope = source.closest('#spatial_projection_background_control_scope');
     if (!scope) return;
-    if (pendingFrame != null && window.cancelAnimationFrame) {
-      window.cancelAnimationFrame(pendingFrame);
-    }
-    const schedule = window.requestAnimationFrame || function (callback) {
-      return window.setTimeout(callback, 0);
-    };
-    pendingFrame = schedule(function () { sendSnapshot(scope, source); });
+    if (pendingFrame != null) window.cancelAnimationFrame(pendingFrame);
+    pendingFrame = window.requestAnimationFrame(function () { sendSnapshot(scope, source); });
   }
 
   // Shiny/ionRangeSlider emit jQuery change events for drags and server-side
@@ -221,18 +216,8 @@ if (window.jQuery) {
 // a code block. The textarea fallback keeps local HTTP Shiny sessions working,
 // where the secure Clipboard API may be unavailable.
 (function registerSpatialPresetCopy() {
-  function canonicalIdentity(value) {
-    if (value == null) return '';
-    if (typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) {
-      return '[' + value.map(canonicalIdentity).join(',') + ']';
-    }
-    return '{' + Object.keys(value).sort().map(function (name) {
-      return JSON.stringify(name) + ':' + canonicalIdentity(value[name]);
-    }).join(',') + '}';
-  }
-
   function stillCurrent(message) {
+    const canonicalIdentity = window.CerebroBackgroundModel.canonicalIdentity;
     const contextApi = window.CerebroDatasetContext;
     if (!contextApi || !contextApi.accepts || !contextApi.accepts(message)) {
       return false;

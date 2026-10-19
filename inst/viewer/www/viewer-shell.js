@@ -10,10 +10,7 @@
     var binding = window.jQuery(sidebar).data("shiny-input-binding");
     if (!binding) event.stopPropagation();
   }
-  ["transitionend", "webkitTransitionEnd", "otransitionend",
-    "oTransitionEnd", "msTransitionEnd"].forEach(function (name) {
-    document.addEventListener(name, guardSidebarTransition, true);
-  });
+  document.addEventListener("transitionend", guardSidebarTransition, true);
 
   var MOBILE_QUERY = "(max-width: 767px)";
   function ready(fn) {
@@ -392,30 +389,28 @@
         }, 1500);
       }
     }
-    function pruneBusyOutputs() {
-      busyOutputs.forEach(function (element) {
-        if (element.isConnected && element.getClientRects().length) return;
-        window.clearTimeout(element.__cerebroWaitTimer);
-        element.__cerebroWaitTimer = null;
-        element.classList.remove("cerebro-output-waiting");
-        element.removeAttribute("aria-busy");
-        secondaryStatus(element, "");
-        busyOutputs.delete(element);
-      });
-    }
-    function finish(element) {
-      if (!element || !element.classList) return;
+    function clearBusy(element) {
       window.clearTimeout(element.__cerebroWaitTimer);
       element.__cerebroWaitTimer = null;
       element.classList.remove("cerebro-output-waiting");
       element.removeAttribute("aria-busy");
       secondaryStatus(element, "");
       busyOutputs.delete(element);
-      pruneBusyOutputs();
+    }
+    // Drops outputs that were removed or hidden, then announces once none wait.
+    function settleBusyOutputs() {
+      busyOutputs.forEach(function (element) {
+        if (!element.isConnected || !element.getClientRects().length) clearBusy(element);
+      });
       if (updateAnnounced && !busyOutputs.size) {
         updateAnnounced = false;
         announce("Content updated");
       }
+    }
+    function finish(element) {
+      if (!element || !element.classList) return;
+      clearBusy(element);
+      settleBusyOutputs();
     }
     window.jQuery(document)
       .on("shiny:outputinvalidated.cerebroMotion", function (event) {
@@ -451,13 +446,7 @@
           secondaryStatus(event.target, "Unable to update this result. See the error below.", true);
         }
       })
-      .on("shown.bs.tab.cerebroMotion", function () {
-        pruneBusyOutputs();
-        if (updateAnnounced && !busyOutputs.size) {
-          updateAnnounced = false;
-          announce("Content updated");
-        }
-      });
+      .on("shown.bs.tab.cerebroMotion", settleBusyOutputs);
   });
 
   ready(function () {
@@ -525,6 +514,23 @@
       if (!pane) return;
       if (busy) pane.setAttribute("aria-busy", "true");
       else pane.removeAttribute("aria-busy");
+    }
+    function clearLoaderTimers() {
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    }
+    function hideLoader() {
+      if (announcement) announcement.textContent = '';
+      loader.classList.remove('is-visible');
+      loader.hidden = true;
+    }
+    // A page with nothing left to wait for releases its pane and loader at once.
+    function endTerminal(pane) {
+      pane.classList.remove('cerebro-page-initializing');
+      setBusy(pane, false);
+      hideLoader();
+      activePane = null;
     }
     function cancelScheduledFinish() {
       settleToken += 1;
@@ -617,9 +623,7 @@
       window.dispatchEvent(new CustomEvent("cerebro:page-ready"));
       if (pane !== activePane) return;
       if (announcement) announcement.textContent = '';
-      window.clearTimeout(slowTimer);
-      window.clearTimeout(showTimer);
-      window.clearTimeout(hideTimer);
+      clearLoaderTimers();
       loader.classList.remove("is-visible");
       hideTimer = window.setTimeout(function () {
         if (!loader.classList.contains("is-visible")) loader.hidden = true;
@@ -629,9 +633,7 @@
     function begin(pane) {
       if (!pane) return;
       cancelScheduledFinish();
-      window.clearTimeout(slowTimer);
-      window.clearTimeout(showTimer);
-      window.clearTimeout(hideTimer);
+      clearLoaderTimers();
       if (window.CerebroPageLifecycle.isReady(pane)) {
         if (activePane && activePane !== pane) setBusy(activePane, false);
         activePane = pane;
@@ -641,11 +643,7 @@
       if (activePane && activePane !== pane) setBusy(activePane, false);
       activePane = pane;
       if (window.CerebroPageLifecycle.isTerminal(pane)) {
-        pane.classList.remove('cerebro-page-initializing');
-        if (announcement) announcement.textContent = '';
-        setBusy(pane, false);
-        loader.classList.remove('is-visible'); loader.hidden = true;
-        activePane = null;
+        endTerminal(pane);
         return;
       }
       setBusy(pane, true);
@@ -654,9 +652,7 @@
       // owns its progress UI; a second page card before/after it adds no signal.
       // Keep busy/settled tracking so returning to the page still works normally.
       if (paneName(pane) === "loadData") {
-        if (announcement) announcement.textContent = "";
-        loader.classList.remove("is-visible");
-        loader.hidden = true;
+        hideLoader();
         return;
       }
       mountLoader(pane);
@@ -847,12 +843,8 @@
       var pane = document.getElementById('shiny-tab-' + event.detail.page);
       if (!pane || pane !== activePane) return;
       cancelScheduledFinish();
-      window.clearTimeout(slowTimer); window.clearTimeout(hideTimer); window.clearTimeout(showTimer);
-      pane.classList.remove('cerebro-page-initializing');
-      setBusy(pane, false);
-      if (announcement) announcement.textContent = '';
-      loader.classList.remove('is-visible'); loader.hidden = true;
-      activePane = null;
+      clearLoaderTimers();
+      endTerminal(pane);
     });
 
     var content = document.getElementById("main-content");
@@ -1050,6 +1042,23 @@
       return overlay;
     }
 
+    function setPercent(percent) {
+      overlay.querySelector(".cerebro-dataset-loading-track span").style.width =
+        percent + "%";
+      overlay.querySelector(".cerebro-dataset-loading-percent").textContent =
+        Math.round(percent) + "%";
+    }
+
+    function hideOverlay() {
+      if (overlay) {
+        overlay.hidden = true;
+        overlay.classList.remove("is-visible");
+      }
+      fadingOut = false;
+      document.body.classList.remove("cerebro-dataset-is-loading");
+      workspaceBusy(false);
+    }
+
     function elapsedText() {
       return ((window.performance.now() - startedAt) / 1000).toFixed(1) + " s";
     }
@@ -1098,10 +1107,7 @@
       // part for the painted page instead of displaying 100% while waiting.
       var percent = message.done && !awaitingView ? 100 :
         Math.max(0, Math.min(90, (Number(message.percent) || 0) * 0.9));
-      overlay.querySelector(".cerebro-dataset-loading-track span").style.width =
-        percent + "%";
-      overlay.querySelector(".cerebro-dataset-loading-percent").textContent =
-        Math.round(percent) + "%";
+      setPercent(percent);
       overlay.querySelector(".cerebro-dataset-loading-elapsed").textContent =
         elapsedText();
       if (message.done) {
@@ -1122,17 +1128,10 @@
         completion = null;
         window.clearTimeout(viewTimer);
         window.clearInterval(elapsedTimer);
-        var hide = function () {
-          overlay.hidden = true;
-          overlay.classList.remove("is-visible");
-          fadingOut = false;
-          document.body.classList.remove("cerebro-dataset-is-loading");
-          workspaceBusy(false);
-        };
         if (revealTimer !== null) {
           window.clearTimeout(revealTimer);
           revealTimer = null;
-          hide();
+          hideOverlay();
           return;
         }
         // Once shown, give the progress card time to read before fading out.
@@ -1141,7 +1140,7 @@
           overlay.classList.remove("is-visible");
           var reducedMotion = window.matchMedia &&
             window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          hideTimer = window.setTimeout(hide, reducedMotion ? 0 : 120);
+          hideTimer = window.setTimeout(hideOverlay, reducedMotion ? 0 : 120);
         }, Math.max(0, 240 - (window.performance.now() - visibleAt)));
       }
     }
@@ -1166,8 +1165,7 @@
         var input = document.getElementById("crb_file_selector");
         var selected = input && input.options[input.selectedIndex];
         begin(selected ? selected.textContent : "Dataset", "Updating dataset…");
-        overlay.querySelector(".cerebro-dataset-loading-track span").style.width = "0%";
-        overlay.querySelector(".cerebro-dataset-loading-percent").textContent = "0%";
+        setPercent(0);
       } else if (detail.phase === "error") {
         completion = null;
         // This event has already passed the context/selection freshness gate.
@@ -1175,9 +1173,7 @@
         window.clearTimeout(revealTimer);
         window.clearInterval(elapsedTimer);
         revealTimer = null;
-        if (overlay) { overlay.hidden = true; overlay.classList.remove("is-visible"); }
-        document.body.classList.remove("cerebro-dataset-is-loading");
-        workspaceBusy(false);
+        hideOverlay();
       }
     });
     function finishPage() {
@@ -1185,20 +1181,13 @@
     }
     window.addEventListener("cerebro:page-ready", finishPage);
     window.addEventListener("cerebro:view-terminal", finishPage);
+    // Only an upload starts the overlay here: the dataset selector reports
+    // through CerebroDatasetContext.beginSelection (the selectionPending event).
     document.addEventListener("change", function (event) {
       var input = event.target;
-      if (!input || (input.id !== "crb_file_selector" && input.id !== "input_file")) {
-        return;
-      }
-      if (input.id === "input_file" && !(input.files && input.files.length)) return;
-      // Selectize emits Shiny input events; beginSelection supplies immediate,
-      // deduplicated feedback for keyboard, mouse, and programmatic changes.
-      if (input.id === "crb_file_selector") return;
-      var selected = input.id === "crb_file_selector" &&
-        input.options[input.selectedIndex];
-      begin(selected ? selected.textContent : "Dataset", "Waiting for the server");
-      overlay.querySelector(".cerebro-dataset-loading-track span").style.width = "0%";
-      overlay.querySelector(".cerebro-dataset-loading-percent").textContent = "0%";
+      if (!input || input.id !== "input_file" || !(input.files && input.files.length)) return;
+      begin("Dataset", "Waiting for the server");
+      setPercent(0);
     });
     install();
   });

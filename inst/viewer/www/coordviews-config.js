@@ -19,12 +19,11 @@
   }
   function currentDatasetContext() {
     var api = datasetContextApi();
-    return api && api.phase && api.phase() === 'ready' ? api.current() : null;
+    return api ? api.readyContext() : null;
   }
   function currentDatasetContextKey() {
     var api = datasetContextApi();
-    var context = currentDatasetContext();
-    return api && api.key && context ? api.key(context) : '';
+    return api ? api.readyKey() : '';
   }
 
   function adapterFor(viewId) {
@@ -120,7 +119,7 @@
     }, 10000);
   }
 
-  function setReadyFor(viewId, ready, selectedCells) {
+  function setReadyFor(viewId, ready) {
     var buttons = document.querySelectorAll(
       '.cv-config-open[data-view-id="' + viewId + '"], ' +
       '.cerebro-config-open[data-view-id="' + viewId + '"]'
@@ -135,14 +134,9 @@
     refreshExportControls();
   }
 
-  function refreshActiveState() {
-    var state = adapter();
-    var summary = state && state.summary ? state.summary() : null;
-    setReadyFor(
-      activeViewId,
-      !!(state && state.ready && state.ready()),
-      summary && summary.selectedCells
-    );
+  function refreshReady(viewId) {
+    var state = adapterFor(viewId);
+    setReadyFor(viewId, !!(state && state.ready && state.ready()));
   }
 
   function updateDialogCopy() {
@@ -168,7 +162,7 @@
     if (!dialog || dialog.open) return;
     status('');
     updateDialogCopy();
-    refreshActiveState();
+    refreshReady(activeViewId);
     setUploadLoading(false);
     lastFocus = document.activeElement;
     dialog.showModal();
@@ -293,20 +287,16 @@
     var input = event && event.currentTarget;
     var file = input && input.files && input.files.length === 1
       ? input.files[0] : null;
+    function reject(message) {
+      if (input) input.value = '';
+      status(message, 'error');
+    }
     if (pending || typeof Shiny === 'undefined' || !Shiny.setInputValue) {
-      if (input) input.value = '';
-      status('The connection is not ready. Try again in a moment.', 'error');
-      return;
+      return reject('The connection is not ready. Try again in a moment.');
     }
-    if (!file || !/[.]json$/i.test(file.name || '')) {
-      if (input) input.value = '';
-      status('Choose one JSON file.', 'error');
-      return;
-    }
+    if (!file || !/[.]json$/i.test(file.name || '')) return reject('Choose one JSON file.');
     if (!isFinite(file.size) || file.size > 5 * 1024 * 1024) {
-      if (input) input.value = '';
-      status('The configuration is larger than 5 MiB.', 'error');
-      return;
+      return reject('The configuration is larger than 5 MiB.');
     }
     var nonce = nextNonce();
     startPending(nonce, 'apply');
@@ -318,8 +308,7 @@
       if (!pending || pending.nonce !== nonce) return;
       clearPending();
       setUploadLoading(false);
-      if (input) input.value = '';
-      status('The file could not be read. Try again.', 'error');
+      reject('The file could not be read. Try again.');
     };
     reader.onload = function () {
       if (!pending || pending.nonce !== nonce) return;
@@ -394,7 +383,7 @@
       if (cellViews && cellViews.attachDatasetIdentity) {
         cellViews.attachDatasetIdentity(identity);
       }
-      refreshActiveState();
+      refreshReady(activeViewId);
     });
     return true;
   }
@@ -441,23 +430,14 @@
     });
     window.addEventListener('cerebro:linkedviews-ready', function (event) {
       var detail = event.detail || {};
-      setReadyFor('linked_views', !!detail.ready, detail.selectedCells);
+      setReadyFor('linked_views', !!detail.ready);
     });
     window.addEventListener('cerebro:linkedviews-selection', function () {
-      var state = adapterFor('linked_views');
-      var summary = state && state.summary ? state.summary() : null;
-      setReadyFor(
-        'linked_views',
-        !!(state && state.ready && state.ready()),
-        summary && summary.selectedCells
-      );
+      refreshReady('linked_views');
     });
     window.addEventListener('cerebro:specialist-state', function (event) {
       var detail = event.detail || {};
-      window.setTimeout(function () {
-        var state = adapterFor(detail.viewId);
-        setReadyFor(detail.viewId, !!(state && state.ready()), detail.selectedCells);
-      }, 0);
+      window.setTimeout(function () { refreshReady(detail.viewId); }, 0);
     });
     window.addEventListener('cerebro:dataset-context', function (event) {
       var detail = event && event.detail || {};
@@ -466,11 +446,11 @@
       exportReady = false;
       refreshExportControls();
       document.querySelectorAll('.cv-config-open, .cerebro-config-open').forEach(function (button) {
-        setReadyFor(button.getAttribute('data-view-id'), false, 0);
+        setReadyFor(button.getAttribute('data-view-id'), false);
       });
     });
     window.addEventListener('cerebro:png-result', announceExternalPNG);
-    refreshActiveState();
+    refreshReady(activeViewId);
   }
 
   if (document.readyState === 'loading') {

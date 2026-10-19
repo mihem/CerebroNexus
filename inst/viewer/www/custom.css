@@ -529,27 +529,15 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
    that pushed the param panel and the plot far apart (a fat empty channel).
    Zero that inner padding so each box hugs its column edge — the flex `gap`
    above is then the ONLY space between the two panels. */
-.cerebro-viz-row > .cerebro-param-col > .col-sm-12,
 .cerebro-viz-row > .cerebro-viz-col > .col-sm-12,
 /* Spatial wraps its Main/Additional boxes in a <div> (for the histology-control
    insertion), so those boxes are a grandchild of the column, not a direct child.
    Zero their side padding too — otherwise they keep the default 15px box gutter
    while the unwrapped Group-filters box hugs the edge, and the two read as
    misaligned. */
-.cerebro-viz-row > .cerebro-param-col > div > .col-sm-12,
 .cerebro-viz-row > .cerebro-viz-col > div > .col-sm-12 {
   padding-left: 0 !important;
   padding-right: 0 !important;
-}
-/* Param column: fixed comfortable width, no grow/shrink. min keeps the heading +
-   info button on one line; max caps it so wide screens don't bloat it. */
-.cerebro-viz-row > .cerebro-param-col {
-  flex: 0 0 clamp(300px, 23%, 360px);
-  width: auto !important;        /* override Bootstrap .col-sm-3 width */
-  max-width: 360px;
-  min-width: 300px;
-  padding: 0 !important;         /* kill Bootstrap col gutter */
-  margin-right: 16px;            /* the ONLY space between the two panels */
 }
 /* Plot column: takes every remaining pixel. min-width:0 lets Plotly shrink
    below its content size instead of forcing overflow. */
@@ -577,8 +565,7 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 .cerebro-viz-top-layout > .cerebro-viz-toolbar-col {
   position: relative;
 }
-.cerebro-viz-top-layout > .cerebro-viz-toolbar-col:has(.selectize-input.dropdown-active),
-.cerebro-viz-top-layout > .cerebro-viz-toolbar-col:has(.bootstrap-select.open) {
+.cerebro-viz-top-layout > .cerebro-viz-toolbar-col:has(.selectize-input.dropdown-active) {
   z-index: 20;
 }
 .cerebro-viz-top-layout > .cerebro-viz-col > .col-sm-12 > .box {
@@ -725,45 +712,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   border-color: var(--c-amber) !important;
   box-shadow: 0 0 0 3px var(--c-amber-50) !important;
 }
-/* pickerInput() renders a .form-control wrapper around its real button. The
-   shared form-control rule above must not paint that wrapper too, or the button
-   appears inset inside a second border. */
-.cerebro-viz-toolbar .bootstrap-select.form-control,
-.cerebro-settings-drawer .bootstrap-select.form-control {
-  padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-}
-.cerebro-viz-toolbar .bootstrap-select.form-control {
-  height: var(--c-toolbar-control-height) !important;
-  min-height: var(--c-toolbar-control-height) !important;
-}
-.cerebro-settings-drawer .bootstrap-select.form-control {
-  height: auto !important;
-  min-height: 42px !important;
-}
-.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle,
-.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--c-border-2);
-  border-radius: var(--r-sm);
-  background: var(--c-surface);
-  color: var(--c-text);
-  font-size: 14px;
-  line-height: 22px;
-  box-shadow: none;
-}
-.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle {
-  height: var(--c-toolbar-control-height);
-  min-height: var(--c-toolbar-control-height);
-  padding: 6px 36px 6px 12px;
-}
-.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle {
-  height: 42px;
-  min-height: 42px;
-  padding: 9px 36px 9px 12px;
-}
 .cerebro-viz-primary .ir-flow-controls {
   display: flex;
   flex: 1 1 auto;
@@ -791,14 +739,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
   line-height: 1.25;
 }
 .cerebro-gene-validation strong { font-weight: 700; }
-.cerebro-viz-toolbar .bootstrap-select.open > .dropdown-toggle,
-.cerebro-viz-toolbar .bootstrap-select > .dropdown-toggle:focus,
-.cerebro-settings-drawer .bootstrap-select.open > .dropdown-toggle,
-.cerebro-settings-drawer .bootstrap-select > .dropdown-toggle:focus {
-  border-color: var(--c-amber);
-  outline: 0 !important;
-  box-shadow: 0 0 0 3px var(--c-amber-50);
-}
 .cerebro-settings-drawer .checkbox label {
   display: flex;
   align-items: center;
@@ -856,22 +796,6 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
 .cerebro-page-info-btn:focus-visible {
   border-color: var(--c-amber);
   background: var(--c-amber-100);
-}
-
-.cerebro-viz-toolbar .cerebro-toolbar-export {
-  height: var(--c-toolbar-control-height);
-  padding: 0 12px;
-  border-color: var(--c-border-2) !important;
-  border-radius: var(--r-sm);
-  background: var(--c-surface) !important;
-  color: var(--c-text-2) !important;
-  font-size: 13px;
-  font-weight: 650;
-}
-.cerebro-viz-toolbar .cerebro-toolbar-export:hover {
-  border-color: var(--c-amber-300) !important;
-  background: var(--c-amber-50) !important;
-  color: var(--c-amber-700) !important;
 }
 
 .cerebro-more-caret {
@@ -1252,19 +1176,8 @@ body .content { padding-left: 0 !important; padding-right: 0 !important; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Narrow viewports: stack the param panel above the plot rather than crushing
-   both. Below this width a side-by-side split isn't comfortable anyway. */
 @media (max-width: 900px) {
   .cerebro-viz-row { flex-wrap: wrap; }
-  .cerebro-viz-row > .cerebro-param-col {
-    flex: 1 1 100%;
-    max-width: none;
-    /* Drop the 300px floor once stacked: on a phone (or with the sidebar open
-       on a narrow screen) the content area can be < 300px, and a hard min-width
-       would push the panel wider than its container and scroll the page
-       sideways. Full-width-but-shrinkable is the correct stacked behaviour. */
-    min-width: 0;
-  }
 }
 
 /* -------------------------------------------------------------------------
@@ -1370,60 +1283,6 @@ body.skin-blue .left-side { min-width: 230px; }
   max-width: 720px;
 }
 
-/* Advanced settings block (Preferences) — sunk to the bottom, visually quieter
-   so novices read it as "optional, safe to ignore". Lighter text, a divider
-   above it, and a muted "advanced" tag on the heading. */
-.cerebro-advanced {
-  margin-top: 40px;
-  padding-top: 18px;
-  border-top: 1px dashed var(--c-border-2);
-  color: var(--c-text-2);
-}
-.cerebro-advanced h3 {
-  color: var(--c-text-2) !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-}
-.cerebro-advanced-tag {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--c-text-3);
-  background: var(--c-surface-2);
-  border-radius: var(--r-pill);
-  vertical-align: middle;
-}
-.cerebro-advanced-hint {
-  margin: 2px 0 12px;
-  font-size: 12.5px;
-  color: var(--c-text-3);
-}
-.cerebro-advanced .checkbox { margin: 10px 0; }
-.cerebro-advanced .checkbox label {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding-left: 0;
-  color: var(--c-text-2) !important;
-  font-weight: 450 !important;
-  text-align: left;
-}
-.cerebro-advanced .checkbox input[type="checkbox"] {
-  position: static;
-  flex: 0 0 auto;
-  margin: 3px 0 0;
-}
-.cerebro-advanced .help-block {
-  margin: -4px 0 10px 26px;
-  color: var(--c-text-3);
-  font-size: 12.5px;
-  text-align: left;
-}
-
 /* -------------------------------------------------------------------------
    Boxes — Console card: white, large radius, soft layered shadow
    ------------------------------------------------------------------------- */
@@ -1527,61 +1386,6 @@ body .nav-tabs-custom > .nav-tabs > li.active > a:focus {
 }
 body .nav-tabs-custom > .nav-tabs > li.active { border-top: none !important; }
 body .nav-tabs-custom > .tab-content { padding: 20px; background: var(--c-surface) !important; }
-
-/* -------------------------------------------------------------------------
-   valueBox / small-box / bg-boxes — Console stat card (white, big number)
-   Replaces AdminLTE's saturated solid-fill stat blocks with a calm white
-   card: large tabular number, muted label, stable position and shadow.
-   ------------------------------------------------------------------------- */
-body .small-box,
-body .small-box[class*="bg-"] {
-  background: var(--c-surface) !important;
-  color: var(--c-text) !important;
-  border: 1px solid var(--c-border) !important;
-  border-radius: var(--r-lg) !important;
-  box-shadow: var(--shadow-1) !important;
-  padding: 0;
-  min-height: auto;
-}
-body .small-box > .inner { padding: 20px 22px 18px !important; }
-body .small-box h3 {
-  color: var(--c-text) !important;
-  font-family: var(--font-sans) !important;
-  font-weight: 700 !important;
-  font-size: 34px !important;
-  line-height: 1.1 !important;
-  margin: 0 0 4px !important;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-body .small-box p {
-  color: var(--c-text-2) !important;
-  font-size: 12.5px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0 !important;
-  text-transform: none !important;
-  margin: 0 !important;
-  line-height: 1.4 !important;
-}
-/* Keep the decorative icon but fade + shrink it to a quiet corner glyph
-   tinted with the warm accent, instead of AdminLTE's huge ghost icon.
-   shinydashboard renders it as `.icon-large > i`, so target both. */
-body .small-box .icon,
-body .small-box .icon-large,
-body .small-box .icon-large > i,
-body .small-box .icon > i {
-  color: var(--c-amber) !important;
-  opacity: 0.18;
-  font-size: 42px !important;
-  top: 50% !important;
-  right: 18px !important;
-  transform: translateY(-50%);
-  transition: opacity var(--dur) var(--ease);
-}
-body .small-box:hover .icon,
-body .small-box:hover .icon-large,
-body .small-box:hover .icon-large > i { opacity: 0.28; }
-body .small-box .small-box-footer, body .small-box > a { display: none !important; }
 
 /* box(background = "...") — the Organism / Date cards on the Data-info page */
 body .box[class*="bg-"] {
@@ -1764,8 +1568,7 @@ body .selectize-input.focus {
 }
 body .selectize-input { padding: 7px 12px !important; min-height: 34px; }
 body select.form-control,
-body .selectize-control,
-body .bootstrap-select {
+body .selectize-control {
   min-inline-size: min(var(--c-select-min-width), 100%);
   max-inline-size: 100%;
 }
@@ -2635,23 +2438,6 @@ body .shiny-bound-output.cerebro-output-waiting {
   .cerebro-welcome > :first-child {
     font-size: 14px !important;
   }
-  body .small-box {
-    margin-bottom: 10px;
-  }
-  body .small-box > .inner {
-    padding: 12px 14px 10px !important;
-  }
-  body .small-box h3 {
-    margin-bottom: 2px !important;
-    font-size: 24px !important;
-  }
-  body .small-box .icon,
-  body .small-box .icon-large,
-  body .small-box .icon-large > i,
-  body .small-box .icon > i {
-    right: 12px !important;
-    font-size: 32px !important;
-  }
   html body.skin-blue .main-header,
   html body.skin-blue .main-header .navbar {
     display: block !important;
@@ -3255,8 +3041,7 @@ body .shiny-bound-output.cerebro-output-waiting {
 /* Layout controls follow Info in the heading, wrapping only when needed. */
 .cerebro-page-feedback { display: flex; align-items: center; gap: 12px; }
 .cerebro-page-feedback[hidden] { display: none; }
-.cerebro-page-initializing .cerebro-viz-toolbar,
-.cerebro-page-initializing .cv-controls { visibility: hidden; }
+.cerebro-page-initializing .cerebro-viz-toolbar { visibility: hidden; }
 .cerebro-page-initializing .cerebro-page-feedback,
 .cerebro-page-initializing #expression_feedback { display: none; }
 #shiny-tab-groups:has([data-composition-unavailable]) > .row:has(#groups_by_other_group_plot) {
@@ -3266,7 +3051,6 @@ body .shiny-bound-output.cerebro-output-waiting {
 #cerebro-startup [hidden] { display: none !important; }
 #cerebro-startup svg { width: 200px; height: auto; display: block; }
 .cerebro-groups-controls:has([data-composition-unavailable]) { min-height: 0; }
-.cerebro-feedback-text { flex: 1; min-width: 0; }
 .cerebro-viz-page-heading:has(.cerebro-page-feedback:not([hidden])) {
   flex-wrap: wrap;
 }

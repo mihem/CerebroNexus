@@ -250,16 +250,7 @@
   function singleRequestKey(id, context) {
     return singleCacheKey(id, context);
   }
-  function canonicalIdentity(value) {
-    if (value == null) return '';
-    if (typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) {
-      return '[' + value.map(canonicalIdentity).join(',') + ']';
-    }
-    return '{' + Object.keys(value).sort().map(function (name) {
-      return JSON.stringify(name) + ':' + canonicalIdentity(value[name]);
-    }).join(',') + '}';
-  }
+  var canonicalIdentity = backgrounds.canonicalIdentity;
 
   // Categorical fallback palette (mirrors the app).
   var PAL = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3',
@@ -297,13 +288,6 @@
     p.description = description;
     if (p.mini) p.mini.setAttribute('aria-hidden', 'true');
     updateCanvasDescription(p);
-  }
-
-  function cssEscape(value) {
-    if (window.CSS && typeof window.CSS.escape === 'function') {
-      return window.CSS.escape(String(value));
-    }
-    return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   }
 
   // RGB co-expression: cells whose max channel is <= RGB_MIN form a light-grey
@@ -1006,7 +990,7 @@
         }
       }
     }
-    p._SX = SX; p._SY = SY; p._S = Math.min(SX, SY);
+    p._SX = SX; p._SY = SY;
     p._sox = ox; p._soy = oy;                // for dataToScreen (image bounds)
     if (!forceCpu && gpuCandidate(p)) {
       p.ok = u.ok;
@@ -1102,6 +1086,11 @@
     if (p.gpuTransformOnly) project(p, true);
   }
 
+  // The panel's data rectangle on screen, as CBGeom and the GPU renderers take it.
+  function panelRect(p) {
+    return { x: p._sox, y: p._soy, width: p._SX, height: p._SY };
+  }
+
   // A committed brush is part of the data conversation, not a decoration at a
   // particular canvas pixel. Keep it in unit coordinates so a Focus reflow (or
   // any other resize) sends the outline through the exact same projection as
@@ -1109,17 +1098,13 @@
   // moving, because hit testing happens against the already-projected cells.
   function lassoToUnit(p, lasso) {
     if (!lasso || !p._SX || !p._SY) return null;
-    return CBGeom.screenToUnit(p.view, {
-      x: p._sox, y: p._soy, width: p._SX, height: p._SY
-    }, lasso);
+    return CBGeom.screenToUnit(p.view, panelRect(p), lasso);
   }
   function lassoToScreen(p) {
     var lasso = p.lassoData || p.lasso;
     if (!lasso || !p._SX || !p._SY) return lasso;
     if (!p.lassoData) return lasso;
-    return CBGeom.unitToScreen(p.view, {
-      x: p._sox, y: p._soy, width: p._SX, height: p._SY
-    }, lasso);
+    return CBGeom.unitToScreen(p.view, panelRect(p), lasso);
   }
 
   // The rotation project() applies, as a function. Anything that has to land
@@ -1788,7 +1773,7 @@
       rgbG: D.rgb && D.rgb.g,
       rgbB: D.rgb && D.rgb.b,
       fieldValues: field && field.v,
-      fieldColors: field && field.colors && field.colors.join(','),
+      fieldColors: field && field.colors,
       fieldPalette: field && field.palette && field.palette.join(','),
       fieldConstantColor: field && field.constantColor,
       groupValues: group && group.values,
@@ -1842,11 +1827,8 @@
     var stats = renderer.stats ? renderer.stats() : {};
     if (stats.backend === 'webgl2') return false;
     var previous = p.gpuCanvas;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-gpu-layer';
-    canvas.style.display = 'none';
-    canvas.setAttribute('aria-hidden', 'true');
     if (!previous.parentNode) return false;
+    var canvas = createLayerCanvas(null, 'cv-gpu-layer');
     previous.parentNode.replaceChild(canvas, previous);
     try {
       p.gpuCanvas = canvas;
@@ -1862,41 +1844,31 @@
     }
   }
 
+  // Swaps the panel's failed renderer for WebGL2, or drops it to Canvas.
+  // Returns whether a GPU renderer is still attached.
+  function failOver(p) {
+    if (replaceGpuWithWebGl(p, p.gpu)) { watchGpu(p, p.gpu); return true; }
+    disableGpu(p);
+    return false;
+  }
+
   function watchGpu(p, renderer) {
-    renderer.failed.then(function () {
+    function failed() {
       if (p.gpu !== renderer) return;
-      if (replaceGpuWithWebGl(p, renderer)) {
-        watchGpu(p, p.gpu);
-        if (D && p.spaceId) draw(p);
-        return;
-      }
-      disableGpu(p);
+      failOver(p);
       if (D && p.spaceId) draw(p);
-    });
+    }
+    renderer.failed.then(failed);
     renderer.ready.then(function () {
-      if (p.gpu !== renderer) return;
-      if (D && p.spaceId) draw(p);
-    }).catch(function () {
-      if (p.gpu !== renderer) return;
-      if (replaceGpuWithWebGl(p, renderer)) {
-        watchGpu(p, p.gpu);
-        if (D && p.spaceId) draw(p);
-        return;
-      }
-      disableGpu(p);
-      if (D && p.spaceId) draw(p);
-    });
+      if (p.gpu === renderer && D && p.spaceId) draw(p);
+    }).catch(failed);
   }
 
   function attachGpu(p) {
     if (!gpuAcceleration || p.gpu) return;
     if (!window.CerebroPointRenderer || !window.CerebroPointRenderer.create) return;
     if (p.gpuCanvas) p.gpuCanvas.remove();
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-gpu-layer';
-    canvas.style.display = 'none';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-gpu-layer');
     try {
       p.gpuCanvas = canvas;
       p.gpu = window.CerebroPointRenderer.create(canvas);
@@ -1960,12 +1932,20 @@
     if (help && help.textContent !== title) help.textContent = title;
   }
 
+  // A canvas layer hidden from assistive technology; given a panel, it is
+  // stacked directly above that panel's canvas. GPU layers start hidden.
+  function createLayerCanvas(p, cls) {
+    var canvas = document.createElement('canvas');
+    canvas.className = cls;
+    canvas.setAttribute('aria-hidden', 'true');
+    if (cls === 'cv-gpu-layer') canvas.style.display = 'none';
+    if (p) p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    return canvas;
+  }
+
   function attachUnderlay(p) {
     if (p.underlayCanvas) return;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-underlay-layer';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-underlay-layer');
     p.underlayCanvas = canvas;
     p.underlayCtx = canvas.getContext('2d');
     syncPanelOverlay(p);
@@ -1980,10 +1960,7 @@
   // trajectory's complete edge set and point cloud.
   function attachInteractionLayer(p) {
     if (p.interactionCanvas) return;
-    var canvas = document.createElement('canvas');
-    canvas.className = 'cv-interaction-layer';
-    canvas.setAttribute('aria-hidden', 'true');
-    p.canvas.parentNode.insertBefore(canvas, p.canvas.nextSibling);
+    var canvas = createLayerCanvas(p, 'cv-interaction-layer');
     p.interactionCanvas = canvas;
     p.interactionCtx = canvas.getContext('2d');
     if (p.W && p.H) {
@@ -2181,18 +2158,12 @@
       p.gpu.setData(data);
       ok = p.gpu.draw({
         view: p.view || { cx: 0.5, cy: 0.5, span: 1 },
-        rect: { x: p._sox, y: p._soy, width: p._SX, height: p._SY },
+        rect: panelRect(p),
         pointSize: p._renderPointSize,
         border: border ? { color: gpuColor(border.color), width: border.width } : null
       });
     } catch (error) {
-      var failedRenderer = p.gpu;
-      if (replaceGpuWithWebGl(p, failedRenderer)) {
-        watchGpu(p, p.gpu);
-        return drawGpuPoints(p, shownMask, shownCount, border);
-      }
-      disableGpu(p);
-      return false;
+      return failOver(p) && drawGpuPoints(p, shownMask, shownCount, border);
     }
     if (!ok) { disableGpu(p); return false; }
     setGpuLayerVisible(p, true);
@@ -2587,9 +2558,8 @@
     // at query time, so filters, hidden groups and selections stay current.
     if (D.n >= GPU_MIN_CELLS && unit && !unit.nz && !unit._pending &&
         unit.nx && unit.ny && unit.ok && p._SX > 0 && p._SY > 0) {
-      return CBGeom.nearestInGrid(CBGeom.pointGrid(unit, D.n), p.view, {
-        x: p._sox, y: p._soy, width: p._SX, height: p._SY
-      }, mx, my, function (i) { return shown(i, p); });
+      return CBGeom.nearestInGrid(CBGeom.pointGrid(unit, D.n), p.view,
+        panelRect(p), mx, my, function (i) { return shown(i, p); });
     }
     ensureScreenProjection(p);
     var best = -1, bd = 200, n = D.n, i;
@@ -3219,110 +3189,89 @@
   function reportSelection(eventKind) {
     eventKind = eventKind || 'interaction';
     var hasSelection = !!(sel && sel.size);
-    var specialistReport = singleActive
-      ? window.CBViewState.specialistSelectionReport(
-        sel,
-        D && D.cells,
-        D && D.n
-      )
-      : null;
-    var pendingStableSelection = !!(specialistReport && specialistReport.pending);
-    var arr = null;
-    if (specialistReport) {
-      arr = specialistReport.ids;
-    } else if (hasSelection && Array.isArray(D && D.cells)) {
-      arr = [];
-      sel.forEach(function (i) { arr.push(D.cells[i]); });
-    }
-    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {
-      if (singleActive) {
-        // Stable IDs identify the selection on their own. Send coordinates
-        // only as the fallback key when some selected cell has no ID.
-        var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
-        var needCoordinates = arr && arr.some(function (id) {
-          return id == null || id === '';
-        });
-        if (needCoordinates && sp) sel.forEach(function (i) {
-          x.push(sp.x[i]); y.push(sp.y[i]);
-        });
-        // Large specialist views paint before their stable cell IDs arrive.
-        // Publish null during that window so every selected-cell result UI is
-        // gated off instead of retaining stale/empty Plot and Table shells.
-        // onSingleAuxBinary() reports only the then-current selection as soon
-        // as the deferred IDs have been attached.
-        var activeView = singleView(singleActive);
-        Shiny.setInputValue(singleActive + '_persistent_selection', {
-          x: pendingStableSelection || !arr ? [] : x,
-          y: pendingStableSelection || !arr ? [] : y,
-          ids: pendingStableSelection || !arr ? [] : arr,
-          dataset_context: activeView && activeView.dataset_context
-        });
-        var renderKey = activeView && activeView.data && activeView.data.render_key;
-        if (eventKind === 'primary' && renderKey != null) {
-          Shiny.setInputValue(singleActive + '_rendered_state', {
-            render_key: String(renderKey),
-            dataset_context: activeView.dataset_context
-          }, { priority: 'event' });
-          Shiny.setInputValue(
-            singleActive + '_rendered_key',
-            String(renderKey),
-            { priority: 'event' }
-          );
-        }
-      } else {
+    var shiny = typeof Shiny !== 'undefined' && Shiny.setInputValue;
+    if (!singleActive) {
+      if (shiny) {
         Shiny.setInputValue('coordviews_selection_indices', {indices:hasSelection ? Array.from(sel) : [], dataset_context:D && D.dataset_context});
       }
+      window.dispatchEvent(new CustomEvent('cerebro:linkedviews-selection', {
+        detail: { selectedCells: hasSelection ? sel.size : 0, dataset_context: D && D.dataset_context }
+      }));
+      return;
     }
-    if (singleActive) {
-      var guide = $(singleActive + '_selection_guide');
-      var active = $(singleActive + '_selection_active');
-      if (guide) guide.classList.toggle('cerebro-selection-status-hidden', hasSelection);
-      if (active) active.classList.toggle('cerebro-selection-status-hidden', !hasSelection);
+    var specialistReport = window.CBViewState.specialistSelectionReport(
+      sel, D && D.cells, D && D.n
+    );
+    var pendingStableSelection = specialistReport.pending;
+    var arr = specialistReport.ids;
+    // The specialist-state event below reports these with or without Shiny.
+    var activeView = singleView(singleActive);
+    var renderKey = activeView && activeView.data && activeView.data.render_key;
+    if (shiny) {
+      // Stable IDs identify the selection on their own. Send coordinates
+      // only as the fallback key when some selected cell has no ID.
+      var sp = spaceById[singleSpaceIds[0]], x = [], y = [];
+      var needCoordinates = arr && arr.some(function (id) {
+        return id == null || id === '';
+      });
+      if (needCoordinates && sp) sel.forEach(function (i) {
+        x.push(sp.x[i]); y.push(sp.y[i]);
+      });
+      // Large specialist views paint before their stable cell IDs arrive.
+      // Publish null during that window so every selected-cell result UI is
+      // gated off instead of retaining stale/empty Plot and Table shells.
+      // onSingleAuxBinary() reports only the then-current selection as soon
+      // as the deferred IDs have been attached.
+      Shiny.setInputValue(singleActive + '_persistent_selection', {
+        x: pendingStableSelection || !arr ? [] : x,
+        y: pendingStableSelection || !arr ? [] : y,
+        ids: pendingStableSelection || !arr ? [] : arr,
+        dataset_context: activeView && activeView.dataset_context
+      });
+      if (eventKind === 'primary' && renderKey != null) {
+        Shiny.setInputValue(singleActive + '_rendered_state', {
+          render_key: String(renderKey),
+          dataset_context: activeView.dataset_context
+        }, { priority: 'event' });
+        Shiny.setInputValue(
+          singleActive + '_rendered_key',
+          String(renderKey),
+          { priority: 'event' }
+        );
+      }
     }
-    var datasetFingerprint = singleActive && D
+    var guide = $(singleActive + '_selection_guide');
+    var active = $(singleActive + '_selection_active');
+    if (guide) guide.classList.toggle('cerebro-selection-status-hidden', hasSelection);
+    if (active) active.classList.toggle('cerebro-selection-status-hidden', !hasSelection);
+    var datasetFingerprint = D
       ? String(D.dataset_fingerprint || D.cell_fingerprint || '')
       : '';
-    if (singleActive &&
-        !/^md5-cell-set-v1:[0-9a-f]{32}$/.test(datasetFingerprint)) return;
-    var specialistTiming = null;
-    if (singleActive) {
-      var timing = singleTiming[singleActive] || {};
-      var readyAt = performance.now();
-      specialistTiming = CBViewState.specialistLifecycle.ready(
-        singleTiming, singleActive, readyAt
-      );
-    }
-    var renderedPointCount = 0;
-    if (singleActive) {
-      var renderedPanel = panels.filter(function (panel) {
-        return panel && panel.spaceId && panel.canvas;
-      })[0];
-      renderedPointCount = Number(
+    if (!/^md5-cell-set-v1:[0-9a-f]{32}$/.test(datasetFingerprint)) return;
+    var timing = singleTiming[singleActive] || {};
+    var specialistTiming = CBViewState.specialistLifecycle.ready(
+      singleTiming, singleActive, performance.now()
+    );
+    var renderedPanel = panels.filter(function (panel) {
+      return panel && panel.spaceId && panel.canvas;
+    })[0];
+    window.dispatchEvent(new CustomEvent('cerebro:specialist-state', { detail: {
+      viewId: singleActive,
+      dataset_context: activeView && activeView.dataset_context,
+      selectedCells: specialistReport.selectedCells,
+      selectionPending: pendingStableSelection,
+      datasetFingerprint: datasetFingerprint,
+      eventKind: eventKind,
+      renderKey: renderKey == null ? null : String(renderKey),
+      generation: Number(timing.generation) || 0,
+      benchmarkGeneration:
+        Number(window.__cerebroPageBenchGeneration) || 0,
+      renderRequestSent: !!timing.renderRequestSent,
+      renderedPointCount: Number(
         renderedPanel && renderedPanel.canvas.dataset.pointCount
-      ) || 0;
-    }
-    window.dispatchEvent(new CustomEvent(
-      singleActive ? 'cerebro:specialist-state' : 'cerebro:linkedviews-selection',
-      { detail: singleActive
-        ? {
-          viewId: singleActive,
-          dataset_context: activeView && activeView.dataset_context,
-          selectedCells: specialistReport
-            ? specialistReport.selectedCells
-            : (hasSelection ? sel.size : 0),
-          selectionPending: pendingStableSelection,
-          datasetFingerprint: datasetFingerprint,
-          eventKind: eventKind,
-          renderKey: renderKey == null ? null : String(renderKey),
-          generation: Number(timing.generation) || 0,
-          benchmarkGeneration:
-            Number(window.__cerebroPageBenchGeneration) || 0,
-          renderRequestSent: !!timing.renderRequestSent,
-          renderedPointCount: renderedPointCount,
-          timing: specialistTiming
-        }
-        : { selectedCells: hasSelection ? sel.size : 0, dataset_context: D && D.dataset_context } }
-    ));
+      ) || 0,
+      timing: specialistTiming
+    } }));
   }
 
   function attachSingleDatasetIdentity(identity) {
@@ -3825,12 +3774,17 @@
       singlePayload.data.panel_colorscales &&
       Object.keys(singlePayload.data.panel_colorscales).length > 1);
     renderPanelScales(distinctPanels);
+    function item(className, html) {
+      var d = document.createElement('div');
+      d.className = className;
+      d.innerHTML = html;
+      L.appendChild(d);
+      return d;
+    }
     function appendEvidenceLegend() {
-      if (!evidenceOn) return;
-      var e = document.createElement('div');
-      e.className = 'cv-lg cv-rgb-lg';
-      e.innerHTML = '<span class="cv-evidence-dot"></span>Positioning evidence';
-      L.appendChild(e);
+      if (evidenceOn) {
+        item('cv-lg cv-rgb-lg', '<span class="cv-evidence-dot"></span>Positioning evidence');
+      }
     }
     // Continuous modes: colourbar for a single gene; nothing for RGB.
     if (colorBy === GENE_MODE) {
@@ -3867,10 +3821,8 @@
     if (fld && fld.colors) {
       renderColorbar(false);
       (fld.channelLabels || []).forEach(function (label, index) {
-        var d = document.createElement('div'); d.className = 'cv-lg cv-rgb-lg';
-        d.innerHTML = '<span class="cv-dot" style="background:' +
-          cssColor((fld.channelColors || [])[index]) + '"></span>' + esc(label);
-        L.appendChild(d);
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          cssColor((fld.channelColors || [])[index]) + '"></span>' + esc(label));
       });
       return;
     }
@@ -3887,25 +3839,17 @@
       var genes = (D.rgb && D.rgb.genes) || ['', '', ''];
       chans.forEach(function (ch, k) {
         var gene = genes[k] || '';
-        var d = document.createElement('div');
-        d.className = 'cv-lg cv-rgb-lg' + (gene ? '' : ' off');
-        d.innerHTML = '<span class="cv-dot" style="background:' + ch[1] + '"></span>' +
+        item('cv-lg cv-rgb-lg' + (gene ? '' : ' off'),
+          '<span class="cv-dot" style="background:' + ch[1] + '"></span>' +
           '<b style="color:' + ch[1] + '">' + ch[0] + '</b> ' +
-          (gene ? esc(gene) : '<span class="cv-rgb-none">not set</span>');
-        L.appendChild(d);
+          (gene ? esc(gene) : '<span class="cv-rgb-none">not set</span>'));
       });
       [
-        ['Low expression', RGB_GREY, ''],
-        ['R + G', '#ffff00', ''],
-        ['R + B', '#ff00ff', ''],
-        ['G + B', '#00ffff', ''],
-        ['R + G + B', '#000000', '']
+        ['Low expression', RGB_GREY], ['R + G', '#ffff00'], ['R + B', '#ff00ff'],
+        ['G + B', '#00ffff'], ['R + G + B', '#000000']
       ].forEach(function (blend) {
-        var d = document.createElement('div');
-        d.className = 'cv-lg cv-rgb-lg';
-        d.innerHTML = '<span class="cv-dot' + blend[2] + '" style="background:' +
-          blend[1] + '"></span>' + blend[0];
-        L.appendChild(d);
+        item('cv-lg cv-rgb-lg', '<span class="cv-dot" style="background:' +
+          blend[1] + '"></span>' + blend[0]);
       });
       var note = document.createElement('div');
       note.className = 'cv-rgb-note';
@@ -3921,15 +3865,13 @@
     for (var i = 0; i < D.n; i++) counts[g.values[i]] = (counts[g.values[i]] || 0) + 1;
     g.levels.forEach(function (nm, li) {
       var col = cssColor((g.colors && g.colors[li]) || PAL[li % PAL.length]);
-      var d = document.createElement('div');
-      d.className = 'cv-lg' + (hidden.has(li) ? ' off' : '');
-      d.innerHTML = '<span class="cv-dot" style="background:' + col + '"></span>' +
-        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>';
-      d.onclick = function () {
+      item('cv-lg' + (hidden.has(li) ? ' off' : ''),
+        '<span class="cv-dot" style="background:' + col + '"></span>' +
+        esc(nm) + ' <span class="cv-lg-ct">(' + (counts[li] || 0) + ')</span>'
+      ).onclick = function () {
         if (hidden.has(li)) hidden.delete(li); else hidden.add(li);
         reportSingleHiddenGroups(); renderLegend(); drawAll();
       };
-      L.appendChild(d);
     });
     appendEvidenceLegend();
   }
@@ -4359,28 +4301,20 @@
   }
 
   function openCard(p, i) {
+    cardCell = i;
+    cardRequest = null;
+    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
+    renderCard();
     if (D && D.trekker) {
-      openTrekkerInspector(i);
-      return;
+      // Trekker shows the cell in its insights inspector, not a floating card.
+      openTrekkerInsights('cell');
+    } else {
+      // The tooltip has just been promoted into the card — leaving it up would
+      // show the same cell twice, once truncated. It returns on the next hover.
+      unpinTip();
+      cardFlyFrom(p, i);
     }
-    cardCell = i;
-    cardRequest = null;
-    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
-    renderCard();
-    // The tooltip has just been promoted into the card — leaving it up would
-    // show the same cell twice, once truncated. It returns on the next hover.
-    unpinTip();
-    cardFlyFrom(p, i);
     // ask for the exact meta row; the card is already on screen either way
-    requestCardMetadata();
-  }
-
-  function openTrekkerInspector(i) {
-    cardCell = i;
-    cardRequest = null;
-    if (!cardMeta || cardMeta.index !== i) cardMeta = null;
-    renderCard();
-    openTrekkerInsights('cell');
     requestCardMetadata();
   }
 
@@ -4644,7 +4578,6 @@
       if (e.target.closest && e.target.closest('button, select, input, a, .cv-tip')) return;
       clearTransientHover();
       requestSingleAux();
-      if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
       // A rotatable panel NAVIGATES; it does not select. Selection here is done
       // on screen coordinates, and once the cloud has depth those stop being a
       // faithful key to it: cells at different depths overlap on screen, so a
@@ -4820,6 +4753,24 @@
     }
   }
 
+  // Pane-level gestures: any press in a spatial pane makes its section the
+  // active one; its title (click) or plot (double-click) focuses the panel.
+  function wirePane(p) {
+    p.pane.addEventListener('mousedown', function () {
+      if (isSpatialSpace(spaceById[p.spaceId])) activateSpatial(p.spaceId);
+    });
+    p.pane.addEventListener('click', function (e) {
+      if (e.target.closest('.cv-ptitle') && canFocusPanel() && p.spaceId) {
+        setFocusPanel(p.key);
+      }
+    });
+    p.pane.addEventListener('dblclick', function (e) {
+      if (!e.target.closest('.cv-canvas-wrap') || !canFocusPanel() || !p.spaceId) return;
+      e.preventDefault();
+      setFocusPanel(p.key);
+    });
+  }
+
   // The canvas elements persist across dataset switches, so panel objects and
   // their event listeners are created EXACTLY ONCE. Re-wiring on every onData
   // would stack duplicate listeners whose stale closures fire on unprojected
@@ -4853,37 +4804,7 @@
       }
       panels.push(p);
       wireHover(p); wireBrush(p);
-      if (p.pane) {
-        p.pane.addEventListener('mousedown', function () {
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (found && isSpatialSpace(spaceById[found.spaceId])) {
-            activateSpatial(found.spaceId);
-          }
-        });
-        p.pane.addEventListener('click', function (e) {
-          if (!e.target.closest('.cv-ptitle')) return;
-          if (!canFocusPanel()) return;
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (found && found.spaceId) setFocusPanel(found.key);
-        });
-        p.pane.addEventListener('dblclick', function (e) {
-          if (!e.target.closest('.cv-canvas-wrap')) return;
-          if (!canFocusPanel()) return;
-          var pane = this, found = null;
-          panels.forEach(function (candidate) {
-            if (candidate.pane === pane) found = candidate;
-          });
-          if (!found || !found.spaceId) return;
-          e.preventDefault();
-          setFocusPanel(found.key);
-        });
-      }
+      if (p.pane) wirePane(p);
       if (resizeObserver && p.pane) resizeObserver.observe(p.pane);
     }
     // Re-project + redraw whenever the panes gain/lose size — critically, when
@@ -5218,7 +5139,7 @@
     D.gene = null;
     clipRange();
     if (colorBy === GENE_MODE) {
-      renderColorbar(true, null, 'loading ' + esc(gene) + '…');
+      renderColorbar(true, null, 'loading ' + gene + '…');
     }
   }
 
@@ -7086,12 +7007,10 @@
         return response.arrayBuffer();
       }).then(function (buffer) {
         var downloadedAt = performance.now();
-        var value = decode(buffer);
-        return {
-          value: value,
+        return Object.assign(decode(buffer), {
           downloadMs: downloadedAt - downloadStarted,
           decodeMs: performance.now() - downloadedAt
-        };
+        });
       });
       cache.set(key, pending);
       pending.catch(function () {
@@ -7100,14 +7019,11 @@
       });
     }
     var started = performance.now();
+    // The decoded entry is shared by every caller; timings are per call.
     return pending.then(function (entry) {
-      return {
-        value: entry.value,
-        downloadMs: entry.downloadMs,
-        decodeMs: entry.decodeMs,
-        fetchMs: performance.now() - started,
-        cacheHit: cacheHit
-      };
+      return Object.assign({}, entry, {
+        fetchMs: performance.now() - started, cacheHit: cacheHit
+      });
     });
   }
   var projectionResourceCache = new Map();
@@ -7145,22 +7061,14 @@
           }
           if (z) z[i] = interleaved[offset + 2];
         }
-        return {
+        return {coordinates: {
           x: x, y: y, z: z,
           xRange: !z && isFinite(x0) && x1 > x0 ? [x0, x1] : null,
           yRange: !z && isFinite(y0) && y1 > y0 ? [y0, y1] : null,
           bytes: buffer.byteLength
-        };
+        }};
       }
-    ).then(function (loaded) {
-      return {
-        coordinates: loaded.value,
-        fetchMs: loaded.fetchMs,
-        downloadMs: loaded.downloadMs,
-        decodeMs: loaded.decodeMs,
-        cacheHit: loaded.cacheHit
-      };
-    });
+    );
   }
   var projectionSubsetResourceCache = new Map();
   function canonicalResourceIdentityMatches(resource, identity) {
@@ -7386,14 +7294,7 @@
         }
         return {kind: kind, indices: indices, bytes: buffer.byteLength};
       }
-    ).then(function (loaded) {
-      var result = loaded.value;
-      return {
-        kind: result.kind, indices: result.indices, bytes: result.bytes,
-        downloadMs: loaded.downloadMs, decodeMs: loaded.decodeMs,
-        fetchMs: loaded.fetchMs, cacheHit: loaded.cacheHit
-      };
-    });
+    );
   }
   function materializeProjectionSubset(coordinates, subset, expectedCells) {
     var started = performance.now();
@@ -7707,11 +7608,7 @@
         }
         return { values: values, bytes: buffer.byteLength };
       }
-    ).then(function (loaded) {
-      var result = loaded.value;
-      return { values: result.values, bytes: result.bytes,
-        fetchMs: loaded.fetchMs };
-    });
+    );
   }
   function fetchMetadataCodesResource(resource, expectedCells) {
     var descriptor = window.CBViewState.resourceDescriptor.validate(resource, {
@@ -7747,11 +7644,7 @@
         }
         return { values: values, bytes: buffer.byteLength };
       }
-    ).then(function (loaded) {
-      var result = loaded.value;
-      return { values: result.values, bytes: result.bytes,
-        fetchMs: loaded.fetchMs };
-    });
+    );
   }
   function fetchValidatedMetadataCodesResource(resource, expectedCells, identity) {
     if (resource && resource.protocol === 'canonical-metadata-codes-v1' &&
@@ -7783,15 +7676,7 @@
       hydrateLinkedProjectionResource(bundle),
       hydrateLinkedMetadataResource(bundle)
     ]).then(function (results) {
-      return {
-        bundle: bundle,
-        projectionFetchMs: results[0].projectionFetchMs,
-        projectionBytes: results[0].projectionBytes,
-        projectionDownloadMs: results[0].projectionDownloadMs,
-        projectionDecodeMs: results[0].projectionDecodeMs,
-        metadataFetchMs: results[1].metadataFetchMs,
-        metadataBytes: results[1].metadataBytes
-      };
+      return Object.assign({}, results[0], results[1]);
     });
   }
   function canonicalGroupedValues(grouped, groups, fallback) {
@@ -7824,6 +7709,12 @@
         };
       }
     }
+    var traces = nested && Array.isArray(data.meta.traces) ? data.meta.traces : [];
+    var levels = traces.map(String);
+    var colors = traces.map(function (name, group) {
+      var colour = data.data.color && data.data.color[group];
+      return String(Array.isArray(colour) ? colour[0] : colour || '#7b8794');
+    });
     if (nested) {
       var directGroups = data.data.canonical_group;
       var directCanonicalX = data.data.x, directCanonicalY = data.data.y;
@@ -7831,23 +7722,14 @@
       if (ArrayBuffer.isView(directGroups) && directGroups.length === n &&
         ArrayBuffer.isView(directCanonicalX) && directCanonicalX.length === n &&
         ArrayBuffer.isView(directCanonicalY) && directCanonicalY.length === n) {
-        var directTraces = Array.isArray(data.meta.traces)
-          ? data.meta.traces : [];
-        var directLevels = [], directColors = [];
-        directTraces.forEach(function (name, group) {
-          directLevels.push(String(name));
-          var colour = data.data.color && data.data.color[group];
-          directColors.push(String(Array.isArray(colour) ? colour[0] :
-            colour || '#7b8794'));
-        });
         return {
           x: directCanonicalX,
           y: directCanonicalY,
           z: ArrayBuffer.isView(directCanonicalZ) &&
             directCanonicalZ.length === n ? directCanonicalZ : null,
           groups: directGroups,
-          levels: directLevels,
-          colors: directColors,
+          levels: levels,
+          colors: colors,
           hover: [],
           hoverEnabled: new Uint8Array(0),
           hoverColumns: []
@@ -7862,7 +7744,7 @@
     if (z) z.fill(NaN);
     var groups = nested ? new Int32Array(n) : null;
     if (groups) groups.fill(-1);
-    var levels = [], colors = [], hover = new Array(n);
+    var hover = new Array(n);
     var hoverEnabled = new Uint8Array(n);
     var hoverColumns = sourceHoverColumns.map(function (column) {
       return {
@@ -7874,7 +7756,6 @@
       };
     });
     if (nested) {
-      var traces = Array.isArray(data.meta.traces) ? data.meta.traces : [];
       var hoverModes = data.hover && data.hover.hoverinfo;
       var canonicalGroups = data.data.canonical_group;
       if (ArrayBuffer.isView(canonicalGroups) && canonicalGroups.length === n) {
@@ -7888,11 +7769,6 @@
           if (z) z[canonicalIndex] = Number(canonicalZ[canonicalIndex]);
           groups[canonicalIndex] = Number(canonicalGroups[canonicalIndex]);
         }
-        traces.forEach(function (name, group) {
-          levels.push(String(name));
-          var colour = data.data.color && data.data.color[group];
-          colors.push(String(Array.isArray(colour) ? colour[0] : colour || '#7b8794'));
-        });
         return {
           x: x, y: y, z: z, groups: groups, levels: levels, colors: colors,
           hover: [], hoverEnabled: hoverEnabled, hoverColumns: []
@@ -7900,9 +7776,6 @@
       }
       var offset = 0;
       traces.forEach(function (name, group) {
-        levels.push(String(name));
-        var colour = data.data.color && data.data.color[group];
-        colors.push(String(Array.isArray(colour) ? colour[0] : colour || '#7b8794'));
         var gx = data.data.x[group] || [], gy = data.data.y[group] || [];
         var gz = data.data.z && data.data.z[group] || [];
         var gh = data.hover && data.hover.text && data.hover.text[group] || [];
@@ -7926,16 +7799,6 @@
       var hx = data.data.x || [], hy = data.data.y || [], hz = data.data.z || [];
       var hh = data.hover && Array.isArray(data.hover.text) ? data.hover.text : [];
       var enabled = !(data.hover && data.hover.hoverinfo === 'skip');
-      var direct = !data.data.selection_key && ArrayBuffer.isView(hx) &&
-        ArrayBuffer.isView(hy) && hx.length === n && hy.length === n;
-      if (direct && !enabled && !sourceHoverColumns.length) {
-        return {
-          x: hx, y: hy,
-          z: ArrayBuffer.isView(hz) && hz.length === n ? hz : null,
-          groups: groups, levels: levels, colors: colors,
-          hover: [], hoverEnabled: hoverEnabled, hoverColumns: []
-        };
-      }
       for (var k = 0; k < Math.min(hx.length, n); k++) {
         x[k] = hx[k] == null ? NaN : Number(hx[k]);
         y[k] = hy[k] == null ? NaN : Number(hy[k]);
@@ -8673,11 +8536,16 @@
     });
     return true;
   }
+  // Hands the shared surface back to Linked views, keeping the specialist state.
+  function leaveSingle() {
+    stashSingleState(); restoreLinkedSurface();
+    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+  }
+
   function activateLinked() {
     if (!linkedBundle) return;
     var state = linkedState;
-    stashSingleState(); restoreLinkedSurface();
-    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    leaveSingle();
     rebuildingBase = true;
     try {
       onData(linkedBundle);
@@ -8771,6 +8639,12 @@
     }
     return true;
   }
+  // The data fields a cell_view_recolor message may replace.
+  var SINGLE_COLOR_FIELDS = [
+    'color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale', 'panel_colorscales',
+    'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
+    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
+  ];
   function updateSingleExpression(id, previousMeta, previousData, message) {
     var view = singleView(id), data = view.data, meta = view.meta;
     var pendingIds = D && Array.isArray(D.cells) && D.cells.length === 0 &&
@@ -8790,11 +8664,8 @@
         data.selection_key !== previousData.selection_key ||
         !['continuous', 'rgb'].includes(previousMeta.color_type) ||
         !['continuous', 'rgb'].includes(meta.color_type)) return false;
-    var allowed = ['color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale',
-      'panel_colorscales', 'color_range', 'reversescale', 'paint_order',
-      'render_key', 'sparse_color', 'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'];
     if (Object.keys(message.data || {}).some(function (key) {
-      return allowed.indexOf(key) < 0;
+      return SINGLE_COLOR_FIELDS.indexOf(key) < 0;
     }) || Object.keys(message.meta || {}).some(function (key) {
       return ['color_type', 'color_variable', 'render_token'].indexOf(key) < 0 &&
         JSON.stringify(meta[key]) !== JSON.stringify(previousMeta[key]);
@@ -8861,14 +8732,9 @@
     if (!sameDatasetContext(view.dataset_context, message.dataset_context) ||
         Number(message.render_token) <= Number(view.render_token)) return false;
     view.render_token = Number(message.render_token);
-    var colorFields = [
-      'color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale', 'panel_colorscales',
-      'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
-      'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
-    ];
     var previousMeta = view.meta || {}, previousData = view.data;
     var data = Object.assign({}, view.data);
-    colorFields.forEach(function (name) { delete data[name]; });
+    SINGLE_COLOR_FIELDS.forEach(function (name) { delete data[name]; });
     view.meta = Object.assign({}, view.meta || {}, message.meta || {});
     view.data = Object.assign(data, message.data || {});
     hydrateSparseSingleColor(view.data);
@@ -8881,6 +8747,10 @@
     return true;
   }
 
+  function clearSelection() {
+    pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+  }
+
   function clearSingleSelection(id) {
     var view = registerSingle(id); if (!view) return;
     view.selection = []; view.lenses = (view.lenses || []).map(function (lens) {
@@ -8888,7 +8758,7 @@
     });
     if (singleActive === id) {
       if (selectionZoomed) resetZoom();
-      pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+      clearSelection();
     }
   }
 
@@ -9048,6 +8918,11 @@
     }, { priority: 'event' });
   }
 
+  // Asks for the JSON bundle of the data set currently on screen.
+  function fallbackCurrent() {
+    requestWireFallback(D && D.dataset_id, D && configFingerprint());
+  }
+
   function onBinaryData(buffer) {
     var token = ++wireToken;
     var started = performance.now();
@@ -9164,10 +9039,7 @@
     var panel = panels[oldOrder.length];
     if (!panel) return false;
 
-    D.groups = Object.assign({}, D.groups, extra.groups);
-    D.cat_extra = Object.assign({}, D.cat_extra, extra.cat_extra);
-    D.cat_skipped = extra.cat_skipped || D.cat_skipped;
-    D.fields = Object.assign({}, D.fields, extra.fields);
+    mergeSupplementAttrs(D, extra);
     D.spaces = (D.spaces || []).concat(extra.spaces || []);
     D.clone = extra.clone;
     linkedBundle = D;
@@ -9221,6 +9093,23 @@
     return true;
   }
 
+  // Keeps a Linked supplement until the Linked bundle is mounted again: hydration
+  // and drawing use D, which a specialist page may currently own.
+  function holdSupplement(item) {
+    if (D === linkedBundle) return false;
+    deferredLinkedSupplements.push(item);
+    return true;
+  }
+
+  // Folds a supplement's group and field dictionaries into `target`.
+  function mergeSupplementAttrs(target, extra) {
+    target.groups = Object.assign({}, target.groups, extra.groups);
+    target.cat_extra = Object.assign({}, target.cat_extra, extra.cat_extra);
+    target.cat_skipped = extra.cat_skipped || target.cat_skipped;
+    target.fields = Object.assign({}, target.fields, extra.fields);
+    return target;
+  }
+
   function linkedSupplementFresh(extra) {
     return !!(extra && linkedBundle && datasetMessageFresh(extra) &&
       sameDatasetContext(extra.dataset_context, linkedBundle.dataset_context) &&
@@ -9233,10 +9122,7 @@
     if (!linkedSupplementFresh(extra)) return;
     // A clone supplement can arrive here in a later animation frame, after
     // navigation has mounted another page's data in the shared renderer.
-    if (D !== linkedBundle) {
-      deferredLinkedSupplements.push({ extra: extra, metric: metric });
-      return;
-    }
+    if (holdSupplement({ extra: extra, metric: metric })) return;
     var drawStarted = performance.now();
     try {
       var structural = !!(extra.clone || extra.trekker ||
@@ -9252,18 +9138,14 @@
       } else if (structural) {
         var saved = exportRuntimeWorkspace();
         var hadSpatial = !!spatialTemplate;
-        var merged = Object.assign({}, D, {
-          groups: Object.assign({}, D.groups, extra.groups),
-          cat_extra: Object.assign({}, D.cat_extra, extra.cat_extra),
-          cat_skipped: extra.cat_skipped || D.cat_skipped,
-          fields: Object.assign({}, D.fields, extra.fields),
+        var merged = mergeSupplementAttrs(Object.assign({}, D, {
           projections: Object.assign({}, D.projections, extra.projections),
           spaces: (D.spaces || []).concat(extra.spaces || []),
           clone: extra.clone || D.clone,
           trekker: extra.trekker || D.trekker,
           progressive: extra.progressive_complete === false
             ? D.progressive : false
-        });
+        }), extra);
         drawAllDeferred = true;
         try {
           applyData(merged);
@@ -9280,10 +9162,7 @@
         drawAll();
         reportWorkspaceReady();
       } else {
-        D.groups = Object.assign({}, D.groups, extra.groups);
-        D.cat_extra = Object.assign({}, D.cat_extra, extra.cat_extra);
-        D.cat_skipped = extra.cat_skipped || D.cat_skipped;
-        D.fields = Object.assign({}, D.fields, extra.fields);
+        mergeSupplementAttrs(D, extra);
         if (extra.progressive_complete !== false) D.progressive = false;
         linkedBundle = D;
         sanitiseColors(D);
@@ -9306,10 +9185,7 @@
         });
       }
     } catch (error) {
-      requestWireFallback(
-        D && D.dataset_id,
-        D && configFingerprint()
-      );
+      fallbackCurrent();
     }
   }
 
@@ -9320,18 +9196,9 @@
       var decodedAt = performance.now();
       if (!extra) throw new Error('Linked views supplement is empty');
       if (!linkedSupplementFresh(extra)) return;
-      // Hydration and drawing use D. Keep the wire payload until the Linked
-      // bundle is mounted again, instead of dropping it on a specialist tab.
-      if (D !== linkedBundle) {
-        deferredLinkedSupplements.push({ buffer: buffer });
-        return;
-      }
+      if (holdSupplement({ buffer: buffer })) return;
       var finish = function () {
-        if (!linkedSupplementFresh(extra)) return;
-        if (D !== linkedBundle) {
-          deferredLinkedSupplements.push({ buffer: buffer });
-          return;
-        }
+        if (!linkedSupplementFresh(extra) || holdSupplement({ buffer: buffer })) return;
         extra = hydrateSparseLinked(hydrateLinkedGeometry(extra));
         var metric = CBViewState.telemetry.transport(
           extra.transport_profile,
@@ -9376,7 +9243,7 @@
         try {
           finish();
         } catch (error) {
-          requestWireFallback(D && D.dataset_id, D && configFingerprint());
+          fallbackCurrent();
         }
       }, function () {
         if (linkedSupplementFresh(extra)) {
@@ -9384,7 +9251,7 @@
         }
       });
     } catch (error) {
-      requestWireFallback(D && D.dataset_id, D && configFingerprint());
+      fallbackCurrent();
     }
   }
 
@@ -9571,10 +9438,7 @@
       reportWorkspaceReady();
       return;
     }
-    if (singleActive) {
-      stashSingleState(); restoreLinkedSurface();
-      singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
-    }
+    if (singleActive) leaveSingle();
     linkedBundle = bundle;
     D = bundle;
     Object.keys(D.projections || {}).forEach(function (name) {
@@ -10225,7 +10089,9 @@
     var primaryPanel = ownsWorkspace && panels.filter(function (panel) {
       return panel.spaceId && Number(panel.canvas.dataset.pointCount) === D.n;
     })[0];
-    var rendered = !!(D && configFingerprint() && primaryPanel);
+    // Without stored fingerprints this hashes every cell ID: compute it once.
+    var fingerprint = configFingerprint();
+    var rendered = !!(D && fingerprint && primaryPanel);
     var complete = !!(rendered && !D.progressive);
     var gpuUploadMs = 0;
     var gpuPositionUploads = 0;
@@ -10240,7 +10106,7 @@
       primaryReady: rendered,
       ready: complete,
       complete: complete,
-      datasetFingerprint: D ? configFingerprint() : null,
+      datasetFingerprint: D ? fingerprint : null,
       renderedPointCount: primaryPanel && D ? Number(D.n) : 0,
       selectedCells: sel ? sel.size : 0,
       selectedCellBarcodes: selectedCellIds(),
@@ -10329,14 +10195,15 @@
       }
     }));
     if (summary.primaryReady && D.progressive && Shiny.setInputValue) {
-      var key = String(D.dataset_id || '') + '\u0000' + configFingerprint() +
+      var fingerprint = configFingerprint();
+      var key = String(D.dataset_id || '') + '\u0000' + fingerprint +
         '\u0000' + String(D.progressive_token || '');
       if (progressiveRequestedKey !== key) {
         progressiveRequestedKey = key;
         Shiny.setInputValue('coordviews_primary_ready', {
           dataset_context: D.dataset_context,
           dataset_id: D.dataset_id,
-          dataset_fingerprint: configFingerprint(),
+          dataset_fingerprint: fingerprint,
           progressive_token: D.progressive_token,
           modalities: requestedModalities(),
           nonce: Date.now()
@@ -10662,7 +10529,7 @@
         window.CBViewState.clearExpression(D, 'gene');
         clipRange();
         if (colorBy === GENE_MODE) {
-          renderColorbar(true, null, esc(m.gene) + ' — not available');
+          renderColorbar(true, null, m.gene + ' — not available');
           drawAll(); updateMoranBadges();
         }
         return;
@@ -10833,30 +10700,27 @@
         // too, before its projection controls operate on the shared renderer.
         activateLinked();
       } else if (linkedVis && !linkedBundle) {
-        stashSingleState();
+        leaveSingle();
         showUnavailable('Loading linked views…');
-        restoreLinkedSurface();
-        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
         setLinkedPresentationReady(false);
       } else if (singleActive) {
-        stashSingleState();
-        restoreLinkedSurface();
-        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+        leaveSingle();
         if (linkedVis) showUnavailable('Loading linked views…');
       }
       if (linkedVis && !singleActive && workspaceSummary().primaryReady) {
         reportWorkspaceReady('cached');
       }
       if (Shiny.setInputValue) {
-        if (vis && !isFinite(linkedRequestTiming.requestAtMs)) {
-          linkedRequestTiming.requestAtMs = performance.now();
-          linkedRequestTiming.clickToRequestMs =
-            isFinite(window.__cerebroPageBenchClickStart)
-              ? linkedRequestTiming.requestAtMs -
-                window.__cerebroPageBenchClickStart : null;
-        }
+        if (vis && !isFinite(linkedRequestTiming.requestAtMs)) stampLinkedRequest();
         Shiny.setInputValue('coordviews_visible', vis);
       }
+    }
+    function stampLinkedRequest() {
+      linkedRequestTiming.requestAtMs = performance.now();
+      linkedRequestTiming.clickToRequestMs =
+        isFinite(window.__cerebroPageBenchClickStart)
+          ? linkedRequestTiming.requestAtMs -
+            window.__cerebroPageBenchClickStart : null;
     }
     setInterval(reportVisibility, 250);
     reportVisibility();
@@ -10869,11 +10733,7 @@
       var tabLink = event.target && event.target.closest
         ? event.target.closest('a[href^="#shiny-tab-"]') : null;
       if (target && Shiny.setInputValue) {
-        linkedRequestTiming.requestAtMs = performance.now();
-        linkedRequestTiming.clickToRequestMs =
-          isFinite(window.__cerebroPageBenchClickStart)
-            ? linkedRequestTiming.requestAtMs -
-              window.__cerebroPageBenchClickStart : null;
+        stampLinkedRequest();
         Shiny.setInputValue('coordviews_visible', true, { priority: 'event' });
       }
       setTimeout(function () {
@@ -10896,9 +10756,7 @@
       lastVis = null;
       reportVisibility();
     };
-    var jq = window.jQuery;
-    if (jq) { jq(document).on('shiny:connected', onConnected); }
-    else { document.addEventListener('shiny:connected', onConnected); }
+    window.jQuery(document).on('shiny:connected', onConnected);
 
     // The alignment controls are server-rendered after the client bundle. When
     // Shiny replaces that small fragment, populate its section tabs again; the
@@ -10916,22 +10774,23 @@
     // clear button + point-size slider live in the top bar (client-owned)
     document.addEventListener('click', function (e) {
       var t = e.target;
-      if (t && t.closest && t.closest('#cv-more-btn, #trekker_more_button')) {
+      if (!t || !t.closest) return;
+      if (t.closest('#cv-more-btn, #trekker_more_button')) {
         setTimeout(syncPointControls, 0);
       }
-      if (t && t.closest && t.closest('#cv-tk-insights-toggle')) {
+      if (t.closest('#cv-tk-insights-toggle')) {
         var tkToggle = $('cv-tk-insights-toggle');
         setTrekkerInsightsOpen(
           !tkToggle || tkToggle.getAttribute('aria-expanded') !== 'true'
         );
         return;
       }
-      var tkTab = t && t.closest && t.closest('.cv-tk-tab[data-tk-tab]');
+      var tkTab = t.closest('.cv-tk-tab[data-tk-tab]');
       if (tkTab) {
         selectTrekkerInsight(tkTab.getAttribute('data-tk-tab'));
         return;
       }
-      var evidenceThumb = t && t.closest && t.closest('.cv-evidence-thumb');
+      var evidenceThumb = t.closest('.cv-evidence-thumb');
       if (evidenceThumb) {
         var image = evidenceThumb.querySelector('img');
         var dlg = $('cv-evidence-modal'), modalImage = $('cv-evidence-modal-img');
@@ -10943,23 +10802,23 @@
         }
         return;
       }
-      var moranBadge = t && t.closest && t.closest('.cv-moran-badge');
+      var moranBadge = t.closest('.cv-moran-badge');
       if (moranBadge) { openMoranDialog(moranBadge); return; }
-      if (t && t.closest && t.closest('#cv-workspace-overview')) {
+      if (t.closest('#cv-workspace-overview')) {
         if (focusPanel) setFocusPanel(focusPanel);
         return;
       }
       // The pinned tooltip's two actions. Checked before anything else, because
       // the tooltip sits over a panel and the handlers below would otherwise
       // read the click as one on the workspace underneath.
-      if (t && t.id === 'cv-img-reset') { resetImgToPreset(); return; }
-      if (t && t.closest && t.closest('.cv-tip-details')) {
+      if (t.id === 'cv-img-reset') { resetImgToPreset(); return; }
+      if (t.closest('.cv-tip-details')) {
         if (pinnedTip.panel && pinnedTip.cell != null) {
           openCard(pinnedTip.panel, pinnedTip.cell);
         }
         return;
       }
-      if (t && t.closest && t.closest('.cv-tip-close')) {
+      if (t.closest('.cv-tip-close')) {
         // Dismisses the tooltip ONLY. The pick stays -- its ring, and on a
         // Trekker data set the niche readout it drives, are the reason the cell
         // was clicked; putting the tooltip away is not a reason to give them up.
@@ -10967,8 +10826,7 @@
         unpinTip();
         return;
       }
-      var singleAction = t && t.closest &&
-        t.closest('[data-cell-view-action][data-cell-view-id]');
+      var singleAction = t.closest('[data-cell-view-action][data-cell-view-id]');
       if (singleAction) {
         e.preventDefault();
         var singleId = singleAction.getAttribute('data-cell-view-id');
@@ -10978,7 +10836,7 @@
         return;
       }
       // per-panel modebar: select mode (box/lasso), zoom in/out, reset, PNG
-      var tb = t && t.closest && t.closest('.cv-tbtn');
+      var tb = t.closest('.cv-tbtn');
       if (tb) {
         var act = tb.getAttribute('data-act'), key = tb.getAttribute('data-panel');
         if (interactionIsStatic() && act !== 'png') return;
@@ -10988,10 +10846,7 @@
           selectMode = act; syncModeButtons(); return;
         }
         if (act === 'trekker-info') { openTrekkerInsights('qc', true); return; }
-        if (act === 'clear') {
-          pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
-          return;
-        }
+        if (act === 'clear') { clearSelection(); return; }
         if (pp) {
           if (act === 'png') {
             window.dispatchEvent(new CustomEvent('cerebro:png-result', {
@@ -11012,21 +10867,21 @@
         }
         return;
       }
-      if (t && t.closest && t.closest('#cv-card-x')) {
+      if (t.closest('#cv-card-x')) {
         closeCard();
         return;
       }
-      if (t && t.closest && t.closest('#cv-clear')) {
+      if (t.closest('#cv-clear')) {
         if (selectionZoomed) resetZoom();
-        pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+        clearSelection();
         return;
       }
-      if (t && t.closest && t.closest('#cv-zsel')) {
+      if (t.closest('#cv-zsel')) {
         toggleSelectionFocus();
         return;
       }
       // clonal-layout segmented toggle: recompute the clone space + reproject
-      var seg = t && t.closest && t.closest('#cv-clone-layout .cv-seg-btn');
+      var seg = t.closest('#cv-clone-layout .cv-seg-btn');
       if (seg) {
         var mode = seg.getAttribute('data-mode');
         if (mode === CLONE_MODE) return;
