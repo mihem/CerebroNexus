@@ -8553,11 +8553,16 @@
     });
     return true;
   }
+  // Hands the shared surface back to Linked views, keeping the specialist state.
+  function leaveSingle() {
+    stashSingleState(); restoreLinkedSurface();
+    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+  }
+
   function activateLinked() {
     if (!linkedBundle) return;
     var state = linkedState;
-    stashSingleState(); restoreLinkedSurface();
-    singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+    leaveSingle();
     rebuildingBase = true;
     try {
       onData(linkedBundle);
@@ -8651,6 +8656,12 @@
     }
     return true;
   }
+  // The data fields a cell_view_recolor message may replace.
+  var SINGLE_COLOR_FIELDS = [
+    'color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale', 'panel_colorscales',
+    'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
+    'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
+  ];
   function updateSingleExpression(id, previousMeta, previousData, message) {
     var view = singleView(id), data = view.data, meta = view.meta;
     var pendingIds = D && Array.isArray(D.cells) && D.cells.length === 0 &&
@@ -8670,11 +8681,8 @@
         data.selection_key !== previousData.selection_key ||
         !['continuous', 'rgb'].includes(previousMeta.color_type) ||
         !['continuous', 'rgb'].includes(meta.color_type)) return false;
-    var allowed = ['color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale',
-      'panel_colorscales', 'color_range', 'reversescale', 'paint_order',
-      'render_key', 'sparse_color', 'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'];
     if (Object.keys(message.data || {}).some(function (key) {
-      return allowed.indexOf(key) < 0;
+      return SINGLE_COLOR_FIELDS.indexOf(key) < 0;
     }) || Object.keys(message.meta || {}).some(function (key) {
       return ['color_type', 'color_variable', 'render_token'].indexOf(key) < 0 &&
         JSON.stringify(meta[key]) !== JSON.stringify(previousMeta[key]);
@@ -8741,14 +8749,9 @@
     if (!sameDatasetContext(view.dataset_context, message.dataset_context) ||
         Number(message.render_token) <= Number(view.render_token)) return false;
     view.render_token = Number(message.render_token);
-    var colorFields = [
-      'color', 'rgb', 'rgb_scaled', 'rgb_genes', 'colorscale', 'panel_colorscales',
-      'color_range', 'reversescale', 'paint_order', 'render_key', 'sparse_color',
-      'color_cache_key', 'packed_rgb', 'packed_rgb_cache_keys', 'zero_color'
-    ];
     var previousMeta = view.meta || {}, previousData = view.data;
     var data = Object.assign({}, view.data);
-    colorFields.forEach(function (name) { delete data[name]; });
+    SINGLE_COLOR_FIELDS.forEach(function (name) { delete data[name]; });
     view.meta = Object.assign({}, view.meta || {}, message.meta || {});
     view.data = Object.assign(data, message.data || {});
     hydrateSparseSingleColor(view.data);
@@ -8761,6 +8764,10 @@
     return true;
   }
 
+  function clearSelection() {
+    pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+  }
+
   function clearSingleSelection(id) {
     var view = registerSingle(id); if (!view) return;
     view.selection = []; view.lenses = (view.lenses || []).map(function (lens) {
@@ -8768,7 +8775,7 @@
     });
     if (singleActive === id) {
       if (selectionZoomed) resetZoom();
-      pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+      clearSelection();
     }
   }
 
@@ -8928,6 +8935,11 @@
     }, { priority: 'event' });
   }
 
+  // Asks for the JSON bundle of the data set currently on screen.
+  function fallbackCurrent() {
+    requestWireFallback(D && D.dataset_id, D && configFingerprint());
+  }
+
   function onBinaryData(buffer) {
     var token = ++wireToken;
     var started = performance.now();
@@ -9044,10 +9056,7 @@
     var panel = panels[oldOrder.length];
     if (!panel) return false;
 
-    D.groups = Object.assign({}, D.groups, extra.groups);
-    D.cat_extra = Object.assign({}, D.cat_extra, extra.cat_extra);
-    D.cat_skipped = extra.cat_skipped || D.cat_skipped;
-    D.fields = Object.assign({}, D.fields, extra.fields);
+    mergeSupplementAttrs(D, extra);
     D.spaces = (D.spaces || []).concat(extra.spaces || []);
     D.clone = extra.clone;
     linkedBundle = D;
@@ -9101,6 +9110,23 @@
     return true;
   }
 
+  // Keeps a Linked supplement until the Linked bundle is mounted again: hydration
+  // and drawing use D, which a specialist page may currently own.
+  function holdSupplement(item) {
+    if (D === linkedBundle) return false;
+    deferredLinkedSupplements.push(item);
+    return true;
+  }
+
+  // Folds a supplement's group and field dictionaries into `target`.
+  function mergeSupplementAttrs(target, extra) {
+    target.groups = Object.assign({}, target.groups, extra.groups);
+    target.cat_extra = Object.assign({}, target.cat_extra, extra.cat_extra);
+    target.cat_skipped = extra.cat_skipped || target.cat_skipped;
+    target.fields = Object.assign({}, target.fields, extra.fields);
+    return target;
+  }
+
   function linkedSupplementFresh(extra) {
     return !!(extra && linkedBundle && datasetMessageFresh(extra) &&
       sameDatasetContext(extra.dataset_context, linkedBundle.dataset_context) &&
@@ -9113,10 +9139,7 @@
     if (!linkedSupplementFresh(extra)) return;
     // A clone supplement can arrive here in a later animation frame, after
     // navigation has mounted another page's data in the shared renderer.
-    if (D !== linkedBundle) {
-      deferredLinkedSupplements.push({ extra: extra, metric: metric });
-      return;
-    }
+    if (holdSupplement({ extra: extra, metric: metric })) return;
     var drawStarted = performance.now();
     try {
       var structural = !!(extra.clone || extra.trekker ||
@@ -9132,18 +9155,14 @@
       } else if (structural) {
         var saved = exportRuntimeWorkspace();
         var hadSpatial = !!spatialTemplate;
-        var merged = Object.assign({}, D, {
-          groups: Object.assign({}, D.groups, extra.groups),
-          cat_extra: Object.assign({}, D.cat_extra, extra.cat_extra),
-          cat_skipped: extra.cat_skipped || D.cat_skipped,
-          fields: Object.assign({}, D.fields, extra.fields),
+        var merged = mergeSupplementAttrs(Object.assign({}, D, {
           projections: Object.assign({}, D.projections, extra.projections),
           spaces: (D.spaces || []).concat(extra.spaces || []),
           clone: extra.clone || D.clone,
           trekker: extra.trekker || D.trekker,
           progressive: extra.progressive_complete === false
             ? D.progressive : false
-        });
+        }), extra);
         drawAllDeferred = true;
         try {
           applyData(merged);
@@ -9160,10 +9179,7 @@
         drawAll();
         reportWorkspaceReady();
       } else {
-        D.groups = Object.assign({}, D.groups, extra.groups);
-        D.cat_extra = Object.assign({}, D.cat_extra, extra.cat_extra);
-        D.cat_skipped = extra.cat_skipped || D.cat_skipped;
-        D.fields = Object.assign({}, D.fields, extra.fields);
+        mergeSupplementAttrs(D, extra);
         if (extra.progressive_complete !== false) D.progressive = false;
         linkedBundle = D;
         sanitiseColors(D);
@@ -9186,10 +9202,7 @@
         });
       }
     } catch (error) {
-      requestWireFallback(
-        D && D.dataset_id,
-        D && configFingerprint()
-      );
+      fallbackCurrent();
     }
   }
 
@@ -9200,18 +9213,9 @@
       var decodedAt = performance.now();
       if (!extra) throw new Error('Linked views supplement is empty');
       if (!linkedSupplementFresh(extra)) return;
-      // Hydration and drawing use D. Keep the wire payload until the Linked
-      // bundle is mounted again, instead of dropping it on a specialist tab.
-      if (D !== linkedBundle) {
-        deferredLinkedSupplements.push({ buffer: buffer });
-        return;
-      }
+      if (holdSupplement({ buffer: buffer })) return;
       var finish = function () {
-        if (!linkedSupplementFresh(extra)) return;
-        if (D !== linkedBundle) {
-          deferredLinkedSupplements.push({ buffer: buffer });
-          return;
-        }
+        if (!linkedSupplementFresh(extra) || holdSupplement({ buffer: buffer })) return;
         extra = hydrateSparseLinked(hydrateLinkedGeometry(extra));
         var metric = CBViewState.telemetry.transport(
           extra.transport_profile,
@@ -9256,7 +9260,7 @@
         try {
           finish();
         } catch (error) {
-          requestWireFallback(D && D.dataset_id, D && configFingerprint());
+          fallbackCurrent();
         }
       }, function () {
         if (linkedSupplementFresh(extra)) {
@@ -9264,7 +9268,7 @@
         }
       });
     } catch (error) {
-      requestWireFallback(D && D.dataset_id, D && configFingerprint());
+      fallbackCurrent();
     }
   }
 
@@ -9453,10 +9457,7 @@
       reportWorkspaceReady();
       return;
     }
-    if (singleActive) {
-      stashSingleState(); restoreLinkedSurface();
-      singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
-    }
+    if (singleActive) leaveSingle();
     linkedBundle = bundle;
     D = bundle;
     Object.keys(D.projections || {}).forEach(function (name) {
@@ -10715,30 +10716,27 @@
         // too, before its projection controls operate on the shared renderer.
         activateLinked();
       } else if (linkedVis && !linkedBundle) {
-        stashSingleState();
+        leaveSingle();
         showUnavailable('Loading linked views…');
-        restoreLinkedSurface();
-        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
         setLinkedPresentationReady(false);
       } else if (singleActive) {
-        stashSingleState();
-        restoreLinkedSurface();
-        singleActive = null; singleSpaceIds = []; singleSpaceModes = {};
+        leaveSingle();
         if (linkedVis) showUnavailable('Loading linked views…');
       }
       if (linkedVis && !singleActive && workspaceSummary().primaryReady) {
         reportWorkspaceReady('cached');
       }
       if (Shiny.setInputValue) {
-        if (vis && !isFinite(linkedRequestTiming.requestAtMs)) {
-          linkedRequestTiming.requestAtMs = performance.now();
-          linkedRequestTiming.clickToRequestMs =
-            isFinite(window.__cerebroPageBenchClickStart)
-              ? linkedRequestTiming.requestAtMs -
-                window.__cerebroPageBenchClickStart : null;
-        }
+        if (vis && !isFinite(linkedRequestTiming.requestAtMs)) stampLinkedRequest();
         Shiny.setInputValue('coordviews_visible', vis);
       }
+    }
+    function stampLinkedRequest() {
+      linkedRequestTiming.requestAtMs = performance.now();
+      linkedRequestTiming.clickToRequestMs =
+        isFinite(window.__cerebroPageBenchClickStart)
+          ? linkedRequestTiming.requestAtMs -
+            window.__cerebroPageBenchClickStart : null;
     }
     setInterval(reportVisibility, 250);
     reportVisibility();
@@ -10751,11 +10749,7 @@
       var tabLink = event.target && event.target.closest
         ? event.target.closest('a[href^="#shiny-tab-"]') : null;
       if (target && Shiny.setInputValue) {
-        linkedRequestTiming.requestAtMs = performance.now();
-        linkedRequestTiming.clickToRequestMs =
-          isFinite(window.__cerebroPageBenchClickStart)
-            ? linkedRequestTiming.requestAtMs -
-              window.__cerebroPageBenchClickStart : null;
+        stampLinkedRequest();
         Shiny.setInputValue('coordviews_visible', true, { priority: 'event' });
       }
       setTimeout(function () {
@@ -10798,22 +10792,23 @@
     // clear button + point-size slider live in the top bar (client-owned)
     document.addEventListener('click', function (e) {
       var t = e.target;
-      if (t && t.closest && t.closest('#cv-more-btn, #trekker_more_button')) {
+      if (!t || !t.closest) return;
+      if (t.closest('#cv-more-btn, #trekker_more_button')) {
         setTimeout(syncPointControls, 0);
       }
-      if (t && t.closest && t.closest('#cv-tk-insights-toggle')) {
+      if (t.closest('#cv-tk-insights-toggle')) {
         var tkToggle = $('cv-tk-insights-toggle');
         setTrekkerInsightsOpen(
           !tkToggle || tkToggle.getAttribute('aria-expanded') !== 'true'
         );
         return;
       }
-      var tkTab = t && t.closest && t.closest('.cv-tk-tab[data-tk-tab]');
+      var tkTab = t.closest('.cv-tk-tab[data-tk-tab]');
       if (tkTab) {
         selectTrekkerInsight(tkTab.getAttribute('data-tk-tab'));
         return;
       }
-      var evidenceThumb = t && t.closest && t.closest('.cv-evidence-thumb');
+      var evidenceThumb = t.closest('.cv-evidence-thumb');
       if (evidenceThumb) {
         var image = evidenceThumb.querySelector('img');
         var dlg = $('cv-evidence-modal'), modalImage = $('cv-evidence-modal-img');
@@ -10825,23 +10820,23 @@
         }
         return;
       }
-      var moranBadge = t && t.closest && t.closest('.cv-moran-badge');
+      var moranBadge = t.closest('.cv-moran-badge');
       if (moranBadge) { openMoranDialog(moranBadge); return; }
-      if (t && t.closest && t.closest('#cv-workspace-overview')) {
+      if (t.closest('#cv-workspace-overview')) {
         if (focusPanel) setFocusPanel(focusPanel);
         return;
       }
       // The pinned tooltip's two actions. Checked before anything else, because
       // the tooltip sits over a panel and the handlers below would otherwise
       // read the click as one on the workspace underneath.
-      if (t && t.id === 'cv-img-reset') { resetImgToPreset(); return; }
-      if (t && t.closest && t.closest('.cv-tip-details')) {
+      if (t.id === 'cv-img-reset') { resetImgToPreset(); return; }
+      if (t.closest('.cv-tip-details')) {
         if (pinnedTip.panel && pinnedTip.cell != null) {
           openCard(pinnedTip.panel, pinnedTip.cell);
         }
         return;
       }
-      if (t && t.closest && t.closest('.cv-tip-close')) {
+      if (t.closest('.cv-tip-close')) {
         // Dismisses the tooltip ONLY. The pick stays -- its ring, and on a
         // Trekker data set the niche readout it drives, are the reason the cell
         // was clicked; putting the tooltip away is not a reason to give them up.
@@ -10849,8 +10844,7 @@
         unpinTip();
         return;
       }
-      var singleAction = t && t.closest &&
-        t.closest('[data-cell-view-action][data-cell-view-id]');
+      var singleAction = t.closest('[data-cell-view-action][data-cell-view-id]');
       if (singleAction) {
         e.preventDefault();
         var singleId = singleAction.getAttribute('data-cell-view-id');
@@ -10860,7 +10854,7 @@
         return;
       }
       // per-panel modebar: select mode (box/lasso), zoom in/out, reset, PNG
-      var tb = t && t.closest && t.closest('.cv-tbtn');
+      var tb = t.closest('.cv-tbtn');
       if (tb) {
         var act = tb.getAttribute('data-act'), key = tb.getAttribute('data-panel');
         if (interactionIsStatic() && act !== 'png') return;
@@ -10870,10 +10864,7 @@
           selectMode = act; syncModeButtons(); return;
         }
         if (act === 'trekker-info') { openTrekkerInsights('qc', true); return; }
-        if (act === 'clear') {
-          pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
-          return;
-        }
+        if (act === 'clear') { clearSelection(); return; }
         if (pp) {
           if (act === 'png') {
             window.dispatchEvent(new CustomEvent('cerebro:png-result', {
@@ -10894,21 +10885,21 @@
         }
         return;
       }
-      if (t && t.closest && t.closest('#cv-card-x')) {
+      if (t.closest('#cv-card-x')) {
         closeCard();
         return;
       }
-      if (t && t.closest && t.closest('#cv-clear')) {
+      if (t.closest('#cv-clear')) {
         if (selectionZoomed) resetZoom();
-        pick = null; unpinTip(); closeCard(); clearLassos(); setSelection(null);
+        clearSelection();
         return;
       }
-      if (t && t.closest && t.closest('#cv-zsel')) {
+      if (t.closest('#cv-zsel')) {
         toggleSelectionFocus();
         return;
       }
       // clonal-layout segmented toggle: recompute the clone space + reproject
-      var seg = t && t.closest && t.closest('#cv-clone-layout .cv-seg-btn');
+      var seg = t.closest('#cv-clone-layout .cv-seg-btn');
       if (seg) {
         var mode = seg.getAttribute('data-mode');
         if (mode === CLONE_MODE) return;

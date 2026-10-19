@@ -50,7 +50,8 @@ function session() {
   c.window = {CBViewWire: {unpack: buffer => buffer.extra},
     requestAnimationFrame: callback => c.frames.push(callback), setTimeout: callback => callback()};
   vm.createContext(c);
-  vm.runInContext(['activateLinked', 'linkedSupplementFresh', 'applyHydratedSupplement', 'onBinarySupplement']
+  vm.runInContext(['leaveSingle', 'activateLinked', 'holdSupplement', 'mergeSupplementAttrs',
+    'linkedSupplementFresh', 'applyHydratedSupplement', 'onBinarySupplement', 'fallbackCurrent']
     .map(fn).join('\n') + visibility, c);
   c.go = page => {c.page = page; c.reportVisibility();};
   c.extra = overrides => Object.assign({dataset_id: 'ds1', dataset_context: 'generation-1',
