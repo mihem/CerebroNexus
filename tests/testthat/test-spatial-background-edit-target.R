@@ -140,7 +140,7 @@ test_that("ROI background edits remain independent, temporary and generation sco
 })
 
 test_that("renderer edits only the addressed ROI background", {
-  skip_if(Sys.which("node") == "")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

@@ -1,6 +1,5 @@
 test_that("shared lifecycle and background models preserve view semantics", {
-  node <- Sys.which("node")
-  skip_if(!nzchar(node), "Node unavailable")
+  node <- skip_if_no_node()
   result <- system2(
     node,
     shQuote(c(

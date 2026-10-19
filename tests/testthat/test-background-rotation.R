@@ -1,5 +1,5 @@
 test_that("background image rotates in data space with the cells", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   output <- system2(
     "node",
     c(

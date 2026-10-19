@@ -1,5 +1,5 @@
 test_that("Spatial background accepts slider and native input events", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

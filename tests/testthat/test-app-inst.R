@@ -1,3 +1,4 @@
+skip_if_not_installed("shinytest2")
 library(shinytest2)
 
 ## Locate inst/ whether running via devtools::test() or R CMD check

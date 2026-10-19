@@ -105,7 +105,7 @@ run_bench_rscript <- function(script, args = character(), env = character()) {
   out <- tempfile("bench-cli-stdout-")
   err <- tempfile("bench-cli-stderr-")
   on.exit(unlink(c(out, err)), add = TRUE)
-  status <- system2(
+  status <- system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(file.path(bench_root, "src", script), args),
     stdout = out,

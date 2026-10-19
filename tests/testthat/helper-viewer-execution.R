@@ -1,5 +1,5 @@
 viewer_node_test <- function(scenario) {
-  skip_if(Sys.which("node") == "", "Node unavailable")
+  skip_if_no_node()
   output <- system2(
     "node",
     c(
@@ -15,8 +15,7 @@ viewer_node_test <- function(scenario) {
 }
 
 viewer_browser_test <- function(scenario) {
-  skip_on_cran()
-  skip_if_not_installed("chromote")
+  skip_if_no_chrome()
   browser <- chromote::ChromoteSession$new()
   on.exit(browser$close(), add = TRUE)
   evaluate <- function(code) {

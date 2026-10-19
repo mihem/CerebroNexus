@@ -18,9 +18,8 @@ viewer_benchmark_scope <- function() {
 }
 
 test_that("page benchmarks reject stale readiness and count actual websocket bytes", {
-  skip_on_cran()
+  skip_if_no_chrome()
   scope <- viewer_benchmark_scope()
-  skip_if_not_installed("chromote")
   browser <- chromote::ChromoteSession$new()
   on.exit(browser$close(), add = TRUE)
   js <- function(code) {
@@ -157,8 +156,7 @@ test_that("page benchmarks launch installed candidates by default", {
 })
 
 test_that("page benchmarks read the Data info cell count inside the overview", {
-  skip_on_cran()
-  skip_if_not_installed("chromote")
+  skip_if_no_chrome()
   scope <- viewer_benchmark_scope()
   browser <- chromote::ChromoteSession$new()
   on.exit(browser$close(), add = TRUE)

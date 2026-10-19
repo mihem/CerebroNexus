@@ -20,7 +20,7 @@ test_that("new viewer defaults match unsorted, unlabelled Seurat plots", {
 })
 
 test_that("expression paint order preserves cells when disabled", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

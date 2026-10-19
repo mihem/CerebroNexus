@@ -1,5 +1,5 @@
 test_that("WebGPU failures make the renderer fall back", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   renderer <- viewer_test_path("www", "cell_points_gpu.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -48,7 +48,7 @@ test_that("WebGPU failures make the renderer fall back", {
 })
 
 test_that("WebGL2 fallback submits a million points in one GPU draw", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   renderer <- viewer_test_path("www", "cell_points_gpu.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)

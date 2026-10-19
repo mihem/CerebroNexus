@@ -113,7 +113,7 @@ test_that("resource checker rejects unsafe plans before a run", {
     manifest_path,
     row.names = FALSE
   )
-  output <- suppressWarnings(system2(
+  output <- suppressWarnings(system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(
       file.path(bench_root, "src", "04_check_resources.R"),

@@ -1,7 +1,7 @@
 state_file <- viewer_test_path("www", "cell_views_state.js")
 
 run_state_node <- function(body) {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_true(file.exists(state_file), info = "cell_views_state.js not found")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)

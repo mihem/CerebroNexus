@@ -1,5 +1,5 @@
 test_that("cell inspection requests use stable IDs and reject stale replies", {
-  skip_if(Sys.which("node") == "", "Node unavailable")
+  skip_if_no_node()
   result <- system2(
     "node",
     shQuote(c(

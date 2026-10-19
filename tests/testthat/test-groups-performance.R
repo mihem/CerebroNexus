@@ -114,7 +114,7 @@ test_that("Groups builds its first-frame controls without a renderUI cascade", {
 })
 
 test_that("Groups reports passive request-bound Plotly readiness", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   scope <- viewer_ui_test_env()
   sys.source(viewer_test_path("groups", "UI.R"), scope)
   scripts <- htmltools::tagQuery(scope$tab_groups)$find("script")$selectedTags()

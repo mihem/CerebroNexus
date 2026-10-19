@@ -1,5 +1,5 @@
 test_that("GPU renderers upload only attributes whose arrays changed", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- testthat::test_path("fixtures", "gpu-attribute-upload.js")
   expect_identical(
     system2(

@@ -234,7 +234,7 @@ test_that("report and plots consume repeated publication rows", {
   )
 
   env <- paste0("BENCH_ROOT=", normalizePath(file.path("..", "bench")))
-  report_status <- system2(
+  report_status <- system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(
       file.path(bench_root, "src", "40_write_report.R"),
@@ -252,7 +252,7 @@ test_that("report and plots consume repeated publication rows", {
   expect_true(any(grepl("Publication-profile evidence", report, fixed = TRUE)))
   expect_true(any(grepl("n=3", report, fixed = TRUE)))
 
-  plot_status <- system2(
+  plot_status <- system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(
       file.path(bench_root, "src", "41_draw_figures.R"),

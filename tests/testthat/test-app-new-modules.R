@@ -1,5 +1,6 @@
 # shinytest2 integration tests for enhanced Viewer modules
 
+skip_if_not_installed("shinytest2")
 library(shinytest2)
 
 inst_dir <- system.file(package = "CerebroNexus")

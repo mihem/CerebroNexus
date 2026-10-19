@@ -11,7 +11,7 @@ run_publisher <- function(stage, target, run_id, fail_at = "") {
   out <- tempfile("bench-publish-stdout-")
   err <- tempfile("bench-publish-stderr-")
   on.exit(unlink(c(out, err)), add = TRUE)
-  status <- system2(
+  status <- system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(
       file.path(bench_root, "src", "60_publish_results.R"),
@@ -99,7 +99,7 @@ test_that("output checker requires report and publication figures", {
   )
   checker <- file.path(bench_root, "src", "50_check_outputs.R")
 
-  missing <- suppressWarnings(system2(
+  missing <- suppressWarnings(system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(checker, stage),
     stdout = TRUE,
@@ -127,7 +127,7 @@ test_that("output checker requires report and publication figures", {
       "expression_backend_benchmark_ceiling.png"
     )
   )
-  complete <- system2(
+  complete <- system2_env(
     file.path(R.home("bin"), "Rscript"),
     c(checker, stage),
     stdout = TRUE,

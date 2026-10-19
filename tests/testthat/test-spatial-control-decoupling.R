@@ -46,7 +46,7 @@ test_that("Spatial styling and colour edits do not resample observations", {
 })
 
 test_that("same-layout updates retain panels and unchanged backgrounds only", {
-  skip_if(Sys.which("node") == "")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

@@ -11,7 +11,7 @@ wire_header <- function(payload) {
 }
 
 test_that("the browser restores compact linked-view vectors", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   skip_if_not_installed("base64enc")
   skip_if_not_installed("jsonlite")
   expect_true(file.exists(wire_file), info = "cell_views_wire.js not found")
@@ -126,7 +126,7 @@ test_that("binary envelopes also preserve messages without packed vectors", {
 })
 
 test_that("specialist cell views use the same binary envelope", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   skip_if_not_installed("jsonlite")
 
   helpers <- new.env(parent = globalenv())

@@ -198,9 +198,7 @@ test_that("HLA network tables and CSV follow graph membership and observation un
       session$setInputs(empty = TRUE)
       expect_null(hla_network_table_data())
       # Keep table/CSV checks above active on CRAN; only the DOM probe needs Chrome.
-      skip_on_cran()
-      skip_if_not_installed("chromote")
-      skip_if(is.null(chromote::find_chrome()), "Chrome unavailable")
+      skip_if_no_chrome()
       browser <- chromote::ChromoteSession$new()
       on.exit(browser$close(), add = TRUE)
       malicious <- '<img src=x onerror="window.injected=true">'

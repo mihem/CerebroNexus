@@ -161,7 +161,7 @@ test_that("loading labels match selector labels without changing dataset identit
 
 
 test_that("loading transitions avoid flashes and survive consecutive switches", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

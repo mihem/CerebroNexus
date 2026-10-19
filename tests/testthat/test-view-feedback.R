@@ -46,8 +46,7 @@ test_that("feedback reads only small controls without reactive dependencies", {
 })
 
 test_that("feedback matches painted operations and rejects stale datasets", {
-  node <- Sys.which("node")
-  skip_if(!nzchar(node), "Node unavailable")
+  node <- skip_if_no_node()
   result <- system2(
     node,
     shQuote(c(

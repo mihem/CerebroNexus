@@ -193,7 +193,7 @@ test_that("trajectory coordinates and graph enter Linked views", {
 })
 
 run_config_transport_node <- function(body) {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
   writeLines(

@@ -1,5 +1,5 @@
 test_that("shared renderer restores every page and retains late Linked supplements", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   output <- system2(
     "node",
     c(

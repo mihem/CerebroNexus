@@ -1,6 +1,5 @@
 test_that("Linked views defaults to individual spatial scenes and preserves edits", {
-  node <- Sys.which("node")
-  skip_if(!nzchar(node), "Node is unavailable")
+  node <- skip_if_no_node()
   result <- system2(
     node,
     shQuote(c(

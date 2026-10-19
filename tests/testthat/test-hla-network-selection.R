@@ -1,5 +1,5 @@
 run_specialist_state_node <- function(body) {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
   writeLines(
@@ -105,7 +105,7 @@ test_that("Projection adapter captures shared JSON and downloads its PNG", {
 })
 
 test_that("HLA PNG adapter reports browser export success and failure", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
   writeLines(
@@ -138,7 +138,7 @@ test_that("HLA PNG adapter reports browser export success and failure", {
 })
 
 test_that("HLA retires drawn selection geometry on a dataset request", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
   writeLines(

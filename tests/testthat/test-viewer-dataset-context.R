@@ -1,7 +1,7 @@
 dataset_context_javascript <- viewer_test_path("www", "dataset-context.js")
 
 run_dataset_context_node <- function(body) {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_true(
     file.exists(dataset_context_javascript),
     info = "dataset-context.js not found"

@@ -594,9 +594,8 @@ auth_test_package_file <- function(path) {
 }
 
 test_that("authentication stylesheet implements the balanced responsive UI", {
-  skip_on_cran()
   skip_if_not_installed("shinymanager")
-  skip_if_not_installed("chromote")
+  skip_if_no_chrome()
   scope <- new.env(parent = globalenv())
   sys.source(viewer_test_path("auth.R"), scope)
   brand <- scope$.viewer_auth_brand(viewer_app_test_path())

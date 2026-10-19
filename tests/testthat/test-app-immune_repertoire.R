@@ -3,6 +3,7 @@
 # The example dataset now ships with real TCR data, so the immune repertoire
 # tab is present by default and its UI can be exercised directly.
 
+skip_if_not_installed("shinytest2")
 library(shinytest2)
 
 inst_dir <- viewer_app_test_path()

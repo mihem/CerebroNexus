@@ -89,7 +89,7 @@ test_that("result selectors have visible labels and explain empty data", {
 })
 
 test_that("inactivity warning can be continued or cancelled before expiry", {
-  skip_if(Sys.which("node") == "", "Node unavailable")
+  skip_if_no_node()
   scope <- new.env(parent = globalenv())
   viewer_server_load(
     viewer_server_statements("shiny_UI.R"),

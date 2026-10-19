@@ -1,5 +1,5 @@
 test_that("shared cluster labels are text without background boxes", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   expect_identical(
     system2(
       "node",

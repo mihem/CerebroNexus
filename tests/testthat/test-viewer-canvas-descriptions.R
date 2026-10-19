@@ -1,5 +1,5 @@
 test_that("cloned panels own distinct accessible descriptions", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- withr::local_tempfile(fileext = ".js")
   writeLines(
     c(

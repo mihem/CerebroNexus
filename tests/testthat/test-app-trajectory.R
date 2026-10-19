@@ -4,6 +4,7 @@
 # demo_full_tcr_bcr.crb) carries the monocle2 B-cell trajectory, so the
 # Trajectory tab is present from the start.
 
+skip_if_not_installed("shinytest2")
 library(shinytest2)
 
 inst_candidates <- c(

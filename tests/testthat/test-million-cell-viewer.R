@@ -243,7 +243,7 @@ test_that("million-cell hover stays columnar until the browser needs it", {
 })
 
 test_that("sparse linked attributes expand into typed canonical vectors", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -272,7 +272,7 @@ test_that("sparse linked attributes expand into typed canonical vectors", {
 })
 
 test_that("shared browser base reuses only matching dataset projections", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -313,7 +313,7 @@ test_that("shared browser base reuses only matching dataset projections", {
 })
 
 test_that("specialist lifecycle owns request, ready, and auxiliary state", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -365,7 +365,7 @@ test_that("specialist lifecycle owns request, ready, and auxiliary state", {
 })
 
 test_that("canonical mapping centralizes identity, subset, and index order", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -422,7 +422,7 @@ test_that("canonical mapping centralizes identity, subset, and index order", {
 })
 
 test_that("resource descriptors share shape and identity validation", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -462,7 +462,7 @@ test_that("resource descriptors share shape and identity validation", {
 })
 
 test_that("telemetry snapshots normalize shared transport phases", {
-  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)

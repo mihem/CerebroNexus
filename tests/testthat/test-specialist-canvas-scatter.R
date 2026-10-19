@@ -11,7 +11,7 @@ if (is.na(inst_dir)) {
 viewer_dir <- file.path(inst_dir, "viewer")
 
 run_geom_node <- function(body) {
-  testthat::skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_no_node()
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
   writeLines(
