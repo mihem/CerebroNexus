@@ -2,7 +2,13 @@
 
 script_arg <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 repo_root <- if (length(script_arg)) {
-  dirname(normalizePath(sub("^--file=", "", script_arg[[1L]]), mustWork = TRUE))
+  script <- normalizePath(
+    sub("^--file=", "", script_arg[[1L]]),
+    mustWork = TRUE
+  )
+  ## dirname() turns Windows separators into "/"; normalise again so both
+  ## branches return the same form.
+  normalizePath(dirname(script), mustWork = TRUE)
 } else {
   normalizePath(".", mustWork = TRUE)
 }
