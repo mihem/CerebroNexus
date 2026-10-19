@@ -3361,26 +3361,41 @@ is_cerebro_dataset <- function(object) {
     any(startsWith(class(object), "Cerebro"))
 }
 
-getExperiment <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExperiment())
+## Getters that forward to the loaded data set's method of the same name and
+## return NULL while no data set is loaded.
+.viewerForwardGetter <- function(method) {
+  force(method)
+  function(...) {
+    if (is_cerebro_dataset(data_set())) {
+      return(data_set()[[method]](...))
+    }
   }
 }
-getParameters <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getParameters())
-  }
+for (getter in c(
+  "getExperiment",
+  "getParameters",
+  "getGroups",
+  "getCellCycle",
+  "getMetaData",
+  "getProjection",
+  "getMethodsForMarkerGenes",
+  "getGroupsWithMarkerGenes",
+  "getMarkerGenes",
+  "getMethodsForTrajectories",
+  "getNamesOfTrajectories",
+  "getTrajectory",
+  "getGroupsWithMostExpressedGenes",
+  "getMethodsForEnrichedPathways",
+  "getGroupsWithEnrichedPathways",
+  "getEnrichedPathways",
+  "checkForExtraPlots",
+  "getNamesOfExtraPlots",
+  "getExtraPlot"
+)) {
+  assign(getter, .viewerForwardGetter(getter))
 }
-getTechnicalInfo <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getTechnicalInfo())
-  }
-}
-getGeneLists <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGeneLists())
-  }
-}
+rm(getter)
+viewerGetMostExpressedGenes <- .viewerForwardGetter("getMostExpressedGenes")
 getGeneNames <- function() {
   cache <- viewerProjectionFirstFrameCache()
   if (!is.null(cache$gene_names)) {
@@ -3388,11 +3403,6 @@ getGeneNames <- function() {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$getGeneNames())
-  }
-}
-getGroups <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroups())
   }
 }
 getGroupLevels <- function(group) {
@@ -3403,16 +3413,6 @@ getGroupLevels <- function(group) {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$getGroupLevels(group))
-  }
-}
-getCellCycle <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getCellCycle())
-  }
-}
-getMetaData <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMetaData())
   }
 }
 .runtimeCerebroCellCount <- function(object) {
@@ -3445,41 +3445,6 @@ availableProjections <- function() {
   }
   if (is_cerebro_dataset(data_set())) {
     return(data_set()$availableProjections())
-  }
-}
-getProjection <- function(name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getProjection(name))
-  }
-}
-getMethodsForMarkerGenes <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForMarkerGenes())
-  }
-}
-getGroupsWithMarkerGenes <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithMarkerGenes(method))
-  }
-}
-getMarkerGenes <- function(method, group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMarkerGenes(method, group))
-  }
-}
-getMethodsForTrajectories <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForTrajectories())
-  }
-}
-getNamesOfTrajectories <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getNamesOfTrajectories(method))
-  }
-}
-getTrajectory <- function(method, name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getTrajectory(method, name))
   }
 }
 
@@ -3557,9 +3522,20 @@ getVariableToCompareChoices <- function() {
   return(all_cols)
 }
 
-getMitoColumn <- function() {
+## The first metadata column that matches the earliest of `patterns`, or NULL.
+firstColumnMatching <- function(patterns) {
   cols <- colnames(getMetaData())
-  patterns <- c(
+  for (pattern in patterns) {
+    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
+    if (length(matches) > 0) {
+      return(matches[1])
+    }
+  }
+  NULL
+}
+
+getMitoColumn <- function() {
+  firstColumnMatching(c(
     "^percent[_.]?mt$",
     "^percent[_.]?mito$",
     "^percent[_.]?mitochondrial$",
@@ -3571,14 +3547,7 @@ getMitoColumn <- function() {
     "^mitochondrial[_.]?percent$",
     "^mito[_.]?pct$",
     "^mt[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasMitoColumn <- function() {
@@ -3586,8 +3555,7 @@ hasMitoColumn <- function() {
 }
 
 getRiboColumn <- function() {
-  cols <- colnames(getMetaData())
-  patterns <- c(
+  firstColumnMatching(c(
     "^percent[_.]?ribo$",
     "^percent[_.]?ribosomal$",
     "^pct[_.]?ribo$",
@@ -3596,14 +3564,7 @@ getRiboColumn <- function() {
     "^ribosomal[_.]?percent$",
     "^ribo[_.]?pct$",
     "^ribosomal[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasRiboColumn <- function() {
@@ -3611,8 +3572,7 @@ hasRiboColumn <- function() {
 }
 
 getEryColumn <- function() {
-  cols <- colnames(getMetaData())
-  patterns <- c(
+  firstColumnMatching(c(
     "^percent[_.]?ery$",
     "^percent[_.]?erythrocyte$",
     "^percent[_.]?hb$",
@@ -3634,14 +3594,7 @@ getEryColumn <- function() {
     "^ery[_.]?pct$",
     "^hb[_.]?pct$",
     "^hgb[_.]?pct$"
-  )
-  for (pattern in patterns) {
-    matches <- grep(pattern, cols, ignore.case = TRUE, value = TRUE)
-    if (length(matches) > 0) {
-      return(matches[1])
-    }
-  }
-  return(NULL)
+  ))
 }
 
 hasEryColumn <- function() {
@@ -4341,33 +4294,6 @@ getGroupsWithMeanExpression <- function() {
   }
   tryCatch(ds$getGroupsWithMeanExpression(), error = function(e) character(0))
 }
-getGroupsWithMostExpressedGenes <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithMostExpressedGenes())
-  }
-}
-viewerGetMostExpressedGenes <- function(group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMostExpressedGenes(group))
-  }
-}
-
-## Wrapper functions for enriched_pathways module.
-getMethodsForEnrichedPathways <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getMethodsForEnrichedPathways())
-  }
-}
-getGroupsWithEnrichedPathways <- function(method) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getGroupsWithEnrichedPathways(method))
-  }
-}
-getEnrichedPathways <- function(method, group) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getEnrichedPathways(method, group))
-  }
-}
 
 ## Wrapper functions for extra_material module. Generated external tables are
 ## private RDS assets and are loaded only after the user chooses a sheet.
@@ -4639,21 +4565,6 @@ getExtraMaterialCategories <- function() {
 }
 checkForExtraTables <- function() {
   length(extra_material_table_groups()) > 0L
-}
-checkForExtraPlots <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$checkForExtraPlots())
-  }
-}
-getNamesOfExtraPlots <- function() {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getNamesOfExtraPlots())
-  }
-}
-getExtraPlot <- function(name) {
-  if (is_cerebro_dataset(data_set())) {
-    return(data_set()$getExtraPlot(name))
-  }
 }
 
 ## Wrapper for immune repertoire module.
