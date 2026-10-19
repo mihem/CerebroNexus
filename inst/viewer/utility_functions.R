@@ -2516,59 +2516,20 @@ findColumnsInteger <- function(df, columns_to_test) {
   return(columns_indices)
 }
 
-findColumnsPercentage <- function(df) {
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(colnames(df)[i], pattern = "pct|percent|%", ignore.case = TRUE) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        min(df[[i]], na.rm = TRUE) >= 0 &&
-        max(df[[i]], na.rm = TRUE) <= 100
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
-}
-
-findColumnsPValues <- function(df) {
-  pattern_columns_p_value <- "pval|p_val|p-val|p.val|padj|p_adj|p-adj|p.adj|adjp|adj_p|adj-p|adj.p|FDR|qval|q_val|q-val|q.val"
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(
-        colnames(df)[i],
-        pattern = pattern_columns_p_value,
-        ignore.case = TRUE
-      ) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]]) &&
-        min(df[[i]], na.rm = TRUE) >= 0 &&
-        max(df[[i]], na.rm = TRUE) <= 1
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
-}
-
-findColumnsLogFC <- function(df) {
-  columns_indices <- c()
-  for (i in 1:ncol(df)) {
-    if (
-      grepl(
-        colnames(df)[i],
-        pattern = "logFC|log-FC|log_FC|log.FC",
-        ignore.case = TRUE
-      ) &&
-        any(is.na(df[[i]])) == FALSE &&
-        is.numeric(df[[i]])
-    ) {
-      columns_indices <- c(columns_indices, i)
-    }
-  }
-  return(columns_indices)
+## Numeric columns without NA whose name matches `pattern` and whose values lie
+## within [lower, upper].
+findColumnsMatching <- function(df, pattern, lower = -Inf, upper = Inf) {
+  which(vapply(
+    seq_along(df),
+    function(i) {
+      values <- df[[i]]
+      grepl(colnames(df)[i], pattern = pattern, ignore.case = TRUE) &&
+        !anyNA(values) &&
+        is.numeric(values) &&
+        all(values >= lower & values <= upper)
+    },
+    logical(1)
+  ))
 }
 
 ##----------------------------------------------------------------------------##
@@ -2667,16 +2628,25 @@ prettifyTable <- function(
 
   ## identify which columns might contain percentages, p-values, and logFC
   columns_percent <- if (classify_values) {
-    findColumnsPercentage(table)
+    findColumnsMatching(table, "pct|percent|%", 0, 100)
   } else {
     integer()
   }
   columns_p_value <- if (classify_values) {
-    findColumnsPValues(table)
+    findColumnsMatching(
+      table,
+      "pval|p_val|p-val|p.val|padj|p_adj|p-adj|p.adj|adjp|adj_p|adj-p|adj.p|FDR|qval|q_val|q-val|q.val",
+      0,
+      1
+    )
   } else {
     integer()
   }
-  columns_logFC <- if (classify_values) findColumnsLogFC(table) else integer()
+  columns_logFC <- if (classify_values) {
+    findColumnsMatching(table, "logFC|log-FC|log_FC|log.FC")
+  } else {
+    integer()
+  }
 
   ## find columns with very long (character) content so that they can be
   ## hidden
@@ -2695,9 +2665,7 @@ prettifyTable <- function(
   }
 
   ## add manually specified column types
-  if (is.null(columns_percentage) == FALSE) {
-    columns_percent <- c(columns_percent, columns_percentage)
-  }
+  columns_percent <- c(columns_percent, columns_percentage)
 
   ## check whether percentage values were given on a 0-100 scale and convert
   ## them to 0-1 if so. Selected-cells slices often carry NA in percent_mt /
@@ -2850,10 +2818,7 @@ prettifyTable <- function(
   ##   significant decimals
   if (number_formatting == TRUE) {
     ## integer values
-    if (
-      !is.null(columns_integer) &&
-        length(columns_integer) > 0
-    ) {
+    if (length(columns_integer)) {
       table <- table %>%
         DT::formatRound(
           columns = columns_integer,
@@ -2864,51 +2829,27 @@ prettifyTable <- function(
     }
 
     ## p-values
-    if (
-      !is.null(columns_p_value) &&
-        length(columns_p_value) > 0
-    ) {
+    if (length(columns_p_value)) {
       table <- table %>%
-        DT::formatSignif(
-          columns = columns_p_value,
-          digits = 3
-        )
+        DT::formatSignif(columns = columns_p_value, digits = 3)
     }
 
     ## logFC
-    if (
-      !is.null(columns_logFC) &&
-        length(columns_logFC) > 0
-    ) {
+    if (length(columns_logFC)) {
       table <- table %>%
-        DT::formatRound(
-          columns = columns_logFC,
-          digits = 3
-        )
+        DT::formatRound(columns = columns_logFC, digits = 3)
     }
 
     ## percentage
-    if (
-      !is.null(columns_percent) &&
-        length(columns_percent) > 0
-    ) {
+    if (length(columns_percent)) {
       table <- table %>%
-        DT::formatPercentage(
-          columns = columns_percent,
-          digits = 2
-        )
+        DT::formatPercentage(columns = columns_percent, digits = 2)
     }
 
     ## numeric but none of the above
-    if (
-      !is.null(columns_only_numeric) &&
-        length(columns_only_numeric) > 0
-    ) {
+    if (length(columns_only_numeric)) {
       table <- table %>%
-        DT::formatSignif(
-          columns = columns_only_numeric,
-          digits = 3
-        )
+        DT::formatSignif(columns = columns_only_numeric, digits = 3)
     }
   }
 
@@ -2924,13 +2865,12 @@ prettifyTable <- function(
     up_col <- if (is.null(chart_theme)) "#4c9a6b" else chart_theme$up
     down_col <- if (is.null(chart_theme)) "#c05b5b" else chart_theme$down
 
-    ## integer
-    if (
-      !is.null(columns_integer) &&
-        length(columns_integer) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_integer) {
+    ## 101-step white-to-accent background over each column's own range.
+    ramp <- function(table, columns) {
+      if (nrow(table_original) <= 1) {
+        return(table)
+      }
+      for (i in columns) {
         range <- range(table_original[[i]])
         if (range[1] != range[2]) {
           table <- table %>%
@@ -2943,85 +2883,46 @@ prettifyTable <- function(
             )
         }
       }
+      table
     }
-
-    ## p-values
-    if (
-      !is.null(columns_p_value) &&
-        length(columns_p_value) > 0
-    ) {
-      table <- table %>%
+    bar <- function(table, columns, data_range) {
+      if (!length(columns)) {
+        return(table)
+      }
+      table %>%
         DT::formatStyle(
-          columns = columns_p_value,
-          background = DT::styleColorBar(c(1, 0), bar_col),
+          columns = columns,
+          background = DT::styleColorBar(data_range, bar_col),
           backgroundSize = '98% 88%',
           backgroundRepeat = 'no-repeat',
           backgroundPosition = 'center'
         )
     }
-
-    ## logFC
-    if (
-      !is.null(columns_logFC) &&
-        length(columns_logFC) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_logFC) {
-        range <- range(table_original[[i]])
-        if (range[1] != range[2]) {
+    ## Columns whose values all have a colour in the named palette.
+    palette_colors <- function(table, palettes) {
+      for (i in which(colnames(table_original) %in% palettes)) {
+        colors <- reactive_colors()[[colnames(table_original)[i]]]
+        if (all(unique(table_original[[i]]) %in% names(colors))) {
           table <- table %>%
             DT::formatStyle(
-              columns = i,
-              backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
-              )
+              i,
+              backgroundColor = DT::styleEqual(names(colors), colors),
+              fontWeight = 'bold'
             )
         }
       }
+      table
     }
 
-    ## percentage
-    if (
-      !is.null(columns_percent) &&
-        length(columns_percent) > 0
-    ) {
-      table <- table %>%
-        DT::formatStyle(
-          columns = columns_percent,
-          background = DT::styleColorBar(c(0, 1), bar_col),
-          backgroundSize = '98% 88%',
-          backgroundRepeat = 'no-repeat',
-          backgroundPosition = 'center'
-        )
-    }
-
-    ## numeric values that are non of the above
-    if (
-      !is.null(columns_only_numeric) &&
-        length(columns_only_numeric) > 0 &&
-        nrow(table_original) > 1
-    ) {
-      for (i in columns_only_numeric) {
-        range <- range(table_original[[i]])
-        if (range[1] != range[2]) {
-          table <- table %>%
-            DT::formatStyle(
-              columns = i,
-              backgroundColor = DT::styleInterval(
-                seq(range[1], range[2], (range[2] - range[1]) / 100),
-                colorRampPalette(colors = c('white', ramp_hi))(102)
-              )
-            )
-        }
-      }
-    }
+    ## Keep this order: a column can receive a ramp and a later bar.
+    table <- ramp(table, columns_integer)
+    table <- bar(table, columns_p_value, c(1, 0))
+    table <- ramp(table, columns_logFC)
+    table <- bar(table, columns_percent, c(0, 1))
+    table <- ramp(table, columns_only_numeric)
 
     ## logicals
-    if (
-      !is.null(columns_logical) &&
-        length(columns_logical) > 0
-    ) {
+    if (length(columns_logical)) {
       table <- table %>%
         DT::formatStyle(
           columns_logical,
@@ -3030,51 +2931,9 @@ prettifyTable <- function(
         )
     }
 
-    ## grouping variables
-    columns_groups <- which(colnames(table_original) %in% getGroups())
-    if (length(columns_groups) > 0) {
-      for (i in columns_groups) {
-        group <- colnames(table_original)[i]
-        if (
-          all(
-            unique(table_original[[i]]) %in% names(reactive_colors()[[group]])
-          )
-        ) {
-          table <- table %>%
-            DT::formatStyle(
-              i,
-              backgroundColor = DT::styleEqual(
-                names(reactive_colors()[[group]]),
-                reactive_colors()[[group]]
-              ),
-              fontWeight = 'bold'
-            )
-        }
-      }
-    }
-
-    ## cell cycle assignments
-    columns_cell_cycle <- which(colnames(table_original) %in% getCellCycle())
-    if (length(columns_cell_cycle) > 0) {
-      for (i in columns_cell_cycle) {
-        method <- colnames(table_original)[i]
-        if (
-          all(
-            unique(table_original[[i]]) %in% names(reactive_colors()[[method]])
-          )
-        ) {
-          table <- table %>%
-            DT::formatStyle(
-              i,
-              backgroundColor = DT::styleEqual(
-                names(reactive_colors()[[method]]),
-                reactive_colors()[[method]]
-              ),
-              fontWeight = 'bold'
-            )
-        }
-      }
-    }
+    ## grouping variables and cell cycle assignments
+    table <- palette_colors(table, getGroups())
+    table <- palette_colors(table, getCellCycle())
   }
 
   ## return the table
