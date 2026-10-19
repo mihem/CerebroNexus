@@ -779,7 +779,7 @@ convertCerebro <- function(input, output = input, codec = c("qs2", "rds")) {
   if (
     valid_output &&
       !identical(
-        dirname(input),
+        normalizePath(dirname(input), mustWork = FALSE),
         normalizePath(dirname(output), mustWork = FALSE)
       )
   ) {
