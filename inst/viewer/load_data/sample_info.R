@@ -1,4 +1,10 @@
-source(cerebro_root_path("viewer/load_data/overview_ui.R"), local = TRUE)
+source(
+  file.path(
+    Cerebro.options[["cerebro_root"]],
+    "viewer/load_data/overview_ui.R"
+  ),
+  local = TRUE
+)
 
 output$load_data_overview <- renderUI({
   viewerOverviewUI(current_dataset_info())
