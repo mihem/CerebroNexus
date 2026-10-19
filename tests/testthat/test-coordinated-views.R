@@ -220,6 +220,8 @@ run_config_transport_node <- function(body) {
     "window.FileReader=function(){this.readAsText=file=>{this.result=file.text;this.onload();};};",
     "const datasetContext={epoch:'session-1',dataset_key:'dataset-1',generation:1};",
     "window.CerebroDatasetContext={phase:()=> 'ready',current:()=>datasetContext,",
+    "  readyContext:()=>datasetContext,",
+    "  readyKey:()=>window.CerebroDatasetContext.key(datasetContext),",
     "  key:value=>value?JSON.stringify([value.epoch,value.dataset_key,value.generation]):'',",
     "  accepts:message=>!!(message&&message.dataset_context&&",
     "    message.dataset_context.epoch===datasetContext.epoch&&",

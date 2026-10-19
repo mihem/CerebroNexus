@@ -37,8 +37,7 @@
 
   function currentContextKey() {
     var api = contextApi();
-    return api && api.key && api.phase && api.phase() === 'ready'
-      ? api.key(api.current()) : '';
+    return api ? api.readyKey() : '';
   }
 
   function currentState(id, api) {
@@ -53,8 +52,7 @@
       var id = detail && detail.viewId;
       var api = contextApi();
       var eventContext = detail && detail.dataset_context;
-      if (id && SPECS[id] && api && api.same &&
-          api.phase() === 'ready' && api.same(eventContext, api.current())) {
+      if (id && SPECS[id] && api && api.same(eventContext, api.readyContext())) {
         readyContexts[id] = api.key(eventContext);
       }
     });

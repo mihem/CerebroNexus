@@ -19,12 +19,11 @@
   }
   function currentDatasetContext() {
     var api = datasetContextApi();
-    return api && api.phase && api.phase() === 'ready' ? api.current() : null;
+    return api ? api.readyContext() : null;
   }
   function currentDatasetContextKey() {
     var api = datasetContextApi();
-    var context = currentDatasetContext();
-    return api && api.key && context ? api.key(context) : '';
+    return api ? api.readyKey() : '';
   }
 
   function adapterFor(viewId) {

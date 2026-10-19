@@ -24,12 +24,11 @@
   }
   function currentContext() {
     var api = contextApi();
-    return api && api.phase && api.phase() === 'ready' ? api.current() : null;
+    return api ? api.readyContext() : null;
   }
   function currentContextKey() {
     var api = contextApi();
-    var context = currentContext();
-    return api && api.key && context ? api.key(context) : '';
+    return api ? api.readyKey() : '';
   }
   function fresh(message) {
     var api = contextApi();

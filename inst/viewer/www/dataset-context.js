@@ -71,6 +71,15 @@
     return currentPhase;
   }
 
+  // The context only once its load is ready, so callers never act on a pending one.
+  function readyContext() {
+    return currentPhase === 'ready' ? currentContext : null;
+  }
+
+  function readyKey() {
+    return key(readyContext());
+  }
+
   function snapshot() {
     return Object.freeze({
       phase: currentPhase,
@@ -90,8 +99,6 @@
 
     var previous = currentContext;
     var previousPhase = currentPhase;
-    var previousKey = key(previous);
-    var nextKey = key(next);
     if (retiredEpochs.has(next.epoch)) return false;
     if (previous) {
       if (next.epoch !== previous.epoch) {
@@ -115,40 +122,35 @@
     if (typeof message.selection === 'string') selectedValue = message.selection;
     if (nextPhase !== 'pending') pendingSelection = null;
     acceptNewEpoch = false;
+    publish(previous, previousPhase);
+    return true;
+  }
 
+  // Publishes the current context as the saved-view identity and announces it.
+  function publish(previous, previousPhase, extra) {
+    var next = currentContext;
+    var changed = !same(previous, next);
     var identity = Object.assign(
-      previousKey === nextKey ? (window.cerebroSavedViewDataset || {}) : {},
+      changed ? {} : (window.cerebroSavedViewDataset || {}),
       {
-      dataset_id: next.dataset_key,
-      dataset_key: next.dataset_key,
-      generation: next.generation,
-      epoch: next.epoch
+        dataset_id: next.dataset_key,
+        dataset_key: next.dataset_key,
+        generation: next.generation,
+        epoch: next.epoch
       }
     );
     window.cerebroSavedViewDataset = identity;
-
-    var detail = {
-      phase: nextPhase,
-      previousPhase: previousPhase,
-      dataset_context: next,
-      previous_context: previous,
-      changed: previousKey !== nextKey,
-      phaseChanged: previousPhase !== nextPhase,
-      identity: identity
-    };
-    window.dispatchEvent(new CustomEvent('cerebro:dataset-context', { detail: detail }));
-    // Older consumers still use this event to refresh identity-dependent UI.
-    // It is informational only; freshness decisions must use dataset_context.
-    window.dispatchEvent(new CustomEvent('cerebro:dataset-identity', {
-      detail: {
-        identity: identity,
-        changed: detail.changed,
-        first: !previousKey,
+    window.dispatchEvent(new CustomEvent('cerebro:dataset-context', {
+      detail: Object.assign({
+        phase: currentPhase,
+        previousPhase: previousPhase,
         dataset_context: next,
-        phase: nextPhase
-      }
+        previous_context: previous,
+        changed: changed,
+        phaseChanged: previousPhase !== currentPhase,
+        identity: identity
+      }, extra)
     }));
-    return true;
   }
 
   function bindShiny() {
@@ -173,39 +175,7 @@
     if (currentContext && currentPhase !== 'pending') {
       var previousPhase = currentPhase;
       currentPhase = 'pending';
-      var identity = Object.assign(
-        window.cerebroSavedViewDataset || {},
-        {
-          dataset_id: currentContext.dataset_key,
-          dataset_key: currentContext.dataset_key,
-          generation: currentContext.generation,
-          epoch: currentContext.epoch
-        }
-      );
-      window.cerebroSavedViewDataset = identity;
-      var detail = {
-        phase: 'pending',
-        previousPhase: previousPhase,
-        dataset_context: currentContext,
-        previous_context: currentContext,
-        changed: false,
-        phaseChanged: previousPhase !== 'pending',
-        identity: identity,
-        reconnect: true
-      };
-      window.dispatchEvent(new CustomEvent(
-        'cerebro:dataset-context',
-        { detail: detail }
-      ));
-      window.dispatchEvent(new CustomEvent('cerebro:dataset-identity', {
-        detail: {
-          identity: identity,
-          changed: false,
-          first: false,
-          dataset_context: currentContext,
-          phase: 'pending'
-        }
-      }));
+      publish(currentContext, previousPhase, { reconnect: true });
     }
     if (window.Shiny && Shiny.setInputValue) {
       connectionSequence += 1;
@@ -246,6 +216,8 @@
     acceptsProgress: acceptsProgress,
     current: current,
     phase: phase,
+    readyContext: readyContext,
+    readyKey: readyKey,
     snapshot: snapshot,
     receive: receive,
     beginConnection: onConnected,
