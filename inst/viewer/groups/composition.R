@@ -12,36 +12,15 @@ groupsMetadataColumns <- function(columns) {
 ## avoids sorting all cells and starting the full dplyr grouping pipeline on the
 ## first visit. The returned columns and factor levels match calculateTableAB().
 groupsCalculateTableAB <- function(table, groupA, groupB, mode, percent) {
-  values_a <- table[[groupA]]
-  values_b <- table[[groupB]]
-  if (is.character(values_a)) {
-    values_a <- factor(
-      values_a,
-      levels = sort(unique(values_a)),
-      exclude = NULL
-    )
+  ## Characters and other non-factors become factors over their sorted values.
+  as_levels <- function(values) {
+    if (is.factor(values)) {
+      return(values)
+    }
+    factor(values, levels = sort(unique(values)), exclude = NULL)
   }
-  if (is.character(values_b)) {
-    values_b <- factor(
-      values_b,
-      levels = sort(unique(values_b)),
-      exclude = NULL
-    )
-  }
-  if (!is.factor(values_a)) {
-    values_a <- factor(
-      values_a,
-      levels = sort(unique(values_a)),
-      exclude = NULL
-    )
-  }
-  if (!is.factor(values_b)) {
-    values_b <- factor(
-      values_b,
-      levels = sort(unique(values_b)),
-      exclude = NULL
-    )
-  }
+  values_a <- as_levels(table[[groupA]])
+  values_b <- as_levels(table[[groupB]])
 
   factor_codes <- function(values) {
     codes <- as.integer(values)

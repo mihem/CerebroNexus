@@ -5866,14 +5866,15 @@ cerebroResultTable <- function(
   color_highlighting = TRUE,
   hide_long_columns = TRUE,
   columns_hide = NULL,
-  columns_percentage = NULL
+  columns_percentage = NULL,
+  filter = list(position = "top", clear = TRUE)
 ) {
   if (!nrow(results_df)) {
     return(prepareEmptyTable(as.data.frame(results_df)[0, , drop = FALSE]))
   }
   prettifyTable(
     results_df,
-    filter = list(position = "top", clear = TRUE),
+    filter = filter,
     dom = "Bfrtlip",
     show_buttons = TRUE,
     number_formatting = number_formatting,

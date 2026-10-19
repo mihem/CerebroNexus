@@ -22,9 +22,6 @@ tab_groups <- tabItem(
     #groups_by_other_group_table .table th {
       text-align: center;
     }
-    #groups_by_cell_cycle_table .table th {
-      text-align: center;
-    }
     "
   ),
   div(class = "cerebro-viz-page-heading", h1("Groups")),
