@@ -331,7 +331,13 @@ output$hla_associations_ui <- renderUI({
 ## `skeleton` is the empty data frame the widget is rendered from; `headers`,
 ## when given, is called inside the render so it may read reactives. Returns the
 ## proxy.
-hla_overlap_live_table <- function(id, data, skeleton, options, headers = NULL) {
+hla_overlap_live_table <- function(
+  id,
+  data,
+  skeleton,
+  options,
+  headers = NULL
+) {
   output[[id]] <- DT::renderDataTable(
     DT::datatable(
       style = "bootstrap",

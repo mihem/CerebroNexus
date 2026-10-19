@@ -286,4 +286,3 @@ IR_PARAM_DESC <- list(
   ir_d_alpha = "Point opacity (0 = transparent, 1 = solid). Lower values help when points overlap heavily.",
   ir_d_percentage_cells_to_show = "Percentage of cells sampled for the clonal projection. Lower values can improve performance for large datasets."
 )
-

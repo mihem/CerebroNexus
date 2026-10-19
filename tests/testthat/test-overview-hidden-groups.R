@@ -105,10 +105,13 @@ test_that("viewerVisibleSelection reads cells only when a group is hidden", {
   }
   expect_identical(visible(NULL), selection)
   expect_identical(
-    visible(list(groups = "a", dataset_context = modifyList(
-      context,
-      list(generation = 2)
-    ))),
+    visible(list(
+      groups = "a",
+      dataset_context = modifyList(
+        context,
+        list(generation = 2)
+      )
+    )),
     selection
   )
   expect_identical(reads, 0L)

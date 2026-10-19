@@ -410,8 +410,14 @@ test_that("trajectory expression metric outputs keep their IDs, messages and cac
         list(
           nUMI = c(y_title = "Number of transcripts", mode = "integer"),
           nGene = c(y_title = "Number of expressed genes", mode = "integer"),
-          percent.mt = c(y_title = "Percentage of transcripts", mode = "percent"),
-          percent.hb = c(y_title = "Percentage of transcripts", mode = "percent")
+          percent.mt = c(
+            y_title = "Percentage of transcripts",
+            mode = "percent"
+          ),
+          percent.hb = c(
+            y_title = "Percentage of transcripts",
+            mode = "percent"
+          )
         )
       )
       expect_error(

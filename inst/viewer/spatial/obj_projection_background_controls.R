@@ -277,7 +277,15 @@ local({
     })
   }
   lapply(
-    c("opacity", "offset_x", "offset_y", "scale", "scale_x", "scale_y", "rotate"),
+    c(
+      "opacity",
+      "offset_x",
+      "offset_y",
+      "scale",
+      "scale_x",
+      "scale_y",
+      "rotate"
+    ),
     function(name) {
       slider_id <- paste0("spatial_projection_background_", name)
       sync_slider_numeric(slider_id, paste0(slider_id, "_num"))
