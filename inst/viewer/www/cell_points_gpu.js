@@ -75,6 +75,29 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
   return color;
 }`;
 
+  // Validates point data for setData and returns the record a renderer keeps.
+  function checkData(next, label) {
+    if (!next || !next.positions || !next.colors || !next.layers) {
+      throw new Error(label + ' point data is incomplete.');
+    }
+    var count = Number(next.count) || 0;
+    if (next.positions.length < count * 2 || next.colors.length < count * 4 ||
+        next.layers.length < count) {
+      throw new Error(label + ' point buffers are shorter than count.');
+    }
+    return {
+      positions: next.positions,
+      colors: next.colors,
+      layers: next.layers,
+      count: count,
+      foreground: !!next.foreground
+    };
+  }
+  function sameData(a, b) {
+    return !!a && a.positions === b.positions && a.colors === b.colors &&
+      a.layers === b.layers && a.count === b.count && a.foreground === b.foreground;
+  }
+
   var sharedResources = null;
   function prepare() {
     if (sharedResources) return sharedResources;
@@ -245,17 +268,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
 
     function setData(next) {
       if (!ready) throw new Error('WebGPU renderer is not ready.');
-      if (!next || !next.positions || !next.colors || !next.layers) {
-        throw new Error('WebGPU point data is incomplete.');
-      }
-      var count = Number(next.count) || 0;
-      if (next.positions.length < count * 2 || next.colors.length < count * 4 ||
-          next.layers.length < count) {
-        throw new Error('WebGPU point buffers are shorter than count.');
-      }
-      if (data && data.positions === next.positions && data.colors === next.colors &&
-          data.layers === next.layers && data.count === count &&
-          data.foreground === !!next.foreground) return;
+      next = checkData(next, 'WebGPU');
+      if (sameData(data, next)) return;
       var started = performance.now();
       if (!data || data.positions !== next.positions) {
         positionBuffer = replaceBuffer(positionBuffer, next.positions);
@@ -267,14 +281,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       if (!data || data.layers !== next.layers) {
         layerBuffer = replaceBuffer(layerBuffer, next.layers);
       }
-      data = {
-        positions: next.positions,
-        colors: next.colors,
-        layers: next.layers,
-        count: count,
-        foreground: !!next.foreground
-      };
-      metrics.pointCount = count;
+      data = next;
+      metrics.pointCount = next.count;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
@@ -295,10 +303,8 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
       ]);
     }
 
-    function draw(options) {
-      if (!ready || !data) return false;
-      options = options || {};
-      var started = performance.now();
+    // Clears the canvas and, when given, records the point draws in one pass.
+    function submitPass(drawPoints) {
       var encoder = device.createCommandEncoder();
       var pass = encoder.beginRenderPass({
         colorAttachments: [{
@@ -308,7 +314,16 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           storeOp: 'store'
         }]
       });
-      if (data.count && Number(options.pointSize)) {
+      if (drawPoints) drawPoints(pass);
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    }
+
+    function draw(options) {
+      if (!ready || !data) return false;
+      options = options || {};
+      var started = performance.now();
+      submitPass(data.count && Number(options.pointSize) ? function (pass) {
         pass.setPipeline(pipeline);
         pass.setVertexBuffer(0, positionBuffer);
         pass.setVertexBuffer(1, colorBuffer);
@@ -325,26 +340,13 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4f {
           pass.setBindGroup(0, bindGroups[0]);
           pass.draw(4, data.count);
         }
-      }
-      pass.end();
-      device.queue.submit([encoder.finish()]);
+      } : null);
       metrics.drawSubmitMs = performance.now() - started;
       return true;
     }
 
     function clear() {
-      if (!ready) return;
-      var encoder = device.createCommandEncoder();
-      var pass = encoder.beginRenderPass({
-        colorAttachments: [{
-          view: context.getCurrentTexture().createView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: 'clear',
-          storeOp: 'store'
-        }]
-      });
-      pass.end();
-      device.queue.submit([encoder.finish()]);
+      if (ready) submitPass(null);
     }
 
     resize(canvas.clientWidth || 1, canvas.clientHeight || 1,
@@ -548,17 +550,8 @@ void main() {
 
     function setData(next) {
       if (!ready) throw new Error('WebGL2 renderer is not ready.');
-      if (!next || !next.positions || !next.colors || !next.layers) {
-        throw new Error('WebGL2 point data is incomplete.');
-      }
-      var count = Number(next.count) || 0;
-      if (next.positions.length < count * 2 || next.colors.length < count * 4 ||
-          next.layers.length < count) {
-        throw new Error('WebGL2 point buffers are shorter than count.');
-      }
-      if (data && data.positions === next.positions && data.colors === next.colors &&
-          data.layers === next.layers && data.count === count &&
-          data.foreground === !!next.foreground) return;
+      next = checkData(next, 'WebGL2');
+      if (sameData(data, next)) return;
       lastFrame = null;
       var started = performance.now();
       gl.useProgram(program);
@@ -572,14 +565,8 @@ void main() {
       if (!data || data.layers !== next.layers) {
         upload(layerBuffer, 2, next.layers, true);
       }
-      data = {
-        positions: next.positions,
-        colors: next.colors,
-        layers: next.layers,
-        count: count,
-        foreground: !!next.foreground
-      };
-      metrics.pointCount = count;
+      data = next;
+      metrics.pointCount = next.count;
       metrics.uploadSubmitMs = performance.now() - started;
     }
 
@@ -624,29 +611,13 @@ void main() {
         gl.ONE,
         gl.ONE_MINUS_SRC_ALPHA
       );
-      gl.uniform3f(
-        locations.view,
-        Number(view.cx),
-        Number(view.cy),
-        Math.max(1e-9, Number(view.span))
-      );
-      gl.uniform4f(
-        locations.rect,
-        Number(rect.x), Number(rect.y), Number(rect.width), Number(rect.height)
-      );
+      gl.uniform3f(locations.view, frame[0], frame[1], frame[2]);
+      gl.uniform4f(locations.rect, frame[3], frame[4], frame[5], frame[6]);
       gl.uniform2f(locations.canvasSize, width, height);
-      gl.uniform1f(locations.pointSize, Math.max(0, Number(options.pointSize) || 0));
-      gl.uniform1f(
-        locations.borderWidth,
-        border ? Math.max(0, Number(border.width) || 0) : 0
-      );
-      gl.uniform4f(
-        locations.borderColor,
-        borderValue[0] / 255,
-        borderValue[1] / 255,
-        borderValue[2] / 255,
-        borderValue[3] / 255
-      );
+      gl.uniform1f(locations.pointSize, frame[7]);
+      gl.uniform1f(locations.borderWidth, frame[8]);
+      gl.uniform4f(locations.borderColor,
+        frame[9] / 255, frame[10] / 255, frame[11] / 255, frame[12] / 255);
       gl.uniform1f(locations.pixelRatio, pixelRatio);
       if (data.count && Number(options.pointSize)) {
         if (data.foreground) {
@@ -697,10 +668,5 @@ void main() {
   }
 
   if (navigator.gpu) prepare().catch(function () {});
-  global.CerebroPointRenderer = {
-    backend: 'gpu',
-    create: create,
-    prepare: prepare,
-    createWebGl: createWebGl
-  };
+  global.CerebroPointRenderer = { create: create, createWebGl: createWebGl };
 })(window);
