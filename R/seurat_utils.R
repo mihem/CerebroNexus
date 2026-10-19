@@ -622,10 +622,8 @@
   }
 
   if (verbose) {
-    message(
-      "[",
-      format(Sys.time(), "%H:%M:%S"),
-      "] Joining layer partition for `",
+    .logStep(
+      "Joining layer partition for `",
       requested_layer,
       "`: ",
       paste(partition$layers, collapse = ", ")
@@ -1100,13 +1098,41 @@
   return(expr_matrix)
 }
 
+## `.getExpressionMatrix()` with split Seurat v5 layers joined, followed by the
+## check that the matrix covers exactly the object's cells. Returns the
+## resolution with the validated matrix in `data`. `.getExpressionMatrix()`
+## already stops on a missing or empty matrix.
+.getValidatedExpression <- function(
+  seurat,
+  assay,
+  slot,
+  allow_cross_semantic_fallback = FALSE
+) {
+  resolution <- .getExpressionMatrix(
+    seurat = seurat,
+    assay = assay,
+    slot = slot,
+    join_samples = TRUE,
+    allow_cross_semantic_fallback = allow_cross_semantic_fallback,
+    return_resolution = TRUE
+  )
+  resolution$data <- .validate_expression_cells(
+    expression_data = resolution$data,
+    object_cells = colnames(seurat),
+    assay = assay,
+    requested_layer = resolution$requested,
+    resolved_layer = resolution$resolved
+  )
+  resolution
+}
+
 # Internal utilities shared across extraction helpers ---------------------------
 #' @keywords internal
 #' @noRd
 
 .spx_msg <- function(..., verbose = FALSE) {
   if (isTRUE(verbose)) {
-    message("[", format(Sys.time(), "%H:%M:%S"), "] ", ...)
+    .logStep(...)
   }
 }
 
@@ -1126,8 +1152,6 @@
   }
   slot_name %in% methods::slotNames(obj)
 }
-
-`%||%` <- function(a, b) if (is.null(a)) b else a
 
 # Extract spatial coordinates and expression from a Seurat object --------------
 #
@@ -1526,7 +1550,7 @@
   # 1. Expression matrix ------------------------------------------------------
   if (!is.null(expression_data)) {
     expr_data <- expression_data
-  } else if (exists(".getExpressionMatrix", mode = "function")) {
+  } else {
     expr_data <- .getExpressionMatrix(
       seurat = object,
       assay = assay,
@@ -1534,14 +1558,6 @@
       join_samples = join_samples,
       verbose = verbose
     )
-  } else {
-    seurat_version <- as.character(utils::packageVersion("Seurat"))
-    is_v5 <- utils::compareVersion(seurat_version, "5.0.0") >= 0
-    expr_data <- if (is_v5) {
-      Seurat::GetAssayData(object, assay = assay, layer = slot)
-    } else {
-      Seurat::GetAssayData(object, assay = assay, slot = slot)
-    }
   }
 
   valid_cells <- colnames(expr_data)

@@ -41,3 +41,29 @@ test_that("bundled PBMC Seurat input converts into a standalone Shiny app", {
   expect_true(file.exists(file.path(app_dir, "cerebro_config.rds")))
   expect_true(dir.exists(file.path(app_dir, "private-data")))
 })
+
+test_that("convertSeuratToCerebro skips non-data.frame most_expressed_genes", {
+  seurat <- readRDS(system.file(
+    "extdata/examples/pbmc_seurat.rds",
+    package = "CerebroNexus"
+  ))
+  result_dir <- withr::local_tempdir()
+  table <- data.frame(gene = "MS4A1", pct = 1)
+
+  ## A skipped element in the middle used to shift the later indices and fail
+  ## with "subscript out of bounds".
+  expect_warning(
+    suppressMessages(convertSeuratToCerebro(
+      seurat,
+      result_dir = result_dir,
+      experiment_name = "meg",
+      groups = c("sample", "seurat_clusters"),
+      most_expressed_genes = list(sample = table, "not a table", table),
+      codec = "rds",
+      verbose = TRUE
+    )),
+    "Element 2 in most_expressed_genes is not a data.frame"
+  )
+  crb <- readRDS(file.path(result_dir, "cerebro_meg.crb"))
+  expect_identical(crb$most_expressed_genes, list(sample = table))
+})

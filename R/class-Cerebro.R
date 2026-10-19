@@ -1015,22 +1015,16 @@ Cerebro <- R6::R6Class(
     #' @return
     #' \code{data.frame} containing the enriched pathways.
     getEnrichedPathways = function(method, group_name) {
-      if (method %in% self$getMethodsWithEnrichedPathways() == FALSE) {
-        stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
-      } else {
-        if (
-          group_name %in% self$getGroupsWithEnrichedPathways(method) == FALSE
-        ) {
-          stop(
-            glue::glue(
-              'Group `{group_name}` is not available for method `{method}`.'
-            ),
-            call. = FALSE
-          )
-        } else {
-          return(self$enriched_pathways[[method]][[group_name]])
-        }
+      ## getGroupsWithEnrichedPathways() rejects an unknown method
+      if (group_name %in% self$getGroupsWithEnrichedPathways(method) == FALSE) {
+        stop(
+          glue::glue(
+            'Group `{group_name}` is not available for method `{method}`.'
+          ),
+          call. = FALSE
+        )
       }
+      return(self$enriched_pathways[[method]][[group_name]])
     },
 
     #' @description
@@ -1076,20 +1070,16 @@ Cerebro <- R6::R6Class(
     #' @return
     #' Trajectory data as \code{data.frame} or \code{list}.
     getTrajectory = function(method, trajectory_name) {
-      if (method %in% self$getMethodsForTrajectories() == FALSE) {
-        stop(glue::glue('Method `{method}` is not available.'), call. = FALSE)
-      } else {
-        if (trajectory_name %in% self$getNamesOfTrajectories(method) == FALSE) {
-          stop(
-            glue::glue(
-              'Trajectory `{trajectory_name}` is not available for method `{method}`.'
-            ),
-            call. = FALSE
-          )
-        } else {
-          return(self$trajectories[[method]][[trajectory_name]])
-        }
+      ## getNamesOfTrajectories() rejects an unknown method
+      if (trajectory_name %in% self$getNamesOfTrajectories(method) == FALSE) {
+        stop(
+          glue::glue(
+            'Trajectory `{trajectory_name}` is not available for method `{method}`.'
+          ),
+          call. = FALSE
+        )
       }
+      return(self$trajectories[[method]][[trajectory_name]])
     },
 
     #' @description
@@ -1162,25 +1152,12 @@ Cerebro <- R6::R6Class(
             call. = FALSE
           )
         }
-        repertoire_file <- file.path(backend$root, backend$file)
-        if (!file.exists(repertoire_file) || dir.exists(repertoire_file)) {
-          stop("The immune repertoire sidecar is missing.", call. = FALSE)
-        }
-        checksum <- unname(tools::md5sum(repertoire_file))
-        if (!identical(checksum, backend$md5)) {
-          stop(
-            "The immune repertoire sidecar checksum does not match.",
-            call. = FALSE
-          )
-        }
-        connection <- file(repertoire_file, open = "rb")
-        magic <- readBin(connection, "raw", n = 4L)
-        close(connection)
-        repertoire <- if (identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
-          qs2::qs_read(repertoire_file)
-        } else {
-          readRDS(repertoire_file)
-        }
+        repertoire <- private$readSidecar(
+          file.path(backend$root, backend$file),
+          backend$md5,
+          "The immune repertoire sidecar is missing.",
+          "The immune repertoire sidecar checksum does not match."
+        )
         if (!is.list(repertoire)) {
           stop("The immune repertoire sidecar is invalid.", call. = FALSE)
         }
@@ -1356,34 +1333,16 @@ Cerebro <- R6::R6Class(
         if (!valid_backend || !valid_ref) {
           stop("Spatial molecule sidecar descriptor is invalid.", call. = FALSE)
         }
-        molecule_file <- file.path(backend$root, molecules$file)
-        if (!file.exists(molecule_file) || dir.exists(molecule_file)) {
-          stop(
-            "Spatial molecule sidecar is missing for `",
-            name,
-            "`.",
-            call. = FALSE
-          )
-        }
-        checksum <- unname(tools::md5sum(molecule_file))
-        if (!identical(checksum, molecules$md5)) {
-          stop(
+        data[["molecules"]] <- private$readSidecar(
+          file.path(backend$root, molecules$file),
+          molecules$md5,
+          paste0("Spatial molecule sidecar is missing for `", name, "`."),
+          paste0(
             "Spatial molecule sidecar checksum does not match for `",
             name,
-            "`.",
-            call. = FALSE
+            "`."
           )
-        }
-        connection <- file(molecule_file, open = "rb")
-        magic <- readBin(connection, "raw", n = 4L)
-        close(connection)
-        data[["molecules"]] <- if (
-          identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))
-        ) {
-          qs2::qs_read(molecule_file)
-        } else {
-          readRDS(molecule_file)
-        }
+        )
         self$spatial[[name]] <- data
       }
       context <- paste0("Spatial data `", name, "`")
@@ -1679,12 +1638,7 @@ Cerebro <- R6::R6Class(
       }
 
       ## stop if `name` is already used
-      if (
-        !is.null(self$extra_material) &&
-          !is.null(self$extra_material$tables) &&
-          is.list(self$extra_material$tables) &&
-          name %in% names(self$extra_material$tables)
-      ) {
+      if (name %in% names(self$extra_material$tables)) {
         stop(
           glue::glue(
             'A table with name `{name}` already exists in the extra material.'
@@ -1716,12 +1670,7 @@ Cerebro <- R6::R6Class(
       }
 
       ## stop if `name` is already used
-      if (
-        !is.null(self$extra_material) &&
-          !is.null(self$extra_material$plots) &&
-          is.list(self$extra_material$plots) &&
-          name %in% names(self$extra_material$plots)
-      ) {
+      if (name %in% names(self$extra_material$plots)) {
         stop(
           glue::glue(
             'A plot with name `{name}` already exists in the extra material.'
@@ -1865,16 +1814,16 @@ Cerebro <- R6::R6Class(
           paste0(names(self$most_expressed_genes), collapse = ', '),
           '\n',
           'marker genes:',
-          private$showMarkerGenes(),
+          private$showNested('marker_genes'),
           '\n',
           'enriched pathways:',
-          private$showEnrichedPathways(),
+          private$showNested('enriched_pathways'),
           '\n',
           'trajectories:',
-          private$showTrajectories(),
+          private$showNested('trajectories'),
           '\n',
           'extra material:',
-          private$showExtraMaterial(),
+          private$showNested('extra_material'),
           '\n',
           'Immune repertoire:',
           paste0(names(self$getImmuneRepertoire()), collapse = ', '),
@@ -2011,70 +1960,41 @@ Cerebro <- R6::R6Class(
       }
     },
 
-    #' Print overview of available marker gene results for \code{self$print()}
-    #' function.
-    showMarkerGenes = function() {
+    ## Overview of a list of named lists (marker genes, enriched pathways,
+    ## trajectories, extra material) for self$print().
+    showNested = function(field) {
+      content <- self[[field]]
       text <- list()
-      for (method in names(self$marker_genes)) {
-        text[[method]] <- paste0(
+      for (name in names(content)) {
+        text[[name]] <- paste0(
           '\n  - ',
-          method,
+          name,
           ' (',
-          length(names(self$marker_genes[[method]])),
+          length(names(content[[name]])),
           '): ',
-          paste0(names(self$marker_genes[[method]]), collapse = ', ')
+          paste0(names(content[[name]]), collapse = ', ')
         )
       }
       paste0(text, collapse = ', ')
     },
 
-    #' Print overview of available enriched pathway results for
-    #' \code{self$print()} function.
-    showEnrichedPathways = function() {
-      text <- list()
-      for (method in names(self$enriched_pathways)) {
-        text[[method]] <- paste0(
-          '\n  - ',
-          method,
-          ' (',
-          length(names(self$enriched_pathways[[method]])),
-          '): ',
-          paste0(names(self$enriched_pathways[[method]]), collapse = ', ')
-        )
+    ## Read a qs2 or RDS sidecar after checking that it exists and matches its
+    ## MD5 checksum; `missing` and `mismatch` are the error messages.
+    readSidecar = function(path, md5, missing, mismatch) {
+      if (!file.exists(path) || dir.exists(path)) {
+        stop(missing, call. = FALSE)
       }
-      paste0(text, collapse = ', ')
-    },
-
-    #' Print overview of available trajectories for \code{self$print()} function.
-    showTrajectories = function() {
-      text <- list()
-      for (method in names(self$trajectories)) {
-        text[[method]] <- paste0(
-          '\n  - ',
-          method,
-          ' (',
-          length(names(self$trajectories[[method]])),
-          '): ',
-          paste0(names(self$trajectories[[method]]), collapse = ', ')
-        )
+      if (!identical(unname(tools::md5sum(path)), md5)) {
+        stop(mismatch, call. = FALSE)
       }
-      paste0(text, collapse = ', ')
-    },
-
-    #' Print overview of extra material for \code{self$print()} function.
-    showExtraMaterial = function() {
-      text <- list()
-      for (category in names(self$extra_material)) {
-        text[[category]] <- paste0(
-          '\n  - ',
-          category,
-          ' (',
-          length(names(self$extra_material[[category]])),
-          '): ',
-          paste0(names(self$extra_material[[category]]), collapse = ', ')
-        )
+      connection <- file(path, open = "rb")
+      magic <- readBin(connection, "raw", n = 4L)
+      close(connection)
+      if (identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+        qs2::qs_read(path)
+      } else {
+        readRDS(path)
       }
-      paste0(text, collapse = ', ')
     }
   )
 )

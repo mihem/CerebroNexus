@@ -26,6 +26,18 @@
     !isTRUE(rlang::env_binding_are_lazy(object, field))
 }
 
+## The stored value of an optional descriptor field, or `default` when the
+## field is absent or NULL. An active or lazy binding stops with `invalid`.
+.storedCerebroDescriptor <- function(object, field, invalid, default = NULL) {
+  if (!exists(field, envir = object, inherits = FALSE)) {
+    return(default)
+  }
+  if (!.storedCerebroField(object, field)) {
+    stop(invalid, call. = FALSE)
+  }
+  object[[field]] %||% default
+}
+
 .recognizedCerebroObject <- function(object) {
   is.environment(object) &&
     any(startsWith(class(object), "Cerebro")) &&
@@ -50,16 +62,12 @@
   if (!.recognizedCerebroObject(object)) {
     stop("`object` must be a serialized Cerebro object.", call. = FALSE)
   }
-  if (!exists("expression_backend", envir = object, inherits = FALSE)) {
-    return(list(type = "embedded", location = NULL))
-  }
-  if (!.storedCerebroField(object, "expression_backend")) {
-    stop("The Cerebro expression-backend descriptor is invalid.", call. = FALSE)
-  }
-  backend <- object[["expression_backend"]]
-  if (is.null(backend)) {
-    return(list(type = "embedded", location = NULL))
-  }
+  backend <- .storedCerebroDescriptor(
+    object,
+    "expression_backend",
+    "The Cerebro expression-backend descriptor is invalid.",
+    list(type = "embedded", location = NULL)
+  )
   valid_type <- is.list(backend) &&
     is.character(backend$type) &&
     length(backend$type) == 1L &&
@@ -105,14 +113,11 @@
 }
 
 .immuneRepertoireBackend <- function(object, file) {
-  field <- "immune_repertoire_backend"
-  if (!exists(field, envir = object, inherits = FALSE)) {
-    return(NULL)
-  }
-  if (!.storedCerebroField(object, field)) {
-    stop("The immune repertoire sidecar descriptor is invalid.", call. = FALSE)
-  }
-  descriptor <- object[[field]]
+  descriptor <- .storedCerebroDescriptor(
+    object,
+    "immune_repertoire_backend",
+    "The immune repertoire sidecar descriptor is invalid."
+  )
   if (is.null(descriptor)) {
     return(NULL)
   }
@@ -384,13 +389,11 @@
 }
 
 .spatialMoleculeBackend <- function(object, file) {
-  if (!exists("spatial_molecule_backend", envir = object, inherits = FALSE)) {
-    return(NULL)
-  }
-  if (!.storedCerebroField(object, "spatial_molecule_backend")) {
-    stop("The spatial molecule backend descriptor is invalid.", call. = FALSE)
-  }
-  backend <- object[["spatial_molecule_backend"]]
+  backend <- .storedCerebroDescriptor(
+    object,
+    "spatial_molecule_backend",
+    "The spatial molecule backend descriptor is invalid."
+  )
   if (is.null(backend)) {
     return(NULL)
   }

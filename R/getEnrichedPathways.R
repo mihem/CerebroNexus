@@ -101,15 +101,11 @@ getEnrichedPathways <- function(
   groups <- names(object@misc$marker_genes[[marker_genes_input]])
 
   ## log message
-  message(
-    paste0(
-      '[',
-      format(Sys.time(), '%H:%M:%S'),
-      '] Found ',
-      length(groups),
-      ' groups: ',
-      paste0(groups, collapse = ', ')
-    )
+  .logStep(
+    'Found ',
+    length(groups),
+    ' groups: ',
+    paste0(groups, collapse = ', ')
   )
 
   ##
@@ -128,70 +124,46 @@ getEnrichedPathways <- function(
       is.character(current_marker_genes) &&
         current_marker_genes == 'no_markers_found'
     ) {
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] No marker genes for group `',
-          current_group,
-          '` were found. Will ',
-          'proceed with next group.'
-        )
+      .logStep(
+        'No marker genes for group `',
+        current_group,
+        '` were found. Will ',
+        'proceed with next group.'
       )
       results <- 'no_markers_found'
 
       ## ... input is not a data frame
     } else if (!is.data.frame(current_marker_genes)) {
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Data for group `',
-          current_group,
-          '` is not a data frame. Will ',
-          'proceed with next group.'
-        )
+      .logStep(
+        'Data for group `',
+        current_group,
+        '` is not a data frame. Will ',
+        'proceed with next group.'
       )
 
       ## ... input data frame doesn't contain required "gene" column
     } else if ("gene" %in% colnames(current_marker_genes) == FALSE) {
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Data for group `',
-          current_group,
-          '` does not contain a column ',
-          'named "gene", which is required. Will proceed with next group.'
-        )
+      .logStep(
+        'Data for group `',
+        current_group,
+        '` does not contain a column ',
+        'named "gene", which is required. Will proceed with next group.'
       )
 
       ## ... input is not a data frame
     } else if (current_group %in% colnames(current_marker_genes) == FALSE) {
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Cannot find column with group level information for group `',
-          current_group,
-          '`, which is expected to be named `',
-          current_group,
-          '`. Will proceed with next group.'
-        )
+      .logStep(
+        'Cannot find column with group level information for group `',
+        current_group,
+        '`, which is expected to be named `',
+        current_group,
+        '`. Will proceed with next group.'
       )
 
       ## ... input is a data frame and contains columns with gene and group levels
     } else {
       ## log message
-      message(
-        paste0(
-          '[',
-          format(Sys.time(), '%H:%M:%S'),
-          '] Get enriched pathways for group `',
-          current_group,
-          '`...'
-        )
-      )
+      .logStep('Get enriched pathways for group `', current_group, '`...')
 
       ## get group levels based on value type
       ## ... group levels are factors
@@ -249,17 +221,13 @@ getEnrichedPathways <- function(
             databases[1] %in% names(data_from_enrichr) == FALSE ||
             'Adjusted.P.value' %in% colnames(data_from_enrichr[[1]]) == FALSE
         ) {
-          message(
-            paste0(
-              '[',
-              format(Sys.time(), '%H:%M:%S'),
-              '] Data returned by Enrichr for subgroup `',
-              x,
-              '` of group `',
-              current_group,
-              '`, does not appear to be in the right format. ',
-              'Will proceed with next subgroup.'
-            )
+          .logStep(
+            'Data returned by Enrichr for subgroup `',
+            x,
+            '` of group `',
+            current_group,
+            '`, does not appear to be in the right format. ',
+            'Will proceed with next subgroup.'
           )
 
           ## ... data is in expected format
@@ -309,22 +277,13 @@ getEnrichedPathways <- function(
           return(data_from_enrichr_merged)
         }
       }
-      results <- if (requireNamespace("future.apply", quietly = TRUE)) {
-        future.apply::future_sapply(
-          group_levels,
-          enrichr_group_fun,
-          USE.NAMES = TRUE,
-          simplify = FALSE,
-          future.globals = FALSE
-        )
-      } else {
-        sapply(
-          group_levels,
-          enrichr_group_fun,
-          USE.NAMES = TRUE,
-          simplify = FALSE
-        )
-      }
+      results <- future.apply::future_sapply(
+        group_levels,
+        enrichr_group_fun,
+        USE.NAMES = TRUE,
+        simplify = FALSE,
+        future.globals = FALSE
+      )
 
       ## remove group levels without any enriched entry in any database
       for (i in names(results)) {
@@ -336,15 +295,11 @@ getEnrichedPathways <- function(
       ## check if results for all group levels are empty
       ## ... no results for any group level
       if (length(results) == 0) {
-        message(
-          paste0(
-            '[',
-            format(Sys.time(), '%H:%M:%S'),
-            '] 0 pathways passed the ',
-            'threshold across all group levels and databases for group `',
-            current_group,
-            '`.'
-          )
+        .logStep(
+          '0 pathways passed the ',
+          'threshold across all group levels and databases for group `',
+          current_group,
+          '`.'
         )
         results <- 'no_pathways_found'
 
@@ -375,14 +330,9 @@ getEnrichedPathways <- function(
         results[["db"]] <- factor(results[["db"]], levels = databases)
 
         ## log message
-        message(
-          paste0(
-            '[',
-            format(Sys.time(), '%H:%M:%S'),
-            '] ',
-            nrow(results),
-            ' pathways passed the thresholds across all group levels and databases.'
-          )
+        .logStep(
+          nrow(results),
+          ' pathways passed the thresholds across all group levels and databases.'
         )
       }
     }

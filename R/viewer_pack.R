@@ -256,10 +256,7 @@
   stage,
   projections = list()
 ) {
-  methods <- tryCatch(
-    object$getMethodsForTrajectories(),
-    error = function(error) character()
-  )
+  methods <- object$getMethodsForTrajectories()
   indexes <- stats::setNames(vector("list", length(methods)), methods)
   frames <- list()
   assets <- NULL
@@ -455,10 +452,7 @@
 }
 
 .viewerPackSpatialAssets <- function(object, cells, stage) {
-  spatial_names <- tryCatch(
-    object$availableSpatial(),
-    error = function(error) character()
-  )
+  spatial_names <- object$availableSpatial()
   getter <- object$getSpatialData
   indexes <- stats::setNames(
     vector("list", length(spatial_names)),
@@ -535,7 +529,7 @@
 .viewerPackHlaFirstFrame <- function(segments, object) {
   all_segments <- segments
   available <- colnames(segments)
-  declared <- tryCatch(object$getGroups(), error = function(error) character())
+  declared <- object$getGroups()
   filter_groups <- unique(intersect(c("sample", declared), available))
   filter_levels <- stats::setNames(
     lapply(filter_groups, function(group) {
@@ -554,9 +548,7 @@
     ]
   }
 
-  technical <- tryCatch(object$getTechnicalInfo(), error = function(error) {
-    list()
-  })
+  technical <- object$getTechnicalInfo()
   declared_lineage <- technical$lineage_column
   lineage_col <- if (
     is.character(declared_lineage) &&
@@ -691,10 +683,7 @@
 })
 
 .viewerPackGroupMetricAssets <- function(object, metadata, stage) {
-  groups <- intersect(
-    tryCatch(object$getGroups(), error = function(error) character()),
-    colnames(metadata)
-  )
+  groups <- intersect(object$getGroups(), colnames(metadata))
   metrics <- intersect(
     c("nUMI", "nGene", "percent_mt", "percent_ribo"),
     colnames(metadata)

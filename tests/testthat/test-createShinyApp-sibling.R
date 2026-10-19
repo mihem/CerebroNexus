@@ -105,6 +105,31 @@ test_that("CRB preflight reads, inspects, and releases one dataset at a time", {
   expect_named(preflight$spatial_catalogs, c("First", "Second"))
 })
 
+test_that("CRB preflight keeps each spatial backend at its dataset index", {
+  sidecar <- list(type = "directory", location = "second.spatial")
+  local_mocked_bindings(
+    .isRecognizedCerebroObject = function(object) TRUE,
+    .readBundleDatasetInfo = function(object, label, path) list(),
+    .spatialMoleculeBackend = function(object, file) {
+      if (identical(file, "second.crb")) sidecar else NULL
+    }
+  )
+  paths <- c(First = "first.crb", Second = "second.crb", Third = "third.crb")
+
+  preflight <- .preflightBundleData(
+    paths,
+    read_object = function(path) list(path = path),
+    inspect_backend = function(path, object) list(type = "embedded"),
+    inspect_spatial = function(object, dataset) list()
+  )
+
+  ## A NULL backend for the first dataset must not shift the second one.
+  expect_identical(
+    preflight$spatial_backends,
+    list(First = NULL, Second = sidecar, Third = NULL)
+  )
+})
+
 test_that("spatial preflight does not hydrate molecule sidecars", {
   hydrate_values <- logical()
   object <- new.env(parent = emptyenv())

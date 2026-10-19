@@ -23,7 +23,10 @@ lock_test_build <- function(crb, result_dir, ...) {
   )
 }
 
-lock_test_wait_for_file <- function(path, process, timeout = 10) {
+## Outside a source tree the worker loads the installed namespace first, which
+## alone takes about 6 s on an idle CI runner and well over 10 s under the
+## parallel test load of R CMD check.
+lock_test_wait_for_file <- function(path, process, timeout = 60) {
   deadline <- Sys.time() + timeout
   repeat {
     if (file.exists(path)) {
