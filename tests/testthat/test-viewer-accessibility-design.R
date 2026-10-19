@@ -98,11 +98,5 @@ test_that("inactivity warning can be continued or cancelled before expiry", {
   )
   script <- withr::local_tempfile(fileext = ".js")
   writeLines(scope$inactivity, script)
-  expect_equal(
-    system2(
-      "node",
-      c(shQuote(test_path("fixtures", "inactivity.js")), shQuote(script))
-    ),
-    0L
-  )
+  expect_node_fixture("inactivity.js", script)
 })

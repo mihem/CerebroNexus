@@ -1,17 +1,52 @@
-viewer_node_test <- function(scenario) {
+## Runs a JavaScript file under Node and returns its output lines; a non-zero
+## exit leaves a "status" attribute, as system2() does.
+run_node <- function(script, ...) {
+  node <- skip_if_no_node()
+  system2(node, shQuote(c(script, ...)), stdout = TRUE, stderr = TRUE)
+}
+
+## Inline JavaScript lines, run from a temporary file.
+run_node_script <- function(code) {
   skip_if_no_node()
-  output <- system2(
-    "node",
-    c(
-      "--no-global-search-paths",
-      shQuote(test_path("fixtures", "viewer-transport.cjs")),
-      shQuote(viewer_test_path("www")),
-      shQuote(scenario)
-    ),
-    stdout = TRUE,
-    stderr = TRUE
-  )
-  expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
+  runner <- withr::local_tempfile(fileext = ".js")
+  writeLines(code, runner)
+  run_node(runner)
+}
+
+## A JavaScript statement that evaluates `path` in the current scope; the
+## script must have required `fs`.
+js_eval_file <- function(path) {
+  sprintf("eval(fs.readFileSync(%s, 'utf8'));", encodeString(path, quote = '"'))
+}
+
+## Fails with the script's output when it exited non-zero. `pass` names a line
+## the script prints once its assertions ran, so an early clean exit cannot
+## pass.
+expect_node_output <- function(output, pass = NULL) {
+  log <- paste(output, collapse = "\n")
+  expect_null(attr(output, "status"), info = log)
+  if (!is.null(pass)) {
+    expect_match(log, pass, fixed = TRUE)
+  }
+  invisible(output)
+}
+
+## A script from tests/testthat/fixtures/, given the viewer files it loads.
+expect_node_fixture <- function(fixture, ..., pass = NULL) {
+  expect_node_output(run_node(test_path("fixtures", fixture), ...), pass)
+}
+
+expect_node_script <- function(code, pass = NULL) {
+  expect_node_output(run_node_script(code), pass)
+}
+
+viewer_node_test <- function(scenario) {
+  expect_node_output(run_node(
+    "--no-global-search-paths",
+    test_path("fixtures", "viewer-transport.cjs"),
+    viewer_test_path("www"),
+    scenario
+  ))
 }
 
 viewer_browser_test <- function(scenario) {

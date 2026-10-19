@@ -6,10 +6,7 @@ run_dataset_context_node <- function(body) {
     file.exists(dataset_context_javascript),
     info = "dataset-context.js not found"
   )
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  run_node_script(c(
       "const fs = require('fs');",
       "const events = []; const handlers = {}; const inputs = [];",
       "global.window = global;",
@@ -23,15 +20,9 @@ run_dataset_context_node <- function(body) {
       "  addCustomMessageHandler: (name, handler) => { handlers[name] = handler; },",
       "  setInputValue: (name, value) => { inputs.push({name:name,value:value}); }",
       "};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(dataset_context_javascript, quote = "\"")
-      ),
+      js_eval_file(dataset_context_javascript),
       body
-    ),
-    runner
-  )
-  system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 }
 
 test_that("dataset context freshness is epoch/key/generation exact", {

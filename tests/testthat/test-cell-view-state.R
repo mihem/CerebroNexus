@@ -3,21 +3,12 @@ state_file <- viewer_test_path("www", "cell_views_state.js")
 run_state_node <- function(body) {
   skip_if_no_node()
   expect_true(file.exists(state_file), info = "cell_views_state.js not found")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  run_node_script(c(
       "const fs = require('fs');",
       "global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(state_file, quote = "\"")
-      ),
+      js_eval_file(state_file),
       body
-    ),
-    runner
-  )
-  system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 }
 
 test_that("specialist state transitions use semantic identities", {

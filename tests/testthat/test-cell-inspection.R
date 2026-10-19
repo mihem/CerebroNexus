@@ -1,15 +1,8 @@
 test_that("cell inspection requests use stable IDs and reject stale replies", {
-  skip_if_no_node()
-  result <- system2(
-    "node",
-    shQuote(c(
-      test_path("fixtures", "cell-inspection.js"),
-      viewer_test_path("www", "cell_views.js")
-    )),
-    stdout = TRUE,
-    stderr = TRUE
+  expect_node_fixture(
+    "cell-inspection.js",
+    viewer_test_path("www", "cell_views.js")
   )
-  expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
 })
 
 test_that("specialist detail requests resolve the requested cell instead of Linked row order", {

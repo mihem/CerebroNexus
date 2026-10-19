@@ -140,15 +140,8 @@ test_that("ROI background edits remain independent, temporary and generation sco
 })
 
 test_that("renderer edits only the addressed ROI background", {
-  skip_if_no_node()
-  expect_identical(
-    system2(
-      "node",
-      c(
-        shQuote(test_path("fixtures", "spatial-background-targets.js")),
-        shQuote(viewer_test_path("www", "cell_views.js"))
-      )
-    ),
-    0L
+  expect_node_fixture(
+    "spatial-background-targets.js",
+    viewer_test_path("www", "cell_views.js")
   )
 })

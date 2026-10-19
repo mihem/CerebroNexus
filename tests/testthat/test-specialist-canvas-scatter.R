@@ -1,35 +1,12 @@
-inst_candidates <- c(
-  normalizePath("inst", mustWork = FALSE),
-  normalizePath("../../inst", mustWork = FALSE),
-  normalizePath(testthat::test_path("../../inst"), mustWork = FALSE)
-)
-inst_dir <- inst_candidates[file.exists(file.path(inst_candidates, "app.R"))][1]
-if (is.na(inst_dir)) {
-  inst_dir <- system.file(package = "CerebroNexus")
-}
-
-viewer_dir <- file.path(inst_dir, "viewer")
+viewer_dir <- viewer_test_path()
 
 run_geom_node <- function(body) {
-  skip_if_no_node()
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  run_node_script(c(
       "const fs = require('fs');",
       "global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(
-          file.path(viewer_dir, "www", "cv-geom.js"),
-          quote = "\""
-        )
-      ),
+      js_eval_file(file.path(viewer_dir, "www", "cv-geom.js")),
       body
-    ),
-    runner
-  )
-  system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 }
 
 test_that("shared viewport and gesture math is reversible", {

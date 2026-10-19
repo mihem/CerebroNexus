@@ -10,6 +10,24 @@ wire_header <- function(payload) {
   )
 }
 
+## Decodes a packed envelope with the browser's cell_views_wire.js.
+unpack_in_node <- function(packed) {
+  payload <- withr::local_tempfile(fileext = ".bin")
+  writeBin(packed, payload)
+  output <- expect_node_script(c(
+    "const fs = require('fs');",
+    "global.window = global;",
+    js_eval_file(wire_file),
+    sprintf(
+      "const input = fs.readFileSync(%s);",
+      encodeString(payload, quote = "\"")
+    ),
+    "const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);",
+    "console.log(JSON.stringify(window.CBViewWire.unpack(buffer), (_key, value) => ArrayBuffer.isView(value) ? Array.from(value) : value));"
+  ))
+  jsonlite::fromJSON(output, simplifyVector = FALSE)
+}
+
 test_that("the browser restores compact linked-view vectors", {
   skip_if_no_node()
   skip_if_not_installed("base64enc")
@@ -47,31 +65,7 @@ test_that("the browser restores compact linked-view vectors", {
   expect_identical(header$groups$cluster$values$`__cv_wire__`, "i32")
   expect_identical(header$cat_extra$batch$values$`__cv_wire__`, "i8")
   expect_identical(header$fields$score$v$`__cv_wire__`, "i16")
-  payload <- tempfile(fileext = ".json")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(c(payload, runner)), add = TRUE)
-  writeBin(packed, payload)
-  writeLines(
-    c(
-      "const fs = require('fs');",
-      "global.window = global;",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(wire_file, quote = "\"")
-      ),
-      sprintf(
-        "const input = fs.readFileSync(%s);",
-        encodeString(payload, quote = "\"")
-      ),
-      "const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);",
-      "console.log(JSON.stringify(window.CBViewWire.unpack(buffer), (_key, value) => ArrayBuffer.isView(value) ? Array.from(value) : value));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_equal(attr(output, "status"), NULL)
-  restored <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  restored <- unpack_in_node(packed)
 
   expect_identical(restored$wire_format, "binary-v1")
   expect_identical(unlist(restored$cells), c("cell-1", "cell-2"))
@@ -143,31 +137,7 @@ test_that("specialist cell views use the same binary envelope", {
     ),
     min_length = 1L
   )
-  payload <- tempfile(fileext = ".bin")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(c(payload, runner)), add = TRUE)
-  writeBin(packed, payload)
-  writeLines(
-    c(
-      "const fs = require('fs');",
-      "global.window = global;",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(wire_file, quote = "\"")
-      ),
-      sprintf(
-        "const input = fs.readFileSync(%s);",
-        encodeString(payload, quote = "\"")
-      ),
-      "const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);",
-      "console.log(JSON.stringify(window.CBViewWire.unpack(buffer), (_key, value) => ArrayBuffer.isView(value) ? Array.from(value) : value));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_equal(attr(output, "status"), NULL)
-  restored <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  restored <- unpack_in_node(packed)
   expect_identical(restored$id, "overview_projection")
   expect_equal(restored$data$x[[1L]], 1.25)
   expect_null(restored$data$x[[2L]])

@@ -1,9 +1,5 @@
 run_specialist_state_node <- function(body) {
-  skip_if_no_node()
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  run_node_script(c(
       "const fs = require('fs');",
       "const timers = []; const controls = {}; const applied = []; const handlers = {};",
       "const windowHandlers = {};",
@@ -30,18 +26,9 @@ run_specialist_state_node <- function(body) {
       "  on: (event, handler) => { handlers[event] = handler; },",
       "  off: event => { delete handlers[event]; }",
       "});",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(
-          viewer_test_path("www", "specialist-view-state.js"),
-          quote = "\""
-        )
-      ),
+      js_eval_file(viewer_test_path("www", "specialist-view-state.js")),
       body
-    ),
-    runner
-  )
-  system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 }
 
 test_that("HLA node selection maps cleanly between motif keys and cells", {
@@ -105,11 +92,7 @@ test_that("Projection adapter captures shared JSON and downloads its PNG", {
 })
 
 test_that("HLA PNG adapter reports browser export success and failure", {
-  skip_if_no_node()
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs = require('fs');",
       "global.window = global;",
       "window.addEventListener = () => {};",
@@ -118,17 +101,11 @@ test_that("HLA PNG adapter reports browser export success and failure", {
       "window.HTMLWidgets = {find: () => ({network:{canvas:{frame:{canvas:canvas}}}})};",
       "global.document = {readyState:'loading',addEventListener:()=>{},",
       "  createElement:()=>({click:()=>{ clicks += 1; }}),getElementById:()=>null};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(viewer_test_path("www", "hla_motifs.js"), quote = "\"")
-      ),
+      js_eval_file(viewer_test_path("www", "hla_motifs.js")),
       "const success = window.cerebroHlaMotifs.downloadPNG();",
       "fail = true; const failure = window.cerebroHlaMotifs.downloadPNG();",
       "console.log(JSON.stringify({success:success,failure:failure,clicks:clicks}));"
-    ),
-    runner
-  )
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -138,21 +115,14 @@ test_that("HLA PNG adapter reports browser export success and failure", {
 })
 
 test_that("HLA retires drawn selection geometry on a dataset request", {
-  skip_if_no_node()
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  result <- run_node_script(c(
       "const fs=require('fs'),assert=require('assert'),events={},docEvents={},handlers={};let cleared=0;",
       "const context={epoch:'test',dataset_key:'A',generation:1};",
       "const network={canvas:{frame:{clientWidth:800,clientHeight:600}},DOMtoCanvas:p=>p,getScale:()=>1,setOptions:()=>{},selectNodes:()=>{},unselectAll:()=>cleared++};",
       "global.window={HTMLWidgets:{find:()=>({network})},setTimeout:()=>{},CerebroDatasetContext:{phase:()=> 'ready',current:()=>context,key:()=> 'A:1',accepts:()=>true},addEventListener:(name,fn)=>{events[name]=fn}};",
       "global.Shiny={addCustomMessageHandler:(name,fn)=>{handlers[name]=fn},setInputValue:()=>{}};window.Shiny=Shiny;",
       "global.document={readyState:'loading',addEventListener:(name,fn)=>{docEvents[name]=fn},getElementById:()=>null,querySelectorAll:()=>[]};",
-      sprintf(
-        "eval(fs.readFileSync(%s,'utf8'));",
-        encodeString(viewer_test_path("www", "hla_motifs.js"), quote = '"')
-      ),
+      js_eval_file(viewer_test_path("www", "hla_motifs.js")),
       "docEvents['shiny:connected']();handlers['hla_motif_selection_state']({node_keys:[],cells:['old-cell']});",
       "const api=window.cerebroHlaMotifs,polygon=[[0,0],[10,0],[10,10],[0,10]];",
       "api.applyState(null,{view:{mode:'box'},selection:{cells:['old-cell'],geometry:{polygon}}});",
@@ -160,10 +130,7 @@ test_that("HLA retires drawn selection geometry on a dataset request", {
       "events['cerebro:dataset-context']({detail:{phase:'ready'}});assert(api.captureState().geometry);",
       "events['cerebro:dataset-context']({detail:{phase:'pending'}});assert.strictEqual(api.captureState(),null);assert.strictEqual(cleared,1);",
       "console.log('HLA dataset geometry checks passed')"
-    ),
-    runner
-  )
-  result <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
   expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
   expect_true("HLA dataset geometry checks passed" %in% result)
 })

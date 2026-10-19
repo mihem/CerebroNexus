@@ -118,8 +118,7 @@ test_that("Groups reports passive request-bound Plotly readiness", {
   scope <- viewer_ui_test_env()
   sys.source(viewer_test_path("groups", "UI.R"), scope)
   scripts <- htmltools::tagQuery(scope$tab_groups)$find("script")$selectedTags()
-  payload <- tempfile(fileext = ".json")
-  on.exit(unlink(payload), add = TRUE)
+  payload <- withr::local_tempfile(fileext = ".json")
   writeLines(
     jsonlite::toJSON(
       unname(lapply(scripts, function(tag) {
@@ -129,16 +128,7 @@ test_that("Groups reports passive request-bound Plotly readiness", {
     ),
     payload
   )
-  output <- system2(
-    "node",
-    c(
-      shQuote(testthat::test_path("fixtures", "groups-readiness.js")),
-      shQuote(payload)
-    ),
-    stdout = TRUE,
-    stderr = TRUE
-  )
-  expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
+  expect_node_fixture("groups-readiness.js", payload)
 })
 
 test_that("Groups composition counts factors without sorting every cell", {

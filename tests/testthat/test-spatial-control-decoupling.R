@@ -46,15 +46,8 @@ test_that("Spatial styling and colour edits do not resample observations", {
 })
 
 test_that("same-layout updates retain panels and unchanged backgrounds only", {
-  skip_if_no_node()
-  expect_identical(
-    system2(
-      "node",
-      c(
-        shQuote(test_path("fixtures", "single-view-update-scope.js")),
-        shQuote(viewer_test_path("www", "cell_views.js"))
-      )
-    ),
-    0L
+  expect_node_fixture(
+    "single-view-update-scope.js",
+    viewer_test_path("www", "cell_views.js")
   )
 })

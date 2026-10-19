@@ -193,11 +193,7 @@ test_that("trajectory coordinates and graph enter Linked views", {
 })
 
 run_config_transport_node <- function(body) {
-  skip_if_no_node()
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  run_node_script(c(
       "const fs = require('fs');",
       "const timers = []; const sent = []; const handlers = {}; let applied = 0;",
       "const events = {}; let ready = true, selectedCells = 1, captures = 0;",
@@ -233,18 +229,9 @@ run_config_transport_node <- function(body) {
       "  capture:()=>{captures++;return {selection:{cells:[]}};},apply:()=>{applied+=1;return {selectedCells:1};},downloadPNG:()=>true};",
       "global.Shiny={setInputValue:(id,value)=>sent.push({id:id,value:value}),",
       "  addCustomMessageHandler:(id,fn)=>{handlers[id]=fn;}};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(
-          file.path(dirname(bundle_file), "..", "www", "coordviews-config.js"),
-          quote = "\""
-        )
-      ),
+      js_eval_file(file.path(dirname(bundle_file), "..", "www", "coordviews-config.js")),
       body
-    ),
-    runner
-  )
-  system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 }
 
 test_that("sharing waits for readiness but accepts an empty selection", {

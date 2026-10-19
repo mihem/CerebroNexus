@@ -1,10 +1,6 @@
 test_that("WebGPU failures make the renderer fall back", {
-  skip_if_no_node()
   renderer <- viewer_test_path("www", "cell_points_gpu.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  expect_node_script(c(
       "const fs = require('fs');",
       "const assert = require('assert');",
       sprintf(
@@ -39,21 +35,12 @@ test_that("WebGPU failures make the renderer fall back", {
       "  assert.strictEqual(renderer.stats().ready, false);",
       "  assert.match(renderer.stats().error, /driver rejected the frame/);",
       "})().catch(error => { console.error(error); process.exit(1); });"
-    ),
-    runner
-  )
-  status <- system2("node", runner)
-
-  expect_identical(status, 0L)
+  ))
 })
 
 test_that("WebGL2 fallback submits a million points in one GPU draw", {
-  skip_if_no_node()
   renderer <- viewer_test_path("www", "cell_points_gpu.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  expect_node_script(c(
       "const fs = require('fs');",
       "const assert = require('assert');",
       sprintf(
@@ -116,9 +103,5 @@ test_that("WebGL2 fallback submits a million points in one GPU draw", {
       "assert(calls.every(call=>call[2]===count),'every draw retains all points');",
       "lost({preventDefault(){}});assert.strictEqual(renderer.draw(opts),false);",
       "assert.strictEqual(renderer.stats().contextLost,true);"
-    ),
-    runner
-  )
-
-  expect_identical(system2("node", runner), 0L)
+  ))
 })

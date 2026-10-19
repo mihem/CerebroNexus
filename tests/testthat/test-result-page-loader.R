@@ -1,20 +1,9 @@
 test_that("result page completion follows local draws and preserves paint gates", {
-  node <- skip_if_no_node()
-  result <- system2(
-    node,
-    shQuote(c(
-      test_path("fixtures", "result-page-loader.js"),
-      viewer_test_path("www", "viewer-shell.js"),
-      viewer_test_path("groups", "UI.R")
-    )),
-    stdout = TRUE,
-    stderr = TRUE
-  )
-  expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
-  expect_match(
-    paste(result, collapse = "\n"),
-    "result page loader assertions passed",
-    fixed = TRUE
+  expect_node_fixture(
+    "result-page-loader.js",
+    viewer_test_path("www", "viewer-shell.js"),
+    viewer_test_path("groups", "UI.R"),
+    pass = "result page loader assertions passed"
   )
 })
 

@@ -1,8 +1,5 @@
 test_that("cloned panels own distinct accessible descriptions", {
-  skip_if_no_node()
-  runner <- withr::local_tempfile(fileext = ".js")
-  writeLines(
-    c(
+  expect_node_script(c(
       "const fs=require('fs'), assert=require('assert');",
       sprintf(
         "const source=fs.readFileSync(%s,'utf8');",
@@ -21,9 +18,5 @@ test_that("cloned panels own distinct accessible descriptions", {
       "assert.strictEqual(clone.description.textContent,'Clonal expansion view with 180 points; 0 selected.');",
       "assert.strictEqual(clone.canvas.attrs['aria-describedby'],'cv-description-b');",
       "const same=clone.description;prepareCanvasSemantics(clone);assert.strictEqual(clone.description,same);"
-    ),
-    runner
-  )
-  result <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
+  ))
 })

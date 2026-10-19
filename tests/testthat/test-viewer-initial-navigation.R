@@ -1,8 +1,5 @@
 test_that("late initial navigation preserves reader intent", {
-  skip_if_no_node()
-  runner <- withr::local_tempfile(fileext = ".js")
-  writeLines(
-    c(
+  expect_node_script(c(
       "const fs=require('fs'),vm=require('vm'),assert=require('assert');",
       sprintf(
         "const source=fs.readFileSync(%s,'utf8');",
@@ -24,9 +21,5 @@ test_that("late initial navigation preserves reader intent", {
       "s=session();s.click(true);s.send({selected:'overview'});assert.strictEqual(s.selected.length,0);",
       "s=session(false);s.click(true);s.connect();s.send({selected:'overview'});assert.strictEqual(s.selected.length,0);",
       "s=session();s.send({selected:'missing'});s.send(null);assert.strictEqual(s.selected.length,0);"
-    ),
-    runner
-  )
-  result <- system2("node", runner, stdout = TRUE, stderr = TRUE)
-  expect_null(attr(result, "status"), info = paste(result, collapse = "\n"))
+  ))
 })

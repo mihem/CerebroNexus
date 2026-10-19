@@ -245,24 +245,14 @@ test_that("million-cell hover stays columnar until the browser needs it", {
 test_that("sparse linked attributes expand into typed canonical vectors", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs = require('fs');",
       "global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const values = window.CBViewState.expandSparse(",
       "  new Int32Array([1, 4]), new Int16Array([7, 9]), 6, -1);",
       "console.log(JSON.stringify(Array.from(values)));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -274,15 +264,9 @@ test_that("sparse linked attributes expand into typed canonical vectors", {
 test_that("shared browser base reuses only matching dataset projections", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs = require('fs'); global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const S = window.CBViewState;",
       "const first = S.sharedBase(null, 'dataset-a', 3, 'order-a');",
       "first.projections.umap = {x:new Float32Array(3),y:new Float32Array(3)};",
@@ -293,11 +277,7 @@ test_that("shared browser base reuses only matching dataset projections", {
       "console.log(JSON.stringify({hit:hit===first,dataset:changedDataset!==first,",
       "count:changedCount!==first,order:changedOrder!==first,",
       "projection:hit.projections.umap===first.projections.umap}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -315,15 +295,9 @@ test_that("shared browser base reuses only matching dataset projections", {
 test_that("specialist lifecycle owns request, ready, and auxiliary state", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs = require('fs'); global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const L = window.CBViewState.specialistLifecycle, timings = {};",
       "const first = L.begin(timings, 'spatial', true); first.requestAtMs = 10;",
       "L.update(timings, 'spatial', {bytes: 42});",
@@ -339,11 +313,7 @@ test_that("specialist lifecycle owns request, ready, and auxiliary state", {
       "cached:cached.cached,bytes:ready.bytes,latency:ready.requestToReadyMs,",
       "activation:ready.activationStartedAtMs,requested,duplicate,rejected,accepted,",
       "pending:view._auxPending,token:view._auxToken}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -367,15 +337,9 @@ test_that("specialist lifecycle owns request, ready, and auxiliary state", {
 test_that("canonical mapping centralizes identity, subset, and index order", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs = require('fs'); global.window = {};",
-      sprintf(
-        "eval(fs.readFileSync(%s, 'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const M = window.CBViewState.canonicalMapping;",
       "const identity = {cell_count:4,",
       " cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),",
@@ -399,11 +363,7 @@ test_that("canonical mapping centralizes identity, subset, and index order", {
       "duplicate:M.indicesMatch(include,new Uint32Array([1,1])),",
       "excludeValid:M.indicesMatch(exclude,new Uint32Array([1,3])),",
       "unsorted:M.indicesMatch(exclude,new Uint32Array([3,1])),included,excluded}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -424,15 +384,9 @@ test_that("canonical mapping centralizes identity, subset, and index order", {
 test_that("resource descriptors share shape and identity validation", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs=require('fs'); global.window={};",
-      sprintf(
-        "eval(fs.readFileSync(%s,'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const R=window.CBViewState.resourceDescriptor;",
       "const identity={cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),",
       "cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),",
@@ -448,11 +402,7 @@ test_that("resource descriptors share shape and identity validation", {
       "shape:!!R.validate({...resource,dimensions:3},{cells:4,dimensions:2}),",
       "identity:!!R.validate({...resource,dataset_fingerprint:'bad'},",
       "{cells:4,identity}),width:R.codeWidth({dtype:'uint16'})}));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(
@@ -464,26 +414,16 @@ test_that("resource descriptors share shape and identity validation", {
 test_that("telemetry snapshots normalize shared transport phases", {
   skip_if_no_node()
   source <- viewer_test_path("www", "cell_views_state.js")
-  runner <- tempfile(fileext = ".js")
-  on.exit(unlink(runner), add = TRUE)
-  writeLines(
-    c(
+  output <- run_node_script(c(
       "const fs=require('fs'); global.window={};",
-      sprintf(
-        "eval(fs.readFileSync(%s,'utf8'));",
-        encodeString(source, quote = '"')
-      ),
+      js_eval_file(source),
       "const T=window.CBViewState.telemetry;",
       "const metric=T.transport({server_prepare_ms:'12.5',",
       "server_resource_ms:'3',server_bundle_ms:'bad',sent_at_ms:900},",
       "{bytes:42,decodeMs:4,requestToBinaryMs:8},true,1000);",
       "const snapshot=T.snapshot(metric,{decodeToDrawMs:6});",
       "console.log(JSON.stringify(snapshot));"
-    ),
-    runner
-  )
-
-  output <- system2("node", runner, stdout = TRUE, stderr = TRUE)
+  ))
 
   expect_equal(attr(output, "status"), NULL)
   expect_identical(

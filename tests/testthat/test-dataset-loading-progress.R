@@ -161,19 +161,9 @@ test_that("loading labels match selector labels without changing dataset identit
 
 
 test_that("loading transitions avoid flashes and survive consecutive switches", {
-  skip_if_no_node()
-  expect_identical(
-    system2(
-      "node",
-      c(
-        shQuote(testthat::test_path(
-          "fixtures",
-          "dataset-loading-transition.js"
-        )),
-        shQuote(viewer_test_path("www", "viewer-shell.js"))
-      )
-    ),
-    0L
+  expect_node_fixture(
+    "dataset-loading-transition.js",
+    viewer_test_path("www", "viewer-shell.js")
   )
 })
 
