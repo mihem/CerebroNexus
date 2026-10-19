@@ -3204,6 +3204,9 @@
     );
     var pendingStableSelection = specialistReport.pending;
     var arr = specialistReport.ids;
+    // The specialist-state event below reports these with or without Shiny.
+    var activeView = singleView(singleActive);
+    var renderKey = activeView && activeView.data && activeView.data.render_key;
     if (shiny) {
       // Stable IDs identify the selection on their own. Send coordinates
       // only as the fallback key when some selected cell has no ID.
@@ -3219,14 +3222,12 @@
       // gated off instead of retaining stale/empty Plot and Table shells.
       // onSingleAuxBinary() reports only the then-current selection as soon
       // as the deferred IDs have been attached.
-      var activeView = singleView(singleActive);
       Shiny.setInputValue(singleActive + '_persistent_selection', {
         x: pendingStableSelection || !arr ? [] : x,
         y: pendingStableSelection || !arr ? [] : y,
         ids: pendingStableSelection || !arr ? [] : arr,
         dataset_context: activeView && activeView.dataset_context
       });
-      var renderKey = activeView && activeView.data && activeView.data.render_key;
       if (eventKind === 'primary' && renderKey != null) {
         Shiny.setInputValue(singleActive + '_rendered_state', {
           render_key: String(renderKey),
