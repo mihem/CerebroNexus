@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -254,6 +254,9 @@ launcher loads that checkout directly.</p>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="fu">git</span> rev-parse HEAD</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">"install.packages(c('remotes', 'pkgload')); remotes::install_local('.', dependencies = TRUE)"</span></span>
 <span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R</span></code></pre></div>
+<p>These demos use BPCells sidecars, so they also need
+<code>BPCells</code>, which CerebroNexus does not install for you:
+<code>Rscript -e "remotes::install_github('bnprks/BPCells/r')"</code>.</p>
 <p>Open <code>http://127.0.0.1:7451</code>. The first run downloads and
 prepares the official 10x one-million-neuron matrix and the Ren et al.
 <a href="https://explore.data.humancellatlas.org/projects/5f607e50-ba22-4598-b1e9-f3d9d7a35dcc" class="external-link">COVID-19

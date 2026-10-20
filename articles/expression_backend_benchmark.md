@@ -9,15 +9,104 @@ backend selection, sidecar portability and launching the demo, see
 [Working with large
 datasets](https://mihem.github.io/CerebroNexus/articles/million_cell_crb_artifacts.md).
 
-The recorded measurements below are **historical experiments**, not a
-new 5.0.0 benchmark. Correctness repairs and the current release have
-not been remeasured under a complete matched large-data protocol. A
-passed regression suite does not establish a performance result.
+The first section reports the current real-data expression-backend
+benchmark. The sections after it are **historical experiments**, kept as
+recorded; they were not remeasured under that protocol. A passed
+regression suite does not establish a performance result.
 
-All tables and the Ren figure read the small, checked-in records under
+All tables read the small, checked-in records under
 `inst/extdata/benchmarks/`. These records are included in installed
-packages; rendering this article requires neither a large dataset nor a
-developer cache. Do not overwrite recorded experiments with a new run.
+packages; the figures are pre-drawn images. Rendering this article
+requires neither a large dataset nor a developer cache. Do not overwrite
+recorded experiments with a new run.
+
+## Real-data expression backends (Scale run, 2026-10-18)
+
+This study compares four ways to store the expression matrix: H5 with
+gzip level 6 (HDF5Array’s default, used by the exporter before 5.1.3),
+the same H5 file at gzip level 0, i.e. written without compression (the
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+default from 5.1.3; `h5_compression_level` changes it), BPCells, and
+embedded storage. In the tables and figures, `h5_uncompressed` is the
+gzip level 0 file. Two public datasets were used: the 10x mouse brain
+E18 matrix (1,306,127 cells, 27,998 genes, 2.6 billion nonzeros) and the
+PsychAD human prefrontal cortex HBCC matrix (1,486,324 cells, 34,176
+genes, 6.1 billion nonzeros). Each source was measured at 1k, 10k, 50k,
+100k, 300k and 500k cells and at its full size.
+
+Every source, size and backend combination was built five times, and
+every build was opened in two fresh R processes, one thread each. All
+processes read the same cells and the same fixed 12-gene panel. Lazy
+reads were fully materialized inside the timer, and the values were
+checked against the source matrix afterwards; all 540 access processes
+matched. Embedded storage was measured up to 500k cells. The full
+matrices exceed its sparse-index limit, so there are no full-size
+embedded results.
+
+The run is `20261018T101740Z-1ed063d363a0-scale`, measured at commit
+`1ed063d3` on one Linux host (Intel i7-14700, 128 GB RAM, R 4.6.1,
+BPCells 0.3.1, HDF5Array 1.40.0). All 270 builds succeeded. The table
+below keeps the median of each measurement; the raw files of the run are
+not part of this repository.
+
+``` r
+scale <- read_tsv("expression-backends-scale-20261018.tsv")
+full_size <- scale[scale$n_cells == max(scale$n_cells[scale$source == "mouse_brain_e18"]) |
+  scale$n_cells == max(scale$n_cells[scale$source == "human_pfc_hbcc"]), ]
+full_size$total_gib <- full_size$total_mib / 1024
+knitr::kable(full_size[, c("source", "n_cells", "backend", "total_gib", "build_s",
+  "startup_s", "rss_mib", "warmed_p50_s", "block_12gene_s")], digits = 3,
+  row.names = FALSE)
+```
+
+| source | n_cells | backend | total_gib | build_s | startup_s | rss_mib | warmed_p50_s | block_12gene_s |
+|:---|---:|:---|---:|---:|---:|---:|---:|---:|
+| human_pfc_hbcc | 1486324 | bpcells | 27.044 | 542.2 | 3.54 | 697 | 0.828 | 0.902 |
+| human_pfc_hbcc | 1486324 | h5 | 9.838 | 2096.0 | 6.73 | 868 | 0.055 | 0.641 |
+| human_pfc_hbcc | 1486324 | h5_uncompressed | 69.006 | 634.8 | 6.56 | 868 | 0.036 | 0.572 |
+| mouse_brain_e18 | 1306127 | bpcells | 2.836 | 154.0 | 3.43 | 677 | 0.591 | 0.891 |
+| mouse_brain_e18 | 1306127 | h5 | 3.614 | 526.7 | 5.72 | 838 | 0.034 | 0.338 |
+| mouse_brain_e18 | 1306127 | h5_uncompressed | 29.738 | 194.7 | 6.04 | 837 | 0.025 | 0.296 |
+
+At full size, H5 at gzip level 0 builds about three times faster than H5
+at level 6 and reads single genes a quarter to a third faster, but it
+needs about seven to eight times more disk. BPCells has the smallest
+memory after load and the fastest 12-gene reads on a shuffled 100k-cell
+subset, but a warmed full-cell single-gene read takes 0.6-0.8 s, against
+0.02-0.06 s for H5. Embedded storage is competitive only for small
+datasets: at 500k cells its single-gene read takes 1.7-3.2 s and its
+memory after load is about 12-23 GiB.
+
+![Scale study. Medians across five builds against cell count (log10
+axis); whiskers show the observed minimum and maximum. The dotted line
+and open symbols mark the full-size endpoint. a-b warmed single-gene
+read, c-d 12-gene block read, e-f memory after load, g-h total on-disk
+size.](img/expression_backend_benchmark_scale.png)
+
+Scale study. Medians across five builds against cell count (log10 axis);
+whiskers show the observed minimum and maximum. The dotted line and open
+symbols mark the full-size endpoint. a-b warmed single-gene read, c-d
+12-gene block read, e-f memory after load, g-h total on-disk size.
+
+![Full-size endpoints of the same run. Small dots are single read
+processes (ten per backend) or builds (five per backend, panels g-h);
+the large symbol is the median across builds and the whisker the
+observed minimum and
+maximum.](img/expression_backend_benchmark_full.png)
+
+Full-size endpoints of the same run. Small dots are single read
+processes (ten per backend) or builds (five per backend, panels g-h);
+the large symbol is the median across builds and the whisker the
+observed minimum and maximum.
+
+The benchmark harness, the run’s summary tables and the figure code are
+in
+[CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code)
+(`benchmark/`). The full-size figure uses the Scale run’s own full-size
+endpoints, not the separate Full run
+(`20261017T174502Z-63d5337c3647-full`). Timings come from one host and
+are not a guarantee for other hardware; the operating-system file cache
+was not cleared between processes.
 
 ## Ren v2: expression backends
 
@@ -50,14 +139,9 @@ knitr::kable(ren_summary, digits = 3)
 | bpcells | 15.393 | 1.884 | 0.929 | 1.209 |
 | h5 | 17.067 | 1.259 | 0.069 | 1.551 |
 
-``` r
-source(file.path(records, "plot-ren.R"), local = TRUE)
-plotRenBackendBenchmark(ren)
-```
-
 ![Historical Ren v2 comparison; medians of three fresh-process rounds.
 Backend computation, not browser page
-load.](expression_backend_benchmark_files/figure-html/ren-figure-1.png)
+load.](img/expression_backend_benchmark_ren.png)
 
 Historical Ren v2 comparison; medians of three fresh-process rounds.
 Backend computation, not browser page load.
@@ -149,24 +233,25 @@ dataset, viewport, source revision, browser and initial state on both
 sides. Record timing and memory profiles in separate runs.
 
 The historical five-round browser series and its immutable
-candidate/fixture identities remain under
-`tests/bench/results/million_cell_pages_pr4_pr5_4_6_3*`. Those records
-used macOS Chrome and an older completion boundary for Linked Views.
-Later Windows Brave acceptance used **WSL R**, not Windows-native R.
-Neither series can be pooled with the other. Durable results and
-limitations are summarized in `tests/bench/PR184_ACCEPTANCE.md` in a
-repository checkout. Stable Gene first usability below three seconds has
-not been established, and there is no matched current-release, all-page
-speedup claim.
+candidate/fixture identities are kept in
+[CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code)
+under `data/viewer_performance/million_cell_pages_pr4_pr5_4_6_3*`. Those
+records used macOS Chrome and an older completion boundary for Linked
+Views. Later Windows Brave acceptance used **WSL R**, not Windows-native
+R. Neither series can be pooled with the other. Durable results and
+limitations are summarized in `PR184_ACCEPTANCE.md` in the same folder.
+Stable Gene first usability below three seconds has not been
+established, and there is no matched current-release, all-page speedup
+claim.
 
 ## Earlier exploratory pilot
 
-The 2026-07-30 embedded/BPCells/HDF5 sweep is retained under
-`tests/bench/result/archive/pilot-2026-07-30/`. It used real mouse-brain
-and human-PFC counts, synthetic grouping/embeddings, and contiguous cell
-blocks. The macOS arm64 host had 32 GB RAM. The run preceded balanced
-independent repeats and complete provenance; its tables and figures are
-exploratory.
+The 2026-07-30 embedded/BPCells/HDF5 sweep is retained in Git history
+under `tests/bench/result/archive/pilot-2026-07-30/`. It used real
+mouse-brain and human-PFC counts, synthetic grouping/embeddings, and
+contiguous cell blocks. The macOS arm64 host had 32 GB RAM. The run
+preceded balanced independent repeats and complete provenance; its
+tables and figures are exploratory.
 
 Its useful lesson is that dense realization and construction of a large
 in-memory Seurat object can dominate memory before a backend is written.
@@ -177,63 +262,35 @@ available for inspection; current figure scripts intentionally require
 validated repeated runs instead of treating this pilot as release
 evidence.
 
-## Reproduce figures without rerunning measurements
+## Reproduce figures and rerun measurements
 
-From a repository checkout, with R installed:
-
-``` bash
-Rscript tests/bench/plot_ren_backend_acceptance.R   inst/extdata/benchmarks/ren-backends-20261008.tsv ren-backends.png
-```
-
-The command and the figure above share
-`inst/extdata/benchmarks/plot-ren.R` and the same TSV. It only reads
-small recorded data and writes the figure; no atlas download, Shiny
-session or benchmark is launched. To render this entire article, install
-the checkout and run
-[`rmarkdown::render()`](https://pkgs.rstudio.com/rmarkdown/reference/render.html)
-on this Rmd.
-
-## Optionally rerun measurements
-
-Measurement scripts are retained in Git but excluded from R package
-builds. These commands require a **repository checkout**, its declared
-dependencies, and sufficient storage; they do not work from an installed
-package alone. Record `git rev-parse HEAD`,
+The figure code and every measurement script are in
+[CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code):
+`viewer/` holds the Viewer, CRB and Ren diagnostics and the Ren figure
+(`viewer/scripts/plot_ren_backend_acceptance.R`), and `benchmark/` holds
+the repeated H5 / BPCells / embedded experiment. They run against a
+CerebroNexus checkout and need its declared dependencies and enough
+storage; they do not work from an installed package alone. Record
+`git rev-parse HEAD`,
 [`sessionInfo()`](https://rdrr.io/r/utils/sessionInfo.html),
-host/browser versions and artifact checksums with every new output. Save
-new runs outside the recorded-data directory.
+host/browser versions and artifact checksums with every new output, and
+save new runs outside the recorded-data directory.
 
-For the mouse preparation, allow at least 16 GiB free disk for the
-recorded artifact layout, additional space for parallel
-backends/outputs, and tens of minutes or longer depending on hardware
-and downloads. The source alone is about 3.93 GiB. Full Ren preparation
-has separate large download/storage costs; inspect the preparation
-script and available disk before starting it. Do not use an arbitrary
-memory limit or a historical completion time as a guarantee.
+The million-cell and Ren demo data used by `run-demo.R` are prepared by
+the scripts in `tests/demo/` of a CerebroNexus checkout. For the mouse
+preparation, allow at least 16 GiB free disk for the recorded artifact
+layout, additional space for parallel backends/outputs, and tens of
+minutes or longer depending on hardware and downloads. The source alone
+is about 3.93 GiB. Full Ren preparation has separate large
+download/storage costs; inspect the preparation script and available
+disk before starting it. Do not use an arbitrary memory limit or a
+historical completion time as a guarantee.
 
 ``` r
-source("tests/bench/prepare_viewer_1m_data.R")
+source("tests/demo/prepare_viewer_1m_data.R")
 pkgload::load_all(".")
 crb <- prepareViewer1mBenchmarkData()
 ```
 
-``` bash
-# Two already-prepared CRBs of the same Ren v2 expression data; three rounds.
-Rscript tests/bench/benchmark_ren_expression_backends.R   /data/ren-bpcells.crb /data/ren-h5.crb /results/ren-backends 3
-
-# CRB lifecycle, five alternating rounds on the same sidecar.
-Rscript tests/bench/benchmark_million_cell_crb.R   /data/cerebro_mouse_brain_1m.crb 5 /results/crb-lifecycle.csv
-
-# Resource-checked repeated expression-backend experiment.
-BENCH_PROFILE=publication tests/bench/run_sweep.sh
-```
-
-A Ren comparison on already-prepared artifacts usually needs minutes
-rather than the complete preparation workflow; actual duration remains
-host-dependent. A full repeated export/access sweep can take hours. Its
-resource preflight records memory, sparse-index and disk constraints
-before bulk transfer. See `tests/bench/README.md` for explicit
-page/renderer harness arguments and `tests/bench/METHODOLOGY.md` for
-experimental units, profiling and publication gates. Preserve raw
-rounds, source identities, failed observations and limits; never replace
-them with a single favorable timing.
+Preserve raw rounds, source identities, failed observations and limits;
+never replace them with a single favorable timing.

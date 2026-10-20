@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,15 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.1.3" id="cerebronexus-513">CerebroNexus 5.1.3<a class="anchor" aria-label="anchor" href="#cerebronexus-513"></a></h2>
+<ul><li>The “Large-dataset benchmarks” article now reports the 2026-10-18 Scale run that compares embedded, BPCells and H5 storage from 1k cells up to each full dataset: setup, full-size medians and both figures, read from a small summary table in <code>inst/extdata/benchmarks/</code>.</li>
+<li>The expression-backend benchmark, the Viewer benchmarks and smoke checks, their results and the paper figures moved to <a href="https://github.com/duocang/CerebroNexus_paper_code" class="external-link">duocang/CerebroNexus_paper_code</a>. <code>tests/bench/</code> is gone; the data preparation used by <code>run-demo.R</code> and its tests is now in <code>tests/demo/</code>.</li>
+<li>
+<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> writes the H5 expression file at gzip level 0 (stored without compression; the shuffle and deflate filters are still applied), because export and read speed matter more than disk size. The file is about 7 times larger than at HDF5Array’s default level 6, e.g. about 69 GiB instead of 10 GiB for 1.5 million human prefrontal cortex cells. The new <code>h5_compression_level</code> argument sets the level; use 6 to save disk space.</li>
+<li>BPCells is no longer installed with the package: <code>DESCRIPTION</code> drops the BPCells remote. Reading BPCells-backed Seurat objects still needs BPCells installed.</li>
+<li>Fixes the HLA motif network’s Focus button showing as off right after a selection was focused, when the server’s selection reply arrived after the click.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.1.2" id="cerebronexus-512">CerebroNexus 5.1.2<a class="anchor" aria-label="anchor" href="#cerebronexus-512"></a></h2>
 <ul><li>Fixes embedded background images above about 750 KB being cut short, which left their last rows transparent.</li>

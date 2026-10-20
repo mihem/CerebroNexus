@@ -146,6 +146,10 @@ Rscript -e "install.packages(c('remotes', 'pkgload')); remotes::install_local('.
 Rscript run-demo.R
 ```
 
+These demos use BPCells sidecars, so they also need `BPCells`, which
+CerebroNexus does not install for you:
+`Rscript -e "remotes::install_github('bnprks/BPCells/r')"`.
+
 Open `http://127.0.0.1:7451`. The first run downloads and prepares the
 official 10x one-million-neuron matrix and the Ren et al. [COVID-19
 immune

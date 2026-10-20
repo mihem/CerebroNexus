@@ -1,5 +1,31 @@
 # Changelog
 
+## CerebroNexus 5.1.3
+
+- The “Large-dataset benchmarks” article now reports the 2026-10-18
+  Scale run that compares embedded, BPCells and H5 storage from 1k cells
+  up to each full dataset: setup, full-size medians and both figures,
+  read from a small summary table in `inst/extdata/benchmarks/`.
+- The expression-backend benchmark, the Viewer benchmarks and smoke
+  checks, their results and the paper figures moved to
+  [duocang/CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code).
+  `tests/bench/` is gone; the data preparation used by `run-demo.R` and
+  its tests is now in `tests/demo/`.
+- [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  writes the H5 expression file at gzip level 0 (stored without
+  compression; the shuffle and deflate filters are still applied),
+  because export and read speed matter more than disk size. The file is
+  about 7 times larger than at HDF5Array’s default level 6, e.g. about
+  69 GiB instead of 10 GiB for 1.5 million human prefrontal cortex
+  cells. The new `h5_compression_level` argument sets the level; use 6
+  to save disk space.
+- BPCells is no longer installed with the package: `DESCRIPTION` drops
+  the BPCells remote. Reading BPCells-backed Seurat objects still needs
+  BPCells installed.
+- Fixes the HLA motif network’s Focus button showing as off right after
+  a selection was focused, when the server’s selection reply arrived
+  after the click.
+
 ## CerebroNexus 5.1.2
 
 - Fixes embedded background images above about 750 KB being cut short,

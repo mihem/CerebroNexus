@@ -20,6 +20,7 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  h5_compression_level = 0L,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 500000L,
@@ -134,7 +135,8 @@ exportFromSeurat(
     seed and transposes it lazily to Cerebro's internal genes x cells
     layout via `DelayedArray::t()` (free). The in-memory `dgCMatrix` is
     never materialised on attach, so RAM stays close to the `.crb`
-    metadata size. Requires the HDF5Array package.
+    metadata size. The gzip level is set by `h5_compression_level`.
+    Requires the HDF5Array package.
 
   The CRB and any sidecar are built and validated in a private sibling
   stage. On POSIX systems, new stages and external matrices are
@@ -148,6 +150,16 @@ exportFromSeurat(
   this multi-path transaction guarantee. Only POSIX mode bits are set or
   preserved; ownership, ACLs, extended attributes, and security labels
   remain the deployment system's responsibility on every platform.
+
+- h5_compression_level:
+
+  Gzip compression level, from 0 to 9, of the H5 file written when
+  `expression_matrix_mode = "h5"`; ignored by the other modes. The
+  default 0 writes the data without compression: the file is about 7
+  times larger than at HDF5Array's default level 6 (about 69 GiB instead
+  of 10 GiB for 1.5 million human prefrontal cortex cells), but it
+  builds about three times faster and single-gene reads are about a
+  third faster. Set 6 when disk space matters more than speed.
 
 - codec:
 
@@ -223,22 +235,22 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [12:47:14] Initializing Cerebro object...
-#> [12:47:14] Adding expression data (embedded)...
-#> [12:47:14] Collecting available meta data...
-#> [12:47:14] Extracting all meta data columns...
-#> [12:47:14] Extracting dimensional reductions...
-#> [12:47:14] Will export the following dimensional reductions: umap
-#> [12:47:14] Extracting marker genes table...
-#> [12:47:14] No trajectories to extract...
-#> [12:47:14] Checking for spatial data...
-#> [12:47:14] Overview of Cerebro object:
+#> [20:06:24] Initializing Cerebro object...
+#> [20:06:24] Adding expression data (embedded)...
+#> [20:06:24] Collecting available meta data...
+#> [20:06:24] Extracting all meta data columns...
+#> [20:06:24] Extracting dimensional reductions...
+#> [20:06:24] Will export the following dimensional reductions: umap
+#> [20:06:24] Extracting marker genes table...
+#> [20:06:24] No trajectories to extract...
+#> [20:06:24] Checking for spatial data...
+#> [20:06:24] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 5.1.2
+#> exporter package version: 5.1.3
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-10-18
+#> date of export: 2026-10-20
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, seurat_clusters
@@ -254,6 +266,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [12:47:14] Saving Cerebro object to: /tmp/nix-shell-4360-3029424409/RtmpM8CtVH/pbmc_Seurat.crb
-#> [12:47:14] Done!
+#> [20:06:24] Saving Cerebro object to: /tmp/nix-shell-4439-2411553759/RtmpmgmT5K/pbmc_Seurat.crb
+#> [20:06:24] Done!
 ```
