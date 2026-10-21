@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -181,10 +181,11 @@ hand. The essence is short: <strong>declare the contracts, store a
 <span>                           receptor_key     <span class="op">=</span> <span class="st">"v_gene+cdr3"</span>,</span>
 <span>                           tcr_selection    <span class="op">=</span> <span class="st">"association-conditioned"</span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span> <span class="op">&lt;-</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html" class="external-link">Matrix</a></span><span class="op">(</span><span class="fl">0</span>, nrow <span class="op">=</span> <span class="fl">0</span>, ncol <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">meta</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>  <span class="co"># no transcriptome</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">setExpressionBackend</span><span class="op">(</span><span class="st">"embedded"</span><span class="op">)</span>                       <span class="co"># the matrix lives inside the .crb</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="va">meta_data</span>  <span class="op">&lt;-</span> <span class="va">meta</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">ir</span><span class="op">)</span>                                <span class="co"># real receptors</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addHLATyping</span><span class="op">(</span><span class="va">hla_long</span>, source_type <span class="op">=</span> <span class="st">"genotyped"</span><span class="op">)</span>      <span class="co"># real genotypes</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/saveCerebro.html">saveCerebro</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span>crb_file_to_load <span class="op">=</span> <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span></code></pre></div>
 <p>The rest of this guide fills in <code>meta</code>, <code>ir</code>,
@@ -377,6 +378,7 @@ under <code>technical_info</code>:</p>
 <span><span class="co"># a real 0-gene x N-unit matrix: bulk measures no transcriptome</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span> <span class="op">&lt;-</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html" class="external-link">Matrix</a></span><span class="op">(</span><span class="fl">0</span>, nrow <span class="op">=</span> <span class="fl">0</span>, ncol <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">meta</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">meta</span><span class="op">$</span><span class="va">cell_barcode</span></span>
+<span><span class="va">crb</span><span class="op">$</span><span class="fu">setExpressionBackend</span><span class="op">(</span><span class="st">"embedded"</span><span class="op">)</span>   <span class="co"># required: a .crb without it is rejected as a retired format</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="va">meta_data</span> <span class="op">&lt;-</span> <span class="va">meta</span></span>
 <span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">ir</span><span class="op">)</span></span>
@@ -385,7 +387,7 @@ under <code>technical_info</code>:</p>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"sample"</span>, <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">addGroup</span><span class="op">(</span><span class="st">"cell_type"</span>, <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">meta</span><span class="op">$</span><span class="va">cell_type</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="../reference/saveCerebro.html">saveCerebro</a></span><span class="op">(</span><span class="va">crb</span>, <span class="st">"demo_hla_tcr_bulk_toy.crb"</span><span class="op">)</span></span></code></pre></div>
 <p><strong>Confirm the contracts round-trip</strong> — reload and read
 them back:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">

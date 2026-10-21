@@ -175,6 +175,55 @@ When extracting these columns from `meta.data`, an explicit `sample_col`
 must exist. Use `sample_col = NULL` only when you want CerebroNexus to
 auto-detect `orig.ident`, `sample`, or `Sample`.
 
+### How the repertoire is stored
+
+A `.crb` holds one unified repertoire: a named list with one table per
+sample, with the TCR and BCR rows of a sample in the same table. The
+Cerebro object has no separate `tcr_data` or `bcr_data` fields;
+`getTCR()` and `getBCR()` derive their tables from the repertoire (rows
+whose `CTgene` names a `TR[ABGD]` or `IG[HKL]` chain, samples without
+such rows dropped), and `getImmuneRepertoire()` returns the whole list.
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+still accepts Seurat objects that keep receptors in
+`object@misc$tcr_data` and `object@misc$bcr_data` and merges them into
+the unified repertoire, so older preparation workflows keep working. A
+`.crb` from an older release that stored receptors in those fields is a
+retired format; convert it once with
+[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md).
+
+A very large repertoire is kept out of the `.crb`.
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+and
+[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+write it to a sibling file `<stem>.immune.qs2` (`.rds` with
+`codec = "rds"`) and record its name and checksum in the `.crb`, so the
+Viewer lists samples and chains without reading it and loads the tables
+when the Immune repertoire page needs them. The `immune_sidecar`
+argument controls this:
+
+- `"auto"` (default): externalise only for H5-backed
+  (`expression_matrix_mode = "h5"`) CRBs whose repertoire has at least
+  `immune_sidecar_threshold` rows (default `100000L`);
+- `"always"`: externalise for any expression storage;
+- `"never"`: keep the repertoire inside the `.crb`.
+
+``` r
+exportFromSeurat(
+  seurat_object,
+  file = "my_data.crb",
+  experiment_name = "my_experiment",
+  organism = "hg",
+  groups = c("sample", "seurat_clusters"),
+  expression_matrix_mode = "h5",
+  immune_sidecar = "always"
+)
+```
+
+The sidecar must travel with the `.crb`: keep the two files in one
+directory when moving them, and
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+copies the sidecar next to the bundled `.crb` automatically.
+
 ## Module interface
 
 ### Settings panel

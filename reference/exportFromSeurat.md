@@ -19,13 +19,15 @@ exportFromSeurat(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  expression_matrix_mode = c("embedded", "h5"),
   h5_compression_level = 0L,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 500000L,
   spatial_images = NULL,
   verbose = FALSE,
+  immune_sidecar = c("auto", "always", "never"),
+  immune_sidecar_threshold = 100000L,
   .expression_resolution = NULL
 )
 ```
@@ -106,37 +108,28 @@ exportFromSeurat(
 
 - expression_matrix_mode:
 
-  How to persist the expression matrix. One of `"embedded"` (default),
-  `"bpcells"`, or `"h5"`.
+  How to persist the expression matrix. One of `"embedded"` (default) or
+  `"h5"`.
 
-  - `"embedded"` stores the matrix inside the `.crb` file, as before.
-    Compatible with all existing `.crb` readers.
-
-  - `"bpcells"` writes the matrix to a BPCells on-disk directory next to
-    the `.crb` and keeps only a lightweight handle in the serialised
-    object. Recommended for large sparse matrices. The resulting `.crb`
-    is portable as long as the sibling `.bpcells/` directory travels
-    with it; the Shiny runtime re-resolves paths via
-    `getExpressionBackend()$location` relative to the `.crb`'s parent
-    directory (step 7.3 runtime attach). Delayed/Rle matrix inputs
-    additionally require HDF5Array; they use a temporary block-written
-    HDF5 file instead of a full dense realization.
+  - `"embedded"` stores the matrix inside the `.crb` file.
 
   - `"h5"` writes the matrix via
     [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
     to a TENx-format sparse HDF5 file next to the `.crb` (sibling
-    `<stem>.h5`) and tags the backend with that relative location. The
-    on-disk layout matches `inst/extdata/examples/example.h5`: a single
-    `/expression` group with `data`, `indices`, `indptr`, `shape`,
-    `genes`, and `barcodes` datasets. The matrix is stored cells x genes
-    (TENx column-favoured, optimised for per-gene reads); the Shiny
-    runtime attach reads it back as a lazy
+    `<stem>.h5`) and tags the backend with that file name. The file
+    holds a single `/expression` group with `data`, `indices`, `indptr`,
+    `shape`, `genes`, and `barcodes` datasets. The matrix is stored
+    cells x genes (TENx column-favoured, optimised for per-gene reads);
+    the Viewer reads it back as a lazy
     [`HDF5Array::TENxMatrix`](https://rdrr.io/pkg/HDF5Array/man/TENxMatrix-class.html)
     seed and transposes it lazily to Cerebro's internal genes x cells
     layout via `DelayedArray::t()` (free). The in-memory `dgCMatrix` is
     never materialised on attach, so RAM stays close to the `.crb`
-    metadata size. The gzip level is set by `h5_compression_level`.
-    Requires the HDF5Array package.
+    metadata size. The `.crb` is thin: the cell names are kept once, in
+    the H5 file, and the `.crb` records their order and a checksum. The
+    gzip level is set by `h5_compression_level`; the default (no
+    compression) is several times larger than a compressed file but
+    builds and reads faster. Requires the HDF5Array package.
 
   The CRB and any sidecar are built and validated in a private sibling
   stage. On POSIX systems, new stages and external matrices are
@@ -176,6 +169,19 @@ exportFromSeurat(
 
   Dataset-level cell threshold used by `viewer_binary = "auto"`.
 
+- immune_sidecar:
+
+  Store the immune repertoire in a sibling file `<stem>.immune.qs2`
+  (`.rds` with `codec = "rds"`) instead of inside the `.crb`. `"auto"`
+  does so for `"h5"` exports whose repertoire has at least
+  `immune_sidecar_threshold` rows; `"always"` and `"never"` override
+  that. The sidecar must travel with the `.crb`.
+
+- immune_sidecar_threshold:
+
+  Number of repertoire rows (cells with receptor data) used by
+  `immune_sidecar = "auto"`.
+
 - spatial_images:
 
   Optional named list mapping Seurat image names to named image paths or
@@ -206,7 +212,8 @@ If `object@misc$immune_repertoire` contains a named list of data.frames
 `CTstrict`), it will be automatically exported into the Cerebro object
 via
 [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md).
-Legacy `bcr_data` / `tcr_data` slots are also supported as a fallback.
+When that slot is empty, receptors kept apart in `object@misc$tcr_data`
+and `object@misc$bcr_data` are merged into it.
 
 ## HLA typing
 
@@ -235,18 +242,18 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [16:04:56] Initializing Cerebro object...
-#> [16:04:56] Adding expression data (embedded)...
-#> [16:04:56] Collecting available meta data...
-#> [16:04:56] Extracting all meta data columns...
-#> [16:04:56] Extracting dimensional reductions...
-#> [16:04:56] Will export the following dimensional reductions: umap
-#> [16:04:56] Extracting marker genes table...
-#> [16:04:56] No trajectories to extract...
-#> [16:04:56] Checking for spatial data...
-#> [16:04:56] Overview of Cerebro object:
+#> [20:54:17] Initializing Cerebro object...
+#> [20:54:17] Adding expression data (embedded)...
+#> [20:54:17] Collecting available meta data...
+#> [20:54:17] Extracting all meta data columns...
+#> [20:54:17] Extracting dimensional reductions...
+#> [20:54:17] Will export the following dimensional reductions: umap
+#> [20:54:17] Extracting marker genes table...
+#> [20:54:17] No trajectories to extract...
+#> [20:54:17] Checking for spatial data...
+#> [20:54:17] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 5.1.4
+#> exporter package version: 5.2.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
@@ -266,6 +273,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [16:04:56] Saving Cerebro object to: /tmp/nix-shell-4258-2863294846/RtmpkNGwMw/pbmc_Seurat.crb
-#> [16:04:56] Done!
+#> [20:54:17] Saving Cerebro object to: /tmp/nix-shell-4236-3089512087/RtmpKzwBcY/pbmc_Seurat.crb
+#> [20:54:17] Done!
 ```

@@ -2,19 +2,26 @@
 
 ## Choose an expression backend
 
-CerebroNexus supports embedded matrices, sparse HDF5 and BPCells. Select
-the backend with `expression_matrix_mode` in
+CerebroNexus stores the expression matrix either inside the `.crb` or in
+a sparse HDF5 file next to it. Select the storage with
+`expression_matrix_mode` in
 [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
 or
 [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md):
 
-| Backend | Practical use | Files to keep together |
+| Mode | Practical use | Files to keep together |
 |----|----|----|
 | `embedded` | Small datasets and simple single-file distribution | `.crb` |
-| `h5` | On-disk sparse expression, including single-gene queries | `.crb` and its recorded `.h5` sidecar |
-| `bpcells` | On-disk expression, block access and large-data workflows | `.crb` and its complete `.bpcells/` directory |
+| `h5` | On-disk sparse expression, including single-gene queries and large datasets | `.crb` and its recorded `.h5` sidecar |
 
-There is no universal fastest backend. Use the [benchmark
+An H5-backed `.crb` is thin: the cell names live once in the H5 file and
+the `.crb` keeps a checksum of them (see [Data integrity
+contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)).
+A very large immune repertoire can also move to a third sibling,
+`<stem>.immune.qs2` (`immune_sidecar`, see
+[`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)).
+
+Use the [benchmark
 guide](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md)
 for measured workloads and their limits. Avoid converting a large
 delayed or on-disk matrix into a dense matrix merely to inspect or
@@ -28,8 +35,8 @@ This small example creates a portable CRB without downloading a dataset:
 library(CerebroNexus)
 cells <- c("cell-a", "cell-b", "cell-c")
 object <- Cerebro$new()
-object$expression <- matrix(c(1, 0, 2, 3, 0, 4), nrow = 2,
-  dimnames = list(c("gene-a", "gene-b"), cells))
+object$setExpression(matrix(c(1, 0, 2, 3, 0, 4), nrow = 2,
+  dimnames = list(c("gene-a", "gene-b"), cells)))
 object$setMetaData(data.frame(cell_barcode = cells, sample = c("A", "A", "B")))
 object$addProjection("umap", data.frame(x = 1:3, y = c(0, 1, 0), row.names = cells))
 work <- tempfile("cerebro-guide-")
@@ -48,21 +55,28 @@ For example:
 ``` r
 exportFromSeurat(seurat_object, file = "study.crb", experiment_name = "Study",
   organism = "hg", groups = c("sample", "seurat_clusters"),
-  expression_matrix_mode = "bpcells")
+  expression_matrix_mode = "h5")
 ```
 
-Use
+This writes `study.crb` and `study.h5`.
 [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
-for legacy RDS and newer CRBs; `.crb` describes the logical format, not
-its physical codec. `saveCerebro(..., codec = "rds")` requests RDS
+reads RDS and qs2 CRBs; `.crb` describes the logical format, not its
+physical codec. `saveCerebro(..., codec = "rds")` requests RDS
 compatibility, while the default uses qs2.
 [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
-changes a CRB’s serialization without replacing its external expression
-data:
+re-serializes a CRB while reusing its existing expression data:
 
 ``` r
 convertCerebro("study.crb", "study-rds.crb", codec = "rds")
 ```
+
+[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+is also the one-time migration path for a CRB written by an older
+release. Such a file is rejected with
+`uses a retired format ... Convert it once with CerebroNexus::convertCerebro()`.
+A CRB whose expression storage this version cannot read or repair is
+rejected there too; re-export it from the source Seurat object with
+`expression_matrix_mode = "h5"`.
 
 ## Move the complete dataset
 
@@ -70,15 +84,16 @@ Keep paths recorded inside the CRB valid. A typical layout is:
 
 ``` text
 study.crb
-study.bpcells/
+study.h5
+study.immune.qs2   (only when the repertoire is large)
 study.viewer/
 ```
 
-Additional spatial molecule/image resources and a lazy immune-repertoire
-sidecar must also travel with their dataset. Do not rename or partially
-copy sidecars independently. RDS and qs2 versions can share the same
-unchanged sidecar. Cell-order checksums reject mismatched BPCells cell
-indexes.
+Additional spatial molecule/image resources must also travel with their
+dataset. Do not rename or partially copy sidecars independently. RDS and
+qs2 versions of a CRB can share the same unchanged H5 file. The
+cell-order checksum stored in the `.crb` rejects an H5 file whose cells
+differ from the ones the `.crb` was written for.
 
 For distribution,
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
@@ -146,9 +161,8 @@ Rscript -e "install.packages(c('remotes', 'pkgload')); remotes::install_local('.
 Rscript run-demo.R
 ```
 
-These demos use BPCells sidecars, so they also need `BPCells`, which
-CerebroNexus does not install for you:
-`Rscript -e "remotes::install_github('bnprks/BPCells/r')"`.
+These demos keep their expression matrices in H5 sidecars and need no
+extra package beyond the ones CerebroNexus installs.
 
 Open `http://127.0.0.1:7451`. The first run downloads and prepares the
 official 10x one-million-neuron matrix and the Ren et al. [COVID-19
@@ -158,11 +172,11 @@ atlas](https://explore.data.humancellatlas.org/projects/5f607e50-ba22-4598-b1e9-
 GSE158055](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE158055);
 1,462,702 cells, all 64 published cell populations, sample/patient
 clinical metadata, and 220,968 paired-TCR plus 282,464 paired-BCR
-cells). The initial compressed downloads total about 18 GB; allow at
-least 100 GB of free cache space for the extracted matrices and BPCells
-artifacts. Source and prepared files are cached outside the repository
-(set `CEREBRO_LARGE_CACHE` to choose the location), so later runs reuse
-them.
+cells). The initial compressed downloads total about 18 GB. The prepared
+H5 files are written uncompressed and take considerable disk space on
+top of the extracted matrices, so allow a generous amount of free cache
+space. Source and prepared files are cached outside the repository (set
+`CEREBRO_LARGE_CACHE` to choose the location), so later runs reuse them.
 
 To test Ren without the 10x dataset, and to separate
 download/preparation failures from Viewer errors (`--prepare-only` exits
@@ -175,10 +189,10 @@ Rscript run-demo.R --ren-only --no-browser
 
 The launcher prints the URL, the source directory and the Ren data
 version (currently 2), and reuses a complete compatible cache. Keep each
-`.crb` and its `.bpcells/` directory together. Prepared versions use
-separate directories (`ren/cerebro-v2/`); preparation never upgrades the
-earlier `ren/cerebro/` atlas in place, failed builds are not published,
-and source downloads are shared between versions.
+`.crb` and its `.h5` file together. Prepared versions use separate
+directories (`ren/cerebro-v2/`); preparation never upgrades the earlier
+`ren/cerebro/` atlas in place, failed builds are not published, and
+source downloads are shared between versions.
 
 The launcher also builds each data set’s Viewer Pack and rebuilds it
 when it is missing or predates an asset the viewer reads. Without a
@@ -202,9 +216,13 @@ before starting.
 
 ## Troubleshooting
 
-- **Missing backend/sidecar:** install the backend package and restore
-  the recorded sibling file/directory. A control CRB alone is not a
-  complete external dataset.
+- **Missing sidecar:** restore the recorded sibling `.h5` (or
+  `.immune.qs2`) file. A thin CRB alone is not a complete external
+  dataset.
+- **Retired format:** convert the file once with
+  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md),
+  or re-export a dataset whose storage this version cannot read from its
+  source Seurat object.
 - **Identity/checksum mismatch:** restore the matching sidecar or
   re-export from a consistent source. Equal cell counts do not prove
   correct cell correspondence.

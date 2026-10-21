@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -125,6 +125,11 @@ performance result.</p>
 installed packages; the figures are pre-drawn images. Rendering this
 article requires neither a large dataset nor a developer cache. Do not
 overwrite recorded experiments with a new run.</p>
+<p>BPCells storage was removed in CerebroNexus 5.2.0 (see
+<code>NEWS.md</code>). The BPCells rows, figures and statements in this
+article are the measurements recorded while it was supported; they are
+kept unchanged as history and cannot be reproduced with the current
+version, which stores external expression only in H5 files.</p>
 </div>
 <div class="section level2">
 <h2 id="real-data-expression-backends-scale-run-2026-10-18">Real-data expression backends (Scale run, 2026-10-18)<a class="anchor" aria-label="anchor" href="#real-data-expression-backends-scale-run-2026-10-18"></a>
@@ -597,7 +602,7 @@ installed package alone. Record <code>git rev-parse HEAD</code>,
 with every new output, and save new runs outside the recorded-data
 directory.</p>
 <p>The million-cell and Ren demo data used by <code>run-demo.R</code>
-are prepared by the scripts in <code>tests/demo/</code> of a
+are prepared by the scripts in <code>data-raw/large-demo/</code> of a
 CerebroNexus checkout. For the mouse preparation, allow at least 16 GiB
 free disk for the recorded artifact layout, additional space for
 parallel backends/outputs, and tens of minutes or longer depending on
@@ -607,7 +612,8 @@ preparation script and available disk before starting it. Do not use an
 arbitrary memory limit or a historical completion time as a
 guarantee.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"tests/demo/prepare_viewer_1m_data.R"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"data-raw/large-demo/h5_transposed_write.R"</span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"data-raw/large-demo/prepare_viewer_1m_data.R"</span><span class="op">)</span></span>
 <span><span class="fu">pkgload</span><span class="fu">::</span><span class="fu"><a href="https://pkgload.r-lib.org/reference/load_all.html" class="external-link">load_all</a></span><span class="op">(</span><span class="st">"."</span><span class="op">)</span></span>
 <span><span class="va">crb</span> <span class="op">&lt;-</span> <span class="fu">prepareViewer1mBenchmarkData</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Preserve raw rounds, source identities, failed observations and

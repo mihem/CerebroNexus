@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -146,12 +146,6 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 used as stable dataset identities. Paths must resolve to distinct files.</p></dd>
 
 
-<dt id="arg-dataset-labels">dataset_labels<a class="anchor" aria-label="anchor" href="#arg-dataset-labels"></a></dt>
-<dd><p>Optional named character vector mapping every dataset
-identity in <code>cerebro_data</code> to its display label. Values must be non-empty
-but may repeat. When omitted, dataset identities are also used as labels.</p></dd>
-
-
 <dt id="arg-result-dir">result_dir<a class="anchor" aria-label="anchor" href="#arg-result-dir"></a></dt>
 <dd><p>Output directory. Its basename must be portable, its path
 must not use the reserved build-lock namespace, and its final target must
@@ -194,12 +188,9 @@ to FALSE.</p></dd>
 
 <dt id="arg-cerebro-options">cerebro_options<a class="anchor" aria-label="anchor" href="#arg-cerebro-options"></a></dt>
 <dd><p>Extra entries merged into <code>Cerebro.options</code> in
-the generated app. Matrix overrides must be absolute host paths and make
-the resulting app host-dependent. Native paths must resolve outside
-<code>result_dir</code>; non-native paths cannot be compared with the local app
-tree during the build. Duplicate internal entries are removed, and the
-keys <code>.bundle_backend_plan</code> and <code>.bundle_run_options</code> are written
-by the function.</p></dd>
+the generated app. Duplicate internal entries are removed, and the keys
+<code>.bundle_backend_plan</code> and <code>.bundle_run_options</code> are written by
+the function.</p></dd>
 
 
 <dt id="arg-overwrite">overwrite<a class="anchor" aria-label="anchor" href="#arg-overwrite"></a></dt>
@@ -221,26 +212,6 @@ directory is rejected before any files are written.</p></dd>
 <dt id="arg-show-upload-ui">show_upload_ui<a class="anchor" aria-label="anchor" href="#arg-show-upload-ui"></a></dt>
 <dd><p>One non-missing logical controlling whether users may
 upload their own data; defaults to <code>FALSE</code>.</p></dd>
-
-
-<dt id="arg-initial-dataset">initial_dataset<a class="anchor" aria-label="anchor" href="#arg-initial-dataset"></a></dt>
-<dd><p>Optional exact dataset identity to load initially. This
-does not change the order of <code>cerebro_data</code>. URL selection and a
-session's current selection take precedence.</p></dd>
-
-
-<dt id="arg-initial-page">initial_page<a class="anchor" aria-label="anchor" href="#arg-initial-page"></a></dt>
-<dd><p>Optional initial Viewer page. Supported stable IDs are
-<code>"data_info"</code>, <code>"projection"</code>, <code>"linked_views"</code>,
-<code>"groups"</code>, <code>"marker_genes"</code>, <code>"most_expressed_genes"</code>,
-<code>"enriched_pathways"</code>, <code>"extra_material"</code>,
-<code>"immune_repertoire"</code>, <code>"trajectory"</code>, <code>"spatial"</code>,
-<code>"trekker"</code>, <code>"hla_tcr_motifs"</code>, <code>"gene_expression"</code>,
-<code>"gene_id_conversion"</code>, <code>"color_management"</code>, and
-<code>"about"</code>. A conditional page is selected only when it is available for
-the first loaded dataset. Initial routing is attempted only once, so switching
-datasets later never triggers a delayed redirect. Shared links take precedence
-after restoration.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>
@@ -267,25 +238,6 @@ Supply one number for every dataset, or a named numeric vector/list whose
 names exactly match <code>cerebro_data</code>. The value initializes every cell
 projection view. Viewer edits are shared by projection pages for the current
 dataset; Spatial uses its own coordinate settings.</p></dd>
-
-
-<dt id="arg-spatial-point-appearance">spatial_point_appearance<a class="anchor" aria-label="anchor" href="#arg-spatial-point-appearance"></a></dt>
-<dd><p>Optional named list in
-<code>dataset -&gt; FOV -&gt; list(point_size, point_opacity)</code> form. Point size
-is from 1 to 20 and opacity from 0 to 1. Used by Spatial and spatial panels
-in Linked views, independently of projection appearance.</p></dd>
-
-
-<dt id="arg-spatial-roi-settings">spatial_roi_settings<a class="anchor" aria-label="anchor" href="#arg-spatial-roi-settings"></a></dt>
-<dd><p>Optional named list in
-<code>dataset -&gt; FOV -&gt; ROI -&gt; list(rotation_degrees, point_size, point_opacity)</code>
-form, matching Builder Coordinate settings. Rotation is a Viewer rotation
-after any coordinate transform baked into the exported CRB.</p></dd>
-
-
-<dt id="arg-spatial-percentage-cells-to-show">spatial_percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-spatial-percentage-cells-to-show"></a></dt>
-<dd><p>Independent spatial sampling percentage
-from 10 to 100; one number or a numeric vector named by dataset. Defaults to 100.</p></dd>
 
 
 <dt id="arg-variable-to-compare">variable_to_compare<a class="anchor" aria-label="anchor" href="#arg-variable-to-compare"></a></dt>
@@ -358,6 +310,7 @@ created by <code><a href="https://rdrr.io/pkg/shinymanager/man/create_db.html" c
 the name of the environment variable containing its passphrase. Optional
 <code>timeout_minutes</code> defaults to 15.</p></dd>
 
+
 <dt id="arg-extra-tables">extra_tables<a class="anchor" aria-label="anchor" href="#arg-extra-tables"></a></dt>
 <dd><p>Optional named collection of CSV, TSV, TXT, XLS, XLSX,
 or XLSM files to bundle as private Extra material tables. Workbook sheets
@@ -370,11 +323,58 @@ by <code>extra_tables</code> labels. Each entry maps displayed names to source
 sheet names; unmapped sheets remain available.</p></dd>
 
 
+<dt id="arg-dataset-labels">dataset_labels<a class="anchor" aria-label="anchor" href="#arg-dataset-labels"></a></dt>
+<dd><p>Optional named character vector mapping every dataset
+identity in <code>cerebro_data</code> to its display label. Values must be
+non-empty but may repeat. When omitted, the dataset identities are also
+used as display labels for backward compatibility.</p></dd>
+
+
+<dt id="arg-initial-dataset">initial_dataset<a class="anchor" aria-label="anchor" href="#arg-initial-dataset"></a></dt>
+<dd><p>Optional exact dataset identity to load initially. This
+does not change the order of <code>cerebro_data</code>. URL selection and a
+session's current selection take precedence.</p></dd>
+
+
+<dt id="arg-initial-page">initial_page<a class="anchor" aria-label="anchor" href="#arg-initial-page"></a></dt>
+<dd><p>Optional initial Viewer page. Supported stable IDs are
+<code>"data_info"</code>, <code>"projection"</code>, <code>"linked_views"</code>,
+<code>"groups"</code>, <code>"marker_genes"</code>,
+<code>"most_expressed_genes"</code>, <code>"enriched_pathways"</code>,
+<code>"extra_material"</code>, <code>"immune_repertoire"</code>,
+<code>"trajectory"</code>, <code>"spatial"</code>, <code>"trekker"</code>,
+<code>"hla_tcr_motifs"</code>, <code>"gene_expression"</code>,
+<code>"gene_id_conversion"</code>, <code>"color_management"</code>, and
+<code>"about"</code>. A conditional page is selected only when it is available
+for the first loaded dataset. Initial routing is attempted only once, so
+switching datasets later never triggers a delayed redirect. Shared links
+take precedence after restoration.</p></dd>
+
+
 <dt id="arg-initial-projections">initial_projections<a class="anchor" aria-label="anchor" href="#arg-initial-projections"></a></dt>
 <dd><p>Optional projection names to show when Linked
 views first opens. A character vector applies to every data set. A named
 list configures individual <code>cerebro_data</code> labels; omitted labels keep
 the Viewer's default single-projection behavior.</p></dd>
+
+
+<dt id="arg-spatial-point-appearance">spatial_point_appearance<a class="anchor" aria-label="anchor" href="#arg-spatial-point-appearance"></a></dt>
+<dd><p>Optional named list in
+<code>dataset -&gt; FOV -&gt; list(point_size, point_opacity)</code> form. Point size
+is from 1 to 20 and opacity from 0 to 1. Used by Spatial and spatial panels
+in Linked views, independently of projection appearance.</p></dd>
+
+
+<dt id="arg-spatial-roi-settings">spatial_roi_settings<a class="anchor" aria-label="anchor" href="#arg-spatial-roi-settings"></a></dt>
+<dd><p>Optional named list in
+<code>dataset -&gt; FOV -&gt; ROI -&gt; list(rotation_degrees, point_size, point_opacity)</code>
+form, matching Builder Coordinate settings. Rotation is a Viewer rotation
+after any coordinate transform baked into the exported CRB.</p></dd>
+
+
+<dt id="arg-spatial-percentage-cells-to-show">spatial_percentage_cells_to_show<a class="anchor" aria-label="anchor" href="#arg-spatial-percentage-cells-to-show"></a></dt>
+<dd><p>Independent spatial sampling percentage
+from 10 to 100; one number or a numeric vector named by dataset. Defaults to 100.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -384,13 +384,13 @@ the Viewer's default single-projection behavior.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Supports external expression backends (<code>bpcells</code>, <code>h5</code>) in
-addition to the embedded mode. Each <code>.crb</code> descriptor names a portable
-relative file or directory, which is copied to the same private location
-under <code>private-data/</code>. The historical <code>data/</code> name is deliberately
+    <p>Supports the external H5 expression backend in addition to the embedded
+mode. Each <code>.crb</code> descriptor names a portable relative file, and so
+does an immune repertoire sidecar; both are copied to the same private
+location under <code>private-data/</code>. The historical <code>data/</code> name is deliberately
 not reused: a still-running older generated app may retain its former
 <code>/data</code> HTTP resource mapping during an in-place replacement. Raw
-<code>.crb</code>, H5, and BPCells artifacts are not registered as HTTP resources.
+<code>.crb</code>, H5, and sidecar files are not registered as HTTP resources.
 Spatial background images are the deliberate exception: files explicitly
 supplied through <code>spatial_images</code> are copied verbatim under
 <code>spatial-assets/</code>. The server-side renderer reads these files and embeds
@@ -398,32 +398,24 @@ them as data URIs; the directory is not registered as an HTTP resource.
 Callers must provide trusted image files. Preflight requires a minimum
 stable runtime API and reads the ordinary <code>expression_backend</code> field
 without invoking serialized methods or its getter. The generated
-configuration stores the effective per-CRB attachment plan after applying
-any deployment override, and configured CRBs consume that exact plan at
-runtime. Direct launches and uploads also read and validate the ordinary
-field without invoking the getter. A historical CRB may omit both field and
-getter; an object containing only one is rejected as an unsupported mixed
-format.
+configuration stores the effective per-CRB attachment plan, and configured
+CRBs consume that exact plan at runtime. Direct launches and uploads also
+read and validate the ordinary field without invoking the getter. A CRB
+from an older release that is no longer read (see
+<code><a href="convertCerebro.html">convertCerebro</a></code>) is rejected, as is an object containing only
+one of field and getter.
 Dataset labels and canonical CRB sources are both unique: two labels cannot
 select the same resolved input file.
 Generated bundles follow the standard deployment model of one app per R
 process; process-global <code>Cerebro.options</code> does not provide same-process
-isolation between separately sourced apps.
-Launch settings are validated and frozen in a typed internal manifest before
+isolation between separately sourced apps.</p>
+<p>Launch settings are validated and frozen in a typed internal manifest before
 target preparation. The generated <code>app.R</code> reads that manifest instead of
 interpolating user values into source, and the staged source is parsed before
 publication. The upload limit is installed as
 <code>shiny.maxRequestSize</code> while the app is running and the previous process
 option is restored when the app stops.</p>
-<p>A configured runtime matrix override keeps its existing precedence and skips
-the descriptor sidecar copy. It must be an absolute path. Native paths are
-resolved component by component and rejected if they resolve inside
-<code>result_dir</code>. Unresolved filesystem entries, unsafe Windows aliases,
-and Windows device namespaces fail closed; a truly absent ordinary target is
-allowed for later provisioning. Non-native absolute paths intended for
-another host are preserved lexically and cannot be compared with that host's
-app tree. Such a bundle depends on that host-managed path and is therefore
-not self-contained. Treat
+<p>Treat
 input <code>.crb</code>/<code>.rds</code> files as trusted serialized R objects;
 structural validation is not a sandbox for untrusted RDS input.</p>
 <p>One atomic sibling lock directory, <code>.&lt;basename&gt;-build.lock</code>, serializes

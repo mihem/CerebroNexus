@@ -107,14 +107,20 @@ rows must not remain analysis units. They are removed with a warning
 before storage. A whole unmatched sample is therefore removed; if every
 sample is unmatched, the operation stops.
 
-### Unified and legacy data
+### Unified and separate TCR/BCR input
 
-A valid `@misc$immune_repertoire` is authoritative. Stale legacy
-`tcr_data`/`bcr_data` does not block it.
+A valid `@misc$immune_repertoire` is authoritative. Stale
+`@misc$tcr_data`/`@misc$bcr_data` slots on the Seurat object do not
+block it.
 
-When only legacy slots exist, new exports validate and merge them into
-the unified field while retaining the originals. Existing CRBs need
-re-exporting because R6 methods are serialized into the file.
+When only those two slots exist,
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+validates them and merges them into the one unified repertoire. The
+`.crb` stores only that unified repertoire; the Cerebro object has no
+`tcr_data` or `bcr_data` fields, and `getTCR()` / `getBCR()` derive
+their tables from it. A `.crb` from an older release that still carries
+those fields is a retired format; see [Retired
+formats](#retired-formats).
 
 See [Immune repertoire
 analysis](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.md)
@@ -128,25 +134,33 @@ An export can produce:
 ``` text
 embedded -> dataset.crb
 h5       -> dataset.crb + dataset.h5
-bpcells  -> dataset.crb + dataset.bpcells/
 ```
 
-Both artifacts are written in a private sibling stage. On POSIX systems
-the stage is mode `0700`, new H5/CRB files are `0600`, and new BPCells
-directories are `0700`; an existing CRB keeps its previous mode. Only
-those POSIX mode bits are set or preserved. Ownership, ACLs, extended
-attributes, and security labels remain the deployment system’s
-responsibility on every platform. Later validation of repertoire, HLA,
-markers, projections, and spatial data happens before publication.
+An H5-backed `.crb` is *thin*: the cell names are stored once, in the H5
+file (`/expression/genes`), and the `.crb` keeps only their order and a
+checksum (see [Thin H5 CRBs](#thin-h5-crbs)). A very large immune
+repertoire can add one more sibling file, `dataset.immune.qs2`, so the
+Viewer lists samples and chains without reading it. With the default
+`immune_sidecar = "auto"` this happens only for `h5` exports whose
+repertoire has at least `immune_sidecar_threshold` (100,000) rows;
+`"always"` and `"never"` override that.
+
+All artifacts are written in a private sibling stage. On POSIX systems
+the stage is mode `0700`, new H5, immune sidecar and CRB files are
+`0600`; an existing CRB keeps its previous mode. Only those POSIX mode
+bits are set or preserved. Ownership, ACLs, extended attributes, and
+security labels remain the deployment system’s responsibility on every
+platform. Later validation of repertoire, HLA, markers, projections, and
+spatial data happens before publication.
 
 Before replacing an existing sidecar, the exporter reads the current
 CRB’s plain backend field without calling a serialized getter.
 Replacement proceeds only when that descriptor claims the exact sidecar
 path and type; an unrelated same-name file is a collision and remains
-untouched. For BPCells, the new matrix is reopened at its final location
-before serialization. If publication fails, the previous CRB and sidecar
-are restored on a best-effort basis. A successful backend switch removes
-the previous sidecar only after the new CRB is committed.
+untouched; the same holds for the immune repertoire sidecar. If
+publication fails, the previous CRB and sidecars are restored on a
+best-effort basis. A successful backend switch removes the previous
+sidecar only after the new CRB is committed.
 
 This is not an atomic transaction across two paths. Stop every app or
 other reader using the export before replacing it: a live reader can
@@ -154,9 +168,65 @@ otherwise load the old CRB during the sidecar swap. Process termination
 and concurrent writers are also outside the guarantee. A failed
 restoration is reported rather than hidden.
 
-External modes require a portable `.crb` filename. Empty stems, Windows
+The `h5` mode requires a portable `.crb` filename. Empty stems, Windows
 reserved names, and filesystem-invalid punctuation are rejected before
 any artifact is written.
+
+### Thin H5 CRBs
+
+For an H5-backed export,
+[`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
+stores the matrix cells by genes, so the file’s `/expression/genes`
+dataset holds the **cell** names and `/expression/barcodes` the **gene**
+names. The `.crb` (thin-CRB schema version 3) then drops
+`meta_data$cell_barcode` and the row names of every projection that
+carries the same cell names, and records a checksum of the cell names
+(`cell_names_hash`), the cell count, and which projections were
+compacted in its `crb_schema` field.
+
+When the `.crb` is loaded,
+[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+and the Viewer read the cell names back from the H5 file, verify them
+against the checksum and restore both fields. A `.crb` paired with the
+wrong H5 file, or an H5 file whose cells were reordered, therefore stops
+with an error instead of attaching expression to the wrong cells. An
+H5-backed `.crb` written by CerebroNexus 5.1.x without a `crb_schema`
+field is still read as it is; every new H5 export is thin.
+
+### Retired formats
+
+The readers accept only the current layout.
+[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+and the Viewer all reject a `.crb` that
+
+- has no `expression_backend` descriptor;
+- has a thin schema other than version 3;
+- still stores receptors in non-empty `bcr_data` / `tcr_data` fields;
+- records an immune repertoire sidecar of any type other than `"file"`;
+- predates spatial support (the Cerebro v1.3 class).
+
+The message is the same everywhere:
+
+``` text
+The Cerebro data file 'x.crb' uses a retired format: <reason>.
+Convert it once with CerebroNexus::convertCerebro().
+```
+
+[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+is the only migration path. It sets a missing descriptor to `embedded`,
+merges `bcr_data` / `tcr_data` into the unified repertoire and thins an
+H5-backed `.crb` that was written without a schema. A `.crb` whose
+expression storage this version cannot read or repair (an expression
+backend other than `embedded` or `h5`, thin schema 1 or 2, an immune
+sidecar of another type than `"file"`) cannot be converted; re-export it
+from the source Seurat object with
+`exportFromSeurat(expression_matrix_mode = "h5")`.
+
+``` r
+CerebroNexus::convertCerebro("old_dataset.crb")
+```
 
 ## What errors versus warnings mean
 
@@ -180,12 +250,12 @@ Warnings mean that the result remains interpretable:
 
 1.  Keep source Seurat layers in memory for export, or materialize every
     intended split layer first.
-2.  Export to a `.crb` path and choose `embedded`, `h5`, or `bpcells`.
+2.  Export to a `.crb` path and choose `embedded` or `h5`.
 3.  Add repertoire data through
     [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
     rather than assigning an unchecked shape.
-4.  Keep each external matrix beside its CRB under the serialized
-    backend name.
+4.  Keep the H5 file, and the immune repertoire sidecar if there is one,
+    beside its CRB under the names recorded in the CRB.
 5.  Build the app with
     [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
     and treat any error it raises as a request to fix identity, not as a

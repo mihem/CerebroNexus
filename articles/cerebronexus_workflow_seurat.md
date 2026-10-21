@@ -428,6 +428,14 @@ exportFromSeurat(
 )
 ```
 
+By default the expression matrix is embedded in the `.crb`. For large
+data sets, add `expression_matrix_mode = "h5"` to write the matrix to a
+sibling `.h5` file instead (the only other storage mode); keep the two
+files together. A very large immune repertoire is moved to a third
+sibling file (`immune_sidecar = "auto"`). See [Store the expression
+matrix in H5
+format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md).
+
 The Cerebro use interface can be launched using the
 [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
 function.

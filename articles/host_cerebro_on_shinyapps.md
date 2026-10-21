@@ -61,7 +61,9 @@ createShinyApp(
 The generated directory contains `app.R`, the Viewer runtime, and the
 private data files needed by the deployed application. See
 [`vignette("create_a_self_contained_shiny_app")`](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
-for deployment options and external expression-backend requirements.
+for deployment options. An H5-backed `.crb` is bundled together with its
+`.h5` file (and its immune repertoire sidecar, if it has one), so the
+uploaded directory stays self-contained.
 
 ## Deploy app
 

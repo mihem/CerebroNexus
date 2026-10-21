@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 830" role="img" aria-labelledby="title desc">
   <title id="title">All CerebroNexus expression consumers share one layered-assay resolver</title>
-  <desc id="desc">Export, conversion, and four preprocessing functions feed into one expression matrix facade. Seurat v3 and v4 use the legacy adapter; Seurat v5 uses the request-driven resolver. A shared cell validator feeds analysis or the three output storage backends.</desc>
+  <desc id="desc">Export, conversion, and four preprocessing functions feed into one expression matrix facade. Seurat v3 and v4 use the legacy adapter; Seurat v5 uses the request-driven resolver. A shared cell validator feeds analysis or the two output storage modes.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#17324d" flood-opacity=".13"/>
@@ -87,25 +87,21 @@
   <path d="M 997 440 L 997 502" class="line"/>
   <text x="580" y="500" class="section">VALIDATED DESTINATIONS</text>
   <g filter="url(#shadow)">
-    <rect x="470" y="518" width="200" height="96" rx="18" fill="#eaf7ef" stroke="#4aa96e" stroke-width="2"/>
-    <rect x="690" y="518" width="140" height="96" rx="18" fill="#e7f4ff" stroke="#4d9fd1" stroke-width="2"/>
-    <rect x="850" y="518" width="140" height="96" rx="18" fill="#f0edff" stroke="#8069ce" stroke-width="2"/>
-    <rect x="1010" y="518" width="135" height="96" rx="18" fill="#fff1df" stroke="#d88a36" stroke-width="2"/>
+    <rect x="470" y="518" width="205" height="96" rx="18" fill="#eaf7ef" stroke="#4aa96e" stroke-width="2"/>
+    <rect x="705" y="518" width="205" height="96" rx="18" fill="#e7f4ff" stroke="#4d9fd1" stroke-width="2"/>
+    <rect x="940" y="518" width="205" height="96" rx="18" fill="#f0edff" stroke="#8069ce" stroke-width="2"/>
   </g>
-  <text x="570" y="555" text-anchor="middle" class="node-title">Analysis result</text>
-  <text x="570" y="579" text-anchor="middle" class="body">metadata / tables</text>
-  <text x="570" y="599" text-anchor="middle" class="body">all object cells</text>
-  <text x="760" y="555" text-anchor="middle" class="node-title">embedded</text>
-  <text x="760" y="583" text-anchor="middle" class="body">matrix in .crb</text>
-  <text x="920" y="555" text-anchor="middle" class="node-title">HDF5</text>
-  <text x="920" y="583" text-anchor="middle" class="body">sibling .h5</text>
-  <text x="1077" y="555" text-anchor="middle" class="node-title">BPCells</text>
-  <text x="1077" y="583" text-anchor="middle" class="body">sibling directory</text>
+  <text x="572" y="555" text-anchor="middle" class="node-title">Analysis result</text>
+  <text x="572" y="579" text-anchor="middle" class="body">metadata / tables</text>
+  <text x="572" y="599" text-anchor="middle" class="body">all object cells</text>
+  <text x="807" y="555" text-anchor="middle" class="node-title">embedded</text>
+  <text x="807" y="583" text-anchor="middle" class="body">matrix in .crb</text>
+  <text x="1042" y="555" text-anchor="middle" class="node-title">HDF5</text>
+  <text x="1042" y="583" text-anchor="middle" class="body">sibling .h5</text>
 
-  <path d="M 997 502 C 997 480, 570 480, 570 518" class="line"/>
-  <path d="M 997 502 C 997 492, 760 492, 760 518" class="line"/>
-  <path d="M 997 502 C 997 500, 920 500, 920 518" class="line"/>
-  <path d="M 997 502 L 1077 518" class="line"/>
+  <path d="M 997 502 C 997 480, 572 480, 572 518" class="line"/>
+  <path d="M 997 502 C 997 492, 807 492, 807 518" class="line"/>
+  <path d="M 997 502 C 997 510, 1042 510, 1042 518" class="line"/>
 
   <g filter="url(#shadow)">
     <rect x="470" y="660" width="675" height="105" rx="20" fill="#ffffff" stroke="#bfd7e5" stroke-width="2"/>

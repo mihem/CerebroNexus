@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -134,7 +134,8 @@ such:</p>
 ├── cell_cycle (vector)
 ├── gene_lists (named list)
 │   └── &lt;gene_list_name&gt; (vector of genes)
-├── expression (matrix-like)
+├── expression (matrix-like; attached from the H5 file when an H5-backed .crb is read)
+├── expression_backend (list: type "embedded" or "h5", location)
 ├── meta_data (data.frame)
 ├── projections (named list)
 │   └── &lt;projection_name&gt; (data.frame)
@@ -151,6 +152,8 @@ such:</p>
 ├── trajectories (named list)
 │   └── &lt;method&gt; (named list)
 │       └── &lt;trajectory_name&gt; (depends on method, most likely a list or data frame)
+├── immune_repertoire (named list)
+│   └── &lt;sample&gt; (data.frame, one row per cell with a receptor)
 └── extra_material (named list)
     ├── tables (named list)
     │   └── &lt;name&gt; (data.frame)    
@@ -159,6 +162,20 @@ such:</p>
 <p>Interaction with the Cerebro object will be done through internal
 methods, providing additional control for the correct format of the
 object.</p>
+<p>The expression matrix is either embedded in the <code>.crb</code> or
+kept in an H5 file next to it; <code>expression_backend</code> records
+which (<code>setExpressionBackend()</code> accepts only
+<code>"embedded"</code> and <code>"h5"</code>), and
+<code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> / <code><a href="../reference/readCerebro.html">readCerebro()</a></code> take care of the
+rest. T-cell and B-cell receptors live together in
+<code>immune_repertoire</code>; there are no separate
+<code>tcr_data</code> / <code>bcr_data</code> fields, and
+<code>getTCR()</code> / <code>getBCR()</code> return the TCR or BCR rows
+of that repertoire. A very large repertoire can sit in a sibling
+<code>&lt;stem&gt;.immune.qs2</code> file that
+<code>getImmuneRepertoire()</code> loads on demand. A <code>.crb</code>
+written by an older release that does not follow this layout is rejected
+with a pointer to <code><a href="../reference/convertCerebro.html">convertCerebro()</a></code>.</p>
 <p>As long as you follow the described scheme, you can export and
 visualize any data frame that is stored in the <code>marker_genes</code>
 or <code>enriched_pathways</code> slots. I have prepared a vignette with

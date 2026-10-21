@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -129,6 +129,11 @@ by Seurat.</p>
 <p>The <code>.crb</code> records the H5 filename in its
 expression-backend descriptor. Keep both files together when moving,
 sharing, or deploying the data set.</p>
+<p><code>embedded</code> and <code>h5</code> are the only expression
+storage modes
+(<code>expression_matrix_mode = c("embedded", "h5")</code>). A
+<code>.crb</code> whose storage this version cannot read has to be
+re-exported from its source Seurat object (see <a href="#older-files-and-retired-formats">Older files</a> below).</p>
 </div>
 <div class="section level2">
 <h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
@@ -194,6 +199,28 @@ only its relative location in the <code>.crb</code>.</p>
 as cells by genes in the <code>/expression</code> group. CerebroNexus
 reconnects it lazily and exposes the usual genes-by-cells matrix to the
 application.</p>
+<div class="section level3">
+<h3 id="a-thin--crb">A thin <code>.crb</code><a class="anchor" aria-label="anchor" href="#a-thin--crb"></a>
+</h3>
+<p>The cell names are kept once, in the H5 file:
+<code>/expression/genes</code> holds the <strong>cell</strong> names and
+<code>/expression/barcodes</code> the <strong>gene</strong> names (the
+axis names follow the 10x convention for a genes-by-cells matrix, which
+is transposed here). The <code>.crb</code> itself is <em>thin</em>
+(schema version 3). It drops <code>meta_data$cell_barcode</code> and the
+row names of the projections, and instead stores a checksum of the cell
+names (<code>cell_names_hash</code>) together with the cell count.
+<code><a href="../reference/readCerebro.html">readCerebro()</a></code> and the Viewer read the cell names back from
+the H5 file, verify the checksum and restore both fields, so the object
+you work with is identical to an embedded one:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="fu">getMetaData</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">cell_barcode</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">crb</span><span class="op">$</span><span class="va">projections</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span></span></code></pre></div>
+<p>If the <code>.crb</code> and the H5 file do not belong together, for
+example because the H5 file was re-exported with a different cell order,
+loading stops with an error instead of attaching expression values to
+the wrong cells.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="launch-or-bundle-the-result">Launch or bundle the result<a class="anchor" aria-label="anchor" href="#launch-or-bundle-the-result"></a>
@@ -202,16 +229,19 @@ application.</p>
 <code>.h5</code> together and launch the <code>.crb</code>. Its
 descriptor tells CerebroNexus where to find the matrix, so no separate
 H5 argument is needed.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
 <span>  crb_file_to_load <span class="op">=</span> <span class="va">crb_output</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>For deployment, pass the <code>.crb</code> to
 <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>. It reads the same descriptor and copies
-the referenced H5 sidecar into the self-contained app bundle. The H5
-file is stored under the app’s private <code>private-data/</code> tree
-and is not registered as a browser-downloadable HTTP resource.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+the referenced H5 sidecar, and the immune repertoire sidecar if there is
+one, into the self-contained app bundle. The files are stored under the
+app’s private <code>private-data/</code> tree and are not registered as
+browser-downloadable HTTP resources. There is no option to point the app
+at a different matrix path on the host: the <code>.crb</code> and its
+recorded sidecars are the only source.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC"</span> <span class="op">=</span> <span class="va">crb_output</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">output_dir</span>, <span class="st">"pbmc_app"</span><span class="op">)</span>,</span>
@@ -221,20 +251,33 @@ and is not registered as a browser-downloadable HTTP resource.</p>
 descriptor remains authoritative. Use
 <code>crb$getExpressionBackend()</code> to see the sidecar that belongs
 to the file.</p>
+<div class="section level3">
+<h3 id="immune-repertoire-sidecar">Immune repertoire sidecar<a class="anchor" aria-label="anchor" href="#immune-repertoire-sidecar"></a>
+</h3>
+<p>A data set with a very large immune repertoire gets a third file,
+<code>&lt;stem&gt;.immune.qs2</code>, next to the <code>.crb</code> and
+the <code>.h5</code> file. By default
+(<code>immune_sidecar = "auto"</code> in <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>
+and <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code>) this happens for H5-backed
+<code>.crb</code> files whose repertoire has at least
+<code>immune_sidecar_threshold = 100000L</code> rows;
+<code>"always"</code> and <code>"never"</code> override that decision.
+Move and bundle the sidecar together with the <code>.crb</code> like the
+H5 file.</p>
+</div>
 </div>
 <div class="section level2">
-<h2 id="legacy-alternative-convert-an-existing-embedded--crb">Legacy alternative: convert an existing embedded
-<code>.crb</code><a class="anchor" aria-label="anchor" href="#legacy-alternative-convert-an-existing-embedded--crb"></a>
+<h2 id="convert-an-existing-embedded--crb">Convert an existing embedded <code>.crb</code><a class="anchor" aria-label="anchor" href="#convert-an-existing-embedded--crb"></a>
 </h2>
 <p>The direct export above is preferred for new Seurat exports. The
-manual workflow remains useful when only an older embedded
+manual workflow remains useful when only a current, embedded
 <code>.crb</code> is available, for example after an
 <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> workflow, and the source object cannot be
 exported again.</p>
 <p>Load the existing <code>.crb</code>, transpose its conventional
 genes-by-cells expression matrix, and write it to the
 <code>/expression</code> group:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crb_input</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
 <span>  <span class="st">"extdata/examples/example.crb"</span>,</span>
 <span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span></span>
@@ -253,8 +296,11 @@ genes-by-cells expression matrix, and write it to the
 <p>Remove the embedded matrix and record the sibling filename before
 saving the smaller <code>.crb</code>; otherwise the original matrix will
 still be loaded into memory, or the saved object will not know where its
-external matrix lives.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+external matrix lives. Because the backend is H5,
+<code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> writes a thin <code>.crb</code>: it checks
+that the H5 cell names match <code>meta_data$cell_barcode</code> in the
+same order and then keeps only their checksum.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crb</span><span class="op">$</span><span class="va">expression</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
 <span><span class="va">crb</span><span class="op">$</span><span class="fu">setExpressionBackend</span><span class="op">(</span></span>
 <span>  type <span class="op">=</span> <span class="st">"h5"</span>,</span>
@@ -263,18 +309,42 @@ external matrix lives.</p>
 <span><span class="va">crb_output</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">legacy_dir</span>, <span class="st">"example.crb"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/saveCerebro.html">saveCerebro</a></span><span class="op">(</span><span class="va">crb</span>, <span class="va">crb_output</span><span class="op">)</span></span></code></pre></div>
 <p>The converted <code>.crb</code> is now self-describing. Keep it
-beside <code>example.h5</code> and launch it without a host-specific
-override:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+beside <code>example.h5</code> and launch it without any further
+argument:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/launchCerebro.html">launchCerebro</a></span><span class="op">(</span></span>
 <span>  crb_file_to_load <span class="op">=</span> <span class="va">crb_output</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>If an older serialized object does not provide
-<code>setExpressionBackend()</code>, do not clear and resave it with no
-descriptor. Re-export it with a current CerebroNexus version instead.
-When the original Seurat object is available,
+<p>When the original Seurat object is available,
 <code>exportFromSeurat(..., expression_matrix_mode = "h5")</code>
 remains the preferred, less error-prone route.</p>
+</div>
+<div class="section level2">
+<h2 id="older-files-and-retired-formats">Older files and retired formats<a class="anchor" aria-label="anchor" href="#older-files-and-retired-formats"></a>
+</h2>
+<p>Only the current layout is read. <code><a href="../reference/readCerebro.html">readCerebro()</a></code>,
+<code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and the
+Viewer reject a <code>.crb</code> that has no expression-backend
+descriptor, uses a thin schema other than version 3, still stores
+receptors in the <code>bcr_data</code> / <code>tcr_data</code> fields,
+or records an immune repertoire sidecar of another type than
+<code>"file"</code>, with</p>
+<pre class="text"><code>The Cerebro data file 'x.crb' uses a retired format: &lt;reason&gt;.
+Convert it once with CerebroNexus::convertCerebro().</code></pre>
+<p><code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> is the only migration path. It sets a
+missing descriptor to <code>embedded</code>, merges the old receptor
+fields into the unified immune repertoire, and rewrites an H5-backed
+<code>.crb</code> from CerebroNexus 5.1.x (which carried its cell names
+in the <code>.crb</code>) as a thin one next to its existing H5
+file:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/convertCerebro.html">convertCerebro</a></span><span class="op">(</span><span class="st">"old_dataset.crb"</span><span class="op">)</span></span></code></pre></div>
+<p>A <code>.crb</code> whose expression storage this version cannot read
+or repair (an expression backend other than <code>embedded</code> or
+<code>h5</code>, thin schema 1 or 2, or an immune sidecar of another
+type than <code>"file"</code>) is rejected and cannot be converted.
+Re-export it from the source Seurat object with
+<code>exportFromSeurat(..., expression_matrix_mode = "h5")</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>

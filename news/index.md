@@ -1,5 +1,186 @@
 # Changelog
 
+## CerebroNexus 5.2.0
+
+This release removes the BPCells expression storage and several retired
+storage forms. **A `.crb` written by an older release may no longer
+open**: see “Migrating existing files” below. External expression is now
+stored only in an H5 file next to the `.crb`, and the large demo data
+sets can be rebuilt as H5 in minutes.
+
+### Storage
+
+- `expression_matrix_mode` of
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  and
+  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  is now `"embedded"` or `"h5"`. The BPCells storage mode is removed;
+  the `h5` backend was the faster reader in the 2026-10-18 scale run.
+  The recorded benchmark results, including the BPCells measurements,
+  are kept as history in `inst/extdata/benchmarks/` and the
+  “Large-dataset benchmarks” article.
+- An H5-backed `.crb` is now thin (CRB schema version 3). The cell names
+  are kept once, in the H5 file (`/expression/genes`), and the `.crb`
+  stores only a checksum and the cell count instead of repeating them in
+  `meta_data` and every projection. The Viewer still defers the cell
+  names until a page needs them, so opening a data set reads no more
+  than before. Opening compares only the cell count; the Viewer refuses
+  an H5 file whose cell names do not match the `.crb` when the names are
+  first read, which is at the latest before any gene expression is read.
+  H5 `.crb` files from 5.1.x, which carry their cell names, keep
+  opening.
+- The immune repertoire of a large H5-backed data set is stored in a
+  sibling file `<stem>.immune.qs2` (`.rds` with `codec = "rds"`) that
+  the package writes itself:
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  and
+  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  gain `immune_sidecar = c("auto", "always", "never")` and
+  `immune_sidecar_threshold` (100,000 rows). The Viewer lists samples
+  and chains from the descriptor and loads the file when the Immune
+  repertoire page needs it;
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  copies it into the bundle.
+- The host-side overrides `expression_matrix_h5`,
+  `expression_matrix_BPCells` and `expression_matrix_mode` are removed
+  from
+  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  and the matching `cerebro_options` entries from
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+  which now stops with an error when `cerebro_options` still contains
+  `expression_matrix_h5` or `expression_matrix_BPCells`. A `.crb` finds
+  its matrix through its own descriptor, relative to its own directory.
+- `Cerebro` no longer has the `bcr_data` and `tcr_data` fields or
+  `addBCRData()` / `addTCRData()`. `getBCR()` and `getTCR()` now return
+  the BCR or TCR rows of the unified immune repertoire.
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  still accepts `@misc$tcr_data` / `@misc$bcr_data` as input and merges
+  them into that repertoire.
+- The Nix environment (`create_env.R`, `default.nix`) no longer provides
+  BPCells. Reading a Seurat object whose layers are BPCells matrices
+  still needs BPCells installed; exporting such an object is not
+  supported (bring every layer into memory first).
+
+### Migrating existing files
+
+[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+and the Viewer stop with “uses a retired format” for a `.crb` that has
+no expression-backend descriptor, uses thin schema version 1 or 2, still
+holds `bcr_data` / `tcr_data`, keeps its immune repertoire in a retired
+sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
+
+- `convertCerebro("x.crb")` upgrades a missing descriptor, `bcr_data` /
+  `tcr_data` and a pre-spatial object in place, and rewrites a 5.1.x H5
+  `.crb` as a thin one.
+- A `.crb` whose matrix is stored in a retired external layout (the
+  BPCells directory, thin schema 1 or 2) cannot be converted. Re-export
+  it from the source object with
+  `exportFromSeurat(expression_matrix_mode = "h5")`, and delete the old
+  matrix directory afterwards.
+- The shipped example `demo_hla_tcr_dextramer.crb` had no descriptor and
+  was converted.
+
+### Large demo data
+
+- The scripts that download and prepare the one-million-cell mouse brain
+  and the Ren et al. COVID-19 atlas moved from `tests/demo/` to
+  `data-raw/large-demo/`, with a README that says how to run them
+  (`Rscript run-demo.R`). They are not part of the test suite.
+  `run-demo.R`, `.Rbuildignore` and the tests that read the scripts
+  follow.
+- Both scripts write the expression matrix as the H5 file next to the
+  `.crb` (and the Ren immune repertoire as `<stem>.immune.qs2`), through
+  the new helper `h5_transposed_write.R`.
+  [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
+  can only write one gene after the other, so a source stored by cells
+  was scanned from start to end for every block of genes; the first
+  mouse brain build did not finish in 26 minutes. The helper transposes
+  in two passes instead: pass 1 reads the cells once, in chunks and on
+  several R processes (an AnnData matrix stored as CSR is read from its
+  arrays), and writes one scratch file per chunk; pass 2 assembles
+  blocks of genes from those files and appends them to the H5 file. The
+  layout is the one `writeTENxMatrix()` writes. On an 8-core machine
+  with 4 processes the mouse brain (1,000,000 cells) took about 8
+  minutes and the Ren atlas (1,462,702 cells) about 7 minutes, with the
+  sources already local. `CEREBRO_DEMO_WORKERS` sets the number of
+  processes (default 2; each needs about 3 to 5 GB of memory, an
+  estimate).
+- The mouse brain demo now uses all 1,306,127 cells of the 10x matrix
+  instead of 1,000,000 evenly spaced ones, and is labelled “10x E18
+  mouse brain (1.3M)”. Its cached analysis is stored as
+  `mouse_brain_e18_sketch.rds`. The file and function names still say
+  `1m`.
+- The mouse brain script reads `CEREBRO_LARGE_CACHE` like the Ren
+  script, so an existing download is found. It prepares the data in
+  `1m/cerebro-v2/` with a `demo-version` stamp, as the Ren script does
+  in its `cerebro-v2` folder, so a mouse brain built by an earlier
+  release (1,000,000 cells, folder `cerebro`) is not taken for the 1.3M
+  data set. The earlier files are left in place.
+- `CEREBRO_1M_DEMO_CRB` and `CEREBRO_REN_DEMO_CRB` must name a `.crb`
+  with an adjacent `.h5` file (before: an adjacent `.bpcells`
+  directory). The demo data built by an earlier release has to be built
+  again.
+
+### Fixes
+
+- [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  accepts `h5_compression_level`, `immune_sidecar` and
+  `immune_sidecar_threshold` and passes them to
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md);
+  before, it always wrote an uncompressed H5 file and could not control
+  the sidecar.
+- Re-exporting with
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  or saving with
+  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  removes an immune repertoire sidecar of the replaced CRB that the new
+  CRB no longer uses (a file another CRB in the directory still points
+  to stays), and
+  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  no longer leaves a staged sidecar behind when a later step fails. An
+  object whose repertoire already sits in a sidecar keeps pointing to it
+  whatever `immune_sidecar` is; see
+  [`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md).
+- `immune_sidecar` and `immune_sidecar_threshold` come after `verbose`
+  in
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+  so the position of the arguments before them is the same as in 5.1.3.
+- The Viewer checks the H5 file’s cell names against the `.crb` before
+  it reads gene expression, so expression of another data set with the
+  same number of cells is no longer painted onto a thin `.crb`. The
+  refusal is written to the log.
+- The “uses a retired format” error says to re-export the file with
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  when
+  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  cannot repair it (a BPCells or thin schema 1 or 2 `.crb`); before, it
+  sent every such file to
+  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md),
+  which then refused it.
+- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  stops on an `expression_backend` that is not a descriptor instead of
+  writing the file as embedded.
+- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  no longer rejects an `output` in the same directory on Windows because
+  of a path-separator mismatch.
+- A background read of a `.crb` that does not finish within 30 s (for
+  example when the worker R process cannot load its packages) no longer
+  leaves the dataset switch waiting forever; the Viewer reads the file
+  in the foreground. The 30 s count from when the switch starts to wait,
+  not from when the read began, and the end of an abandoned read no
+  longer discards a newer one.
+
+### Documentation
+
+- The H5, thin-CRB and immune-sidecar changes are described in the
+  vignettes on H5 expression, self-contained apps, shinyapps.io hosting,
+  data integrity, million-cell artifacts, immune repertoire analysis,
+  the Cerebro class, Seurat v5 layered assays and the Seurat workflow.
+  The benchmark article keeps its BPCells measurements as history and
+  says that BPCells storage was removed in 5.2.0.
+
 ## CerebroNexus 5.1.4
 
 - Fixes Data info taking 13 to 21 seconds to open a large dataset when

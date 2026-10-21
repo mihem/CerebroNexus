@@ -11,7 +11,7 @@ the data to Cerebro format for visualization."><meta property="og:image" content
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,7 +102,7 @@ the data to Cerebro format for visualization.</p>
 <span>  nGene <span class="op">=</span> <span class="st">"nFeature_RNA"</span>,</span>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"bpcells"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
+<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
 <span>  codec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"qs2"</span>, <span class="st">"rds"</span><span class="op">)</span>,</span>
 <span>  spatial_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -112,7 +112,10 @@ the data to Cerebro format for visualization.</p>
 <span>  add_most_expressed_genes <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  most_expressed_genes <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  bcr_file <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  tcr_file <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  tcr_file <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  h5_compression_level <span class="op">=</span> <span class="fl">0L</span>,</span>
+<span>  immune_sidecar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
+<span>  immune_sidecar_threshold <span class="op">=</span> <span class="fl">100000L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -190,19 +193,14 @@ Ignored when <code>expression_matrix_mode</code> is set to an external backend.<
 
 <dt id="arg-expression-matrix-mode">expression_matrix_mode<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-mode"></a></dt>
 <dd><p>How to persist the expression matrix in the
-generated <code>.crb</code>. One of <code>"embedded"</code> (default), <code>"bpcells"</code>
-or <code>"h5"</code>. See <code><a href="exportFromSeurat.html">exportFromSeurat</a></code> for details; briefly,
-<code>"embedded"</code> stores the matrix inside the <code>.crb</code> (legacy
-behaviour), <code>"bpcells"</code> writes an on-disk BPCells directory next to
-the <code>.crb</code> and keeps a lightweight handle inside it (typically
-reduces <code>.crb</code> size by ~80<!-- % on large sparse matrices), and -->
-<code>"h5"</code> writes a TENx-format HDF5 file next to the <code>.crb</code>
-that the Shiny runtime loads lazily, minimising RAM and startup time
-(recommended default for large datasets). The Shiny runtime
-re-resolves both backends relative to the <code>.crb</code>'s parent
-directory, so packaging the <code>.crb</code> with its sibling
-<code>&lt;stem&gt;.bpcells/</code> or <code>&lt;stem&gt;.h5</code> together is enough for
-portable deployment.</p></dd>
+generated <code>.crb</code>. One of <code>"embedded"</code> (default) or <code>"h5"</code>.
+See <code><a href="exportFromSeurat.html">exportFromSeurat</a></code> for details; briefly, <code>"embedded"</code>
+stores the matrix inside the <code>.crb</code>, and <code>"h5"</code> writes a
+TENx-format HDF5 file next to the <code>.crb</code> that the Viewer loads lazily,
+minimising RAM and startup time (recommended for large datasets). The
+Viewer finds the file relative to the <code>.crb</code>'s parent directory, so
+packaging the <code>.crb</code> with its sibling <code>&lt;stem&gt;.h5</code> together is
+enough for portable deployment.</p></dd>
 
 
 <dt id="arg-codec">codec<a class="anchor" aria-label="anchor" href="#arg-codec"></a></dt>
@@ -269,6 +267,13 @@ default: <code>NULL</code>.</p></dd>
 (.rds format). The data will be merged into the unified
 <code>immune_repertoire</code> slot of the Seurat object before export;
 default: <code>NULL</code>.</p></dd>
+
+
+<dt id="arg-h-compression-level-immune-sidecar-immune-sidecar-threshold">h5_compression_level, immune_sidecar, immune_sidecar_threshold<a class="anchor" aria-label="anchor" href="#arg-h-compression-level-immune-sidecar-immune-sidecar-threshold"></a></dt>
+<dd><p>Passed to
+<code><a href="exportFromSeurat.html">exportFromSeurat</a></code>: the gzip level of the H5 file (default 0,
+uncompressed), and whether and from which size the immune repertoire is
+stored in a sibling file.</p></dd>
 
 </dl></div>
     <div class="section level2">

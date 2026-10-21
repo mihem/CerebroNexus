@@ -9,7 +9,7 @@ data that can be visualized in Cerebro."><meta property="og:image" content="http
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -131,26 +131,30 @@ mitochondrial and/or ribosomal genes.</p></dd>
 
 
     <dt><code>expression_backend</code></dt>
-<dd><p><code>list</code> describing how/where the expression
-matrix is stored. For step 7.1 every newly exported object tags itself
-<code>list(type = "embedded", location = NULL)</code>; future step 7.2 will
-introduce <code>type = "h5"</code> / <code>"bpcells"</code> with an external
-<code>location</code>. Older <code>.crb</code> files (serialised before this field
-existed) load with <code>expression_backend = NULL</code>; <code>getExpressionBackend()</code>
-treats that as <code>"embedded"</code> for backward compatibility.</p></dd>
+<dd><p><code>list</code> describing where the expression
+matrix is stored: <code>list(type = "embedded", location = NULL)</code> when it
+travels inside the <code>.crb</code>, or <code>list(type = "h5", location =
+"&lt;stem&gt;.h5")</code> for an H5 file next to it.</p></dd>
 
 
     <dt><code>crb_schema</code></dt>
 <dd><p>Description of fields omitted from a thin CRB and
-restored from its external expression sidecar. Legacy and embedded CRBs
-leave this as <code>NULL</code>.</p></dd>
+restored from its H5 expression sidecar. Embedded CRBs leave this as
+<code>NULL</code>.</p></dd>
 
 
     <dt><code>spatial_molecule_backend</code></dt>
 <dd><p>Descriptor for molecule tables stored in
-a sibling spatial sidecar. The runtime-only <code>root</code> member is populated
-by <code><a href="readCerebro.html">readCerebro()</a></code> or the generated Viewer and is never required for
+a sibling spatial sidecar. The runtime-only `root` member is populated
+by `readCerebro()` or the generated Viewer and is never required for
 legacy CRBs with embedded molecule tables.</p></dd>
+
+
+    <dt><code>immune_repertoire_backend</code></dt>
+<dd><p>Descriptor for a large immune
+repertoire stored in a sibling file (<code>type = "file"</code>). The
+runtime-only `root` member is attached when the CRB is opened; without a
+descriptor the repertoire is the embedded `immune_repertoire` field.</p></dd>
 
 
     <dt><code>cell_fingerprint</code></dt>
@@ -221,16 +225,6 @@ containing scRepertoire columns (CTgene, CTnt, CTaa, CTstrict, etc.).</p></dd>
 per sample x locus x copy) with data provenance, or NULL. Consumed by
 the HLA &amp; TCR Motifs page for donor-level HLA context. Optional; older
 .crb files simply lack it.</p></dd>
-
-
-    <dt><code>bcr_data</code></dt>
-<dd><p><code>list</code> that contains BCR data (kept for backward
-compatibility with older .crb files).</p></dd>
-
-
-    <dt><code>tcr_data</code></dt>
-<dd><p><code>list</code> that contains TCR data (kept for backward
-compatibility with older .crb files).</p></dd>
 
 
     <dt><code>spatial</code></dt>
@@ -309,8 +303,6 @@ Consumed by the Trekker page. Optional; older .crb files simply lack it.</p></dd
 <li><p><a href="#method-Cerebro-getTrajectory"><code>Cerebro$getTrajectory()</code></a></p></li>
 <li><p><a href="#method-Cerebro-getBCR"><code>Cerebro$getBCR()</code></a></p></li>
 <li><p><a href="#method-Cerebro-getTCR"><code>Cerebro$getTCR()</code></a></p></li>
-<li><p><a href="#method-Cerebro-addBCRData"><code>Cerebro$addBCRData()</code></a></p></li>
-<li><p><a href="#method-Cerebro-addTCRData"><code>Cerebro$addTCRData()</code></a></p></li>
 <li><p><a href="#method-Cerebro-getImmuneRepertoire"><code>Cerebro$getImmuneRepertoire()</code></a></p></li>
 <li><p><a href="#method-Cerebro-addImmuneRepertoire"><code>Cerebro$addImmuneRepertoire()</code></a></p></li>
 <li><p><a href="#method-Cerebro-getHLATyping"><code>Cerebro$getHLATyping()</code></a></p></li>
@@ -641,26 +633,18 @@ default.</p></dd>
 <p></p><hr><a id="method-Cerebro-setExpressionBackend"></a><div class="section">
 <h3 id="cerebro-setexpressionbackend-"><code>Cerebro$setExpressionBackend()</code><a class="anchor" aria-label="anchor" href="#cerebro-setexpressionbackend-"></a></h3>
 <p>Tag the object with information about how / where its expression matrix
-is stored. In step 7.1 every newly exported <code>.crb</code> is tagged
-<code>"embedded"</code> with a NULL location, meaning the matrix is carried
-inside the serialised <code>.crb</code>. Later steps (7.2 exporter, 7.3
-runtime attach) will produce objects tagged <code>"h5"</code> or
-<code>"bpcells"</code> with an external <code>location</code>.</p><div class="section">
+is stored: <code>"embedded"</code> with a NULL location when the matrix is
+carried inside the serialised <code>.crb</code>, or <code>"h5"</code> with the name
+of the H5 file that sits next to it.</p><div class="section">
 <h4 id="usage-19">Usage<a class="anchor" aria-label="anchor" href="#usage-19"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">setExpressionBackend</span><span class="op">(</span>type <span class="op">=</span> <span class="st">"embedded"</span>, location <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-11">Arguments<a class="anchor" aria-label="anchor" href="#arguments-11"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>type</code></dt>
-<dd><p>Storage backend label. One of <code>"embedded"</code>,
-<code>"h5"</code>, <code>"bpcells"</code>. Step 7.1 only recognises
-<code>"embedded"</code> at runtime; the other two are accepted here (so step
-7.2 can set them) but will still need step-7.3 runtime attach to be
-useful.</p></dd>
+<dd><p>Storage backend label, <code>"embedded"</code> or <code>"h5"</code>.</p></dd>
 
       <dt><code>location</code></dt>
-<dd><p>Optional character path (absolute or relative to the
-parent directory of the serialized Cerebro object) where the external
-matrix lives.
+<dd><p>File name of the H5 file next to the <code>.crb</code>;
 <code>NULL</code> when <code>type == "embedded"</code>.</p></dd>
 
 
@@ -671,11 +655,8 @@ matrix lives.
 
 <p></p><hr><a id="method-Cerebro-getExpressionBackend"></a><div class="section">
 <h3 id="cerebro-getexpressionbackend-"><code>Cerebro$getExpressionBackend()</code><a class="anchor" aria-label="anchor" href="#cerebro-getexpressionbackend-"></a></h3>
-<p>Read the expression backend tag. Returns a <code>list(type, location)</code>.
-For <code>.crb</code> files generated before the <code>expression_backend</code>
-field existed the stored slot is <code>NULL</code>; this method graciously
-falls back to <code>list(type = "embedded", location = NULL)</code> so that
-downstream code does not need to special-case legacy objects.</p><div class="section">
+<p>Read the expression backend tag. Returns a <code>list(type, location)</code>;
+an object that has not been tagged yet counts as embedded.</p><div class="section">
 <h4 id="usage-20">Usage<a class="anchor" aria-label="anchor" href="#usage-20"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getExpressionBackend</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
@@ -827,7 +808,7 @@ extract; <code>NULL</code> returns all cells.</p></dd>
 <h4 id="returns-15">Returns<a class="anchor" aria-label="anchor" href="#returns-15"></a></h4>
 <p>A sub-matrix of the same concrete class as <code>self$expression</code>:
 <code>dgCMatrix</code> stays <code>dgCMatrix</code>, <code>RleMatrix</code> yields
-<code>DelayedMatrix</code>, <code>IterableMatrix</code> stays <code>IterableMatrix</code>.</p>
+<code>DelayedMatrix</code>.</p>
 </div>
 
 </div>
@@ -1311,66 +1292,38 @@ pathways.</p></dd>
 
 <p></p><hr><a id="method-Cerebro-getBCR"></a><div class="section">
 <h3 id="cerebro-getbcr-"><code>Cerebro$getBCR()</code><a class="anchor" aria-label="anchor" href="#cerebro-getbcr-"></a></h3>
-<p>Retrieve BCR data</p><div class="section">
+<p>Retrieve the BCR rows of the immune repertoire: for each sample the
+cells whose <code>CTgene</code> names an immunoglobulin chain (IGH, IGK or
+IGL). Samples without such cells are dropped.</p><div class="section">
 <h4 id="usage-54">Usage<a class="anchor" aria-label="anchor" href="#usage-54"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getBCR</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-34">Returns<a class="anchor" aria-label="anchor" href="#returns-34"></a></h4>
-<p>BCR data stored in the object.</p>
+<p>Named list of data.frames (one per sample), or an empty list.</p>
 </div>
 
 </div>
 
 <p></p><hr><a id="method-Cerebro-getTCR"></a><div class="section">
 <h3 id="cerebro-gettcr-"><code>Cerebro$getTCR()</code><a class="anchor" aria-label="anchor" href="#cerebro-gettcr-"></a></h3>
-<p>Retrieve TCR data</p><div class="section">
+<p>Retrieve the TCR rows of the immune repertoire: for each sample the
+cells whose <code>CTgene</code> names a T-cell receptor chain (TRA, TRB, TRG
+or TRD). Samples without such cells are dropped.</p><div class="section">
 <h4 id="usage-55">Usage<a class="anchor" aria-label="anchor" href="#usage-55"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getTCR</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-35">Returns<a class="anchor" aria-label="anchor" href="#returns-35"></a></h4>
-<p>TCR data stored in the object.</p>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-Cerebro-addBCRData"></a><div class="section">
-<h3 id="cerebro-addbcrdata-"><code>Cerebro$addBCRData()</code><a class="anchor" aria-label="anchor" href="#cerebro-addbcrdata-"></a></h3>
-<p>Add BCR data.</p><div class="section">
-<h4 id="usage-56">Usage<a class="anchor" aria-label="anchor" href="#usage-56"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addBCRData</span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-35">Arguments<a class="anchor" aria-label="anchor" href="#arguments-35"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>data</code></dt>
-<dd><p><code>list</code> that contains BCR data.</p></dd>
-
-
-</dl><p></p></div>
-</div>
-
-</div>
-
-<p></p><hr><a id="method-Cerebro-addTCRData"></a><div class="section">
-<h3 id="cerebro-addtcrdata-"><code>Cerebro$addTCRData()</code><a class="anchor" aria-label="anchor" href="#cerebro-addtcrdata-"></a></h3>
-<p>Add TCR data.</p><div class="section">
-<h4 id="usage-57">Usage<a class="anchor" aria-label="anchor" href="#usage-57"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addTCRData</span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></code></pre></div><p></p></div>
-</div><p></p><div class="section">
-<h4 id="arguments-36">Arguments<a class="anchor" aria-label="anchor" href="#arguments-36"></a></h4>
-<p></p><div class="arguments"><dl><dt><code>data</code></dt>
-<dd><p><code>list</code> that contains TCR data.</p></dd>
-
-
-</dl><p></p></div>
+<p>Named list of data.frames (one per sample), or an empty list.</p>
 </div>
 
 </div>
 
 <p></p><hr><a id="method-Cerebro-getImmuneRepertoire"></a><div class="section">
 <h3 id="cerebro-getimmunerepertoire-"><code>Cerebro$getImmuneRepertoire()</code><a class="anchor" aria-label="anchor" href="#cerebro-getimmunerepertoire-"></a></h3>
-<p>Get immune repertoire data. Returns the unified <code>immune_repertoire</code>
-field if available; otherwise falls back to merging legacy
-<code>bcr_data</code> and <code>tcr_data</code>.</p><div class="section">
-<h4 id="usage-58">Usage<a class="anchor" aria-label="anchor" href="#usage-58"></a></h4>
+<p>Get immune repertoire data: the <code>immune_repertoire</code> field, or the
+sibling file that <code>immune_repertoire_backend</code> points to (loaded and
+checksummed on first use).</p><div class="section">
+<h4 id="usage-56">Usage<a class="anchor" aria-label="anchor" href="#usage-56"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getImmuneRepertoire</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-36">Returns<a class="anchor" aria-label="anchor" href="#returns-36"></a></h4>
@@ -1382,10 +1335,10 @@ field if available; otherwise falls back to merging legacy
 <p></p><hr><a id="method-Cerebro-addImmuneRepertoire"></a><div class="section">
 <h3 id="cerebro-addimmunerepertoire-"><code>Cerebro$addImmuneRepertoire()</code><a class="anchor" aria-label="anchor" href="#cerebro-addimmunerepertoire-"></a></h3>
 <p>Set immune repertoire data.</p><div class="section">
-<h4 id="usage-59">Usage<a class="anchor" aria-label="anchor" href="#usage-59"></a></h4>
+<h4 id="usage-57">Usage<a class="anchor" aria-label="anchor" href="#usage-57"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-37">Arguments<a class="anchor" aria-label="anchor" href="#arguments-37"></a></h4>
+<h4 id="arguments-35">Arguments<a class="anchor" aria-label="anchor" href="#arguments-35"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>data</code></dt>
 <dd><p>Named list of data.frames (one per sample) containing
 scRepertoire columns.</p></dd>
@@ -1400,7 +1353,7 @@ scRepertoire columns.</p></dd>
 <h3 id="cerebro-gethlatyping-"><code>Cerebro$getHLATyping()</code><a class="anchor" aria-label="anchor" href="#cerebro-gethlatyping-"></a></h3>
 <p>Get HLA typing data (canonical long <code>data.frame</code>), or an empty
 table when none is stored. Safe on older objects that predate the field.</p><div class="section">
-<h4 id="usage-60">Usage<a class="anchor" aria-label="anchor" href="#usage-60"></a></h4>
+<h4 id="usage-58">Usage<a class="anchor" aria-label="anchor" href="#usage-58"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getHLATyping</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-37">Returns<a class="anchor" aria-label="anchor" href="#returns-37"></a></h4>
@@ -1418,7 +1371,7 @@ that already has the canonical columns is validated (unrecognisable
 alleles dropped, locus re-derived, copy and provenance coerced) rather
 than stored verbatim, so a canonical-looking table cannot smuggle invalid
 values into downstream analysis.</p><div class="section">
-<h4 id="usage-61">Usage<a class="anchor" aria-label="anchor" href="#usage-61"></a></h4>
+<h4 id="usage-59">Usage<a class="anchor" aria-label="anchor" href="#usage-59"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addHLATyping</span><span class="op">(</span></span>
 <span>  <span class="va">data</span>,</span>
 <span>  source_type <span class="op">=</span> <span class="st">"unknown"</span>,</span>
@@ -1426,7 +1379,7 @@ values into downstream analysis.</p><div class="section">
 <span>  source_reference <span class="op">=</span> <span class="cn">NA_character_</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-38">Arguments<a class="anchor" aria-label="anchor" href="#arguments-38"></a></h4>
+<h4 id="arguments-36">Arguments<a class="anchor" aria-label="anchor" href="#arguments-36"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>data</code></dt>
 <dd><p>HLA typing in any accepted form.</p></dd>
 
@@ -1449,10 +1402,10 @@ values into downstream analysis.</p><div class="section">
 <p></p><hr><a id="method-Cerebro-addSpatialData"></a><div class="section">
 <h3 id="cerebro-addspatialdata-"><code>Cerebro$addSpatialData()</code><a class="anchor" aria-label="anchor" href="#cerebro-addspatialdata-"></a></h3>
 <p>Add spatial data.</p><div class="section">
-<h4 id="usage-62">Usage<a class="anchor" aria-label="anchor" href="#usage-62"></a></h4>
+<h4 id="usage-60">Usage<a class="anchor" aria-label="anchor" href="#usage-60"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addSpatialData</span><span class="op">(</span><span class="va">name</span>, <span class="va">data</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-39">Arguments<a class="anchor" aria-label="anchor" href="#arguments-39"></a></h4>
+<h4 id="arguments-37">Arguments<a class="anchor" aria-label="anchor" href="#arguments-37"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of the spatial data entry (for example a Seurat image or
 Cerebro spatial entry).</p></dd>
@@ -1476,12 +1429,17 @@ background'.</p></dd>
 <p></p><hr><a id="method-Cerebro-getSpatialData"></a><div class="section">
 <h3 id="cerebro-getspatialdata-"><code>Cerebro$getSpatialData()</code><a class="anchor" aria-label="anchor" href="#cerebro-getspatialdata-"></a></h3>
 <p>Retrieve spatial data.</p><div class="section">
-<h4 id="usage-63">Usage<a class="anchor" aria-label="anchor" href="#usage-63"></a></h4>
-<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getSpatialData</span><span class="op">(</span><span class="va">name</span><span class="op">)</span></span></code></pre></div><p></p></div>
+<h4 id="usage-61">Usage<a class="anchor" aria-label="anchor" href="#usage-61"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getSpatialData</span><span class="op">(</span><span class="va">name</span>, hydrate_molecules <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-40">Arguments<a class="anchor" aria-label="anchor" href="#arguments-40"></a></h4>
+<h4 id="arguments-38">Arguments<a class="anchor" aria-label="anchor" href="#arguments-38"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of the spatial data entry.</p></dd>
+
+      <dt><code>hydrate_molecules</code></dt>
+<dd><p>Whether to read an external molecule table. Set
+to <code>FALSE</code> for Viewer paths that only consume coordinates,
+expression, or images.</p></dd>
 
 
 </dl><p></p></div>
@@ -1497,7 +1455,7 @@ normalized on read.</p>
 <p></p><hr><a id="method-Cerebro-availableSpatial"></a><div class="section">
 <h3 id="cerebro-availablespatial-"><code>Cerebro$availableSpatial()</code><a class="anchor" aria-label="anchor" href="#cerebro-availablespatial-"></a></h3>
 <p>Get list of available spatial data entries.</p><div class="section">
-<h4 id="usage-64">Usage<a class="anchor" aria-label="anchor" href="#usage-64"></a></h4>
+<h4 id="usage-62">Usage<a class="anchor" aria-label="anchor" href="#usage-62"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">availableSpatial</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-39">Returns<a class="anchor" aria-label="anchor" href="#returns-39"></a></h4>
@@ -1511,7 +1469,7 @@ normalized on read.</p>
 <p>Get Trekker single-cell spatial-mapping data, or <code>NULL</code> when none is
 stored. Safe on older objects that predate the field (the slot is read
 through a <code>tryCatch</code> so the getter never errors on a legacy .crb).</p><div class="section">
-<h4 id="usage-65">Usage<a class="anchor" aria-label="anchor" href="#usage-65"></a></h4>
+<h4 id="usage-63">Usage<a class="anchor" aria-label="anchor" href="#usage-63"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getTrekker</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-40">Returns<a class="anchor" aria-label="anchor" href="#returns-40"></a></h4>
@@ -1523,10 +1481,10 @@ through a <code>tryCatch</code> so the getter never errors on a legacy .crb).</p
 <p></p><hr><a id="method-Cerebro-addTrekker"></a><div class="section">
 <h3 id="cerebro-addtrekker-"><code>Cerebro$addTrekker()</code><a class="anchor" aria-label="anchor" href="#cerebro-addtrekker-"></a></h3>
 <p>Set Trekker single-cell spatial-mapping data.</p><div class="section">
-<h4 id="usage-66">Usage<a class="anchor" aria-label="anchor" href="#usage-66"></a></h4>
+<h4 id="usage-64">Usage<a class="anchor" aria-label="anchor" href="#usage-64"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addTrekker</span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-41">Arguments<a class="anchor" aria-label="anchor" href="#arguments-41"></a></h4>
+<h4 id="arguments-39">Arguments<a class="anchor" aria-label="anchor" href="#arguments-39"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>data</code></dt>
 <dd><p><code>list</code> carrying the Trekker page content (coordinates,
 cell metadata, positioning QC, upstream Moran's I, and positioning
@@ -1541,10 +1499,10 @@ evidence). See the Trekker page module for the expected structure.</p></dd>
 <p></p><hr><a id="method-Cerebro-addExtraMaterial"></a><div class="section">
 <h3 id="cerebro-addextramaterial-"><code>Cerebro$addExtraMaterial()</code><a class="anchor" aria-label="anchor" href="#cerebro-addextramaterial-"></a></h3>
 <p>Add content to extra material field.</p><div class="section">
-<h4 id="usage-67">Usage<a class="anchor" aria-label="anchor" href="#usage-67"></a></h4>
+<h4 id="usage-65">Usage<a class="anchor" aria-label="anchor" href="#usage-65"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addExtraMaterial</span><span class="op">(</span><span class="va">category</span>, <span class="va">name</span>, <span class="va">content</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-42">Arguments<a class="anchor" aria-label="anchor" href="#arguments-42"></a></h4>
+<h4 id="arguments-40">Arguments<a class="anchor" aria-label="anchor" href="#arguments-40"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>category</code></dt>
 <dd><p>Name of category. At the moment, only <code>tables</code> and
 <code>plots</code> are valid categories. Tables must be in <code>data.frame</code>
@@ -1565,10 +1523,10 @@ format and plots must be created with <code>ggplot2</code>.</p></dd>
 <p></p><hr><a id="method-Cerebro-addExtraTable"></a><div class="section">
 <h3 id="cerebro-addextratable-"><code>Cerebro$addExtraTable()</code><a class="anchor" aria-label="anchor" href="#cerebro-addextratable-"></a></h3>
 <p>Add table to `extra_material` slot.</p><div class="section">
-<h4 id="usage-68">Usage<a class="anchor" aria-label="anchor" href="#usage-68"></a></h4>
+<h4 id="usage-66">Usage<a class="anchor" aria-label="anchor" href="#usage-66"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addExtraTable</span><span class="op">(</span><span class="va">name</span>, <span class="va">table</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-43">Arguments<a class="anchor" aria-label="anchor" href="#arguments-43"></a></h4>
+<h4 id="arguments-41">Arguments<a class="anchor" aria-label="anchor" href="#arguments-41"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of material, will be used to select it in Cerebro.</p></dd>
 
@@ -1584,10 +1542,10 @@ format and plots must be created with <code>ggplot2</code>.</p></dd>
 <p></p><hr><a id="method-Cerebro-addExtraPlot"></a><div class="section">
 <h3 id="cerebro-addextraplot-"><code>Cerebro$addExtraPlot()</code><a class="anchor" aria-label="anchor" href="#cerebro-addextraplot-"></a></h3>
 <p>Add plot to `extra_material` slot.</p><div class="section">
-<h4 id="usage-69">Usage<a class="anchor" aria-label="anchor" href="#usage-69"></a></h4>
+<h4 id="usage-67">Usage<a class="anchor" aria-label="anchor" href="#usage-67"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">addExtraPlot</span><span class="op">(</span><span class="va">name</span>, <span class="va">plot</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-44">Arguments<a class="anchor" aria-label="anchor" href="#arguments-44"></a></h4>
+<h4 id="arguments-42">Arguments<a class="anchor" aria-label="anchor" href="#arguments-42"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of material, will be used to select it in Cerebro.</p></dd>
 
@@ -1604,7 +1562,7 @@ format and plots must be created with <code>ggplot2</code>.</p></dd>
 <p></p><hr><a id="method-Cerebro-getExtraMaterial"></a><div class="section">
 <h3 id="cerebro-getextramaterial-"><code>Cerebro$getExtraMaterial()</code><a class="anchor" aria-label="anchor" href="#cerebro-getextramaterial-"></a></h3>
 <p>Retrieve extra material from <code>extra_material</code> field.</p><div class="section">
-<h4 id="usage-70">Usage<a class="anchor" aria-label="anchor" href="#usage-70"></a></h4>
+<h4 id="usage-68">Usage<a class="anchor" aria-label="anchor" href="#usage-68"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getExtraMaterial</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-41">Returns<a class="anchor" aria-label="anchor" href="#returns-41"></a></h4>
@@ -1616,7 +1574,7 @@ format and plots must be created with <code>ggplot2</code>.</p></dd>
 <p></p><hr><a id="method-Cerebro-getExtraMaterialCategories"></a><div class="section">
 <h3 id="cerebro-getextramaterialcategories-"><code>Cerebro$getExtraMaterialCategories()</code><a class="anchor" aria-label="anchor" href="#cerebro-getextramaterialcategories-"></a></h3>
 <p>Get names of categories for which extra material is available.</p><div class="section">
-<h4 id="usage-71">Usage<a class="anchor" aria-label="anchor" href="#usage-71"></a></h4>
+<h4 id="usage-69">Usage<a class="anchor" aria-label="anchor" href="#usage-69"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getExtraMaterialCategories</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-42">Returns<a class="anchor" aria-label="anchor" href="#returns-42"></a></h4>
@@ -1628,7 +1586,7 @@ format and plots must be created with <code>ggplot2</code>.</p></dd>
 <p></p><hr><a id="method-Cerebro-checkForExtraTables"></a><div class="section">
 <h3 id="cerebro-checkforextratables-"><code>Cerebro$checkForExtraTables()</code><a class="anchor" aria-label="anchor" href="#cerebro-checkforextratables-"></a></h3>
 <p>Check whether there are tables in the extra materials.</p><div class="section">
-<h4 id="usage-72">Usage<a class="anchor" aria-label="anchor" href="#usage-72"></a></h4>
+<h4 id="usage-70">Usage<a class="anchor" aria-label="anchor" href="#usage-70"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">checkForExtraTables</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-43">Returns<a class="anchor" aria-label="anchor" href="#returns-43"></a></h4>
@@ -1641,7 +1599,7 @@ materials.</p>
 <p></p><hr><a id="method-Cerebro-getNamesOfExtraTables"></a><div class="section">
 <h3 id="cerebro-getnamesofextratables-"><code>Cerebro$getNamesOfExtraTables()</code><a class="anchor" aria-label="anchor" href="#cerebro-getnamesofextratables-"></a></h3>
 <p>Get names of tables in extra materials.</p><div class="section">
-<h4 id="usage-73">Usage<a class="anchor" aria-label="anchor" href="#usage-73"></a></h4>
+<h4 id="usage-71">Usage<a class="anchor" aria-label="anchor" href="#usage-71"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getNamesOfExtraTables</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-44">Returns<a class="anchor" aria-label="anchor" href="#returns-44"></a></h4>
@@ -1653,10 +1611,10 @@ materials.</p>
 <p></p><hr><a id="method-Cerebro-getExtraTable"></a><div class="section">
 <h3 id="cerebro-getextratable-"><code>Cerebro$getExtraTable()</code><a class="anchor" aria-label="anchor" href="#cerebro-getextratable-"></a></h3>
 <p>Get table from extra materials.</p><div class="section">
-<h4 id="usage-74">Usage<a class="anchor" aria-label="anchor" href="#usage-74"></a></h4>
+<h4 id="usage-72">Usage<a class="anchor" aria-label="anchor" href="#usage-72"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getExtraTable</span><span class="op">(</span><span class="va">name</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-45">Arguments<a class="anchor" aria-label="anchor" href="#arguments-45"></a></h4>
+<h4 id="arguments-43">Arguments<a class="anchor" aria-label="anchor" href="#arguments-43"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of table.</p></dd>
 
@@ -1672,7 +1630,7 @@ materials.</p>
 <p></p><hr><a id="method-Cerebro-checkForExtraPlots"></a><div class="section">
 <h3 id="cerebro-checkforextraplots-"><code>Cerebro$checkForExtraPlots()</code><a class="anchor" aria-label="anchor" href="#cerebro-checkforextraplots-"></a></h3>
 <p>Check whether there are plots in the extra materials.</p><div class="section">
-<h4 id="usage-75">Usage<a class="anchor" aria-label="anchor" href="#usage-75"></a></h4>
+<h4 id="usage-73">Usage<a class="anchor" aria-label="anchor" href="#usage-73"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">checkForExtraPlots</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-46">Returns<a class="anchor" aria-label="anchor" href="#returns-46"></a></h4>
@@ -1685,7 +1643,7 @@ materials.</p>
 <p></p><hr><a id="method-Cerebro-getNamesOfExtraPlots"></a><div class="section">
 <h3 id="cerebro-getnamesofextraplots-"><code>Cerebro$getNamesOfExtraPlots()</code><a class="anchor" aria-label="anchor" href="#cerebro-getnamesofextraplots-"></a></h3>
 <p>Get names of plots in extra materials.</p><div class="section">
-<h4 id="usage-76">Usage<a class="anchor" aria-label="anchor" href="#usage-76"></a></h4>
+<h4 id="usage-74">Usage<a class="anchor" aria-label="anchor" href="#usage-74"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getNamesOfExtraPlots</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-47">Returns<a class="anchor" aria-label="anchor" href="#returns-47"></a></h4>
@@ -1697,10 +1655,10 @@ materials.</p>
 <p></p><hr><a id="method-Cerebro-getExtraPlot"></a><div class="section">
 <h3 id="cerebro-getextraplot-"><code>Cerebro$getExtraPlot()</code><a class="anchor" aria-label="anchor" href="#cerebro-getextraplot-"></a></h3>
 <p>Get plot from extra materials.</p><div class="section">
-<h4 id="usage-77">Usage<a class="anchor" aria-label="anchor" href="#usage-77"></a></h4>
+<h4 id="usage-75">Usage<a class="anchor" aria-label="anchor" href="#usage-75"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">getExtraPlot</span><span class="op">(</span><span class="va">name</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-46">Arguments<a class="anchor" aria-label="anchor" href="#arguments-46"></a></h4>
+<h4 id="arguments-44">Arguments<a class="anchor" aria-label="anchor" href="#arguments-44"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>name</code></dt>
 <dd><p>Name of plot.</p></dd>
 
@@ -1722,7 +1680,7 @@ Print overview of available enriched pathway results for
 <code>self$print()</code> function.
 Print overview of available trajectories for <code>self$print()</code> function.
 Print overview of extra material for <code>self$print()</code> function.</p><div class="section">
-<h4 id="usage-78">Usage<a class="anchor" aria-label="anchor" href="#usage-78"></a></h4>
+<h4 id="usage-76">Usage<a class="anchor" aria-label="anchor" href="#usage-76"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -1731,10 +1689,10 @@ Print overview of extra material for <code>self$print()</code> function.</p><div
 <p></p><hr><a id="method-Cerebro-clone"></a><div class="section">
 <h3 id="cerebro-clone-"><code>Cerebro$clone()</code><a class="anchor" aria-label="anchor" href="#cerebro-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-79">Usage<a class="anchor" aria-label="anchor" href="#usage-79"></a></h4>
+<h4 id="usage-77">Usage<a class="anchor" aria-label="anchor" href="#usage-77"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Cerebro</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-47">Arguments<a class="anchor" aria-label="anchor" href="#arguments-47"></a></h4>
+<h4 id="arguments-45">Arguments<a class="anchor" aria-label="anchor" href="#arguments-45"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

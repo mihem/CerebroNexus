@@ -21,7 +21,7 @@ convertSeuratToCerebro(
   nGene = "nFeature_RNA",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "bpcells", "h5"),
+  expression_matrix_mode = c("embedded", "h5"),
   codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
@@ -31,7 +31,10 @@ convertSeuratToCerebro(
   add_most_expressed_genes = TRUE,
   most_expressed_genes = NULL,
   bcr_file = NULL,
-  tcr_file = NULL
+  tcr_file = NULL,
+  h5_compression_level = 0L,
+  immune_sidecar = c("auto", "always", "never"),
+  immune_sidecar_threshold = 100000L
 )
 ```
 
@@ -108,17 +111,14 @@ convertSeuratToCerebro(
 - expression_matrix_mode:
 
   How to persist the expression matrix in the generated `.crb`. One of
-  `"embedded"` (default), `"bpcells"` or `"h5"`. See
+  `"embedded"` (default) or `"h5"`. See
   [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
-  for details; briefly, `"embedded"` stores the matrix inside the `.crb`
-  (legacy behaviour), `"bpcells"` writes an on-disk BPCells directory
-  next to the `.crb` and keeps a lightweight handle inside it (typically
-  reduces `.crb` size by ~80 `"h5"` writes a TENx-format HDF5 file next
-  to the `.crb` that the Shiny runtime loads lazily, minimising RAM and
-  startup time (recommended default for large datasets). The Shiny
-  runtime re-resolves both backends relative to the `.crb`'s parent
-  directory, so packaging the `.crb` with its sibling `<stem>.bpcells/`
-  or `<stem>.h5` together is enough for portable deployment.
+  for details; briefly, `"embedded"` stores the matrix inside the
+  `.crb`, and `"h5"` writes a TENx-format HDF5 file next to the `.crb`
+  that the Viewer loads lazily, minimising RAM and startup time
+  (recommended for large datasets). The Viewer finds the file relative
+  to the `.crb`'s parent directory, so packaging the `.crb` with its
+  sibling `<stem>.h5` together is enough for portable deployment.
 
 - codec:
 
@@ -182,6 +182,13 @@ convertSeuratToCerebro(
   Character string specifying the path to a TCR data file (.rds format).
   The data will be merged into the unified `immune_repertoire` slot of
   the Seurat object before export; default: `NULL`.
+
+- h5_compression_level, immune_sidecar, immune_sidecar_threshold:
+
+  Passed to
+  [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md):
+  the gzip level of the H5 file (default 0, uncompressed), and whether
+  and from which size the immune repertoire is stored in a sibling file.
 
 ## Value
 

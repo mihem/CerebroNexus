@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -86,9 +86,6 @@
 <span>  mode <span class="op">=</span> <span class="st">"open"</span>,</span>
 <span>  maxFileSize <span class="op">=</span> <span class="fl">800</span>,</span>
 <span>  crb_file_to_load <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  expression_matrix_mode <span class="op">=</span> <span class="st">"crb"</span>,</span>
-<span>  expression_matrix_h5 <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  expression_matrix_BPCells <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  welcome_message <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  point_size <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  point_opacity <span class="op">=</span> <span class="fl">1</span>,</span>
@@ -118,35 +115,6 @@ data set (<code>closed</code>, removes the "Load data" element); defaults to
 <dd><p>Path to <code>.crb</code> file to load on launch of
 Cerebro. Useful when using/hosting Cerebro in <code>closed</code> mode. Defaults to
 <code>NULL</code>.</p></dd>
-
-
-<dt id="arg-expression-matrix-mode">expression_matrix_mode<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-mode"></a></dt>
-<dd><p>Mode of expression matrix. Can be either
-crb, h5, or BPCells. Default is crb.</p></dd>
-
-
-<dt id="arg-expression-matrix-h-">expression_matrix_h5<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-h-"></a></dt>
-<dd><p>Optional: Path to <code>.h5</code> file containing an expression
-matrix created with <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>, with genes as
-columns and cells as rows, contrary to the conventional format of genes as
-rows and cells as columns. This format greatly favors performance for
-extracting expression values for a gene (column), rather than a cell (row),
-which is the primary action in Cerebro. Importantly, the matrix should be
-stored with "expression" as group name (see parameters of the
-<code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> function). Saving the expression matrix
-in <code>TENxMatrix</code> format has the benefit of a low memory footprint since
-the expression values are directly read from disk. This is particularly
-useful when working with very large data sets and/or when startup of the
-CerebroNexus app is a priority (which is shorter because only the rest of the data
-that needs to be loaded tends to be very small). By default, this value is
-set to <code>NULL</code>, meaning that the expression matrix is expected to be part
-of the <code>.crb</code> file.</p></dd>
-
-
-<dt id="arg-expression-matrix-bpcells">expression_matrix_BPCells<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-bpcells"></a></dt>
-<dd><p>Optional: Path to BPCells directory created with
-<code><a href="https://bnprks.github.io/BPCells/reference/matrix_io.html" class="external-link">BPCells::write_matrix_dir()</a></code>. This is a hopefully faster alternative to h5
-with a similar approach.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>

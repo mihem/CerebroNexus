@@ -84,17 +84,13 @@
   </g>
   <text x="590" y="552" class="card-title">Why the guard must run before storage modes diverge</text>
 
-  <rect x="590" y="574" width="165" height="80" rx="14" fill="#eaf7ef" stroke="#5aad76"/>
-  <text x="672" y="603" text-anchor="middle" class="card-title">embedded</text>
-  <text x="672" y="627" text-anchor="middle" class="small">may fail later</text>
+  <rect x="590" y="574" width="255" height="80" rx="14" fill="#eaf7ef" stroke="#5aad76"/>
+  <text x="717" y="603" text-anchor="middle" class="card-title">embedded</text>
+  <text x="717" y="627" text-anchor="middle" class="small">may fail later</text>
 
-  <rect x="773" y="574" width="165" height="80" rx="14" fill="#f0edff" stroke="#8775d5"/>
-  <text x="855" y="603" text-anchor="middle" class="card-title">HDF5</text>
-  <text x="855" y="627" text-anchor="middle" class="small">matrix lives outside .crb</text>
-
-  <rect x="956" y="574" width="165" height="80" rx="14" fill="#fff4df" stroke="#d99a32"/>
-  <text x="1038" y="603" text-anchor="middle" class="card-title">BPCells</text>
-  <text x="1038" y="627" text-anchor="middle" class="small">matrix lives outside .crb</text>
+  <rect x="865" y="574" width="255" height="80" rx="14" fill="#f0edff" stroke="#8775d5"/>
+  <text x="992" y="603" text-anchor="middle" class="card-title">HDF5</text>
+  <text x="992" y="627" text-anchor="middle" class="small">matrix lives outside .crb</text>
 
   <g filter="url(#shadow)">
     <rect x="55" y="515" width="465" height="175" rx="22" fill="#eaf8f3" stroke="#43a57e" stroke-width="2"/>

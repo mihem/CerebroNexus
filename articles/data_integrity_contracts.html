@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -202,14 +202,19 @@ warning before storage. A whole unmatched sample is therefore removed;
 if every sample is unmatched, the operation stops.</p>
 </div>
 <div class="section level3">
-<h3 id="unified-and-legacy-data">Unified and legacy data<a class="anchor" aria-label="anchor" href="#unified-and-legacy-data"></a>
+<h3 id="unified-and-separate-tcrbcr-input">Unified and separate TCR/BCR input<a class="anchor" aria-label="anchor" href="#unified-and-separate-tcrbcr-input"></a>
 </h3>
 <p>A valid <code>@misc$immune_repertoire</code> is authoritative. Stale
-legacy <code>tcr_data</code>/<code>bcr_data</code> does not block
-it.</p>
-<p>When only legacy slots exist, new exports validate and merge them
-into the unified field while retaining the originals. Existing CRBs need
-re-exporting because R6 methods are serialized into the file.</p>
+<code>@misc$tcr_data</code>/<code>@misc$bcr_data</code> slots on the
+Seurat object do not block it.</p>
+<p>When only those two slots exist, <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>
+validates them and merges them into the one unified repertoire. The
+<code>.crb</code> stores only that unified repertoire; the Cerebro
+object has no <code>tcr_data</code> or <code>bcr_data</code> fields, and
+<code>getTCR()</code> / <code>getBCR()</code> derive their tables from
+it. A <code>.crb</code> from an older release that still carries those
+fields is a retired format; see <a href="#retired-formats">Retired
+formats</a>.</p>
 <p>See <a href="immune_repertoire_analysis.html">Immune repertoire
 analysis</a> for Cell Ranger inputs, metadata extraction, scRepertoire
 integration, and module use.</p>
@@ -219,33 +224,93 @@ integration, and module use.</p>
 <h2 id="contract-3-stage-crb-and-sidecar-replacement">Contract 3: stage CRB and sidecar replacement<a class="anchor" aria-label="anchor" href="#contract-3-stage-crb-and-sidecar-replacement"></a>
 </h2>
 <p>An export can produce:</p>
-<pre class="text"><code>embedded -&gt; dataset.crb
-h5       -&gt; dataset.crb + dataset.h5
-bpcells  -&gt; dataset.crb + dataset.bpcells/</code></pre>
-<p>Both artifacts are written in a private sibling stage. On POSIX
-systems the stage is mode <code>0700</code>, new H5/CRB files are
-<code>0600</code>, and new BPCells directories are <code>0700</code>; an
-existing CRB keeps its previous mode. Only those POSIX mode bits are set
-or preserved. Ownership, ACLs, extended attributes, and security labels
-remain the deployment system’s responsibility on every platform. Later
-validation of repertoire, HLA, markers, projections, and spatial data
-happens before publication.</p>
+<pre class="text"><code><span><span class="va">embedded</span> <span class="op">-&gt;</span> <span class="va">dataset.crb</span></span>
+<span><span class="va">h5</span>       <span class="op">-&gt;</span> <span class="va">dataset.crb</span> <span class="op">+</span> <span class="va">dataset.h5</span></span></code></pre>
+<p>An H5-backed <code>.crb</code> is <em>thin</em>: the cell names are
+stored once, in the H5 file (<code>/expression/genes</code>), and the
+<code>.crb</code> keeps only their order and a checksum (see <a href="#thin-h5-crbs">Thin H5 CRBs</a>). A very large immune repertoire
+can add one more sibling file, <code>dataset.immune.qs2</code>, so the
+Viewer lists samples and chains without reading it. With the default
+<code>immune_sidecar = "auto"</code> this happens only for
+<code>h5</code> exports whose repertoire has at least
+<code>immune_sidecar_threshold</code> (100,000) rows;
+<code>"always"</code> and <code>"never"</code> override that.</p>
+<p>All artifacts are written in a private sibling stage. On POSIX
+systems the stage is mode <code>0700</code>, new H5, immune sidecar and
+CRB files are <code>0600</code>; an existing CRB keeps its previous
+mode. Only those POSIX mode bits are set or preserved. Ownership, ACLs,
+extended attributes, and security labels remain the deployment system’s
+responsibility on every platform. Later validation of repertoire, HLA,
+markers, projections, and spatial data happens before publication.</p>
 <p>Before replacing an existing sidecar, the exporter reads the current
 CRB’s plain backend field without calling a serialized getter.
 Replacement proceeds only when that descriptor claims the exact sidecar
 path and type; an unrelated same-name file is a collision and remains
-untouched. For BPCells, the new matrix is reopened at its final location
-before serialization. If publication fails, the previous CRB and sidecar
-are restored on a best-effort basis. A successful backend switch removes
-the previous sidecar only after the new CRB is committed.</p>
+untouched; the same holds for the immune repertoire sidecar. If
+publication fails, the previous CRB and sidecars are restored on a
+best-effort basis. A successful backend switch removes the previous
+sidecar only after the new CRB is committed.</p>
 <p>This is not an atomic transaction across two paths. Stop every app or
 other reader using the export before replacing it: a live reader can
 otherwise load the old CRB during the sidecar swap. Process termination
 and concurrent writers are also outside the guarantee. A failed
 restoration is reported rather than hidden.</p>
-<p>External modes require a portable <code>.crb</code> filename. Empty
-stems, Windows reserved names, and filesystem-invalid punctuation are
-rejected before any artifact is written.</p>
+<p>The <code>h5</code> mode requires a portable <code>.crb</code>
+filename. Empty stems, Windows reserved names, and filesystem-invalid
+punctuation are rejected before any artifact is written.</p>
+<div class="section level3">
+<h3 id="thin-h5-crbs">Thin H5 CRBs<a class="anchor" aria-label="anchor" href="#thin-h5-crbs"></a>
+</h3>
+<p>For an H5-backed export, <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>
+stores the matrix cells by genes, so the file’s
+<code>/expression/genes</code> dataset holds the <strong>cell</strong>
+names and <code>/expression/barcodes</code> the <strong>gene</strong>
+names. The <code>.crb</code> (thin-CRB schema version 3) then drops
+<code>meta_data$cell_barcode</code> and the row names of every
+projection that carries the same cell names, and records a checksum of
+the cell names (<code>cell_names_hash</code>), the cell count, and which
+projections were compacted in its <code>crb_schema</code> field.</p>
+<p>When the <code>.crb</code> is loaded, <code><a href="../reference/readCerebro.html">readCerebro()</a></code> and
+the Viewer read the cell names back from the H5 file, verify them
+against the checksum and restore both fields. A <code>.crb</code> paired
+with the wrong H5 file, or an H5 file whose cells were reordered,
+therefore stops with an error instead of attaching expression to the
+wrong cells. An H5-backed <code>.crb</code> written by CerebroNexus
+5.1.x without a <code>crb_schema</code> field is still read as it is;
+every new H5 export is thin.</p>
+</div>
+<div class="section level3">
+<h3 id="retired-formats">Retired formats<a class="anchor" aria-label="anchor" href="#retired-formats"></a>
+</h3>
+<p>The readers accept only the current layout.
+<code><a href="../reference/readCerebro.html">readCerebro()</a></code>, <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>,
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and the Viewer all reject a
+<code>.crb</code> that</p>
+<ul>
+<li>has no <code>expression_backend</code> descriptor;</li>
+<li>has a thin schema other than version 3;</li>
+<li>still stores receptors in non-empty <code>bcr_data</code> /
+<code>tcr_data</code> fields;</li>
+<li>records an immune repertoire sidecar of any type other than
+<code>"file"</code>;</li>
+<li>predates spatial support (the Cerebro v1.3 class).</li>
+</ul>
+<p>The message is the same everywhere:</p>
+<pre class="text"><code>The Cerebro data file 'x.crb' uses a retired format: &lt;reason&gt;.
+Convert it once with CerebroNexus::convertCerebro().</code></pre>
+<p><code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> is the only migration path. It sets a
+missing descriptor to <code>embedded</code>, merges
+<code>bcr_data</code> / <code>tcr_data</code> into the unified
+repertoire and thins an H5-backed <code>.crb</code> that was written
+without a schema. A <code>.crb</code> whose expression storage this
+version cannot read or repair (an expression backend other than
+<code>embedded</code> or <code>h5</code>, thin schema 1 or 2, an immune
+sidecar of another type than <code>"file"</code>) cannot be converted;
+re-export it from the source Seurat object with
+<code>exportFromSeurat(expression_matrix_mode = "h5")</code>.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">CerebroNexus</span><span class="fu">::</span><span class="fu"><a href="../reference/convertCerebro.html">convertCerebro</a></span><span class="op">(</span><span class="st">"old_dataset.crb"</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="what-errors-versus-warnings-mean">What errors versus warnings mean<a class="anchor" aria-label="anchor" href="#what-errors-versus-warnings-mean"></a>
@@ -274,12 +339,12 @@ to <code>counts</code>;</li>
 <ol style="list-style-type: decimal">
 <li>Keep source Seurat layers in memory for export, or materialize every
 intended split layer first.</li>
-<li>Export to a <code>.crb</code> path and choose <code>embedded</code>,
-<code>h5</code>, or <code>bpcells</code>.</li>
+<li>Export to a <code>.crb</code> path and choose <code>embedded</code>
+or <code>h5</code>.</li>
 <li>Add repertoire data through <code><a href="../reference/addImmuneRepertoire.html">addImmuneRepertoire()</a></code>
 rather than assigning an unchecked shape.</li>
-<li>Keep each external matrix beside its CRB under the serialized
-backend name.</li>
+<li>Keep the H5 file, and the immune repertoire sidecar if there is one,
+beside its CRB under the names recorded in the CRB.</li>
 <li>Build the app with <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and treat any error
 it raises as a request to fix identity, not as a file-copy
 inconvenience.</li>

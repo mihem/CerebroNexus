@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -96,13 +96,15 @@
 <span>  nGene <span class="op">=</span> <span class="st">"nGene"</span>,</span>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"bpcells"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
+<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
 <span>  h5_compression_level <span class="op">=</span> <span class="fl">0L</span>,</span>
 <span>  codec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"qs2"</span>, <span class="st">"rds"</span><span class="op">)</span>,</span>
 <span>  viewer_binary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
 <span>  viewer_binary_threshold <span class="op">=</span> <span class="fl">500000L</span>,</span>
 <span>  spatial_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  immune_sidecar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
+<span>  immune_sidecar_threshold <span class="op">=</span> <span class="fl">100000L</span>,</span>
 <span>  .expression_resolution <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -187,30 +189,23 @@ such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored whe
 
 <dt id="arg-expression-matrix-mode">expression_matrix_mode<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-mode"></a></dt>
 <dd><p>How to persist the expression matrix. One of
-<code>"embedded"</code> (default), <code>"bpcells"</code>, or <code>"h5"</code>.</p><ul><li><p><code>"embedded"</code> stores the matrix inside the <code>.crb</code> file, as
-  before. Compatible with all existing <code>.crb</code> readers.</p></li>
-<li><p><code>"bpcells"</code> writes the matrix to a BPCells on-disk directory
-  next to the <code>.crb</code> and keeps only a lightweight handle in the
-  serialised object. Recommended for large sparse matrices. The resulting
-  <code>.crb</code> is portable as long as the sibling <code>.bpcells/</code> directory
-  travels with it; the Shiny runtime re-resolves paths via
-  <code>getExpressionBackend()$location</code> relative to the <code>.crb</code>'s
-  parent directory (step 7.3 runtime attach).
-  Delayed/Rle matrix inputs additionally require <span class="pkg">HDF5Array</span>; they use
-  a temporary block-written HDF5 file instead of a full dense realization.</p></li>
+<code>"embedded"</code> (default) or <code>"h5"</code>.</p><ul><li><p><code>"embedded"</code> stores the matrix inside the <code>.crb</code> file.</p></li>
 <li><p><code>"h5"</code> writes the matrix via <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>
   to a TENx-format sparse HDF5 file next to the <code>.crb</code> (sibling
-  <code>&lt;stem&gt;.h5</code>) and tags the backend with that relative location. The
-  on-disk layout matches <code>inst/extdata/examples/example.h5</code>: a single
-  <code>/expression</code> group with <code>data</code>, <code>indices</code>, <code>indptr</code>,
-  <code>shape</code>, <code>genes</code>, and <code>barcodes</code> datasets. The matrix is
-  stored cells x genes (TENx column-favoured, optimised for per-gene
-  reads); the Shiny runtime attach reads it back as a lazy
-  <code><a href="https://rdrr.io/pkg/HDF5Array/man/TENxMatrix-class.html" class="external-link">HDF5Array::TENxMatrix</a></code> seed and transposes it lazily to Cerebro's
-  internal genes x cells layout via <code>DelayedArray::t()</code> (free). The
-  in-memory <code>dgCMatrix</code> is never materialised on attach, so RAM stays
-  close to the <code>.crb</code> metadata size. The gzip level is set by
-  <code>h5_compression_level</code>. Requires the <span class="pkg">HDF5Array</span> package.</p></li>
+  <code>&lt;stem&gt;.h5</code>) and tags the backend with that file name. The
+  file holds a single <code>/expression</code> group with <code>data</code>,
+  <code>indices</code>, <code>indptr</code>, <code>shape</code>, <code>genes</code>, and
+  <code>barcodes</code> datasets. The matrix is stored cells x genes (TENx
+  column-favoured, optimised for per-gene reads); the Viewer reads it back as
+  a lazy <code><a href="https://rdrr.io/pkg/HDF5Array/man/TENxMatrix-class.html" class="external-link">HDF5Array::TENxMatrix</a></code> seed and transposes it lazily to
+  Cerebro's internal genes x cells layout via <code>DelayedArray::t()</code>
+  (free). The in-memory <code>dgCMatrix</code> is never materialised on attach, so
+  RAM stays close to the <code>.crb</code> metadata size. The <code>.crb</code> is thin:
+  the cell names are kept once, in the H5 file, and the <code>.crb</code> records
+  their order and a checksum. The gzip level is set by
+  <code>h5_compression_level</code>; the default (no compression) is several
+  times larger than a compressed file but builds and reads faster.
+  Requires the <span class="pkg">HDF5Array</span> package.</p></li>
 </ul><p>The CRB and any sidecar are built and validated in a private sibling stage.
 On POSIX systems, new stages and external matrices are owner-only; replacing
 a CRB preserves its existing mode. An existing sidecar is replaced only when
@@ -251,6 +246,20 @@ for large datasets, <code>"always"</code>, or <code>"never"</code>.</p></dd>
 <code>viewer_binary = "auto"</code>.</p></dd>
 
 
+<dt id="arg-immune-sidecar">immune_sidecar<a class="anchor" aria-label="anchor" href="#arg-immune-sidecar"></a></dt>
+<dd><p>Store the immune repertoire in a sibling file
+<code>&lt;stem&gt;.immune.qs2</code> (<code>.rds</code> with <code>codec = "rds"</code>) instead of
+inside the <code>.crb</code>. <code>"auto"</code> does so for <code>"h5"</code> exports whose
+repertoire has at least <code>immune_sidecar_threshold</code> rows; <code>"always"</code>
+and <code>"never"</code> override that. The sidecar must travel with the
+<code>.crb</code>.</p></dd>
+
+
+<dt id="arg-immune-sidecar-threshold">immune_sidecar_threshold<a class="anchor" aria-label="anchor" href="#arg-immune-sidecar-threshold"></a></dt>
+<dd><p>Number of repertoire rows (cells with
+receptor data) used by <code>immune_sidecar = "auto"</code>.</p></dd>
+
+
 <dt id="arg-spatial-images">spatial_images<a class="anchor" aria-label="anchor" href="#arg-spatial-images"></a></dt>
 <dd><p>Optional named list mapping Seurat image names to named
 image paths or descriptors of the form <code>list(path = ..., bounds = ...)</code>.
@@ -280,9 +289,9 @@ resolved and validated. Users should leave this as <code>NULL</code>.</p></dd>
 <p>If <code>object@misc$immune_repertoire</code> contains a named list of
 data.frames (one per sample, with <code>barcode</code>, <code>CTgene</code>,
 <code>CTnt</code>, <code>CTaa</code>, and <code>CTstrict</code>), it will be automatically
-exported into the Cerebro object via <code><a href="addImmuneRepertoire.html">addImmuneRepertoire()</a></code>. Legacy
-<code>bcr_data</code> /
-<code>tcr_data</code> slots are also supported as a fallback.</p>
+exported into the Cerebro object via <code><a href="addImmuneRepertoire.html">addImmuneRepertoire()</a></code>. When that
+slot is empty, receptors kept apart in <code>object@misc$tcr_data</code> and
+<code>object@misc$bcr_data</code> are merged into it.</p>
     </div>
     <div class="section level2">
     <h2 id="hla-typing">HLA typing<a class="anchor" aria-label="anchor" href="#hla-typing"></a></h2>
@@ -313,18 +322,18 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.1.4</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.2.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -344,8 +353,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Saving Cerebro object to: /tmp/nix-shell-4258-2863294846/RtmpkNGwMw/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [16:04:56] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Saving Cerebro object to: /tmp/nix-shell-4236-3089512087/RtmpKzwBcY/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:54:17] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

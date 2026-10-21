@@ -28,7 +28,8 @@ Let’s look at some details. Overall, the object is organized as such:
     ├── cell_cycle (vector)
     ├── gene_lists (named list)
     │   └── <gene_list_name> (vector of genes)
-    ├── expression (matrix-like)
+    ├── expression (matrix-like; attached from the H5 file when an H5-backed .crb is read)
+    ├── expression_backend (list: type "embedded" or "h5", location)
     ├── meta_data (data.frame)
     ├── projections (named list)
     │   └── <projection_name> (data.frame)
@@ -45,6 +46,8 @@ Let’s look at some details. Overall, the object is organized as such:
     ├── trajectories (named list)
     │   └── <method> (named list)
     │       └── <trajectory_name> (depends on method, most likely a list or data frame)
+    ├── immune_repertoire (named list)
+    │   └── <sample> (data.frame, one row per cell with a receptor)
     └── extra_material (named list)
         ├── tables (named list)
         │   └── <name> (data.frame)    
@@ -54,6 +57,21 @@ Let’s look at some details. Overall, the object is organized as such:
 Interaction with the Cerebro object will be done through internal
 methods, providing additional control for the correct format of the
 object.
+
+The expression matrix is either embedded in the `.crb` or kept in an H5
+file next to it; `expression_backend` records which
+(`setExpressionBackend()` accepts only `"embedded"` and `"h5"`), and
+[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+/
+[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+take care of the rest. T-cell and B-cell receptors live together in
+`immune_repertoire`; there are no separate `tcr_data` / `bcr_data`
+fields, and `getTCR()` / `getBCR()` return the TCR or BCR rows of that
+repertoire. A very large repertoire can sit in a sibling
+`<stem>.immune.qs2` file that `getImmuneRepertoire()` loads on demand. A
+`.crb` written by an older release that does not follow this layout is
+rejected with a pointer to
+[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md).
 
 As long as you follow the described scheme, you can export and visualize
 any data frame that is stored in the `marker_genes` or

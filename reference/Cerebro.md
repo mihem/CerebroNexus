@@ -51,27 +51,29 @@ A new `Cerebro` object.
 
 - `expression_backend`:
 
-  `list` describing how/where the expression matrix is stored. For step
-  7.1 every newly exported object tags itself
-  `list(type = "embedded", location = NULL)`; future step 7.2 will
-  introduce `type = "h5"` / `"bpcells"` with an external `location`.
-  Older `.crb` files (serialised before this field existed) load with
-  `expression_backend = NULL`; `getExpressionBackend()` treats that as
-  `"embedded"` for backward compatibility.
+  `list` describing where the expression matrix is stored:
+  `list(type = "embedded", location = NULL)` when it travels inside the
+  `.crb`, or `list(type = "h5", location = "<stem>.h5")` for an H5 file
+  next to it.
 
 - `crb_schema`:
 
-  Description of fields omitted from a thin CRB and restored from its
-  external expression sidecar. Legacy and embedded CRBs leave this as
-  `NULL`.
+  Description of fields omitted from a thin CRB and restored from its H5
+  expression sidecar. Embedded CRBs leave this as `NULL`.
 
 - `spatial_molecule_backend`:
 
   Descriptor for molecule tables stored in a sibling spatial sidecar.
-  The runtime-only `root` member is populated by
-  [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
-  or the generated Viewer and is never required for legacy CRBs with
+  The runtime-only \`root\` member is populated by \`readCerebro()\` or
+  the generated Viewer and is never required for legacy CRBs with
   embedded molecule tables.
+
+- `immune_repertoire_backend`:
+
+  Descriptor for a large immune repertoire stored in a sibling file
+  (`type = "file"`). The runtime-only \`root\` member is attached when
+  the CRB is opened; without a descriptor the repertoire is the embedded
+  \`immune_repertoire\` field.
 
 - `cell_fingerprint`:
 
@@ -142,16 +144,6 @@ A new `Cerebro` object.
   copy) with data provenance, or NULL. Consumed by the HLA & TCR Motifs
   page for donor-level HLA context. Optional; older .crb files simply
   lack it.
-
-- `bcr_data`:
-
-  `list` that contains BCR data (kept for backward compatibility with
-  older .crb files).
-
-- `tcr_data`:
-
-  `list` that contains TCR data (kept for backward compatibility with
-  older .crb files).
 
 - `spatial`:
 
@@ -281,10 +273,6 @@ A new `Cerebro` object.
 - [`Cerebro$getBCR()`](#method-Cerebro-getBCR)
 
 - [`Cerebro$getTCR()`](#method-Cerebro-getTCR)
-
-- [`Cerebro$addBCRData()`](#method-Cerebro-addBCRData)
-
-- [`Cerebro$addTCRData()`](#method-Cerebro-addTCRData)
 
 - [`Cerebro$getImmuneRepertoire()`](#method-Cerebro-getImmuneRepertoire)
 
@@ -660,11 +648,9 @@ Set transcript count matrix.
 ### `Cerebro$setExpressionBackend()`
 
 Tag the object with information about how / where its expression matrix
-is stored. In step 7.1 every newly exported `.crb` is tagged
-`"embedded"` with a NULL location, meaning the matrix is carried inside
-the serialised `.crb`. Later steps (7.2 exporter, 7.3 runtime attach)
-will produce objects tagged `"h5"` or `"bpcells"` with an external
-`location`.
+is stored: `"embedded"` with a NULL location when the matrix is carried
+inside the serialised `.crb`, or `"h5"` with the name of the H5 file
+that sits next to it.
 
 #### Usage
 
@@ -674,26 +660,19 @@ will produce objects tagged `"h5"` or `"bpcells"` with an external
 
 - `type`:
 
-  Storage backend label. One of `"embedded"`, `"h5"`, `"bpcells"`. Step
-  7.1 only recognises `"embedded"` at runtime; the other two are
-  accepted here (so step 7.2 can set them) but will still need step-7.3
-  runtime attach to be useful.
+  Storage backend label, `"embedded"` or `"h5"`.
 
 - `location`:
 
-  Optional character path (absolute or relative to the parent directory
-  of the serialized Cerebro object) where the external matrix lives.
-  `NULL` when `type == "embedded"`.
+  File name of the H5 file next to the `.crb`; `NULL` when
+  `type == "embedded"`.
 
 ------------------------------------------------------------------------
 
 ### `Cerebro$getExpressionBackend()`
 
-Read the expression backend tag. Returns a `list(type, location)`. For
-`.crb` files generated before the `expression_backend` field existed the
-stored slot is `NULL`; this method graciously falls back to
-`list(type = "embedded", location = NULL)` so that downstream code does
-not need to special-case legacy objects.
+Read the expression backend tag. Returns a `list(type, location)`; an
+object that has not been tagged yet counts as embedded.
 
 #### Usage
 
@@ -861,8 +840,7 @@ etc.) fast instead of densifying just to aggregate.
 #### Returns
 
 A sub-matrix of the same concrete class as `self$expression`:
-`dgCMatrix` stays `dgCMatrix`, `RleMatrix` yields `DelayedMatrix`,
-`IterableMatrix` stays `IterableMatrix`.
+`dgCMatrix` stays `dgCMatrix`, `RleMatrix` yields `DelayedMatrix`.
 
 ------------------------------------------------------------------------
 
@@ -1375,7 +1353,9 @@ Trajectory data as `data.frame` or `list`.
 
 ### `Cerebro$getBCR()`
 
-Retrieve BCR data
+Retrieve the BCR rows of the immune repertoire: for each sample the
+cells whose `CTgene` names an immunoglobulin chain (IGH, IGK or IGL).
+Samples without such cells are dropped.
 
 #### Usage
 
@@ -1383,13 +1363,15 @@ Retrieve BCR data
 
 #### Returns
 
-BCR data stored in the object.
+Named list of data.frames (one per sample), or an empty list.
 
 ------------------------------------------------------------------------
 
 ### `Cerebro$getTCR()`
 
-Retrieve TCR data
+Retrieve the TCR rows of the immune repertoire: for each sample the
+cells whose `CTgene` names a T-cell receptor chain (TRA, TRB, TRG or
+TRD). Samples without such cells are dropped.
 
 #### Usage
 
@@ -1397,47 +1379,15 @@ Retrieve TCR data
 
 #### Returns
 
-TCR data stored in the object.
-
-------------------------------------------------------------------------
-
-### `Cerebro$addBCRData()`
-
-Add BCR data.
-
-#### Usage
-
-    Cerebro$addBCRData(data)
-
-#### Arguments
-
-- `data`:
-
-  `list` that contains BCR data.
-
-------------------------------------------------------------------------
-
-### `Cerebro$addTCRData()`
-
-Add TCR data.
-
-#### Usage
-
-    Cerebro$addTCRData(data)
-
-#### Arguments
-
-- `data`:
-
-  `list` that contains TCR data.
+Named list of data.frames (one per sample), or an empty list.
 
 ------------------------------------------------------------------------
 
 ### `Cerebro$getImmuneRepertoire()`
 
-Get immune repertoire data. Returns the unified `immune_repertoire`
-field if available; otherwise falls back to merging legacy `bcr_data`
-and `tcr_data`.
+Get immune repertoire data: the `immune_repertoire` field, or the
+sibling file that `immune_repertoire_backend` points to (loaded and
+checksummed on first use).
 
 #### Usage
 
@@ -1554,13 +1504,18 @@ Retrieve spatial data.
 
 #### Usage
 
-    Cerebro$getSpatialData(name)
+    Cerebro$getSpatialData(name, hydrate_molecules = TRUE)
 
 #### Arguments
 
 - `name`:
 
   Name of the spatial data entry.
+
+- `hydrate_molecules`:
+
+  Whether to read an external molecule table. Set to `FALSE` for Viewer
+  paths that only consume coordinates, expression, or images.
 
 #### Returns
 

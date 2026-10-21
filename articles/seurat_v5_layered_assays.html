@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -170,8 +170,8 @@ cell, and then chooses the requested output storage mode.</p>
 <li>more than one valid partition exists under the requested
 prefix;</li>
 <li>no partition covers every assay cell;</li>
-<li>the source layers live on disk as BPCells or DelayedArray
-matrices;</li>
+<li>the source layers live on disk (for example
+<code>IterableMatrix</code> or DelayedArray matrices);</li>
 <li>you deliberately request one partial physical layer for an operation
 that requires the complete object.</li>
 </ul>
@@ -230,9 +230,8 @@ cells than the rest.</p>
 </ul>
 <p>The <code>.crb</code> is internally contradictory.</p>
 <p>This check must happen before output storage modes diverge. An
-embedded matrix, an HDF5 sibling, and a BPCells sibling are different
-representations of the same data contract; they must not differ in which
-errors they catch.</p>
+embedded matrix and an HDF5 sibling are different representations of the
+same data contract; they must not differ in which errors they catch.</p>
 </div>
 <div class="section level2">
 <h2 id="why-names-are-not-enough">Why names are not enough<a class="anchor" aria-label="anchor" href="#why-names-are-not-enough"></a>
@@ -540,7 +539,7 @@ and does not use this direct matrix path.</p>
 <td>strict error</td>
 </tr>
 <tr class="even">
-<td>BPCells-backed source</td>
+<td>disk-backed source (<code>IterableMatrix</code>, DelayedArray)</td>
 <td>any</td>
 <td>materialisation error</td>
 </tr>
@@ -558,13 +557,15 @@ and does not use this direct matrix path.</p>
 <ul>
 <li>in-memory <code>matrix</code>;</li>
 <li>sparse <code>dgCMatrix</code>;</li>
-<li>BPCells <code>IterableMatrix</code>;</li>
-<li>DelayedArray-backed matrix.</li>
+<li>disk-backed <code>IterableMatrix</code> (the class of on-disk
+matrices);</li>
+<li>DelayedArray-backed matrix (for example HDF5-backed).</li>
 </ul>
 <p>CerebroNexus automatically joins in-memory Seurat v5 partitions.
-Disk-backed source layers must currently be materialised first. Every
-member of the chosen partition is checked, so a mixed in-memory/BPCells
-partition is rejected regardless of layer order.</p>
+Disk-backed source layers are rejected in every output mode and must be
+materialised first. Every member of the chosen partition is checked, so
+a mixed in-memory/disk-backed partition is rejected regardless of layer
+order.</p>
 </div>
 <div class="section level3">
 <h3 id="output-expression-storage">Output expression storage<a class="anchor" aria-label="anchor" href="#output-expression-storage"></a>
@@ -575,14 +576,13 @@ the resolved matrix:</p>
 <li>
 <code>"embedded"</code>: inside the <code>.crb</code>;</li>
 <li>
-<code>"h5"</code>: a sibling HDF5 file;</li>
-<li>
-<code>"bpcells"</code>: a sibling BPCells directory.</li>
+<code>"h5"</code>: a sibling HDF5 file (the <code>.crb</code> is
+then thin; see <a href="data_integrity_contracts.html">Data integrity
+contracts</a>).</li>
 </ul>
-<p>Choosing <code>expression_matrix_mode = "bpcells"</code> does not
-make a BPCells-backed source assay readable. Source resolution happens
-first; output storage happens after the complete matrix has been
-validated.</p>
+<p>Choosing <code>expression_matrix_mode = "h5"</code> does not make a
+disk-backed source assay readable. Source resolution happens first;
+output storage happens after the complete matrix has been validated.</p>
 </div>
 </div>
 <div class="section level2">
@@ -760,9 +760,10 @@ preprocessing.</p>
 <div class="section level3">
 <h3 id="layer-lives-on-disk">“Layer lives on disk”<a class="anchor" aria-label="anchor" href="#layer-lives-on-disk"></a>
 </h3>
-<p>The source layer is BPCells- or DelayedArray-backed. Follow the
-all-layer materialisation loop in the message. Changing
-<code>expression_matrix_mode</code> does not solve source storage.</p>
+<p>The source layer is disk-backed (<code>IterableMatrix</code> or
+DelayedArray). Follow the all-layer materialisation loop in the message.
+Changing <code>expression_matrix_mode</code> does not solve source
+storage.</p>
 </div>
 <div class="section level3">
 <h3 id="cross-semantic-fallback-warning">Cross-semantic fallback warning<a class="anchor" aria-label="anchor" href="#cross-semantic-fallback-warning"></a>
@@ -796,8 +797,8 @@ complete partitions without changing the caller’s assay.</li>
 <code>slot = "data"</code>.</li>
 <li>Treat ambiguity and incomplete coverage as data-contract errors, not
 warnings to suppress.</li>
-<li>Choose embedded, HDF5, or BPCells output based on deployment needs
-only after source resolution is understood.</li>
+<li>Choose embedded or HDF5 output based on deployment needs only after
+source resolution is understood.</li>
 </ol>
 </div>
 <div class="section level2">

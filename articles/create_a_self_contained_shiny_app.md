@@ -13,10 +13,9 @@ Connect, or launch locally with
 [`shiny::runApp()`](https://rdrr.io/pkg/shiny/man/runApp.html) — no
 further calls into `CerebroNexus` are required at runtime.
 
-The default descriptor-based workflow is self-contained: sibling H5 or
-BPCells matrices are copied with the `.crb`. A runtime matrix override
-is an explicit host-managed exception. It is not copied, so an app using
-one still requires that absolute host path after deployment.
+The workflow is self-contained: the sibling H5 matrix and the immune
+repertoire sidecar, if the `.crb` has them, are copied next to the
+`.crb`. The generated app needs no path outside its own directory.
 
 This is the recommended path when you want to hand a colleague a
 runnable copy of Cerebro pre-loaded with a specific data set without
@@ -79,7 +78,7 @@ shiny::runApp(out_dir)
 | `launch_browser`, `quiet`, `display_mode` | non-missing logical flags and exactly `auto`, `normal`, or `showcase` for [`shiny::runApp()`](https://rdrr.io/pkg/shiny/man/runApp.html) |
 | `welcome_message` | text shown in the Load Data tab |
 | `colors` | optional `dataset -> variable -> named level colours` list |
-| `cerebro_options` | extra entries merged into `Cerebro.options`; matrix overrides must be absolute host paths (native paths must resolve outside `result_dir`) |
+| `cerebro_options` | extra entries merged into `Cerebro.options` |
 | `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
 | `show_upload_ui` | allow users to upload their own data; defaults to `FALSE` for generated apps |
 | `initial_page` | stable Viewer page ID used once when the first dataset loads |
@@ -173,45 +172,50 @@ sheet choices, then loads only the selected sheet. Formula-like text is
 neutralized and external table cells are HTML-escaped in the Viewer;
 downloads use the same neutralized data.
 
-## Sibling files: `.bpcells/` and `.h5`
+## Sibling files: `.h5` and `.immune.qs2`
 
-If your `.crb` was exported with an external expression backend
-(`expression_matrix_mode = "bpcells"` or `"h5"` in
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)),
-its descriptor records the matrix location relative to the `.crb`. Fresh
-exports normally use a sibling `<stem>.bpcells/` directory or
-`<stem>.h5` file, but the descriptor remains authoritative if the `.crb`
-is renamed.
+If your `.crb` was exported with `expression_matrix_mode = "h5"` in
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+its descriptor records the H5 file relative to the `.crb`. Fresh exports
+use `<stem>.h5`, but the descriptor remains authoritative if the `.crb`
+is renamed. A large immune repertoire can sit in a second sibling,
+`<stem>.immune.qs2`, which the `.crb` also records by relative name (see
+`immune_sidecar` in
+[`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)).
 
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-copies the tagged file or directory to the same relative location under
-`result_dir/private-data/`. The location must be a portable relative
-path; missing backends and conflicting bundle targets are errors rather
-than silent overwrites. Before copying, the function resolves every
-descriptor and sidecar and plans all data and spatial-image targets
-together. Exact, parent/child, case-folded and symbolic-link collisions
-fail during preflight.
+copies each recorded file to the same relative location under
+`result_dir/private-data/`, next to the copy of the `.crb`. The location
+must be a portable relative path; missing sidecars and conflicting
+bundle targets are errors rather than silent overwrites. Before copying,
+the function resolves every descriptor and sidecar and plans all data
+and spatial-image targets together. Exact, parent/child, case-folded and
+symbolic-link collisions fail during preflight.
 
 Preflight reads the ordinary `expression_backend` field without invoking
-its serialized getter. It combines that field with any deployment
-override and writes a versioned, per-CRB attachment plan into
-`cerebro_config.rds`. Configured CRBs consume that exact plan at runtime
-instead of interpreting the serialized object a second time. Direct
-launches and uploads also avoid the getter: they validate the ordinary
-field at load time. A historical CRB may omit both the field and getter;
-an object containing only one of them is an unsupported mixed format and
-fails closed.
+its serialized getter and writes a versioned, per-CRB attachment plan
+into `cerebro_config.rds`. Configured CRBs consume that exact plan at
+runtime instead of interpreting the serialized object a second time.
+Direct launches and uploads also avoid the getter: they validate the
+ordinary field at load time.
+
+A `.crb` in a retired format is rejected during preflight, before
+anything is written, with
+`uses a retired format ... Convert it once with CerebroNexus::convertCerebro()`.
+See [Data integrity
+contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)
+for what counts as retired.
 
 ### Private data and spatial assets
 
 Files explicitly passed through `spatial_images` are copied under
 `spatial-assets/`. The server-side renderer reads them from disk and
 embeds them as data URIs when drawing the plot; the directory is not
-registered as an HTTP resource. Raw `.crb`, H5 and BPCells artifacts
-stay under `private-data/`, which is likewise never registered with
-`addResourcePath()`. The historical `data/` directory name is
-deliberately not reused: a still-running older generated app can retain
-its former `/data` resource mapping while the bundle directory is
+registered as an HTTP resource. Raw `.crb`, H5 and immune repertoire
+sidecar files stay under `private-data/`, which is likewise never
+registered with `addResourcePath()`. The historical `data/` directory
+name is deliberately not reused: a still-running older generated app can
+retain its former `/data` resource mapping while the bundle directory is
 replaced.
 
 This boundary prevents ordinary HTTP download through the generated
@@ -223,27 +227,6 @@ warning.
 Generated bundles follow the standard Shiny deployment model of one app
 per R process. They use process-global `Cerebro.options` and do not
 claim isolation between separately sourced apps in the same process.
-
-### Host-managed matrix overrides
-
-The global `expression_matrix_h5` and `expression_matrix_BPCells`
-overrides retain precedence over a `.crb` descriptor. An override must
-be an absolute path. A path native to the build host is canonicalized
-and rejected if it resolves inside `result_dir`. Existing native
-components are resolved before an unresolved suffix, so aliases cannot
-hide a future path inside the app. Unresolved filesystem entries fail
-closed, as do Windows device or extended-length namespaces and
-Windows-incompatible segments. A truly absent ordinary target is still
-allowed because the deployment host may provision it later.
-
-A non-native absolute path intended for a different host is preserved
-lexically; the build cannot compare it with the destination host’s app
-tree, so the deployer must verify that relationship. Native Windows
-paths use link-aware physical resolution, including mapped-drive and UNC
-aliases. The descriptor sidecar is not copied. The deployed app
-therefore depends on that exact host path and is not self-contained.
-Because an override is global, it may serve only one effective CRB
-consumer in a multi-dataset app.
 
 ### Single-writer publication and recovery
 
@@ -286,11 +269,10 @@ On POSIX systems, the staging directory is mode `0700` while data is
 copied. Replacing an existing app retains its root permission bits;
 platform-specific ACLs, ownership changes and security labels remain the
 deployment system’s responsibility. Inputs are validated and then copied
-without immutable snapshots. Every CRB, descriptor sidecar, spatial
-image and source-path ancestor must remain trusted and unchanged for the
-complete build. The target build lock does not protect these input
-paths; concurrent producers should finish an immutable release directory
-before
+without immutable snapshots. Every CRB, sidecar, spatial image and
+source-path ancestor must remain trusted and unchanged for the complete
+build. The target build lock does not protect these input paths;
+concurrent producers should finish an immutable release directory before
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
 consumes it.
 
@@ -331,10 +313,8 @@ removed, and anything you supply for those keys is overwritten.
 
 ## Deploying the bundle
 
-With descriptor-backed sidecars (the default), the output directory is
-self-contained: shipping the folder is all that is required. If you
-configured a host-managed matrix override, provision that absolute path
-separately on the deployment host. Three common targets:
+The output directory is self-contained: shipping the folder is all that
+is required. Three common targets:
 
 ``` r
 # 1. Local

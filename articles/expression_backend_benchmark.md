@@ -20,6 +20,12 @@ packages; the figures are pre-drawn images. Rendering this article
 requires neither a large dataset nor a developer cache. Do not overwrite
 recorded experiments with a new run.
 
+BPCells storage was removed in CerebroNexus 5.2.0 (see `NEWS.md`). The
+BPCells rows, figures and statements in this article are the
+measurements recorded while it was supported; they are kept unchanged as
+history and cannot be reproduced with the current version, which stores
+external expression only in H5 files.
+
 ## Real-data expression backends (Scale run, 2026-10-18)
 
 This study compares four ways to store the expression matrix: H5 with
@@ -277,17 +283,18 @@ host/browser versions and artifact checksums with every new output, and
 save new runs outside the recorded-data directory.
 
 The million-cell and Ren demo data used by `run-demo.R` are prepared by
-the scripts in `tests/demo/` of a CerebroNexus checkout. For the mouse
-preparation, allow at least 16 GiB free disk for the recorded artifact
-layout, additional space for parallel backends/outputs, and tens of
-minutes or longer depending on hardware and downloads. The source alone
-is about 3.93 GiB. Full Ren preparation has separate large
+the scripts in `data-raw/large-demo/` of a CerebroNexus checkout. For
+the mouse preparation, allow at least 16 GiB free disk for the recorded
+artifact layout, additional space for parallel backends/outputs, and
+tens of minutes or longer depending on hardware and downloads. The
+source alone is about 3.93 GiB. Full Ren preparation has separate large
 download/storage costs; inspect the preparation script and available
 disk before starting it. Do not use an arbitrary memory limit or a
 historical completion time as a guarantee.
 
 ``` r
-source("tests/demo/prepare_viewer_1m_data.R")
+source("data-raw/large-demo/h5_transposed_write.R")
+source("data-raw/large-demo/prepare_viewer_1m_data.R")
 pkgload::load_all(".")
 crb <- prepareViewer1mBenchmarkData()
 ```

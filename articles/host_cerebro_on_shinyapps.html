@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -160,7 +160,9 @@ a label that users will see in the application.</p>
 <p>The generated directory contains <code>app.R</code>, the Viewer
 runtime, and the private data files needed by the deployed application.
 See <code><a href="../articles/create_a_self_contained_shiny_app.html">vignette("create_a_self_contained_shiny_app")</a></code> for
-deployment options and external expression-backend requirements.</p>
+deployment options. An H5-backed <code>.crb</code> is bundled together
+with its <code>.h5</code> file (and its immune repertoire sidecar, if it
+has one), so the uploaded directory stays self-contained.</p>
 </div>
 <div class="section level2">
 <h2 id="deploy-app">Deploy app<a class="anchor" aria-label="anchor" href="#deploy-app"></a>

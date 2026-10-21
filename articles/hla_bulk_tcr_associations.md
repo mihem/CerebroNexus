@@ -64,10 +64,11 @@ crb$technical_info <- list(observation_unit = "analysis unit",   # a row is NOT 
                            receptor_key     = "v_gene+cdr3",
                            tcr_selection    = "association-conditioned")
 crb$expression <- Matrix::Matrix(0, nrow = 0, ncol = nrow(meta), sparse = TRUE)  # no transcriptome
+crb$setExpressionBackend("embedded")                       # the matrix lives inside the .crb
 crb$meta_data  <- meta
 crb$addImmuneRepertoire(ir)                                # real receptors
 crb$addHLATyping(hla_long, source_type = "genotyped")      # real genotypes
-saveRDS(crb, "demo_hla_tcr_bulk_toy.crb")
+saveCerebro(crb, "demo_hla_tcr_bulk_toy.crb")
 
 launchCerebro(crb_file_to_load = "demo_hla_tcr_bulk_toy.crb")
 ```
@@ -271,6 +272,7 @@ crb$technical_info <- list(
 # a real 0-gene x N-unit matrix: bulk measures no transcriptome
 crb$expression <- Matrix::Matrix(0, nrow = 0, ncol = nrow(meta), sparse = TRUE)
 colnames(crb$expression) <- meta$cell_barcode
+crb$setExpressionBackend("embedded")   # required: a .crb without it is rejected as a retired format
 crb$meta_data <- meta
 
 crb$addImmuneRepertoire(ir)
@@ -279,7 +281,7 @@ crb$addHLATyping(hla_long, source_type = "genotyped",
 crb$addGroup("sample", unique(meta$sample))
 crb$addGroup("cell_type", unique(meta$cell_type))
 
-saveRDS(crb, "demo_hla_tcr_bulk_toy.crb")
+saveCerebro(crb, "demo_hla_tcr_bulk_toy.crb")
 ```
 
 **Confirm the contracts round-trip** — reload and read them back:

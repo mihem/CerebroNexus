@@ -63,7 +63,8 @@ You do need to intervene when:
 
 - more than one valid partition exists under the requested prefix;
 - no partition covers every assay cell;
-- the source layers live on disk as BPCells or DelayedArray matrices;
+- the source layers live on disk (for example `IterableMatrix` or
+  DelayedArray matrices);
 - you deliberately request one partial physical layer for an operation
   that requires the complete object.
 
@@ -133,9 +134,8 @@ If a fallback accepts `data.sample_a` alone:
 The `.crb` is internally contradictory.
 
 This check must happen before output storage modes diverge. An embedded
-matrix, an HDF5 sibling, and a BPCells sibling are different
-representations of the same data contract; they must not differ in which
-errors they catch.
+matrix and an HDF5 sibling are different representations of the same
+data contract; they must not differ in which errors they catch.
 
 ## Why names are not enough
 
@@ -356,7 +356,7 @@ matrix path.
 | no normalized data, complete counts | export requests `data` | warn before compatibility fallback |
 | partial `data.imputed`, complete counts | export requests `data` | ignore incomplete noise, warn, use complete counts |
 | no normalized data, complete counts | enrichment requests `data` | strict error |
-| BPCells-backed source | any | materialisation error |
+| disk-backed source (`IterableMatrix`, DelayedArray) | any | materialisation error |
 
 ## Source storage and output storage are different
 
@@ -368,13 +368,14 @@ This describes how the input Seurat object stores its layers:
 
 - in-memory `matrix`;
 - sparse `dgCMatrix`;
-- BPCells `IterableMatrix`;
-- DelayedArray-backed matrix.
+- disk-backed `IterableMatrix` (the class of on-disk matrices);
+- DelayedArray-backed matrix (for example HDF5-backed).
 
 CerebroNexus automatically joins in-memory Seurat v5 partitions.
-Disk-backed source layers must currently be materialised first. Every
-member of the chosen partition is checked, so a mixed in-memory/BPCells
-partition is rejected regardless of layer order.
+Disk-backed source layers are rejected in every output mode and must be
+materialised first. Every member of the chosen partition is checked, so
+a mixed in-memory/disk-backed partition is rejected regardless of layer
+order.
 
 ### Output expression storage
 
@@ -382,12 +383,13 @@ partition is rejected regardless of layer order.
 matrix:
 
 - `"embedded"`: inside the `.crb`;
-- `"h5"`: a sibling HDF5 file;
-- `"bpcells"`: a sibling BPCells directory.
+- `"h5"`: a sibling HDF5 file (the `.crb` is then thin; see [Data
+  integrity
+  contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)).
 
-Choosing `expression_matrix_mode = "bpcells"` does not make a
-BPCells-backed source assay readable. Source resolution happens first;
-output storage happens after the complete matrix has been validated.
+Choosing `expression_matrix_mode = "h5"` does not make a disk-backed
+source assay readable. Source resolution happens first; output storage
+happens after the complete matrix has been validated.
 
 ## Disk-backed source layers
 
@@ -568,8 +570,8 @@ preprocessing.
 
 ### “Layer lives on disk”
 
-The source layer is BPCells- or DelayedArray-backed. Follow the
-all-layer materialisation loop in the message. Changing
+The source layer is disk-backed (`IterableMatrix` or DelayedArray).
+Follow the all-layer materialisation loop in the message. Changing
 `expression_matrix_mode` does not solve source storage.
 
 ### Cross-semantic fallback warning
@@ -598,8 +600,8 @@ workflow discovers files by name alone.
 3.  Export with the logical layer name, usually `slot = "data"`.
 4.  Treat ambiguity and incomplete coverage as data-contract errors, not
     warnings to suppress.
-5.  Choose embedded, HDF5, or BPCells output based on deployment needs
-    only after source resolution is understood.
+5.  Choose embedded or HDF5 output based on deployment needs only after
+    source resolution is understood.
 
 ## See also
 

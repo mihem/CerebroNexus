@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -512,6 +512,13 @@ into CerebroNexus.</p>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>By default the expression matrix is embedded in the
+<code>.crb</code>. For large data sets, add
+<code>expression_matrix_mode = "h5"</code> to write the matrix to a
+sibling <code>.h5</code> file instead (the only other storage mode);
+keep the two files together. A very large immune repertoire is moved to
+a third sibling file (<code>immune_sidecar = "auto"</code>). See <a href="create_expression_matrix_in_h5_format.html">Store the expression
+matrix in H5 format</a>.</p>
 <p>The Cerebro use interface can be launched using the
 <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> function.</p>
 </div>

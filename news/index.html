@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.1.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,57 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.2.0" id="cerebronexus-520">CerebroNexus 5.2.0<a class="anchor" aria-label="anchor" href="#cerebronexus-520"></a></h2>
+<p>This release removes the BPCells expression storage and several retired storage forms. <strong>A <code>.crb</code> written by an older release may no longer open</strong>: see “Migrating existing files” below. External expression is now stored only in an H5 file next to the <code>.crb</code>, and the large demo data sets can be rebuilt as H5 in minutes.</p>
+<div class="section level3">
+<h3 id="storage-5-2-0">Storage<a class="anchor" aria-label="anchor" href="#storage-5-2-0"></a></h3>
+<ul><li>
+<code>expression_matrix_mode</code> of <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> and <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> is now <code>"embedded"</code> or <code>"h5"</code>. The BPCells storage mode is removed; the <code>h5</code> backend was the faster reader in the 2026-10-18 scale run. The recorded benchmark results, including the BPCells measurements, are kept as history in <code>inst/extdata/benchmarks/</code> and the “Large-dataset benchmarks” article.</li>
+<li>An H5-backed <code>.crb</code> is now thin (CRB schema version 3). The cell names are kept once, in the H5 file (<code>/expression/genes</code>), and the <code>.crb</code> stores only a checksum and the cell count instead of repeating them in <code>meta_data</code> and every projection. The Viewer still defers the cell names until a page needs them, so opening a data set reads no more than before. Opening compares only the cell count; the Viewer refuses an H5 file whose cell names do not match the <code>.crb</code> when the names are first read, which is at the latest before any gene expression is read. H5 <code>.crb</code> files from 5.1.x, which carry their cell names, keep opening.</li>
+<li>The immune repertoire of a large H5-backed data set is stored in a sibling file <code>&lt;stem&gt;.immune.qs2</code> (<code>.rds</code> with <code>codec = "rds"</code>) that the package writes itself: <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> and <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> gain <code>immune_sidecar = c("auto", "always", "never")</code> and <code>immune_sidecar_threshold</code> (100,000 rows). The Viewer lists samples and chains from the descriptor and loads the file when the Immune repertoire page needs it; <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> copies it into the bundle.</li>
+<li>The host-side overrides <code>expression_matrix_h5</code>, <code>expression_matrix_BPCells</code> and <code>expression_matrix_mode</code> are removed from <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, and the matching <code>cerebro_options</code> entries from <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>, which now stops with an error when <code>cerebro_options</code> still contains <code>expression_matrix_h5</code> or <code>expression_matrix_BPCells</code>. A <code>.crb</code> finds its matrix through its own descriptor, relative to its own directory.</li>
+<li>
+<code>Cerebro</code> no longer has the <code>bcr_data</code> and <code>tcr_data</code> fields or <code>addBCRData()</code> / <code>addTCRData()</code>. <code>getBCR()</code> and <code>getTCR()</code> now return the BCR or TCR rows of the unified immune repertoire. <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> still accepts <code>@misc$tcr_data</code> / <code>@misc$bcr_data</code> as input and merges them into that repertoire.</li>
+<li>The Nix environment (<code>create_env.R</code>, <code>default.nix</code>) no longer provides BPCells. Reading a Seurat object whose layers are BPCells matrices still needs BPCells installed; exporting such an object is not supported (bring every layer into memory first).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="migrating-existing-files-5-2-0">Migrating existing files<a class="anchor" aria-label="anchor" href="#migrating-existing-files-5-2-0"></a></h3>
+<p><code><a href="../reference/readCerebro.html">readCerebro()</a></code>, <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and the Viewer stop with “uses a retired format” for a <code>.crb</code> that has no expression-backend descriptor, uses thin schema version 1 or 2, still holds <code>bcr_data</code> / <code>tcr_data</code>, keeps its immune repertoire in a retired sidecar layout, or is a pre-spatial <code>Cerebro_v1.3</code> object.</p>
+<ul><li>
+<code>convertCerebro("x.crb")</code> upgrades a missing descriptor, <code>bcr_data</code> / <code>tcr_data</code> and a pre-spatial object in place, and rewrites a 5.1.x H5 <code>.crb</code> as a thin one.</li>
+<li>A <code>.crb</code> whose matrix is stored in a retired external layout (the BPCells directory, thin schema 1 or 2) cannot be converted. Re-export it from the source object with <code>exportFromSeurat(expression_matrix_mode = "h5")</code>, and delete the old matrix directory afterwards.</li>
+<li>The shipped example <code>demo_hla_tcr_dextramer.crb</code> had no descriptor and was converted.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="large-demo-data-5-2-0">Large demo data<a class="anchor" aria-label="anchor" href="#large-demo-data-5-2-0"></a></h3>
+<ul><li>The scripts that download and prepare the one-million-cell mouse brain and the Ren et al. COVID-19 atlas moved from <code>tests/demo/</code> to <code>data-raw/large-demo/</code>, with a README that says how to run them (<code>Rscript run-demo.R</code>). They are not part of the test suite. <code>run-demo.R</code>, <code>.Rbuildignore</code> and the tests that read the scripts follow.</li>
+<li>Both scripts write the expression matrix as the H5 file next to the <code>.crb</code> (and the Ren immune repertoire as <code>&lt;stem&gt;.immune.qs2</code>), through the new helper <code>h5_transposed_write.R</code>. <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> can only write one gene after the other, so a source stored by cells was scanned from start to end for every block of genes; the first mouse brain build did not finish in 26 minutes. The helper transposes in two passes instead: pass 1 reads the cells once, in chunks and on several R processes (an AnnData matrix stored as CSR is read from its arrays), and writes one scratch file per chunk; pass 2 assembles blocks of genes from those files and appends them to the H5 file. The layout is the one <code>writeTENxMatrix()</code> writes. On an 8-core machine with 4 processes the mouse brain (1,000,000 cells) took about 8 minutes and the Ren atlas (1,462,702 cells) about 7 minutes, with the sources already local. <code>CEREBRO_DEMO_WORKERS</code> sets the number of processes (default 2; each needs about 3 to 5 GB of memory, an estimate).</li>
+<li>The mouse brain demo now uses all 1,306,127 cells of the 10x matrix instead of 1,000,000 evenly spaced ones, and is labelled “10x E18 mouse brain (1.3M)”. Its cached analysis is stored as <code>mouse_brain_e18_sketch.rds</code>. The file and function names still say <code>1m</code>.</li>
+<li>The mouse brain script reads <code>CEREBRO_LARGE_CACHE</code> like the Ren script, so an existing download is found. It prepares the data in <code>1m/cerebro-v2/</code> with a <code>demo-version</code> stamp, as the Ren script does in its <code>cerebro-v2</code> folder, so a mouse brain built by an earlier release (1,000,000 cells, folder <code>cerebro</code>) is not taken for the 1.3M data set. The earlier files are left in place.</li>
+<li>
+<code>CEREBRO_1M_DEMO_CRB</code> and <code>CEREBRO_REN_DEMO_CRB</code> must name a <code>.crb</code> with an adjacent <code>.h5</code> file (before: an adjacent <code>.bpcells</code> directory). The demo data built by an earlier release has to be built again.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-5-2-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-5-2-0"></a></h3>
+<ul><li>
+<code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> accepts <code>h5_compression_level</code>, <code>immune_sidecar</code> and <code>immune_sidecar_threshold</code> and passes them to <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>; before, it always wrote an uncompressed H5 file and could not control the sidecar.</li>
+<li>Re-exporting with <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> or saving with <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> removes an immune repertoire sidecar of the replaced CRB that the new CRB no longer uses (a file another CRB in the directory still points to stays), and <code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> no longer leaves a staged sidecar behind when a later step fails. An object whose repertoire already sits in a sidecar keeps pointing to it whatever <code>immune_sidecar</code> is; see <code><a href="../reference/saveCerebro.html">?saveCerebro</a></code>.</li>
+<li>
+<code>immune_sidecar</code> and <code>immune_sidecar_threshold</code> come after <code>verbose</code> in <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code>, so the position of the arguments before them is the same as in 5.1.3.</li>
+<li>The Viewer checks the H5 file’s cell names against the <code>.crb</code> before it reads gene expression, so expression of another data set with the same number of cells is no longer painted onto a thin <code>.crb</code>. The refusal is written to the log.</li>
+<li>The “uses a retired format” error says to re-export the file with <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> when <code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> cannot repair it (a BPCells or thin schema 1 or 2 <code>.crb</code>); before, it sent every such file to <code><a href="../reference/convertCerebro.html">convertCerebro()</a></code>, which then refused it.</li>
+<li>
+<code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> stops on an <code>expression_backend</code> that is not a descriptor instead of writing the file as embedded.</li>
+<li>
+<code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> no longer rejects an <code>output</code> in the same directory on Windows because of a path-separator mismatch.</li>
+<li>A background read of a <code>.crb</code> that does not finish within 30 s (for example when the worker R process cannot load its packages) no longer leaves the dataset switch waiting forever; the Viewer reads the file in the foreground. The 30 s count from when the switch starts to wait, not from when the read began, and the end of an abandoned read no longer discards a newer one.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-5-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-5-2-0"></a></h3>
+<ul><li>The H5, thin-CRB and immune-sidecar changes are described in the vignettes on H5 expression, self-contained apps, shinyapps.io hosting, data integrity, million-cell artifacts, immune repertoire analysis, the Cerebro class, Seurat v5 layered assays and the Seurat workflow. The benchmark article keeps its BPCells measurements as history and says that BPCells storage was removed in 5.2.0.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.1.4" id="cerebronexus-514">CerebroNexus 5.1.4<a class="anchor" aria-label="anchor" href="#cerebronexus-514"></a></h2>
 <ul><li>Fixes Data info taking 13 to 21 seconds to open a large dataset when the app has no prebuilt dataset catalog, as in <code>run-demo.R</code>; the 1.46-million-cell Ren et al. atlas now opens in about a second. The page counts categories without copying the metadata, takes the gene count and projection names from the first-frame cache instead of reading every cell name, publishes the projection resources after it is painted, and renders category bars as one string. The Viewer also reserves heap at start-up when a large CRB is configured, so opening it no longer triggers a full garbage collection.</li>

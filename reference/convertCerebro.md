@@ -1,6 +1,14 @@
 # Convert a Cerebro data file
 
-Re-serializes a CRB while reusing its existing expression sidecar.
+Re-serializes a CRB while reusing its existing expression sidecar. This
+is also how a CRB from an older release is brought up to date: a missing
+expression-backend descriptor is set to embedded, receptor data in the
+retired `bcr_data` / `tcr_data` fields is merged into the unified immune
+repertoire, and an H5-backed CRB written without a thin schema is
+thinned. A CRB whose expression storage is older than the formats this
+version reads (an unknown expression backend, thin schema 1 or 2) cannot
+be converted; re-export it with
+[`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).
 
 ## Usage
 
