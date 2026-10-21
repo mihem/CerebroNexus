@@ -1,5 +1,17 @@
 # Changelog
 
+## CerebroNexus 5.1.4
+
+- Fixes Data info taking 13 to 21 seconds to open a large dataset when
+  the app has no prebuilt dataset catalog, as in `run-demo.R`; the
+  1.46-million-cell Ren et al. atlas now opens in about a second. The
+  page counts categories without copying the metadata, takes the gene
+  count and projection names from the first-frame cache instead of
+  reading every cell name, publishes the projection resources after it
+  is painted, and renders category bars as one string. The Viewer also
+  reserves heap at start-up when a large CRB is configured, so opening
+  it no longer triggers a full garbage collection.
+
 ## CerebroNexus 5.1.3
 
 - The “Large-dataset benchmarks” article now reports the 2026-10-18
