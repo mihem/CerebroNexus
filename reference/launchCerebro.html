@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -113,7 +113,10 @@ data set (<code>closed</code>, removes the "Load data" element); defaults to
 
 <dt id="arg-crb-file-to-load">crb_file_to_load<a class="anchor" aria-label="anchor" href="#arg-crb-file-to-load"></a></dt>
 <dd><p>Path to <code>.crb</code> file to load on launch of
-Cerebro. Useful when using/hosting Cerebro in <code>closed</code> mode. Defaults to
+Cerebro. Useful when using/hosting Cerebro in <code>closed</code> mode. To offer
+several data sets, pass a <em>named</em> character vector, e.g.
+<code>c(sampleA = "a.crb", sampleB = "b.crb")</code>: every name is the stable,
+unique data set identity used in links and saved state. Defaults to
 <code>NULL</code>.</p></dd>
 
 

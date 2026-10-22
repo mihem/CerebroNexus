@@ -65,8 +65,8 @@ A new `Cerebro` object.
 
   Descriptor for molecule tables stored in a sibling spatial sidecar.
   The runtime-only \`root\` member is populated by \`readCerebro()\` or
-  the generated Viewer and is never required for legacy CRBs with
-  embedded molecule tables.
+  the generated Viewer. A stored CRB keeps its molecule tables only in
+  this sidecar.
 
 - `immune_repertoire_backend`:
 
@@ -78,7 +78,8 @@ A new `Cerebro` object.
 - `cell_fingerprint`:
 
   Stable identity of the cell population used by portable saved views.
-  Older CRBs leave this as `NULL`.
+  Embedded CRBs leave this as `NULL`; the Viewer then derives it from
+  the cell names.
 
 - `meta_data`:
 
@@ -142,8 +143,7 @@ A new `Cerebro` object.
 
   canonical HLA typing `data.frame` (long: one row per sample x locus x
   copy) with data provenance, or NULL. Consumed by the HLA & TCR Motifs
-  page for donor-level HLA context. Optional; older .crb files simply
-  lack it.
+  page for donor-level HLA context. Optional.
 
 - `spatial`:
 
@@ -156,7 +156,7 @@ A new `Cerebro` object.
   per-nucleus cluster/cell-type, positioning QC in the vendor's original
   field names, the upstream (vendor) Moran's I table, and per-nucleus
   positioning-evidence images (base64 `data:` URIs). Consumed by the
-  Trekker page. Optional; older .crb files simply lack it.
+  Trekker page. Optional.
 
 ## Methods
 
@@ -253,8 +253,6 @@ A new `Cerebro` object.
 - [`Cerebro$getMarkerGenes()`](#method-Cerebro-getMarkerGenes)
 
 - [`Cerebro$addEnrichedPathways()`](#method-Cerebro-addEnrichedPathways)
-
-- [`Cerebro$getMethodsWithEnrichedPathways()`](#method-Cerebro-getMethodsWithEnrichedPathways)
 
 - [`Cerebro$getMethodsForEnrichedPathways()`](#method-Cerebro-getMethodsForEnrichedPathways)
 
@@ -1193,24 +1191,9 @@ Add table of enriched pathways.
 
 ------------------------------------------------------------------------
 
-### `Cerebro$getMethodsWithEnrichedPathways()`
-
-Retrieve names of methods for which enriched pathways are available.
-
-#### Usage
-
-    Cerebro$getMethodsWithEnrichedPathways()
-
-#### Returns
-
-`vector` of methods for which enriched pathways are available.
-
-------------------------------------------------------------------------
-
 ### `Cerebro$getMethodsForEnrichedPathways()`
 
-Alias of `getMethodsWithEnrichedPathways()`, kept for backwards
-compatibility with the Shiny app, which calls this name.
+Retrieve names of methods for which enriched pathways are available.
 
 #### Usage
 
@@ -1419,7 +1402,7 @@ Set immune repertoire data.
 ### `Cerebro$getHLATyping()`
 
 Get HLA typing data (canonical long `data.frame`), or an empty table
-when none is stored. Safe on older objects that predate the field.
+when none is stored.
 
 #### Usage
 
@@ -1493,8 +1476,8 @@ Add spatial data.
   uniquely named list of image payloads. Each payload contains
   'histology_image' (a base64 `data:` URI) and 'histology_image_bounds'
   (xmin/xmax/ymin/ymax in coordinate space). Bounds omitted from a
-  payload are derived from the coordinates. Legacy singular image fields
-  are accepted and normalized as 'Tissue background'.
+  payload are derived from the coordinates. The singular
+  'histology_image' / 'histology_image_bounds' fields are rejected.
 
 ------------------------------------------------------------------------
 
@@ -1520,8 +1503,7 @@ Retrieve spatial data.
 #### Returns
 
 A canonical spatial-data `list` containing 'coordinates', 'expression',
-and 'histology_images'. Legacy singular image fields are normalized on
-read.
+and 'histology_images'.
 
 ------------------------------------------------------------------------
 
@@ -1542,8 +1524,7 @@ Get list of available spatial data entries.
 ### `Cerebro$getTrekker()`
 
 Get Trekker single-cell spatial-mapping data, or `NULL` when none is
-stored. Safe on older objects that predate the field (the slot is read
-through a `tryCatch` so the getter never errors on a legacy .crb).
+stored.
 
 #### Usage
 

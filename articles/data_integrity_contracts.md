@@ -205,7 +205,10 @@ and the Viewer all reject a `.crb` that
 - has a thin schema other than version 3;
 - still stores receptors in non-empty `bcr_data` / `tcr_data` fields;
 - records an immune repertoire sidecar of any type other than `"file"`;
-- predates spatial support (the Cerebro v1.3 class).
+- predates spatial support (the Cerebro v1.3 class), HLA typing support,
+  Trekker support or the enriched-pathways page, so its stored object
+  lacks the `availableSpatial()`, `getHLATyping()`, `getTrekker()` or
+  `getMethodsForEnrichedPathways()` method.
 
 The message is the same everywhere:
 
@@ -216,6 +219,7 @@ Convert it once with CerebroNexus::convertCerebro().
 
 [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
 is the only migration path. It sets a missing descriptor to `embedded`,
+rebuilds an object that lacks one of those methods on the current class,
 merges `bcr_data` / `tcr_data` into the unified repertoire and thins an
 H5-backed `.crb` that was written without a schema. A `.crb` whose
 expression storage this version cannot read or repair (an expression
@@ -242,7 +246,6 @@ unusable artifact:
 
 Warnings mean that the result remains interpretable:
 
-- an explicitly allowed expression fallback, such as `data` to `counts`;
 - repertoire rows or samples absent from the object were removed;
 - publication succeeded but an old backup could not be removed.
 

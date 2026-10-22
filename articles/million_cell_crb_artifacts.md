@@ -120,11 +120,9 @@ projections.
 
 After changing the CRB, rebuild with
 `buildViewerPack(file, viewer_binary = "always", overwrite = TRUE)`. A
-missing, incompatible or stale asset falls back to the ordinary data
-path. Older packs without verified projection identity do not supply
-projection coordinates; independent safe assets remain usable in the
-Viewer. Old violin assets lacking exact-summary metadata also fall back.
-Rebuilding restores the affected fast paths. Do not suppress checksum
+missing, incompatible or stale pack, such as one written for another
+pack schema, is invalid as a whole and falls back to the ordinary data
+path; rebuilding it restores the fast paths. Do not suppress checksum
 failures or edit a manifest to make a pack appear valid.
 
 ## Understand large-group plots

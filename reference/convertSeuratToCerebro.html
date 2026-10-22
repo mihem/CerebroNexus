@@ -11,7 +11,7 @@ the data to Cerebro format for visualization."><meta property="og:image" content
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -295,9 +295,11 @@ to the specified <code>result_dir</code>.</p>
     collection</p></li>
 </ol><p>Seurat uses the same named image collection for several platform-specific
 structures: a name can identify a Visium slice, Xenium or MERFISH field of
-view (FOV), Slide-seq puck, or another SpatialImage subclass. It is a
-structural spatial-entry key, not necessarily a donor or sample name. An
-entry can carry multiple user-named backgrounds, or coordinates only.</p>
+view (FOV), or another Seurat v5 spatial image. It is a structural
+spatial-entry key, not necessarily a donor or sample name. An entry can carry
+multiple user-named backgrounds, or coordinates only. Seurat v4
+<code>VisiumV1</code> images are rejected with guidance to rebuild them as
+<code>VisiumV2</code> images.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

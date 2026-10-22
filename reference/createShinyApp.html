@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -116,12 +116,6 @@ run with <code>shiny::runApp(result_dir)</code>.</p>
 <span>  variable_to_compare <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_image_settings <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_flip_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_flip_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_scale_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_scale_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_offset_x <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  spatial_images_offset_y <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  spatial_plot_rotation <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  auth <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  extra_tables <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -251,9 +245,9 @@ must match <code>cerebro_data</code>; spatial names must match the corresponding
 CRB's <code>availableSpatial()</code>, and image labels must be unique and
 non-empty within an entry. A leaf may instead be a descriptor containing
 <code>path</code> and optional coordinate <code>bounds</code>. Supplied files are
-copied to opaque, safe relative paths under <code>spatial-assets/</code>. The
-legacy <code>c(Dataset = path)</code> form is accepted only
-when that CRB has exactly one spatial entry.</p></dd>
+copied to opaque, safe relative paths under <code>spatial-assets/</code>. A
+plain <code>c(Dataset = path)</code> vector is rejected; write
+<code>list(Dataset = list(&lt;spatial entry&gt; = c(label = path)))</code>.</p></dd>
 
 
 <dt id="arg-spatial-image-settings">spatial_image_settings<a class="anchor" aria-label="anchor" href="#arg-spatial-image-settings"></a></dt>
@@ -269,37 +263,12 @@ CRB's embedded images and this call's <code>spatial_images</code>; unknown
 identities are rejected. Labels are user-facing names, not protocol names.</p></dd>
 
 
-<dt id="arg-spatial-images-flip-x">spatial_images_flip_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-x"></a></dt>
-<dd><p>Legacy named per-dataset horizontal flip values.</p></dd>
-
-
-<dt id="arg-spatial-images-flip-y">spatial_images_flip_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-flip-y"></a></dt>
-<dd><p>Legacy named per-dataset vertical flip values.</p></dd>
-
-
-<dt id="arg-spatial-images-scale-x">spatial_images_scale_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-x"></a></dt>
-<dd><p>Legacy named per-dataset X scale values.</p></dd>
-
-
-<dt id="arg-spatial-images-scale-y">spatial_images_scale_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-scale-y"></a></dt>
-<dd><p>Legacy named per-dataset Y scale values.</p></dd>
-
-
-<dt id="arg-spatial-images-offset-x">spatial_images_offset_x<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-x"></a></dt>
-<dd><p>Legacy named per-dataset horizontal offsets.</p></dd>
-
-
-<dt id="arg-spatial-images-offset-y">spatial_images_offset_y<a class="anchor" aria-label="anchor" href="#arg-spatial-images-offset-y"></a></dt>
-<dd><p>Legacy named per-dataset vertical offsets.</p></dd>
-
-
 <dt id="arg-spatial-plot-rotation">spatial_plot_rotation<a class="anchor" aria-label="anchor" href="#arg-spatial-plot-rotation"></a></dt>
 <dd><p>Optional nested rotations in
 <code>dataset -&gt; spatial entry -&gt; degrees</code> form, applied only to spatial
-cell coordinates. The legacy named per-dataset vector form remains
-supported and applies one rotation to every spatial entry in that dataset.
-Dataset names must match <code>cerebro_data</code>; spatial names must match the
-corresponding CRB's <code>availableSpatial()</code>.</p></dd>
+cell coordinates. Dataset names must match <code>cerebro_data</code>; spatial
+names must match the corresponding CRB's <code>availableSpatial()</code>. A
+per-dataset numeric vector is rejected.</p></dd>
 
 
 <dt id="arg-auth">auth<a class="anchor" aria-label="anchor" href="#arg-auth"></a></dt>
@@ -327,7 +296,7 @@ sheet names; unmapped sheets remain available.</p></dd>
 <dd><p>Optional named character vector mapping every dataset
 identity in <code>cerebro_data</code> to its display label. Values must be
 non-empty but may repeat. When omitted, the dataset identities are also
-used as display labels for backward compatibility.</p></dd>
+used as display labels.</p></dd>
 
 
 <dt id="arg-initial-dataset">initial_dataset<a class="anchor" aria-label="anchor" href="#arg-initial-dataset"></a></dt>

@@ -31,12 +31,6 @@ createShinyApp(
   variable_to_compare = NULL,
   spatial_images = NULL,
   spatial_image_settings = NULL,
-  spatial_images_flip_x = NULL,
-  spatial_images_flip_y = NULL,
-  spatial_images_scale_x = NULL,
-  spatial_images_scale_y = NULL,
-  spatial_images_offset_x = NULL,
-  spatial_images_offset_y = NULL,
   spatial_plot_rotation = NULL,
   auth = NULL,
   extra_tables = NULL,
@@ -166,9 +160,9 @@ createShinyApp(
   CRB's `availableSpatial()`, and image labels must be unique and
   non-empty within an entry. A leaf may instead be a descriptor
   containing `path` and optional coordinate `bounds`. Supplied files are
-  copied to opaque, safe relative paths under `spatial-assets/`. The
-  legacy `c(Dataset = path)` form is accepted only when that CRB has
-  exactly one spatial entry.
+  copied to opaque, safe relative paths under `spatial-assets/`. A plain
+  `c(Dataset = path)` vector is rejected; write
+  `list(Dataset = list(<spatial entry> = c(label = path)))`.
 
 - spatial_image_settings:
 
@@ -182,38 +176,12 @@ createShinyApp(
   embedded images and this call's `spatial_images`; unknown identities
   are rejected. Labels are user-facing names, not protocol names.
 
-- spatial_images_flip_x:
-
-  Legacy named per-dataset horizontal flip values.
-
-- spatial_images_flip_y:
-
-  Legacy named per-dataset vertical flip values.
-
-- spatial_images_scale_x:
-
-  Legacy named per-dataset X scale values.
-
-- spatial_images_scale_y:
-
-  Legacy named per-dataset Y scale values.
-
-- spatial_images_offset_x:
-
-  Legacy named per-dataset horizontal offsets.
-
-- spatial_images_offset_y:
-
-  Legacy named per-dataset vertical offsets.
-
 - spatial_plot_rotation:
 
   Optional nested rotations in `dataset -> spatial entry -> degrees`
-  form, applied only to spatial cell coordinates. The legacy named
-  per-dataset vector form remains supported and applies one rotation to
-  every spatial entry in that dataset. Dataset names must match
-  `cerebro_data`; spatial names must match the corresponding CRB's
-  `availableSpatial()`.
+  form, applied only to spatial cell coordinates. Dataset names must
+  match `cerebro_data`; spatial names must match the corresponding CRB's
+  `availableSpatial()`. A per-dataset numeric vector is rejected.
 
 - auth:
 
@@ -241,7 +209,7 @@ createShinyApp(
   Optional named character vector mapping every dataset identity in
   `cerebro_data` to its display label. Values must be non-empty but may
   repeat. When omitted, the dataset identities are also used as display
-  labels for backward compatibility.
+  labels.
 
 - initial_dataset:
 

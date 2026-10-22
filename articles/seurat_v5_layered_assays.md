@@ -315,27 +315,30 @@ cell validator.
 
 ![](img/seurat-v5-layer-entry-points.svg)
 
-| Function | Required semantic data | Fallback policy |
-|----|----|----|
-| [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md) | requested `slot` | warned compatibility fallback |
-| [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md) | requested `slot` | warned compatibility fallback |
-| [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md) | `counts` | strict |
-| [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md) | `counts` | strict |
-| [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md) | `counts` | strict |
-| [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md) | normalized `data` | strict |
+| Function | Required semantic data |
+|----|----|
+| [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md) | requested `slot` |
+| [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md) | requested `slot` |
+| [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md) | `counts` |
+| [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md) | `counts` |
+| [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md) | `counts` |
+| [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md) | normalized `data` |
 
-The preprocessing functions are strict because raw counts and normalized
-values are not interchangeable analysis inputs.
+No function substitutes another layer for the one it needs: raw counts
+and normalized values are not interchangeable inputs. If the requested
+layer does not exist, the call stops with an error that names the layer,
+lists the layers the assay does have and, for
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+and
+[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md),
+tells you which `slot` to pass.
 
 During export, the validated expression matrix is reused by spatial
 extraction. This matters for layered assays: the package resolves and
 joins the requested root once, then intersects the same matrix with each
 image’s coordinates. It does not independently resolve the assay again
 for every spatial image. Spatial payloads retain both the requested
-layer and the physical layer. For example, a warned `data -> counts`
-compatibility fallback is stored as `requested_layer = "data"` and
-`layer = "counts"` rather than mislabelling raw counts as normalized
-data.
+layer and the physical layer.
 
 [`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
 delegates to Seurat’s marker machinery and does not use this direct
@@ -353,9 +356,9 @@ matrix path.
 | overlapping partial custom layer plus true partition | `data` | select independent true partition |
 | two valid partitions | root | ambiguity error |
 | partition misses cells | root | coverage error |
-| no normalized data, complete counts | export requests `data` | warn before compatibility fallback |
-| partial `data.imputed`, complete counts | export requests `data` | ignore incomplete noise, warn, use complete counts |
-| no normalized data, complete counts | enrichment requests `data` | strict error |
+| no normalized data, complete counts | export requests `data` | error listing the layers that exist; pass `slot = "counts"` |
+| partial `data.imputed`, complete counts | export requests `data` | error; the incomplete layer is not used |
+| no normalized data, complete counts | enrichment requests `data` | error |
 | disk-backed source (`IterableMatrix`, DelayedArray) | any | materialisation error |
 
 ## Source storage and output storage are different
@@ -574,14 +577,18 @@ The source layer is disk-backed (`IterableMatrix` or DelayedArray).
 Follow the all-layer materialisation loop in the message. Changing
 `expression_matrix_mode` does not solve source storage.
 
-### Cross-semantic fallback warning
+### “Layer `data` does not exist in the `RNA` assay”
 
-Export compatibility used a complete matrix from another semantic class.
-Read the warning carefully: using `counts` instead of normalized `data`
-changes the meaning of expression values.
-
-For analysis functions, supply the required semantic layer instead; they
-do not perform this substitution.
+The requested layer is not in the assay, and no other layer is used in
+its place. The message lists the available layers. For
+[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+and
+[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+pass one of them, for example `slot = "counts"` for an assay that was
+never normalized, or create the layer you need (for example with
+[`Seurat::NormalizeData()`](https://satijalab.org/seurat/reference/NormalizeData.html)).
+Analysis functions need a specific layer (`counts` or `data`); add it to
+the assay.
 
 ### “Error processing …”
 

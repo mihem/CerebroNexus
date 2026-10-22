@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -124,20 +124,32 @@ filtering, and selection-based analysis.</p>
 </h2>
 <p>The Spatial tab surfaces automatically once a dataset carrying
 spatial data is loaded. To also show a histological image behind the
-cells, pass its path through <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>:</p>
+cells, pass its path through <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>. Images are
+declared per dataset, per spatial entry (the name of the Seurat image,
+<code>availableSpatial()</code>), and per image label; alignment goes in
+<code>spatial_image_settings</code> under the same three names:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"path/to/sample_spatial.crb"</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"cerebro_app"</span>,</span>
-<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"path/to/sample_histology.png"</span><span class="op">)</span>,</span>
-<span>  spatial_images_flip_y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  spatial_images_scale_x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span>
+<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="st">"path/to/sample_histology.png"</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  spatial_image_settings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>flip_y <span class="op">=</span> <span class="cn">TRUE</span>, scale_x <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The names of <code>spatial_images</code> (and every alignment
-parameter) must match the names of <code>cerebro_data</code>. When the
-app runs:</p>
+<p>The dataset names of <code>spatial_images</code> and
+<code>spatial_image_settings</code> must match the names of
+<code>cerebro_data</code>, and the spatial entry names must match those
+listed by <code>availableSpatial()</code> of the CRB. When the app
+runs:</p>
 <ol style="list-style-type: decimal">
 <li>If the dataset contains spatial data, <strong>Spatial</strong>
 appears in the sidebar.</li>
@@ -251,12 +263,18 @@ is loaded.</p>
 <p>Histology images are <strong>not</strong> stored inside the
 <code>.crb</code>; they are passed to <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>,
 which copies them into the generated app bundle and references them by
-dataset name. Both JPG and PNG are supported.</p>
+dataset, spatial entry, and image label. JPG, PNG, and SVG are
+supported. A plain <code>c(Dataset = path)</code> vector is
+rejected.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"my_spatial_data.crb"</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"cerebro_app"</span>,</span>
-<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"path/to/histology.png"</span><span class="op">)</span></span>
+<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="st">"path/to/histology.png"</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
@@ -264,7 +282,7 @@ dataset name. Both JPG and PNG are supported.</p>
 </h3>
 <p>When several capture areas live in one app, give each its own image
 and use the flip / scale / rotation parameters to align each image with
-its coordinate system. Every named entry must use the same names as
+its coordinate system. Every dataset name must match a name of
 <code>cerebro_data</code>:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
@@ -273,14 +291,22 @@ its coordinate system. Every named entry must use the same names as
 <span>    <span class="st">"MS sample"</span> <span class="op">=</span> <span class="st">"ms_spatial.crb"</span></span>
 <span>  <span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"cerebro_app"</span>,</span>
-<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="st">"ctrl_histology.png"</span>,</span>
-<span>    <span class="st">"MS sample"</span> <span class="op">=</span> <span class="st">"ms_histology.png"</span></span>
+<span>  spatial_images <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="st">"ctrl_histology.png"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="st">"ms_histology.png"</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
-<span>  spatial_images_flip_y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="cn">TRUE</span>, <span class="st">"MS sample"</span> <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  spatial_images_scale_x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="fl">0.90</span>, <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span>,</span>
-<span>  spatial_images_scale_y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="fl">1.00</span>, <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fl">1.45</span><span class="op">)</span>,</span>
-<span>  spatial_plot_rotation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="op">-</span><span class="fl">61</span>, <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fl">205</span><span class="op">)</span></span>
+<span>  spatial_image_settings <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>flip_y <span class="op">=</span> <span class="cn">TRUE</span>, scale_x <span class="op">=</span> <span class="fl">0.90</span>, scale_y <span class="op">=</span> <span class="fl">1.00</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">)</span>,</span>
+<span>    <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      slice1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"H&amp;E"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>flip_y <span class="op">=</span> <span class="cn">TRUE</span>, scale_x <span class="op">=</span> <span class="fl">0.95</span>, scale_y <span class="op">=</span> <span class="fl">1.45</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  spatial_plot_rotation <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>slice1 <span class="op">=</span> <span class="op">-</span><span class="fl">61</span><span class="op">)</span>,</span>
+<span>    <span class="st">"MS sample"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>slice1 <span class="op">=</span> <span class="fl">205</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
@@ -303,50 +329,40 @@ its coordinate system. Every named entry must use the same names as
 <tbody>
 <tr class="odd">
 <td><code>spatial_images</code></td>
-<td>named vector/list</td>
+<td>nested list</td>
 <td><code>NULL</code></td>
-<td>Maps each dataset name to a histology image path (JPG or PNG). Names
-must match <code>cerebro_data</code>.</td>
+<td>
+<code>dataset -&gt; spatial entry -&gt; image label -&gt; path</code>
+(JPG, PNG, or SVG), or a descriptor
+<code>list(path = , bounds = )</code>. Dataset names must match
+<code>cerebro_data</code>.</td>
 </tr>
 <tr class="even">
-<td><code>spatial_images_flip_x</code></td>
-<td>named vector/list</td>
+<td><code>spatial_image_settings</code></td>
+<td>nested list</td>
 <td><code>NULL</code></td>
-<td>Flip the image horizontally. <code>TRUE</code> mirrors across the
-vertical axis.</td>
+<td>
+<code>dataset -&gt; spatial entry -&gt; image label -&gt; list(...)</code>
+with <code>flip_x</code>, <code>flip_y</code> (<code>TRUE</code> mirrors
+the image), <code>scale_x</code>, <code>scale_y</code> (1.0 = no
+scaling), <code>offset_x</code>, <code>offset_y</code>,
+<code>rotation</code>, and <code>image_opacity</code>.</td>
 </tr>
 <tr class="odd">
-<td><code>spatial_images_flip_y</code></td>
-<td>named vector/list</td>
-<td><code>NULL</code></td>
-<td>Flip the image vertically. <code>TRUE</code> mirrors across the
-horizontal axis.</td>
-</tr>
-<tr class="even">
-<td><code>spatial_images_scale_x</code></td>
-<td>named vector/list</td>
-<td><code>NULL</code></td>
-<td>Multiplicative X-axis scale (1.0 = no scaling).</td>
-</tr>
-<tr class="odd">
-<td><code>spatial_images_scale_y</code></td>
-<td>named vector/list</td>
-<td><code>NULL</code></td>
-<td>Multiplicative Y-axis scale (1.0 = no scaling).</td>
-</tr>
-<tr class="even">
 <td><code>spatial_plot_rotation</code></td>
-<td>named vector/list</td>
+<td>nested list</td>
 <td><code>NULL</code></td>
-<td>Rotation of cell coordinates in degrees (e.g. -90 to 270), for when
-capture-area and image orientation differ.</td>
+<td>
+<code>dataset -&gt; spatial entry -&gt; degrees</code>: rotation of
+cell coordinates (e.g. -90 to 270), for when capture-area and image
+orientation differ.</td>
 </tr>
 </tbody>
 </table>
-<p>Entries with no matching dataset name are ignored with a warning
-rather than raising an error, so a typo never blocks app generation.
-Missing entries default to a no-op (no flip, scale 1.0, no
-rotation).</p>
+<p>A dataset, spatial entry, or image label that does not exist raises
+an error before anything is bundled, so a typo never produces a silently
+unaligned app. Missing settings default to a no-op (no flip, scale 1.0,
+no rotation).</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>

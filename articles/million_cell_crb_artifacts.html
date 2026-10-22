@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -227,11 +227,9 @@ counts agree. Keep actual barcode row names on manually supplied
 projections.</p>
 <p>After changing the CRB, rebuild with
 <code>buildViewerPack(file, viewer_binary = "always", overwrite = TRUE)</code>.
-A missing, incompatible or stale asset falls back to the ordinary data
-path. Older packs without verified projection identity do not supply
-projection coordinates; independent safe assets remain usable in the
-Viewer. Old violin assets lacking exact-summary metadata also fall back.
-Rebuilding restores the affected fast paths. Do not suppress checksum
+A missing, incompatible or stale pack, such as one written for another
+pack schema, is invalid as a whole and falls back to the ordinary data
+path; rebuilding it restores the fast paths. Do not suppress checksum
 failures or edit a manifest to make a pack appear valid.</p>
 </div>
 <div class="section level2">

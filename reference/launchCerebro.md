@@ -33,7 +33,11 @@ launchCerebro(
 - crb_file_to_load:
 
   Path to `.crb` file to load on launch of Cerebro. Useful when
-  using/hosting Cerebro in `closed` mode. Defaults to `NULL`.
+  using/hosting Cerebro in `closed` mode. To offer several data sets,
+  pass a *named* character vector, e.g.
+  `c(sampleA = "a.crb", sampleB = "b.crb")`: every name is the stable,
+  unique data set identity used in links and saved state. Defaults to
+  `NULL`.
 
 - welcome_message:
 

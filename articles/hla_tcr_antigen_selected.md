@@ -19,7 +19,7 @@ One HLA demo ships, and everything in it is measured:
 
 |  | `demo_hla_tcr_dextramer.crb` |
 |----|----|
-| cells | **real** — 12,000 sequenced CD8+ T cells |
+| cells | **real** — 2,000 sequenced CD8+ T cells, a random subset of 12,000 selected ones |
 | TCR | **real** — paired αβ contigs, V gene + CDR3 |
 | HLA | **real** — the donors’ published genotypes (table S1), measured independently of these cells |
 
@@ -211,11 +211,12 @@ cell. A binder call does not establish that the cell is specific for
 that peptide, nor that the reagent’s allele is what presents it in that
 donor. Dextramer staining is heavily cross-reactive in this experiment,
 and the size of the effect is easy to state: only **5,271 of the 12,000
-shipped cells (44 %)** bound a reagent whose restriction their donor
+selected cells (44 %)** bound a reagent whose restriction their donor
 actually carries. 6,654 bound one their donor demonstrably does not, and
 75 more cannot be decided at all (per donor, yes / no / unknown of
 3,000: 2,046 / 879 / 75 · 2,532 / 468 / 0 · 3 / 2,997 / 0 · 690 / 2,310
-/ 0 — donor 3 is the extreme case) (see §*Why the genotypes are not
+/ 0 — donor 3 is the extreme case; counts on the full 12,000, of which
+the shipped demo keeps a random 2,000) (see §*Why the genotypes are not
 inferred from binding*, where the same fact sinks the inference).
 
 That is why the per-cell columns ship as `dextramer_antigen`,
@@ -480,12 +481,12 @@ Historical gate output before the 1,500-gene panel update:
        binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
        PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)
 
-The current demo retains all 12,000 dextramer-selected cells and caps
-expression at 1,500 genes after analysis, protecting available immune
-markers and filling by normalized-expression variance. Gene search is
-limited to that panel; UMAP, full-input QC, receptors, donor genotypes
-and dextramer calls are unchanged. See `data-raw/README.md` for current
-measured sizes.
+The current demo retains a random 2,000 of the 12,000 dextramer-selected
+cells (fixed seed, recorded in the file) and caps expression at 100
+genes after analysis, protecting available immune markers and filling by
+normalized-expression variance. Gene search is limited to that panel;
+UMAP, full-input QC, receptors, donor genotypes and dextramer calls are
+unchanged. See `data-raw/README.md` for current measured sizes.
 
 ## What you see in the app
 

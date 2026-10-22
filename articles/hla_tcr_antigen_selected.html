@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -138,7 +138,8 @@ transformed</strong>, and <strong>where the HLA comes from</strong>.</p>
 <tr class="odd">
 <td>cells</td>
 <td>
-<strong>real</strong> — 12,000 sequenced CD8+ T cells</td>
+<strong>real</strong> — 2,000 sequenced CD8+ T cells, a random
+subset of 12,000 selected ones</td>
 </tr>
 <tr class="even">
 <td>TCR</td>
@@ -385,13 +386,14 @@ property of the cell. A binder call does not establish that the cell is
 specific for that peptide, nor that the reagent’s allele is what
 presents it in that donor. Dextramer staining is heavily cross-reactive
 in this experiment, and the size of the effect is easy to state: only
-<strong>5,271 of the 12,000 shipped cells (44 %)</strong> bound a
+<strong>5,271 of the 12,000 selected cells (44 %)</strong> bound a
 reagent whose restriction their donor actually carries. 6,654 bound one
 their donor demonstrably does not, and 75 more cannot be decided at all
 (per donor, yes / no / unknown of 3,000: 2,046 / 879 / 75 · 2,532 / 468
-/ 0 · 3 / 2,997 / 0 · 690 / 2,310 / 0 — donor 3 is the extreme case)
-(see §<em>Why the genotypes are not inferred from binding</em>, where
-the same fact sinks the inference).</p>
+/ 0 · 3 / 2,997 / 0 · 690 / 2,310 / 0 — donor 3 is the extreme case;
+counts on the full 12,000, of which the shipped demo keeps a random
+2,000) (see §<em>Why the genotypes are not inferred from binding</em>,
+where the same fact sinks the inference).</p>
 <p>That is why the per-cell columns ship as
 <code>dextramer_antigen</code>, <code>dextramer_peptide</code> and
 <code>dextramer_allele</code> — a reagent label, deliberately not named
@@ -733,8 +735,9 @@ assumed.</p>
    HLA: 4 donors, 12 alleles, source_type=genotyped
    binder calls vs genotype: 6654 off-genotype, 75 undecidable, of 12000 cells
    PUBLISHED inst/extdata/examples/demo_hla_tcr_dextramer.crb (5.2 MB)</code></pre>
-<p>The current demo retains all 12,000 dextramer-selected cells and caps
-expression at 1,500 genes after analysis, protecting available immune
+<p>The current demo retains a random 2,000 of the 12,000
+dextramer-selected cells (fixed seed, recorded in the file) and caps
+expression at 100 genes after analysis, protecting available immune
 markers and filling by normalized-expression variance. Gene search is
 limited to that panel; UMAP, full-input QC, receptors, donor genotypes
 and dextramer calls are unchanged. See <code>data-raw/README.md</code>

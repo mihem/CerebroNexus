@@ -5,7 +5,12 @@ is also how a CRB from an older release is brought up to date: a missing
 expression-backend descriptor is set to embedded, receptor data in the
 retired `bcr_data` / `tcr_data` fields is merged into the unified immune
 repertoire, and an H5-backed CRB written without a thin schema is
-thinned. A CRB whose expression storage is older than the formats this
+thinned. An object written before spatial, HLA typing, Trekker or
+enriched-pathways support is rebuilt on the current class, so the
+accessors it lacked exist. A spatial entry with the singular
+`histology_image` fields becomes `histology_images`, and a molecule
+table embedded in a spatial entry moves into the per-FOV sidecar next to
+the CRB. A CRB whose expression storage is older than the formats this
 version reads (an unknown expression backend, thin schema 1 or 2) cannot
 be converted; re-export it with
 [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).

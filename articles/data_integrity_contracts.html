@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -293,13 +293,18 @@ every new H5 export is thin.</p>
 <code>tcr_data</code> fields;</li>
 <li>records an immune repertoire sidecar of any type other than
 <code>"file"</code>;</li>
-<li>predates spatial support (the Cerebro v1.3 class).</li>
+<li>predates spatial support (the Cerebro v1.3 class), HLA typing
+support, Trekker support or the enriched-pathways page, so its stored
+object lacks the <code>availableSpatial()</code>,
+<code>getHLATyping()</code>, <code>getTrekker()</code> or
+<code>getMethodsForEnrichedPathways()</code> method.</li>
 </ul>
 <p>The message is the same everywhere:</p>
 <pre class="text"><code>The Cerebro data file 'x.crb' uses a retired format: &lt;reason&gt;.
 Convert it once with CerebroNexus::convertCerebro().</code></pre>
 <p><code><a href="../reference/convertCerebro.html">convertCerebro()</a></code> is the only migration path. It sets a
-missing descriptor to <code>embedded</code>, merges
+missing descriptor to <code>embedded</code>, rebuilds an object that
+lacks one of those methods on the current class, merges
 <code>bcr_data</code> / <code>tcr_data</code> into the unified
 repertoire and thins an H5-backed <code>.crb</code> that was written
 without a schema. A <code>.crb</code> whose expression storage this
@@ -327,8 +332,6 @@ unusable artifact:</p>
 </ul>
 <p>Warnings mean that the result remains interpretable:</p>
 <ul>
-<li>an explicitly allowed expression fallback, such as <code>data</code>
-to <code>counts</code>;</li>
 <li>repertoire rows or samples absent from the object were removed;</li>
 <li>publication succeeded but an old backup could not be removed.</li>
 </ul>

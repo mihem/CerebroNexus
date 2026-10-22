@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -401,63 +401,53 @@ that directly need a complete expression matrix use the same resolver
 and cell validator.</p>
 <p><img src="img/seurat-v5-layer-entry-points.svg" class="r-plt" alt="" width="100%" style="display: block; margin: auto;"></p>
 <table class="table">
-<colgroup>
-<col width="33%">
-<col width="33%">
-<col width="33%">
-</colgroup>
 <thead><tr class="header">
 <th>Function</th>
 <th>Required semantic data</th>
-<th>Fallback policy</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td><code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code></td>
 <td>requested <code>slot</code>
 </td>
-<td>warned compatibility fallback</td>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code></td>
 <td>requested <code>slot</code>
 </td>
-<td>warned compatibility fallback</td>
 </tr>
 <tr class="odd">
 <td><code><a href="../reference/calculatePercentGenes.html">calculatePercentGenes()</a></code></td>
 <td><code>counts</code></td>
-<td>strict</td>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/getMostExpressedGenes.html">getMostExpressedGenes()</a></code></td>
 <td><code>counts</code></td>
-<td>strict</td>
 </tr>
 <tr class="odd">
 <td><code><a href="../reference/addPercentMtRibo.html">addPercentMtRibo()</a></code></td>
 <td><code>counts</code></td>
-<td>strict</td>
 </tr>
 <tr class="even">
 <td><code><a href="../reference/performGeneSetEnrichmentAnalysis.html">performGeneSetEnrichmentAnalysis()</a></code></td>
 <td>normalized <code>data</code>
 </td>
-<td>strict</td>
 </tr>
 </tbody>
 </table>
-<p>The preprocessing functions are strict because raw counts and
-normalized values are not interchangeable analysis inputs.</p>
+<p>No function substitutes another layer for the one it needs: raw
+counts and normalized values are not interchangeable inputs. If the
+requested layer does not exist, the call stops with an error that names
+the layer, lists the layers the assay does have and, for
+<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> and
+<code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code>, tells you which <code>slot</code>
+to pass.</p>
 <p>During export, the validated expression matrix is reused by spatial
 extraction. This matters for layered assays: the package resolves and
 joins the requested root once, then intersects the same matrix with each
 image’s coordinates. It does not independently resolve the assay again
 for every spatial image. Spatial payloads retain both the requested
-layer and the physical layer. For example, a warned
-<code>data -&gt; counts</code> compatibility fallback is stored as
-<code>requested_layer = "data"</code> and <code>layer = "counts"</code>
-rather than mislabelling raw counts as normalized data.</p>
+layer and the physical layer.</p>
 <p><code><a href="../reference/getMarkerGenes.html">getMarkerGenes()</a></code> delegates to Seurat’s marker machinery
 and does not use this direct matrix path.</p>
 </div>
@@ -524,19 +514,21 @@ and does not use this direct matrix path.</p>
 <td>no normalized data, complete counts</td>
 <td>export requests <code>data</code>
 </td>
-<td>warn before compatibility fallback</td>
+<td>error listing the layers that exist; pass
+<code>slot = "counts"</code>
+</td>
 </tr>
 <tr class="even">
 <td>partial <code>data.imputed</code>, complete counts</td>
 <td>export requests <code>data</code>
 </td>
-<td>ignore incomplete noise, warn, use complete counts</td>
+<td>error; the incomplete layer is not used</td>
 </tr>
 <tr class="odd">
 <td>no normalized data, complete counts</td>
 <td>enrichment requests <code>data</code>
 </td>
-<td>strict error</td>
+<td>error</td>
 </tr>
 <tr class="even">
 <td>disk-backed source (<code>IterableMatrix</code>, DelayedArray)</td>
@@ -766,14 +758,18 @@ Changing <code>expression_matrix_mode</code> does not solve source
 storage.</p>
 </div>
 <div class="section level3">
-<h3 id="cross-semantic-fallback-warning">Cross-semantic fallback warning<a class="anchor" aria-label="anchor" href="#cross-semantic-fallback-warning"></a>
+<h3 id="layer-data-does-not-exist-in-the-rna-assay">“Layer <code>data</code> does not exist in the <code>RNA</code>
+assay”<a class="anchor" aria-label="anchor" href="#layer-data-does-not-exist-in-the-rna-assay"></a>
 </h3>
-<p>Export compatibility used a complete matrix from another semantic
-class. Read the warning carefully: using <code>counts</code> instead of
-normalized <code>data</code> changes the meaning of expression
-values.</p>
-<p>For analysis functions, supply the required semantic layer instead;
-they do not perform this substitution.</p>
+<p>The requested layer is not in the assay, and no other layer is used
+in its place. The message lists the available layers. For
+<code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> and
+<code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> pass one of them, for example
+<code>slot = "counts"</code> for an assay that was never normalized, or
+create the layer you need (for example with
+<code><a href="https://satijalab.org/seurat/reference/NormalizeData.html" class="external-link">Seurat::NormalizeData()</a></code>). Analysis functions need a
+specific layer (<code>counts</code> or <code>data</code>); add it to the
+assay.</p>
 </div>
 <div class="section level3">
 <h3 id="error-processing">“Error processing …”<a class="anchor" aria-label="anchor" href="#error-processing"></a>

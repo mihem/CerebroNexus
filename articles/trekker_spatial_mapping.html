@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -381,9 +381,10 @@ self-contained <code>.crb</code>.</p>
 </h3>
 <p>The source is 21,374 genes × 7,420 nuclei. The existing stratified
 sampling force-includes the 50 nuclei carrying evidence images. The
-shipped artifact retains its 2,536 nuclei. After analysis, the builder
-limits expression to 1,500 genes, protecting marker, myelination and
-upstream Moran genes and filling the remaining budget by
+shipped artifact keeps 1,000 of its 2,536 nuclei: the 50 evidence nuclei
+and a random 950 others (fixed seed, recorded in the file). After
+analysis, the builder limits expression to 100 genes, protecting marker,
+myelination and upstream Moran genes and filling the remaining budget by
 normalized-expression variance. This narrows gene search; it does not
 recompute UMAP, QC or per-cell scores, or alter retained values.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
@@ -448,8 +449,10 @@ matrix’s internal column order.</p>
 <p>The whole build is one command:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R</span></span>
-<span><span class="co"># -&gt; inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 1,500 genes,</span></span>
-<span><span class="co">#                                         50 embedded evidence images)</span></span></code></pre></div>
+<span><span class="co"># -&gt; inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 100 genes,</span></span>
+<span><span class="co">#                                         50 embedded evidence images)</span></span>
+<span><span class="co"># The shipped file is then cut to 1,000 nuclei x 100 genes with</span></span>
+<span><span class="co"># data-raw/subsample_demos.R.</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">

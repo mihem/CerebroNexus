@@ -220,10 +220,11 @@ The function performs the following steps:
 
 Seurat uses the same named image collection for several
 platform-specific structures: a name can identify a Visium slice, Xenium
-or MERFISH field of view (FOV), Slide-seq puck, or another SpatialImage
-subclass. It is a structural spatial-entry key, not necessarily a donor
-or sample name. An entry can carry multiple user-named backgrounds, or
-coordinates only.
+or MERFISH field of view (FOV), or another Seurat v5 spatial image. It
+is a structural spatial-entry key, not necessarily a donor or sample
+name. An entry can carry multiple user-named backgrounds, or coordinates
+only. Seurat v4 `VisiumV1` images are rejected with guidance to rebuild
+them as `VisiumV2` images.
 
 ## See also
 

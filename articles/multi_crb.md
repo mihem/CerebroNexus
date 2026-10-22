@@ -99,6 +99,5 @@ query string and a path segment are supported:
 The token is the **last path segment** (so it works even when the app is
 mounted under a sub-path such as `/app/`), or the value of the `dataset`
 query parameter. It is matched against the **names** you gave in
-`cerebro_data` first, then against the file basename (with or without
-the `.crb` extension). If no match is found, the smallest-file default
-applies.
+`cerebro_data`; file names are not links. If no match is found, the
+smallest-file default applies.

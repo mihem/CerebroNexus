@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -264,7 +264,9 @@ receptor data) used by <code>immune_sidecar = "auto"</code>.</p></dd>
 <dd><p>Optional named list mapping Seurat image names to named
 image paths or descriptors of the form <code>list(path = ..., bounds = ...)</code>.
 Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
-derived from the exported x/y coordinate range.</p></dd>
+derived from the exported x/y coordinate range. An object whose
+<code>@images</code> hold a Seurat v4 <code>VisiumV1</code> image is rejected;
+rebuild it as <code>VisiumV2</code> with <code><a href="https://satijalab.org/seurat/reference/Load10X_Spatial.html" class="external-link">Seurat::Load10X_Spatial()</a></code>.</p></dd>
 
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
@@ -322,18 +324,18 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.2.1</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.3.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> organism: hg</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
@@ -353,8 +355,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Saving Cerebro object to: /tmp/nix-shell-4372-481660883/RtmpJ2fM7X/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [17:29:06] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Saving Cerebro object to: /tmp/nix-shell-4202-1842542904/RtmpG4gkWI/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [18:02:12] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

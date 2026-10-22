@@ -15,7 +15,10 @@ analysis.
 The Spatial tab surfaces automatically once a dataset carrying spatial
 data is loaded. To also show a histological image behind the cells, pass
 its path through
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md):
+[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+Images are declared per dataset, per spatial entry (the name of the
+Seurat image, `availableSpatial()`), and per image label; alignment goes
+in `spatial_image_settings` under the same three names:
 
 ``` r
 library(CerebroNexus)
@@ -23,14 +26,23 @@ library(CerebroNexus)
 createShinyApp(
   cerebro_data = c("My spatial sample" = "path/to/sample_spatial.crb"),
   result_dir = "cerebro_app",
-  spatial_images = c("My spatial sample" = "path/to/sample_histology.png"),
-  spatial_images_flip_y = c("My spatial sample" = TRUE),
-  spatial_images_scale_x = c("My spatial sample" = 0.9)
+  spatial_images = list(
+    "My spatial sample" = list(
+      slice1 = c("H&E" = "path/to/sample_histology.png")
+    )
+  ),
+  spatial_image_settings = list(
+    "My spatial sample" = list(
+      slice1 = list("H&E" = list(flip_y = TRUE, scale_x = 0.9))
+    )
+  )
 )
 ```
 
-The names of `spatial_images` (and every alignment parameter) must match
-the names of `cerebro_data`. When the app runs:
+The dataset names of `spatial_images` and `spatial_image_settings` must
+match the names of `cerebro_data`, and the spatial entry names must
+match those listed by `availableSpatial()` of the CRB. When the app
+runs:
 
 1.  If the dataset contains spatial data, **Spatial** appears in the
     sidebar.
@@ -115,13 +127,18 @@ Histology images are **not** stored inside the `.crb`; they are passed
 to
 [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
 which copies them into the generated app bundle and references them by
-dataset name. Both JPG and PNG are supported.
+dataset, spatial entry, and image label. JPG, PNG, and SVG are
+supported. A plain `c(Dataset = path)` vector is rejected.
 
 ``` r
 createShinyApp(
   cerebro_data = c("My spatial sample" = "my_spatial_data.crb"),
   result_dir = "cerebro_app",
-  spatial_images = c("My spatial sample" = "path/to/histology.png")
+  spatial_images = list(
+    "My spatial sample" = list(
+      slice1 = c("H&E" = "path/to/histology.png")
+    )
+  )
 )
 ```
 
@@ -129,7 +146,7 @@ createShinyApp(
 
 When several capture areas live in one app, give each its own image and
 use the flip / scale / rotation parameters to align each image with its
-coordinate system. Every named entry must use the same names as
+coordinate system. Every dataset name must match a name of
 `cerebro_data`:
 
 ``` r
@@ -139,14 +156,22 @@ createShinyApp(
     "MS sample" = "ms_spatial.crb"
   ),
   result_dir = "cerebro_app",
-  spatial_images = c(
-    "Ctrl sample" = "ctrl_histology.png",
-    "MS sample" = "ms_histology.png"
+  spatial_images = list(
+    "Ctrl sample" = list(slice1 = c("H&E" = "ctrl_histology.png")),
+    "MS sample" = list(slice1 = c("H&E" = "ms_histology.png"))
   ),
-  spatial_images_flip_y = c("Ctrl sample" = TRUE, "MS sample" = TRUE),
-  spatial_images_scale_x = c("Ctrl sample" = 0.90, "MS sample" = 0.95),
-  spatial_images_scale_y = c("Ctrl sample" = 1.00, "MS sample" = 1.45),
-  spatial_plot_rotation = c("Ctrl sample" = -61, "MS sample" = 205)
+  spatial_image_settings = list(
+    "Ctrl sample" = list(
+      slice1 = list("H&E" = list(flip_y = TRUE, scale_x = 0.90, scale_y = 1.00))
+    ),
+    "MS sample" = list(
+      slice1 = list("H&E" = list(flip_y = TRUE, scale_x = 0.95, scale_y = 1.45))
+    )
+  ),
+  spatial_plot_rotation = list(
+    "Ctrl sample" = list(slice1 = -61),
+    "MS sample" = list(slice1 = 205)
+  )
 )
 ```
 
@@ -154,16 +179,14 @@ createShinyApp(
 
 | Parameter | Type | Default | Description |
 |----|----|----|----|
-| `spatial_images` | named vector/list | `NULL` | Maps each dataset name to a histology image path (JPG or PNG). Names must match `cerebro_data`. |
-| `spatial_images_flip_x` | named vector/list | `NULL` | Flip the image horizontally. `TRUE` mirrors across the vertical axis. |
-| `spatial_images_flip_y` | named vector/list | `NULL` | Flip the image vertically. `TRUE` mirrors across the horizontal axis. |
-| `spatial_images_scale_x` | named vector/list | `NULL` | Multiplicative X-axis scale (1.0 = no scaling). |
-| `spatial_images_scale_y` | named vector/list | `NULL` | Multiplicative Y-axis scale (1.0 = no scaling). |
-| `spatial_plot_rotation` | named vector/list | `NULL` | Rotation of cell coordinates in degrees (e.g. -90 to 270), for when capture-area and image orientation differ. |
+| `spatial_images` | nested list | `NULL` | `dataset -> spatial entry -> image label -> path` (JPG, PNG, or SVG), or a descriptor `list(path = , bounds = )`. Dataset names must match `cerebro_data`. |
+| `spatial_image_settings` | nested list | `NULL` | `dataset -> spatial entry -> image label -> list(...)` with `flip_x`, `flip_y` (`TRUE` mirrors the image), `scale_x`, `scale_y` (1.0 = no scaling), `offset_x`, `offset_y`, `rotation`, and `image_opacity`. |
+| `spatial_plot_rotation` | nested list | `NULL` | `dataset -> spatial entry -> degrees`: rotation of cell coordinates (e.g. -90 to 270), for when capture-area and image orientation differ. |
 
-Entries with no matching dataset name are ignored with a warning rather
-than raising an error, so a typo never blocks app generation. Missing
-entries default to a no-op (no flip, scale 1.0, no rotation).
+A dataset, spatial entry, or image label that does not exist raises an
+error before anything is bundled, so a typo never produces a silently
+unaligned app. Missing settings default to a no-op (no flip, scale 1.0,
+no rotation).
 
 ## See also
 

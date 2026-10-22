@@ -216,9 +216,10 @@ encode_jpeg <- function(path, max_px = 620L, quality = 68L) {
 
 The source is 21,374 genes × 7,420 nuclei. The existing stratified
 sampling force-includes the 50 nuclei carrying evidence images. The
-shipped artifact retains its 2,536 nuclei. After analysis, the builder
-limits expression to 1,500 genes, protecting marker, myelination and
-upstream Moran genes and filling the remaining budget by
+shipped artifact keeps 1,000 of its 2,536 nuclei: the 50 evidence nuclei
+and a random 950 others (fixed seed, recorded in the file). After
+analysis, the builder limits expression to 100 genes, protecting marker,
+myelination and upstream Moran genes and filling the remaining budget by
 normalized-expression variance. This narrows gene search; it does not
 recompute UMAP, QC or per-cell scores, or alter retained values.
 
@@ -290,8 +291,10 @@ The whole build is one command:
 
 ``` r
 # TREKKER_OUTPUT_DIR=/path/.../output Rscript data-raw/build_trekker_demo.R
-# -> inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 1,500 genes,
+# -> inst/extdata/examples/demo_trekker.crb  (2,536 nuclei x 100 genes,
 #                                         50 embedded evidence images)
+# The shipped file is then cut to 1,000 nuclei x 100 genes with
+# data-raw/subsample_demos.R.
 ```
 
 ## Load it in the app

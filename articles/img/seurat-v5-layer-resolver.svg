@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1100" role="img" aria-labelledby="title desc">
   <title id="title">Request-driven Seurat v5 layer resolver decision flow</title>
-  <desc id="desc">The resolver validates the assay, honours an exact layer, otherwise searches candidates for the requested root. It uses a linear partition fast path, then an indexed exact-cover fallback. A unique partition is isolated and joined, an ambiguous partition errors, and absent strict requests either error or use an explicit warned compatibility fallback. Complete-cell consumers validate and reorder the matrix.</desc>
+  <desc id="desc">The resolver validates the assay, honours an exact layer, otherwise searches candidates for the requested root. It uses a linear partition fast path, then an indexed exact-cover fallback. A unique partition is isolated and joined, an ambiguous partition errors, and an absent layer is an explicit error. Complete-cell consumers validate and reorder the matrix.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#17324d" flood-opacity=".13"/>
@@ -111,9 +111,8 @@
     <rect x="945" y="840" width="200" height="110" rx="18" fill="#fff9e9" stroke="#dba13c" stroke-width="2"/>
   </g>
   <text x="1045" y="870" text-anchor="middle" class="node-title">0 solutions</text>
-  <text x="1045" y="896" text-anchor="middle" class="body">strict → error</text>
-  <text x="1045" y="921" text-anchor="middle" class="body">compatibility → complete</text>
-  <text x="1045" y="941" text-anchor="middle" class="body">fallback + warning</text>
+  <text x="1045" y="896" text-anchor="middle" class="body">no layer substituted</text>
+  <text x="1045" y="921" text-anchor="middle" class="body">→ explicit error</text>
   <path d="M 1005 800 L 1045 840" class="line"/>
 
   <path d="M 260 464 L 260 995 L 400 995" class="good"/>
