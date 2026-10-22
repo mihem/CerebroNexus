@@ -1,5 +1,45 @@
 # Changelog
 
+## CerebroNexus 5.3.1
+
+### Fixes
+
+- Fixes
+  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  failing on an object whose only reduction is PCA, and ignoring
+  `use_delayed_array = TRUE`.
+- Fixes
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  dropping the spatial molecule sidecars of every data set when one data
+  set before them had none.
+- Fixes
+  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  failing when `most_expressed_genes` holds a non-table element,
+  [`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
+  failing with the default `organism = NULL`, and the gene lists of
+  [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
+  results carrying a stray space after every gene.
+- Fixes the Linked views group filters on a group that is not the one
+  coloured at start, for example `celltype` on the Trekker example:
+  filtering it showed a stale picture or empty panels, because its
+  per-cell values had not been loaded. The filter now loads them and
+  then shows the cells that pass every filter; the colouring stays as it
+  was ([\#222](https://github.com/mihem/CerebroNexus/issues/222)).
+
+### Internal
+
+- Internal clean-up with no change in behaviour:
+  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  and
+  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  share their builders, and repeated code in the analysis helpers,
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  and the `Cerebro` class is merged.
+- The expression backend types are listed once, in
+  `inst/viewer/core/crb_contract.R`, and the export file-name stem is
+  computed by one helper. A failed first load of the shared CRB contract
+  is no longer cached as an empty environment.
+
 ## CerebroNexus 5.3.0
 
 This release removes the remaining compatibility code for files,

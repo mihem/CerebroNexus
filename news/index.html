@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,21 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.3.1" id="cerebronexus-531">CerebroNexus 5.3.1<a class="anchor" aria-label="anchor" href="#cerebronexus-531"></a></h2>
+<div class="section level3">
+<h3 id="fixes-5-3-1">Fixes<a class="anchor" aria-label="anchor" href="#fixes-5-3-1"></a></h3>
+<ul><li>Fixes <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> failing on an object whose only reduction is PCA, and ignoring <code>use_delayed_array = TRUE</code>.</li>
+<li>Fixes <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> dropping the spatial molecule sidecars of every data set when one data set before them had none.</li>
+<li>Fixes <code><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> failing when <code>most_expressed_genes</code> holds a non-table element, <code><a href="../reference/getMarkerGenes.html">getMarkerGenes()</a></code> failing with the default <code>organism = NULL</code>, and the gene lists of <code><a href="../reference/performGeneSetEnrichmentAnalysis.html">performGeneSetEnrichmentAnalysis()</a></code> results carrying a stray space after every gene.</li>
+<li>Fixes the Linked views group filters on a group that is not the one coloured at start, for example <code>celltype</code> on the Trekker example: filtering it showed a stale picture or empty panels, because its per-cell values had not been loaded. The filter now loads them and then shows the cells that pass every filter; the colouring stays as it was (<a href="https://github.com/mihem/CerebroNexus/issues/222" class="external-link">#222</a>).</li>
+</ul></div>
+<div class="section level3">
+<h3 id="internal-5-3-1">Internal<a class="anchor" aria-label="anchor" href="#internal-5-3-1"></a></h3>
+<ul><li>Internal clean-up with no change in behaviour: <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> and <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> share their builders, and repeated code in the analysis helpers, <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> and the <code>Cerebro</code> class is merged.</li>
+<li>The expression backend types are listed once, in <code>inst/viewer/core/crb_contract.R</code>, and the export file-name stem is computed by one helper. A failed first load of the shared CRB contract is no longer cached as an empty environment.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.3.0" id="cerebronexus-530">CerebroNexus 5.3.0<a class="anchor" aria-label="anchor" href="#cerebronexus-530"></a></h2>
 <p>This release removes the remaining compatibility code for files, arguments and dependency versions that no current release writes or needs. <strong>Some calls and stored files that 5.2.0 accepted now fail with an error that says what to use instead</strong>: see “Stored files” and “Calls that now fail” below.</p>
