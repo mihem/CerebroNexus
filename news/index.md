@@ -1,5 +1,16 @@
 # Changelog
 
+## CerebroNexus 5.2.1
+
+### Fixes
+
+- Share on a single-plot page (Projection, Spatial, Immune repertoire
+  and the other pages with a Share button) works in a session that has
+  not opened Linked views yet. The Share dialog’s download and open
+  requests are answered by the Linked views server, which was loaded
+  only when that page was opened, so both requests timed out with
+  “Download did not finish” or “Open did not finish”.
+
 ## CerebroNexus 5.2.0
 
 This release removes the BPCells expression storage and several retired
