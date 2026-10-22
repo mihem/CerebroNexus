@@ -163,7 +163,10 @@ test_that("a grouping that cannot be drawn as panels falls back with a notice", 
   expect_match(empty$notice, "No cells shown have a value in `sample`")
 
   ## more groups than panels: drawn without grouping
-  many <- env$ir_clonal_umap_grouping(grouped(sprintf("g%02d", 1:13)), "cluster")
+  many <- env$ir_clonal_umap_grouping(
+    grouped(sprintf("g%02d", 1:13)),
+    "cluster"
+  )
   expect_identical(env$IR_CLONAL_UMAP_MAX_PANELS, 12L)
   expect_null(many$df)
   expect_match(many$notice, "`cluster` has 13 groups.*more than the 12 panels")
@@ -178,9 +181,15 @@ test_that("a grouping that cannot be drawn as panels falls back with a notice", 
   partial <- env$ir_clonal_umap_grouping(grouped(c("a", "b"), 3L), "sample")
   expect_false(is.null(partial$df))
   expect_identical(partial$type, "message")
-  expect_match(partial$notice, "^3 cells have no value in `sample` and are not drawn")
+  expect_match(
+    partial$notice,
+    "^3 cells have no value in `sample` and are not drawn"
+  )
   single <- env$ir_clonal_umap_grouping(grouped("a", 1L), "sample")
-  expect_match(single$notice, "^1 cell has no value in `sample` and is not drawn")
+  expect_match(
+    single$notice,
+    "^1 cell has no value in `sample` and is not drawn"
+  )
 })
 
 test_that("grouped Clonal UMAP panels partition the cells and label their counts", {
@@ -200,7 +209,10 @@ test_that("grouped Clonal UMAP panels partition the cells and label their counts
       levels = env$IR_CLONE_LABELS
     ),
     barcode = paste0("cell", 1:6),
-    .umap_group = factor(c("a", "a", "b", "b", "b", "b"), levels = c("a", "b", "c")),
+    .umap_group = factor(
+      c("a", "a", "b", "b", "b", "b"),
+      levels = c("a", "b", "c")
+    ),
     stringsAsFactors = FALSE
   )
   out <- env$ir_clonal_umap_panels(df, "umap")
@@ -219,7 +231,10 @@ test_that("grouped Clonal UMAP panels partition the cells and label their counts
   ## colour levels and colours line up; cells without the receptor come first
   expect_identical(out$levels, c("Other cells", "Single", "Small", "Medium"))
   expect_length(out$colors, length(out$levels))
-  expect_identical(unname(out$group[seq_len(2)]), c("Other cells", "Other cells"))
+  expect_identical(
+    unname(out$group[seq_len(2)]),
+    c("Other cells", "Other cells")
+  )
   expect_identical(out$group[[length(out$group)]], "Medium")
   expect_length(out$group, length(out$keys))
 })

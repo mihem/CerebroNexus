@@ -51,7 +51,9 @@ test_that("app spatial images keep the dataset -> spatial entry -> label form", 
   paths <- file.path(root, c("first.png", "second.png"))
   lapply(paths, writeLines, text = "IMAGE")
   normalized <- .normalizeAppSpatialImages(
-    list(Dataset = list(section = c(first = paths[[1L]], second = paths[[2L]]))),
+    list(
+      Dataset = list(section = c(first = paths[[1L]], second = paths[[2L]]))
+    ),
     catalogs
   )
 
@@ -177,11 +179,17 @@ test_that("singular spatial image fields are rejected and name histology_images"
     "Spatial data `legacy`.*singular `histology_image`.*histology_images = list\\(<label>"
   )
   expect_error(
-    crb$addSpatialData("legacy", singular[setdiff(names(singular), "histology_image_bounds")]),
+    crb$addSpatialData(
+      "legacy",
+      singular[setdiff(names(singular), "histology_image_bounds")]
+    ),
     "no longer accepted"
   )
   ## even next to a canonical manifest
-  both <- c(spatial_manifest_data(list(DAPI = spatial_manifest_payload())), singular[3:4])
+  both <- c(
+    spatial_manifest_data(list(DAPI = spatial_manifest_payload())),
+    singular[3:4]
+  )
   expect_error(crb$addSpatialData("both", both), "no longer accepted")
   expect_length(crb$spatial, 0L)
 })

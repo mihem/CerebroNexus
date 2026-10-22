@@ -4416,7 +4416,9 @@ get_or_load_crb <- function(
     }
   }
   getter <- stored("getSpatialData")
-  if (!is.function(getter) || !"hydrate_molecules" %in% names(formals(getter))) {
+  if (
+    !is.function(getter) || !"hydrate_molecules" %in% names(formals(getter))
+  ) {
     return("it predates deferred spatial molecule loading")
   }
   NULL

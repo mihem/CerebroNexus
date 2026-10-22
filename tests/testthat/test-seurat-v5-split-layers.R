@@ -524,7 +524,11 @@ test_that("a missing split root is an error, never replaced by another root", {
     warning = function(w) paste("unexpected warning:", conditionMessage(w)),
     error = function(e) conditionMessage(e)
   )
-  expect_match(err, "Layer `data` does not exist in the `RNA` assay", fixed = TRUE)
+  expect_match(
+    err,
+    "Layer `data` does not exist in the `RNA` assay",
+    fixed = TRUE
+  )
   expect_match(err, "Available layers: counts.s1, counts.s2", fixed = TRUE)
   expect_match(err, "`slot = \"counts\"`", fixed = TRUE)
 })

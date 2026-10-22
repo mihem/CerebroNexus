@@ -25,7 +25,9 @@ demo_subset_trajectories <- function(trajectories, kept) {
     lapply(method, function(trajectory) {
       if (is.list(trajectory) && is.data.frame(trajectory$meta)) {
         trajectory$meta <- trajectory$meta[
-          rownames(trajectory$meta) %in% kept, , drop = FALSE
+          rownames(trajectory$meta) %in% kept,
+          ,
+          drop = FALSE
         ]
       }
       trajectory
@@ -52,7 +54,10 @@ demo_subsample_cells <- function(object, n_keep, seed) {
   rest <- setdiff(seq_along(cells), forced)
   stopifnot(length(forced) <= n_keep)
   set.seed(seed)
-  keep <- sort(c(forced, rest[sample.int(length(rest), n_keep - length(forced))]))
+  keep <- sort(c(
+    forced,
+    rest[sample.int(length(rest), n_keep - length(forced))]
+  ))
   kept <- cells[keep]
 
   result <- object$clone(deep = TRUE)
@@ -63,19 +68,31 @@ demo_subsample_cells <- function(object, n_keep, seed) {
       metadata[[group]] <- droplevels(metadata[[group]])
       result$groups[[group]] <- levels(metadata[[group]])
     } else {
-      result$groups[[group]] <- intersect(object$groups[[group]], unique(metadata[[group]]))
+      result$groups[[group]] <- intersect(
+        object$groups[[group]],
+        unique(metadata[[group]])
+      )
     }
   }
   result$meta_data <- metadata
   result$projections <- lapply(
     object$projections,
-    function(projection) projection[rownames(projection) %in% kept, , drop = FALSE]
+    function(projection) {
+      projection[rownames(projection) %in% kept, , drop = FALSE]
+    }
   )
   for (name in names(object$spatial)) {
     entry <- object$spatial[[name]]
-    entry$coordinates <- entry$coordinates[rownames(entry$coordinates) %in% kept, , drop = FALSE]
+    entry$coordinates <- entry$coordinates[
+      rownames(entry$coordinates) %in% kept,
+      ,
+      drop = FALSE
+    ]
     if (!is.null(entry$expression)) {
-      entry$expression <- entry$expression[, colnames(entry$expression) %in% kept, drop = FALSE]
+      entry$expression <- entry$expression[,
+        colnames(entry$expression) %in% kept,
+        drop = FALSE
+      ]
     }
     result$spatial[[name]] <- entry
   }
@@ -85,7 +102,9 @@ demo_subsample_cells <- function(object, n_keep, seed) {
       object$immune_repertoire,
       function(table) table[table$barcode %in% kept, , drop = FALSE]
     )
-    result$immune_repertoire <- repertoire[vapply(repertoire, nrow, integer(1)) > 0L]
+    result$immune_repertoire <- repertoire[
+      vapply(repertoire, nrow, integer(1)) > 0L
+    ]
   }
   if (is.list(object$trekker)) {
     n <- length(cells)
@@ -103,7 +122,10 @@ demo_subsample_cells <- function(object, n_keep, seed) {
       }
     }
     trekker <- object$trekker
-    for (field in setdiff(names(trekker), c("meta", "qc", "moran", "celltype", "evidence"))) {
+    for (field in setdiff(
+      names(trekker),
+      c("meta", "qc", "moran", "celltype", "evidence")
+    )) {
       trekker[[field]] <- subset_nuclei(trekker[[field]])
     }
     ## Evidence entries name their nucleus by barcode and 0-based position.
@@ -152,6 +174,18 @@ for (i in seq_along(targets)) {
     message(name, ": ", before, " cells, unchanged")
     next
   }
-  save_demo_crb(demo_subsample_cells(object, targets[[i]], seed = 20261020L + i), file)
-  message(name, ": ", before, " -> ", ncol(readCerebro(file)$expression), " cells, ", file.size(file), " bytes")
+  save_demo_crb(
+    demo_subsample_cells(object, targets[[i]], seed = 20261020L + i),
+    file
+  )
+  message(
+    name,
+    ": ",
+    before,
+    " -> ",
+    ncol(readCerebro(file)$expression),
+    " cells, ",
+    file.size(file),
+    " bytes"
+  )
 }

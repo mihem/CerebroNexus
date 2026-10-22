@@ -10,7 +10,10 @@ demo_referenced_genes <- function(object, genes) {
         named <<- c(named, as.character(x[[column]]))
       }
       if ("Genes" %in% names(x)) {
-        named <<- c(named, unlist(strsplit(as.character(x[["Genes"]]), ";", fixed = TRUE)))
+        named <<- c(
+          named,
+          unlist(strsplit(as.character(x[["Genes"]]), ";", fixed = TRUE))
+        )
       }
     } else if (is.character(x)) {
       named <<- c(named, x)
@@ -118,8 +121,13 @@ demo_gene_panel <- function(object, max_genes = 100L) {
   # Genes named by analysis tables come next, the most variable first, until
   # the budget is used.
   referenced <- setdiff(demo_referenced_genes(object, genes), protected)
-  referenced <- referenced[order(-variance[match(referenced, genes)], match(referenced, genes))]
-  protected <- genes[genes %in% c(protected, head(referenced, max_genes - length(protected)))]
+  referenced <- referenced[order(
+    -variance[match(referenced, genes)],
+    match(referenced, genes)
+  )]
+  protected <- genes[
+    genes %in% c(protected, head(referenced, max_genes - length(protected)))
+  ]
   detected <- Matrix::rowSums(m != 0) > 0L
   # Stable ties use input order; retain that order in the final sparse matrix.
   ranked <- genes[order(-variance, seq_along(genes))]

@@ -651,36 +651,42 @@ retired_cerebros <- function(root) {
       upgrades = TRUE
     ),
     singular_image = list(
-      payload = legacy_payload(with_base(spatial = list(
-        fov = fov_entry(
-          histology_image = tissue,
-          histology_image_bounds = list(
-            ymax = 40,
-            xmin = 0,
-            ymin = 0,
-            xmax = 100
+      payload = legacy_payload(with_base(
+        spatial = list(
+          fov = fov_entry(
+            histology_image = tissue,
+            histology_image_bounds = list(
+              ymax = 40,
+              xmin = 0,
+              ymin = 0,
+              xmax = 100
+            )
           )
         )
-      ))),
+      )),
       reason = "spatial entry 'fov' stores a singular histology_image",
       upgrades = TRUE
     ),
     singular_bounds_only = list(
-      payload = legacy_payload(with_base(spatial = list(
-        fov = fov_entry(
-          histology_images = list(
-            DAPI = list(histology_image = tissue)
-          ),
-          histology_image_bounds = c(xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+      payload = legacy_payload(with_base(
+        spatial = list(
+          fov = fov_entry(
+            histology_images = list(
+              DAPI = list(histology_image = tissue)
+            ),
+            histology_image_bounds = c(xmin = 0, xmax = 1, ymin = 0, ymax = 1)
+          )
         )
-      ))),
+      )),
       reason = "spatial entry 'fov' stores a singular histology_image",
       upgrades = TRUE
     ),
     embedded_molecules = list(
-      payload = legacy_payload(with_base(spatial = list(
-        fov = fov_entry(molecules = molecules)
-      ))),
+      payload = legacy_payload(with_base(
+        spatial = list(
+          fov = fov_entry(molecules = molecules)
+        )
+      )),
       reason = "spatial entry 'fov' embeds its molecule table",
       upgrades = TRUE
     ),
@@ -891,11 +897,18 @@ test_that("convertCerebro upgrades what can be repaired without the source", {
       info = name
     )
     for (accessor in names(.requiredCerebroMethods)) {
-      expect_true(is.function(converted[[accessor]]), info = paste(name, accessor))
+      expect_true(
+        is.function(converted[[accessor]]),
+        info = paste(name, accessor)
+      )
     }
     expect_equal(nrow(converted$getHLATyping()), 0L, info = name)
     expect_null(converted$getTrekker(), info = name)
-    expect_identical(converted$getMethodsForEnrichedPathways(), NULL, info = name)
+    expect_identical(
+      converted$getMethodsForEnrichedPathways(),
+      NULL,
+      info = name
+    )
     expect_null(.legacyCerebroReason(.readCerebroPayload(entry$path)))
   }
 
@@ -935,7 +948,10 @@ test_that("convertCerebro repairs singular spatial images", {
     stored$histology_images[["Tissue background"]]$histology_image_bounds,
     bounds
   )
-  expect_identical(converted$getSpatialData("fov")$histology_images, stored$histology_images)
+  expect_identical(
+    converted$getSpatialData("fov")$histology_images,
+    stored$histology_images
+  )
 
   ## a canonical manifest wins over stray singular fields, which are dropped
   convertCerebro(retired$entries$singular_bounds_only$path)

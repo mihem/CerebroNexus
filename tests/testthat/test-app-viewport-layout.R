@@ -164,10 +164,12 @@ test_that("shared selection actions and layouts survive navigation and resize", 
     paste0(
       "^[0-9,]+ / ",
       format(
-        ncol(readCerebro(system.file(
-          "extdata/examples/demo_full_tcr_bcr.crb",
-          package = "CerebroNexus"
-        ))$expression),
+        ncol(
+          readCerebro(system.file(
+            "extdata/examples/demo_full_tcr_bcr.crb",
+            package = "CerebroNexus"
+          ))$expression
+        ),
         big.mark = ","
       ),
       " selected$"

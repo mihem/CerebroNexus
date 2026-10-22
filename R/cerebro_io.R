@@ -131,7 +131,10 @@
     inherits = FALSE
   )
   if (any(absent)) {
-    return(paste0("it predates ", .requiredCerebroMethods[[which(absent)[[1L]]]]))
+    return(paste0(
+      "it predates ",
+      .requiredCerebroMethods[[which(absent)[[1L]]]]
+    ))
   }
   ## Spatial entries written in a form that is no longer read.
   .legacySpatialReason(object)
@@ -183,7 +186,9 @@
   getter <- if (.storedCerebroField(object, "getSpatialData")) {
     object[["getSpatialData"]]
   }
-  if (!is.function(getter) || !"hydrate_molecules" %in% names(formals(getter))) {
+  if (
+    !is.function(getter) || !"hydrate_molecules" %in% names(formals(getter))
+  ) {
     return("it predates deferred spatial molecule loading")
   }
   NULL

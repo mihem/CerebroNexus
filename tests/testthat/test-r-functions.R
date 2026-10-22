@@ -722,7 +722,11 @@ test_that(".getExpressionMatrix errors on a missing layer and says how to fix it
     ),
     error = function(e) conditionMessage(e)
   )
-  expect_match(err, "Layer `data` does not exist in the `RNA` assay", fixed = TRUE)
+  expect_match(
+    err,
+    "Layer `data` does not exist in the `RNA` assay",
+    fixed = TRUE
+  )
   expect_match(err, "Available layers: counts", fixed = TRUE)
   expect_match(err, "`slot = \"counts\"`", fixed = TRUE)
 

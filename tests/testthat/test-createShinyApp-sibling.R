@@ -1066,7 +1066,9 @@ test_that("every copied artifact has a portable bundle target", {
   build_test_app(
     c("Dataset" = crb),
     app,
-    spatial_images = list(Dataset = list(section = c("Tissue background" = reserved_image)))
+    spatial_images = list(
+      Dataset = list(section = c("Tissue background" = reserved_image))
+    )
   )
   config <- readRDS(file.path(app, "cerebro_config.rds"))
   expect_true(file.exists(file.path(
@@ -1949,7 +1951,9 @@ test_that("private and spatial targets may share a basename", {
   suppressWarnings(build_test_app(
     c("First" = crb),
     app,
-    spatial_images = list(First = list(section = c("Tissue background" = image)))
+    spatial_images = list(
+      First = list(section = c("Tissue background" = image))
+    )
   ))
 
   config <- readRDS(file.path(app, "cerebro_config.rds"))
@@ -2511,7 +2515,9 @@ test_that("external spatial images render from disk without an HTTP mapping", {
   build_test_app(
     c("Dataset" = crb),
     app,
-    spatial_images = list(Dataset = list(section = c("Tissue background" = image)))
+    spatial_images = list(
+      Dataset = list(section = c("Tissue background" = image))
+    )
   )
 
   config <- readRDS(file.path(app, "cerebro_config.rds"))
@@ -2562,7 +2568,9 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
   build_test_app(
     c("Dataset" = crb),
     app,
-    spatial_images = list(Dataset = list(section = c("Tissue background" = image)))
+    spatial_images = list(
+      Dataset = list(section = c("Tissue background" = image))
+    )
   )
 
   config <- readRDS(file.path(app, "cerebro_config.rds"))
@@ -2645,7 +2653,9 @@ test_that("missing spatial images fail before bundling", {
     build_test_app(
       c("Dataset" = crb),
       app,
-      spatial_images = list(Dataset = list(section = c("Tissue background" = missing)))
+      spatial_images = list(
+        Dataset = list(section = c("Tissue background" = missing))
+      )
     ),
     "does not exist"
   )

@@ -620,7 +620,10 @@ observe(
           "ir_clonalUMAP_projection",
           list(
             color_type = "categorical",
-            space_label = paste("Clonal", ir_projection_display_name(projection)),
+            space_label = paste(
+              "Clonal",
+              ir_projection_display_name(projection)
+            ),
             color_variable = "expansion",
             traces = grouped_view$levels,
             group_colors = grouped_view$colors,

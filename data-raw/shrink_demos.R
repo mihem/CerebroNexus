@@ -10,7 +10,11 @@ source("data-raw/demo_gene_panel.R")
 
 cap <- 100L
 
-for (file in list.files("inst/extdata/examples", "[.]crb$", full.names = TRUE)) {
+for (file in list.files(
+  "inst/extdata/examples",
+  "[.]crb$",
+  full.names = TRUE
+)) {
   object <- readCerebro(file)
   before <- nrow(object$expression)
   if (before <= cap) {
@@ -18,5 +22,14 @@ for (file in list.files("inst/extdata/examples", "[.]crb$", full.names = TRUE)) 
     next
   }
   save_demo_crb(demo_gene_panel(object, cap), file)
-  message(basename(file), ": ", before, " -> ", nrow(readCerebro(file)$expression), " genes, ", file.size(file), " bytes")
+  message(
+    basename(file),
+    ": ",
+    before,
+    " -> ",
+    nrow(readCerebro(file)$expression),
+    " genes, ",
+    file.size(file),
+    " bytes"
+  )
 }

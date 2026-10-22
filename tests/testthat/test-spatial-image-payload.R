@@ -27,7 +27,11 @@ test_that("spatial image payload validation accepts a contained FOV image", {
   coordinates <- data.frame(x = c(10, 90), y = c(5, 75))
 
   expect_identical(
-    normalize_test_spatial_image(tissue_image(payload), "spatial_fov", coordinates),
+    normalize_test_spatial_image(
+      tissue_image(payload),
+      "spatial_fov",
+      coordinates
+    ),
     list(histology_images = list(`Tissue background` = payload))
   )
 })
@@ -134,7 +138,11 @@ test_that("spatial image payload validation rejects malformed images", {
 
   payload$histology_image <- "not-a-data-uri"
   expect_error(
-    normalize_test_spatial_image(tissue_image(payload), "spatial_fov", coordinates),
+    normalize_test_spatial_image(
+      tissue_image(payload),
+      "spatial_fov",
+      coordinates
+    ),
     "spatial_fov.*data:image"
   )
 
@@ -146,21 +154,33 @@ test_that("spatial image payload validation rejects malformed images", {
     bottom = 80
   )
   expect_error(
-    normalize_test_spatial_image(tissue_image(payload), "spatial_fov", coordinates),
+    normalize_test_spatial_image(
+      tissue_image(payload),
+      "spatial_fov",
+      coordinates
+    ),
     "xmin.*xmax.*ymin.*ymax"
   )
 
   payload <- valid_spatial_image_payload()
   payload$histology_image_bounds[["xmax"]] <- Inf
   expect_error(
-    normalize_test_spatial_image(tissue_image(payload), "spatial_fov", coordinates),
+    normalize_test_spatial_image(
+      tissue_image(payload),
+      "spatial_fov",
+      coordinates
+    ),
     "finite"
   )
 
   payload <- valid_spatial_image_payload()
   payload$histology_image_bounds[["xmin"]] <- 100
   expect_error(
-    normalize_test_spatial_image(tissue_image(payload), "spatial_fov", coordinates),
+    normalize_test_spatial_image(
+      tissue_image(payload),
+      "spatial_fov",
+      coordinates
+    ),
     "xmin.*less than.*xmax"
   )
 })
