@@ -29,7 +29,7 @@ tab_immune_repertoire <- tabItem(
         cerebroToolbarActions(
           cerebroSettingsButton("ir_more_button", "ir_more"),
           conditionalPanel(
-            condition = "input.ir_tabs == 'Clonal UMAP' && input.ir_p_umap_group_by == ''",
+            condition = "input.ir_tabs == 'Clonal UMAP'",
             cerebroShareButton("ir_clonalUMAP_projection")
           )
         ),

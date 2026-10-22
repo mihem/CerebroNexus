@@ -122,6 +122,16 @@
     }
   }
 
+  // Whether restoring this control changes the page: a control that is not
+  // bound yet counts as a change.
+  function controlChanges(control) {
+    var element = document.getElementById(control.id);
+    var value = element ? controlValue(element) : undefined;
+    if (value === undefined) return true;
+    var values = Array.isArray(value) ? value : [value];
+    return JSON.stringify(values) !== JSON.stringify(control.values);
+  }
+
   function stopControlRestore() {
     if (controlRestoreHandler && window.jQuery) {
       window.jQuery(document).off(
@@ -211,10 +221,26 @@
       },
       apply: function (config) {
         navigate(spec);
-        restoreControls(config.controls || []);
+        var controls = config.controls || [];
+        var rerender = controls.some(controlChanges);
+        // A newer restore replaces a state still waiting for its render.
+        var previousApi = engine(spec);
+        if (previousApi && previousApi.dropPendingState) {
+          previousApi.dropPendingState(id);
+        }
+        restoreControls(controls);
         var restoreSequence = ++stateRestoreSequence;
         var restoreContext = currentContextKey();
         var applied = false;
+        // Restored controls re-render the plot (a grouping column turns it
+        // into panels), and that render resets the panels and the brush, so
+        // the state is applied again once it arrives, however long the render
+        // takes. It waits on the view of this dataset only, and is dropped by a
+        // newer restore or a selection the user makes before the render.
+        var pendingApi = rerender ? engine(spec) : null;
+        if (pendingApi && pendingApi.dropPendingState) {
+          pendingApi.applyState(id, config, { afterRender: true });
+        }
         [0, 250, 750].forEach(function (delay) {
           window.setTimeout(function () {
             if (applied || restoreSequence !== stateRestoreSequence ||

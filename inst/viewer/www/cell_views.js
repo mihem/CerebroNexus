@@ -2582,6 +2582,9 @@
     return (sp && sp.label) || source.spaceId || '';
   }
   function setSelection(s, source) {
+    // A selection made while a restored view waits for its render wins over
+    // the restored one.
+    if (singleActive) dropPendingSingleState(singleActive);
     sel = (s && s.size) ? s : null;
     if (!sel) {
       selectionSource = null;
@@ -8697,8 +8700,8 @@
       })) return false;
     } else if (!(Array.isArray(data.color) || ArrayBuffer.isView(data.color)) ||
         data.color.length !== D.n) return false;
-    // Legacy payloads may contain duplicate stringified IDs. Their Map-based
-    // alignment must keep its existing semantics rather than assuming an order.
+    // Writing values by position equals the Map-based alignment of the render
+    // only when every key is unique; the index is cached from that render.
     if (!pendingIds && singleIndex().size !== D.n) return false;
     var fieldName = 'single:' + id + ':0', mode;
     if (rgb) {
@@ -8782,12 +8785,18 @@
     var view = singleView(id);
     if (!view || !view.data) return null;
     if (singleActive === id) stashSingleState();
-    var lens = view.lenses && view.lenses[0] || {};
+    // A grouped view has one lens per panel. Save the panel that holds the
+    // brush, so the outline and its view return to that panel.
+    var lenses = view.lenses || [];
+    var panel = Math.max(0, lenses.findIndex(function (candidate) {
+      return candidate && candidate.lassoData && candidate.lassoData.length > 2;
+    }));
+    var lens = lenses[panel] || {};
     var rotation = lens.rot || {};
     return {
       cells: (view.selection || []).slice(),
       geometry: lens.lassoData && lens.lassoData.length > 2 ? {
-        mode: view.mode === 'box' ? 'box' : 'lasso', panel: 0,
+        mode: view.mode === 'box' ? 'box' : 'lasso', panel: panel,
         polygon: lens.lassoData.map(function (point) { return point.slice(); })
       } : null,
       view: {
@@ -8851,19 +8860,25 @@
     return downloadVisiblePanelsPNG(pngFilename(id));
   }
 
-  function applySingleState(id, saved) {
+  // `afterRender` keeps the state for the next render of the view: restored
+  // controls (a grouping column) re-render it, and that render resets the
+  // panels and the brush applied before it.
+  function applySingleState(id, saved, options) {
     var target = registerSingle(id); if (!target) return { selectedCells: 0 };
-    if (!target.data) {
+    if (!target.data || (options && options.afterRender)) {
       target.pendingSavedState = saved;
       return { selectedCells: saved && saved.selection ? saved.selection.cells.length : 0 };
     }
     var selection = saved && saved.selection || {};
     var view = saved && saved.view || {};
     var viewport = view.zoomed === false ? null : view.viewport;
+    var panel = selection.geometry && Number(selection.geometry.panel) || 0;
     target.selection = (selection.cells || []).map(String);
     target.hiddenGroups = (view.hidden_groups || []).map(String);
     target.mode = view.mode || 'lasso';
-    target.lenses = [{
+    target.lenses = [];
+    for (var index = 0; index < panel; index++) target.lenses.push({});
+    target.lenses.push({
       view: viewport ? Object.assign({}, viewport) : null,
       rot: view.rotation ? {
         rx: Number(view.rotation.x) || 0, ry: Number(view.rotation.y) || 0
@@ -8872,9 +8887,19 @@
         ? selection.geometry.polygon.map(function (point) {
           return [Number(point[0]), Number(point[1])];
         }) : null
-    }];
+    });
     if (visibleSingleId() === id) activateSingle(id, false, true);
     return { selectedCells: target.selection.length };
+  }
+
+  // Drops the state kept for the next render of a view (any state when `saved`
+  // is omitted). Views are kept per dataset, so a render of another dataset
+  // never receives it.
+  function dropPendingSingleState(id, saved) {
+    var view = singleView(id);
+    if (view && (saved === undefined || view.pendingSavedState === saved)) {
+      view.pendingSavedState = null;
+    }
   }
 
   function updateSingleBackground(message) {
@@ -10332,6 +10357,7 @@
     summary: singleSummary,
     captureState: captureSingleState,
     applyState: applySingleState,
+    dropPendingState: dropPendingSingleState,
     downloadPNG: downloadSinglePNG,
     attachDatasetIdentity: attachSingleDatasetIdentity
   });

@@ -143,12 +143,18 @@ tab_gene_expression <- tabItem(
             typeof Shiny.setInputValue !== 'function') return;
         Shiny.setInputValue('expression_summary_viewport_request', visible);
       }
+      // A quarter of the gate, or a quarter of the viewport for a gate taller
+      // than four viewports, which can never show a quarter of itself.
+      // The low thresholds make the observer report such tall gates.
       var observer = new IntersectionObserver(function (entries) {
         visible = entries.some(function (entry) {
-          return entry.isIntersecting && entry.intersectionRatio >= 0.25;
+          var viewport = entry.rootBounds ? entry.rootBounds.height :
+            window.innerHeight;
+          return entry.isIntersecting && (entry.intersectionRatio >= 0.25 ||
+            entry.intersectionRect.height >= 0.25 * viewport);
         });
         publish();
-      }, {threshold: 0.25});
+      }, {threshold: [0, 0.01, 0.025, 0.05, 0.1, 0.25]});
       observer.observe(target);
       if (window.jQuery) window.jQuery(document).on('shiny:connected', publish);
     })();

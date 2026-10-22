@@ -3,7 +3,7 @@ sys.source(
   environment()
 )
 
-test_that("expression presets have consistent direction and legacy defaults", {
+test_that("expression presets have consistent direction and fill missing fields", {
   defaults <- list(
     palette = "cerebro_orange",
     panel_mode = "shared",

@@ -1,3 +1,24 @@
+# CerebroNexus 5.4.0
+
+## Viewer
+
+- Share is offered on the grouped Immune repertoire Clonal projection too. An
+  opened view comes back grouped by its column, and its selection and brush
+  return to the panel they were made in once the panels are drawn, however long
+  that render takes. A newer opened view replaces the waiting one, and a
+  selection made before the render wins over it.
+- The Gene expression summaries keep updating when they are taller than four
+  screens, for example with many groups or genes. Before, they counted as
+  visible only once a quarter of them was on screen, which a block that tall
+  never reaches, so they stopped following gene or group changes even while
+  filling the screen. They now also count as visible when they cover a quarter
+  of the screen.
+- The spatial renderer draws a background image only from the descriptor the
+  Viewer resolved for the current dataset, spatial entry and image. It no longer
+  accepts a bare image path as the selection; the Viewer never sends one.
+- Spatial plot rotation and geometry look up the dataset by its id only, no
+  longer by its `.crb` path, matching the dataset links.
+
 # CerebroNexus 5.3.1
 
 ## Fixes

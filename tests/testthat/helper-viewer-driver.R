@@ -140,3 +140,18 @@ viewer_set_selectize <- function(app, input_id, value) {
 viewer_test_text <- function(path) {
   paste(readLines(path, warn = FALSE), collapse = "\n")
 }
+
+## Gene expression summaries update only while their gate is visible
+## (expression_summary_viewport_request). Scroll on every poll: panels above
+## the gate may still change height and push it back out of view.
+viewer_show_expression_summary <- function(app, timeout = 60000) {
+  app$wait_for_js(
+    paste0(
+      "(() => {document.getElementById('expression_summary_gate')",
+      "?.scrollIntoView();",
+      "return Shiny.shinyapp.$inputValues",
+      ".expression_summary_viewport_request === true;})()"
+    ),
+    timeout = timeout
+  )
+}

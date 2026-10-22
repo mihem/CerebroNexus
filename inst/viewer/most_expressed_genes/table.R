@@ -181,8 +181,9 @@ output[["most_expressed_genes_table"]] <- DT::renderDataTable({
     input[["most_expressed_genes_table_select_group_level"]]
   )
   if (identical(metric_type, "pct") && "pct" %in% colnames(results_df)) {
-    ## Legacy producers use pct for different quantities and scales. Without
-    ## metric provenance, neither the values nor their range identify a unit.
+    ## getMostExpressedGenes() and convertSeuratToCerebro() store different
+    ## quantities and scales as pct. Without metric provenance, neither the
+    ## values nor their range identify a unit.
     results_df <- dplyr::rename(results_df, "Stored score" = pct)
   } else if (
     !identical(metric_type, "pct") &&
@@ -224,7 +225,7 @@ most_expressed_genes_info <- list(
     Table showing gene expression statistics for each group. These lists can help to identify/verify the dominant cell types.
     <h4>Expression metrics</h4>
     <b>Stored expression score (pct)</b><br>
-    Values are shown as stored, without percentage conversion. Legacy generating methods use pct for different quantities: getMostExpressedGenes stores a gene's fraction of total transcript counts (0–1), while convertSeuratToCerebro can store the percentage of cells with nonzero expression (0–100). These quantities are not interchangeable. The table does not identify which definition was used; consult the data set's analysis documentation before interpreting the values.<br>
+    Values are shown as stored, without percentage conversion. The generating methods use pct for different quantities: getMostExpressedGenes stores a gene's fraction of total transcript counts (0–1), while convertSeuratToCerebro can store the percentage of cells with nonzero expression (0–100). These quantities are not interchangeable. The table does not identify which definition was used; consult the data set's analysis documentation before interpreting the values.<br>
     <br>
     <b>Mean expression</b><br>
     The average normalized expression level of each gene across all cells in each group. Higher values indicate genes with stronger overall expression in the group.<br>

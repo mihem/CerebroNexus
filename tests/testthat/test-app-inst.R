@@ -85,6 +85,16 @@ test_that("retry_get_value reports the last error after timing out", {
 ## Wait until an input element exists in the DOM (its Shiny binding is registered)
 ## before set_inputs — a renderUI-created selectize is not present the instant
 ## wait_for_idle returns.
+## The dataset selector is rendered by the server, so a new session may not have
+## bound it yet ("Unable to find input binding"). Switch only once it has a value.
+select_dataset <- function(app, dataset, timeout = 30000) {
+  app$wait_for_js(
+    "Shiny.shinyapp.$inputValues.crb_file_selector !== undefined",
+    timeout = timeout
+  )
+  app$set_inputs(crb_file_selector = dataset, wait_ = FALSE)
+}
+
 wait_for_input <- function(app, id, timeout = 20000) {
   app$wait_for_js(
     sprintf("document.getElementById('%s') !== null", id),
@@ -120,10 +130,7 @@ test_that("{shinytest2} recording: overview", {
 test_that("Projection switches categorical spatial datasets coherently", {
   app <- viewer_new_session(switching_app())
 
-  app$set_inputs(
-    crb_file_selector = "Mouse ileum (MERFISH)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse ileum (MERFISH)")
   app$wait_for_idle(timeout = 30000)
   activate_tab(app, "overview", timeout = 30000)
   app$wait_for_js(
@@ -134,10 +141,7 @@ test_that("Projection switches categorical spatial datasets coherently", {
     timeout = 30000
   )
 
-  app$set_inputs(
-    crb_file_selector = "Mouse brain (Xenium)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse brain (Xenium)")
   app$wait_for_js(
     paste0(
       "document.getElementById('overview_projection_point_color')?.value ",
@@ -163,10 +167,7 @@ test_that("Projection switches categorical spatial datasets coherently", {
 test_that("Spatial backgrounds reset when the spatial dataset changes", {
   app <- viewer_new_session(switching_app())
 
-  app$set_inputs(
-    crb_file_selector = "Mouse brain (Visium)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse brain (Visium)")
   app$wait_for_idle(timeout = 30000)
   activate_tab(app, "spatial", timeout = 30000)
   wait_for_input(app, "spatial_projection_more_button", timeout = 30000)
@@ -251,10 +252,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  app$set_inputs(
-    crb_file_selector = "Mouse brain (Xenium)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse brain (Xenium)")
   app$wait_for_idle(timeout = 30000)
   wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
   app$wait_for_js(
@@ -300,10 +298,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  app$set_inputs(
-    crb_file_selector = "Mouse hippocampus (Slide-seq v2)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse hippocampus (Slide-seq v2)")
   app$wait_for_idle(timeout = 30000)
   ## Slide-seq ships no background image, and a data set without images renders
   ## no picker at all: the previous selection cannot survive into one.
@@ -331,10 +326,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
 
 test_that("Linked views resets the active background to its preset", {
   app <- viewer_new_session(switching_app())
-  app$set_inputs(
-    crb_file_selector = "Mouse brain (Xenium)",
-    wait_ = FALSE
-  )
+  select_dataset(app, "Mouse brain (Xenium)")
   activate_tab(app, "coordinated_views", timeout = 30000)
   app$wait_for_js(
     paste0(

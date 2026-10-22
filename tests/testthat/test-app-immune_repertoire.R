@@ -73,7 +73,9 @@ activate_ir_tab <- function(app, timeout = 60000) {
 ##     is Clonal UMAP;
 ##   * tests that assert INITIAL state ("Group by" empty, Clonal UMAP
 ##     ungrouped) — a reused app carries prior selections;
-##   * the info-dialog test — it leaves a modal open over the page.
+##   * the info-dialog test — it leaves a modal open over the page;
+##   * the grouped Share round trip — it relies on an app that has never opened
+##     Linked views, and it leaves the projection grouped.
 shared_app <- viewer_shared_app("ir_shared", inst_dir)
 
 test_that("immune_repertoire tab is present with example data (has TCR)", {
@@ -592,6 +594,193 @@ test_that("Clonal UMAP groups into interactive panels that brush their own cells
   app$wait_for_js(paste0(visible_boxes, ".length === 1"), timeout = 45000)
   logs <- app$get_logs()
   expect_false(any(grepl("Error in|Invalid IHDR", logs$message)))
+})
+
+test_that("a shared grouped Clonal UMAP reopens grouped with its selection", {
+  local_app_support(inst_dir)
+  app <- AppDriver$new(
+    inst_dir,
+    name = "ir_umap_grouped_share",
+    height = 950,
+    width = 1619,
+    load_timeout = 60000
+  )
+  withr::defer(app$stop())
+  activate_ir_tab(app)
+
+  host <- "#ir_clonalUMAP_projection_cell_view_host"
+  share <- ".cerebro-config-open[data-view-id=\"ir_clonalUMAP_projection\"]"
+  state <- "window.cerebroSpecialistViews.get('ir_clonalUMAP_projection')"
+  visible_boxes <- paste0(
+    "Array.from(document.querySelectorAll('",
+    host,
+    " .cv-tbtn[data-act=\"box\"]')).filter(b=>b.getClientRects().length>0)"
+  )
+  metadata <- readCerebro(
+    system.file(
+      "extdata/examples/demo_full_tcr_bcr.crb",
+      package = "CerebroNexus"
+    )
+  )$getMetaData()
+  second_group <- levels(factor(metadata$sample))[[2L]]
+
+  app$wait_for_js(
+    paste0(
+      "(function(){var group=document.querySelector('#ir_p_umap_group_by');",
+      "return !!group && group.value==='' && ",
+      "document.querySelector('",
+      ir_canvas_selector,
+      "')!==null;})()"
+    ),
+    timeout = 60000
+  )
+  app$set_inputs(ir_p_umap_group_by = "sample", wait_ = FALSE)
+  app$wait_for_js(paste0(visible_boxes, ".length >= 2"), timeout = 45000)
+  panels <- app$get_js(paste0(visible_boxes, ".length"))
+
+  ## Brush every cell of the second panel.
+  app$run_js(paste0(visible_boxes, "[1].click()"))
+  canvases <- app$get_js(paste0(
+    "Array.from(document.querySelectorAll('",
+    host,
+    " canvas:not(.cv-mini)')).filter(c=>c.getClientRects().length>0)",
+    ".map(c=>{const r=c.getBoundingClientRect();",
+    "return {x:r.x,y:r.y,w:r.width,h:r.height};})"
+  ))
+  ## Each panel owns two stacked canvases; the second panel starts at index 3.
+  box <- canvases[[3]]
+  viewer_drag_mouse(
+    app,
+    box$x + box$w * .02,
+    box$y + box$h * .02,
+    box$x + box$w * .98,
+    box$y + box$h * .98
+  )
+  app$wait_for_js(paste0(state, ".capture().selection.cells.length > 0"))
+  selected <- sort(unlist(app$get_js(paste0(
+    state,
+    ".capture().selection.cells"
+  ))))
+  expect_identical(
+    unique(as.character(metadata$sample[match(
+      selected,
+      metadata$cell_barcode
+    )])),
+    second_group
+  )
+
+  ## Share is offered in grouped mode, and the JSON it downloads carries the
+  ## grouping column, the selected cells and the panel they were brushed in.
+  ## This app has never opened Linked views, whose server answers Share.
+  app$wait_for_js(
+    paste0(
+      "(()=>{const b=document.querySelector('",
+      share,
+      "');return !!b && b.getClientRects().length>0 && !b.disabled;})()"
+    ),
+    timeout = 15000
+  )
+  app$run_js(paste0(
+    "(() => {const original=URL.createObjectURL;window.__testViewJSON=null;",
+    "URL.createObjectURL=function(blob){",
+    "if(blob.type.startsWith('application/json'))",
+    "blob.text().then(text=>{window.__testViewJSON=text;});",
+    "return original.call(URL,blob);};})()"
+  ))
+  app$click(selector = share)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('cv-config-dialog').open && ",
+      "!document.getElementById('cv-config-download').disabled"
+    ),
+    timeout = 10000
+  )
+  ## The PNG holds every panel; it must still download from the grouped view.
+  app$click(selector = "#cv-config-png")
+  expect_identical(
+    app$get_js("document.getElementById('cv-config-status').textContent"),
+    "PNG download started."
+  )
+  app$click(selector = "#cv-config-download")
+  app$wait_for_js("window.__testViewJSON !== null", timeout = 15000)
+  json <- app$get_js("window.__testViewJSON")
+  config <- jsonlite::fromJSON(json, simplifyVector = FALSE)
+  app$click(selector = "#cv-config-close")
+  saved_group <- Filter(
+    function(control) identical(control$id, "ir_p_umap_group_by"),
+    config$controls
+  )
+  expect_length(saved_group, 1L)
+  expect_identical(saved_group[[1L]]$values[[1L]], "sample")
+  expect_identical(sort(unlist(config$selection$cells)), selected)
+  expect_identical(config$selection$geometry$panel, 1L)
+
+  ## Reset the page: ungroup and clear the selection.
+  app$set_inputs(ir_p_umap_group_by = "", wait_ = FALSE)
+  app$wait_for_js(paste0(visible_boxes, ".length === 1"), timeout = 45000)
+  app$wait_for_js(
+    paste0(
+      "Array.from(document.querySelectorAll('",
+      host,
+      " .cv-clear-btn')).some(b=>b.getClientRects().length>0)"
+    ),
+    timeout = 15000
+  )
+  app$run_js(paste0(
+    "Array.from(document.querySelectorAll('",
+    host,
+    " .cv-clear-btn')).find(b=>b.getClientRects().length>0).click()"
+  ))
+  app$wait_for_js(paste0(state, ".capture().selection.cells.length === 0"))
+
+  ## Open the JSON through the dialog's file input, as a user would.
+  app$click(selector = share)
+  app$wait_for_js(
+    "document.getElementById('cv-config-dialog').open",
+    timeout = 10000
+  )
+  app$run_js(sprintf(
+    paste0(
+      "(() => {const input=document.getElementById('coordviews_config_upload');",
+      "const transfer=new DataTransfer();",
+      "transfer.items.add(new File([%s],'grouped.json',",
+      "{type:'application/json'}));",
+      "input.files=transfer.files;",
+      "input.dispatchEvent(new Event('change',{bubbles:true}));})()"
+    ),
+    jsonlite::toJSON(json, auto_unbox = TRUE)
+  ))
+  app$wait_for_js(
+    "document.getElementById('cv-config-status').classList.contains('is-success')",
+    timeout = 15000
+  )
+  app$click(selector = "#cv-config-close")
+
+  ## Grouping comes back first, then the selection lands in its panel.
+  app$wait_for_js(
+    paste0(
+      visible_boxes,
+      ".length === ",
+      panels,
+      " && ",
+      state,
+      ".capture().selection.cells.length === ",
+      length(selected)
+    ),
+    timeout = 45000
+  )
+  expect_identical(
+    app$get_js("document.getElementById('ir_p_umap_group_by').value"),
+    "sample"
+  )
+  restored <- app$get_js(paste0(state, ".capture()"))
+  expect_identical(sort(unlist(restored$selection$cells)), selected)
+  expect_identical(restored$selection$geometry$panel, 1L)
+  app$wait_for_js(
+    "document.getElementById('ir_clonalUMAP_number_of_selected_cells').textContent.includes('Selected')"
+  )
+  logs <- app$get_logs()
+  expect_false(any(grepl("Error in", logs$message)))
 })
 
 test_that("Clone call is hidden on the Clonal UMAP tab", {

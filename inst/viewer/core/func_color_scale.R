@@ -1,4 +1,5 @@
-## Pure display settings shared by Builder and Viewer. Missing legacy fields
+## Pure display settings shared by Builder and Viewer. Fields a configuration
+## leaves out (createShinyApp() accepts a partial `gene_expression` list)
 ## resolve here without rewriting a checkpoint's saved configuration.
 expressionPaletteChoices <- function() {
   c(

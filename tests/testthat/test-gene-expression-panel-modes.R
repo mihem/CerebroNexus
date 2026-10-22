@@ -269,20 +269,6 @@ test_that("gene summary hosts change only when their layout changes", {
   )
 })
 
-## Summaries update only while visible (expression_summary_viewport_request).
-## Scroll on every poll: the page may still grow and push the gate back out.
-viewer_show_expression_summary <- function(app) {
-  app$wait_for_js(
-    paste0(
-      "(() => {document.getElementById('expression_summary_gate')",
-      "?.scrollIntoView();",
-      "return Shiny.shinyapp.$inputValues",
-      ".expression_summary_viewport_request === true;})()"
-    ),
-    timeout = 60000
-  )
-}
-
 ## Wait for summary content. A repaint (e.g. switching to RGB) can resize the
 ## projection after the summary was scrolled into view and push it out again,
 ## where it intentionally stops updating; keep it in view while waiting.

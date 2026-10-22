@@ -3015,8 +3015,9 @@ cerebroProjectionHoverColumns <- function(
     codes <- match(values, levels)
     codes[is.na(values)] <- match("NA", levels)
     if (anyNA(codes)) {
-      # Unregistered metadata and incomplete legacy dictionaries retain the
-      # original first-occurrence encoding, including literal/missing NA.
+      # Unregistered metadata, and registered levels that miss values
+      # (addGroup() does not check them), keep the first-occurrence encoding,
+      # including literal/missing NA.
       values[is.na(values)] <- "NA"
       levels <- unique(values)
       codes <- match(values, levels)

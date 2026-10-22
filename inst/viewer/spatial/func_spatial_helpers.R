@@ -24,17 +24,9 @@ spatial_dataset_name <- function(crb_files, selected) {
   ) {
     return(NULL)
   }
-  ## The selector carries the configured dataset key. Accept paths only for
-  ## legacy callers; a shared CRB file must not collapse two configured entries.
-  if (selected %in% names(crb_files)) {
-    return(as.character(selected))
-  }
-  index <- which(crb_files == selected)
-  if (length(index) == 0L) {
-    return(NULL)
-  }
-  dataset <- names(crb_files)[[index[[1L]]]]
-  if (is.na(dataset) || !nzchar(dataset)) NULL else dataset
+  ## The selection is the configured dataset id, never a path: two ids may
+  ## share one CRB file and keep their own spatial settings.
+  if (selected %in% names(crb_files)) as.character(selected) else NULL
 }
 
 ## Reusing the stored Spatial coordinates is safe only for the exact canonical

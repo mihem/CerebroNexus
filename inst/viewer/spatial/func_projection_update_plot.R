@@ -145,23 +145,9 @@ spatial_projection_update_plot <- function(input) {
   ## The selected descriptor was resolved server-side from the exact current
   ## dataset / spatial / image leaf. Browser input values never contain a path or
   ## data URI and cannot select an image from another entry.
+  ## Without a descriptor no image is drawn: `background_image` is only the
+  ## selector token and is never read as a path.
   selected_background <- plot_parameters[["background_descriptor"]]
-  ## Compatibility for direct renderer callers that predate source-tagged
-  ## selection. The live Viewer always supplies background_descriptor.
-  if (
-    is.null(selected_background) &&
-      is.character(plot_parameters[["background_image"]]) &&
-      length(plot_parameters[["background_image"]]) == 1L &&
-      plot_parameters[["background_image"]] %in%
-        plot_parameters[["background_image_allowlist"]]
-  ) {
-    selected_background <- list(
-      source = "external",
-      label = basename(plot_parameters[["background_image"]]),
-      path = plot_parameters[["background_image"]],
-      bounds = NULL
-    )
-  }
   background_meta <- c(
     list(is_spatial = TRUE),
     spatial_background_render_payload(

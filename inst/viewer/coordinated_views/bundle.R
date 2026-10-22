@@ -2227,7 +2227,8 @@ cv_build_progressive_supplement <- function(
 }
 
 ## Reference only geometry whose Viewer Pack explicitly validates the same
-## canonical projection. Legacy/custom coordinate systems retain their arrays.
+## canonical projection. Trajectories with their own coordinates (a
+## `trajectory_asset` frame) or without a Viewer Pack keep their arrays.
 cv_reference_trajectory_geometry <- function(supplement, primary, crb) {
   pack <- attr(crb, "cerebro_viewer_pack", exact = TRUE)
   if (
