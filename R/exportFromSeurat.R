@@ -774,7 +774,7 @@ exportFromSeurat <- function(
   h5_compression_level = 0L,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
-  viewer_binary_threshold = 500000L,
+  viewer_binary_threshold = 100000L,
   spatial_images = NULL,
   verbose = FALSE,
   immune_sidecar = c("auto", "always", "never"),

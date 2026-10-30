@@ -38,6 +38,11 @@
 - The Data info bars take the colour of their category, as on the other pages.
   Only hex, named and plain rgb()/hsl() colours are used as a bar fill.
 
+## Changes
+
+- `saveCerebro()`, `exportFromSeurat()` and `exportFromSCE()` build a Viewer Pack
+  above 100,000 cells (was 500,000), so mid-sized data sets get one too.
+
 # CerebroNexus 5.3.1
 
 ## Fixes

@@ -28,7 +28,7 @@
 
 .viewerPackOptions <- function(
   viewer_binary = c("auto", "always", "never"),
-  viewer_binary_threshold = 500000L
+  viewer_binary_threshold = 100000L
 ) {
   mode <- match.arg(viewer_binary)
   threshold <- suppressWarnings(as.integer(viewer_binary_threshold))
@@ -1070,7 +1070,7 @@ readViewerPack <- function(file, pack = .viewerPackPath(file)) {
 buildViewerPack <- function(
   file,
   viewer_binary = c("auto", "always", "never"),
-  viewer_binary_threshold = 500000L,
+  viewer_binary_threshold = 100000L,
   overwrite = FALSE
 ) {
   options <- .viewerPackOptions(viewer_binary, viewer_binary_threshold)

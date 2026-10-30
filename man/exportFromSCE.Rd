@@ -18,7 +18,7 @@ exportFromSCE(
   use_delayed_array = FALSE,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
-  viewer_binary_threshold = 500000L,
+  viewer_binary_threshold = 100000L,
   verbose = FALSE
 )
 }
