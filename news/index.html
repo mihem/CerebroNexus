@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,27 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.4.0" id="cerebronexus-540">CerebroNexus 5.4.0<a class="anchor" aria-label="anchor" href="#cerebronexus-540"></a></h2>
+<div class="section level3">
+<h3 id="viewer-5-4-0">Viewer<a class="anchor" aria-label="anchor" href="#viewer-5-4-0"></a></h3>
+<ul><li>Share is offered on the grouped Immune repertoire Clonal projection too. An opened view comes back grouped, with its selection in its panel.</li>
+<li>Gene expression summaries taller than four screens keep updating; they used to need a quarter of themselves on screen.</li>
+<li>The spatial renderer takes a background image only from the resolved descriptor, and finds rotation and geometry by dataset id, not <code>.crb</code> path.</li>
+<li>Focus and Clear work the same on every page, and each page keeps its own selection and Focus while another page is open.</li>
+<li>The HLA &amp; TCR Motifs network says why it draws nothing instead of spinning.</li>
+<li>Clicking a plot after brushing keeps the brushed outline.</li>
+<li>The Linked views panel button is now Enlarge / Restore, so Focus only zooms to the selection; the plot toolbar floats in the plot’s top-right corner.</li>
+<li>Background tasks see libraries added at run time (<code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code>, renv); with mirai or qs2 installed there, they used to stop silently.</li>
+<li>Linked views paints its first frame in the configured colours; it used to flash the default palette first.</li>
+<li>The Focus button turns off when a data set, projection or clone layout replaces the view under it, and follows a restored view.</li>
+<li>A restored view stops waiting for its render at the first click, key press or scroll, so a later render cannot undo what was done meanwhile. A filter or subsample change does not end that wait, and a selection emptied by one takes its brushed outline with it.</li>
+<li>Gene expression summaries keep updating however tall they are, and when the gate changes size in place.</li>
+<li>The plot toolbar of a short plot wraps into a second column and keeps clear of the minimap.</li>
+<li>Linked views, Spatial and the other plot pages follow the window while it is resized: the last plot no longer drops to a second row (a classic scrollbar, a fractional width or a drag inside a step did that), the height follows the window instead of moving in 24px steps, a plot is resized once per frame, and a page whose controls render late (Spatial) is refitted. A resize at the bottom of a scrolled page no longer grows the plots, and a last, shorter row of plots starts at the left edge.</li>
+<li>The Data info bars take the colour of their category, as on the other pages. Only hex, named and plain rgb()/hsl() colours are used as a bar fill.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.3.1" id="cerebronexus-531">CerebroNexus 5.3.1<a class="anchor" aria-label="anchor" href="#cerebronexus-531"></a></h2>
 <div class="section level3">

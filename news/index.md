@@ -1,5 +1,52 @@
 # Changelog
 
+## CerebroNexus 5.4.0
+
+### Viewer
+
+- Share is offered on the grouped Immune repertoire Clonal projection
+  too. An opened view comes back grouped, with its selection in its
+  panel.
+- Gene expression summaries taller than four screens keep updating; they
+  used to need a quarter of themselves on screen.
+- The spatial renderer takes a background image only from the resolved
+  descriptor, and finds rotation and geometry by dataset id, not `.crb`
+  path.
+- Focus and Clear work the same on every page, and each page keeps its
+  own selection and Focus while another page is open.
+- The HLA & TCR Motifs network says why it draws nothing instead of
+  spinning.
+- Clicking a plot after brushing keeps the brushed outline.
+- The Linked views panel button is now Enlarge / Restore, so Focus only
+  zooms to the selection; the plot toolbar floats in the plot’s
+  top-right corner.
+- Background tasks see libraries added at run time
+  ([`.libPaths()`](https://rdrr.io/r/base/libPaths.html), renv); with
+  mirai or qs2 installed there, they used to stop silently.
+- Linked views paints its first frame in the configured colours; it used
+  to flash the default palette first.
+- The Focus button turns off when a data set, projection or clone layout
+  replaces the view under it, and follows a restored view.
+- A restored view stops waiting for its render at the first click, key
+  press or scroll, so a later render cannot undo what was done
+  meanwhile. A filter or subsample change does not end that wait, and a
+  selection emptied by one takes its brushed outline with it.
+- Gene expression summaries keep updating however tall they are, and
+  when the gate changes size in place.
+- The plot toolbar of a short plot wraps into a second column and keeps
+  clear of the minimap.
+- Linked views, Spatial and the other plot pages follow the window while
+  it is resized: the last plot no longer drops to a second row (a
+  classic scrollbar, a fractional width or a drag inside a step did
+  that), the height follows the window instead of moving in 24px steps,
+  a plot is resized once per frame, and a page whose controls render
+  late (Spatial) is refitted. A resize at the bottom of a scrolled page
+  no longer grows the plots, and a last, shorter row of plots starts at
+  the left edge.
+- The Data info bars take the colour of their category, as on the other
+  pages. Only hex, named and plain rgb()/hsl() colours are used as a bar
+  fill.
+
 ## CerebroNexus 5.3.1
 
 ### Fixes
