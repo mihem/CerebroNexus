@@ -10,6 +10,7 @@
 
 skip_if_not_installed("Seurat")
 skip_if_not_installed("SeuratObject")
+builder_repo_source("preview.R")
 
 ## `split()` on an assay, and layers as a concept, arrived with Seurat 5. The
 ## package still declares Seurat (>= 3.0.0), so an older environment has to skip
@@ -59,6 +60,81 @@ make_split_object <- function(by, n_genes = 60, n_cells = 20) {
   obj[["RNA"]] <- split(obj[["RNA"]], f = obj$sample)
   obj
 }
+
+test_that("alignment resolves split-layer cells without joining expression", {
+  object <- make_split_object(rep(c("s1", "s2"), each = 10L))
+  layers_before <- SeuratObject::Layers(object[["RNA"]])
+
+  cells <- builder_alignment_layer_cells(object, "RNA", "data")
+
+  expect_identical(cells, SeuratObject::Cells(object[["RNA"]]))
+  expect_identical(SeuratObject::Layers(object[["RNA"]]), layers_before)
+})
+
+test_that("alignment cell resolution never reads expression matrices", {
+  cohort_helpers <- c(
+    "builder_alignment_layer_cells",
+    ".layer_prefix_pattern",
+    ".layer_prefix_candidates",
+    ".layer_partition_candidates",
+    ".direct_layer_partition_candidates",
+    ".find_layer_partition",
+    ".nested_partition_root"
+  )
+  calls <- unique(unlist(lapply(cohort_helpers, function(name) {
+    codetools::findGlobals(
+      get(name, mode = "function"),
+      merge = FALSE
+    )$functions
+  })))
+
+  expect_false(".getExpressionMatrix" %in% calls)
+  expect_false("LayerData" %in% calls)
+  expect_false("JoinLayers" %in% calls)
+})
+
+test_that("alignment resolves exact Assay5 and legacy Assay memberships", {
+  object <- make_split_object(rep(c("s1", "s2"), each = 10L))
+  exact_layer <- grep(
+    "^data\\.",
+    SeuratObject::Layers(object[["RNA"]]),
+    value = TRUE
+  )[[1L]]
+  expect_identical(
+    builder_alignment_layer_cells(object, "RNA", exact_layer),
+    as.character(SeuratObject::Cells(object[["RNA"]], layer = exact_layer))
+  )
+
+  joined <- SeuratObject::JoinLayers(object[["RNA"]])
+  counts <- SeuratObject::LayerData(joined, layer = "counts")
+  object[["LEGACY"]] <- SeuratObject::CreateAssayObject(counts = counts)
+  expect_identical(
+    builder_alignment_layer_cells(object, "LEGACY", "counts"),
+    as.character(colnames(counts))
+  )
+})
+
+test_that("exact legacy Assay resolution reads its slot directly", {
+  object <- SeuratObject::pbmc_small
+  assay <- object[["RNA"]]
+  expect_true(inherits(assay, "Assay"))
+  layer_data_called <- FALSE
+
+  resolution <- .resolve_seurat_v5_layer(
+    seurat = object,
+    assay = "RNA",
+    requested_layer = "data",
+    .layer_data = function(...) {
+      layer_data_called <<- TRUE
+      stop("legacy Assay should not call LayerData")
+    }
+  )
+
+  expect_false(layer_data_called)
+  expect_identical(resolution$data, methods::slot(assay, "data"))
+  expect_identical(resolution$resolved, "data")
+  expect_false(resolution$joined)
+})
 
 add_custom_partition <- function(
   object,
@@ -118,6 +194,57 @@ make_incomplete_requested_root <- function() {
   ) <- partial_data
   object
 }
+
+test_that("alignment fails closed for ambiguous and incomplete partitions", {
+  ambiguous <- make_split_object(c("s1", "s2"))
+  first <- add_custom_partition(ambiguous, "ambient")
+  ambiguous <- first$object
+  joined <- SeuratObject::JoinLayers(ambiguous[["RNA"]])
+  joined_data <- SeuratObject::LayerData(joined, layer = "data")
+  alternate <- list(
+    ambient.batch_a = colnames(ambiguous)[seq(1, ncol(ambiguous), by = 2)],
+    ambient.batch_b = colnames(ambiguous)[seq(2, ncol(ambiguous), by = 2)]
+  )
+  for (i in seq_along(alternate)) {
+    piece <- joined_data[, alternate[[i]], drop = FALSE]
+    SeuratObject::LayerData(
+      ambiguous[["RNA"]],
+      layer = names(alternate)[[i]]
+    ) <- piece
+  }
+  expect_error(
+    builder_alignment_layer_cells(ambiguous, "RNA", "ambient"),
+    "more than one valid cell partition",
+    fixed = TRUE
+  )
+
+  incomplete <- make_incomplete_requested_root()
+  expect_error(
+    builder_alignment_layer_cells(incomplete, "RNA", "data"),
+    "do not form one complete cell partition",
+    fixed = TRUE
+  )
+})
+
+test_that("alignment refuses a nested partition as an ambiguous cohort", {
+  object <- make_split_object(c("s1", "s2"))
+  nested <- add_custom_partition(object, "data.outer")$object
+  for (layer in grep(
+    "^data\\.[^.]+$",
+    SeuratObject::Layers(nested[["RNA"]]),
+    value = TRUE
+  )) {
+    suppressWarnings(
+      SeuratObject::LayerData(nested[["RNA"]], layer = layer) <- NULL
+    )
+  }
+
+  expect_error(
+    builder_alignment_layer_cells(nested, "RNA", "data"),
+    "ambiguous nested cell partition",
+    fixed = TRUE
+  )
+})
 
 export_args <- function(object, file, ...) {
   c(

@@ -4291,6 +4291,55 @@ get_or_load_crb <- function(
   )
 }
 
+## Verified files are remembered in this function's own environment (the
+## process environment of source_cache.R), keyed by path, size and
+## modification time: each file is hashed once per process until it changes.
+.verifyRuntimeH5Checksum <- function(path, md5, crb_path) {
+  if (is.null(md5)) {
+    return(invisible(TRUE))
+  }
+  home <- environment(sys.function())
+  if (!exists(".runtime_h5_verified", envir = home, inherits = FALSE)) {
+    assign(".runtime_h5_verified", new.env(parent = emptyenv()), envir = home)
+  }
+  verified <- get(".runtime_h5_verified", envir = home, inherits = FALSE)
+  if (
+    !is.character(md5) ||
+      length(md5) != 1L ||
+      is.na(md5) ||
+      !grepl("^[[:xdigit:]]{32}$", md5)
+  ) {
+    stop("The Cerebro expression-backend descriptor is invalid.", call. = FALSE)
+  }
+  info <- file.info(path)
+  key <- paste(
+    normalizePath(path, mustWork = TRUE),
+    info$size,
+    format(as.numeric(info$mtime), digits = 17),
+    md5,
+    sep = "\r"
+  )
+  if (isTRUE(get0(key, envir = verified, inherits = FALSE))) {
+    return(invisible(TRUE))
+  }
+  started <- proc.time()[["elapsed"]]
+  actual <- unname(tools::md5sum(path))
+  print(glue::glue(
+    "[{Sys.time()}] Verified h5 checksum in ",
+    "{round(proc.time()[['elapsed']] - started, 2)} s: {path}"
+  ))
+  if (!identical(tolower(actual), tolower(md5))) {
+    stop(
+      "The h5 expression sidecar checksum does not match CRB '",
+      basename(crb_path),
+      "'.",
+      call. = FALSE
+    )
+  }
+  assign(key, TRUE, envir = verified)
+  invisible(TRUE)
+}
+
 .attachExternalExpression <- function(
   obj,
   crb_path,
@@ -4343,6 +4392,10 @@ get_or_load_crb <- function(
       call. = FALSE
     )
   }
+  ## The CRB records the checksum of the H5 file it was written with (CRBs from
+  ## before that record none): a replaced file with the same cell and gene
+  ## names must not be painted as this data set.
+  .verifyRuntimeH5Checksum(loc_abs, obj$expression_backend$md5, crb_path)
   cell_names_state <- new.env(parent = emptyenv())
   if (!is.null(crb_schema)) {
     obj <- .deferThinCrbHydration(

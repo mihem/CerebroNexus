@@ -1,0 +1,136 @@
+/* CerebroNexus Builder: design tokens and semantic role variables. */
+
+:root {
+  /* Shared Builder/Viewer primitives. */
+  --c-white: #ffffff;
+  --c-bg: #f6f7f8;
+  --c-surface: #ffffff;
+  --c-surface-2: #f6f7f8;
+  --c-surface-3: #eef0f2;
+  --c-border: #e5e7eb;
+  --c-border-2: #d8dce1;
+  --c-text: #1c1c1e;
+  --c-text-2: #6b6b70;
+  --c-text-3: #9a9aa0;
+
+  --c-blue-50: #eef4fb;
+  --c-blue-100: #d7e6f7;
+  --c-blue-300: #7bb0e8;
+  --c-blue: #2f6fd6;
+  --c-blue-600: #2560bd;
+  --c-blue-700: #1d4ea0;
+
+  --c-amber-50: #fff7f2;
+  --c-amber-100: #fce8dc;
+  --c-amber-300: #e6a17d;
+  --c-amber: #c9612a;
+  --c-amber-600: #b84b16;
+  --c-amber-700: #943a12;
+
+  --c-success: #16a34a;
+  --c-success-50: #eefbf2;
+  --c-success-700: #14653a;
+  --c-warning: #9a6700;
+  --c-warning-50: #fff8e6;
+  --c-warning-100: #f3dfaa;
+  --c-warning-700: #6f4b00;
+  --c-error: #dc2626;
+  --c-error-700: #8f1d1d;
+
+  --shadow-1: 0 1px 2px rgba(17,17,26,0.04), 0 1px 3px rgba(17,17,26,0.05);
+  --shadow-2: 0 2px 4px rgba(17,17,26,0.04), 0 4px 12px rgba(17,17,26,0.06);
+  --shadow-3: 0 4px 8px rgba(17,17,26,0.05), 0 12px 28px rgba(17,17,26,0.09);
+  --shadow-4: 0 8px 20px rgba(17,17,26,0.08), 0 24px 56px rgba(17,17,26,0.14);
+
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 0.16s;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Builder-only semantic roles. */
+  --builder-action: var(--c-amber-600);
+  --builder-action-hover: var(--c-amber-700);
+  --builder-action-active: #78300f;
+  --builder-accent-strong: #78300f;
+  --builder-focus-ring: var(--c-amber-600);
+  --builder-selection-bg: var(--builder-action);
+  --builder-text-muted: var(--c-text-2);
+  --builder-text-subtle: var(--c-text-3);
+  --builder-text-disabled: #a9adb4;
+  --builder-hover-bg: var(--c-surface-2);
+  --builder-hover-border: var(--c-amber-300);
+  --builder-rail-selected-bg: var(--c-amber-50);
+  --builder-rail-selected-marker: var(--c-amber);
+  --builder-rail-hover-bg: var(--c-surface-2);
+  --builder-rail-progress-bg: var(--c-amber-50);
+  --builder-rail-progress-fg: var(--c-amber);
+  --builder-rail-ready-fg: var(--c-success);
+  --builder-rail-error-bg: var(--c-error-50);
+  --builder-rail-error-fg: var(--c-error);
+  --builder-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+                       "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                       "Helvetica Neue", Arial, sans-serif;
+  /* Type scale. micro is for uppercase kickers and badges only. */
+  --builder-type-micro: .6875rem;
+  --builder-type-caption: .75rem;
+  --builder-type-small: .8125rem;
+  --builder-type-body: .875rem;
+  --builder-type-subtitle: 1rem;
+  --builder-type-title: 1.25rem;
+  --builder-type-display: 1.5rem;
+  --builder-measure-copy: 48rem;
+  --builder-measure-form: 56rem;
+  --builder-measure-data: none;
+  --builder-page-gutter: 24px;
+  --builder-stage-padding: var(--space-5);
+  --builder-section-gap: var(--space-5);
+  --builder-rail-width: 20.5rem;
+  --builder-shell-gap: var(--builder-section-gap);
+  --spatial-preview-aspect: 4 / 3;
+
+  /* Semantic content and review tag palette. */
+  --builder-tag-spatial-bg: var(--c-surface-2);
+  --builder-tag-spatial-border: var(--c-border-2);
+  --builder-tag-spatial-text: var(--c-text-2);
+  --builder-tag-analysis-bg: var(--c-surface-2);
+  --builder-tag-analysis-border: var(--c-border-2);
+  --builder-tag-analysis-text: var(--c-text-2);
+  --builder-tag-trajectory-bg: var(--c-surface-2);
+  --builder-tag-trajectory-border: var(--c-border-2);
+  --builder-tag-trajectory-text: var(--c-text-2);
+  --builder-tag-immune-bg: var(--c-surface-2);
+  --builder-tag-immune-border: var(--c-border-2);
+  --builder-tag-immune-text: var(--c-text-2);
+  --builder-tag-extra-bg: var(--c-surface-2);
+  --builder-tag-extra-border: var(--c-border-2);
+  --builder-tag-extra-text: var(--c-text-2);
+  /* Compatibility aliases for existing Builder components. */
+  --c-surface-muted: var(--c-surface-2);
+  --c-border-strong: var(--c-border-2);
+  --c-text-muted: var(--builder-text-muted);
+  --c-text-subtle: var(--builder-text-subtle);
+  --c-error-50: #fff1f2;
+  --c-error-100: #ffe4e6;
+  --ease-standard: var(--ease);
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+  --duration-base: var(--duration-normal);
+  --motion-fast: var(--duration-fast);
+  --builder-topbar-height: 3.75rem;
+  --builder-workflow-progress-height: 4.25rem;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+}

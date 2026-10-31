@@ -169,7 +169,11 @@
     ## self$expression stays NULL — saveRDS therefore does not embed the
     ## matrix inside the .crb. The runtime attach reads the sibling back
     ## as a lazy TENxMatrix seed (no in-memory dgCMatrix materialisation).
-    export$setExpressionBackend(type = "h5", location = h5_filename)
+    export$setExpressionBackend(
+      type = "h5",
+      location = h5_filename,
+      md5 = unname(tools::md5sum(h5_abs))
+    )
   }
 
   expression_data

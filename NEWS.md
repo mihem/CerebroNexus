@@ -25,6 +25,44 @@
   `CEREBRO_PACKAGE_SOURCE` is documented and ignored unless it names a
   CerebroNexus checkout.
 
+## Input formats in the Builder and the export
+
+- Reads SingleCellExperiment (`convertSCEToCerebro()`, `exportFromSCE()`) and
+  AnnData (`convertH5adToCerebro()`, `readH5adAsSCE()`; `.h5ad` and `.h5mu`)
+  natively, without Python, through the same export core as Seurat. The `.crb`
+  is the hub: Seurat, SCE and h5ad convert to each other through it, and
+  `exportToH5ad()` writes a `.crb` back as `.h5ad`.
+- From AnnData it also carries scanpy marker tables and category colours,
+  Visium tissue images, spatial sections, scirpy TCR/BCR repertoires and
+  scanpy / scVelo trajectories. `exportToH5ad()` writes spatial coordinates and
+  tissue images back so scanpy and squidpy can draw them, the immune repertoire
+  as scirpy's `obsm["airr"]` and each trajectory's pseudotime as an `obs` column.
+- SpatialData (`.zarr`) stores are read natively too: `readSpatialDataAsSCE()` and
+  `convertSpatialDataToCerebro()` take the cell table, its coordinates (from
+  `obsm["spatial"]` or from the annotated shapes) and the tissue pictures placed
+  in each section, one spatial section per region. Plain AnnData `.zarr` stores
+  open in `convertH5adToCerebro()`.
+- CITE-seq data: `extra_modalities =` (MuData, e.g. `"prot"`) and `extra_features =`
+  (SingleCellExperiment `altExp`, e.g. `"ADT"`) add the antibody features to the
+  expression data as `<experiment>:<feature>`.
+- The Builder opens `.h5ad`, `.h5mu` and SingleCellExperiment `.rds`/`.qs2`
+  files like Seurat ones (`convertSCEToSeurat()` is the conversion it uses), and
+  offers PAGA, scVelo and pseudotime trajectories next to monocle2. A SpatialData
+  store can be added as a `.zip` of its `.zarr` folder, and the antibody features
+  of an `.h5mu` file (or a SingleCellExperiment's `ADT` alternative experiment)
+  are added to the genes as `<experiment>:<feature>`. Spatial
+  coordinates arrive as one spatial section per `library_id`, and Visium tissue
+  pictures are attached to their sections as images at the position their scale
+  factor gives.
+
+## Builder
+
+- Add `launchCerebroBuilder()` for importing data, configuring content, saving
+  reusable projects, previewing spatial alignment, and publishing private Viewer
+  apps with optional login. Review planned payload targets before publication.
+- Preserve dataset and cell identities across export; publish ROI, image alignment
+  and content settings through shared contracts consumed by the Viewer.
+
 # CerebroNexus 5.6.0
 
 ## Changes
@@ -686,14 +724,74 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   compatible.
 - Supports lazy large-repertoire sidecars and compact repeated metadata, including
   the Ren atlas's paired TCR/BCR repertoire and published t-SNE projection.
+- Adds `convertSCEToCerebro()` for `SingleCellExperiment` objects (or `.rds` /
+  `.qs2` files holding one), and brings `exportFromSCE()` to parity with the
+  Seurat route: `expression_matrix_mode = "h5"` / `"bpcells"`, the transactional
+  CRB + sidecar publish, immune repertoire, HLA typing and mean expression.
+  Both exporters now share one format-independent core, so further input formats
+  only need a thin adapter. `exportFromSCE()` now registers `metadata()` tables
+  only for the requested `groups`, as the Seurat route does.
+- Adds `convertH5adToCerebro()` and `readH5adAsSCE()` for AnnData (`.h5ad`)
+  files from scanpy and the wider scverse ecosystem. The file is read natively
+  from HDF5 with rhdf5, so neither Python nor zellkonverter is needed; a sparse
+  CSR `X` is used without a transpose. `obs`, `var`, `layers`, `obsm` and
+  scanpy's `rank_genes_groups` become metadata, assays, projections and marker
+  genes, and `convertSCEToCerebro()` now also accepts a `.h5ad` path.
+- Reads the h5ad files public data actually comes in. `readH5adAsSCE()` and
+  `convertH5adToCerebro()` now handle AnnData written before 0.7 (compound `obs`/`var`,
+  `uns[<col>_categories]`, `raw.X`, as in the classic scanpy PBMC3k and scVelo
+  files), MuData `.h5mu` files (`modality =`), and Ensembl-ID `var` indexes, which
+  are replaced by `feature_name` / `gene_symbols` when present (`gene_names =`).
+  scanpy `rank_genes_groups` keeps its group labels in the old layout too.
+- Point-coordinate spatial data (MERFISH, Slide-seq, `obsm["spatial"]`, or a
+  `spatial` reducedDim) now fills the Spatial tab for SCE and AnnData input, and
+  `spatial_split_by =` divides one coordinate frame into its tissue sections.
+  A marker file whose `cluster` column holds the values of one grouping variable
+  is stored as one table for that variable, with the Viewer's per-group filter.
+  A missing reduction now says how to add one.
+- Brings what a scanpy/squidpy file shows along. scanpy's category colours
+  (`uns[<column>_colors]`) become the groups' default colours in the Viewer (stored in
+  the `.crb`, below build-time `colors` and the user's own picks, and written back by
+  `exportToH5ad()`); Visium tissue images (`uns["spatial"]`) are embedded behind the
+  spots with their extent derived from the scale factors, `spatial_images =` chooses
+  hires/lowres, and a file with several libraries becomes one section per library.
+  Build the app with `spatial_image_settings = ... flip_y = TRUE` for the image to
+  line up with the spots (as for Seurat Visium objects).
+- Adds `exportToH5ad()`, the reverse of `convertH5adToCerebro()`: a `.crb` (or
+  Cerebro object) is written as an `.h5ad` that anndata and scanpy open as it is,
+  natively with rhdf5. With it `.crb` is the hub between Seurat, SingleCellExperiment
+  and AnnData: `X`, `obs` (categorical, bool and nullable columns), `obsm` and
+  marker tables are exported under any expression backend, and `readH5adAsSCE()`
+  reads the marker tables back. Content AnnData has no place for (immune
+  repertoire, HLA typing, spatial data, trees, trajectories, pathways) is named
+  in a message instead of being dropped silently.
+- Imports immune receptor data from AnnData and MuData. scirpy keeps the TCR/BCR
+  chains of every cell as an awkward array in `obsm["airr"]` (the `airr` modality
+  of an `.h5mu`); `readH5adAsSCE()` and `convertH5adToCerebro()` now decode it
+  natively from HDF5 (`airr = "auto"`, or a name, or `FALSE`) and hand the
+  chains to scRepertoire, so the Immune repertoire page works for scirpy data
+  as it does on the Seurat route. The repertoire is keyed by `airr_sample`
+  (default `orig.ident`, `sample`, `Sample` or `sample_id`) and cells are matched
+  to the expression data by name. Only productive chains with a CDR3 count.
 - Streams delayed-matrix exports without whole-matrix dense realization, and
   bounds external enrichment request time and error handling.
+- Imports trajectory results from AnnData files, so the Trajectory page also serves
+  scanpy and scVelo output. For every pseudotime column in `obs` (`dpt_pseudotime`,
+  `velocity_pseudotime`, `latent_time`, any `*_pseudotime`), `readH5adAsSCE()` builds
+  one trajectory per source in `metadata(sce)$trajectories`: scanpy PAGA
+  (`uns["paga"]`, method `paga`, groups as nodes at their centroid in the UMAP and
+  connectivities of at least 0.01 as edges), scVelo's `obsm["velocity_<basis>"]`
+  (method `scvelo`, the velocity averaged on a grid and drawn as arrows), or just
+  the pseudotime (method `pseudotime`) when the file has neither. `velocity_*` entries
+  are no longer added as projections. The exporters and the Viewer accept the three
+  new methods; gene-level velocity layers and directed PAGA transitions are not
+  imported, as the Trajectory page has no place for them.
 
 ## Packaging
 
 - Removes application-specific container recipes and the direct OpenSSL package
   dependency. Dataset bundle filenames remain unchanged.
-- Consolidates this PR's development NEWS entries into one 5.0.0 release; earlier
+- Consolidates this PR's development NEWS entries into one 6.0.0 release; earlier
   released versions below are unchanged. Nix remains the CI environment.
 
 # CerebroNexus 4.4.3

@@ -644,7 +644,5 @@ convertSeuratToCerebro <- function(
     }
   )
 
-  # Clean up the Seurat object to save memory
-  rm(seurat)
-  gc() # Call garbage collector
+  invisible(file.path(result_dir, file_name))
 }

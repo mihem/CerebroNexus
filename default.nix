@@ -21,6 +21,8 @@
 #  > "shinymanager",
 #  > "anndataR",
 #  > "arrow",
+#  > "jpeg",
+#  > "writexl",
 #  > "base64enc",
 #  > "biomaRt",
 #  > "colourpicker",
@@ -94,6 +96,7 @@ let
       htmlwidgets
       httr
       igraph
+      jpeg
       jsonlite
       later
       Matrix
@@ -128,6 +131,7 @@ let
       tidyr
       tidyselect
       withr
+      writexl
       xml2;
   };
       

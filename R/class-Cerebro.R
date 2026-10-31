@@ -415,7 +415,13 @@ Cerebro <- R6::R6Class(
     #' @param type Storage backend label, \code{"embedded"} or \code{"h5"}.
     #' @param location File name of the H5 file next to the \code{.crb};
     #' \code{NULL} when \code{type == "embedded"}.
-    setExpressionBackend = function(type = "embedded", location = NULL) {
+    #' @param md5 MD5 checksum of the H5 file, recorded when it is written and
+    #' checked when it is attached; \code{NULL} when not recorded.
+    setExpressionBackend = function(
+      type = "embedded",
+      location = NULL,
+      md5 = NULL
+    ) {
       allowed <- c("embedded", "h5")
       if (length(type) != 1L || !is.character(type) || !(type %in% allowed)) {
         stop(
@@ -438,7 +444,17 @@ Cerebro <- R6::R6Class(
           call. = FALSE
         )
       }
+      if (
+        !is.null(md5) &&
+          (type == "embedded" || !.validMd5(md5))
+      ) {
+        stop(
+          "`md5` must be one MD5 checksum of an external expression file.",
+          call. = FALSE
+        )
+      }
       self$expression_backend <- list(type = type, location = location)
+      if (!is.null(md5)) self$expression_backend$md5 <- md5
     },
 
     #' @description

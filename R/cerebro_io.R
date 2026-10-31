@@ -83,10 +83,57 @@
     } else {
       .cerebroSiblingName(backend$location)
     }
-  if (!valid_type || !valid_location) {
+  if (
+    !valid_type ||
+      !valid_location ||
+      (!is.null(backend$md5) &&
+        (identical(backend$type, "embedded") || !.validMd5(backend$md5)))
+  ) {
     stop("The Cerebro expression-backend descriptor is invalid.", call. = FALSE)
   }
-  list(type = backend$type, location = backend$location)
+  out <- list(type = backend$type, location = backend$location)
+  if (!is.null(backend$md5)) {
+    out$md5 <- backend$md5
+  }
+  out
+}
+
+.validMd5 <- function(x) {
+  is.character(x) &&
+    length(x) == 1L &&
+    !is.na(x) &&
+    grepl("^[[:xdigit:]]{32}$", x)
+}
+
+## Checksums of expression sidecars already verified in this process, keyed by
+## path, size and modification time: a file is hashed once until it changes.
+.cerebroH5Verified <- new.env(parent = emptyenv())
+
+.verifyExpressionSidecar <- function(sidecar, md5, crb) {
+  if (is.null(md5)) {
+    return(invisible(TRUE))
+  }
+  info <- file.info(sidecar)
+  key <- paste(
+    normalizePath(sidecar, mustWork = TRUE),
+    info$size,
+    format(as.numeric(info$mtime), digits = 17),
+    md5,
+    sep = "\r"
+  )
+  if (isTRUE(get0(key, envir = .cerebroH5Verified, inherits = FALSE))) {
+    return(invisible(TRUE))
+  }
+  if (!identical(tolower(unname(tools::md5sum(sidecar))), tolower(md5))) {
+    stop(
+      "The h5 expression sidecar checksum does not match CRB '",
+      basename(crb),
+      "'.",
+      call. = FALSE
+    )
+  }
+  assign(key, TRUE, envir = .cerebroH5Verified)
+  invisible(TRUE)
 }
 
 ## A sidecar is addressed by one file name that sits next to the CRB.
@@ -417,6 +464,7 @@
     return(object)
   }
   sidecar <- .cerebroSidecar(file, backend)
+  .verifyExpressionSidecar(sidecar, backend$md5, file)
   ## Check the installation without loading the namespace: loading HDF5Array
   ## and its S4 methods, then reading every cell name for the TENxMatrix, takes
   ## seconds. The matrix is attached on first use of `expression`.
@@ -1024,6 +1072,19 @@ saveCerebro <- function(
   invisible(file)
 }
 
+## What readCerebro() does after the checks; the Builder's read-back calls it on
+## a payload it has read itself.
+.hydrateCerebroPayload <- function(serialized, file) {
+  file <- normalizePath(file, mustWork = TRUE)
+  backend <- .cerebroBackend(serialized)
+  schema <- .crbContract()$.readRuntimeCrbSchema(serialized, file)
+  object <- .currentCerebroCopy(serialized)
+  object <- .attachCerebroExpression(object, file, backend)
+  object <- .hydrateThinCerebro(object, file, backend, schema)
+  object <- .attachCerebroSpatialMolecules(object, file)
+  .attachCerebroImmuneRepertoire(object, file)
+}
+
 #' Read a Cerebro data file
 #'
 #' Reads a CRB written by \code{saveCerebro()} or the export functions, as RDS or
@@ -1044,13 +1105,7 @@ readCerebro <- function(file) {
     stop("`object` must be a serialized Cerebro object.", call. = FALSE)
   }
   .crbContract()$.assertCurrentRuntimeCrb(serialized, file)
-  backend <- .cerebroBackend(serialized)
-  schema <- .crbContract()$.readRuntimeCrbSchema(serialized, file)
-  object <- .currentCerebroCopy(serialized)
-  object <- .attachCerebroExpression(object, file, backend)
-  object <- .hydrateThinCerebro(object, file, backend, schema)
-  object <- .attachCerebroSpatialMolecules(object, file)
-  .attachCerebroImmuneRepertoire(object, file)
+  .hydrateCerebroPayload(serialized, file)
 }
 
 ## The one place that still knows the singular spatial image form: one

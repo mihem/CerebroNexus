@@ -187,6 +187,132 @@ test_that("CRB preflight preserves an inspection error when release also fails",
   expect_identical(events, c("backend", "release"))
 })
 
+test_that("CRB preflight consumes matching Builder verification once", {
+  path <- tempfile(fileext = ".crb")
+  on.exit(unlink(path), add = TRUE)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  writeBin(as.raw(1:8), path)
+  data <- c(First = path)
+  cached <- list(
+    backends = list(
+      First = list(
+        type = "embedded",
+        location = NULL,
+        legacy = FALSE
+      )
+    ),
+    spatial_backends = list(First = NULL),
+    spatial_catalogs = list(First = list(section = "H&E")),
+    dataset_catalog = list(First = NULL)
+  )
+  fingerprints <- list(First = .bundlePreflightFingerprint(path))
+
+  expect_true(.cacheBundlePreflightData(data, cached, fingerprints))
+  observed <- .preflightBundleData(
+    data,
+    read_object = function(path) stop("cached CRB was read again")
+  )
+
+  expect_identical(observed[names(cached)], cached)
+  expect_identical(observed$immune_backends, list(First = NULL))
+  reads <- 0L
+  .preflightBundleData(
+    data,
+    read_object = function(path) {
+      reads <<- reads + 1L
+      list(path = path)
+    },
+    inspect_backend = function(path, object) cached$backends$First,
+    inspect_spatial = function(object, dataset) cached$spatial_catalogs$First
+  )
+  expect_identical(reads, 1L)
+})
+
+test_that("CRB preflight rejects a same-size cache substitution", {
+  path <- tempfile(fileext = ".crb")
+  on.exit(unlink(path), add = TRUE)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  writeBin(as.raw(1:8), path)
+  data <- c(First = path)
+  cached <- list(
+    backends = list(
+      First = list(
+        type = "embedded",
+        location = NULL,
+        legacy = FALSE
+      )
+    ),
+    spatial_backends = list(First = NULL),
+    spatial_catalogs = list(First = list()),
+    dataset_catalog = list(First = NULL)
+  )
+  fingerprints <- list(First = .bundlePreflightFingerprint(path))
+  expect_true(.cacheBundlePreflightData(data, cached, fingerprints))
+
+  old_time <- file.info(path)$mtime
+  Sys.sleep(0.01)
+  writeBin(as.raw(9:16), path)
+  Sys.setFileTime(path, old_time)
+  reads <- 0L
+  observed <- .preflightBundleData(
+    data,
+    read_object = function(path) {
+      reads <<- reads + 1L
+      list(path = path)
+    },
+    inspect_backend = function(path, object) cached$backends$First,
+    inspect_spatial = function(object, dataset) cached$spatial_catalogs$First
+  )
+
+  expect_identical(reads, 1L)
+  expect_identical(observed[names(cached)], cached)
+  expect_identical(observed$immune_backends, list(First = NULL))
+})
+
+test_that("cached CRB preflight preserves spatial molecule sidecars", {
+  root <- withr::local_tempdir()
+  crb <- file.path(root, "dataset.crb")
+  object <- Cerebro$new()
+  object$expression <- matrix(
+    1:4,
+    nrow = 2L,
+    dimnames = list(c("gene-1", "gene-2"), c("cell-1", "cell-2"))
+  )
+  object$spatial <- list(
+    fov1 = list(
+      coordinates = data.frame(
+        x = c(0, 1),
+        y = c(0, 1),
+        row.names = c("cell-1", "cell-2")
+      ),
+      expression = object$expression,
+      molecules = data.frame(x = 1, y = 2, gene = "A")
+    )
+  )
+  saveCerebro(object, crb, codec = "rds")
+  data <- c(Dataset = crb)
+  preflight <- .preflightBundleData(data)
+  fingerprints <- list(Dataset = .bundlePreflightFingerprint(crb))
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+
+  expect_true(.cacheBundlePreflightData(data, preflight, fingerprints))
+  app <- file.path(root, "app")
+  createShinyApp(
+    cerebro_data = data,
+    result_dir = app,
+    launch_browser = FALSE,
+    verbose = FALSE
+  )
+
+  expect_true(dir.exists(file.path(app, "private-data", "dataset.spatial")))
+  expect_true(file.exists(file.path(
+    app,
+    "private-data",
+    "dataset.spatial",
+    "0001.rds"
+  )))
+})
+
 write_spatial_bundle_crb <- function(
   directory,
   name = "dataset.crb",
@@ -275,6 +401,36 @@ test_that("valid Viewer Packs are bundled beside their CRB", {
       file.path(app, "private-data", "dataset.viewer")
     )$valid
   )
+})
+
+test_that("a cached CRB preflight still bundles a valid Viewer Pack", {
+  root <- withr::local_tempdir()
+  crb <- write_bundle_crb(file.path(root, "source"))
+  object <- readCerebro(crb)
+  object$setMetaData(data.frame(
+    cell_barcode = c("cell-1", "cell-2"),
+    group = c("A", "B"),
+    stringsAsFactors = FALSE
+  ))
+  object$addProjection(
+    "umap",
+    data.frame(x = 1:2, y = 2:1, row.names = c("cell-1", "cell-2"))
+  )
+  saveCerebro(object, crb, codec = "rds", viewer_binary = "always")
+  data <- c(Dataset = crb)
+  preflight <- .preflightBundleData(data)
+  expect_true(preflight$viewer_pack_valid)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  expect_true(.cacheBundlePreflightData(
+    data,
+    preflight,
+    list(Dataset = .bundlePreflightFingerprint(crb))
+  ))
+
+  app <- file.path(root, "app")
+  build_test_app(data, app)
+
+  expect_true(dir.exists(file.path(app, "private-data", "dataset.viewer")))
 })
 
 test_that("scatter defaults accept one value or one value per dataset", {

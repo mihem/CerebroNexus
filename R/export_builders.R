@@ -150,7 +150,12 @@
     if (verbose) {
       .logStep('Extracting all meta data columns...')
     }
-    other <- setdiff(names(meta), c(groups, nUMI, nGene, cell_cycle))
+    ## Source columns named like the reserved ones would overwrite the cell
+    ## barcodes and the chosen nUMI/nGene values, so they are left out.
+    other <- setdiff(
+      names(meta),
+      c("cell_barcode", "nUMI", "nGene", groups, nUMI, nGene, cell_cycle)
+    )
     for (column in other) {
       meta_data[[column]] <- meta[[column]]
     }

@@ -1,0 +1,116 @@
+/* CerebroNexus Builder: base element and global foundation styles. */
+
+* { box-sizing: border-box; }
+html {
+  font-size: 16px;
+  scrollbar-color: var(--c-border-2) transparent;
+  scrollbar-width: thin;
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--builder-font-sans);
+  font-size: var(--builder-type-subtitle);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.form-group { margin-bottom: var(--space-3); }
+label, .control-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-caption);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.form-control, .selectize-input {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--c-border-2) !important;
+  border-radius: var(--r-sm) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-type-body) !important;
+  color: var(--c-text) !important;
+  background: var(--c-surface) !important;
+  min-height: 2.65rem;
+}
+.form-control:focus, .selectize-input.focus {
+  border-color: var(--builder-action) !important;
+  box-shadow: 0 0 0 3px var(--c-amber-50) !important;
+}
+.form-control[readonly] { background: var(--c-surface-2) !important; }
+.selectize-dropdown .option.active,
+.selectize-dropdown .option.selected,
+.selectize-dropdown .active {
+  background: var(--c-amber-50) !important;
+  color: var(--c-text) !important;
+}
+.selectize-dropdown .option.active:hover {
+  background: var(--c-amber-100) !important;
+}
+.selectize-control { min-width: 0; }
+.selectize-control.single .selectize-input {
+  min-height: 2.65rem;
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.35;
+  margin: 0;
+}
+.selectize-dropdown { z-index: 50; color: var(--c-text); }
+.selectize-control.multi .selectize-input > input::placeholder {
+  color: var(--c-text-muted);
+  opacity: 1;
+}
+.selectize-control.multi .selectize-input > input:only-child {
+  min-width: 5.5em !important;
+}
+.selectize-control.multi .selectize-dropdown {
+  width: max-content !important;
+  min-width: 100% !important;
+  max-width: calc(100vw - 32px) !important;
+}
+.selectize-control.multi .selectize-dropdown .option { white-space: nowrap; }
+.selectize-input.disabled,
+.form-control:disabled {
+  background: var(--c-surface-muted) !important;
+  color: var(--c-text-muted) !important;
+  opacity: 1;
+}
+input[type="checkbox"] { accent-color: var(--builder-action); }
+
+pre, code { font-family: var(--font-mono); font-size: var(--builder-type-small); }
+pre {
+  background: var(--c-surface-2); border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); padding: var(--space-2) var(--space-3); overflow-x: auto;
+  margin: var(--space-2) 0 0; color: var(--c-text-muted);
+}
+hr { border: none; border-top: 1px solid var(--c-border); margin: var(--space-4) 0; }
+.icon { width: 1rem; height: 1rem; vertical-align: -2px; }
+.builder-icon-slot { display: inline-flex; flex: 0 0 auto; }
+.builder-icon { width: 1rem; height: 1rem; display: block; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-2); border-radius: var(--r-pill);
+  border: 2px solid var(--c-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--c-text-subtle); }
+
+@media (max-width: 43.75rem) {
+  body { overflow-x: hidden; }
+  pre, code { overflow-wrap: anywhere; }
+}

@@ -927,6 +927,28 @@
   names(spatial_catalogs) <- names(cerebro_data)
   names(dataset_catalog) <- names(cerebro_data)
   for (index in seq_along(cerebro_data)) {
+    cached <- .takeBundlePreflightData(
+      cerebro_data[[index]],
+      names(cerebro_data)[[index]]
+    )
+    ## Immune sidecars are only inspected for recognized Cerebro objects, and a
+    ## file-backed repertoire always marks the dataset info as immune.
+    immune_absent <- !is.null(cached) &&
+      (is.null(cached$dataset_info) ||
+        identical(cached$dataset_info$immune_repertoire, FALSE))
+    if (!is.null(cached) && (isTRUE(cached$immune_known) || immune_absent)) {
+      backends[[index]] <- cached$backend
+      spatial_backends[index] <- list(cached$spatial_backend)
+      immune_backends[index] <- list(cached$immune_backend)
+      spatial_catalogs[[index]] <- cached$spatial_catalog
+      dataset_catalog[index] <- list(cached$dataset_info)
+      ## the CRB is not read again, so its Viewer Pack is checked the long way
+      viewer_pack_valid[[index]] <- .bundleViewerPackValid(
+        cerebro_data[[index]],
+        NULL
+      )
+      next
+    }
     object <- read_object(cerebro_data[[index]])
     inspection_error <- NULL
     release_error <- NULL
@@ -3473,4 +3495,236 @@ createShinyApp <- function(
     returned_result_dir <- result_dir
   }
   invisible(returned_result_dir)
+}
+
+
+.bundlePreflightCache <- new.env(parent = emptyenv())
+
+.bundlePreflightFingerprint <- function(path) {
+  info <- tryCatch(
+    fs::file_info(path, fail = TRUE, follow = FALSE),
+    error = function(error) NULL
+  )
+  canonical <- tryCatch(
+    normalizePath(path, winslash = "/", mustWork = TRUE),
+    error = function(error) NULL
+  )
+  if (
+    is.null(info) ||
+      nrow(info) != 1L ||
+      !identical(as.character(info$type), "file") ||
+      is.null(canonical)
+  ) {
+    return(NULL)
+  }
+  fingerprint <- list(
+    path = canonical,
+    size = as.double(info$size),
+    permissions = as.character(info$permissions),
+    device_id = as.double(info$device_id),
+    inode = as.double(info$inode),
+    hard_links = as.double(info$hard_links),
+    modification_time = as.double(info$modification_time),
+    change_time = as.double(info$change_time)
+  )
+  scalar <- vapply(fingerprint, length, integer(1)) == 1L
+  missing <- vapply(fingerprint, function(value) anyNA(value), logical(1))
+  numeric_fields <- setdiff(names(fingerprint), c("path", "permissions"))
+  finite <- vapply(
+    fingerprint[numeric_fields],
+    function(value) is.finite(value),
+    logical(1)
+  )
+  if (
+    !all(scalar) ||
+      any(missing) ||
+      !all(finite) ||
+      !nzchar(fingerprint$path) ||
+      !nzchar(fingerprint$permissions) ||
+      fingerprint$size < 0 ||
+      fingerprint$device_id < 0 ||
+      fingerprint$inode < 0 ||
+      fingerprint$hard_links < 1
+  ) {
+    return(NULL)
+  }
+  fingerprint
+}
+
+.bundlePreflightCacheKey <- function(path, dataset) {
+  paste(dataset, path, sep = "\r")
+}
+
+.clearBundlePreflightCache <- function() {
+  keys <- ls(.bundlePreflightCache, all.names = TRUE)
+  if (length(keys)) {
+    rm(list = keys, envir = .bundlePreflightCache)
+  }
+  invisible(TRUE)
+}
+
+.cacheBundlePreflightData <- function(
+  cerebro_data,
+  preflight_data,
+  fingerprints
+) {
+  labels <- names(cerebro_data)
+  legacy_preflight <- is.list(preflight_data) &&
+    identical(names(preflight_data), c("backends", "spatial_catalogs"))
+  if (legacy_preflight) {
+    preflight_data$spatial_backends <- stats::setNames(
+      vector("list", length(cerebro_data)),
+      labels
+    )
+    preflight_data <- preflight_data[c(
+      "backends",
+      "spatial_backends",
+      "spatial_catalogs"
+    )]
+  }
+  if (is.list(preflight_data) && is.null(preflight_data$dataset_catalog)) {
+    preflight_data$dataset_catalog <- stats::setNames(
+      vector("list", length(cerebro_data)),
+      labels
+    )
+  }
+  ## Immune sidecar descriptors are optional: callers that only verified the
+  ## core preflight leave them unknown, and `.preflightBundleData()` then
+  ## re-reads datasets that may carry an immune repertoire.
+  immune_known <- is.list(preflight_data) &&
+    !is.null(preflight_data$immune_backends)
+  core_names <- setdiff(
+    names(preflight_data),
+    c("immune_backends", "viewer_pack_valid")
+  )
+  valid <- is.character(cerebro_data) &&
+    length(cerebro_data) > 0L &&
+    !is.null(labels) &&
+    !anyNA(labels) &&
+    all(nzchar(labels)) &&
+    is.list(preflight_data) &&
+    setequal(
+      core_names,
+      c("backends", "spatial_backends", "spatial_catalogs", "dataset_catalog")
+    ) &&
+    length(core_names) == 4L &&
+    (!immune_known ||
+      identical(names(preflight_data$immune_backends), labels)) &&
+    identical(names(preflight_data$backends), labels) &&
+    identical(names(preflight_data$spatial_backends), labels) &&
+    identical(names(preflight_data$spatial_catalogs), labels) &&
+    identical(names(preflight_data$dataset_catalog), labels) &&
+    is.list(fingerprints) &&
+    identical(names(fingerprints), labels)
+  if (!valid) {
+    return(FALSE)
+  }
+
+  entries <- vector("list", length(cerebro_data))
+  for (index in seq_along(cerebro_data)) {
+    observed <- .bundlePreflightFingerprint(cerebro_data[[index]])
+    if (is.null(observed) || !identical(observed, fingerprints[[index]])) {
+      return(FALSE)
+    }
+    entries[[index]] <- list(
+      key = .bundlePreflightCacheKey(observed$path, labels[[index]]),
+      fingerprint = observed,
+      backend = preflight_data$backends[[index]],
+      spatial_backend = preflight_data$spatial_backends[[index]],
+      spatial_catalog = preflight_data$spatial_catalogs[[index]],
+      dataset_info = preflight_data$dataset_catalog[[index]],
+      immune_known = immune_known,
+      immune_backend = if (immune_known) {
+        preflight_data$immune_backends[[index]]
+      } else {
+        NULL
+      }
+    )
+  }
+  for (entry in entries) {
+    assign(entry$key, entry, envir = .bundlePreflightCache)
+  }
+  TRUE
+}
+
+.takeBundlePreflightData <- function(path, dataset) {
+  observed <- .bundlePreflightFingerprint(path)
+  if (is.null(observed)) {
+    return(NULL)
+  }
+  key <- .bundlePreflightCacheKey(observed$path, dataset)
+  entry <- get0(key, envir = .bundlePreflightCache, inherits = FALSE)
+  if (is.null(entry)) {
+    return(NULL)
+  }
+  rm(list = key, envir = .bundlePreflightCache)
+  if (!identical(entry$fingerprint, observed)) {
+    return(NULL)
+  }
+  list(
+    backend = entry$backend,
+    spatial_backend = entry$spatial_backend,
+    spatial_catalog = entry$spatial_catalog,
+    dataset_info = entry$dataset_info,
+    immune_known = isTRUE(entry$immune_known),
+    immune_backend = entry$immune_backend
+  )
+}
+
+# OS-backed entropy for generated application credentials. Never fall back to
+# R's seeded statistical PRNG: these bytes can become authentication secrets.
+.builderRandomBytes <- function(n) {
+  if (
+    length(n) != 1L ||
+      !is.numeric(n) ||
+      is.na(n) ||
+      n < 1 ||
+      n > 65536 ||
+      n != as.integer(n)
+  ) {
+    stop("The requested random byte count is invalid.", call. = FALSE)
+  }
+  n <- as.integer(n)
+  if (.Platform$OS.type == "windows") {
+    command <- sprintf(
+      paste0(
+        "$ErrorActionPreference='Stop'; $bytes=New-Object byte[] %d; ",
+        "$rng=[System.Security.Cryptography.RandomNumberGenerator]::Create(); ",
+        "try {$rng.GetBytes($bytes); [BitConverter]::ToString($bytes).Replace('-', '')} ",
+        "finally {$rng.Dispose()}"
+      ),
+      n
+    )
+    output <- system2(
+      "powershell.exe",
+      c(
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        shQuote(command)
+      ),
+      stdout = TRUE,
+      stderr = FALSE
+    )
+    if (!is.null(attr(output, "status")) || length(output) != 1L) {
+      stop("Operating-system secure randomness is unavailable.", call. = FALSE)
+    }
+    if (
+      nchar(output, type = "bytes") != 2L * n ||
+        !grepl("^[0-9A-Fa-f]+$", output)
+    ) {
+      stop("Operating-system secure randomness is invalid.", call. = FALSE)
+    }
+    starts <- seq.int(1L, 2L * n, by = 2L)
+    bytes <- as.raw(strtoi(substring(output, starts, starts + 1L), base = 16L))
+  } else {
+    connection <- file("/dev/urandom", open = "rb", raw = TRUE)
+    on.exit(close(connection), add = TRUE)
+    bytes <- readBin(connection, what = "raw", n = n)
+  }
+  if (!is.raw(bytes) || length(bytes) != n) {
+    stop("Operating-system secure randomness is incomplete.", call. = FALSE)
+  }
+  bytes
 }

@@ -51,6 +51,7 @@
   ".fallbackRuntimeBackendPlan",
   ".runtimeBackendRecoveryAdvice",
   ".attachExternalExpression",
+  ".verifyRuntimeH5Checksum",
   ".h5ExpressionRows",
   "extra_material_table_filter",
   "viewerHasTcrRepertoire",

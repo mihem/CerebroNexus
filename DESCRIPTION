@@ -27,6 +27,10 @@ biocViews:
   Transcriptomics,
   Visualization
 Imports:
+  callr,
+  data.table,
+  digest,
+  ggdendro,
   htmltools,
   base64enc,
   biomaRt (>= 2.38.0),
@@ -47,12 +51,16 @@ Imports:
   methods,
   mirai,
   msigdbr (>= 24.1.0),
+  patchwork,
   pbapply (>= 1.4),
   plotly (>= 4.9.0),
+  processx,
   promises,
+  ps,
   qvalue (>= 2.14.0),
   qs2,
   R6 (>= 2.4.0),
+  readxl,
   rlang (>= 1.0.0),
   scales (>= 1.1.0),
   scRepertoire (>= 2.0.0),
@@ -72,18 +80,15 @@ Suggests:
   anndataR,
   arrow,
   cachem,
-  callr,
   chromote,
   DelayedArray,
-  ggdendro,
   HDF5Array (>= 1.18.1),
   httpuv,
   httr,
+  jpeg,
   knitr,
   monocle,
-  patchwork,
   png,
-  readxl,
   rhdf5,
   rmarkdown,
   S4Vectors,
@@ -95,8 +100,12 @@ Suggests:
   testthat (>= 3.0.0),
   shinytest2 (>= 0.2.0),
   withr,
-  xml2
+  writexl,
+  xml2,
+  zip
 VignetteBuilder: knitr
+Enhances:
+  qs
 Config/testthat/edition: 3
 Config/testthat/parallel: true
 Config/testthat/start-first: app-immune_repertoire, app-inst,

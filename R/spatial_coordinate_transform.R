@@ -180,6 +180,76 @@
   normalized
 }
 
+.spx_coordinate_transforms_normalize <- function(
+  transforms,
+  spatial_names,
+  coordinates_by_spatial,
+  context = "spatial_coordinate_transforms"
+) {
+  if (
+    !is.character(spatial_names) ||
+      is.object(spatial_names) ||
+      anyNA(spatial_names) ||
+      any(!nzchar(spatial_names)) ||
+      anyDuplicated(spatial_names)
+  ) {
+    stop(
+      context,
+      " spatial_names must contain unique non-blank names.",
+      call. = FALSE
+    )
+  }
+  if (
+    !is.list(coordinates_by_spatial) ||
+      is.object(coordinates_by_spatial) ||
+      !identical(names(coordinates_by_spatial), spatial_names)
+  ) {
+    stop(
+      context,
+      " coordinates_by_spatial must be a named list matching spatial_names.",
+      call. = FALSE
+    )
+  }
+  if (is.null(transforms)) {
+    return(list())
+  }
+  if (
+    !is.list(transforms) ||
+      is.object(transforms) ||
+      is.null(names(transforms)) ||
+      !is.character(names(transforms)) ||
+      is.object(names(transforms)) ||
+      anyNA(names(transforms)) ||
+      any(!nzchar(names(transforms))) ||
+      anyDuplicated(names(transforms))
+  ) {
+    stop(
+      context,
+      " must be an ordinary named list with unique non-blank FOV names.",
+      call. = FALSE
+    )
+  }
+  unknown <- setdiff(names(transforms), spatial_names)
+  if (length(unknown)) {
+    stop(
+      context,
+      " contains unknown FOV(s): ",
+      paste(unknown, collapse = ", "),
+      call. = FALSE
+    )
+  }
+  normalized <- vector("list", length(transforms))
+  names(normalized) <- names(transforms)
+  for (spatial_name in names(transforms)) {
+    normalized[[spatial_name]] <- .spx_coordinate_transform_normalize(
+      transforms[[spatial_name]],
+      coordinates_by_spatial[[spatial_name]],
+      paste0(context, "$", spatial_name)
+    )
+  }
+  normalized
+}
+
 .spx_apply_coordinate_transform <- function(coordinates, transform) {
   normalized <- .spx_coordinate_transform_normalize(transform, coordinates)
   if (
@@ -267,4 +337,53 @@
   writeBin(payload, path, useBytes = TRUE)
   md5sum <- getExportedValue("tools", "md5sum")
   unname(as.character(md5sum(path)))
+}
+
+.spx_invert_coordinate_transform <- function(coordinates, transform) {
+  details <- .spx_coordinate_transform_coordinates(
+    coordinates,
+    "Spatial coordinate inverse transform"
+  )
+  if (!is.list(transform) || is.object(transform)) {
+    stop(
+      "Spatial coordinate inverse transform requires provenance.",
+      call. = FALSE
+    )
+  }
+  rotation <- .spx_coordinate_transform_scalar(
+    transform$rotation_degrees,
+    "rotation_degrees",
+    "Spatial coordinate inverse transform"
+  )
+  scale <- .spx_coordinate_transform_scalar(
+    transform$scale,
+    "scale",
+    "Spatial coordinate inverse transform",
+    positive = TRUE
+  )
+  pivot <- transform$pivot
+  if (
+    !is.numeric(pivot) ||
+      is.object(pivot) ||
+      length(pivot) != 2L ||
+      !identical(names(pivot), c("x", "y")) ||
+      any(!is.finite(pivot))
+  ) {
+    stop(
+      "Spatial coordinate inverse transform requires a finite x/y pivot.",
+      call. = FALSE
+    )
+  }
+  angle <- rotation * pi / 180
+  scaled_x <- (details$x - pivot[["x"]]) / scale
+  scaled_y <- (details$y - pivot[["y"]]) / scale
+  coordinates$x <- pivot[["x"]] + cos(angle) * scaled_x + sin(angle) * scaled_y
+  coordinates$y <- pivot[["y"]] - sin(angle) * scaled_x + cos(angle) * scaled_y
+  if (any(!is.finite(coordinates$x)) || any(!is.finite(coordinates$y))) {
+    stop(
+      "Spatial coordinate inverse transform produced non-finite coordinates.",
+      call. = FALSE
+    )
+  }
+  coordinates
 }

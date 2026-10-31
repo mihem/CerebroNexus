@@ -1,0 +1,652 @@
+/* CerebroNexus Builder: page, shell, and responsive layout styles. */
+
+.topbar {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-bottom: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  position: relative;
+  top: auto;
+  z-index: 30;
+  width: calc(100% - 2 * var(--builder-page-gutter));
+  max-width: none;
+  margin: var(--space-3) auto 0;
+}
+.builder-project-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  position: relative;
+}
+.builder-runtime-version {
+  position: absolute;
+  right: 0;
+  bottom: -.62rem;
+  color: var(--c-text-subtle);
+  font-family: var(--font-mono);
+  font-size: .56rem;
+  font-weight: 500;
+  line-height: 1;
+  opacity: .78;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.topbar .wordmark { display: flex; align-items: center; gap: var(--space-3); }
+.topbar .wordmark svg { height: 17px; width: auto; display: block; }
+.topbar h1 {
+  font-size: var(--builder-type-subtitle); font-weight: 600; margin: 0; letter-spacing: -.01em;
+}
+.topbar .formats {
+  font-size: var(--builder-type-caption); color: var(--c-text-subtle); font-family: var(--font-mono);
+  margin-left: 0;
+}
+.builder-project-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.builder-project-toolbar .builder-project-status { margin-right: .2rem; }
+
+#workflow_progress {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: block;
+  width: calc(100% - 2 * var(--builder-page-gutter));
+  max-width: none;
+  margin: 0 auto;
+}
+#workflow_progress .builder-workflow-progress {
+  padding: 0 var(--space-5);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface-2);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-progress {
+  border-color: var(--c-border-strong);
+  border-top-color: transparent;
+  background: var(--c-surface);
+  box-shadow: var(--shadow-2);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-progress li > button,
+#workflow_progress.is-workflow-compact .builder-workflow-progress li > span {
+  min-height: 2.85rem;
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-stage-link > .action-label {
+  gap: var(--space-2);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-step-number {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-basis: 1.5rem;
+  font-size: var(--builder-type-caption);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-step-copy strong {
+  font-size: var(--builder-type-body);
+}
+#workflow_progress.is-workflow-compact .builder-workflow-step-copy small {
+  display: none;
+}
+.shell,
+.builder-shell {
+  display: grid;
+  grid-template-columns: var(--builder-rail-width) minmax(0, 1fr);
+  gap: 0;
+  width: calc(100% - 2 * var(--builder-page-gutter));
+  max-width: none;
+  min-height: calc(100dvh - 12rem);
+  margin: 0 auto var(--space-8);
+  padding: 0;
+  align-items: stretch;
+  position: relative;
+  border: 1px solid var(--c-border);
+  border-top: 0;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+  background: var(--c-surface);
+  box-shadow: none;
+  overflow: clip;
+  transition: min-height 220ms var(--ease-standard);
+}
+.builder-shell:not(:has(.rail .ds)) {
+  min-height: 0;
+}
+/* Grid items refuse to shrink below their content by default, so one long
+   path in a <pre> would push the whole column past the viewport. */
+.shell > * { min-width: 0; }
+#workbench,
+.builder-stage {
+  min-width: 0;
+  max-width: 100%;
+}
+#pane { position: relative; z-index: 1; }
+.builder-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+#builder-workspace { padding: 0; }
+#workflow_progress .builder-workflow-progress ol {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+#workflow_progress .builder-workflow-progress li {
+  font-size: clamp(.82rem, .35vw + .76rem, .92rem);
+  font-weight: 500;
+}
+#workflow_progress .builder-workflow-progress li[aria-current="step"] {
+  color: var(--builder-action);
+  font-weight: 600;
+}
+/* The dataset navigator has a different purpose from the workspace. On
+   desktop it gets its own scrollport; the workspace keeps the document
+   scrollport so long forms and result cards always remain reachable. */
+@media (min-width: 58.0625rem) {
+  .builder-shell:not(:has(.rail .ds)) {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+  .shell .rail,
+  .builder-shell .rail {
+    align-self: start;
+    position: sticky;
+    top: var(--builder-workflow-progress-height, 4.75rem);
+    height: calc(
+      100dvh - var(--builder-topbar-height, 4rem) -
+      var(--builder-workflow-progress-height, 4.75rem) - var(--space-8)
+    );
+    max-height: calc(
+      100dvh - var(--builder-workflow-progress-height, 4.75rem) - var(--space-8)
+    );
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 1;
+    transform: none;
+    transition: opacity 180ms var(--ease-standard),
+      transform 180ms var(--ease-standard);
+  }
+  .builder-shell:not(:has(.rail .ds)) > .rail {
+    height: 0;
+    max-height: 0;
+    overflow: hidden;
+    border-right-color: transparent;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-.75rem);
+  }
+  #workflow_progress.is-workflow-compact ~ .shell .rail,
+  #workflow_progress.is-workflow-compact ~ .builder-shell .rail {
+    height: calc(
+      100dvh - var(--builder-workflow-progress-height, 4.75rem) - var(--space-8)
+    );
+  }
+}
+
+#workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--builder-section-gap);
+  align-items: start;
+}
+#workbench > * { min-width: 0; }
+.builder-stage {
+  background: var(--c-surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--builder-stage-padding);
+  height: auto;
+  align-self: start;
+  overflow-wrap: anywhere;
+  animation: builder-stage-enter 140ms var(--ease) both;
+  transition: border-color var(--duration-base) var(--ease),
+              box-shadow var(--duration-base) var(--ease);
+}
+.builder-stage ul { max-width: 100%; padding-left: var(--space-5); }
+.builder-stage li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.builder-stage[data-current-stage="true"] {
+  border-color: transparent;
+  box-shadow: none;
+}
+.builder-stage > h2 { margin-top: 0; }
+
+@keyframes builder-stage-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- dataset rail ------------------------------------------------------ */
+
+.rail-summary,
+.rail-manager-backdrop,
+.rail-manager-close { display: none; }
+
+.rail-summary {
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+  color: var(--c-text);
+  box-shadow: var(--shadow-1);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.rail-summary:focus-visible {
+  outline: 2px solid var(--builder-action);
+  outline-offset: 2px;
+}
+.rail-summary-copy { min-width: 0; display: grid; }
+.rail-summary-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.rail-summary-state { color: var(--c-text-muted); font-size: var(--builder-type-caption); }
+.rail-summary-action {
+  flex: 0 0 auto;
+  color: var(--builder-action-active);
+  font-size: var(--builder-type-small);
+  font-weight: 600;
+}
+
+.rail {
+  z-index: 3;
+  background: var(--c-surface);
+  border: 0;
+  border-right: 1px solid var(--c-border);
+  border-radius: 0;
+  overflow: visible;
+  position: relative;
+  top: auto;
+  box-shadow: none;
+}
+.ds--ready:has(.ds-ready-stamp.needs-review) .ds-pick { padding-right: 2.5rem; }
+.rail-head {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--builder-type-caption);
+  font-family: var(--font-mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--c-text-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rail-empty { padding: var(--space-4) var(--space-4); color: var(--c-text-subtle); font-size: var(--builder-type-body); }
+.rail-add-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--c-border);
+}
+.rail-add-actions .btn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 4.25rem;
+  justify-content: center;
+  justify-items: center;
+  align-items: center;
+  align-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-3);
+  border-color: var(--c-border);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  text-align: left;
+  box-shadow: none;
+}
+.rail-add-actions .btn:hover,
+.rail-add-actions .btn:focus-visible {
+  border-color: var(--c-border-2);
+  background: var(--c-surface-2);
+  box-shadow: none;
+}
+.rail-add-icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border-radius: var(--r-xs);
+  background: var(--c-surface-2);
+  color: var(--c-text-muted);
+}
+.rail-add-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.rail-add-title strong {
+  color: var(--c-text);
+  font-size: var(--builder-type-subtitle);
+  line-height: 1.2;
+}
+.rail-add-detail {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-micro);
+  line-height: 1.3;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.builder-format-deprecated {
+  display: block;
+  color: var(--c-text-subtle, var(--c-text-muted));
+  font-size: var(--builder-type-micro);
+  line-height: 1.35;
+  text-align: center;
+}
+.rail-add-actions > .builder-format-deprecated {
+  margin-top: var(--space-1);
+  padding: 0 var(--space-1);
+}
+.builder-dataset-dropzone .builder-format-deprecated {
+  margin-top: .2rem;
+  font-size: var(--builder-type-caption);
+  text-align: inherit;
+}
+.builder-format-unavailable {
+  display: grid;
+  gap: .2rem;
+  color: var(--c-error);
+  font-size: var(--builder-type-caption);
+  line-height: 1.4;
+}
+.builder-format-unavailable--rail {
+  padding: 0 var(--space-1);
+  font-size: var(--builder-type-micro);
+  text-align: left;
+}
+
+/* One data set row.
+   The row is a container, not a button, because it holds two targets: the
+   whole row selects, and a remove button sits on top of its right end. */
+.ds {
+  position: relative;
+  margin: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  transition: background var(--duration-base) var(--ease),
+              box-shadow var(--duration-fast) var(--ease-standard),
+              transform var(--duration-fast) var(--ease-standard);
+}
+.ds-picker .ds:not(.is-active):has(.ds-pick:hover),
+.ds-picker .ds:not(.is-active):has(.ds-pick:focus-visible) {
+  background: var(--builder-rail-hover-bg);
+  box-shadow: inset 0 0 0 1px var(--c-border-2);
+  transform: none;
+}
+.ds-picker .ds.is-active:has(.ds-pick:hover),
+.ds-picker .ds.is-active:has(.ds-pick:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--c-border-2);
+}
+.ds.is-active {
+  border-color: var(--c-border-2);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.ds::before {
+  position: absolute;
+  inset: .55rem auto .55rem -.05rem;
+  width: 3px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  content: "";
+}
+.ds.is-active::before { background: var(--builder-action); }
+
+.ds-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.ds-pick:focus-visible { outline: 2px solid var(--builder-focus-ring); outline-offset: -2px; }
+
+/* Dataset order is part of the generated app contract, so keep it visible. */
+.ds-idx {
+  display: inline-grid;
+  flex: 0 0 1.7rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border: 1px solid var(--c-border-2);
+  border-radius: 50%;
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+}
+.ds-idx::before, .ds-idx::after { display: none; }
+.ds.is-active .ds-idx {
+  border-color: var(--c-border-2);
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+.ds:has(.ds-ready-stamp.is-checked) .ds-idx {
+  border-color: var(--c-success);
+  background: var(--c-success);
+  color: #fff;
+}
+
+.ds-body { min-width: 0; flex: 1; }
+.ds .nm {
+  display: block; font-weight: 600; font-size: var(--builder-type-body); line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ds .meta {
+  display: block; font-family: var(--font-mono); font-size: var(--builder-type-caption);
+  color: var(--c-text-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ds .meta.bad { color: var(--c-warning); }
+.ds.is-active .meta,
+.ds.is-active .builder-import-status { color: var(--c-text-muted); }
+.ds.is-active .meta.bad { color: var(--c-warning-700); }
+
+/* Destructive actions remain visible without relying on pointer hover. */
+.ds-del {
+  display: inline-flex;
+  justify-content: center;
+  position: static;
+  width: auto;
+  min-height: 1.8rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--c-error);
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 1;
+}
+.ds-del:hover { background: var(--c-error-100); color: var(--c-error); }
+.ds-del:focus-visible { outline: 2px solid var(--c-error); outline-offset: 1px; }
+.ds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+  opacity: .62;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.ds:hover .ds-actions,
+.ds:focus-within .ds-actions,
+.ds.is-active .ds-actions { opacity: 1; }
+.ds-move {
+  display: inline-flex;
+  width: auto;
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  margin: 0;
+  padding: .15rem var(--space-1);
+  border: 1px solid var(--c-border-2);
+  border-radius: var(--r-xs);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+.ds-move,
+.ds-del {
+  align-items: center;
+  gap: var(--space-1);
+  font: inherit;
+  font-size: var(--builder-type-caption);
+  line-height: 1;
+}
+.ds-action-label { white-space: nowrap; }
+.ds-move:focus-visible {
+  outline: 2px solid var(--builder-action);
+  outline-offset: 1px;
+}
+.ds-move[disabled] { opacity: .4; cursor: not-allowed; }
+.ds.is-active .ds-move {
+  border-color: var(--c-border-2);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+}
+.builder-stage-core { max-width: none; overflow: visible; }
+
+@media (max-width: 68.75rem) {
+  :root {
+    --builder-rail-width: 15.5rem;
+    --builder-shell-gap: var(--space-4);
+  }
+}
+
+@media (max-width: 58rem) {
+  .shell,
+  .builder-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+  .rail-summary { display: flex; }
+  .rail-manager-backdrop.is-open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 69;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(17, 17, 26, .42);
+    opacity: 0;
+    cursor: default;
+    transition: opacity var(--duration-normal) var(--ease-standard);
+  }
+  .rail-manager-backdrop.is-visible { opacity: 1; }
+  .rail {
+    display: none;
+    position: fixed;
+    inset: max(1rem, env(safe-area-inset-top)) 1rem
+      max(1rem, env(safe-area-inset-bottom));
+    top: max(1rem, env(safe-area-inset-top));
+    z-index: 70;
+    width: auto;
+    max-height: none;
+    overflow-y: auto;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-3);
+  }
+  .rail.is-manager-open {
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateY(.35rem);
+    transition: opacity var(--duration-normal) var(--ease-standard),
+      transform var(--duration-normal) var(--ease-standard);
+  }
+  .rail.is-manager-visible { opacity: 1; transform: none; }
+  .rail-manager-close {
+    display: inline-flex;
+    min-height: 2rem;
+    align-items: center;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--c-border-2);
+    border-radius: var(--r-xs);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .builder-stage { animation: none; }
+  .builder-shell,
+  .builder-shell > .rail { transition: none; }
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --builder-page-gutter: var(--space-4);
+    --builder-stage-padding: var(--space-4);
+    --builder-section-gap: var(--space-3);
+  }
+  .topbar { padding-inline: var(--space-4); }
+  .builder-project-toolbar {
+    width: 100%;
+    order: 3;
+    margin-left: 0;
+  }
+  .builder-project-toolbar .builder-project-status { margin-right: auto; }
+  .topbar .formats { width: 100%; order: 4; }
+  .shell,
+  .builder-shell { padding-block: 0; }
+  .ds-move,
+  .ds-del,
+  .rail-manager-close {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds,
+  .ds-picker .ds:has(.ds-pick:hover),
+  .ds-picker .ds:has(.ds-pick:focus-visible) {
+    transform: none;
+    transition: none;
+  }
+  .ds:not(.is-active)::before { display: none; }
+  .rail.is-manager-open { transform: none; }
+}

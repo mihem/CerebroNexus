@@ -215,3 +215,11 @@ test_that("sheet renames are restricted to declared Excel files", {
     "only map Excel"
   )
 })
+
+test_that("a delimited extra table keeps an apostrophe inside a field", {
+  path <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("disease,n", "Crohn's disease,3", "Colitis,5"), path)
+  table <- .readExtraDelimited(path, "csv")
+  expect_identical(nrow(table), 2L)
+  expect_identical(table$disease, c("Crohn's disease", "Colitis"))
+})
