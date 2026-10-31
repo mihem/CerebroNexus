@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,39 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.5.0" id="cerebronexus-550">CerebroNexus 5.5.0<a class="anchor" aria-label="anchor" href="#cerebronexus-550"></a></h2>
+<div class="section level3">
+<h3 id="new-5-5-0">New<a class="anchor" aria-label="anchor" href="#new-5-5-0"></a></h3>
+<ul><li>Two more large demo data sets for <code>run-demo.R</code>, for the pages the existing ones do not exercise at this size. <code>Rscript run-demo.R --data=cosmx</code> prepares and opens the NanoString CosMx SMI non-small-cell lung cancer data set (eight sections, 960 genes, one spatial entry per section; Spatial and Gene expression pages). <code>--data=tcell</code> prepares and opens the Zheng et al. (2021) pan-cancer T-cell atlas (397,810 cells, 316 patients, 21 cancer types, 168,901 cells with TCR sequences, and the published CD8 exhaustion pseudotime; Immune repertoire and Trajectory pages). The Viewer reads the files named by <code>CEREBRO_COSMX_DEMO_CRB</code> and <code>CEREBRO_TCELL_DEMO_CRB</code>, which must name a <code>.crb</code> with an adjacent <code>.h5</code> file like the two earlier variables.</li>
+<li>
+<code>run-demo.R</code> takes the data sets as <code>--data=1m,ren,cosmx,tcell</code> and prepares only the mouse brain without it. <code>--ren-only</code> is now <code>--data=ren</code>, and <code>--no-browser</code> is gone: the Viewer always opens in the browser. <code>--prepare-only</code> stays. Each prepared data set also gets a compressed twin of its H5 file, listed in the data set menu as “<name> [compressed]”.</name></li>
+<li>The scripts are <code>data-raw/large-demo/prepare_viewer_cosmx_data.R</code> and <code>prepare_viewer_tcell_data.R</code>. Downloads are checked against the published size and MD5, resumed after an interruption, and not repeated; the result is built in a temporary folder and published with a <code>demo-version</code> stamp, so a stopped run leaves no half-finished data set and a changed version builds again. Sources, licences and changes to the data are in <code>cosmx.ATTRIBUTION.md</code> and <code>tcell.ATTRIBUTION.md</code>; no data file is committed.</li>
+<li>The trajectory page accepts a trajectory with the method name <code>published_pseudotime</code> (shown as “Published pseudotime”), for a pseudotime that comes with a data set rather than from a method run in CerebroNexus.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="changes-5-5-0">Changes<a class="anchor" aria-label="anchor" href="#changes-5-5-0"></a></h3>
+<ul><li>Seurat 5.0 or later is required (<code>DESCRIPTION</code> already said so); an older Seurat is refused with a message, and Seurat 4 objects are no longer read.</li>
+<li>The HLA &amp; TCR Motifs network is drawn in the browser, so <code>visNetwork</code> is no longer a dependency; the page needs <code>stringdist</code> and <code>igraph</code>.</li>
+<li>The prepared mouse brain demo data set is version 3: an existing <code>1m/cerebro-v2</code> folder is not reused, and <code>run-demo.R --data=1m</code> builds it again.</li>
+<li>
+<code><a href="../reference/readCerebro.html">readCerebro()</a></code> opens an H5-backed data file without loading HDF5Array: the cell names are read from the H5 file with rhdf5, and the expression matrix is attached when <code>$expression</code> is first used. Reading the 1.3 and 1.5 million cell demo data sets takes about 1 s instead of 3-5 s.</li>
+<li>An H5-backed CRB stores repertoire barcodes that are cells of the data set as cell indices (in the CRB or its <code>.immune</code> sidecar; thin-CRB schema version 4, written only when there are such barcodes). <code>getImmuneRepertoire()</code> returns them as barcodes. Reading the Ren repertoire takes 3.8 s instead of 5.0 s. CRBs written before read as before; an earlier release refuses a version 4 CRB with an error naming the schema version.</li>
+<li>The Viewer Pack stores the immune repertoire as integer columns (<code>immune/encoded.qs2</code>, <code>immune_encoding</code> in the manifest) and the HLA motif segments without scRepertoire’s clone strings. Rebuild the Viewer Pack of a data set built before (<code>buildViewerPack(&lt;crb&gt;, overwrite = TRUE)</code>; the large demo data sets rebuild themselves). Until then, and for a data set without a Pack, the Immune repertoire page encodes the repertoire in memory, says so, and keeps the result in the user cache folder (<code>CEREBRO_IR_CACHE</code> changes it): 21 s on the first start and 8 s after it on the 1.46 M-cell Ren data set, 1.1 s with a rebuilt Pack. The encoding is version 2: the order of equally large clones in Compare is now the byte order of their names, not the locale’s, so a Pack with an earlier encoding counts as outdated and is rebuilt by the large demos.</li>
+<li>
+<code><a href="../reference/saveCerebro.html">saveCerebro()</a></code>, <code><a href="../reference/exportFromSeurat.html">exportFromSeurat()</a></code> and <code><a href="../reference/exportFromSCE.html">exportFromSCE()</a></code> build a Viewer Pack above 100,000 cells (was 500,000), so mid-sized data sets get one too.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="viewer-5-5-0">Viewer<a class="anchor" aria-label="anchor" href="#viewer-5-5-0"></a></h3>
+<ul><li>Point size, opacity, labels, borders, square layout, “% of cells”, the pseudotime chart sliders and the HLA node size apply in the browser as the control moves, also while R is busy.</li>
+<li>Pages open faster: the page’s own resources are sent first, the data set is prepared while Data info is shown, and Viewer Pack files are hashed once per file version.</li>
+<li>Spatial applies group filters in the browser and draws a new sample’s section without waiting for its controls; “Split by” works again.</li>
+<li>Immune repertoire draws every tab from the encoded repertoire. Diversity is computed in the app (equal to scRepertoire for the same seed) and follows “Order groups”; it leaves out empty group combinations and samples without cells on the chosen chain, where scRepertoire returned zeros or an error. SizeDist uses the empirical clone-size profile for every data set. Paired Scatter follows the point size and opacity controls (default opacity 0.8).</li>
+<li>“Expression in selected cells” leaves out cells hidden by a group filter.</li>
+<li>Region outlines stay on when a filter or ROI rebuilds the Spatial frame.</li>
+<li>An error figure in Immune repertoire is no longer shared with other sessions.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.4.0" id="cerebronexus-540">CerebroNexus 5.4.0<a class="anchor" aria-label="anchor" href="#cerebronexus-540"></a></h2>
 <div class="section level3">

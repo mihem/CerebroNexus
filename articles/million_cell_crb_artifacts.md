@@ -122,8 +122,17 @@ After changing the CRB, rebuild with
 `buildViewerPack(file, viewer_binary = "always", overwrite = TRUE)`. A
 missing, incompatible or stale pack, such as one written for another
 pack schema, is invalid as a whole and falls back to the ordinary data
-path; rebuilding it restores the fast paths. Do not suppress checksum
-failures or edit a manifest to make a pack appear valid.
+path; rebuilding it restores the fast paths.
+
+A pack built before the Viewer stored the immune repertoire as integer
+columns (`immune/encoded.qs2`) is still valid, but its Immune repertoire
+page encodes the repertoire in memory at the first visit and says so:
+about 21 s on the 1.46 M-cell Ren data set, about 8 s on later starts
+(the encoding is kept in the user cache folder; `CEREBRO_IR_CACHE`
+changes it), against about 1 s with a current pack. Rebuild such a pack
+once with `buildViewerPack("path/to/data.crb", overwrite = TRUE)`. Do
+not suppress checksum failures or edit a manifest to make a pack appear
+valid.
 
 ## Understand large-group plots
 
@@ -181,8 +190,8 @@ download/preparation failures from Viewer errors (`--prepare-only` exits
 before starting Shiny):
 
 ``` bash
-Rscript run-demo.R --ren-only --prepare-only
-Rscript run-demo.R --ren-only --no-browser
+Rscript run-demo.R --data=ren --prepare-only
+Rscript run-demo.R --data=ren
 ```
 
 The launcher prints the URL, the source directory and the Ren data
@@ -193,14 +202,14 @@ directories (`ren/cerebro-v2/`); preparation never upgrades the earlier
 source downloads are shared between versions.
 
 The launcher also builds each data set’s Viewer Pack and rebuilds it
-when it is missing or predates an asset the viewer reads. Without a
-pack, the HLA & TCR motifs page spends about 15 s (about 25 s for the
-whole first entry) building the CDR3 Hamming-1 graph at Ren’s scale;
-with one, the same entry settles in under two seconds. If you start the
-viewer against a prepared `.crb` yourself, build the pack once (about a
-minute for Ren) with
-`buildViewerPack("path/to/data.crb", overwrite = TRUE)`; rerunning it
-after re-preparing a CRB is also the repair.
+when it is missing or predates an asset the viewer reads (the HLA first
+frames, the immune repertoire’s integer encoding). Without a pack, the
+HLA & TCR motifs page spends about 15 s (about 25 s for the whole first
+entry) building the CDR3 Hamming-1 graph at Ren’s scale; with one, the
+same entry settles in under two seconds. If you start the viewer against
+a prepared `.crb` yourself, build the pack once (about a minute for Ren)
+with `buildViewerPack("path/to/data.crb", overwrite = TRUE)`; rerunning
+it after re-preparing a CRB is also the repair.
 
 The 10x marker-guided E18 neurogenesis path excludes endothelial,
 microglial and oligodendrocyte programs, orders the remaining neural

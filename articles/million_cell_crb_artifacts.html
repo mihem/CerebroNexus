@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -229,8 +229,17 @@ projections.</p>
 <code>buildViewerPack(file, viewer_binary = "always", overwrite = TRUE)</code>.
 A missing, incompatible or stale pack, such as one written for another
 pack schema, is invalid as a whole and falls back to the ordinary data
-path; rebuilding it restores the fast paths. Do not suppress checksum
-failures or edit a manifest to make a pack appear valid.</p>
+path; rebuilding it restores the fast paths.</p>
+<p>A pack built before the Viewer stored the immune repertoire as
+integer columns (<code>immune/encoded.qs2</code>) is still valid, but
+its Immune repertoire page encodes the repertoire in memory at the first
+visit and says so: about 21 s on the 1.46 M-cell Ren data set, about 8 s
+on later starts (the encoding is kept in the user cache folder;
+<code>CEREBRO_IR_CACHE</code> changes it), against about 1 s with a
+current pack. Rebuild such a pack once with
+<code>buildViewerPack("path/to/data.crb", overwrite = TRUE)</code>. Do
+not suppress checksum failures or edit a manifest to make a pack appear
+valid.</p>
 </div>
 <div class="section level2">
 <h2 id="understand-large-group-plots">Understand large-group plots<a class="anchor" aria-label="anchor" href="#understand-large-group-plots"></a>
@@ -279,8 +288,8 @@ location), so later runs reuse them.</p>
 <p>To test Ren without the 10x dataset, and to separate
 download/preparation failures from Viewer errors
 (<code>--prepare-only</code> exits before starting Shiny):</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--prepare-only</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--ren-only</span> <span class="at">--no-browser</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--data</span><span class="op">=</span>ren <span class="at">--prepare-only</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="ex">Rscript</span> run-demo.R <span class="at">--data</span><span class="op">=</span>ren</span></code></pre></div>
 <p>The launcher prints the URL, the source directory and the Ren data
 version (currently 2), and reuses a complete compatible cache. Keep each
 <code>.crb</code> and its <code>.h5</code> file together. Prepared
@@ -289,12 +298,13 @@ preparation never upgrades the earlier <code>ren/cerebro/</code> atlas
 in place, failed builds are not published, and source downloads are
 shared between versions.</p>
 <p>The launcher also builds each data set’s Viewer Pack and rebuilds it
-when it is missing or predates an asset the viewer reads. Without a
-pack, the HLA &amp; TCR motifs page spends about 15 s (about 25 s for
-the whole first entry) building the CDR3 Hamming-1 graph at Ren’s scale;
-with one, the same entry settles in under two seconds. If you start the
-viewer against a prepared <code>.crb</code> yourself, build the pack
-once (about a minute for Ren) with
+when it is missing or predates an asset the viewer reads (the HLA first
+frames, the immune repertoire’s integer encoding). Without a pack, the
+HLA &amp; TCR motifs page spends about 15 s (about 25 s for the whole
+first entry) building the CDR3 Hamming-1 graph at Ren’s scale; with one,
+the same entry settles in under two seconds. If you start the viewer
+against a prepared <code>.crb</code> yourself, build the pack once
+(about a minute for Ren) with
 <code>buildViewerPack("path/to/data.crb", overwrite = TRUE)</code>;
 rerunning it after re-preparing a CRB is also the repair.</p>
 <p>The 10x marker-guided E18 neurogenesis path excludes endothelial,
