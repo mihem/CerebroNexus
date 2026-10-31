@@ -1,5 +1,43 @@
 # Changelog
 
+## CerebroNexus 5.6.0
+
+### Changes
+
+- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  exports faster and with less memory. Validating a Viewer Pack compares
+  the pack’s own cell-order asset with the CRB’s cells instead of
+  hashing every cell name again, and the preflight validates the pack
+  while it has the CRB, so a thin CRB and its H5 cell names are not read
+  a second time. On the 1.3 M cell mouse brain data set the first export
+  takes about half the time and about two thirds of the memory.
+- An App stores its spatial images as flat `spatial-assets/u<md5>.<ext>`
+  files and no longer hashes a copied image a second time, which failed
+  on long Windows paths.
+
+### Fixes
+
+- External SVG images given as `spatial_images` are drawn as Spatial and
+  Linked views backgrounds. The export accepted them and the page
+  offered them, but the Viewer dropped them without a message. An SVG
+  with an obvious script, `foreignObject`, event handler, `javascript:`
+  URL or entity declaration is refused, and the image response carries a
+  sandboxing `Content-Security-Policy`, so an SVG opened as a document
+  cannot run script.
+- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  no longer refuses two `cerebro_data` entries that name the same CRB:
+  the file is reused under both labels and the bundle holds one copy of
+  the CRB and its H5 file per label.
+- Copying a directory into the bundle on Linux and macOS follows
+  symbolic links inside it, so the App stays self-contained, and a copy
+  that must not overwrite leaves an existing target alone.
+- [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  of a read CRB with spatial molecule sidecars to another directory no
+  longer looks for the sidecar next to the output file.
+- Spatial tables whose coordinate columns are called `X`, `Y` or `ID`
+  are read by their lower-cased names; before, a table with `ID, X, Y`
+  used `ID` for both coordinates.
+
 ## CerebroNexus 5.5.0
 
 ### New

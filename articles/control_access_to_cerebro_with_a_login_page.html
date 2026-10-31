@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,8 +136,12 @@ img {
 <li>an encrypted <code>shinymanager</code> database; and</li>
 <li>an environment variable containing that database’s passphrase.</li>
 </ol>
-<p>The App receives the encrypted database. Passwords and the passphrase
-stay outside the App. HTTPS is still required.</p>
+<p>The scripted workflow below copies the encrypted database into the
+App and keeps the passphrase in an external environment file. An App
+exported with a local <code>viewer-auth.env</code> instead carries its
+matching secret privately alongside <code>app.R</code>; protect the
+entire release during transfer and deployment. Neither workflow
+publishes the secret as a web resource. HTTPS is still required.</p>
 <div class="float">
 <img src="img/auth-lite-validation.svg" alt="Auth lite checks the descriptor, environment, and database before publication and again when the Viewer starts."><div class="figcaption">Auth lite checks the descriptor, environment,
 and database before publication and again when the Viewer starts.</div>
@@ -249,21 +253,29 @@ privileges:</p>
 <td align="right">No; a copy is added</td>
 </tr>
 <tr class="even">
-<td><code>viewer-auth.env</code></td>
+<td>External <code>viewer-auth.env</code> used by the scripted
+workflow</td>
 <td>Secret store or protected path</td>
-<td align="right"><strong>Never</strong></td>
+<td align="right">No</td>
 </tr>
 <tr class="odd">
+<td>Export-generated local <code>viewer-auth.env</code>
+</td>
+<td>App root with private permissions</td>
+<td align="right">Yes; never under <code>www/</code>
+</td>
+</tr>
+<tr class="even">
 <td>Generated App</td>
 <td>Deployment directory</td>
 <td align="right">Yes</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Bundled encrypted database</td>
 <td><code>private-data/auth/</code></td>
 <td align="right">Yes</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Plaintext account table</td>
 <td>Trusted R memory only</td>
 <td align="right"><strong>Never</strong></td>
@@ -306,6 +318,19 @@ passwords.</li>
 <div class="section level2">
 <h2 id="run-locally">Run locally<a class="anchor" aria-label="anchor" href="#run-locally"></a>
 </h2>
+<p>For an exported App with its matching local
+<code>viewer-auth.env</code>, Linux users can run
+<code>bash viewer/start-linux.sh</code> from the App directory. This
+prepares private file permissions and starts Viewer as the current user,
+including after a Windows transfer. For a service account, use
+<code>sudo bash viewer/start-linux.sh --prepare-only --user shiny</code>
+once, then start the service normally. Replace <code>shiny</code> with
+the real runtime account. The helper does not change secrets or bypass
+authentication; direct R launches still validate permissions without
+repairing them. See the bundled
+<code>viewer/AUTHENTICATION-DEPLOYMENT.md</code> for read-only storage
+and filesystem limitations. Scripted exports using an external
+passphrase still need the external environment setup below.</p>
 <p><strong>Run this as:</strong> the account that will start the
 App.</p>
 <p><strong>Run it on:</strong> the machine holding the generated App and
@@ -452,8 +477,10 @@ deployed</td>
 </h2>
 <ul>
 <li>Use HTTPS.</li>
-<li>Keep passwords, passphrase, and env file outside the App and
-Git.</li>
+<li>Keep plaintext account tables and all secrets out of Git and public
+web paths. For this scripted workflow keep the env file outside the App;
+preserve and protect an export-generated local env file when using that
+workflow instead.</li>
 <li>Pair each App release with exactly one matching secret.</li>
 <li>Verify valid login, invalid login, runtime read access, and
 rollback.</li>

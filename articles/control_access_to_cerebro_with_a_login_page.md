@@ -9,8 +9,12 @@ existing inputs:
 1.  an encrypted `shinymanager` database; and
 2.  an environment variable containing that database’s passphrase.
 
-The App receives the encrypted database. Passwords and the passphrase
-stay outside the App. HTTPS is still required.
+The scripted workflow below copies the encrypted database into the App
+and keeps the passphrase in an external environment file. An App
+exported with a local `viewer-auth.env` instead carries its matching
+secret privately alongside `app.R`; protect the entire release during
+transfer and deployment. Neither workflow publishes the secret as a web
+resource. HTTPS is still required.
 
 ![Auth lite checks the descriptor, environment, and database before
 publication and again when the Viewer
@@ -132,7 +136,8 @@ Sys.unsetenv("CEREBRO_AUTH_PASSPHRASE")
 | Item | Correct location | In the App? |
 |----|----|---:|
 | Source `credentials.sqlite` | Private build area | No; a copy is added |
-| `viewer-auth.env` | Secret store or protected path | **Never** |
+| External `viewer-auth.env` used by the scripted workflow | Secret store or protected path | No |
+| Export-generated local `viewer-auth.env` | App root with private permissions | Yes; never under `www/` |
 | Generated App | Deployment directory | Yes |
 | Bundled encrypted database | `private-data/auth/` | Yes |
 | Plaintext account table | Trusted R memory only | **Never** |
@@ -168,6 +173,18 @@ optionally “timeout_minutes”.
 A wrong passphrase never produces a half-configured App.
 
 ## Run locally
+
+For an exported App with its matching local `viewer-auth.env`, Linux
+users can run `bash viewer/start-linux.sh` from the App directory. This
+prepares private file permissions and starts Viewer as the current user,
+including after a Windows transfer. For a service account, use
+`sudo bash viewer/start-linux.sh --prepare-only --user shiny` once, then
+start the service normally. Replace `shiny` with the real runtime
+account. The helper does not change secrets or bypass authentication;
+direct R launches still validate permissions without repairing them. See
+the bundled `viewer/AUTHENTICATION-DEPLOYMENT.md` for read-only storage
+and filesystem limitations. Scripted exports using an external
+passphrase still need the external environment setup below.
 
 **Run this as:** the account that will start the App.
 
@@ -314,7 +331,10 @@ rollback window.
 ## Security checklist
 
 - Use HTTPS.
-- Keep passwords, passphrase, and env file outside the App and Git.
+- Keep plaintext account tables and all secrets out of Git and public
+  web paths. For this scripted workflow keep the env file outside the
+  App; preserve and protect an export-generated local env file when
+  using that workflow instead.
 - Pair each App release with exactly one matching secret.
 - Verify valid login, invalid login, runtime read access, and rollback.
 - Add monitoring and rate limiting.

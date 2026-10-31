@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,6 +75,25 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.6.0" id="cerebronexus-560">CerebroNexus 5.6.0<a class="anchor" aria-label="anchor" href="#cerebronexus-560"></a></h2>
+<div class="section level3">
+<h3 id="changes-5-6-0">Changes<a class="anchor" aria-label="anchor" href="#changes-5-6-0"></a></h3>
+<ul><li>
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> exports faster and with less memory. Validating a Viewer Pack compares the pack’s own cell-order asset with the CRB’s cells instead of hashing every cell name again, and the preflight validates the pack while it has the CRB, so a thin CRB and its H5 cell names are not read a second time. On the 1.3 M cell mouse brain data set the first export takes about half the time and about two thirds of the memory.</li>
+<li>An App stores its spatial images as flat <code>spatial-assets/u&lt;md5&gt;.&lt;ext&gt;</code> files and no longer hashes a copied image a second time, which failed on long Windows paths.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fixes-5-6-0">Fixes<a class="anchor" aria-label="anchor" href="#fixes-5-6-0"></a></h3>
+<ul><li>External SVG images given as <code>spatial_images</code> are drawn as Spatial and Linked views backgrounds. The export accepted them and the page offered them, but the Viewer dropped them without a message. An SVG with an obvious script, <code>foreignObject</code>, event handler, <code>javascript:</code> URL or entity declaration is refused, and the image response carries a sandboxing <code>Content-Security-Policy</code>, so an SVG opened as a document cannot run script.</li>
+<li>
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> no longer refuses two <code>cerebro_data</code> entries that name the same CRB: the file is reused under both labels and the bundle holds one copy of the CRB and its H5 file per label.</li>
+<li>Copying a directory into the bundle on Linux and macOS follows symbolic links inside it, so the App stays self-contained, and a copy that must not overwrite leaves an existing target alone.</li>
+<li>
+<code><a href="../reference/saveCerebro.html">saveCerebro()</a></code> of a read CRB with spatial molecule sidecars to another directory no longer looks for the sidecar next to the output file.</li>
+<li>Spatial tables whose coordinate columns are called <code>X</code>, <code>Y</code> or <code>ID</code> are read by their lower-cased names; before, a table with <code>ID, X, Y</code> used <code>ID</code> for both coordinates.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="5.5.0" id="cerebronexus-550">CerebroNexus 5.5.0<a class="anchor" aria-label="anchor" href="#cerebronexus-550"></a></h2>
 <div class="section level3">

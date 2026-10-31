@@ -283,8 +283,8 @@ uploads also read and validate the ordinary field without invoking the
 getter. A CRB from an older release that is no longer read (see
 [`convertCerebro`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md))
 is rejected, as is an object containing only one of field and getter.
-Dataset labels and canonical CRB sources are both unique: two labels
-cannot select the same resolved input file. Generated bundles follow the
+Dataset labels are unique. Two labels may name the same input file; the
+bundle then holds one copy of it per label. Generated bundles follow the
 standard deployment model of one app per R process; process-global
 `Cerebro.options` does not provide same-process isolation between
 separately sourced apps.

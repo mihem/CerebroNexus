@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -125,6 +125,15 @@ drop behind <code>rsconnect</code>/Posit Connect, or launch locally with
 repertoire sidecar, if the <code>.crb</code> has them, are copied next
 to the <code>.crb</code>. The generated app needs no path outside its
 own directory.</p>
+<p>Self-contained refers to the application code and data, not an
+embedded R installation. The destination still needs R and the Viewer
+packages from the exporting version’s <code>DESCRIPTION</code> Imports,
+plus backend/content dependencies used by the selected datasets
+(<code>BPCells</code>, <code>rhdf5</code>/<code>HDF5Array</code>, or
+<code>shinymanager &gt;= 1.1.0</code> for login). Installing the
+matching CerebroNexus version with the needed optional packages is a
+convenient way to provision that runtime, although the exported App does
+not call back into the package.</p>
 <p>This is the recommended path when you want to hand a colleague a
 runnable copy of Cerebro pre-loaded with a specific data set without
 making them install the package themselves, pin the Shiny sources at a
@@ -162,8 +171,8 @@ paths to <code>.crb</code> (or <code>.rds</code>) files.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>After this call, <code>out_dir</code> contains the generated
 <code>app.R</code>, a copy of the Shiny sources under
-<code>shiny/</code>, the <code>inst/extdata/</code> reference files, the
-data file(s) under <code>private-data/</code>, and a
+<code>viewer/</code>, the reference files under <code>extdata/</code>,
+the data file(s) under <code>private-data/</code>, and a
 <code>cerebro_config.rds</code> holding the serialized
 <code>Cerebro.options</code>. The <code>private-data/</code> directory
 is private to the R process: the generated app does not register it as
@@ -171,6 +180,13 @@ an HTTP resource.</p>
 <p>Launch it locally:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="va">out_dir</span><span class="op">)</span></span></code></pre></div>
+<p>On Linux, <code>bash viewer/start-linux.sh</code> from
+<code>out_dir</code> prepares authentication-file permissions and starts
+the App. For Shiny Server/systemd, initialize with
+<code>sudo bash viewer/start-linux.sh --prepare-only --user shiny</code>
+using the real service account, then start the service normally. See
+<code>viewer/AUTHENTICATION-DEPLOYMENT.md</code> in the exported
+directory.</p>
 </div>
 <div class="section level2">
 <h2 id="common-parameters">Common parameters<a class="anchor" aria-label="anchor" href="#common-parameters"></a>

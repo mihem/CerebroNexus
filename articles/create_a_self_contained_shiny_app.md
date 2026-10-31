@@ -17,6 +17,15 @@ The workflow is self-contained: the sibling H5 matrix and the immune
 repertoire sidecar, if the `.crb` has them, are copied next to the
 `.crb`. The generated app needs no path outside its own directory.
 
+Self-contained refers to the application code and data, not an embedded
+R installation. The destination still needs R and the Viewer packages
+from the exporting version’s `DESCRIPTION` Imports, plus backend/content
+dependencies used by the selected datasets (`BPCells`,
+`rhdf5`/`HDF5Array`, or `shinymanager >= 1.1.0` for login). Installing
+the matching CerebroNexus version with the needed optional packages is a
+convenient way to provision that runtime, although the exported App does
+not call back into the package.
+
 This is the recommended path when you want to hand a colleague a
 runnable copy of Cerebro pre-loaded with a specific data set without
 making them install the package themselves, pin the Shiny sources at a
@@ -54,7 +63,7 @@ createShinyApp(
 ```
 
 After this call, `out_dir` contains the generated `app.R`, a copy of the
-Shiny sources under `shiny/`, the `inst/extdata/` reference files, the
+Shiny sources under `viewer/`, the reference files under `extdata/`, the
 data file(s) under `private-data/`, and a `cerebro_config.rds` holding
 the serialized `Cerebro.options`. The `private-data/` directory is
 private to the R process: the generated app does not register it as an
@@ -65,6 +74,13 @@ Launch it locally:
 ``` r
 shiny::runApp(out_dir)
 ```
+
+On Linux, `bash viewer/start-linux.sh` from `out_dir` prepares
+authentication-file permissions and starts the App. For Shiny
+Server/systemd, initialize with
+`sudo bash viewer/start-linux.sh --prepare-only --user shiny` using the
+real service account, then start the service normally. See
+`viewer/AUTHENTICATION-DEPLOYMENT.md` in the exported directory.
 
 ## Common parameters
 

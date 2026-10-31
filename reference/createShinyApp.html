@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -373,8 +373,8 @@ read and validate the ordinary field without invoking the getter. A CRB
 from an older release that is no longer read (see
 <code><a href="convertCerebro.html">convertCerebro</a></code>) is rejected, as is an object containing only
 one of field and getter.
-Dataset labels and canonical CRB sources are both unique: two labels cannot
-select the same resolved input file.
+Dataset labels are unique. Two labels may name the same input file; the
+bundle then holds one copy of it per label.
 Generated bundles follow the standard deployment model of one app per R
 process; process-global <code>Cerebro.options</code> does not provide same-process
 isolation between separately sourced apps.</p>
