@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">5.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">6.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,14 +77,17 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="5.6.0" id="cerebronexus-560">CerebroNexus 5.6.0<a class="anchor" aria-label="anchor" href="#cerebronexus-560"></a></h2>
+<h2 class="pkg-version" data-toc-text="6.0.0" id="cerebronexus-600">CerebroNexus 6.0.0<a class="anchor" aria-label="anchor" href="#cerebronexus-600"></a></h2>
 <div class="section level3">
-<h3 id="new-5-6-0">New<a class="anchor" aria-label="anchor" href="#new-5-6-0"></a></h3>
+<h3 id="new-6-0-0">New<a class="anchor" aria-label="anchor" href="#new-6-0-0"></a></h3>
 <ul><li>AnnData (<code>.h5ad</code>, <code>.h5mu</code>, <code>.zarr</code>) and SpatialData (<code>.zarr</code>) files are read natively, without Python: <code><a href="../reference/readH5adAsSCE.html">readH5adAsSCE()</a></code>, <code><a href="../reference/readSpatialDataAsSCE.html">readSpatialDataAsSCE()</a></code>, <code><a href="../reference/convertH5adToCerebro.html">convertH5adToCerebro()</a></code> and <code><a href="../reference/convertSpatialDataToCerebro.html">convertSpatialDataToCerebro()</a></code>; <code><a href="../reference/exportToH5ad.html">exportToH5ad()</a></code> writes a CRB back as <code>.h5ad</code>. The readers are written here and not on anndataR, because anndataR 1.2.2 cannot read AIRR (awkward) arrays, <code>.h5mu</code> files or sharded Zarr v3 stores (nor the SpatialData tables in them), and read a 300,000 cell h5ad about 2.2 times slower at the same memory. A test compares the h5ad reader with anndataR (skipped where it is not installed); to be revisited once anndataR reads sharded Zarr.</li>
 <li>Zarr stores compressed with Blosc (lz4, zstd or zlib, with or without the byte shuffle) and arrays of numpy fixed-width strings (<code>&lt;U</code>, <code>|S</code>) are read. Blosc with blosclz, snappy, the bit shuffle or the delta filter, and any other codec, stop with their name; a truncated Blosc chunk is an error, not zeros. Blosc chunks are decoded in R (lz4, the numcodecs default, at about 4 MB/s), so re-save a large store with zstd, or use an <code>.h5ad</code> file. Zarr arrays with a transpose codec are not read.</li>
 <li>
 <code><a href="../reference/readH5adAsSCE.html">readH5adAsSCE()</a></code> says how many <code>obs</code> or <code>var</code> columns it skipped for an encoding it does not read, also with <code>verbose = FALSE</code>; a float tissue image whose maximum is just above 1 is no longer darkened (its type, not its maximum, tells 0-255 pixels from 0-1 ones); the environment variable <code>CEREBRO_PACKAGE_SOURCE</code> is documented and ignored unless it names a CerebroNexus checkout.</li>
 </ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="5.6.0" id="cerebronexus-560">CerebroNexus 5.6.0<a class="anchor" aria-label="anchor" href="#cerebronexus-560"></a></h2>
 <div class="section level3">
 <h3 id="changes-5-6-0">Changes<a class="anchor" aria-label="anchor" href="#changes-5-6-0"></a></h3>
 <ul><li>
