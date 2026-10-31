@@ -45,21 +45,14 @@ test_that("long read-only jobs and builds remain event-driven", {
     "start_enhance_table_inventory <- function",
     "observeEvent\\(input\\[\\[\"enhance-table_files"
   )
-  project <- function_text(
-    source_text("server", "project.R"),
-    "builder_project_start_open <- function",
-    "invalidate_builder_project_source_sync <- function"
-  )
   build <- function_text(
     source_text("server", "build.R"),
     "start_builder_new_release <- function",
     "show_builder_build_server_path <- function"
   )
 
-  for (text in list(enhancements, project)) {
-    expect_match(text, "builder_async_submit", fixed = TRUE)
-    expect_match(text, "builder_async_then", fixed = TRUE)
-  }
+  expect_match(enhancements, "builder_async_submit", fixed = TRUE)
+  expect_match(enhancements, "builder_async_then", fixed = TRUE)
   expect_match(build, "builder_build_output_preflight(parent)", fixed = TRUE)
   expect_match(build, "schedule_selected_output_build(target)", fixed = TRUE)
   build_schedule <- function_text(
@@ -87,12 +80,6 @@ test_that("long read-only jobs and builds remain event-driven", {
     regexpr("add_enhance_table_files(", enhancements, fixed = TRUE)[[1L]]
   )
   expect_false(grepl("callr::r_bg", enhancements, fixed = TRUE))
-  expect_false(grepl(
-    "builder_project_schedule_open_poll",
-    project,
-    fixed = TRUE
-  ))
-  expect_false(grepl("builder_project_poll_open", project, fixed = TRUE))
   expect_false(grepl(
     "builder_poll_build_output_preflight",
     build,

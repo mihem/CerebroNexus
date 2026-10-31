@@ -221,13 +221,7 @@ freeze_plan_for_output <- function(
   if (!isTRUE(parsed_auth$ok)) {
     return(builder_plan_error(parsed_auth$error, "invalid_auth_accounts"))
   }
-  build_entries <- if (
-    exists("builder_project_build_entries", mode = "function")
-  ) {
-    builder_project_build_entries(all)
-  } else {
-    all
-  }
+  build_entries <- all
   app_options <- if (make_app && explicit_output) {
     builder_review_options_for_plan(
       output_options$app,
@@ -714,22 +708,8 @@ observe({
   } else {
     readiness$message
   }
-  current_index <- match(current(), ids)
-  current_entry <- if (length(current_index) == 1L && !is.na(current_index)) {
-    entries[[current_index]]
-  } else {
-    NULL
-  }
-  if (
-    is.list(current_entry) &&
-      identical(current_entry$load_state %||% "loaded", "artifact_ready")
-  ) {
-    mode <- "artifact"
-  } else {
-    mode <- "dataset"
-  }
   state <- list(
-    mode = mode,
+    mode = "dataset",
     message = message,
     can_continue = readiness$can_continue &&
       !length(unchecked) &&
@@ -756,15 +736,6 @@ output$configure_dataset_name <- renderText(configure_dataset_name())
 output$configure_actions <- renderUI({
   state <- configure_actions_state()
   req(state)
-  if (identical(state$mode, "artifact")) {
-    return(builder_project_artifact_actions_ui(
-      state$message,
-      state$can_continue,
-      dataset_checked = state$dataset_checked,
-      remaining = state$remaining,
-      check_ready = state$check_ready
-    ))
-  }
   builder_configure_actions_ui(
     state$message,
     state$can_continue,
@@ -961,13 +932,6 @@ render_configure_workbench <- function() {
   entry <- isolate(entry_of(id))
   if (is.null(entry)) {
     return(builder_empty_workbench_ui())
-  }
-  if (identical(entry$load_state %||% "loaded", "artifact_ready")) {
-    project <- isolate(builder_project())
-    return(builder_project_artifact_workbench_ui(
-      entry,
-      root = if (is.null(project)) NULL else project$root
-    ))
   }
   state <- try(
     builder_cached_dataset_state(entry, builder_dataset_state_cache),

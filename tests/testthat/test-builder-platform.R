@@ -6,7 +6,6 @@ test_that("native pickers cover datasets, projects, and output folders", {
     c(
       "output_directory",
       "project_directory",
-      "project_manifest",
       "dataset_files"
     )
   )
@@ -38,12 +37,12 @@ test_that("Windows native pickers use modern STA shell dialogs", {
     fixed = TRUE
   )
   expect_match(
-    builder_windows_picker_script("project_manifest"),
+    builder_windows_picker_script("dataset_files"),
     "OpenFileDialog",
     fixed = TRUE
   )
   expect_match(
-    builder_windows_picker_script("project_manifest"),
+    builder_windows_picker_script("dataset_files"),
     "$dialog.AutoUpgradeEnabled = $true",
     fixed = TRUE
   )
@@ -101,7 +100,7 @@ test_that("every native picker has one typed selection contract", {
   )
   expect_identical(
     vapply(contracts, `[[`, character(1), "type"),
-    c("directory", "directory", "file", "file")
+    c("directory", "directory", "file")
   )
   expect_true(all(vapply(
     contracts,
@@ -312,7 +311,7 @@ test_that("all server-filesystem buttons use the native picker boundary", {
   kinds <- sub('.*"([^"]+)"$', "\\1", calls)
 
   expect_identical(
-    sort(kinds),
+    sort(unique(kinds)),
     sort(builder_native_picker_kinds())
   )
 })
@@ -426,11 +425,6 @@ test_that("macOS specs cover every directory and file picker", {
   )))
   expect_match(
     paste(specs[[3L]]$args, collapse = "\n"),
-    'choose file with prompt "Open a Builder project." of type {"public.json"}',
-    fixed = TRUE
-  )
-  expect_match(
-    paste(specs[[4L]]$args, collapse = "\n"),
     "with multiple selections allowed",
     fixed = TRUE
   )
@@ -473,9 +467,8 @@ test_that("Linux Zenity and KDialog specs cover every picker", {
     },
     logical(1)
   )))
-  expect_true("--file-filter=Builder project | *.json" %in% zenity[[3L]]$args)
-  expect_true("--multiple" %in% zenity[[4L]]$args)
-  expect_true(any(startsWith(zenity[[4L]]$args, "--separator=")))
+  expect_true("--multiple" %in% zenity[[3L]]$args)
+  expect_true(any(startsWith(zenity[[3L]]$args, "--separator=")))
   expect_true(all(vapply(
     kdialog[1:2],
     function(spec) {
@@ -484,9 +477,8 @@ test_that("Linux Zenity and KDialog specs cover every picker", {
     logical(1)
   )))
   expect_true("--getopenfilename" %in% kdialog[[3L]]$args)
-  expect_true("Builder project (*.json)" %in% kdialog[[3L]]$args)
-  expect_true("--multiple" %in% kdialog[[4L]]$args)
-  expect_true("--separate-output" %in% kdialog[[4L]]$args)
+  expect_true("--multiple" %in% kdialog[[3L]]$args)
+  expect_true("--separate-output" %in% kdialog[[3L]]$args)
   expect_true(all(vapply(
     c(zenity, kdialog),
     function(spec) {
@@ -579,7 +571,7 @@ test_that("native picker cancellation is explicit and empty success is an error"
     fixed = TRUE
   )
   expect_match(
-    builder_windows_picker_script("project_manifest"),
+    builder_windows_picker_script("dataset_files"),
     marker,
     fixed = TRUE
   )

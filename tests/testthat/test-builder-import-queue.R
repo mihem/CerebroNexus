@@ -218,34 +218,7 @@ test_that("a missing format reader rejects before an import is queued", {
   })
 })
 
-test_that("a restored source explains when its worker is unavailable", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this import queue test.")
-  }
-
-  shiny::testServer(app_env$server, {
-    worker(NULL)
-    worker_available(FALSE)
-    expect_error(
-      start_builder_project_record_load(
-        list(
-          id = "ds1",
-          name = "Saved dataset",
-          source = list(kind = "example", example = "complete_viewer_data")
-        ),
-        tempdir()
-      ),
-      "background worker is still starting"
-    )
-  })
-})
-
-test_that("Project resume forwards its saved MD5 to the worker", {
+test_that("a saved source is queued once, from its own path", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")
   app_env <- new.env(parent = globalenv())
@@ -255,98 +228,36 @@ test_that("Project resume forwards its saved MD5 to the worker", {
     list(error = "Worker startup is disabled in this import queue test.")
   }
   root <- withr::local_tempdir()
-  source_dir <- file.path(root, "sources", "ds1")
-  dir.create(source_dir, recursive = TRUE)
-  source_path <- file.path(source_dir, "source.rds")
+  source_path <- file.path(root, "source.rds")
   saveRDS(SeuratObject::pbmc_small, source_path)
-  fingerprint <- app_env$builder_project_file_fingerprint(
-    source_path,
-    content = TRUE
-  )
-  state <- app_env$builder_project_file_metadata(source_path)
-  source_reference <- "sources/ds1/source.rds"
-  state$path <- normalizePath(source_path, winslash = "/", mustWork = TRUE)
-  signature <- stats::setNames(list(state), source_reference)
+  source_path <- normalizePath(source_path, winslash = "/", mustWork = TRUE)
 
   shiny::testServer(app_env$server, {
-    worker(list(epoch = "worker-project-md5", snapshot_root = root))
+    worker(list(epoch = "worker-saved-source", snapshot_root = root))
     worker_available(TRUE)
-    protocol(app_env$builder_request_protocol("worker-project-md5"))
+    protocol(app_env$builder_request_protocol("worker-saved-source"))
     record <- list(
       id = "ds1",
       name = "Saved dataset",
-      runtime_restore_action = "resume",
-      runtime_restore_status = list(stat_signature = signature),
       source = list(
-        kind = "managed",
-        path = source_reference,
-        filename = "source.rds",
-        fingerprint = fingerprint
+        kind = "file",
+        origin = "local",
+        path = source_path,
+        filename = "source.rds"
       )
     )
+    builder_project_pending_entries(list(ds1 = record))
 
-    expect_true(start_builder_project_record_load(record, root))
+    expect_true(start_builder_project_record_load(record))
+    expect_identical(length(protocol()$queue), 1L)
+    expect_identical(imports()$entries$ds1$load_state, "queued")
     request <- Filter(
       Negate(is.null),
       c(list(protocol()$pending), protocol()$queue)
     )[[1L]]
-    expect_identical(request$payload$expected_md5, fingerprint$md5)
-    expect_identical(request$payload$path, state$path)
-    expect_identical(isolate(pending_uploads())$ds1$size, fingerprint$bytes)
-  })
-})
+    expect_identical(request$payload$path, source_path)
 
-test_that("Project source resume is idempotent and clears orphan reservations", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this import queue test.")
-  }
-  root <- withr::local_tempdir()
-  source_dir <- file.path(root, "sources", "ds1")
-  dir.create(source_dir, recursive = TRUE)
-  source_path <- file.path(source_dir, "source.rds")
-  saveRDS(SeuratObject::pbmc_small, source_path)
-  fingerprint <- app_env$builder_project_file_fingerprint(
-    source_path,
-    content = TRUE
-  )
-  state <- app_env$builder_project_file_metadata(source_path)
-  source_reference <- "sources/ds1/source.rds"
-  state$path <- normalizePath(source_path, winslash = "/", mustWork = TRUE)
-  signature <- stats::setNames(list(state), source_reference)
-
-  shiny::testServer(app_env$server, {
-    worker(list(
-      epoch = "worker-idempotent-resume",
-      snapshot_root = root
-    ))
-    worker_available(TRUE)
-    protocol(app_env$builder_request_protocol("worker-idempotent-resume"))
-    record <- list(
-      id = "ds1",
-      name = "Saved dataset",
-      runtime_restore_action = "resume",
-      runtime_restore_status = list(stat_signature = signature),
-      source = list(
-        kind = "managed",
-        path = source_reference,
-        filename = "source.rds",
-        fingerprint = fingerprint
-      )
-    )
-    builder_project_pending_entries(list(ds1 = record))
-    orphan <- app_env$builder_source_key("file", source_path)
-    pending_sources(orphan)
-
-    expect_true(start_builder_project_record_load(record, root))
-    expect_identical(length(protocol()$queue), 1L)
-    expect_identical(imports()$entries$ds1$load_state, "queued")
-
-    expect_true(start_builder_project_record_load(record, root))
+    expect_true(start_builder_project_record_load(record))
     expect_identical(length(protocol()$queue), 1L)
     expect_identical(imports()$entries$ds1$load_state, "queued")
   })

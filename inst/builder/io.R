@@ -298,7 +298,6 @@ builder_native_picker_kinds <- function() {
   c(
     "output_directory",
     "project_directory",
-    "project_manifest",
     "dataset_files"
   )
 }
@@ -324,16 +323,6 @@ builder_native_picker_contract <- function(
       type = "directory",
       prompt = "Choose a folder for the Builder project.",
       unavailable = "The selected folder is not available."
-    ),
-    project_manifest = list(
-      kind = kind,
-      type = "file",
-      prompt = "Open a Builder project.",
-      windows_filter = "Builder project (*.json)|*.json|All files (*.*)|*.*",
-      macos_types = "public.json",
-      zenity_filter = "Builder project | *.json",
-      kdialog_filter = "Builder project (*.json)",
-      unavailable = "The selected project file is not available."
     ),
     dataset_files = {
       formats <- builder_available_formats()
@@ -691,7 +680,6 @@ builder_native_picker_spec <- function(
   kind = c(
     "output_directory",
     "project_directory",
-    "project_manifest",
     "dataset_files"
   ),
   .system = Sys.info()[["sysname"]] %||% "",
@@ -956,7 +944,6 @@ builder_start_native_picker <- function(
   kind = c(
     "output_directory",
     "project_directory",
-    "project_manifest",
     "dataset_files"
   ),
   .spec = NULL,

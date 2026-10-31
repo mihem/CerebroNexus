@@ -1,11 +1,7 @@
-test_that("headless Project open validates every external dataset source", {
+test_that("a server only opens project sources inside its allowed folders", {
   local({
     source(
-      builder_profile_inst_path(
-        "builder",
-        "core",
-        "bundle_path_contract.R"
-      ),
+      builder_profile_inst_path("builder", "core", "bundle_path_contract.R"),
       local = TRUE
     )
     source(builder_profile_inst_path("builder", "io.R"), local = TRUE)
@@ -21,28 +17,38 @@ test_that("headless Project open validates every external dataset source", {
     writeBin(charToRaw("inside"), inside_source)
     writeBin(charToRaw("outside"), outside_source)
 
-    manifest <- list(
-      datasets = list(list(
-        id = "ds1",
-        name = "Allowed dataset",
-        source = list(kind = "external", path = inside_source)
-      ))
+    entry <- function(id, name, path) {
+      list(
+        id = id,
+        filename = basename(path),
+        path = path,
+        source_origin = "local",
+        settings = list(name = name)
+      )
+    }
+    manifest <- builder_project_snapshot(
+      "p",
+      list(
+        entry("ds1", "Allowed dataset", inside_source),
+        entry("ds2", "Outside dataset", outside_source)
+      )
     )
-    checked <- builder_project_validate_external_sources(
-      manifest,
-      roots = allowed
-    )
+    path_allowed <- function(path) {
+      !inherits(
+        tryCatch(
+          builder_server_path_resolve(path, "file", roots = allowed),
+          error = identity
+        ),
+        "condition"
+      )
+    }
+    plan <- builder_project_restore_plan(manifest, path_allowed = path_allowed)
+    expect_identical(plan$ds1$status, "ready")
+    expect_identical(plan$ds2$status, "missing")
+    expect_match(plan$ds2$reason, "outside the folders")
     expect_identical(
-      checked$datasets[[1L]]$source$path,
-      normalizePath(inside_source, winslash = "/", mustWork = TRUE)
-    )
-
-    manifest$datasets[[1L]]$name <- "Outside dataset"
-    manifest$datasets[[1L]]$source$path <- outside_source
-    expect_error(
-      builder_project_validate_external_sources(manifest, roots = allowed),
-      "Outside dataset",
-      fixed = TRUE
+      builder_project_restore_plan(manifest)$ds2$status,
+      "ready"
     )
   })
 })

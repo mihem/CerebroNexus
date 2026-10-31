@@ -9,50 +9,6 @@ builder_ui_fixes_app <- function(scope = parent.frame()) {
   app_env
 }
 
-test_that("a Project cache job attaches CerebroNexus when no source is sourced", {
-  skip_if_not_installed("callr")
-  skip_if_not(
-    "CerebroNexus" %in% rownames(utils::installed.packages()),
-    "CerebroNexus is not installed for a background R process"
-  )
-  app_env <- builder_ui_fixes_app()
-  expression <- app_env$builder_project_crb_job_expression()
-  runtime <- withr::local_tempfile(fileext = ".R")
-  writeLines(
-    c(
-      "builder_execute_plan <- function(plan, output, snapshots) {",
-      "  list(found = exists('exportFromSeurat', mode = 'function'))",
-      "}",
-      "builder_project_prepare_build_artifacts <- function(value, ...) value"
-    ),
-    runtime
-  )
-  run <- function(load_package) {
-    callr::r(
-      function(expression, args) {
-        list2env(args, envir = environment())
-        eval(expression, envir = environment())
-      },
-      args = list(
-        expression = expression,
-        args = list(
-          plan = list(source_snapshot_identities = list(), items = list()),
-          output = tempdir(),
-          root = tempdir(),
-          previous_artifacts = list(),
-          entry = list(id = "ds1"),
-          runtime_files = runtime,
-          load_package = load_package,
-          source_utf8 = function(path, envir) sys.source(path, envir = envir)
-        )
-      ),
-      libpath = .libPaths()
-    )
-  }
-  expect_true(run(TRUE)$found)
-  expect_false(run(FALSE)$found)
-})
-
 test_that("a Build that needs a decision names the failed analysis and why", {
   app_env <- builder_ui_fixes_app()
   log <- c(
@@ -83,22 +39,6 @@ test_that("a Build that needs a decision names the failed analysis and why", {
   expect_match(html, "Layer `counts` could not be found", fixed = TRUE)
   expect_match(html, "Analysis log", fixed = TRUE)
   expect_match(html, "Remove and review", fixed = TRUE)
-
-  expect_match(
-    app_env$builder_project_build_failure_text(list(analysis_log = log)),
-    "stopped on an optional analysis: pbmc3k: Mitochondrial",
-    fixed = TRUE
-  )
-  expect_identical(
-    app_env$builder_project_build_failure_text(list(
-      failures = "pbmc3k: analysis `most_expressed` failed."
-    )),
-    "pbmc3k: analysis `most_expressed` failed."
-  )
-  expect_identical(
-    app_env$builder_project_build_failure_text(list()),
-    "Dataset caches could not be prepared."
-  )
 })
 
 test_that("raw-count analyses are blocked on an assay without counts", {

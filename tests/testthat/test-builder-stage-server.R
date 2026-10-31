@@ -244,75 +244,6 @@ test_that("project picker permissions update immediately after selection", {
   })
 })
 
-test_that("Build reuses current project CRBs after preserving review identity", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this reuse test.")
-  }
-  captured <- NULL
-  app_env$builder_freeze_plan <- function(entries, review_identity, ...) {
-    captured <<- list(entries = entries, review_identity = review_identity)
-    captured
-  }
-
-  shiny::testServer(app_env$server, {
-    root <- withr::local_tempdir()
-    artifact_path <- file.path(root, "dataset-a.crb")
-    writeLines("ready", artifact_path)
-    entry <- list(
-      id = "dataset-a",
-      revision = 0L,
-      load_state = "loaded",
-      snapshot = list(
-        path = "/private/dataset-a",
-        owner_token = "owner-a",
-        object_md5 = strrep("a", 32L),
-        source_fingerprint = "source-a"
-      ),
-      profile = list(marker = "a", extras = list()),
-      settings = list(name = "Dataset A"),
-      acknowledgements = character(),
-      spatial_drafts = list()
-    )
-    use_state_only_fixture(list(entry))
-    original_identity <- app_env$builder_review_configuration_identity(
-      list(entry),
-      builder_configuration_identity_cache
-    )
-    artifact <- list(
-      status = "ready",
-      reusable = TRUE,
-      path = basename(artifact_path),
-      fingerprint = app_env$builder_project_file_fingerprint(
-        artifact_path,
-        content = TRUE
-      ),
-      members = list(),
-      built_from_revision = 0L,
-      built_from_source_fingerprint = "source-a",
-      built_from_configuration = app_env$builder_project_configuration_digest(
-        entry
-      ),
-      plan_item = list(
-        artifact_identity = list(spatial_sections = character())
-      ),
-      bundle_contract_version = 1L
-    )
-    builder_project(list(root = root, manifest = list(datasets = list())))
-    builder_project_artifacts(list(`dataset-a` = artifact))
-
-    freeze_plan_for_output(tempfile("reuse-project-crb-"))
-
-    expect_identical(captured$review_identity, original_identity)
-    expect_identical(captured$entries[[1L]]$load_state, "artifact_ready")
-    expect_identical(isolate(sets())[[1L]]$load_state, "loaded")
-  })
-})
-
 test_that("Projection cards distinguish inclusion from initial display", {
   ui <- paste(
     readLines(
@@ -422,7 +353,7 @@ test_that("dataset-scoped browser actions retain their current entry owner", {
     project,
     fixed = TRUE
   )[[1L]]
-  expect_identical(sum(epoch_updates > 0L), 2L)
+  expect_identical(sum(epoch_updates > 0L), 1L)
 })
 
 test_that("Configure renders Extras before the final Views content", {

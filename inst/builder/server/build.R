@@ -584,9 +584,6 @@ enqueue_build_plan <- function(
       "The build could not be queued. Try Build again."
     ))
   }
-  if (exists("builder_project_capture_build_plan", mode = "function")) {
-    builder_project_capture_build_plan(plan)
-  }
   builder_build_remember_plan(plan)
   build_flow(list(stage = "building", plan = NULL))
   auth_accounts_state(builder_auth_empty_accounts())

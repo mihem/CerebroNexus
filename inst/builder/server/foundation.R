@@ -379,33 +379,8 @@ checked_dataset_ids <- reactive({
   )
   setdiff(checked, builder_project_pending_draft_ids(pending_drafts))
 })
-# Status rendering may recur on selection changes. Reuse content verification
-# only while path, size, modification/change time and file identity still match.
-builder_checkpoint_verification_cache <- new.env(parent = emptyenv())
-builder_checkpoint_verification_root <- NULL
-dataset_checkpoint_states <- reactive({
-  project <- builder_project()
-  root <- if (is.null(project)) NULL else project$root
-  if (
-    !identical(root, builder_checkpoint_verification_root) ||
-      length(builder_checkpoint_verification_cache) > 2048L
-  ) {
-    rm(
-      list = ls(builder_checkpoint_verification_cache),
-      envir = builder_checkpoint_verification_cache
-    )
-    builder_checkpoint_verification_root <<- root
-  }
-  builder_project_checkpoint_states(
-    sets(),
-    checked_ids = checked_dataset_ids(),
-    artifacts = builder_project_artifacts(),
-    root = root,
-    jobs = builder_project_crb_jobs(),
-    identity_cache = builder_configuration_identity_cache,
-    verification_cache = builder_checkpoint_verification_cache
-  )
-})
+# A dataset has no cached build to report on: the rail shows its check mark only.
+dataset_checkpoint_states <- reactive(list())
 all_datasets_checked <- reactive({
   ids <- vapply(sets(), `[[`, character(1), "id")
   length(ids) > 0L && all(ids %in% checked_dataset_ids())
