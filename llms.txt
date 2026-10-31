@@ -38,17 +38,26 @@ remotes::install_github('mihem/CerebroNexus')
 ``` r
 library(CerebroNexus)
 
+# Seurat, SingleCellExperiment, AnnData (.h5ad / .zarr), MuData (.h5mu)
+# or SpatialData
 convertSeuratToCerebro(
   seurat_file = "my_seurat.rds",
   result_dir = "output",
   groups = c("sample", "cluster")
 )
+convertSCEToCerebro(sce, "output", groups = "cluster")
+convertH5adToCerebro("my_data.h5ad", "output", groups = "cell_type")
+convertSpatialDataToCerebro("my_data.zarr", "output", groups = "cell_type")
 
 createShinyApp(
   cerebro_data = c("My dataset" = "output/cerebro_my_seurat.crb"),
   result_dir = "my_app"
 )
 ```
+
+No Python is needed to read AnnData or SpatialData; see the vignette
+[Use SingleCellExperiment and AnnData
+data](https://mihem.github.io/CerebroNexus/vignettes/use_sce_and_anndata_data.Rmd).
 
 ## License
 
@@ -67,6 +76,25 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Export SingleCellExperiment (SCE) object to Cerebro.
 - [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
   : Export Seurat object to Cerebro.
+- [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  : Export a Cerebro file to AnnData (h5ad)
+
+## Convert data
+
+- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  : Convert a Cerebro data file
+- [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)
+  : Convert an AnnData (h5ad) file to a Cerebro file
+- [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
+  : Convert a SingleCellExperiment object to a Cerebro file
+- [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  : Convert Seurat Object to Cerebro Format
+- [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
+  : Convert a SpatialData store to a Cerebro object
+- [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md)
+  : Read an h5ad file as a SingleCellExperiment
+- [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+  : Read a SpatialData store as a SingleCellExperiment
 
 ## Pre-processing
 
@@ -101,8 +129,14 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Calculate percentage of transcripts of gene list.
 - [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
   : Convert a Cerebro data file
+- [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)
+  : Convert an AnnData (h5ad) file to a Cerebro file
+- [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
+  : Convert a SingleCellExperiment object to a Cerebro file
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
+- [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
+  : Convert a SpatialData store to a Cerebro object
 - [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
   : Create a self-contained CerebroNexus Shiny app folder
 - [`.read_GMT_file()`](https://mihem.github.io/CerebroNexus/reference/dot-read_GMT_file.md)
@@ -113,6 +147,8 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Export SingleCellExperiment (SCE) object to Cerebro.
 - [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
   : Export Seurat object to Cerebro.
+- [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  : Export a Cerebro file to AnnData (h5ad)
 - [`extractMonocleTrajectory()`](https://mihem.github.io/CerebroNexus/reference/extractMonocleTrajectory.md)
   : Extract trajectory from Monocle and add to Seurat object.
 - [`getEnrichedPathways()`](https://mihem.github.io/CerebroNexus/reference/getEnrichedPathways.md)
@@ -130,6 +166,10 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Perform gene set enrichment analysis with GSVA.
 - [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
   : Read a Cerebro data file
+- [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md)
+  : Read an h5ad file as a SingleCellExperiment
+- [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+  : Read a SpatialData store as a SingleCellExperiment
 - [`readViewerPack()`](https://mihem.github.io/CerebroNexus/reference/readViewerPack.md)
   : Read a valid Viewer Pack descriptor
 - [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
@@ -145,6 +185,8 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   (Seurat)](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md):
 - [Export a data set in SCE
   format](https://mihem.github.io/CerebroNexus/articles/export_a_data_set_in_SCE_format.md):
+- [Use SingleCellExperiment and AnnData
+  data](https://mihem.github.io/CerebroNexus/articles/use_sce_and_anndata_data.md):
 
 ### Data model
 

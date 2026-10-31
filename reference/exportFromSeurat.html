@@ -22,6 +22,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
     <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
+    <li><a class="dropdown-item" href="../articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
@@ -105,7 +106,9 @@
 <span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  immune_sidecar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
 <span>  immune_sidecar_threshold <span class="op">=</span> <span class="fl">100000L</span>,</span>
-<span>  .expression_resolution <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  .expression_resolution <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  projections <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_coordinate_transforms <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -279,6 +282,23 @@ defaults to <code>FALSE</code>.</p></dd>
 <code><a href="convertSeuratToCerebro.html">convertSeuratToCerebro()</a></code> to reuse a matrix that has already been
 resolved and validated. Users should leave this as <code>NULL</code>.</p></dd>
 
+
+<dt id="arg-projections">projections<a class="anchor" aria-label="anchor" href="#arg-projections"></a></dt>
+<dd><p>Optional ordered names of dimensional reductions to
+export. When supplied, every named reduction is exported in that order,
+including PCA beside other projections. The default <code>NULL</code> preserves
+the legacy behavior that uses non-PCA reductions when they are available.</p></dd>
+
+
+<dt id="arg-spatial-coordinate-transforms">spatial_coordinate_transforms<a class="anchor" aria-label="anchor" href="#arg-spatial-coordinate-transforms"></a></dt>
+<dd><p>Optional named list of coordinate
+transforms keyed by exact Seurat spatial FOV/image name. Each entry may
+specify <code>rotation_degrees</code> and positive uniform <code>scale</code>; the
+pivot is the coordinate bounds center. The transform is applied once to
+the exported spatial coordinates and its normalized provenance is stored
+in the corresponding CRB spatial record. <code>NULL</code> preserves coordinates
+exactly as extracted from Seurat.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -324,16 +344,16 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.6.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
@@ -355,8 +375,8 @@ genotype is never mistaken for a directly typed one.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Saving Cerebro object to: /tmp/nix-shell-4222-882645369/RtmpQ8lNYp/pbmc_Seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Saving Cerebro object to: /tmp/nix-shell-4249-2839082002/RtmppwJnih/pbmc_Seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

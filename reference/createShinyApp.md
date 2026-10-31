@@ -284,10 +284,15 @@ getter. A CRB from an older release that is no longer read (see
 [`convertCerebro`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md))
 is rejected, as is an object containing only one of field and getter.
 Dataset labels are unique. Two labels may name the same input file; the
-bundle then holds one copy of it per label. Generated bundles follow the
-standard deployment model of one app per R process; process-global
-`Cerebro.options` does not provide same-process isolation between
-separately sourced apps.
+bundle then holds one copy of it per label. While developing the
+package, the environment variable `CEREBRO_PACKAGE_SOURCE` may name a
+source checkout (a directory with `DESCRIPTION` for
+`Package: CerebroNexus`, `R/` and `inst/`); the Viewer files and the
+version written into the bundle then come from it instead of from the
+installed package. Any other directory is ignored. Generated bundles
+follow the standard deployment model of one app per R process;
+process-global `Cerebro.options` does not provide same-process isolation
+between separately sourced apps.
 
 Launch settings are validated and frozen in a typed internal manifest
 before target preparation. The generated `app.R` reads that manifest

@@ -38,17 +38,26 @@ remotes::install_github('mihem/CerebroNexus')
 ``` r
 library(CerebroNexus)
 
+# Seurat, SingleCellExperiment, AnnData (.h5ad / .zarr), MuData (.h5mu)
+# or SpatialData
 convertSeuratToCerebro(
   seurat_file = "my_seurat.rds",
   result_dir = "output",
   groups = c("sample", "cluster")
 )
+convertSCEToCerebro(sce, "output", groups = "cluster")
+convertH5adToCerebro("my_data.h5ad", "output", groups = "cell_type")
+convertSpatialDataToCerebro("my_data.zarr", "output", groups = "cell_type")
 
 createShinyApp(
   cerebro_data = c("My dataset" = "output/cerebro_my_seurat.crb"),
   result_dir = "my_app"
 )
 ```
+
+No Python is needed to read AnnData or SpatialData; see the vignette
+[Use SingleCellExperiment and AnnData
+data](https://mihem.github.io/CerebroNexus/vignettes/use_sce_and_anndata_data.Rmd).
 
 ## License
 

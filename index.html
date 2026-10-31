@@ -39,6 +39,7 @@
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
     <li><a class="dropdown-item" href="articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
+    <li><a class="dropdown-item" href="articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
@@ -116,16 +117,22 @@
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
+<span><span class="co"># Seurat, SingleCellExperiment, AnnData (.h5ad / .zarr), MuData (.h5mu)</span></span>
+<span><span class="co"># or SpatialData</span></span>
 <span><span class="fu"><a href="reference/convertSeuratToCerebro.html">convertSeuratToCerebro</a></span><span class="op">(</span></span>
 <span>  seurat_file <span class="op">=</span> <span class="st">"my_seurat.rds"</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"output"</span>,</span>
 <span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"cluster"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/convertSCEToCerebro.html">convertSCEToCerebro</a></span><span class="op">(</span><span class="va">sce</span>, <span class="st">"output"</span>, groups <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/convertH5adToCerebro.html">convertH5adToCerebro</a></span><span class="op">(</span><span class="st">"my_data.h5ad"</span>, <span class="st">"output"</span>, groups <span class="op">=</span> <span class="st">"cell_type"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/convertSpatialDataToCerebro.html">convertSpatialDataToCerebro</a></span><span class="op">(</span><span class="st">"my_data.zarr"</span>, <span class="st">"output"</span>, groups <span class="op">=</span> <span class="st">"cell_type"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My dataset"</span> <span class="op">=</span> <span class="st">"output/cerebro_my_seurat.crb"</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"my_app"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
+<p>No Python is needed to read AnnData or SpatialData; see the vignette <a href="vignettes/use_sce_and_anndata_data.Rmd">Use SingleCellExperiment and AnnData data</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

@@ -24,6 +24,7 @@ object to visualize in Cerebro."><meta property="og:image" content="https://mihe
     <li><h6 class="dropdown-header" data-toc-skip>Workflows</h6></li>
     <li><a class="dropdown-item" href="../articles/cerebronexus_workflow_seurat.html">Introduction to the CerebroNexus workflow (Seurat)</a></li>
     <li><a class="dropdown-item" href="../articles/export_a_data_set_in_SCE_format.html">Export a data set in SCE format</a></li>
+    <li><a class="dropdown-item" href="../articles/use_sce_and_anndata_data.html">Use SingleCellExperiment and AnnData data</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Interface</h6></li>
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
@@ -97,10 +98,15 @@ object to visualize in Cerebro.</p>
 <span>  nGene <span class="op">=</span> <span class="st">"nGene"</span>,</span>
 <span>  add_all_meta_data <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  expression_matrix_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"embedded"</span>, <span class="st">"h5"</span><span class="op">)</span>,</span>
 <span>  codec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"qs2"</span>, <span class="st">"rds"</span><span class="op">)</span>,</span>
 <span>  viewer_binary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"always"</span>, <span class="st">"never"</span><span class="op">)</span>,</span>
 <span>  viewer_binary_threshold <span class="op">=</span> <span class="fl">100000L</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  main_group <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  projections <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_reductions <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  spatial_split_by <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -166,7 +172,16 @@ and instead values will be read from the disk directly, at the cost of
 performance. Note that it is necessary to install the <code>DelayedArray</code>
 package. If set to <code>FALSE</code> (default), the expression matrix will be
 copied from the input object as is. It is recommended to use a sparse format,
-such as <code>dgCMatrix</code> from the <code>Matrix</code> package.</p></dd>
+such as <code>dgCMatrix</code> from the <code>Matrix</code> package. Ignored when
+<code>expression_matrix_mode</code> is set to an external backend.</p></dd>
+
+
+<dt id="arg-expression-matrix-mode">expression_matrix_mode<a class="anchor" aria-label="anchor" href="#arg-expression-matrix-mode"></a></dt>
+<dd><p>How to persist the expression matrix. One of
+<code>"embedded"</code> (default) or <code>"h5"</code>; identical to
+<code><a href="exportFromSeurat.html">exportFromSeurat</a></code>. The <code>"h5"</code> backend writes a sibling
+<code>&lt;stem&gt;.h5</code> file next to the <code>.crb</code>, and <code>file</code> must then
+end in <code>.crb</code>.</p></dd>
 
 
 <dt id="arg-codec">codec<a class="anchor" aria-label="anchor" href="#arg-codec"></a></dt>
@@ -189,10 +204,52 @@ for large datasets, <code>"always"</code>, or <code>"never"</code>.</p></dd>
 <dd><p>Set this to <code>TRUE</code> if you want additional log messages;
 defaults to <code>FALSE</code>.</p></dd>
 
+
+<dt id="arg-main-group">main_group<a class="anchor" aria-label="anchor" href="#arg-main-group"></a></dt>
+<dd><p>Optional entry of <code>groups</code> to use as the main group.</p></dd>
+
+
+<dt id="arg-projections">projections<a class="anchor" aria-label="anchor" href="#arg-projections"></a></dt>
+<dd><p>Optional character vector naming the
+<code>reducedDims(object)</code> to export. By default every non-PCA reduction is
+exported (PCA only when it is the sole reduction).</p></dd>
+
+
+<dt id="arg-spatial-reductions">spatial_reductions<a class="anchor" aria-label="anchor" href="#arg-spatial-reductions"></a></dt>
+<dd><p>Optional character vector naming the
+<code>reducedDims(object)</code> that hold spatial point coordinates (cells x &gt;= 2).
+By default a reduction named <code>spatial</code> (any case) is used, which is how
+AnnData <code>obsm["spatial"]</code> arrives; they fill the Spatial tab.</p></dd>
+
+
+<dt id="arg-spatial-split-by">spatial_split_by<a class="anchor" aria-label="anchor" href="#arg-spatial-split-by"></a></dt>
+<dd><p>Optional <code>colData</code> column. When given, the
+spatial coordinates are divided by its values into one section per level
+(e.g. the tissue sections of a MERFISH or multi-slice Visium data set that
+share one coordinate frame), selectable in the Spatial tab.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>No data returned.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The export is written by the same format-independent core as
+<code><a href="exportFromSeurat.html">exportFromSeurat</a></code>: the CRB and any sidecar are built in a
+private stage and published together, and <code>object@metadata</code> entries
+(trees, markers, pathways, immune repertoire, HLA typing, extra material, ...)
+are read with the same keys as <code>object@misc</code> on the Seurat side.
+Two entries are specific to this route. <code>metadata(object)$group_colors</code>, a
+list named by grouping variable of named colour vectors (level to
+<code>"#RRGGBB"</code>), becomes the groups' default colours in the Viewer.
+<code>metadata(object)$spatial_images</code>, a list named by library of images
+(each <code>list(histology_image = &lt;base64 data URI&gt;,
+histology_image_bounds = c(xmin, xmax, ymin, ymax))</code>), is drawn behind the
+spatial coordinates: the single library's images go to the single spatial
+entry, and with <code>spatial_split_by</code> each section takes the images of the
+library named like its level. Both are filled in by
+<code><a href="readH5adAsSCE.html">readH5adAsSCE</a></code> from scanpy's <code>uns</code>.</p>
     </div>
 
     <div class="section level2">
@@ -210,13 +267,14 @@ defaults to <code>FALSE</code>.</p></dd>
 <span class="r-in"><span>  use_delayed_array <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Will export the following dimensional reductions: UMAP</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Will export the following dimensional reductions: UMAP</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 5.6.0</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC</span>
@@ -237,8 +295,8 @@ defaults to <code>FALSE</code>.</p></dd>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Saving Cerebro object to: /tmp/nix-shell-4222-882645369/RtmpQ8lNYp/pbmc_SCE.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [13:38:43] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Saving Cerebro object to: /tmp/nix-shell-4249-2839082002/RtmppwJnih/pbmc_SCE.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:22:21] Done!</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

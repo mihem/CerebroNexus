@@ -2,6 +2,39 @@
 
 ## CerebroNexus 5.6.0
 
+### New
+
+- AnnData (`.h5ad`, `.h5mu`, `.zarr`) and SpatialData (`.zarr`) files
+  are read natively, without Python:
+  [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md),
+  [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md),
+  [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)
+  and
+  [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md);
+  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  writes a CRB back as `.h5ad`. The readers are written here and not on
+  anndataR, because anndataR 1.2.2 cannot read AIRR (awkward) arrays,
+  `.h5mu` files or sharded Zarr v3 stores (nor the SpatialData tables in
+  them), and read a 300,000 cell h5ad about 2.2 times slower at the same
+  memory. A test compares the h5ad reader with anndataR (skipped where
+  it is not installed); to be revisited once anndataR reads sharded
+  Zarr.
+- Zarr stores compressed with Blosc (lz4, zstd or zlib, with or without
+  the byte shuffle) and arrays of numpy fixed-width strings (`<U`, `|S`)
+  are read. Blosc with blosclz, snappy, the bit shuffle or the delta
+  filter, and any other codec, stop with their name; a truncated Blosc
+  chunk is an error, not zeros. Blosc chunks are decoded in R (lz4, the
+  numcodecs default, at about 4 MB/s), so re-save a large store with
+  zstd, or use an `.h5ad` file. Zarr arrays with a transpose codec are
+  not read.
+- [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md)
+  says how many `obs` or `var` columns it skipped for an encoding it
+  does not read, also with `verbose = FALSE`; a float tissue image whose
+  maximum is just above 1 is no longer darkened (its type, not its
+  maximum, tells 0-255 pixels from 0-1 ones); the environment variable
+  `CEREBRO_PACKAGE_SOURCE` is documented and ignored unless it names a
+  CerebroNexus checkout.
+
 ### Changes
 
 - [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)

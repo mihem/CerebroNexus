@@ -6,6 +6,8 @@
   (Seurat)](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md):
 - [Export a data set in SCE
   format](https://mihem.github.io/CerebroNexus/articles/export_a_data_set_in_SCE_format.md):
+- [Use SingleCellExperiment and AnnData
+  data](https://mihem.github.io/CerebroNexus/articles/use_sce_and_anndata_data.md):
 
 ### Data model
 

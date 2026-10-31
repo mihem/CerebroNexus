@@ -27,6 +27,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/trekker_spatial_mapping.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/use_sce_and_anndata_data.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/authors.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/index.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/news/index.html</loc></url>
@@ -40,12 +41,16 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/buildViewerPack.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/createShinyApp.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/dot-read_GMT_file.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/dot-send_enrichr_query.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/exportFromSCE.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/exportToH5ad.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/extractMonocleTrajectory.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/getEnrichedPathways.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.html</loc></url>
@@ -101,6 +106,8 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/launchCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/readCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/readViewerPack.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/saveCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/validateViewerPack.html</loc></url>

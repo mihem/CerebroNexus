@@ -28,7 +28,9 @@ exportFromSeurat(
   verbose = FALSE,
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L,
-  .expression_resolution = NULL
+  .expression_resolution = NULL,
+  projections = NULL,
+  spatial_coordinate_transforms = NULL
 )
 ```
 
@@ -204,6 +206,22 @@ exportFromSeurat(
   to reuse a matrix that has already been resolved and validated. Users
   should leave this as `NULL`.
 
+- projections:
+
+  Optional ordered names of dimensional reductions to export. When
+  supplied, every named reduction is exported in that order, including
+  PCA beside other projections. The default `NULL` preserves the legacy
+  behavior that uses non-PCA reductions when they are available.
+
+- spatial_coordinate_transforms:
+
+  Optional named list of coordinate transforms keyed by exact Seurat
+  spatial FOV/image name. Each entry may specify `rotation_degrees` and
+  positive uniform `scale`; the pivot is the coordinate bounds center.
+  The transform is applied once to the exported spatial coordinates and
+  its normalized provenance is stored in the corresponding CRB spatial
+  record. `NULL` preserves coordinates exactly as extracted from Seurat.
+
 ## Value
 
 No data returned.
@@ -245,16 +263,16 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [13:38:43] Initializing Cerebro object...
-#> [13:38:43] Adding expression data (embedded)...
-#> [13:38:43] Collecting available meta data...
-#> [13:38:43] Extracting all meta data columns...
-#> [13:38:43] Extracting dimensional reductions...
-#> [13:38:43] Will export the following dimensional reductions: umap
-#> [13:38:43] Extracting marker genes table...
-#> [13:38:43] No trajectories to extract...
-#> [13:38:43] Checking for spatial data...
-#> [13:38:43] Overview of Cerebro object:
+#> [15:22:21] Initializing Cerebro object...
+#> [15:22:21] Adding expression data (embedded)...
+#> [15:22:21] Collecting available meta data...
+#> [15:22:21] Extracting all meta data columns...
+#> [15:22:21] Extracting dimensional reductions...
+#> [15:22:21] Will export the following dimensional reductions: umap
+#> [15:22:21] Extracting marker genes table...
+#> [15:22:21] No trajectories to extract...
+#> [15:22:21] Checking for spatial data...
+#> [15:22:21] Overview of Cerebro object:
 #> class: Cerebro
 #> exporter package version: 5.6.0
 #> experiment name: PBMC
@@ -276,6 +294,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [13:38:43] Saving Cerebro object to: /tmp/nix-shell-4222-882645369/RtmpQ8lNYp/pbmc_Seurat.crb
-#> [13:38:43] Done!
+#> [15:22:21] Saving Cerebro object to: /tmp/nix-shell-4249-2839082002/RtmppwJnih/pbmc_Seurat.crb
+#> [15:22:21] Done!
 ```
