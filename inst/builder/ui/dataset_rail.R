@@ -423,7 +423,6 @@ builder_dataset_rail_server <- function(
 }
 
 builder_empty_workbench_ui <- function(
-  project_active = FALSE,
   dataset_count = 0L,
   formats = get0("builder_formats", inherits = TRUE),
   examples = builder_example_directory(),
@@ -489,16 +488,6 @@ builder_empty_workbench_ui <- function(
       builder_example_buttons_ui(examples),
       shiny::uiOutput("add_error")
     ),
-    if (isTRUE(project_active)) {
-      shiny::tags$div(
-        class = "builder-empty-project-action",
-        shiny::actionButton(
-          "choose_saved_project_datasets",
-          "Choose saved datasets…",
-          class = "btn"
-        )
-      )
-    },
     if (dataset_count > 0L) {
       builder_stage_footer_ui(
         paste(
@@ -916,51 +905,11 @@ builder_dataset_rail_row_fingerprint <- function(model) {
 }
 
 builder_dataset_rail_status <- function(model) {
-  if (identical(model$checkpoint_status, "generating")) {
-    return(list(
-      label = "Checked",
-      ready = TRUE,
-      crb_label = "Generating cache…",
-      crb_status = "generating"
-    ))
-  }
-  if (identical(model$checkpoint_status, "ready")) {
-    return(list(
-      label = "Checked",
-      ready = TRUE,
-      crb_label = "Cached · opens fast",
-      crb_status = "ready"
-    ))
-  }
-  if (identical(model$checkpoint_status, "no_crb")) {
-    return(list(
-      label = "Checked",
-      ready = TRUE,
-      crb_label = "Not cached",
-      crb_status = "no-crb"
-    ))
-  }
-  if (identical(model$checkpoint_status, "unchecked")) {
-    return(list(label = "Needs checking", ready = FALSE))
-  }
-  if (identical(model$readiness_label, "CRB ready")) {
-    return(list(
-      label = "Checked",
-      ready = TRUE,
-      crb_label = "Cached · opens fast",
-      crb_status = "ready"
-    ))
-  }
   if (identical(model$readiness_label, "Loading")) {
     return(list(label = "Loading source…", ready = FALSE))
   }
   if (isTRUE(model$checked)) {
-    return(list(
-      label = "Checked",
-      ready = TRUE,
-      crb_label = "Not cached",
-      crb_status = "no-crb"
-    ))
+    return(list(label = "Checked", ready = TRUE))
   }
   if (identical(model$readiness_label, "Reload required")) {
     return(list(label = "Source reload required", ready = FALSE))
@@ -1028,13 +977,7 @@ builder_dataset_rail_row_ui <- function(model) {
               if (status$ready) "is-checked" else "needs-review"
             ),
             status$label
-          ),
-          if (!is.null(status$crb_label)) {
-            shiny::span(
-              class = paste("ds-crb-status", paste0("is-", status$crb_status)),
-              status$crb_label
-            )
-          }
+          )
         )
       )
     ),

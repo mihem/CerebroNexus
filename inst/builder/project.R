@@ -1546,6 +1546,25 @@ builder_project_record_map <- function(manifest) {
 
 ## Saved datasets that are unchanged in the live workspace: the same datasets
 ## in the same order, each with the configuration that was saved.
+## A picture the Builder extracted from a source lives in that session's
+## temporary folder, so its path differs from one session to the next. A record
+## that carries the picture's content hash is the same picture whatever its
+## path; comparing two settings ignores the path of such a record.
+.builder_project_without_session_paths <- function(value) {
+  if (!is.list(value)) {
+    return(value)
+  }
+  if (
+    "source_path" %in%
+      names(value) &&
+      .builder_project_text(value[["source_content_md5", exact = TRUE]])
+  ) {
+    value[["source_path"]] <- NULL
+    return(value)
+  }
+  lapply(value, .builder_project_without_session_paths)
+}
+
 builder_project_live_dirty <- function(entries, manifest) {
   records <- manifest$datasets %||% list()
   if (length(entries) != length(records)) {
@@ -1558,7 +1577,10 @@ builder_project_live_dirty <- function(entries, manifest) {
     live <- builder_project_configuration_entry(entry)
     if (
       !identical(as.character(entry$id), as.character(record$id)) ||
-        !identical(live$settings, saved$settings) ||
+        !identical(
+          .builder_project_without_session_paths(live$settings),
+          .builder_project_without_session_paths(saved$settings)
+        ) ||
         !identical(live$acknowledgements, saved$acknowledgements) ||
         !identical(live$spatial_drafts, saved$spatial_drafts)
     ) {
@@ -1624,6 +1646,39 @@ builder_project_restore_plan <- function(
   !(.builder_project_text(path %||% NULL) && !file.exists(path) && !has_copy)
 }
 
+## A saved picture whose file was in a session's temporary folder is the same
+## picture the source brought again when the content hash matches: keep the
+## saved adjustments (position, scale, opacity, ...) and point it at the new file.
+.builder_project_rebind_pictures <- function(saved, fresh) {
+  if (!is.list(saved) || !is.list(fresh)) {
+    return(saved)
+  }
+  if ("source_path" %in% names(saved)) {
+    path <- saved[["source_path", exact = TRUE]]
+    hash <- saved[["source_content_md5", exact = TRUE]]
+    if (
+      .builder_project_text(path) &&
+        !file.exists(path) &&
+        .builder_project_text(hash) &&
+        .builder_project_text(fresh[["source_path", exact = TRUE]]) &&
+        identical(hash, fresh[["source_content_md5", exact = TRUE]])
+    ) {
+      saved[["source_path"]] <- fresh[["source_path", exact = TRUE]]
+      if (!is.null(fresh[["source", exact = TRUE]])) {
+        saved[["source"]] <- fresh[["source", exact = TRUE]]
+      }
+    }
+    return(saved)
+  }
+  for (name in intersect(names(saved), names(fresh))) {
+    saved[[name]] <- .builder_project_rebind_pictures(
+      saved[[name]],
+      fresh[[name]]
+    )
+  }
+  saved
+}
+
 .builder_project_usable_settings <- function(settings) {
   for (field in c("images", "tables")) {
     collection <- settings[[field]]
@@ -1637,7 +1692,8 @@ builder_project_restore_plan <- function(
       if (any(c("source_path", "source_uri", "uri") %in% names(value))) {
         return(if (.builder_project_usable_record(value)) value else NULL)
       }
-      lapply(value, keep_nested)
+      kept <- lapply(value, keep_nested)
+      kept[!vapply(kept, is.null, logical(1))]
     }
     collection <- keep_nested(collection)
     if (is.list(collection) && !is.null(names(collection))) {
@@ -1667,7 +1723,16 @@ builder_project_finalize_loaded_entry <- function(loaded, record) {
     return(loaded)
   }
   fresh <- loaded
-  saved_settings <- .builder_project_usable_settings(saved$settings)
+  saved_settings <- saved$settings
+  for (field in c("images", "tables")) {
+    if (is.list(saved_settings[[field]])) {
+      saved_settings[[field]] <- .builder_project_rebind_pictures(
+        saved_settings[[field]],
+        loaded$settings[[field]] %||% list()
+      )
+    }
+  }
+  saved_settings <- .builder_project_usable_settings(saved_settings)
   fresh$settings <- utils::modifyList(
     loaded$settings %||% list(),
     saved_settings[setdiff(names(saved_settings), c("images", "tables"))],

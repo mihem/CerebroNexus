@@ -1458,7 +1458,6 @@
       confirm_builder_project_open: activityCapability("open_project") ||
         (builderActivityState.has_project === true &&
           activityCapability("edit_dataset")),
-      choose_saved_project_datasets: activityCapability("edit_dataset"),
       project_resume_current_source: activityCapability("edit_dataset"),
       complete_dataset_check: activityCapability("check_dataset"),
       continue_to_review: activityCapability("navigate_workflow"),

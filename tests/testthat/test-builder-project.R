@@ -283,6 +283,44 @@ test_that("a saved picture whose file is gone does not hide the one the source b
   )
 })
 
+test_that("a saved picture from a gone session folder is rebound to the source's own", {
+  runtime <- project_runtime()
+  fresh_file <- project_source_file("fresh.png")
+  gone <- file.path(dirname(fresh_file), "old-session", "tissue.png")
+  record <- function(path, scale) {
+    list(
+      source_path = path,
+      source_content_md5 = "abc",
+      scale = scale,
+      dx = 3,
+      source = list(name = "hires")
+    )
+  }
+  saved_entry <- project_entry(path = project_source_file())
+  saved_entry$settings$images <- list(sec1 = list(hires = record(gone, 2)))
+  manifest <- runtime$builder_project_snapshot("p", list(saved_entry))
+  loaded <- project_entry(path = manifest$datasets[[1L]]$source$path)
+  loaded$settings$images <- list(sec1 = list(hires = record(fresh_file, 1)))
+  restored <- runtime$builder_project_finalize_loaded_entry(
+    loaded,
+    manifest$datasets[[1L]]
+  )
+  expect_identical(restored$settings$images$sec1$hires$scale, 2)
+  expect_identical(restored$settings$images$sec1$hires$dx, 3)
+  expect_identical(restored$settings$images$sec1$hires$source_path, fresh_file)
+  # Opening a project that changed nothing leaves it saved, whatever the paths.
+  expect_false(runtime$builder_project_live_dirty(list(restored), manifest))
+
+  # A picture whose content changed is not the saved one.
+  other <- loaded
+  other$settings$images$sec1$hires$source_content_md5 <- "different"
+  restored_other <- runtime$builder_project_finalize_loaded_entry(
+    other,
+    manifest$datasets[[1L]]
+  )
+  expect_identical(restored_other$settings$images$sec1$hires$scale, 1)
+})
+
 test_that("the live workspace is compared with the saved project", {
   runtime <- project_runtime()
   entry <- project_entry(path = project_source_file())
@@ -340,6 +378,11 @@ test_that("Save writes the project file and Open brings the datasets back", {
     first$snapshot <- list(source_fingerprint = "a")
     second$snapshot <- list(source_fingerprint = "b")
     use_state_only_fixture(list(first, second))
+    live <- isolate(sets())
+    dataset_check_marks(stats::setNames(
+      vapply(live, app_env$builder_project_check_identity, character(1)),
+      vapply(live, `[[`, "", "id")
+    )[1L])
 
     create_builder_project_in_folder(app_env$builder_project_folder_state(
       folder
@@ -361,5 +404,23 @@ test_that("Save writes the project file and Open brings the datasets back", {
     expect_identical(builder_project_skipped_ids(), "ds2")
     expect_identical(builder_project_restore_outcome()$missing, "Moved dataset")
     expect_length(isolate(sets()), 0L)
+
+    # The review compares the marks with the identities of the live entries
+    # as character vectors: a restored mark must match one for one.
+    expect_type(dataset_check_marks(), "character")
+    loaded <- app_env$builder_project_finalize_loaded_entry(
+      first,
+      builder_project_pending_entries()$ds1
+    )
+    builder_project_commit_restored_entry(loaded)
+    expect_identical(
+      unname(dataset_check_marks()),
+      unname(vapply(
+        list(loaded),
+        app_env$builder_project_check_identity,
+        character(1)
+      ))
+    )
+    expect_identical(names(dataset_check_marks()), "ds1")
   })
 })

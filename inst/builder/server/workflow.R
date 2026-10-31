@@ -135,7 +135,6 @@ output$workbench <- renderUI({
     } else {
       tagAppendAttributes(
         builder_empty_workbench_ui(
-          project_active = !is.null(builder_project()),
           dataset_count = length(store()$datasets %||% list()),
           formats = builder_format_capabilities(),
           examples = builder_example_directory(),

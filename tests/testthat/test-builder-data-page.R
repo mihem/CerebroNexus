@@ -200,41 +200,6 @@ test_that("Dataset rail presents one concise readiness status", {
   )
 })
 
-test_that("Dataset rail distinguishes cached datasets from loaded sources", {
-  withr::local_package("shiny")
-  runtime <- builder_data_page_runtime()
-  model <- list(
-    index = 1L,
-    id = "dataset-a",
-    label = "Dataset A",
-    cells = 180L,
-    format = "qs",
-    import_elapsed_ms = NA_real_,
-    readiness_label = "CRB ready",
-    checked = TRUE,
-    selected = TRUE,
-    confirm = FALSE,
-    can_up = FALSE,
-    can_down = FALSE
-  )
-
-  crb_html <- htmltools::renderTags(
-    runtime$builder_dataset_rail_row_ui(model)
-  )$html
-  model$readiness_label <- "Ready"
-  source_html <- htmltools::renderTags(
-    runtime$builder_dataset_rail_row_ui(model)
-  )$html
-
-  expect_match(crb_html, ">Checked<", fixed = TRUE)
-  expect_match(crb_html, "Cached · opens fast", fixed = TRUE)
-  ## The readiness key stays internal; the visible text says "cache".
-  expect_false(grepl("CRB", gsub("<[^>]*>", "", crb_html), fixed = TRUE))
-  expect_match(source_html, ">Checked<", fixed = TRUE)
-  expect_match(source_html, "Not cached", fixed = TRUE)
-  expect_false(grepl("CRB", gsub("<[^>]*>", "", source_html), fixed = TRUE))
-})
-
 test_that("Data page shows its footer only after a dataset exists", {
   withr::local_package("shiny")
   runtime <- builder_data_page_runtime()

@@ -878,7 +878,7 @@ start_builder_project_open <- function(path, roots = NULL) {
   builder_project_configuration_cache_clear(
     builder_configuration_identity_cache
   )
-  dataset_check_marks(list())
+  dataset_check_marks(character())
   generation <- as.double(isolate(builder_project_open_generation())) + 1
   builder_project_open_generation(generation)
   send_dataset_action_owner(project_epoch = generation)

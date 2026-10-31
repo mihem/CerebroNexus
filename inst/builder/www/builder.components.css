@@ -2372,12 +2372,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   color: var(--c-text-subtle);
   font-size: var(--builder-type-caption);
 }
-.builder-empty-project-action {
-  display: flex;
-  justify-content: center;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--c-border);
-}
 .builder-data-sources {
   display: grid;
   gap: var(--space-2);
@@ -3092,44 +3086,6 @@ input.is-invalid {
   line-height: 1;
   white-space: nowrap;
 }
-.ds-crb-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--c-text-subtle);
-  font-size: var(--builder-type-micro);
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.ds-crb-status::before {
-  display: block;
-  width: .42rem;
-  height: .42rem;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  content: "";
-}
-.ds-crb-status.is-ready {
-  color: var(--builder-rail-ready-fg);
-}
-.ds-crb-status.is-ready::before {
-  border-color: currentColor;
-  background: currentColor;
-}
-.ds-crb-status.is-generating {
-  color: var(--c-warning-700);
-}
-.ds-crb-status.is-generating::before {
-  width: .55rem;
-  height: .55rem;
-  border-width: 2px;
-  border-right-color: transparent;
-  animation: spin .8s linear infinite;
-}
-.ds-crb-status.is-no-crb {
-  color: var(--c-text-subtle);
-}
 .ds--import .builder-load-time {
   position: absolute;
   top: .72rem;
@@ -3216,7 +3172,6 @@ input.is-invalid {
 
 @media (prefers-reduced-motion: reduce) {
   .ds-ready-stamp { transform: none; }
-  .ds-crb-status.is-generating::before { animation: none; }
 }
 
 .btn-remove-soft {
