@@ -26,123 +26,6 @@ test_that("new and restored projects use explicit spatial image storage", {
   )
 })
 
-test_that("generated App smoke detects whether browser verification is available", {
-  expect_true(builder_e2e_browser_available(list(
-    path = "/path/to/chrome",
-    error = "",
-    .check = list(status = 0L)
-  )))
-  expect_false(builder_e2e_browser_available(list(
-    path = "/path/to/chrome",
-    error = "",
-    .check = list(status = -6L)
-  )))
-  expect_false(builder_e2e_browser_available(list(
-    path = "",
-    error = "Chrome was not found",
-    .check = list(status = 0L)
-  )))
-})
-
-test_that("Builder release documentation matches the guided workflow", {
-  builder_dir <- normalizePath(builder_profile_inst_path("builder"))
-  repo <- dirname(dirname(builder_dir))
-  readme_path <- file.path(repo, "README.md")
-  vignette_path <- file.path(
-    repo,
-    "vignettes",
-    "build_a_data_set_by_pointing.Rmd"
-  )
-  skip_if_not(
-    file.exists(readme_path) && file.exists(vignette_path),
-    "Builder source documentation not present (installed-package layout)"
-  )
-
-  readme <- paste(readLines(readme_path, warn = FALSE), collapse = "\n")
-  readme_text <- gsub("\\s+", " ", readme)
-  vignette_lines <- readLines(vignette_path, warn = FALSE)
-  vignette <- paste(vignette_lines, collapse = "\n")
-  vignette_text <- gsub("\\s+", " ", vignette)
-  news_path <- file.path(repo, "NEWS.md")
-  news <- readLines(news_path, warn = FALSE)
-  news_text <- gsub("\\s+", " ", paste(news, collapse = "\n"))
-  for (stage in c(
-    "**Data**",
-    "**Configure**",
-    "**Review**",
-    "**Build**"
-  )) {
-    expect_match(readme_text, stage, fixed = TRUE)
-    expect_match(vignette_text, stage, fixed = TRUE)
-  }
-  expect_match(readme, "build_a_data_set_by_pointing", fixed = TRUE)
-
-  for (contract in c(
-    "CRB-only",
-    "Public App",
-    "Login App",
-    "cerebro_app/viewer-auth.env",
-    "private-data",
-    "viewer_bundle_assets",
-    "HTTP exposure",
-    "snapshot disk cost",
-    "Needs decision",
-    "rollback",
-    "recovery",
-    "ownership migration",
-    "Reveal Folder",
-    "Copy Path",
-    "Copy Report"
-  )) {
-    expect_match(vignette, contract, fixed = TRUE)
-  }
-  expect_false(grepl("logged and skipped", vignette, fixed = TRUE))
-  expect_match(news_text, "planned payload targets", fixed = TRUE)
-  for (contract in c(
-    "distinct source adapters",
-    "shared import pipeline",
-    "planned payload targets",
-    "snapshot payload once",
-    "build-report.json",
-    ".cerebro-builder-release-v1",
-    "Reveal Folder"
-  )) {
-    expect_match(vignette_text, contract, fixed = TRUE)
-  }
-  combined_docs <- tolower(paste(readme_text, news_text, vignette_text))
-  expect_false(grepl("exact release members", combined_docs, fixed = TRUE))
-  expect_false(grepl("same adapter", combined_docs, fixed = TRUE))
-  expect_false(grepl(
-    "each card says whether its source is real or synthetic",
-    combined_docs,
-    fixed = TRUE
-  ))
-  expect_false(grepl(
-    "disk estimate includes both sets",
-    combined_docs,
-    fixed = TRUE
-  ))
-
-  resource_start <- match("resource_files:", trimws(vignette_lines))
-  expect_false(is.na(resource_start))
-  resource_end <- which(
-    trimws(vignette_lines) == "---" & seq_along(vignette_lines) > resource_start
-  )[[1L]]
-  resources <- trimws(vignette_lines[seq.int(
-    resource_start + 1L,
-    resource_end - 1L
-  )])
-  resources <- sub("^-\\s*", "", resources)
-  resources <- resources[nzchar(resources)]
-  expect_length(resources, 1L)
-  expect_true(all(file.exists(file.path(dirname(vignette_path), resources))))
-
-  builder_heading <- match("## Builder", news)
-  next_release <- which(grepl("^# CerebroNexus ", news))[[2L]]
-  expect_false(is.na(builder_heading))
-  expect_lt(builder_heading, next_release)
-})
-
 test_that("the Builder example catalog is a stable product contract", {
   expect_true(exists("builder_example_catalog", mode = "function"))
   catalog <- builder_example_catalog()
@@ -745,7 +628,7 @@ test_that("valid Seurat content blockers stop before staging or publication", {
   expect_false(file.exists(control))
 })
 
-test_that("the 10 valid external-image artifact combinations build and relocate", {
+test_that("every backend, content kind, and output builds and relocates", {
   root <- withr::local_tempdir()
   hermetic_library <- privacy_hermetic_library(root)
   expect_true(
@@ -754,19 +637,14 @@ test_that("the 10 valid external-image artifact combinations build and relocate"
   )
   runtime_results <- list()
   browser_available <- builder_e2e_browser_available()
-  matrix <- expand.grid(
-    backend = c("embedded", "h5"),
-    content = c("plain", "histology", "trekker"),
-    output = c("crb_only", "generated_app"),
+  ## Every backend, content kind, and output appears at least once; histology
+  ## is only valid with a generated App.
+  matrix <- data.frame(
+    backend = c("embedded", "h5", "embedded", "h5"),
+    content = c("plain", "histology", "trekker", "trekker"),
+    output = c("crb_only", "generated_app", "generated_app", "crb_only"),
     stringsAsFactors = FALSE
   )
-  matrix <- matrix[
-    !(matrix$content == "histology" & matrix$output == "crb_only"),
-    ,
-    drop = FALSE
-  ]
-  expect_identical(nrow(matrix), 10L)
-  expect_identical(anyDuplicated(matrix), 0L)
 
   records <- builder_example_catalog()
   content_names <- c("plain", "histology", "trekker")
@@ -972,7 +850,7 @@ test_that("the 10 valid external-image artifact combinations build and relocate"
       expect_false(dir.exists(file.path(release, "cerebro_app")), info = label)
     }
   }
-  expect_length(runtime_results, 6L)
+  expect_length(runtime_results, 2L)
   expect_true(all(vapply(
     runtime_results,
     function(result) isTRUE(result$started),

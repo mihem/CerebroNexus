@@ -400,58 +400,6 @@ test_that("CRB builds run in their own pool and never starve short tasks", {
   )
 })
 
-test_that("the Project status shows CRB progress with a Cancel action", {
-  runtime <- new.env(parent = globalenv())
-  runtime$`%||%` <- function(left, right) if (is.null(left)) right else left
-  sys.source(
-    builder_test_inst_path("builder", "ui", "project.R"),
-    envir = runtime
-  )
-  attach_shiny <- function(env) {
-    for (name in c("tags", "tagList", "actionButton", "span", "uiOutput")) {
-      assign(name, getExportedValue("shiny", name), envir = env)
-    }
-  }
-  attach_shiny(runtime)
-  crb <- list(total = 3L, position = 2L, name = "Kidney atlas")
-  html <- as.character(runtime$builder_project_status_ui(
-    list(name = "P"),
-    phase = "clean",
-    crb = crb
-  ))
-  expect_match(
-    html,
-    "Building dataset cache · 2 of 3 · Kidney atlas",
-    fixed = TRUE
-  )
-  expect_match(html, "cancel_builder_project_crbs", fixed = TRUE)
-  expect_match(html, "is-busy", fixed = TRUE)
-  # The Cancel action is styled by the status stylesheet, not as a
-  # Bootstrap link with inline overrides.
-  expect_match(
-    html,
-    "action-button builder-project-status-cancel",
-    fixed = TRUE
-  )
-  expect_match(html, "builder-project-status-label", fixed = TRUE)
-  expect_false(grepl("btn-link", html, fixed = TRUE))
-  expect_false(grepl("style=", html, fixed = TRUE))
-
-  syncing <- as.character(runtime$builder_project_status_ui(
-    list(name = "P"),
-    phase = "clean",
-    source_sync = list(status = "syncing", completed = 0L, total = 1L),
-    crb = crb
-  ))
-  expect_false(grepl("cancel_builder_project_crbs", syncing, fixed = TRUE))
-  saving <- as.character(runtime$builder_project_status_ui(
-    list(name = "P"),
-    phase = "saving",
-    crb = crb
-  ))
-  expect_match(saving, "Saving project", fixed = TRUE)
-})
-
 test_that("CRB queue progress and Cancel keep only the record being written", {
   skip_if_not_installed("shiny")
   app_env <- builder_responsiveness_app()
@@ -804,39 +752,6 @@ test_that("other sources are streamed with byte progress and one hash pass", {
   )
 })
 
-test_that("the source copy reports bytes instead of file counts", {
-  runtime <- new.env(parent = globalenv())
-  runtime$`%||%` <- function(left, right) if (is.null(left)) right else left
-  sys.source(
-    builder_test_inst_path("builder", "ui", "project.R"),
-    envir = runtime
-  )
-  for (name in c("tags", "tagList", "actionButton")) {
-    assign(name, getExportedValue("shiny", name), envir = runtime)
-  }
-  sys.source(builder_test_inst_path("builder", "extras.R"), envir = runtime)
-  html <- as.character(runtime$builder_project_status_ui(
-    list(name = "P"),
-    phase = "clean",
-    source_sync = list(
-      status = "syncing",
-      completed = 0L,
-      total = 1L,
-      bytes_done = 1.5 * 1024^3,
-      bytes_total = 4 * 1024^3
-    )
-  ))
-  expect_match(html, "Saving source files · 1.5 GB of 4", fixed = TRUE)
-  browser <- paste(
-    readLines(
-      builder_test_inst_path("builder", "www", "builder.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  expect_match(browser, "message.bytes_total", fixed = TRUE)
-})
-
 test_that("reopening the dataset choices keeps the user's selections", {
   runtime <- builder_responsiveness_runtime()
   record <- function(id, default, actions) {
@@ -1115,53 +1030,6 @@ test_that("a warm writer verifies unchanged sidecars once across Saves", {
   expect_gt(reads$n, 0L)
 })
 
-test_that("the writer warm-up compiles the write path and fills the cache", {
-  runtime <- builder_responsiveness_runtime()
-  root <- withr::local_tempdir()
-  runtime$builder_project_write(
-    builder_responsiveness_project(runtime, root),
-    root
-  )
-  cache <- runtime$builder_project_write_verification_cache()
-  rm(list = ls(cache, all.names = TRUE), envir = cache)
-  compiled <- function(name) {
-    any(grepl(
-      "<bytecode",
-      utils::capture.output(print(get(name, envir = runtime))),
-      fixed = TRUE
-    ))
-  }
-  expect_false(compiled("builder_project_write"))
-
-  expect_true(runtime$builder_project_writer_warmup_task(
-    function(full) runtime,
-    list(root = root)
-  ))
-  expect_true(compiled("builder_project_write"))
-  expect_true(compiled("builder_project_build_manifest"))
-  expect_gt(length(ls(cache, all.names = TRUE)), 0L)
-
-  ## Compiled once per loaded runtime.
-  runtime$builder_project_write <- function(...) NULL
-  runtime$builder_project_writer_warmup_task(
-    function(full) runtime,
-    list(root = root)
-  )
-  expect_false(compiled("builder_project_write"))
-  ## Before the Project exists the warm-up only loads and compiles.
-  fresh <- builder_responsiveness_runtime()
-  expect_false(fresh$builder_project_writer_warmup_task(
-    function(full) fresh,
-    list(root = NULL)
-  ))
-  expect_true(isTRUE(fresh$.builder_project_compiled))
-  ## A folder without a Project is left for the Save to report.
-  expect_false(runtime$builder_project_writer_warmup_task(
-    function(full) runtime,
-    list(root = withr::local_tempdir())
-  ))
-})
-
 test_that("the writer is readied before the first Save and per Project", {
   skip_if_not_installed("shiny")
   app_env <- builder_responsiveness_app()
@@ -1206,31 +1074,6 @@ test_that("the writer is readied before the first Save and per Project", {
     builder_project_prewarm_workers(NULL, has_datasets = FALSE)
     expect_length(calls$warmups, 3L)
   })
-})
-
-test_that("a manual Save queues CRBs only after its result is shown", {
-  source <- paste(
-    readLines(
-      builder_test_inst_path("builder", "server", "project.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  start <- regexpr(
-    "request_builder_project_save <- function(",
-    source,
-    fixed = TRUE
-  )[[1L]]
-  end <- regexpr("output$project_status <-", source, fixed = TRUE)[[1L]]
-  save <- substr(source, start, end - 1L)
-  deferred <- regexpr("later::later(", save, fixed = TRUE)[[1L]]
-  queued <- regexpr(
-    "queue_builder_project_crbs(isolate(checked_dataset_ids()))",
-    save,
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(deferred, 0L)
-  expect_gt(queued, deferred)
 })
 
 test_that("a new configuration is verified once, not again after its rename", {

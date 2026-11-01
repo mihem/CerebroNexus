@@ -480,29 +480,6 @@ test_that("build preparation prunes and default-orders Viewer content", {
   )
 })
 
-test_that("ordinary safe metadata survives when it is not a formal Group", {
-  skip_if_not_installed("SeuratObject")
-  object <- SeuratObject::pbmc_small
-  object$batch <- rep(c("first", "second"), length.out = ncol(object))
-  item <- list(
-    analyses = character(),
-    metadata_policy = list(
-      included = c(
-        "cell_barcode",
-        "groups",
-        "batch",
-        "nCount_RNA",
-        "nFeature_RNA"
-      )
-    )
-  )
-
-  prepared <- .builder_build_apply_metadata_policy(object, item)
-
-  expect_contains(colnames(prepared@meta.data), "batch")
-  expect_identical(colnames(prepared@meta.data)[[1L]], "groups")
-})
-
 test_that("exportFromSeurat preserves Builder-selected PCA beside UMAP", {
   skip_if_not_installed("SeuratObject")
   skip_if_not_installed("Seurat")

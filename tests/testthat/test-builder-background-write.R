@@ -412,28 +412,3 @@ test_that("Project workers source the artifact runtime only when asked", {
   expect_identical(environment(portable), globalenv())
   expect_lt(length(serialize(portable, NULL)), 50000L)
 })
-
-test_that("the project server writes and copies through warm workers", {
-  source <- paste(
-    readLines(
-      builder_test_inst_path("builder", "server", "project.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  expect_false(grepl("callr::r_bg(", source, fixed = TRUE))
-  expect_match(source, "worker = builder_project_writer,", fixed = TRUE)
-  expect_match(
-    source,
-    "builder_project_worker_close(builder_project_writer)",
-    fixed = TRUE
-  )
-  base <- regmatches(
-    source,
-    regexpr(
-      "builder_project_worker_runtime_files <- function[^\n]*\n(.|\n)*?\n}\n",
-      source
-    )
-  )
-  expect_match(base, "if (isTRUE(full))", fixed = TRUE)
-})

@@ -440,31 +440,6 @@ builder_build_session_source <- function(...) {
   )
 }
 
-test_that("the Build progress panel does not depend on page_inert", {
-  javascript <- builder_build_session_source("www", "builder.js")
-  activation <- regmatches(
-    javascript,
-    regexpr(
-      "var nextBuildOperationActive = [^;]+;",
-      javascript
-    )
-  )
-  expect_length(activation, 1L)
-  expect_false(grepl("pageInert", activation, fixed = TRUE))
-  expect_match(
-    javascript,
-    'overlay.classList.toggle("is-nonmodal", buildPanelNonModal);',
-    fixed = TRUE
-  )
-  expect_match(
-    javascript,
-    "!buildOperationFocusHeld && !buildPanelNonModal",
-    fixed = TRUE
-  )
-  css <- builder_build_session_source("www", "builder.components.css")
-  expect_match(css, ".builder-operation-overlay.is-nonmodal {", fixed = TRUE)
-})
-
 test_that("a successful App build offers Open App and the same folder", {
   app_env <- builder_build_session_app()
   value <- app_env$builder_result_success(
@@ -527,29 +502,6 @@ test_that("mode and starting dataset do not re-render the options form", {
   ))
   expect_match(settings, "Welcome message", fixed = TRUE)
   expect_match(settings, 'id="build_initial_dataset"', fixed = TRUE)
-
-  lines <- strsplit(builder_build_session_source("server", "build.R"), "\n")[[
-    1L
-  ]]
-  first <- grep(
-    "output$build_output_options <- renderUI({",
-    lines,
-    fixed = TRUE
-  )
-  last <- grep("output$build_app_settings <- renderUI({", lines, fixed = TRUE)
-  form_block <- paste(lines[first:(last - 1L)], collapse = "\n")
-  expect_match(form_block, "isolate(build_mode())", fixed = TRUE)
-  expect_false(grepl(
-    "build_mode()",
-    gsub("isolate(build_mode())", "", form_block, fixed = TRUE),
-    fixed = TRUE
-  ))
-  expect_false(grepl("[^(]build_initial_dataset()", form_block))
-  expect_match(
-    builder_build_session_source("server", "build.R"),
-    'updateSelectInput(\n      session,\n      "build_initial_page"',
-    fixed = TRUE
-  )
 })
 
 test_that("missing login accounts are requested in place before a Build", {

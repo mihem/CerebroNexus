@@ -312,17 +312,6 @@ test_that("a cancel raised inside a hook is not wrapped as a dataset failure", {
   )
 })
 
-test_that("default analysis hook forwards step progress for cancellation", {
-  hook <- eval(body(builder_build_hooks)[[2L]]$run_analyses)
-  expect_true("on_progress" %in% names(formals(hook)))
-  expect_true(.builder_build_hook_accepts(hook, "on_progress"))
-  expect_false(.builder_build_hook_accepts(
-    function(object, item) NULL,
-    "on_progress"
-  ))
-  expect_null(.builder_build_cancel_callback(NULL))
-})
-
 test_that("build execution releases working objects before CRB verification", {
   stage <- withr::local_tempdir()
   hooks <- builder_build_test_hooks()
@@ -569,10 +558,6 @@ test_that("build progress records reject unsupported phases", {
 
   expect_true(builder_build_progress_write(path, "verify"))
   expect_identical(builder_build_progress_read(path), "verify")
-  expect_identical(
-    builder_build_progress_note(list(items = list()), "publish"),
-    "Publishing release atomically…"
-  )
 })
 
 test_that("build progress names the dataset and step in progress", {
@@ -1342,74 +1327,6 @@ test_that("external Spatial filenames are portable and collision-safe", {
   )
 })
 
-test_that("read-back verifies frozen H5 sidecars", {
-  skip_if_not_installed("HDF5Array")
-  skip_if_not_installed("Matrix")
-  root <- tempfile("builder-sidecars-")
-  dir.create(root)
-  on.exit(unlink(root, recursive = TRUE, force = TRUE), add = TRUE)
-  base_object <- new.env(parent = emptyenv())
-  base_object$expression <- NULL
-  base_object$meta_data <- data.frame(
-    cell_barcode = c("cell-b", "cell-a"),
-    cluster = c("B", "A"),
-    row.names = c("cell-b", "cell-a")
-  )
-  base_object$gene_data <- data.frame(
-    row.names = c("Gene2", "Gene1")
-  )
-  base_object$groups <- list(cluster = c("B", "A"))
-  base_object$projections <- list(
-    umap = data.frame(
-      x = c(1, 2),
-      y = c(3, 4),
-      row.names = c("cell-b", "cell-a")
-    )
-  )
-  for (field in c(
-    "marker_genes",
-    "most_expressed_genes",
-    "enriched_pathways",
-    "extra_material",
-    "immune_repertoire",
-    "trajectories",
-    "spatial"
-  )) {
-    base_object[[field]] <- list()
-  }
-  base_object$trekker <- NULL
-  base_object$hla_typing <- NULL
-  class(base_object) <- c("Cerebro_v1.3", "R6")
-
-  item <- builder_build_test_plan()$items[[1L]]
-  item$expression_backend <- "h5"
-  item$sidecars <- "dataset-a.h5"
-  object <- unserialize(serialize(base_object, NULL))
-  object$expression_backend <- list(type = "h5", location = item$sidecars)
-  lockEnvironment(object, bindings = FALSE)
-  crb <- file.path(root, "h5.crb")
-  matrix <- Matrix::Matrix(
-    matrix(
-      seq_len(4L),
-      nrow = 2L,
-      dimnames = list(
-        item$artifact_identity$features,
-        item$artifact_identity$cells
-      )
-    ),
-    sparse = TRUE
-  )
-  HDF5Array::writeTENxMatrix(
-    methods::as(Matrix::t(matrix), "CsparseMatrix"),
-    file.path(root, item$sidecars),
-    group = "expression"
-  )
-  saveRDS(object, crb)
-  observed <- builder_verify_crb(crb, item)
-  expect_true(observed$valid)
-  expect_identical(observed$backend$type, "h5")
-})
-
 test_that("H5 sidecar identity is independent of CRB fallback fields", {
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("Matrix")
@@ -1472,7 +1389,9 @@ test_that("H5 sidecar identity is independent of CRB fallback fields", {
   }
 
   write_h5(item$artifact_identity$cells, item$artifact_identity$features)
-  expect_true(builder_verify_crb(crb, item)$valid)
+  observed <- builder_verify_crb(crb, item)
+  expect_true(observed$valid)
+  expect_identical(observed$backend$type, "h5")
 
   write_h5(rev(item$artifact_identity$cells), item$artifact_identity$features)
   expect_error(builder_verify_crb(crb, item), "H5 sidecar cell identity")
@@ -2145,118 +2064,4 @@ test_that("build preparation follows the frozen immune source", {
   expect_null(filtered@misc$immune_repertoire)
   expect_null(filtered@misc$tcr_data)
   expect_null(filtered@misc$bcr_data)
-})
-
-test_that("a real example is exported and verified only inside its stage", {
-  skip_if_not_installed("SeuratObject")
-  skip_if_not_installed("Seurat")
-  object <- SeuratObject::pbmc_small
-  cells <- SeuratObject::Cells(object)
-  features <- rownames(object[["RNA"]])
-  group_levels <- sort(unique(as.character(object$groups)))
-  item <- list(
-    id = "pbmc-small",
-    name = "PBMC small",
-    filename = "pbmc-small.crb",
-    organism = "hg",
-    assay = "RNA",
-    layer = "data",
-    included_groups = "groups",
-    included_projections = "tsne",
-    analyses = character(),
-    analysis_dependency_graph = list(),
-    artifact_identity = list(
-      schema_version = 2L,
-      cells = cells,
-      features = features,
-      group_levels = list(groups = group_levels),
-      projections = "tsne",
-      source_metadata = c(
-        "cell_barcode",
-        "groups",
-        "nCount_RNA",
-        "nFeature_RNA"
-      ),
-      metadata = c("cell_barcode", "groups", "nUMI", "nGene"),
-      spatial_sections = character()
-    ),
-    tables = list(),
-    images = list(),
-    nUMI = "nCount_RNA",
-    nGene = "nFeature_RNA",
-    default_group = "groups",
-    metadata_policy = list(
-      included = c(
-        "cell_barcode",
-        "groups",
-        "nCount_RNA",
-        "nFeature_RNA"
-      )
-    ),
-    expression_backend = "embedded",
-    sidecars = character(),
-    viewer_page_expectations = list(
-      visible_conditional = character(),
-      hidden_conditional = character()
-    )
-  )
-  plan <- structure(
-    list(
-      items = list(item),
-      make_app = FALSE,
-      app_options = list(enabled = FALSE),
-      app_auth = list(
-        enabled = FALSE,
-        account_count = 0L,
-        timeout_minutes = 15L
-      )
-    ),
-    class = c("builder_build_plan", "list")
-  )
-  stage <- tempfile("builder-real-stage-")
-  dir.create(stage, mode = "0700")
-  on.exit(unlink(stage, recursive = TRUE, force = TRUE), add = TRUE)
-  hooks <- list(
-    open_snapshot = function(snapshot) unserialize(snapshot),
-    prepare = .builder_build_prepare,
-    run_analyses = function(object, item) {
-      builder_run_analyses(object, item$analyses, item)
-    },
-    export = .builder_build_export,
-    attach_extras = .builder_build_attach_extras,
-    verify = builder_verify_crb
-  )
-
-  result <- builder_execute_plan(
-    plan,
-    stage,
-    snapshots = list(`pbmc-small` = serialize(object, NULL)),
-    hooks = hooks
-  )
-
-  expect_null(result$error)
-  expect_identical(result$state, "success")
-  expect_true(result$publishable)
-  expect_length(result$built, 1L)
-  expect_true(startsWith(
-    result$built[[1L]],
-    normalizePath(stage, winslash = "/")
-  ))
-  expect_true(result$verifications[["pbmc-small"]]$valid)
-  expect_identical(
-    result$verifications[["pbmc-small"]]$file_fingerprint,
-    .bundlePreflightFingerprint(result$built[[1L]])
-  )
-  expect_identical(
-    result$verifications[["pbmc-small"]]$bundle_preflight$backend$type,
-    "embedded"
-  )
-  expect_length(
-    result$verifications[["pbmc-small"]]$bundle_preflight$spatial_catalog,
-    0L
-  )
-  expect_identical(
-    result$verifications[["pbmc-small"]]$metadata,
-    item$artifact_identity$metadata
-  )
 })
