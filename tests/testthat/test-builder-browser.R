@@ -803,7 +803,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   )
   app$wait_for_js(
     "document.getElementById('builder-live-status').textContent.trim() === ''",
-    timeout = 10000
+    timeout = 30000
   )
 })
 

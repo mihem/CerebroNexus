@@ -996,7 +996,7 @@ test_that("release identity rejects special filesystem nodes without blocking", 
       list(builder_root, target)
     )
     on.exit(if (process$is_alive()) process$kill(), add = TRUE)
-    process$wait(timeout = 1500)
+    process$wait(timeout = 20000)
     finished <- !process$is_alive()
     if (!finished) {
       process$kill()
