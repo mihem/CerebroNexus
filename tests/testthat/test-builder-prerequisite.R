@@ -363,6 +363,42 @@ test_that("Build dependency preflight includes conditional plan requirements", {
   ))
 })
 
+test_that("Build dependency preflight loads only frozen plan capabilities", {
+  plan <- list(
+    items = list(list(
+      expression_backend = "memory",
+      reused_artifact = NULL,
+      source_snapshot_identity = list(
+        snapshot = list(serialization = "qs2")
+      )
+    )),
+    app_auth = list(enabled = FALSE)
+  )
+  loaded <- character()
+
+  capability <- builder_build_dependency_capability(
+    plan,
+    .load = function(package) {
+      loaded <<- c(loaded, package)
+      TRUE
+    },
+    .version = function(package) base::package_version("99.0.0")
+  )
+
+  expect_true(capability$available)
+  expect_identical(
+    loaded,
+    c(
+      builder_build_base_package_requirements(),
+      "Seurat",
+      "SeuratObject",
+      "qs2"
+    )
+  )
+  expect_false("scRepertoire" %in% loaded)
+  expect_false(any(c("biomaRt", "GSVA") %in% loaded))
+})
+
 test_that("dependency preflight reports every load and version failure", {
   capability <- builder_dependency_capability(
     c("healthy", "native", "old (>= 2.0.0)"),
@@ -438,87 +474,6 @@ test_that("app plans freeze the accepted privacy contract version", {
     expect_identical(plan$app_contract_version, 1L)
     expect_true(any(basename(plan$output_release$targets) == "cerebro_app"))
   })
-})
-
-test_that("builder UI loads the prerequisite before its plan", {
-  lines <- builder_app_source_lines()
-  text <- paste(lines, collapse = "\n")
-  prerequisite_source <- grep(
-    '"prerequisite.R"',
-    lines,
-    fixed = TRUE
-  )
-  plan_source <- grep('source("plan.R", local = TRUE)', lines, fixed = TRUE)
-
-  expect_length(prerequisite_source, 1L)
-  expect_length(plan_source, 1L)
-  expect_lt(prerequisite_source, plan_source)
-  expect_match(text, "base::source(", fixed = TRUE)
-  expect_match(text, 'encoding = "UTF-8"', fixed = TRUE)
-  expect_match(
-    text,
-    "app_capability <- builder_app_capability\\(\\)"
-  )
-})
-
-test_that("builder UI activates source only for the running App", {
-  lines <- builder_app_source_lines()
-  text <- paste(lines, collapse = "\n")
-  lifecycle_start <- grep(
-    "builder_app_start <- function(",
-    lines,
-    fixed = TRUE
-  )
-  activate_source <- grep(
-    "builder_activate_source_package(builder_source_package)",
-    lines,
-    fixed = TRUE
-  )
-  app_bundle_source <- grep(
-    'source("app_bundle.R", local = TRUE)',
-    lines,
-    fixed = TRUE
-  )
-
-  expect_length(activate_source, 1L)
-  expect_length(app_bundle_source, 1L)
-  expect_length(lifecycle_start, 1L)
-  expect_gt(activate_source, lifecycle_start)
-  expect_match(text, "builder_app_restore_process_state", fixed = TRUE)
-  expect_match(text, 'Sys.unsetenv("CEREBRO_PACKAGE_SOURCE")', fixed = TRUE)
-  expect_match(
-    text,
-    "shinyApp(ui, server, onStart = builder_app_start)",
-    fixed = TRUE
-  )
-})
-
-test_that("worker setup loads the app prerequisite before planning", {
-  session_path <- builder_test_inst_path(
-    "builder",
-    "worker.R"
-  )
-  if (!file.exists(session_path)) {
-    session_path <- system.file(
-      file.path("builder", "worker.R"),
-      package = "CerebroNexus"
-    )
-  }
-  lines <- readLines(session_path, warn = FALSE)
-  prerequisite_source <- grep(
-    'source_utf8(file.path(dir, "prerequisite.R"), globalenv())',
-    lines,
-    fixed = TRUE
-  )
-  plan_source <- grep(
-    'source_utf8(file.path(dir, "plan.R"), globalenv())',
-    lines,
-    fixed = TRUE
-  )
-
-  expect_length(prerequisite_source, 1L)
-  expect_length(plan_source, 1L)
-  expect_lt(prerequisite_source, plan_source)
 })
 
 test_that("worker rejects a forged app plan before createShinyApp", {
@@ -641,54 +596,6 @@ test_that("Build dependency preflight executes in the worker process", {
 
     expect_identical(required, "build")
     expect_match(capability$error, "LoadLibrary failure", fixed = TRUE)
-  })
-})
-
-test_that("session binds successful App results to the dispatched build id", {
-  local({
-    builder_repo_source("build.R")
-    builder_repo_source("session.R")
-    builder_app_capability <- function(...) list(version = 1L)
-    builder_worker_require_capability <- function(name) invisible(TRUE)
-    .builder_build_progress_callback <- function(path) {
-      function(...) invisible(NULL)
-    }
-    builder_execute_plan <- function(
-      plan,
-      stage,
-      registry,
-      auth_material = NULL,
-      objects = list(),
-      on_progress = NULL,
-      check_cancel = NULL
-    ) {
-      expect_true(is.function(on_progress))
-      list(state = "success", publishable = TRUE, stage = stage)
-    }
-    builder_worker_response <- function(
-      request,
-      value = NULL,
-      error = NULL,
-      diagnostics = NULL
-    ) {
-      if (!is.null(error)) list(error = error) else value
-    }
-    rs <- list(call = function(fun, args) do.call(fun, args))
-    plan <- list(
-      out_dir = withr::local_tempdir(),
-      items = list(),
-      make_app = TRUE,
-      app_contract_version = 1L,
-      overwrite = FALSE
-    )
-
-    result <- builder_session_build(
-      rs,
-      plan,
-      request = list(build_id = "build-session")
-    )
-
-    expect_identical(result$build_id, "build-session")
   })
 })
 

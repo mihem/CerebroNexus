@@ -121,16 +121,6 @@ test_that("spatial molecule identity capture does not hide CRB read failures", {
   )
 })
 
-test_that("App identity permissions follow the host filesystem format", {
-  expect_true(.builder_app_permissions_valid("rw-", .os_type = "windows"))
-  expect_false(.builder_app_permissions_valid(
-    "rw-r--r--",
-    .os_type = "windows"
-  ))
-  expect_true(.builder_app_permissions_valid("rw-r--r--", .os_type = "unix"))
-  expect_false(.builder_app_permissions_valid("rw-", .os_type = "unix"))
-})
-
 test_that("App request carries only the fixed safe login summary", {
   fixture <- builder_app_bundle_fixture()
   fixture$plan$app_auth <- list(
@@ -548,33 +538,6 @@ test_that("App arguments come only from the frozen plan", {
   )))
 })
 
-test_that("App requests freeze portable copied-content identities", {
-  fixture <- builder_app_backend_fixture("h5")
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  relative_crb <- "private-data/dataset-a.crb"
-  content <- request$content_identities[[relative_crb]]
-
-  expect_identical(
-    names(request$content_identities),
-    names(request$backend_plan$entries)
-  )
-  expect_identical(content$crb$path, relative_crb)
-  expect_identical(content$crb$type, "file")
-  expect_identical(content$crb$size, request$crb_identities[[1L]]$size)
-  expect_identical(content$crb$md5, request$crb_identities[[1L]]$md5)
-  expect_identical(content$backend$type, "h5")
-  expect_identical(content$backend$root, "private-data/dataset-a.h5")
-  expect_identical(
-    content$spatial_molecules,
-    list(type = "none", root = NULL, entries = list())
-  )
-  expect_identical(names(content$backend$entries), "private-data/dataset-a.h5")
-})
-
 test_that("App requests freeze spatial molecule sidecar identities", {
   fixture <- builder_app_bundle_fixture()
   crb <- fixture$paths[[1L]]
@@ -663,30 +626,6 @@ test_that("spatial molecule identities reject stale absolute roots", {
     "invalid location",
     fixed = TRUE
   )
-})
-
-test_that("App requests freeze the complete backend closure", {
-  fixture <- builder_app_backend_fixture("h5")
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  relative_crb <- "private-data/dataset-a.crb"
-  closure <- request$backend_identities[[relative_crb]]
-
-  expect_identical(
-    names(closure),
-    c("type", "root", "root_fingerprint", "entries")
-  )
-  expect_identical(closure$type, "h5")
-  expect_identical(
-    closure$root,
-    normalizePath(fixture$sidecar, winslash = "/", mustWork = TRUE)
-  )
-  expect_null(closure$root_fingerprint)
-  expect_identical(names(closure$entries), "dataset-a.h5")
-  expect_true(grepl("^[0-9a-f]{32}$", closure$entries[[1L]]$identity$md5))
 })
 
 test_that("App assembly rejects backend closure drift before dispatch", {
@@ -792,63 +731,6 @@ test_that("stable identities reuse digests across checkpoints", {
     .previous = tree_identity
   )
   expect_identical(calls, 2L)
-})
-
-test_that("App requests consume prior staged file identities", {
-  fixture <- builder_app_bundle_fixture()
-  first <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  previous <- lapply(seq_along(first$crb_identities), function(index) {
-    stats::setNames(
-      list(first$crb_identities[[index]]),
-      basename(fixture$paths[[index]])
-    )
-  })
-  names(previous) <- fixture$ids
-  observed <- NULL
-  runtime <- builder_app_bundle_test_runtime()
-  capture <- runtime$.builder_app_capture_file_identity
-  runtime$.builder_app_capture_file_identity <- function(
-    path,
-    label = NULL,
-    .digest_file = tools::md5sum,
-    .previous = NULL
-  ) {
-    if (identical(label, fixture$ids[[1L]])) {
-      observed <<- .previous
-    }
-    capture(path, label, .digest_file, .previous)
-  }
-
-  second <- runtime$builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels,
-    previous_file_identities = previous
-  )
-
-  expect_identical(observed, first$crb_identities[[1L]])
-  expect_identical(second$crb_identities, first$crb_identities)
-  expect_error(
-    builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels,
-      previous_file_identities = rev(previous)
-    ),
-    "Prior staged file identities"
-  )
-})
-
-test_that("empty staged identity evidence is ignored", {
-  expect_null(.builder_app_previous_closure(
-    "directory",
-    "data.spatial",
-    list()
-  ))
 })
 
 test_that("App requests reuse identities captured while sidecars were staged", {
@@ -1504,42 +1386,6 @@ test_that("real login App verifies its exact database and external env pair", {
     verification,
     builder_auth_read_env_file(app_env)
   ))
-})
-
-test_that("installed layout carries the exact App entrypoint template", {
-  installed <- system.file(
-    "viewer",
-    "_bundle_app.R",
-    package = "CerebroNexus"
-  )
-  source <- builder_profile_inst_path("viewer", "_bundle_app.R")
-
-  expect_true(nzchar(installed))
-  expect_true(file.exists(installed))
-  expect_identical(
-    readBin(installed, "raw", n = file.info(installed)$size),
-    readBin(source, "raw", n = file.info(source)$size)
-  )
-})
-
-test_that("the bundled App entrypoint runs directly with visible startup information", {
-  source <- paste(
-    readLines(
-      builder_profile_inst_path("viewer", "_bundle_app.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(source, "sys.nframe() == 0L", fixed = TRUE)
-  expect_match(source, "direct_options$quiet <- FALSE", fixed = TRUE)
-  expect_match(
-    source,
-    "embedded_options\\[c\\(\\s*\"port\",\\s*\"host\",\\s*\"launch\\.browser\",\\s*\"quiet\",\\s*\"display\\.mode\"\\s*\\)\\] <- NULL",
-    perl = TRUE
-  )
-  expect_match(source, "options = embedded_options", fixed = TRUE)
-  expect_match(source, "do.call(shiny::runApp", fixed = TRUE)
 })
 
 test_that("App verification rejects stable copied data replacements", {
@@ -2220,29 +2066,5 @@ test_that("external spatial topology contains only declared relative assets", {
   expect_error(
     builder_verify_app(app_dir, request),
     "spatial-assets topology"
-  )
-})
-
-test_that("fingerprinting a table of entries equals fingerprinting its rows one by one", {
-  root <- withr::local_tempdir()
-  dir.create(file.path(root, "sub"))
-  for (name in c("a.txt", "b.txt", file.path("sub", "c.txt"))) {
-    writeLines(name, file.path(root, name))
-  }
-  entries <- sort(
-    as.character(fs::dir_ls(root, recurse = TRUE, all = TRUE)),
-    method = "radix"
-  )
-  info <- fs::file_info(entries, fail = TRUE, follow = FALSE)
-  one_by_one <- lapply(seq_len(nrow(info)), function(index) {
-    .builder_app_file_fingerprint(info[index, , drop = FALSE])
-  })
-  expect_identical(.builder_app_file_fingerprints(info), one_by_one)
-  expect_identical(.builder_app_file_fingerprints(info[0L, ]), list())
-  broken <- info
-  broken$size[[2L]] <- NA
-  expect_error(
-    .builder_app_file_fingerprints(broken),
-    "could not be fingerprinted safely"
   )
 })

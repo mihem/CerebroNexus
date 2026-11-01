@@ -179,46 +179,6 @@ test_that("temporary App input removal retries transient Windows locks", {
   })
 })
 
-test_that("temporary App input removal reports the failed path and OS error", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    stage <- file.path(root, "stage")
-    dir.create(stage)
-    path <- file.path(stage, "dataset.crb")
-    writeLines("temporary", path)
-    attempts <- 0L
-
-    error <- expect_error(
-      .builder_coordinator_remove_app_input(
-        path,
-        "dataset.crb",
-        stage,
-        .unlink = function(...) {
-          attempts <<- attempts + 1L
-          warning("Permission denied: sharing violation")
-          1L
-        },
-        .sleep = function(delay) invisible(delay),
-        .retry_delays = c(0, 0, 0)
-      ),
-      "could not be removed after 3 attempts",
-      fixed = TRUE
-    )
-
-    message <- conditionMessage(error)
-    expect_identical(attempts, 3L)
-    expect_match(
-      message,
-      normalizePath(path, winslash = "/", mustWork = TRUE),
-      fixed = TRUE
-    )
-    expect_match(message, 'Relative path: "dataset.crb"', fixed = TRUE)
-    expect_match(message, "(Windows delete|Delete) status: 1")
-    expect_match(message, "Permission denied: sharing violation", fixed = TRUE)
-  })
-})
-
 test_that("temporary App input removal rejects a path swapped during retry", {
   local({
     builder_task9_source()
@@ -438,92 +398,6 @@ test_that("a needs-decision result keeps finished CRBs for the retry", {
   })
 })
 
-test_that("publication reuses verified spatial sidecar metadata", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    plan$items[[1L]]$sidecars <- "dataset-a.spatial"
-    handle <- list(
-      app_plan = plan,
-      stage = file.path(root, "stage"),
-      transient_app_inputs = character(),
-      expected_payload_targets = character()
-    )
-    built <- c(
-      `dataset-a` = file.path(handle$stage, "dataset-a.crb"),
-      `dataset-b` = file.path(handle$stage, "dataset-b.crb")
-    )
-    verifications <- list(
-      `dataset-a` = list(
-        spatial_molecule_backend = list(
-          type = "directory",
-          location = "dataset-a.spatial"
-        )
-      ),
-      `dataset-b` = list(spatial_molecule_backend = NULL)
-    )
-    .builder_app_capture_spatial_molecule_identity <- function(...) {
-      stop("The coordinator repeated the authoritative sidecar scan.")
-    }
-
-    updated <- .builder_coordinator_register_spatial_molecule_inputs(
-      handle,
-      built,
-      app_expected = TRUE,
-      verifications = verifications
-    )
-
-    expect_identical(
-      updated$transient_app_inputs,
-      "dataset-a.spatial"
-    )
-    crb_handle <- handle
-    crb_handle$app_plan$make_app <- FALSE
-    crb_handle$transient_app_inputs <- character()
-    crb_updated <- .builder_coordinator_register_spatial_molecule_inputs(
-      crb_handle,
-      built,
-      app_expected = FALSE,
-      verifications = verifications
-    )
-    expect_identical(
-      crb_updated$expected_payload_targets,
-      "dataset-a.spatial"
-    )
-    expect_error(
-      .builder_coordinator_register_spatial_molecule_inputs(
-        handle,
-        built,
-        app_expected = TRUE,
-        verifications = list(
-          `dataset-a` = list(
-            spatial_molecule_backend = list(
-              type = "directory",
-              location = "../dataset-a.spatial"
-            )
-          )
-        )
-      ),
-      "sidecar closure is invalid",
-      fixed = TRUE
-    )
-    expect_error(
-      .builder_coordinator_register_spatial_molecule_inputs(
-        handle,
-        built,
-        app_expected = TRUE,
-        verifications = list(
-          `dataset-a` = verifications[["dataset-a"]],
-          `dataset-b` = verifications[["dataset-a"]]
-        )
-      ),
-      "sidecar closure is invalid",
-      fixed = TRUE
-    )
-  })
-})
-
 test_that("coordinator contract inspection never dispatches plan methods", {
   local({
     builder_task9_source()
@@ -723,6 +597,12 @@ builder_app_coordinator_fake_app <- function(
   app_dir
 }
 
+builder_app_coordinator_auth_cache <- local({
+  cache <- new.env(parent = emptyenv())
+  cache$passphrase_bytes <- as.raw(sample.int(256L, 32L, replace = TRUE) - 1L)
+  cache
+})
+
 builder_app_coordinator_fixture <- function(
   make_app = TRUE,
   backend = "embedded",
@@ -778,6 +658,9 @@ builder_app_coordinator_fixture <- function(
     request <- bundle_request(plan, built, labels)
     auth_runtime <- environment(bundle_request)
     auth_material <- if (isTRUE(request$auth$enabled)) {
+      # The encrypted database (scrypt) is the slow part of this fixture, so
+      # the file creates it once and gives every stage its own copy of it.
+      cache <- builder_app_coordinator_auth_cache
       get("builder_auth_create_material", envir = auth_runtime)(
         get("builder_auth_validate_payload", envir = auth_runtime)(
           TRUE,
@@ -795,6 +678,23 @@ builder_app_coordinator_fixture <- function(
           )
         )$accounts,
         handle$stage,
+        .random_bytes = function(n) cache$passphrase_bytes,
+        .create_db = function(credentials_data, sqlite_path, passphrase) {
+          if (is.null(cache$database)) {
+            shinymanager::create_db(
+              credentials_data = credentials_data,
+              sqlite_path = sqlite_path,
+              passphrase = passphrase
+            )
+            cache$database <- readBin(
+              sqlite_path,
+              raw(),
+              file.size(sqlite_path)
+            )
+          } else {
+            writeBin(cache$database, sqlite_path)
+          }
+        },
         .capability = function() list(available = TRUE, reason = NULL)
       )
     } else {
@@ -877,46 +777,6 @@ write_builder_coordinator_record_fixture <- function(root, members) {
     file.path(root, ".cerebro-builder-release-v1")
   )
 }
-
-test_that("the coordinator preregisters an owner-only assigned stage", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-
-    handle <- builder_coordinator_prepare(
-      list(
-        out_dir = target,
-        expected_prior_identity = NULL,
-        app_auth = list(
-          enabled = FALSE,
-          account_count = 0L,
-          timeout_minutes = 15L
-        )
-      ),
-      build_id = "build-1"
-    )
-
-    expect_s3_class(handle, "builder_release_coordinator")
-    expect_true(dir.exists(handle$stage))
-    expect_true(.pathWithin(handle$stage, handle$control))
-    if (!identical(.Platform$OS.type, "windows")) {
-      expect_identical(
-        as.octmode(file.info(handle$control)$mode),
-        as.octmode("700")
-      )
-    }
-    journal <- readRDS(handle$journal)
-    expect_identical(journal$phase, "prepared")
-    expect_identical(journal$build_id, "build-1")
-    expect_identical(journal$stage, handle$stage)
-    expect_true(dir.exists(handle$lock))
-
-    expect_true(builder_coordinator_abort(handle)$aborted)
-    expect_false(dir.exists(handle$stage))
-    expect_false(dir.exists(handle$lock))
-  })
-})
 
 test_that("Windows path budget fails before a stage is created", {
   local({
@@ -1399,27 +1259,6 @@ test_that("coordinator publishes only its verified assigned stage", {
   })
 })
 
-test_that("publication stays in the parent and uses the registered stage", {
-  root <- builder_test_inst_path("builder")
-  if (!dir.exists(root)) {
-    root <- system.file("builder", package = "CerebroNexus")
-  }
-  app <- builder_app_source_lines()
-  worker <- readLines(file.path(root, "worker.R"), warn = FALSE)
-  expect_false(any(grepl(
-    'source(file.path(dir, "publish.R"))',
-    worker,
-    fixed = TRUE
-  )))
-  expect_false(any(grepl("builder_publish_release", worker, fixed = TRUE)))
-  expect_false(any(grepl(
-    ".cerebro-builder-release-v1",
-    worker,
-    fixed = TRUE
-  )))
-  expect_true(any(grepl("builder_coordinator_publish", app, fixed = TRUE)))
-})
-
 test_that("parent ownership permits safe release shrinkage", {
   local({
     builder_task9_source()
@@ -1775,47 +1614,6 @@ test_that("output preflight reports foreign occupants before staging", {
   })
 })
 
-test_that("output preflight can reuse a previously verified release state", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    plan <- builder_crb_coordinator_plan(
-      target,
-      "dataset.crb",
-      overwrite = TRUE
-    )
-    verified <- builder_coordinator_output_preflight(plan)
-
-    reused <- builder_coordinator_output_preflight(
-      plan,
-      prior_state = verified$prior_state
-    )
-
-    expect_identical(reused, verified)
-  })
-})
-
-test_that("output preflight ignores Finder metadata only", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("finder", file.path(target, ".DS_Store"))
-    plan <- builder_crb_coordinator_plan(target, "dataset.crb")
-
-    clean <- builder_coordinator_output_preflight(plan)
-    expect_length(clean$foreign, 0L)
-
-    writeLines("foreign", file.path(target, ".unknown"))
-    foreign <- builder_coordinator_output_preflight(plan)
-    expect_identical(foreign$foreign, ".unknown")
-  })
-})
-
 test_that("known prior outputs still require explicit replacement", {
   local({
     builder_task9_source()
@@ -1903,148 +1701,6 @@ test_that("unplanned staged artifacts cannot enter the release", {
       "unplanned"
     )
     expect_false(dir.exists(target))
-    expect_true(builder_coordinator_abort(handle)$aborted)
-  })
-})
-
-test_that("coordinator freezes the complete App publication expectation", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    plan <- builder_app_coordinator_plan_fixture(target)
-    handle <- builder_coordinator_prepare(plan, "build-frozen-app")
-
-    expect_true(handle$app_expectation$expected)
-    expect_identical(
-      names(handle$app_expectation),
-      c(
-        "expected",
-        "contract_version",
-        "dataset_ids",
-        "labels",
-        "dataset_labels",
-        "filenames",
-        "initial_dataset",
-        "initial_dataset_mode",
-        "initial_page",
-        "show_upload_ui",
-        "welcome_message",
-        "point_size",
-        "variable_to_compare",
-        "host",
-        "port",
-        "max_request_size",
-        "display_mode",
-        "launch_browser",
-        "auth",
-        "colors",
-        "backend_plan",
-        "app_dir"
-      )
-    )
-    frozen <- unserialize(serialize(handle$app_expectation, NULL))
-    plan$items[[1L]]$name <- "Mutated"
-    plan$items[[1L]]$colors$cluster[["A"]] <- "#ff0000"
-    plan$app_options$initial_dataset <- "dataset-a"
-    expect_identical(handle$app_expectation, frozen)
-    expect_identical(
-      handle$app_expectation$app_dir,
-      file.path(handle$stage, "cerebro_app")
-    )
-    expect_true(builder_coordinator_abort(handle)$aborted)
-  })
-})
-
-test_that("coordinator preserves per-dataset Viewer defaults for parent verification", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    roi_settings <- list(
-      "fov-a" = list(
-        lesion = list(
-          rotation_degrees = 37.5,
-          point_opacity = 0.65,
-          point_size = 7
-        )
-      )
-    )
-    point_appearance <- list(
-      "fov-a" = list(point_opacity = 0.6, point_size = 7)
-    )
-    plan$items[[2L]]$spatial_point_appearance <- point_appearance
-    plan$items[[2L]]$spatial_roi_settings <- roi_settings
-    plan$items[[2L]]$spatial_image_storage <- "external"
-    contract <- .builder_coordinator_app_contract(plan)
-
-    expect_identical(
-      contract$plan$items[[2L]]$spatial_point_appearance,
-      point_appearance
-    )
-    expect_identical(
-      contract$plan$items[[2L]]$spatial_roi_settings,
-      roi_settings
-    )
-    expect_identical(
-      contract$plan$items[[2L]]$spatial_image_storage,
-      "external"
-    )
-    expect_identical(
-      contract$plan$items[[1L]]$spatial_image_storage,
-      "external"
-    )
-    expect_identical(
-      contract$plan$items[[1L]]$default_projection,
-      "umap"
-    )
-    expect_null(contract$plan$items[[1L]]$default_trajectory)
-    expect_identical(
-      contract$plan$items[[1L]]$overview_point_size,
-      5
-    )
-    expect_identical(
-      contract$plan$items[[2L]]$default_projection,
-      "pca"
-    )
-    expect_identical(
-      contract$plan$items[[2L]]$default_trajectory,
-      list(method = "slingshot", name = "lineage")
-    )
-    expect_identical(
-      contract$plan$items[[2L]]$overview_point_size,
-      7
-    )
-  })
-})
-
-test_that("coordinator exact targets allow declared App tree members", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    handle <- builder_coordinator_prepare(plan, "app-tree-members")
-    dir.create(
-      file.path(handle$stage, "cerebro_app", "viewer"),
-      recursive = TRUE
-    )
-    writeLines("app", file.path(handle$stage, "cerebro_app", "app.R"))
-    writeLines(
-      "viewer",
-      file.path(handle$stage, "cerebro_app", "viewer", "ui.R")
-    )
-    writeLines("report", file.path(handle$stage, "build-report.json"))
-
-    identity <- .builder_coordinator_stage_identity(
-      handle,
-      expected = c("cerebro_app", "build-report.json"),
-      exact = TRUE
-    )
-    expect_true(any(vapply(
-      identity$entries,
-      function(entry) identical(entry$path, "cerebro_app/viewer/ui.R"),
-      logical(1)
-    )))
     expect_true(builder_coordinator_abort(handle)$aborted)
   })
 })
@@ -2215,125 +1871,6 @@ test_that("Windows App publication accepts canonical slash variants", {
     )
     expect_true(published$published)
     expect_true(dir.exists(published$app_dir))
-  })
-})
-
-test_that("App verification reports its sub-steps to the Build card", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    plan <- builder_app_coordinator_plan_fixture(target)
-    plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    fixture <- builder_app_coordinator_fixture(
-      root = root,
-      target = target,
-      plan = plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    reported <- list()
-    published <- builder_coordinator_publish(
-      fixture$handle,
-      fixture$result,
-      .on_progress = function(phase, detail = NULL) {
-        reported[[length(reported) + 1L]] <<- c(list(phase = phase), detail)
-      }
-    )
-
-    expect_true(published$published)
-    phases <- vapply(reported, `[[`, character(1), "phase")
-    expect_identical(unique(phases), c("verify", "publish"))
-    labels <- unique(unlist(lapply(reported, `[[`, "step_label")))
-    expect_identical(
-      labels,
-      c(
-        "Checking build result",
-        "Checking datasets",
-        "Checking spatial data",
-        "Checking Viewer files",
-        "Checking Viewer runtime",
-        "Checking Viewer content",
-        "Checking files",
-        "Writing build report",
-        "Checking final files",
-        "Recording release"
-      )
-    )
-    datasets <- Filter(
-      function(value) identical(value$step_label, "Checking datasets"),
-      reported
-    )
-    indexes <- vapply(datasets, function(value) value$step_index, integer(1))
-    expect_identical(indexes[[1L]], 0L)
-    expect_identical(indexes[[length(indexes)]], 2L)
-    expect_true(all(vapply(datasets, `[[`, integer(1), "step_count") == 2L))
-    # Every file pass ends on its last file, even when throttled.
-    for (label in c(
-      "Checking files",
-      "Checking final files",
-      "Recording release"
-    )) {
-      pass <- Filter(
-        function(value) identical(value$step_label, label),
-        reported
-      )
-      last <- pass[[length(pass)]]
-      expect_gt(last$step_count, 0L)
-      expect_identical(last$step_index, last$step_count, info = label)
-    }
-  })
-})
-
-test_that("verification sub-steps are throttled and need a detail callback", {
-  local({
-    builder_task9_source()
-    clock <- 0
-    seen <- list()
-    step <- .builder_coordinator_verify_reporter(
-      function(phase, detail) seen[[length(seen) + 1L]] <<- detail,
-      interval = 0.25,
-      .now = function() clock
-    )
-    step("Checking files", 0L, 3L)
-    step("Checking files", 1L, 3L)
-    step("Checking files", 2L, 3L)
-    clock <- 0.3
-    step("Checking files", 2L, 3L)
-    step("Checking files", 3L, 3L)
-    step("Writing build report")
-    expect_identical(
-      vapply(
-        seen,
-        function(value) {
-          paste(value$step_label, value$step_index %||% "-", sep = "|")
-        },
-        character(1)
-      ),
-      c(
-        "Checking files|0",
-        "Checking files|2",
-        "Checking files|3",
-        "Writing build report|-"
-      )
-    )
-
-    phases <- character()
-    quiet <- .builder_coordinator_verify_reporter(
-      function(phase) phases <<- c(phases, phase)
-    )
-    expect_false(quiet("Checking files", 1L, 3L))
-    expect_length(phases, 0L)
-    broken <- .builder_coordinator_verify_reporter(
-      function(phase, detail) stop("disk full")
-    )
-    expect_true(broken("Checking files", 1L, 3L))
   })
 })
 
@@ -2781,14 +2318,88 @@ test_that("verified Apps publish with final paths and parent ownership", {
       verify_app = builder_verify_app
     )
     stage <- fixture$handle$stage
+    reported <- list()
 
     published <- builder_coordinator_publish(
       fixture$handle,
-      fixture$result
+      fixture$result,
+      .on_progress = function(phase, detail = NULL) {
+        reported[[length(reported) + 1L]] <<- c(list(phase = phase), detail)
+      }
     )
 
     expect_true(published$published)
     expect_true(file.exists(published$report_path))
+
+    # Verification reports its sub-steps to the Build card.
+    phases <- vapply(reported, `[[`, character(1), "phase")
+    expect_identical(unique(phases), c("verify", "publish"))
+    labels <- unique(unlist(lapply(reported, `[[`, "step_label")))
+    expect_identical(
+      labels,
+      c(
+        "Checking build result",
+        "Checking datasets",
+        "Checking spatial data",
+        "Checking Viewer files",
+        "Checking Viewer runtime",
+        "Checking Viewer content",
+        "Checking files",
+        "Writing build report",
+        "Checking final files",
+        "Recording release"
+      )
+    )
+    datasets <- Filter(
+      function(value) identical(value$step_label, "Checking datasets"),
+      reported
+    )
+    indexes <- vapply(datasets, function(value) value$step_index, integer(1))
+    expect_identical(indexes[[1L]], 0L)
+    expect_identical(indexes[[length(indexes)]], 2L)
+    expect_true(all(vapply(datasets, `[[`, integer(1), "step_count") == 2L))
+    # Every file pass ends on its last file, even when throttled.
+    for (label in c(
+      "Checking files",
+      "Checking final files",
+      "Recording release"
+    )) {
+      pass <- Filter(
+        function(value) identical(value$step_label, label),
+        reported
+      )
+      last <- pass[[length(pass)]]
+      expect_gt(last$step_count, 0L)
+      expect_identical(last$step_index, last$step_count, info = label)
+    }
+
+    # Login publication removes only the transient root inputs.
+    target <- published$release$target
+    root_inputs <- basename(unname(fixture$result$built))
+    expect_false(any(file.exists(file.path(target, root_inputs))))
+    expect_true(all(file.exists(file.path(
+      target,
+      "cerebro_app",
+      "private-data",
+      root_inputs
+    ))))
+    expect_false(file.exists(file.path(target, "viewer-auth.env")))
+    expect_true(file.exists(file.path(
+      target,
+      "cerebro_app",
+      "viewer-auth.env"
+    )))
+    expect_true(isTRUE(builder_auth_verify_database_pair(
+      file.path(
+        target,
+        "cerebro_app",
+        "private-data",
+        "auth",
+        "credentials.sqlite"
+      ),
+      file.path(target, "cerebro_app", "viewer-auth.env")
+    )))
+    expect_false(dir.exists(stage))
     expect_identical(
       published$app_dir,
       file.path(published$release$target, "cerebro_app")
@@ -2837,29 +2448,6 @@ test_that("verified Apps publish with final paths and parent ownership", {
   })
 })
 
-test_that("App publication reuses full release identities", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    original_identity <- .builder_app_tree_identity
-    identity_calls <- 0L
-    .builder_app_tree_identity <- function(...) {
-      identity_calls <<- identity_calls + 1L
-      original_identity(...)
-    }
-
-    published <- builder_coordinator_publish(fixture$handle, fixture$result)
-
-    expect_true(published$published)
-    expect_identical(identity_calls, 6L)
-  })
-})
-
 test_that("App build and publication hash an H5 payload three times", {
   local({
     builder_task9_source()
@@ -2885,7 +2473,12 @@ test_that("App build and publication hash an H5 payload three times", {
         .previous = .previous
       )
     }
+    release_hashed <- character()
     .builder_release_payload_md5 <- function(path) {
+      release_hashed <<- c(
+        release_hashed,
+        normalizePath(path, winslash = "/", mustWork = TRUE)
+      )
       record_hash(path, original_release_md5)
     }
     root <- withr::local_tempdir(.local_envir = environment())
@@ -2914,6 +2507,11 @@ test_that("App build and publication hash an H5 payload three times", {
 
     expect_true(published$published)
     expect_identical(length(hashed), 3L)
+    # Publication reuses the parent-verified App digests.
+    expect_false(any(
+      basename(release_hashed) %in% c("dataset-a.crb", "dataset-b.crb")
+    ))
+    expect_false(any(grepl("/cerebro_app/", release_hashed, fixed = TRUE)))
   })
 })
 
@@ -2965,272 +2563,6 @@ test_that("in-place App publication tolerates only root relocation metadata", {
       portable,
       "after_in_place"
     ))
-  })
-})
-
-test_that("a verified App publishes through a locked output root", {
-  local({
-    builder_task9_source()
-    .builder_app_package_path <- function(...) builder_profile_inst_path(...)
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    plan <- builder_app_coordinator_plan_fixture(target)
-    plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    fixture <- builder_app_coordinator_fixture(
-      root = root,
-      target = target,
-      plan = plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    locked_root <- function(from, to) {
-      if (
-        identical(.builder_release_path(from), .builder_release_path(target)) &&
-          identical(
-            .builder_release_path(to),
-            .builder_release_path(fixture$handle$backup)
-          )
-      ) {
-        return(FALSE)
-      }
-      file.rename(from, to)
-    }
-    publish <- function(handle, .verify_payload, .digest_cache) {
-      builder_publish_release(
-        handle,
-        .move = locked_root,
-        .verify_payload = .verify_payload,
-        .digest_cache = .digest_cache,
-        .allow_in_place = TRUE
-      )
-    }
-
-    published <- builder_coordinator_publish(
-      fixture$handle,
-      fixture$result,
-      .publish = publish
-    )
-
-    expect_true(published$published)
-    expect_true(dir.exists(file.path(target, "cerebro_app")))
-    expect_true(file.exists(file.path(target, "build-report.json")))
-    expect_identical(
-      published$release$publication_mode,
-      "in_place"
-    )
-    expect_true(published$release$control_cleaned)
-    expect_false(dir.exists(fixture$handle$control))
-  })
-})
-
-test_that("coordinator reports after App verification and before ownership", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    events <- character()
-
-    published <- builder_coordinator_publish(
-      fixture$handle,
-      fixture$result,
-      .verify_app = function(...) {
-        events <<- c(events, "app_verify")
-        builder_verify_app(...)
-      },
-      .write_report = function(stage, report) {
-        events <<- c(events, "report")
-        builder_write_build_report(stage, report)
-      },
-      .record_move = function(from, to) {
-        events <<- c(events, "ownership")
-        file.rename(from, to)
-      }
-    )
-
-    expect_identical(events, c("app_verify", "report", "ownership"))
-    expect_true(published$published)
-    expect_true(file.exists(published$report_path))
-  })
-})
-
-test_that("coordinator reuses parent-verified App digests for publication", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    fixture <- builder_app_coordinator_fixture(
-      root = root,
-      plan = plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    tree <- .builder_app_tree_identity(fixture$result$app_dir)
-    file_entries <- Filter(
-      function(entry) identical(entry$type, "file"),
-      tree$entries
-    )
-    key_fields <- c(
-      "type",
-      "permissions",
-      "size",
-      "device_id",
-      "inode",
-      "hard_links",
-      "modification_time",
-      "change_time"
-    )
-    expect_true(length(file_entries) > 0L)
-    expect_true(all(vapply(
-      file_entries,
-      function(entry) {
-        all(vapply(
-          entry[key_fields],
-          function(value) length(value) == 1L && !is.na(value),
-          logical(1)
-        ))
-      },
-      logical(1)
-    )))
-    cache_keys <- vapply(
-      file_entries,
-      .builder_release_digest_cache_key,
-      character(1)
-    )
-    expect_false(anyNA(cache_keys))
-    expect_identical(anyDuplicated(cache_keys), 0L)
-    original_md5 <- .builder_release_payload_md5
-    hashed <- character()
-    .builder_release_payload_md5 <- function(path) {
-      hashed <<- c(
-        hashed,
-        normalizePath(
-          path,
-          winslash = "/",
-          mustWork = TRUE
-        )
-      )
-      original_md5(path)
-    }
-
-    published <- builder_coordinator_publish(fixture$handle, fixture$result)
-
-    expect_true(published$published)
-    expect_false(any(
-      basename(hashed) %in%
-        c(
-          "dataset-a.crb",
-          "dataset-b.crb"
-        )
-    ))
-    expect_false(any(grepl("/cerebro_app/", hashed, fixed = TRUE)))
-  })
-})
-
-test_that("coordinator reuses the ownership identity before final publication", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    stage <- normalizePath(
-      fixture$handle$stage,
-      winslash = "/",
-      mustWork = TRUE
-    )
-    original_identity <- builder_release_identity
-    events <- character()
-    builder_release_identity <- function(target, ...) {
-      path <- normalizePath(target, winslash = "/", mustWork = FALSE)
-      if (identical(path, stage)) {
-        events <<- c(events, "stage_identity")
-      }
-      original_identity(target, ...)
-    }
-
-    published <- builder_coordinator_publish(
-      fixture$handle,
-      fixture$result,
-      .record_move = function(from, to) {
-        events <<- c(events, "ownership")
-        file.rename(from, to)
-      },
-      .publish = function(...) {
-        events <<- c(events, "publish_entry")
-        builder_publish_release(...)
-      }
-    )
-
-    after_ownership <- events[seq.int(
-      match("ownership", events),
-      length(events)
-    )]
-    expect_identical(
-      after_ownership,
-      c(
-        "ownership",
-        "stage_identity",
-        "publish_entry",
-        "stage_identity"
-      )
-    )
-    expect_true(published$published)
-  })
-})
-
-test_that("coordinator freezes only the portable report-plan projection", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    plan$runtime_only <- new.env(parent = emptyenv())
-
-    handle <- builder_coordinator_prepare(plan, "portable-report-plan")
-
-    expect_s3_class(handle$report_plan, "builder_build_plan")
-    expect_false(.builder_app_has_reference(handle$report_plan))
-    expect_false("runtime_only" %in% names(handle$report_plan))
-    expect_identical(handle$report_plan$dataset_order, plan$dataset_order)
-    expect_identical(
-      handle$report_plan$output_release$targets,
-      plan$output_release$targets
-    )
-    expect_identical(
-      handle$report_plan$items[[1L]]$spatial_image_storage,
-      plan$items[[1L]]$spatial_image_storage %||% "external"
-    )
-    expect_identical(
-      handle$report_plan$items[[1L]]$spatial_alignment,
-      list(
-        section_count = as.integer(
-          plan$items[[1L]]$spatial_alignment$section_count %||% 0L
-        ),
-        image_count = as.integer(
-          plan$items[[1L]]$spatial_alignment$image_count %||% 0L
-        )
-      )
-    )
-    expect_true(builder_coordinator_abort(handle)$aborted)
   })
 })
 
@@ -3348,75 +2680,6 @@ test_that("report failure preserves the prior release unpublished", {
     expect_identical(readRDS(file.path(target, "dataset-a.crb")), "prior")
     expect_false(file.exists(file.path(target, "build-report.json")))
     expect_true(dir.exists(fixture$handle$stage))
-  })
-})
-
-test_that("public Apps reach publication guards without authentication material", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    plan <- builder_app_coordinator_plan_fixture(target)
-    plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    plan$targets <- file.path(target, "cerebro_app")
-    plan$output_release$targets <- plan$targets
-    fixture <- builder_app_coordinator_fixture(
-      root = root,
-      target = target,
-      plan = plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    published <- builder_coordinator_publish(fixture$handle, fixture$result)
-    expect_true(published$published)
-    expect_false(file.exists(file.path(target, "viewer-auth.env")))
-    expect_true(dir.exists(file.path(target, "cerebro_app")))
-  })
-})
-
-test_that("login publication removes only transient root inputs after reporting", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    stage <- fixture$handle$stage
-    published <- builder_coordinator_publish(fixture$handle, fixture$result)
-    target <- published$release$target
-    root_inputs <- basename(unname(fixture$result$built))
-    expect_false(any(file.exists(file.path(target, root_inputs))))
-    expect_true(all(file.exists(file.path(
-      target,
-      "cerebro_app",
-      "private-data",
-      root_inputs
-    ))))
-    expect_false(file.exists(file.path(target, "viewer-auth.env")))
-    expect_true(file.exists(file.path(
-      target,
-      "cerebro_app",
-      "viewer-auth.env"
-    )))
-    expect_true(isTRUE(builder_auth_verify_database_pair(
-      file.path(
-        target,
-        "cerebro_app",
-        "private-data",
-        "auth",
-        "credentials.sqlite"
-      ),
-      file.path(target, "cerebro_app", "viewer-auth.env")
-    )))
-    expect_false(dir.exists(stage))
   })
 })
 

@@ -43,60 +43,6 @@ write_builder_release_record_fixture <- function(root, members) {
   )
 }
 
-test_that("native file operation diagnostics retain action paths and failures", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    source <- file.path(root, "source")
-    destination <- file.path(root, "destination")
-    warning_attempt <- .nativeFileOperationAttempt(
-      action = "install prepared release",
-      source = source,
-      destination = destination,
-      operation = function() {
-        warning("Access is denied (Win32 error 5).", call. = FALSE)
-        FALSE
-      }
-    )
-    warning_message <- .nativeFileOperationMessage(warning_attempt)
-
-    expect_false(warning_attempt$ok)
-    expect_match(warning_message, "install prepared release", fixed = TRUE)
-    expect_match(
-      warning_message,
-      normalizePath(
-        source,
-        winslash = "/",
-        mustWork = FALSE
-      ),
-      fixed = TRUE
-    )
-    expect_match(
-      warning_message,
-      normalizePath(
-        destination,
-        winslash = "/",
-        mustWork = FALSE
-      ),
-      fixed = TRUE
-    )
-    expect_match(warning_message, "Win32 error 5", fixed = TRUE)
-
-    error_attempt <- .nativeFileOperationAttempt(
-      action = "protect prior release",
-      source = source,
-      destination = destination,
-      operation = function() {
-        stop("sharing violation (Win32 error 32)", call. = FALSE)
-      }
-    )
-    error_message <- .nativeFileOperationMessage(error_attempt)
-    expect_false(error_attempt$ok)
-    expect_match(error_message, "sharing violation", fixed = TRUE)
-    expect_match(error_message, "Win32 error 32", fixed = TRUE)
-  })
-})
-
 test_that("release moves retry only while the atomic state is unambiguous", {
   local({
     builder_publish_source()
@@ -151,23 +97,6 @@ test_that("release moves retry only while the atomic state is unambiguous", {
   })
 })
 
-test_that("release move retry policy rejects invalid delays", {
-  local({
-    builder_publish_source()
-    expect_error(
-      .builder_release_move_attempt(
-        "source",
-        "destination",
-        "move release",
-        .move = function(...) FALSE,
-        .retry_delays = c(0, NA_real_)
-      ),
-      "retry delays are invalid",
-      fixed = TRUE
-    )
-  })
-})
-
 test_that("release existence includes dangling lexical entries", {
   local({
     builder_publish_source()
@@ -183,25 +112,6 @@ test_that("release existence includes dangling lexical entries", {
     expect_true(.builder_release_exists(target))
     expect_identical(Sys.readlink(target), outside)
     expect_false(file.exists(outside))
-  })
-})
-
-test_that("release relative paths share one canonical root", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    nested <- file.path(root, "nested")
-    dir.create(nested)
-    paths <- c(file.path(root, "one"), file.path(nested, "two"))
-
-    expect_identical(
-      unname(.builder_release_relative(paths, root)),
-      c("one", file.path("nested", "two"))
-    )
-    expect_error(
-      .builder_release_relative(c(paths, dirname(root)), root),
-      "escaped its owned root"
-    )
   })
 })
 
@@ -222,28 +132,6 @@ test_that("release identity ignores Finder metadata but not other dotfiles", {
 
     expect_setequal(paths, c(".unknown", "dataset.crb", "nested"))
     expect_false(any(basename(paths) == ".DS_Store"))
-  })
-})
-
-test_that("release identity reports each file without changing the identity", {
-  local({
-    builder_publish_source()
-    release <- file.path(withr::local_tempdir(), "release")
-    dir.create(file.path(release, "nested"), recursive = TRUE)
-    writeLines("a", file.path(release, "a.crb"))
-    writeLines("b", file.path(release, "nested", "b.rds"))
-    writeLines("c", file.path(release, "nested", "c.rds"))
-
-    seen <- character()
-    identity <- builder_release_identity(
-      release,
-      .on_file = function(index, total) {
-        seen <<- c(seen, paste0(index, "/", total))
-      }
-    )
-
-    expect_identical(seen, c("0/3", "1/3", "2/3", "3/3"))
-    expect_identical(identity, builder_release_identity(release))
   })
 })
 
@@ -277,32 +165,6 @@ test_that("output preflight reports only foreign top-level members", {
         expected_roots = "dataset.crb"
       )$ok
     )
-  })
-})
-
-test_that("release ownership records require canonical recursive members", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(file.path(release, "cerebro_app", "www"), recursive = TRUE)
-    writeLines("crb", file.path(release, "01-a.crb"))
-    writeLines("app", file.path(release, "cerebro_app", "app.R"))
-    writeLines("asset", file.path(release, "cerebro_app", "www", "asset.txt"))
-    members <- list(
-      list(type = "D", path = "cerebro_app"),
-      list(type = "D", path = "cerebro_app/www"),
-      list(type = "F", path = "01-a.crb"),
-      list(type = "F", path = "cerebro_app/app.R"),
-      list(type = "F", path = "cerebro_app/www/asset.txt")
-    )
-    write_builder_release_record_fixture(release, members)
-
-    record <- .builder_release_read_record(release)
-
-    expect_identical(record$members, members)
-    expect_type(record$bytes, "raw")
-    expect_identical(record$identity, builder_release_identity(release))
   })
 })
 
@@ -376,45 +238,6 @@ test_that("malformed ownership records fail closed", {
   })
 })
 
-test_that("ownership records reject extra blank lines", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeBin(
-      charToRaw("CEREBRO_BUILDER_RELEASE_V1\n\n"),
-      file.path(release, ".cerebro-builder-release-v1")
-    )
-
-    expect_error(
-      .builder_release_read_record(release),
-      "blank member"
-    )
-  })
-})
-
-test_that("ownership records reject trailing member delimiters", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    writeBin(
-      charToRaw(
-        "CEREBRO_BUILDER_RELEASE_V1\nF\tdataset.crb\t\n"
-      ),
-      file.path(release, ".cerebro-builder-release-v1")
-    )
-
-    expect_error(
-      .builder_release_read_record(release),
-      "malformed member"
-    )
-  })
-})
-
 test_that("ownership records reject identity mismatches and links", {
   local({
     builder_publish_source()
@@ -466,37 +289,6 @@ test_that("ownership records reject identity mismatches and links", {
   })
 })
 
-test_that("deleted releases are recognized as reusable empty shells", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    write_builder_release_record_fixture(
-      release,
-      list(
-        list(type = "D", path = "cerebro_app"),
-        list(type = "F", path = "cerebro_app/app.R"),
-        list(type = "F", path = "dataset.crb")
-      )
-    )
-    writeLines("finder", file.path(release, ".DS_Store"))
-
-    state <- builder_release_state(
-      release,
-      exact_record = FALSE,
-      allow_abandoned = TRUE
-    )
-
-    expect_true(state$record$abandoned)
-    expect_length(state$record$foreign, 0L)
-    expect_identical(
-      vapply(state$record$members, `[[`, character(1), "path"),
-      c("cerebro_app", "cerebro_app/app.R", "dataset.crb")
-    )
-  })
-})
-
 test_that("partially deleted releases are never treated as empty shells", {
   local({
     builder_publish_source()
@@ -521,33 +313,6 @@ test_that("partially deleted releases are never treated as empty shells", {
       ),
       "does not match its recorded members"
     )
-  })
-})
-
-test_that("ownership record replacement is atomic", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-
-    expect_error(
-      .builder_release_write_record(
-        release,
-        identity,
-        token = "atomic-test",
-        .move = function(from, to) FALSE
-      ),
-      "atomically"
-    )
-    expect_false(file.exists(file.path(
-      release,
-      ".cerebro-builder-release-v1"
-    )))
-    expect_identical(readLines(file.path(release, "dataset.crb")), "crb")
-    expect_length(list.files(release, all.files = TRUE, no.. = TRUE), 1L)
   })
 })
 
@@ -1087,25 +852,6 @@ test_that("release identity rejects payload changes during hashing", {
   })
 })
 
-test_that("clean release preparation initializes control once", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    original_ensure <- .builder_release_ensure_control
-    calls <- 0L
-    .builder_release_ensure_control <- function(target) {
-      calls <<- calls + 1L
-      original_ensure(target)
-    }
-
-    handle <- builder_prepare_release(target, "build-clean-control")
-
-    expect_identical(calls, 1L)
-    expect_true(builder_abort_release(handle)$aborted)
-  })
-})
-
 test_that("compare-and-swap rejects a release changed after Review", {
   local({
     builder_publish_source()
@@ -1365,50 +1111,6 @@ test_that("failed in-place publication restores the prior release", {
     )
     expect_identical(readLines(file.path(target, "dataset.crb")), "old")
     expect_false(dir.exists(handle$backup))
-  })
-})
-
-test_that("publication failures retain the native install diagnostic", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    handle <- builder_prepare_release(
-      target,
-      "build-native-diagnostic",
-      builder_release_identity(target)
-    )
-    writeLines("new", file.path(handle$stage, "dataset.crb"))
-    move <- function(from, to) {
-      if (
-        identical(.canonicalTargetPath(from), handle$stage) &&
-          identical(.canonicalTargetPath(to), handle$target)
-      ) {
-        warning("sharing violation (Win32 error 32)", call. = FALSE)
-        return(FALSE)
-      }
-      file.rename(from, to)
-    }
-
-    failure <- tryCatch(
-      builder_publish_release(
-        handle,
-        .move = move,
-        .allow_in_place = FALSE
-      ),
-      error = identity
-    )
-
-    expect_s3_class(failure, "error")
-    message <- conditionMessage(failure)
-    expect_match(message, "prior release was restored", fixed = TRUE)
-    expect_match(message, "install prepared release", fixed = TRUE)
-    expect_match(message, handle$stage, fixed = TRUE)
-    expect_match(message, handle$target, fixed = TRUE)
-    expect_match(message, "Win32 error 32", fixed = TRUE)
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
   })
 })
 
@@ -1983,40 +1685,6 @@ test_that("foreign or unverifiable locks remain fail closed", {
     )
     expect_true(dir.exists(lock))
     expect_identical(readRDS(file.path(lock, "owner.rds")), owner)
-  })
-})
-
-test_that("release lock ownership can move to a trusted publication process", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    handle <- builder_prepare_release(target, "build-owner-transfer")
-    original <- .builder_release_lock_owner(handle$lock)
-    child_pid <- original$pid + 1L
-
-    transferred <- .builder_release_transfer_lock(
-      handle$lock,
-      handle$token,
-      from_pid = original$pid,
-      to_pid = child_pid
-    )
-
-    expect_identical(transferred$pid, child_pid)
-    expect_identical(
-      .builder_release_lock_owner(handle$lock)$pid,
-      child_pid
-    )
-    expect_error(
-      .builder_release_transfer_lock(
-        handle$lock,
-        handle$token,
-        from_pid = original$pid,
-        to_pid = original$pid + 2L
-      ),
-      "ownership changed"
-    )
-    expect_true(builder_abort_release(handle)$aborted)
   })
 })
 

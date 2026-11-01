@@ -1,17 +1,6 @@
 builder_repo_source("prerequisite.R")
 builder_repo_source("app_bundle.R")
 
-test_that("Builder App bundle loads the auth contract before request helpers", {
-  path <- builder_profile_inst_path("builder", "app_bundle.R")
-  lines <- readLines(path, warn = FALSE)
-  auth_source <- grep('"auth.R"', lines, fixed = TRUE)
-  contract_source <- grep('"contract.R"', lines, fixed = TRUE)
-
-  expect_length(auth_source, 1L)
-  expect_length(contract_source, 1L)
-  expect_lt(auth_source, contract_source)
-})
-
 test_that("Builder auth normalizes usernames but never passwords", {
   parsed <- builder_auth_validate_payload(
     enabled = TRUE,

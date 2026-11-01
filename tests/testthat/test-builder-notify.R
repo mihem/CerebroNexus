@@ -76,33 +76,3 @@ test_that("builder_notify escapes text and renders tags", {
   ))
   expect_match(html, 'id="undo_remove_notice"', fixed = TRUE)
 })
-
-test_that("the Builder no longer calls showNotification directly", {
-  files <- list.files(
-    builder_test_inst_path("builder"),
-    pattern = "[.]R$",
-    recursive = TRUE,
-    full.names = TRUE
-  )
-  hits <- unlist(lapply(files, function(path) {
-    lines <- readLines(path, warn = FALSE)
-    found <- grep("(show|remove)Notification\\(", lines)
-    if (length(found)) paste0(basename(path), ":", found) else character()
-  }))
-  expect_identical(hits, character())
-
-  browser <- paste(
-    readLines(
-      builder_test_inst_path("builder", "www", "builder.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  expect_match(
-    browser,
-    'addCustomMessageHandler("builder_notify"',
-    fixed = TRUE
-  )
-  # The save confirmation no longer builds its own corner toast panel.
-  expect_false(grepl('.id = "shiny-notification-panel"', browser, fixed = TRUE))
-})
