@@ -454,6 +454,11 @@ test_that("builder interaction reflows and preserves accessible state", {
   )
   expect_false(app$get_js("document.querySelector('.result-card') !== null"))
 
+  # Opening the Build step scrolls to the top smoothly; with reduced motion the
+  # scroll finishes at once and cannot move the action while it is measured.
+  app$get_chromote_session()$Emulation$setEmulatedMedia(
+    features = list(list(name = "prefers-reduced-motion", value = "reduce"))
+  )
   geometry_by_width <- list()
   for (viewport in list(
     c(1920L, 1080L),
@@ -474,11 +479,18 @@ test_that("builder interaction reflows and preserves accessible state", {
       ),
       timeout = 10000
     )
-    app$run_js(
-      "document.getElementById('build').scrollIntoView({block:'center'});"
-    )
+    # The page can still reflow after a resize, so scroll again until the
+    # action sits inside the viewport and stays put between two polls.
     app$wait_for_js(
-      "window.__builderPrimaryActionVisible === true",
+      paste0(
+        "(function(){var b=document.getElementById('build');",
+        "var r=b.getBoundingClientRect();",
+        "if (r.top < 0 || r.bottom > window.innerHeight) {",
+        "b.scrollIntoView({block:'center'}); window.__buildTop = null;",
+        "return false;}",
+        "var still = window.__buildTop === r.top; window.__buildTop = r.top;",
+        "return still && window.__builderPrimaryActionVisible === true;})()"
+      ),
       timeout = 10000
     )
     geometry <- builder_browser_geometry(app)
