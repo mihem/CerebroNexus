@@ -41,11 +41,18 @@ jobs:
       ## Run all tests from source. test_local() loads the package in each
       ## worker, so DESCRIPTION's Config/testthat/parallel takes effect; the
       ## runner's four cores run four test files at a time.
+      ## Builder workers and the Builder browser tests run library(CerebroNexus)
+      ## in their own processes, so install this checkout into a private library
+      ## first; without it those tests skip.
       - name: Run all unit/integration tests
         env:
           TESTTHAT_CPUS: "4"
+          CEREBRO_RUN_BROWSER_TESTS: "true"
         run: |
-          nix-shell default.nix --run "Rscript -e \"
+          lib="$RUNNER_TEMP/cerebro-lib"
+          mkdir -p "$lib"
+          nix-shell default.nix --run "R CMD INSTALL --no-docs --library='$lib' ."
+          R_LIBS="$lib" nix-shell default.nix --run "Rscript -e \"
             testthat::test_local(
               '.',
               reporter = testthat::default_reporter(),
