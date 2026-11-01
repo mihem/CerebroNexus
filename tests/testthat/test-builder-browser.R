@@ -801,8 +801,14 @@ test_that("builder interaction reflows and preserves accessible state", {
     ),
     "polite"
   )
+  ## Moving to the Build step announces "Opened build step." and nothing
+  ## clears that one; whether it is still there depends on whether a busy or
+  ## result message came after it. What must not stay is a progress message.
   app$wait_for_js(
-    "document.getElementById('builder-live-status').textContent.trim() === ''",
+    paste0(
+      "['', 'Opened build step.'].indexOf(",
+      "document.getElementById('builder-live-status').textContent.trim()) >= 0"
+    ),
     timeout = 30000
   )
 })
