@@ -1418,12 +1418,35 @@ IR_BCR_SHM_CAVEAT <- "BCR: CDR3 not collapsed by SHM; clones may be split."
 ## The data layer (ir_sharing_classes) keeps immunology-standard labels
 ## (Private / Public (within-group) / Public (cross-group)); the plot maps
 ## them to self-explanatory axis labels. Two-class mode reuses the first two.
-IR_SHARING_DISPLAY_LABELS <- c(
-  "Private" = "Private (1 sample)",
-  "Public (within-group)" = "Shared within group",
-  "Public (cross-group)" = "Shared across groups",
-  "Public" = "Shared (≥ 2 samples)"
-)
+## The count in the Private and Shared labels is of the sharing unit's values,
+## so it names the unit the user chose: "sample" -> "1 sample" / "≥ 2 samples",
+## "tissue_site" -> "1 tissue site" / "≥ 2 tissue sites".
+ir_sharing_unit_noun <- function(unit_col) {
+  noun <- if (
+    is.character(unit_col) &&
+      length(unit_col) == 1L &&
+      !is.na(unit_col) &&
+      nzchar(trimws(unit_col))
+  ) {
+    trimws(gsub("[._]+", " ", unit_col))
+  } else {
+    "sample"
+  }
+  list(
+    one = noun,
+    many = if (grepl("s$", noun)) noun else paste0(noun, "s")
+  )
+}
+
+ir_sharing_display_labels <- function(unit_col = "sample") {
+  noun <- ir_sharing_unit_noun(unit_col)
+  c(
+    "Private" = paste0("Private (1 ", noun$one, ")"),
+    "Public (within-group)" = "Shared within group",
+    "Public (cross-group)" = "Shared across groups",
+    "Public" = paste0("Shared (≥ 2 ", noun$many, ")")
+  )
+}
 
 ## ---- Build the Clone Sharing ggplot ------------------------------------ ##
 ## Classifies each V;J;CDR3 clonotype of `chain` by the sharing units and the
@@ -1467,9 +1490,10 @@ ir_build_sharing_plot <- function(
   counts <- as.data.frame(table(sharing = sharing))
   counts$pct <- counts$Freq / sum(counts$Freq) * 100
   # Map the raw class labels to friendly display labels, preserving order.
+  display_labels <- ir_sharing_display_labels(unit_col)
   counts$display <- factor(
-    IR_SHARING_DISPLAY_LABELS[as.character(counts$sharing)],
-    levels = IR_SHARING_DISPLAY_LABELS[levels(counts$sharing)]
+    display_labels[as.character(counts$sharing)],
+    levels = display_labels[levels(counts$sharing)]
   )
   # Clean, human-readable hover text. ggplotly otherwise derives the tooltip
   # from the raw aes names (display, Freq) and repeats `display` because both
