@@ -510,6 +510,18 @@ generated_app_fixture_pages <- function(conditional = character()) {
     .builder_fixture_stabilize(.builder_fixture_immune(mode))
   )
   if (is_tcr) {
+    ## scRepertoire writes a TRB-only clone as "NA_<TRB part>": TRB is the
+    ## second "_" part. The shared fixture's bare "TRBV1.TRBJ1" reads as TRA,
+    ## which leaves the TRB chain of the Abundance tab without clonotypes.
+    object@misc$immune_repertoire <- lapply(
+      object@misc$immune_repertoire,
+      function(table) {
+        for (column in c("CTgene", "CTnt", "CTaa")) {
+          table[[column]] <- paste0("NA_", table[[column]])
+        }
+        table
+      }
+    )
     umap <- SeuratObject::Embeddings(object, "umap")
     tsne <- cbind(TSNE_1 = umap[, 2L] + 0.25, TSNE_2 = -umap[, 1L])
     object[["tsne"]] <- SeuratObject::CreateDimReducObject(

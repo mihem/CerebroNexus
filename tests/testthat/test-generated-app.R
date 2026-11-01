@@ -18,7 +18,7 @@ generated_app_expected_content_pages <- function(expected) {
   id_js <- .generated_app_e2e_js_value(id)
   value_js <- .generated_app_e2e_js_value(value)
   driver <- generated_app_e2e_driver()
-  driver$wait_for_js(
+  script <- function(click) {
     paste0(
       "(function(){var link=document.querySelector(",
       selector_js,
@@ -27,13 +27,26 @@ generated_app_expected_content_pages <- function(expected) {
       "Shiny.shinyapp;var current=app&&app.$inputValues?",
       "app.$inputValues[",
       id_js,
-      "]:null;if(!active)link.click();return active&&current===",
+      "]:null;",
+      if (click) "if(!active)link.click();" else "",
+      "return active&&current===",
       value_js,
       ";})()"
-    ),
-    timeout = timeout
-  )
-  invisible(value)
+    )
+  }
+  ## A data switch rebuilds some tab strips on the server, and the rebuilt
+  ## strip selects the tab remembered from before. A click that lands before
+  ## the rebuild is then undone, so click once the App is idle and check that
+  ## the tab is still selected after the next idle period.
+  for (attempt in 1:3) {
+    driver$wait_for_idle(duration = 500, timeout = timeout)
+    driver$wait_for_js(script(click = TRUE), timeout = timeout)
+    driver$wait_for_idle(duration = 500, timeout = timeout)
+    if (isTRUE(driver$get_js(script(click = FALSE)))) {
+      return(invisible(value))
+    }
+  }
+  stop("Tab ", value, " of ", id, " did not stay selected.", call. = FALSE)
 }
 
 .generated_app_e2e_select_text <- function(id, timeout = 60000) {
