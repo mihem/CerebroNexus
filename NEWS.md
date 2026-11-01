@@ -37,6 +37,11 @@
   apps with optional login. Review planned payload targets before publication.
 - Preserve dataset and cell identities across export; publish ROI, image alignment
   and content settings through shared contracts consumed by the Viewer.
+- A Builder project is one small file, `builder-project.rds`, in a folder you
+  choose: the datasets, the path of each source file and your choices for each.
+  It holds no data, so it is not portable: a source that moved, or a dataset
+  added by a browser upload, is listed as not restored when the project is
+  opened. There is no autosave, and Build always builds every checked dataset.
 
 # CerebroNexus 6.0.0
 
