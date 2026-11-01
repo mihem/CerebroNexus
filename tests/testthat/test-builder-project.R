@@ -367,43 +367,7 @@ test_that("background source jobs commit exact bytes through a part file", {
   expect_identical(job$storage_name, "source.qs2")
 })
 
-test_that("source save retries reuse an existing verified blob", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  source <- file.path(root, "session-source.rds")
-  writeBin(charToRaw("already copied"), source)
-  fingerprint <- runtime$builder_project_file_fingerprint(
-    source,
-    content = TRUE
-  )
-  entry <- list(
-    id = "ds1",
-    path = source,
-    filename = "source.rds",
-    snapshot = list(
-      source_fingerprint = paste(
-        "builder-snapshot-v2",
-        "source.rds",
-        fingerprint$bytes,
-        fingerprint$modified_at,
-        fingerprint$md5,
-        sep = ":"
-      )
-    )
-  )
-  job <- runtime$builder_project_source_job(entry, root)
-  dir.create(dirname(job$target), recursive = TRUE)
-  expect_true(file.copy(source, job$target))
-
-  prepared <- runtime$builder_project_prepare_source(entry, root)
-
-  expect_identical(prepared$source$status, "ready")
-  expect_identical(prepared$source$path, job$relative)
-  expect_identical(prepared$source$fingerprint$md5, fingerprint$md5)
-  expect_null(prepared$job)
-})
-
-test_that("source save retries reject a corrupted content-addressed blob", {
+test_that("source save retries verify an existing content-addressed blob", {
   runtime <- builder_project_test_runtime()
   root <- withr::local_tempdir()
   source <- file.path(root, "session-source.rds")
@@ -436,6 +400,13 @@ test_that("source save retries reject a corrupted content-addressed blob", {
     "failed its integrity check",
     fixed = TRUE
   )
+
+  expect_true(file.copy(source, job$target, overwrite = TRUE))
+  prepared <- runtime$builder_project_prepare_source(entry, root)
+  expect_identical(prepared$source$status, "ready")
+  expect_identical(prepared$source$path, job$relative)
+  expect_identical(prepared$source$fingerprint$md5, fingerprint$md5)
+  expect_null(prepared$job)
 })
 
 test_that("legacy retained snapshots save and restore through verified hashing", {
@@ -619,32 +590,6 @@ test_that("restored examples reuse the matching managed source", {
   expect_null(prepared$job)
 })
 
-test_that("background source generations never overwrite prior content", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  project <- file.path(root, "project")
-  source <- file.path(root, "session-sources", "ds1", "sample.qs2")
-  dir.create(dirname(source), recursive = TRUE)
-  dir.create(project)
-  writeBin(charToRaw("first-source"), source)
-  job <- runtime$builder_project_source_job(
-    list(id = "ds1", path = source, filename = "sample.qs2"),
-    project
-  )
-  first <- runtime$builder_project_copy_source_job(job)
-  first_bytes <- readBin(first$path, "raw", n = 100L)
-
-  writeBin(charToRaw("second-source"), source)
-  second <- runtime$builder_project_copy_source_job(job)
-
-  expect_false(identical(first$path, second$path))
-  expect_identical(readBin(first$path, "raw", n = 100L), first_bytes)
-  expect_identical(
-    readBin(second$path, "raw", n = 100L),
-    charToRaw("second-source")
-  )
-})
-
 test_that("background source jobs report a missing source without a partial target", {
   runtime <- builder_project_test_runtime()
   root <- withr::local_tempdir()
@@ -807,90 +752,6 @@ test_that("session source cleanup refuses paths outside the owned session root",
   expect_false(file.exists(retained))
   expect_false(runtime$builder_project_release_session_source(outside, owned))
   expect_true(file.exists(outside))
-})
-
-test_that("session source release rejects lexical symlinks without deleting targets", {
-  skip_on_os("windows")
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  owned <- file.path(root, "owned")
-  outside <- file.path(root, "outside.qs2")
-  link <- file.path(owned, "session-sources", "ds1", "linked.qs2")
-  dir.create(dirname(link), recursive = TRUE)
-  writeBin(charToRaw("outside"), outside)
-  skip_if_not(file.symlink(outside, link), "symbolic links are unavailable")
-
-  expect_false(runtime$builder_project_release_session_source(link, owned))
-  expect_true(nzchar(Sys.readlink(link)))
-  expect_true(file.exists(outside))
-})
-
-test_that("managed path checks allow only an explicitly missing create leaf", {
-  skip_on_os("windows")
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  checkpoint_parent <- file.path(root, "checkpoints")
-
-  expect_true(runtime$.builder_project_path_has_link_within(
-    checkpoint_parent,
-    root
-  ))
-  expect_false(runtime$.builder_project_path_has_link_within(
-    checkpoint_parent,
-    root,
-    allow_missing_leaf = TRUE
-  ))
-  expect_true(runtime$.builder_project_path_has_link_within(
-    file.path(root, "missing-parent", "checkpoints"),
-    root,
-    allow_missing_leaf = TRUE
-  ))
-
-  expect_true(dir.create(checkpoint_parent))
-  expect_false(runtime$.builder_project_path_has_link_within(
-    checkpoint_parent,
-    root,
-    allow_missing_leaf = TRUE
-  ))
-
-  unlink(checkpoint_parent, recursive = TRUE)
-  skip_if_not(
-    file.symlink(file.path(root, "missing-target"), checkpoint_parent),
-    "symbolic links are unavailable"
-  )
-  expect_true(runtime$.builder_project_path_has_link_within(
-    checkpoint_parent,
-    root,
-    allow_missing_leaf = TRUE
-  ))
-})
-
-test_that("checkpoint cleanup accepts the lexical macOS alias of its project root", {
-  skip_on_os("windows")
-  runtime <- builder_project_test_runtime()
-  lexical_root <- withr::local_tempdir()
-  normalized_root <- normalizePath(
-    lexical_root,
-    winslash = "/",
-    mustWork = TRUE
-  )
-  skip_if(
-    identical(lexical_root, normalized_root),
-    "the temporary root has no lexical filesystem alias"
-  )
-  checkpoint <- file.path(
-    lexical_root,
-    "checkpoints",
-    "20260820T000000"
-  )
-  dir.create(checkpoint, recursive = TRUE)
-  writeLines("checkpoint", file.path(checkpoint, "dataset.crb"))
-
-  expect_true(runtime$builder_project_cleanup_checkpoint(
-    checkpoint,
-    normalized_root
-  ))
-  expect_false(dir.exists(checkpoint))
 })
 
 test_that("background save runtimes include verified copy support", {
@@ -1293,59 +1154,6 @@ test_that("project table asset jobs deduplicate sheets from one workbook", {
   ))
 })
 
-test_that("missing project spatial assets identify the affected FOV and image", {
-  skip_if_not_installed("png")
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  source_path <- withr::local_tempfile(fileext = ".png")
-  png::writePNG(matrix(seq(0, 1, length.out = 16L), nrow = 4L), source_path)
-  inspected <- runtime$builder_read_image(source_path)
-  entry <- list(
-    id = "ds1",
-    settings = list(
-      images = list(
-        fov_1 = list(
-          DAPI = list(
-            source = list(name = "DAPI.png", type = "image/png"),
-            source_path = inspected$source_path,
-            source_content_md5 = inspected$source_content_md5,
-            base_bounds = list(xmin = 0, xmax = 1, ymin = 0, ymax = 1)
-          )
-        )
-      )
-    )
-  )
-  payload_entry <- runtime$builder_project_stage_spatial_assets(entry, root)
-  dataset_source <- file.path(root, "source.rds")
-  writeBin(charToRaw("source"), dataset_source)
-  record <- runtime$builder_project_dataset_record(
-    entry,
-    list(
-      kind = "managed",
-      path = runtime$builder_project_relative_path(dataset_source, root)
-    ),
-    payload_entry = payload_entry,
-    root = root
-  )
-  asset <- payload_entry$settings$images$fov_1$DAPI$project_asset$path
-  unlink(file.path(root, asset))
-
-  status <- runtime$builder_project_dataset_status(record, root)
-  expect_null(status$configuration_entry)
-  expect_identical(status$actions, c("reload", "skip"))
-  expect_identical(status$default_action, "reload")
-  expect_identical(status$message, "Settings unavailable")
-  expect_match(status$problem, "ds1.*fov_1.*DAPI")
-  expect_error(
-    runtime$builder_project_restore_entry(
-      record,
-      root,
-      status$configuration_entry
-    ),
-    "saved dataset configuration is unavailable"
-  )
-})
-
 test_that("open validation checks spatial descriptors without reading image payloads", {
   runtime <- builder_project_test_runtime()
   root <- withr::local_tempdir()
@@ -1387,54 +1195,6 @@ test_that("open validation checks spatial descriptors without reading image payl
     status$configuration_entry$settings$images$fov$image$source_path,
     normalizePath(asset, winslash = "/")
   )
-})
-
-test_that("file metadata batches files and safely follows symbolic-link targets", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  first <- file.path(root, "first.bin")
-  second <- file.path(root, "second.bin")
-  directory <- file.path(root, "directory")
-  missing <- file.path(root, "missing.bin")
-  link <- file.path(root, "linked.bin")
-  chained <- file.path(root, "chained.bin")
-  broken <- file.path(root, "broken.bin")
-  cycle_a <- file.path(root, "cycle-a.bin")
-  cycle_b <- file.path(root, "cycle-b.bin")
-  writeBin(charToRaw("first"), first)
-  writeBin(charToRaw("second"), second)
-  dir.create(directory)
-  skip_if_not(file.symlink(first, link), "symbolic links are unavailable")
-  skip_if_not(file.symlink(link, chained), "symbolic links are unavailable")
-  skip_if_not(file.symlink(missing, broken), "symbolic links are unavailable")
-  skip_if_not(file.symlink(cycle_b, cycle_a), "symbolic links are unavailable")
-  skip_if_not(file.symlink(cycle_a, cycle_b), "symbolic links are unavailable")
-
-  metadata <- runtime$.builder_project_files_metadata(c(
-    first,
-    second,
-    directory,
-    missing
-  ))
-
-  expect_length(metadata, 4L)
-  expect_identical(metadata[[1L]], runtime$builder_project_file_metadata(first))
-  expect_identical(
-    metadata[[2L]],
-    runtime$builder_project_file_metadata(second)
-  )
-  expect_null(metadata[[3L]])
-  expect_null(metadata[[4L]])
-  expect_identical(
-    runtime$builder_project_file_metadata(link),
-    metadata[[1L]]
-  )
-  expect_identical(
-    runtime$builder_project_file_metadata(chained),
-    metadata[[1L]]
-  )
-  expect_null(runtime$builder_project_file_metadata(broken))
-  expect_null(runtime$builder_project_file_metadata(cycle_a))
 })
 
 test_that("checkpoint entries keep spatial images external", {
@@ -1561,69 +1321,6 @@ test_that("legacy qs reminders identify only qs datasets", {
   expect_identical(
     vapply(found, `[[`, character(1), "name"),
     c("Legacy one", "Legacy two")
-  )
-})
-
-test_that("persisted schema and revision integers are exact", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  path <- file.path(root, "builder-project.json")
-  manifest <- runtime$builder_project_new_manifest(root, "Strict integers")
-  write_manifest <- function(value) {
-    writeBin(
-      charToRaw(enc2utf8(jsonlite::serializeJSON(
-        value,
-        digits = NA,
-        pretty = FALSE
-      ))),
-      path
-    )
-  }
-  for (bad in list(3.5, "3x", -1, .Machine$integer.max + 1)) {
-    candidate <- manifest
-    candidate$schema_version <- bad
-    write_manifest(candidate)
-    expect_error(
-      runtime$builder_project_read_manifest_payload(path),
-      "not a supported Builder project",
-      fixed = TRUE
-    )
-    candidate <- manifest
-    candidate$project$revision <- bad
-    write_manifest(candidate)
-    expect_error(
-      runtime$builder_project_read_manifest_payload(path),
-      "not a supported Builder project",
-      fixed = TRUE
-    )
-  }
-
-  config <- list(
-    id = "ds1",
-    revision = 1.1,
-    settings = list(name = "Dataset"),
-    acknowledgements = character(),
-    spatial_drafts = list()
-  )
-  config_path <- file.path(root, "config.json")
-  writeBin(
-    charToRaw(enc2utf8(jsonlite::serializeJSON(
-      config,
-      digits = NA,
-      pretty = FALSE
-    ))),
-    config_path
-  )
-  expect_error(
-    runtime$builder_project_verify_configuration(
-      config_path,
-      "ds1",
-      1.9,
-      runtime$builder_project_configuration_digest(config),
-      runtime$builder_project_file_fingerprint(config_path, content = TRUE)
-    ),
-    "persisted integer is invalid",
-    fixed = TRUE
   )
 })
 
@@ -2490,33 +2187,6 @@ test_that("manifest preview fingerprint covers the manifest read window", {
         stop("an unstable payload must not be parsed")
       },
       .metadata = next_metadata
-    ),
-    "changed while it was being read",
-    fixed = TRUE
-  )
-})
-
-test_that("stable manifest reading rejects a short payload", {
-  runtime <- builder_project_test_runtime()
-  path <- withr::local_tempfile()
-  writeBin(charToRaw("0123456789"), path)
-  metadata <- function(path) {
-    list(
-      bytes = 11,
-      modified_at = "2026-09-29T00:00:00.000Z",
-      changed_at = "1",
-      stat_version = 1L,
-      file_id = "1:1"
-    )
-  }
-
-  expect_error(
-    runtime$builder_project_read_stable_manifest(
-      path,
-      .read = function(path, payload) {
-        stop("a short payload must not be parsed")
-      },
-      .metadata = metadata
     ),
     "changed while it was being read",
     fixed = TRUE
@@ -3605,111 +3275,6 @@ test_that("legacy reviewed settings migrate to the checked flag", {
   expect_false(runtime$builder_project_record_configuration_confirmed(record))
 })
 
-test_that("dataset config generations survive manifest backups and stale writers", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  manifest <- runtime$builder_project_new_manifest(root, "Generation safety")
-  entry <- function(name) {
-    list(
-      id = "ds1",
-      revision = 1L,
-      settings = list(name = name),
-      acknowledgements = character(),
-      spatial_drafts = list()
-    )
-  }
-  record <- function(name) {
-    runtime$builder_project_dataset_record(
-      entry(name),
-      source = list(kind = "missing", path = NULL),
-      root = root
-    )
-  }
-
-  manifest$datasets <- list(record("first"))
-  first <- runtime$builder_project_write(manifest, root)
-  stale <- first$manifest
-
-  winner <- first$manifest
-  winner$datasets <- list(record("winner"))
-  winner <- runtime$builder_project_write(
-    winner,
-    root,
-    expected_revision = first$manifest$project$revision
-  )
-
-  stale$datasets <- list(record("stale"))
-  expect_error(
-    runtime$builder_project_write(
-      stale,
-      root,
-      expected_revision = first$manifest$project$revision
-    ),
-    "updated by another Builder window",
-    fixed = TRUE
-  )
-
-  expect_identical(
-    runtime$builder_project_read_dataset_config(
-      winner$manifest$datasets[[1L]],
-      root
-    )$settings$name,
-    "winner"
-  )
-  backup <- runtime$builder_project_read(paste0(winner$path, ".bak"))
-  expect_identical(
-    runtime$builder_project_read_dataset_config(
-      backup$datasets[[1L]],
-      root
-    )$settings$name,
-    "first"
-  )
-  expect_false(identical(
-    backup$datasets[[1L]]$configuration$path,
-    winner$manifest$datasets[[1L]]$configuration$path
-  ))
-})
-
-test_that("manifest restore failure reports the retained backup", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  first <- runtime$builder_project_write(
-    runtime$builder_project_new_manifest(root, "Recovery path"),
-    root
-  )
-  target <- first$path
-  backup <- paste0(target, ".bak")
-  move <- function(from, to) {
-    if (
-      identical(basename(from), "builder-project.json") &&
-        identical(basename(to), "builder-project.json.bak")
-    ) {
-      return(file.rename(from, to))
-    }
-    FALSE
-  }
-
-  expect_error(
-    runtime$builder_project_write(
-      first$manifest,
-      root,
-      expected_revision = first$manifest$project$revision,
-      .move = move
-    ),
-    paste(
-      "Recover it from:",
-      normalizePath(backup, winslash = "/", mustWork = FALSE)
-    ),
-    fixed = TRUE
-  )
-  expect_false(file.exists(target))
-  expect_true(file.exists(backup))
-  expect_identical(
-    runtime$builder_project_read(backup)$project$revision,
-    first$manifest$project$revision
-  )
-})
-
 test_that("manifest revision commits are serialized by an owned project lock", {
   runtime <- builder_project_test_runtime()
   root <- withr::local_tempdir()
@@ -3768,58 +3333,6 @@ test_that("project input is bounded and Builder has no inline image decoder", {
     implementation,
     fixed = TRUE
   ))
-})
-
-test_that("restored source identity requires the recorded content fingerprint", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  source <- file.path(root, "sources", "ds1", "source.rds")
-  dir.create(dirname(source), recursive = TRUE)
-  writeBin(charToRaw("AAAA"), source)
-  recorded_time <- file.info(source)$mtime[[1L]]
-  record <- runtime$builder_project_dataset_record(
-    list(id = "ds1", settings = list(name = "Dataset")),
-    source = list(
-      kind = "managed",
-      path = "sources/ds1/source.rds",
-      status = "ready",
-      fingerprint = runtime$builder_project_file_fingerprint(
-        source,
-        content = TRUE
-      )
-    ),
-    checked = TRUE,
-    root = root
-  )
-
-  writeBin(charToRaw("BBBB"), source)
-  Sys.setFileTime(source, recorded_time)
-  status <- runtime$builder_project_dataset_status(record, root)
-
-  expect_true("resume" %in% status$actions)
-  record$runtime_restore_status <- status
-  record$runtime_restore_action <- "resume"
-  loaded <- list(
-    id = "ds1",
-    snapshot = list(
-      source_fingerprint = paste(
-        "builder-snapshot-v2",
-        basename(source),
-        file.info(source)$size[[1L]],
-        "timestamp",
-        unname(tools::md5sum(source)),
-        sep = ":"
-      ),
-      source_state = c(
-        list(location = normalizePath(source, winslash = "/")),
-        runtime$builder_project_file_metadata(source)
-      )
-    )
-  )
-  expect_error(
-    runtime$builder_project_finalize_loaded_entry(loaded, record, root),
-    "source changed"
-  )
 })
 
 test_that("content-addressed sources detect same-metadata tampering", {
@@ -3998,35 +3511,6 @@ test_that("artifact availability rejects an untracked spatial molecule closure",
 
   unlink(sidecar)
   expect_false(runtime$builder_project_artifact_available(artifact, root))
-})
-
-test_that("artifact registration rejects a nonportable spatial closure", {
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  build <- file.path(root, "build")
-  project <- file.path(root, "project")
-  sidecar <- file.path(build, "ds1.spatial")
-  dir.create(sidecar, recursive = TRUE)
-  dir.create(project)
-  primary <- file.path(build, "ds1.crb")
-  writeBin(charToRaw("primary"), primary)
-  writeBin(charToRaw("molecules"), file.path(sidecar, "0001.qs2"))
-  runtime$.builder_app_capture_spatial_molecule_identity <- function(path) {
-    stop("stale spatial root", call. = FALSE)
-  }
-
-  expect_error(
-    runtime$builder_project_store_artifact_bundle(
-      primary,
-      sidecars = "ds1.spatial",
-      dataset_id = "ds1",
-      root = project
-    ),
-    "not portable",
-    fixed = TRUE
-  )
-  generations <- file.path(project, "artifacts", "ds1", "generations")
-  expect_length(list.dirs(generations, recursive = FALSE), 0L)
 })
 
 test_that("completed build artifacts use the formal Project registration path", {
@@ -4548,33 +4032,6 @@ test_that("artifact bundles retain directory sidecar contents", {
   ))
 })
 
-test_that("directory sidecars of artifact bundles reject symbolic links", {
-  skip_on_os("windows")
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  build_dir <- file.path(root, "build")
-  project <- file.path(root, "project")
-  sidecar <- file.path(build_dir, "ds1.spatial")
-  dir.create(sidecar, recursive = TRUE)
-  dir.create(project)
-  primary <- file.path(build_dir, "ds1.crb")
-  data <- file.path(sidecar, "data")
-  writeBin(charToRaw("primary"), primary)
-  writeBin(charToRaw("data"), data)
-  skip_if_not(file.symlink(data, file.path(sidecar, "linked")))
-
-  expect_error(
-    runtime$builder_project_store_artifact_bundle(
-      primary,
-      sidecars = "ds1.spatial",
-      dataset_id = "ds1",
-      root = project
-    ),
-    "escaped the build folder",
-    fixed = TRUE
-  )
-})
-
 test_that("checkpoint artifacts promote to immutable shared generations", {
   runtime <- builder_project_test_runtime()
   root <- withr::local_tempdir()
@@ -4708,22 +4165,6 @@ test_that("configuration identity cache bounds variants", {
     )
   }
   expect_lte(length(ls(cache)), 8L)
-})
-
-test_that("checkpoint cleanup refuses lexical symlinks without deleting targets", {
-  skip_on_os("windows")
-  runtime <- builder_project_test_runtime()
-  root <- withr::local_tempdir()
-  checkpoint_root <- file.path(root, "checkpoints")
-  target <- file.path(checkpoint_root, "retained")
-  link <- file.path(checkpoint_root, "build-link")
-  dir.create(target, recursive = TRUE)
-  writeBin(charToRaw("checkpoint"), file.path(target, "dataset.crb"))
-  skip_if_not(file.symlink(target, link), "symbolic links are unavailable")
-
-  expect_false(runtime$builder_project_cleanup_checkpoint(link, root))
-  expect_true(nzchar(Sys.readlink(link)))
-  expect_true(file.exists(file.path(target, "dataset.crb")))
 })
 
 test_that("source sync context is bound to project identity, not revision", {

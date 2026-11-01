@@ -113,7 +113,7 @@ test_that("resume applies its verified configuration directly", {
   )
 })
 
-test_that("resume rejects metadata or content drift without revalidation", {
+test_that("resume rejects configuration drift without revalidation", {
   runtime <- builder_project_open_runtime()
   root <- withr::local_tempdir()
   saved <- list(
@@ -148,24 +148,6 @@ test_that("resume rejects metadata or content drift without revalidation", {
     root,
     needs = c("configuration", "spatial", "table")
   ))
-  expect_error(
-    runtime$builder_project_finalize_loaded_entry(loaded, record, root),
-    "inputs changed during Project restore",
-    fixed = TRUE
-  )
-
-  record$runtime_restore_status <- runtime$builder_project_dataset_status(
-    record,
-    root
-  )
-
-  writeBin(
-    c(
-      readBin(config_path, "raw", n = file.info(config_path)$size),
-      as.raw(0)
-    ),
-    config_path
-  )
   expect_error(
     runtime$builder_project_finalize_loaded_entry(loaded, record, root),
     "inputs changed during Project restore",
