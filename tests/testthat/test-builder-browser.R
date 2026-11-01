@@ -431,6 +431,7 @@ builder_browser_geometry <- function(app) {
 }
 
 test_that("builder interaction reflows and preserves accessible state", {
+  skip_without_installed_package()
   app_dir <- builder_browser_current_contract_app(
     builder_browser_dir,
     .local_envir = environment()
@@ -944,6 +945,7 @@ test_that("duplicate spatial image names open a usable naming modal", {
 })
 
 test_that("builder explains a mocked old privacy contract exactly", {
+  skip_without_installed_package()
   old_contract_app <- builder_browser_old_contract_app(
     builder_browser_dir,
     .local_envir = environment()

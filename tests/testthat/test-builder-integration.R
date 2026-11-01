@@ -1,5 +1,4 @@
-utils_env <- new.env(parent = globalenv())
-sys.source(viewer_test_path("utility_functions.R"), envir = utils_env)
+utils_env <- viewer_runtime_env()
 
 test_that("Viewer resolves per-section Spatial point appearance", {
   options <- list(

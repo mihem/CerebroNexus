@@ -45,3 +45,19 @@ viewer_app_test_path <- function() {
 
   system.file(package = "CerebroNexus")
 }
+
+## The background R processes of the Builder (a build, the browser tests) start
+## with library(CerebroNexus) and read the viewer files of the *installed*
+## package. A checkout run with load_all() has none, or an older one, so those
+## tests wait for an installation that has the file they need.
+skip_without_installed_package <- function() {
+  testthat::skip_if_not(
+    nzchar(base::system.file(
+      "viewer",
+      "core",
+      "crb_contract.R",
+      package = "CerebroNexus"
+    )),
+    "an installed CerebroNexus with the Viewer files is needed"
+  )
+}

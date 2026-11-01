@@ -59,6 +59,7 @@ articles:
   - title: "How-to guides"
     navbar: How-to
     contents:
+      - build_a_data_set_by_pointing
       - data_integrity_contracts
       - seurat_v5_layered_assays
       - create_a_self_contained_shiny_app

@@ -717,6 +717,7 @@ test_that("file fingerprints change when content changes", {
 }
 
 test_that("real worker loads, fresh-builds and drops an owned snapshot", {
+  skip_without_installed_package()
   skip_if_not_installed("callr")
   builder_repo_source("worker.R", local = globalenv())
   builder_repo_source("session.R", local = globalenv())

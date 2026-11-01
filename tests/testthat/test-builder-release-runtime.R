@@ -1,4 +1,5 @@
 test_that("release runtime resolves contracts without source namespace injection", {
+  skip_without_installed_package()
   root <- normalizePath(builder_test_inst_path("builder"))
   result <- callr::r(
     function(root) {
