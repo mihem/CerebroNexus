@@ -1,7 +1,7 @@
 ## Pan-cancer T-cell atlas (Zheng et al., Science 374:abe6474, 2021): 397,810
 ## T cells of 316 patients and 21 cancer types, with TCR sequences and the
 ## published CD8 T-cell exhaustion continuum. See tcell.ATTRIBUTION.md.
-.viewerTcellVersion <- 1L
+.viewerTcellVersion <- 2L
 
 .viewerTcellZenodo <- "https://zenodo.org/api/records/5461803/files/"
 
@@ -424,9 +424,21 @@
 
 ## ---- immune repertoire --------------------------------------------------------
 
-## The atlas's own recombinant identifier is "V_junction_J"; the first and last
-## fields are the V and J genes.
+## The atlas's recombinant identifier is "V_junction_J" for Smart-seq2 cells
+## and "V|D|J|C|junction" for 10x cells; the 10x layout is rewritten to the
+## Smart-seq2 one.
+.viewerTcellIdentifier <- function(identifier) {
+  sub(
+    "^([^|]*)\\|[^|]*\\|([^|]*)\\|[^|]*\\|([^|]*)$",
+    "\\1_\\3_\\2",
+    as.character(identifier)
+  )
+}
+
+## The first and last fields of a "V_junction_J" identifier are the V and J
+## genes.
 .viewerTcellGenePair <- function(identifier) {
+  identifier <- .viewerTcellIdentifier(identifier)
   fields <- strsplit(as.character(identifier), "_", fixed = TRUE)
   vapply(
     fields,
@@ -452,7 +464,7 @@
 ## alpha and two beta chains of a cell the first listed (A1, B1) is used; A2 or
 ## B2 stand in only when it is absent. `CTnt` is the recombinant identifier
 ## (V, junction nucleotides, J) of both chains: the table has no CDR3
-## nucleotide sequence; its fields are joined with ":".
+## nucleotide column; its fields are joined with ":".
 .viewerTcellRepertoire <- function(tcr, cells) {
   required <- c(
     "Cell_Name",
@@ -474,13 +486,16 @@
       call. = FALSE
     )
   }
+  ## 10x rows mark an absent chain with "-".
   pick <- function(first, second) {
     first <- as.character(first)
     second <- as.character(second)
+    first[first %in% "-"] <- NA_character_
+    second[second %in% "-"] <- NA_character_
     ifelse(is.na(first), second, first)
   }
-  alpha_id <- pick(tcr$Identifier.A1, tcr$Identifier.A2)
-  beta_id <- pick(tcr$Identifier.B1, tcr$Identifier.B2)
+  alpha_id <- .viewerTcellIdentifier(pick(tcr$Identifier.A1, tcr$Identifier.A2))
+  beta_id <- .viewerTcellIdentifier(pick(tcr$Identifier.B1, tcr$Identifier.B2))
   alpha_aa <- pick(tcr$CDR3.A1, tcr$CDR3.A2)
   beta_aa <- pick(tcr$CDR3.B1, tcr$CDR3.B2)
   gene <- .viewerTcellJoin(

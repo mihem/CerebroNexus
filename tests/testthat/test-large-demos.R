@@ -410,6 +410,68 @@ test_that("TCR rows become clone calls, split by patient and tissue site", {
   )
 })
 
+test_that("10x TCR identifiers give the same clone calls as Smart-seq2 ones", {
+  env <- large_demo_env("prepare_viewer_tcell_data.R")
+  expect_identical(
+    env$.viewerTcellGenePair(c(
+      "TRAV38-2DV8|None|TRAJ42|TRAC|TGTGCTTTC",
+      "TRBV20-1|TRBD1|TRBJ2-3|TRBC2|TGCAGTGCT",
+      "TRAV26-1_AGAGC(TT)CAGGA_TRAJ45",
+      "TRAV29_DV5_AAGCGT_TRAJ36",
+      NA
+    )),
+    c(
+      "TRAV38-2DV8.TRAJ42",
+      "TRBV20-1.TRBJ2-3",
+      "TRAV26-1.TRAJ45",
+      "TRAV29.TRAJ36",
+      NA
+    )
+  )
+  ## A 10x cell (two rows: second alpha "-" or present) next to a Smart-seq2
+  ## cell; "-" marks an absent chain and never stands in for one.
+  tcr <- data.frame(
+    Cell_Name = c("t1", "t2", "s1"),
+    CDR3.A1 = c("CAVF", "-", "CAAF"),
+    CDR3.A2 = c("-", "CDDF", NA),
+    CDR3.B1 = c("CASF", "CEEF", "CBBF"),
+    CDR3.B2 = c("-", "-", NA),
+    Identifier.A1 = c(
+      "TRAV38-2DV8|None|TRAJ42|TRAC|TGTGCTTTC",
+      "-",
+      "TRAV1_AAA(T)CC_TRAJ2"
+    ),
+    Identifier.A2 = c("-", "TRAV3|None|TRAJ4|TRAC|TGTGAC", NA),
+    Identifier.B1 = c(
+      "TRBV20-1|TRBD1|TRBJ2-3|TRBC2|TGCAGTGCT",
+      "TRBV6|None|TRBJ1-1|None|TGCGCC",
+      "TRBV5-1_GGG_TRBJ2-3"
+    ),
+    Identifier.B2 = c("-", "-", NA),
+    stringsAsFactors = FALSE
+  )
+  repertoire <- env$.viewerTcellRepertoire(tcr, tcr$Cell_Name)
+  expect_identical(
+    repertoire$CTgene,
+    c(
+      "TRAV38-2DV8.TRAJ42_TRBV20-1.TRBJ2-3",
+      "TRAV3.TRAJ4_TRBV6.TRBJ1-1",
+      "TRAV1.TRAJ2_TRBV5-1.TRBJ2-3"
+    )
+  )
+  expect_identical(
+    repertoire$CTnt,
+    c(
+      "TRAV38-2DV8:TGTGCTTTC:TRAJ42_TRBV20-1:TGCAGTGCT:TRBJ2-3",
+      "TRAV3:TGTGAC:TRAJ4_TRBV6:TGCGCC:TRBJ1-1",
+      "TRAV1:AAA(T)CC:TRAJ2_TRBV5-1:GGG:TRBJ2-3"
+    )
+  )
+  expect_identical(repertoire$CTaa, c("CAVF_CASF", "CDDF_CEEF", "CAAF_CBBF"))
+  expect_false(any(grepl("|", unlist(repertoire), fixed = TRUE)))
+  expect_false(any(grepl("-_|_-|^-$", unlist(repertoire))))
+})
+
 test_that("T-cell expression objects are read by symbol and joined on their genes", {
   skip_if_not_installed("SingleCellExperiment")
   env <- large_demo_env("prepare_viewer_tcell_data.R")
