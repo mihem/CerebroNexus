@@ -114,39 +114,7 @@ test_that("AsIs barcode columns retain exporter compatibility", {
   )
 })
 
-test_that("classed atomic barcodes never dispatch custom conversion", {
-  touched <- FALSE
-  assign(
-    "as.character.spx_barcode_trap",
-    function(value, ...) {
-      touched <<- TRUE
-      stop("untrusted method executed")
-    },
-    envir = .GlobalEnv
-  )
-  on.exit(
-    rm("as.character.spx_barcode_trap", envir = .GlobalEnv),
-    add = TRUE
-  )
-
-  data <- data.frame(
-    barcode = c("cell-a", "cell-b"),
-    stringsAsFactors = FALSE
-  )
-  attr(data$barcode, "class") <- "spx_barcode_trap"
-
-  expect_identical(
-    .spx_find_barcode_column(data, c("cell-a", "cell-b")),
-    "barcode"
-  )
-  expect_false(touched)
-
-  data$barcode <- I(list("cell-a", "cell-b"))
-  expect_null(.spx_find_barcode_column(data, c("cell-a", "cell-b")))
-  expect_false(touched)
-})
-
-test_that("classed column names never dispatch custom methods", {
+test_that("classed barcodes and column names never dispatch custom methods", {
   touched <- FALSE
   assign(
     "as.character.spx_contract_trap",
@@ -161,13 +129,25 @@ test_that("classed column names never dispatch custom methods", {
     add = TRUE
   )
 
-  data <- data.frame(x = 1:2, y = 3:4)
-  attr(data, "names") <- structure(
+  barcodes <- data.frame(
+    barcode = c("cell-a", "cell-b"),
+    stringsAsFactors = FALSE
+  )
+  attr(barcodes$barcode, "class") <- "spx_contract_trap"
+  expect_identical(
+    .spx_find_barcode_column(barcodes, c("cell-a", "cell-b")),
+    "barcode"
+  )
+  barcodes$barcode <- I(list("cell-a", "cell-b"))
+  expect_null(.spx_find_barcode_column(barcodes, c("cell-a", "cell-b")))
+
+  named <- data.frame(x = 1:2, y = 3:4)
+  attr(named, "names") <- structure(
     c("x", "y"),
     class = "spx_contract_trap"
   )
-  expect_null(.spx_find_coordinate_columns(data))
-  expect_null(.spx_find_barcode_column(data, c("1", "2")))
+  expect_null(.spx_find_coordinate_columns(named))
+  expect_null(.spx_find_barcode_column(named, c("1", "2")))
   expect_false(touched)
 })
 

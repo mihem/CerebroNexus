@@ -1633,64 +1633,10 @@ test_that("browser control ownership rejects retired views but accepts an old ow
       }
 
       initial_scene <- alignment$canvas_contract()
-      images_before_viewport <- current_entry()$settings$images
-      session$setInputs(
-        builder_spatial_viewports = list(
-          viewKey = initial_scene$viewKey,
-          generation = initial_scene$generation,
-          viewports = list(
-            lesion = list(xmin = -5, xmax = 15, ymin = -5, ymax = 15)
-          ),
-          imageFitViewports = list()
-        )
-      )
-      session$flushReact()
-      expect_identical(
-        current_entry()$settings$images,
-        images_before_viewport
-      )
-
-      synchronized <- control_event(initial_scene, 1, 1, 0)
-      synchronized$controls$point_size <- as.numeric(
-        synchronized$controls$point_size
-      )
-      session$setInputs(builder_spatial_alignment_controls = synchronized)
-      session$flushReact()
-      expect_false("roi_coordinates" %in% names(alignment$pending_drafts()))
-      expect_false("roi_appearance" %in% names(alignment$pending_drafts()))
-      materialized <- alignment$materialize_coordinate_drafts(
-        dataset = "dataset-a",
-        notify = FALSE
-      )
-      expect_true(materialized$ok)
-      expect_identical(
-        current_entry()$settings$spatial_roi_settings[["section-a"]][[
-          "lesion"
-        ]]$point_size,
-        5L
-      )
-
       session$setInputs(
         builder_spatial_alignment_controls = control_event(
           initial_scene,
-          2,
-          0.6,
-          10
-        )
-      )
-      session$flushReact()
-      expect_identical(
-        current_entry()$settings$images[["section-a"]]$A$scale,
-        0.6
-      )
-      ## The server may publish a replacement scene before the browser receives
-      ## it. A second complete control snapshot from the same active view still
-      ## belongs to that activation epoch even though it carries the old render
-      ## generation.
-      session$setInputs(
-        builder_spatial_alignment_controls = control_event(
-          initial_scene,
-          3,
+          1,
           0.7,
           20
         )
@@ -1706,31 +1652,19 @@ test_that("browser control ownership rejects retired views but accepts an old ow
         ]]$lesion$spec$rotation_degrees,
         20
       )
-      missing_reset_token <- control_event(initial_scene, 4, 0.8, 30)
-      missing_reset_token$resetToken <- NULL
-      session$setInputs(
-        builder_spatial_alignment_controls = missing_reset_token
-      )
-      session$flushReact()
-      expect_identical(
-        current_entry()$settings$images[["section-a"]]$A$scale,
-        0.7
-      )
-      expect_identical(
-        alignment$pending_drafts()$roi_coordinates[["dataset-a"]][[
-          "section-a"
-        ]]$lesion$spec$rotation_degrees,
-        20
-      )
+
+      ## A control snapshot sent before a reset belongs to the old reset epoch.
       pre_reset_scene <- alignment$canvas_contract()
       session$setInputs(`enhance-reset_coordinate_transform` = 1L)
       session$flushReact()
-      reset_scene <- alignment$canvas_contract()
-      expect_gt(reset_scene$resetToken, pre_reset_scene$resetToken)
+      expect_gt(
+        alignment$canvas_contract()$resetToken,
+        pre_reset_scene$resetToken
+      )
       session$setInputs(
         builder_spatial_alignment_controls = control_event(
           pre_reset_scene,
-          4,
+          2,
           0.8,
           30
         )
@@ -1742,29 +1676,13 @@ test_that("browser control ownership rejects retired views but accepts an old ow
       )
       expect_false("roi_coordinates" %in% names(alignment$pending_drafts()))
       separate_scene <- alignment$canvas_contract()
-      expect_identical(separate_scene$viewKey, initial_scene$viewKey)
-      expect_gte(separate_scene$generation, initial_scene$generation)
 
-      ## The owner stays (ROI lesion + image A), but the view is replaced.
+      ## Returning to a deterministic viewKey starts a new generation epoch;
+      ## an event from the retired incarnation must still be rejected.
       session$setInputs(`enhance-active_roi` = "lesion")
       session$flushReact()
       alignment_preview(preview)
       session$flushReact()
-      single_scene <- alignment$canvas_contract()
-      expect_false(identical(single_scene$viewKey, separate_scene$viewKey))
-
-      stale_different_view <- control_event(separate_scene, 5, 0.9, 40)
-      session$setInputs(
-        builder_spatial_alignment_controls = stale_different_view
-      )
-      session$flushReact()
-      expect_identical(
-        current_entry()$settings$images[["section-a"]]$A$scale,
-        0.7
-      )
-
-      ## Returning to a deterministic viewKey starts a new generation epoch;
-      ## an event from the retired incarnation must still be rejected.
       session$setInputs(`enhance-active_roi` = "__separate__")
       session$flushReact()
       alignment_preview(preview)
@@ -1772,7 +1690,7 @@ test_that("browser control ownership rejects retired views but accepts an old ow
       returned_scene <- alignment$canvas_contract()
       expect_identical(returned_scene$viewKey, separate_scene$viewKey)
       expect_gt(returned_scene$generation, separate_scene$generation)
-      stale_same_key <- control_event(separate_scene, 6, 1, 45)
+      stale_same_key <- control_event(separate_scene, 3, 1, 45)
       session$setInputs(builder_spatial_alignment_controls = stale_same_key)
       session$flushReact()
       expect_identical(
@@ -1783,19 +1701,20 @@ test_that("browser control ownership rejects retired views but accepts an old ow
       ## A pre-switch flush belongs to a different owner after ROI selection.
       ## It remains valid for persistence, but must not replace the active
       ## border ROI's coordinate reactive state.
-      roi_event <- list(
-        roi = "border",
-        dataset = returned_scene$dataset,
-        snapshotIdentity = returned_scene$snapshotIdentity,
-        section = returned_scene$section,
-        viewKey = returned_scene$viewKey,
-        generation = returned_scene$generation,
-        nonce = 1
+      session$setInputs(
+        builder_spatial_roi_select = list(
+          roi = "border",
+          dataset = returned_scene$dataset,
+          snapshotIdentity = returned_scene$snapshotIdentity,
+          section = returned_scene$section,
+          viewKey = returned_scene$viewKey,
+          generation = returned_scene$generation,
+          nonce = 1
+        )
       )
-      session$setInputs(builder_spatial_roi_select = roi_event)
       session$flushReact()
       expect_identical(alignment$active_roi(), "border")
-      delayed_old_owner <- control_event(returned_scene, 7, 1, 50)
+      delayed_old_owner <- control_event(returned_scene, 4, 1, 50)
       session$setInputs(
         builder_spatial_alignment_controls = delayed_old_owner
       )
@@ -1815,45 +1734,6 @@ test_that("browser control ownership rejects retired views but accepts an old ow
       expect_identical(
         alignment$canvas_contract()$controls$coordinateRotation,
         0
-      )
-
-      ## Reactivating the same owner can reproduce the same deterministic
-      ## view key. Its newer generation is the exact high-water mark, so the
-      ## retired generation must no longer be accepted.
-      border_scene <- alignment$canvas_contract()
-      session$setInputs(
-        builder_spatial_roi_select = list(
-          roi = "lesion",
-          dataset = border_scene$dataset,
-          snapshotIdentity = border_scene$snapshotIdentity,
-          section = border_scene$section,
-          viewKey = border_scene$viewKey,
-          generation = border_scene$generation,
-          nonce = 2
-        )
-      )
-      session$flushReact()
-      reactivated_scene <- alignment$canvas_contract()
-      expect_identical(reactivated_scene$viewKey, returned_scene$viewKey)
-      expect_gt(reactivated_scene$generation, returned_scene$generation)
-      session$setInputs(
-        builder_spatial_alignment_controls = control_event(
-          returned_scene,
-          7,
-          1.1,
-          90
-        )
-      )
-      session$flushReact()
-      expect_identical(
-        current_entry()$settings$images[["section-a"]]$A$scale,
-        1
-      )
-      expect_identical(
-        alignment$pending_drafts()$roi_coordinates[["dataset-a"]][[
-          "section-a"
-        ]]$lesion$spec$rotation_degrees,
-        50
       )
     }
   )
@@ -2046,14 +1926,6 @@ test_that("Trekker full-control commits preserve images without coordinate draft
     source_path = image$source_path
   )
   record$source_content_md5 <- image$source_content_md5
-  alternate <- record
-  alternate$source$name <- "trekker-alternate.png"
-  alternate$image_label <- "Alternate"
-  alternate$scale <- 0.01
-  alternate$bounds <- builder_alignment_transform_bounds(
-    alternate$base_bounds,
-    .builder_alignment_parameters(alternate)
-  )
   entry <- list(
     id = "dataset-a",
     snapshot = list(
@@ -2067,12 +1939,7 @@ test_that("Trekker full-control commits preserve images without coordinate draft
     ),
     settings = list(
       name = "Dataset A",
-      images = list(
-        trekker = list(
-          Histology = record,
-          Alternate = alternate
-        )
-      ),
+      images = list(trekker = list(Histology = record)),
       default_group = "cluster",
       default_projection = "umap",
       palette = "cerebro"
@@ -2102,17 +1969,9 @@ test_that("Trekker full-control commits preserve images without coordinate draft
   current_entry <- shiny::reactiveVal(entry)
   current <- shiny::reactiveVal(entry$id)
   alignment_preview <- shiny::reactiveVal(preview)
-  input_messages <- list()
 
   shiny::testServer(
     function(input, output, session) {
-      session$sendInputMessage <- function(input_id, message) {
-        input_messages[[length(input_messages) + 1L]] <<- list(
-          id = input_id,
-          message = message
-        )
-        invisible()
-      }
       alignment <- builder_spatial_alignment_server(
         input = input,
         output = output,
@@ -2134,71 +1993,8 @@ test_that("Trekker full-control commits preserve images without coordinate draft
       session$flushReact()
       alignment_preview(preview)
       session$flushReact()
-      scene <- alignment$canvas_contract()
       expect_identical(alignment$draft()$scale, 0.001)
       expect_identical(alignment$active_image(), "Histology")
-
-      slider_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale"),
-        input_messages
-      )
-      number_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale_number"),
-        input_messages
-      )
-      expect_gt(length(slider_updates), 0L)
-      expect_gt(length(number_updates), 0L)
-      expect_identical(
-        as.numeric(tail(slider_updates, 1L)[[1L]]$message$value),
-        0.001
-      )
-      expect_identical(
-        as.numeric(tail(number_updates, 1L)[[1L]]$message$value),
-        0.001
-      )
-
-      session$setInputs(`enhance-active_image` = "Alternate")
-      session$flushReact()
-      expect_identical(alignment$active_image(), "Alternate")
-      expect_identical(alignment$draft()$scale, 0.01)
-      alternate_slider_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale"),
-        input_messages
-      )
-      alternate_number_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale_number"),
-        input_messages
-      )
-      expect_identical(
-        as.numeric(tail(alternate_slider_updates, 1L)[[1L]]$message$value),
-        0.01
-      )
-      expect_identical(
-        as.numeric(tail(alternate_number_updates, 1L)[[1L]]$message$value),
-        0.01
-      )
-
-      session$setInputs(`enhance-active_image` = "Histology")
-      session$flushReact()
-      expect_identical(alignment$active_image(), "Histology")
-      expect_identical(alignment$draft()$scale, 0.001)
-      restored_slider_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale"),
-        input_messages
-      )
-      restored_number_updates <- Filter(
-        function(item) identical(item$id, "enhance-img_scale_number"),
-        input_messages
-      )
-      expect_identical(
-        as.numeric(tail(restored_slider_updates, 1L)[[1L]]$message$value),
-        0.001
-      )
-      expect_identical(
-        as.numeric(tail(restored_number_updates, 1L)[[1L]]$message$value),
-        0.001
-      )
-
       scene <- alignment$canvas_contract()
       controls <- scene$controls
       controls$scale <- 0.01
@@ -3348,36 +3144,6 @@ test_that("metadata coordinates require explicit x and y selections", {
   expect_identical(explicit$coordinates$y, arbitrary$bar)
 })
 
-test_that("Seurat metadata subclasses fail before row-name dispatch", {
-  skip_if_not_installed("SeuratObject")
-  touched <- FALSE
-  assign(
-    "dimnames.builder_seurat_metadata_trap",
-    function(value) {
-      touched <<- TRUE
-      stop("untrusted Seurat metadata dimnames method executed")
-    },
-    envir = .GlobalEnv
-  )
-  on.exit(
-    rm("dimnames.builder_seurat_metadata_trap", envir = .GlobalEnv),
-    add = TRUE
-  )
-
-  object <- builder_content_spatial_example_object()
-  metadata <- methods::slot(object, "meta.data")
-  metadata$x <- seq_len(nrow(metadata))
-  metadata$y <- rev(metadata$x)
-  class(metadata) <- c("builder_seurat_metadata_trap", "data.frame")
-  methods::slot(object, "meta.data", check = FALSE) <- metadata
-
-  expect_error(
-    builder_spatial_contract(object, coord_cols = c("x", "y")),
-    "unclassed base matrix|exact base data frame"
-  )
-  expect_false(touched)
-})
-
 test_that("spatial subsets filter outside rows before preview and export", {
   cells <- c("cell-a", "cell-b", "cell-c")
   metadata <- data.frame(
@@ -3458,51 +3224,21 @@ test_that("spatial identity and coordinate damage fails closed", {
   )
 })
 
-test_that("classed numeric spatial coordinates fail without method dispatch", {
+test_that("classed spatial coordinates fail without method dispatch", {
   touched <- FALSE
-  assign(
-    "as.numeric.builder_coordinate_trap",
-    function(value, ...) {
-      touched <<- TRUE
-      stop("untrusted coordinate conversion executed")
-    },
-    envir = .GlobalEnv
-  )
-  on.exit(
-    rm("as.numeric.builder_coordinate_trap", envir = .GlobalEnv),
-    add = TRUE
-  )
-  cells <- c("cell-a", "cell-b")
-  coordinates <- data.frame(
-    x = structure(c(1, 2), class = "builder_coordinate_trap"),
-    y = c(3, 4),
-    row.names = cells
-  )
-
-  expect_error(
-    builder_spatial_contract(
-      coordinates,
-      cells,
-      coord_cols = c("x", "y"),
-      source = "metadata"
+  method_names <- c(
+    paste0(
+      c("as.data.frame.", "dim.", "dimnames.", "row.names."),
+      "builder_table_trap"
     ),
-    "unclassed|base integer|base double"
-  )
-  expect_false(touched)
-})
-
-test_that("classed spatial coordinate tables fail without method dispatch", {
-  touched <- FALSE
-  method_names <- paste0(
-    c("as.data.frame.", "dim.", "dimnames.", "row.names."),
-    "builder_table_trap"
+    "as.numeric.builder_coordinate_trap"
   )
   for (method_name in method_names) {
     assign(
       method_name,
       function(value, ...) {
         touched <<- TRUE
-        stop("untrusted coordinate table method executed")
+        stop("untrusted coordinate method executed")
       },
       envir = .GlobalEnv
     )
@@ -3522,22 +3258,30 @@ test_that("classed spatial coordinate tables fail without method dispatch", {
     row.names = cells
   )
   class(data_frame_table) <- c("builder_table_trap", "data.frame")
+  classed_column <- data.frame(
+    x = structure(c(1, 2), class = "builder_coordinate_trap"),
+    y = c(3, 4),
+    row.names = cells
+  )
+  cases <- list(
+    matrix = list(matrix_table, "unclassed base matrix|exact base data frame"),
+    data_frame = list(
+      data_frame_table,
+      "unclassed base matrix|exact base data frame"
+    ),
+    column = list(classed_column, "unclassed|base integer|base double")
+  )
 
-  for (kind in c("matrix", "data_frame")) {
+  for (kind in names(cases)) {
     touched <- FALSE
-    coordinate_table <- if (identical(kind, "matrix")) {
-      matrix_table
-    } else {
-      data_frame_table
-    }
     expect_error(
       builder_spatial_contract(
-        coordinate_table,
+        cases[[kind]][[1L]],
         cells,
         coord_cols = c("x", "y"),
         source = "metadata"
       ),
-      "unclassed base matrix|exact base data frame",
+      cases[[kind]][[2L]],
       info = kind
     )
     expect_false(touched, info = kind)

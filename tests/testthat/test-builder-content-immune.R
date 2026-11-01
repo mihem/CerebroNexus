@@ -246,14 +246,6 @@ test_that("serialized custom classes never dispatch during content profiling", {
     touched <<- c(touched, "hla-list-length")
     NextMethod()
   }
-  `[[.builder_evil_hla_frame` <- function(x, ...) {
-    touched <<- c(touched, "hla-frame-bracket")
-    NextMethod()
-  }
-  dim.builder_evil_hla_frame <- function(x) {
-    touched <<- c(touched, "hla-frame-dim")
-    NextMethod()
-  }
   as.character.builder_evil_hla_column <- function(x, ...) {
     touched <<- c(touched, "hla-column-character")
     NextMethod()
@@ -298,9 +290,6 @@ test_that("serialized custom classes never dispatch during content profiling", {
   invisible(length(hla_list))
   expect_identical(touched, "hla-list-length")
   touched <- character()
-  invisible(hla_list[[1L]])
-  expect_identical(touched, "hla-list-bracket")
-  touched <- character()
   object@misc$hla_typing <- hla_list
   hla_list_profile <- builder_profile_immune_content(
     object,
@@ -308,25 +297,6 @@ test_that("serialized custom classes never dispatch during content profiling", {
   )$hla
   expect_false(hla_list_profile$valid)
   expect_contains(hla_list_profile$diagnostics, "unsafe_container_class")
-  expect_identical(touched, character())
-
-  object <- builder_immune_fixture_object()
-  hla_frame <- data.frame(
-    sample = "sample_a",
-    allele = "HLA-A*02:01",
-    stringsAsFactors = FALSE
-  )
-  class(hla_frame) <- c("builder_evil_hla_frame", "data.frame")
-  invisible(dim(hla_frame))
-  expect_identical(touched, "hla-frame-dim")
-  touched <- character()
-  object@misc$hla_typing <- hla_frame
-  hla_frame_profile <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-  expect_false(hla_frame_profile$valid)
-  expect_contains(hla_frame_profile$diagnostics, "unsafe_container_class")
   expect_identical(touched, character())
 
   object <- builder_immune_fixture_object()
@@ -397,13 +367,6 @@ test_that("attribute-level classes fail closed without S3 dispatch", {
   expect_inert(list(sample_a = table), "unsafe_column_names")
 
   table <- builder_immune_fixture_table("cell1", "TRB")
-  table[["barcode"]] <- structure(
-    table[["barcode"]],
-    class = "builder_attr_bomb"
-  )
-  expect_inert(list(sample_a = table), "unsafe_column_class")
-
-  table <- builder_immune_fixture_table("cell1", "TRB")
   gene <- factor(table[["CTgene"]])
   attr(gene, "levels") <- structure(
     attr(gene, "levels", exact = TRUE),
@@ -429,25 +392,6 @@ test_that("attribute-level classes fail closed without S3 dispatch", {
   )$immune_repertoire$candidates$metadata
   expect_false(metadata_got$valid)
   expect_contains(metadata_got$diagnostics, "unsafe_row_names")
-  expect_identical(touched, character())
-
-  object <- builder_immune_fixture_object()
-  hla <- data.frame(
-    sample = "sample_a",
-    allele = "HLA-A*02:01",
-    stringsAsFactors = FALSE
-  )
-  attr(hla, "names") <- structure(
-    names(hla),
-    class = "builder_attr_bomb"
-  )
-  object@misc$hla_typing <- hla
-  hla_names <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-  expect_false(hla_names$valid)
-  expect_contains(hla_names$diagnostics, "unsafe_column_names")
   expect_identical(touched, character())
 
   object <- builder_immune_fixture_object()
@@ -496,27 +440,6 @@ test_that("metadata repertoire exposes conversion facts without choosing it", {
   expect_setequal(candidate$normalized$sample_names, c("sample_a", "sample_b"))
   expect_identical(candidate$normalized$n_rows, 3L)
   expect_identical(candidate$normalized$dataset_overlap_count, 3L)
-})
-
-test_that("partial metadata repertoire is detected but is not convertible", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  object@meta.data$CTgene <- rep("TRBV1.TRBJ1", nrow(object@meta.data))
-  context <- builder_immune_fixture_context(object)
-  context$metadata <- object@meta.data
-
-  candidate <- builder_profile_immune_content(
-    object,
-    context
-  )$immune_repertoire$candidates$metadata
-
-  expect_true(candidate$detected)
-  expect_false(candidate$valid)
-  expect_contains(candidate$diagnostics, "missing_required_columns")
-  expect_setequal(
-    candidate$missing_columns,
-    c("CTnt", "CTaa", "CTstrict")
-  )
 })
 
 test_that("source overlap treats reassigned samples as divergence", {

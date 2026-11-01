@@ -408,7 +408,8 @@ builder_open_app_runtime_fixture <- function() {
   )
 }
 
-builder_open_app_child_in_callr <- function(path, env_file, previous = NULL) {
+## Runs each `list(path, env_file, previous)` in turn inside one callr child.
+builder_open_app_child_in_callr <- function(runs) {
   app_bundle <- builder_profile_inst_path("builder", "app_bundle.R")
   build_status <- builder_profile_inst_path("builder", "ui", "build_status.R")
   viewer_auth <- test_path("..", "..", "R", "viewer-auth.R")
@@ -416,7 +417,7 @@ builder_open_app_child_in_callr <- function(path, env_file, previous = NULL) {
     viewer_auth <- NULL
   }
   callr::r(
-    function(app_bundle, build_status, viewer_auth, path, env_file, previous) {
+    function(app_bundle, build_status, viewer_auth, runs) {
       app_bundle <- normalizePath(app_bundle)
       build_status <- normalizePath(build_status)
       if (!is.null(viewer_auth)) {
@@ -436,52 +437,54 @@ builder_open_app_child_in_callr <- function(path, env_file, previous = NULL) {
         sys.source(viewer_auth, envir = runtime)
       }
       sys.source(build_status, envir = runtime)
-      launched <- FALSE
-      if (!is.null(previous)) {
-        do.call(
-          Sys.setenv,
-          stats::setNames(list(previous), "CEREBRO_AUTH_PASSPHRASE")
-        )
-      }
-      before <- Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
-      outcome <- tryCatch(
-        {
-          seen <- runtime$.builder_open_app_child(
-            path,
-            env_file,
-            "CEREBRO_AUTH_PASSPHRASE",
-            validate_database = runtime$.viewerAuthValidateDatabase,
-            run_app = function(...) {
-              launched <<- TRUE
-              Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
-            }
+      lapply(runs, function(run) {
+        launched <- FALSE
+        if (is.null(run$previous)) {
+          Sys.unsetenv("CEREBRO_AUTH_PASSPHRASE")
+        } else {
+          do.call(
+            Sys.setenv,
+            stats::setNames(list(run$previous), "CEREBRO_AUTH_PASSPHRASE")
           )
-          list(ok = TRUE, seen = seen, error = NULL)
-        },
-        error = function(error) {
-          list(ok = FALSE, seen = NULL, error = conditionMessage(error))
         }
-      )
-      list(
-        outcome = outcome,
-        launched = launched,
-        before = before,
-        after = Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
-      )
+        before <- Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
+        outcome <- tryCatch(
+          {
+            seen <- runtime$.builder_open_app_child(
+              run$path,
+              run$env_file,
+              "CEREBRO_AUTH_PASSPHRASE",
+              validate_database = runtime$.viewerAuthValidateDatabase,
+              run_app = function(...) {
+                launched <<- TRUE
+                Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
+              }
+            )
+            list(ok = TRUE, seen = seen, error = NULL)
+          },
+          error = function(error) {
+            list(ok = FALSE, seen = NULL, error = conditionMessage(error))
+          }
+        )
+        list(
+          outcome = outcome,
+          launched = launched,
+          before = before,
+          after = Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
+        )
+      })
     },
     args = list(
       app_bundle = app_bundle,
       build_status = build_status,
       viewer_auth = viewer_auth,
-      path = path,
-      env_file = env_file,
-      previous = previous
+      runs = runs
     ),
     spinner = FALSE
   )
 }
 
-test_that("Open App child rejects post-verification authentication races", {
+test_that("Open App child launches only an unchanged pair and restores its environment", {
   skip_on_os("windows")
   skip_if_not_installed("callr")
   skip_if_not_installed("shinymanager")
@@ -525,18 +528,30 @@ test_that("Open App child rejects post-verification authentication races", {
       expect_true(file.rename(replacement, fixture$database))
     }
   )
+  # Each race changes the pair after the parent verified it.
+  runs <- list()
   for (name in names(cases)) {
     fixture <- builder_open_app_runtime_fixture()
-    child <- NULL
     opened <- builder_open_final_app(
       fixture$result,
       .open = function(path, env_file) {
         cases[[name]](fixture)
-        child <<- builder_open_app_child_in_callr(path, env_file)
+        runs[[name]] <<- list(path = path, env_file = env_file)
         FALSE
       }
     )
     expect_false(opened, info = name)
+  }
+  matching <- builder_open_app_runtime_fixture()
+  runs$matching <- list(
+    path = matching$app_dir,
+    env_file = matching$env_file,
+    previous = "preexisting-auth-environment-value"
+  )
+  children <- builder_open_app_child_in_callr(runs)
+
+  for (name in names(cases)) {
+    child <- children[[name]]
     expect_false(child$outcome$ok, info = name)
     expect_false(child$launched, info = name)
     expect_identical(
@@ -546,24 +561,12 @@ test_that("Open App child rejects post-verification authentication races", {
     )
     expect_true(is.na(child$after), info = name)
   }
-})
-
-test_that("Open App child launches only a matching pair and restores its environment", {
-  skip_on_os("windows")
-  skip_if_not_installed("callr")
-  skip_if_not_installed("shinymanager")
-  fixture <- builder_open_app_runtime_fixture()
-  child <- builder_open_app_child_in_callr(
-    fixture$app_dir,
-    fixture$env_file,
-    previous = "preexisting-auth-environment-value"
-  )
-
+  child <- children$matching
   expect_true(child$outcome$ok)
   expect_true(child$launched)
   expect_identical(
     child$outcome$seen,
-    builder_auth_read_env_file(fixture$env_file)
+    builder_auth_read_env_file(matching$env_file)
   )
   expect_identical(child$before, "preexisting-auth-environment-value")
   expect_identical(child$after, "preexisting-auth-environment-value")

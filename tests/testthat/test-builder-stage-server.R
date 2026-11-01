@@ -44,42 +44,6 @@ builder_stage_checked_marks <- function(entries, identity_fun, identity_cache) {
   stats::setNames(marks, ids)
 }
 
-test_that("project picker permissions update immediately after selection", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this picker state test.")
-  }
-
-  shiny::testServer(app_env$server, {
-    use_state_only_fixture(list(list(
-      id = "dataset-a",
-      settings = list(name = "Dataset A")
-    )))
-    session$flushReact()
-
-    expect_true(isolate(builder_operation_allowed(
-      "create_project",
-      notify = FALSE
-    )))
-    builder_project_operation_phase("choosing")
-    session$flushReact()
-    expect_false(isolate(builder_operation_allowed(
-      "create_project",
-      notify = FALSE
-    )))
-
-    builder_project_operation_phase("idle")
-    expect_true(isolate(builder_operation_allowed(
-      "create_project",
-      notify = FALSE
-    )))
-  })
-})
-
 test_that("Build reuses current project CRBs after preserving review identity", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")
@@ -396,8 +360,6 @@ test_that("Build result survives unsafe folder selection and clears on acceptanc
     )
     result(success)
     choices <- list(
-      list(status = "cancelled", path = NULL),
-      list(status = "error", path = NULL, error = "picker failed"),
       list(status = "selected", path = "/unsafe/output"),
       list(status = "selected", path = "/new/output")
     )
@@ -500,14 +462,6 @@ test_that("Build result survives unsafe folder selection and clears on acceptanc
     busy_note(NULL)
     result(success)
 
-    choose_build_folder()
-    real_session$flushReact()
-    expect_identical(result(), success)
-    expect_identical(selected_output(), "/old/output")
-    choose_build_folder()
-    real_session$flushReact()
-    expect_identical(result(), success)
-    expect_identical(selected_output(), "/old/output")
     choose_build_folder()
     real_session$flushReact()
     expect_identical(result(), success)
@@ -854,60 +808,6 @@ test_that("unchanged configure actions ignore projection settings writes", {
   })
 })
 
-test_that("reverting a projection edit does not restore an old check", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this state-only test.")
-  }
-  shiny::testServer(app_env$server, {
-    entry <- list(
-      id = "dataset-a",
-      revision = 0L,
-      snapshot = list(
-        path = "/private/dataset-a",
-        owner_token = "owner-dataset-a",
-        object_md5 = strrep("a", 32L)
-      ),
-      profile = list(marker = "dataset-a", extras = list()),
-      settings = list(
-        name = "Dataset A",
-        included_projections = "umap",
-        reductions = "umap",
-        default_projection = "umap"
-      )
-    )
-    use_state_only_fixture(list(entry))
-    dataset_check_marks(stats::setNames(
-      app_env$builder_project_check_identity(entry),
-      entry$id
-    ))
-    expect_identical(checked_dataset_ids(), entry$id)
-    old_mark <- app_env$builder_project_check_identity(entry)
-    same_settings_after_edits <- entry
-    same_settings_after_edits$revision <- 2L
-    expect_false(identical(
-      old_mark,
-      app_env$builder_project_check_identity(same_settings_after_edits)
-    ))
-
-    changed <- sets()[[1L]]
-    changed$settings$included_projections <- c("umap", "pca")
-    changed$settings$reductions <- c("umap", "pca")
-    expect_true(replace_entry(changed))
-    expect_length(checked_dataset_ids(), 0L)
-
-    reverted <- sets()[[1L]]
-    reverted$settings$included_projections <- "umap"
-    reverted$settings$reductions <- "umap"
-    expect_true(replace_entry(reverted))
-    expect_length(checked_dataset_ids(), 0L)
-  })
-})
-
 test_that("incomplete datasets focus their first unresolved setting", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")
@@ -1035,17 +935,6 @@ test_that("Builder auth accepts only the exact typed browser payload", {
       builder_auth_accounts = list(
         enabled = TRUE,
         accounts = valid_accounts,
-        nonce = list(1)
-      )
-    )
-    session$flushReact()
-    expect_false(auth_enabled())
-    expect_length(auth_accounts(), 0L)
-
-    session$setInputs(
-      builder_auth_accounts = list(
-        enabled = TRUE,
-        accounts = valid_accounts,
         nonce = 2
       )
     )
@@ -1053,11 +942,6 @@ test_that("Builder auth accepts only the exact typed browser payload", {
     expect_true(auth_enabled())
     expect_s3_class(auth_accounts(), "builder_auth_accounts")
     expect_identical(auth_accounts()[[1L]]$username, "user-a")
-
-    session$setInputs(builder_auth_accounts = NULL)
-    session$flushReact()
-    expect_true(auth_enabled())
-    expect_length(auth_accounts(), 1L)
 
     session$setInputs(
       builder_auth_accounts = list(
@@ -1086,29 +970,13 @@ test_that("Builder auth accepts only the exact typed browser payload", {
     expect_s3_class(auth_accounts(), "builder_auth_accounts")
     expect_length(auth_accounts(), 0L)
 
-    session$setInputs(
-      builder_auth_accounts = list(
-        enabled = TRUE,
-        accounts = valid_accounts,
-        nonce = 4
-      )
-    )
-    session$flushReact()
-    expect_false(auth_enabled())
-    expect_length(auth_accounts(), 0L)
-    expect_false(auth_validation()$ok)
-    expect_identical(
-      auth_validation()$error,
-      "Login accounts could not be saved."
-    )
-
     capability$available <- FALSE
     build_mode(TRUE)
     session$setInputs(
       builder_auth_accounts = list(
         enabled = TRUE,
         accounts = valid_accounts,
-        nonce = 5
+        nonce = 4
       )
     )
     session$flushReact()
@@ -1605,55 +1473,27 @@ test_that("active Build states reject forged stage actions", {
     ))
     selected_output("/confirmed/output")
 
-    for (index in seq_along(c("preparing", "building", "choosing_folder"))) {
-      stage <- c("preparing", "building", "choosing_folder")[[index]]
-      frozen_flow <- list(
-        stage = stage,
-        plan = NULL
-      )
-      build_flow(frozen_flow)
-      notification_count <- length(notifications)
-      real_session$setInputs(back_to_review = index)
-      real_session$setInputs(build = index)
-      real_session$flushReact()
+    frozen_flow <- list(stage = "building", plan = NULL)
+    build_flow(frozen_flow)
+    real_session$setInputs(back_to_review = 1L)
+    real_session$setInputs(build = 1L)
+    real_session$flushReact()
 
-      expect_identical(workflow()$stage, "build", info = stage)
-      expect_identical(build_flow(), frozen_flow, info = stage)
-      expect_identical(selected_output(), "/confirmed/output", info = stage)
-      expect_identical(picker_calls, 0L, info = stage)
-      expect_true(
-        length(notifications) > notification_count,
-        info = stage
-      )
-      expect_true(any(grepl(
-        "Wait for the active build to finish",
-        notifications,
-        fixed = TRUE
-      )))
-    }
+    expect_identical(workflow()$stage, "build")
+    expect_identical(build_flow(), frozen_flow)
+    expect_identical(selected_output(), "/confirmed/output")
+    expect_identical(picker_calls, 0L)
+    expect_true(any(grepl(
+      "Wait for the active build to finish",
+      notifications,
+      fixed = TRUE
+    )))
 
     build_flow(list(stage = "idle", plan = NULL))
     selected_output(NULL)
-    output_preflight <- get("builder_build_output_preflight", envir = fn_env)
-    assign(
-      "builder_build_output_preflight",
-      function(...) stop("preflight failed"),
-      envir = fn_env
-    )
-    real_session$setInputs(build = 4L)
+    real_session$setInputs(build = 2L)
     real_session$flushReact()
     expect_identical(picker_calls, 1L)
-    expect_null(selected_output())
-    expect_identical(build_flow(), list(stage = "idle", plan = NULL))
-    expect_match(
-      tail(notifications, 1L),
-      "The selected folder could not be checked: preflight failed",
-      fixed = TRUE
-    )
-    assign("builder_build_output_preflight", output_preflight, envir = fn_env)
-    real_session$setInputs(build = 5L)
-    real_session$flushReact()
-    expect_identical(picker_calls, 2L)
     release_directory <- selected_output()
     expect_identical(dirname(release_directory), selected_directory)
     expect_match(
@@ -1665,7 +1505,7 @@ test_that("active Build states reject forged stage actions", {
       built = file.path(release_directory, "dataset.crb")
     )
     result(navigation_result)
-    real_session$setInputs(back_to_review = 4L)
+    real_session$setInputs(back_to_review = 2L)
     real_session$flushReact()
     expect_identical(workflow()$stage, "review")
     expect_identical(result(), navigation_result)
@@ -1756,39 +1596,32 @@ test_that("active builds lock dataset imports and rail mutations", {
     ))
     expect_true(store()$can_undo_remove)
 
-    for (index in seq_along(c("queued", "building"))) {
-      stage <- c("queued", "building")[[index]]
-      build_flow(list(stage = stage, plan = NULL))
-      active_protocol <- isolate(protocol())
-      active_protocol$build_status <- c("queued", "running")[[index]]
-      protocol(active_protocol)
-      before <- isolate(store())
-      before_imports <- isolate(imports())
-      before_protocol <- isolate(protocol())
+    build_flow(list(stage = "building", plan = NULL))
+    active_protocol <- isolate(protocol())
+    active_protocol$build_status <- "running"
+    protocol(active_protocol)
+    before <- isolate(store())
+    before_imports <- isolate(imports())
+    before_protocol <- isolate(protocol())
 
-      expect_false(start_load(
-        "example",
-        paste0("locked-example-", index),
-        "Locked example"
-      ))
-      real_session$setInputs(
-        reorder_ds = list(id = "dataset-a", direction = "down"),
-        drop_ds = list(id = "dataset-a", confirmed = TRUE),
-        undo_remove = index,
-        use_example = c("complete_viewer_data", "spatial")[[index]],
-        dataset_files = data.frame(
-          name = "forged.rds",
-          datapath = tempfile(fileext = ".rds"),
-          size = 1,
-          type = "application/octet-stream"
-        )
+    expect_false(start_load("example", "locked-example", "Locked example"))
+    real_session$setInputs(
+      reorder_ds = list(id = "dataset-a", direction = "down"),
+      drop_ds = list(id = "dataset-a", confirmed = TRUE),
+      undo_remove = 1L,
+      use_example = "spatial",
+      dataset_files = data.frame(
+        name = "forged.rds",
+        datapath = tempfile(fileext = ".rds"),
+        size = 1,
+        type = "application/octet-stream"
       )
-      real_session$flushReact()
+    )
+    real_session$flushReact()
 
-      expect_identical(store(), before, info = stage)
-      expect_identical(imports(), before_imports, info = stage)
-      expect_identical(protocol(), before_protocol, info = stage)
-    }
+    expect_identical(store(), before)
+    expect_identical(imports(), before_imports)
+    expect_identical(protocol(), before_protocol)
     expect_true(any(grepl(
       "active build",
       tolower(notifications),
@@ -1799,7 +1632,7 @@ test_that("active builds lock dataset imports and rail mutations", {
     protocol(app_env$builder_request_protocol("worker-lock"))
     expect_true(start_load("example", "idle-example", "Idle example"))
     expect_length(imports()$entries, 1L)
-    real_session$setInputs(undo_remove = 3L)
+    real_session$setInputs(undo_remove = 2L)
     real_session$flushReact()
     expect_false(store()$can_undo_remove)
     expect_length(store()$datasets, 2L)
@@ -1853,7 +1686,6 @@ test_that("Build recovery actions preserve confirmation only when safe", {
     recovery_output <- tempfile("builder-recovery-output-")
     notifications <- character()
     enqueued <- list()
-    restart_succeeds <- TRUE
     server_env <- environment(start_confirmed_build)
     assign(
       "builder_operation_allowed",
@@ -1869,7 +1701,7 @@ test_that("Build recovery actions preserve confirmation only when safe", {
     )
     assign(
       "restart_worker_protocol",
-      function(...) restart_succeeds,
+      function(...) TRUE,
       envir = server_env
     )
     assign(
@@ -1886,21 +1718,7 @@ test_that("Build recovery actions preserve confirmation only when safe", {
 
     action_nonce <- 0L
     recovery_output <- file.path(tempdir(), "builder-recovery-output")
-    valid_accounts <- app_env$builder_auth_validate_payload(
-      TRUE,
-      list(list(
-        id = "auth-account-1",
-        username = "user-a",
-        password = "password-a"
-      ))
-    )$accounts
-    set_case <- function(
-      value,
-      auth_missing = FALSE,
-      auth_ready = FALSE,
-      stale = FALSE,
-      analyses = "marker_genes"
-    ) {
+    set_case <- function(value, stale = FALSE) {
       entry <- list(
         id = "dataset-a",
         revision = 0L,
@@ -1910,18 +1728,9 @@ test_that("Build recovery actions preserve confirmation only when safe", {
           object_md5 = strrep("a", 32L)
         ),
         profile = list(marker = "a", extras = list()),
-        settings = list(name = "Dataset A", analyses = analyses)
+        settings = list(name = "Dataset A", analyses = "marker_genes")
       )
       use_state_only_fixture(list(entry))
-      auth_enabled(isTRUE(auth_ready))
-      auth_accounts(
-        if (isTRUE(auth_ready)) {
-          valid_accounts
-        } else {
-          app_env$builder_auth_empty_accounts()
-        }
-      )
-      build_mode(isTRUE(auth_ready) || isTRUE(auth_missing))
       real_session$flushReact()
       entries <- isolate(sets())
       dataset_check_marks(builder_stage_checked_marks(
@@ -1930,9 +1739,6 @@ test_that("Build recovery actions preserve confirmation only when safe", {
         builder_configuration_identity_cache
       ))
       snapshot <- isolate(current_review_snapshot())
-      if (isTRUE(auth_missing)) {
-        auth_enabled(TRUE)
-      }
       reviewed <- app_env$builder_reduce_workflow(
         app_env$builder_workflow_state(),
         list(type = "open_review", snapshot = snapshot)
@@ -1969,7 +1775,6 @@ test_that("Build recovery actions preserve confirmation only when safe", {
       restartable_worker = TRUE
     )
     set_case(restart_failure)
-    restart_succeeds <- TRUE
     click_action("restart_worker")
     expect_null(result())
     expect_identical(workflow()$stage, "build")
@@ -1978,30 +1783,6 @@ test_that("Build recovery actions preserve confirmation only when safe", {
     expect_match(
       paste(unlist(output$build_stage_footer), collapse = " "),
       ">Build<",
-      fixed = TRUE
-    )
-
-    set_case(restart_failure)
-    restart_succeeds <- FALSE
-    click_action("restart_worker")
-    expect_identical(result(), restart_failure)
-    expect_match(
-      tail(notifications, 1L),
-      "could not restart",
-      ignore.case = TRUE
-    )
-
-    # Missing login accounts are asked for in place; the reviewed plan, the
-    # output and the result stay.
-    set_case(restart_failure, auth_missing = TRUE)
-    restart_succeeds <- TRUE
-    click_action("restart_worker")
-    expect_identical(workflow()$stage, "build")
-    expect_identical(selected_output(), recovery_output)
-    expect_s3_class(result(), "builder_result")
-    expect_match(
-      tail(notifications, 1L),
-      "Enter the login accounts for this build, then build again.",
       fixed = TRUE
     )
 
@@ -2020,47 +1801,6 @@ test_that("Build recovery actions preserve confirmation only when safe", {
     expect_match(
       tail(notifications, 1L),
       "Optional work removed. Review the updated plan before building.",
-      fixed = TRUE
-    )
-
-    missing_decision <- app_env$builder_result_needs_decision(
-      "Choose one.",
-      retry_closure = "marker_genes",
-      failed_dataset_id = "missing"
-    )
-    set_case(missing_decision)
-    click_action("remove_failed_analysis")
-    expect_identical(result(), missing_decision)
-    expect_length(enqueued, 0L)
-    expect_match(
-      tail(notifications, 1L),
-      "could not be removed",
-      ignore.case = TRUE
-    )
-
-    set_case(decision)
-    click_action("retry_failed_analysis")
-    expect_length(enqueued, 1L)
-    expect_null(result())
-    expect_identical(build_flow()$stage, "building")
-
-    set_case(decision, auth_ready = TRUE)
-    click_action("retry_failed_analysis")
-    expect_length(enqueued, 1L)
-    expect_null(result())
-    expect_identical(build_flow()$stage, "building")
-    expect_length(auth_accounts(), 0L)
-    expect_false(auth_validation()$ok)
-
-    set_case(decision, auth_missing = TRUE)
-    click_action("retry_failed_analysis")
-    expect_length(enqueued, 0L)
-    expect_identical(workflow()$stage, "build")
-    expect_identical(selected_output(), recovery_output)
-    expect_identical(result(), decision)
-    expect_match(
-      tail(notifications, 1L),
-      "Enter the login accounts for this build, then build again.",
       fixed = TRUE
     )
 

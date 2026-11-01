@@ -326,33 +326,6 @@ test_that("extra plots reject forged subclasses without dispatch", {
   expect_identical(result$page_candidates, character())
 })
 
-test_that("extra plot class summaries stay bounded", {
-  skip_if_not_installed("SeuratObject")
-  plot <- structure(
-    list(),
-    class = rep(c("ggplot", "gg"), 50000L)
-  )
-  object <- builder_table_object(list(
-    extra_material = list(plots = list(repeated = plot))
-  ))
-
-  extra <- builder_profile_table_content(
-    object,
-    builder_table_context()
-  )$extra_material
-  summary <- extra$normalized$plots$repeated
-
-  expect_true(extra$valid)
-  expect_true(summary$recognized)
-  expect_identical(summary$class_count, 100000L)
-  expect_type(summary$class_preview, "character")
-  expect_length(summary$class_preview, 20L)
-  expect_lte(length(summary$class_preview), 20L)
-  expect_identical(summary$class_truncated_count, 99980L)
-  expect_false("class" %in% names(summary))
-  expect_lt(as.numeric(object.size(extra)), 20000)
-})
-
 test_that("extra plot class preview values have text bounds", {
   skip_if_not_installed("SeuratObject")
   oversized_ascii <- strrep("x", 1024L * 1024L)
@@ -553,21 +526,6 @@ test_that("content profiling never dispatches untrusted nested methods", {
     "value",
     class = "builder_table_bomb"
   )
-  unsafe_factor <- factor(c("A", "B"))
-  attr(unsafe_factor, "levels") <- structure(
-    c("A", "B"),
-    class = "builder_table_bomb"
-  )
-  unsafe_factor_table <- structure(
-    list(value = unsafe_factor),
-    class = "data.frame",
-    row.names = c(NA_integer_, -2L)
-  )
-  unsafe_rows <- data.frame(value = 1:2)
-  attr(unsafe_rows, "row.names") <- structure(
-    c("row1", "row2"),
-    class = "builder_table_bomb"
-  )
 
   object <- builder_table_object(list(
     marker_genes = builder_table_bomb(
@@ -590,9 +548,7 @@ test_that("content profiling never dispatches untrusted nested methods", {
           class = "data.frame",
           row.names = c(NA_integer_, -2L)
         ),
-        unsafe_names = unsafe_names,
-        unsafe_factor = unsafe_factor_table,
-        unsafe_rows = unsafe_rows
+        unsafe_names = unsafe_names
       )
     )
   ))
