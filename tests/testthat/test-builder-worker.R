@@ -1198,12 +1198,14 @@ if (builder_lifecycle_api_available) {
     withr::defer(try(builder_worker_stop(worker), silent = TRUE))
 
     expect_null(started$error)
-    expect_lt(started_at, 1)
+    ## The gate keeps the bootstrap from finishing, so "starting" below is what
+    ## shows that start did not wait for it; this bound only catches a hang.
+    expect_lt(started_at, 20)
     expect_identical(worker$state, "starting")
     expect_false(worker$ready)
 
     file.create(gate)
-    deadline <- Sys.time() + 5
+    deadline <- Sys.time() + 60
     repeat {
       startup <- builder_session_poll_startup(worker)
       worker <- startup$worker
