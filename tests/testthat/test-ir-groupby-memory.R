@@ -63,3 +63,17 @@ test_that("a tab without the control leaves the remembered groupings alone", {
     expect_identical(ir_remembered_groupby("Diversity"), "patient")
   })
 })
+
+test_that("the toolbar takes the Group by it rebuilds with from the memory of its kind", {
+  source <- paste(
+    readLines(viewer_test_path("immune_repertoire", "settings.R")),
+    collapse = "\n"
+  )
+  expect_match(source, "prev_gb <- ir_remembered_groupby(tab)", fixed = TRUE)
+  ## The control's own current value belongs to the tab it was built for.
+  expect_false(grepl(
+    "prev_gb <- isolate(input$ir_groupBy)",
+    source,
+    fixed = TRUE
+  ))
+})

@@ -123,3 +123,56 @@ test_that("Opening Linked views after Share does not answer the request again", 
     fixed = TRUE
   ))
 })
+
+test_that("Opening a Trajectory view reports the cells the trajectory kept", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+
+  ## The trajectory holds only some of the data set's cells; a saved selection
+  ## may name others, which the view drops. The message counts what it kept.
+  crb <- readCerebro(file.path(
+    viewer_app_test_path(),
+    "extdata",
+    "examples",
+    "demo_full_tcr_bcr.crb"
+  ))
+  method <- crb$getMethodsForTrajectories()[[1L]]
+  name <- crb$getNamesOfTrajectories(method)[[1L]]
+  on_trajectory <- rownames(crb$getTrajectory(method, name)$meta)
+  off_trajectory <- setdiff(crb$getCellNames(), on_trajectory)
+  skip_if(length(on_trajectory) < 3L || length(off_trajectory) < 2L)
+
+  app <- share_single_view_app("share_trajectory_open")
+  withr::defer(app$stop())
+  trajectory_share <- "#shiny-tab-trajectory .cerebro-toolbar-share"
+  app$click(selector = 'a[href="#shiny-tab-trajectory"]')
+  app$wait_for_js(
+    paste0(
+      "window.cerebroSpecialistViews.get('trajectory_projection')?.ready() && ",
+      "!document.querySelector('",
+      trajectory_share,
+      "').disabled"
+    ),
+    timeout = 60000
+  )
+  json <- viewer_share_json(app, trajectory_share)
+  ## Rewrite the saved selection in the page, so the JSON keeps its shapes.
+  named <- app$get_js(sprintf(
+    "(() => {const c=JSON.parse(%s);c.selection.cells=%s;return JSON.stringify(c);})()",
+    jsonlite::toJSON(json, auto_unbox = TRUE),
+    jsonlite::toJSON(c(on_trajectory[1:3], off_trajectory[1:2]))
+  ))
+  app$run_js("document.getElementById('cv-config-close').click()")
+  viewer_open_view_json(app, trajectory_share, named)
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('cv-config-status').textContent.startsWith(",
+      "'Restored 3 of 5 selected cells')"
+    ),
+    timeout = 15000
+  )
+  expect_match(
+    app$get_js("document.getElementById('cv-config-status').textContent"),
+    "^Restored 3 of 5 selected cells"
+  )
+})

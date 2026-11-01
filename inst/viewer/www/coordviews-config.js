@@ -9,6 +9,7 @@
   var pending = null;
   var pendingTimer = null;
   var pngFeedbackTimer = null;
+  var restoreWatch = null;
   var sequence = 0;
   var shinyBound = false;
 
@@ -235,6 +236,41 @@
     }
   }
 
+  // A page restores a saved selection when its plot is drawn, which may be after
+  // this message: a view that draws only some of the data set's cells (a
+  // trajectory) keeps just those of the saved cells that it draws. The page
+  // then reports how many it kept, and the message says so.
+  function restoredMessage(restored, requested) {
+    if (!restored) {
+      return 'None of the ' + requested + ' selected cells are in this view. View settings restored.';
+    }
+    return 'Restored ' + restored + ' of ' + requested +
+      ' selected cells; the others are not in this view. View settings restored.';
+  }
+
+  function watchRestore(viewId, requested, message) {
+    if (restoreWatch && restoreWatch.timer) window.clearTimeout(restoreWatch.timer);
+    var watch = { viewId: viewId, requested: Number(requested), message: message };
+    watch.timer = window.setTimeout(function () {
+      if (restoreWatch === watch) restoreWatch = null;
+    }, 15000);
+    restoreWatch = watch;
+  }
+
+  function reportRestore(detail) {
+    var report = detail && detail.selectionRestore;
+    var watch = restoreWatch;
+    if (!watch || !report || detail.viewId !== watch.viewId) return;
+    if (watch.timer) window.clearTimeout(watch.timer);
+    restoreWatch = null;
+    var restored = Number(report.restored);
+    if (!isFinite(restored) || restored === watch.requested) return;
+    var element = byId('cv-config-status');
+    // Leave a message that has since been replaced by another action's.
+    if (!element || element.textContent !== watch.message) return;
+    status(restoredMessage(restored, watch.requested), 'success');
+  }
+
   function applyConfig(result) {
     try {
       var target = adapterForConfig(result.config);
@@ -245,10 +281,11 @@
         result.colour_data || null,
         result.selection_indices || null
       );
-      status(
-        'Restored ' + summary.selectedCells + ' selected cells and view settings.',
-        'success'
-      );
+      var message = 'Restored ' + summary.selectedCells + ' selected cells and view settings.';
+      status(message, 'success');
+      if (result.config && result.config.schema === 'cerebronexus-specialist-view') {
+        watchRestore(activeViewId, summary.selectedCells, message);
+      }
     } catch (error) {
       status(
         error && error.message
@@ -437,6 +474,7 @@
     });
     window.addEventListener('cerebro:specialist-state', function (event) {
       var detail = event.detail || {};
+      reportRestore(detail);
       window.setTimeout(function () { refreshReady(detail.viewId); }, 0);
     });
     window.addEventListener('cerebro:dataset-context', function (event) {
