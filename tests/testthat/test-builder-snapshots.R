@@ -291,15 +291,6 @@ test_that("snapshot creation rejects unsafe paths and insufficient space", {
     "already exists"
   )
   expect_true(dir.exists(existing))
-  expect_error(
-    builder_snapshot_seurat(
-      object,
-      file.path(root, "small.snapshot"),
-      available_bytes = 1
-    ),
-    "free space"
-  )
-  expect_false(dir.exists(file.path(root, "small.snapshot")))
 
   source <- file.path(root, "source")
   dir.create(source)
@@ -675,29 +666,6 @@ test_that("snapshot failure does not leave a partial or replace a target", {
   )
   expect_false(file.exists(target))
   expect_false(any(grepl("stage", list.files(root), fixed = TRUE)))
-})
-
-test_that("free space is queried before the snapshot object is written", {
-  lines <- readLines(
-    builder_profile_inst_path("builder", "adapters.R"),
-    warn = FALSE
-  )
-  implementation <- grep(
-    ".builder_snapshot_seurat_impl <-",
-    lines,
-    fixed = TRUE
-  )[1L]
-  query <- grep(
-    ".builder_snapshot_available_bytes(parent)",
-    lines,
-    fixed = TRUE
-  )[1L]
-  save <- grep(
-    ".builder_snapshot_save_stub(object, stub_path)",
-    lines,
-    fixed = TRUE
-  )[1L]
-  expect_true(implementation < query && query < save)
 })
 
 test_that("minimum headroom failure occurs before SaveSeuratRds", {

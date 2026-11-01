@@ -599,7 +599,18 @@ generated_app_fixture_pages <- function(conditional = character()) {
   )
 }
 
+## Building the six fixtures takes several seconds; build them once per
+## process. The fixtures are plain values, so callers get copy-on-modify copies.
+.generated_app_fixture_cache <- new.env(parent = emptyenv())
+
 generated_app_fixture_matrix <- function() {
+  if (is.null(.generated_app_fixture_cache$matrix)) {
+    .generated_app_fixture_cache$matrix <- .generated_app_fixture_build_matrix()
+  }
+  .generated_app_fixture_cache$matrix
+}
+
+.generated_app_fixture_build_matrix <- function() {
   fixtures <- list(
     basic = .generated_app_fixture_basic(),
     analysis = .generated_app_fixture_analysis(),

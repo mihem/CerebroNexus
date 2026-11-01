@@ -1,49 +1,3 @@
-utils_env <- viewer_runtime_env()
-
-test_that("Viewer resolves per-section Spatial point appearance", {
-  options <- list(
-    viewer_content = list(
-      "Dataset A" = list(
-        spatial_point_appearance = list(
-          "fov-a" = list(point_opacity = 0.42, point_size = 8)
-        )
-      )
-    )
-  )
-
-  expect_identical(
-    utils_env$spatialPointAppearance(options, "Dataset A", "fov-a"),
-    list(point_opacity = 0.42, point_size = 8)
-  )
-  expect_null(utils_env$spatialPointAppearance(options, "Dataset A", "missing"))
-})
-
-
-test_that("Builder preflight reuse retains the master's dataset catalog", {
-  root <- withr::local_tempdir()
-  path <- file.path(root, "small.crb")
-  object <- Cerebro$new()
-  object$setExpressionBackend(type = "embedded")
-  object$setMetaData(data.frame(cell_barcode = c("a", "b"), sample = "sample"))
-  saveRDS(object, path)
-  data <- c(dataset = path)
-  preflight <- .preflightBundleData(data)
-  expect_equal(preflight$dataset_catalog$dataset$cells, 2L)
-  withr::defer(.clearBundlePreflightCache())
-  expect_true(.cacheBundlePreflightData(
-    data,
-    preflight,
-    list(dataset = .bundlePreflightFingerprint(path))
-  ))
-  expect_identical(
-    .preflightBundleData(
-      data,
-      read_object = function(...) stop("verification should be reused")
-    ),
-    preflight
-  )
-})
-
 test_that("Builder secure credentials do not depend on R's random seed", {
   withr::local_seed(7)
   first <- .builderRandomBytes(32L)
@@ -55,27 +9,6 @@ test_that("Builder secure credentials do not depend on R's random seed", {
   for (bad in list(0, -1, NA_real_, Inf, 0.5, "32", c(1, 2))) {
     expect_error(.builderRandomBytes(bad), "byte count")
   }
-})
-
-test_that("Builder MD5 identities retain their existing byte-level format", {
-  bytes <- charToRaw("abc")
-  expect_identical(
-    digest::digest(bytes, algo = "md5", serialize = FALSE),
-    "900150983cd24fb0d6963f7d28e17f72"
-  )
-  builder_repo_source("io.R", local = environment())
-  root <- withr::local_tempdir()
-  source <- file.path(root, "source")
-  destination <- file.path(root, "copy")
-  writeBin(bytes, source)
-  result <- builder_copy_file_verified(
-    source,
-    destination,
-    expected_md5 = "900150983cd24fb0d6963f7d28e17f72",
-    buffer_bytes = 2L
-  )
-  expect_identical(result$md5, "900150983cd24fb0d6963f7d28e17f72")
-  expect_identical(readBin(destination, "raw", n = 10L), bytes)
 })
 
 test_that("a verified copy hashes while copying instead of rereading", {

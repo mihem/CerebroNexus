@@ -68,36 +68,6 @@ builder_browser_old_contract_app <- function(
   builder_browser_contract_app(app_dir, 0L, .local_envir)
 }
 
-builder_browser_project_folder_picker <- function(
-  project_dir,
-  .local_envir = parent.frame()
-) {
-  skip_on_os("windows")
-  dir.create(project_dir, recursive = TRUE, showWarnings = FALSE)
-  fake_bin <- withr::local_tempdir(.local_envir = .local_envir)
-  picker_script <- c(
-    "#!/bin/sh",
-    sprintf(
-      "printf '%%s\\n' %s",
-      shQuote(normalizePath(project_dir, winslash = "/", mustWork = TRUE))
-    )
-  )
-  pickers <- file.path(fake_bin, c("osascript", "zenity", "kdialog"))
-  for (picker in pickers) {
-    writeLines(picker_script, picker)
-  }
-  Sys.chmod(pickers, mode = "0755")
-  withr::local_envvar(
-    PATH = paste(fake_bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
-    # These tests return fixture paths through the POSIX picker. Native WSL
-    # dialogs are exercised separately and must never interrupt unattended CI.
-    WSL_DISTRO_NAME = NA_character_,
-    WSL_INTEROP = NA_character_,
-    .local_envir = .local_envir
-  )
-  invisible(project_dir)
-}
-
 builder_browser_wait_for_example_ready <- function(
   app,
   example = "complete_viewer_data",
@@ -118,18 +88,6 @@ builder_browser_wait_for_example_ready <- function(
         "button.getAttribute('aria-disabled') === 'false'; })()"
       ),
       example
-    ),
-    timeout = timeout
-  )
-  invisible(TRUE)
-}
-
-builder_browser_wait_for_worker_ready <- function(app, timeout = 60000) {
-  app$wait_for_js(
-    paste0(
-      "document.getElementById('builder-worker-status') !== null && ",
-      "document.getElementById('builder-worker-status')",
-      ".dataset.workerState === 'ready'"
     ),
     timeout = timeout
   )

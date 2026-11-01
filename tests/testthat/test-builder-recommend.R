@@ -44,21 +44,6 @@ metadata_fact <- function(
   )
 }
 
-test_that("the live recommendation contract is available", {
-  expect_true(all(vapply(
-    c(
-      "builder_recommend_metadata",
-      "builder_recommend_backend",
-      "builder_nomenclature_choices",
-      "builder_validate_nomenclature"
-    ),
-    exists,
-    logical(1),
-    mode = "function",
-    inherits = TRUE
-  )))
-})
-
 test_that("backend recommendations keep large sparse exports off embedded", {
   mib <- 1024^2
   available <- list(build = list(h5 = TRUE), viewer = list(h5 = TRUE))

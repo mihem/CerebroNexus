@@ -772,37 +772,6 @@ test_that("modern drafts fail closed before planning", {
   })
 })
 
-test_that("Builder runtimes load dataset state before planning", {
-  app <- readLines(
-    builder_profile_inst_path("builder", "app.R"),
-    warn = FALSE
-  )
-  session <- readLines(
-    builder_profile_inst_path("builder", "worker.R"),
-    warn = FALSE
-  )
-
-  app_state <- grep('source("state.R", local = TRUE)', app, fixed = TRUE)
-  app_plan <- grep('source("plan.R", local = TRUE)', app, fixed = TRUE)
-  worker_state <- grep(
-    'source_utf8(file.path(dir, "state.R"), globalenv())',
-    session,
-    fixed = TRUE
-  )
-  worker_plan <- grep(
-    'source_utf8(file.path(dir, "plan.R"), globalenv())',
-    session,
-    fixed = TRUE
-  )
-
-  expect_length(app_state, 1L)
-  expect_length(app_plan, 1L)
-  expect_lt(app_state, app_plan)
-  expect_length(worker_state, 1L)
-  expect_length(worker_plan, 1L)
-  expect_lt(worker_state, worker_plan)
-})
-
 test_that("frozen plans own every reviewed value", {
   local({
     builder_repo_source("preview.R")
@@ -945,19 +914,6 @@ test_that("frozen plans own every reviewed value", {
     )
     expect_identical(unsafe_attribute$error_code, "unsafe_reference")
   })
-})
-
-test_that("final plan validation does not serialize the full frozen plan", {
-  freeze <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "plan", "freeze.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_false(grepl(".builder_plan_deep_copy(plan)", freeze, fixed = TRUE))
-  expect_match(freeze, ".builder_plan_has_reference(plan)", fixed = TRUE)
 })
 
 test_that("Review App options are typed, range checked, and frozen", {

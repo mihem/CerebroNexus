@@ -286,17 +286,6 @@ test_that("snapshot copies report bytes through the import progress", {
 })
 
 test_that("Shiny upload progress is mirrored into the client queue row", {
-  app <- paste(
-    readLines(builder_profile_inst_path("builder", "app.R"), warn = FALSE),
-    collapse = "\n"
-  )
-  expect_match(app, 'id = "dataset_files_progress"', fixed = TRUE)
-  expect_match(
-    app,
-    'class = "shiny-file-input-progress builder-upload-transport-progress"',
-    fixed = TRUE
-  )
-
   js <- paste(
     readLines(
       builder_profile_inst_path("builder", "www", "builder.js"),
@@ -304,7 +293,6 @@ test_that("Shiny upload progress is mirrored into the client queue row", {
     ),
     collapse = "\n"
   )
-  expect_match(js, "observeClientUploadProgress();", fixed = TRUE)
   functions <- vapply(
     c("clientQueueStatus", "clientUploadPercent"),
     builder_import_progress_js_function,

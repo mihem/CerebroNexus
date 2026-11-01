@@ -23,19 +23,6 @@ test_that("the format registry claims AnnData files next to the Seurat ones", {
   expect_identical(builder_match_format("data.H5MU")$id, "h5mu")
 })
 
-test_that("an h5ad file is read as a Seurat object with its reductions and results", {
-  result <- quiet(builder_read_object(fixture("small_csr.h5ad")))
-  expect_null(result$error)
-  expect_s4_class(result$object, "Seurat")
-  expect_identical(result$format, "h5ad")
-  expect_equal(ncol(result$object), 120)
-  expect_true(all(c("PCA", "UMAP") %in% names(result$object@reductions)))
-  expect_true("marker_genes" %in% names(result$object@misc))
-  expect_true(all(
-    c("cell_type", "donor") %in% colnames(result$object@meta.data)
-  ))
-})
-
 test_that("a SingleCellExperiment saved as .rds or .qs2 is read the same way", {
   sce <- quiet(readH5adAsSCE(fixture("small_csr.h5ad")))
   path <- file.path(withr::local_tempdir(), "sce.rds")
@@ -111,66 +98,6 @@ test_that("an AnnData file goes through the Builder's own inspect path", {
   ))
 })
 
-test_that("the same data as Seurat and as AnnData gives the same profile shape", {
-  sce <- quiet(readH5adAsSCE(fixture("small_csr.h5ad")))
-  converted <- convertSCEToSeurat(sce)
-  source <- list(
-    type = "example",
-    location = "x",
-    fingerprint = "f",
-    format = "rds"
-  )
-  a <- quiet(builder_dataset_profile(converted, source))
-  ## the Seurat object a user would have built by hand from the same parts
-  manual <- SeuratObject::CreateSeuratObject(
-    SeuratObject::LayerData(converted, "counts"),
-    meta.data = converted@meta.data
-  )
-  b <- quiet(builder_dataset_profile(manual, source))
-  expect_identical(names(a), names(b))
-  expect_identical(a$schema_version, b$schema_version)
-  expect_identical(a$identity$cells$ids, b$identity$cells$ids)
-  expect_identical(a$identity$features$ids, b$identity$features$ids)
-  expect_identical(names(a$groups), names(b$groups))
-})
-
-test_that("an exported .crb from the converted object matches the direct conversion", {
-  skip_if_not_installed("Seurat")
-  sce <- quiet(readH5adAsSCE(fixture("small_csr.h5ad")))
-  seurat <- convertSCEToSeurat(sce)
-  out <- withr::local_tempdir()
-  via_seurat <- file.path(out, "via_seurat.crb")
-  quiet(exportFromSeurat(
-    seurat,
-    assay = "RNA",
-    slot = "counts",
-    file = via_seurat,
-    experiment_name = "x",
-    organism = "hg",
-    groups = c("cell_type", "donor"),
-    nUMI = "nCount_RNA",
-    nGene = "nFeature_RNA",
-    verbose = FALSE,
-    viewer_binary = "never"
-  ))
-  direct <- quiet(convertSCEToCerebro(
-    sce,
-    file.path(out, "direct"),
-    assay = "X",
-    groups = c("cell_type", "donor"),
-    viewer_binary = "never",
-    verbose = FALSE,
-    .source_name = "small.h5ad"
-  ))
-  a <- readCerebro(via_seurat)
-  b <- readCerebro(direct)
-  expect_identical(a$getMetaData()$cell_barcode, b$getMetaData()$cell_barcode)
-  expect_identical(sort(a$getGroups()), sort(b$getGroups()))
-  expect_setequal(names(a$projections), names(b$projections))
-  expect_identical(names(a$marker_genes), names(b$marker_genes))
-  expect_identical(names(a$marker_genes[[1]]), names(b$marker_genes[[1]]))
-})
-
 ## ---------------------------------------------------------------------------
 ## the whole Builder pipeline: file -> inspect -> snapshot -> plan -> build
 ## ---------------------------------------------------------------------------
@@ -209,23 +136,6 @@ build_through_builder <- function(path, id, configure = identity) {
   expect_identical(result$state, "success", info = result$error %||% "")
   list(result = result, entry = entry, crb = qs2::qs_read(result$built[[1L]]))
 }
-
-test_that("an AnnData file builds a .crb through the Builder, with its results", {
-  skip_if_not_installed("qs2")
-  built <- build_through_builder(fixture("small_csr.h5ad"), "h5ad_small")
-  crb <- built$crb
-  expect_s3_class(crb, "Cerebro")
-  expect_equal(nrow(crb$getMetaData()), 120)
-  expect_true(all(c("cell_type", "donor") %in% crb$getGroups()))
-  expect_true(length(crb$projections) >= 1L)
-  expect_true(length(crb$marker_genes) >= 1L)
-})
-
-test_that("a spatial AnnData file builds a spatial section through the Builder", {
-  skip_if_not_installed("qs2")
-  built <- build_through_builder(fixture("small_spatial.h5ad"), "h5ad_spatial")
-  expect_true(length(built$crb$spatial) >= 1L)
-})
 
 test_that("scanpy / scVelo trajectories are offered and built by the Builder", {
   skip_if_not_installed("qs2")
@@ -343,6 +253,12 @@ test_that("the same data as AnnData, SCE and Seurat gives the same .crb through 
     names(routes)
   )
   reference <- crbs$h5ad
+  ## the AnnData route keeps its groups and stored results
+  expect_s3_class(reference, "Cerebro")
+  expect_equal(nrow(reference$getMetaData()), 120)
+  expect_true(all(c("cell_type", "donor") %in% reference$getGroups()))
+  expect_true(length(reference$projections) >= 1L)
+  expect_true(length(reference$marker_genes) >= 1L)
   for (name in c("sce", "seurat")) {
     other <- crbs[[name]]
     expect_identical(

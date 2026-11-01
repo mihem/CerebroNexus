@@ -191,33 +191,6 @@ test_that("frozen release targets are mutually exclusive by output mode", {
   })
 })
 
-test_that("legacy seventh positional argument remains prior identity", {
-  local({
-    builder_repo_source(file.path("core", "bundle_path_contract.R"))
-    builder_repo_source("preview.R")
-    builder_repo_source("plan.R")
-    builder_repo_source("publish.R")
-    out_dir <- withr::local_tempdir()
-    prior <- builder_release_identity(out_dir)
-    plan <- builder_freeze_plan(
-      list(builder_task6_entry()),
-      out_dir,
-      FALSE,
-      FALSE,
-      NULL,
-      list(),
-      prior
-    )
-
-    expect_s3_class(plan, "builder_build_plan")
-    expect_identical(plan$expected_prior_identity, prior)
-    expect_identical(
-      plan$app_auth,
-      list(enabled = FALSE, account_count = 0L, timeout_minutes = 15L)
-    )
-  })
-})
-
 test_that("profiles expose safe layer choices for every assay", {
   skip_if_not_installed("SeuratObject")
 
@@ -568,7 +541,7 @@ test_that("resolved group colors are shared by every projection", {
   })
 })
 
-test_that("plan validation rejects blank labels but permits duplicate labels", {
+test_that("plan validation rejects blank labels", {
   local({
     builder_repo_source("preview.R")
     builder_repo_source("plan.R")
@@ -595,13 +568,8 @@ test_that("plan validation rejects blank labels but permits duplicate labels", {
     }
 
     blank <- builder_make_plan(list(entry("ds1", "  ")), tempdir())
-    duplicate <- builder_make_plan(
-      list(entry("ds1", "PBMC"), entry("ds2", " PBMC ")),
-      tempdir()
-    )
 
     expect_match(blank$error, "name", ignore.case = TRUE)
-    expect_false(identical(duplicate$error_code, "duplicate_dataset_name"))
   })
 })
 

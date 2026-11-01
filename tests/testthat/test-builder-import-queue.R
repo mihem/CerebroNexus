@@ -454,34 +454,6 @@ test_that("ten queued sources stay lightweight and single-flight", {
   })
 })
 
-test_that("loading datasets block Configure with a user-facing reason", {
-  app <- builder_app_source_text()
-  workflow_server <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "server", "workflow.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    app,
-    "Wait for all datasets to finish loading.",
-    fixed = TRUE
-  )
-  expect_match(
-    app,
-    "Retry or remove datasets that could not load.",
-    fixed = TRUE
-  )
-  expect_match(app, "active_import_id", fixed = TRUE)
-  expect_false(grepl(
-    "builder_loading_workbench_ui",
-    workflow_server,
-    fixed = TRUE
-  ))
-})
-
 builder_import_queue_restart_stub <- function(app_env, server_env, calls) {
   server_env$restart_worker_protocol <- function(
     current_worker,

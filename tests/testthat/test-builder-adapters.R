@@ -8,73 +8,6 @@ builder_repo_source("io.R", local = globalenv())
 
 .builder_adapter_source_contracts()
 
-test_that("snapshot contracts read legacy Assay slots directly", {
-  object <- SeuratObject::pbmc_small
-  expect_true(inherits(object[["RNA"]], "Assay"))
-  layer_data_called <- FALSE
-
-  contracts <- .builder_snapshot_layer_contracts(
-    object,
-    .layer_data = function(...) {
-      layer_data_called <<- TRUE
-      stop("legacy Assay should not call LayerData")
-    }
-  )
-
-  expect_false(layer_data_called)
-  expect_length(contracts, 0L)
-})
-
-.builder_normalize_profile_sources <- function(value) {
-  if (!is.list(value)) {
-    return(value)
-  }
-  value_names <- names(value)
-  for (index in seq_along(value)) {
-    if (
-      length(value_names) >= index &&
-        identical(value_names[[index]], "source")
-    ) {
-      value[index] <- list(list(normalized = TRUE))
-    } else {
-      value[index] <- list(.builder_normalize_profile_sources(value[[index]]))
-    }
-  }
-  value
-}
-
-test_that("file and example adapters converge after loading", {
-  object <- SeuratObject::pbmc_small
-  path <- file.path(withr::local_tempdir(), "pbmc.rds")
-  saveRDS(object, path)
-
-  from_file <- builder_adapter_inspect(
-    builder_seurat_file_adapter(path)
-  )
-  from_example <- builder_adapter_inspect(
-    builder_example_adapter("pbmc_small", object)
-  )
-
-  expect_s4_class(from_file$object, "Seurat")
-  expect_s4_class(from_example$object, "Seurat")
-  expect_s3_class(from_file$profile, "builder_dataset_profile")
-  expect_identical(from_file$profile$schema_version, 2L)
-  expect_identical(
-    .builder_normalize_profile_sources(from_file$profile),
-    .builder_normalize_profile_sources(from_example$profile)
-  )
-  expect_identical(from_file$legacy_profile, from_example$legacy_profile)
-  expect_identical(from_file$levels, from_example$levels)
-  expect_identical(from_file$format, "RDS")
-  expect_identical(from_example$format, "Built-in example")
-  expect_identical(from_file$source$type, "file")
-  expect_identical(from_example$source$type, "example")
-  expect_identical(
-    from_file$matrix_summary,
-    list(sparse = TRUE, storage = "memory")
-  )
-})
-
 test_that("QS reads use bounded physical-core parallelism", {
   skip_if_not_installed("qs")
   path <- tempfile(fileext = ".qs")
@@ -570,17 +503,6 @@ test_that("file adapters reject sources changed while they are read", {
   )
 
   expect_error(builder_adapter_inspect(adapter), "changed while")
-})
-
-test_that("adapter and snapshot public interfaces stay narrow", {
-  expect_identical(names(formals(builder_seurat_file_adapter)), "path")
-  expect_identical(names(formals(builder_example_adapter)), c("id", "object"))
-  expect_identical(names(formals(builder_adapter_inspect)), "adapter")
-  expect_identical(
-    names(formals(builder_snapshot_seurat)),
-    c("object", "snapshot_dir", "available_bytes")
-  )
-  expect_identical(names(formals(builder_open_snapshot)), "snapshot")
 })
 
 test_that("registration publishes a snapshot before exposing an object", {

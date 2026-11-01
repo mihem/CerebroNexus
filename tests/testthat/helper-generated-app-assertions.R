@@ -408,29 +408,6 @@ generated_app_e2e_plotly_point_count <- function(id) {
   as.integer(value)
 }
 
-generated_app_e2e_plotly_coordinates <- function(id) {
-  id_js <- .generated_app_e2e_js_value(id)
-  value <- generated_app_e2e_driver()$get_js(paste0(
-    "(function(){var plot=document.getElementById(",
-    id_js,
-    ");if(!plot || !plot.data)return [];return plot.data.reduce(",
-    "function(points,trace){var mode=String(trace.mode||'');if(",
-    "mode.indexOf('markers')===-1)return points;var xs=Array.from(trace.x||[]);",
-    "var ys=Array.from(trace.y||[]);return points.concat(xs.map(",
-    "function(x,index){return [Number(x),Number(ys[index])];}));},[]);})()"
-  ))
-  coordinates <- do.call(
-    rbind,
-    lapply(value, function(point) {
-      as.numeric(unlist(point, use.names = FALSE))
-    })
-  )
-  if (is.null(coordinates)) {
-    return(matrix(numeric(), ncol = 2L))
-  }
-  unname(coordinates)
-}
-
 generated_app_e2e_external_resource_urls <- function() {
   urls <- generated_app_e2e_driver()$get_js(
     paste0(

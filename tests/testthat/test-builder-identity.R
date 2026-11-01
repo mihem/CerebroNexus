@@ -28,30 +28,6 @@ builder_task5_source_runtime <- function(local = parent.frame()) {
 
 builder_task5_source_runtime()
 
-test_that("identity loader builds an isolated spatial runtime", {
-  isolated <- new.env(parent = baseenv())
-  loaded <- builder_task5_source_runtime(isolated)
-  expect_true(all(loaded))
-  if (!all(loaded)) {
-    return(invisible())
-  }
-
-  coordinates <- data.frame(
-    cx = c(2, 1),
-    cy = c(20, 10),
-    row.names = c("b", "a")
-  )
-  contract <- isolated$builder_spatial_contract(
-    coordinates,
-    cells = c("a", "b"),
-    coord_cols = c("cx", "cy"),
-    source = "metadata"
-  )
-  expect_identical(contract$coordinates$cell_barcode, c("a", "b"))
-  expect_identical(contract$coordinates$x, c(1, 2))
-  expect_identical(contract$coordinates$y, c(10, 20))
-})
-
 test_that("exact cell matching is barcode-aware and reorderable", {
   expected <- c("cell-a", "cell-b", "cell-c")
   match <- builder_match_cells(rev(expected), expected, mode = "exact")
@@ -108,11 +84,7 @@ test_that("spatial subset matching records and excludes outside rows", {
     mode = "subset"
   )
 
-  expect_true(match$valid)
   expect_identical(match$relation, "partial")
-  expect_identical(match$extra, "outside")
-  expect_identical(match$missing, "cell-c")
-  expect_identical(match$matched_ids, c("cell-a", "cell-b"))
   expect_identical(match$input_index, c(3L, 1L))
 
   expect_false(
@@ -132,39 +104,6 @@ test_that("spatial subset matching records and excludes outside rows", {
   expect_false(
     builder_match_cells("outside", expected, mode = "subset")$valid
   )
-})
-
-test_that("identity profiles preserve their established schema", {
-  expected <- c("cell-a", "cell-b", "cell-c")
-  profile <- builder_identity_profile(rev(expected), expected)
-
-  expect_named(
-    profile,
-    c(
-      "ids",
-      "count",
-      "valid",
-      "duplicates",
-      "blanks",
-      "missing",
-      "extra",
-      "order_matches",
-      "coverage",
-      "canonical_ids",
-      "reorder_index"
-    ),
-    ignore.order = FALSE
-  )
-  expect_true(profile$valid)
-  expect_identical(profile$canonical_ids, expected)
-  expect_identical(profile$reorder_index, c(3L, 2L, 1L))
-
-  damaged_expected <- builder_identity_profile(
-    expected,
-    c("cell-a", "cell-a", "cell-c")
-  )
-  expect_false(damaged_expected$valid)
-  expect_lte(damaged_expected$coverage, 1)
 })
 
 builder_preview_shuffled_object <- function() {

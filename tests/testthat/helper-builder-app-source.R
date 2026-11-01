@@ -46,7 +46,3 @@ builder_app_source_lines <- function() {
     use.names = FALSE
   )
 }
-
-builder_app_source_text <- function() {
-  paste(builder_app_source_lines(), collapse = "\n")
-}

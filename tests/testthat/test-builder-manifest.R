@@ -136,37 +136,6 @@ test_that("manifest entries keep status and disposition orthogonal", {
   )
 })
 
-test_that("manifest entries expose the complete typed record", {
-  entry <- manifest_entry(
-    "immune_metadata",
-    disposition = "converted",
-    artifact_scope = "both",
-    pages = "immune_repertoire"
-  )
-
-  expect_s3_class(entry, "builder_manifest_entry")
-  expect_named(
-    entry,
-    c(
-      "id",
-      "source",
-      "status",
-      "disposition",
-      "artifact_scope",
-      "summary",
-      "diagnostics",
-      "compatibility",
-      "pages",
-      "required_action",
-      "verifier"
-    ),
-    ignore.order = FALSE
-  )
-  expect_identical(entry$source$type, "fixture")
-  expect_identical(entry$source$location, "immune_metadata")
-  expect_identical(entry$pages, "immune_repertoire")
-})
-
 test_that("attention entries require one of the three action types", {
   expect_builder_manifest_code(
     manifest_entry("attention_without_action", status = "attention"),

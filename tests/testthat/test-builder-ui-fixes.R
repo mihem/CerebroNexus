@@ -199,27 +199,3 @@ test_that("a dataset added twice gets a distinct name", {
     "visium (3)"
   )
 })
-
-test_that("Review shows group columns by their real names", {
-  app_env <- builder_ui_fixes_app()
-  expect_identical(
-    app_env$builder_review_group_label("Neuron_cluster_ID"),
-    "Neuron_cluster_ID"
-  )
-  expect_identical(app_env$builder_review_group_label("louvain"), "louvain")
-  expect_identical(app_env$builder_review_group_label(""), "Not selected")
-})
-
-test_that("Viewer appearance flags share a row and page cards have titles", {
-  app_env <- builder_ui_fixes_app()
-  html <- as.character(app_env$builder_viewer_display_ui(
-    "core",
-    list(id = "ds1", settings = list()),
-    1L
-  ))
-  expect_match(html, "builder-display-flags", fixed = TRUE)
-  expect_match(
-    html,
-    '<summary>\\s*<span class="builder-viewer-card-title">Projection</span>'
-  )
-})

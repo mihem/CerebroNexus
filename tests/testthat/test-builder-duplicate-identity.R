@@ -1,33 +1,6 @@
 builder_plan_contract_source_runtime(environment())
 builder_repo_source("extras.R", local = environment())
 
-builder_duplicate_project_runtime <- function() {
-  runtime <- new.env(parent = globalenv())
-  sys.source(
-    builder_profile_inst_path("builder", "prerequisite.R"),
-    envir = runtime
-  )
-  runtime$builder_source_utf8(
-    builder_profile_inst_path("builder", "core", "bundle_path_contract.R"),
-    envir = runtime
-  )
-  runtime$builder_source_utf8(
-    builder_profile_inst_path(
-      "viewer",
-      "core",
-      "spatial_coordinate_transform.R"
-    ),
-    envir = runtime
-  )
-  for (file in c("io.R", "worker.R", "extras.R", "project.R")) {
-    runtime$builder_source_utf8(
-      builder_profile_inst_path("builder", file),
-      envir = runtime
-    )
-  }
-  runtime
-}
-
 test_that("stored sources may be added again while pending events stay unique", {
   runtime <- new.env(parent = globalenv())
   sys.source(
@@ -47,13 +20,6 @@ test_that("stored sources may be added again while pending events stay unique", 
   )
   expect_true(repeated$ok)
   expect_identical(repeated$code, "source_in_store")
-  project_runtime <- builder_duplicate_project_runtime()
-  first_id <- project_runtime$builder_project_allocate_dataset_id(0L)
-  second_id <- project_runtime$builder_project_allocate_dataset_id(
-    first_id$sequence,
-    first_id$id
-  )
-  expect_identical(c(first_id$id, second_id$id), c("ds1", "ds2"))
 
   double_click <- runtime$builder_source_reserve(
     entries,

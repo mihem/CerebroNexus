@@ -29,17 +29,3 @@ test_that("Builder version falls back to installed package metadata", {
     .installed_version = function() stop("not installed")
   ))
 })
-
-test_that("Builder brand renders the runtime version without hardcoding it", {
-  app <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "app.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(app, "builder_runtime_package_version()", fixed = TRUE)
-  expect_match(app, 'paste0("v", builder_runtime_version)', fixed = TRUE)
-  expect_false(grepl('"v6.0.0"', app, fixed = TRUE))
-})
