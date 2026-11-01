@@ -20,3 +20,8 @@ if (
     browser$close()
   })
 }
+
+## inst/builder/app.R byte-compiles hundreds of closures when it is sourced, so
+## the first import does not stall the UI. Tests source it over a hundred times
+## and pay seconds each; R's JIT still compiles what a test calls.
+options(cerebro.builder.precompile = FALSE)

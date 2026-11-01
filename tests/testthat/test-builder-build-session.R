@@ -356,6 +356,33 @@ test_that("a coordinator refuses a job if its runtime changed after loading", {
   expect_false(file.exists(inbox))
 })
 
+test_that("app.R byte-compiles hot closures and server code unless tests opt out", {
+  skip_if_not_installed("shiny")
+  withr::local_dir(builder_profile_inst_path("builder"))
+  compiled <- function(env) {
+    any(grepl(
+      "<bytecode",
+      utils::capture.output(print(env$builder_reduce_state)),
+      fixed = TRUE
+    ))
+  }
+  withr::local_options(cerebro.builder.precompile = NULL)
+  production <- new.env(parent = globalenv())
+  sys.source("app.R", envir = production)
+  expect_true(compiled(production))
+  expect_true(all(vapply(
+    production$.builder_server_programs,
+    function(program) identical(typeof(program), "bytecode"),
+    logical(1)
+  )))
+
+  withr::local_options(cerebro.builder.precompile = FALSE)
+  skipped <- new.env(parent = globalenv())
+  sys.source("app.R", envir = skipped)
+  expect_false(compiled(skipped))
+  expect_true(is.function(skipped$server))
+})
+
 test_that("an idle coordinator compiles the release functions ahead", {
   app_env <- builder_build_session_app()
   compile_ahead <- NULL

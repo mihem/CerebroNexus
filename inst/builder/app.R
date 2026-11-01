@@ -774,18 +774,24 @@ names(.builder_server_programs) <- .builder_server_sources
 ## Compile hot state/UI closures before accepting sessions. Otherwise R's JIT
 ## compiles them together during the first import/restore, blocking UI updates.
 ## Do not alter process-wide JIT settings or functions owned by other packages.
+## Tests that source this file many times turn it off with
+## options(cerebro.builder.precompile = FALSE): it costs seconds per source.
 .builder_compile_environment <- environment()
-for (.builder_compile_name in ls(
-  .builder_compile_environment,
-  all.names = TRUE,
-  pattern = paste0(
-    "^([.]builder_(state_|store_|manifest_|page_)|builder_(dataset_state|reduce_state|",
-    "group_catalog|projection_catalog|upgrade_viewer_content|",
-    "core_stage_ui|enhance_model|specialized_content_model|viewer_|content_|",
-    "analysis_results_model|immune_source_choices_model|build_stage_status|activity_|project_(cached_configuration|",
-    "file_fingerprint|fingerprint|checked|live_dirty)))"
+.builder_precompile <- !isFALSE(getOption("cerebro.builder.precompile", TRUE))
+.builder_compile_names <- if (.builder_precompile) {
+  ls(
+    .builder_compile_environment,
+    all.names = TRUE,
+    pattern = paste0(
+      "^([.]builder_(state_|store_|manifest_|page_)|builder_(dataset_state|reduce_state|",
+      "group_catalog|projection_catalog|upgrade_viewer_content|",
+      "core_stage_ui|enhance_model|specialized_content_model|viewer_|content_|",
+      "analysis_results_model|immune_source_choices_model|build_stage_status|activity_|project_(cached_configuration|",
+      "file_fingerprint|fingerprint|checked|live_dirty)))"
+    )
   )
-)) {
+}
+for (.builder_compile_name in .builder_compile_names) {
   if (bindingIsActive(.builder_compile_name, .builder_compile_environment)) {
     next
   }
@@ -808,12 +814,19 @@ for (.builder_compile_name in ls(
   }
 }
 .builder_server_programs <- lapply(.builder_server_programs, function(program) {
-  compiler::compile(
-    as.call(c(list(as.name("{")), as.list(program))),
-    env = .builder_compile_environment
-  )
+  program <- as.call(c(list(as.name("{")), as.list(program)))
+  if (.builder_precompile) {
+    program <- compiler::compile(program, env = .builder_compile_environment)
+  }
+  program
 })
-rm(.builder_compile_name, .builder_compile_value, .builder_compile_environment)
+suppressWarnings(rm(
+  .builder_compile_name,
+  .builder_compile_value,
+  .builder_compile_environment,
+  .builder_compile_names,
+  .builder_precompile
+))
 
 server <- function(input, output, session) {
   server_environment <- environment()
