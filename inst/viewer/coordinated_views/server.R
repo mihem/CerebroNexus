@@ -1265,8 +1265,17 @@ coordviews_selected_cells_ui <- renderUI({
 
 ## Deliberately bypass the page-scoped outputOptions wrapper: only the gate
 ## above stays awake; metadata and the plot/table outputs remain demand-driven.
-## Registered at the first selection: until then it would only run (twice on
-## the first open) to stop at its gate.
+## The gated renderer above is registered at the first selection: until then it
+## would only run (twice on the first open) to stop at its gate. An output that
+## has no renderer never receives a value, and shiny >= 1.9 keeps `.recalculating`
+## on an output until its first value arrives, so the page would stay busy; an
+## empty renderer holds the place until the first selection replaces it.
+output[["coordviews_selected_cells_UI"]] <- renderUI(NULL)
+shiny::outputOptions(
+  output,
+  "coordviews_selected_cells_UI",
+  suspendWhenHidden = FALSE
+)
 observeEvent(
   if (isTRUE(coordviews_selection_present())) TRUE,
   once = TRUE,
