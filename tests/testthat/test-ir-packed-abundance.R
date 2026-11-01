@@ -143,8 +143,15 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
-    names = "ir_keep_selection"
+    names = c(
+      "ir_keep_selection",
+      "ir_groupby_kind",
+      "ir_groupby_memory",
+      "ir_remembered_groupby"
+    )
   )
+  ## The control opens with the grouping it last had for this kind of tab.
+  env$ir_groupby_memory(list(results = "group"))
   render <- ir_test_body("settings.R", "ir_main_params_UI", "renderUI", env)
   html <- as.character(render())
   expect_match(html, 'value="TRB"', fixed = TRUE)
@@ -224,7 +231,12 @@ test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
-    names = "ir_keep_selection"
+    names = c(
+      "ir_keep_selection",
+      "ir_groupby_kind",
+      "ir_groupby_memory",
+      "ir_remembered_groupby"
+    )
   )
   render <- ir_test_body("settings.R", "ir_main_params_UI", "renderUI", env)
   html <- as.character(render())
