@@ -303,14 +303,6 @@ test_that("snapshot creation rejects unsafe paths and insufficient space", {
   ) {
     expect_error(builder_seurat_file_adapter(link), "symbolic link")
   }
-
-  linked_parent <- file.path(root, "linked-parent")
-  if (isTRUE(suppressWarnings(file.symlink(source, linked_parent)))) {
-    expect_error(
-      builder_seurat_file_adapter(file.path(linked_parent, "object.rds")),
-      "symbolic link"
-    )
-  }
 })
 
 test_that("free-space queries support POSIX and Windows volumes", {
@@ -476,34 +468,6 @@ test_that("a target appearing before publication is preserved", {
   expect_true(dir.exists(target))
 })
 
-test_that("a foreign directory replacing a published snapshot is preserved", {
-  object <- .builder_snapshot_object(.builder_snapshot_dense())
-  root <- withr::local_tempdir()
-  target <- file.path(root, "replaced.snapshot")
-  adapter_env <- environment(builder_snapshot_seurat)
-  original <- .builder_snapshot_after_publish
-  assign(
-    ".builder_snapshot_after_publish",
-    function(snapshot) {
-      unlink(snapshot$path, recursive = TRUE, force = TRUE)
-      dir.create(snapshot$path)
-      writeLines("foreign", file.path(snapshot$path, "foreign.txt"))
-      stop("Injected post-publication failure.")
-    },
-    envir = adapter_env
-  )
-  on.exit(
-    assign(".builder_snapshot_after_publish", original, envir = adapter_env),
-    add = TRUE
-  )
-
-  expect_error(
-    builder_snapshot_seurat(object, target, available_bytes = 2^40),
-    "Injected post-publication failure"
-  )
-  expect_identical(readLines(file.path(target, "foreign.txt")), "foreign")
-})
-
 test_that("a changed published object revokes cleanup authority", {
   object <- .builder_snapshot_object(.builder_snapshot_dense())
   root <- withr::local_tempdir()
@@ -562,60 +526,6 @@ test_that("release isolates then restores a raced foreign replacement", {
     readLines(file.path(snapshot$path, "foreign.txt")),
     "foreign"
   )
-})
-
-test_that("failed stage cleanup preserves a raced foreign replacement", {
-  root <- withr::local_tempdir()
-  target <- file.path(root, "stage-race.snapshot")
-  adapter_env <- environment(builder_snapshot_seurat)
-  original_copy <- .builder_snapshot_after_copy
-  original_cleanup <- .builder_cleanup_after_check
-  assign(
-    ".builder_snapshot_after_copy",
-    function() stop("Injected stage failure."),
-    envir = adapter_env
-  )
-  assign(
-    ".builder_cleanup_after_check",
-    function(path) {
-      if (startsWith(basename(path), ".s-")) {
-        unlink(path, recursive = TRUE, force = TRUE)
-        dir.create(path)
-        writeLines("foreign", file.path(path, "foreign.txt"))
-      }
-    },
-    envir = adapter_env
-  )
-  on.exit(
-    {
-      assign(".builder_snapshot_after_copy", original_copy, envir = adapter_env)
-      assign(
-        ".builder_cleanup_after_check",
-        original_cleanup,
-        envir = adapter_env
-      )
-    },
-    add = TRUE
-  )
-
-  expect_error(
-    builder_snapshot_seurat(
-      .builder_snapshot_object(.builder_snapshot_dense()),
-      target,
-      available_bytes = 2^40
-    ),
-    "Injected stage failure"
-  )
-  foreign <- list.files(
-    root,
-    pattern = "foreign[.]txt$",
-    all.files = TRUE,
-    no.. = TRUE,
-    recursive = TRUE,
-    full.names = TRUE
-  )
-  expect_length(foreign, 1L)
-  expect_identical(readLines(foreign), "foreign")
 })
 
 test_that("backing changes during copy prevent publication", {

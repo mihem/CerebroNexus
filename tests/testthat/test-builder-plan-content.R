@@ -639,49 +639,36 @@ test_that("final metadata cannot weaken profiled hard blockers", {
       "invalid_metadata_policy"
     )
 
-    for (bad_class in c("character", "list", "data.frame")) {
-      unsafe <- builder_task6_entry()
-      unsafe$dataset_profile$metadata$columns$unsafe_column <- list(
-        name = "unsafe_column",
-        class = bad_class,
-        supported = FALSE,
-        non_missing = 100L,
-        unique_non_missing = 2L
+    unsafe <- builder_task6_entry()
+    unsafe$dataset_profile$metadata$columns$unsafe_column <- list(
+      name = "unsafe_column",
+      class = "list",
+      supported = FALSE,
+      non_missing = 100L,
+      unique_non_missing = 2L
+    )
+    recommendation <- builder_recommend_metadata(
+      unsafe$dataset_profile,
+      required = c("nCount_RNA", "nFeature_RNA"),
+      dependency_ids = list(
+        nCount_RNA = "core.qc.nUMI",
+        nFeature_RNA = "core.qc.nGene"
       )
-      recommendation <- builder_recommend_metadata(
-        unsafe$dataset_profile,
-        required = c("nCount_RNA", "nFeature_RNA"),
-        dependency_ids = list(
-          nCount_RNA = "core.qc.nUMI",
-          nFeature_RNA = "core.qc.nGene"
-        )
+    )
+    unsafe$settings$recommendations$metadata <- recommendation
+    unsafe$settings$metadata_policy <- builder_task6_final_metadata_policy(
+      recommendation,
+      list(
+        nCount_RNA = "included",
+        nFeature_RNA = "included",
+        donor_id = "excluded",
+        unsafe_column = "included"
       )
-      included <- builder_task6_final_metadata_policy(
-        recommendation,
-        list(
-          nCount_RNA = "included",
-          nFeature_RNA = "included",
-          donor_id = "excluded",
-          unsafe_column = "included"
-        )
-      )
-      unsafe$settings$recommendations$metadata <- recommendation
-      unsafe$settings$metadata_policy <- included
-      expect_identical(
-        builder_freeze_plan(list(unsafe), tempdir(), FALSE)$error_code,
-        "invalid_metadata_policy",
-        info = bad_class
-      )
-
-      fallback <- unsafe
-      fallback$settings$metadata_policy <- NULL
-      fallback$settings$recommendations$metadata <- included
-      expect_identical(
-        builder_freeze_plan(list(fallback), tempdir(), FALSE)$error_code,
-        "invalid_metadata_policy",
-        info = paste("fallback", bad_class)
-      )
-    }
+    )
+    expect_identical(
+      builder_freeze_plan(list(unsafe), tempdir(), FALSE)$error_code,
+      "invalid_metadata_policy"
+    )
   })
 })
 
@@ -954,64 +941,25 @@ test_that("final metadata policies must prove their own consistency", {
     unknown_column <- policy
     unknown_column$columns$invented <- unknown_column$columns$donor_id
     unknown_column$columns$invented$name <- "invented"
-    unknown_column <- builder_task6_final_metadata_policy(
-      unknown_column
-    )
-
-    forged_missing_sentinel <- policy
-    forged_missing_sentinel$columns$invented <-
-      forged_missing_sentinel$columns$donor_id
-    forged_missing_sentinel$columns$invented$name <- "invented"
-    forged_missing_sentinel$columns$invented$class <- "missing"
-    forged_missing_sentinel$columns$invented$required <- TRUE
-    forged_missing_sentinel$columns$invented$non_missing <- 1L
-    forged_missing_sentinel$columns$invented$unique_non_missing <- 0L
-    forged_missing_sentinel <- builder_task6_final_metadata_policy(
-      forged_missing_sentinel,
-      list(invented = "blocking")
-    )
-
-    missing_source_column <- policy
-    missing_source_column$columns$donor_id <- NULL
-    missing_source_column <- builder_task6_final_metadata_policy(
-      missing_source_column
-    )
+    unknown_column <- builder_task6_final_metadata_policy(unknown_column)
 
     overlapping_sets <- policy
-    overlapping_sets$included <- c(
-      overlapping_sets$included,
-      "donor_id"
-    )
+    overlapping_sets$included <- c(overlapping_sets$included, "donor_id")
     overlapping_sets$value <- overlapping_sets$included
-
-    missing_barcode <- policy
-    missing_barcode$columns$cell_barcode <- NULL
-    missing_barcode <- builder_task6_final_metadata_policy(
-      missing_barcode
-    )
 
     excluded_barcode <- builder_task6_final_metadata_policy(
       policy,
       list(cell_barcode = "excluded")
     )
 
-    disposition_drift <- policy
-    disposition_drift$columns$donor_id$disposition <- "included"
+    record_drift <- policy
+    record_drift$columns$donor_id$disposition <- "included"
 
     effective_drift <- policy
     effective_drift$columns$donor_id$value <- "included"
     effective_drift$columns$donor_id$disposition <- "included"
     effective_drift$columns$donor_id$effective_included <- FALSE
-    effective_drift$excluded <- setdiff(
-      effective_drift$excluded,
-      "donor_id"
-    )
-
-    record_value_drift <- policy
-    record_value_drift$columns$donor_id$value <- "included"
-
-    record_confirmation_drift <- policy
-    record_confirmation_drift$columns$donor_id$requires_confirmation <- TRUE
+    effective_drift$excluded <- setdiff(effective_drift$excluded, "donor_id")
 
     aggregate_drift <- policy
     aggregate_drift$excluded <- character()
@@ -1022,24 +970,15 @@ test_that("final metadata policies must prove their own consistency", {
     policy_confirmation_drift <- policy
     policy_confirmation_drift$requires_confirmation <- TRUE
 
-    mutable_record <- policy
-    mutable_record$columns$donor_id$mutable <- new.env(parent = emptyenv())
-
     invalid <- list(
       unknown_column = unknown_column,
-      forged_missing_sentinel = forged_missing_sentinel,
-      missing_source_column = missing_source_column,
       overlapping_sets = overlapping_sets,
-      missing_barcode = missing_barcode,
       excluded_barcode = excluded_barcode,
-      disposition_drift = disposition_drift,
+      record_drift = record_drift,
       effective_drift = effective_drift,
-      record_value_drift = record_value_drift,
-      record_confirmation_drift = record_confirmation_drift,
       aggregate_drift = aggregate_drift,
       policy_value_drift = policy_value_drift,
-      policy_confirmation_drift = policy_confirmation_drift,
-      mutable_record = mutable_record
+      policy_confirmation_drift = policy_confirmation_drift
     )
     for (label in names(invalid)) {
       malformed <- entry

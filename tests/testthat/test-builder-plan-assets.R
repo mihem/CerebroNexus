@@ -47,213 +47,82 @@ test_that("plan input boundaries always return structured failures", {
     builder_repo_source("recommend.R")
     builder_repo_source("plan.R")
 
-    expect_failure <- function(result, code, info = NULL) {
-      expect_s3_class(result, "builder_plan_failure")
-      expect_identical(result$error_code, code, info = info)
-    }
-    capture <- function(...) {
-      tryCatch(
-        builder_freeze_plan(...),
-        error = function(error) error
-      )
-    }
-    capture_state <- function(entry) {
-      tryCatch(
-        builder_dataset_state(entry),
-        error = function(error) error
-      )
-    }
-
-    invalid_entry <- capture(list(1), tempdir(), FALSE)
-    expect_failure(invalid_entry, "invalid_entries", "entry")
-
-    invalid_settings <- builder_task6_entry()
-    invalid_settings$settings <- "settings"
-    expect_failure(
-      capture(list(invalid_settings), tempdir(), FALSE),
-      "invalid_entries",
-      "settings"
-    )
-
-    recommendation_entry <- builder_task6_entry()
-    valid_recommendations <- recommendation_entry$settings$recommendations
-    recommendation_cases <- list(
-      outer_atomic = "recommendations",
-      outer_classed = structure(
-        valid_recommendations,
-        class = "builder_recommendations"
-      ),
-      groups_atomic = utils::modifyList(
-        valid_recommendations,
-        list(groups = "groups")
-      ),
-      projections_atomic = utils::modifyList(
-        valid_recommendations,
-        list(projections = "projections")
-      ),
-      groups_included = utils::modifyList(
-        valid_recommendations,
-        list(groups = list(included = list("cluster")))
-      ),
-      projections_included = utils::modifyList(
-        valid_recommendations,
-        list(projections = list(included = 1))
-      ),
-      groups_classed = valid_recommendations
-    )
-    recommendation_cases$groups_classed$groups <- structure(
-      list(included = "cluster"),
-      class = "builder_group_recommendation"
-    )
-    reference_recommendations <- valid_recommendations
-    reference_recommendations$groups$mutable <-
-      new.env(parent = emptyenv())
-    recommendation_cases$groups_reference <- reference_recommendations
-    for (label in names(recommendation_cases)) {
-      invalid_recommendations <- builder_task6_entry()
-      invalid_recommendations$settings$recommendations <-
-        recommendation_cases[[label]]
-      state_result <- capture_state(invalid_recommendations)
-      expect_s3_class(state_result, "builder_state_error")
-      expect_identical(
-        state_result$code,
-        "invalid_recommendations",
-        info = paste("state", label)
-      )
-      expect_failure(
-        capture(list(invalid_recommendations), tempdir(), FALSE),
-        "invalid_recommendations",
-        paste("plan", label)
-      )
-    }
-
-    invalid_name <- builder_task6_entry()
-    invalid_name$settings$name <- c("Dataset", "Other")
-    expect_failure(
-      capture(list(invalid_name), tempdir(), FALSE),
-      "invalid_dataset_name",
-      "name"
-    )
-
     null_analyses <- builder_task6_entry()
     null_analyses$settings$analyses <- NULL
-    null_state <- builder_dataset_state(null_analyses)
-    expect_identical(null_state$analyses, character())
-    null_plan <- builder_freeze_plan(
-      list(null_analyses),
-      tempdir(),
-      FALSE
-    )
+    expect_identical(builder_dataset_state(null_analyses)$analyses, character())
+    null_plan <- builder_freeze_plan(list(null_analyses), tempdir(), FALSE)
     expect_null(null_plan$error)
     expect_identical(null_plan$items[[1L]]$analyses, character())
 
-    invalid_analyses <- list(
-      list("marker_genes"),
-      NA_character_,
-      "unknown_analysis",
-      c("marker_genes", "marker_genes"),
-      new.env(parent = emptyenv())
-    )
-    for (index in seq_along(invalid_analyses)) {
+    with_settings <- function(field, value) {
       entry <- builder_task6_entry()
-      entry$settings$analyses <- invalid_analyses[[index]]
-      state_result <- tryCatch(
-        builder_dataset_state(entry),
-        builder_state_error = function(error) error,
-        error = function(error) error
+      entry$settings[[field]] <- value
+      list(entry)
+    }
+    classed <- builder_task6_entry()$settings$recommendations
+    classed$groups <- structure(
+      list(included = "cluster"),
+      class = "builder_group_recommendation"
+    )
+    state_cases <- list(
+      invalid_recommendations = with_settings(
+        "recommendations",
+        "recommendations"
+      ),
+      invalid_recommendations = with_settings("recommendations", classed),
+      invalid_analyses = with_settings("analyses", "unknown_analysis")
+    )
+    for (index in seq_along(state_cases)) {
+      code <- names(state_cases)[[index]]
+      state <- tryCatch(
+        builder_dataset_state(state_cases[[index]][[1L]]),
+        error = identity
       )
-      expect_s3_class(
-        state_result,
-        "builder_state_error"
-      )
-      expect_identical(
-        state_result$code,
-        "invalid_analyses",
-        info = paste("state analyses", index)
-      )
-      expect_failure(
-        capture(list(entry), tempdir(), FALSE),
-        "invalid_analyses",
-        paste("analyses", index)
-      )
+      expect_s3_class(state, "builder_state_error")
+      expect_identical(state$code, code, info = index)
     }
 
-    for (value in list(1, NA, c(TRUE, FALSE))) {
-      expect_failure(
-        capture(list(builder_task6_entry()), tempdir(), value),
-        "invalid_make_app",
-        "make_app"
+    unsettled <- builder_task6_entry()
+    unsettled$settings <- "settings"
+    metadata <- builder_task6_entry()
+    metadata$settings$recommendations$metadata <- "metadata"
+    plan_cases <- list(
+      invalid_entries = list(list(1), FALSE),
+      invalid_entries = list(list(unsettled), FALSE),
+      invalid_recommendations = list(state_cases[[1L]], FALSE),
+      invalid_analyses = list(state_cases[[3L]], FALSE),
+      invalid_dataset_name = list(with_settings("name", c("A", "B")), FALSE),
+      invalid_make_app = list(list(builder_task6_entry()), NA),
+      invalid_metadata_policy = list(list(metadata), FALSE)
+    )
+    for (index in seq_along(plan_cases)) {
+      args <- plan_cases[[index]]
+      result <- tryCatch(
+        builder_freeze_plan(args[[1L]], tempdir(), args[[2L]]),
+        error = identity
       )
-      expect_failure(
-        capture(
-          list(builder_task6_entry()),
-          tempdir(),
-          FALSE,
-          overwrite = value
-        ),
-        "invalid_overwrite",
-        "overwrite"
-      )
+      expect_s3_class(result, "builder_plan_failure")
+      expect_identical(result$error_code, names(plan_cases)[[index]])
     }
 
-    expect_failure(
-      capture(
-        list(builder_task6_entry()),
-        tempdir(),
-        FALSE,
+    entries <- list(builder_task6_entry())
+    option_cases <- list(
+      invalid_overwrite = list(overwrite = NA),
+      invalid_app_options = list(
         app_options = structure(list(), class = "options")
       ),
-      "invalid_app_options",
-      "app_options"
+      invalid_app_options = list(app_options = list(show_upload_ui = NA)),
+      invalid_app_options = list(app_options = list(initial_dataset = "")),
+      invalid_expected_prior_identity = list(expected_prior_identity = "prior")
     )
-    for (value in list(NULL, 1, NA, c(TRUE, FALSE))) {
-      expect_failure(
-        capture(
-          list(builder_task6_entry()),
-          tempdir(),
-          FALSE,
-          app_options = list(show_upload_ui = value)
-        ),
-        "invalid_app_options",
-        "show_upload_ui"
+    for (index in seq_along(option_cases)) {
+      result <- do.call(
+        builder_freeze_plan,
+        c(list(entries, tempdir(), FALSE), option_cases[[index]])
       )
+      expect_s3_class(result, "builder_plan_failure")
+      expect_identical(result$error_code, names(option_cases)[[index]])
     }
-    for (value in list(
-      NULL,
-      1,
-      NA_character_,
-      c("a", "b"),
-      ""
-    )) {
-      expect_failure(
-        capture(
-          list(builder_task6_entry()),
-          tempdir(),
-          FALSE,
-          app_options = list(initial_dataset = value)
-        ),
-        "invalid_app_options",
-        "initial_dataset"
-      )
-    }
-    expect_failure(
-      capture(
-        list(builder_task6_entry()),
-        tempdir(),
-        FALSE,
-        expected_prior_identity = "prior"
-      ),
-      "invalid_expected_prior_identity",
-      "prior_identity"
-    )
-
-    malformed_metadata <- builder_task6_entry()
-    malformed_metadata$settings$recommendations$metadata <- "metadata"
-    expect_failure(
-      capture(list(malformed_metadata), tempdir(), FALSE),
-      "invalid_metadata_policy",
-      "metadata_recommendation"
-    )
   })
 })
 

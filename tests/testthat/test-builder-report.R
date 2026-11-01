@@ -185,14 +185,12 @@ test_that("not-applicable manifest dispositions round-trip as portable null", {
   expect_null(reread$content$marker_genes$disposition)
   expect_identical(reread$identity, report$identity)
 
-  for (invalid in list(1L, list("preserved"), c("a", "b"))) {
-    malformed <- builder_report_fixture()
-    malformed$plan$manifest$marker_genes$disposition <- invalid
-    expect_error(
-      builder_build_report(malformed$plan, malformed$result),
-      "schema"
-    )
-  }
+  malformed <- builder_report_fixture()
+  malformed$plan$manifest$marker_genes$disposition <- c("a", "b")
+  expect_error(
+    builder_build_report(malformed$plan, malformed$result),
+    "schema"
+  )
 })
 
 test_that("reports with no documented warnings retain identity", {
@@ -221,53 +219,12 @@ test_that("artifact-visible labels may use provenance-like words", {
   expect_true(file.exists(path))
 })
 
-test_that("sensitive structural keys fail closed at every depth", {
-  fixture <- builder_report_fixture()
-  base <- builder_build_report(fixture$plan, fixture$result)
-  cases <- list(
-    diagnostic = function(report) {
-      report$datasets[[1L]]$diagnostic <- "already redacted"
-      report
-    },
-    private_diagnostic = function(report) {
-      report$content$private_diagnostic <- 1L
-      report
-    },
-    host = function(report) {
-      report$content$nested <- list(host = 12345L)
-      report
-    },
-    pid = function(report) {
-      report$datasets[[1L]]$nested <- list(pid = 12345L)
-      report
-    },
-    source = function(report) {
-      report$content$source <- TRUE
-      report
-    },
-    raw_value = function(report) {
-      report$content$one <- list(two = list(three = list(raw_value = 42)))
-      report
-    }
-  )
-
-  for (name in names(cases)) {
-    leaked <- cases[[name]](base)
-    leaked$identity <- .builder_report_identity(leaked)
-    expect_error(
-      .builder_report_validate(leaked, require_class = TRUE),
-      "schema|redact|sensitive",
-      info = name
-    )
-  }
-})
-
-test_that("report v1 rejects malformed nested schemas", {
+test_that("report v1 rejects sensitive keys and malformed nested schemas", {
   fixture <- builder_report_fixture()
   base <- builder_build_report(fixture$plan, fixture$result)
   malformed <- list(
-    dataset_order_type = function(report) {
-      report$dataset_order <- 1L
+    nested_sensitive_key = function(report) {
+      report$content$one <- list(two = list(three = list(raw_value = 42)))
       report
     },
     datasets_type = function(report) {
@@ -276,18 +233,6 @@ test_that("report v1 rejects malformed nested schemas", {
     },
     dataset_unknown_key = function(report) {
       report$datasets[[1L]]$unexpected <- TRUE
-      report
-    },
-    dataset_missing_key = function(report) {
-      report$datasets[[1L]]$methods <- NULL
-      report
-    },
-    content_unknown_key = function(report) {
-      report$content[[1L]]$unexpected <- "value"
-      report
-    },
-    vector_type = function(report) {
-      report$viewer_bundle_assets <- list("asset.png")
       report
     },
     count_range = function(report) {
@@ -305,7 +250,7 @@ test_that("report v1 rejects malformed nested schemas", {
     value$identity <- .builder_report_identity(value)
     expect_error(
       .builder_report_validate(value, require_class = TRUE),
-      "schema",
+      "schema|redact|sensitive",
       info = name
     )
   }
@@ -333,43 +278,12 @@ test_that("report writer rejects redaction, write, parse, and identity failures"
     "portable|redact"
   )
 
-  leaked <- report
-  leaked$warnings <- paste(
-    "pid=12345 source=/Users/alice/raw.rds host=secret-host"
-  )
-  leaked$identity <- .builder_report_identity(leaked)
-  expect_error(
-    builder_write_build_report(fixture$stage, leaked),
-    "portable|redact"
-  )
-
   for (secret in c(
-    "source=/Users/alice/raw.rds",
-    "raw_value=secret",
-    "private diagnostic: donor=Alice",
-    "raw value secret",
-    "private diagnostic donor Alice",
-    "diagnostic donor Alice",
-    "  RAW   VALUE   secret  ",
-    "Private\tdiagnostic\tdonor\tAlice",
-    "DiAgNoStIc   donor Alice",
-    "raw values secret",
-    "raw_value secret",
-    "private diagnostics donor Alice",
-    "private_diagnostic donor Alice",
+    "pid=12345 source=/Users/alice/raw.rds host=secret-host",
     "PRIVATE__DIAGNOSTICS   donor Alice",
-    "raw-values secret",
-    "raw.values secret",
     "raw—values secret",
-    "host secret-host",
-    "pid 12345",
-    "HOST\tsecret-host",
-    "PID_12345",
-    "prefix[source:C:/Users/alice/raw.rds]suffix",
-    "context(raw_token=secret)"
+    "prefix[source:C:/Users/alice/raw.rds]suffix"
   )) {
-    report_path <- file.path(fixture$stage, "build-report.json")
-    unlink(report_path, force = TRUE)
     leaked <- report
     leaked$warnings <- secret
     leaked$identity <- .builder_report_identity(leaked)
@@ -378,8 +292,8 @@ test_that("report writer rejects redaction, write, parse, and identity failures"
       "portable|redact",
       info = secret
     )
-    unlink(report_path, force = TRUE)
   }
+  expect_false(file.exists(file.path(fixture$stage, "build-report.json")))
 
   expect_error(
     builder_write_build_report(

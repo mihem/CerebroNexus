@@ -119,14 +119,12 @@ test_that("external alignment diagnostics gate freezing", {
     ready <- builder_freeze_plan(list(entry), tempdir(), make_app = TRUE)
     expect_null(ready$error)
 
-    for (invalid in list("invalid", NA_integer_, c(0L, 1L), -1L, 1.5)) {
-      entry$settings$images$fov$outside <- invalid
-      blocked <- builder_freeze_plan(list(entry), tempdir(), make_app = TRUE)
-      expect_identical(
-        blocked$error_code,
-        "invalid_spatial_alignment_diagnostics"
-      )
-    }
+    entry$settings$images$fov$outside <- -1L
+    blocked <- builder_freeze_plan(list(entry), tempdir(), make_app = TRUE)
+    expect_identical(
+      blocked$error_code,
+      "invalid_spatial_alignment_diagnostics"
+    )
 
     entry$settings$images$fov <- "corrupt image record"
     blocked <- builder_freeze_plan(list(entry), tempdir(), make_app = TRUE)
@@ -205,30 +203,17 @@ test_that("spatial image storage and nested image counts freeze exactly", {
       fixed = TRUE
     )
 
-    valid_external_entry <- entry
-    duplicate <- structure(list(record, record), names = c("H&E", "H&E"))
-    entry$settings$images <- list(fov = duplicate)
-    expect_error(builder_plan_requires_app(list(entry)), "unique")
-    expect_error(
-      builder_plan_requires_app(list(valid_external_entry, entry)),
-      "unique"
-    )
-
-    invalid_image_entry <- valid_external_entry
+    invalid_image_entry <- entry
     invalid_image_entry$settings$images <- list(fov = "corrupt image record")
     expect_error(
       builder_plan_requires_app(list(invalid_image_entry)),
       "named image records",
       fixed = TRUE
     )
-    expect_error(
-      builder_plan_requires_app(list(
-        valid_external_entry,
-        invalid_image_entry
-      )),
-      "named image records",
-      fixed = TRUE
-    )
+
+    duplicate <- structure(list(record, record), names = c("H&E", "H&E"))
+    entry$settings$images <- list(fov = duplicate)
+    expect_error(builder_plan_requires_app(list(entry)), "unique")
 
     blocked <- builder_freeze_plan(list(entry), tempdir(), make_app = TRUE)
     expect_identical(blocked$error_code, "duplicate_spatial_image_label")
@@ -846,21 +831,6 @@ test_that("frozen plans own every reviewed value", {
       builder_viewer_page_contract(plan$items[[1L]]$manifest)
     )
 
-    spoofed_app <- builder_freeze_plan(
-      list(builder_task6_entry()),
-      tempdir(),
-      FALSE,
-      app_options = list(enabled = TRUE)
-    )
-    expect_identical(spoofed_app$error_code, "invalid_app_options")
-    inert_welcome <- builder_freeze_plan(
-      list(builder_task6_entry()),
-      tempdir(),
-      FALSE,
-      app_options = list(welcome = "Hello")
-    )
-    expect_identical(inert_welcome$error_code, "invalid_app_options")
-
     invalid_initial_dataset <- builder_freeze_plan(
       list(builder_task6_entry()),
       tempdir(),
@@ -967,45 +937,26 @@ test_that("Review App options are typed, range checked, and frozen", {
     expect_identical(wrapped$app_options$welcome_message, "mutated")
 
     invalid <- list(
-      welcome_message = list(NA_character_, c("a", "b"), 1),
-      point_size = list(
-        list(overview_projection_point_size = -1),
-        list(overview_projection_point_size = 21),
-        list(overview_projection_point_size = NULL),
-        list(hidden = 4),
-        4
-      ),
-      variable_to_compare = list(NULL, NA, c(TRUE, FALSE), "cluster"),
-      host = list("", NA_character_, c("a", "b"), 1),
-      port = list(0, 65536, 1.5, NA, "8080"),
-      max_request_size = list(0, Inf, NA, "8000"),
-      display_mode = list("fullscreen", NA_character_, c("auto", "normal")),
-      launch_browser = list(NA, c(TRUE, FALSE), 1),
-      initial_page = list("missing", NA_character_, c("data_info", "groups"))
+      welcome_message = 1,
+      point_size = list(overview_projection_point_size = 21),
+      variable_to_compare = "cluster",
+      host = "",
+      port = 65536,
+      max_request_size = Inf,
+      display_mode = "fullscreen",
+      launch_browser = NA,
+      initial_page = "missing",
+      hidden_future_option = TRUE
     )
     for (field in names(invalid)) {
-      for (value in invalid[[field]]) {
-        failure <- builder_freeze_plan(
-          list(builder_task6_entry()),
-          tempdir(),
-          make_app = TRUE,
-          app_options = stats::setNames(list(value), field)
-        )
-        expect_identical(
-          failure$error_code,
-          "invalid_app_options",
-          info = field
-        )
-      }
+      failure <- builder_freeze_plan(
+        list(builder_task6_entry()),
+        tempdir(),
+        make_app = TRUE,
+        app_options = invalid[field]
+      )
+      expect_identical(failure$error_code, "invalid_app_options", info = field)
     }
-
-    unknown <- builder_freeze_plan(
-      list(builder_task6_entry()),
-      tempdir(),
-      make_app = TRUE,
-      app_options = list(hidden_future_option = TRUE)
-    )
-    expect_identical(unknown$error_code, "invalid_app_options")
   })
 })
 

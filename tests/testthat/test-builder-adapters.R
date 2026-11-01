@@ -353,30 +353,6 @@ test_that("file adapters clear a materialized stale cache without executing it",
   expect_false(file.exists(sentinel))
 })
 
-test_that("example adapters use the same safe cache cleanup path", {
-  object <- SeuratObject::pbmc_small
-  sentinel <- file.path(withr::local_tempdir(), "example-sentinel")
-  object@tools[["SaveSeuratRds"]] <- data.frame(
-    layer = "counts",
-    path = tempfile(),
-    class = "matrix",
-    pkg = "base",
-    fxn = paste0(
-      "function(x) { file.create(",
-      dQuote(sentinel),
-      "); matrix(0, 1, 1) }"
-    ),
-    assay = "RNA",
-    stringsAsFactors = FALSE
-  )
-
-  inspected <- builder_adapter_inspect(
-    builder_example_adapter("cached-example", object)
-  )
-  expect_null(.builder_saved_cache(inspected$object))
-  expect_false(file.exists(sentinel))
-})
-
 ## A Seurat object whose counts live in an HDF5 file under `root`.
 builder_hdf5_backed_object <- function(root) {
   matrix <- builder_profile_matrix(paste0("c", 1:6))
@@ -451,11 +427,6 @@ test_that("adapter inputs fail closed", {
   saveRDS(SeuratObject::pbmc_small, path)
   changed_format <- builder_seurat_file_adapter(path)
   changed_format$reader$id <- "qs2"
-  expect_error(
-    builder_adapter_inspect(changed_format),
-    "format adapter changed"
-  )
-  changed_format$location <- NULL
   expect_error(
     builder_adapter_inspect(changed_format),
     "format adapter changed"

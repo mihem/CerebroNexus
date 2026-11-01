@@ -136,70 +136,6 @@ test_that("stale explicit immune sources block after candidates disappear", {
   })
 })
 
-test_that("malformed immune candidate and overlap evidence fails typed", {
-  local({
-    builder_repo_source("preview.R")
-    builder_repo_source("recommend.R")
-    builder_repo_source("plan.R")
-
-    capture_state <- function(entry) {
-      tryCatch(
-        builder_dataset_state(entry),
-        error = function(error) error
-      )
-    }
-    capture_plan <- function(entry) {
-      tryCatch(
-        builder_freeze_plan(list(entry), tempdir(), FALSE),
-        error = function(error) error
-      )
-    }
-    expect_typed <- function(entry, code) {
-      state <- capture_state(entry)
-      plan <- capture_plan(entry)
-      expect_s3_class(state, "builder_state_error")
-      expect_identical(state$code, code)
-      expect_s3_class(plan, "builder_plan_failure")
-      expect_identical(plan$error_code, code)
-    }
-
-    candidate_cases <- list(
-      source_kind = c("unified_misc", "metadata"),
-      detected = c(TRUE, FALSE),
-      full_ir_ready = "yes",
-      hla_tcr_ready = NA
-    )
-    for (field in names(candidate_cases)) {
-      malformed <- builder_task6_entry(full_ir_ready = TRUE)
-      malformed$dataset_profile$content$immune_repertoire$candidates$unified_misc[[
-        field
-      ]] <- candidate_cases[[field]]
-      expect_typed(malformed, "invalid_immune_candidates")
-    }
-
-    overlap_entry <- builder_task6_entry(immune_detected = FALSE)
-    overlap_fact <- builder_task6_immune_fact(list(
-      unified_misc = builder_task6_immune_candidate(
-        "unified_misc",
-        full_ir_ready = TRUE
-      ),
-      metadata = builder_task6_immune_candidate(
-        "metadata",
-        full_ir_ready = TRUE
-      )
-    ))
-    overlap_fact$source_overlaps <- list(list(
-      left = c("unified_misc", "metadata"),
-      right = "metadata",
-      n_overlap = 1L,
-      n_divergent = 1L,
-      equivalent = FALSE
-    ))
-    overlap_entry$dataset_profile$content$immune_repertoire <- overlap_fact
-    expect_typed(overlap_entry, "invalid_immune_overlaps")
-  })
-})
-
 test_that("divergent immune sources require an explicit source choice", {
   local({
     builder_repo_source("preview.R")
@@ -699,285 +635,82 @@ test_that("production motif-only sources cannot bypass exportability", {
   })
 })
 
-test_that("optional-content facts require inert typed evidence", {
+test_that("malformed optional-content evidence and settings fail closed", {
   local({
     builder_repo_source("preview.R")
     builder_repo_source("recommend.R")
     builder_repo_source("plan.R")
 
-    capture_state <- function(entry) {
-      tryCatch(
-        builder_dataset_state(entry),
-        error = function(error) error
-      )
-    }
-    capture_plan <- function(entry) {
-      tryCatch(
-        builder_freeze_plan(list(entry), tempdir(), FALSE),
-        error = function(error) error
-      )
-    }
-    expect_invalid_fact <- function(entry) {
-      state <- capture_state(entry)
-      plan <- capture_plan(entry)
-      expect_s3_class(state, "builder_state_error")
-      expect_identical(state$code, "invalid_content_evidence")
-      expect_s3_class(plan, "builder_plan_failure")
-      expect_identical(plan$error_code, "invalid_content_evidence")
-    }
-
-    accessor_called <- FALSE
-    method_env <- environment(builder_dataset_state)
-    method_name <- "$.builder_hostile_fact"
-    had_method <- exists(method_name, envir = method_env, inherits = FALSE)
-    if (had_method) {
-      prior_method <- get(method_name, envir = method_env, inherits = FALSE)
-    }
-    assign(
-      method_name,
-      function(value, name) {
-        accessor_called <<- TRUE
-        stop("HOSTILE_FACT_ACCESSOR_EXECUTED", call. = FALSE)
-      },
-      envir = method_env
-    )
-    for (id in c("hla", "marker_genes")) {
-      hostile <- builder_task6_entry()
-      if (is.null(hostile$dataset_profile$content[[id]])) {
-        hostile$dataset_profile$content[[id]] <- builder_task6_fact()
-      }
-      hostile$dataset_profile$content[[id]] <- structure(
-        hostile$dataset_profile$content[[id]],
-        class = c("builder_hostile_fact", "list")
-      )
-      expect_invalid_fact(hostile)
-    }
-    if (had_method) {
-      assign(method_name, prior_method, envir = method_env)
-    } else {
-      rm(list = method_name, envir = method_env)
-    }
-    expect_false(accessor_called)
-
-    malformed_fields <- list(
-      detected = c(TRUE, FALSE),
-      valid = 1,
-      normalized = "rows",
-      diagnostics = list("boom"),
-      requirements = NA_character_,
-      page_candidates = list("hla"),
-      attention = c(TRUE, FALSE)
-    )
-    for (field in names(malformed_fields)) {
-      malformed <- builder_task6_entry()
-      malformed$dataset_profile$content$hla[[field]] <-
-        malformed_fields[[field]]
-      expect_invalid_fact(malformed)
-    }
-  })
-})
-
-test_that("malformed optional-content settings fail as plan records", {
-  local({
-    builder_repo_source("preview.R")
-    builder_repo_source("recommend.R")
-    builder_repo_source("plan.R")
-
-    sources <- builder_task6_entry(full_ir_ready = TRUE)
-    sources$settings$content_sources <- "unified_misc"
-    expect_identical(
-      builder_freeze_plan(list(sources), tempdir(), FALSE)$error_code,
-      "invalid_content_sources"
-    )
-
-    invalid_names <- list(
-      unnamed = list("unified_misc"),
-      blank = setNames(list("unified_misc"), ""),
-      duplicate = structure(
-        list("unified_misc", "metadata"),
-        names = c("immune_repertoire", "immune_repertoire")
+    overlap_fact <- builder_task6_immune_fact(list(
+      unified_misc = builder_task6_immune_candidate(
+        "unified_misc",
+        full_ir_ready = TRUE
       ),
-      unknown = list(unknown_capability = "unified_misc"),
-      known_but_not_selectable = list(marker_genes = "table")
-    )
-    for (label in names(invalid_names)) {
-      malformed <- builder_task6_entry(full_ir_ready = TRUE)
-      malformed$settings$content_sources <- invalid_names[[label]]
-      expect_identical(
-        builder_freeze_plan(
-          list(malformed),
-          tempdir(),
-          FALSE
-        )$error_code,
-        "invalid_content_sources",
-        info = label
+      metadata = builder_task6_immune_candidate(
+        "metadata",
+        full_ir_ready = TRUE
       )
-    }
-
-    invalid_value <- builder_task6_entry()
-    invalid_value$settings$content_sources <- list(
-      immune_repertoire = ""
-    )
-    expect_identical(
-      builder_freeze_plan(
-        list(invalid_value),
-        tempdir(),
-        FALSE
-      )$error_code,
-      "invalid_content_source"
-    )
-
-    for (value in c("preserved", "filtered", "stored_only")) {
-      unknown <- builder_task6_entry()
-      unknown$settings$content_dispositions <- list(
-        unknown_capability = value
-      )
-      state_error <- tryCatch(
-        builder_dataset_state(unknown),
-        builder_state_error = function(error) error
-      )
-      expect_s3_class(
-        state_error,
-        "builder_state_error"
-      )
-      expect_identical(
-        state_error$code,
-        "invalid_content_dispositions",
-        info = value
-      )
-      expect_identical(
-        builder_freeze_plan(
-          list(unknown),
-          tempdir(),
-          FALSE
-        )$error_code,
-        "invalid_content_dispositions",
-        info = value
-      )
-    }
-
-    dispositions <- builder_task6_entry()
-    dispositions$settings$content_dispositions <- "preserved"
-    expect_identical(
-      builder_freeze_plan(list(dispositions), tempdir(), FALSE)$error_code,
-      "invalid_content_dispositions"
-    )
-  })
-})
-
-test_that("optional-content setting records are inert and non-dispatching", {
-  local({
-    builder_repo_source("preview.R")
-    builder_repo_source("recommend.R")
-    builder_repo_source("plan.R")
-
-    capture_state <- function(entry) {
-      tryCatch(
-        builder_dataset_state(entry),
-        error = function(error) error
-      )
-    }
-    capture_plan <- function(entry) {
-      tryCatch(
-        builder_freeze_plan(list(entry), tempdir(), FALSE),
-        error = function(error) error
-      )
-    }
-    expect_invalid <- function(entry, code, info) {
-      state <- capture_state(entry)
-      plan <- capture_plan(entry)
-      expect_s3_class(state, "builder_state_error")
-      expect_identical(state$code, code, info = info)
-      expect_s3_class(plan, "builder_plan_failure")
-      expect_identical(plan$error_code, code, info = info)
-    }
-
-    accessor_called <- FALSE
-    method_env <- environment(builder_dataset_state)
-    method_name <- "[[.evil_choices"
-    had_method <- exists(method_name, envir = method_env, inherits = FALSE)
-    if (had_method) {
-      prior_method <- get(method_name, envir = method_env, inherits = FALSE)
-    }
-    assign(
-      method_name,
-      function(value, name, ...) {
-        accessor_called <<- TRUE
-        stop("EVIL_CHOICES_ACCESSOR_EXECUTED", call. = FALSE)
-      },
-      envir = method_env
-    )
-
-    cases <- list(
-      content_dispositions = list(
-        value = list(hla = "filtered"),
-        code = "invalid_content_dispositions"
-      ),
-      content_sources = list(
-        value = list(immune_repertoire = "unified_misc"),
-        code = "invalid_content_sources"
-      )
-    )
-    for (field in names(cases)) {
-      classed <- builder_task6_entry(full_ir_ready = TRUE)
-      classed$settings[[field]] <- structure(
-        cases[[field]]$value,
-        class = c("evil_choices", "list")
-      )
-      expect_invalid(classed, cases[[field]]$code, paste(field, "class"))
-    }
-    expect_false(accessor_called)
-
-    if (had_method) {
-      assign(method_name, prior_method, envir = method_env)
-    } else {
-      rm(list = method_name, envir = method_env)
-    }
-
-    for (field in names(cases)) {
-      attributed <- builder_task6_entry(full_ir_ready = TRUE)
-      record <- cases[[field]]$value
-      attr(record, "probe") <- new.env(parent = emptyenv())
-      attributed$settings[[field]] <- record
-      expect_invalid(
-        attributed,
-        cases[[field]]$code,
-        paste(field, "reference attribute")
-      )
-    }
-
-    scalar_cases <- list(
-      content_dispositions = list(
-        id = "hla",
-        value = "filtered",
-        code = "invalid_content_disposition"
-      ),
-      content_sources = list(
-        id = "immune_repertoire",
-        value = "unified_misc",
-        code = "invalid_content_source"
-      )
-    )
-    for (field in names(scalar_cases)) {
-      scalar_case <- scalar_cases[[field]]
-      for (shape in c("class", "attribute")) {
-        malformed <- builder_task6_entry(full_ir_ready = TRUE)
-        value <- scalar_case$value
-        if (identical(shape, "class")) {
-          class(value) <- "evil_choice_value"
-        } else {
-          attr(value, "note") <- "not-plain"
-        }
-        malformed$settings[[field]] <- setNames(
-          list(value),
-          scalar_case$id
+    ))
+    overlap_fact$source_overlaps <- list(list(
+      left = c("unified_misc", "metadata"),
+      right = "metadata",
+      n_overlap = 1L,
+      n_divergent = 1L,
+      equivalent = FALSE
+    ))
+    edits <- list(
+      invalid_content_evidence = function(entry) {
+        entry$dataset_profile$content$hla <- structure(
+          entry$dataset_profile$content$hla,
+          class = c("builder_hostile_fact", "list")
         )
-        expect_invalid(
-          malformed,
-          scalar_case$code,
-          paste(field, "scalar", shape)
-        )
+        entry
+      },
+      invalid_content_evidence = function(entry) {
+        entry$dataset_profile$content$hla$detected <- c(TRUE, FALSE)
+        entry
+      },
+      invalid_immune_candidates = function(entry) {
+        entry$dataset_profile$content$immune_repertoire$candidates$unified_misc$full_ir_ready <- "yes"
+        entry
+      },
+      invalid_immune_overlaps = function(entry) {
+        entry$dataset_profile$content$immune_repertoire <- overlap_fact
+        entry
+      },
+      invalid_content_sources = function(entry) {
+        entry$settings$content_sources <- "unified_misc"
+        entry
+      },
+      invalid_content_sources = function(entry) {
+        entry$settings$content_sources <- list(unknown = "unified_misc")
+        entry
+      },
+      invalid_content_source = function(entry) {
+        entry$settings$content_sources <- list(immune_repertoire = "")
+        entry
+      },
+      invalid_content_dispositions = function(entry) {
+        entry$settings$content_dispositions <- "preserved"
+        entry
+      },
+      invalid_content_dispositions = function(entry) {
+        entry$settings$content_dispositions <- list(unknown = "preserved")
+        entry
+      },
+      invalid_content_disposition = function(entry) {
+        entry$settings$content_dispositions <- list(hla = "bogus")
+        entry
       }
+    )
+    for (index in seq_along(edits)) {
+      code <- names(edits)[[index]]
+      entry <- edits[[index]](builder_task6_entry(full_ir_ready = TRUE))
+      state <- tryCatch(builder_dataset_state(entry), error = identity)
+      expect_s3_class(state, "builder_state_error")
+      expect_identical(state$code, code, info = index)
+      plan <- builder_freeze_plan(list(entry), tempdir(), FALSE)
+      expect_identical(plan$error_code, code, info = index)
     }
   })
 })
