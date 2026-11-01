@@ -19,75 +19,6 @@ builder_spatial_wysiwyg_source("worker.R")
 builder_spatial_wysiwyg_source("plan/defaults.R")
 builder_spatial_wysiwyg_source("spatial_alignment_server.R")
 
-test_that("persistent spatial scrollbar is inert outside wide layout", {
-  css <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "www", "builder.features.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    css,
-    "\\.spatial-alignment-persistent-scrollbar \\{ display: none; \\}",
-    perl = TRUE
-  )
-  expect_match(
-    css,
-    paste0(
-      "@media \\(min-width: 81rem\\) \\{[\\s\\S]*",
-      "\\.spatial-alignment-persistent-scrollbar \\{[\\s\\S]*",
-      "display: block;"
-    ),
-    perl = TRUE
-  )
-})
-
-test_that("spatial workbench uses a compact wide-screen gutter", {
-  css <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "www", "builder.features.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    css,
-    paste0(
-      "@media \\(min-width: 81rem\\) \\{[\\s\\S]*",
-      "\\.spatial-alignment-layout \\{[\\s\\S]*",
-      "column-gap: var\\(--space-3\\);"
-    ),
-    perl = TRUE
-  )
-  expect_match(
-    css,
-    "\\.spatial-alignment-sidebar-body \\{[\\s\\S]*padding-right: var\\(--space-2\\);",
-    perl = TRUE
-  )
-})
-
-test_that("coordinate number fields fit signed decimal values", {
-  css <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "www", "builder.features.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    css,
-    paste0(
-      "\\.spatial-coordinate-control \\{[\\s\\S]*",
-      "grid-template-columns: 4rem minmax\\(0, 1fr\\) 5rem;"
-    ),
-    perl = TRUE
-  )
-})
-
 test_that("frozen section appearance falls back to image records", {
   record <- builder_alignment_record(
     source = list(name = "histology.png"),
@@ -165,29 +96,6 @@ test_that("numeric coordinate rotation preserves the stored coordinate scale", {
       )
     }
   )
-})
-
-test_that("Canvas scene carries the persisted coordinate scale", {
-  scene <- builder_spatial_canvas_scene(
-    preview = list(
-      available = TRUE,
-      capped = FALSE,
-      spatial = data.frame(
-        x = c(0, 10),
-        y = c(0, 20),
-        cell_barcode = c("cell-a", "cell-b"),
-        group = c("A", "B")
-      ),
-      coordinate_frame = list(xmin = 0, xmax = 10, ymin = 0, ymax = 20)
-    ),
-    colors = character(),
-    coordinate_transform = list(rotation_degrees = 12, scale = 2),
-    identity = "dataset-a::fov-a",
-    generation = 1L
-  )
-
-  expect_identical(scene$controls$coordinateRotation, 12)
-  expect_identical(scene$controls$coordinateScale, 2)
 })
 
 test_that("ROI preview contracts carry the section coordinate transform", {

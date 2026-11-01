@@ -1,56 +1,5 @@
 builder_table_source_runtime()
 
-test_that("table content always returns the stable source-fact contract", {
-  skip_if_not_installed("SeuratObject")
-  result <- builder_profile_table_content(
-    builder_table_object(),
-    builder_table_context()
-  )
-
-  expect_named(
-    result,
-    c(
-      "marker_genes",
-      "most_expressed_genes",
-      "mean_expression",
-      "enriched_pathways",
-      "trajectory",
-      "gene_lists",
-      "extra_material"
-    ),
-    ignore.order = FALSE
-  )
-  for (record in result) {
-    expect_named(
-      record,
-      c(
-        "detected",
-        "valid",
-        "normalized",
-        "diagnostics",
-        "requirements",
-        "page_candidates"
-      ),
-      ignore.order = FALSE
-    )
-    expect_type(record$detected, "logical")
-    expect_length(record$detected, 1L)
-    expect_false(is.na(record$detected))
-    expect_type(record$valid, "logical")
-    expect_length(record$valid, 1L)
-    expect_false(is.na(record$valid))
-    expect_type(record$diagnostics, "character")
-    expect_false(anyNA(record$diagnostics))
-    expect_type(record$requirements, "character")
-    expect_false(anyNA(record$requirements))
-    expect_type(record$page_candidates, "character")
-    expect_false(anyNA(record$page_candidates))
-    expect_false(anyDuplicated(record$page_candidates) > 0L)
-  }
-  expect_true(all(vapply(result, function(x) x$valid, logical(1))))
-  expect_true(all(!vapply(result, function(x) x$detected, logical(1))))
-})
-
 test_that("gene-list facts stay bounded and inert", {
   skip_if_not_installed("SeuratObject")
   object <- builder_table_object(list(

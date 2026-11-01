@@ -89,50 +89,6 @@ builder_immune_fixture_table <- function(
   )
 }
 
-builder_immune_fixture_all_modalities <- function() {
-  object <- builder_immune_fixture_object(300L)
-  cells <- SeuratObject::Cells(object)
-  sample_names <- c("sample_a", "sample_b")
-  sample_cells <- split(
-    cells,
-    rep(sample_names, length.out = length(cells))
-  )
-  object@misc$immune_repertoire <- list(
-    sample_a = builder_immune_fixture_table(
-      sample_cells$sample_a,
-      chain = "TRA",
-      suffix = "all-a"
-    ),
-    sample_b = builder_immune_fixture_table(
-      sample_cells$sample_b,
-      chain = "TRB",
-      suffix = "all-b"
-    )
-  )
-
-  typing <- expand.grid(
-    sample = sample_names,
-    locus = c("A", "B", "C"),
-    copy = 1:2,
-    KEEP.OUT.ATTRS = FALSE,
-    stringsAsFactors = FALSE
-  )
-  typing$donor_id <- typing$sample
-  typing$allele <- sprintf(
-    "HLA-%s*%02d:%02d",
-    typing$locus,
-    seq_len(nrow(typing)),
-    typing$copy
-  )
-  typing$locus <- paste0("HLA-", typing$locus)
-  typing$resolution <- "2-field"
-  object@misc$hla_typing <- typing[,
-    c("sample", "donor_id", "locus", "copy", "allele", "resolution")
-  ]
-  object@misc$hla_typing_source_type <- "synthetic"
-  object
-}
-
 builder_immune_fixture_viewer_demo <- function() {
   path <- builder_content_immune_inst_path(
     "extdata",
@@ -143,26 +99,4 @@ builder_immune_fixture_viewer_demo <- function() {
     return(NULL)
   }
   readCerebro(path)
-}
-
-builder_immune_expect_record_contract <- function(record) {
-  expect_type(record, "list")
-  expect_true(is.logical(record$detected))
-  expect_length(record$detected, 1L)
-  expect_false(is.na(record$detected))
-  expect_true(is.logical(record$valid))
-  expect_length(record$valid, 1L)
-  expect_false(is.na(record$valid))
-  expect_true(
-    is.null(record$normalized) ||
-      is.list(record$normalized) ||
-      is.data.frame(record$normalized)
-  )
-  expect_type(record$diagnostics, "character")
-  expect_false(anyNA(record$diagnostics))
-  expect_type(record$requirements, "character")
-  expect_false(anyNA(record$requirements))
-  expect_type(record$page_candidates, "character")
-  expect_false(anyNA(record$page_candidates))
-  expect_identical(anyDuplicated(record$page_candidates), 0L)
 }

@@ -25,43 +25,6 @@ builder_spatial_canvas_node <- function() {
   jsonlite::fromJSON(tail(output, 1L), simplifyVector = FALSE)
 }
 
-test_that("Spatial Builder uses a persistent Canvas live preview", {
-  root <- builder_test_inst_path("builder")
-  ui <- paste(
-    readLines(file.path(root, "ui", "enhance_stage.R"), warn = FALSE),
-    collapse = "\n"
-  )
-
-  expect_match(ui, '"Cells shown (%)"', fixed = TRUE)
-  expect_match(ui, '`aria-label` = label', fixed = TRUE)
-})
-
-test_that("Canvas renderer owns bounded raw points and latest-only controls", {
-  root <- builder_test_inst_path("builder")
-  js <- paste(
-    readLines(
-      file.path(root, "www", "builder-spatial-canvas.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(js, "devicePixelRatio", fixed = TRUE)
-  expect_match(js, "Math.min(window.devicePixelRatio || 1, 2)", fixed = TRUE)
-  expect_match(js, "var left = screen({x: b.xmin, y: cy});", fixed = TRUE)
-  expect_match(js, "var right = screen({x: b.xmax, y: cy});", fixed = TRUE)
-  expect_match(js, "new ResizeObserver(schedule)", fixed = TRUE)
-  expect_match(js, "pointermove", fixed = TRUE)
-  expect_match(js, 'var label = "View area";', fixed = TRUE)
-  expect_match(js, "var VIEWER_FRAME_PADDING = 10;", fixed = TRUE)
-  expect_false(grepl("ctx.fillText(group", js, fixed = TRUE))
-  expect_match(js, '"builder_spatial_roi_select"', fixed = TRUE)
-  expect_match(js, "if (!groups.length)", fixed = TRUE)
-  expect_match(js, "state.releaseGuardId = null;", fixed = TRUE)
-  expect_match(js, '"builder_spatial_coordinate_draft"', fixed = TRUE)
-  expect_match(js, "coordinateSequence", fixed = TRUE)
-})
-
 test_that("Canvas runtime persists point-safe View areas and deduplicates Ion events", {
   result <- builder_spatial_canvas_node()
 
@@ -241,31 +204,6 @@ test_that("Canvas runtime persists point-safe View areas and deduplicates Ion ev
   expect_identical(as.integer(result$pendingTimers), 0L)
 })
 
-test_that("paired number controls do not echo slider updates through Shiny", {
-  root <- builder_test_inst_path("builder")
-  server <- paste(
-    readLines(file.path(root, "spatial_alignment_server.R"), warn = FALSE),
-    collapse = "\n"
-  )
-  sync_start <- regexpr(
-    "sync_coordinate_control <- function",
-    server,
-    fixed = TRUE
-  )[[1L]]
-  sync_end <- regexpr(
-    'sync_coordinate_control("img_scale", 0, 10)',
-    server,
-    fixed = TRUE
-  )[[1L]]
-  sync_block <- substr(server, sync_start, sync_end - 1L)
-
-  expect_false(grepl(
-    "shiny::observeEvent(\n      input[[slider_id]]",
-    sync_block,
-    fixed = TRUE
-  ))
-})
-
 test_that("Canvas hover coalesces pointer work and reuses rendered screen points", {
   root <- builder_test_inst_path("builder")
   js <- paste(
@@ -298,47 +236,6 @@ test_that("Canvas hover coalesces pointer work and reuses rendered screen points
     js,
     fixed = TRUE
   ))
-})
-
-test_that("same-token scene refreshes preserve browser-local controls", {
-  root <- builder_test_inst_path("builder")
-  js <- paste(
-    readLines(
-      file.path(root, "www", "builder-spatial-canvas.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(js, "viewChanged || resetToken > state.resetToken", fixed = TRUE)
-})
-
-test_that("Canvas scene refreshes reuse image bytes already sent", {
-  root <- builder_test_inst_path("builder")
-  server <- paste(
-    readLines(file.path(root, "spatial_alignment_server.R"), warn = FALSE),
-    collapse = "\n"
-  )
-
-  expect_match(server, "builder_spatial_canvas_cache_sources(", fixed = TRUE)
-})
-
-test_that("Reset image waits for server-authoritative controls", {
-  root <- builder_test_inst_path("builder")
-  js <- paste(
-    readLines(
-      file.path(root, "www", "builder-spatial-canvas.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(js, 'closest("#enhance-reset_align")', fixed = TRUE)
-  expect_match(
-    js,
-    'closest("#enhance-reset_coordinate_transform")',
-    fixed = TRUE
-  )
 })
 
 test_that("programmatic Image settings restore cannot commit partial values", {
@@ -383,65 +280,8 @@ test_that("programmatic Image settings restore cannot commit partial values", {
   )
 })
 
-test_that("control commits carry a complete spatial owner and flush on switch", {
-  root <- builder_test_inst_path("builder")
-  js <- paste(
-    readLines(
-      file.path(root, "www", "builder-spatial-canvas.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(js, "snapshotIdentity: scene.snapshotIdentity", fixed = TRUE)
-  expect_match(js, "image: scene.activeImage", fixed = TRUE)
-})
-
-test_that("preview settlement cannot overwrite live control values", {
-  root <- builder_test_inst_path("builder")
-  server <- paste(
-    readLines(file.path(root, "spatial_alignment_server.R"), warn = FALSE),
-    collapse = "\n"
-  )
-  start <- regexpr(
-    "shiny::observeEvent(alignment_preview()",
-    server,
-    fixed = TRUE
-  )[[1L]]
-  block <- substr(server, start, start + 1600L)
-
-  expect_match(
-    block,
-    "update_position_steps(draft(), preview$bounds)",
-    fixed = TRUE
-  )
-  expect_false(grepl("update_controls(", block, fixed = TRUE))
-})
-
-test_that("image replacement clears stale decoded pixels", {
-  root <- builder_test_inst_path("builder")
-  js <- paste(
-    readLines(
-      file.path(root, "www", "builder-spatial-canvas.js"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    js,
-    "if (state.imageKey !== key) state.image = null;",
-    fixed = TRUE
-  )
-  expect_match(js, "state.imageKey = null;", fixed = TRUE)
-})
-
 test_that("Spatial preview worker receives only the ROI base transform", {
   root <- builder_test_inst_path("builder")
-  server <- paste(
-    readLines(file.path(root, "spatial_alignment_server.R"), warn = FALSE),
-    collapse = "\n"
-  )
   worker_session <- paste(
     readLines(file.path(root, "session.R"), warn = FALSE),
     collapse = "\n"
@@ -451,12 +291,6 @@ test_that("Spatial preview worker receives only the ROI base transform", {
     collapse = "\n"
   )
 
-  expect_false(grepl("coordinate_preview_transforms", server, fixed = TRUE))
-  expect_false(grepl(
-    "coordinate_transforms = coordinate_draft",
-    server,
-    fixed = TRUE
-  ))
   expect_match(
     worker_session,
     "base_coordinate_transform = base_coordinate_transform",

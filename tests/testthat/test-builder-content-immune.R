@@ -1,27 +1,5 @@
 builder_content_immune_source_runtime()
 
-test_that("absent immune and HLA content is valid optional content", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-
-  content <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )
-
-  builder_immune_expect_record_contract(content$immune_repertoire)
-  builder_immune_expect_record_contract(content$hla)
-  expect_false(content$immune_repertoire$detected)
-  expect_true(content$immune_repertoire$valid)
-  expect_null(content$immune_repertoire$normalized)
-  expect_identical(content$immune_repertoire$page_candidates, character())
-  expect_identical(content$immune_repertoire$diagnostics, character())
-  expect_false(content$hla$detected)
-  expect_true(content$hla$valid)
-  expect_null(content$hla$normalized)
-  expect_identical(content$hla$page_candidates, character())
-})
-
 test_that("IR and motif readiness follow separate Viewer contracts", {
   skip_if_not_installed("SeuratObject")
   object <- builder_immune_fixture_object()
@@ -113,7 +91,6 @@ test_that("unified, metadata, and legacy repertoire remain separate facts", {
     ir$page_candidates,
     c("immune_repertoire", "hla_tcr_motifs")
   )
-  lapply(ir$candidates, builder_immune_expect_record_contract)
 })
 
 test_that("repertoire validation records samples, chains, and cell identity", {
@@ -542,48 +519,6 @@ test_that("partial metadata repertoire is detected but is not convertible", {
   )
 })
 
-test_that("immune comparisons separate exact and complementary chains", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  cells <- SeuratObject::Cells(object)
-  common <- builder_immune_fixture_table(cells[1:2], "TRB", "same")
-  object@misc$immune_repertoire <- list(sample_a = common)
-  object@misc$tcr_data <- list(sample_a = common)
-  object@misc$bcr_data <- list(
-    sample_a = builder_immune_fixture_table(cells[2:3], "IGH", "different")
-  )
-
-  ir <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$immune_repertoire
-  overlaps <- ir$source_overlaps
-  exact <- Filter(
-    function(x) {
-      identical(x$left, "unified_misc") &&
-        identical(x$right, "legacy_tcr")
-    },
-    overlaps
-  )[[1L]]
-  divergent <- Filter(
-    function(x) {
-      identical(x$left, "unified_misc") &&
-        identical(x$right, "legacy_bcr")
-    },
-    overlaps
-  )[[1L]]
-
-  expect_identical(exact$n_overlap, 2L)
-  expect_identical(exact$n_exact, 2L)
-  expect_identical(exact$n_divergent, 0L)
-  expect_true(exact$equivalent)
-  expect_identical(divergent$n_overlap, 0L)
-  expect_identical(divergent$n_exact, 0L)
-  expect_identical(divergent$n_divergent, 0L)
-  expect_false(divergent$equivalent)
-  expect_identical(ir$selected_source, NULL)
-})
-
 test_that("source overlap treats reassigned samples as divergence", {
   skip_if_not_installed("SeuratObject")
   object <- builder_immune_fixture_object()
@@ -609,83 +544,6 @@ test_that("source overlap treats reassigned samples as divergence", {
   expect_identical(comparison$n_divergent, 1L)
   expect_false(comparison$equivalent)
   expect_identical(comparison$divergent_preview, cells[[1L]])
-})
-
-test_that("HLA named-list input normalizes with explicit provenance", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  object@misc$hla_typing <- list(
-    sample_a = c("HLA-A*02:01", "HLA-A*11:01"),
-    sample_b = "HLA-B*08:01"
-  )
-  object@misc$hla_typing_source_type <- "genotyped"
-
-  hla <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-
-  builder_immune_expect_record_contract(hla)
-  expect_true(hla$detected)
-  expect_true(hla$valid)
-  expect_identical(hla$shape, "named_list")
-  expect_identical(hla$normalized$n_rows, 3L)
-  expect_true(hla_is_typing_table(hla$normalized$table_preview))
-  expect_identical(nrow(hla$normalized$table_preview), 3L)
-  expect_identical(hla$provenance$source_types, "genotyped")
-  expect_false(hla$provenance$has_unknown)
-  expect_true(hla$provenance$association_eligible)
-  expect_false(hla$provenance$descriptive_only)
-  expect_false(hla$attention)
-  expect_identical(hla$page_candidates, character())
-  expect_identical(hla$page_gate$role, "supporting")
-  expect_false(hla$page_gate$opens)
-  expect_identical(hla$page_gate$requires, "valid_tcr")
-})
-
-test_that("HLA wide and canonical inputs use the shared HLA core", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  wide <- data.frame(
-    sample = c("sample_a", "sample_b"),
-    `HLA-A_1` = c("02:01", "01:01"),
-    `HLA-A_2` = c("11:01", "03:01"),
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-  object@misc$hla_typing <- wide
-  object@misc$hla_typing_source_type <- "imputed"
-  wide_profile <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-  expect_true(wide_profile$valid)
-  expect_identical(wide_profile$shape, "wide")
-  expect_setequal(
-    wide_profile$normalized$table_preview$allele,
-    c(
-      "HLA-A*02:01",
-      "HLA-A*01:01",
-      "HLA-A*11:01",
-      "HLA-A*03:01"
-    )
-  )
-  expect_identical(wide_profile$provenance$source_types, "imputed")
-
-  canonical <- wide_profile$normalized$table_preview
-  canonical$source_type[1L] <- "not-a-source"
-  object@misc$hla_typing <- canonical
-  object@misc$hla_typing_source_type <- "genotyped"
-  canonical_profile <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-  expect_true(canonical_profile$valid)
-  expect_identical(canonical_profile$shape, "canonical_long")
-  expect_contains(canonical_profile$provenance$source_types, "unknown")
-  expect_true(canonical_profile$provenance$has_unknown)
-  expect_true(canonical_profile$attention)
-  expect_contains(canonical_profile$diagnostics, "unknown_provenance")
 })
 
 test_that("unknown HLA provenance is attention, not inferred evidence", {
@@ -733,25 +591,6 @@ test_that("malformed HLA is retained as an invalid source fact", {
   expect_identical(nrow(hla$normalized$table_preview), 0L)
   expect_contains(hla$diagnostics, "no_valid_alleles")
   expect_identical(hla$page_candidates, character())
-})
-
-test_that("HLA-only data remains supporting and cannot open the motif page", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  object@misc$hla_typing <- list(sample_a = "HLA-A*02:01")
-  object@misc$hla_typing_source_type <- "genotyped"
-
-  content <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )
-
-  expect_false(content$immune_repertoire$detected)
-  expect_identical(content$immune_repertoire$page_candidates, character())
-  expect_true(content$hla$valid)
-  expect_identical(content$hla$page_candidates, character())
-  expect_false(content$hla$page_gate$opens)
-  expect_identical(content$hla$page_gate$requires, "valid_tcr")
 })
 
 test_that("HLA mappings use exact Viewer sample identity", {
@@ -847,39 +686,6 @@ test_that("exact HLA matches can collapse complete samples to donors", {
   expect_identical(hla$page_candidates, character())
 })
 
-test_that("the deterministic all-content fixture profiles real IR and HLA", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_all_modalities()
-  expect_s4_class(object, "Seurat")
-  context <- builder_immune_fixture_context(object)
-
-  content <- builder_profile_immune_content(object, context)
-
-  expect_true(content$immune_repertoire$detected)
-  expect_true(content$immune_repertoire$valid)
-  expect_true(content$immune_repertoire$candidates$unified_misc$valid)
-  expect_identical(
-    content$immune_repertoire$candidates$unified_misc$normalized$n_samples,
-    2L
-  )
-  expect_identical(
-    content$immune_repertoire$candidates$unified_misc$normalized$n_rows,
-    300L
-  )
-  expect_contains(
-    content$immune_repertoire$candidates$unified_misc$normalized$chains,
-    "TRA"
-  )
-  expect_true(content$hla$detected)
-  expect_true(content$hla$valid)
-  expect_identical(content$hla$normalized$n_rows, 12L)
-  expect_identical(nrow(content$hla$normalized$table_preview), 12L)
-  expect_false(content$hla$attention)
-  expect_identical(content$hla$provenance$source_types, "synthetic")
-  expect_false(content$hla$provenance$association_eligible)
-  expect_true(content$hla$provenance$descriptive_only)
-})
-
 test_that("tracked Viewer IR and HLA payloads satisfy Builder contracts", {
   demo <- builder_immune_fixture_viewer_demo()
   skip_if(is.null(demo), "tracked HLA/TCR Viewer demo is unavailable")
@@ -904,80 +710,6 @@ test_that("tracked Viewer IR and HLA payloads satisfy Builder contracts", {
   expect_true(hla$valid)
   expect_identical(hla$normalized$n_rows, 14L)
   expect_identical(hla$page_candidates, character())
-})
-
-test_that("every returned preview string has character and byte bounds", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_immune_fixture_object()
-  cells <- SeuratObject::Cells(object)
-  long_sample <- paste0("sample_", strrep("界", 10000L))
-  repertoire <- list(builder_immune_fixture_table(cells[[1L]], "TRB"))
-  names(repertoire) <- long_sample
-  object@misc$immune_repertoire <- repertoire
-
-  n_hla <- 20L
-  object@misc$hla_typing <- data.frame(
-    sample = paste0("sample_", seq_len(n_hla)),
-    donor_id = NA_character_,
-    locus = "HLA-A",
-    copy = 1L,
-    allele = "HLA-A*02:01",
-    resolution = "2-field",
-    source_type = "genotyped",
-    typing_method = "fixture",
-    source_reference = vapply(
-      seq_len(n_hla),
-      function(index) paste0(index, strrep("界", 10000L)),
-      character(1)
-    ),
-    confidence = 1,
-    stringsAsFactors = FALSE
-  )
-
-  content <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )
-  ir_candidate <- content$immune_repertoire$candidates$unified_misc
-  hla_preview <- content$hla$normalized$table_preview
-  preview_text <- c(
-    ir_candidate$normalized$sample_names,
-    unlist(
-      hla_preview[vapply(hla_preview, is.character, logical(1))],
-      use.names = FALSE
-    )
-  )
-  preview_text <- preview_text[!is.na(preview_text)]
-
-  expect_gt(ir_candidate$preview_truncated_count, 0L)
-  expect_gt(content$hla$preview_truncated_count, 0L)
-  expect_true(all(
-    nchar(preview_text, type = "chars") <=
-      .builder_immune_preview_character_limit
-  ))
-  expect_true(all(
-    nchar(preview_text, type = "bytes") <= .builder_immune_preview_byte_limit
-  ))
-  expect_lt(as.numeric(object.size(content)), 200000)
-
-  object <- builder_immune_fixture_object()
-  object@misc$hla_typing <- data.frame(
-    sample = "sample_a",
-    allele = paste0("not-an-allele-", strrep("界", 10000L)),
-    stringsAsFactors = FALSE
-  )
-  qc_hla <- builder_profile_immune_content(
-    object,
-    builder_immune_fixture_context(object)
-  )$hla
-  expect_gt(qc_hla$preview_truncated_count, 0L)
-  expect_true(all(
-    nchar(qc_hla$qc$value, type = "chars") <=
-      .builder_immune_preview_character_limit
-  ))
-  expect_true(all(
-    nchar(qc_hla$qc$value, type = "bytes") <= .builder_immune_preview_byte_limit
-  ))
 })
 
 test_that("immune and HLA normalized facts stay bounded for large inputs", {

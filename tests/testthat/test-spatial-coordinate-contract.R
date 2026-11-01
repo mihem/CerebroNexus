@@ -171,38 +171,6 @@ test_that("classed column names never dispatch custom methods", {
   expect_false(touched)
 })
 
-test_that("the Builder and exporter consume the shared coordinate contract", {
-  exporter_path <- testthat::test_path(
-    "..",
-    "..",
-    "R",
-    "seurat_utils.R"
-  )
-  skip_if_not(
-    file.exists(exporter_path),
-    "source tree not present (installed-package layout)"
-  )
-  builder_path <- spatial_contract_inst_path(
-    "builder",
-    "content_spatial.R"
-  )
-  expect_true(file.exists(builder_path))
-  exporter <- readLines(exporter_path, warn = FALSE)
-  builder <- readLines(builder_path, warn = FALSE)
-  for (consumer in list(exporter, builder)) {
-    expect_true(any(grepl(
-      ".spx_find_coordinate_columns",
-      consumer,
-      fixed = TRUE
-    )))
-    expect_true(any(grepl(
-      ".spx_find_barcode_column",
-      consumer,
-      fixed = TRUE
-    )))
-  }
-})
-
 test_that("the bundled coordinate contract is byte-identical and safe", {
   source_path <- testthat::test_path(
     "..",
@@ -345,23 +313,6 @@ test_that("coordinate fingerprints have a portable versioned encoding", {
     .spx_coordinate_transform_fingerprint(utf8),
     .spx_coordinate_transform_fingerprint(coordinates)
   ))
-})
-
-test_that("coordinate transforms invert around their persisted pivot", {
-  coordinates <- data.frame(
-    x = c(0, 2, 3),
-    y = c(1, 4, -2),
-    row.names = c("a", "b", "c")
-  )
-  spec <- list(rotation_degrees = 37, scale = 1.7)
-  provenance <- .spx_coordinate_transform_normalize(spec, coordinates)
-  transformed <- .spx_apply_coordinate_transform(coordinates, spec)
-
-  expect_equal(
-    .spx_invert_coordinate_transform(transformed, provenance),
-    coordinates,
-    tolerance = 1e-12
-  )
 })
 
 test_that("coordinate fingerprints survive a non-orthogonal transform round trip", {

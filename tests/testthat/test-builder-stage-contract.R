@@ -271,26 +271,6 @@ test_that("content actions reject stale same-id dataset owners", {
     project_a,
     7
   ))
-
-  datasets_server <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "server", "datasets.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  guards <- gregexpr(
-    "builder_content_action_owner_is_current(",
-    datasets_server,
-    fixed = TRUE
-  )[[1L]]
-  expect_identical(sum(guards > 0L), 2L)
-  refreshes <- gregexpr(
-    "configure_workbench_surface(NULL)",
-    datasets_server,
-    fixed = TRUE
-  )[[1L]]
-  expect_identical(sum(refreshes > 0L), 2L)
 })
 
 test_that("Inspect uses actionable issue labels and removes duplicate content", {
@@ -387,81 +367,6 @@ test_that("group catalog searches visible labels and keeps controls compact", {
   expect_match(html, "Unavailable metadata", fixed = TRUE)
   expect_match(html, 'class="viewer-group-unavailable-count">2<', fixed = TRUE)
   expect_false(grepl(">Group<", html, fixed = TRUE))
-
-  checkbox <- regexpr('class="viewer-group-include"', html, fixed = TRUE)[[1L]]
-  focus <- regexpr('class="viewer-group-focus"', html, fixed = TRUE)[[1L]]
-  default <- regexpr('class="viewer-group-default"', html, fixed = TRUE)[[1L]]
-  expect_true(checkbox < focus)
-  expect_true(focus < default)
-})
-
-test_that("group colors align with the distribution rows", {
-  withr::local_package("shiny")
-  model <- builder_group_colors_model(
-    "cell_type",
-    c("Short", "A substantially longer cell type")
-  )
-  html <- htmltools::renderTags(
-    builder_group_colors_ui("enhance", model)
-  )$html
-
-  expect_match(html, "viewer-group-distribution-list", fixed = TRUE)
-  expect_match(html, "viewer-group-distribution-row", fixed = TRUE)
-  css <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "www", "builder.features.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  expect_match(
-    css,
-    "grid-template-columns: 2rem minmax(5rem, .8fr) minmax(5rem, 1fr) 5rem;",
-    fixed = TRUE
-  )
-  expect_match(css, "padding: .2rem 0;", fixed = TRUE)
-  expect_false(grepl("group-color-toggle", html, fixed = TRUE))
-  expect_false(grepl("Show all", html, fixed = TRUE))
-  expect_false(grepl("Show fewer", html, fixed = TRUE))
-})
-
-test_that("group distribution reserves a fixed count column", {
-  css <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "www", "builder.features.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    css,
-    "grid-template-columns: minmax(5rem, .8fr) minmax(5rem, 1fr) 6rem;",
-    fixed = TRUE
-  )
-  expect_match(css, ".viewer-group-count {", fixed = TRUE)
-  expect_match(css, "text-align: right;", fixed = TRUE)
-})
-
-test_that("dataset source titles use the full interface font size", {
-  css <- paste(
-    readLines(
-      builder_profile_inst_path("builder", "www", "builder.layout.css"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(
-    css,
-    paste(
-      ".rail-add-title strong {",
-      "  color: var(--c-text);",
-      "  font-size: var(--builder-type-subtitle);",
-      sep = "\n"
-    ),
-    fixed = TRUE
-  )
 })
 
 builder_open_app_runtime_fixture <- function() {

@@ -218,12 +218,6 @@ builder_profile_embeddings_fixture <- function(mode = "valid") {
   list(embeddings = embeddings, expected = cells)
 }
 
-builder_profile_legacy_assay <- function() {
-  SeuratObject::CreateAssayObject(
-    counts = builder_profile_matrix(paste0("cell", seq_len(6L)))
-  )
-}
-
 builder_profile_reduction_object <- function(names) {
   cells <- paste0("cell", seq_len(6L))
   object <- SeuratObject::CreateSeuratObject(builder_profile_matrix(cells))

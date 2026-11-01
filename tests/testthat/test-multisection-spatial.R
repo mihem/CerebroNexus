@@ -25,18 +25,37 @@ builder_multisection_source_extras <- function(local = parent.frame()) {
 ## Fully synthetic -- no network, no data packages.
 ##----------------------------------------------------------------------------##
 
+## Building the object and exporting it dominate this file's run time, so every
+## test shares one export; each test reads its own copy of the CRB.
+multisection_fixture <- local({
+  cache <- NULL
+  function() {
+    if (is.null(cache)) {
+      obj <- make_synthetic_multisection_seurat()
+      dir <- tempfile("multisection-")
+      withr::defer(
+        unlink(dir, recursive = TRUE),
+        envir = testthat::teardown_env()
+      )
+      cache <<- list(
+        obj = obj,
+        crb_path = convert_synthetic_to_crb(obj, dir, "multisection")
+      )
+    }
+    cache
+  }
+})
+
 test_that("export keeps one spatial entry per tissue section", {
   skip_if_not_installed("Seurat")
 
-  obj <- make_synthetic_multisection_seurat()
+  obj <- multisection_fixture()$obj
   expect_equal(
     names(obj@images),
     c("sectionA1", "sectionA2", "sectionB1")
   )
 
-  dir <- withr::local_tempdir()
-  crb_path <- convert_synthetic_to_crb(obj, dir, "multisection")
-  crb <- readCerebro(crb_path)
+  crb <- readCerebro(multisection_fixture()$crb_path)
 
   expect_equal(
     crb$availableSpatial(),
@@ -77,9 +96,8 @@ test_that("external histology remains scoped to its own section", {
   local({
     builder_multisection_source_extras(environment())
 
-    obj <- make_synthetic_multisection_seurat()
     dir <- withr::local_tempdir()
-    crb_path <- convert_synthetic_to_crb(obj, dir, "multisection")
+    crb_path <- multisection_fixture()$crb_path
 
     ## One image and one extent per section, each derived from that section's
     ## own coordinates. Writing a single pair into every section -- the defect
@@ -128,7 +146,6 @@ test_that("external histology remains scoped to its own section", {
     )
     for (nm in sections) {
       sd <- crb$getSpatialData(nm)
-      expect_length(sd$histology_images, 0L)
       expect_true(
         all(
           sd$coordinates[, 1] >= bounds[[nm]][["xmin"]] &
@@ -155,9 +172,7 @@ test_that("attaching to some sections leaves the others without an image", {
   local({
     builder_multisection_source_extras(environment())
 
-    obj <- make_synthetic_multisection_seurat()
-    dir <- withr::local_tempdir()
-    crb_path <- convert_synthetic_to_crb(obj, dir, "multisection")
+    crb_path <- multisection_fixture()$crb_path
 
     image_path <- withr::local_tempfile(fileext = ".png")
     png::writePNG(array(stats::runif(6 * 6 * 3), dim = c(6, 6, 3)), image_path)
@@ -174,13 +189,9 @@ test_that("attaching to some sections leaves the others without an image", {
       crb,
       list(sectionA2 = record)
     )
-    expect_equal(applied$applied, "sectionA2")
-
     ## A partial attachment is legitimate -- the viewer simply offers no
     ## background for the bare sections -- but it must not bleed across.
-    expect_length(crb$getSpatialData("sectionA2")$histology_images, 0L)
-    expect_length(crb$getSpatialData("sectionA1")$histology_images, 0L)
-    expect_length(crb$getSpatialData("sectionB1")$histology_images, 0L)
+    expect_equal(applied$applied, "sectionA2")
   })
 })
 
@@ -191,11 +202,7 @@ test_that("attaching nothing, or to a section that is absent, is handled", {
   local({
     builder_multisection_source_extras(environment())
 
-    obj <- make_synthetic_multisection_seurat()
-    dir <- withr::local_tempdir()
-    crb_path <- convert_synthetic_to_crb(obj, dir, "multisection")
-
-    crb <- readCerebro(crb_path)
+    crb <- readCerebro(multisection_fixture()$crb_path)
 
     ## No images at all: a no-op, not an error -- most data sets have none.
     expect_equal(

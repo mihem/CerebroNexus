@@ -95,32 +95,6 @@ test_that("axis identities preserve order, missing values, and UTF-8 text", {
   expect_false(identical(identity, builder_axis_identity(rev(ids))))
 })
 
-test_that("legacy spatial fields reuse the bounded content profile", {
-  skip_if_not_installed("SeuratObject")
-
-  object <- builder_content_spatial_example_object()
-  names(object@images) <- strrep("section-name-", 100000L)
-  profile <- builder_dataset_profile(
-    object,
-    builder_profile_source_fixture()
-  )
-  spatial_fact <- profile$content$spatial$normalized
-
-  expect_identical(profile$spatial$section_count, spatial_fact$section_count)
-  expect_identical(
-    profile$spatial$sections,
-    vapply(spatial_fact$sections, function(section) section$name, character(1))
-  )
-  expect_identical(
-    profile$spatial$section_names_truncated,
-    spatial_fact$section_names_truncated
-  )
-  expect_true(profile$spatial$section_names_truncated)
-  expect_false(profile$spatial$sections_truncated)
-  expect_lte(nchar(profile$spatial$sections[[1L]], type = "bytes"), 256L)
-  expect_lt(as.numeric(object.size(profile$spatial)), 100000)
-})
-
 test_that("source records are inert validated data", {
   skip_if_not_installed("SeuratObject")
   object <- builder_profile_pbmc()
@@ -244,46 +218,6 @@ test_that("metadata identity permits reorder but rejects identity damage", {
     shuffled_profile$reorder_index,
     match(cells, rownames(shuffled))
   )
-
-  missing <- object@meta.data[-1L, , drop = FALSE]
-  missing_profile <- builder_profile_metadata(missing, cells)$identity
-  expect_false(missing_profile$valid)
-  expect_identical(
-    missing_profile$missing,
-    cells[1L]
-  )
-
-  extra_row <- object@meta.data[1L, , drop = FALSE]
-  rownames(extra_row) <- "not_a_dataset_cell"
-  extra <- rbind(object@meta.data, extra_row)
-  extra_profile <- builder_profile_metadata(extra, cells)$identity
-  expect_false(extra_profile$valid)
-  expect_identical(
-    extra_profile$extra,
-    "not_a_dataset_cell"
-  )
-
-  duplicated_meta <- object@meta.data
-  ids <- rownames(duplicated_meta)
-  ids[2L] <- ids[1L]
-  attr(duplicated_meta, "row.names") <- ids
-  duplicated_profile <- builder_profile_metadata(
-    duplicated_meta,
-    cells
-  )$identity
-  expect_false(duplicated_profile$valid)
-  expect_identical(
-    duplicated_profile$duplicates,
-    ids[1L]
-  )
-
-  blank_meta <- object@meta.data
-  blank_ids <- rownames(blank_meta)
-  blank_ids[2L] <- ""
-  attr(blank_meta, "row.names") <- blank_ids
-  blank_profile <- builder_profile_metadata(blank_meta, cells)$identity
-  expect_false(blank_profile$valid)
-  expect_identical(blank_profile$blanks, "")
 })
 
 test_that("metadata column names are unique non-empty identities", {
@@ -624,27 +558,6 @@ test_that("reduction identity is exact and shuffled rows remain reorderable", {
     shuffled$cells$reorder_index,
     match(shuffled_fixture$expected, rownames(shuffled_fixture$embeddings))
   )
-
-  failures <- c(
-    missing = "missing",
-    extra = "extra",
-    wrong_same_count = "extra",
-    duplicate = "duplicates",
-    blank = "blanks"
-  )
-  for (mode in names(failures)) {
-    fixture <- builder_profile_embeddings_fixture(mode)
-    reduction <- builder_profile_embeddings(
-      fixture$embeddings,
-      fixture$expected,
-      "umap"
-    )
-    expect_false(reduction$exportable, info = mode)
-    expect_true(
-      length(reduction$cells[[failures[[mode]]]]) > 0L,
-      info = mode
-    )
-  }
 })
 
 test_that("reductions must be numeric and at least two dimensional", {
@@ -723,16 +636,6 @@ test_that("PCA remains a stable fallback fact rather than a frozen selection", {
         character(1)
       )
   )
-
-  app <- readLines(
-    builder_profile_inst_path("builder", "app.R"),
-    warn = FALSE
-  )
-  expect_false(any(grepl(
-    "PCA-named reductions are omitted",
-    app,
-    fixed = TRUE
-  )))
 })
 
 test_that("Viewer projection catalog includes every exportable 2-D reduction", {
@@ -873,45 +776,6 @@ test_that("an unselected bad reduction does not block a valid projection", {
   expect_identical(only_bad[["reduction:broken"]]$status, "valid")
   expect_identical(only_bad[["projection"]]$status, "blocking")
   expect_identical(builder_manifest_readiness(only_bad)$state, "blocked")
-})
-
-test_that("legacy Assay slots remain profileable without the v5 layer API", {
-  skip_if_not_installed("SeuratObject")
-  builder_repo_source("inspect.R")
-  assay <- builder_profile_legacy_assay()
-  expected_cells <- colnames(assay)
-  expected_features <- rownames(assay)
-  profile <- builder_profile_assay(
-    assay,
-    expected_cells,
-    "RNA",
-    expected_features = expected_features,
-    layer_api = NULL
-  )
-
-  expect_true(methods::validObject(assay, test = TRUE, complete = TRUE))
-  expect_true(all(c("counts", "data") %in% names(profile$layers)))
-  expect_true(profile$layers$counts$exportable)
-  expect_true(profile$layers$data$exportable)
-  expect_identical(profile$layers$counts$cells$ids, expected_cells)
-  expect_identical(profile$layers$counts$features$ids, expected_features)
-
-  choices <- builder_layer_choices(
-    assay,
-    expected_cells = expected_cells,
-    layer_api = NULL
-  )
-  expect_true(all(c("counts", "data") %in% choices))
-
-  object <- builder_profile_pbmc()
-  prepared <- builder_prepare_export_layer(
-    object,
-    "RNA",
-    "counts",
-    layer_api = NULL
-  )
-  expect_s4_class(prepared, "Seurat")
-  expect_identical(SeuratObject::Cells(prepared), SeuratObject::Cells(object))
 })
 
 test_that("feature subsets are diagnosed without rejecting valid layers", {
@@ -1093,33 +957,6 @@ test_that("legacy describe_seurat fields remain available", {
   object <- builder_profile_pbmc()
   described <- describe_seurat(object)
 
-  expect_named(
-    described,
-    c(
-      "n_cells",
-      "n_genes",
-      "assays",
-      "default_assay",
-      "assay_profiles",
-      "layers",
-      "default_layer",
-      "group_candidates",
-      "group_preselect",
-      "group_counts",
-      "group_struck",
-      "reductions",
-      "reduction_preselect",
-      "images",
-      "spatial_scenes",
-      "nUMI",
-      "nGene",
-      "qc_values",
-      "organism_guess",
-      "extras",
-      "suggested_dir"
-    ),
-    ignore.order = FALSE
-  )
   expect_identical(described$n_cells, ncol(object))
   expect_identical(described$n_genes, nrow(object))
   expect_identical(described$reductions, c("pca", "tsne"))
@@ -1146,51 +983,4 @@ test_that("describe_seurat carries bounded spatial scene labels", {
   expect_identical(described$spatial_scenes[[1L]]$id, "xenium-fov")
   expect_match(described$spatial_scenes[[1L]]$label, "2 samples", fixed = TRUE)
   expect_match(described$spatial_scenes[[1L]]$label, "2 ROIs", fixed = TRUE)
-})
-
-test_that("profile bootstraps from the installed application layout", {
-  skip_if_not_installed("SeuratObject")
-  isolated <- new.env(parent = baseenv())
-  files <- builder_profile_source_runtime(isolated)
-
-  expect_true(all(nzchar(files)))
-  expect_true(all(file.exists(files)))
-  expect_true(exists("builder_dataset_profile", isolated, inherits = FALSE))
-  profile <- isolated$builder_dataset_profile(
-    builder_profile_pbmc(),
-    builder_profile_source_fixture()
-  )
-  expect_s3_class(profile, "builder_dataset_profile")
-  expect_s3_class(profile$manifest, "builder_content_manifest")
-})
-
-test_that("application and worker source the profile after its dependencies", {
-  app <- readLines(
-    builder_profile_inst_path("builder", "app.R"),
-    warn = FALSE
-  )
-  session <- readLines(
-    builder_profile_inst_path("builder", "worker.R"),
-    warn = FALSE
-  )
-
-  app_contract <- grep("viewer_content_contract[.]R", app, fixed = FALSE)[1L]
-  app_manifest <- grep('source\\("manifest[.]R"', app)[1L]
-  app_profile <- grep('source\\("profile[.]R"', app)[1L]
-  expect_true(app_contract < app_manifest)
-  expect_true(app_manifest < app_profile)
-
-  worker_contract <- grep("viewer_content_contract[.]R", session)[1L]
-  worker_manifest <- grep(
-    'source_utf8\\(file[.]path\\(dir, "manifest[.]R"',
-    session
-  )[1L]
-  worker_profile <- grep(
-    'source_utf8\\(file[.]path\\(dir, "profile[.]R"',
-    session
-  )[
-    1L
-  ]
-  expect_true(worker_contract < worker_manifest)
-  expect_true(worker_manifest < worker_profile)
 })

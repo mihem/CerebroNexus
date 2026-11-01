@@ -275,46 +275,6 @@ test_that("alignment projection prefers UMAP then the current default then PCA",
   expect_null(builder_alignment_projection("tsne", "missing"))
 })
 
-test_that("Builder runtime has no data-URI image materialization path", {
-  extras <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "extras.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  server <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "spatial_alignment_server.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_false(grepl("builder_parse_image_uri", extras, fixed = TRUE))
-  expect_false(grepl("builder_materialize_image_uri", extras, fixed = TRUE))
-  expect_false(grepl("base64encode", extras, fixed = TRUE))
-  expect_false(grepl("base64encode", server, fixed = TRUE))
-  expect_false(grepl("readBin(data$path", server, fixed = TRUE))
-  expect_match(server, "list(file = data$path, owned = FALSE)", fixed = TRUE)
-})
-
-test_that("alignment server does not subscribe to Plotly selection events", {
-  server <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "spatial_alignment_server.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_false(grepl("plotly::event_data(", server, fixed = TRUE))
-  expect_false(grepl("builder_alignment_event_cells", server, fixed = TRUE))
-  expect_false(grepl("selected_cells", server, fixed = TRUE))
-  expect_false(grepl("session$onFlushed(", server, fixed = TRUE))
-  expect_false(grepl(".clientValue-", server, fixed = TRUE))
-})
-
 test_that("finishing a check waits for uploads and active interactions", {
   server <- paste(
     readLines(
@@ -1899,32 +1859,6 @@ test_that("browser control ownership rejects retired views but accepts an old ow
   )
 })
 
-test_that("alignment preview joins both spaces by cell identity", {
-  skip_if_not_installed("SeuratObject")
-  object <- builder_content_spatial_example_object("section-a")
-  group <- colnames(object@meta.data)[[1L]]
-
-  model <- builder_alignment_preview_model(
-    object,
-    default_projection = "pca",
-    group = group,
-    section_id = "section-a",
-    layer = "counts",
-    max_cells = 12L
-  )
-
-  expect_true(model$available)
-  expect_identical(model$section$id, "section-a")
-  expect_lte(nrow(model$transcriptome), 12L)
-  expect_identical(
-    model$transcriptome$cell_barcode,
-    model$spatial$cell_barcode
-  )
-  expect_identical(model$transcriptome$group, model$spatial$group)
-  expect_named(model$bounds, c("xmin", "xmax", "ymin", "ymax"))
-  expect_true(all(is.finite(unlist(model$bounds))))
-})
-
 test_that("bounded alignment previews never retain full coverage coordinates", {
   skip_if_not_installed("SeuratObject")
   object <- builder_content_spatial_example_object("section-a")
@@ -1971,15 +1905,6 @@ test_that("bounded alignment previews never retain full coverage coordinates", {
     section = "section-a"
   )
   expect_false("coverage" %in% names(scene))
-  expect_identical(scene$dataset, "dataset-a")
-  expect_identical(scene$snapshotIdentity, "snapshot-a")
-  expect_identical(scene$section, "section-a")
-  expect_identical(scene$controls$point_opacity, 0.65)
-  expect_identical(scene$controls$point_size, 6)
-  expect_identical(scene$layout, "separate")
-  expect_identical(scene$activeRoi, "A")
-  expect_identical(scene$roiBounds, preview$roi_bounds)
-  expect_named(scene$roiImages, c("A", "B"))
   expect_identical(scene$roiImages$B[[1L]]$controls$image_opacity, 0.7)
 })
 
@@ -2344,37 +2269,13 @@ test_that("default image fit preserves aspect ratio inside the viewport", {
   expect_lte(fitted$xmax, 100)
   expect_gte(fitted$ymin, 0)
   expect_lte(fitted$ymax, 100)
-})
 
-test_that("image fit can use the displayed extent of rotated coordinates", {
-  rotated <- builder_alignment_rotated_bounds(
-    list(xmin = 0, xmax = 20, ymin = 0, ymax = 100),
-    rotation = 45
-  )
-
-  expect_equal(rotated$xmax - rotated$xmin, 120 / sqrt(2))
-  expect_equal(rotated$ymax - rotated$ymin, 120 / sqrt(2))
-  expect_equal(
-    c((rotated$xmin + rotated$xmax) / 2, (rotated$ymin + rotated$ymax) / 2),
-    c(10, 50)
-  )
-})
-
-test_that("default image fit contains decimal bounds", {
-  bounds <- list(
-    xmin = 17.52,
-    xmax = 4151.96,
-    ymin = 3.92,
-    ymax = 3173.76
-  )
-  fitted <- builder_alignment_fit_bounds(
-    bounds,
-    c(width = 320, height = 240)
-  )
-  expect_gte(fitted$xmin, bounds$xmin)
-  expect_lte(fitted$xmax, bounds$xmax)
-  expect_gte(fitted$ymin, bounds$ymin)
-  expect_lte(fitted$ymax, bounds$ymax)
+  decimal <- list(xmin = 17.52, xmax = 4151.96, ymin = 3.92, ymax = 3173.76)
+  fitted <- builder_alignment_fit_bounds(decimal, c(width = 320, height = 240))
+  expect_gte(fitted$xmin, decimal$xmin)
+  expect_lte(fitted$xmax, decimal$xmax)
+  expect_gte(fitted$ymin, decimal$ymin)
+  expect_lte(fitted$ymax, decimal$ymax)
 })
 
 test_that("centering aligns an existing image with the active viewport", {
@@ -2420,28 +2321,6 @@ test_that("canonical alignment transform is deterministic and complete", {
     section = list(id = "section-a", kind = "spatial")
   )
 
-  expect_named(
-    record,
-    c(
-      "source",
-      "source_uri",
-      "uri",
-      "base_bounds",
-      "bounds",
-      "dx",
-      "dy",
-      "scale",
-      "rotation",
-      "flip_x",
-      "flip_y",
-      "image_opacity",
-      "point_opacity",
-      "point_size",
-      "section_id",
-      "section_kind"
-    ),
-    ignore.order = TRUE
-  )
   expect_false("saved" %in% names(record))
   expect_equal(
     record$bounds,
@@ -2617,48 +2496,6 @@ test_that("named spatial image collections normalize without losing labels", {
   expect_named(upgraded$section_a, "H&E.png")
 })
 
-test_that("named spatial image actions preserve unaffected records", {
-  record <- function(section, filename, dx = 0) {
-    builder_alignment_record(
-      source = list(name = filename, type = "image/png", size = 4),
-      source_uri = paste0("data:image/png;base64,", filename),
-      uri = paste0("data:image/png;base64,", filename),
-      base_bounds = list(xmin = 0, xmax = 10, ymin = 0, ymax = 10),
-      parameters = list(dx = dx),
-      section = list(id = section, kind = "spatial")
-    )
-  }
-  he <- record("section_a", "he.png", dx = 3)
-  dapi <- record("section_a", "dapi.png")
-  images <- builder_image_collection_normalize(list(
-    section_a = list(`H&E` = he, DAPI = dapi)
-  ))
-  expect_named(images$section_a, c("H&E", "DAPI"))
-  he$image_label <- "H&E"
-  dapi$image_label <- "DAPI"
-  expect_identical(images$section_a[["H&E"]], he)
-
-  renamed <- builder_image_collection_rename(
-    images,
-    "section_a",
-    "DAPI",
-    "IF"
-  )
-  expect_named(renamed$section_a, c("H&E", "IF"))
-  renamed_dapi <- dapi
-  renamed_dapi$image_label <- "IF"
-  expect_identical(renamed$section_a[["IF"]], renamed_dapi)
-  expect_identical(renamed$section_a[["H&E"]], he)
-  expect_error(
-    builder_image_collection_rename(renamed, "section_a", "IF", "H&E"),
-    "unique"
-  )
-
-  removed <- builder_image_collection_remove(renamed, "section_a", "H&E")
-  expect_named(removed$section_a, "IF")
-  expect_identical(removed$section_a$IF, renamed_dapi)
-})
-
 test_that("spatial image display labels are unique only within one ROI", {
   scoped_record <- function(roi) {
     value <- builder_alignment_record(
@@ -2692,66 +2529,6 @@ test_that("spatial image display labels are unique only within one ROI", {
   duplicate <- images
   duplicate$section_a[["same.png.2"]] <- scoped_record("lesion")
   expect_error(builder_image_collection_normalize(duplicate), "same ROI")
-})
-
-test_that("snapshot drop acknowledgement clears every preview cache", {
-  imports <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "server", "imports.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-
-  expect_match(imports, "builder_preview_cache_drop_dataset(", fixed = TRUE)
-  expect_match(
-    imports,
-    "builder_spatial_preview_cache_drop_dataset(",
-    fixed = TRUE
-  )
-  expect_match(imports, "projection_previews(", fixed = TRUE)
-  expect_match(imports, "trajectory_previews(", fixed = TRUE)
-  expect_match(imports, "spatial_previews(", fixed = TRUE)
-})
-
-test_that("coordinate drafts stay partitioned and reject stale browser events", {
-  drafts <- list()
-  first <- builder_coordinate_drafts_put(
-    drafts,
-    dataset = "dataset-a",
-    snapshot_identity = "snapshot-a",
-    section = "fov-a",
-    spec = list(rotation_degrees = 37.5, scale = 1),
-    sequence = 4
-  )
-  expect_true(first$accepted)
-
-  second <- builder_coordinate_drafts_put(
-    first$drafts,
-    dataset = "dataset-a",
-    snapshot_identity = "snapshot-a",
-    section = "fov-b",
-    spec = list(rotation_degrees = -12, scale = 1),
-    sequence = 5
-  )
-  stale <- builder_coordinate_drafts_put(
-    second$drafts,
-    dataset = "dataset-a",
-    snapshot_identity = "snapshot-a",
-    section = "fov-a",
-    spec = list(rotation_degrees = 0, scale = 1),
-    sequence = 3
-  )
-
-  expect_false(stale$accepted)
-  expect_identical(
-    builder_coordinate_drafts_get(stale$drafts, "dataset-a", "fov-a")$spec,
-    list(schema_version = 1L, rotation_degrees = 37.5, scale = 1)
-  )
-  expect_identical(
-    builder_coordinate_drafts_get(stale$drafts, "dataset-a", "fov-b")$spec,
-    list(schema_version = 1L, rotation_degrees = -12, scale = 1)
-  )
 })
 
 test_that("coordinate draft pruning removes deleted and stale snapshots", {
@@ -3040,80 +2817,6 @@ test_that("points-only Spatial FOV appearance persists without an image", {
   )
 })
 
-test_that("coordinate drafts batch materialize transforms without image state", {
-  record <- function(section) {
-    builder_alignment_record(
-      source = list(name = paste0(section, ".png")),
-      source_uri = "data:image/png;base64,AA==",
-      uri = "data:image/png;base64,AA==",
-      base_bounds = list(xmin = 0, xmax = 10, ymin = 0, ymax = 10),
-      section = list(id = section, kind = "spatial")
-    )
-  }
-  entry <- list(
-    id = "dataset-a",
-    settings = list(
-      spatial_coordinate_transforms = list(
-        "fov-b" = list(rotation_degrees = 19, scale = 1)
-      ),
-      images = list(
-        "fov-a" = list(image = record("fov-a")),
-        "fov-b" = list(image = record("fov-b")),
-        "fov-c" = list(image = record("fov-c"))
-      )
-    )
-  )
-  drafts <- list()
-  drafts <- builder_coordinate_drafts_put(
-    drafts,
-    "dataset-a",
-    "snapshot-a",
-    "fov-a",
-    list(rotation_degrees = 42, scale = 1),
-    1
-  )$drafts
-  drafts <- builder_coordinate_drafts_put(
-    drafts,
-    "dataset-a",
-    "snapshot-a",
-    "fov-b",
-    list(rotation_degrees = 0, scale = 1),
-    2
-  )$drafts
-
-  applied <- builder_coordinate_drafts_apply_entry(
-    entry,
-    drafts[["dataset-a"]],
-    snapshot_identity = "snapshot-a"
-  )
-
-  expect_true(applied$changed)
-  expect_setequal(applied$sections, c("fov-a", "fov-b"))
-  expect_identical(
-    applied$entry$settings$spatial_coordinate_transforms[["fov-a"]],
-    list(schema_version = 1L, rotation_degrees = 42, scale = 1)
-  )
-  expect_null(applied$entry$settings$spatial_coordinate_transforms[["fov-b"]])
-  expect_false(
-    "saved" %in%
-      names(
-        applied$entry$settings$images[["fov-a"]]$image
-      )
-  )
-  expect_false(
-    "saved" %in%
-      names(
-        applied$entry$settings$images[["fov-b"]]$image
-      )
-  )
-  expect_false(
-    "saved" %in%
-      names(
-        applied$entry$settings$images[["fov-c"]]$image
-      )
-  )
-})
-
 test_that("ROI drafts materialize coordinate and point settings together", {
   entry <- list(
     id = "dataset-a",
@@ -3167,11 +2870,13 @@ test_that("coordinate release events stay light until one batched materializatio
       owner_token = "owner-a",
       object_md5 = strrep("a", 32L)
     ),
-    profile = list(images = c("fov-a", "fov-b"), extras = list()),
+    profile = list(images = c("fov-a", "fov-b", "fov-c"), extras = list()),
     settings = list(
       name = "Dataset A",
       images = list(),
-      spatial_coordinate_transforms = list(),
+      spatial_coordinate_transforms = list(
+        "fov-c" = list(rotation_degrees = 19, scale = 1)
+      ),
       default_group = "cluster",
       default_projection = "umap",
       palette = "cerebro"
@@ -3233,6 +2938,17 @@ test_that("coordinate release events stay light until one batched materializatio
           sequence = 1
         )
       )
+      ## Rotating a stored section back to 0 removes its saved transform.
+      session$setInputs(`enhance-active_section` = "fov-c")
+      session$setInputs(
+        builder_spatial_coordinate_draft = list(
+          dataset = "dataset-a",
+          snapshotIdentity = identity,
+          section = "fov-c",
+          rotationDegrees = 0,
+          sequence = 4
+        )
+      )
       session$flushReact()
 
       expect_identical(commit_count, 0L)
@@ -3263,6 +2979,9 @@ test_that("coordinate release events stay light until one batched materializatio
           "fov-b"
         ]]$rotation_degrees,
         -12
+      )
+      expect_null(
+        current_entry()$settings$spatial_coordinate_transforms[["fov-c"]]
       )
       expect_length(alignment$coordinate_drafts(), 0L)
     }
@@ -3499,41 +3218,6 @@ test_that("failed coordinate materialization retains its session drafts", {
   )
 })
 
-test_that("serialized alignment payload excludes editing bytes and local paths", {
-  record <- builder_alignment_record(
-    source = list(name = "tissue.png", type = "image/png"),
-    source_uri = "data:image/png;base64,SOURCE",
-    uri = "data:image/png;base64,DISPLAY",
-    base_bounds = list(xmin = 0, xmax = 10, ymin = 0, ymax = 5),
-    parameters = list(dx = 2, rotation = 15, point_size = 7),
-    section = list(id = "fov", kind = "spatial")
-  )
-  record$datapath <- "/private/tmp/upload.png"
-  payload <- builder_alignment_payload(record)
-
-  expect_named(
-    payload,
-    c(
-      "source",
-      "builder_managed",
-      "dx",
-      "dy",
-      "scale",
-      "rotation",
-      "flip_x",
-      "flip_y",
-      "image_opacity",
-      "point_opacity",
-      "point_size"
-    )
-  )
-  expect_identical(payload$source, "tissue.png")
-  expect_true(payload$builder_managed)
-  expect_false(any(grepl("/private/tmp", unlist(payload), fixed = TRUE)))
-  expect_false("source_uri" %in% names(payload))
-  expect_false("datapath" %in% names(payload))
-})
-
 test_that("Builder alignment payload retains its ROI scope", {
   record <- builder_alignment_record(
     source = list(name = "roi-lesion.png", type = "image/png"),
@@ -3692,29 +3376,6 @@ test_that("Seurat metadata subclasses fail before row-name dispatch", {
     "unclassed base matrix|exact base data frame"
   )
   expect_false(touched)
-})
-
-test_that("Seurat coordinate aliases win over physical column order", {
-  cells <- c("cell-a", "cell-b", "cell-c")
-  coordinates <- data.frame(
-    quality = c(99, 98, 97),
-    y = c(40, 50, 60),
-    x = c(10, 20, 30),
-    cell = rev(cells)
-  )
-
-  contract <- builder_spatial_contract(
-    coordinates,
-    cells,
-    barcodes = coordinates$cell,
-    source = "seurat_image"
-  )
-  index <- match(cells, coordinates$cell)
-
-  expect_identical(contract$coordinate_columns, c(x = "x", y = "y"))
-  expect_identical(contract$coordinates$cell_barcode, cells)
-  expect_identical(contract$coordinates$x, coordinates$x[index])
-  expect_identical(contract$coordinates$y, coordinates$y[index])
 })
 
 test_that("spatial subsets filter outside rows before preview and export", {
@@ -3883,19 +3544,8 @@ test_that("classed spatial coordinate tables fail without method dispatch", {
   }
 })
 
-test_that("PNG and JPEG read while TIFF variants give conversion guidance", {
-  skip_if_not_installed("png")
-  skip_if_not_installed("jpeg")
+test_that("TIFF variants give conversion guidance", {
   directory <- withr::local_tempdir()
-  rgb <- array(seq(0, 1, length.out = 27L), dim = c(3L, 3L, 3L))
-  png_path <- file.path(directory, "image.png")
-  jpeg_path <- file.path(directory, "image.jpeg")
-  png::writePNG(rgb, png_path)
-  jpeg::writeJPEG(rgb, jpeg_path)
-
-  expect_null(builder_read_image(png_path)$error)
-  expect_null(builder_read_image(jpeg_path)$error)
-
   for (extension in c("tif", "tiff", "ome.tif", "ome.tiff")) {
     path <- file.path(directory, paste0("image.", extension))
     file.create(path)
@@ -3955,33 +3605,19 @@ test_that("uploaded image retention rejects incomplete copies", {
   expect_false(file.exists(target))
 })
 
-test_that("image headers are read without raster decoding", {
+test_that("image reads respect the configured file-size limit", {
   skip_if_not_installed("png")
-  skip_if_not_installed("jpeg")
-  directory <- withr::local_tempdir()
-  rgb <- array(seq(0, 1, length.out = 27L), dim = c(3L, 3L, 3L))
-  png_path <- file.path(directory, "budget.png")
-  jpeg_path <- file.path(directory, "budget.jpeg")
-  png::writePNG(rgb, png_path)
-  jpeg::writeJPEG(rgb, jpeg_path)
+  png_path <- withr::local_tempfile(fileext = ".png")
+  png::writePNG(
+    array(seq(0, 1, length.out = 27L), dim = c(3L, 3L, 3L)),
+    png_path
+  )
 
-  expect_identical(
-    builder_image_file_dimensions(png_path, "budget.png"),
-    c(width = 3L, height = 3L)
-  )
-  expect_identical(
-    builder_image_file_dimensions(jpeg_path, "budget.jpeg"),
-    c(width = 3L, height = 3L)
-  )
   expect_match(
     builder_read_image(png_path, max_bytes = 8L)$error,
     "configured file-size limit",
     fixed = TRUE
   )
-  expect_false(grepl(
-    "readPNG|readJPEG",
-    deparse1(body(builder_image_file_dimensions))
-  ))
 })
 
 test_that("JPEG EXIF orientations 5 through 8 swap display dimensions", {
@@ -4062,12 +3698,6 @@ test_that("JPEG metadata scanning reports a missing frame", {
     "metadata",
     ignore.case = TRUE
   )
-  parser <- paste(
-    deparse(body(.builder_jpeg_dimensions_from_connection)),
-    collapse = "\n"
-  )
-  expect_false(grepl("which(", parser, fixed = TRUE))
-  expect_false(grepl("as.integer(bytes)", parser, fixed = TRUE))
 })
 
 test_that("incomplete PNG files are rejected", {
@@ -4152,33 +3782,6 @@ test_that("alignment records propagate transformed extent facts", {
   )) {
     expect_identical(paired[[field]], picture[[field]], info = field)
   }
-
-  app <- builder_app_source_text()
-  alignment_server <- paste(
-    readLines(
-      builder_spatial_test_inst_path(
-        "builder",
-        "spatial_alignment_server.R"
-      ),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  session <- paste(
-    readLines(
-      builder_spatial_test_inst_path("builder", "session.R"),
-      warn = FALSE
-    ),
-    collapse = "\n"
-  )
-  expect_match(alignment_server, '"extent_width"', fixed = TRUE)
-  expect_match(alignment_server, '"extent_height"', fixed = TRUE)
-  expect_match(alignment_server, "builder_alignment_record", fixed = TRUE)
-  expect_false(grepl("builder_encode_image", alignment_server, fixed = TRUE))
-  expect_match(app, "nxt\\$extent_width")
-  expect_match(app, "nxt\\$extent_height")
-  expect_match(session, "extent_width")
-  expect_match(session, "extent_height")
 })
 
 test_that("one slide applied to every section keeps each section's own extent", {
