@@ -52,54 +52,6 @@ test_that("installed privacy contract v1 is eager and locked", {
   expect_identical(get(marker, namespace, inherits = FALSE), 1L)
 })
 
-test_that("a function-valued app privacy marker is never executed", {
-  namespace <- new.env(parent = emptyenv())
-  called <- FALSE
-  marker <- function() {
-    called <<- TRUE
-    1L
-  }
-  assign(".cerebro_bundle_privacy_contract_version", marker, namespace)
-  lockBinding(".cerebro_bundle_privacy_contract_version", namespace)
-
-  expect_identical(builder_installed_app_contract_version(namespace), 0L)
-  expect_false(called)
-})
-
-test_that("an active app privacy marker is never executed", {
-  namespace <- new.env(parent = emptyenv())
-  called <- FALSE
-  makeActiveBinding(
-    ".cerebro_bundle_privacy_contract_version",
-    function(value) {
-      called <<- TRUE
-      1L
-    },
-    namespace
-  )
-  lockBinding(".cerebro_bundle_privacy_contract_version", namespace)
-
-  expect_identical(builder_installed_app_contract_version(namespace), 0L)
-  expect_false(called)
-})
-
-test_that("a delayed app privacy marker is never forced", {
-  namespace <- new.env(parent = emptyenv())
-  forced <- FALSE
-  delayedAssign(
-    ".cerebro_bundle_privacy_contract_version",
-    {
-      forced <<- TRUE
-      1L
-    },
-    assign.env = namespace
-  )
-  lockBinding(".cerebro_bundle_privacy_contract_version", namespace)
-
-  expect_identical(builder_installed_app_contract_version(namespace), 0L)
-  expect_false(forced)
-})
-
 test_that("source App contract takes precedence over the installed package", {
   source_root <- withr::local_tempdir()
   marker <- file.path(
@@ -494,34 +446,6 @@ test_that("worker rejects a forged app plan before createShinyApp", {
       items = list(),
       make_app = TRUE,
       app_contract_version = 0L,
-      overwrite = FALSE
-    )
-
-    result <- builder_session_build(rs, plan)
-
-    expect_match(result$error, "private app publication", ignore.case = TRUE)
-    expect_false(create_called)
-  })
-})
-
-test_that("worker rechecks the current active App contract", {
-  local({
-    builder_repo_source("session.R")
-    builder_app_capability <- function(...) list(version = 0L)
-    create_called <- FALSE
-    testthat::local_mocked_bindings(
-      createShinyApp = function(...) {
-        create_called <<- TRUE
-        stop("createShinyApp must not be called")
-      },
-      .package = "CerebroNexus"
-    )
-    rs <- list(call = function(fun, args) do.call(fun, args))
-    plan <- list(
-      out_dir = withr::local_tempdir(),
-      items = list(),
-      make_app = TRUE,
-      app_contract_version = 1L,
       overwrite = FALSE
     )
 

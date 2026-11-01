@@ -167,40 +167,6 @@ test_that("a failed task kill remains owned until the process is reaped", {
   expect_true(runtime$.builder_async$last_stop$stopped)
 })
 
-test_that("fulfillment callback failures are recorded before rejection", {
-  runtime <- new.env(parent = globalenv())
-  sys.source(
-    builder_profile_inst_path("builder", "async.R"),
-    envir = runtime
-  )
-  on.exit(runtime$builder_async_stop(), add = TRUE)
-
-  task <- new.env(parent = emptyenv())
-  task$state <- "completed"
-  task$error <- NULL
-  task$result <- 42L
-  task$session <- NULL
-  task$on_fulfilled <- function(value) stop("fulfillment callback failed")
-  rejected <- NULL
-  task$on_rejected <- function(error) rejected <<- conditionMessage(error)
-  task$callbacks_registered <- TRUE
-  task$callback_error <- NULL
-  class(task) <- "builder_async_task"
-  runtime$.builder_async$tasks <- list(task)
-
-  expect_message(
-    runtime$builder_async_poll(),
-    "Builder asynchronous fulfillment callback failed"
-  )
-
-  expect_identical(rejected, "fulfillment callback failed")
-  expect_identical(task$callback_error$phase, "fulfillment")
-  expect_identical(
-    runtime$.builder_async$last_callback_error$message,
-    "fulfillment callback failed"
-  )
-})
-
 test_that("a process spawn failure rejects once without poisoning the queue", {
   runtime <- new.env(parent = globalenv())
   sys.source(

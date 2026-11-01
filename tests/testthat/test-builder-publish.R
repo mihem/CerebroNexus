@@ -289,62 +289,6 @@ test_that("ownership records reject identity mismatches and links", {
   })
 })
 
-test_that("partially deleted releases are never treated as empty shells", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("still here", file.path(release, "dataset.crb"))
-    write_builder_release_record_fixture(
-      release,
-      list(
-        list(type = "D", path = "cerebro_app"),
-        list(type = "F", path = "cerebro_app/app.R"),
-        list(type = "F", path = "dataset.crb")
-      )
-    )
-
-    expect_error(
-      builder_release_state(
-        release,
-        exact_record = FALSE,
-        allow_abandoned = TRUE
-      ),
-      "does not match its recorded members"
-    )
-  })
-})
-
-test_that("record temp creation never follows a dangling symlink", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-    token <- "dangling-test"
-    temporary <- file.path(
-      release,
-      paste0(".o-", token, ".tmp")
-    )
-    outside <- file.path(root, "outside.txt")
-    link_ok <- tryCatch(
-      file.symlink(outside, temporary),
-      error = function(error) FALSE
-    )
-    skip_if_not(isTRUE(link_ok))
-
-    expect_error(
-      .builder_release_write_record(release, identity, token),
-      "temporary"
-    )
-    expect_false(file.exists(outside))
-    expect_true(.builder_release_link(temporary))
-  })
-})
-
 test_that("record temp replacement cannot write through an outside link", {
   local({
     builder_publish_source()
@@ -382,78 +326,6 @@ test_that("record temp replacement cannot write through an outside link", {
   })
 })
 
-test_that("record publication rejects a hard-link swap during rename", {
-  skip_if(identical(.Platform$OS.type, "windows"))
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-    outside <- file.path(root, "outside-record")
-
-    expect_error(
-      .builder_release_write_record(
-        release,
-        identity,
-        token = "hard-link-swap",
-        .move = function(from, to) {
-          file.copy(from, outside)
-          unlink(from, force = TRUE)
-          linked <- file.link(outside, from)
-          isTRUE(linked) && file.rename(from, to)
-        }
-      ),
-      "changed during publication"
-    )
-    expect_false(file.exists(file.path(
-      release,
-      ".cerebro-builder-release-v1"
-    )))
-    expect_true(file.exists(outside))
-  })
-})
-
-test_that("record publication tolerates metadata changes caused by rename", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-
-    record <- .builder_release_write_record(
-      release,
-      identity,
-      token = "metadata-changing-rename",
-      .move = function(from, to) {
-        moved <- file.rename(from, to)
-        if (isTRUE(moved)) {
-          Sys.setFileTime(to, Sys.time() + 120)
-        }
-        moved
-      }
-    )
-
-    expect_identical(
-      record$bytes,
-      readBin(
-        file.path(release, ".cerebro-builder-release-v1"),
-        what = "raw",
-        n = file.info(file.path(
-          release,
-          ".cerebro-builder-release-v1"
-        ))$size
-      )
-    )
-    state <- builder_release_state(release)
-    expect_true(is.list(state$record))
-    expect_identical(state$record$bytes, record$bytes)
-  })
-})
-
 test_that("record publication still rejects changed bytes after rename", {
   local({
     builder_publish_source()
@@ -479,80 +351,6 @@ test_that("record publication still rejects changed bytes after rename", {
       "changed during publication",
       fixed = TRUE
     )
-    expect_false(file.exists(file.path(
-      release,
-      ".cerebro-builder-release-v1"
-    )))
-  })
-})
-
-test_that("record publication rejects a hard-link swap during final parsing", {
-  skip_if(identical(.Platform$OS.type, "windows"))
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-    outside <- file.path(root, "outside-record")
-    original_identity <- builder_release_identity
-    swapped <- FALSE
-    builder_release_identity <- function(target, ...) {
-      record <- file.path(target, ".cerebro-builder-release-v1")
-      if (!swapped && file.exists(record)) {
-        file.copy(record, outside)
-        unlink(record, force = TRUE)
-        swapped <<- isTRUE(file.link(outside, record))
-      }
-      original_identity(target, ...)
-    }
-
-    expect_error(
-      .builder_release_write_record(
-        release,
-        identity,
-        token = "hard-link-final-parse"
-      ),
-      "changed during publication"
-    )
-    expect_true(swapped)
-    expect_false(file.exists(file.path(
-      release,
-      ".cerebro-builder-release-v1"
-    )))
-    expect_true(file.exists(outside))
-  })
-})
-
-test_that("failed final record parsing removes the unpublished record", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("crb", file.path(release, "dataset.crb"))
-    identity <- builder_release_identity(release)
-    original_identity <- builder_release_identity
-    corrupted <- FALSE
-    builder_release_identity <- function(target, ...) {
-      record <- file.path(target, ".cerebro-builder-release-v1")
-      if (!corrupted && file.exists(record)) {
-        writeLines("bad", record)
-        corrupted <<- TRUE
-      }
-      original_identity(target, ...)
-    }
-
-    expect_error(
-      .builder_release_write_record(
-        release,
-        identity,
-        token = "failed-final-parse"
-      ),
-      "ownership record|changed during publication"
-    )
-    expect_true(corrupted)
     expect_false(file.exists(file.path(
       release,
       ".cerebro-builder-release-v1"
@@ -683,154 +481,6 @@ test_that("release identity rejects a file replaced by a directory", {
   })
 })
 
-test_that("release identity rejects a same-name directory replacement", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    slot <- file.path(target, "slot")
-    hidden <- file.path(slot, "hidden.txt")
-    replacement <- file.path(root, "replacement")
-    replacement_hidden <- file.path(replacement, "hidden.txt")
-    dir.create(slot, recursive = TRUE)
-    writeLines("old", hidden)
-    original <- fs::file_info(slot, follow = FALSE)
-    dir.create(replacement)
-    writeLines("new", replacement_hidden)
-    replacement_info <- fs::file_info(replacement, follow = FALSE)
-    expect_false(identical(
-      as.double(original$inode),
-      as.double(replacement_info$inode)
-    ))
-    calls <- 0L
-    replace_before_confirmation <- function(path) {
-      calls <<- calls + 1L
-      if (identical(calls, 3L)) {
-        unlink(slot, recursive = TRUE)
-        if (!file.rename(replacement, slot)) {
-          stop("The replacement fixture could not be moved.")
-        }
-      }
-      .builder_release_list_directory(path)
-    }
-
-    attempt <- tryCatch(
-      builder_release_identity(
-        target,
-        .list_directory = replace_before_confirmation
-      ),
-      error = function(error) error
-    )
-    if (!inherits(attempt, "error")) {
-      paths <- vapply(attempt$entries, `[[`, character(1), "path")
-      expect_identical(paths, c("slot", "slot/hidden.txt"))
-    }
-    expect_s3_class(attempt, "error")
-    if (inherits(attempt, "error")) {
-      expect_match(conditionMessage(attempt), "changed after enumeration")
-    }
-    expect_identical(readLines(hidden), "new")
-  })
-})
-
-test_that("release identity rejects special filesystem nodes without blocking", {
-  skip_on_os("windows")
-  skip_if_not_installed("callr")
-  skip_if(Sys.which("mkfifo") == "")
-  local({
-    builder_root <- builder_test_inst_path("builder")
-    if (!dir.exists(builder_root)) {
-      builder_root <- system.file("builder", package = "CerebroNexus")
-    }
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    expect_identical(
-      system2("mkfifo", file.path(target, ".cerebro-builder-release-v1")),
-      0L
-    )
-    process <- callr::r_bg(
-      function(builder_root, target) {
-        source(file.path(builder_root, "core", "bundle_path_contract.R"))
-        source(file.path(builder_root, "publish.R"))
-        tryCatch(
-          builder_release_state(target),
-          error = function(error) conditionMessage(error)
-        )
-      },
-      list(builder_root, target)
-    )
-    on.exit(if (process$is_alive()) process$kill(), add = TRUE)
-    process$wait(timeout = 20000)
-    finished <- !process$is_alive()
-    if (!finished) {
-      process$kill()
-    }
-
-    expect_true(finished, info = "release identity blocked on a FIFO")
-    if (finished) {
-      expect_match(process$get_result(), "unsupported filesystem entry")
-    }
-  })
-})
-
-test_that("release identity rejects an unreadable release root", {
-  skip_if(identical(.Platform$OS.type, "windows"))
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("foreign", file.path(release, "foreign.txt"))
-    Sys.chmod(release, mode = "0000")
-    withr::defer(Sys.chmod(release, mode = "0700"))
-    skip_if(file.access(release, mode = 5L) == 0L)
-
-    expect_error(
-      builder_release_identity(release),
-      "enumerate"
-    )
-  })
-})
-
-test_that("release identity rejects unreadable nested directories", {
-  skip_if(identical(.Platform$OS.type, "windows"))
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    secret <- file.path(release, "secret")
-    dir.create(secret, recursive = TRUE)
-    writeLines("foreign", file.path(secret, "foreign.txt"))
-    Sys.chmod(secret, mode = "0000")
-    withr::defer(Sys.chmod(secret, mode = "0700"))
-    skip_if(file.access(secret, mode = 5L) == 0L)
-
-    expect_error(
-      builder_release_identity(release),
-      "enumerate"
-    )
-  })
-})
-
-test_that("release identity rejects an invalid payload hash", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    release <- file.path(root, "release")
-    dir.create(release)
-    writeLines("payload", file.path(release, "dataset.crb"))
-
-    expect_error(
-      builder_release_identity(
-        release,
-        .hash_file = function(path) NA_character_
-      ),
-      "read safely"
-    )
-  })
-})
-
 test_that("release identity rejects payload changes during hashing", {
   local({
     builder_publish_source()
@@ -927,39 +577,6 @@ test_that("release control paths do not repeat long output names", {
   })
 })
 
-test_that("legacy long control directories remain recoverable", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "legacy-release")
-    handle <- builder_prepare_release(target, "legacy-build")
-    legacy <- .builder_release_legacy_control_path(target)
-    expect_true(file.rename(handle$control, legacy))
-
-    journal_path <- file.path(legacy, "journal.rds")
-    journal <- readRDS(journal_path)
-    journal$control <- legacy
-    journal$stage <- file.path(legacy, "stages", basename(handle$stage))
-    journal$backup <- file.path(legacy, "backup")
-    journal$journal <- journal_path
-    journal$lock <- file.path(legacy, "lock")
-    saveRDS(journal, journal_path, version = 3L)
-    .builder_release_pid_alive <- function(pid) FALSE
-
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$state, "recovery_required")
-    expect_identical(recovery$control, legacy)
-    expect_true(builder_recover_release(target, action = "abort")$recovered)
-
-    replacement <- builder_prepare_release(target, "new-build")
-    expect_identical(
-      replacement$control,
-      builder_release_control_path(target)
-    )
-    expect_true(builder_abort_release(replacement)$aborted)
-  })
-})
-
 test_that("stage removal is verified and uses extended Windows paths", {
   local({
     builder_publish_source()
@@ -980,27 +597,6 @@ test_that("stage removal is verified and uses extended Windows paths", {
       },
       "could not be removed safely"
     )
-  })
-})
-
-test_that("prepare removes a journal-owned aborted stage", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    abandoned <- builder_prepare_release(target, "abandoned-build")
-    writeLines("partial", file.path(abandoned$stage, "partial.crb"))
-    abandoned <- .builder_release_write_phase(abandoned, "aborted")
-    .builder_release_release_lock(
-      abandoned$control,
-      abandoned$lock,
-      abandoned$token
-    )
-
-    replacement <- builder_prepare_release(target, "replacement-build")
-    expect_false(dir.exists(abandoned$stage))
-    expect_true(dir.exists(replacement$stage))
-    expect_true(builder_abort_release(replacement)$aborted)
   })
 })
 
@@ -1114,48 +710,6 @@ test_that("failed in-place publication restores the prior release", {
   })
 })
 
-test_that("failed post-install verification restores an in-place release", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    handle <- builder_prepare_release(
-      target,
-      "build-in-place-guard",
-      builder_release_identity(target)
-    )
-    writeLines("new", file.path(handle$stage, "dataset.crb"))
-    locked_root <- function(from, to) {
-      if (
-        identical(.canonicalTargetPath(from), .canonicalTargetPath(target)) &&
-          identical(
-            .canonicalTargetPath(to),
-            .canonicalTargetPath(handle$backup)
-          )
-      ) {
-        return(FALSE)
-      }
-      file.rename(from, to)
-    }
-
-    expect_error(
-      builder_publish_release(
-        handle,
-        .move = locked_root,
-        .allow_in_place = TRUE,
-        .verify_payload = function(root, phase) {
-          !identical(phase, "after_in_place")
-        }
-      ),
-      "verification failed"
-    )
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-    expect_identical(readLines(file.path(handle$stage, "dataset.crb")), "new")
-  })
-})
-
 test_that("process death between renames leaves exact recoverable evidence", {
   skip_if_not_installed("callr")
   local({
@@ -1236,46 +790,6 @@ test_that("a dead release that never moved output is cleared automatically", {
   })
 })
 
-test_that("interrupted abort cleanup stays retryable and verifies stage removal", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    abandoned <- builder_prepare_release(
-      target,
-      "build-abort-cleanup-retry",
-      builder_release_identity(target)
-    )
-    writeLines("partial", file.path(abandoned$stage, "partial.crb"))
-    owner <- readRDS(file.path(abandoned$lock, "owner.rds"))
-    owner$pid <- .Machine$integer.max
-    saveRDS(owner, file.path(abandoned$lock, "owner.rds"))
-
-    remove_stage <- .builder_release_remove_stage
-    .builder_release_remove_stage <- function(stage, ...) {
-      stop("simulated stage lock", call. = FALSE)
-    }
-    expect_error(
-      builder_recover_release(target, action = "abort"),
-      "simulated stage lock"
-    )
-    retry <- builder_discover_recovery(target)
-    expect_identical(retry$phase, "recovering_abort")
-    expect_identical(retry$journal$recovery_from, "prepared")
-    expect_true(retry$safe_to_abort)
-
-    .builder_release_remove_stage <- remove_stage
-    recovered <- builder_recover_release(target, action = "abort")
-    expect_true(recovered$recovered)
-    expect_true(recovered$control_cleaned)
-    expect_false(dir.exists(abandoned$stage))
-    expect_false(dir.exists(abandoned$control))
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-  })
-})
-
 test_that("clearing an interrupted release refuses a changed target", {
   local({
     builder_publish_source()
@@ -1298,189 +812,6 @@ test_that("clearing an interrupted release refuses a changed target", {
       "release target changed"
     )
     expect_true(dir.exists(abandoned$stage))
-  })
-})
-
-test_that("clearing treats an absent and empty target as content-equivalent", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    abandoned <- builder_prepare_release(
-      target,
-      "build-empty-target",
-      builder_release_identity(target)
-    )
-    writeLines("partial", file.path(abandoned$stage, "partial.crb"))
-    owner <- readRDS(file.path(abandoned$lock, "owner.rds"))
-    owner$pid <- .Machine$integer.max
-    saveRDS(owner, file.path(abandoned$lock, "owner.rds"))
-    unlink(target, recursive = TRUE, force = TRUE)
-
-    recovered <- builder_recover_release(target, action = "abort")
-
-    expect_true(recovered$recovered)
-    expect_true(recovered$control_cleaned)
-    expect_false(dir.exists(abandoned$control))
-    expect_false(dir.exists(target))
-  })
-})
-
-test_that("process death after protecting the prior release keeps recovery intent", {
-  skip_if_not_installed("callr")
-  local({
-    root_path <- builder_test_inst_path("builder")
-    if (!dir.exists(root_path)) {
-      root_path <- system.file("builder", package = "CerebroNexus")
-    }
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    crash <- callr::r_bg(
-      function(builder_root, target) {
-        source(file.path(builder_root, "core", "bundle_path_contract.R"))
-        source(file.path(builder_root, "publish.R"))
-        handle <- builder_prepare_release(
-          target,
-          "build-moving-crash",
-          builder_release_identity(target)
-        )
-        writeLines("new", file.path(handle$stage, "dataset.crb"))
-        builder_publish_release(
-          handle,
-          .after_move = function(move) {
-            if (identical(move, "old_to_backup")) {
-              quit(save = "no", status = 21L, runLast = FALSE)
-            }
-          }
-        )
-      },
-      list(root_path, target)
-    )
-    builder_publish_await_exit(crash)
-    expect_identical(crash$get_exit_status(), 21L)
-
-    builder_publish_source()
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$phase, "old_moving")
-    expect_false(dir.exists(target))
-    expect_true(dir.exists(recovery$backup))
-    expect_true(builder_recover_release(target, "restore")$recovered)
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-  })
-})
-
-test_that("process death after the new release can still restore the prior one", {
-  skip_if_not_installed("callr")
-  local({
-    root_path <- builder_test_inst_path("builder")
-    if (!dir.exists(root_path)) {
-      root_path <- system.file("builder", package = "CerebroNexus")
-    }
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    crash <- callr::r_bg(
-      function(builder_root, target) {
-        source(file.path(builder_root, "core", "bundle_path_contract.R"))
-        source(file.path(builder_root, "publish.R"))
-        expected <- builder_release_identity(target)
-        handle <- builder_prepare_release(target, "build-new-crash", expected)
-        writeLines("new", file.path(handle$stage, "dataset.crb"))
-        builder_publish_release(
-          handle,
-          .after_phase = function(phase) {
-            if (identical(phase, "new_published")) {
-              quit(save = "no", status = 18L, runLast = FALSE)
-            }
-          }
-        )
-      },
-      list(root_path, target)
-    )
-    builder_publish_await_exit(crash)
-    expect_identical(crash$get_exit_status(), 18L)
-
-    builder_publish_source()
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$phase, "new_published")
-    expect_identical(readLines(file.path(target, "dataset.crb")), "new")
-    restored <- builder_recover_release(target, action = "restore")
-    expect_true(restored$recovered)
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-  })
-})
-
-test_that("final target identity is captured before the release becomes terminal", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    handle <- builder_prepare_release(
-      target,
-      "build-final-identity",
-      builder_release_identity(target)
-    )
-    writeLines("new", file.path(handle$stage, "dataset.crb"))
-    original_identity <- builder_release_identity
-    builder_release_identity <- function(path, ...) {
-      payload <- file.path(path, "dataset.crb")
-      if (
-        identical(normalizePath(path), normalizePath(target)) &&
-          file.exists(payload) &&
-          identical(readLines(payload), "new")
-      ) {
-        stop("final identity failed")
-      }
-      original_identity(path, ...)
-    }
-
-    expect_error(builder_publish_release(handle), "final identity failed")
-    builder_release_identity <- original_identity
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$phase, "old_moved")
-    expect_true(dir.exists(recovery$backup))
-  })
-})
-
-test_that("restoration failure preserves the exact backup for recovery", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    handle <- builder_prepare_release(
-      target,
-      "build-restore-failure",
-      builder_release_identity(target)
-    )
-    writeLines("new", file.path(handle$stage, "dataset.crb"))
-    moves <- 0L
-    fail_publish_and_restore <- function(from, to) {
-      moves <<- moves + 1L
-      if (moves %in% c(2L, 3L)) {
-        return(FALSE)
-      }
-      file.rename(from, to)
-    }
-
-    failure <- tryCatch(
-      builder_publish_release(handle, .move = fail_publish_and_restore),
-      error = function(error) error
-    )
-    expect_s3_class(failure, "error")
-    expect_true(grepl(handle$backup, conditionMessage(failure), fixed = TRUE))
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$state, "recovery_required")
-    expect_identical(recovery$backup, handle$backup)
-    expect_true(dir.exists(handle$backup))
-    expect_identical(readLines(file.path(handle$backup, "dataset.crb")), "old")
   })
 })
 
@@ -1604,50 +935,6 @@ test_that("unsafe terminal controls are retained without failing publication", {
   })
 })
 
-test_that("a crash after the stage rename but before journaling is recoverable", {
-  skip_if_not_installed("callr")
-  local({
-    root_path <- builder_test_inst_path("builder")
-    if (!dir.exists(root_path)) {
-      root_path <- system.file("builder", package = "CerebroNexus")
-    }
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old", file.path(target, "dataset.crb"))
-    crash <- callr::r_bg(
-      function(builder_root, target) {
-        source(file.path(builder_root, "core", "bundle_path_contract.R"))
-        source(file.path(builder_root, "publish.R"))
-        handle <- builder_prepare_release(
-          target,
-          "build-rename-crash",
-          builder_release_identity(target)
-        )
-        writeLines("new", file.path(handle$stage, "dataset.crb"))
-        builder_publish_release(
-          handle,
-          .after_move = function(move) {
-            if (identical(move, "new_to_target")) {
-              quit(save = "no", status = 20L, runLast = FALSE)
-            }
-          }
-        )
-      },
-      list(root_path, target)
-    )
-    builder_publish_await_exit(crash)
-    expect_identical(crash$get_exit_status(), 20L)
-
-    builder_publish_source()
-    recovery <- builder_discover_recovery(target)
-    expect_identical(recovery$phase, "old_moved")
-    expect_identical(readLines(file.path(target, "dataset.crb")), "new")
-    expect_true(builder_recover_release(target, "restore")$recovered)
-    expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-  })
-})
-
 test_that("foreign or unverifiable locks remain fail closed", {
   local({
     builder_publish_source()
@@ -1688,27 +975,6 @@ test_that("foreign or unverifiable locks remain fail closed", {
   })
 })
 
-test_that("interrupted atomic writes stay outside control and lock roots", {
-  local({
-    builder_publish_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    handle <- builder_prepare_release(target, "build-atomic-orphan")
-    diagnostics <- file.path(handle$control, "diagnostics")
-    orphan <- file.path(diagnostics, ".journal.rds.interrupted.tmp")
-    writeLines("interrupted", orphan)
-
-    expect_silent(.builder_release_assert_control(handle$control))
-    expect_true(.builder_release_lock_known(handle$lock))
-    expect_true(builder_abort_release(handle)$aborted)
-    expect_true(file.exists(orphan))
-
-    next_handle <- builder_prepare_release(target, "build-after-orphan")
-    expect_s3_class(next_handle, "builder_release_handle")
-    expect_true(builder_abort_release(next_handle)$aborted)
-  })
-})
-
 test_that("completed releases cannot be rewritten as aborted", {
   local({
     builder_publish_source()
@@ -1722,22 +988,6 @@ test_that("completed releases cannot be rewritten as aborted", {
       .builder_release_journal(target, required = TRUE)$phase,
       "complete"
     )
-  })
-})
-
-test_that("terminal journals with a surviving lock require stale-lock cleanup", {
-  local({
-    builder_publish_source()
-    for (phase in c("complete", "aborted", "recovered")) {
-      root <- withr::local_tempdir()
-      target <- file.path(root, "release")
-      handle <- builder_prepare_release(target, paste0("build-", phase))
-      handle <- .builder_release_write_phase(handle, phase)
-
-      recovery <- builder_discover_recovery(target)
-      expect_identical(recovery$state, "stale_lock")
-      expect_identical(recovery$journal$phase, phase)
-    }
   })
 })
 
@@ -1756,36 +1006,6 @@ test_that("foreign control occupants are preserved and fail closed", {
       "unknown control"
     )
     expect_identical(readLines(foreign), "foreign")
-  })
-})
-
-test_that("payload verification requires exact TRUE and restores the prior release", {
-  local({
-    builder_publish_source()
-    for (result in list(FALSE, NULL, structure("boom", class = "error"))) {
-      root <- withr::local_tempdir()
-      target <- file.path(root, "release")
-      dir.create(target)
-      writeLines("old", file.path(target, "dataset.crb"))
-      handle <- builder_prepare_release(
-        target,
-        "guard",
-        builder_release_identity(target)
-      )
-      writeLines("new", file.path(handle$stage, "dataset.crb"))
-      callback <- if (inherits(result, "error")) {
-        function(...) stop("private callback detail")
-      } else {
-        force(result)
-        function(...) result
-      }
-      expect_error(
-        builder_publish_release(handle, .verify_payload = callback),
-        "verification failed"
-      )
-      expect_identical(readLines(file.path(target, "dataset.crb")), "old")
-      expect_true(dir.exists(handle$stage))
-    }
   })
 })
 

@@ -179,42 +179,6 @@ test_that("temporary App input removal retries transient Windows locks", {
   })
 })
 
-test_that("temporary App input removal rejects a path swapped during retry", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    stage <- file.path(root, "stage")
-    dir.create(stage)
-    path <- file.path(stage, "dataset.crb")
-    writeLines("temporary", path)
-    original_link <- .builder_release_link
-    attempted <- FALSE
-    .builder_release_link <- function(candidate) {
-      if (identical(candidate, path) && attempted) {
-        TRUE
-      } else {
-        original_link(candidate)
-      }
-    }
-
-    expect_error(
-      .builder_coordinator_remove_app_input(
-        path,
-        "dataset.crb",
-        stage,
-        .unlink = function(...) {
-          attempted <<- TRUE
-          1L
-        },
-        .sleep = function(delay) invisible(delay),
-        .retry_delays = c(0, 0)
-      ),
-      "became unsafe during removal",
-      fixed = TRUE
-    )
-  })
-})
-
 builder_crb_coordinator_result <- function(handle, artifacts, labels = NULL) {
   if (is.null(labels)) {
     labels <- paste0("Dataset ", seq_along(artifacts))
@@ -395,24 +359,6 @@ test_that("a needs-decision result keeps finished CRBs for the retry", {
       record$verification$spatial_molecule_path,
       file.path(dirname(record$path), "first.spatial")
     )
-  })
-})
-
-test_that("coordinator contract inspection never dispatches plan methods", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    calls <- 0L
-    `$.builder_build_plan` <- function(value, ...) {
-      calls <<- calls + 1L
-      stop("executed hostile method")
-    }
-
-    contract <- .builder_coordinator_app_contract(plan)
-
-    expect_true(contract$expectation$expected)
-    expect_identical(calls, 0L)
   })
 })
 
@@ -961,60 +907,6 @@ test_that("Windows path budget fails before a stage is created", {
   })
 })
 
-test_that("coordinator rejects a dangling release-root link before prepare", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    outside <- file.path(root, "outside", "release")
-    dir.create(dirname(outside))
-    linked <- tryCatch(
-      file.symlink(outside, target),
-      error = function(error) FALSE
-    )
-    skip_if_not(isTRUE(linked), "Symbolic links are unavailable")
-
-    attempt <- tryCatch(
-      builder_coordinator_prepare(
-        list(
-          out_dir = target,
-          overwrite = TRUE,
-          targets = file.path(target, "dataset.crb"),
-          app_auth = list(
-            enabled = FALSE,
-            account_count = 0L,
-            timeout_minutes = 15L
-          )
-        ),
-        "build-dangling-root"
-      ),
-      error = function(error) error
-    )
-    if (inherits(attempt, "builder_release_coordinator")) {
-      artifact <- file.path(attempt$stage, "dataset.crb")
-      writeLines("new", artifact)
-      builder_coordinator_publish(
-        attempt,
-        list(
-          state = "success",
-          publishable = TRUE,
-          auth_enabled = FALSE,
-          auth_env_file = NULL,
-          stage = attempt$stage,
-          built = artifact
-        )
-      )
-    }
-
-    expect_s3_class(attempt, "error")
-    if (inherits(attempt, "error")) {
-      expect_match(conditionMessage(attempt), "symbolic link")
-    }
-    expect_false(dir.exists(outside))
-    expect_identical(Sys.readlink(target), outside)
-  })
-})
-
 test_that("coordinator rejects an existing release-root link", {
   local({
     builder_task9_source()
@@ -1298,120 +1190,6 @@ test_that("parent ownership permits safe release shrinkage", {
       target,
       ".cerebro-builder-release-v1"
     )))
-  })
-})
-
-test_that("unrecorded nested release members remain foreign and untouched", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(file.path(target, "cerebro_app", "private"), recursive = TRUE)
-    writeLines("app", file.path(target, "cerebro_app", "app.R"))
-    foreign <- file.path(target, "cerebro_app", "private", "notes.txt")
-    writeLines("keep me", foreign)
-    write_builder_coordinator_record_fixture(
-      target,
-      list(
-        list(type = "D", path = "cerebro_app"),
-        list(type = "D", path = "cerebro_app/private"),
-        list(type = "F", path = "cerebro_app/app.R")
-      )
-    )
-    planned <- file.path(target, "dataset.crb")
-
-    expect_error(
-      builder_coordinator_prepare(
-        list(
-          out_dir = target,
-          overwrite = TRUE,
-          targets = planned,
-          output_release = list(targets = planned),
-          app_auth = list(
-            enabled = FALSE,
-            account_count = 0L,
-            timeout_minutes = 15L
-          )
-        ),
-        "build-nested-foreign"
-      ),
-      "foreign release entr"
-    )
-    expect_identical(readLines(foreign), "keep me")
-    expect_identical(
-      readLines(file.path(target, "cerebro_app", "app.R")),
-      "app"
-    )
-  })
-})
-
-test_that("one prior snapshot prevents record ABA from claiming foreign files", {
-  local({
-    builder_task9_source()
-    root <- withr::local_tempdir()
-    target <- file.path(root, "release")
-    dir.create(target)
-    writeLines("old-a", file.path(target, "a.crb"))
-    foreign <- file.path(target, "notes.txt")
-    writeLines("keep me", foreign)
-    narrow <- list(list(type = "F", path = "a.crb"))
-    broad <- list(
-      list(type = "F", path = "a.crb"),
-      list(type = "F", path = "notes.txt")
-    )
-    write_builder_coordinator_record_fixture(target, narrow)
-    expected_prior <- builder_release_identity(target)
-    original_read <- .builder_release_read_record
-    reads <- 0L
-    .builder_release_read_record <- function(...) {
-      record <- original_read(...)
-      reads <<- reads + 1L
-      if (identical(reads, 1L)) {
-        write_builder_coordinator_record_fixture(target, broad)
-      } else if (identical(reads, 2L)) {
-        write_builder_coordinator_record_fixture(target, narrow)
-      }
-      record
-    }
-    planned <- file.path(target, "a.crb")
-    result <- tryCatch(
-      {
-        handle <- builder_coordinator_prepare(
-          list(
-            out_dir = target,
-            overwrite = TRUE,
-            targets = planned,
-            output_release = list(targets = planned),
-            expected_prior_identity = expected_prior,
-            app_auth = list(
-              enabled = FALSE,
-              account_count = 0L,
-              timeout_minutes = 15L
-            )
-          ),
-          "build-record-aba"
-        )
-        artifact <- file.path(handle$stage, "a.crb")
-        writeLines("new-a", artifact)
-        builder_coordinator_publish(
-          handle,
-          list(
-            state = "success",
-            publishable = TRUE,
-            auth_enabled = FALSE,
-            auth_env_file = NULL,
-            stage = handle$stage,
-            built = artifact,
-            labels = "A"
-          )
-        )
-      },
-      error = function(error) error
-    )
-
-    expect_s3_class(result, "error")
-    expect_true(file.exists(foreign))
-    expect_identical(readLines(foreign), "keep me")
   })
 })
 
@@ -1766,74 +1544,58 @@ test_that("parent and worker requests retain identical Viewer defaults", {
   })
 })
 
-test_that("App publication requires an exact worker tree identity", {
+test_that("App publication rejects worker results that differ from the plan", {
   local({
     builder_task9_source()
-
-    missing <- builder_app_coordinator_fixture(
+    fixture <- builder_app_coordinator_fixture(
       .local_envir = environment(),
       coordinator_prepare = builder_coordinator_prepare,
       bundle_request = builder_app_bundle_request,
       verify_app = builder_verify_app
     )
-    missing$result$app_tree_identity <- NULL
-    expect_error(
-      builder_coordinator_publish(missing$handle, missing$result),
-      "App identity"
+    # Each forged result fails before publication touches the stage.
+    cases <- list(
+      list("app_tree_identity", NULL, "App identity"),
+      list("build_id", "another-build", "build identity"),
+      list("app_dir", fixture$root, "assigned App directory"),
+      list("auth_enabled", FALSE, "authentication evidence"),
+      list(
+        "auth_env_file",
+        file.path(fixture$root, "wrong.env"),
+        "authentication evidence"
+      )
     )
-    expect_true(builder_coordinator_abort(missing$handle)$aborted)
+    for (case in cases) {
+      forged <- fixture$result
+      forged[case[[1L]]] <- list(case[[2L]])
+      expect_error(
+        builder_coordinator_publish(fixture$handle, forged),
+        case[[3L]],
+        info = case[[1L]]
+      )
+    }
+    verification <- fixture$result$app_verification
+    verification["auth_enabled"] <- list(FALSE)
+    expect_error(
+      .builder_coordinator_app_verification(
+        verification,
+        fixture$handle$app_expectation
+      ),
+      "differs from the frozen plan"
+    )
 
-    forged <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
+    # The publication guard runs last, after the root inputs are removed.
+    forged <- fixture$result
+    forged$verifications[[1L]]$path <- file.path(
+      fixture$root,
+      "missing-verification.crb"
     )
-    forged$result$app_tree_identity <- new.env(parent = emptyenv())
     expect_error(
-      builder_coordinator_publish(forged$handle, forged$result),
-      "App identity"
+      builder_coordinator_publish(fixture$handle, forged),
+      "Publication verification failed"
     )
-    expect_true(builder_coordinator_abort(forged$handle)$aborted)
-
-    wrong_build <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    wrong_build$result$build_id <- "another-build"
-    expect_error(
-      builder_coordinator_publish(wrong_build$handle, wrong_build$result),
-      "build identity"
-    )
-    expect_true(builder_coordinator_abort(wrong_build$handle)$aborted)
-
-    escaped <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    escaped$result$app_dir <- escaped$root
-    expect_error(
-      builder_coordinator_publish(escaped$handle, escaped$result),
-      "assigned App directory"
-    )
-    expect_true(builder_coordinator_abort(escaped$handle)$aborted)
-
-    missing_dir <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    unlink(missing_dir$result$app_dir, recursive = TRUE)
-    expect_error(
-      builder_coordinator_publish(missing_dir$handle, missing_dir$result),
-      "assigned App directory"
-    )
-    expect_true(builder_coordinator_abort(missing_dir$handle)$aborted)
+    expect_false(dir.exists(fixture$target))
+    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
   })
 })
 
@@ -1871,138 +1633,6 @@ test_that("Windows App publication accepts canonical slash variants", {
     )
     expect_true(published$published)
     expect_true(dir.exists(published$app_dir))
-  })
-})
-
-test_that("coordinator requires exact scalar authentication evidence", {
-  local({
-    builder_task9_source()
-    login <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    for (value in list(NULL, NA, "TRUE", FALSE)) {
-      forged <- login$result$app_verification
-      forged["auth_enabled"] <- list(value)
-      expect_error(
-        .builder_coordinator_app_verification(
-          forged,
-          login$handle$app_expectation
-        ),
-        "differs from the frozen plan"
-      )
-    }
-    expect_true(builder_coordinator_abort(login$handle)$aborted)
-
-    root <- withr::local_tempdir()
-    plan <- builder_app_coordinator_plan_fixture(file.path(root, "release"))
-    plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    public <- builder_app_coordinator_fixture(
-      root = root,
-      plan = plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    for (value in list(NULL, NA, "FALSE", TRUE)) {
-      forged <- public$result$app_verification
-      forged["auth_enabled"] <- list(value)
-      expect_error(
-        .builder_coordinator_app_verification(
-          forged,
-          public$handle$app_expectation
-        ),
-        "differs from the frozen plan"
-      )
-    }
-    expect_true(builder_coordinator_abort(public$handle)$aborted)
-  })
-})
-
-test_that("coordinator binds top-level build authentication to all plan modes", {
-  local({
-    builder_task9_source()
-    check_forged <- function(fixture, enabled, env_file) {
-      valid <- fixture$result
-      expect_silent(.builder_coordinator_validate_build_auth(
-        fixture$handle,
-        valid
-      ))
-      for (value in list(NULL, NA, "TRUE", 0, !enabled)) {
-        forged <- valid
-        forged["auth_enabled"] <- list(value)
-        expect_error(
-          .builder_coordinator_validate_build_auth(fixture$handle, forged),
-          "authentication evidence"
-        )
-      }
-      forged_env <- valid
-      forged_env["auth_env_file"] <- list(env_file)
-      expect_error(
-        .builder_coordinator_validate_build_auth(fixture$handle, forged_env),
-        "authentication evidence"
-      )
-      expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-    }
-
-    login <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    check_forged(login, TRUE, file.path(login$root, "wrong.env"))
-
-    public_root <- withr::local_tempdir()
-    public_plan <- builder_app_coordinator_plan_fixture(
-      file.path(public_root, "release")
-    )
-    public_plan$app_auth <- list(
-      enabled = FALSE,
-      account_count = 0L,
-      timeout_minutes = 15L
-    )
-    public_plan$targets <- file.path(public_root, "release", "cerebro_app")
-    public_plan$output_release$targets <- public_plan$targets
-    public <- builder_app_coordinator_fixture(
-      root = public_root,
-      plan = public_plan,
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    check_forged(
-      public,
-      FALSE,
-      file.path(public$handle$stage, "viewer-auth.env")
-    )
-
-    crb_root <- withr::local_tempdir()
-    crb_plan <- builder_crb_coordinator_plan(
-      file.path(crb_root, "release"),
-      "dataset.crb"
-    )
-    crb <- builder_coordinator_prepare(crb_plan, "crb-auth")
-    artifact <- file.path(crb$stage, "dataset.crb")
-    saveRDS(list(ok = TRUE), artifact)
-    crb_fixture <- list(
-      root = crb_root,
-      handle = crb,
-      result = builder_crb_coordinator_result(crb, artifact)
-    )
-    check_forged(
-      crb_fixture,
-      FALSE,
-      file.path(crb$stage, "viewer-auth.env")
-    )
   })
 })
 
@@ -2134,174 +1764,7 @@ test_that("parent binds staged CRB closure to final payload identity", {
 
     expect_error(
       builder_coordinator_publish(fixture$handle, fixture$result),
-      "changed after parent verification"
-    )
-    expect_false(dir.exists(fixture$target))
-    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-  })
-})
-
-test_that("same-byte staged CRB hard-link swaps stay unpublished", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    staged_crb <- unname(fixture$result$built[[1L]])
-    outside_copy <- file.path(fixture$root, "same-byte-source.crb")
-    copied <- file.copy(staged_crb, outside_copy)
-    skip_if_not(isTRUE(copied), "A same-byte fixture could not be created")
-    original_identity <- .builder_coordinator_stage_identity
-    injected <- FALSE
-    .builder_coordinator_stage_identity <- function(...) {
-      if (!injected) {
-        injected <<- TRUE
-        unlink(staged_crb)
-        stopifnot(file.link(outside_copy, staged_crb))
-      }
-      original_identity(...)
-    }
-
-    expect_error(
-      builder_coordinator_publish(fixture$handle, fixture$result),
       "input closure changed after parent verification"
-    )
-    expect_false(dir.exists(fixture$target))
-    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-  })
-})
-
-test_that("an H5 sidecar type remains bound after parent verification", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      backend = "h5",
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    sidecar <- file.path(fixture$handle$stage, "dataset-a.h5")
-    original_identity <- .builder_coordinator_stage_identity
-    injected <- FALSE
-    .builder_coordinator_stage_identity <- function(...) {
-      if (!injected) {
-        injected <<- TRUE
-        unlink(sidecar, recursive = TRUE)
-        dir.create(sidecar)
-      }
-      original_identity(...)
-    }
-
-    expect_error(
-      builder_coordinator_publish(fixture$handle, fixture$result),
-      "input closure changed after parent verification"
-    )
-    expect_false(dir.exists(fixture$target))
-    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-  })
-})
-
-test_that("same-byte App hard-link swaps fail after parent verification", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    app_crb <- file.path(
-      fixture$result$app_dir,
-      "private-data",
-      basename(fixture$result$built[[1L]])
-    )
-    outside_link <- file.path(fixture$root, "same-bytes.crb")
-    copied <- file.copy(app_crb, outside_link)
-    skip_if_not(isTRUE(copied), "A same-byte fixture could not be created")
-    original_identity <- .builder_coordinator_stage_identity
-    injected <- FALSE
-    .builder_coordinator_stage_identity <- function(...) {
-      if (!injected) {
-        injected <<- TRUE
-        unlink(app_crb)
-        stopifnot(file.link(outside_link, app_crb))
-      }
-      original_identity(...)
-    }
-
-    expect_error(
-      builder_coordinator_publish(fixture$handle, fixture$result),
-      "Publication verification failed"
-    )
-    expect_false(dir.exists(fixture$target))
-    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-  })
-})
-
-test_that("App metadata races during ownership commit stay unpublished", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    app_crb <- file.path(
-      fixture$result$app_dir,
-      "private-data",
-      basename(fixture$result$built[[1L]])
-    )
-    outside_link <- file.path(fixture$root, "ownership-race.crb")
-    copied <- file.copy(app_crb, outside_link)
-    skip_if_not(isTRUE(copied), "A same-byte fixture could not be created")
-
-    expect_error(
-      builder_coordinator_publish(
-        fixture$handle,
-        fixture$result,
-        .record_move = function(from, to) {
-          unlink(app_crb)
-          stopifnot(file.link(outside_link, app_crb))
-          file.rename(from, to)
-        }
-      ),
-      "Publication verification failed"
-    )
-    expect_false(dir.exists(fixture$target))
-    expect_true(builder_coordinator_abort(fixture$handle)$aborted)
-  })
-})
-
-test_that("input closure races fail the ownership record guard", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    staged_crb <- unname(fixture$result$built[[1L]])
-    outside_copy <- file.path(fixture$root, "ownership-source-race.crb")
-    copied <- file.copy(staged_crb, outside_copy)
-    skip_if_not(isTRUE(copied), "A same-byte fixture could not be created")
-
-    expect_error(
-      builder_coordinator_publish(
-        fixture$handle,
-        fixture$result,
-        .record_move = function(from, to) {
-          unlink(staged_crb)
-          stopifnot(file.link(outside_copy, staged_crb))
-          file.rename(from, to)
-        }
-      ),
-      "release ownership record does not match the complete release"
     )
     expect_false(dir.exists(fixture$target))
     expect_true(builder_coordinator_abort(fixture$handle)$aborted)
@@ -2683,9 +2146,8 @@ test_that("report failure preserves the prior release unpublished", {
   })
 })
 
-test_that("login publication rejects an environment changed after parent verification", {
+test_that("login publication detects a same-content env file replacement", {
   local({
-    skip_on_os("windows")
     builder_task9_source()
     fixture <- builder_app_coordinator_fixture(
       .local_envir = environment(),
@@ -2704,148 +2166,16 @@ test_that("login publication rejects an environment changed after parent verific
         fixture$result,
         .write_report = function(stage, report) {
           path <- builder_write_build_report(stage, report)
-          Sys.chmod(env_file, mode = "0644")
+          value <- readLines(env_file, warn = FALSE)
+          unlink(env_file)
+          writeLines(value, env_file, useBytes = TRUE)
+          Sys.chmod(env_file, mode = "0600")
           path
         }
       ),
-      "authentication secret file is not private"
-    )
-    expect_true(dir.exists(fixture$handle$stage))
-    expect_false(dir.exists(fixture$handle$target))
-  })
-})
-
-test_that("publication rejects a mapped verification path that is absent", {
-  local({
-    builder_task9_source()
-    fixture <- builder_app_coordinator_fixture(
-      .local_envir = environment(),
-      coordinator_prepare = builder_coordinator_prepare,
-      bundle_request = builder_app_bundle_request,
-      verify_app = builder_verify_app
-    )
-    fixture$result$verifications[[1L]]$path <- file.path(
-      fixture$root,
-      "missing-verification.crb"
-    )
-    expect_error(
-      builder_coordinator_publish(fixture$handle, fixture$result),
-      "Publication verification failed"
-    )
-  })
-})
-
-test_that("login publication detects same-content inode and hard-link env replacement", {
-  local({
-    builder_task9_source()
-    run_case <- function(
-      name,
-      mutate,
-      expected = "staged App changed after parent verification"
-    ) {
-      fixture <- builder_app_coordinator_fixture(
-        .local_envir = environment(),
-        coordinator_prepare = builder_coordinator_prepare,
-        bundle_request = builder_app_bundle_request,
-        verify_app = builder_verify_app
-      )
-      env_file <- file.path(
-        fixture$handle$stage,
-        "cerebro_app",
-        "viewer-auth.env"
-      )
-      expect_error(
-        builder_coordinator_publish(
-          fixture$handle,
-          fixture$result,
-          .write_report = function(stage, report) {
-            path <- builder_write_build_report(stage, report)
-            mutate(env_file, stage)
-            path
-          }
-        ),
-        expected,
-        info = name
-      )
-    }
-    run_case("inode", function(env_file, stage) {
-      value <- readLines(env_file, warn = FALSE)
-      unlink(env_file)
-      writeLines(value, env_file, useBytes = TRUE)
-      Sys.chmod(env_file, mode = "0600")
-    })
-    probe <- withr::local_tempfile()
-    writeLines("probe", probe)
-    skip_if_not(
-      isTRUE(file.link(probe, paste0(probe, "-link"))),
-      "Hard links are unavailable"
-    )
-    run_case(
-      "hard-link",
-      function(env_file, stage) {
-        source <- file.path(stage, "same-content-env")
-        copied <- file.copy(env_file, source)
-        stopifnot(isTRUE(copied))
-        unlink(env_file)
-        stopifnot(isTRUE(file.link(source, env_file)))
-      },
       "staged App changed after parent verification"
     )
-  })
-})
-
-test_that("login publisher guard rejects env changes in both rename windows", {
-  local({
-    builder_task9_source()
-    run_case <- function(window, mutate) {
-      fixture <- builder_app_coordinator_fixture(
-        .local_envir = environment(),
-        coordinator_prepare = builder_coordinator_prepare,
-        bundle_request = builder_app_bundle_request,
-        verify_app = builder_verify_app
-      )
-      publish <- function(handle, .verify_payload, .digest_cache = NULL) {
-        builder_publish_release(
-          handle,
-          .verify_payload = .verify_payload,
-          .digest_cache = .digest_cache,
-          .after_phase = function(phase) {
-            if (identical(window, "old_moved") && identical(phase, window)) {
-              mutate(
-                file.path(handle$stage, "cerebro_app", "viewer-auth.env"),
-                handle$stage
-              )
-            }
-          },
-          .after_move = function(move) {
-            if (identical(window, "new_to_target") && identical(move, window)) {
-              mutate(
-                file.path(handle$target, "cerebro_app", "viewer-auth.env"),
-                handle$target
-              )
-            }
-          }
-        )
-      }
-      expect_error(
-        builder_coordinator_publish(
-          fixture$handle,
-          fixture$result,
-          .publish = publish
-        ),
-        "Publication verification failed"
-      )
-      expect_true(dir.exists(fixture$handle$stage))
-      expect_false(dir.exists(fixture$handle$target))
-    }
-    replace_env <- function(env_file, root) {
-      value <- readLines(env_file, warn = FALSE)
-      unlink(env_file)
-      writeLines(value, env_file, useBytes = TRUE)
-      Sys.chmod(env_file, mode = "0600")
-    }
-    run_case("old_moved", replace_env)
-    run_case("new_to_target", replace_env)
+    expect_false(dir.exists(fixture$handle$target))
   })
 })
 

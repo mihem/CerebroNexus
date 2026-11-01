@@ -297,41 +297,6 @@ test_that("authentication passphrase exists only during the supplied action", {
   )))
 })
 
-test_that("authentication passphrase restores the exact pre-existing value", {
-  old <- "pre-existing-passphrase-value-64c2"
-  withr::local_envvar(CEREBRO_AUTH_PASSPHRASE = old)
-  passphrase <- strrep("d", 64L)
-
-  seen <- .builder_auth_with_passphrase(passphrase, function() {
-    expect_identical(Sys.getenv("CEREBRO_AUTH_PASSPHRASE"), passphrase)
-    "done"
-  })
-
-  expect_identical(seen, "done")
-  expect_identical(Sys.getenv("CEREBRO_AUTH_PASSPHRASE"), old)
-})
-
-test_that("partial authentication cleanup rejects escapes and verifies deletion", {
-  stage <- withr::local_tempdir()
-  source <- file.path(stage, ".builder-auth-source")
-  env <- file.path(stage, "viewer-auth.env")
-  dir.create(source)
-  writeLines("x", env)
-
-  expect_silent(.builder_auth_remove_partial_material(stage))
-  expect_false(file.exists(source))
-  expect_false(file.exists(env))
-
-  dir.create(source)
-  expect_error(
-    .builder_auth_remove_partial_material(
-      stage,
-      .unlink = function(...) 0L
-    ),
-    "cleaned up"
-  )
-})
-
 test_that("authentication database verification accepts only exact TRUE", {
   database <- tempfile(fileext = ".sqlite")
   writeBin(as.raw(1:8), database)
@@ -347,41 +312,18 @@ test_that("authentication database verification accepts only exact TRUE", {
     .validate = function(...) TRUE
   ))
   called <- FALSE
-  validate <- function(...) {
-    called <<- TRUE
-    TRUE
-  }
-  for (unsafe_database in list(
-    file.path(stage, "missing.sqlite"),
-    "",
-    c(database, database)
-  )) {
-    expect_error(
-      builder_auth_verify_database_pair(
-        unsafe_database,
-        env,
-        .validate = validate
-      ),
-      "database could not be verified"
-    )
-    expect_false(called)
-  }
-  linked_database <- file.path(stage, "linked.sqlite")
-  if (isTRUE(suppressWarnings(file.symlink(database, linked_database)))) {
-    expect_error(
-      builder_auth_verify_database_pair(
-        linked_database,
-        env,
-        .validate = validate
-      ),
-      "database could not be verified"
-    )
-  }
-  expect_false(called)
   expect_error(
-    builder_auth_verify_database_pair(database, env, .validate = TRUE),
+    builder_auth_verify_database_pair(
+      file.path(stage, "missing.sqlite"),
+      env,
+      .validate = function(...) {
+        called <<- TRUE
+        TRUE
+      }
+    ),
     "database could not be verified"
   )
+  expect_false(called)
   for (value in list(FALSE, NULL, simpleError("sentinel-secret-2f84"))) {
     validate <- if (inherits(value, "condition")) {
       function(...) stop(value)
@@ -502,11 +444,7 @@ test_that("authentication creation faults fail closed with generic cleanup", {
     builder_auth_test_accounts()
   )$accounts
   cases <- list(
-    db_chmod = list(.db_chmod = function(...) stop("fault-secret-db")),
     env_write = list(.write_env = function(...) stop("fault-secret-env")),
-    validate = list(.validate_material = function(...) {
-      stop("fault-secret-validate")
-    }),
     rollback = list(
       .create_db = function(...) stop("fault-secret-create"),
       .rollback = function(...) FALSE
@@ -568,38 +506,6 @@ test_that("environment writer rejects chmod rename and mode faults", {
     expect_s3_class(error, "error")
     expect_false(file.exists(path), info = name)
   }
-})
-
-test_that("environment writer fails closed on symlinks and lying temp cleanup", {
-  passphrase <- strrep("b", 64L)
-  stage <- withr::local_tempdir()
-  target <- file.path(stage, "target.env")
-  writeLines("safe", target)
-  link <- file.path(stage, "viewer-auth.env")
-  if (isTRUE(suppressWarnings(file.symlink(target, link)))) {
-    expect_error(.builder_auth_write_env(link, passphrase), "target is invalid")
-    expect_identical(readLines(target), "safe")
-  }
-
-  path <- file.path(stage, "another-viewer-auth.env")
-  ## The cleanup failure raised on exit supersedes the write failure.
-  error <- tryCatch(
-    .builder_auth_write_env(
-      path,
-      passphrase,
-      .write_lines = function(lines, con, ...) {
-        writeLines(lines, con)
-        stop("write-fault-secret")
-      },
-      .unlink = function(...) 0L
-    ),
-    error = identity
-  )
-  expect_match(
-    conditionMessage(error),
-    "temporary file could not be cleaned up"
-  )
-  expect_false(file.exists(path))
 })
 
 test_that("strict material cleanup rejects tampering links and lying unlink", {

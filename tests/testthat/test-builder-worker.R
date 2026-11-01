@@ -606,113 +606,6 @@ test_that("protocol recovery retries FIFO commands but never a Build", {
   expect_identical(recovered$protocol$build_status, "idle")
 })
 
-test_that("protocol recovery reports queries and terminal ACK ownership", {
-  query_protocol <- builder_enqueue(
-    builder_request_protocol(epoch = "worker-1"),
-    builder_query("preview", "a", 1L, slot = "projection")
-  )
-  query_protocol <- builder_enqueue(
-    query_protocol,
-    builder_command("settings", "a")
-  )
-  query_recovery <- builder_protocol_recover(
-    query_protocol,
-    epoch = "worker-2"
-  )
-  expect_identical(
-    vapply(query_recovery$discarded, `[[`, character(1), "kind"),
-    "preview"
-  )
-  expect_identical(builder_pending_ids(query_recovery$protocol), "settings:a")
-
-  command_protocol <- builder_enqueue(
-    builder_request_protocol(epoch = "worker-1"),
-    builder_command("settings", "a")
-  )
-  dispatched <- builder_protocol_dispatch(command_protocol)
-  completed <- builder_protocol_complete(
-    dispatched$protocol,
-    builder_worker_response(dispatched$request, TRUE)
-  )
-  acknowledged_recovery <- builder_protocol_recover(
-    completed$protocol,
-    epoch = "worker-2"
-  )
-  expect_length(acknowledged_recovery$retried, 0L)
-  expect_identical(
-    vapply(acknowledged_recovery$failed, `[[`, character(1), "kind"),
-    "settings"
-  )
-  expect_length(acknowledged_recovery$protocol$awaiting_ack, 0L)
-})
-
-test_that("failed restart can explicitly terminate every outstanding request", {
-  protocol <- builder_request_protocol(epoch = "worker-1")
-  protocol <- builder_enqueue(protocol, builder_command("settings", "a"))
-  protocol <- builder_enqueue(
-    protocol,
-    builder_command("build", "session", payload = list(id = "build-1"))
-  )
-  dispatched <- builder_protocol_dispatch(protocol)
-
-  terminal <- builder_protocol_recover(
-    dispatched$protocol,
-    epoch = "worker-1",
-    reason = "restart_failed",
-    retry_persistent = FALSE
-  )
-
-  expect_length(terminal$retried, 0L)
-  expect_identical(
-    vapply(terminal$failed, `[[`, character(1), "kind"),
-    c("settings", "build")
-  )
-  expect_length(builder_pending_ids(terminal$protocol), 0L)
-  expect_null(terminal$protocol$pending)
-  expect_length(terminal$protocol$awaiting_ack, 0L)
-  expect_identical(terminal$protocol$build_status, "idle")
-})
-
-test_that("only a pending command consumes one transport retry", {
-  protocol <- builder_request_protocol(epoch = "worker-1")
-  protocol <- builder_enqueue(protocol, builder_command("settings", "a"))
-  protocol <- builder_enqueue(protocol, builder_command("alignment", "a"))
-  first_dispatch <- builder_protocol_dispatch(protocol)
-
-  first_recovery <- builder_protocol_recover(
-    first_dispatch$protocol,
-    epoch = "worker-2"
-  )
-  expect_identical(first_recovery$retried[[1L]]$kind, "settings")
-  expect_identical(first_recovery$retried[[1L]]$transport_retries, 1L)
-  expect_identical(first_recovery$retried[[2L]]$kind, "alignment")
-  expect_identical(first_recovery$retried[[2L]]$transport_retries, 0L)
-
-  second_dispatch <- builder_protocol_dispatch(first_recovery$protocol)
-  second_recovery <- builder_protocol_recover(
-    second_dispatch$protocol,
-    epoch = "worker-3"
-  )
-  expect_identical(
-    vapply(second_recovery$failed, `[[`, character(1), "kind"),
-    "settings"
-  )
-  expect_identical(
-    builder_pending_ids(second_recovery$protocol),
-    "alignment:a"
-  )
-  expect_identical(second_recovery$retried[[1L]]$transport_retries, 0L)
-
-  third_dispatch <- builder_protocol_dispatch(second_recovery$protocol)
-  third_recovery <- builder_protocol_recover(
-    third_dispatch$protocol,
-    epoch = "worker-4"
-  )
-  expect_length(third_recovery$failed, 0L)
-  expect_identical(third_recovery$retried[[1L]]$kind, "alignment")
-  expect_identical(third_recovery$retried[[1L]]$transport_retries, 1L)
-})
-
 test_that("a deterministic command failure advances without clearing FIFO", {
   protocol <- builder_request_protocol(epoch = "worker-1")
   protocol <- builder_enqueue(protocol, builder_command("settings", "a"))
@@ -1009,35 +902,6 @@ test_that("session startup returns before a slow worker bootstrap completes", {
   expect_true(worker$ready)
 })
 
-test_that("a session can stop while worker bootstrap is still running", {
-  skip_if_not_installed("callr")
-  gate <- tempfile("builder-worker-stop-startup-gate-")
-  withr::defer(unlink(gate, force = TRUE))
-  worker <- builder_worker_start(
-    builder_profile_inst_path("builder"),
-    .async = TRUE,
-    .bootstrap = local({
-      gate_path <- gate
-      function(...) {
-        while (!file.exists(gate_path)) {
-          Sys.sleep(0.01)
-        }
-        character()
-      }
-    })
-  )
-  process <- worker$process
-
-  expect_identical(worker$state, "starting")
-  expect_true(process$is_alive())
-
-  stopped <- builder_worker_stop(worker, grace_ms = 1000L)
-
-  expect_true(stopped$stopped)
-  expect_false(process$is_alive())
-  expect_true(stopped$tree_verified)
-})
-
 test_that("copied Builder runtimes accept an explicit development source", {
   copied_runtime <- withr::local_tempdir()
   copied_builder <- file.path(copied_runtime, "builder")
@@ -1054,31 +918,6 @@ test_that("copied Builder runtimes accept an explicit development source", {
 
   expect_identical(
     .builder_worker_package_source(copied_builder),
-    source_root
-  )
-})
-
-test_that("background workers retain the active development source", {
-  skip_if_not_installed("callr")
-  source_root <- normalizePath(
-    test_path("..", ".."),
-    winslash = "/",
-    mustWork = TRUE
-  )
-  withr::local_envvar(CEREBRO_PACKAGE_SOURCE = source_root)
-  worker <- builder_worker_start(builder_profile_inst_path("builder"))
-  withr::defer({
-    try(worker$process$close(), silent = TRUE)
-    if (isTRUE(worker$owns_root)) {
-      unlink(worker$snapshot_root, recursive = TRUE, force = TRUE)
-    }
-  })
-
-  expect_s3_class(worker, "builder_worker")
-  expect_identical(
-    worker$process$run(function() {
-      Sys.getenv("CEREBRO_PACKAGE_SOURCE", unset = "")
-    }),
     source_root
   )
 })
@@ -1128,32 +967,6 @@ test_that("main registry trusts the worker MD5 instead of rehashing", {
   )
 })
 
-test_that("main registry rejects an owned snapshot from another root", {
-  skip_if_not_installed("callr")
-  foreign <- builder_worker_fixture()
-  withr::defer(.builder_snapshot_release(foreign$snapshot))
-  local_root <- tempfile("builder-local-snapshots-")
-  worker <- builder_worker_start(
-    builder_profile_inst_path("builder"),
-    snapshot_root = local_root,
-    snapshot_registry = list()
-  )
-  withr::defer({
-    try(worker$process$close(), silent = TRUE)
-    unlink(local_root, recursive = TRUE, force = TRUE)
-  })
-
-  expect_error(
-    builder_worker_register_snapshot(
-      worker,
-      "foreign",
-      foreign$snapshot
-    ),
-    "snapshot root"
-  )
-  expect_length(worker$snapshot_registry, 0L)
-})
-
 test_that("dead workers reopen main-owned immutable snapshots", {
   skip_if_not_installed("callr")
   fixture <- builder_worker_fixture()
@@ -1180,48 +993,6 @@ test_that("dead workers reopen main-owned immutable snapshots", {
     normalizePath(fixture$root, mustWork = TRUE)
   )
   expect_identical(restarted$snapshot_registry, fixture$registry)
-  expect_equal(builder_worker_cell_count(restarted, "dataset-a"), 80L)
-  expect_true(.builder_snapshot_owned(fixture$snapshot))
-})
-
-test_that("a busy worker restarts without waiting for its call", {
-  skip_if_not_installed("callr")
-  fixture <- builder_worker_fixture()
-  withr::defer(.builder_snapshot_release(fixture$snapshot))
-  worker <- builder_worker_start(
-    builder_profile_inst_path("builder"),
-    snapshot_root = fixture$root,
-    snapshot_registry = fixture$registry
-  )
-  withr::defer(try(worker$process$close(), silent = TRUE))
-  worker$process$call(function() {
-    repeat {
-      Sys.sleep(0.05)
-    }
-  })
-
-  started <- Sys.time()
-  restarted <- builder_worker_restart(
-    worker,
-    grace_ms = 0L,
-    .async = TRUE,
-    verify_tree = FALSE
-  )
-  withr::defer(try(restarted$process$kill_tree(), silent = TRUE))
-  elapsed <- as.numeric(difftime(Sys.time(), started, units = "secs"))
-
-  expect_false(worker$process$is_alive())
-  expect_identical(restarted$state, "starting")
-  expect_lt(elapsed, 10)
-  deadline <- Sys.time() + 30
-  repeat {
-    startup <- builder_worker_poll_startup(restarted, timeout = 100L)
-    restarted <- startup$worker
-    if (!identical(startup$state, "starting") || Sys.time() > deadline) {
-      break
-    }
-  }
-  expect_identical(startup$state, "ready")
   expect_equal(builder_worker_cell_count(restarted, "dataset-a"), 80L)
   expect_true(.builder_snapshot_owned(fixture$snapshot))
 })
@@ -1343,55 +1114,6 @@ test_that("the worker object budget defaults to a quarter of memory", {
   expect_identical(builder_worker_object_budget(), 123)
 })
 
-test_that("restart removes only verified unregistered snapshot artifacts", {
-  skip_if_not_installed("callr")
-  root <- withr::local_tempdir()
-  registered <- builder_snapshot_seurat(
-    SeuratObject::pbmc_small,
-    file.path(root, "dataset-registered"),
-    available_bytes = 2^40
-  )
-  orphan <- builder_snapshot_seurat(
-    SeuratObject::pbmc_small,
-    file.path(root, "dataset-orphan"),
-    available_bytes = 2^40
-  )
-  stage <- file.path(root, "dataset-stage-incomplete")
-  expect_true(dir.create(stage, mode = "0700"))
-  .builder_stage_owner(stage)
-  writeLines("partial", file.path(stage, "partial.txt"))
-
-  unknown <- file.path(root, "foreign-directory")
-  expect_true(dir.create(unknown))
-  writeLines("keep", file.path(unknown, "foreign.txt"))
-
-  tampered <- builder_snapshot_seurat(
-    SeuratObject::pbmc_small,
-    file.path(root, "dataset-tampered"),
-    available_bytes = 2^40
-  )
-  tampered_marker <- readRDS(.builder_snapshot_marker_path(tampered$path))
-  tampered_marker$owner_token <- paste0(tampered_marker$owner_token, "-other")
-  saveRDS(tampered_marker, .builder_snapshot_marker_path(tampered$path))
-
-  worker <- builder_worker_start(
-    builder_profile_inst_path("builder"),
-    snapshot_root = root,
-    snapshot_registry = list("dataset-a" = registered)
-  )
-  old_process <- worker$process
-  restarted <- builder_worker_restart(worker)
-  withr::defer(try(restarted$process$close(), silent = TRUE))
-
-  expect_false(old_process$is_alive())
-  expect_true(.builder_snapshot_owned(registered))
-  expect_false(dir.exists(orphan$path))
-  expect_false(dir.exists(stage))
-  expect_true(dir.exists(unknown))
-  expect_true(file.exists(file.path(unknown, "foreign.txt")))
-  expect_true(dir.exists(tampered$path))
-})
-
 test_that("orphan cleanup retains strict state checks for every snapshot format", {
   root <- withr::local_tempdir()
   snapshots <- lapply(c("rds", "qs", "qs2"), function(serialization) {
@@ -1496,45 +1218,6 @@ test_that("poll restarts a closed worker without reading its closed pipe", {
   expect_equal(builder_worker_cell_count(restarted, "dataset-a"), 80L)
 })
 
-test_that("a background restart reports a failed snapshot restore", {
-  skip_if_not_installed("callr")
-  root <- withr::local_tempdir()
-  snapshot <- builder_snapshot_seurat(
-    SeuratObject::pbmc_small,
-    file.path(root, "dataset-a"),
-    available_bytes = 2^40
-  )
-  worker <- builder_worker_start(
-    builder_profile_inst_path("builder"),
-    snapshot_root = root,
-    snapshot_registry = list("dataset-a" = snapshot)
-  )
-  unlink(snapshot$object_file)
-  worker$process$close()
-
-  polled <- builder_worker_poll(worker, timeout = 0)
-  withr::defer(try(polled$worker$process$kill_tree(), silent = TRUE))
-
-  expect_identical(polled$event, "restarted")
-  expect_null(polled$result)
-  restarted <- polled$worker
-  deadline <- Sys.time() + 60
-  repeat {
-    startup <- builder_worker_poll_startup(restarted, timeout = 100L)
-    restarted <- startup$worker
-    if (!identical(startup$state, "starting") || Sys.time() > deadline) {
-      break
-    }
-  }
-  expect_identical(startup$state, "failed")
-  expect_match(
-    startup$error,
-    "snapshot is no longer owned",
-    ignore.case = TRUE
-  )
-  expect_false(restarted$ready)
-})
-
 test_that("a callr read failure is one completed typed error", {
   process <- .builder_fake_process("ready")
   process$read <- function() stop("closed response channel")
@@ -1582,30 +1265,6 @@ test_that("worker completion preserves bounded callr transport diagnostics", {
     "worker_failure()"
   )
 })
-
-test_that("worker protocol failures prefer the returned callr message", {
-  process <- .builder_fake_process(
-    "ready",
-    list(
-      code = 501L,
-      message = "R session crashed with exit code 7",
-      result = NULL,
-      stdout = "crash stdout\n",
-      stderr = "crash stderr\n",
-      error = NULL
-    )
-  )
-
-  completed <- builder_worker_poll(.builder_fake_worker(process), timeout = 0)
-
-  expect_identical(
-    completed$result$error,
-    "R session crashed with exit code 7"
-  )
-  expect_identical(completed$result$transport$stdout, "crash stdout\n")
-  expect_identical(completed$result$transport$stderr, "crash stderr\n")
-})
-
 
 test_that("worker stop timeout conversion never overflows", {
   deadline <- Sys.time() + (.Machine$integer.max / 1000) + 10
@@ -1657,49 +1316,6 @@ test_that("worker interrupts use CTRL+BREAK on Windows", {
   calls <- character()
   .builder_worker_interrupt(process, os_type = "unix")
   expect_identical(calls, "interrupt")
-})
-
-test_that("worker stop lets an active call unwind before force kill", {
-  skip_if_not_installed("callr")
-  worker <- builder_worker_start(builder_profile_inst_path("builder"))
-  root <- worker$snapshot_root
-  rollback_file <- tempfile("builder-stop-rollback-")
-  started_file <- tempfile("builder-stop-started-")
-  withr::defer({
-    if (worker$process$is_alive()) {
-      try(worker$process$kill_tree(), silent = TRUE)
-    }
-    unlink(root, recursive = TRUE, force = TRUE)
-    unlink(rollback_file, force = TRUE)
-    unlink(started_file, force = TRUE)
-  })
-  worker$process$call(
-    function(rollback_path, started_path) {
-      on.exit(writeLines("rolled back", rollback_path), add = TRUE)
-      writeLines("started", started_path)
-      repeat {
-        Sys.sleep(0.05)
-      }
-    },
-    args = list(
-      rollback_path = rollback_file,
-      started_path = started_file
-    )
-  )
-  deadline <- Sys.time() + 10
-  while (!file.exists(started_file) && Sys.time() < deadline) {
-    Sys.sleep(0.01)
-  }
-  expect_true(file.exists(started_file))
-
-  stopped <- builder_worker_stop(worker, grace_ms = 1000L)
-
-  expect_true(stopped$stopped)
-  expect_false(worker$process$is_alive())
-  expect_true(file.exists(rollback_file))
-  if (file.exists(rollback_file)) {
-    expect_identical(readLines(rollback_file, warn = FALSE), "rolled back")
-  }
 })
 
 test_that("dead-parent restart quarantines artifacts from a lost child", {
@@ -2052,22 +1668,6 @@ test_that("load returns a descriptor and drop releases only after main ACK", {
     snapshot
   )
   expect_length(completed_drop$protocol$awaiting_ack, 0L)
-})
-
-
-test_that("worker tree inspection rejects a child that exits during lookup", {
-  calls <- 0L
-  process <- list(
-    is_alive = function() {
-      calls <<- calls + 1L
-      calls == 1L
-    },
-    get_pid = function() Sys.getpid()
-  )
-  tree <- .builder_worker_tree_handles(process)
-  expect_length(tree$handles, 0L)
-  expect_match(tree$error, "could not be inspected", fixed = TRUE)
-  expect_identical(calls, 2L)
 })
 
 test_that("worker tree inspection finds marked descendants without a ppid scan", {

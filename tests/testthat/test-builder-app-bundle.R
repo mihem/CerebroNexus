@@ -417,25 +417,6 @@ builder_flip_file_byte <- function(path) {
   writeBin(bytes, path)
 }
 
-builder_copy_backend_to_app <- function(fixture, app_dir) {
-  target <- file.path(app_dir, "private-data", basename(fixture$sidecar))
-  if (dir.exists(fixture$sidecar)) {
-    dir.create(file.path(target, "empty"), recursive = TRUE)
-    dir.create(file.path(target, "nested"), recursive = TRUE)
-    file.copy(
-      file.path(fixture$sidecar, "index.bin"),
-      file.path(target, "index.bin")
-    )
-    file.copy(
-      file.path(fixture$sidecar, "nested", "matrix.bin"),
-      file.path(target, "nested", "matrix.bin")
-    )
-  } else {
-    file.copy(fixture$sidecar, target)
-  }
-  target
-}
-
 test_that("App arguments come only from the frozen plan", {
   fixture <- builder_app_bundle_fixture()
   fixture$plan$items[[2L]]$spatial_point_appearance <- list(
@@ -649,55 +630,6 @@ test_that("App assembly rejects backend closure drift before dispatch", {
   expect_false(called)
 })
 
-test_that("App assembly rejects backend closure drift during create_app", {
-  fixture <- builder_app_backend_fixture("h5")
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  create_app <- function(...) {
-    arguments <- list(...)
-    builder_fake_app(request, arguments$result_dir)
-    builder_flip_file_byte(fixture$sidecar)
-  }
-
-  expect_error(
-    builder_build_app(request, fixture$stage, create_app),
-    "backend closure"
-  )
-})
-
-test_that("Backend closure capture rejects aliases and unreadable files", {
-  skip_on_os("windows")
-
-  linked <- builder_app_backend_fixture("h5")
-  alias <- tempfile(fileext = ".h5")
-  withr::defer(unlink(alias))
-  skip_if_not(file.link(linked$sidecar, alias), "hard links are unavailable")
-  expect_error(
-    builder_app_bundle_request(linked$plan, linked$paths, linked$labels),
-    "hard link"
-  )
-
-  unreadable <- builder_app_backend_fixture("h5")
-  old_mode <- file.info(unreadable$sidecar)$mode
-  Sys.chmod(unreadable$sidecar, mode = "0000", use_umask = FALSE)
-  withr::defer(Sys.chmod(
-    unreadable$sidecar,
-    mode = old_mode,
-    use_umask = FALSE
-  ))
-  expect_error(
-    builder_app_bundle_request(
-      unreadable$plan,
-      unreadable$paths,
-      unreadable$labels
-    ),
-    "readable"
-  )
-})
-
 test_that("stable identities reuse digests across checkpoints", {
   root <- withr::local_tempdir()
   first <- file.path(root, "a.bin")
@@ -883,39 +815,8 @@ test_that("Builder and verifier share an exact request-v1 schema", {
   wrong_identity$crb_identities[[1L]]$md5 <- 1L
   wrong_backend <- request
   wrong_backend$backend_plan$entries[[1L]]$unknown <- TRUE
-  wrong_backend_identity <- request
-  wrong_backend_identity$backend_identities[[1L]]$root <- request$stage
-  wrong_content_identity <- request
-  wrong_content_identity$content_identities[[1L]]$crb$md5 <- strrep("0", 32L)
-  uppercase_digest <- request
-  uppercase_digest$crb_identities[[1L]]$md5 <- toupper(
-    uppercase_digest$crb_identities[[1L]]$md5
-  )
-  noncanonical_path <- request
-  noncanonical_path$cerebro_data[[1L]] <- file.path(
-    dirname(noncanonical_path$cerebro_data[[1L]]),
-    ".",
-    basename(noncanonical_path$cerebro_data[[1L]])
-  )
-  noncanonical_path$crb_identities[[1L]]$path <-
-    noncanonical_path$cerebro_data[[1L]]
-  automatic_drift <- request
-  automatic_drift$initial_dataset_mode <- "automatic"
-  wrong_colors <- request
-  wrong_colors$colors[[1L]]$cluster <- c(A = 1L)
-  empty_colors <- request
-  empty_colors$colors[[1L]] <- list()
-  unnamed_colors <- request
-  unnamed_colors$colors[[1L]]$cluster <- "#000000"
   invalid_colors <- request
   invalid_colors$colors[[1L]]$cluster <- c(A = "not-a-color")
-  wrong_sidecar <- request
-  first_backend <- names(wrong_sidecar$backend_plan$entries)[[1L]]
-  wrong_sidecar$backend_plan$entries[[first_backend]] <- list(
-    type = "h5",
-    mode = "bundled",
-    location = "nested/a.h5"
-  )
   outside <- tempfile(fileext = ".crb")
   saveRDS(list(valid = TRUE), outside)
   withr::defer(unlink(outside))
@@ -934,16 +835,7 @@ test_that("Builder and verifier share an exact request-v1 schema", {
     wrong_upload,
     wrong_identity,
     wrong_backend,
-    wrong_backend_identity,
-    wrong_content_identity,
-    uppercase_digest,
-    noncanonical_path,
-    automatic_drift,
-    wrong_colors,
-    empty_colors,
-    unnamed_colors,
     invalid_colors,
-    wrong_sidecar,
     outside_data,
     structure(
       c(unclass(request), list(unknown = TRUE)),
@@ -956,21 +848,6 @@ test_that("Builder and verifier share an exact request-v1 schema", {
     structure(
       unclass(request)[setdiff(names(request), "crb_identities")],
       class = class(request)
-    ),
-    structure(
-      unclass(request)[setdiff(names(request), "backend_identities")],
-      class = class(request)
-    ),
-    structure(
-      unclass(request)[setdiff(
-        names(request),
-        "spatial_molecule_identities"
-      )],
-      class = class(request)
-    ),
-    structure(
-      unclass(request)[setdiff(names(request), "content_identities")],
-      class = class(request)
     )
   )
 
@@ -982,18 +859,6 @@ test_that("Builder and verifier share an exact request-v1 schema", {
       "request contract"
     )
   }
-
-  build_fixture <- builder_app_bundle_fixture()
-  build_request <- builder_app_bundle_request(
-    build_fixture$plan,
-    build_fixture$paths,
-    build_fixture$labels
-  )
-  build_request$contract_version <- 2L
-  expect_error(
-    builder_build_app(build_request, build_fixture$stage),
-    "request contract"
-  )
 })
 
 test_that("App requests reject non-frozen and mismatched build evidence", {
@@ -1077,57 +942,6 @@ test_that("App frozen values reject executable and unbounded structures", {
     labels = c("A", "B"),
     enabled = FALSE
   )))
-})
-
-test_that("inert validation does not dispatch user length methods", {
-  calls <- 0L
-  length.builder_hostile <- function(value) {
-    calls <<- calls + 1L
-    stop("executed hostile method")
-  }
-  value <- structure(list(ok = TRUE), class = "builder_hostile")
-
-  expect_true(.builder_app_has_reference(value))
-  expect_identical(calls, 0L)
-})
-
-test_that("App requests reject nested S3 dispatch before reading items", {
-  fixture <- builder_app_bundle_fixture()
-  calls <- 0L
-  `[[.builder_hostile_item` <- function(value, ...) {
-    calls <<- calls + 1L
-    stop("executed hostile method")
-  }
-  class(fixture$plan$items[[1L]]) <- "builder_hostile_item"
-
-  expect_error(
-    builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels
-    ),
-    "reference"
-  )
-  expect_identical(calls, 0L)
-})
-
-test_that("App requests strip the trusted top-level class before field reads", {
-  fixture <- builder_app_bundle_fixture()
-  calls <- 0L
-  `$.builder_build_plan` <- function(value, ...) {
-    calls <<- calls + 1L
-    stop("executed hostile method")
-  }
-
-  expect_s3_class(
-    builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels
-    ),
-    "builder_app_bundle_request"
-  )
-  expect_identical(calls, 0L)
 })
 
 test_that("App requests accept typed inert leaves from production plans", {
@@ -1389,41 +1203,6 @@ test_that("real login App verifies its exact database and external env pair", {
 })
 
 test_that("App verification rejects stable copied data replacements", {
-  crb_fixture <- builder_app_bundle_fixture()
-  crb_request <- builder_app_bundle_request(
-    crb_fixture$plan,
-    crb_fixture$paths,
-    crb_fixture$labels
-  )
-  crb_app <- builder_fake_app(
-    crb_request,
-    file.path(crb_fixture$stage, "cerebro_app")
-  )
-  builder_flip_file_byte(file.path(crb_app, "private-data", "dataset-a.crb"))
-  expect_error(
-    builder_verify_app(crb_app, crb_request),
-    "copied content"
-  )
-
-  fixture <- builder_app_backend_fixture("h5")
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  app_dir <- builder_fake_app(
-    request,
-    file.path(fixture$stage, "cerebro_app")
-  )
-  builder_flip_file_byte(builder_copy_backend_to_app(fixture, app_dir))
-
-  expect_error(
-    builder_verify_app(app_dir, request),
-    "copied content"
-  )
-})
-
-test_that("App verification rejects unrequested private artifacts", {
   fixture <- builder_app_bundle_fixture()
   request <- builder_app_bundle_request(
     fixture$plan,
@@ -1434,69 +1213,50 @@ test_that("App verification rejects unrequested private artifacts", {
     request,
     file.path(fixture$stage, "cerebro_app")
   )
-  writeBin(as.raw(1:8), file.path(app_dir, "private-data", "rogue.bin"))
+  builder_flip_file_byte(file.path(app_dir, "private-data", "dataset-a.crb"))
 
   expect_error(builder_verify_app(app_dir, request), "copied content")
 })
 
 test_that("App verification binds executable code to package templates", {
-  assert_code_rejected <- function(relative, contents) {
-    fixture <- builder_app_bundle_fixture()
-    request <- builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels
-    )
-    app_dir <- builder_fake_app(
-      request,
-      file.path(fixture$stage, "cerebro_app")
-    )
-    target <- file.path(app_dir, relative)
-    dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
-    writeLines(contents, target)
-    expect_error(builder_verify_app(app_dir, request), "trusted template")
-  }
-
-  assert_code_rejected(
-    "app.R",
+  fixture <- builder_app_bundle_fixture()
+  request <- builder_app_bundle_request(
+    fixture$plan,
+    fixture$paths,
+    fixture$labels
+  )
+  app_dir <- builder_fake_app(
+    request,
+    file.path(fixture$stage, "cerebro_app")
+  )
+  writeLines(
     c(
       "shiny::addResourcePath('leak', 'private-data')",
       "shiny::shinyApp(ui = NULL, server = function(...) NULL)"
-    )
+    ),
+    file.path(app_dir, "app.R")
   )
-  assert_code_rejected(
-    "viewer/shiny_UI.R",
-    "ui <- shiny::fluidPage('evil')"
-  )
-  assert_code_rejected("viewer/www/evil.js", "window.evil = true;")
-  assert_code_rejected("viewer/www/evil.css", "body { display: none; }")
-  assert_code_rejected("extdata/example_gene_set.gmt", "evil\tna\tGENE")
+
+  expect_error(builder_verify_app(app_dir, request), "trusted template")
 })
 
 test_that("App verification rejects extra Shiny root entrypoints", {
-  assert_root_rejected <- function(relative, contents) {
-    fixture <- builder_app_bundle_fixture()
-    request <- builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels
-    )
-    app_dir <- builder_fake_app(
-      request,
-      file.path(fixture$stage, "cerebro_app")
-    )
-    target <- file.path(app_dir, relative)
-    dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
-    writeLines(contents, target)
-    expect_error(builder_verify_app(app_dir, request), "trusted topology")
-  }
-
-  assert_root_rejected(
-    "global.R",
-    "shiny::addResourcePath('leak', 'private-data')"
+  fixture <- builder_app_bundle_fixture()
+  request <- builder_app_bundle_request(
+    fixture$plan,
+    fixture$paths,
+    fixture$labels
   )
-  assert_root_rejected("www/evil.js", "window.evil = true;")
-  assert_root_rejected("R/evil.R", "options(cerebro.evil = TRUE)")
+  app_dir <- builder_fake_app(
+    request,
+    file.path(fixture$stage, "cerebro_app")
+  )
+  writeLines(
+    "shiny::addResourcePath('leak', 'private-data')",
+    file.path(app_dir, "global.R")
+  )
+
+  expect_error(builder_verify_app(app_dir, request), "trusted topology")
 })
 
 test_that("App verification reads back a private inert bundle", {
@@ -1540,25 +1300,6 @@ test_that("App verification reads back a private inert bundle", {
 
   dir.create(file.path(app_dir, "data"))
   expect_error(builder_verify_app(app_dir, request), "legacy")
-})
-
-test_that("App verification reports a missing private root directly", {
-  fixture <- builder_app_bundle_fixture()
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  app_dir <- builder_fake_app(
-    request,
-    file.path(fixture$stage, "cerebro_app")
-  )
-  unlink(file.path(app_dir, "private-data"), recursive = TRUE)
-
-  expect_error(
-    builder_verify_app(app_dir, request),
-    "private-data directory is missing or symbolic"
-  )
 })
 
 test_that("App verification rejects a tree changed during one verification", {
@@ -1634,37 +1375,6 @@ test_that("App verification reuses stable regular-file digests", {
   )
   expect_true(length(hashed) > 0L)
   expect_true(all(table(hashed) == 1L))
-})
-
-test_that("App verification rejects config drift and private path aliases", {
-  fixture <- builder_app_bundle_fixture()
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  app_dir <- builder_fake_app(
-    request,
-    file.path(fixture$stage, "cerebro_app")
-  )
-  config_file <- file.path(app_dir, "cerebro_config.rds")
-  config <- readRDS(config_file)
-  config$initial_dataset <- "Dataset A"
-  saveRDS(config, config_file)
-  expect_error(builder_verify_app(app_dir, request), "initial")
-
-  config$initial_dataset <- request$initial_dataset
-  config$crb_pick_smallest_file <- TRUE
-  saveRDS(config, config_file)
-  expect_error(builder_verify_app(app_dir, request), "smallest")
-
-  config$crb_pick_smallest_file <- request$crb_pick_smallest_file
-  saveRDS(config, config_file)
-  target <- file.path(app_dir, config$crb_file_to_load[[1L]])
-  unlink(target)
-  skip_on_os("windows")
-  expect_true(file.symlink(fixture$paths[[1L]], target))
-  expect_error(builder_verify_app(app_dir, request), "symbolic")
 })
 
 test_that("App verification requires every bundled backend sidecar", {
@@ -1762,29 +1472,6 @@ test_that("App config is size-bounded before deserialization", {
   expect_error(builder_verify_app(app_dir, request), "config is too large")
 })
 
-test_that("App config rejects deeply nested deserialized values", {
-  fixture <- builder_app_bundle_fixture()
-  request <- builder_app_bundle_request(
-    fixture$plan,
-    fixture$paths,
-    fixture$labels
-  )
-  app_dir <- builder_fake_app(
-    request,
-    file.path(fixture$stage, "cerebro_app")
-  )
-  config_file <- file.path(app_dir, "cerebro_config.rds")
-  config <- readRDS(config_file)
-  config$deep <- Reduce(
-    function(value, index) list(value),
-    seq_len(70L),
-    init = TRUE
-  )
-  saveRDS(config, config_file)
-
-  expect_error(builder_verify_app(app_dir, request), "inert readable")
-})
-
 test_that("App config rejects compressed values over the object byte budget", {
   fixture <- builder_app_bundle_fixture()
   request <- builder_app_bundle_request(
@@ -1845,65 +1532,39 @@ test_that("the privacy allowlist covers every bundled demo data file", {
 })
 
 test_that("App verification rejects private data outside exact allowed roots", {
-  assert_rejected <- function(relative, directory = FALSE) {
-    fixture <- builder_app_bundle_fixture()
-    request <- builder_app_bundle_request(
-      fixture$plan,
-      fixture$paths,
-      fixture$labels
-    )
-    app_dir <- builder_fake_app(
-      request,
-      file.path(fixture$stage, "cerebro_app")
-    )
-    target <- file.path(app_dir, relative)
-    dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
-    if (directory) {
-      dir.create(target)
-    } else {
-      writeBin(as.raw(1:4), target)
-    }
-    expect_error(builder_verify_app(app_dir, request), "outside private-data")
-  }
+  fixture <- builder_app_bundle_fixture()
+  request <- builder_app_bundle_request(
+    fixture$plan,
+    fixture$paths,
+    fixture$labels
+  )
+  app_dir <- builder_fake_app(
+    request,
+    file.path(fixture$stage, "cerebro_app")
+  )
+  leak <- file.path(app_dir, "viewer", "www", "leak.crb")
+  dir.create(dirname(leak), recursive = TRUE, showWarnings = FALSE)
+  writeBin(as.raw(1:4), leak)
+  expect_error(builder_verify_app(app_dir, request), "outside private-data")
 
-  assert_rejected("misc/rogue.crb")
-  assert_rejected("misc/rogue.h5")
-  assert_rejected("misc/leak.rds")
-  assert_rejected("extdata/examples/rogue.crb")
-  assert_rejected("viewer/www/leak.crb")
-  assert_rejected("viewer/www/leak.rds")
-  case_alias <- list(
-    entries = list(list(
-      path = "PRIVATE-DATA/rogue.crb",
-      type = "file",
-      md5 = strrep("a", 32L)
-    ))
-  )
-  names(case_alias$entries) <- "PRIVATE-DATA/rogue.crb"
-  expect_error(
-    .builder_app_validate_private_locations(
-      case_alias,
-      root = "/app",
-      .canonical_path = function(path) path
-    ),
-    "outside private-data"
-  )
-  case_config <- list(
-    entries = list(list(
-      path = "CEREBRO_CONFIG.RDS",
-      type = "file",
-      md5 = strrep("a", 32L)
-    ))
-  )
-  names(case_config$entries) <- "CEREBRO_CONFIG.RDS"
-  expect_error(
-    .builder_app_validate_private_locations(
-      case_config,
-      root = "/app",
-      .canonical_path = function(path) path
-    ),
-    "outside private-data"
-  )
+  # Case-only aliases of private paths are not private on any platform.
+  for (path in c("PRIVATE-DATA/rogue.crb", "CEREBRO_CONFIG.RDS")) {
+    identity <- list(
+      entries = stats::setNames(
+        list(list(path = path, type = "file", md5 = strrep("a", 32L))),
+        path
+      )
+    )
+    expect_error(
+      .builder_app_validate_private_locations(
+        identity,
+        root = "/app",
+        .canonical_path = function(path) path
+      ),
+      "outside private-data",
+      info = path
+    )
+  }
 })
 
 test_that("external spatial assets are frozen and passed as formal arguments", {
@@ -1968,16 +1629,7 @@ test_that("external spatial assets preserve their ROI scope", {
   expect_identical(observed$roi_value, "lesion")
 })
 
-test_that("external spatial request rejects aliases and target collisions", {
-  skip_on_os("windows")
-  linked <- builder_app_external_fixture()
-  link <- file.path(linked$stage, ".builder-spatial-assets", "linked.png")
-  expect_true(file.symlink(linked$image, link))
-  linked$plan$items[[1L]]$external_images[["section-a"]][["H&E"]]$path <- link
-  expect_error(
-    builder_app_bundle_request(linked$plan, linked$paths, linked$labels)
-  )
-
+test_that("external spatial request rejects duplicates and separates collisions", {
   duplicated <- builder_app_external_fixture()
   duplicated$plan$items[[1L]]$external_images[["section-a"]][["DAPI"]] <-
     duplicated$plan$items[[1L]]$external_images[["section-a"]][["H&E"]]

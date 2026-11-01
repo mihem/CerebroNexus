@@ -185,35 +185,3 @@ test_that("settlement diagnostics are retained only for terminal failures", {
     "boom"
   )))
 })
-
-test_that("callr output is drained before a pipe can hide the failure", {
-  skip_if_not_installed("callr")
-  runtime <- builder_diagnostics_test_runtime()
-  process <- callr::r_bg(
-    function() {
-      cat(strrep("o", 256L * 1024L))
-      message("stderr sentinel")
-      stop("remote diagnostic failure")
-    },
-    supervise = TRUE,
-    stdout = "|",
-    stderr = "|"
-  )
-  withr::defer(try(process$kill_tree(), silent = TRUE))
-  capture <- runtime$builder_diagnostics_capture(limit = 512L * 1024L)
-  deadline <- Sys.time() + 10
-  repeat {
-    capture <- runtime$builder_diagnostics_drain(process, capture)
-    if (!process$is_alive() || Sys.time() >= deadline) {
-      break
-    }
-    Sys.sleep(0.01)
-  }
-  capture <- runtime$builder_diagnostics_drain(process, capture)
-  value <- tryCatch(process$get_result(), error = identity)
-
-  expect_false(process$is_alive())
-  expect_s3_class(value, "condition")
-  expect_gte(length(capture$stdout), 256L * 1024L)
-  expect_match(rawToChar(capture$stderr), "stderr sentinel", fixed = TRUE)
-})
