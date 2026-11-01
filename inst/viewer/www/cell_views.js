@@ -4114,7 +4114,7 @@
       }, 0);
     });
   }
-  function reportSelection(eventKind) {
+  function reportSelection(eventKind, restoreReport) {
     eventKind = eventKind || 'interaction';
     var hasSelection = !!(sel && sel.size);
     var shiny = typeof Shiny !== 'undefined' && Shiny.setInputValue;
@@ -4213,6 +4213,7 @@
       viewId: singleActive,
       dataset_context: activeView && activeView.dataset_context,
       selectedCells: specialistReport.selectedCells,
+      selectionRestore: restoreReport || null,
       selectionPending: pendingStableSelection,
       datasetFingerprint: datasetFingerprint,
       eventKind: eventKind,
@@ -9762,12 +9763,16 @@
       p.lassoData = lens.lassoData || null; p.focusFrom = lens.focusFrom || null;
       project(p);
     });
+    // A restored selection may name cells this view does not draw (a trajectory
+    // holds only some of the data set's cells): the report says how many it kept.
+    var restoreReport = null;
     if (Array.isArray(payload.selection) && payload.selection.length) {
       var cells = singleIndex(), restored = new Set();
       payload.selection.forEach(function (cell) {
         var at = cells.get(String(cell)); if (at != null) restored.add(at);
       });
       sel = restored.size ? restored : null;
+      restoreReport = { requested: payload.selection.length, restored: restored.size };
     }
     // A reused surface keeps its panels, but the restored lenses may carry a
     // Focus state of their own: the toggle follows it either way.
@@ -9777,7 +9782,7 @@
     var drawn = resizeAll();
     renderSelbar();
     if (!drawn) drawAll();
-    reportSingleHiddenGroups(); reportSelection(eventKind || 'interaction');
+    reportSingleHiddenGroups(); reportSelection(eventKind || 'interaction', restoreReport);
     // Gene's selection core is requested by click or brush, and, once the page
     // is idle, in the background: sending all cell IDs at once would compete
     // with the user's first gene operation on the R thread.
