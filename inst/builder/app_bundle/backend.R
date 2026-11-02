@@ -622,87 +622,18 @@
       is.object(plain$crb_identities) ||
       !identical(names(plain$crb_identities), plain$selector_order) ||
       length(plain$crb_identities) != length(plain$cerebro_data) ||
-      !is.character(plain$initial_dataset) ||
-      length(plain$initial_dataset) != 1L ||
-      is.na(plain$initial_dataset) ||
-      !plain$initial_dataset %in% plain$selector_order ||
-      !is.character(plain$initial_dataset_mode) ||
-      length(plain$initial_dataset_mode) != 1L ||
-      is.na(plain$initial_dataset_mode) ||
-      !plain$initial_dataset_mode %in% c("automatic", "explicit") ||
-      (identical(plain$initial_dataset_mode, "automatic") &&
-        !identical(
-          plain$initial_dataset,
-          plain$selector_order[[1L]]
-        )) ||
-      !is.character(plain$initial_page) ||
-      length(plain$initial_page) != 1L ||
-      is.na(plain$initial_page) ||
-      !plain$initial_page %in% builder_viewer_known_page_ids() ||
-      !is.logical(plain$show_upload_ui) ||
-      length(plain$show_upload_ui) != 1L ||
-      is.na(plain$show_upload_ui) ||
-      !is.character(plain$welcome_message) ||
-      length(plain$welcome_message) != 1L ||
-      is.na(plain$welcome_message) ||
-      !nzchar(trimws(plain$welcome_message)) ||
-      !is.list(plain$point_size) ||
-      is.null(names(plain$point_size)) ||
-      !length(names(plain$point_size)) ||
-      !identical(
-        names(plain$point_size)[[1L]],
-        "overview_projection_point_size"
+      !.builder_app_options_valid(
+        c(
+          list(enabled = TRUE),
+          plain[names(.builder_app_option_checks(plain$selector_order))]
+        ),
+        plain$selector_order,
+        point_size_min = 1
       ) ||
-      any(
-        !names(plain$point_size) %in%
-          c(
-            "overview_projection_point_size",
-            "projection_point_opacity"
-          )
-      ) ||
-      !is.numeric(plain$point_size$overview_projection_point_size) ||
-      length(plain$point_size$overview_projection_point_size) != 1L ||
-      is.na(plain$point_size$overview_projection_point_size) ||
-      !is.finite(plain$point_size$overview_projection_point_size) ||
-      plain$point_size$overview_projection_point_size < 1 ||
-      plain$point_size$overview_projection_point_size > 20 ||
-      (!is.null(plain$point_size$projection_point_opacity) &&
-        (!is.numeric(plain$point_size$projection_point_opacity) ||
-          length(plain$point_size$projection_point_opacity) != 1L ||
-          is.na(plain$point_size$projection_point_opacity) ||
-          !is.finite(plain$point_size$projection_point_opacity) ||
-          plain$point_size$projection_point_opacity < 0.1 ||
-          plain$point_size$projection_point_opacity > 1)) ||
       !.builder_app_viewer_content_valid(
         plain$viewer_content,
         plain$selector_order
       ) ||
-      !is.logical(plain$variable_to_compare) ||
-      length(plain$variable_to_compare) != 1L ||
-      is.na(plain$variable_to_compare) ||
-      !is.character(plain$host) ||
-      length(plain$host) != 1L ||
-      is.na(plain$host) ||
-      !nzchar(plain$host) ||
-      !is.numeric(plain$port) ||
-      length(plain$port) != 1L ||
-      is.na(plain$port) ||
-      !is.finite(plain$port) ||
-      plain$port != floor(plain$port) ||
-      plain$port < 1 ||
-      plain$port > 65535 ||
-      !is.numeric(plain$max_request_size) ||
-      length(plain$max_request_size) != 1L ||
-      is.na(plain$max_request_size) ||
-      !is.finite(plain$max_request_size) ||
-      plain$max_request_size <= 0 ||
-      !is.character(plain$display_mode) ||
-      length(plain$display_mode) != 1L ||
-      is.na(plain$display_mode) ||
-      !plain$display_mode %in% c("auto", "normal", "showcase") ||
-      !is.logical(plain$launch_browser) ||
-      length(plain$launch_browser) != 1L ||
-      is.na(plain$launch_browser) ||
       !.builder_app_auth_request_valid(plain$auth) ||
       !.builder_app_colors_valid(plain$colors, plain$selector_order) ||
       !identical(plain$crb_pick_smallest_file, FALSE) ||

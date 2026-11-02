@@ -446,103 +446,90 @@
   isTRUE(valid) && !anyDuplicated(source_paths) && !anyDuplicated(targets)
 }
 
-.builder_app_options_valid <- function(options, dataset_order) {
-  expected <- c(
-    "enabled",
-    "show_upload_ui",
-    "initial_dataset",
-    "initial_dataset_mode",
-    "initial_page",
-    "welcome_message",
-    "point_size",
-    "variable_to_compare",
-    "host",
-    "port",
-    "max_request_size",
-    "display_mode",
-    "launch_browser"
-  )
-  point_size <- if (is.list(options)) options$point_size else NULL
-  point_value <- if (is.list(point_size)) {
-    point_size$overview_projection_point_size
-  } else {
-    NULL
+## One check per generated-App option, shared by the frozen options and the
+## App request. `point_size_min` is the overview point-size lower bound: the
+## frozen options (like the plan check in plan/preflight.R) accept 0, the App
+## request requires 1.
+.builder_app_option_checks <- function(dataset_order, point_size_min = 0) {
+  flag <- function(value) {
+    is.logical(value) && length(value) == 1L && !is.na(value)
   }
+  choice <- function(value, choices) {
+    is.character(value) &&
+      length(value) == 1L &&
+      !is.na(value) &&
+      value %in% choices
+  }
+  list(
+    show_upload_ui = flag,
+    initial_dataset = function(value) choice(value, dataset_order),
+    initial_dataset_mode = function(value) {
+      choice(value, c("automatic", "explicit"))
+    },
+    initial_page = function(value) {
+      choice(value, builder_viewer_known_page_ids())
+    },
+    welcome_message = function(value) {
+      is.character(value) &&
+        length(value) == 1L &&
+        !is.na(value) &&
+        nzchar(trimws(value))
+    },
+    point_size = function(value) {
+      is.list(value) &&
+        !is.object(value) &&
+        length(names(value)) >= 1L &&
+        identical(names(value)[[1L]], "overview_projection_point_size") &&
+        all(
+          names(value) %in%
+            c(
+              "overview_projection_point_size",
+              "projection_point_opacity"
+            )
+        ) &&
+        .builder_app_number_in(
+          value$overview_projection_point_size,
+          point_size_min,
+          20
+        ) &&
+        (is.null(value$projection_point_opacity) ||
+          .builder_app_number_in(value$projection_point_opacity, 0.1, 1))
+    },
+    variable_to_compare = flag,
+    host = .builder_app_text,
+    port = function(value) {
+      .builder_app_number_in(value, 1, 65535) && value == floor(value)
+    },
+    max_request_size = function(value) {
+      is.numeric(value) &&
+        length(value) == 1L &&
+        is.finite(value) &&
+        value > 0
+    },
+    display_mode = function(value) {
+      choice(value, c("auto", "normal", "showcase"))
+    },
+    launch_browser = flag
+  )
+}
+
+.builder_app_options_valid <- function(
+  options,
+  dataset_order,
+  point_size_min = 0
+) {
+  checks <- .builder_app_option_checks(dataset_order, point_size_min)
   is.list(options) &&
     !is.object(options) &&
-    identical(sort(names(options)), sort(expected)) &&
+    identical(sort(names(options)), sort(c("enabled", names(checks)))) &&
     isTRUE(options$enabled) &&
-    is.logical(options$show_upload_ui) &&
-    length(options$show_upload_ui) == 1L &&
-    !is.na(options$show_upload_ui) &&
-    is.character(options$initial_dataset) &&
-    length(options$initial_dataset) == 1L &&
-    !is.na(options$initial_dataset) &&
-    options$initial_dataset %in% dataset_order &&
-    is.character(options$initial_dataset_mode) &&
-    length(options$initial_dataset_mode) == 1L &&
-    !is.na(options$initial_dataset_mode) &&
-    options$initial_dataset_mode %in% c("automatic", "explicit") &&
+    all(vapply(
+      names(checks),
+      function(name) isTRUE(checks[[name]](options[[name]])),
+      logical(1)
+    )) &&
     (!identical(options$initial_dataset_mode, "automatic") ||
-      identical(options$initial_dataset, dataset_order[[1L]])) &&
-    is.character(options$initial_page) &&
-    length(options$initial_page) == 1L &&
-    !is.na(options$initial_page) &&
-    options$initial_page %in% builder_viewer_known_page_ids() &&
-    is.character(options$welcome_message) &&
-    length(options$welcome_message) == 1L &&
-    !is.na(options$welcome_message) &&
-    nzchar(trimws(options$welcome_message)) &&
-    is.list(point_size) &&
-    !is.object(point_size) &&
-    length(names(point_size)) >= 1L &&
-    identical(names(point_size)[[1L]], "overview_projection_point_size") &&
-    all(
-      names(point_size) %in%
-        c(
-          "overview_projection_point_size",
-          "projection_point_opacity"
-        )
-    ) &&
-    is.numeric(point_value) &&
-    length(point_value) == 1L &&
-    !is.na(point_value) &&
-    is.finite(point_value) &&
-    point_value >= 0 &&
-    point_value <= 20 &&
-    (is.null(point_size$projection_point_opacity) ||
-      (is.numeric(point_size$projection_point_opacity) &&
-        length(point_size$projection_point_opacity) == 1L &&
-        !is.na(point_size$projection_point_opacity) &&
-        is.finite(point_size$projection_point_opacity) &&
-        point_size$projection_point_opacity >= 0.1 &&
-        point_size$projection_point_opacity <= 1)) &&
-    is.logical(options$variable_to_compare) &&
-    length(options$variable_to_compare) == 1L &&
-    !is.na(options$variable_to_compare) &&
-    is.character(options$host) &&
-    length(options$host) == 1L &&
-    !is.na(options$host) &&
-    nzchar(options$host) &&
-    is.numeric(options$port) &&
-    length(options$port) == 1L &&
-    !is.na(options$port) &&
-    is.finite(options$port) &&
-    options$port == floor(options$port) &&
-    options$port >= 1 &&
-    options$port <= 65535 &&
-    is.numeric(options$max_request_size) &&
-    length(options$max_request_size) == 1L &&
-    !is.na(options$max_request_size) &&
-    is.finite(options$max_request_size) &&
-    options$max_request_size > 0 &&
-    is.character(options$display_mode) &&
-    length(options$display_mode) == 1L &&
-    !is.na(options$display_mode) &&
-    options$display_mode %in% c("auto", "normal", "showcase") &&
-    is.logical(options$launch_browser) &&
-    length(options$launch_browser) == 1L &&
-    !is.na(options$launch_browser)
+      identical(options$initial_dataset, dataset_order[[1L]]))
 }
 
 .builder_app_auth_request_valid <- function(value) {
