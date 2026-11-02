@@ -330,15 +330,19 @@ group_catalog_for_entry <- function(entry) {
   ))
 }
 
-send_group_state <- function(entry, message = NULL) {
+## The revision a client state message carries: the stored dataset's when it
+## is still in the store.
+entry_generation <- function(entry) {
   current_entry <- isolate(entry_of(entry$id)) %||% entry
+  as.integer(current_entry$revision %||% entry$revision %||% 0L)
+}
+
+send_group_state <- function(entry, message = NULL) {
   session$sendCustomMessage(
     "builder_group_state",
     list(
       dataset = entry$id,
-      generation = as.integer(
-        current_entry$revision %||% entry$revision %||% 0L
-      ),
+      generation = entry_generation(entry),
       included = unname(entry$settings$included_groups %||% character()),
       default = entry$settings$default_group %||% NULL,
       message = message
@@ -398,14 +402,11 @@ selectable_trajectory_selection <- function(catalog) {
 }
 
 send_projection_state <- function(entry, message = NULL) {
-  current_entry <- isolate(entry_of(entry$id)) %||% entry
   session$sendCustomMessage(
     "builder_projection_state",
     list(
       dataset = entry$id,
-      generation = as.integer(
-        current_entry$revision %||% entry$revision %||% 0L
-      ),
+      generation = entry_generation(entry),
       included = unname(
         entry$settings$included_projections %||% character()
       ),
@@ -427,7 +428,6 @@ send_projection_state <- function(entry, message = NULL) {
 }
 
 send_trajectory_state <- function(entry, message = NULL) {
-  current_entry <- isolate(entry_of(entry$id)) %||% entry
   included <- list()
   for (method in names(entry$settings$included_trajectories %||% list())) {
     for (name in entry$settings$included_trajectories[[method]]) {
@@ -441,9 +441,7 @@ send_trajectory_state <- function(entry, message = NULL) {
     "builder_trajectory_state",
     list(
       dataset = entry$id,
-      generation = as.integer(
-        current_entry$revision %||% entry$revision %||% 0L
-      ),
+      generation = entry_generation(entry),
       included = included,
       default = entry$settings$default_trajectory %||% NULL,
       message = message
