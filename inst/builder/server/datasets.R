@@ -681,80 +681,81 @@ observeEvent(
   ignoreInit = TRUE
 )
 
-observe({
+## The current dataset when the worker can preview it.
+preview_entry <- function() {
   req(isTRUE(worker_available()))
   id <- current()
   req(id)
   entry <- builder_upgrade_viewer_content_entry(entry_of(id))
   req(entry)
   req(!identical(entry$load_state %||% "loaded", "artifact_ready"))
+  entry
+}
+
+## Queue one gallery preview unless `previews` already holds this contract;
+## an empty selection is stored as ready without asking the worker.
+queue_previews <- function(previews, entry, contract, selection, request) {
+  cache <- isolate(previews())
+  if (builder_preview_cache_hit(cache, entry$id, contract)) {
+    return()
+  }
+  if (!length(selection)) {
+    previews(builder_preview_cache_store(
+      builder_preview_cache_begin(cache, entry$id, contract),
+      entry$id,
+      list()
+    ))
+    return()
+  }
+  if (isTRUE(enqueue(request))) {
+    previews(builder_preview_cache_begin(cache, entry$id, contract))
+  }
+}
+
+observe({
+  entry <- preview_entry()
   catalog <- projection_catalog_for_entry(entry)
   ids <- names(catalog)[vapply(
     catalog,
     function(item) is.list(item) && isTRUE(item$available),
     logical(1)
   )]
-  contract <- builder_projection_preview_contract(entry, ids)
-  cache <- isolate(projection_previews())
-  if (builder_preview_cache_hit(cache, id, contract)) {
-    return()
-  }
-  if (!length(ids)) {
-    projection_previews(builder_preview_cache_store(
-      builder_preview_cache_begin(cache, id, contract),
-      id,
-      list()
-    ))
-    return()
-  }
-  queued <- enqueue(list(
-    kind = "projection_previews",
-    id = id,
-    dataset_revision = entry$revision,
-    projections = ids,
-    group = entry$settings$default_group %||% NULL,
-    max_cells = BUILDER_PREVIEW_MAX,
-    replaces = "viewer-projection-gallery"
-  ))
-  if (isTRUE(queued)) {
-    projection_previews(builder_preview_cache_begin(cache, id, contract))
-  }
+  queue_previews(
+    projection_previews,
+    entry,
+    builder_projection_preview_contract(entry, ids),
+    ids,
+    list(
+      kind = "projection_previews",
+      id = entry$id,
+      dataset_revision = entry$revision,
+      projections = ids,
+      group = entry$settings$default_group %||% NULL,
+      max_cells = BUILDER_PREVIEW_MAX,
+      replaces = "viewer-projection-gallery"
+    )
+  )
 })
 
 observe({
-  req(isTRUE(worker_available()))
-  id <- current()
-  req(id)
-  entry <- builder_upgrade_viewer_content_entry(entry_of(id))
-  req(entry)
-  req(!identical(entry$load_state %||% "loaded", "artifact_ready"))
+  entry <- preview_entry()
   trajectories <- selectable_trajectory_selection(
     trajectory_catalog_for_entry(entry)
   )
-  contract <- builder_trajectory_preview_contract(entry, trajectories)
-  cache <- isolate(trajectory_previews())
-  if (builder_preview_cache_hit(cache, id, contract)) {
-    return()
-  }
-  if (!length(trajectories)) {
-    trajectory_previews(builder_preview_cache_store(
-      builder_preview_cache_begin(cache, id, contract),
-      id,
-      list()
-    ))
-    return()
-  }
-  queued <- enqueue(list(
-    kind = "trajectory_previews",
-    id = id,
-    dataset_revision = entry$revision,
-    trajectories = trajectories,
-    max_cells = BUILDER_PREVIEW_MAX,
-    replaces = "viewer-trajectory-gallery"
-  ))
-  if (isTRUE(queued)) {
-    trajectory_previews(builder_preview_cache_begin(cache, id, contract))
-  }
+  queue_previews(
+    trajectory_previews,
+    entry,
+    builder_trajectory_preview_contract(entry, trajectories),
+    trajectories,
+    list(
+      kind = "trajectory_previews",
+      id = entry$id,
+      dataset_revision = entry$revision,
+      trajectories = trajectories,
+      max_cells = BUILDER_PREVIEW_MAX,
+      replaces = "viewer-trajectory-gallery"
+    )
+  )
 })
 
 observeEvent(
