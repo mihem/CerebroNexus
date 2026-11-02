@@ -253,30 +253,6 @@ builder_alignment_defaults <- function() {
     bounds$ymax > bounds$ymin
 }
 
-#' Expand a coordinate viewport to its displayed extent after rotation.
-builder_alignment_rotated_bounds <- function(bounds, rotation = 0) {
-  if (!.builder_alignment_valid_bounds(bounds)) {
-    stop("Alignment requires finite, non-empty physical bounds.", call. = FALSE)
-  }
-  rotation <- suppressWarnings(as.numeric(rotation))
-  if (length(rotation) != 1L || is.na(rotation) || !is.finite(rotation)) {
-    stop("Alignment rotation must be finite.", call. = FALSE)
-  }
-  radians <- rotation * pi / 180
-  width <- bounds$xmax - bounds$xmin
-  height <- bounds$ymax - bounds$ymin
-  extent_width <- abs(width * cos(radians)) + abs(height * sin(radians))
-  extent_height <- abs(width * sin(radians)) + abs(height * cos(radians))
-  centre_x <- (bounds$xmin + bounds$xmax) / 2
-  centre_y <- (bounds$ymin + bounds$ymax) / 2
-  list(
-    xmin = centre_x - extent_width / 2,
-    xmax = centre_x + extent_width / 2,
-    ymin = centre_y - extent_height / 2,
-    ymax = centre_y + extent_height / 2
-  )
-}
-
 #' Fit the original image inside the physical coordinate viewport.
 #'
 #' The image is centred, aspect-preserving, and fills the available viewport.

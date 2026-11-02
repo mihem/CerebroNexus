@@ -3776,91 +3776,12 @@
     }
   }
 
+  // The server only ever closes the client's pending build status.
   function showBuildDialog(message) {
-    var existing = document.querySelector(".builder-build-dialog-backdrop");
-    if (message && message.action === "close") {
-      if (existing) existing.remove();
-      var pending = document.querySelector(".is-client-build-status");
-      if (pending) pending.remove();
-      updateDialogLock();
-      return;
-    }
-    if (!message || message.type !== "conflict") return;
-    if (existing) return;
-    var trigger = document.getElementById("build");
-    var backdrop = document.createElement("div");
-    backdrop.className = "builder-confirm-backdrop builder-build-dialog-backdrop";
-    var dialog = document.createElement("div");
-    dialog.className = "builder-dialog builder-confirm-dialog builder-build-dialog";
-    var title = document.createElement("h2");
-    title.id = "builder-build-dialog-title";
-    title.textContent = message.title || "Files already exist";
-    dialog.appendChild(title);
-
-    var description = document.createElement("p");
-    description.textContent = "Some outputs already exist in this folder:";
-    dialog.appendChild(description);
-
-    var list = document.createElement("ul");
-    list.className = "builder-build-dialog-list";
-    var values = Array.isArray(message.files)
-      ? message.files
-      : (typeof message.files === "string" && message.files.length
-        ? [message.files]
-        : []);
-    var shown = values.slice(0, 4);
-    shown.forEach(function (name) {
-      var item = document.createElement("li");
-      item.textContent = name;
-      list.appendChild(item);
-    });
-    if (values.length > shown.length) {
-      var more = document.createElement("li");
-      more.textContent = "…and " + (values.length - shown.length) + " more";
-      list.appendChild(more);
-    }
-    dialog.appendChild(list);
-    var question = document.createElement("p");
-    question.textContent = "What would you like to do?";
-    dialog.appendChild(question);
-
-    var actions = document.createElement("div");
-    actions.className = "builder-dialog-actions builder-confirm-actions builder-build-dialog-actions";
-    var buttons = [
-      { label: "Cancel", action: "cancel", className: "btn" },
-      { label: "Replace existing files", action: "replace", className: "btn btn-replace" },
-      { label: "Choose another folder", action: "choose_another", className: "btn btn-action" },
-    ];
-    var closed = false;
-    function close(action) {
-      if (closed) return;
-      closed = true;
-      send("builder_build_dialog", {
-        action: action || "cancel",
-        nonce: message.nonce,
-      });
-      removeTransientLayer(backdrop, dialog, "is-visible", function () {
-        updateDialogLock();
-        restoreFocus(dialog);
-      });
-    }
-    buttons.forEach(function (definition) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = definition.className;
-      button.textContent = definition.label;
-      button.addEventListener("click", function () { close(definition.action); });
-      actions.appendChild(button);
-    });
-    dialog.appendChild(actions);
-    backdrop.appendChild(dialog);
-    document.body.appendChild(backdrop);
-    dialog.setAttribute("aria-labelledby", title.id);
-    backdrop.addEventListener("click", function (event) {
-      if (event.target === backdrop) close("cancel");
-    });
-    prepareDialog(dialog, trigger, close);
-    showTransientLayer(backdrop, dialog);
+    if (!message || message.action !== "close") return;
+    var pending = document.querySelector(".is-client-build-status");
+    if (pending) pending.remove();
+    updateDialogLock();
   }
 
   function setCurrentStage(stage) {

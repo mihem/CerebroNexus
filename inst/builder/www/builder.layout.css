@@ -546,7 +546,6 @@
 @media (max-width: 68.75rem) {
   :root {
     --builder-rail-width: 15.5rem;
-    --builder-shell-gap: var(--space-4);
   }
 }
 

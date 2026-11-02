@@ -1294,14 +1294,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   box-shadow: none;
 }
 .builder-stage-header { margin-bottom: var(--space-5); }
-.builder-stage-eyebrow {
-  margin: 0 0 var(--space-1);
-  color: var(--builder-action);
-  font-size: var(--builder-type-micro);
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
 .builder-stage-header h2 {
   margin: 0;
   font-size: clamp(1.5rem, 2vw, 1.75rem);
@@ -1618,7 +1610,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   max-width: 100%;
   align-items: stretch;
 }
-.builder-file-picker--content,
 .builder-file-picker--compact {
   width: fit-content;
   min-width: min(12rem, 100%);
@@ -1636,8 +1627,7 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   white-space: nowrap;
   border: 0;
 }
-.builder-file-trigger,
-.dataset-file-button {
+.builder-file-trigger {
   display: inline-flex;
   width: 100%;
   min-height: 2.65rem;
@@ -1659,24 +1649,10 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
     box-shadow var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard);
 }
-.dataset-file-button .icon { width: 1rem; height: 1rem; }
-.builder-file-trigger--secondary {
-  border-color: var(--c-border);
-  background: var(--c-surface);
-  color: var(--c-text);
-  box-shadow: none;
-}
 .builder-file-picker:hover .builder-file-trigger {
   background: var(--builder-action-hover);
   border-color: var(--builder-action-hover);
   box-shadow: var(--shadow-2);
-}
-.builder-file-picker:hover .builder-file-trigger--secondary,
-.builder-file-trigger--secondary:hover {
-  border-color: var(--builder-action);
-  background: var(--c-surface);
-  color: var(--builder-action);
-  box-shadow: var(--shadow-1);
 }
 .builder-file-picker:active .builder-file-trigger {
   background: var(--builder-action-active);
@@ -2286,7 +2262,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   width: min(100%, 72rem);
   margin-inline: auto;
 }
-.builder-empty-header { margin-bottom: 0; }
 .builder-dataset-dropzone {
   display: grid;
   width: 100%;
@@ -2430,7 +2405,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 .builder-data-source-copy { display: grid; min-width: 0; gap: .18rem; }
 .builder-data-source-copy strong { font-size: var(--builder-type-body); font-weight: 650; }
 .builder-data-source-copy small { color: var(--c-text-muted); font-size: var(--builder-type-caption); }
-.builder-data-source-tags { display: flex; align-items: center; gap: var(--space-2); }
 .builder-data-source-tag {
   display: inline-flex;
   width: 4.4rem;
@@ -2445,11 +2419,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   font-size: var(--builder-type-body);
   font-weight: 800;
   line-height: 1;
-}
-.builder-data-source-tag.is-fast {
-  border-color: var(--c-success);
-  background: var(--c-success-50);
-  color: var(--c-success-700);
 }
 .builder-data-source-tag.is-example {
   width: auto;
@@ -2475,7 +2444,6 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 .builder-data-source.example-btn .builder-data-source-tag {
   display: none;
 }
-.builder-data-source.example-btn.is-taken { display: none; }
 .builder-data-source.example-btn.is-loading { cursor: wait; }
 .builder-data-source.example-btn.is-loading .builder-data-source-icon {
   color: var(--builder-action-active);
@@ -2800,10 +2768,6 @@ input.is-invalid {
 .builder-dialog-actions .btn,
 .builder-confirm-actions .btn { min-height: 2.5rem; }
 
-.builder-build-dialog {
-  width: min(31rem, calc(100vw - 2rem));
-}
-
 .builder-marker-dialog-backdrop {
   z-index: 90;
 }
@@ -2821,34 +2785,6 @@ input.is-invalid {
 
 .marker-dialog-actions {
   margin-top: var(--space-4);
-}
-
-.builder-build-dialog-list {
-  max-height: 15rem;
-  margin: 0 0 var(--space-4);
-  padding-left: var(--space-6);
-  overflow: auto;
-  color: var(--c-text);
-}
-
-.builder-build-dialog-list li {
-  padding: var(--space-1) 0;
-  overflow-wrap: anywhere;
-}
-
-.builder-build-dialog-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.builder-build-dialog .btn-replace {
-  border-color: transparent;
-  background: var(--c-error-50);
-  color: var(--c-error-700);
-}
-
-.builder-build-dialog .btn-replace:hover {
-  background: var(--c-error-100);
 }
 
 .builder-dialog-actions,
@@ -2951,7 +2887,6 @@ input.is-invalid {
     grid-row: auto;
   }
   .card { padding: var(--space-4); }
-  .builder-file-picker--content,
   .builder-file-picker--compact { width: 100%; max-width: none; }
   .builder-action-row {
     flex-direction: column;
