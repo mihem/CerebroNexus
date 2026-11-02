@@ -1,11 +1,8 @@
 /* CerebroNexus Builder: page, shell, and responsive layout styles. */
 
 .topbar {
-  background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-bottom: 0;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  padding: var(--space-3) var(--space-4);
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -14,7 +11,6 @@
   top: auto;
   z-index: 30;
   width: calc(100% - 2 * var(--builder-page-gutter));
-  max-width: none;
   margin: var(--space-3) auto 0;
 }
 .builder-project-brand {
@@ -40,10 +36,10 @@
 .topbar .wordmark { display: flex; align-items: center; gap: var(--space-3); }
 .topbar .wordmark svg { height: 17px; width: auto; display: block; }
 .topbar h1 {
-  font-size: var(--builder-type-subtitle); font-weight: 600; margin: 0; letter-spacing: -.01em;
+  margin: 0;
 }
 .topbar .formats {
-  font-size: var(--builder-type-caption); color: var(--c-text-subtle); font-family: var(--font-mono);
+  font-size: var(--builder-type-caption); font-family: var(--font-mono);
   margin-left: 0;
 }
 .builder-project-toolbar {
@@ -61,19 +57,11 @@
   z-index: 20;
   display: block;
   width: calc(100% - 2 * var(--builder-page-gutter));
-  max-width: none;
   margin: 0 auto;
 }
 #workflow_progress .builder-workflow-progress {
   padding: 0 var(--space-5);
   border: 1px solid var(--c-border);
-  background: var(--c-surface-2);
-}
-#workflow_progress.is-workflow-compact .builder-workflow-progress {
-  border-color: var(--c-border-strong);
-  border-top-color: transparent;
-  background: var(--c-surface);
-  box-shadow: var(--shadow-2);
 }
 #workflow_progress.is-workflow-compact .builder-workflow-progress li > button,
 #workflow_progress.is-workflow-compact .builder-workflow-progress li > span {
@@ -102,7 +90,6 @@
   grid-template-columns: var(--builder-rail-width) minmax(0, 1fr);
   gap: 0;
   width: calc(100% - 2 * var(--builder-page-gutter));
-  max-width: none;
   min-height: calc(100dvh - 12rem);
   margin: 0 auto var(--space-8);
   padding: 0;
@@ -110,8 +97,6 @@
   position: relative;
   border: 1px solid var(--c-border);
   border-top: 0;
-  border-radius: 0 0 var(--r-lg) var(--r-lg);
-  background: var(--c-surface);
   box-shadow: none;
   overflow: clip;
   transition: min-height 220ms var(--ease-standard);
@@ -201,7 +186,6 @@
 }
 #workbench > * { min-width: 0; }
 .builder-stage {
-  background: var(--c-surface);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -269,7 +253,6 @@
 
 .rail {
   z-index: 3;
-  background: var(--c-surface);
   border: 0;
   border-right: 1px solid var(--c-border);
   border-radius: 0;
@@ -280,13 +263,7 @@
 }
 .ds--ready:has(.ds-ready-stamp.needs-review) .ds-pick { padding-right: 2.5rem; }
 .rail-head {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--c-border);
-  font-size: var(--builder-type-caption);
-  font-family: var(--font-mono);
-  letter-spacing: .09em;
   text-transform: uppercase;
-  color: var(--c-text-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -296,24 +273,18 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
-  margin: var(--space-3);
-  padding-top: var(--space-3);
   border-top: 1px solid var(--c-border);
 }
 .rail-add-actions .btn {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
-  min-height: 4.25rem;
   justify-content: center;
   justify-items: center;
   align-items: center;
   align-content: center;
   gap: var(--space-1);
   padding: var(--space-3) var(--space-3);
-  border-color: var(--c-border);
-  border-radius: var(--r-sm);
-  background: var(--c-surface);
   text-align: left;
   box-shadow: none;
 }
@@ -325,11 +296,8 @@
 }
 .rail-add-icon {
   display: grid;
-  width: 2.15rem;
-  height: 2.15rem;
   place-items: center;
   border-radius: var(--r-xs);
-  background: var(--c-surface-2);
   color: var(--c-text-muted);
 }
 .rail-add-title {
@@ -388,44 +356,27 @@
    whole row selects, and a remove button sits on top of its right end. */
 .ds {
   position: relative;
-  margin: var(--space-2) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
   transition: background var(--duration-base) var(--ease),
               box-shadow var(--duration-fast) var(--ease-standard),
               transform var(--duration-fast) var(--ease-standard);
 }
 .ds-picker .ds:not(.is-active):has(.ds-pick:hover),
 .ds-picker .ds:not(.is-active):has(.ds-pick:focus-visible) {
-  background: var(--builder-rail-hover-bg);
-  box-shadow: inset 0 0 0 1px var(--c-border-2);
   transform: none;
 }
-.ds-picker .ds.is-active:has(.ds-pick:hover),
-.ds-picker .ds.is-active:has(.ds-pick:focus-visible) {
-  box-shadow: inset 0 0 0 1px var(--c-border-2);
-}
 .ds.is-active {
-  border-color: var(--c-border-2);
-  background: var(--c-surface-2);
   color: var(--c-text);
 }
 .ds::before {
   position: absolute;
-  inset: .55rem auto .55rem -.05rem;
-  width: 3px;
-  border-radius: var(--r-pill);
-  background: transparent;
   content: "";
 }
-.ds.is-active::before { background: var(--builder-action); }
 
 .ds-pick {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
   border: none;
   background: transparent;
   text-align: left;
@@ -439,16 +390,8 @@
 .ds-idx {
   display: inline-grid;
   flex: 0 0 1.7rem;
-  width: 1.7rem;
-  height: 1.7rem;
   place-items: center;
-  border: 1px solid var(--c-border-2);
-  border-radius: 50%;
-  background: var(--c-surface);
-  color: var(--c-text-muted);
-  font-size: var(--builder-type-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
   line-height: 1;
 }
 .ds-idx::before, .ds-idx::after { display: none; }
@@ -459,18 +402,15 @@
 }
 .ds:has(.ds-ready-stamp.is-checked) .ds-idx {
   border-color: var(--c-success);
-  background: var(--c-success);
-  color: #fff;
 }
 
 .ds-body { min-width: 0; flex: 1; }
 .ds .nm {
-  display: block; font-weight: 600; font-size: var(--builder-type-body); line-height: 1.5;
+  display: block; line-height: 1.5;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ds .meta {
-  display: block; font-family: var(--font-mono); font-size: var(--builder-type-caption);
-  color: var(--c-text-subtle);
+  display: block; font-family: var(--font-mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ds .meta.bad { color: var(--c-warning); }
@@ -484,17 +424,14 @@
   justify-content: center;
   position: static;
   width: auto;
-  min-height: 1.8rem;
   padding: var(--space-1) var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--r-xs);
-  background: transparent;
   color: var(--c-error);
-  font-weight: 700;
   cursor: pointer;
   opacity: 1;
 }
-.ds-del:hover { background: var(--c-error-100); color: var(--c-error); }
+.ds-del:hover { color: var(--c-error); }
 .ds-del:focus-visible { outline: 2px solid var(--c-error); outline-offset: 1px; }
 .ds-actions {
   display: flex;
@@ -502,9 +439,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-1);
-  padding: 0 var(--space-3) var(--space-2);
-  opacity: .62;
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 .ds:hover .ds-actions,
 .ds:focus-within .ds-actions,
@@ -513,12 +447,10 @@
   display: inline-flex;
   width: auto;
   min-width: 1.8rem;
-  min-height: 1.8rem;
   margin: 0;
   padding: .15rem var(--space-1);
   border: 1px solid var(--c-border-2);
   border-radius: var(--r-xs);
-  background: var(--c-surface);
   color: var(--c-text-muted);
   cursor: pointer;
 }
@@ -527,7 +459,6 @@
   align-items: center;
   gap: var(--space-1);
   font: inherit;
-  font-size: var(--builder-type-caption);
   line-height: 1;
 }
 .ds-action-label { white-space: nowrap; }
@@ -544,9 +475,6 @@
 .builder-stage-core { max-width: none; overflow: visible; }
 
 @media (max-width: 68.75rem) {
-  :root {
-    --builder-rail-width: 15.5rem;
-  }
 }
 
 @media (max-width: 58rem) {
@@ -616,12 +544,6 @@
 }
 
 @media (max-width: 40rem) {
-  :root {
-    --builder-page-gutter: var(--space-4);
-    --builder-stage-padding: var(--space-4);
-    --builder-section-gap: var(--space-3);
-  }
-  .topbar { padding-inline: var(--space-4); }
   .builder-project-toolbar {
     width: 100%;
     order: 3;

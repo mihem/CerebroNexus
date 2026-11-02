@@ -69,8 +69,6 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--c-border);
-  border-radius: var(--r-md);
-  background: var(--c-surface-muted);
 }
 .spatial-coordinate-settings > summary {
   display: flex;
@@ -472,9 +470,6 @@
 }
 .builder-viewer-content-head h4 {
   margin: 0;
-  color: var(--c-text);
-  font-size: var(--builder-type-subtitle);
-  font-weight: 700;
   line-height: 1.4;
 }
 .builder-viewer-content-head p {
@@ -485,18 +480,13 @@
 }
 .builder-viewer-card {
   overflow: hidden;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-md);
-  background: var(--c-surface);
 }
 .builder-viewer-card > summary {
   display: flex;
   width: 100%;
-  min-height: 2.75rem;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
   color: var(--c-text);
   cursor: pointer;
   list-style: none;
@@ -504,37 +494,20 @@
 }
 .builder-viewer-card > summary::-webkit-details-marker { display: none; }
 .builder-viewer-card > summary::before {
-  content: "›";
-  color: var(--builder-action-active);
   font-size: 1.15rem;
-  transform: rotate(0deg);
-  transition: transform var(--duration-fast) var(--ease-standard);
 }
-.builder-viewer-card[open] > summary::before { transform: rotate(90deg); }
-.builder-viewer-card > summary:hover { background: var(--builder-hover-bg); }
 .builder-viewer-card > summary:focus-visible {
   outline: 3px solid var(--c-amber-300);
   outline-offset: -3px;
 }
 .builder-viewer-card-title {
   margin-right: auto;
-  color: var(--c-text);
-  font-size: var(--builder-type-body);
-  font-weight: 600;
   line-height: 1.35;
 }
 .builder-viewer-card-count {
   margin-left: auto;
-  color: var(--c-text-muted);
-  font-size: var(--builder-type-caption);
-  font-weight: 500;
   line-height: 1.35;
   text-align: right;
-}
-.builder-viewer-card-body {
-  padding: var(--space-3);
-  border-top: 1px solid var(--c-border);
-  background: var(--c-surface);
 }
 .builder-viewer-advanced-settings { margin-top: var(--space-3); }
 
@@ -1196,11 +1169,6 @@ div.viewer-trajectory-preview {
   display: inline-flex;
   align-items: center;
   min-height: 1.55rem;
-  padding: .2rem var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--r-xs);
-  font-size: var(--builder-type-micro);
-  font-weight: 600;
   line-height: 1.2;
 }
 .builder-content-tag.is-core {
@@ -1244,10 +1212,7 @@ div.viewer-trajectory-preview {
 /* ---- optional analyses and progressive disclosure --------------------- */
 .stage-intro {
   width: 100%;
-  max-width: var(--builder-measure-copy);
   margin: -.25rem 0 var(--space-6);
-  color: var(--c-text-muted);
-  font-size: var(--builder-type-body);
   line-height: 1.5;
 }
 .enhance-group {
@@ -1277,9 +1242,7 @@ div.viewer-trajectory-preview {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--c-border);
-  border-radius: var(--r-md);
   background: var(--c-surface);
-  box-shadow: var(--shadow-1);
   overflow: hidden;
   transition:
     background-color var(--duration-base) var(--ease),
@@ -1287,14 +1250,10 @@ div.viewer-trajectory-preview {
     box-shadow var(--duration-base) var(--ease);
 }
 .enhance-module:focus-within {
-  border-color: var(--c-amber-300);
   background: var(--c-surface);
-  box-shadow: var(--shadow-2);
 }
 .enhance-module:hover {
-  border-color: var(--builder-hover-border);
   background: var(--builder-hover-bg);
-  box-shadow: var(--shadow-1);
 }
 .enhance-module-select {
   display: flex;
@@ -1487,16 +1446,6 @@ div.viewer-trajectory-preview {
 .enhance-info-button:focus-visible {
   outline: 2px solid var(--builder-action);
   outline-offset: 2px;
-}
-.enhance-module:has(input:checked),
-.enhance-module:has(input:checked):hover,
-.enhance-module:has(input:checked):focus-within,
-.enhance-module.is-selected,
-.enhance-module.is-selected:hover,
-.enhance-module.is-selected:focus-within {
-  border-color: var(--builder-action);
-  background: var(--c-amber-50);
-  box-shadow: none;
 }
 .enhance-module:has(input:checked) .enhance-module-title,
 .enhance-module.is-selected .enhance-module-title {
@@ -2101,8 +2050,6 @@ details > summary:focus-visible { outline: 2px solid var(--builder-action); outl
   gap: var(--space-2) var(--space-5);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--c-border);
-  border-radius: var(--r-sm);
-  background: var(--c-surface-2);
   font-size: var(--builder-type-caption);
 }
 .builder-build-summary > span {

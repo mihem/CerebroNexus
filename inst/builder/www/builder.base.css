@@ -20,37 +20,20 @@ html {
 
 body {
   margin: 0;
-  background: var(--c-bg);
-  color: var(--c-text);
-  font-family: var(--builder-font-sans);
   font-size: var(--builder-type-subtitle);
-  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
 .form-group { margin-bottom: var(--space-3); }
 label, .control-label {
   display: block;
-  margin-bottom: var(--space-1);
-  color: var(--c-text-muted);
-  font-size: var(--builder-type-caption);
-  font-weight: 600;
   line-height: 1.35;
 }
 .form-control, .selectize-input {
   display: block;
   width: 100%;
   border: 1px solid var(--c-border-2) !important;
-  border-radius: var(--r-sm) !important;
-  box-shadow: none !important;
   font-size: var(--builder-type-body) !important;
-  color: var(--c-text) !important;
-  background: var(--c-surface) !important;
-  min-height: 2.65rem;
-}
-.form-control:focus, .selectize-input.focus {
-  border-color: var(--builder-action) !important;
-  box-shadow: 0 0 0 3px var(--c-amber-50) !important;
 }
 .form-control[readonly] { background: var(--c-surface-2) !important; }
 .selectize-dropdown .option.active,
