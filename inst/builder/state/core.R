@@ -50,6 +50,15 @@ builder_default_percentage_cells_to_show <- function(
     nzchar(trimws(value))
 }
 
+## A finite numeric scalar inside the closed range [lower, upper].
+.builder_state_number_in <- function(value, lower, upper) {
+  is.numeric(value) &&
+    length(value) == 1L &&
+    is.finite(value) &&
+    value >= lower &&
+    value <= upper
+}
+
 .builder_state_has_reference <- function(value, depth = 0L) {
   if (depth > 50L) {
     return(TRUE)
@@ -338,13 +347,7 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   ## missing or zero value.  Normalize that legacy field before the canonical
   ## state validator sees it; current UI edits cannot produce an invalid value.
   point_opacity <- suppressWarnings(as.numeric(settings$overview_point_opacity))
-  if (
-    length(point_opacity) != 1L ||
-      is.na(point_opacity) ||
-      !is.finite(point_opacity) ||
-      point_opacity < 0.1 ||
-      point_opacity > 1
-  ) {
+  if (!.builder_state_number_in(point_opacity, 0.1, 1)) {
     settings$overview_point_opacity <- 1
     entry$settings <- settings
   }
@@ -530,25 +533,11 @@ builder_upgrade_viewer_content_entry <- function(entry) {
     overrides <- list()
   }
   point_size <- settings$overview_point_size
-  if (
-    !is.numeric(point_size) ||
-      length(point_size) != 1L ||
-      is.na(point_size) ||
-      !is.finite(point_size) ||
-      point_size < 1 ||
-      point_size > 20
-  ) {
+  if (!.builder_state_number_in(point_size, 1, 20)) {
     point_size <- 5
   }
   percentage_cells_to_show <- settings$overview_percentage_cells_to_show
-  if (
-    !is.numeric(percentage_cells_to_show) ||
-      length(percentage_cells_to_show) != 1L ||
-      is.na(percentage_cells_to_show) ||
-      !is.finite(percentage_cells_to_show) ||
-      percentage_cells_to_show < 10 ||
-      percentage_cells_to_show > 100
-  ) {
+  if (!.builder_state_number_in(percentage_cells_to_show, 10, 100)) {
     percentage_cells_to_show <- builder_default_percentage_cells_to_show(
       entry$profile$n_cells
     )
@@ -564,13 +553,7 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   settings$initial_projections <- initial_projections
   settings$overview_point_size <- as.numeric(point_size)
   point_opacity <- suppressWarnings(as.numeric(settings$overview_point_opacity))
-  if (
-    length(point_opacity) != 1L ||
-      is.na(point_opacity) ||
-      !is.finite(point_opacity) ||
-      point_opacity < 0.1 ||
-      point_opacity > 1
-  ) {
+  if (!.builder_state_number_in(point_opacity, 0.1, 1)) {
     point_opacity <- 1
   }
   settings$overview_point_opacity <- point_opacity
@@ -856,42 +839,24 @@ builder_upgrade_viewer_content_entry <- function(entry) {
       )
     }
   }
-  point_size <- settings$overview_point_size
-  if (
-    !is.numeric(point_size) ||
-      length(point_size) != 1L ||
-      is.na(point_size) ||
-      !is.finite(point_size) ||
-      point_size < 1 ||
-      point_size > 20
-  ) {
+  if (!.builder_state_number_in(settings$overview_point_size, 1, 20)) {
     .builder_state_abort(
       "invalid_viewer_content_settings",
       "Initial point size must be between 0 and 20."
     )
   }
-  point_opacity <- settings$overview_point_opacity
-  if (
-    !is.numeric(point_opacity) ||
-      length(point_opacity) != 1L ||
-      is.na(point_opacity) ||
-      !is.finite(point_opacity) ||
-      point_opacity < 0.1 ||
-      point_opacity > 1
-  ) {
+  if (!.builder_state_number_in(settings$overview_point_opacity, 0.1, 1)) {
     .builder_state_abort(
       "invalid_viewer_content_settings",
       "Initial point opacity must be between 0.1 and 1."
     )
   }
-  percentage_cells_to_show <- settings$overview_percentage_cells_to_show
   if (
-    !is.numeric(percentage_cells_to_show) ||
-      length(percentage_cells_to_show) != 1L ||
-      is.na(percentage_cells_to_show) ||
-      !is.finite(percentage_cells_to_show) ||
-      percentage_cells_to_show < 10 ||
-      percentage_cells_to_show > 100
+    !.builder_state_number_in(
+      settings$overview_percentage_cells_to_show,
+      10,
+      100
+    )
   ) {
     .builder_state_abort(
       "invalid_viewer_content_settings",
@@ -900,13 +865,7 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   }
 
   spatial_percentage <- settings$spatial_percentage_cells_to_show %||% 100
-  if (
-    !is.numeric(spatial_percentage) ||
-      length(spatial_percentage) != 1L ||
-      !is.finite(spatial_percentage) ||
-      spatial_percentage < 10 ||
-      spatial_percentage > 100
-  ) {
+  if (!.builder_state_number_in(spatial_percentage, 10, 100)) {
     .builder_state_abort(
       "invalid_viewer_content_settings",
       "Spatial cells shown must be between 10 and 100 percent."

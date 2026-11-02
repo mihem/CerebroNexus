@@ -50,6 +50,20 @@
   "md5"
 )
 
+## Scalar predicates shared by the generated-App contract checks.
+.builder_app_text <- function(value) {
+  is.character(value) && length(value) == 1L && !is.na(value) && nzchar(value)
+}
+
+## A finite numeric scalar inside the closed range [lower, upper].
+.builder_app_number_in <- function(value, lower, upper) {
+  is.numeric(value) &&
+    length(value) == 1L &&
+    is.finite(value) &&
+    value >= lower &&
+    value <= upper
+}
+
 .builder_app_backend_identity_fields <- c(
   "type",
   "root",
@@ -98,12 +112,7 @@
 }
 
 .builder_app_spatial_path_field <- function(value) {
-  if (
-    !is.character(value) ||
-      length(value) != 1L ||
-      is.na(value) ||
-      !nzchar(value)
-  ) {
+  if (!.builder_app_text(value)) {
     stop(
       "Spatial image bundle path components must be non-empty strings.",
       call. = FALSE
@@ -164,16 +173,7 @@
     return(TRUE)
   }
   identical(scope, c("roi_field", "roi_value")) &&
-    all(vapply(
-      descriptor[scope],
-      function(value) {
-        is.character(value) &&
-          length(value) == 1L &&
-          !is.na(value) &&
-          nzchar(value)
-      },
-      logical(1)
-    ))
+    all(vapply(descriptor[scope], .builder_app_text, logical(1)))
 }
 
 .builder_app_config_spatial_manifest_valid <- function(images, selector_order) {
@@ -252,10 +252,7 @@
                     )
                 ) ||
                 (!is.null(descriptor$label) &&
-                  (!is.character(descriptor$label) ||
-                    length(descriptor$label) != 1L ||
-                    is.na(descriptor$label) ||
-                    !nzchar(descriptor$label))) ||
+                  !.builder_app_text(descriptor$label)) ||
                 !.builder_app_spatial_roi_scope_valid(descriptor) ||
                 (!is.null(bounds) &&
                   (!is.numeric(bounds) ||
@@ -381,10 +378,7 @@
                 )
             ) ||
             (!is.null(descriptor$label) &&
-              (!is.character(descriptor$label) ||
-                length(descriptor$label) != 1L ||
-                is.na(descriptor$label) ||
-                !nzchar(descriptor$label))) ||
+              !.builder_app_text(descriptor$label)) ||
             !.builder_app_spatial_roi_scope_valid(descriptor) ||
             !is.character(path) ||
             length(path) != 1L ||
@@ -664,10 +658,7 @@
       spatial_point_appearance <- item$spatial_point_appearance
       spatial_roi_settings <- item$spatial_roi_settings
       projection_valid <- is.null(projection) ||
-        (is.character(projection) &&
-          length(projection) == 1L &&
-          !is.na(projection) &&
-          nzchar(projection))
+        .builder_app_text(projection)
       initial_projections_valid <-
         is.character(initial_projections) &&
         !is.object(initial_projections) &&
@@ -684,16 +675,7 @@
         (is.list(trajectory) &&
           !is.object(trajectory) &&
           identical(names(trajectory), c("method", "name")) &&
-          all(vapply(
-            trajectory,
-            function(field) {
-              is.character(field) &&
-                length(field) == 1L &&
-                !is.na(field) &&
-                nzchar(field)
-            },
-            logical(1)
-          )))
+          all(vapply(trajectory, .builder_app_text, logical(1))))
       isTRUE(tryCatch(
         identical(item$display, builderViewerDisplayDefaults(item$display)),
         error = function(e) FALSE
@@ -713,29 +695,14 @@
         projection_valid &&
         initial_projections_valid &&
         trajectory_valid &&
-        is.numeric(point_size) &&
-        length(point_size) == 1L &&
-        !is.na(point_size) &&
-        is.finite(point_size) &&
-        point_size >= 1 &&
-        point_size <= 20 &&
-        is.numeric(point_opacity) &&
-        length(point_opacity) == 1L &&
-        !is.na(point_opacity) &&
-        is.finite(point_opacity) &&
-        point_opacity >= 0.1 &&
-        point_opacity <= 1 &&
-        is.numeric(percentage_cells_to_show) &&
-        length(percentage_cells_to_show) == 1L &&
-        !is.na(percentage_cells_to_show) &&
-        is.finite(percentage_cells_to_show) &&
-        percentage_cells_to_show >= 10 &&
-        percentage_cells_to_show <= 100 &&
-        is.numeric(item$spatial_percentage_cells_to_show) &&
-        length(item$spatial_percentage_cells_to_show) == 1L &&
-        is.finite(item$spatial_percentage_cells_to_show) &&
-        item$spatial_percentage_cells_to_show >= 10 &&
-        item$spatial_percentage_cells_to_show <= 100 &&
+        .builder_app_number_in(point_size, 1, 20) &&
+        .builder_app_number_in(point_opacity, 0.1, 1) &&
+        .builder_app_number_in(percentage_cells_to_show, 10, 100) &&
+        .builder_app_number_in(
+          item$spatial_percentage_cells_to_show,
+          10,
+          100
+        ) &&
         .builder_app_spatial_point_appearance_valid(
           spatial_point_appearance
         ) &&
@@ -784,7 +751,7 @@
       next
     }
     key <- table$name
-    if (!is.character(key) || length(key) != 1L || is.na(key) || !nzchar(key)) {
+    if (!.builder_app_text(key)) {
       next
     }
     index[[key]] <- list(
@@ -804,45 +771,19 @@
   fallback_opacity <- fallback_point_size$projection_point_opacity %||% 1
   values <- lapply(items, function(item) {
     point_size <- item$overview_point_size
-    if (
-      !is.numeric(point_size) ||
-        length(point_size) != 1L ||
-        is.na(point_size) ||
-        !is.finite(point_size) ||
-        point_size < 1 ||
-        point_size > 20
-    ) {
+    if (!.builder_app_number_in(point_size, 1, 20)) {
       point_size <- fallback
     }
     point_opacity <- item$overview_point_opacity
-    if (
-      !is.numeric(point_opacity) ||
-        length(point_opacity) != 1L ||
-        is.na(point_opacity) ||
-        !is.finite(point_opacity) ||
-        point_opacity < 0.1 ||
-        point_opacity > 1
-    ) {
+    if (!.builder_app_number_in(point_opacity, 0.1, 1)) {
       point_opacity <- fallback_opacity
     }
     percentage_cells_to_show <- item$overview_percentage_cells_to_show
-    if (
-      !is.numeric(percentage_cells_to_show) ||
-        length(percentage_cells_to_show) != 1L ||
-        is.na(percentage_cells_to_show) ||
-        !is.finite(percentage_cells_to_show) ||
-        percentage_cells_to_show < 10 ||
-        percentage_cells_to_show > 100
-    ) {
+    if (!.builder_app_number_in(percentage_cells_to_show, 10, 100)) {
       percentage_cells_to_show <- 100
     }
     projection <- item$default_projection
-    if (
-      !is.character(projection) ||
-        length(projection) != 1L ||
-        is.na(projection) ||
-        !nzchar(projection)
-    ) {
+    if (!.builder_app_text(projection)) {
       projection <- NULL
     }
     initial_projections <- item$initial_projections
@@ -869,16 +810,7 @@
       !is.list(trajectory) ||
         is.object(trajectory) ||
         !identical(names(trajectory), c("method", "name")) ||
-        any(vapply(
-          trajectory,
-          function(field) {
-            !is.character(field) ||
-              length(field) != 1L ||
-              is.na(field) ||
-              !nzchar(field)
-          },
-          logical(1)
-        ))
+        !all(vapply(trajectory, .builder_app_text, logical(1)))
     ) {
       trajectory <- NULL
     }
