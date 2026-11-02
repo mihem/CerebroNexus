@@ -196,37 +196,50 @@ observe({
   replace_entry(entry)
 })
 
+## A content action request from the rendered Configure dataset: the upgraded
+## entry, or NULL when the request is malformed (`valid` adds the per-action
+## checks), names another dataset or comes from a stale owner.
+content_action_text <- function(value) {
+  is.character(value) &&
+    length(value) == 1L &&
+    !is.na(value) &&
+    nzchar(value)
+}
+content_action_entry <- function(request, valid) {
+  if (
+    !is.list(request) ||
+      !content_action_text(request$dataset) ||
+      !content_action_text(request$capability) ||
+      !valid(request) ||
+      !identical(request$dataset, isolate(current())) ||
+      !identical(input[["core-rendered_for"]], request$dataset)
+  ) {
+    return(NULL)
+  }
+  entry <- isolate(entry_of(request$dataset))
+  if (
+    !builder_content_action_owner_is_current(
+      request,
+      entry,
+      isolate(builder_project_open_generation())
+    )
+  ) {
+    return(NULL)
+  }
+  builder_upgrade_viewer_content_entry(entry)
+}
+
 observeEvent(
   input[["core-acknowledge_content"]],
   {
     request <- input[["core-acknowledge_content"]]
-    scalar_text <- function(value) {
-      is.character(value) &&
-        length(value) == 1L &&
-        !is.na(value) &&
-        nzchar(value)
-    }
-    if (
-      !is.list(request) ||
-        !scalar_text(request$dataset) ||
-        !scalar_text(request$capability) ||
-        !scalar_text(request$token) ||
-        !identical(request$dataset, isolate(current())) ||
-        !identical(input[["core-rendered_for"]], request$dataset)
-    ) {
+    entry <- content_action_entry(
+      request,
+      function(request) content_action_text(request$token)
+    )
+    if (is.null(entry)) {
       return()
     }
-    entry <- isolate(entry_of(request$dataset))
-    if (
-      !builder_content_action_owner_is_current(
-        request,
-        entry,
-        isolate(builder_project_open_generation())
-      )
-    ) {
-      return()
-    }
-    entry <- builder_upgrade_viewer_content_entry(entry)
     state <- try(builder_dataset_state(entry), silent = TRUE)
     if (inherits(state, "try-error")) {
       return()
@@ -255,39 +268,19 @@ observeEvent(
   input[["core-content_disposition"]],
   {
     request <- input[["core-content_disposition"]]
-    scalar_text <- function(value) {
-      is.character(value) &&
-        length(value) == 1L &&
-        !is.na(value) &&
-        nzchar(value)
-    }
     allowed_capabilities <- c(
       .builder_profile_content_ids(),
       "hla_tcr_motifs"
     )
-    if (
-      !is.list(request) ||
-        !scalar_text(request$dataset) ||
-        !scalar_text(request$capability) ||
-        !request$capability %in% allowed_capabilities ||
-        !scalar_text(request$disposition) ||
-        !request$disposition %in% c("filtered", "auto") ||
-        !identical(request$dataset, isolate(current())) ||
-        !identical(input[["core-rendered_for"]], request$dataset)
-    ) {
+    entry <- content_action_entry(request, function(request) {
+      request$capability %in%
+        allowed_capabilities &&
+        content_action_text(request$disposition) &&
+        request$disposition %in% c("filtered", "auto")
+    })
+    if (is.null(entry)) {
       return()
     }
-    entry <- isolate(entry_of(request$dataset))
-    if (
-      !builder_content_action_owner_is_current(
-        request,
-        entry,
-        isolate(builder_project_open_generation())
-      )
-    ) {
-      return()
-    }
-    entry <- builder_upgrade_viewer_content_entry(entry)
     dispositions <- entry$settings$content_dispositions %||% list()
     if (!is.list(dispositions) || is.object(dispositions)) {
       dispositions <- list()
