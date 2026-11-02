@@ -7,6 +7,37 @@ builder_stage_has_text <- function(value) {
     nzchar(trimws(value))
 }
 
+## The disclosure card used across Configure: a <details> with a title, an
+## optional count and a body. builder.js remembers the open state by
+## `data-disclosure-key` and updates counts through their `data-*` marker
+## (`count_attrs`), so both are emitted exactly as given.
+builder_viewer_card <- function(
+  class,
+  title,
+  ...,
+  key = NULL,
+  count = NULL,
+  count_attrs = list(),
+  id = NULL,
+  body_class = "builder-viewer-card-body"
+) {
+  tags$details(
+    id = id,
+    class = class,
+    `data-disclosure-key` = key,
+    tags$summary(
+      span(class = "builder-viewer-card-title", title),
+      if (!is.null(count)) {
+        do.call(
+          span,
+          c(list(class = "builder-viewer-card-count"), count_attrs, list(count))
+        )
+      }
+    ),
+    div(class = body_class, ...)
+  )
+}
+
 builder_stage_text_items <- function(values, class = NULL) {
   values <- as.character(values %||% character())
   if (!length(values)) {

@@ -992,80 +992,64 @@ builder_enhance_stage_ui <- function(
     ),
     tags$section(
       class = "builder-stage-section builder-stage-enhance",
-      tags$details(
-        class = paste(
+      builder_viewer_card(
+        paste(
           "enhance-group enhance-group--analyses",
           "builder-viewer-card builder-viewer-optional-analyses"
         ),
-        `data-disclosure-key` = "optional-analyses",
-        tags$summary(
-          span(class = "builder-viewer-card-title", "Optional analyses"),
-          span(
-            class = "builder-viewer-card-count",
-            `data-analysis-count` = "true",
-            paste(selected_analysis_count, "included")
-          )
-        ),
+        "Optional analyses",
         div(
-          class = "builder-viewer-card-body",
-          div(
-            class = "enhance-module-grid",
-            if (isTRUE(dynamic_modules)) {
-              uiOutput(ns("analysis_modules"))
-            } else {
-              builder_enhance_modules_ui(id, model$modules %||% list())
-            }
-          )
-        )
+          class = "enhance-module-grid",
+          if (isTRUE(dynamic_modules)) {
+            uiOutput(ns("analysis_modules"))
+          } else {
+            builder_enhance_modules_ui(id, model$modules %||% list())
+          }
+        ),
+        key = "optional-analyses",
+        count = paste(selected_analysis_count, "included"),
+        count_attrs = list(`data-analysis-count` = "true")
       ),
       div(
         class = "enhance-group enhance-group--attachments",
-        tags$details(
-          class = paste(
+        builder_viewer_card(
+          paste(
             "enhance-attachment-block enhance-attachment-block--tables",
             "builder-viewer-card builder-viewer-extra-material"
           ),
-          `data-disclosure-key` = "extra-material",
-          tags$summary(
-            span(class = "builder-viewer-card-title", "Extra material"),
-            span(
-              class = "builder-viewer-card-count",
-              `data-extra-material-count` = "true",
-              paste(
-                length(model$attachments$tables$selected %||% character()),
-                "included"
-              )
-            )
+          "Extra material",
+          p(
+            class = "enhance-attachment-description",
+            "Add CSV, TSV or Excel tables. Selected sheets are included at build time."
           ),
           div(
-            class = "builder-viewer-card-body",
-            p(
-              class = "enhance-attachment-description",
-              "Add CSV, TSV or Excel tables. Selected sheets are included at build time."
-            ),
-            div(
-              class = "enhance-table-file-actions builder-action-row",
-              tags$button(
-                class = "btn enhance-table-add-button",
-                type = "button",
-                span(
-                  `aria-hidden` = "true",
-                  shiny::icon("folder-open")
-                ),
-                span(class = "builder-add-label", "Add tables")
+            class = "enhance-table-file-actions builder-action-row",
+            tags$button(
+              class = "btn enhance-table-add-button",
+              type = "button",
+              span(
+                `aria-hidden` = "true",
+                shiny::icon("folder-open")
               ),
-              tags$input(
-                id = ns("table_files"),
-                name = ns("table_files"),
-                class = "shiny-input-file enhance-table-file-input builder-file-input",
-                type = "file",
-                multiple = "multiple",
-                accept = builder_file_accept(builder_table_extensions()),
-                `tabindex` = "-1"
-              )
+              span(class = "builder-add-label", "Add tables")
             ),
-            uiOutput(ns("table_list"))
-          )
+            tags$input(
+              id = ns("table_files"),
+              name = ns("table_files"),
+              class = "shiny-input-file enhance-table-file-input builder-file-input",
+              type = "file",
+              multiple = "multiple",
+              accept = builder_file_accept(builder_table_extensions()),
+              `tabindex` = "-1"
+            )
+          ),
+          uiOutput(ns("table_list")),
+          key = "extra-material",
+          count = paste(
+            length(model$attachments$tables$selected %||% character()),
+            "included"
+          ),
+          count_attrs = list(`data-extra-material-count` = "true")
         )
       )
     ),
@@ -1080,27 +1064,20 @@ builder_spatial_stage_ui <- function(id, model) {
   }
   tags$div(
     class = "builder-stage-spatial spatial-alignment-workbench",
-    tags$details(
-      class = "builder-viewer-card builder-viewer-spatial-alignment",
-      `data-disclosure-key` = "spatial-alignment",
-      tags$summary(
-        span(class = "builder-viewer-card-title", "Spatial alignment"),
-        span(
-          class = "builder-viewer-card-count",
-          paste(
-            length(histology$sections %||% character()),
-            if (length(histology$sections %||% character()) == 1L) {
-              "section"
-            } else {
-              "sections"
-            }
-          )
-        )
+    builder_viewer_card(
+      "builder-viewer-card builder-viewer-spatial-alignment",
+      "Spatial alignment",
+      builder_spatial_alignment_ui(id, histology),
+      key = "spatial-alignment",
+      count = paste(
+        length(histology$sections %||% character()),
+        if (length(histology$sections %||% character()) == 1L) {
+          "section"
+        } else {
+          "sections"
+        }
       ),
-      div(
-        class = "builder-viewer-card-body builder-spatial-alignment-body",
-        builder_spatial_alignment_ui(id, histology)
-      )
+      body_class = "builder-viewer-card-body builder-spatial-alignment-body"
     )
   )
 }

@@ -158,76 +158,44 @@ builder_core_stage_ui <- function(id, model) {
         )
       ),
       if (specialized_content$total_count > 0L) {
-        tags$details(
-          class = "builder-viewer-card builder-viewer-specialized-content",
-          `data-disclosure-key` = "viewer-specialized-content",
-          tags$summary(
-            span(class = "builder-viewer-card-title", "Specialized content"),
-            span(
-              class = "builder-viewer-card-count",
-              specialized_content$summary
-            )
-          ),
-          div(
-            class = "builder-viewer-card-body",
-            builder_specialized_content_ui(specialized_content, id)
-          )
+        builder_viewer_card(
+          "builder-viewer-card builder-viewer-specialized-content",
+          "Specialized content",
+          builder_specialized_content_ui(specialized_content, id),
+          key = "viewer-specialized-content",
+          count = specialized_content$summary
         )
       },
-      tags$details(
-        id = ns("groups"),
-        class = "builder-viewer-card builder-viewer-groups",
-        `data-disclosure-key` = "viewer-groups",
-        tags$summary(
-          span(class = "builder-viewer-card-title", "Groups"),
-          span(
-            class = "builder-viewer-card-count",
-            `data-viewer-group-count` = "true",
-            paste0(
-              group_catalog$included_count,
-              " included · ",
-              "Default: ",
-              group_catalog$default %||% "None"
-            )
-          )
+      builder_viewer_card(
+        "builder-viewer-card builder-viewer-groups",
+        "Groups",
+        builder_group_catalog_ui(id, group_catalog),
+        key = "viewer-groups",
+        count = paste0(
+          group_catalog$included_count,
+          " included · ",
+          "Default: ",
+          group_catalog$default %||% "None"
         ),
-        div(
-          class = "builder-viewer-card-body",
-          builder_group_catalog_ui(id, group_catalog)
-        )
+        count_attrs = list(`data-viewer-group-count` = "true"),
+        id = ns("groups")
       ),
       if (length(cell_cycle_catalog$items)) {
-        tags$details(
-          class = "builder-viewer-card builder-viewer-cell-cycle",
-          `data-disclosure-key` = "viewer-cell-cycle",
-          tags$summary(
-            span(class = "builder-viewer-card-title", "Cell cycle"),
-            span(
-              class = "builder-viewer-card-count",
-              paste(cell_cycle_catalog$included_count, "included")
-            )
-          ),
-          div(
-            class = "builder-viewer-card-body",
-            builder_cell_cycle_catalog_ui(id, cell_cycle_catalog)
-          )
+        builder_viewer_card(
+          "builder-viewer-card builder-viewer-cell-cycle",
+          "Cell cycle",
+          builder_cell_cycle_catalog_ui(id, cell_cycle_catalog),
+          key = "viewer-cell-cycle",
+          count = paste(cell_cycle_catalog$included_count, "included")
         )
       },
       if (analysis_results$total_count > 0L) {
-        tags$details(
-          class = "builder-viewer-card builder-viewer-analysis-results",
-          `data-disclosure-key` = "viewer-analysis-results",
-          tags$summary(
-            span(class = "builder-viewer-card-title", "Analysis results"),
-            span(
-              class = "builder-viewer-card-count",
-              paste(analysis_results$total_count, "detected or planned")
-            )
-          ),
-          div(
-            class = "builder-viewer-card-body",
-            builder_analysis_results_ui(analysis_results, id)
-          )
+        builder_viewer_card(
+          "builder-viewer-card builder-viewer-analysis-results",
+          "Analysis results",
+          builder_analysis_results_ui(analysis_results, id),
+          key = "viewer-analysis-results",
+          count = paste(analysis_results$total_count, "detected or planned")
         )
       }
     ),
@@ -253,37 +221,32 @@ builder_core_advanced_ui <- function(id, model) {
       "builder-stage-section builder-stage-advanced",
       "builder-viewer-content"
     ),
-    tags$details(
-      class = "builder-viewer-card builder-viewer-advanced-settings",
-      `data-disclosure-key` = "viewer-advanced-settings",
-      tags$summary(
-        span(class = "builder-viewer-card-title", "Advanced settings"),
-        span(class = "builder-viewer-card-count", "3 settings")
-      ),
+    builder_viewer_card(
+      "builder-viewer-card builder-viewer-advanced-settings",
+      "Advanced settings",
       div(
-        class = "builder-viewer-card-body",
-        div(
-          class = "builder-advanced-grid",
-          selectInput(
-            ns("nUMI"),
-            "UMI QC column",
-            choices = model$nUMI_choices,
-            selected = model$nUMI
-          ),
-          selectInput(
-            ns("nGene"),
-            "Gene QC column",
-            choices = model$nGene_choices,
-            selected = model$nGene
-          ),
-          selectInput(
-            ns("backend"),
-            "Expression backend",
-            choices = model$backend_choices,
-            selected = model$backend
-          )
+        class = "builder-advanced-grid",
+        selectInput(
+          ns("nUMI"),
+          "UMI QC column",
+          choices = model$nUMI_choices,
+          selected = model$nUMI
+        ),
+        selectInput(
+          ns("nGene"),
+          "Gene QC column",
+          choices = model$nGene_choices,
+          selected = model$nGene
+        ),
+        selectInput(
+          ns("backend"),
+          "Expression backend",
+          choices = model$backend_choices,
+          selected = model$backend
         )
-      )
+      ),
+      key = "viewer-advanced-settings",
+      count = "3 settings"
     )
   )
 }
@@ -317,62 +280,43 @@ builder_views_stage_ui <- function(id, model, spatial = NULL) {
       p("Choose the trajectories, projections, and spatial views to show.")
     ),
     if (length(trajectory_catalog$items)) {
-      tags$details(
-        class = "builder-viewer-card builder-viewer-trajectories",
-        `data-disclosure-key` = "viewer-trajectories",
-        tags$summary(
-          span(class = "builder-viewer-card-title", "Trajectories"),
-          span(
-            class = "builder-viewer-card-count",
-            `data-viewer-trajectory-count` = "true",
-            paste0(
-              trajectory_catalog$included_count,
-              " included",
-              if (is.list(trajectory_catalog$default)) {
-                paste0(" · Default: ", trajectory_catalog$default$name)
-              } else {
-                ""
-              }
-            )
-          )
+      builder_viewer_card(
+        "builder-viewer-card builder-viewer-trajectories",
+        "Trajectories",
+        uiOutput(ns("trajectory_gallery")),
+        key = "viewer-trajectories",
+        count = paste0(
+          trajectory_catalog$included_count,
+          " included",
+          if (is.list(trajectory_catalog$default)) {
+            paste0(" · Default: ", trajectory_catalog$default$name)
+          } else {
+            ""
+          }
         ),
-        div(
-          class = "builder-viewer-card-body",
-          uiOutput(ns("trajectory_gallery"))
-        )
+        count_attrs = list(`data-viewer-trajectory-count` = "true")
       )
     },
     if (length(projection_catalog$items)) {
-      tags$details(
-        class = "builder-viewer-card builder-viewer-projections",
-        `data-disclosure-key` = "viewer-projections",
-        tags$summary(
-          span(class = "builder-viewer-card-title", "Projections"),
-          span(
-            class = "builder-viewer-card-count",
-            `data-viewer-projection-count` = "true",
-            paste0(
-              projection_catalog$included_count,
-              " included · Default: ",
-              projection_default_label
-            )
-          )
+      builder_viewer_card(
+        "builder-viewer-card builder-viewer-projections",
+        "Projections",
+        uiOutput(ns("projection_gallery")),
+        key = "viewer-projections",
+        count = paste0(
+          projection_catalog$included_count,
+          " included · Default: ",
+          projection_default_label
         ),
-        div(
-          class = "builder-viewer-card-body",
-          uiOutput(ns("projection_gallery"))
-        )
+        count_attrs = list(`data-viewer-projection-count` = "true")
       )
     },
     spatial,
-    tags$details(
-      class = "builder-viewer-card",
-      `data-disclosure-key` = "viewer-display",
-      tags$summary(span(
-        class = "builder-viewer-card-title",
-        "Viewer appearance"
-      )),
-      div(class = "builder-viewer-card-body", uiOutput(ns("viewer_display")))
+    builder_viewer_card(
+      "builder-viewer-card",
+      "Viewer appearance",
+      uiOutput(ns("viewer_display")),
+      key = "viewer-display"
     )
   )
 }
@@ -435,20 +379,18 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
     div(class = "builder-display-flags", ...)
   }
   page <- function(prefix, label, labels = TRUE, extras = NULL) {
-    tags$details(
-      class = "builder-viewer-card",
-      tags$summary(span(class = "builder-viewer-card-title", label)),
-      div(
-        class = "builder-viewer-card-body builder-advanced-grid",
-        flags(
-          if (labels) {
-            flag(paste0(prefix, "_group_labels"), "Show group labels")
-          },
-          flag(paste0(prefix, "_draw_border"), "Draw cell borders"),
-          flag(paste0(prefix, "_keep_square"), "Keep plots square")
-        ),
-        extras
-      )
+    builder_viewer_card(
+      "builder-viewer-card",
+      label,
+      flags(
+        if (labels) {
+          flag(paste0(prefix, "_group_labels"), "Show group labels")
+        },
+        flag(paste0(prefix, "_draw_border"), "Draw cell borders"),
+        flag(paste0(prefix, "_keep_square"), "Keep plots square")
+      ),
+      extras,
+      body_class = "builder-viewer-card-body builder-advanced-grid"
     )
   }
   div(
@@ -590,21 +532,16 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
         number("ir_scatter_opacity", "Scatter point opacity", .1, 1, .05)
       )
     ),
-    tags$details(
-      class = "builder-viewer-card",
-      tags$summary(span(
-        class = "builder-viewer-card-title",
-        "HLA & TCR Motifs"
-      )),
-      div(
-        class = "builder-viewer-card-body builder-advanced-grid",
-        select(
-          "hla_legend_mode",
-          "Legend",
-          c("Auto" = "auto", "Always show" = "always", "Hide" = "never")
-        ),
-        number("hla_node_scale", "Node size multiplier", .3, 2.5, .1)
-      )
+    builder_viewer_card(
+      "builder-viewer-card",
+      "HLA & TCR Motifs",
+      select(
+        "hla_legend_mode",
+        "Legend",
+        c("Auto" = "auto", "Always show" = "always", "Hide" = "never")
+      ),
+      number("hla_node_scale", "Node size multiplier", .3, 2.5, .1),
+      body_class = "builder-viewer-card-body builder-advanced-grid"
     ),
     p(
       class = "help-block",
