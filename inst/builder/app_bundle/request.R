@@ -272,15 +272,6 @@ builder_app_bundle_request <- function(
   if (!.builder_app_auth_summary_valid(app_auth)) {
     stop("Frozen generated-App login settings are invalid.", call. = FALSE)
   }
-  if (
-    identical(options$initial_dataset_mode, "automatic") &&
-      !identical(options$initial_dataset, order[[1L]])
-  ) {
-    stop(
-      "An automatic initial dataset must be the first ordered dataset.",
-      call. = FALSE
-    )
-  }
   initial_index <- match(options$initial_dataset, order)
   colors <- lapply(items, `[[`, "colors")
   names(colors) <- item_ids
@@ -360,39 +351,24 @@ builder_app_bundle_request <- function(
   storage_valid <- vapply(
     items,
     function(item) {
-      storage <- item$spatial_image_storage
       images <- item$external_images
       settings <- item$external_image_settings
-      is.character(storage) &&
-        length(storage) == 1L &&
-        !is.na(storage) &&
-        identical(storage, "external") &&
+      identical(item$spatial_image_storage, "external") &&
         is.list(images) &&
         !is.object(images) &&
         is.list(settings) &&
         !is.object(settings) &&
-        identical(names(images), names(settings)) &&
-        (identical(storage, "external") ||
-          (!length(images) && !length(settings)))
+        identical(names(images), names(settings))
     },
     logical(1)
   )
   if (!all(storage_valid)) {
     stop("BuildPlan external spatial image contract is invalid.", call. = FALSE)
   }
-  external <- vapply(
-    items,
-    function(item) identical(item$spatial_image_storage, "external"),
-    logical(1)
-  )
-  spatial_images <- lapply(items[external], `[[`, "external_images")
-  spatial_image_settings <- lapply(
-    items[external],
-    `[[`,
-    "external_image_settings"
-  )
-  names(spatial_images) <- item_ids[external]
-  names(spatial_image_settings) <- item_ids[external]
+  spatial_images <- lapply(items, `[[`, "external_images")
+  spatial_image_settings <- lapply(items, `[[`, "external_image_settings")
+  names(spatial_images) <- item_ids
+  names(spatial_image_settings) <- item_ids
   populated <- vapply(spatial_images, length, integer(1)) > 0L
   spatial_images <- spatial_images[populated]
   spatial_image_settings <- spatial_image_settings[populated]

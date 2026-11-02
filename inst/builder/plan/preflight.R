@@ -198,18 +198,6 @@ builder_plan_requires_app <- function(entries) {
   }
 
   for (entry in entries) {
-    storage <- entry$settings$spatial_image_storage %||% "external"
-    if (
-      !is.character(storage) ||
-        length(storage) != 1L ||
-        is.na(storage) ||
-        !identical(storage, "external")
-    ) {
-      return(builder_plan_error(
-        "Builder Spatial images must use external storage.",
-        "invalid_spatial_image_storage"
-      ))
-    }
     alignments <- tryCatch(
       .builder_plan_partition_alignments(entry$settings$images %||% list()),
       error = function(error) error

@@ -45,10 +45,8 @@
       is.na(state$revision) ||
       state$revision < 0L ||
       state$revision == .Machine$integer.max ||
-      (!is.null(state$review_snapshot) &&
-        !builder_review_snapshot_valid(state$review_snapshot)) ||
-      (state$stage %in%
-        c("review", "build") &&
+      ((!is.null(state$review_snapshot) ||
+        state$stage %in% c("review", "build")) &&
         !builder_review_snapshot_valid(state$review_snapshot)) ||
       (!is.null(state$confirmation) &&
         !.builder_workflow_confirmation_valid(

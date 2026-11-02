@@ -395,23 +395,8 @@ builder_freeze_plan <- function(
     return(builder_plan_error(reason, "app_capability_unavailable"))
   }
 
-  dataset_order <- vapply(
-    entries,
-    function(entry) {
-      if (is.list(entry) && builder_has_text(entry$id %||% "")) {
-        entry$id
-      } else {
-        ""
-      }
-    },
-    character(1)
-  )
-  if (any(!nzchar(dataset_order)) || anyDuplicated(dataset_order)) {
-    return(builder_plan_error(
-      "Every dataset needs a unique stable id.",
-      "invalid_dataset_order"
-    ))
-  }
+  ## Preflight has checked that every id is a unique non-empty string.
+  dataset_order <- vapply(entries, function(entry) entry$id, character(1))
 
   states <- lapply(entries, function(entry) {
     tryCatch(
