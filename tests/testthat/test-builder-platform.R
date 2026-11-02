@@ -241,7 +241,7 @@ test_that("on-disk backend flags are probed once without loading packages", {
         fixed = TRUE
       )
     )),
-    2L
+    1L
   )
 })
 

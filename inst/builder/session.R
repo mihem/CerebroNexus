@@ -66,25 +66,31 @@ builder_session_worker_callback <- function(callback) {
   callback
 }
 
-#' Load one of the built-in examples, without a file.
-builder_session_example <- function(
+## Run one dataset import in the worker. `load(id, source, progress, args)`
+## returns the dataset descriptor, which is answered with the worker's backend
+## capabilities. A failed or interrupted import releases its memory with one
+## full collection. `load` runs in the worker's global environment, so it may
+## refer only to what the worker defines and to `args`.
+.builder_session_import_call <- function(
   worker,
   id,
-  example_id,
-  request = NULL,
-  progress_path = NULL,
-  import_generation = 1L,
-  .importer = NULL
+  source,
+  request,
+  progress_path,
+  import_generation,
+  load,
+  args
 ) {
   rs <- .builder_session_process(worker)
   rs$call(
     function(
       id,
-      example_id,
+      source,
       request,
       progress_path,
       import_generation,
-      importer,
+      load,
+      args,
       collect_failed_import
     ) {
       progress <- .builder_import_progress_callback(
@@ -102,30 +108,7 @@ builder_session_example <- function(
       )
       response <- tryCatch(
         {
-          if (is.function(importer)) {
-            value <- importer(id, example_id, progress)
-          } else {
-            ex <- Filter(
-              function(e) identical(e$id, example_id),
-              builder_examples()
-            )
-            if (!length(ex)) {
-              stop("This example does not exist.", call. = FALSE)
-            }
-            made <- ex[[1]]$make()
-            if (!is.null(made$error)) {
-              stop(made$error, call. = FALSE)
-            }
-            value <- .builder_register_adapter(
-              .builder_example_source_adapter(
-                builder_example_adapter(example_id, made$object),
-                made$source_file,
-                made$source_md5
-              ),
-              id,
-              progress = progress
-            )
-          }
+          value <- load(id, source, progress, args)
           backends <- builder_backend_capabilities()
           value$backend_capabilities <- list(
             build = backends,
@@ -143,13 +126,60 @@ builder_session_example <- function(
     },
     args = list(
       id = id,
-      example_id = example_id,
+      source = source,
       request = request,
       progress_path = progress_path,
       import_generation = import_generation,
-      importer = .importer,
+      load = builder_session_worker_callback(load),
+      args = args,
       collect_failed_import = .builder_session_collect_failed_import
     )
+  )
+}
+
+#' Load one of the built-in examples, without a file.
+builder_session_example <- function(
+  worker,
+  id,
+  example_id,
+  request = NULL,
+  progress_path = NULL,
+  import_generation = 1L,
+  .importer = NULL
+) {
+  .builder_session_import_call(
+    worker,
+    id,
+    example_id,
+    request,
+    progress_path,
+    import_generation,
+    function(id, example_id, progress, args) {
+      if (is.function(args$importer)) {
+        return(args$importer(id, example_id, progress))
+      }
+      ex <- Filter(
+        function(e) identical(e$id, example_id),
+        builder_examples()
+      )
+      if (!length(ex)) {
+        stop("This example does not exist.", call. = FALSE)
+      }
+      made <- ex[[1]]$make()
+      if (!is.null(made$error)) {
+        stop(made$error, call. = FALSE)
+      }
+      .builder_register_adapter(
+        .builder_example_source_adapter(
+          builder_example_adapter(example_id, made$object),
+          made$source_file,
+          made$source_md5
+        ),
+        id,
+        progress = progress
+      )
+    },
+    list(importer = .importer)
   )
 }
 
@@ -168,84 +198,80 @@ builder_session_load <- function(
   .copy = NULL,
   .transport_writer = NULL
 ) {
+  .builder_session_import_call(
+    worker,
+    id,
+    path,
+    request,
+    progress_path,
+    import_generation,
+    function(id, path, progress, args) {
+      if (!is.function(args$importer)) {
+        return(.builder_register_adapter(
+          .builder_seurat_file_adapter(
+            path,
+            expected_md5 = args$expected_md5,
+            snapshot_reusable = TRUE
+          ),
+          id,
+          progress = progress
+        ))
+      }
+      if (is.function(args$copy) && is.function(args$transport_writer)) {
+        args$importer(
+          id,
+          path,
+          progress,
+          .copy = args$copy,
+          .transport_writer = args$transport_writer
+        )
+      } else {
+        args$importer(id, path, progress)
+      }
+    },
+    list(
+      expected_md5 = expected_md5,
+      importer = .importer,
+      copy = .copy,
+      transport_writer = .transport_writer
+    )
+  )
+}
+
+## Run `compute(object, args)` on dataset `id` in the worker once
+## `capabilities` are loaded, and answer `request` with its value or its error
+## message. `compute` runs in the worker's global environment, so it may refer
+## only to what the worker defines and to `args`.
+.builder_session_object_call <- function(
+  worker,
+  id,
+  request,
+  capabilities,
+  compute,
+  args
+) {
   rs <- .builder_session_process(worker)
   rs$call(
-    function(
-      id,
-      path,
-      request,
-      progress_path,
-      import_generation,
-      expected_md5,
-      importer,
-      copy,
-      transport_writer,
-      collect_failed_import
-    ) {
-      progress <- .builder_import_progress_callback(
-        progress_path,
-        import_generation
-      )
-      completed <- FALSE
-      on.exit(
+    function(id, request, capabilities, compute, args) {
+      tryCatch(
         {
-          if (!completed) {
-            collect_failed_import()
+          for (capability in capabilities) {
+            builder_worker_require_capability(capability)
           }
-        },
-        add = TRUE
-      )
-      response <- tryCatch(
-        {
-          if (is.function(importer)) {
-            value <- if (is.function(copy) && is.function(transport_writer)) {
-              importer(
-                id,
-                path,
-                progress,
-                .copy = copy,
-                .transport_writer = transport_writer
-              )
-            } else {
-              importer(id, path, progress)
-            }
-          } else {
-            value <- .builder_register_adapter(
-              .builder_seurat_file_adapter(
-                path,
-                expected_md5 = expected_md5,
-                snapshot_reusable = TRUE
-              ),
-              id,
-              progress = progress
-            )
-          }
-          backends <- builder_backend_capabilities()
-          value$backend_capabilities <- list(
-            build = backends,
-            viewer = backends
-          )
-          response <- builder_worker_response(request, value)
-          completed <- TRUE
-          response
+          object <- .builder_worker_object(id)
+          builder_worker_response(request, compute(object, args))
         },
         error = function(error) {
           builder_worker_response(request, error = conditionMessage(error))
         }
       )
-      response
     },
     args = list(
       id = id,
-      path = path,
       request = request,
-      progress_path = progress_path,
-      import_generation = import_generation,
-      expected_md5 = expected_md5,
-      importer = .importer,
-      copy = .copy,
-      transport_writer = .transport_writer,
-      collect_failed_import = .builder_session_collect_failed_import
+      capabilities = capabilities,
+      compute = builder_session_worker_callback(compute),
+      args = args
     )
   )
 }
@@ -259,30 +285,15 @@ builder_session_preview <- function(
   max_cells,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(id, reduction, group, max_cells, request) {
-      tryCatch(
-        {
-          builder_worker_require_capability("analysis")
-          obj <- .builder_worker_object(id)
-          builder_worker_response(
-            request,
-            builder_preview_frame(obj, reduction, group, max_cells)
-          )
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
-        }
-      )
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "analysis",
+    function(object, args) {
+      builder_preview_frame(object, args$reduction, args$group, args$max_cells)
     },
-    args = list(
-      id = id,
-      reduction = reduction,
-      group = group,
-      max_cells = max_cells,
-      request = request
-    )
+    list(reduction = reduction, group = group, max_cells = max_cells)
   )
 }
 
@@ -295,35 +306,20 @@ builder_session_projection_previews <- function(
   max_cells = BUILDER_PREVIEW_MAX,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(id, projections, group, max_cells, request) {
-      tryCatch(
-        {
-          builder_worker_require_capability("analysis")
-          object <- .builder_worker_object(id)
-          builder_worker_response(
-            request,
-            builder_projection_preview_catalog(
-              object,
-              projections = projections,
-              group = group,
-              max_cells = max_cells
-            )
-          )
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
-        }
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "analysis",
+    function(object, args) {
+      builder_projection_preview_catalog(
+        object,
+        projections = args$projections,
+        group = args$group,
+        max_cells = args$max_cells
       )
     },
-    args = list(
-      id = id,
-      projections = projections,
-      group = group,
-      max_cells = max_cells,
-      request = request
-    )
+    list(projections = projections, group = group, max_cells = max_cells)
   )
 }
 
@@ -335,33 +331,19 @@ builder_session_trajectory_previews <- function(
   max_cells = BUILDER_PREVIEW_MAX,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(id, trajectories, max_cells, request) {
-      tryCatch(
-        {
-          builder_worker_require_capability("analysis")
-          object <- .builder_worker_object(id)
-          builder_worker_response(
-            request,
-            builder_trajectory_preview_catalog(
-              object,
-              trajectories = trajectories,
-              max_cells = max_cells
-            )
-          )
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
-        }
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "analysis",
+    function(object, args) {
+      builder_trajectory_preview_catalog(
+        object,
+        trajectories = args$trajectories,
+        max_cells = args$max_cells
       )
     },
-    args = list(
-      id = id,
-      trajectories = trajectories,
-      max_cells = max_cells,
-      request = request
-    )
+    list(trajectories = trajectories, max_cells = max_cells)
   )
 }
 
@@ -373,46 +355,32 @@ builder_session_coords <- function(
   max_cells = BUILDER_PREVIEW_MAX,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(id, image, max_cells, request) {
-      tryCatch(
-        {
-          builder_worker_require_capability("spatial")
-          obj <- .builder_worker_object(id)
-          co <- builder_spatial_coords(obj, image)
-          if (is.null(co)) {
-            return(builder_worker_response(request, NULL))
-          }
-          ## Sampled: the alignment preview needs a shape, not every cell.
-          n <- length(co[[1]])
-          keep <- if (n > max_cells) {
-            set.seed(7)
-            sort(sample.int(n, max_cells))
-          } else {
-            seq_len(n)
-          }
-          builder_worker_response(
-            request,
-            list(
-              x = co[[1]],
-              y = co[[2]],
-              sx = co[[1]][keep],
-              sy = co[[2]][keep]
-            )
-          )
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
-        }
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "spatial",
+    function(object, args) {
+      co <- builder_spatial_coords(object, args$image)
+      if (is.null(co)) {
+        return(NULL)
+      }
+      ## Sampled: the alignment preview needs a shape, not every cell.
+      n <- length(co[[1]])
+      keep <- if (n > args$max_cells) {
+        set.seed(7)
+        sort(sample.int(n, args$max_cells))
+      } else {
+        seq_len(n)
+      }
+      list(
+        x = co[[1]],
+        y = co[[2]],
+        sx = co[[1]][keep],
+        sy = co[[2]][keep]
       )
     },
-    args = list(
-      id = id,
-      image = image,
-      max_cells = max_cells,
-      request = request
-    )
+    list(image = image, max_cells = max_cells)
   )
 }
 
@@ -430,47 +398,25 @@ builder_session_spatial_preview <- function(
   max_cells = BUILDER_PREVIEW_MAX,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(
-      id,
-      default_projection,
-      group,
-      roi,
-      section_id,
-      assay,
-      layer,
-      base_coordinate_transform,
-      max_cells,
-      request
-    ) {
-      tryCatch(
-        {
-          builder_worker_require_capability("analysis")
-          builder_worker_require_capability("spatial")
-          object <- .builder_worker_object(id)
-          builder_worker_response(
-            request,
-            builder_alignment_preview_model(
-              object,
-              default_projection = default_projection,
-              group = group,
-              roi = roi,
-              section_id = section_id,
-              assay = assay,
-              layer = layer,
-              base_coordinate_transform = base_coordinate_transform,
-              max_cells = max_cells
-            )
-          )
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
-        }
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    c("analysis", "spatial"),
+    function(object, args) {
+      builder_alignment_preview_model(
+        object,
+        default_projection = args$default_projection,
+        group = args$group,
+        roi = args$roi,
+        section_id = args$section_id,
+        assay = args$assay,
+        layer = args$layer,
+        base_coordinate_transform = args$base_coordinate_transform,
+        max_cells = args$max_cells
       )
     },
-    args = list(
-      id = id,
+    list(
       default_projection = default_projection,
       group = group,
       roi = roi,
@@ -478,8 +424,7 @@ builder_session_spatial_preview <- function(
       assay = assay,
       layer = layer,
       base_coordinate_transform = base_coordinate_transform,
-      max_cells = max_cells,
-      request = request
+      max_cells = max_cells
     )
   )
 }
@@ -509,57 +454,44 @@ builder_session_section_bounds <- function(
   scale = 1,
   request = NULL
 ) {
-  rs <- .builder_session_process(worker)
-  rs$call(
-    function(
-      id,
-      sections,
-      mode,
-      extent_width,
-      extent_height,
-      um_per_px,
-      dx,
-      dy,
-      scale,
-      request
-    ) {
-      tryCatch(
-        {
-          builder_worker_require_capability("spatial")
-          obj <- .builder_worker_object(id)
-          out <- list()
-          for (nm in sections) {
-            co <- builder_spatial_coords(obj, nm)
-            if (is.null(co)) {
-              next
-            }
-            b0 <- builder_image_bounds(
-              mode,
-              co,
-              list(
-                extent_width = extent_width,
-                extent_height = extent_height
-              ),
-              um_per_px = um_per_px
-            )
-            if (!is.null(b0$error)) {
-              next
-            }
-            bounds <- builder_adjust_bounds(b0, dx = dx, dy = dy, scale = scale)
-            out[[nm]] <- list(
-              bounds = bounds,
-              cover = builder_bounds_cover(bounds, co)
-            )
-          }
-          builder_worker_response(request, out)
-        },
-        error = function(error) {
-          builder_worker_response(request, error = conditionMessage(error))
+  .builder_session_object_call(
+    worker,
+    id,
+    request,
+    "spatial",
+    function(object, args) {
+      out <- list()
+      for (nm in args$sections) {
+        co <- builder_spatial_coords(object, nm)
+        if (is.null(co)) {
+          next
         }
-      )
+        b0 <- builder_image_bounds(
+          args$mode,
+          co,
+          list(
+            extent_width = args$extent_width,
+            extent_height = args$extent_height
+          ),
+          um_per_px = args$um_per_px
+        )
+        if (!is.null(b0$error)) {
+          next
+        }
+        bounds <- builder_adjust_bounds(
+          b0,
+          dx = args$dx,
+          dy = args$dy,
+          scale = args$scale
+        )
+        out[[nm]] <- list(
+          bounds = bounds,
+          cover = builder_bounds_cover(bounds, co)
+        )
+      }
+      out
     },
-    args = list(
-      id = id,
+    list(
       sections = sections,
       mode = mode,
       extent_width = extent_width,
@@ -567,8 +499,7 @@ builder_session_section_bounds <- function(
       um_per_px = um_per_px,
       dx = dx,
       dy = dy,
-      scale = scale,
-      request = request
+      scale = scale
     )
   )
 }
