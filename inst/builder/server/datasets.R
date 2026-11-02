@@ -565,84 +565,56 @@ observeEvent(
   ignoreInit = TRUE
 )
 
-observeEvent(
-  input[["core-point_size"]],
-  {
-    id <- current()
-    value <- suppressWarnings(as.numeric(input[["core-point_size"]]))
-    if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
-        length(value) != 1L ||
-        is.na(value) ||
-        !is.finite(value) ||
-        value < 1 ||
-        value > 20
-    ) {
-      return()
-    }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
-    entry$settings$overview_point_size <- value
-    if (isTRUE(replace_entry(entry))) {
-      send_projection_state(entry)
-    }
-  },
-  ignoreInit = TRUE
-)
-
-observeEvent(
-  input[["core-point_opacity"]],
-  {
-    id <- current()
-    value <- suppressWarnings(as.numeric(input[["core-point_opacity"]]))
-    if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
-        length(value) != 1L ||
-        is.na(value) ||
-        !is.finite(value) ||
-        value < 0.1 ||
-        value > 1
-    ) {
-      return()
-    }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
-    entry$settings$overview_point_opacity <- value
-    if (isTRUE(replace_entry(entry))) {
-      send_projection_state(entry)
-    }
-  },
-  ignoreInit = TRUE
-)
-
-observeEvent(
-  input[["core-percentage_cells_to_show"]],
-  {
-    id <- current()
-    value <- suppressWarnings(as.numeric(
-      input[["core-percentage_cells_to_show"]]
-    ))
-    if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
-        length(value) != 1L ||
-        is.na(value) ||
-        !is.finite(value) ||
-        value < 10 ||
-        value > 100
-    ) {
-      return()
-    }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
-    entry$settings$overview_percentage_cells_to_show <- value
-    if (isTRUE(replace_entry(entry))) {
-      send_projection_state(entry)
-    }
-  },
-  ignoreInit = TRUE
+## Overview point controls: each input, the setting it writes and its
+## inclusive bounds.
+lapply(
+  list(
+    list(
+      input = "core-point_size",
+      setting = "overview_point_size",
+      min = 1,
+      max = 20
+    ),
+    list(
+      input = "core-point_opacity",
+      setting = "overview_point_opacity",
+      min = 0.1,
+      max = 1
+    ),
+    list(
+      input = "core-percentage_cells_to_show",
+      setting = "overview_percentage_cells_to_show",
+      min = 10,
+      max = 100
+    )
+  ),
+  function(control) {
+    observeEvent(
+      input[[control$input]],
+      {
+        id <- current()
+        value <- suppressWarnings(as.numeric(input[[control$input]]))
+        if (
+          is.null(id) ||
+            !identical(input[["core-rendered_for"]], id) ||
+            length(value) != 1L ||
+            is.na(value) ||
+            !is.finite(value) ||
+            value < control$min ||
+            value > control$max
+        ) {
+          return()
+        }
+        entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
+        req(entry)
+        entry$settings[[control$setting]] <- value
+        if (isTRUE(replace_entry(entry))) {
+          send_projection_state(entry)
+        }
+      },
+      ignoreInit = TRUE
+    )
+  }
 )
 
 parse_trajectory_action <- function(value, selectable) {
