@@ -1,70 +1,56 @@
 ## Builder server: datasets.
 
 ## -- the rail ------------------------------------------------------------
-last_dataset_rail_patch <- reactiveVal(NULL)
+## Send `patch()` whenever it changes, and `sync_patch()` when the browser
+## asks for a resync; returns the last patch the change observer sent.
+rail_patch_channel <- function(message, sync_input, patch, sync_patch = patch) {
+  last_patch <- reactiveVal(NULL)
+  observe({
+    next_patch <- patch()
+    if (identical(next_patch, isolate(last_patch()))) {
+      return()
+    }
+    last_patch(next_patch)
+    session$sendCustomMessage(message, next_patch)
+  })
+  observeEvent(
+    input[[sync_input]],
+    {
+      session$sendCustomMessage(message, sync_patch())
+    },
+    ignoreInit = TRUE
+  )
+  last_patch
+}
+
 dataset_rail_row_cache <- new.env(parent = emptyenv())
-observe({
-  next_patch <- builder_dataset_rail_patch(
+dataset_rail_patch <- function(force_html = FALSE) {
+  builder_dataset_rail_patch(
     store(),
     current(),
     checked_dataset_ids(),
     dataset_checkpoint_states(),
     row_cache = dataset_rail_row_cache,
+    force_html = force_html,
     state_cache = builder_dataset_state_cache
   )
-  if (identical(next_patch, isolate(last_dataset_rail_patch()))) {
-    return()
-  }
-  last_dataset_rail_patch(next_patch)
-  session$sendCustomMessage("builder_dataset_rail_patch", next_patch)
-})
-
-observeEvent(
-  input$builder_dataset_rail_sync,
-  {
-    session$sendCustomMessage(
-      "builder_dataset_rail_patch",
-      builder_dataset_rail_patch(
-        store(),
-        current(),
-        checked_dataset_ids(),
-        dataset_checkpoint_states(),
-        row_cache = dataset_rail_row_cache,
-        force_html = TRUE,
-        state_cache = builder_dataset_state_cache
-      )
-    )
-  },
-  ignoreInit = TRUE
+}
+last_dataset_rail_patch <- rail_patch_channel(
+  "builder_dataset_rail_patch",
+  "builder_dataset_rail_sync",
+  dataset_rail_patch,
+  function() dataset_rail_patch(force_html = TRUE)
 )
-
-last_import_rail_patch <- reactiveVal(NULL)
-observe({
-  next_patch <- builder_import_rail_patch(
-    imports()$entries,
-    active_import_id(),
-    length(store()$datasets %||% list())
-  )
-  if (identical(next_patch, isolate(last_import_rail_patch()))) {
-    return()
-  }
-  last_import_rail_patch(next_patch)
-  session$sendCustomMessage("builder_import_rail_patch", next_patch)
-})
-
-observeEvent(
-  input$builder_import_rail_sync,
-  {
-    session$sendCustomMessage(
-      "builder_import_rail_patch",
-      builder_import_rail_patch(
-        imports()$entries,
-        active_import_id(),
-        length(store()$datasets %||% list())
-      )
+last_import_rail_patch <- rail_patch_channel(
+  "builder_import_rail_patch",
+  "builder_import_rail_sync",
+  function() {
+    builder_import_rail_patch(
+      imports()$entries,
+      active_import_id(),
+      length(store()$datasets %||% list())
     )
-  },
-  ignoreInit = TRUE
+  }
 )
 
 ## -- keep the current entry's settings in step with Core -----------------
