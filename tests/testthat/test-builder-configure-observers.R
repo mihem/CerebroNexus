@@ -1073,3 +1073,87 @@ test_that("projection and trajectory previews are queued once per contract", {
     )
   })
 })
+
+test_that("rail patches are sent when they change and in full on a resync", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- configure_observer_app()
+  shiny::testServer(app_env$server, {
+    log <- configure_observer_messages(session)
+    use_state_only_fixture(list(
+      configure_observer_entry(app_env, "dataset-a"),
+      configure_observer_entry(app_env, "dataset-b")
+    ))
+    session$flushReact()
+    dataset_patches <- function() {
+      configure_observer_sent(log, "builder_dataset_rail_patch")
+    }
+    import_patches <- function() {
+      configure_observer_sent(log, "builder_import_rail_patch")
+    }
+    row_ids <- function(patch) vapply(patch$rows, `[[`, character(1), "id")
+    has_html <- function(patch) {
+      vapply(patch$rows, function(row) is.character(row$html), logical(1))
+    }
+    sent <- dataset_patches()
+    expect_gte(length(sent), 1L)
+    expect_identical(sent[[length(sent)]], last_dataset_rail_patch())
+    expect_identical(
+      row_ids(last_dataset_rail_patch()),
+      c("dataset-a", "dataset-b")
+    )
+    expect_gte(length(import_patches()), 1L)
+    expect_identical(
+      import_patches()[[length(import_patches())]],
+      last_import_rail_patch()
+    )
+
+    ## A renamed dataset: one dataset patch, re-rendering only that row; the
+    ## unchanged import rail is not sent again.
+    configure_observer_reset(log)
+    renamed <- configure_observer_stored(sets)
+    renamed$settings$name <- "Renamed dataset"
+    expect_true(replace_entry(renamed))
+    session$flushReact()
+    sent <- dataset_patches()
+    expect_length(sent, 1L)
+    expect_identical(sent[[1L]], last_dataset_rail_patch())
+    expect_identical(has_html(sent[[1L]]), c(TRUE, FALSE))
+    expect_match(sent[[1L]]$rows[[1L]]$html, "Renamed dataset", fixed = TRUE)
+    expect_length(import_patches(), 0L)
+
+    ## Two more edits that leave every row as it is: the first sends the
+    ## rows without html, the second the same patch, so nothing.
+    configure_observer_reset(log)
+    for (size in c(9, 8)) {
+      changed <- configure_observer_stored(sets)
+      changed$settings$overview_point_size <- size
+      expect_true(replace_entry(changed))
+      session$flushReact()
+    }
+    sent <- dataset_patches()
+    expect_length(sent, 1L)
+    expect_identical(has_html(sent[[1L]]), c(FALSE, FALSE))
+    expect_identical(sent[[1L]], last_dataset_rail_patch())
+
+    ## A resync resends every row in full, without touching the last patch.
+    before <- last_dataset_rail_patch()
+    configure_observer_reset(log)
+    session$setInputs(builder_dataset_rail_sync = list(nonce = 1))
+    session$flushReact()
+    sent <- dataset_patches()
+    expect_length(sent, 1L)
+    expect_identical(row_ids(sent[[1L]]), c("dataset-a", "dataset-b"))
+    expect_identical(has_html(sent[[1L]]), c(TRUE, TRUE))
+    expect_identical(last_dataset_rail_patch(), before)
+    expect_length(import_patches(), 0L)
+
+    configure_observer_reset(log)
+    session$setInputs(builder_import_rail_sync = list(nonce = 1))
+    session$flushReact()
+    expect_length(dataset_patches(), 0L)
+    sent <- import_patches()
+    expect_length(sent, 1L)
+    expect_identical(sent[[1L]], last_import_rail_patch())
+  })
+})
