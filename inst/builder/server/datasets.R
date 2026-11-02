@@ -196,6 +196,20 @@ observe({
   replace_entry(entry)
 })
 
+## The upgraded entry of the current dataset while the Configure pane is
+## rendered for it; NULL while it shows another dataset (or none). Both inputs
+## are read every time, so a renderUI caller depends on each of them.
+rendered_core_entry <- function() {
+  id <- current()
+  rendered_for <- input[["core-rendered_for"]]
+  if (is.null(id) || !identical(rendered_for, id)) {
+    return(NULL)
+  }
+  entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
+  req(entry)
+  entry
+}
+
 ## A content action request from the rendered Configure dataset: the upgraded
 ## entry, or NULL when the request is malformed (`valid` adds the per-action
 ## checks), names another dataset or comes from a stale owner.
@@ -457,17 +471,11 @@ lapply(
     observeEvent(
       input[[paste0("core-immune_source_", capability)]],
       {
-        id <- current()
+        entry <- rendered_core_entry()
         value <- input[[paste0("core-immune_source_", capability)]]
-        if (
-          is.null(id) ||
-            !identical(input[["core-rendered_for"]], id) ||
-            !builder_stage_has_text(value %||% "")
-        ) {
+        if (is.null(entry) || !builder_stage_has_text(value %||% "")) {
           return()
         }
-        entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-        req(entry)
         fact <- entry$dataset_profile$content$immune_repertoire %||%
           entry$profile$content$immune_repertoire %||%
           list()
@@ -509,18 +517,15 @@ lapply(
 observeEvent(
   input[["core-projection_action"]],
   {
-    id <- current()
+    entry <- rendered_core_entry()
     action <- input[["core-projection_action"]]
     if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
+      is.null(entry) ||
         !is.list(action) ||
         !identical(action$action, "set")
     ) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     catalog <- projection_catalog_for_entry(entry)
     available <- names(catalog)[vapply(
       catalog,
@@ -592,11 +597,10 @@ lapply(
     observeEvent(
       input[[control$input]],
       {
-        id <- current()
+        entry <- rendered_core_entry()
         value <- suppressWarnings(as.numeric(input[[control$input]]))
         if (
-          is.null(id) ||
-            !identical(input[["core-rendered_for"]], id) ||
+          is.null(entry) ||
             length(value) != 1L ||
             is.na(value) ||
             !is.finite(value) ||
@@ -605,8 +609,6 @@ lapply(
         ) {
           return()
         }
-        entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-        req(entry)
         entry$settings[[control$setting]] <- value
         if (isTRUE(replace_entry(entry))) {
           send_projection_state(entry)
@@ -644,18 +646,15 @@ parse_trajectory_action <- function(value, selectable) {
 observeEvent(
   input[["core-trajectory_action"]],
   {
-    id <- current()
+    entry <- rendered_core_entry()
     action <- input[["core-trajectory_action"]]
     if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
+      is.null(entry) ||
         !is.list(action) ||
         !identical(action$action, "set")
     ) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     selectable <- selectable_trajectory_selection(
       trajectory_catalog_for_entry(entry)
     )
@@ -761,18 +760,15 @@ observe({
 observeEvent(
   input[["core-metadata_action"]],
   {
-    id <- current()
+    entry <- rendered_core_entry()
     action <- input[["core-metadata_action"]]
     if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
+      is.null(entry) ||
         !is.list(action) ||
         !identical(action$action, "set-retention")
     ) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     policy <- entry$settings$metadata_policy %||%
       entry$settings$recommendations$metadata
     req(is.list(policy))
@@ -812,18 +808,15 @@ observeEvent(
 observeEvent(
   input[["core-group_action"]],
   {
-    id <- current()
+    entry <- rendered_core_entry()
     action <- input[["core-group_action"]]
     if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
+      is.null(entry) ||
         !is.list(action) ||
         !action$action %in% c("set", "set-groups")
     ) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     catalog <- group_catalog_for_entry(entry)
     eligible <- vapply(
       Filter(function(item) isTRUE(item$eligible), catalog$items),
@@ -879,15 +872,10 @@ observeEvent(
 observeEvent(
   input[["core-cell_cycle"]],
   {
-    id <- current()
-    if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id)
-    ) {
+    entry <- rendered_core_entry()
+    if (is.null(entry)) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     metadata <- entry$dataset_profile$viewer_content$metadata %||%
       entry$profile$viewer_content$metadata %||%
       list()
@@ -913,13 +901,10 @@ group_preview_ui_revision <- reactiveVal(0L)
 
 output[["core-group_detail"]] <- renderUI({
   group_preview_ui_revision()
-  id <- current()
-  rendered_for <- input[["core-rendered_for"]]
-  if (is.null(id) || !identical(rendered_for, id)) {
+  entry <- rendered_core_entry()
+  if (is.null(entry)) {
     return(NULL)
   }
-  entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-  req(entry)
   catalog <- group_catalog_for_entry(entry)
   focus <- group_focus_value(input[["core-group_focus"]]) %||%
     entry$settings$default_group %||%
@@ -942,13 +927,10 @@ output[["core-metadata_preview"]] <- renderUI({
 
 output[["core-group_colors"]] <- renderUI({
   group_color_ui_revision()
-  id <- current()
-  rendered_for <- input[["core-rendered_for"]]
-  if (is.null(id) || !identical(rendered_for, id)) {
+  entry <- rendered_core_entry()
+  if (is.null(entry)) {
     return(NULL)
   }
-  entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-  req(entry)
   catalog <- group_catalog_for_entry(entry)
   group <- group_focus_value(input[["core-group_focus"]]) %||%
     entry$settings$default_group %||%
@@ -969,14 +951,11 @@ output[["core-group_colors"]] <- renderUI({
 })
 
 output[["core-projection_gallery"]] <- renderUI({
-  id <- current()
-  rendered_for <- input[["core-rendered_for"]]
-  if (is.null(id) || !identical(rendered_for, id)) {
+  entry <- rendered_core_entry()
+  if (is.null(entry)) {
     return(NULL)
   }
-  entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-  req(entry)
-  frames <- builder_preview_cache_frames(projection_previews(), id)
+  frames <- builder_preview_cache_frames(projection_previews(), entry$id)
   group <- entry$settings$default_group %||% ""
   levels <- entry$levels[[group]] %||% character()
   colors <- if (length(levels)) {
@@ -1056,14 +1035,11 @@ observeEvent(
 )
 
 output[["core-trajectory_gallery"]] <- renderUI({
-  id <- current()
-  rendered_for <- input[["core-rendered_for"]]
-  if (is.null(id) || !identical(rendered_for, id)) {
+  entry <- rendered_core_entry()
+  if (is.null(entry)) {
     return(NULL)
   }
-  entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-  req(entry)
-  frames <- builder_preview_cache_frames(trajectory_previews(), id)
+  frames <- builder_preview_cache_frames(trajectory_previews(), entry$id)
   model <- builder_trajectory_catalog_model(list(
     trajectory_catalog = trajectory_catalog_for_entry(entry),
     included_trajectories = entry$settings$included_trajectories,
@@ -1076,19 +1052,16 @@ output[["core-trajectory_gallery"]] <- renderUI({
 observeEvent(
   input[["core-group_color"]],
   {
-    id <- current()
+    entry <- rendered_core_entry()
     change <- input[["core-group_color"]]
     if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id) ||
+      is.null(entry) ||
         !is.list(change) ||
         !builder_stage_has_text(change$group %||% "") ||
         !builder_stage_has_text(change$level %||% "")
     ) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     group <- as.character(change$group)
     level <- as.character(change$level)
     if (
@@ -1117,15 +1090,10 @@ observeEvent(
 observeEvent(
   input[["core-reset_colors"]],
   {
-    id <- current()
-    if (
-      is.null(id) ||
-        !identical(input[["core-rendered_for"]], id)
-    ) {
+    entry <- rendered_core_entry()
+    if (is.null(entry)) {
       return()
     }
-    entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
-    req(entry)
     group <- group_focus_value(input[["core-group_focus"]]) %||%
       entry$settings$default_group %||%
       ""
