@@ -1494,33 +1494,11 @@ builder_project_publish_verified_file <- function(part, target, md5, message) {
   fingerprint
 }
 
-## Incremental MD5 so a streamed copy is hashed while its bytes pass through.
-## Uses openssl's digest state when that package is installed; NULL means
-## the caller hashes the finished file once with tools::md5sum().
+## Incremental MD5 so a streamed copy is hashed while its bytes pass through
+## (io.R's stream; its digest is returned as text without the 16-byte check).
+## NULL means the caller hashes the finished file once with tools::md5sum().
 .builder_project_md5_stream <- function() {
-  if (!requireNamespace("openssl", quietly = TRUE)) {
-    return(NULL)
-  }
-  namespace <- getNamespace("openssl")
-  functions <- lapply(
-    c(init = "md_init", feed = "md_feed", final = "md_final"),
-    function(name) {
-      get0(name, envir = namespace, mode = "function", inherits = FALSE)
-    }
-  )
-  if (!all(vapply(functions, is.function, logical(1)))) {
-    return(NULL)
-  }
-  state <- tryCatch(functions$init("md5"), error = function(error) NULL)
-  if (is.null(state)) {
-    return(NULL)
-  }
-  list(
-    feed = function(bytes) functions$feed(state, bytes),
-    final = function() {
-      tolower(paste(as.character(functions$final(state)), collapse = ""))
-    }
-  )
+  .builder_md5_stream(strict = FALSE)
 }
 
 ## MD5 of a file, read in chunks so `progress(bytes)` can report as it goes.
@@ -1555,7 +1533,9 @@ builder_project_stream_md5 <- function(
 }
 
 ## Copies a file to a new destination, hashing while streaming and reporting
-## `progress(bytes)`. Same contract as builder_copy_file_verified() in io.R.
+## `progress(bytes)`: builder_copy_file_verified() in io.R, except that blank
+## paths are rejected, a progress error aborts the copy and a macOS clone is
+## hashed with progress.
 builder_project_stream_copy <- function(
   source,
   destination,
@@ -1563,107 +1543,26 @@ builder_project_stream_copy <- function(
   progress = NULL,
   buffer_bytes = 16L * 1024L^2
 ) {
-  if (
-    !.builder_project_text(source) ||
-      !file.exists(source) ||
-      dir.exists(source) ||
-      !.builder_project_text(destination) ||
-      file.exists(destination)
-  ) {
+  if (!.builder_project_text(source) || !.builder_project_text(destination)) {
     stop(
       "A verified copy requires one file and a new destination.",
       call. = FALSE
     )
   }
-  expected_md5 <- if (is.null(expected_md5)) NULL else tolower(expected_md5)
-  if (
-    !is.null(expected_md5) &&
-      (length(expected_md5) != 1L ||
-        !grepl("^[[:xdigit:]]{32}$", expected_md5))
-  ) {
-    stop("The expected file MD5 is invalid.", call. = FALSE)
-  }
-  expected_bytes <- suppressWarnings(as.double(file.info(source)$size[[1L]]))
-  input <- output <- NULL
-  complete <- FALSE
-  on.exit(
-    {
-      if (!is.null(input)) {
-        try(close(input), silent = TRUE)
-      }
-      if (!is.null(output)) {
-        try(close(output), silent = TRUE)
-      }
-      if (!complete) unlink(destination, force = TRUE)
+  builder_copy_file_verified(
+    source,
+    destination,
+    expected_md5 = expected_md5,
+    buffer_bytes = buffer_bytes,
+    on_progress = if (is.function(progress)) {
+      function(copied, total) progress(copied)
     },
-    add = TRUE
+    progress_errors = TRUE,
+    md5_stream = .builder_project_md5_stream,
+    clone_md5 = function(path) {
+      builder_project_stream_md5(path, progress = progress)
+    }
   )
-  if (
-    identical(unname(Sys.info()[["sysname"]]), "Darwin") &&
-      file.exists("/bin/cp")
-  ) {
-    # APFS clones share blocks; only the verification read remains.
-    status <- suppressWarnings(system2(
-      "/bin/cp",
-      c("-c", "--", shQuote(source), shQuote(destination)),
-      stdout = FALSE,
-      stderr = FALSE
-    ))
-    if (isTRUE(status == 0L) && file.exists(destination)) {
-      cloned <- suppressWarnings(as.double(file.info(destination)$size[[1L]]))
-      actual_md5 <- builder_project_stream_md5(destination, progress = progress)
-      if (
-        !is.finite(expected_bytes) ||
-          !identical(cloned, expected_bytes) ||
-          !grepl("^[[:xdigit:]]{32}$", actual_md5) ||
-          (!is.null(expected_md5) && !identical(actual_md5, expected_md5))
-      ) {
-        stop("The cloned file could not be verified.", call. = FALSE)
-      }
-      complete <- TRUE
-      return(list(path = destination, bytes = cloned, md5 = actual_md5))
-    }
-    unlink(destination, force = TRUE)
-  }
-  stream <- .builder_project_md5_stream()
-  input <- file(source, open = "rb")
-  output <- file(destination, open = "wb")
-  copied <- 0
-  repeat {
-    bytes <- readBin(input, what = "raw", n = as.integer(buffer_bytes))
-    if (!length(bytes)) {
-      break
-    }
-    writeBin(bytes, output)
-    if (!is.null(stream)) {
-      stream$feed(bytes)
-    }
-    copied <- copied + length(bytes)
-    if (is.function(progress)) {
-      progress(copied)
-    }
-  }
-  close(input)
-  close(output)
-  input <- output <- NULL
-  if (
-    !is.finite(expected_bytes) || !identical(as.double(copied), expected_bytes)
-  ) {
-    stop(
-      "The source file ended before the verified copy completed.",
-      call. = FALSE
-    )
-  }
-  actual_md5 <- if (is.null(stream)) {
-    unname(tolower(as.character(tools::md5sum(destination))))
-  } else {
-    stream$final()
-  }
-  if (!is.null(expected_md5) && !identical(actual_md5, expected_md5)) {
-    stop("The copied file does not match its saved MD5.", call. = FALSE)
-  }
-  complete <- TRUE
-  list(path = destination, bytes = as.double(copied), md5 = actual_md5)
 }
 
 ## Whether a source path is the Builder's own retained session copy (under

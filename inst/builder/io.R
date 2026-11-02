@@ -14,7 +14,9 @@
 
 ## An incremental MD5 over the bytes a copy loop already holds, or NULL when
 ## openssl's digest primitives are unavailable (callers then hash the file).
-.builder_md5_stream <- function() {
+## A `strict` digest that is not 16 raw bytes finishes as NA, so the caller
+## hashes the file instead; otherwise it is returned as lower-case text.
+.builder_md5_stream <- function(strict = TRUE) {
   if (!requireNamespace("openssl", quietly = TRUE)) {
     return(NULL)
   }
@@ -33,6 +35,9 @@
     feed = function(bytes) invisible(feed(state, bytes)),
     final = function() {
       digest <- final(state)
+      if (!isTRUE(strict)) {
+        return(tolower(paste(as.character(digest), collapse = "")))
+      }
       if (!is.raw(digest) || length(digest) != 16L) {
         return(NA_character_)
       }
@@ -41,13 +46,19 @@
   )
 }
 
-## `on_progress(copied_bytes, total_bytes)` is called after each buffer.
+## `on_progress(copied_bytes, total_bytes)` is called after each buffer; an
+## error it raises is ignored unless `progress_errors` is TRUE, which aborts
+## the copy. `md5_stream()` supplies the incremental hash, and
+## `clone_md5(path)` hashes a macOS clone (default: one tools::md5sum() read).
 builder_copy_file_verified <- function(
   source,
   destination,
   expected_md5 = NULL,
   buffer_bytes = 16L * 1024L^2,
-  on_progress = NULL
+  on_progress = NULL,
+  progress_errors = FALSE,
+  md5_stream = .builder_md5_stream,
+  clone_md5 = NULL
 ) {
   if (
     !is.character(source) ||
@@ -100,7 +111,11 @@ builder_copy_file_verified <- function(
     ))
     if (isTRUE(status == 0L) && file.exists(destination)) {
       copied <- suppressWarnings(as.double(file.info(destination)$size[[1L]]))
-      actual_md5 <- unname(tolower(as.character(tools::md5sum(destination))))
+      actual_md5 <- if (is.function(clone_md5)) {
+        clone_md5(destination)
+      } else {
+        unname(tolower(as.character(tools::md5sum(destination))))
+      }
       if (
         !is.finite(expected_bytes) ||
           !identical(copied, expected_bytes) ||
@@ -119,7 +134,7 @@ builder_copy_file_verified <- function(
   input <- file(source, open = "rb")
   output <- file(destination, open = "wb")
   # Hash each buffer while it is in memory instead of rereading the copy.
-  digest <- .builder_md5_stream()
+  digest <- md5_stream()
   copied <- 0
   repeat {
     bytes <- readBin(input, what = "raw", n = as.integer(buffer_bytes))
@@ -132,7 +147,11 @@ builder_copy_file_verified <- function(
     }
     copied <- copied + length(bytes)
     if (is.function(on_progress)) {
-      try(on_progress(copied, expected_bytes), silent = TRUE)
+      if (isTRUE(progress_errors)) {
+        on_progress(copied, expected_bytes)
+      } else {
+        try(on_progress(copied, expected_bytes), silent = TRUE)
+      }
     }
   }
   close(input)
