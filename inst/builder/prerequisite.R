@@ -35,6 +35,45 @@ builder_source_utf8 <- function(file, envir = parent.frame(), chdir = FALSE) {
 builder_source_utf8 <- utils::removeSource(builder_source_utf8)
 environment(builder_source_utf8) <- baseenv()
 
+## Evaluate the files of one Builder source group ("plan", "state",
+## "app_bundle" or "ui/core_stage") in order in `envir`. The group directory
+## is looked up next to the loader being sourced, then in `extra_dirs`, under
+## the working directory, and finally in the installed package.
+builder_source_group <- function(
+  group,
+  files,
+  envir,
+  message,
+  extra_dirs = character()
+) {
+  loaders <- unlist(lapply(
+    sys.frames(),
+    function(frame) get0("ofile", envir = frame, inherits = FALSE)
+  ))
+  loaders <- loaders[is.character(loaders) & nzchar(loaders)]
+  sibling <- if (length(loaders)) {
+    file.path(dirname(tail(loaders, 1L)), basename(group))
+  } else {
+    ""
+  }
+  candidates <- unique(c(
+    sibling,
+    extra_dirs,
+    file.path(getwd(), group),
+    file.path(getwd(), "inst", "builder", group),
+    system.file("builder", group, package = "CerebroNexus")
+  ))
+  candidates <- candidates[nzchar(candidates)]
+  matches <- candidates[dir.exists(candidates)]
+  if (!length(matches)) {
+    stop(message, call. = FALSE)
+  }
+  for (name in files) {
+    builder_source_utf8(file.path(matches[[1L]], name), envir = envir)
+  }
+  invisible(TRUE)
+}
+
 builder_installed_app_contract_version <- function(namespace = NULL) {
   if (is.null(namespace)) {
     namespace <- tryCatch(
