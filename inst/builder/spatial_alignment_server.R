@@ -431,6 +431,22 @@ builder_spatial_alignment_server <- function(
   canvas_contract <- shiny::reactiveVal(NULL)
   canvas_viewports <- shiny::reactiveVal(NULL)
   image_collection_cache <- new.env(parent = emptyenv())
+  ## Remember the image collection last committed for `dataset`;
+  ## collection_for() overlays it on the stored settings.
+  cache_images <- function(dataset, images) {
+    image_collection_cache$dataset <- dataset
+    image_collection_cache$images <- images
+  }
+  ## Messages about the alignment card are shown inside its body.
+  notify_alignment <- function(type, message) {
+    builder_notify(
+      type,
+      message,
+      target = list(
+        selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
+      )
+    )
+  }
   send_canvas_clear <- function() {
     active_control_owner_key <<- NULL
     contract <- shiny::isolate(canvas_contract())
@@ -587,22 +603,17 @@ builder_spatial_alignment_server <- function(
   output[["enhance-has_rois"]] <- shiny::reactive({
     length(active_roi_values()) > 0L
   })
-  shiny::outputOptions(
-    output,
-    "enhance-has_image",
-    suspendWhenHidden = FALSE
-  )
-  shiny::outputOptions(output, "enhance-has_rois", suspendWhenHidden = FALSE)
-  shiny::outputOptions(
-    output,
-    "enhance-has_multiple_images",
-    suspendWhenHidden = FALSE
-  )
-  shiny::outputOptions(
-    output,
-    "enhance-has_coordinate_frame",
-    suspendWhenHidden = FALSE
-  )
+  invisible(lapply(
+    c(
+      "enhance-has_image",
+      "enhance-has_rois",
+      "enhance-has_multiple_images",
+      "enhance-has_coordinate_frame"
+    ),
+    function(name) {
+      shiny::outputOptions(output, name, suspendWhenHidden = FALSE)
+    }
+  ))
 
   freeze_controls <- function(ids) {
     invisible(lapply(ids, function(id) shiny::freezeReactiveValue(input, id)))
@@ -766,6 +777,14 @@ builder_spatial_alignment_server <- function(
     }
     stored
   }
+  ## The committed record of image `label` in `section`, normalized.
+  stored_record <- function(entry, section, label) {
+    builder_alignment_normalize(
+      collection_for(entry)[[section]][[label]],
+      section,
+      kind_for(section)
+    )
+  }
   image_choices_for <- function(
     entry,
     section,
@@ -831,13 +850,7 @@ builder_spatial_alignment_server <- function(
       }
     }
     commit_images(entry, images)
-    image_collection_cache$dataset <- entry$id
-    image_collection_cache$images <- images
-    image_collection_cache$known_sections <- unique(c(
-      image_collection_cache$known_sections %||% character(),
-      section,
-      names(images)
-    ))
+    cache_images(entry$id, images)
     invisible(images)
   }
   coordinate_roi <- function(view = roi_view(), roi = active_roi()) {
@@ -1295,11 +1308,7 @@ builder_spatial_alignment_server <- function(
     stored <- if (is.null(label)) {
       NULL
     } else {
-      builder_alignment_normalize(
-        collection_for(entry)[[section]][[label]],
-        section_id = section,
-        section_kind = kind_for(section)
-      )
+      stored_record(entry, section, label)
     }
     draft(stored)
     image_file_record(stored)
@@ -1560,9 +1569,9 @@ builder_spatial_alignment_server <- function(
       !exists("dataset", image_collection_cache, inherits = FALSE) ||
         !identical(image_collection_cache$dataset, entry$id)
     ) {
-      image_collection_cache$dataset <- entry$id
-      image_collection_cache$images <- builder_image_collection_normalize(
-        entry$settings$images %||% list()
+      cache_images(
+        entry$id,
+        builder_image_collection_normalize(entry$settings$images %||% list())
       )
     }
     sections <- if (is.null(entry)) character() else sections_for(entry)
@@ -2087,13 +2096,7 @@ builder_spatial_alignment_server <- function(
       ))
       expected_controls(NULL)
       if (changed) {
-        image_collection_cache$dataset <- owner$dataset
-        image_collection_cache$images <- images
-        image_collection_cache$known_sections <- unique(c(
-          image_collection_cache$known_sections %||% character(),
-          owner$section,
-          names(images)
-        ))
+        cache_images(owner$dataset, images)
       }
     }
     invisible(TRUE)
@@ -2448,13 +2451,7 @@ builder_spatial_alignment_server <- function(
     }
     image <- builder_read_image(upload$datapath[[1L]], filename = filename)
     if (!is.null(image$error)) {
-      builder_notify(
-        "error",
-        image$error,
-        target = list(
-          selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
-        )
-      )
+      notify_alignment("error", image$error)
       return(invisible(FALSE))
     }
     extension <- if (identical(image$mime, "image/png")) "png" else "jpg"
@@ -2468,13 +2465,7 @@ builder_spatial_alignment_server <- function(
       image$bytes
     )
     if (!is.null(retained$error)) {
-      builder_notify(
-        "error",
-        retained$error,
-        target = list(
-          selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
-        )
-      )
+      notify_alignment("error", retained$error)
       return(invisible(FALSE))
     }
     ## builder_read_image() already computed the content fingerprint. The
@@ -2622,13 +2613,10 @@ builder_spatial_alignment_server <- function(
         !.builder_alignment_valid_bounds(preview$bounds)
     ) {
       pending_upload(NULL)
-      builder_notify(
+      notify_alignment(
         "error",
         preview$message %||%
-          "The spatial preview is not available for this tissue section.",
-        target = list(
-          selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
-        )
+          "The spatial preview is not available for this tissue section."
       )
       return()
     }
@@ -2807,11 +2795,7 @@ builder_spatial_alignment_server <- function(
         lapply(preview$roi$values %||% character(), function(roi) {
           labels <- image_labels_for(entry, section, roi)
           record <- if (length(labels)) {
-            builder_alignment_normalize(
-              collection_for(entry)[[section]][[labels[[1L]]]],
-              section,
-              kind_for(section)
-            )
+            stored_record(entry, section, labels[[1L]])
           } else {
             NULL
           }
@@ -2835,11 +2819,7 @@ builder_spatial_alignment_server <- function(
             labels <- image_labels_for(entry, section, roi)
             stats::setNames(
               lapply(labels, function(label) {
-                record <- builder_alignment_normalize(
-                  collection_for(entry)[[section]][[label]],
-                  section,
-                  kind_for(section)
-                )
+                record <- stored_record(entry, section, label)
                 record$active <- identical(roi, active_roi()) &&
                   identical(label, active_image())
                 record_for_canvas(record)
@@ -3191,13 +3171,7 @@ builder_spatial_alignment_server <- function(
         "to finish, then try again."
       )
       if (isTRUE(notify)) {
-        builder_notify(
-          "warning",
-          message,
-          target = list(
-            selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
-          )
-        )
+        notify_alignment("warning", message)
       }
       return(list(
         ok = FALSE,
@@ -3327,13 +3301,7 @@ builder_spatial_alignment_server <- function(
           } else {
             "The coordinate settings could not be saved."
           }
-          builder_notify(
-            "error",
-            message,
-            target = list(
-              selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
-            )
-          )
+          notify_alignment("error", message)
         }
         return(list(
           ok = FALSE,
@@ -3377,13 +3345,7 @@ builder_spatial_alignment_server <- function(
         changed &&
           identical(dataset_id, shiny::isolate(current()))
       ) {
-        image_collection_cache$dataset <- dataset_id
-        image_collection_cache$images <- applied$entry$settings$images
-        image_collection_cache$known_sections <- unique(c(
-          image_collection_cache$known_sections %||% character(),
-          applied$sections,
-          names(applied$entry$settings$images)
-        ))
+        cache_images(dataset_id, applied$entry$settings$images)
       }
     }
     list(
@@ -3624,14 +3586,11 @@ builder_spatial_alignment_server <- function(
       ) {
         return()
       }
-      builder_notify(
+      notify_alignment(
         "error",
         paste(
           "The image was uploaded, but the browser could not display it.",
           "Switch views to retry, or remove and add the image again."
-        ),
-        target = list(
-          selector = ".builder-viewer-spatial-alignment .builder-viewer-card-body"
         )
       )
     },
@@ -3647,11 +3606,7 @@ builder_spatial_alignment_server <- function(
     labels <- image_labels_for(entry, section)
     position <- match(label, labels)
     if (length(labels) == 1L) {
-      removed <- builder_alignment_normalize(
-        collection_for(entry)[[section]][[label]],
-        section,
-        kind_for(section)
-      )
+      removed <- stored_record(entry, section, label)
       appearance <- point_appearance_for(entry, section, removed)
       roi <- coordinate_roi()
       if (nzchar(roi)) {
@@ -3747,8 +3702,7 @@ builder_spatial_alignment_server <- function(
       images <- builder_image_collection_normalize(committed$settings$images)
     }
     active_image(renamed_key)
-    image_collection_cache$dataset <- entry$id
-    image_collection_cache$images <- images
+    cache_images(entry$id, images)
     entry$settings$images <- images
     renamed_record <- builder_alignment_normalize(
       images[[section]][[renamed_key]],
