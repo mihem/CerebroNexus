@@ -5781,29 +5781,49 @@
     });
   }
 
+  // Register Shiny custom-message handlers in table order.
+  function addMessageHandlers(handlers) {
+    Object.keys(handlers).forEach(function (name) {
+      window.Shiny.addCustomMessageHandler(name, handlers[name]);
+    });
+  }
+
   function registerBuildDialogHandler() {
     if (buildDialogHandlerRegistered || !window.Shiny) return;
-    window.Shiny.addCustomMessageHandler("builder_copy_text", copyTextToClipboard);
-    window.Shiny.addCustomMessageHandler("builder_build_dialog", showBuildDialog);
-    window.Shiny.addCustomMessageHandler("builder_build_progress", handleBuildProgress);
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_rail_patch",
-      reconcileDatasetRail
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_import_rail_patch",
-      reconcileImportRail
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_mutation_lock",
-      function (message) {
+    function handleAuthStatus(message) {
+      if (
+        !message ||
+        typeof authEditor.saving !== "number" ||
+        message.nonce !== authEditor.saving
+      ) return;
+      var error = document.getElementById("builder-auth-error");
+      setAuthSaving(false);
+      if (message.ok) {
+        if (error) { error.textContent = ""; error.hidden = true; }
+        clearAuthLiveInputs();
+        authRender([]);
+        authEditor.snapshot = [];
+        send("builder_auth_accounts", null);
+        authEditor.rollbackRequireLogin = false;
+        closeAuthDialog(true);
+      } else if (error) {
+        error.textContent = "Login accounts could not be saved. Review the account details and try again.";
+        error.hidden = false;
+        error.focus({ preventScroll: true });
+      }
+    }
+    window.__builderHandleAuthStatus = handleAuthStatus;
+    addMessageHandlers({
+      "builder_copy_text": copyTextToClipboard,
+      "builder_build_dialog": showBuildDialog,
+      "builder_build_progress": handleBuildProgress,
+      "builder_dataset_rail_patch": reconcileDatasetRail,
+      "builder_import_rail_patch": reconcileImportRail,
+      "builder_dataset_mutation_lock": function (message) {
         datasetMutationsLocked = Boolean(message && message.locked === true);
         applyDatasetMutationLock();
-      }
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_activity_state",
-      function (message) {
+      },
+      "builder_activity_state": function (message) {
         if (!message || typeof message !== "object") return;
         // Feedback inside a dialog stays until that dialog closes; the
         // activity state changes while the dialog's action is still running.
@@ -5834,62 +5854,22 @@
             : null,
         };
         applyBuilderActivityState();
-      }
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_action_owner",
-      applyDatasetActionOwner
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_worker_status",
-      updateBuilderWorkerStatus
-    );
-    window.Shiny.addCustomMessageHandler("builder_notify", builderNotify);
-    window.Shiny.addCustomMessageHandler(
-      "builder_project_save_result",
-      showBuilderProjectSaveResult
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_project_source_progress",
-      updateBuilderProjectSourceProgress
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_project_source_load_state",
-      updateProjectSourceLoadState
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_switch_state",
-      updateDatasetSwitchPhase
-    );
-    window.Shiny.addCustomMessageHandler(
-      "enhance_tables_added",
-      announceAddedTables
-    );
-    window.Shiny.addCustomMessageHandler(
-      "enhance_attachment_saved",
-      applyAttachmentSaved
-    );
-    window.Shiny.addCustomMessageHandler(
-      "enhance_workbook_reopen",
-      reopenWorkbookAfterRename
-    );
-
-    window.Shiny.addCustomMessageHandler("builder_marker_dialog", setMarkerDialog);
-    window.Shiny.addCustomMessageHandler(
-      "builder_focus_dataset_start",
-      focusDatasetStart
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_focus_incomplete_setting",
-      focusIncompleteSetting
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_coordinate_reset_motion",
-      animateCoordinateResetSliders
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_focus_build_status",
-      function (message) {
+      },
+      "builder_dataset_action_owner": applyDatasetActionOwner,
+      "builder_worker_status": updateBuilderWorkerStatus,
+      "builder_notify": builderNotify,
+      "builder_project_save_result": showBuilderProjectSaveResult,
+      "builder_project_source_progress": updateBuilderProjectSourceProgress,
+      "builder_project_source_load_state": updateProjectSourceLoadState,
+      "builder_dataset_switch_state": updateDatasetSwitchPhase,
+      "enhance_tables_added": announceAddedTables,
+      "enhance_attachment_saved": applyAttachmentSaved,
+      "enhance_workbook_reopen": reopenWorkbookAfterRename,
+      "builder_marker_dialog": setMarkerDialog,
+      "builder_focus_dataset_start": focusDatasetStart,
+      "builder_focus_incomplete_setting": focusIncompleteSetting,
+      "builder_coordinate_reset_motion": animateCoordinateResetSliders,
+      "builder_focus_build_status": function (message) {
         if (buildOperationActive) {
           beginBuildOperationFocus(
             document.getElementById("builder-operation-overlay")
@@ -5897,87 +5877,64 @@
           return;
         }
         scheduleBuildStatusFocus();
-      }
-    );
-    window.Shiny.addCustomMessageHandler("builder_focus_stage", function (message) {
-      var id = message && message.id;
-      if (["upload", "configure", "review", "build"].indexOf(id) < 0) return;
-      stageFocusToken += 1;
-      var token = stageFocusToken;
-      var attempts = 0;
-      function apply() {
-        if (token !== stageFocusToken) return;
-        var stage = document.querySelector('[data-workflow-stage="' + id + '"]');
-        var heading = stage && stage.querySelector("h2");
-        if (!heading) {
-          attempts += 1;
-          if (attempts < 12) window.setTimeout(apply, 50);
-          return;
+      },
+      "builder_focus_stage": function (message) {
+        var id = message && message.id;
+        if (["upload", "configure", "review", "build"].indexOf(id) < 0) return;
+        stageFocusToken += 1;
+        var token = stageFocusToken;
+        var attempts = 0;
+        function apply() {
+          if (token !== stageFocusToken) return;
+          var stage = document.querySelector('[data-workflow-stage="' + id + '"]');
+          var heading = stage && stage.querySelector("h2");
+          if (!heading) {
+            attempts += 1;
+            if (attempts < 12) window.setTimeout(apply, 50);
+            return;
+          }
+          heading.setAttribute("tabindex", "-1");
+          if (id === "build") {
+            window.scrollTo({
+              top: 0,
+              behavior: reducedMotion.matches ? "auto" : "smooth",
+            });
+          } else {
+            var topbar = document.querySelector(".topbar");
+            var workflowBar = document.querySelector("#workflow_progress");
+            var stickyBottom = Math.max(
+              topbar ? topbar.getBoundingClientRect().bottom : 0,
+              workflowBar ? workflowBar.getBoundingClientRect().bottom : 0
+            );
+            heading.style.scrollMarginTop = Math.max(0, stickyBottom + 12) + "px";
+            heading.scrollIntoView({
+              block: "start",
+              behavior: reducedMotion.matches ? "auto" : "smooth",
+            });
+          }
+          heading.focus({ preventScroll: true });
+          scheduleStatusAnnouncement("Opened " + id + " step.");
         }
-        heading.setAttribute("tabindex", "-1");
-        if (id === "build") {
-          window.scrollTo({
-            top: 0,
-            behavior: reducedMotion.matches ? "auto" : "smooth",
-          });
-        } else {
-          var topbar = document.querySelector(".topbar");
-          var workflowBar = document.querySelector("#workflow_progress");
-          var stickyBottom = Math.max(
-            topbar ? topbar.getBoundingClientRect().bottom : 0,
-            workflowBar ? workflowBar.getBoundingClientRect().bottom : 0
-          );
-          heading.style.scrollMarginTop = Math.max(0, stickyBottom + 12) + "px";
-          heading.scrollIntoView({
-            block: "start",
-            behavior: reducedMotion.matches ? "auto" : "smooth",
-          });
-        }
-        heading.focus({ preventScroll: true });
-        scheduleStatusAnnouncement("Opened " + id + " step.");
-      }
-      apply();
-    });
-    window.Shiny.addCustomMessageHandler("builder_import_status", function (message) {
-      if (message && message.text) scheduleStatusAnnouncement(message.text);
-    });
-    function handleAuthStatus(message) {
-      if (
-        !message ||
-        typeof authEditor.saving !== "number" ||
-        message.nonce !== authEditor.saving
-      ) return;
-      var error = document.getElementById("builder-auth-error");
-      setAuthSaving(false);
-      if (message.ok) {
-        if (error) { error.textContent = ""; error.hidden = true; }
-        clearAuthLiveInputs();
+        apply();
+      },
+      "builder_import_status": function (message) {
+        if (message && message.text) scheduleStatusAnnouncement(message.text);
+      },
+      "builder_auth_status": handleAuthStatus,
+      // Build and Retry ask for login accounts in place instead of sending the
+      // user back to Review.
+      "builder_open_auth_dialog": function (message) {
+        if (!message || message.open !== true || authEditor.open) return;
+        openAuthDialog(document.getElementById("build"));
+      },
+      "builder_auth_reset": function (message) {
+        if (!message || message.reset !== true) return;
+        setAuthSaving(false);
+        clearAuthSecrets();
+        clearAuthError();
         authRender([]);
-        authEditor.snapshot = [];
         send("builder_auth_accounts", null);
-        authEditor.rollbackRequireLogin = false;
-        closeAuthDialog(true);
-      } else if (error) {
-        error.textContent = "Login accounts could not be saved. Review the account details and try again.";
-        error.hidden = false;
-        error.focus({ preventScroll: true });
-      }
-    }
-    window.__builderHandleAuthStatus = handleAuthStatus;
-    window.Shiny.addCustomMessageHandler("builder_auth_status", handleAuthStatus);
-    // Build and Retry ask for login accounts in place instead of sending the
-    // user back to Review.
-    window.Shiny.addCustomMessageHandler("builder_open_auth_dialog", function (message) {
-      if (!message || message.open !== true || authEditor.open) return;
-      openAuthDialog(document.getElementById("build"));
-    });
-    window.Shiny.addCustomMessageHandler("builder_auth_reset", function (message) {
-      if (!message || message.reset !== true) return;
-      setAuthSaving(false);
-      clearAuthSecrets();
-      clearAuthError();
-      authRender([]);
-      send("builder_auth_accounts", null);
+      },
     });
     buildDialogHandlerRegistered = true;
   }
@@ -6016,46 +5973,24 @@
 
   function registerClientImportHandlers() {
     if (clientImportHandlersRegistered || !window.Shiny) return;
-    window.Shiny.addCustomMessageHandler(
-      "builder_client_import_dispatch_ready",
-      handleClientImportDispatchReady
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_client_import_accepted",
-      handleClientImportAccepted
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_client_import_transport_release",
-      handleClientImportTransportRelease
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_client_import_release",
-      handleClientImportRelease
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_import_sync",
-      handleClientImportSync
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_picker_fallback",
-      function (message) {
+    addMessageHandlers({
+      "builder_client_import_dispatch_ready": handleClientImportDispatchReady,
+      "builder_client_import_accepted": handleClientImportAccepted,
+      "builder_client_import_transport_release": handleClientImportTransportRelease,
+      "builder_client_import_release": handleClientImportRelease,
+      "builder_import_sync": handleClientImportSync,
+      "builder_dataset_picker_fallback": function (message) {
         setDatasetPickerOpening(false);
         openDatasetPicker(message);
-      }
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_dataset_picker_state",
-      function (message) {
+      },
+      "builder_dataset_picker_state": function (message) {
         setDatasetPickerOpening(Boolean(message && message.active));
-      }
-    );
-    window.Shiny.addCustomMessageHandler(
-      "builder_import_scheduler_state",
-      function (message) {
+      },
+      "builder_import_scheduler_state": function (message) {
         serverImportGate = Boolean(message && message.active);
         if (!serverImportGate) dispatchNextClientImport();
-      }
-    );
+      },
+    });
     clientImportHandlersRegistered = true;
   }
 
