@@ -141,6 +141,26 @@
   list(type = type, root = NULL, root_fingerprint = NULL, entries = entries)
 }
 
+## The request fields that come straight from the frozen App options and
+## login summary. The publication expectation is built from the same list, so
+## the parent's request and the expectation cannot disagree on them.
+.builder_app_request_options <- function(options, app_auth) {
+  list(
+    initial_dataset_mode = options$initial_dataset_mode,
+    initial_page = options$initial_page,
+    show_upload_ui = options$show_upload_ui,
+    welcome_message = options$welcome_message,
+    point_size = options$point_size,
+    variable_to_compare = options$variable_to_compare,
+    host = options$host,
+    port = as.integer(options$port),
+    max_request_size = options$max_request_size,
+    display_mode = options$display_mode,
+    launch_browser = options$launch_browser,
+    auth = .builder_app_auth_request(app_auth)
+  )
+}
+
 builder_app_bundle_request <- function(
   plan,
   built,
@@ -376,7 +396,7 @@ builder_app_bundle_request <- function(
     spatial_images
   )
 
-  request <- structure(
+  request <- c(
     list(
       contract_version = 1L,
       stage = stage,
@@ -385,19 +405,7 @@ builder_app_bundle_request <- function(
       selector_order = item_ids,
       dataset_labels = dataset_labels,
       initial_dataset = item_ids[[initial_index]],
-      initial_dataset_mode = options$initial_dataset_mode,
-      initial_page = options$initial_page,
-      show_upload_ui = options$show_upload_ui,
-      welcome_message = options$welcome_message,
-      point_size = options$point_size,
       viewer_content = viewer_content,
-      variable_to_compare = options$variable_to_compare,
-      host = options$host,
-      port = as.integer(options$port),
-      max_request_size = options$max_request_size,
-      display_mode = options$display_mode,
-      launch_browser = options$launch_browser,
-      auth = .builder_app_auth_request(app_auth),
       colors = colors,
       crb_pick_smallest_file = FALSE,
       backend_plan = backend_plan,
@@ -408,6 +416,10 @@ builder_app_bundle_request <- function(
       spatial_image_settings = spatial_image_settings,
       spatial_image_identities = spatial_image_identities
     ),
+    .builder_app_request_options(options, app_auth)
+  )
+  request <- structure(
+    request[.builder_app_request_fields],
     class = c("builder_app_bundle_request", "list")
   )
   .builder_app_validate_request(request)

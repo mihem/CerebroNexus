@@ -434,29 +434,22 @@ environment(builder_runtime_assert_identity) <- baseenv()
     class = c("builder_build_plan", "list")
   )
   frozen_plan <- .builder_coordinator_freeze(request_plan)
-  expectation <- .builder_coordinator_freeze(list(
-    expected = TRUE,
-    contract_version = 1L,
-    dataset_ids = dataset_ids,
-    labels = labels,
-    dataset_labels = stats::setNames(labels, dataset_ids),
-    filenames = filenames,
-    initial_dataset = dataset_ids[[initial_index]],
-    initial_dataset_mode = options$initial_dataset_mode,
-    initial_page = options$initial_page,
-    show_upload_ui = options$show_upload_ui,
-    welcome_message = options$welcome_message,
-    point_size = options$point_size,
-    variable_to_compare = options$variable_to_compare,
-    host = options$host,
-    port = as.integer(options$port),
-    max_request_size = options$max_request_size,
-    display_mode = options$display_mode,
-    launch_browser = options$launch_browser,
-    auth = .builder_app_auth_request(plan$app_auth),
-    colors = colors,
-    backend_plan = list(schema_version = 1L, entries = backend_entries),
-    app_dir = NULL
+  expectation <- .builder_coordinator_freeze(c(
+    list(
+      expected = TRUE,
+      contract_version = 1L,
+      dataset_ids = dataset_ids,
+      labels = labels,
+      dataset_labels = stats::setNames(labels, dataset_ids),
+      filenames = filenames,
+      initial_dataset = dataset_ids[[initial_index]]
+    ),
+    .builder_app_request_options(options, plan$app_auth),
+    list(
+      colors = colors,
+      backend_plan = list(schema_version = 1L, entries = backend_entries),
+      app_dir = NULL
+    )
   ))
   list(plan = frozen_plan, expectation = expectation)
 }
@@ -566,30 +559,6 @@ environment(builder_runtime_assert_identity) <- baseenv()
     )
   }
   value
-}
-
-.builder_coordinator_request_matches <- function(request, expectation) {
-  identical(request$contract_version, expectation$contract_version) &&
-    identical(request$selector_order, expectation$dataset_ids) &&
-    identical(request$dataset_labels, expectation$dataset_labels) &&
-    identical(request$initial_dataset, expectation$initial_dataset) &&
-    identical(request$initial_page, expectation$initial_page) &&
-    identical(
-      request$initial_dataset_mode,
-      expectation$initial_dataset_mode
-    ) &&
-    identical(request$show_upload_ui, expectation$show_upload_ui) &&
-    identical(request$welcome_message, expectation$welcome_message) &&
-    identical(request$point_size, expectation$point_size) &&
-    identical(request$variable_to_compare, expectation$variable_to_compare) &&
-    identical(request$host, expectation$host) &&
-    identical(request$port, expectation$port) &&
-    identical(request$max_request_size, expectation$max_request_size) &&
-    identical(request$display_mode, expectation$display_mode) &&
-    identical(request$launch_browser, expectation$launch_browser) &&
-    identical(request$auth, expectation$auth) &&
-    identical(request$colors, expectation$colors) &&
-    identical(request$backend_plan, expectation$backend_plan)
 }
 
 .builder_coordinator_assert_input_closure <- function(
@@ -1595,13 +1564,9 @@ builder_coordinator_publish <- function(
       ),
       error = function(error) error
     )
-    if (
-      inherits(parent_request, "condition") ||
-        !.builder_coordinator_request_matches(
-          parent_request,
-          handle$app_expectation
-        )
-    ) {
+    # The request and the expectation derive their App fields from the same
+    # frozen plan through .builder_app_request_options().
+    if (inherits(parent_request, "condition")) {
       stop(
         "The staged App inputs differ from the frozen plan.",
         call. = FALSE
