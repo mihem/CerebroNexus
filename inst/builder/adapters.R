@@ -1313,6 +1313,24 @@ builder_adapter_inspect <- function(adapter) {
   as.matrix(layer[rows, columns, drop = FALSE])
 }
 
+## A Seurat v5 layer as stored. LayerData() returns `layer[features, cells]`,
+## a full copy of the matrix (seconds for a 100k-cell layer), where only the
+## layer's class is needed. NULL when the assay keeps no such layer; a delayed
+## (on-disk) layer still goes through LayerData(), whose view callers inspect.
+.builder_stored_layer <- function(assay_object, layer_name) {
+  if (
+    !methods::is(assay_object, "StdAssay") ||
+      !"layers" %in% methods::slotNames(assay_object)
+  ) {
+    return(NULL)
+  }
+  layers <- methods::slot(assay_object, "layers")
+  if (!is.character(layer_name) || !layer_name %in% names(layers)) {
+    return(NULL)
+  }
+  layers[[layer_name]]
+}
+
 .builder_snapshot_layer_contracts <- function(
   object,
   .layer_data = SeuratObject::LayerData
@@ -1321,11 +1339,14 @@ builder_adapter_inspect <- function(adapter) {
   for (assay in names(object@assays)) {
     assay_object <- object[[assay]]
     for (layer_name in SeuratObject::Layers(assay_object)) {
+      stored <- .builder_stored_layer(assay_object, layer_name)
       layer <- if (
         inherits(assay_object, "Assay") &&
           layer_name %in% methods::slotNames(assay_object)
       ) {
         methods::slot(assay_object, layer_name)
+      } else if (!is.null(stored) && !inherits(stored, "DelayedMatrix")) {
+        stored
       } else {
         suppressWarnings(.layer_data(assay_object, layer = layer_name))
       }

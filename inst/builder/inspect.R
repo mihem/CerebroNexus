@@ -195,12 +195,27 @@ builder_qc_numeric_values <- function(values) {
   assay <- profile$default_assay
   layer <- profile$assay_profiles[[assay]]$default_layer
   assay_object <- object[[assay]]
+  ## Only the class matters: read a Seurat v5 layer as stored instead of
+  ## through LayerData(), which copies the whole matrix. An on-disk
+  ## (DelayedMatrix) layer keeps the LayerData() view it always had.
+  stored <- tryCatch(
+    if (
+      methods::is(assay_object, "StdAssay") &&
+        is.character(layer) &&
+        layer %in% names(methods::slot(assay_object, "layers"))
+    ) {
+      methods::slot(assay_object, "layers")[[layer]]
+    },
+    error = function(error) NULL
+  )
   matrix <- tryCatch(
     if (
       inherits(assay_object, "Assay") &&
         layer %in% methods::slotNames(assay_object)
     ) {
       methods::slot(assay_object, layer)
+    } else if (!is.null(stored) && !inherits(stored, "DelayedMatrix")) {
+      stored
     } else {
       suppressWarnings(SeuratObject::LayerData(assay_object, layer = layer))
     },

@@ -315,29 +315,50 @@
   ) {
     return(out)
   }
-  for (row in seq_len(nrow(table))) {
-    barcode <- table$barcode[[row]]
-    if (is.na(barcode) || !nzchar(barcode)) {
-      next
-    }
-    chains <- .builder_immune_detect_chains(table$CTgene[[row]])
-    if (!length(chains)) {
-      next
-    }
-    values <- vapply(
-      columns,
-      function(column) {
-        value <- table[[column]][[row]]
-        if (is.na(value)) "<NA>" else value
-      },
-      character(1)
-    )
-    signature <- paste(c(sample_name, values), collapse = "\u001f")
-    keys <- paste(chains, barcode, sep = "\u001f")
-    records <- rep(signature, length(keys))
-    names(records) <- keys
-    out <- c(out, records)
+  ## One record per (row, chain found in that row's CTgene), rows in table
+  ## order and chains in `.builder_immune_chain_names` order, keyed
+  ## "chain<US>barcode". Computed column-wise: a row-by-row loop that grows
+  ## the result is quadratic and took about a minute for 60,000 TCR rows.
+  rows <- nrow(table)
+  if (!rows) {
+    return(out)
   }
+  barcodes <- table$barcode
+  genes <- .builder_immune_text_vector(table$CTgene)
+  if (length(genes) != rows) {
+    return(out)
+  }
+  genes <- toupper(genes)
+  usable <- !is.na(barcodes) & nzchar(barcodes) & !is.na(genes) & nzchar(genes)
+  chains <- .builder_immune_chain_names
+  hits <- matrix(
+    vapply(
+      chains,
+      function(chain) {
+        usable &
+          grepl(paste0("(^|[^A-Z0-9])", chain, "[VDJC]"), genes, perl = TRUE)
+      },
+      logical(rows)
+    ),
+    nrow = rows
+  )
+  found <- which(t(hits)) - 1L
+  if (!length(found)) {
+    return(out)
+  }
+  row_index <- found %/% length(chains) + 1L
+  chain_index <- found %% length(chains) + 1L
+  values <- lapply(columns, function(column) {
+    value <- table[[column]][row_index]
+    value[is.na(value)] <- "<NA>"
+    value
+  })
+  out <- do.call(paste, c(list(sample_name), values, list(sep = "\u001f")))
+  names(out) <- paste(
+    chains[chain_index],
+    barcodes[row_index],
+    sep = "\u001f"
+  )
   out
 }
 
