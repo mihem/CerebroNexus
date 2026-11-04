@@ -804,6 +804,37 @@
   as.character(value)
 }
 
+## Whether a CRB carries an immune repertoire, and T-cell receptor chains,
+## from what it stores: the sidecar descriptor with its chains, or the CTgene
+## column of the embedded samples. The samples are not read through
+## getImmuneRepertoire(): a thin CRB stores their barcodes by cell index and
+## has no cell names to restore them with until the Viewer hydrates it.
+.bundleRepertoireInfo <- function(object) {
+  backend <- object$immune_repertoire_backend
+  if (!is.null(backend)) {
+    if (!is.list(backend) || !identical(backend$type, "file")) {
+      stop(
+        "The immune repertoire sidecar descriptor is invalid.",
+        call. = FALSE
+      )
+    }
+    chains <- as.character(unlist(backend$chains, use.names = FALSE))
+  } else {
+    repertoire <- object$immune_repertoire
+    if (!length(repertoire)) {
+      return(list(immune_repertoire = FALSE, tcr_repertoire = FALSE))
+    }
+    if (!is.list(repertoire)) {
+      stop("The immune repertoire is invalid.", call. = FALSE)
+    }
+    chains <- .immuneRepertoireChains(repertoire)
+  }
+  list(
+    immune_repertoire = TRUE,
+    tcr_repertoire = any(chains %in% c("TRA", "TRB"))
+  )
+}
+
 .readBundleDatasetInfo <- function(object, label, path) {
   if (!.recognizedCerebroObject(object)) {
     stop(
@@ -833,36 +864,15 @@
       error = function(error) NULL
     ))
   }
-  backend <- tryCatch(object$immune_repertoire_backend, error = function(e) {
-    NULL
-  })
-  if (is.list(backend) && identical(backend$type, "file")) {
-    immune_repertoire <- TRUE
-    tcr_repertoire <- any(as.character(backend$chains) %in% c("TRA", "TRB"))
-  } else {
-    repertoire <- tryCatch(object$getImmuneRepertoire(), error = function(e) {
-      list()
-    })
-    immune_repertoire <- is.list(repertoire) && length(repertoire) > 0L
-    tcr_repertoire <- immune_repertoire &&
-      any(vapply(
-        repertoire,
-        function(sample) {
-          !is.null(sample) &&
-            "CTgene" %in% names(sample) &&
-            any(grepl("TR[AB]", as.character(sample$CTgene)), na.rm = TRUE)
-        },
-        logical(1)
-      ))
-  }
+  repertoire <- .bundleRepertoireInfo(object)
   list(
     label = as.character(label),
     path = as.character(path),
     cells = as.integer(nrow(metadata)),
     organism = .datasetInfoScalar(experiment$organism),
     date = .datasetInfoScalar(experiment$date_of_export),
-    immune_repertoire = immune_repertoire,
-    tcr_repertoire = tcr_repertoire,
+    immune_repertoire = repertoire$immune_repertoire,
+    tcr_repertoire = repertoire$tcr_repertoire,
     projection_names = as.character(object$availableProjections()),
     overview = overview,
     capabilities = .viewerDatasetCapabilities(object)

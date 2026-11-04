@@ -1648,6 +1648,8 @@ Cerebro <- R6::R6Class(
     },
 
     ## Repertoire barcodes stored as metadata rows get their names back, once.
+    ## Self-contained like .restoreRepertoireByCell(): an App calls this
+    ## method without the CerebroNexus namespace.
     restoreRepertoireCells = function(repertoire) {
       indexed <- vapply(
         repertoire,
@@ -1659,10 +1661,29 @@ Cerebro <- R6::R6Class(
       if (!any(indexed)) {
         return(repertoire)
       }
-      repertoire <- .restoreRepertoireByCell(
-        repertoire,
-        private$storedCellNames()
-      )
+      cells <- private$storedCellNames()
+      repertoire <- lapply(repertoire, function(sample) {
+        column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
+        if (is.null(column)) {
+          return(sample)
+        }
+        index <- sample[[column]]
+        if (
+          !identical(column, "barcode") ||
+            !is.integer(index) ||
+            length(index) != nrow(sample) ||
+            anyNA(index) ||
+            any(index < 1L | index > length(cells))
+        ) {
+          stop(
+            "The thin CRB stores an invalid repertoire cell index.",
+            call. = FALSE
+          )
+        }
+        attr(sample, "cerebro_cell_index_column") <- NULL
+        sample[[column]] <- cells[index]
+        sample
+      })
       self$immune_repertoire <- repertoire
       repertoire
     },

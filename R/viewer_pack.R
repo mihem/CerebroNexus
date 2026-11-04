@@ -1,18 +1,23 @@
 .viewerPackSchemaVersion <- 1L
 
 .viewerDatasetCapabilities <- function(object) {
-  available <- function(value) {
-    isTRUE(tryCatch(length(force(value)) > 0L, error = function(error) FALSE))
+  ## Each capability is one stored field. An object without the accessor
+  ## predates that content and has none; an accessor that fails is an error,
+  ## never "no content", or the Viewer would hide a page the CRB has.
+  stored <- function(accessor) {
+    method <- tryCatch(object[[accessor]], error = function(error) NULL)
+    if (!is.function(method)) {
+      return(NULL)
+    }
+    method()
   }
-  trajectory_methods <- tryCatch(
-    object$getMethodsForTrajectories(),
-    error = function(error) character()
-  )
+  available <- function(accessor) length(stored(accessor)) > 0L
+  trajectory_methods <- as.character(stored("getMethodsForTrajectories"))
   list(
-    marker_genes = available(object$getMethodsForMarkerGenes()),
-    most_expressed_genes = available(object$getGroupsWithMostExpressedGenes()),
-    enriched_pathways = available(object$getMethodsForEnrichedPathways()),
-    extra_material = available(object$getExtraMaterialCategories()),
+    marker_genes = available("getMethodsForMarkerGenes"),
+    most_expressed_genes = available("getGroupsWithMostExpressedGenes"),
+    enriched_pathways = available("getMethodsForEnrichedPathways"),
+    extra_material = available("getExtraMaterialCategories"),
     trajectory = any(
       trajectory_methods %in%
         c(
@@ -25,8 +30,8 @@
           "published_pseudotime"
         )
     ),
-    spatial = available(object$availableSpatial()),
-    trekker = available(object$getTrekker())
+    spatial = available("availableSpatial"),
+    trekker = available("getTrekker")
   )
 }
 

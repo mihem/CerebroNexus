@@ -4253,7 +4253,59 @@ get_or_load_crb <- function(
     eval.env = environment(),
     assign.env = obj
   )
+  ## Repertoire samples stored by cell index get their barcodes from the same
+  ## cell names, on first use. The CRB's own method cannot do this here: it
+  ## calls a CerebroNexus function, and an App runs without the package.
+  repertoire <- obj$immune_repertoire
+  if (.runtimeRepertoireIndexed(repertoire)) {
+    delayedAssign(
+      "immune_repertoire",
+      .restoreRuntimeRepertoireCells(
+        repertoire,
+        hydrate()$meta_data$cell_barcode
+      ),
+      eval.env = environment(),
+      assign.env = obj
+    )
+  }
   obj
+}
+
+.runtimeRepertoireIndexed <- function(repertoire) {
+  is.list(repertoire) &&
+    any(vapply(
+      repertoire,
+      function(sample) {
+        !is.null(attr(sample, "cerebro_cell_index_column", exact = TRUE))
+      },
+      logical(1)
+    ))
+}
+
+## The Viewer's copy of the package's .restoreRepertoireByCell().
+.restoreRuntimeRepertoireCells <- function(repertoire, cells) {
+  lapply(repertoire, function(sample) {
+    column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
+    if (is.null(column)) {
+      return(sample)
+    }
+    index <- sample[[column]]
+    if (
+      !identical(column, "barcode") ||
+        !is.integer(index) ||
+        length(index) != nrow(sample) ||
+        anyNA(index) ||
+        any(index < 1L | index > length(cells))
+    ) {
+      stop(
+        "The thin CRB stores an invalid repertoire cell index.",
+        call. = FALSE
+      )
+    }
+    attr(sample, "cerebro_cell_index_column") <- NULL
+    sample[[column]] <- cells[index]
+    sample
+  })
 }
 
 .fallbackRuntimeBackendPlan <- function(obj, crb_path) {

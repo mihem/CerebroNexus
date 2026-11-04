@@ -3198,7 +3198,8 @@ test_that("dataset information reads immune chains from a file descriptor", {
 write_thin_h5_crb <- function(
   directory,
   name = "dataset.crb",
-  immune_sidecar = "never"
+  immune_sidecar = "never",
+  chain = "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC"
 ) {
   dir.create(directory, recursive = TRUE, showWarnings = FALSE)
   stem <- tools::file_path_sans_ext(name)
@@ -3219,7 +3220,7 @@ write_thin_h5_crb <- function(
   object$addImmuneRepertoire(list(
     donorA = data.frame(
       barcode = cells[1:2],
-      CTgene = "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC",
+      CTgene = chain,
       stringsAsFactors = FALSE
     )
   ))
@@ -3283,6 +3284,126 @@ test_that("a thin H5 CRB is bundled with its H5 file and keeps its gene count", 
     colnames(built$expected)
   )
   expect_attached_matrix(attached, built$expected)
+})
+
+test_that("the App lists the immune repertoire of every kind of CRB", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  root <- withr::local_tempdir()
+  tcr <- "TRAV1.TRAJ2.TRAC_TRBV3.TRBJ1.TRBC1"
+  bcr <- "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC"
+  cases <- list(
+    ## thin: barcodes stored by cell index, no cell names in the payload
+    thin_embedded = write_thin_h5_crb(
+      file.path(root, "thin_embedded"),
+      chain = tcr
+    )$crb,
+    thin_sidecar = write_thin_h5_crb(
+      file.path(root, "thin_sidecar"),
+      immune_sidecar = "always",
+      chain = tcr
+    )$crb,
+    thin_bcr = write_thin_h5_crb(file.path(root, "thin_bcr"))$crb,
+    embedded_sidecar = write_immune_sidecar_crb(
+      file.path(root, "embedded_sidecar")
+    )
+  )
+  expect_identical(
+    readRDS(cases$thin_embedded)$crb_schema$cell_indexed,
+    "immune_repertoire"
+  )
+  for (name in names(cases)) {
+    payload <- .readCerebroPayload(cases[[name]])
+    info <- .readBundleDatasetInfo(payload, name, cases[[name]])
+    expect_true(info$immune_repertoire, info = name)
+    expect_identical(
+      info$tcr_repertoire,
+      !identical(name, "thin_bcr"),
+      info = name
+    )
+    ## the flags read from the payload agree with the hydrated object
+    expect_identical(
+      info$capabilities,
+      .viewerDatasetCapabilities(readCerebro(cases[[name]])),
+      info = name
+    )
+  }
+
+  app <- file.path(root, "app")
+  build_test_app(c(Dataset = cases$thin_embedded), app)
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+  entry <- config[[".dataset_catalog"]][["private-data/dataset.crb"]]
+  expect_true(entry$immune_repertoire)
+  expect_true(entry$tcr_repertoire)
+
+  ## the App reads the samples with their cell names restored
+  runtime <- source_bundle_runtime(app)
+  local_cerebro_options(config)
+  withr::local_dir(app)
+  attached <- runtime$get_or_load_crb(
+    unname(config$crb_file_to_load[[1L]]),
+    config[[".bundle_backend_plan"]],
+    unname(config$crb_file_to_load)
+  )
+  ## restored by the Viewer itself, also for a CRB whose own method needs
+  ## the package
+  cells <- as.character(attached$meta_data$cell_barcode)
+  expect_identical(attached$immune_repertoire$donorA$barcode, cells[1:2])
+  expect_identical(attached$getImmuneRepertoire()$donorA$barcode, cells[1:2])
+  expect_true(runtime$viewerImmuneRepertoireSummary(attached)$available)
+
+  ## and in an App that runs without CerebroNexus
+  skip_if_not_installed("callr")
+  standalone <- callr::r(
+    function(app, files) {
+      setwd(app)
+      config <- readRDS("cerebro_config.rds")
+      assign("Cerebro.options", config, envir = globalenv())
+      runtime <- new.env(parent = globalenv())
+      for (file in files) {
+        sys.source(file.path("viewer", file), envir = runtime)
+      }
+      attached <- runtime$get_or_load_crb(
+        unname(config$crb_file_to_load[[1L]]),
+        config[[".bundle_backend_plan"]],
+        unname(config$crb_file_to_load)
+      )
+      list(
+        package = "CerebroNexus" %in% loadedNamespaces(),
+        barcodes = attached$getImmuneRepertoire()$donorA$barcode,
+        available = runtime$viewerImmuneRepertoireSummary(attached)$available
+      )
+    },
+    args = list(
+      app = normalizePath(app),
+      files = c(
+        "plotting_functions.R",
+        "core/viewer_pack.R",
+        "core/crb_contract.R",
+        "msigdb.R",
+        "crb_cache.R",
+        "utility_functions.R"
+      )
+    ),
+    libpath = privacy_hermetic_library(root)
+  )
+  expect_false(standalone$package)
+  expect_identical(standalone$barcodes, cells[1:2])
+  expect_true(standalone$available)
+})
+
+test_that("an unreadable repertoire descriptor is an error, not no repertoire", {
+  object <- new_embedded_cerebro()
+  object$setMetaData(data.frame(
+    cell_barcode = "cell-1",
+    row.names = "cell-1",
+    stringsAsFactors = FALSE
+  ))
+  object$immune_repertoire_backend <- list(type = "unknown")
+  expect_error(
+    .readBundleDatasetInfo(object, "Dataset", "dataset.crb"),
+    "immune repertoire sidecar descriptor is invalid"
+  )
 })
 
 test_that("a thin H5 CRB bundles its H5 file and immune sidecar together", {

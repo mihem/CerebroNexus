@@ -48,6 +48,8 @@
   ".thinCrbCellNames",
   ".hydrateThinCrbFields",
   ".deferThinCrbHydration",
+  ".runtimeRepertoireIndexed",
+  ".restoreRuntimeRepertoireCells",
   ".fallbackRuntimeBackendPlan",
   ".runtimeBackendRecoveryAdvice",
   ".attachExternalExpression",
