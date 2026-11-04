@@ -8,7 +8,7 @@ builder_omnibus_env$builder_source_utf8(
   envir = builder_omnibus_env
 )
 
-test_that("Spatial alignment demo restores the arrow image and transform", {
+test_that("Spatial alignment demo restores the Visium H&E and transform", {
   builder_omnibus_env$builder_source_utf8(
     builder_profile_inst_path("builder", "extras.R"),
     envir = builder_omnibus_env
@@ -17,51 +17,60 @@ test_that("Spatial alignment demo restores the arrow image and transform", {
   loaded <- record$make()
 
   expect_null(loaded$error)
+  expect_identical(record$provenance, "real")
+  expect_match(record$detail, "10x Genomics, CC BY 4.0", fixed = TRUE)
   expect_s4_class(loaded$object, "Seurat")
-  expect_identical(SeuratObject::Images(loaded$object), "arrow_fov")
+  expect_identical(SeuratObject::Images(loaded$object), "visium_breast")
   expect_true("umap" %in% SeuratObject::Reductions(loaded$object))
   expect_length(record$histology_images, 1L)
-  expect_true(file.exists(file.path(
+  image_path <- file.path(
     dirname(record$serialized_path),
-    record$histology_images$arrow_background$path
-  )))
+    record$histology_images$visium_breast_cancer_he$path
+  )
+  expect_true(file.exists(image_path))
+  he <- jpeg::readJPEG(image_path)
+  width <- as.numeric(ncol(he))
+  height <- as.numeric(nrow(he))
 
   configured <- builder_omnibus_env$builder_example_configure_entry(
     list(id = record$id, settings = list()),
     record,
     loaded$object
   )
-  image <- configured$settings$images$arrow_fov[["Arrow background"]]
-  ## The example opens registered: cells are the background's pixel
-  ## positions, so the preset is flip y only.
+  image <- configured$settings$images$visium_breast[["H&E"]]
+  ## The example opens registered: spots are the H&E crop's pixel
+  ## positions, so the image spans its own pixel extent and the preset is
+  ## flip y only.
   expect_identical(image$rotation, 0)
   expect_identical(image$flip_y, TRUE)
   expect_identical(image$flip_x, FALSE)
   expect_identical(c(image$dx, image$dy, image$scale), c(0, 0, 1))
   expect_identical(
     image$base_bounds,
-    list(xmin = 0, xmax = 800, ymin = 0, ymax = 500)
+    list(xmin = 0, xmax = width, ymin = 0, ymax = height)
   )
-  expect_identical(image$image_opacity, 0.65)
+  expect_identical(image$image_opacity, 0.9)
   expect_identical(image$point_opacity, 0.6)
   expect_identical(image$point_size, 7)
   expect_null(configured$settings$spatial_coordinate_transforms)
   expect_identical(
-    configured$settings$spatial_point_appearance$arrow_fov,
+    configured$settings$spatial_point_appearance$visium_breast,
     list(point_opacity = 0.6, point_size = 7)
   )
 
-  ## In the generated Viewer every cell's pixel lands on the cell: the
+  ## In the generated Viewer every spot's pixel lands on the spot: the
   ## settings it receives, drawn as cell_views.js drawImage() does (bounds
   ## rotated about the origin, flips and scale after the rotation).
   setting <- builder_omnibus_env$builder_alignment_viewer_setting(image)
   b <- image$base_bounds
   a <- setting$rotation * pi / 180
   rot <- function(x, y) cbind(cos(a) * x - sin(a) * y, sin(a) * x + cos(a) * y)
-  cells <- SeuratObject::GetTissueCoordinates(loaded$object[["arrow_fov"]])
+  cells <- SeuratObject::GetTissueCoordinates(
+    loaded$object[["visium_breast"]]
+  )
   p <- rot(
-    b$xmin + cells$x / 800 * (b$xmax - b$xmin),
-    b$ymax - cells$y / 500 * (b$ymax - b$ymin)
+    b$xmin + cells$x / width * (b$xmax - b$xmin),
+    b$ymax - cells$y / height * (b$ymax - b$ymin)
   )
   cr <- rot((b$xmin + b$xmax) / 2, (b$ymin + b$ymax) / 2)
   d <- c(
@@ -73,6 +82,35 @@ test_that("Spatial alignment demo restores the arrow image and transform", {
     setting$offset_y + cr[2] + d[2] * (p[, 2] - cr[2])
   )
   expect_equal(unname(drawn), unname(cbind(cells$x, cells$y)), tolerance = 1e-9)
+
+  ## The coordinates really are the H&E's: the stain under each spot
+  ## (colour saturation of the spot's pixels) follows the spot's expression
+  ## cluster far better than under a flipped or shifted registration.
+  saturation <- do.call(pmax, lapply(1:3, function(k) he[,, k])) -
+    do.call(pmin, lapply(1:3, function(k) he[,, k]))
+  clusters <- loaded$object$seurat_clusters[cells$cell]
+  explained <- function(x, y) {
+    stain <- vapply(
+      seq_along(x),
+      function(i) {
+        rows <- pmin(pmax(round(y[[i]]) + (-6:6), 1L), height)
+        columns <- pmin(pmax(round(x[[i]]) + (-6:6), 1L), width)
+        mean(saturation[rows, columns])
+      },
+      numeric(1)
+    )
+    summary(stats::lm(stain ~ clusters))$r.squared
+  }
+  registered <- explained(cells$x, cells$y)
+  expect_gt(registered, 0.45)
+  for (wrong in list(
+    list(width - cells$x, cells$y),
+    list(cells$x, height - cells$y),
+    list(width - cells$x, height - cells$y),
+    list(cells$x + 30, cells$y)
+  )) {
+    expect_gt(registered - explained(wrong[[1]], wrong[[2]]), 0.1)
+  }
 })
 
 test_that("omnibus Trekker payload satisfies the Builder content contract", {

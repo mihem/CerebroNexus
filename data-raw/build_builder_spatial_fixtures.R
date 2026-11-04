@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
-# Offline synthetic inputs for Builder, distinct from the real Viewer Trekker demo.
-# Rscript data-raw/build_builder_spatial_fixtures.R [--fixture all|trekker|arrow] [--output DIR]
+# Offline synthetic Trekker input for Builder, distinct from the real Viewer Trekker demo.
+# Rscript data-raw/build_builder_spatial_fixtures.R [--fixture all|trekker] [--output DIR]
+# The Spatial alignment example is real data: data-raw/build_builder_visium_fixture.R.
 
 builder_fixture_stabilize <- function(object) {
   for (name in names(object@commands)) {
@@ -10,105 +11,6 @@ builder_fixture_stabilize <- function(object) {
     )
   }
   object
-}
-
-builder_fixture_arrow_vertices <- function() {
-  rbind(
-    c(80, 190),
-    c(470, 190),
-    c(470, 90),
-    c(720, 250),
-    c(470, 410),
-    c(470, 310),
-    c(80, 310),
-    c(80, 190)
-  )
-}
-
-builder_fixture_arrow <- function(output) {
-  set.seed(20261013)
-  dir.create(output, recursive = TRUE, showWarnings = FALSE)
-  vertices <- builder_fixture_arrow_vertices()
-  # Seven edges, excluding the repeated endpoint, then spine and two extent anchors.
-  outline <- do.call(
-    rbind,
-    lapply(seq_len(7), function(i) {
-      cbind(
-        seq(vertices[i, 1], vertices[i + 1, 1], length.out = 18)[-18],
-        seq(vertices[i, 2], vertices[i + 1, 2], length.out = 18)[-18]
-      )
-    })
-  )
-  xy <- rbind(
-    outline,
-    cbind(seq(120, 650, length.out = 38), 250),
-    c(0, 0),
-    c(800, 500)
-  )
-  cells <- paste0("ArrowCell", seq_len(nrow(xy)))
-  rownames(xy) <- cells
-  counts <- Matrix::Matrix(
-    matrix(
-      stats::rpois(30 * length(cells), 3),
-      30,
-      dimnames = list(paste0("Gene", 1:30), cells)
-    ),
-    sparse = TRUE
-  )
-  object <- SeuratObject::CreateSeuratObject(counts, assay = "Spatial")
-  groups <- factor(c(rep("outline", nrow(outline)), rep("spine", 40)))
-  object$seurat_clusters <- groups
-  object$cell_type_final <- groups
-  object$sample <- "arrow_sample"
-  object <- Seurat::NormalizeData(object, verbose = FALSE)
-  embedding <- xy / 100
-  colnames(embedding) <- c("UMAP_1", "UMAP_2")
-  object[["umap"]] <- SeuratObject::CreateDimReducObject(
-    embedding,
-    key = "UMAP_",
-    assay = "Spatial"
-  )
-  object[["arrow_fov"]] <- SeuratObject::CreateFOV(
-    coords = data.frame(x = xy[, 1], y = xy[, 2], cell = cells),
-    type = "centroids",
-    assay = "Spatial",
-    key = "arrow_"
-  )
-  saveRDS(
-    builder_fixture_stabilize(object),
-    file.path(output, "arrow_spatial.rds"),
-    version = 3,
-    compress = "xz"
-  )
-  grDevices::png(
-    file.path(output, "arrow_background.png"),
-    width = 800,
-    height = 500
-  )
-  on.exit(grDevices::dev.off(), add = TRUE)
-  graphics::par(mar = rep(0, 4), xaxs = "i", yaxs = "i")
-  graphics::plot.new()
-  graphics::plot.window(xlim = c(0, 800), ylim = c(500, 0))
-  graphics::rect(0, 0, 800, 500, col = "#f8fafc", border = NA)
-  graphics::abline(v = seq(0, 800, 100), h = seq(0, 500, 100), col = "#e2edff")
-  graphics::polygon(vertices, col = "#bfdbfe", border = "#ea580c", lwd = 4)
-  graphics::segments(120, 250, 650, 250, col = "#1d4ed8", lty = 2, lwd = 2)
-  graphics::rect(
-    c(0, 750, 0, 750),
-    c(0, 0, 450, 450),
-    c(50, 800, 50, 800),
-    c(50, 50, 500, 500),
-    col = c("#dc2626", "#16a34a", "#2563eb", "#eab308"),
-    border = NA
-  )
-  graphics::text(
-    c(400, 680, 400),
-    c(32, 250, 472),
-    c("TOP", "RIGHT", "BOTTOM"),
-    font = 2,
-    col = "#172033"
-  )
-  invisible(object)
 }
 
 builder_fixture_markers <- function() {
@@ -391,7 +293,7 @@ if (sys.nframe() == 0L) {
   )
   while (length(args)) {
     if (length(args) < 2L || !args[[1L]] %in% c("--fixture", "--output")) {
-      stop("Usage: --fixture all|trekker|arrow --output DIR", call. = FALSE)
+      stop("Usage: --fixture all|trekker --output DIR", call. = FALSE)
     }
     if (args[[1L]] == "--fixture") {
       fixture <- args[[2L]]
@@ -400,7 +302,7 @@ if (sys.nframe() == 0L) {
     }
     args <- args[-c(1L, 2L)]
   }
-  if (!fixture %in% c("all", "trekker", "arrow")) {
+  if (!fixture %in% c("all", "trekker")) {
     stop("Unknown fixture: ", fixture)
   }
   packages <- c("Seurat", "SeuratObject", "Matrix", "qs2", "jpeg", "future")
@@ -416,9 +318,6 @@ if (sys.nframe() == 0L) {
   options(Seurat.object.assay.version = "v5")
   if (fixture %in% c("all", "trekker")) {
     builder_fixture_trekker(file.path(output, "trekker_spatial"))
-  }
-  if (fixture %in% c("all", "arrow")) {
-    builder_fixture_arrow(file.path(output, "spatial_alignment"))
   }
   message("Built ", fixture, " fixtures in ", normalizePath(output))
 }

@@ -83,6 +83,33 @@ test_that("the Builder example catalog is a stable product contract", {
     unname(vapply(builder_examples(), `[[`, character(1), "id")),
     expected_ids
   )
+  labels <- c(
+    "Complete Viewer demo",
+    "Trekker spatial demo",
+    "Visium breast cancer demo"
+  )
+  expect_identical(unname(vapply(catalog, `[[`, character(1), "label")), labels)
+  expect_identical(
+    unname(vapply(catalog, `[[`, character(1), "provenance")),
+    c("synthetic", "synthetic", "real")
+  )
+  ## The gallery button offers the same examples under the same labels, and
+  ## the real dataset's licence requires its attribution where it is offered.
+  directory <- builder_example_directory()[[1L]]
+  expect_identical(
+    vapply(directory$examples, `[[`, character(1), "id"),
+    expected_ids
+  )
+  expect_identical(
+    vapply(directory$examples, `[[`, character(1), "label"),
+    labels
+  )
+  expect_match(directory$detail, "10x Genomics, CC BY 4.0", fixed = TRUE)
+  expect_match(
+    catalog$spatial_alignment$detail,
+    "10x Genomics, CC BY 4.0",
+    fixed = TRUE
+  )
 })
 
 test_that("sourced Builder resources stay in the io.R inst tree", {
@@ -104,8 +131,8 @@ test_that("sourced Builder resources stay in the io.R inst tree", {
   resources <- c(
     "builder/fixtures/complete_viewer/complete_viewer_data.rds",
     "builder/fixtures/trekker_spatial/trekker_4_tissues.qs2",
-    "builder/fixtures/spatial_alignment/arrow_spatial.rds",
-    "builder/fixtures/spatial_alignment/arrow_background.png",
+    "builder/fixtures/spatial_alignment/visium_breast_cancer.rds",
+    "builder/fixtures/spatial_alignment/visium_breast_cancer_he.jpg",
     "extdata/examples/demo_trekker.crb"
   )
   for (relative in resources) {
@@ -162,7 +189,7 @@ test_that("sourced Builder resources stay in the io.R inst tree", {
       catalog$spatial_alignment$serialized_path,
       file.path(
         dirname(catalog$spatial_alignment$serialized_path),
-        catalog$spatial_alignment$histology_images$arrow_background$path
+        catalog$spatial_alignment$histology_images$visium_breast_cancer_he$path
       ),
       runtime$.builder_example_path("extdata/examples/demo_trekker.crb")
     )

@@ -1,7 +1,7 @@
-test_that("spatial Builder fixtures rebuild offline with stable content and images", {
+test_that("the Trekker Builder fixture rebuilds offline with stable content and images", {
   script <- test_path("../../data-raw/build_builder_spatial_fixtures.R")
   skip_if_not(file.exists(script), "Regeneration scripts are repository-only")
-  for (package in c("Seurat", "SeuratObject", "qs2", "jpeg", "png", "future")) {
+  for (package in c("Seurat", "SeuratObject", "qs2", "jpeg", "future")) {
     skip_if_not_installed(package)
   }
   first <- withr::local_tempdir()
@@ -14,8 +14,6 @@ test_that("spatial Builder fixtures rebuild offline with stable content and imag
     )
   }
   files <- c(
-    "spatial_alignment/arrow_spatial.rds",
-    "spatial_alignment/arrow_background.png",
     "trekker_spatial/trekker_4_tissues.qs2",
     sprintf("trekker_spatial/tissue_%02d_he.jpg", 1:4)
   )
@@ -25,13 +23,9 @@ test_that("spatial Builder fixtures rebuild offline with stable content and imag
     unname(tools::md5sum(file.path(first, files))),
     unname(tools::md5sum(file.path(second, files)))
   )
-  arrow <- readRDS(file.path(first, files[[1]]))
-  trekker <- qs2::qs_read(file.path(first, files[[3]]))
-  expect_equal(dim(arrow), c(30L, 159L))
+  trekker <- qs2::qs_read(file.path(first, files[[1]]))
   expect_equal(dim(trekker), c(200L, 5020L))
-  expect_identical(colnames(arrow), paste0("ArrowCell", 1:159))
   expect_identical(colnames(trekker), sprintf("SYNTH-%05d", 1:5020))
-  expect_identical(SeuratObject::Images(arrow), "arrow_fov")
   expect_identical(SeuratObject::Images(trekker), "slice1")
   expect_s4_class(trekker[["slice1"]], "SlideSeq")
   expect_setequal(
@@ -39,13 +33,6 @@ test_that("spatial Builder fixtures rebuild offline with stable content and imag
     c("pca", "umap", "SPATIAL")
   )
   expect_identical(as.integer(table(trekker$tissue_id)), c(rep(1250L, 4), 20L))
-  coords <- SeuratObject::GetTissueCoordinates(arrow[["arrow_fov"]])
-  expect_equal(
-    unname(as.matrix(coords[, c("x", "y")])),
-    unname(SeuratObject::Embeddings(arrow, "umap") * 100)
-  )
-  expect_equal(range(coords$x), c(0, 800))
-  expect_equal(range(coords$y), c(0, 500))
   spatial <- SeuratObject::Embeddings(trekker, "SPATIAL")
   slide <- trekker[["slice1"]]@coordinates
   expect_identical(rownames(slide), colnames(trekker))
@@ -59,27 +46,17 @@ test_that("spatial Builder fixtures rebuild offline with stable content and imag
     5 * mean(expression["PECAM1", trekker$cell_type != "endothelial"])
   )
   expect_identical(
-    dim(png::readPNG(file.path(first, files[[2]])))[1:2],
-    c(500L, 800L)
-  )
-  expect_identical(
-    dim(jpeg::readJPEG(file.path(first, files[[4]])))[1:2],
+    dim(jpeg::readJPEG(file.path(first, files[[2]])))[1:2],
     c(728L, 1064L)
   )
   published_root <- test_path("../../inst/builder/fixtures")
-  published_arrow <- readRDS(file.path(published_root, files[[1]]))
-  published_trekker <- qs2::qs_read(file.path(published_root, files[[3]]))
-  for (pair in list(
-    list(arrow, published_arrow),
-    list(trekker, published_trekker)
-  )) {
-    expect_equal(
-      SeuratObject::LayerData(pair[[1]], layer = "counts"),
-      SeuratObject::LayerData(pair[[2]], layer = "counts"),
-      tolerance = 0
-    )
-    expect_identical(colnames(pair[[1]]), colnames(pair[[2]]))
-  }
+  published_trekker <- qs2::qs_read(file.path(published_root, files[[1]]))
+  expect_equal(
+    SeuratObject::LayerData(trekker, layer = "counts"),
+    SeuratObject::LayerData(published_trekker, layer = "counts"),
+    tolerance = 0
+  )
+  expect_identical(colnames(trekker), colnames(published_trekker))
   expect_identical(trekker$cell_type, published_trekker$cell_type)
   expect_identical(trekker$tissue_id, published_trekker$tissue_id)
   expect_equal(
@@ -87,9 +64,69 @@ test_that("spatial Builder fixtures rebuild offline with stable content and imag
     SeuratObject::Embeddings(published_trekker, "SPATIAL"),
     tolerance = 0
   )
+})
+
+## The Spatial alignment example is a crop of a real 10x Visium section. Its
+## inputs (a 28 MB matrix and a 10 MB image archive, 10x Genomics, CC BY 4.0)
+## are not committed, so this rebuild runs only when
+## CEREBRO_VISIUM_BREAST_DIR names a directory holding the two published
+## files (see data-raw/builder_fixtures.md).
+test_that("the Visium Builder fixture rebuilds from the 10x files", {
+  script <- test_path("../../data-raw/build_builder_visium_fixture.R")
+  skip_if_not(file.exists(script), "Regeneration scripts are repository-only")
+  source_dir <- Sys.getenv("CEREBRO_VISIUM_BREAST_DIR")
+  skip_if_not(nzchar(source_dir), "CEREBRO_VISIUM_BREAST_DIR is not set")
+  find <- function(pattern) {
+    found <- list.files(
+      source_dir,
+      pattern = pattern,
+      recursive = TRUE,
+      full.names = TRUE
+    )
+    skip_if_not(length(found) == 1L, paste("No single", pattern))
+    found
+  }
+  matrix <- find("_filtered_feature_bc_matrix[.]h5$")
+  spatial <- find("_spatial[.]tar[.]gz$")
+  for (package in c("Seurat", "SeuratObject", "rhdf5", "jpeg", "png")) {
+    skip_if_not_installed(package)
+  }
+  first <- withr::local_tempdir()
+  second <- withr::local_tempdir()
+  for (output in c(first, second)) {
+    callr::rscript(
+      normalizePath(script),
+      cmdargs = c("--matrix", matrix, "--spatial", spatial, "--output", output),
+      libpath = .libPaths()
+    )
+  }
+  files <- c(
+    "spatial_alignment/visium_breast_cancer.rds",
+    "spatial_alignment/visium_breast_cancer_he.jpg"
+  )
+  expect_setequal(list.files(first, recursive = TRUE), files)
+  expect_identical(
+    unname(tools::md5sum(file.path(first, files))),
+    unname(tools::md5sum(file.path(second, files)))
+  )
+  rebuilt <- readRDS(file.path(first, files[[1]]))
+  published_root <- test_path("../../inst/builder/fixtures")
+  published <- readRDS(file.path(published_root, files[[1]]))
+  expect_equal(dim(rebuilt), c(300L, 405L))
+  expect_identical(colnames(rebuilt), colnames(published))
+  expect_identical(rownames(rebuilt), rownames(published))
   expect_equal(
-    SeuratObject::GetTissueCoordinates(arrow[["arrow_fov"]]),
-    SeuratObject::GetTissueCoordinates(published_arrow[["arrow_fov"]]),
+    SeuratObject::LayerData(rebuilt, layer = "counts"),
+    SeuratObject::LayerData(published, layer = "counts"),
     tolerance = 0
+  )
+  expect_equal(
+    SeuratObject::GetTissueCoordinates(rebuilt[["visium_breast"]]),
+    SeuratObject::GetTissueCoordinates(published[["visium_breast"]]),
+    tolerance = 0
+  )
+  expect_identical(
+    dim(jpeg::readJPEG(file.path(first, files[[2]]))),
+    dim(jpeg::readJPEG(file.path(published_root, files[[2]])))
   )
 })

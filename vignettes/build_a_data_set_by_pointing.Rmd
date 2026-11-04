@@ -68,9 +68,9 @@ Builder checks the dependencies of selected analyses before Build. The exact sup
 
 Choose **Add files** (or drop files anywhere on the page) to add Seurat or SingleCellExperiment objects stored as `.rds`, `.qs2` or `.qs`, AnnData `.h5ad`, MuData `.h5mu`, or a zipped SpatialData store, or choose **Load example datasets**. Available formats depend on the installed readers; a format whose reader is missing is listed under the add button with the reason.
 
-The example action loads three synthetic datasets: **Complete Viewer demo**, **Trekker spatial demo** and **Spatial alignment demo**. The first covers analysis tables, gene lists, trajectories, supplementary material, immune repertoire, HLA and spatial content; the second provides four tissue images; the third demonstrates an arrow-shaped section with a preset background alignment.
+The example action loads three datasets: **Complete Viewer demo**, **Trekker spatial demo** and **Visium breast cancer demo**. The first two are synthetic: the first covers analysis tables, gene lists, trajectories, supplementary material, immune repertoire, HLA and spatial content; the second provides four tissue images. The third is a crop of a real 10x Visium breast cancer section (405 spots, 300 genes; 10x Genomics, CC BY 4.0) whose H&E image opens with a preset alignment.
 
-The complete example also ships marker, supplementary-table and histology attachments for the explicit content controls. The arrow example's background is configured automatically; this does not imply that arbitrary uploaded images are aligned automatically.
+The complete example also ships marker, supplementary-table and histology attachments for the explicit content controls. The Visium example's H&E image is configured automatically; this does not imply that arbitrary uploaded images are aligned automatically.
 
 Patient, section, FOV, and image identities are explicit: a tissue photograph is not a new spatial FOV. Gallery and file inputs use **distinct source adapters**, then join the **shared import pipeline** for inspection, recommendations, snapshots, Review, and Build.
 

@@ -28,7 +28,12 @@ fixtures <- c(
     "complete_viewer",
     "complete_viewer_data.rds"
   ),
-  file.path("builder", "fixtures", "spatial_alignment", "arrow_spatial.rds"),
+  file.path(
+    "builder",
+    "fixtures",
+    "spatial_alignment",
+    "visium_breast_cancer.rds"
+  ),
   file.path("builder", "fixtures", "trekker_spatial", "trekker_4_tissues.qs2")
 )
 resolved <- vapply(fixtures, runtime$.builder_example_path, character(1))

@@ -2009,13 +2009,13 @@ builder_example_catalog <- function() {
     "id"
   )
   alignment_histology_images <- list(
-    arrow_background = list(
-      id = "arrow_background",
-      label = "Arrow background",
-      stain = "Synthetic alignment guide",
-      path = "arrow_background.png",
-      section_id = "arrow_fov",
-      fov_ids = "arrow_fov"
+    visium_breast_cancer_he = list(
+      id = "visium_breast_cancer_he",
+      label = "H&E",
+      stain = "H&E",
+      path = "visium_breast_cancer_he.jpg",
+      section_id = "visium_breast",
+      fov_ids = "visium_breast"
     )
   )
   complete_viewer_data <- record(
@@ -2092,19 +2092,20 @@ builder_example_catalog <- function() {
   )
   spatial_alignment <- record(
     "spatial_alignment",
-    "Spatial alignment demo",
+    "Visium breast cancer demo",
     paste(
-      "A synthetic arrow-shaped Spatial section with an automatically",
-      "aligned directional background image"
+      "A crop of a real 10x Visium breast cancer section (405 spots,",
+      "300 genes) with its H&E image, aligned automatically.",
+      "Data: 10x Genomics, CC BY 4.0"
     ),
-    "synthetic",
-    fixture("spatial_alignment", "arrow_spatial.rds"),
+    "real",
+    fixture("spatial_alignment", "visium_breast_cancer.rds"),
     expected_dispositions = with_content(
       core("umap"),
       spatial = "preserved"
     ),
     expected_pages = "spatial",
-    expected_supporting_content = "arrow_background.png",
+    expected_supporting_content = "visium_breast_cancer_he.jpg",
     histology_images = alignment_histology_images
   )
   list(
@@ -2118,11 +2119,12 @@ builder_example_catalog <- function() {
 builder_example_configure_entry <- function(entry, record, object) {
   example_id <- record$id %||% NULL
   if (identical(example_id, "spatial_alignment")) {
+    section <- "visium_breast"
     if (
       !is.list(entry) ||
         !is.list(entry$settings) ||
         !methods::is(object, "Seurat") ||
-        !"arrow_fov" %in% SeuratObject::Images(object)
+        !section %in% SeuratObject::Images(object)
     ) {
       stop(
         "The Spatial alignment example could not be configured.",
@@ -2131,27 +2133,27 @@ builder_example_configure_entry <- function(entry, record, object) {
     }
     image_path <- file.path(
       dirname(record$serialized_path),
-      record$histology_images$arrow_background$path
+      record$histology_images$visium_breast_cancer_he$path
     )
     image <- builder_read_image(image_path, basename(image_path))
     if (!is.null(image$error)) {
       stop(image$error, call. = FALSE)
     }
-    coordinates <- SeuratObject::GetTissueCoordinates(object[["arrow_fov"]])
+    ## The spot centres are the H&E crop's pixel positions (x = column,
+    ## y = row), so the image covers exactly its own pixel extent and
+    ## flipping y (image rows point down) registers it; no rotation,
+    ## offset or scale.
     bounds <- list(
-      xmin = min(coordinates$x),
-      xmax = max(coordinates$x),
-      ymin = min(coordinates$y),
-      ymax = max(coordinates$y)
+      xmin = 0,
+      xmax = as.numeric(image$source_dimensions[[1L]]),
+      ymin = 0,
+      ymax = as.numeric(image$source_dimensions[[2L]])
     )
     parameters <- utils::modifyList(
       builder_alignment_defaults(),
-      ## The cell coordinates are the background's pixel positions
-      ## (x = column, y = row) and image rows point down, so flipping y
-      ## registers the picture exactly; no rotation, offset or scale.
       list(
         flip_y = TRUE,
-        image_opacity = 0.65,
+        image_opacity = 0.9,
         point_opacity = 0.6,
         point_size = 7
       )
@@ -2167,11 +2169,11 @@ builder_example_configure_entry <- function(entry, record, object) {
         image$source_dimensions
       ),
       parameters = parameters,
-      section = list(id = "arrow_fov", kind = "spatial"),
+      section = list(id = section, kind = "spatial"),
       source_path = image$source_path
     )
     alignment$viewport_bounds <- bounds
-    alignment$image_label <- "Arrow background"
+    alignment$image_label <- "H&E"
     facts <- intersect(
       names(image),
       c(
@@ -2188,11 +2190,13 @@ builder_example_configure_entry <- function(entry, record, object) {
       )
     )
     alignment[facts] <- image[facts]
-    entry$settings$images <- list(
-      arrow_fov = list(`Arrow background` = alignment)
+    entry$settings$images <- stats::setNames(
+      list(list(`H&E` = alignment)),
+      section
     )
-    entry$settings$spatial_point_appearance <- list(
-      arrow_fov = list(point_opacity = 0.6, point_size = 7)
+    entry$settings$spatial_point_appearance <- stats::setNames(
+      list(list(point_opacity = 0.6, point_size = 7)),
+      section
     )
     return(entry)
   }
@@ -2316,13 +2320,14 @@ builder_example_directory <- local({
       id = "complete_viewer_data",
       label = "Load example datasets",
       detail = paste(
-        "Try three datasets with expression, trajectories and spatial images."
+        "Try three datasets with expression, trajectories and spatial images,",
+        "including a real Visium breast cancer section (10x Genomics, CC BY 4.0)."
       ),
       source = "builder/fixtures/complete_viewer/complete_viewer_data.rds",
       examples = list(
         list(id = "complete_viewer_data", label = "Complete Viewer demo"),
         list(id = "trekker_spatial", label = "Trekker spatial demo"),
-        list(id = "spatial_alignment", label = "Spatial alignment demo")
+        list(id = "spatial_alignment", label = "Visium breast cancer demo")
       )
     )
   )
