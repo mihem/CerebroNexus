@@ -4942,6 +4942,52 @@ builder_project_verified_spatial_sidecar <- function(built, verification) {
   basename(path)
 }
 
+## The Viewer Pack directory and immune repertoire file a verified dataset
+## cache has next to its CRB; they are stored with it as artifact members.
+builder_project_verified_companions <- function(built, verification) {
+  stem <- tools::file_path_sans_ext(basename(built))
+  companions <- list(
+    list(
+      value = verification$viewer_pack %||% NULL,
+      type = "directory",
+      names = paste0(stem, ".viewer")
+    ),
+    list(
+      value = verification$immune_sidecar %||% NULL,
+      type = "file",
+      names = paste0(stem, ".immune.", c("qs2", "rds"))
+    )
+  )
+  locations <- character()
+  for (companion in companions) {
+    value <- companion$value
+    if (is.null(value)) {
+      next
+    }
+    path <- file.path(dirname(built), value$location %||% "")
+    exists <- if (identical(companion$type, "directory")) {
+      dir.exists(path)
+    } else {
+      file.exists(path) && !dir.exists(path)
+    }
+    if (
+      !is.list(value) ||
+        !identical(value$type, companion$type) ||
+        !.builder_project_text(value$location %||% "") ||
+        !value$location %in% companion$names ||
+        !exists ||
+        nzchar(Sys.readlink(path))
+    ) {
+      stop(
+        "A verified dataset cache companion is unavailable.",
+        call. = FALSE
+      )
+    }
+    locations <- c(locations, value$location)
+  }
+  locations
+}
+
 builder_project_store_artifact_bundle <- function(
   built,
   sidecars = character(),
@@ -5921,12 +5967,24 @@ builder_project_prepare_build_artifacts <- function(
       registration_error <- conditionMessage(spatial_sidecar)
       break
     }
+    companions <- tryCatch(
+      builder_project_verified_companions(
+        built,
+        value$verifications[[item$id]] %||% list()
+      ),
+      error = identity
+    )
+    if (inherits(companions, "condition")) {
+      registration_error <- conditionMessage(companions)
+      break
+    }
     bundle <- tryCatch(
       builder_project_store_artifact_bundle(
         built,
         sidecars = c(
           item$sidecars %||% character(),
-          spatial_sidecar %||% character()
+          spatial_sidecar %||% character(),
+          companions
         ),
         dataset_id = item$id,
         root = root,

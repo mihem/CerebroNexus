@@ -159,7 +159,8 @@
     ))
   }
   sidecar <- file.path(dirname(crb_path), entry$location)
-  expected_type <- if (identical(entry$type, "h5")) "file" else "directory"
+  single_file <- entry$type %in% c("h5", "file")
+  expected_type <- if (single_file) "file" else "directory"
   sidecar_info <- tryCatch(
     fs::file_info(sidecar, fail = TRUE, follow = FALSE),
     error = function(error) NULL
@@ -185,7 +186,7 @@
   ) {
     stop("A verified input backend closure has an invalid path.", call. = FALSE)
   }
-  if (identical(entry$type, "h5")) {
+  if (single_file) {
     previous_identity <- if (
       is.list(.previous) &&
         is.list(.previous$entries) &&
@@ -205,7 +206,7 @@
       entry$location
     )
     return(list(
-      type = "h5",
+      type = entry$type,
       root = root,
       root_fingerprint = NULL,
       entries = entries
@@ -419,6 +420,116 @@
   ))
 }
 
+## The closure of a planned Viewer Pack: every directory and file under
+## `<stem>.viewer/` with its MD5, captured the same way as a directory backend
+## (no symbolic links, hard links or special files).
+.builder_app_capture_viewer_pack_identity <- function(
+  crb_path,
+  location,
+  .previous = NULL
+) {
+  if (is.null(location) || identical(location, "")) {
+    return(NULL)
+  }
+  if (!identical(location, .builder_viewer_pack_name(crb_path))) {
+    stop("A planned Viewer Pack has an invalid location.", call. = FALSE)
+  }
+  .builder_app_capture_backend_identity(
+    list(type = "directory", mode = "bundled", location = location),
+    crb_path,
+    .previous = .previous
+  )
+}
+
+## The closure of the immune repertoire file a CRB's descriptor names. Its MD5
+## must be the one the CRB records.
+.builder_app_capture_immune_sidecar_identity <- function(
+  crb_path,
+  backend,
+  .previous = NULL
+) {
+  if (is.null(backend)) {
+    return(NULL)
+  }
+  if (
+    !is.list(backend) ||
+      !identical(backend$type, "file") ||
+      !.builder_app_text(backend$location) ||
+      !backend$location %in% .builder_immune_sidecar_names(crb_path) ||
+      !.builder_app_text(backend$md5)
+  ) {
+    stop(
+      "A verified immune repertoire sidecar has an invalid location.",
+      call. = FALSE
+    )
+  }
+  closure <- .builder_app_capture_backend_identity(
+    list(type = "file", mode = "bundled", location = backend$location),
+    crb_path,
+    .previous = .previous
+  )
+  if (
+    !identical(
+      closure$entries[[backend$location]]$identity$md5,
+      tolower(backend$md5)
+    )
+  ) {
+    stop(
+      "A verified immune repertoire sidecar differs from its CRB.",
+      call. = FALSE
+    )
+  }
+  closure
+}
+
+## Companion closures are NULL or one closure of `type` at one of the
+## `locations` next to its CRB.
+.builder_app_companion_identities_valid <- function(
+  identities,
+  cerebro_data,
+  relative_crbs,
+  type,
+  locations
+) {
+  if (
+    !is.list(identities) ||
+      is.object(identities) ||
+      !identical(names(identities), relative_crbs)
+  ) {
+    return(FALSE)
+  }
+  all(vapply(
+    seq_along(identities),
+    function(index) {
+      closure <- identities[[index]]
+      if (is.null(closure)) {
+        return(TRUE)
+      }
+      root <- if (is.list(closure)) closure$root else NULL
+      if (!.builder_app_text(root)) {
+        return(FALSE)
+      }
+      location <- basename(root)
+      if (!location %in% locations(cerebro_data[[index]])) {
+        return(FALSE)
+      }
+      plan <- list(
+        schema_version = 1L,
+        entries = stats::setNames(
+          list(list(type = type, mode = "bundled", location = location)),
+          relative_crbs[[index]]
+        )
+      )
+      .builder_app_backend_identities_valid(
+        stats::setNames(list(closure), relative_crbs[[index]]),
+        plan,
+        cerebro_data[[index]]
+      )
+    },
+    logical(1)
+  ))
+}
+
 .builder_app_fingerprint_valid <- function(fingerprint, expected_type) {
   if (
     !is.list(fingerprint) ||
@@ -495,7 +606,8 @@
           any(!nzchar(mappings)) ||
           anyDuplicated(mappings) ||
           !identical(mappings, sort(mappings, method = "radix")))
-      h5_invalid <- identical(entry$type, "h5") &&
+      single_file <- entry$type %in% c("h5", "file")
+      h5_invalid <- single_file &&
         (!is.null(closure$root_fingerprint) ||
           !identical(mappings, entry$location))
       directory_invalid <- identical(entry$type, "directory") &&
@@ -517,7 +629,7 @@
         seq_along(closure$entries),
         function(file_index) {
           mapping <- mappings[[file_index]]
-          relative <- if (identical(entry$type, "h5")) {
+          relative <- if (single_file) {
             entry$location
           } else {
             substring(mapping, nchar(entry$location) + 2L)
@@ -651,6 +763,20 @@
         plain$cerebro_data,
         names(plain$backend_plan$entries)
       ) ||
+      !.builder_app_companion_identities_valid(
+        plain$viewer_pack_identities,
+        plain$cerebro_data,
+        names(plain$backend_plan$entries),
+        "directory",
+        .builder_viewer_pack_name
+      ) ||
+      !.builder_app_companion_identities_valid(
+        plain$immune_sidecar_identities,
+        plain$cerebro_data,
+        names(plain$backend_plan$entries),
+        "file",
+        .builder_immune_sidecar_names
+      ) ||
       !.builder_app_spatial_manifest_valid(
         plain$spatial_images,
         plain$spatial_image_settings,
@@ -680,7 +806,9 @@
       plain$crb_identities,
       plain$backend_identities,
       plain$backend_plan,
-      plain$spatial_molecule_identities
+      plain$spatial_molecule_identities,
+      plain$viewer_pack_identities,
+      plain$immune_sidecar_identities
     ),
     error = function(error) NULL
   )
@@ -767,9 +895,66 @@
   current
 }
 
+## Like the spatial molecule closure, a Viewer Pack or immune repertoire
+## closure is revalidated from what the request recorded, without reopening
+## the CRB whose identity was asserted just before.
+.builder_app_capture_companion_identities <- function(request) {
+  relative_crbs <- names(request$backend_plan$entries)
+  viewer_packs <- lapply(seq_along(request$cerebro_data), function(index) {
+    previous <- request$viewer_pack_identities[[index]]
+    if (is.null(previous)) {
+      return(NULL)
+    }
+    .builder_app_capture_viewer_pack_identity(
+      request$cerebro_data[[index]],
+      basename(previous$root),
+      .previous = previous
+    )
+  })
+  immune_sidecars <- lapply(seq_along(request$cerebro_data), function(index) {
+    previous <- request$immune_sidecar_identities[[index]]
+    if (is.null(previous)) {
+      return(NULL)
+    }
+    location <- basename(previous$root)
+    .builder_app_capture_immune_sidecar_identity(
+      request$cerebro_data[[index]],
+      list(
+        type = "file",
+        location = location,
+        md5 = previous$entries[[location]]$identity$md5
+      ),
+      .previous = previous
+    )
+  })
+  list(
+    viewer_pack_identities = stats::setNames(viewer_packs, relative_crbs),
+    immune_sidecar_identities = stats::setNames(immune_sidecars, relative_crbs)
+  )
+}
+
 .builder_app_assert_input_identities <- function(request) {
   .builder_app_assert_crb_identities(request)
   .builder_app_assert_backend_identities(request)
+  current_companions <- tryCatch(
+    .builder_app_capture_companion_identities(request),
+    error = function(error) NULL
+  )
+  if (
+    is.null(current_companions) ||
+      !identical(
+        current_companions,
+        list(
+          viewer_pack_identities = request$viewer_pack_identities,
+          immune_sidecar_identities = request$immune_sidecar_identities
+        )
+      )
+  ) {
+    stop(
+      "A verified input Viewer Pack or immune repertoire closure changed after request creation.",
+      call. = FALSE
+    )
+  }
   current_molecules <- tryCatch(
     .builder_app_capture_spatial_molecule_identities(request),
     error = function(error) NULL

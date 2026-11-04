@@ -501,6 +501,8 @@ test_that("App arguments come only from the frozen plan", {
       "backend_plan",
       "backend_identities",
       "spatial_molecule_identities",
+      "viewer_pack_identities",
+      "immune_sidecar_identities",
       "content_identities",
       "spatial_images",
       "spatial_image_settings",

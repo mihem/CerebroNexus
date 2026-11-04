@@ -679,32 +679,61 @@
       }
       list(type = plan_entry$type, root = root, entries = entries)
     }
-    spatial_plan <- request$spatial_molecule_identities[[relative_crb]]
-    spatial_molecules <- if (is.null(spatial_plan)) {
-      list(type = "none", root = NULL, entries = list())
-    } else {
-      root <- paste0("private-data/", basename(spatial_plan$root))
-      prefix <- paste0(root, "/")
-      paths <- names(identity$entries)
-      paths <- paths[startsWith(paths, prefix)]
-      entries <- lapply(paths, function(path) {
-        entry <- identity$entries[[path]]
-        if (identical(entry$type, "directory")) {
-          return(list(path = path, type = "directory"))
-        }
-        .builder_app_portable_file(path, entry$size, entry$md5)
-      })
-      names(entries) <- paths
-      list(type = "directory", root = root, entries = entries)
-    }
     list(
       crb = crb,
       backend = backend,
-      spatial_molecules = spatial_molecules
+      spatial_molecules = .builder_app_output_companion(
+        identity,
+        request$spatial_molecule_identities[[relative_crb]],
+        "directory"
+      ),
+      viewer_pack = .builder_app_output_companion(
+        identity,
+        request$viewer_pack_identities[[relative_crb]],
+        "directory"
+      ),
+      immune_sidecar = .builder_app_output_companion(
+        identity,
+        request$immune_sidecar_identities[[relative_crb]],
+        "file"
+      )
     )
   })
   names(content) <- relative_crbs
   content
+}
+
+## What the staged App holds for one requested companion closure, in the form
+## .builder_app_companion_content() gives the request.
+.builder_app_output_companion <- function(identity, closure, type) {
+  if (is.null(closure)) {
+    return(list(type = "none", root = NULL, entries = list()))
+  }
+  root <- paste0("private-data/", basename(closure$root))
+  if (identical(type, "file")) {
+    entry <- identity$entries[[root]]
+    entries <- if (is.list(entry) && identical(entry$type, "file")) {
+      stats::setNames(
+        list(.builder_app_portable_file(root, entry$size, entry$md5)),
+        root
+      )
+    } else {
+      list()
+    }
+    return(list(type = type, root = root, entries = entries))
+  }
+  prefix <- paste0(root, "/")
+  paths <- names(identity$entries)
+  paths <- paths[startsWith(paths, prefix)]
+  entries <- lapply(paths, function(path) {
+    entry <- identity$entries[[path]]
+    if (identical(entry$type, "directory")) {
+      return(list(path = path, type = "directory"))
+    }
+    .builder_app_portable_file(path, entry$size, entry$md5)
+  })
+  names(entries) <- paths
+  list(type = type, root = root, entries = entries)
 }
 
 .builder_app_assert_private_topology <- function(identity, request) {
@@ -718,12 +747,17 @@
     for (entry in backend$entries) {
       expected[[entry$path]] <- entry$type
     }
-    spatial_molecules <- content$spatial_molecules
-    if (identical(spatial_molecules$type, "directory")) {
-      expected[[spatial_molecules$root]] <- "directory"
-    }
-    for (entry in spatial_molecules$entries) {
-      expected[[entry$path]] <- entry$type
+    for (companion in content[c(
+      "spatial_molecules",
+      "viewer_pack",
+      "immune_sidecar"
+    )]) {
+      if (identical(companion$type, "directory")) {
+        expected[[companion$root]] <- "directory"
+      }
+      for (entry in companion$entries) {
+        expected[[entry$path]] <- entry$type
+      }
     }
   }
   if (isTRUE(request$auth$enabled)) {

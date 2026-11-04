@@ -75,10 +75,7 @@ builder_build_retention_root <- function(root = tempdir()) {
   if (!is.list(primary) || !.builder_build_text(primary$md5 %||% "")) {
     return(NULL)
   }
-  companions <- c(
-    item$sidecars %||% character(),
-    verification$spatial_molecule_backend$location %||% character()
-  )
+  companions <- builder_verification_companions(item, verification)
   relative <- substring(file_paths, nchar(prefix) + 1L)
   selected <- startsWith(file_paths, prefix) &
     vapply(
@@ -186,6 +183,7 @@ builder_build_reuse_records <- function(plan, value) {
           mustWork = TRUE
         )
       }
+      .builder_build_assert_reused_companions(verification, directory, item)
       verification$path <- target
       verification$file_fingerprint <- .builder_build_runtime_function(
         ".bundlePreflightFingerprint"
@@ -727,16 +725,23 @@ builder_build_progress_finish <- function(plan, path, current_note = NULL) {
   }
   extra <- .builder_build_field(object, "extra_material")
   immune <- .builder_build_field(object, "immune_repertoire")
-  tcr_chains <- tryCatch(
-    hla_detect_chains(immune),
-    error = function(error) character()
-  )
+  ## A repertoire kept in its sidecar file is listed by the descriptor.
+  immune_file <- .builder_build_field(object, "immune_repertoire_backend")
+  file_backed <- is.list(immune_file) && !length(immune)
+  tcr_chains <- if (file_backed) {
+    as.character(immune_file$chains %||% character())
+  } else {
+    tryCatch(
+      hla_detect_chains(immune),
+      error = function(error) character()
+    )
+  }
   pages <- c(
     if (present("marker_genes")) "marker_genes",
     if (present("most_expressed_genes")) "most_expressed_genes",
     if (present("enriched_pathways")) "enriched_pathways",
     if (!is.null(extra) && length(extra$tables) > 0L) "extra_material",
-    if (present("immune_repertoire")) "immune_repertoire",
+    if (present("immune_repertoire") || file_backed) "immune_repertoire",
     if (present("trajectories")) "trajectory",
     if (present("spatial")) "spatial",
     if (present("trekker")) "trekker",
@@ -745,6 +750,222 @@ builder_build_progress_finish <- function(plan, path, current_note = NULL) {
     }
   )
   as.character(pages)
+}
+
+## Whether anything (file, directory or link, even a dangling one) occupies
+## `path`. Sys.readlink() gives NA for a path that does not exist.
+.builder_build_occupied <- function(path) {
+  link <- Sys.readlink(path)
+  file.exists(path) || dir.exists(path) || (!is.na(link) && nzchar(link))
+}
+
+## The immune repertoire file a staged CRB names: one regular file next to it,
+## at the sidecar name and with the MD5 its descriptor records. A sidecar the
+## CRB does not name is refused.
+.builder_build_verify_immune_sidecar <- function(path, serialized) {
+  backend <- tryCatch(
+    .builder_build_runtime_function(".immuneRepertoireBackend")(
+      serialized,
+      path
+    ),
+    error = function(error) error
+  )
+  if (inherits(backend, "condition")) {
+    stop(
+      "The staged CRB immune repertoire sidecar is invalid: ",
+      conditionMessage(backend),
+      call. = FALSE
+    )
+  }
+  candidates <- .builder_immune_sidecar_names(path)
+  present <- candidates[vapply(
+    file.path(dirname(path), candidates),
+    .builder_build_occupied,
+    logical(1)
+  )]
+  if (is.null(backend)) {
+    if (length(present)) {
+      stop(
+        "The staged CRB has an immune repertoire sidecar it does not use.",
+        call. = FALSE
+      )
+    }
+    return(NULL)
+  }
+  location <- backend$file
+  if (!location %in% candidates || !identical(present, location)) {
+    stop(
+      "The staged CRB immune repertoire sidecar does not match its descriptor.",
+      call. = FALSE
+    )
+  }
+  sidecar <- file.path(dirname(path), location)
+  identity <- tryCatch(
+    .builder_app_capture_file_identity(sidecar, location),
+    error = function(error) NULL
+  )
+  if (
+    is.null(identity) ||
+      !.builder_build_path_within(sidecar, dirname(path)) ||
+      !identical(identity$md5, tolower(backend$md5))
+  ) {
+    stop(
+      "The staged CRB immune repertoire sidecar does not match its descriptor.",
+      call. = FALSE
+    )
+  }
+  list(type = "file", location = location, md5 = identity$md5)
+}
+
+## The Viewer Pack BuildPlan gives a staged CRB. A planned pack must be a real
+## directory next to the CRB that validates against it, holding exactly its
+## manifest and the assets the manifest lists, with their MD5s; an unplanned
+## pack is refused.
+.builder_build_verify_viewer_pack <- function(path, item, serialized) {
+  planned <- builder_planned_viewer_pack(item)
+  pack <- file.path(dirname(path), .builder_viewer_pack_name(path))
+  present <- .builder_build_occupied(pack)
+  if (is.null(planned)) {
+    if (present) {
+      stop(
+        "The staged CRB has a Viewer Pack that BuildPlan does not plan.",
+        call. = FALSE
+      )
+    }
+    return(NULL)
+  }
+  if (!identical(planned, basename(pack)) || !present) {
+    stop("The staged CRB is missing its planned Viewer Pack.", call. = FALSE)
+  }
+  info <- tryCatch(
+    fs::file_info(pack, fail = TRUE, follow = FALSE),
+    error = function(error) NULL
+  )
+  if (
+    is.null(info) ||
+      !identical(as.character(info$type), "directory") ||
+      nzchar(Sys.readlink(pack)) ||
+      !.builder_build_path_within(pack, dirname(path))
+  ) {
+    stop("The staged CRB Viewer Pack is not a directory.", call. = FALSE)
+  }
+  tree <- tryCatch(.builder_app_tree_identity(pack), error = identity)
+  if (inherits(tree, "condition")) {
+    stop(
+      "The staged CRB Viewer Pack is unsafe: ",
+      conditionMessage(tree),
+      call. = FALSE
+    )
+  }
+  check <- tryCatch(
+    .builder_build_runtime_function(".validateViewerPack")(
+      path,
+      pack,
+      full = TRUE,
+      payload = serialized
+    ),
+    error = function(error) {
+      list(valid = FALSE, reason = conditionMessage(error))
+    }
+  )
+  if (!isTRUE(check$valid)) {
+    stop(
+      "The staged CRB Viewer Pack is invalid: ",
+      check$reason %||% "unknown reason",
+      call. = FALSE
+    )
+  }
+  assets <- check$manifest$assets
+  files <- c("manifest.json", as.character(assets$path))
+  directories <- unique(unlist(
+    lapply(files, function(file) {
+      parts <- strsplit(file, "/", fixed = TRUE)[[1L]]
+      if (length(parts) < 2L) {
+        return(character())
+      }
+      vapply(
+        seq_len(length(parts) - 1L),
+        function(index) paste(parts[seq_len(index)], collapse = "/"),
+        character(1)
+      )
+    }),
+    use.names = FALSE
+  ))
+  expected <- c(
+    stats::setNames(rep("directory", length(directories)), directories),
+    stats::setNames(rep("file", length(files)), files)
+  )
+  expected <- expected[order(names(expected), method = "radix")]
+  observed <- vapply(tree$entries, `[[`, character(1), "type")
+  observed_md5 <- vapply(
+    tree$entries[as.character(assets$path)],
+    function(entry) as.character(entry$md5 %||% NA_character_),
+    character(1)
+  )
+  if (
+    anyDuplicated(files) ||
+      !all(vapply(files, .builder_build_safe_relative, logical(1))) ||
+      !identical(observed, expected) ||
+      !identical(
+        unname(observed_md5),
+        tolower(as.character(assets$checksum))
+      )
+  ) {
+    stop(
+      "The staged CRB Viewer Pack differs from its manifest.",
+      call. = FALSE
+    )
+  }
+  if (!identical(.builder_app_tree_identity(pack, .previous = tree), tree)) {
+    stop(
+      "The staged CRB Viewer Pack changed while it was verified.",
+      call. = FALSE
+    )
+  }
+  list(type = "directory", location = basename(pack))
+}
+
+## A reused CRB's verification must name the Viewer Pack BuildPlan gives it,
+## and every companion it names must sit next to the staged copy.
+.builder_build_assert_reused_companions <- function(
+  verification,
+  directory,
+  item
+) {
+  if (
+    !identical(
+      verification$viewer_pack$location %||% NULL,
+      builder_planned_viewer_pack(item)
+    )
+  ) {
+    stop("The reused CRB Viewer Pack differs from BuildPlan.", call. = FALSE)
+  }
+  companions <- list(
+    directory = verification$viewer_pack,
+    file = verification$immune_sidecar
+  )
+  for (type in names(companions)) {
+    companion <- companions[[type]]
+    if (is.null(companion)) {
+      next
+    }
+    target <- file.path(directory, companion$location %||% "")
+    info <- tryCatch(
+      fs::file_info(target, fail = TRUE, follow = FALSE),
+      error = function(error) NULL
+    )
+    if (
+      !identical(companion$type, type) ||
+        !.builder_build_safe_relative(companion$location %||% "") ||
+        is.null(info) ||
+        !identical(as.character(info$type), type) ||
+        nzchar(Sys.readlink(target)) ||
+        !.builder_build_path_within(target, directory)
+    ) {
+      stop("A reused CRB companion is missing.", call. = FALSE)
+    }
+  }
+  invisible(TRUE)
 }
 
 #' Reopen and compare one staged CRB with its frozen expectation.
@@ -1218,6 +1439,8 @@ builder_verify_crb <- function(
       call. = FALSE
     )
   }
+  immune_sidecar <- .builder_build_verify_immune_sidecar(path, serialized)
+  viewer_pack <- .builder_build_verify_viewer_pack(path, item, serialized)
   bundle_preflight <- if (is.null(file_fingerprint)) {
     NULL
   } else {
@@ -1270,6 +1493,8 @@ builder_verify_crb <- function(
       spatial_backend_descriptor[c("type", "location")]
     },
     spatial_molecule_path = spatial_backend_path,
+    viewer_pack = viewer_pack,
+    immune_sidecar = immune_sidecar,
     file_fingerprint = file_fingerprint,
     bundle_preflight = bundle_preflight,
     page_contract = list(visible_conditional = visible)
@@ -1629,6 +1854,8 @@ builder_verify_crb <- function(
     projections = item$included_projections,
     expression_matrix_mode = item$expression_backend,
     codec = "qs2",
+    viewer_binary = .builder_viewer_pack_options$mode,
+    viewer_binary_threshold = .builder_viewer_pack_options$threshold,
     spatial_coordinate_transforms = coordinate_transforms,
     .finalize_export = if (length(item$images %||% list())) {
       function(export) {
@@ -1821,7 +2048,9 @@ builder_verify_crb <- function(
       c(
         list(content$crb),
         unname(content$backend$entries %||% list()),
-        unname(content$spatial_molecules$entries %||% list())
+        unname(content$spatial_molecules$entries %||% list()),
+        unname(content$viewer_pack$entries %||% list()),
+        unname(content$immune_sidecar$entries %||% list())
       )
     )
     for (expected in expected_files) {
@@ -2376,7 +2605,14 @@ builder_execute_plan <- function(
         result$built,
         result$labels,
         verified_spatial_backends = verified_spatial_backends,
-        previous_file_identities = copied_file_identities
+        previous_file_identities = copied_file_identities,
+        viewer_packs = builder_planned_viewer_packs(app_plan$items),
+        verified_immune_backends = stats::setNames(
+          lapply(verified_preflight, function(verification) {
+            verification$immune_sidecar %||% NULL
+          }),
+          plan$dataset_order
+        )
       ),
       error = function(error) error
     )

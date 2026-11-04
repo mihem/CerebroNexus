@@ -900,7 +900,11 @@ builder_coordinator_output_preflight <- function(plan, prior_state = NULL) {
     },
     ""
   )
-  expected <- sort(unique(relative), method = "radix")
+  if (!isTRUE(.subset2(plan, "make_app"))) {
+    viewer_packs <- builder_planned_viewer_packs(.subset2(plan, "items"))
+    relative <- c(relative, viewer_packs[nzchar(viewer_packs)])
+  }
+  expected <- sort(unique(unname(relative)), method = "radix")
   declared_prior <- .subset2(plan, "expected_prior_identity")
   if (
     !is.null(declared_prior) && !.builder_release_identity_valid(declared_prior)
@@ -989,15 +993,19 @@ builder_coordinator_prepare <- function(plan, build_id, prior_state = NULL) {
     }
   )
   handle$expected_payload_targets <- expected
+  handle$viewer_packs <- builder_planned_viewer_packs(plan$items)
   handle$transient_app_inputs <- if (
     isTRUE(app_contract$expectation$expected)
   ) {
     sort(
-      unique(unlist(
-        lapply(plan$items, function(item) {
-          c(item$filename, item$sidecars %||% character())
-        }),
-        use.names = FALSE
+      unique(c(
+        unlist(
+          lapply(plan$items, function(item) {
+            c(item$filename, item$sidecars %||% character())
+          }),
+          use.names = FALSE
+        ),
+        unname(handle$viewer_packs[nzchar(handle$viewer_packs)])
       )),
       method = "radix"
     )
@@ -1323,7 +1331,11 @@ builder_coordinator_prepare <- function(plan, build_id, prior_state = NULL) {
   )
 }
 
-.builder_coordinator_register_spatial_molecule_inputs <- function(
+## The worker's verifications name each CRB's companions. The Viewer Pack must
+## be the one the frozen plan gives the CRB (it is already a planned target);
+## spatial molecule directories and immune repertoire files follow from the
+## CRB and become expected targets here.
+.builder_coordinator_register_companion_inputs <- function(
   handle,
   built,
   app_expected,
@@ -1336,46 +1348,81 @@ builder_coordinator_prepare <- function(plan, build_id, prior_state = NULL) {
     character(1)
   )
   names(plan_items) <- item_ids
-  locations <- vapply(
-    seq_along(built),
-    function(index) {
-      built_names <- names(built)
-      item <- if (!is.null(built_names) && nzchar(built_names[[index]])) {
-        plan_items[[built_names[[index]]]] %||% NULL
-      } else {
-        matches <- which(vapply(
-          plan_items,
-          function(candidate) {
-            identical(
-              basename(built[[index]]),
-              candidate$filename %||% ""
-            )
-          },
-          logical(1)
-        ))
-        if (length(matches) == 1L) plan_items[[matches]] else NULL
-      }
-      verification <- if (is.list(item)) {
-        verifications[[item$id]] %||%
-          if (length(verifications) >= index) verifications[[index]] else NULL
-      } else {
-        NULL
-      }
-      backend <- verification$spatial_molecule_backend %||% NULL
-      if (is.null(backend)) {
-        return("")
-      }
-      if (
-        !is.list(backend) ||
-          !identical(backend$type, "directory") ||
-          !.builder_release_text(backend$location)
-      ) {
-        return(NA_character_)
-      }
+  companions <- lapply(seq_along(built), function(index) {
+    built_names <- names(built)
+    item <- if (!is.null(built_names) && nzchar(built_names[[index]])) {
+      plan_items[[built_names[[index]]]] %||% NULL
+    } else {
+      matches <- which(vapply(
+        plan_items,
+        function(candidate) {
+          identical(
+            basename(built[[index]]),
+            candidate$filename %||% ""
+          )
+        },
+        logical(1)
+      ))
+      if (length(matches) == 1L) plan_items[[matches]] else NULL
+    }
+    verification <- if (is.list(item)) {
+      verifications[[item$id]] %||%
+        if (length(verifications) >= index) verifications[[index]] else NULL
+    } else {
+      NULL
+    }
+    planned_pack <- if (is.list(item)) {
+      unname(handle$viewer_packs[item$id]) %||% ""
+    } else {
+      ""
+    }
+    if (is.na(planned_pack)) {
+      planned_pack <- ""
+    }
+    pack <- verification$viewer_pack %||% NULL
+    pack_location <- if (is.null(pack)) "" else pack$location %||% NA
+    if (
+      !identical(pack_location, planned_pack) ||
+        (!is.null(pack) && !identical(pack$type, "directory"))
+    ) {
+      stop(
+        "The staged Viewer Pack differs from the frozen plan.",
+        call. = FALSE
+      )
+    }
+    backend <- verification$spatial_molecule_backend %||% NULL
+    spatial <- if (is.null(backend)) {
+      ""
+    } else if (
+      !is.list(backend) ||
+        !identical(backend$type, "directory") ||
+        !.builder_release_text(backend$location)
+    ) {
+      NA_character_
+    } else {
       backend$location
-    },
-    character(1)
-  )
+    }
+    immune_backend <- verification$immune_sidecar %||% NULL
+    immune <- if (is.null(immune_backend)) {
+      ""
+    } else if (
+      !is.list(item) ||
+        !is.list(immune_backend) ||
+        !identical(immune_backend$type, "file") ||
+        !.builder_release_text(immune_backend$location) ||
+        !immune_backend$location %in%
+          .builder_immune_sidecar_names(item$filename %||% "")
+    ) {
+      stop(
+        "The staged immune repertoire sidecar closure is invalid.",
+        call. = FALSE
+      )
+    } else {
+      immune_backend$location
+    }
+    c(spatial = spatial, immune = immune)
+  })
+  locations <- vapply(companions, `[[`, character(1), "spatial")
   if (
     anyNA(locations) ||
       anyDuplicated(tolower(locations[nzchar(locations)])) ||
@@ -1387,6 +1434,10 @@ builder_coordinator_prepare <- function(plan, build_id, prior_state = NULL) {
       call. = FALSE
     )
   }
+  locations <- c(
+    locations,
+    vapply(companions, `[[`, character(1), "immune")
+  )
   locations <- sort(unique(locations[nzchar(locations)]), method = "radix")
   if (!length(locations)) {
     return(handle)
@@ -1497,7 +1548,7 @@ builder_coordinator_publish <- function(
     stop("Verified build artifacts escaped the assigned stage.", call. = FALSE)
   }
   app_expected <- isTRUE(handle$app_expectation$expected)
-  handle <- .builder_coordinator_register_spatial_molecule_inputs(
+  handle <- .builder_coordinator_register_companion_inputs(
     handle,
     built,
     app_expected,
@@ -1558,6 +1609,7 @@ builder_coordinator_publish <- function(
         handle$app_plan,
         built,
         handle$app_expectation$labels,
+        viewer_packs = handle$viewer_packs,
         .on_progress = function(label, index, count) {
           step(label, as.integer(index), as.integer(count))
         }
@@ -1639,6 +1691,8 @@ builder_coordinator_publish <- function(
         parent_request$crb_identities,
         parent_request$backend_identities,
         parent_request$spatial_molecule_identities,
+        parent_request$viewer_pack_identities,
+        parent_request$immune_sidecar_identities,
         parent_request$spatial_image_identities
       ),
       digest_cache
@@ -1998,7 +2052,20 @@ builder_coordinator_publish <- function(
     ),
     use.names = FALSE
   )
-  mapped_paths <- c(mapped_paths, spatial_molecule_paths)
+  companion_paths <- unlist(
+    lapply(build_result$verifications, function(verification) {
+      locations <- c(
+        verification$viewer_pack$location %||% character(),
+        verification$immune_sidecar$location %||% character()
+      )
+      if (!length(locations)) {
+        return(character())
+      }
+      file.path(dirname(verification$path), locations)
+    }),
+    use.names = FALSE
+  )
+  mapped_paths <- c(mapped_paths, spatial_molecule_paths, companion_paths)
   if (
     !length(mapped_paths) ||
       anyNA(mapped_paths) ||
@@ -2092,13 +2159,11 @@ builder_coordinator_retain_partial <- function(
     }
     record <- tryCatch(
       {
-        spatial <- verification$spatial_molecule_backend$location %||%
-          character()
         relative <- unique(c(
           item$filename,
           unlist(
             lapply(
-              c(item$sidecars %||% character(), spatial),
+              builder_verification_companions(item, verification),
               function(name) .builder_coordinator_stage_files(stage, name)
             ),
             use.names = FALSE

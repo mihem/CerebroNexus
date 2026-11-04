@@ -121,7 +121,7 @@
   if (is.null(paths)) {
     return(NULL)
   }
-  selected <- if (identical(type, "h5")) {
+  selected <- if (type %in% c("h5", "file")) {
     paths == location
   } else {
     startsWith(paths, paste0(location, "/"))
@@ -139,6 +139,67 @@
   })
   names(entries) <- names(identities)
   list(type = type, root = NULL, root_fingerprint = NULL, entries = entries)
+}
+
+## What one staged CRB names: its spatial molecule backend and its immune
+## repertoire sidecar (`list(type = "file", location, md5)`), each or NULL.
+.builder_app_read_crb_descriptors <- function(crb_path) {
+  object <- .builder_app_runtime_function(".readCerebroPayload")(crb_path)
+  if (!is.environment(object)) {
+    return(list(spatial = NULL, immune = NULL))
+  }
+  spatial <- .builder_app_runtime_function(".spatialMoleculeBackend")(
+    object,
+    crb_path
+  )
+  immune <- .builder_app_runtime_function(".immuneRepertoireBackend")(
+    object,
+    crb_path
+  )
+  object <- NULL
+  list(
+    spatial = spatial,
+    immune = if (is.null(immune)) {
+      NULL
+    } else {
+      list(type = "file", location = immune$file, md5 = immune$md5)
+    }
+  )
+}
+
+## The planned Viewer Pack of each dataset: a character vector named by dataset
+## id, "" where the CRB has none. NULL plans none.
+.builder_app_viewer_pack_plan <- function(viewer_packs, item_ids) {
+  if (is.null(viewer_packs)) {
+    return(stats::setNames(rep("", length(item_ids)), item_ids))
+  }
+  if (
+    .builder_app_has_reference(viewer_packs) ||
+      !is.character(viewer_packs) ||
+      is.object(viewer_packs) ||
+      anyNA(viewer_packs) ||
+      !identical(names(viewer_packs), item_ids)
+  ) {
+    stop("Planned Viewer Packs are invalid.", call. = FALSE)
+  }
+  .builder_app_plain_value(viewer_packs)
+}
+
+## The worker's verified immune repertoire sidecars, named by dataset id (NULL
+## where the CRB keeps its repertoire). NULL means none.
+.builder_app_verified_immune_backends <- function(backends, item_ids) {
+  if (is.null(backends)) {
+    return(stats::setNames(vector("list", length(item_ids)), item_ids))
+  }
+  if (
+    .builder_app_has_reference(backends) ||
+      !is.list(backends) ||
+      is.object(backends) ||
+      !identical(names(backends), item_ids)
+  ) {
+    stop("Verified immune repertoire sidecars are invalid.", call. = FALSE)
+  }
+  .builder_app_plain_value(backends)
 }
 
 ## The request fields that come straight from the frozen App options and
@@ -167,6 +228,8 @@ builder_app_bundle_request <- function(
   labels,
   verified_spatial_backends = NULL,
   previous_file_identities = NULL,
+  viewer_packs = NULL,
+  verified_immune_backends = NULL,
   .on_progress = NULL
 ) {
   # Progress only: `.on_progress(label, index, count)` names each dataset pass.
@@ -341,6 +404,13 @@ builder_app_bundle_request <- function(
     }
     .builder_app_plain_value(verified_spatial_backends)
   }
+  ## Without the worker's verified descriptors, each CRB is opened once for
+  ## the spatial molecule and immune repertoire sidecars it names.
+  crb_descriptors <- if (is.null(verified_spatial_backends)) {
+    lapply(resolved, .builder_app_read_crb_descriptors)
+  } else {
+    NULL
+  }
   spatial_molecule_identities <- lapply(seq_along(resolved), function(index) {
     report("Checking spatial data", index, length(resolved))
     previous <- .builder_app_previous_closure(
@@ -348,25 +418,61 @@ builder_app_bundle_request <- function(
       paste0(tools::file_path_sans_ext(filenames[[index]]), ".spatial"),
       previous_file_identities[[index]]
     )
-    if (is.null(verified_spatial_backends)) {
-      return(.builder_app_capture_spatial_molecule_identity(
-        resolved[[index]],
-        .previous = previous
-      ))
-    }
     .builder_app_capture_spatial_molecule_identity(
       resolved[[index]],
       .previous = previous,
-      .verified_backend = verified_spatial_backends[[index]],
+      .verified_backend = if (is.null(crb_descriptors)) {
+        verified_spatial_backends[[index]]
+      } else {
+        crb_descriptors[[index]]$spatial
+      },
       .backend_is_verified = TRUE
     )
   })
   names(spatial_molecule_identities) <- names(backend_entries)
+  viewer_packs <- .builder_app_viewer_pack_plan(viewer_packs, item_ids)
+  viewer_pack_identities <- lapply(seq_along(resolved), function(index) {
+    location <- viewer_packs[[index]]
+    .builder_app_capture_viewer_pack_identity(
+      resolved[[index]],
+      location,
+      .previous = .builder_app_previous_closure(
+        "directory",
+        location,
+        previous_file_identities[[index]]
+      )
+    )
+  })
+  names(viewer_pack_identities) <- names(backend_entries)
+  immune_backends <- if (is.null(crb_descriptors)) {
+    .builder_app_verified_immune_backends(verified_immune_backends, item_ids)
+  } else {
+    lapply(crb_descriptors, `[[`, "immune")
+  }
+  immune_sidecar_identities <- lapply(seq_along(resolved), function(index) {
+    backend <- immune_backends[[index]]
+    .builder_app_capture_immune_sidecar_identity(
+      resolved[[index]],
+      backend,
+      .previous = if (is.null(backend)) {
+        NULL
+      } else {
+        .builder_app_previous_closure(
+          "file",
+          backend$location,
+          previous_file_identities[[index]]
+        )
+      }
+    )
+  })
+  names(immune_sidecar_identities) <- names(backend_entries)
   content_identities <- .builder_app_content_identities(
     crb_identities,
     backend_identities,
     backend_plan,
-    spatial_molecule_identities
+    spatial_molecule_identities,
+    viewer_pack_identities,
+    immune_sidecar_identities
   )
   storage_valid <- vapply(
     items,
@@ -411,6 +517,8 @@ builder_app_bundle_request <- function(
       backend_plan = backend_plan,
       backend_identities = backend_identities,
       spatial_molecule_identities = spatial_molecule_identities,
+      viewer_pack_identities = viewer_pack_identities,
+      immune_sidecar_identities = immune_sidecar_identities,
       content_identities = content_identities,
       spatial_images = spatial_images,
       spatial_image_settings = spatial_image_settings,

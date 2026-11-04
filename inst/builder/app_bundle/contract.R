@@ -31,6 +31,8 @@
   "backend_plan",
   "backend_identities",
   "spatial_molecule_identities",
+  "viewer_pack_identities",
+  "immune_sidecar_identities",
   "content_identities",
   "spatial_images",
   "spatial_image_settings",
@@ -62,6 +64,97 @@
     is.finite(value) &&
     value >= lower &&
     value <= upper
+}
+
+## CRB companions -----------------------------------------------------------
+## Besides its expression sidecar and spatial molecule directory, a Builder CRB
+## can have two companions written by the exporter: the derived Viewer Pack
+## `<stem>.viewer/` and, for an H5-backed CRB with a large repertoire, the
+## immune repertoire file `<stem>.immune.qs2`. They travel with their CRB into
+## the CRB-only release and into the generated App's private-data.
+
+## The Viewer Pack options the Builder exports with (exportFromSeurat()'s
+## defaults, passed explicitly). Whether a CRB has a pack follows from them and
+## the frozen cell count, so the worker's verification, the generated-App
+## request and the release coordinator all plan the same pack.
+.builder_viewer_pack_options <- list(mode = "auto", threshold = 100000L)
+
+.builder_viewer_pack_name <- function(crb) {
+  paste0(tools::file_path_sans_ext(basename(crb)), ".viewer")
+}
+
+.builder_immune_sidecar_names <- function(crb) {
+  paste0(
+    tools::file_path_sans_ext(basename(crb)),
+    ".immune.",
+    c("qs2", "rds")
+  )
+}
+
+## A CerebroNexus function, from the loaded namespace when there is one (so a
+## test's mocked binding is the one used) and otherwise from the runtime that
+## sourced the package files.
+.builder_app_package_function <- function(name) {
+  value <- if (isNamespaceLoaded("CerebroNexus")) {
+    get0(name, envir = asNamespace("CerebroNexus"), inherits = FALSE)
+  }
+  if (!is.function(value)) {
+    value <- get0(name, mode = "function", inherits = TRUE)
+  }
+  if (!is.function(value)) {
+    stop("The Cerebro runtime is unavailable.", call. = FALSE)
+  }
+  value
+}
+
+## The Viewer Pack directory a frozen plan item's CRB has, or NULL.
+builder_planned_viewer_pack <- function(item) {
+  cells <- item$artifact_identity$cells
+  if (is.null(cells)) {
+    return(NULL)
+  }
+  count <- if (is.list(cells)) cells$count else length(cells)
+  count <- suppressWarnings(as.double(count))
+  if (
+    length(count) != 1L ||
+      !is.finite(count) ||
+      count < 0 ||
+      !.builder_app_text(item$filename)
+  ) {
+    stop(
+      "BuildPlan does not determine the dataset's Viewer Pack.",
+      call. = FALSE
+    )
+  }
+  enabled <- .builder_app_package_function(".viewerPackEnabled")(
+    .builder_viewer_pack_options$mode,
+    .builder_viewer_pack_options$threshold,
+    count
+  )
+  if (isTRUE(enabled)) .builder_viewer_pack_name(item$filename) else NULL
+}
+
+## Every file or directory that travels next to a verified CRB: the planned
+## expression sidecars and the companions its verification found.
+builder_verification_companions <- function(item, verification) {
+  unique(c(
+    item$sidecars %||% character(),
+    verification$spatial_molecule_backend$location %||% character(),
+    verification$viewer_pack$location %||% character(),
+    verification$immune_sidecar$location %||% character()
+  ))
+}
+
+## The planned Viewer Pack of every plan item, named by dataset id ("" when the
+## CRB has none).
+builder_planned_viewer_packs <- function(items) {
+  ids <- vapply(items, function(item) as.character(item$id %||% ""), "")
+  packs <- vapply(
+    items,
+    function(item) builder_planned_viewer_pack(item) %||% "",
+    ""
+  )
+  stats::setNames(packs, ids)
 }
 
 .builder_app_backend_identity_fields <- c(
@@ -1167,11 +1260,43 @@
   list(path = path, type = "file", size = size, md5 = md5)
 }
 
+## The private-data content a captured companion closure (a spatial molecule
+## directory, a Viewer Pack or an immune repertoire file next to its CRB) must
+## become in the generated App: its root and every entry with size and MD5.
+.builder_app_companion_content <- function(closure, type) {
+  if (is.null(closure)) {
+    return(list(type = "none", root = NULL, entries = list()))
+  }
+  entries <- lapply(closure$entries, function(entry) {
+    path <- paste0("private-data/", entry$path)
+    if (identical(entry$type, "directory")) {
+      return(list(path = path, type = "directory"))
+    }
+    .builder_app_portable_file(
+      path,
+      entry$identity$size,
+      entry$identity$md5
+    )
+  })
+  names(entries) <- if (length(entries)) {
+    paste0("private-data/", names(closure$entries))
+  } else {
+    character()
+  }
+  list(
+    type = type,
+    root = paste0("private-data/", basename(closure$root)),
+    entries = entries
+  )
+}
+
 .builder_app_content_identities <- function(
   crb_identities,
   backend_identities,
   backend_plan,
-  spatial_molecule_identities
+  spatial_molecule_identities,
+  viewer_pack_identities,
+  immune_sidecar_identities
 ) {
   relative_crbs <- names(backend_plan$entries)
   identities <- lapply(seq_along(relative_crbs), function(index) {
@@ -1205,35 +1330,6 @@
         entries = entries
       )
     }
-    spatial_molecules <- spatial_molecule_identities[[relative_crb]]
-    spatial_molecules <- if (is.null(spatial_molecules)) {
-      list(type = "none", root = NULL, entries = list())
-    } else {
-      entries <- lapply(spatial_molecules$entries, function(entry) {
-        path <- paste0("private-data/", entry$path)
-        if (identical(entry$type, "directory")) {
-          return(list(path = path, type = "directory"))
-        }
-        .builder_app_portable_file(
-          path,
-          entry$identity$size,
-          entry$identity$md5
-        )
-      })
-      names(entries) <- if (length(entries)) {
-        paste0("private-data/", names(spatial_molecules$entries))
-      } else {
-        character()
-      }
-      list(
-        type = "directory",
-        root = paste0(
-          "private-data/",
-          basename(spatial_molecules$root)
-        ),
-        entries = entries
-      )
-    }
     list(
       crb = .builder_app_portable_file(
         relative_crb,
@@ -1241,7 +1337,18 @@
         crb_identities[[index]]$md5
       ),
       backend = backend,
-      spatial_molecules = spatial_molecules
+      spatial_molecules = .builder_app_companion_content(
+        spatial_molecule_identities[[relative_crb]],
+        "directory"
+      ),
+      viewer_pack = .builder_app_companion_content(
+        viewer_pack_identities[[relative_crb]],
+        "directory"
+      ),
+      immune_sidecar = .builder_app_companion_content(
+        immune_sidecar_identities[[relative_crb]],
+        "file"
+      )
     )
   })
   names(identities) <- relative_crbs
