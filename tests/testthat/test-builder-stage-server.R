@@ -232,12 +232,19 @@ test_that("Build output UI locks CRB-only when external images require an App", 
 
   expect_match(
     html,
-    "Spatial images or ROI settings require CRB files + Viewer App output.",
+    paste0(
+      '<p id="build_output_crb_reason" class="hint builder-app-required-reason">',
+      "Spatial images or ROI settings require CRB files + Viewer App output."
+    ),
     fixed = TRUE
   )
   expect_match(
     html,
-    '<input type="radio" name="build_output_mode" value="crb" disabled="disabled" aria-disabled="true"/>',
+    paste0(
+      '<input type="radio" name="build_output_mode" value="crb" ',
+      'disabled="disabled" aria-disabled="true" ',
+      'aria-describedby="build_output_crb_reason"/>'
+    ),
     fixed = TRUE
   )
   expect_match(

@@ -2136,6 +2136,15 @@ details > summary:focus-visible { outline: 2px solid var(--builder-action); outl
   flex: 0 0 auto;
   margin: 0 var(--space-2) 0 0;
 }
+/* A choice the datasets rule out (its reason sits under the cards): faded, and
+   no part of the card takes a click or a hover. */
+.builder-build-options .radio:has(input[disabled]) {
+  cursor: not-allowed;
+}
+.builder-build-options .radio:has(input[disabled]) label {
+  opacity: .45;
+  pointer-events: none;
+}
 .builder-build-status-section { min-width: 0; }
 .builder-build-waiting .spinner {
   border-color: var(--c-success);

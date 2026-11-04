@@ -943,3 +943,111 @@ test_that("extensionless datasets load by content and unknown files say why", {
   })
   builder_expect_clean_browser_logs(app)
 })
+
+## When spatial images or ROI settings require the Viewer App, "CRB files only"
+## is visibly unavailable: faded, never clickable, with its reason attached.
+test_that("a ruled-out output choice is faded and cannot be picked", {
+  skip_if_not(identical(Sys.getenv("CEREBRO_RUN_BROWSER_TESTS"), "true"))
+  app_dir <- builder_browser_current_contract_app(
+    builder_browser_dir,
+    .local_envir = environment()
+  )
+  local_app_support(app_dir)
+  app <- AppDriver$new(
+    app_dir,
+    name = "builder_disabled_output_choice",
+    width = 1280,
+    height = 900,
+    load_timeout = 60000
+  )
+  on.exit(app$stop(), add = TRUE)
+  app$wait_for_idle(timeout = 30000)
+  builder_with_browser_diagnostics(app, "browser-disabled-output-build", {
+    builder_browser_wait_for_example_ready(app)
+    builder_browser_click_dynamic(
+      app,
+      ".example-btn[data-ex=complete_viewer_data]"
+    )
+    builder_browser_dismiss_project_offer(app)
+    builder_browser_check_all_datasets(app)
+    builder_browser_click_dynamic(app, "#continue_to_review")
+    app$wait_for_js(
+      "document.getElementById('confirm_review') !== null",
+      timeout = 10000
+    )
+    builder_browser_click_dynamic(app, "#confirm_review")
+    app$wait_for_js(
+      "document.querySelector('.builder-app-required-reason') !== null",
+      timeout = 30000
+    )
+    app$wait_for_idle(timeout = 10000)
+  })
+  card_state <- function() {
+    app$get_js(paste0(
+      "(() => { const state = value => { ",
+      "const input = document.querySelector(",
+      "'input[name=build_output_mode][value=' + value + ']');",
+      "const card = input.closest('.radio'); const label = input.closest('label');",
+      "return {disabled: input.disabled, ",
+      "aria: input.getAttribute('aria-disabled'), ",
+      "describedby: input.getAttribute('aria-describedby'), ",
+      "opacity: getComputedStyle(label).opacity, ",
+      "cursor: getComputedStyle(card).cursor, ",
+      "pointer: getComputedStyle(label).pointerEvents, ",
+      "checked: input.checked}; };",
+      "return {crb: state('crb'), app: state('app')}; })()"
+    ))
+  }
+  before <- card_state()
+  expect_identical(
+    before$crb,
+    list(
+      disabled = TRUE,
+      aria = "true",
+      describedby = "build_output_crb_reason",
+      opacity = "0.45",
+      cursor = "not-allowed",
+      pointer = "none",
+      checked = FALSE
+    )
+  )
+  ## The available choice keeps its normal look.
+  expect_identical(before$app$opacity, "1")
+  expect_identical(before$app$pointer, "auto")
+  expect_true(before$app$checked)
+  expect_identical(
+    app$get_js(paste0(
+      "document.getElementById('build_output_crb_reason')",
+      ".textContent.trim()"
+    )),
+    "Spatial images or ROI settings require CRB files + Viewer App output."
+  )
+
+  ## A real click anywhere on the card, the radio circle included, changes
+  ## nothing.
+  chrome <- app$get_chromote_session()
+  points <- app$get_js(paste0(
+    "(() => { const card = document.querySelector(",
+    "'input[name=build_output_mode][value=crb]').closest('.radio');",
+    "card.scrollIntoView({block: 'center'});",
+    "const box = card.getBoundingClientRect();",
+    "const circle = card.querySelector('input').getBoundingClientRect();",
+    "return [[box.x + box.width / 2, box.y + box.height / 2],",
+    "[circle.x + circle.width / 2, circle.y + circle.height / 2]]; })()"
+  ))
+  for (point in points) {
+    for (type in c("mousePressed", "mouseReleased")) {
+      chrome$Input$dispatchMouseEvent(
+        type = type,
+        x = point[[1L]],
+        y = point[[2L]],
+        button = "left",
+        clickCount = 1L
+      )
+    }
+  }
+  app$wait_for_idle(timeout = 10000)
+  expect_identical(app$get_value(input = "build_output_mode"), "app")
+  expect_identical(card_state(), before)
+  builder_expect_clean_browser_logs(app)
+})

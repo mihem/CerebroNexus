@@ -160,7 +160,9 @@ builder_build_options_ui <- function(
     ),
     selected = if (isTRUE(options$make_app)) "app" else "crb"
   )
-  disable_output_choice <- function(node, value) {
+  ## A ruled-out choice stays visible but cannot be picked; `reason` is the id
+  ## of the sentence that says why, read with the choice by screen readers.
+  disable_output_choice <- function(node, value, reason) {
     if (inherits(node, "shiny.tag")) {
       if (
         identical(node$name, "input") &&
@@ -168,22 +170,36 @@ builder_build_options_ui <- function(
       ) {
         node$attribs$disabled <- "disabled"
         node$attribs$`aria-disabled` <- "true"
+        node$attribs$`aria-describedby` <- reason
       }
-      node$children <- lapply(node$children, disable_output_choice, value)
+      node$children <- lapply(
+        node$children,
+        disable_output_choice,
+        value,
+        reason
+      )
       return(node)
     }
     if (is.list(node)) {
       original_attributes <- attributes(node)
-      node <- lapply(node, disable_output_choice, value)
+      node <- lapply(node, disable_output_choice, value, reason)
       attributes(node) <- original_attributes
     }
     node
   }
   if (isTRUE(app_required)) {
-    output_mode <- disable_output_choice(output_mode, "crb")
+    output_mode <- disable_output_choice(
+      output_mode,
+      "crb",
+      "build_output_crb_reason"
+    )
   }
   if (!isTRUE(app_available)) {
-    output_mode <- disable_output_choice(output_mode, "app")
+    output_mode <- disable_output_choice(
+      output_mode,
+      "app",
+      "build_output_app_reason"
+    )
   }
   tags$fieldset(
     class = "builder-build-options-fields",
@@ -194,6 +210,7 @@ builder_build_options_ui <- function(
       output_mode,
       if (isTRUE(app_required)) {
         p(
+          id = "build_output_crb_reason",
           class = "hint builder-app-required-reason",
           "Spatial images or ROI settings require CRB files + Viewer App output."
         )
@@ -214,6 +231,7 @@ builder_build_options_ui <- function(
               "Viewer App unavailable"
             ),
             p(
+              id = "build_output_app_reason",
               class = "builder-app-capability-reason",
               app_reason %||%
                 "This installation cannot safely create a Viewer App."
