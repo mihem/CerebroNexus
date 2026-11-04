@@ -726,8 +726,49 @@ copy_result_value <- function(value) {
   session$sendCustomMessage("builder_copy_text", list(text = value))
   TRUE
 }
+## Waits (without blocking the session) until the App answers, then sends its
+## port to the page, which opens it and shows the address on the result card.
+announce_opened_app <- function(app, waited = 0) {
+  if (isTRUE(session$isClosed())) {
+    return(invisible(FALSE))
+  }
+  state <- builder_opened_app_state(app)
+  if (identical(state, "starting") && waited < 120) {
+    later::later(function() announce_opened_app(app, waited + 0.25), 0.25)
+    return(invisible(TRUE))
+  }
+  session$sendCustomMessage(
+    "builder_open_app",
+    builder_opened_app_message(app, state)
+  )
+  if (identical(state, "stopped")) {
+    builder_notify(
+      "error",
+      c(
+        "The App stopped while starting.",
+        builder_opened_app_log(app)
+      ),
+      target = "build",
+      session = session
+    )
+  }
+  invisible(TRUE)
+}
 observeEvent(input$open_app, {
-  run_result_action(builder_open_final_app)
+  run_result_action(function(value) {
+    opened <- try(
+      builder_open_final_app(value, .on_open = announce_opened_app),
+      silent = TRUE
+    )
+    if (!isTRUE(opened)) {
+      ## The page opened a tab for the App when the button was clicked.
+      session$sendCustomMessage("builder_open_app", list(ok = FALSE))
+    }
+    if (inherits(opened, "try-error")) {
+      stop(attr(opened, "condition"))
+    }
+    opened
+  })
 })
 observeEvent(input$reveal_folder, {
   run_result_action(builder_reveal_release)

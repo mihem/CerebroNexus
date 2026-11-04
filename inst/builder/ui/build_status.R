@@ -684,7 +684,9 @@ builder_build_failed_analysis_reasons <- function(log) {
   env_file,
   env_name,
   validate_database = NULL,
-  run_app = shiny::runApp
+  run_app = shiny::runApp,
+  port = NULL,
+  host = NULL
 ) {
   if (!identical(env_name, "CEREBRO_AUTH_PASSPHRASE")) {
     stop("The authentication environment is invalid.", call. = FALSE)
@@ -779,7 +781,143 @@ builder_build_failed_analysis_reasons <- function(log) {
     do.call(Sys.setenv, stats::setNames(list(value), env_name))
     installed <- TRUE
   }
-  run_app(path, launch.browser = TRUE)
+  ## The Builder chose the port and opens the URL in its own page's browser,
+  ## which may not be on this machine.
+  network <- Filter(Negate(is.null), list(port = port, host = host))
+  do.call(run_app, c(list(path), network, list(launch.browser = FALSE)))
+}
+
+## Apps started by Open App, by App directory. processx kills a child process
+## when its handle is garbage-collected, so every handle stays here until the
+## Builder stops (builder_stop_opened_apps() is registered in
+## builder_app_start()).
+.builder_opened_apps <- new.env(parent = emptyenv())
+
+## Host and port the App was built with (Review > Connection settings).
+builder_app_run_options <- function(app_dir) {
+  config <- tryCatch(
+    readRDS(file.path(app_dir, "cerebro_config.rds")),
+    error = function(error) NULL
+  )
+  options <- if (is.list(config)) {
+    config[[".bundle_run_options"]]$shiny_app_options
+  }
+  port <- suppressWarnings(as.integer(options$port %||% NA_integer_))
+  host <- options$host
+  list(
+    port = if (length(port) == 1L && !is.na(port) && port >= 1L) {
+      port
+    } else {
+      8080L
+    },
+    host = if (builder_stage_has_text(host %||% "")) host else "127.0.0.1"
+  )
+}
+
+builder_port_is_free <- function(host, port) {
+  server <- tryCatch(
+    suppressWarnings(httpuv::startServer(host, port, list())),
+    error = function(error) NULL
+  )
+  if (is.null(server)) {
+    return(FALSE)
+  }
+  httpuv::stopServer(server)
+  TRUE
+}
+
+## The configured port when it is free, otherwise a free one.
+builder_app_free_port <- function(host, port) {
+  if (builder_port_is_free(host, port)) {
+    return(as.integer(port))
+  }
+  as.integer(httpuv::randomPort(host = host))
+}
+
+## Changes when the App is rebuilt in place.
+builder_app_identity <- function(app_dir) {
+  info <- file.info(file.path(app_dir, "cerebro_config.rds"))
+  paste(info$size, as.numeric(info$mtime))
+}
+
+## The running App started for this directory, or NULL. A stopped App, or one
+## started before the App was rebuilt, is dropped.
+builder_opened_app <- function(app_dir) {
+  app <- .builder_opened_apps[[app_dir]]
+  if (is.null(app)) {
+    return(NULL)
+  }
+  if (
+    isTRUE(app$process$is_alive()) &&
+      identical(app$identity, builder_app_identity(app_dir))
+  ) {
+    return(app)
+  }
+  builder_stop_opened_app(app)
+  rm(list = app_dir, envir = .builder_opened_apps)
+  NULL
+}
+
+builder_stop_opened_app <- function(app) {
+  if (isTRUE(app$process$is_alive())) {
+    tryCatch(app$process$kill_tree(), error = function(error) {
+      try(app$process$kill(), silent = TRUE)
+    })
+  }
+  invisible(TRUE)
+}
+
+builder_stop_opened_apps <- function() {
+  for (app_dir in ls(.builder_opened_apps, all.names = TRUE)) {
+    builder_stop_opened_app(.builder_opened_apps[[app_dir]])
+  }
+  rm(
+    list = ls(.builder_opened_apps, all.names = TRUE),
+    envir = .builder_opened_apps
+  )
+  invisible(TRUE)
+}
+
+## "ready" once the App answers on its port, "stopped" when its process has
+## ended, otherwise "starting".
+builder_opened_app_state <- function(app) {
+  if (!isTRUE(app$process$is_alive())) {
+    return("stopped")
+  }
+  host <- if (app$host %in% c("0.0.0.0", "::", "")) "127.0.0.1" else app$host
+  connected <- tryCatch(
+    {
+      connection <- suppressWarnings(
+        socketConnection(host, app$port, open = "r+", timeout = 1)
+      )
+      close(connection)
+      TRUE
+    },
+    error = function(error) FALSE
+  )
+  if (connected) "ready" else "starting"
+}
+
+## The last lines the App printed, for an App that stopped while starting.
+builder_opened_app_log <- function(app, lines = 5L) {
+  text <- tryCatch(
+    readLines(app$log, warn = FALSE),
+    error = function(error) character()
+  )
+  text <- trimws(text[nzchar(trimws(text))])
+  utils::tail(text, lines)
+}
+
+## What the page needs to open the App: the host is left out when the App
+## listens on every address, so the page uses the host it reached Builder by.
+builder_opened_app_message <- function(app, state) {
+  list(
+    ok = identical(state, "ready"),
+    state = state,
+    port = app$port,
+    host = if (app$host %in% c("0.0.0.0", "::", "")) NULL else app$host,
+    configured_port = app$configured_port
+  )
 }
 
 builder_open_final_app <- function(
@@ -795,26 +933,46 @@ builder_open_final_app <- function(
   .run_app = NULL,
   .on_open = NULL,
   .open = function(path, env_file) {
-    if (!requireNamespace("callr", quietly = TRUE)) {
-      stop("The callr package is required to open the App.", call. = FALSE)
+    app <- builder_opened_app(path)
+    if (is.null(app)) {
+      if (!requireNamespace("callr", quietly = TRUE)) {
+        stop("The callr package is required to open the App.", call. = FALSE)
+      }
+      run_options <- builder_app_run_options(path)
+      port <- builder_app_free_port(run_options$host, run_options$port)
+      args <- list(
+        path = path,
+        env_file = env_file,
+        env_name = "CEREBRO_AUTH_PASSPHRASE",
+        validate_database = .validate_database,
+        port = port,
+        host = run_options$host
+      )
+      environment(args$validate_database) <- globalenv()
+      if (!is.null(.run_app)) {
+        args$run_app <- .run_app
+      }
+      log <- tempfile("cerebro-app-", fileext = ".log")
+      process <- callr::r_bg(
+        .child,
+        args = args,
+        supervise = TRUE,
+        stdout = log,
+        stderr = "2>&1"
+      )
+      app <- list(
+        process = process,
+        app_dir = path,
+        identity = builder_app_identity(path),
+        host = run_options$host,
+        port = port,
+        configured_port = run_options$port,
+        log = log
+      )
+      assign(path, app, envir = .builder_opened_apps)
     }
-    args <- list(
-      path = path,
-      env_file = env_file,
-      env_name = "CEREBRO_AUTH_PASSPHRASE",
-      validate_database = .validate_database
-    )
-    environment(args$validate_database) <- globalenv()
-    if (!is.null(.run_app)) {
-      args$run_app <- .run_app
-    }
-    process <- callr::r_bg(
-      .child,
-      args = args,
-      supervise = FALSE
-    )
     if (is.function(.on_open)) {
-      .on_open(process)
+      .on_open(app)
     }
     TRUE
   }
@@ -1709,6 +1867,15 @@ builder_build_status_ui <- function(model) {
             "Copy Report",
             class = "btn btn-quiet",
             `data-report` = model$report_path
+          )
+        },
+        if (!is.null(model$app_dir)) {
+          ## builder.js shows the address once Open App has started the App.
+          p(
+            id = "builder-open-app-url",
+            class = "hint builder-open-app-url",
+            role = "status",
+            hidden = NA
           )
         }
       )

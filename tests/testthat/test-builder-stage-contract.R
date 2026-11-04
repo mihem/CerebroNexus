@@ -584,7 +584,7 @@ test_that("Open App uses its default r_bg launcher without parent helpers", {
       Sys.getenv("CEREBRO_AUTH_PASSPHRASE", unset = NA_character_)
     },
     .on_open = function(value) {
-      process <<- value
+      process <<- value$process
     }
   ))
   expect_s3_class(process, "r_process")
@@ -595,6 +595,103 @@ test_that("Open App uses its default r_bg launcher without parent helpers", {
     process$get_result(),
     builder_auth_read_env_file(fixture$env_file)
   )
+})
+
+test_that("Open App keeps the App running on its port until Builder stops", {
+  skip_if_not_installed("callr")
+  skip_if_not_installed("httpuv")
+  root <- withr::local_tempdir()
+  app_dir <- normalizePath(
+    file.path(root, "cerebro_app"),
+    winslash = "/",
+    mustWork = FALSE
+  )
+  dir.create(app_dir)
+  configured <- httpuv::randomPort(host = "127.0.0.1")
+  saveRDS(
+    list(
+      .bundle_run_options = list(
+        shiny_app_options = list(port = configured, host = "127.0.0.1")
+      )
+    ),
+    file.path(app_dir, "cerebro_config.rds")
+  )
+  result <- builder_result_success(
+    published = TRUE,
+    app_dir = app_dir,
+    app_verified = TRUE,
+    release = list(target = root)
+  )
+  # Stands in for shiny::runApp(): serves on the port it is given.
+  serve <- function(path, port, host, ...) {
+    httpuv::runServer(
+      host,
+      port,
+      list(call = function(request) {
+        list(status = 200L, headers = list(), body = "ok")
+      })
+    )
+  }
+  environment(serve) <- globalenv()
+  withr::defer(builder_stop_opened_apps())
+  wait_ready <- function(app) {
+    for (i in seq_len(240L)) {
+      state <- builder_opened_app_state(app)
+      if (!identical(state, "starting")) {
+        return(state)
+      }
+      Sys.sleep(0.25)
+    }
+    state
+  }
+  opened <- list()
+  remember <- function(app) {
+    opened[[length(opened) + 1L]] <<- app
+  }
+
+  expect_true(builder_open_final_app(
+    result,
+    .run_app = serve,
+    .on_open = remember
+  ))
+  first <- opened[[1L]]
+  expect_identical(first$port, as.integer(configured))
+  # No reference outside the registry: a collected handle would kill the App.
+  opened <- list()
+  invisible(gc(full = TRUE))
+  expect_identical(wait_ready(first), "ready")
+  expect_identical(
+    builder_opened_app_message(first, "ready")[c("ok", "port", "host")],
+    list(ok = TRUE, port = as.integer(configured), host = "127.0.0.1")
+  )
+
+  # A second click reuses the running App.
+  expect_true(builder_open_final_app(
+    result,
+    .run_app = serve,
+    .on_open = remember
+  ))
+  expect_identical(opened[[1L]]$process$get_pid(), first$process$get_pid())
+
+  # Builder stopping stops the App.
+  builder_stop_opened_apps()
+  first$process$wait(10000)
+  expect_false(first$process$is_alive())
+  expect_identical(builder_opened_app_state(first), "stopped")
+
+  # A taken port falls back to a free one.
+  blocker <- httpuv::startServer("127.0.0.1", configured, list())
+  withr::defer(httpuv::stopServer(blocker))
+  opened <- list()
+  expect_true(builder_open_final_app(
+    result,
+    .run_app = serve,
+    .on_open = remember
+  ))
+  second <- opened[[1L]]
+  expect_false(identical(second$port, as.integer(configured)))
+  expect_identical(second$configured_port, as.integer(configured))
+  expect_identical(wait_ready(second), "ready")
 })
 
 test_that("Apply to all targets loaded unchecked datasets", {

@@ -104,7 +104,11 @@ test_that("the App registers its stop callbacks when it starts", {
   ))
   expect_identical(
     registered,
-    list(app_env$builder_async_stop, app_env$builder_app_restore_process_state)
+    list(
+      app_env$builder_async_stop,
+      app_env$builder_app_restore_process_state,
+      app_env$builder_stop_opened_apps
+    )
   )
   expect_true(app_env$builder_app_restore_process_state())
 })

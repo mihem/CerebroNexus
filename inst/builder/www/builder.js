@@ -442,6 +442,72 @@
     announce(legacyCopyText(value));
   }
 
+  // Open App: the tab is opened on the click itself (a tab opened later,
+  // when the App is ready, would be blocked as a pop-up), then pointed at the
+  // App once Builder reports its port.
+  var pendingAppWindow = null;
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("#open_app");
+    if (!button || button.disabled) return;
+    if (pendingAppWindow && !pendingAppWindow.closed) pendingAppWindow.close();
+    pendingAppWindow = null;
+    try {
+      pendingAppWindow = window.open("", "_blank");
+      if (pendingAppWindow) {
+        pendingAppWindow.opener = null;
+        pendingAppWindow.document.title = "Starting the App";
+        pendingAppWindow.document.body.textContent = "Starting the App…";
+      }
+    } catch (error) {
+      pendingAppWindow = null;
+    }
+  }, true);
+
+  function isLoopbackHost(host) {
+    return host === "localhost" || host === "::1" || host === "[::1]" ||
+      /^127\./.test(host);
+  }
+
+  function handleOpenApp(message) {
+    var tab = pendingAppWindow;
+    pendingAppWindow = null;
+    var port = message && Number(message.port);
+    if (!message || message.state === "stopped" || !(port > 0)) {
+      if (tab && !tab.closed) tab.close();
+      return;
+    }
+    var host = typeof message.host === "string" && message.host
+      ? message.host : window.location.hostname;
+    if (host.indexOf(":") !== -1 && host.charAt(0) !== "[") host = "[" + host + "]";
+    var url = "http://" + host + ":" + port + "/";
+    if (tab && !tab.closed) {
+      tab.location.href = url;
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+    var note = document.getElementById("builder-open-app-url");
+    if (!note) return;
+    note.textContent = message.state === "ready" ? "App running at " : "App starting at ";
+    var link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = url;
+    note.appendChild(link);
+    if (message.configured_port && Number(message.configured_port) !== port) {
+      note.appendChild(document.createTextNode(
+        " (port " + message.configured_port + " was in use)."
+      ));
+    }
+    if (isLoopbackHost(host) && !isLoopbackHost(window.location.hostname)) {
+      note.appendChild(document.createTextNode(
+        " The App listens only on the Builder machine; set Host to 0.0.0.0 " +
+        "in Connection settings and rebuild to reach it from this browser."
+      ));
+    }
+    note.hidden = false;
+  }
+
   function matchingDynamicElements(roots, selector) {
     var matches = new Set();
     (roots && roots.length ? roots : [document]).forEach(function (root) {
@@ -5881,6 +5947,7 @@
     window.__builderHandleAuthStatus = handleAuthStatus;
     addMessageHandlers({
       "builder_copy_text": copyTextToClipboard,
+      "builder_open_app": handleOpenApp,
       "builder_build_dialog": showBuildDialog,
       "builder_build_progress": handleBuildProgress,
       "builder_dataset_rail_patch": reconcileDatasetRail,

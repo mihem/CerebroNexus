@@ -231,6 +231,8 @@ builder_app_start <- function(
   ## and keeps this whole environment alive.
   shiny::onStop(builder_async_stop)
   shiny::onStop(builder_app_restore_process_state)
+  ## Apps started by Open App live as long as the Builder.
+  shiny::onStop(builder_stop_opened_apps)
   ## Local Seurat objects and microscopy images can be arbitrarily large.
   ## Respect an explicit launcher-supplied cap; otherwise impose none.
   if (is.null(getOption("shiny.maxRequestSize"))) {
