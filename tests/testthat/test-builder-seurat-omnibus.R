@@ -9,6 +9,7 @@ builder_omnibus_env$builder_source_utf8(
 )
 
 test_that("Spatial alignment demo restores the Visium H&E and transform", {
+  skip_if_not_installed("jpeg")
   builder_omnibus_env$builder_source_utf8(
     builder_profile_inst_path("builder", "extras.R"),
     envir = builder_omnibus_env
