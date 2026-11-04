@@ -71,6 +71,44 @@ test_that("Builder restores process settings after its App lifecycle", {
   )))
 })
 
+test_that("sourcing app.R leaves nothing behind that keeps the Builder alive", {
+  freed <- new.env()
+  local({
+    app_env <- new.env(parent = globalenv())
+    withr::local_dir(builder_profile_inst_path("builder"))
+    sys.source("app.R", envir = app_env)
+    reg.finalizer(app_env, function(env) freed$done <- TRUE)
+  })
+  invisible(gc(full = TRUE))
+  expect_true(isTRUE(freed$done))
+})
+
+test_that("the App registers its stop callbacks when it starts", {
+  withr::local_options(list(shiny.maxRequestSize = NULL))
+  withr::local_envvar(CEREBRO_PACKAGE_SOURCE = NA_character_)
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  registered <- list()
+  local_mocked_bindings(
+    onStop = function(fun, session = NULL) {
+      registered[[length(registered) + 1L]] <<- fun
+      function() invisible(NULL)
+    },
+    .package = "shiny"
+  )
+
+  expect_true(app_env$builder_app_start(
+    list(available = TRUE, reason = NULL),
+    .prewarm = function() FALSE
+  ))
+  expect_identical(
+    registered,
+    list(app_env$builder_async_stop, app_env$builder_app_restore_process_state)
+  )
+  expect_true(app_env$builder_app_restore_process_state())
+})
+
 test_that("Builder prewarms and hands the first session an isolated worker", {
   app_env <- new.env(parent = globalenv())
   withr::local_dir(builder_profile_inst_path("builder"))

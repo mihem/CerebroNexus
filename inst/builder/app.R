@@ -226,6 +226,10 @@ builder_app_start <- function(
   .builder_app_process_state$shiny_was_attached <-
     .builder_app_shiny_was_attached
   .builder_app_process_state$active <- TRUE
+  ## Registered when the App starts, not when this file is sourced: a
+  ## callback registered outside a running App stays in Shiny's global list
+  ## and keeps this whole environment alive.
+  shiny::onStop(builder_async_stop)
   shiny::onStop(builder_app_restore_process_state)
   ## Local Seurat objects and microscopy images can be arbitrarily large.
   ## Respect an explicit launcher-supplied cap; otherwise impose none.

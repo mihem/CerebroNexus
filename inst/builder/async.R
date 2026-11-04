@@ -507,5 +507,3 @@ builder_async_stop <- function() {
   )
   invisible(!length(lingering))
 }
-
-shiny::onStop(builder_async_stop)
