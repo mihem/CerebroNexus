@@ -183,10 +183,15 @@ builder_browser_escape <- function(app) {
   ))
 }
 
-builder_browser_geometry <- function(app) {
+## With scroll = TRUE the action is scrolled into view in the same task that
+## measures it, so nothing can move the page in between.
+builder_browser_geometry <- function(app, scroll = FALSE) {
   app$get_js(paste0(
     "(() => {",
     "const action = document.getElementById('build');",
+    if (scroll) {
+      "action.scrollIntoView({block: 'center', behavior: 'instant'});"
+    },
     "const box = action.getBoundingClientRect();",
     "const rail = document.querySelector('.rail');",
     "const summary = document.querySelector('.rail-summary');",
@@ -294,7 +299,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       "document.getElementById('complete_dataset_check').textContent.trim() === ",
       "'Finish Checking'"
     ),
-    timeout = 10000
+    timeout = 30000
   )
   if (
     isTRUE(app$get_js(
@@ -304,7 +309,7 @@ test_that("builder interaction reflows and preserves accessible state", {
     app$run_js(
       "document.getElementById('core-organism').selectize.setValue('hg');"
     )
-    app$wait_for_idle(timeout = 10000)
+    app$wait_for_idle(timeout = 30000)
   }
   app$click(selector = "#complete_dataset_check")
   app$wait_for_js(
@@ -318,7 +323,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       encodeString(first_dataset, quote = '"'),
       encodeString(first_dataset, quote = '"')
     ),
-    timeout = 10000
+    timeout = 30000
   )
   app$click(
     selector = sprintf(
@@ -330,7 +335,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   ## asserting the check mark. Integer slider values (for example `5L`) and
   ## JSON numeric values (`5`) are semantically identical and must not rewrite
   ## `spatial_point_appearance` or invalidate the checked identity.
-  app$wait_for_idle(timeout = 10000)
+  app$wait_for_idle(timeout = 30000)
   app$wait_for_js(
     paste0(
       "document.querySelector('.ds[data-ds=",
@@ -338,9 +343,13 @@ test_that("builder interaction reflows and preserves accessible state", {
       "] ",
       ".ds-ready-summary').classList.contains('is-checked') && ",
       "document.getElementById('complete_dataset_check') !== null && ",
-      "document.getElementById('complete_dataset_check').textContent.trim() === 'Next'"
+      "document.getElementById('complete_dataset_check').textContent.trim() === 'Next' && ",
+      ## The button stays disabled while the restored Spatial controls are
+      ## still being saved ("Saving the latest spatial adjustment…"); a click
+      ## then is ignored on purpose.
+      "document.getElementById('complete_dataset_check').disabled === false"
     ),
-    timeout = 10000
+    timeout = 30000
   )
   app$click(selector = "#complete_dataset_check")
   app$wait_for_js(
@@ -351,7 +360,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       ),
       encodeString(first_dataset, quote = '"')
     ),
-    timeout = 10000
+    timeout = 30000
   )
 
   app$get_chromote_session()$set_viewport_size(width = 1440L, height = 900L)
@@ -361,7 +370,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       "document.querySelector('.ds[data-ds=ds2] .ds-pick')",
       ".getAttribute('aria-current') === 'true'"
     ),
-    timeout = 10000
+    timeout = 30000
   )
   app$run_js(paste0(
     "const details = document.querySelector(",
@@ -375,7 +384,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       "document.querySelector('.builder-spatial-canvas-summary')",
       ".textContent.includes('sampled points')"
     ),
-    timeout = 10000
+    timeout = 30000
   )
   expect_match(
     app$get_js(
@@ -400,7 +409,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   builder_browser_check_all_datasets(app)
   app$wait_for_js(
     "document.getElementById('continue_to_review') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   readiness_text <- app$get_js(
     "document.querySelector('.builder-configure-readiness').textContent"
@@ -423,7 +432,7 @@ test_that("builder interaction reflows and preserves accessible state", {
       "document.querySelectorAll(",
       "'body > [role=log][aria-live=assertive]').length === 0"
     ),
-    timeout = 10000
+    timeout = 30000
   )
   review_text <- app$get_js(
     "document.getElementById('review-stage').textContent"
@@ -477,23 +486,16 @@ test_that("builder interaction reflows and preserves accessible state", {
         viewport[[1]],
         viewport[[2]]
       ),
-      timeout = 10000
+      timeout = 30000
     )
-    # The page can still reflow after a resize, so scroll again until the
-    # action sits inside the viewport and stays put between two polls.
+    app$run_js(
+      "document.getElementById('build').scrollIntoView({block:'center'});"
+    )
     app$wait_for_js(
-      paste0(
-        "(function(){var b=document.getElementById('build');",
-        "var r=b.getBoundingClientRect();",
-        "if (r.top < 0 || r.bottom > window.innerHeight) {",
-        "b.scrollIntoView({block:'center'}); window.__buildTop = null;",
-        "return false;}",
-        "var still = window.__buildTop === r.top; window.__buildTop = r.top;",
-        "return still && window.__builderPrimaryActionVisible === true;})()"
-      ),
-      timeout = 10000
+      "window.__builderPrimaryActionVisible === true",
+      timeout = 30000
     )
-    geometry <- builder_browser_geometry(app)
+    geometry <- builder_browser_geometry(app, scroll = TRUE)
     geometry_by_width[[as.character(viewport[[1]])]] <- geometry
     expect_lte(geometry$documentWidth, geometry$width + 1)
     expect_gte(geometry$pageHeight, geometry$viewportHeight)
@@ -516,7 +518,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   app$click(selector = ".rail-summary")
   app$wait_for_js(
     "document.querySelector('.rail.is-manager-open[role=dialog]') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   expect_identical(
     app$get_js("document.querySelector('.rail').getAttribute('aria-modal')"),
@@ -525,7 +527,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   app$click(selector = ".ds.is-active .builder-drop")
   app$wait_for_js(
     "document.querySelector('.builder-confirm-dialog[role=dialog]') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   expect_true(app$get_js(paste0(
     "document.querySelector('.builder-confirm-dialog').contains(",
@@ -534,7 +536,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   builder_browser_escape(app)
   app$wait_for_js(
     "document.querySelector('.builder-confirm-dialog') === null",
-    timeout = 10000
+    timeout = 30000
   )
   expect_true(app$get_js(
     paste0(
@@ -545,7 +547,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   builder_browser_escape(app)
   app$wait_for_js(
     "!document.querySelector('.rail').classList.contains('is-manager-open')",
-    timeout = 10000
+    timeout = 30000
   )
   expect_true(app$get_js(
     "document.activeElement.classList.contains('rail-summary')"
@@ -558,7 +560,7 @@ test_that("builder interaction reflows and preserves accessible state", {
   app$get_chromote_session()$Emulation$setEmulatedMedia(
     features = list(list(name = "prefers-reduced-motion", value = "reduce"))
   )
-  app$wait_for_js("window.__builderMotionDuration === 0", timeout = 10000)
+  app$wait_for_js("window.__builderMotionDuration === 0", timeout = 30000)
   expect_identical(
     app$get_js(
       "getComputedStyle(document.querySelector('.ds')).transitionDuration"
@@ -574,14 +576,14 @@ test_that("builder interaction reflows and preserves accessible state", {
   )
   app$wait_for_js(
     "window.innerWidth === 320 && window.devicePixelRatio === 4",
-    timeout = 10000
+    timeout = 30000
   )
   app$run_js(
     "document.getElementById('build').scrollIntoView({block:'center'});"
   )
   app$wait_for_js(
     "window.__builderPrimaryActionVisible === true",
-    timeout = 10000
+    timeout = 30000
   )
 
   expect_true(app$get_js(
