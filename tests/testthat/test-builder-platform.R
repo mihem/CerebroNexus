@@ -328,6 +328,8 @@ test_that("Linux Zenity and KDialog specs cover every picker", {
   )))
   expect_true("--file-filter=Builder project | *.json" %in% zenity[[3L]]$args)
   expect_true("--multiple" %in% zenity[[4L]]$args)
+  ## Dataset files without an extension stay selectable.
+  expect_true("--file-filter=All files | *" %in% zenity[[4L]]$args)
   expect_true(any(startsWith(zenity[[4L]]$args, "--separator=")))
   expect_true(all(vapply(
     kdialog[1:2],

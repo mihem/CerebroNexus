@@ -376,7 +376,12 @@ builder_native_picker_contract <- function(
           "|All files (*.*)|*.*"
         ),
         macos_types = extensions,
-        zenity_filter = paste("Dataset files |", extension_words),
+        ## "All files" keeps a file without an extension (a `targets`
+        ## object) selectable; its content names the format.
+        zenity_filter = c(
+          paste("Dataset files |", extension_words),
+          "All files | *"
+        ),
         kdialog_filter = paste0("Dataset files (", extension_words, ")"),
         unavailable = "One or more selected dataset files are not available."
       )
@@ -1390,25 +1395,185 @@ builder_deprecated_format_note_ui <- function(
   )
 }
 
+## `content`: when the name has no extension we read, the file to recognise by
+## its first bytes instead (see builder_sniff_format()).
 builder_path_format_capability <- function(
   path,
-  capabilities = builder_cached_format_capabilities()
+  capabilities = builder_cached_format_capabilities(),
+  content = NULL
 ) {
   extension <- tolower(tools::file_ext(path %||% ""))
   matches <- Filter(
     function(format) extension %in% tolower(format$extensions %||% character()),
     capabilities
   )
+  if (!length(matches) && !is.null(content)) {
+    sniffed <- builder_sniff_format(content)
+    matches <- Filter(
+      function(format) identical(format$id, sniffed),
+      capabilities
+    )
+  }
   if (length(matches)) matches[[1L]] else NULL
 }
 
-#' Which formats can be read right now.
+## Recognise a dataset file by its first bytes, for files whose name carries no
+## extension we read (a `targets` store object, a renamed download). Reads at
+## most a few KB, never the whole file.
+##
+## Returns a builder_formats id, "hdf5" for an HDF5 file that is neither
+## clearly AnnData nor MuData, or NULL.
+builder_sniff_format <- function(path) {
+  if (
+    !is.character(path) ||
+      length(path) != 1L ||
+      is.na(path) ||
+      !nzchar(path) ||
+      !file.exists(path) ||
+      dir.exists(path)
+  ) {
+    return(NULL)
+  }
+  head <- tryCatch(
+    readBin(path, "raw", n = 2056L),
+    error = function(error) raw()
+  )
+  starts <- function(bytes, at = 0L) {
+    bytes <- as.raw(bytes)
+    length(head) >= at + length(bytes) &&
+      identical(head[at + seq_along(bytes)], bytes)
+  }
+  if (starts(c(0x50, 0x4b, 0x03, 0x04)) || starts(c(0x50, 0x4b, 0x05, 0x06))) {
+    return("spatialdata")
+  }
+  if (starts(c(0x0b, 0x0e, 0x0a, 0xc1))) {
+    return("qs2")
+  }
+  if (starts(c(0x0b, 0x0e, 0x0a, 0x0c))) {
+    return("qs")
+  }
+  ## The HDF5 signature sits at 0 or, after a user block, at 512, 1024, ...
+  hdf5 <- c(0x89, 0x48, 0x44, 0x46, 0x0d, 0x0a, 0x1a, 0x0a)
+  if (
+    any(vapply(c(0L, 512L, 1024L, 2048L), starts, logical(1), bytes = hdf5))
+  ) {
+    return(.builder_sniff_hdf5(path, head))
+  }
+  if (.builder_sniff_rds(path, head)) {
+    return("rds")
+  }
+  NULL
+}
+
+## readRDS() reads gzip, bzip2, xz, zstd and uncompressed serializations;
+## gzfile() decompresses all of them, so the first decompressed bytes must be
+## an R serialization header: "X\n", "A\n" or "B\n" and format version 2 or 3.
+.builder_sniff_rds <- function(path, head) {
+  compressed <- list(
+    c(0x1f, 0x8b),
+    c(0x42, 0x5a, 0x68),
+    c(0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00),
+    c(0x28, 0xb5, 0x2f, 0xfd)
+  )
+  plain <- list(c(0x58, 0x0a), c(0x41, 0x0a), c(0x42, 0x0a))
+  starts <- function(bytes) {
+    bytes <- as.raw(bytes)
+    length(head) >= length(bytes) &&
+      identical(head[seq_along(bytes)], bytes)
+  }
+  if (!any(vapply(c(compressed, plain), starts, logical(1)))) {
+    return(FALSE)
+  }
+  connection <- tryCatch(gzfile(path, "rb"), error = function(error) NULL)
+  if (is.null(connection)) {
+    return(FALSE)
+  }
+  header <- tryCatch(
+    suppressWarnings(readBin(connection, "raw", n = 6L)),
+    error = function(error) raw()
+  )
+  close(connection)
+  if (length(header) < 4L || header[[2L]] != as.raw(0x0a)) {
+    return(FALSE)
+  }
+  version <- switch(
+    rawToChar(header[1L]),
+    X = if (length(header) >= 6L) as.integer(header[[6L]]) else NA_integer_,
+    B = as.integer(header[[3L]]),
+    A = suppressWarnings(as.integer(rawToChar(header[3L]))),
+    NA_integer_
+  )
+  isTRUE(version %in% c(2L, 3L))
+}
+
+## MuData writes "MuData (format-version=...)" into the HDF5 user block and
+## keeps its modalities under a top-level `mod` group; AnnData has `X`/`obs`.
+## Listing the top-level groups reads only the file's root metadata.
+.builder_sniff_hdf5 <- function(path, head) {
+  if (identical(head[seq_len(min(6L, length(head)))], charToRaw("MuData"))) {
+    return("h5mu")
+  }
+  if (!requireNamespace("rhdf5", quietly = TRUE)) {
+    return("hdf5")
+  }
+  top <- tryCatch(
+    as.character(
+      rhdf5::h5ls(path, recursive = FALSE, datasetinfo = FALSE)$name
+    ),
+    error = function(error) character()
+  )
+  if ("mod" %in% top) {
+    return("h5mu")
+  }
+  if (all(c("obs", "var") %in% top)) {
+    return("h5ad")
+  }
+  "hdf5"
+}
+
+## Why a file with no readable extension could not be recognised either.
+builder_unrecognised_format_message <- function(name, path = NULL) {
+  name <- basename(as.character(name %||% "This file")[[1L]])
+  if (identical(builder_sniff_format(path), "hdf5")) {
+    return(paste0(
+      name,
+      " is an HDF5 file, but its content does not show whether it holds ",
+      "AnnData or MuData. Save it with the .h5ad or .h5mu extension."
+    ))
+  }
+  formats <- Filter(
+    function(format) !isTRUE(format$deprecated),
+    builder_formats
+  )
+  labels <- vapply(
+    formats,
+    function(format) gsub("[()]", "", format$label),
+    character(1)
+  )
+  extensions <- paste0(
+    ".",
+    unique(unlist(lapply(formats, `[[`, "extensions")))
+  )
+  extension <- tools::file_ext(name)
+  paste0(
+    name,
+    if (nzchar(extension)) {
+      paste0(" has an unsupported .", extension, " extension")
+    } else {
+      " has no file extension"
+    },
+    " and its content is not a supported format (",
+    paste(labels, collapse = ", "),
+    "). Save it with one of these extensions: ",
+    paste(extensions, collapse = ", "),
+    "."
+  )
+}
+
+#' Pick the format for a path: by extension, else by content.
 #'
-#' @return A data.frame with one row per format: id, label, extensions,
-#'   package, available.
-#' Pick the format for a path, by extension.
-#'
-#' @return The format entry, or `NULL` when the extension is not one we claim.
+#' @return The format entry, or `NULL` when neither the extension nor the
+#'   file's first bytes are a format we read.
 builder_match_format <- function(path) {
   ext <- tolower(tools::file_ext(path))
   for (f in builder_formats) {
@@ -1416,10 +1581,17 @@ builder_match_format <- function(path) {
       return(f)
     }
   }
+  sniffed <- builder_sniff_format(path)
+  for (f in builder_formats) {
+    if (identical(f$id, sniffed)) {
+      return(f)
+    }
+  }
   NULL
 }
 
-#' Read a serialised object, choosing the reader by file extension.
+#' Read a serialised object, choosing the reader by file extension or, when
+#' the name has none we read, by the file's content.
 #'
 #' @param path Path to the file.
 #'
@@ -1435,27 +1607,15 @@ builder_read_object <- function(path) {
 
   fmt <- builder_match_format(path)
   if (is.null(fmt)) {
-    known <- paste(
-      unique(unlist(lapply(builder_formats, `[[`, "extensions"))),
-      collapse = ", "
-    )
-    return(list(
-      error = paste0(
-        "Unsupported .",
-        tools::file_ext(path),
-        " extension. Supported formats: ",
-        known,
-        "."
-      )
-    ))
+    return(list(error = builder_unrecognised_format_message(path, path)))
   }
 
   if (!is.null(fmt$package) && !requireNamespace(fmt$package, quietly = TRUE)) {
     return(list(
       error = paste0(
-        "Reading .",
-        tools::file_ext(path),
-        " requires the ",
+        "Reading ",
+        fmt$label,
+        " files requires the ",
         fmt$package,
         " package. Run install.packages(\"",
         fmt$package,

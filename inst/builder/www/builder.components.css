@@ -2843,6 +2843,21 @@ input.is-invalid {
   align-self: flex-end;
   max-width: 100%;
 }
+/* A refused browser import keeps its reason readable in the narrow rail: the
+   reason takes the row's width and Retry / Remove wrap below it. */
+.ds--client-upload:is([data-load-state="error"], [data-load-state="rejected"]) {
+  flex-wrap: wrap;
+}
+.ds--client-upload:is([data-load-state="error"], [data-load-state="rejected"]) .ds-body {
+  flex: 1 1 calc(100% - 4rem);
+}
+.ds--client-upload:is([data-load-state="error"], [data-load-state="rejected"]) .builder-import-status {
+  color: var(--c-error);
+  overflow-wrap: anywhere;
+}
+.ds--client-upload:is([data-load-state="error"], [data-load-state="rejected"]) > button:first-of-type {
+  margin-left: auto;
+}
 .builder-cancel-import,
 .builder-cancel-client-import {
   display: inline-flex;

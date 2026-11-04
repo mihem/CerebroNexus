@@ -801,3 +801,145 @@ test_that("builder explains a mocked old privacy contract exactly", {
     TRUE
   )
 })
+
+## A file whose name has no extension (a `targets` object) is recognised by its
+## content; one that is not a dataset ends visibly with the reason, by browser
+## drop and by the desktop file dialog alike.
+test_that("extensionless datasets load by content and unknown files say why", {
+  skip_if_not(identical(Sys.getenv("CEREBRO_RUN_BROWSER_TESTS"), "true"))
+  skip_on_os("windows")
+  app_dir <- builder_browser_current_contract_app(
+    builder_browser_dir,
+    .local_envir = environment()
+  )
+  local_app_support(app_dir)
+  files <- withr::local_tempdir()
+  fixture <- file.path(
+    builder_browser_dir,
+    "fixtures",
+    "complete_viewer",
+    "complete_viewer_data.rds"
+  )
+  dropped_rds <- file.path(files, "sc_tcr")
+  picked_rds <- file.path(files, "sc_tcr_picked")
+  stopifnot(file.copy(fixture, dropped_rds), file.copy(fixture, picked_rds))
+  dropped_garbage <- file.path(files, "notes")
+  picked_garbage <- file.path(files, "notes_picked")
+  writeBin(as.raw(rep(0:255, 8L)), dropped_garbage)
+  file.copy(dropped_garbage, picked_garbage)
+
+  ## The desktop dialog answers with the second pair of files.
+  fake_bin <- withr::local_tempdir()
+  picker_script <- c(
+    "#!/bin/sh",
+    sprintf(
+      "printf '%%s\n' %s %s",
+      shQuote(normalizePath(picked_rds)),
+      shQuote(normalizePath(picked_garbage))
+    )
+  )
+  pickers <- file.path(fake_bin, c("osascript", "zenity", "kdialog"))
+  for (picker in pickers) {
+    writeLines(picker_script, picker)
+  }
+  Sys.chmod(pickers, mode = "0755")
+  withr::local_envvar(
+    PATH = paste(fake_bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+    WSL_DISTRO_NAME = NA_character_,
+    WSL_INTEROP = NA_character_
+  )
+
+  app <- AppDriver$new(
+    app_dir,
+    name = "builder_extensionless_import",
+    width = 1280,
+    height = 900,
+    load_timeout = 60000
+  )
+  on.exit(app$stop(), add = TRUE)
+  app$wait_for_idle(timeout = 30000)
+  builder_browser_wait_for_example_ready(app)
+
+  ## Browser drop: the files travel through the client import queue.
+  app$run_js(paste0(
+    "(() => { const input = document.createElement('input');",
+    "input.type = 'file'; input.multiple = true; input.id = 'test_drop_files';",
+    "input.hidden = true; document.body.appendChild(input); })()"
+  ))
+  chrome <- app$get_chromote_session()
+  root <- chrome$DOM$getDocument()$root$nodeId
+  chrome$DOM$setFileInputFiles(
+    files = list(normalizePath(dropped_rds), normalizePath(dropped_garbage)),
+    nodeId = chrome$DOM$querySelector(root, "#test_drop_files")$nodeId
+  )
+  app$run_js(paste0(
+    "(() => { const transfer = new DataTransfer();",
+    "for (const file of document.getElementById('test_drop_files').files) ",
+    "transfer.items.add(file);",
+    "document.body.dispatchEvent(new DragEvent('drop', ",
+    "{dataTransfer: transfer, bubbles: true, cancelable: true})); })()"
+  ))
+  rejected_row <- paste0(
+    "Array.from(document.querySelectorAll('.ds--client-upload'))",
+    ".find(row => row.querySelector('.nm').textContent === 'notes')"
+  )
+  builder_with_browser_diagnostics(app, "browser-extensionless-drop", {
+    app$wait_for_js(
+      paste0(
+        "(() => { const row = ",
+        rejected_row,
+        ";",
+        "return Boolean(row) && row.dataset.loadState === 'rejected' && ",
+        "Array.from(document.querySelectorAll('.ds--ready[data-ds] .nm'))",
+        ".some(name => name.textContent.trim() === 'sc_tcr'); })()"
+      ),
+      timeout = 90000
+    )
+  })
+  expect_identical(
+    app$get_js(paste0(
+      rejected_row,
+      ".querySelector('.builder-import-status').textContent"
+    )),
+    paste0(
+      "notes has no file extension and its content is not a supported ",
+      "format (RDS, qs2, h5ad, h5mu, SpatialData zip). Save it with one of ",
+      "these extensions: .rds, .qs2, .h5ad, .h5mu, .zip."
+    )
+  )
+  expect_identical(
+    app$get_js(paste0(
+      "(() => { const row = ",
+      rejected_row,
+      ";",
+      "return [row.querySelector('.builder-cancel-client-import') === null,",
+      "row.querySelector('.builder-remove-client-failure') !== null]; })()"
+    )),
+    list(TRUE, TRUE)
+  )
+  expect_false(app$get_js(
+    "document.body.textContent.includes('Waiting for the server')"
+  ))
+
+  app$run_js(paste0(
+    rejected_row,
+    ".querySelector('.builder-remove-client-failure').click()"
+  ))
+
+  ## Desktop dialog: the server reads the chosen paths itself.
+  builder_browser_dismiss_project_offer(app)
+  builder_browser_click_dynamic(app, ".btn.builder-add-datasets")
+  builder_with_browser_diagnostics(app, "browser-extensionless-picker", {
+    app$wait_for_js(
+      paste0(
+        "Array.from(document.querySelectorAll('.ds--ready[data-ds] .nm'))",
+        ".some(name => name.textContent.trim() === 'sc_tcr_picked') && ",
+        "Array.from(document.querySelectorAll('.builder-notice-text'))",
+        ".some(text => text.textContent.startsWith(",
+        "'notes_picked has no file extension'))"
+      ),
+      timeout = 90000
+    )
+  })
+  builder_expect_clean_browser_logs(app)
+})

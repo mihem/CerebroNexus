@@ -2816,6 +2816,9 @@
     clientImportQueue.shift();
     activeClientImport = null;
     if (["error", "rejected"].includes(message.outcome) && !message.server_id) {
+      // The row is drawn from `state`; left at "awaiting_accept" it would keep
+      // saying "Waiting for the server…" with a Cancel button.
+      releasedEntry.state = message.outcome;
       clientImportFailures.push(releasedEntry);
     }
     renderClientImportQueue();

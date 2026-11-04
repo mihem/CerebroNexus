@@ -435,6 +435,29 @@ test_that("a SpatialData store as a .zip is a Builder source and builds one sect
   expect_equal(nrow(built$crb$getSpatialData("sec1", FALSE)$coordinates), 30)
 })
 
+test_that("a SpatialData zip and an h5mu file without an extension are read by content", {
+  skip_if_not_installed("arrow")
+  zip_file <- zip_store(
+    normalizePath(fixture("small_sd_visium.zarr")),
+    file.path(withr::local_tempdir(), "visium.zarr.zip")
+  )
+  bare_zip <- file.path(withr::local_tempdir(), "visium_store")
+  file.copy(zip_file, bare_zip)
+  expect_identical(builder_match_format(bare_zip)$id, "spatialdata")
+  inspected <- quiet(builder_adapter_inspect(
+    builder_seurat_file_adapter(bare_zip)
+  ))
+  expect_equal(inspected$profile$identity$cells$count, 54)
+
+  bare_h5mu <- file.path(withr::local_tempdir(), "cite_seq")
+  file.copy(fixture("small_mudata.h5mu"), bare_h5mu)
+  expect_identical(builder_match_format(bare_h5mu)$id, "h5mu")
+  from_bare <- quiet(builder_read_object(bare_h5mu))
+  from_named <- quiet(builder_read_object(fixture("small_mudata.h5mu")))
+  expect_null(from_bare$error)
+  expect_identical(rownames(from_bare$object), rownames(from_named$object))
+})
+
 test_that("a zip that holds no SpatialData store is refused with a clear message", {
   skip_if_not_installed("zip")
   skip_if_not_installed("arrow")

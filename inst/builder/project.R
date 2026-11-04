@@ -1204,11 +1204,23 @@ builder_project_snapshot_source_md5 <- function(entry) {
   )
 }
 
-builder_project_source_storage_name <- function(filename, fallback = "rds") {
+## `content`: the source file, whose first bytes name the format when the
+## filename has no extension we read; the stored copy then gets the extension
+## its reader is chosen by.
+builder_project_source_storage_name <- function(
+  filename,
+  fallback = "rds",
+  content = NULL
+) {
   filename <- as.character(filename %||% "")
   filename <- if (length(filename)) filename[[1L]] else ""
   extension <- tolower(tools::file_ext(filename))
-  if (!extension %in% c("rds", "qs", "qs2", "h5ad", "h5mu", "zip")) {
+  known <- c("rds", "qs", "qs2", "h5ad", "h5mu", "zip")
+  if (!extension %in% known && !is.null(content)) {
+    format <- builder_match_format(content)
+    extension <- if (is.list(format)) format$extensions[[1L]] else ""
+  }
+  if (!extension %in% known) {
     extension <- fallback
   }
   paste0("source.", extension)
@@ -1230,7 +1242,10 @@ builder_project_source_job <- function(entry, root) {
     filename <- paste0(entry$id, ".rds")
   }
   filename <- basename(filename)
-  storage_name <- builder_project_source_storage_name(filename)
+  storage_name <- builder_project_source_storage_name(
+    filename,
+    content = if (.builder_project_text(source)) source else NULL
+  )
   source_md5 <- builder_project_snapshot_source_md5(entry)
   relative <- if (.builder_project_text(source_md5)) {
     paste("sources", entry$id, "blobs", source_md5, storage_name, sep = "/")
@@ -2414,7 +2429,10 @@ builder_project_session_source_path <- function(
   if (!nzchar(display_name) || display_name %in% c(".", "..")) {
     display_name <- paste0(dataset_id, ".rds")
   }
-  retained_name <- builder_project_source_storage_name(display_name)
+  retained_name <- builder_project_source_storage_name(
+    display_name,
+    content = source
+  )
   file.path(
     normalizePath(root, winslash = "/", mustWork = TRUE),
     "session-sources",

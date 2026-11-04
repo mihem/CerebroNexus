@@ -44,7 +44,10 @@ start_load <- function(
     NULL
   }
   source_format <- if (builder_has_text(source_name %||% "")) {
-    builder_path_format_capability(source_name)
+    builder_path_format_capability(
+      source_name,
+      content = if (identical(kind, "file")) arg else NULL
+    )
   } else {
     NULL
   }
@@ -406,16 +409,13 @@ process_client_import_upload <- function(uploads, dispatch) {
     )
     return()
   }
-  supported_extensions <- unique(tolower(unlist(lapply(
-    builder_formats,
-    `[[`,
-    "extensions"
-  ))))
-  if (!tolower(tools::file_ext(label)) %in% supported_extensions) {
+  ## A name without an extension we read (a `targets` object, a renamed
+  ## download) is recognised by the uploaded file's first bytes.
+  if (is.null(builder_path_format_capability(label, content = path))) {
     release_client_import(
       pending_client_id,
       outcome = "rejected",
-      message = "This file format is not supported."
+      message = builder_unrecognised_format_message(label, path)
     )
     return()
   }
@@ -465,26 +465,32 @@ expire_pending_client_upload <- function(token) {
 process_native_dataset_files <- function(paths) {
   paths <- unique(as.character(paths))
   paths <- paths[!is.na(paths) & nzchar(paths)]
-  supported_extensions <- builder_dataset_extensions()
   accepted <- 0L
   for (path in paths) {
     filename <- basename(path)
-    format <- builder_path_format_capability(filename)
+    readable <- file.exists(path) && !dir.exists(path)
+    format <- builder_path_format_capability(
+      filename,
+      content = if (readable) path else NULL
+    )
     if (is.list(format) && identical(format$available, FALSE)) {
       builder_notify("error", format$unavailable_reason)
       next
     }
-    if (
-      !file.exists(path) ||
-        dir.exists(path) ||
-        !tolower(tools::file_ext(filename)) %in% supported_extensions
-    ) {
+    if (!readable) {
       builder_notify(
         "error",
         paste0(
           "The selected dataset is unavailable or unsupported: ",
           filename
         )
+      )
+      next
+    }
+    if (is.null(format)) {
+      builder_notify(
+        "error",
+        builder_unrecognised_format_message(filename, path)
       )
       next
     }
