@@ -641,7 +641,31 @@ set_import_state <- function(id, state, generation, error = NULL) {
   if (inherits(updated, "try-error")) {
     return(invisible(FALSE))
   }
+  previous <- builder_import_find(isolate(imports()), id)
   imports(updated)
+  ## Screen readers hear each new step once; percent ticks are not announced.
+  step <- builder_import_step(state)
+  entry <- builder_import_find(updated, id)
+  if (
+    !is.null(step) &&
+      identical(entry$load_state, state) &&
+      !identical(previous$load_state, state)
+  ) {
+    session$sendCustomMessage(
+      "builder_import_status",
+      list(
+        text = paste0(
+          entry$label,
+          ": step ",
+          step$index,
+          " of ",
+          step$count,
+          ", ",
+          entry$progress_label
+        )
+      )
+    )
+  }
   if (state %in% c("ready", "error", "cancelled")) {
     entry <- builder_import_find(updated, id)
     if (identical(state, "error")) {

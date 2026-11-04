@@ -2823,6 +2823,38 @@ consume_transport_retained <- function(payload) {
   )
 }
 
+## Read progress of a dataset file, measured from the worker's file offset
+## where the platform reports it (see builder_import_read_offset()). The
+## format is looked up once per path: sniffing reads the file's first bytes.
+import_read_formats <- new.env(parent = emptyenv())
+
+import_read_progress <- function(current_worker, payload) {
+  path <- if (isTRUE(payload$retain_source)) {
+    payload$retained_path
+  } else {
+    payload$path
+  }
+  if (!builder_has_text(path %||% "")) {
+    return(NULL)
+  }
+  format_id <- import_read_formats[[path]]
+  if (is.null(format_id)) {
+    format_id <- tryCatch(
+      builder_match_format(path)$id %||% "",
+      error = function(error) ""
+    )
+    assign(path, format_id, envir = import_read_formats)
+  }
+  pid <- tryCatch(
+    current_worker$process$get_pid(),
+    error = function(error) NULL
+  )
+  tryCatch(
+    builder_import_read_offset(pid, path, format_id = format_id),
+    error = function(error) NULL
+  )
+}
+
 ## -- one poller drains whatever the worker was asked to do ---------------
 observe({
   current_protocol <- protocol()
@@ -2898,6 +2930,13 @@ observe({
           progress$stage,
           progress$generation
         )
+        if (
+          is.null(progress$bytes_done) &&
+            identical(progress$stage, "reading") &&
+            identical(p$source, "file")
+        ) {
+          progress <- c(progress, import_read_progress(current_worker, p))
+        }
         imports(builder_import_set_progress_bytes(
           isolate(imports()),
           p$id,

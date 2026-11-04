@@ -35,6 +35,20 @@
   cancelled = "Load cancelled"
 )
 
+## "Step k/N" of a loading row: the position of an active state among all of
+## them. NULL for a row that is waiting, failed or done.
+builder_import_step <- function(state) {
+  index <- if (is.character(state) && length(state) == 1L) {
+    match(state, .builder_import_active_states)
+  } else {
+    NA_integer_
+  }
+  if (is.na(index)) {
+    return(NULL)
+  }
+  list(index = index, count = length(.builder_import_active_states))
+}
+
 .builder_import_abort <- function(message) {
   stop(structure(
     list(message = message, call = NULL),
@@ -343,6 +357,71 @@ builder_import_set_progress_bytes <- function(
     return(NULL)
   }
   as.integer(floor(100 * min(done, total) / total))
+}
+
+## Serializations decoded front to back, so the reader's file offset says how
+## much of the file has been read. A converted source (h5ad, h5mu, zip) is
+## read out of order and gets no percent.
+.builder_import_sequential_reads <- c("rds", "qs2", "qs")
+
+## How far process `pid` has read `path`, as list(bytes_done, bytes_total), or
+## NULL when that cannot be measured. Linux reports each open file's offset in
+## /proc/<pid>/fdinfo; macOS and Windows have no such view, so their rows show
+## the step without a percent.
+builder_import_read_offset <- function(
+  pid,
+  path,
+  format_id = NULL,
+  proc_root = "/proc"
+) {
+  pid <- suppressWarnings(as.integer(pid))
+  if (
+    length(pid) != 1L ||
+      is.na(pid) ||
+      !.builder_import_text(path) ||
+      !(is.null(format_id) ||
+        isTRUE(format_id %in% .builder_import_sequential_reads))
+  ) {
+    return(NULL)
+  }
+  fd_dir <- file.path(proc_root, pid, "fd")
+  if (!dir.exists(fd_dir)) {
+    return(NULL)
+  }
+  target <- tryCatch(
+    normalizePath(path, winslash = "/", mustWork = TRUE),
+    error = function(error) NULL
+  )
+  total <- if (is.null(target)) NA_real_ else file.size(target)
+  if (is.na(total) || !is.finite(total) || total <= 0) {
+    return(NULL)
+  }
+  descriptors <- list.files(fd_dir)
+  links <- suppressWarnings(Sys.readlink(file.path(fd_dir, descriptors)))
+  open <- descriptors[!is.na(links) & links == target]
+  offsets <- vapply(
+    open,
+    function(descriptor) {
+      info <- tryCatch(
+        readLines(
+          file.path(proc_root, pid, "fdinfo", descriptor),
+          warn = FALSE
+        ),
+        error = function(error) character()
+      )
+      position <- grep("^pos:", info, value = TRUE)
+      if (!length(position)) {
+        return(NA_real_)
+      }
+      suppressWarnings(as.numeric(sub("^pos:[[:space:]]*", "", position[[1L]])))
+    },
+    numeric(1)
+  )
+  offsets <- offsets[is.finite(offsets) & offsets >= 0]
+  if (!length(offsets)) {
+    return(NULL)
+  }
+  list(bytes_done = min(max(offsets), total), bytes_total = total)
 }
 
 builder_import_retry <- function(queue, id) {

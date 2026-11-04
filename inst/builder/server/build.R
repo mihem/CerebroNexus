@@ -376,11 +376,12 @@ observe({
   if (
     is.list(sent) &&
       identical(
-        sent[c("active", "phase", "text")],
+        sent[c("active", "phase", "text", "percent")],
         message[c(
           "active",
           "phase",
-          "text"
+          "text",
+          "percent"
         )]
       )
   ) {

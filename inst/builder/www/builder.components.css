@@ -323,6 +323,50 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   line-height: 1.35;
 }
 .builder-build-progress-detail[hidden] { display: none; }
+.builder-build-progress-step {
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.builder-build-progress-step[hidden],
+.builder-build-progress-measure[hidden] { display: none; }
+.builder-build-progress-measure {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: var(--space-2);
+}
+.builder-build-progress-meter {
+  flex: 1 1 auto;
+  max-width: 18rem;
+  height: .4rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-pill);
+  appearance: none;
+  background: var(--c-surface-3);
+  accent-color: var(--builder-action-active);
+}
+.builder-build-progress-meter::-webkit-progress-bar {
+  border-radius: var(--r-pill);
+  background: var(--c-surface-3);
+}
+.builder-build-progress-meter::-webkit-progress-value {
+  border-radius: var(--r-pill);
+  background: var(--builder-action-active);
+}
+.builder-build-progress-meter::-moz-progress-bar {
+  border-radius: var(--r-pill);
+  background: var(--builder-action-active);
+}
+.builder-build-progress-percent {
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
 .builder-build-progress-text { min-width: 0; overflow-wrap: anywhere; }
 .builder-build-progress-elapsed {
   color: var(--c-text-muted);
@@ -2880,6 +2924,41 @@ input.is-invalid {
 .builder-import-status.is-error,
 .ds--import.is-error .builder-import-status {
   color: var(--c-error);
+}
+.builder-import-step {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--c-text-subtle);
+  font-size: var(--builder-type-micro);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.builder-import-step + .builder-import-status {
+  margin-top: 0;
+}
+.builder-import-meter {
+  display: block;
+  height: 3px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-3);
+}
+.builder-import-meter::before {
+  display: block;
+  width: var(--builder-import-percent, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--builder-action-active);
+  content: "";
+  transition: width .2s linear;
+}
+.builder-import-meter[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .builder-import-meter::before { transition: none; }
 }
 .builder-import-error {
   display: block;

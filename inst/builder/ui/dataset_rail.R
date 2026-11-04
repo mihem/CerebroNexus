@@ -628,6 +628,8 @@ builder_import_rail_row_model <- function(entry, index, current = NULL) {
       NULL
     },
     load_state = entry$load_state,
+    step_index = builder_import_step(entry$load_state)$index,
+    step_count = builder_import_step(entry$load_state)$count,
     progress_label = entry$progress_label,
     progress_percent = if (isTRUE(entry$cancelling)) {
       NULL
@@ -650,6 +652,8 @@ builder_import_rail_row_fingerprint <- function(model) {
       "label",
       "detail",
       "load_state",
+      "step_index",
+      "step_count",
       "progress_label",
       "progress_percent",
       "cancelling",
@@ -712,12 +716,44 @@ builder_import_rail_row_structure <- function(model) {
   NULL
 }
 
-## The status line, with the byte-level percent of a running copy.
+.builder_rail_import_has_percent <- function(model) {
+  percent <- model$progress_percent
+  is.numeric(percent) && length(percent) == 1L && !is.na(percent)
+}
+
+## "Step k/N" of a running import. NULL for a waiting or failed row.
+.builder_rail_import_step <- function(model) {
+  if (!is.numeric(model$step_index) || !is.numeric(model$step_count)) {
+    return(NULL)
+  }
+  shiny::span(
+    class = "builder-import-step",
+    paste0("Step ", model$step_index, "/", model$step_count)
+  )
+}
+
+## A bar for the step's percent where bytes are counted; hidden otherwise.
+## The status line carries the same percent for assistive technology.
+.builder_rail_import_meter <- function(model) {
+  if (!is.numeric(model$step_index)) {
+    return(NULL)
+  }
+  has_percent <- .builder_rail_import_has_percent(model)
+  shiny::span(
+    class = "builder-import-meter",
+    `aria-hidden` = "true",
+    hidden = if (has_percent) NULL else NA,
+    style = sprintf(
+      "--builder-import-percent: %d%%",
+      if (has_percent) as.integer(model$progress_percent) else 0L
+    )
+  )
+}
+
+## The status line, with the byte-level percent of a running read or copy.
 .builder_rail_import_status <- function(model) {
   percent <- model$progress_percent
-  has_percent <- is.numeric(percent) &&
-    length(percent) == 1L &&
-    !is.na(percent)
+  has_percent <- .builder_rail_import_has_percent(model)
   shiny::span(
     class = paste(
       "builder-import-status",
@@ -770,7 +806,9 @@ builder_import_rail_row_ui <- function(model) {
         class = "ds-body",
         shiny::span(class = "nm", title = model$label, model$label),
         if (!is.null(model$detail)) shiny::span(class = "meta", model$detail),
+        .builder_rail_import_step(model),
         .builder_rail_import_status(model),
+        .builder_rail_import_meter(model),
         if (
           failed &&
             is.character(model$error) &&

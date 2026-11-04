@@ -1066,6 +1066,7 @@ builder_build_progress_message <- function(detail, now = Sys.time()) {
   )
   started <- suppressWarnings(as.numeric(detail$started_at %||% NA_real_))
   elapsed <- as.numeric(now) - started
+  measured <- builder_build_progress_measure(detail)
   list(
     active = TRUE,
     phase = phase,
@@ -1074,23 +1075,88 @@ builder_build_progress_message <- function(detail, now = Sys.time()) {
       max(0, round(elapsed, 1))
     } else {
       NULL
-    }
+    },
+    percent = measured$percent,
+    percent_text = measured$text
   )
 }
 
-builder_build_progress_detail_ui <- function(id = NULL) {
+## The share of the current step that is counted, as a whole percent: the
+## datasets already built while a multi-dataset build writes the next one, or
+## the items a verification pass has finished. Steps without such a count (one
+## dataset being written, packaging the Viewer) get no percent; how long they
+## take cannot be known in advance.
+builder_build_progress_measure <- function(detail) {
+  whole <- function(value) {
+    value <- suppressWarnings(as.numeric(value))
+    length(value) == 1L && is.finite(value) && value == floor(value)
+  }
+  none <- list(percent = NULL, text = NULL)
+  if (!is.list(detail)) {
+    return(none)
+  }
+  if (identical(detail$phase, "datasets")) {
+    index <- detail$dataset_index %||% NULL
+    count <- detail$dataset_count %||% NULL
+    if (!whole(index) || !whole(count) || count < 2 || index < 1) {
+      return(none)
+    }
+    done <- min(index, count) - 1
+    return(list(
+      percent = as.integer(floor(100 * done / count)),
+      text = paste0(done, " of ", count, " datasets built")
+    ))
+  }
+  if (identical(detail$phase, "verify")) {
+    index <- detail$step_index %||% NULL
+    count <- detail$step_count %||% NULL
+    if (!whole(index) || !whole(count) || count < 1 || index < 0) {
+      return(none)
+    }
+    ## A pass names each item before it checks it.
+    done <- max(0, min(index, count) - 1)
+    return(list(
+      percent = as.integer(floor(100 * done / count)),
+      text = paste0(done, " of ", count, " checked")
+    ))
+  }
+  none
+}
+
+## `step = TRUE` adds the "Step k/N" label the Build card shows; the
+## operation overlay names the step in its own header. The meter appears only
+## while the current step reports a count (builder_build_progress_measure()).
+builder_build_progress_detail_ui <- function(id = NULL, step = FALSE) {
   tags$p(
     id = id,
     class = "builder-build-progress-detail",
     `data-build-progress-detail` = "true",
     hidden = "hidden",
+    if (isTRUE(step)) {
+      tags$span(class = "builder-build-progress-step", hidden = "hidden")
+    },
     tags$span(
       class = "builder-build-progress-text",
       role = "status",
       `aria-live` = "polite"
     ),
     # A ticking clock is visible only; announcing it every second is noise.
-    tags$span(class = "builder-build-progress-elapsed", `aria-hidden` = "true")
+    tags$span(class = "builder-build-progress-elapsed", `aria-hidden` = "true"),
+    tags$span(
+      class = "builder-build-progress-measure",
+      hidden = "hidden",
+      tags$progress(
+        class = "builder-build-progress-meter",
+        max = "100",
+        value = "0",
+        `aria-label` = "Progress of the current build step"
+      ),
+      # The meter already exposes its value; the number is for sighted users.
+      tags$span(
+        class = "builder-build-progress-percent",
+        `aria-hidden` = "true"
+      )
+    )
   )
 }
 
@@ -1314,12 +1380,12 @@ builder_build_stage_status_body_ui <- function(model) {
     queued = tagList(
       builder_build_pipeline_ui("queued"),
       p(model$message %||% "Build queued…"),
-      builder_build_progress_detail_ui()
+      builder_build_progress_detail_ui(step = TRUE)
     ),
     building = tagList(
       builder_build_pipeline_ui("building"),
       p(model$message %||% "Building Viewer…"),
-      builder_build_progress_detail_ui()
+      builder_build_progress_detail_ui(step = TRUE)
     ),
     result = tagList(
       builder_build_status_ui(model$result_model),

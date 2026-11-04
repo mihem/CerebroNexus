@@ -512,6 +512,8 @@ builder_browser_pipeline_fake_dom <- c(
   "  prepend(child) { child.remove(); child.parentElement = this; this.children.unshift(child); }",
   "  remove() { const p = this.parentElement; if (p) { p.children = p.children.filter(c => c !== this); this.parentElement = null; } }",
   "  setAttribute(name, value) { this.attributes[name] = String(value); }",
+  "  getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; }",
+  "  removeAttribute(name) { delete this.attributes[name]; }",
   "  hasClass(name) { return this.className.split(/\\s+/).includes(name); }",
   "  closest(selector) { let node = this; while (node) { if (node.hasClass(selector.slice(1))) return node; node = node.parentElement; } return null; }",
   "  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }",
@@ -706,29 +708,54 @@ test_that("the Build card hides the previous step's dataset line", {
     js,
     "renderBuildProgressDetail"
   )
+  step <- builder_browser_pipeline_js_function(js, "buildPhaseStep")
+  phases <- regmatches(
+    js,
+    regexpr("var buildOperationPhases = \\[[^]]*\\];", js)
+  )
   out <- builder_browser_pipeline_run_node(
-    c(builder_browser_pipeline_fake_dom, render),
+    c(builder_browser_pipeline_fake_dom, phases, step, render),
     c(
       "const assert = require('assert');",
       "function formatBuildElapsed() { return '0:05'; }",
       "const buildProgressState = { active: true, anchor: 0, phase: 'datasets',",
-      "  text: 'Dataset 4/4 · Spatial · Writing CRB' };",
+      "  text: 'Dataset 4/4 · Spatial · Writing CRB', percent: 75,",
+      "  percentText: '3 of 4 datasets built' };",
       "let builderActivityState = { busy_phase: 'datasets' };",
       "const detail = body.appendChild(new El('div'));",
       "detail.setAttribute('data-build-progress-detail', '');",
+      "const stepLabel = detail.appendChild(new El('span', 'builder-build-progress-step'));",
       "const label = detail.appendChild(new El('span', 'builder-build-progress-text'));",
       "const clock = detail.appendChild(new El('span', 'builder-build-progress-elapsed'));",
+      "const measure = detail.appendChild(new El('span', 'builder-build-progress-measure'));",
+      "const meter = measure.appendChild(new El('progress', 'builder-build-progress-meter'));",
+      "const percent = measure.appendChild(new El('span', 'builder-build-progress-percent'));",
+      "meter.value = 0;",
       "renderBuildProgressDetail();",
       "assert.strictEqual(label.textContent, 'Dataset 4/4 · Spatial · Writing CRB');",
+      "assert.strictEqual(stepLabel.textContent, 'Step 4/7');",
+      "assert.strictEqual(measure.hidden, false);",
+      "assert.strictEqual(meter.value, 75);",
+      "assert.strictEqual(meter.getAttribute('aria-valuenow'), '75');",
+      "assert.strictEqual(meter.getAttribute('aria-valuetext'), '3 of 4 datasets built');",
+      "assert.strictEqual(percent.textContent, '75% · 3 of 4 datasets built');",
       "// The header moved to Packaging Viewer before the matching detail arrived.",
       "builderActivityState.busy_phase = 'viewer';",
       "renderBuildProgressDetail();",
       "assert.strictEqual(label.textContent, '');",
       "assert.strictEqual(clock.textContent, '0:05');",
       "assert.strictEqual(detail.hidden, false);",
+      "assert.strictEqual(stepLabel.textContent, 'Step 5/7');",
+      "assert.strictEqual(measure.hidden, true);",
+      "assert.strictEqual(percent.textContent, '');",
       "buildProgressState.phase = 'viewer'; buildProgressState.text = 'Packaging Viewer';",
+      "buildProgressState.percent = null; buildProgressState.percentText = '';",
       "renderBuildProgressDetail();",
       "assert.strictEqual(label.textContent, 'Packaging Viewer');",
+      "assert.strictEqual(measure.hidden, true);",
+      "buildProgressState.active = false;",
+      "renderBuildProgressDetail();",
+      "assert.strictEqual(stepLabel.hidden, true);",
       "console.log('ok');"
     )
   )

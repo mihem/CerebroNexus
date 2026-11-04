@@ -127,6 +127,7 @@
   var buildOperationFocusHeld = false;
   var buildProgressState = {
     active: false, text: "", phase: null, anchor: null, timer: null,
+    percent: null, percentText: "",
   };
   var buildOperationRestoreFocus = null;
   var buildOperationFocusToken = 0;
@@ -619,18 +620,35 @@
     };
   }
 
+  var buildOperationPhases = [
+    "preflight",
+    "stage",
+    "dispatch",
+    "datasets",
+    "viewer",
+    "verify",
+    "publish",
+  ];
+
+  // "Step k/N" of a build phase, or null for a phase outside the pipeline.
+  function buildPhaseStep(phase) {
+    var index = buildOperationPhases.indexOf(phase);
+    if (index < 0) return null;
+    return { index: index + 1, count: buildOperationPhases.length };
+  }
+
+  // A whole percent from the server, or null when the step has no count.
+  function buildProgressPercent(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var number = Number(value);
+    if (!Number.isFinite(number)) return null;
+    return Math.max(0, Math.min(100, Math.floor(number)));
+  }
+
   function updateBuildOperationProgress(active, phase) {
     var elements = builderOperationElements();
     if (!elements.progress) return;
-    var phases = [
-      "preflight",
-      "stage",
-      "dispatch",
-      "datasets",
-      "viewer",
-      "verify",
-      "publish",
-    ];
+    var phases = buildOperationPhases;
     var activeIndex = phases.indexOf(phase);
     elements.progress.hidden = !active || activeIndex < 0;
     if (elements.progressSummary) {
@@ -1703,12 +1721,47 @@
       typeof buildProgressState.phase === "string" &&
       buildProgressState.phase !== headerPhase;
     var text = buildProgressState.active && !stale ? buildProgressState.text : "";
+    var percent = buildProgressState.active && !stale
+      ? buildProgressState.percent
+      : null;
+    var step = running
+      ? buildPhaseStep(headerPhase || buildProgressState.phase)
+      : null;
+    var stepText = step ? "Step " + step.index + "/" + step.count : "";
     document.querySelectorAll("[data-build-progress-detail]").forEach(function (node) {
       var label = node.querySelector(".builder-build-progress-text");
       var clock = node.querySelector(".builder-build-progress-elapsed");
+      var stepLabel = node.querySelector(".builder-build-progress-step");
+      var measure = node.querySelector(".builder-build-progress-measure");
+      var meter = node.querySelector(".builder-build-progress-meter");
+      var number = node.querySelector(".builder-build-progress-percent");
       node.hidden = !(text || elapsed);
       if (label && label.textContent !== text) label.textContent = text;
       if (clock && clock.textContent !== elapsed) clock.textContent = elapsed;
+      if (stepLabel) {
+        stepLabel.hidden = !stepText;
+        if (stepLabel.textContent !== stepText) stepLabel.textContent = stepText;
+      }
+      if (measure) measure.hidden = percent === null;
+      if (meter && percent !== null) {
+        if (Number(meter.value) !== percent) meter.value = percent;
+        meter.setAttribute("aria-valuenow", String(percent));
+        if (buildProgressState.percentText) {
+          meter.setAttribute("aria-valuetext", buildProgressState.percentText);
+        } else {
+          meter.removeAttribute("aria-valuetext");
+        }
+      }
+      if (number) {
+        // Say what the percent counts: "75% · 3 of 4 datasets built".
+        var shown = percent === null
+          ? ""
+          : percent + "%" +
+            (buildProgressState.percentText
+              ? " · " + buildProgressState.percentText
+              : "");
+        if (number.textContent !== shown) number.textContent = shown;
+      }
     });
   }
 
@@ -1721,6 +1774,8 @@
       buildProgressState.anchor = null;
       buildProgressState.text = "";
       buildProgressState.phase = null;
+      buildProgressState.percent = null;
+      buildProgressState.percentText = "";
     }
     buildProgressState.active = active;
     if (active && buildProgressState.timer === null) {
@@ -1736,11 +1791,17 @@
     if (!message || message.active !== true) {
       buildProgressState.text = "";
       buildProgressState.phase = null;
+      buildProgressState.percent = null;
+      buildProgressState.percentText = "";
       renderBuildProgressDetail();
       return;
     }
     buildProgressState.text = typeof message.text === "string" ? message.text : "";
     buildProgressState.phase = typeof message.phase === "string" ? message.phase : null;
+    buildProgressState.percent = buildProgressPercent(message.percent);
+    buildProgressState.percentText = typeof message.percent_text === "string"
+      ? message.percent_text
+      : "";
     var elapsed = Number(message.elapsed_seconds);
     if (Number.isFinite(elapsed) && elapsed >= 0) {
       // After a reload the worker's start time is earlier than this page's.
@@ -3344,7 +3405,9 @@
     live: [
       { selector: ":scope > .ds-pick" },
       { selector: ".ds-idx", text: true },
+      { selector: ".builder-import-step", text: true },
       { selector: ".builder-import-status", text: true },
+      { selector: ".builder-import-meter" },
       { selector: ".builder-load-time" },
     ],
     actions: {
