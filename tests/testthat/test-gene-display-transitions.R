@@ -196,9 +196,19 @@ test_that("four selected genes survive RGB layout and display-mode round trips",
       wait_ = FALSE
     )
   }
+  channels_js <- "['r','g','b'].map(c=>document.getElementById('expression_rgb_gene_'+c).selectize.getValue())"
   channels <- function() {
-    app$get_js(
-      "['r','g','b'].map(c=>document.getElementById('expression_rgb_gene_'+c).selectize.getValue())"
+    app$get_js(channels_js)
+  }
+  ## The channels can settle a moment after the RGB frame on a slow runner.
+  wait_channels <- function(expected) {
+    app$wait_for_js(
+      sprintf(
+        "JSON.stringify(%s) === %s",
+        channels_js,
+        jsonlite::toJSON(jsonlite::toJSON(expected), auto_unbox = TRUE)
+      ),
+      timeout = 30000
     )
   }
   wait_panels <- function(n, mode, layout = NULL) {
@@ -236,6 +246,7 @@ test_that("four selected genes survive RGB layout and display-mode round trips",
   wait_panels(4L, "separate")
   mode("rgb")
   wait_panels(1L, "rgb", "composite")
+  wait_channels(c("MS4A1", "CD3D", "CD79A"))
   expect_identical(
     unlist(channels(), use.names = FALSE),
     c("MS4A1", "CD3D", "CD79A")
@@ -274,6 +285,7 @@ test_that("four selected genes survive RGB layout and display-mode round trips",
   wait_panels(2L, "separate")
   mode("rgb")
   wait_panels(1L, "rgb", "composite")
+  wait_channels(c("CD3E", "CD79A", ""))
   expect_identical(
     unlist(channels(), use.names = FALSE),
     c("CD3E", "CD79A", "")
