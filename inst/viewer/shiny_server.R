@@ -2172,6 +2172,11 @@ server <- function(input, output, session) {
   }
 
   toggleConditionalTab(
+    "overview",
+    function() length(availableProjections()) > 0L,
+    catalog_check = viewerProjectionsAvailable
+  )
+  toggleConditionalTab(
     "coordinated_views",
     function() viewerLinkedViewsAvailable(object = data_set()),
     catalog_check = viewerLinkedViewsAvailable,

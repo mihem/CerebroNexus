@@ -34,6 +34,20 @@ test_that("Linked views depends on available views, not their names or selection
   expect_true(viewerLinkedViewsAvailable(info))
 })
 
+test_that("a data set without projections has no Projection or Linked views page", {
+  info <- linked_catalog(character())
+  info$capabilities$spatial <- TRUE
+  expect_false(viewerProjectionsAvailable(info))
+  expect_false(viewerLinkedViewsAvailable(info))
+  expect_true(viewerProjectionsAvailable(linked_catalog("umap")))
+  expect_null(viewerProjectionsAvailable(list()))
+  object <- list(
+    availableProjections = function() character(),
+    availableSpatial = function() "section"
+  )
+  expect_false(viewerLinkedViewsAvailable(object = object))
+})
+
 test_that("loaded objects use their full registered content", {
   object <- list(availableProjections = function() "umap")
   expect_false(viewerLinkedViewsAvailable(object = object))

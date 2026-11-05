@@ -32,6 +32,17 @@ viewerInitialPageDecision <- function(
   )
 }
 
+## Whether the catalog entry lists any projection; NULL without a catalog
+## entry. A data set without reductions (a spatial-only or expression-only
+## object) has no Projection page.
+viewerProjectionsAvailable <- function(info = NULL) {
+  projections <- if (is.list(info)) info$projection_names
+  if (!is.character(projections)) {
+    return(NULL)
+  }
+  any(!is.na(projections) & nzchar(projections))
+}
+
 ## NULL means there is no catalog entry (an upload) or it does not describe its
 ## projections yet. Never interpret an incomplete catalog or the first
 ## progressive frame as absence.
@@ -54,6 +65,10 @@ viewerLinkedViewsAvailable <- function(info = NULL, object = NULL) {
     if (length(projections) > 1L) {
       return(TRUE)
     }
+    ## Linked views are linked on a projection.
+    if (is.null(cached) && !length(projections)) {
+      return(FALSE)
+    }
     if (length(read(object$availableSpatial())) > 0L) {
       return(TRUE)
     }
@@ -75,6 +90,9 @@ viewerLinkedViewsAvailable <- function(info = NULL, object = NULL) {
   }
   if (!is.list(info)) {
     return(NULL)
+  }
+  if (isFALSE(viewerProjectionsAvailable(info))) {
+    return(FALSE)
   }
   extra <- list(
     spatial = info$capabilities$spatial,

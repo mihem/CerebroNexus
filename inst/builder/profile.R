@@ -1525,15 +1525,33 @@ builder_profile_core_manifest <- function(
     }
   }
 
-  entries[[length(entries) + 1L]] <- .builder_profile_manifest_entry(
-    "projection",
-    source,
-    length(usable_reductions) > 0L,
-    "At least one Viewer-compatible projection is required.",
-    list(usable_reductions = usable_reductions),
-    pages = "projection",
-    verifier = "verify_projection"
-  )
+  ## An object without any reduction (an unclustered spatial section, an
+  ## expression-only object) is built without projections. Reductions that
+  ## are all unsafe still block: the object had projections to show.
+  entries[[length(entries) + 1L]] <- if (length(reductions)) {
+    .builder_profile_manifest_entry(
+      "projection",
+      source,
+      length(usable_reductions) > 0L,
+      "At least one Viewer-compatible projection is required.",
+      list(usable_reductions = usable_reductions),
+      pages = "projection",
+      verifier = "verify_projection"
+    )
+  } else {
+    builder_manifest_entry(
+      id = "projection",
+      source = .builder_profile_manifest_source(source),
+      status = "not_applicable",
+      disposition = NA_character_,
+      artifact_scope = "both",
+      summary = "The object has no dimensional reductions to show.",
+      diagnostics = list(usable_reductions = character()),
+      compatibility = list(viewer = TRUE),
+      pages = character(),
+      verifier = "verify_projection"
+    )
+  }
   builder_content_manifest(entries)
 }
 

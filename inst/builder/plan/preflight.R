@@ -379,6 +379,14 @@ builder_plan_requires_app <- function(entries) {
     ))
   }
 
+  ## An object without dimensional reductions (a spatial-only or
+  ## expression-only object) is built without projections.
+  .builder_plan_without_projections <- function(entry) {
+    profile <- entry$profile
+    is.list(profile) &&
+      "reductions" %in% names(profile) &&
+      !length(profile$reductions)
+  }
   valid_core <- vapply(
     entries,
     function(entry) {
@@ -386,7 +394,8 @@ builder_plan_requires_app <- function(entries) {
       .builder_plan_character_set(settings$groups) &&
         length(settings$groups) > 0L &&
         .builder_plan_character_set(settings$reductions) &&
-        length(settings$reductions) > 0L &&
+        (length(settings$reductions) > 0L ||
+          .builder_plan_without_projections(entry)) &&
         builder_has_text(settings$organism) &&
         builder_has_text(settings$assay) &&
         builder_has_text(settings$layer)
@@ -573,7 +582,11 @@ builder_plan_requires_app <- function(entries) {
     function(entry) {
       settings <- entry$settings
       value <- settings$default_projection
-      if (is.null(settings$recommendations) && is.null(value)) {
+      if (
+        is.null(value) &&
+          (is.null(settings$recommendations) ||
+            !length(settings$reductions))
+      ) {
         return(FALSE)
       }
       !builder_has_text(value) || !value %in% settings$reductions

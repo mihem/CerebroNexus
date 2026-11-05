@@ -788,8 +788,10 @@
 #' as \code{NULL}.
 #' @param projections Optional ordered names of dimensional reductions to
 #'   export. When supplied, every named reduction is exported in that order,
-#'   including PCA beside other projections. The default \code{NULL} preserves
-#'   the legacy behavior that uses non-PCA reductions when they are available.
+#'   including PCA beside other projections. An empty vector exports none (an
+#'   object without reductions, such as an unclustered spatial section). The
+#'   default \code{NULL} preserves the legacy behavior that uses non-PCA
+#'   reductions when they are available.
 #' @param spatial_coordinate_transforms Optional named list of coordinate
 #'   transforms keyed by exact Seurat spatial FOV/image name. Each entry may
 #'   specify \code{rotation_degrees} and positive uniform \code{scale}; the
@@ -916,7 +918,6 @@ exportFromSeurat <- function(
   if (
     !is.null(projections) &&
       (!is.character(projections) ||
-        !length(projections) ||
         anyNA(projections) ||
         any(!nzchar(projections)) ||
         anyDuplicated(projections) ||

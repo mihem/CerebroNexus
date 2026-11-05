@@ -1235,8 +1235,11 @@ builder_verify_crb <- function(
       )
     }
   }
-  projections <- names(.builder_build_field(object, "projections"))
-  if (!identical(projections, expectation$projections)) {
+  projections <- as.character(names(.builder_build_field(
+    object,
+    "projections"
+  )))
+  if (!identical(projections, as.character(expectation$projections))) {
     stop("The staged CRB projections differ from BuildPlan.", call. = FALSE)
   }
   if (!is.null(expectation$trajectories)) {
@@ -1851,7 +1854,7 @@ builder_verify_crb <- function(
     nUMI = item$nUMI,
     nGene = item$nGene,
     add_all_meta_data = TRUE,
-    projections = item$included_projections,
+    projections = as.character(item$included_projections),
     expression_matrix_mode = item$expression_backend,
     codec = "qs2",
     viewer_binary = .builder_viewer_pack_options$mode,

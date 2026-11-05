@@ -163,7 +163,6 @@ exportFromSCE <- function(
   if (
     !is.null(projections) &&
       (!is.character(projections) ||
-        !length(projections) ||
         anyNA(projections) ||
         any(!nzchar(projections)) ||
         anyDuplicated(projections) ||

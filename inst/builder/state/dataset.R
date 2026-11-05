@@ -39,9 +39,16 @@
   } else {
     NULL
   }
+  ## An object without any reduction is built without projections.
+  profile <- entry$profile
+  without_reductions <- is.list(profile) &&
+    "reductions" %in% names(profile) &&
+    !length(profile$reductions)
   missing <- c(
     if (!length(settings$groups)) "settings_groups",
-    if (!length(settings$reductions)) "settings_reductions",
+    if (!length(settings$reductions) && !without_reductions) {
+      "settings_reductions"
+    },
     if (!.builder_state_text(settings$organism)) "settings_organism",
     if (isTRUE(validates_assay) && !is.list(assay_profile)) "settings_assay",
     if (!.builder_state_text(settings$layer)) "settings_layer",

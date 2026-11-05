@@ -114,7 +114,7 @@ builder_e2e_entry <- function(record, caller = parent.frame()) {
     metadata = metadata,
     groups = list(value = groups[[1L]], included = groups),
     projections = list(
-      value = projections[[1L]],
+      value = if (length(projections)) projections[[1L]],
       included = projections
     ),
     organism = list(value = inspected$legacy_profile$organism_guess),

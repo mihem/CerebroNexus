@@ -212,7 +212,7 @@ builder_projection_catalog_model <- function(model) {
     character(1),
     "id"
   )
-  if (!default %in% selected_ids) {
+  if (is.null(default) || !default %in% selected_ids) {
     default <- if (length(selected_ids)) selected_ids[[1L]] else NULL
   }
   initial <- selected_ids[selected_ids %in% initial]

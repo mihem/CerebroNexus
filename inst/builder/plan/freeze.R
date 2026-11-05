@@ -845,8 +845,9 @@ builder_freeze_plan <- function(
         nUMI = settings$nUMI %||% entry$profile$nUMI,
         nGene = settings$nGene %||% entry$profile$nGene,
         default_group = default_group,
+        ## NULL for an object without reductions
         default_projection = settings$default_projection %||%
-          settings$reductions[[1L]],
+          if (length(settings$reductions)) settings$reductions[[1L]],
         default_trajectory = settings$default_trajectory %||% NULL,
         viewer_display = builderViewerDisplayDefaults(settings$viewer_display),
         spatial_percentage_cells_to_show = settings$spatial_percentage_cells_to_show %||%

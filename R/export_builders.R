@@ -186,6 +186,13 @@
   if (verbose) {
     .logStep('Extracting dimensional reductions...')
   }
+  ## An explicit empty selection exports no projection.
+  if (explicit && !length(available)) {
+    if (verbose) {
+      .logStep('No dimensional reductions selected; exporting none.')
+    }
+    return(invisible())
+  }
   if (length(available) == 0) {
     stop(
       'No dimensional reductions available. Add at least one first, e.g. ',

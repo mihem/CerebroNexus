@@ -372,7 +372,7 @@ builder_review_snapshot <- function(
       settings$groups[[1L]],
     default_projection = settings$default_projection %||%
       saved$default_projection %||%
-      settings$reductions[[1L]],
+      if (length(settings$reductions)) settings$reductions[[1L]],
     default_trajectory = settings$default_trajectory %||%
       saved$default_trajectory %||%
       NULL,
