@@ -253,7 +253,9 @@ test_that("builder interaction reflows and preserves accessible state", {
         "document.querySelector('[aria-current=step]') !== null && ",
         "document.getElementById('complete_dataset_check') !== null"
       ),
-      timeout = 60000
+      ## Loading the three examples takes ~13 s alone and ~30 s with four
+      ## test processes on a laptop; a busy CI runner needs more than 60 s.
+      timeout = 180000
     )
     app$wait_for_idle(timeout = 30000)
   })
@@ -668,7 +670,7 @@ test_that("duplicate spatial image names open a usable naming modal", {
     app$click(selector = ".example-btn[data-ex=complete_viewer_data]")
     app$wait_for_js(
       "document.getElementById('enhance-tissue_image_file') !== null",
-      timeout = 60000
+      timeout = 180000
     )
   })
   builder_browser_dismiss_project_offer(app)
