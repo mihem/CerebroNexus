@@ -20,7 +20,14 @@ builder_project_test_runtime <- function() {
     ),
     envir = runtime
   )
-  for (file in c("io.R", "worker.R", "extras.R", "project.R", "build.R")) {
+  for (file in c(
+    "io.R",
+    "worker.R",
+    "extras.R",
+    "project.R",
+    "analysis.R",
+    "build.R"
+  )) {
     path <- builder_test_inst_path("builder", file)
     runtime$builder_source_utf8(path, envir = runtime)
   }

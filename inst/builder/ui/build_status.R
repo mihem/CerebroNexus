@@ -795,10 +795,10 @@ builder_build_failed_analysis_reasons <- function(log) {
 
 ## Host and port the App was built with (Review > Connection settings).
 builder_app_run_options <- function(app_dir) {
-  config <- tryCatch(
-    readRDS(file.path(app_dir, "cerebro_config.rds")),
-    error = function(error) NULL
-  )
+  config_path <- file.path(app_dir, "cerebro_config.rds")
+  config <- if (file.exists(config_path)) {
+    tryCatch(readRDS(config_path), error = function(error) NULL)
+  }
   options <- if (is.list(config)) {
     config[[".bundle_run_options"]]$shiny_app_options
   }
