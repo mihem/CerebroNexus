@@ -580,6 +580,12 @@ test_that("build progress names the dataset and step in progress", {
     on_progress("Marker genes")
     list(object = object, completed = item$analyses, failed = character())
   }
+  write_crb <- hooks$export
+  hooks$export <- function(object, item, path, on_progress = NULL) {
+    on_progress("writing expression")
+    on_progress("saving the CRB file")
+    write_crb(object, item, path)
+  }
 
   result <- builder_execute_plan(
     plan,
@@ -597,26 +603,36 @@ test_that("build progress names the dataset and step in progress", {
         value$dataset_index %||% "-",
         value$dataset_count %||% "-",
         value$step_label %||% value$phase,
+        if (is.null(value$steps_total)) {
+          "-"
+        } else {
+          paste0(value$steps_done, "/", value$steps_total)
+        },
         sep = "|"
       )
     },
     character(1)
   )
+  ## Opening, preparing, one analysis, six export parts and verifying: the
+  ## finished steps are counted, and an export part counts the parts before it.
+  per_dataset <- function(index) {
+    paste0(
+      index,
+      "|2|",
+      c(
+        "Opening dataset|0/10",
+        "Preparing dataset|1/10",
+        "Marker genes|2/10",
+        "Writing CRB|3/10",
+        "Writing CRB: writing expression|4/10",
+        "Writing CRB: saving the CRB file|7/10",
+        "Verifying CRB|9/10"
+      )
+    )
+  }
   expect_identical(
     steps,
-    c(
-      "-|-|datasets",
-      "1|2|Opening dataset",
-      "1|2|Preparing dataset",
-      "1|2|Marker genes",
-      "1|2|Writing CRB",
-      "1|2|Verifying CRB",
-      "2|2|Opening dataset",
-      "2|2|Preparing dataset",
-      "2|2|Marker genes",
-      "2|2|Writing CRB",
-      "2|2|Verifying CRB"
-    )
+    c("-|-|datasets|-", per_dataset(1L), per_dataset(2L))
   )
   last <- reported[[length(reported)]]
   expect_identical(last$dataset_name, "Dataset B")

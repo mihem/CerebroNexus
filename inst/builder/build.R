@@ -244,6 +244,8 @@ builder_build_progress_note <- function(plan, phase) {
   "step_label",
   "step_index",
   "step_count",
+  "steps_done",
+  "steps_total",
   "started_at"
 )
 
@@ -268,6 +270,8 @@ builder_build_progress_note <- function(plan, phase) {
     step_label = text(detail$step_label),
     step_index = count(detail$step_index),
     step_count = count(detail$step_count),
+    steps_done = count(detail$steps_done),
+    steps_total = count(detail$steps_total),
     started_at = if (length(started) == 1L && is.finite(started)) {
       started
     } else {
@@ -1831,7 +1835,7 @@ builder_verify_crb <- function(
   object
 }
 
-.builder_build_export <- function(object, item, path) {
+.builder_build_export <- function(object, item, path, on_progress = NULL) {
   object <- .builder_build_apply_metadata_policy(object, item)
   coordinate_transforms <- item$spatial_coordinate_transforms %||% NULL
   if (
@@ -1860,6 +1864,7 @@ builder_verify_crb <- function(
     viewer_binary = .builder_viewer_pack_options$mode,
     viewer_binary_threshold = .builder_viewer_pack_options$threshold,
     spatial_coordinate_transforms = coordinate_transforms,
+    .on_progress = on_progress,
     .finalize_export = if (length(item$images %||% list())) {
       function(export) {
         external <- .builder_apply_external_spatial_appearance(
@@ -2201,6 +2206,14 @@ builder_execute_plan <- function(
   item_count <- length(plan$items)
   item_index <- 0L
   item_name <- NULL
+  ## The current dataset's steps: opening, preparing, each analysis, each part
+  ## of the CRB export and verifying. `steps_done` counts those finished, so
+  ## the Build progress can show how far one long dataset has got.
+  steps_total <- 0L
+  steps_done <- 0L
+  export_parts <- get0(".exportProgressParts", inherits = TRUE) %||%
+    get(".exportProgressParts", envir = asNamespace("CerebroNexus"))
+  analysis_ids <- vapply(builder_analysis_steps(), `[[`, character(1L), "id")
   report_step <- function(label) {
     if (isTRUE(detail_progress)) {
       report_progress(
@@ -2209,7 +2222,9 @@ builder_execute_plan <- function(
           dataset_index = item_index,
           dataset_count = item_count,
           dataset_name = item_name,
-          step_label = label
+          step_label = label,
+          steps_done = min(steps_done, steps_total),
+          steps_total = steps_total
         )
       )
     }
@@ -2250,7 +2265,9 @@ builder_execute_plan <- function(
     item_index <- item_index + 1L
     item_name <- item$name %||% item$id
     reused <- item$reused_artifact %||% NULL
+    steps_done <- 0L
     if (is.list(reused)) {
+      steps_total <- 1L
       report_step("Reusing CRB")
       if (
         !.builder_build_safe_relative(item$filename) ||
@@ -2399,7 +2416,10 @@ builder_execute_plan <- function(
         "."
       )))
     }
-    if (is.null(object)) {
+    opening <- is.null(object)
+    analysis_count <- sum(analysis_ids %in% item$analyses)
+    steps_total <- opening + 2L + analysis_count + length(export_parts)
+    if (opening) {
       report_step("Opening dataset")
     }
     object <- if (!is.null(object)) {
@@ -2418,6 +2438,7 @@ builder_execute_plan <- function(
         conditionMessage(object)
       )))
     }
+    steps_done <- as.integer(opening)
     report_step("Preparing dataset")
     object <- .builder_build_raise_cancel(tryCatch(
       hooks$prepare(object, item),
@@ -2431,6 +2452,9 @@ builder_execute_plan <- function(
         conditionMessage(object)
       )))
     }
+    steps_done <- steps_done + 1L
+    analyses_from <- steps_done
+    analyses_started <- 0L
     analyses <- .builder_build_raise_cancel(tryCatch(
       if (.builder_build_hook_accepts(hooks$run_analyses, "on_progress")) {
         hooks$run_analyses(
@@ -2438,6 +2462,9 @@ builder_execute_plan <- function(
           item,
           on_progress = function(label = NULL, ...) {
             cancel_point()
+            ## Each call starts the next analysis.
+            steps_done <<- analyses_from + analyses_started
+            analyses_started <<- analyses_started + 1L
             if (.builder_build_text(label)) {
               report_step(label)
             }
@@ -2476,6 +2503,7 @@ builder_execute_plan <- function(
       return(result)
     }
     object <- analyses$object
+    steps_done <- analyses_from + analysis_count
     if (!.builder_build_safe_relative(item$filename)) {
       return(.builder_build_failure(
         "A build artifact target is outside the assigned stage."
@@ -2488,10 +2516,19 @@ builder_execute_plan <- function(
       ))
     }
     report_step("Writing CRB")
+    export_from <- steps_done
+    export_progress <- function(part) {
+      steps_done <<- export_from + match(part, export_parts, nomatch = 1L) - 1L
+      report_step(paste0("Writing CRB: ", part))
+    }
     export_diagnostics <- NULL
     exported <- tryCatch(
       withCallingHandlers(
-        hooks$export(object, item, target),
+        if (.builder_build_hook_accepts(hooks$export, "on_progress")) {
+          hooks$export(object, item, target, on_progress = export_progress)
+        } else {
+          hooks$export(object, item, target)
+        },
         error = function(error) {
           captured <- try(
             .builder_build_condition_diagnostics(error, sys.calls()),
@@ -2548,6 +2585,7 @@ builder_execute_plan <- function(
     analyses <- NULL
     extras <- NULL
     invisible(gc(FALSE))
+    steps_done <- export_from + length(export_parts)
     report_step("Verifying CRB")
     verified <- .builder_build_raise_cancel(tryCatch(
       hooks$verify(exported, item),

@@ -259,28 +259,45 @@ test_that("loading rows and the Build card show the step and a measured percent"
     function(record) identical(record$live, "polite"),
     logical(1)
   )))
-  ## Two datasets: while the second is written, half of them are built.
-  halfway <- Filter(
+  ## Two datasets: each percent is the datasets built plus the finished steps
+  ## of the one being written, and the meter says so.
+  counted <- Filter(
     function(record) {
-      identical(record$step, "Step 4/7") &&
-        identical(record$percent, "50% · 1 of 2 datasets built") &&
-        startsWith(record$text, "Dataset 2/2")
+      identical(record$step, "Step 4/7") && !is.null(record$percent)
     },
     built
   )
-  expect_gt(length(halfway), 0L)
-  expect_identical(halfway[[1L]]$now, "50")
-  expect_equal(halfway[[1L]]$value, 50)
-  expect_identical(halfway[[1L]]$valuetext, "1 of 2 datasets built")
-  ## The first dataset has no built share yet; a single-step phase none at all.
-  expect_true(any(vapply(
-    built,
-    function(record) {
-      startsWith(record$text, "Dataset 1/2") &&
-        identical(record$percent, "0% · 0 of 2 datasets built")
-    },
-    logical(1)
-  )))
+  expect_gt(length(counted), 0L)
+  for (record in counted) {
+    numbers <- as.numeric(regmatches(
+      record$valuetext,
+      gregexpr("[0-9]+", record$valuetext)
+    )[[1L]])
+    expect_length(numbers, 4L)
+    expected <- floor(100 * (numbers[[1L]] + numbers[[3L]] / numbers[[4L]]) / 2)
+    expect_identical(record$now, as.character(expected))
+    expect_equal(record$value, expected)
+    expect_identical(
+      record$percent,
+      paste0(expected, "% · ", record$valuetext)
+    )
+    expect_match(
+      record$valuetext,
+      "^[01] of 2 datasets built · [0-9]+ of [0-9]+ steps done$"
+    )
+  }
+  ## The bar moves inside each dataset, not only between them.
+  first <- Filter(
+    function(record) startsWith(record$text, "Dataset 1/2"),
+    counted
+  )
+  expect_gt(length(unique(vapply(first, `[[`, "", "now"))), 2L)
+  second <- Filter(
+    function(record) startsWith(record$text, "Dataset 2/2"),
+    counted
+  )
+  expect_true(any(vapply(second, `[[`, "", "now") == "50"))
+  expect_true(any(as.numeric(vapply(second, `[[`, "", "now")) > 50))
   expect_false(any(vapply(
     built,
     function(record) {

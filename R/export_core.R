@@ -7,6 +7,25 @@
 ## needs a thin adapter and inherits the external expression backends, the
 ## transactional publish and the Viewer Pack from here.
 
+## The parts of one export, in order, as named to an `.on_progress` callback
+## (the Builder counts them for its Build progress). A part that does not
+## apply, such as a Viewer Pack for a small dataset, is not reported.
+.exportProgressParts <- c(
+  "reading expression",
+  "writing expression",
+  "adding metadata and results",
+  "adding spatial data",
+  "saving the CRB file",
+  "writing the Viewer Pack"
+)
+
+.exportReportPart <- function(on_progress, part) {
+  if (is.function(on_progress)) {
+    on_progress(match.arg(part, .exportProgressParts))
+  }
+  invisible(NULL)
+}
+
 #' @keywords internal
 #' @noRd
 .exportCheckOutputArgs <- function(
@@ -281,7 +300,8 @@
   expression_matrix_mode,
   codec,
   viewer_options,
-  immune_options = list(mode = "auto", threshold = 100000L)
+  immune_options = list(mode = "auto", threshold = 100000L),
+  on_progress = NULL
 ) {
   ##--------------------------------------------------------------------------##
   ## show overview of Cerebro object
@@ -297,6 +317,7 @@
 
   ## log message
   .logStep('Saving Cerebro object to: ', final_file)
+  .exportReportPart(on_progress, "saving the CRB file")
 
   ## Replace the sidecar and .crb with best-effort rollback on ordinary errors.
   .publishCerebroExport(
@@ -315,6 +336,7 @@
       length(.viewerPackCells(export))
     )
   ) {
+    .exportReportPart(on_progress, "writing the Viewer Pack")
     buildViewerPack(
       final_file,
       viewer_binary = "always",

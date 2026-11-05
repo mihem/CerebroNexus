@@ -196,10 +196,35 @@ test_that("the build percent counts only what a step counts", {
     measure(list(phase = "datasets", dataset_index = 1L, dataset_count = 4L)),
     list(percent = 0L, text = "0 of 4 datasets built")
   )
-  ## One dataset: the share of it that is written is unknown.
+  ## One dataset without step counts: the share of it that is written is
+  ## unknown.
   expect_identical(
     measure(list(phase = "datasets", dataset_index = 1L, dataset_count = 1L)),
     list(percent = NULL, text = NULL)
+  )
+  ## With step counts the finished steps of the current dataset are added.
+  expect_identical(
+    measure(list(
+      phase = "datasets",
+      dataset_index = 1L,
+      dataset_count = 1L,
+      steps_done = 3L,
+      steps_total = 10L
+    )),
+    list(percent = 30L, text = "3 of 10 steps done")
+  )
+  expect_identical(
+    measure(list(
+      phase = "datasets",
+      dataset_index = 2L,
+      dataset_count = 2L,
+      steps_done = 5L,
+      steps_total = 10L
+    )),
+    list(
+      percent = 75L,
+      text = "1 of 2 datasets built · 5 of 10 steps done"
+    )
   )
   expect_identical(
     measure(list(

@@ -786,6 +786,9 @@
 #' with the Cerebro object just before it is written, so the object can be
 #' completed without reading the written file back. Users should leave this
 #' as \code{NULL}.
+#' @param .on_progress Internal hook used by the Builder: a function called
+#' with the name of each part of the export as it starts, so a long export
+#' can report how far it has got. Users should leave this as \code{NULL}.
 #' @param projections Optional ordered names of dimensional reductions to
 #'   export. When supplied, every named reduction is exported in that order,
 #'   including PCA beside other projections. An empty vector exports none (an
@@ -867,6 +870,7 @@ exportFromSeurat <- function(
   immune_sidecar_threshold = 100000L,
   .expression_resolution = NULL,
   .finalize_export = NULL,
+  .on_progress = NULL,
   projections = NULL,
   spatial_coordinate_transforms = NULL
 ) {
@@ -958,6 +962,7 @@ exportFromSeurat <- function(
   ## add transcript counts
   ##--------------------------------------------------------------------------##
 
+  .exportReportPart(.on_progress, "reading expression")
   ## get expression data using shared utility function. A requested layer that
   ## does not exist is an error naming the layers that do (no other layer is
   ## substituted).
@@ -1012,6 +1017,7 @@ exportFromSeurat <- function(
     resolved_layer = expression_resolution$resolved
   )
 
+  .exportReportPart(.on_progress, "writing expression")
   expression_data <- .exportWriteExpression(
     export = export,
     expression_data = expression_data,
@@ -1023,6 +1029,7 @@ exportFromSeurat <- function(
     h5_compression_level = h5_compression_level
   )
 
+  .exportReportPart(.on_progress, "adding metadata and results")
   extras <- object@misc
   .addExportExperiment(export, extras)
   .addExportMetaData(
@@ -1062,6 +1069,7 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## spatial data
   ##--------------------------------------------------------------------------##
+  .exportReportPart(.on_progress, "adding spatial data")
   if (verbose) {
     .logStep('Checking for spatial data...')
   }
@@ -1309,6 +1317,7 @@ exportFromSeurat <- function(
     expression_matrix_mode = expression_matrix_mode,
     codec = codec,
     viewer_options = viewer_options,
-    immune_options = immune_options
+    immune_options = immune_options,
+    on_progress = .on_progress
   )
 }

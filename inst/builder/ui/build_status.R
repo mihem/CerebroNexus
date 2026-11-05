@@ -1240,10 +1240,11 @@ builder_build_progress_message <- function(detail, now = Sys.time()) {
 }
 
 ## The share of the current step that is counted, as a whole percent: the
-## datasets already built while a multi-dataset build writes the next one, or
-## the items a verification pass has finished. Steps without such a count (one
-## dataset being written, packaging the Viewer) get no percent; how long they
-## take cannot be known in advance.
+## datasets already built plus the finished steps of the one being written
+## (opening, preparing, each analysis, each part of the CRB export, verifying),
+## or the items a verification pass has finished. The steps are counted, not
+## timed: a step that takes longer still moves the bar by one step. Steps
+## without such a count (packaging the Viewer) get no percent.
 builder_build_progress_measure <- function(detail) {
   whole <- function(value) {
     value <- suppressWarnings(as.numeric(value))
@@ -1256,13 +1257,34 @@ builder_build_progress_measure <- function(detail) {
   if (identical(detail$phase, "datasets")) {
     index <- detail$dataset_index %||% NULL
     count <- detail$dataset_count %||% NULL
-    if (!whole(index) || !whole(count) || count < 2 || index < 1) {
+    steps_done <- detail$steps_done %||% NULL
+    steps_total <- detail$steps_total %||% NULL
+    stepped <- whole(steps_done) && whole(steps_total) && steps_total >= 1
+    if (!whole(index) || !whole(count) || count < 1 || index < 1) {
+      return(none)
+    }
+    if (count < 2 && !stepped) {
       return(none)
     }
     done <- min(index, count) - 1
+    steps_done <- if (stepped) min(steps_done, steps_total) else 0
+    share <- if (stepped) steps_done / steps_total else 0
     return(list(
-      percent = as.integer(floor(100 * done / count)),
-      text = paste0(done, " of ", count, " datasets built")
+      percent = as.integer(floor(100 * (done + share) / count)),
+      text = paste(
+        c(
+          if (count >= 2) paste0(done, " of ", count, " datasets built"),
+          if (stepped) {
+            paste0(
+              steps_done,
+              " of ",
+              steps_total,
+              if (steps_total == 1) " step done" else " steps done"
+            )
+          }
+        ),
+        collapse = " · "
+      )
     ))
   }
   if (identical(detail$phase, "verify")) {
