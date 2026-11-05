@@ -56,6 +56,8 @@ jobs:
             set -eu
             unset CI NOT_CRAN NODE_PATH
             export NODE_OPTIONS=--no-global-search-paths
+            # testthat runs 2 test processes by default; the runner has 4 cores.
+            export TESTTHAT_CPUS=4
             R CMD check --as-cran --no-manual CerebroNexus_*.tar.gz
             test -f CerebroNexus.Rcheck/00check.log
             ! grep -E "^Status:.*(ERROR|WARNING)" CerebroNexus.Rcheck/00check.log
