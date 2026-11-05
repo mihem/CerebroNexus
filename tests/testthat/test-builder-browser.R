@@ -285,6 +285,35 @@ test_that("builder interaction reflows and preserves accessible state", {
     ".every(node => node.open === false)"
   )))
 
+  ## The Expression backend menu sits at the foot of the Advanced settings
+  ## card; an open card must not clip the dropdown's second option.
+  app$run_js(paste0(
+    "var card = document.querySelector('.builder-viewer-advanced-settings');",
+    "card.querySelector('summary').click();",
+    "card.scrollIntoView({block: 'center'});",
+    "document.getElementById('core-backend').selectize.open();"
+  ))
+  app$wait_for_js(
+    paste0(
+      "(function () {",
+      "  var options = document.getElementById('core-backend').selectize",
+      "    .$dropdown[0].querySelectorAll('.option');",
+      "  var last = options[options.length - 1];",
+      "  if (options.length < 2) return false;",
+      "  var box = last.getBoundingClientRect();",
+      "  var hit = document.elementFromPoint(box.left + 4,",
+      "    box.top + box.height / 2);",
+      "  return hit !== null && last.contains(hit);",
+      "})()"
+    ),
+    timeout = 5000
+  )
+  app$run_js(paste0(
+    "document.getElementById('core-backend').selectize.close();",
+    "document.querySelector('.builder-viewer-advanced-settings ",
+    "summary').click();"
+  ))
+
   ## Exercise the real browser binding across every label transition. The
   ## Configure footer is rendered dynamically; a Shiny actionButton would
   ## reset its client counter when this DOM is replaced and could silently

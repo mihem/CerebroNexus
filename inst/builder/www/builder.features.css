@@ -478,7 +478,10 @@
   font-size: var(--builder-type-body);
   line-height: 1.5;
 }
-.builder-viewer-card {
+/* No `overflow: hidden` here: an open card holds selectize inputs, and
+   clipping the card clips their dropdowns (the Expression backend menu lost
+   its second option). The closed state has nothing to clip. */
+.builder-viewer-card:not([open]) {
   overflow: hidden;
 }
 .builder-viewer-card > summary {

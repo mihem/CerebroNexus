@@ -1537,6 +1537,15 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 .builder-stage-configure .builder-viewer-card[open]::details-content {
   block-size: auto;
   opacity: 1;
+  /* Clip only while the card expands: once open, a selectize dropdown near
+     the bottom of the card must be able to hang below it. Closing clips at
+     once, since the closed state lists no overflow transition. */
+  overflow: visible;
+  transition:
+    block-size 200ms var(--ease-standard),
+    content-visibility 200ms allow-discrete,
+    opacity 140ms var(--ease-standard),
+    overflow 0s 200ms allow-discrete;
 }
 .builder-stage-configure .builder-viewer-advanced-settings { margin-top: 0; }
 
@@ -1547,6 +1556,7 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 
 @media (prefers-reduced-motion: reduce) {
   .builder-stage-configure .builder-viewer-card::details-content,
+  .builder-stage-configure .builder-viewer-card[open]::details-content,
   .builder-stage-configure .builder-viewer-card > summary::before {
     transition: none;
   }
