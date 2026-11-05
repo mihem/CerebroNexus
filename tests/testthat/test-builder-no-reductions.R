@@ -64,6 +64,29 @@ test_that("a dataset without reductions is not missing a projection setting", {
   expect_true("settings_reductions" %in% blocked$blocking_ids)
 })
 
+test_that("spatial alignment draws an FOV without any reduction", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_no_reduction_object(spatial = TRUE)
+  object$cluster <- rep(c("a", "b"), length.out = ncol(object))
+  model <- builder_alignment_preview_model(
+    object,
+    group = "cluster",
+    layer = "counts"
+  )
+  expect_true(model$available, info = model$message)
+  expect_null(model$projection_name)
+  expect_null(model$transcriptome)
+  expect_equal(nrow(model$spatial), ncol(object))
+  expect_setequal(model$spatial$cell_barcode, colnames(object))
+  expect_identical(
+    model$spatial$group,
+    object$cluster[match(model$spatial$cell_barcode, colnames(object))],
+    ignore_attr = TRUE
+  )
+  expect_true(all(is.finite(c(model$spatial$x, model$spatial$y))))
+  expect_false(is.null(model$bounds))
+})
+
 for (spatial in c(FALSE, TRUE)) {
   local({
     spatial <- spatial

@@ -53,6 +53,25 @@ BUILDER_SPATIAL_PREVIEW_MAX <- 5000L
   )
 }
 
+#' Cell identities and Viewer Group labels when no projection exists.
+.builder_alignment_group_frame <- function(object, group = NULL) {
+  cells <- as.character(SeuratObject::Cells(object))
+  metadata <- object@meta.data
+  groups <- if (!is.null(group) && group %in% colnames(metadata)) {
+    as.character(metadata[[group]][match(cells, rownames(metadata))])
+  } else {
+    rep("cells", length(cells))
+  }
+  groups[is.na(groups)] <- "N/A"
+  data.frame(
+    cell_barcode = cells,
+    x = rep(NA_real_, length(cells)),
+    y = rep(NA_real_, length(cells)),
+    group = groups,
+    stringsAsFactors = FALSE
+  )
+}
+
 #' Resolve the selected layer's cell cohort without reading expression values.
 #'
 #' Spatial alignment only needs cell identities. Materialising a logical split
@@ -275,18 +294,19 @@ builder_alignment_preview_model <- function(
     ),
     default_projection
   )
-  if (is.null(reduction)) {
-    return(.builder_alignment_unavailable(
-      sections,
-      "No UMAP, current projection, or PCA is available for transcriptome space."
-    ))
+  ## The workbench draws physical space only; the projection supplies the
+  ## cell identities and Viewer Group colours. An object without any
+  ## reduction (an unclustered Xenium section) takes both from its metadata.
+  transcriptome_full <- if (is.null(reduction)) {
+    .builder_alignment_group_frame(object, group)
+  } else {
+    builder_preview_frame(
+      object,
+      reduction,
+      group,
+      max_cells = .Machine$integer.max
+    )
   }
-  transcriptome_full <- builder_preview_frame(
-    object,
-    reduction,
-    group,
-    max_cells = .Machine$integer.max
-  )
   assay <- assay %||%
     tryCatch(
       SeuratObject::DefaultAssay(object),
@@ -417,7 +437,9 @@ builder_alignment_preview_model <- function(
     sections = sections,
     section = section,
     projection_name = reduction,
-    transcriptome = transcriptome_full[keep, , drop = FALSE],
+    transcriptome = if (!is.null(reduction)) {
+      transcriptome_full[keep, , drop = FALSE]
+    },
     spatial = spatial_full[keep, , drop = FALSE],
     bounds = .builder_alignment_bounds(spatial_full),
     coordinate_frame = coordinate_frame,

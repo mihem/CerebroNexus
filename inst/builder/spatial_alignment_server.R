@@ -2890,6 +2890,12 @@ builder_spatial_alignment_server <- function(
     if (!isTRUE(preview$available)) {
       return(shiny::span(class = "hint", preview$message %||% "Loading…"))
     }
+    if (is.null(preview$projection_name)) {
+      return(shiny::span(
+        class = "hint",
+        "No projection: cells are coloured by the Viewer Group."
+      ))
+    }
     shiny::span(class = "hint", paste("Projection:", preview$projection_name))
   })
   output[["enhance-alignment_status"]] <- shiny::renderUI({
