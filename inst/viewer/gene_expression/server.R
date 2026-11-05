@@ -20,8 +20,10 @@ for (i in files_to_load) {
 }
 
 ## A data set without projections has nothing to draw expression on: say so,
-## so the page settles instead of waiting for a plot.
+## so the page settles instead of waiting for a plot. Sent when the page is
+## opened: sent while the data set loads, the browser drops it as stale.
 observe({
+  req(identical(input[["sidebar"]], "geneExpression"))
   req(data_set())
   if (length(availableProjections())) {
     return()
