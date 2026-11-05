@@ -167,10 +167,16 @@ for (spatial in c(FALSE, TRUE)) {
               )].filter(e => e.offsetParent !== null)
                 .map(e => e.id + ': ' + e.innerText.slice(0, 150));
               const pane = document.getElementById('shiny-tab-' + tab);
-              const settled = !!pane && window.CerebroPageLifecycle
-                .isSettled(pane);
-              out.push({tab: tab, idle: ok, settled: settled,
-                errors: errors.join(' | ')});
+              const isSettled = () => !!pane &&
+                window.CerebroPageLifecycle.isSettled(pane);
+              for (let i = 0; i < 100 && !isSettled(); i++) await sleep(100);
+              const feedback = pane ? [...pane.querySelectorAll(
+                '.cerebro-view-feedback'
+              )].map(e => e.textContent.trim()).join(' | ') : '';
+              out.push({tab: tab, idle: ok, settled: isSettled(),
+                errors: errors.join(' | '),
+                state: JSON.stringify(pane ? pane.dataset : null) +
+                  ' feedback: ' + feedback});
             }
             return JSON.stringify(out);
           })()",
@@ -182,7 +188,10 @@ for (spatial in c(FALSE, TRUE)) {
       ## Projection and Linked views need a projection.
       expect_false(any(c("overview", "coordinated_views") %in% visited$tab))
       ## Gene expression says why it draws nothing instead of loading forever.
-      expect_true(visited$settled[visited$tab == "geneExpression"])
+      expect_true(
+        visited$settled[visited$tab == "geneExpression"],
+        info = visited$state[visited$tab == "geneExpression"]
+      )
       for (index in seq_len(nrow(visited))) {
         expect_true(visited$idle[[index]], info = visited$tab[[index]])
         expect_identical(
