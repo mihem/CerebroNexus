@@ -469,7 +469,8 @@ test_that("App arguments come only from the frozen plan", {
         panel_mode = "shared",
         panel_palette = "default"
       ),
-      extra_material_table_index = list()
+      extra_material_table_index = list(),
+      immune_repertoire_tabs = viewerImmuneRepertoireTabs()$id
     )
   )
   expect_false(request$crb_pick_smallest_file)

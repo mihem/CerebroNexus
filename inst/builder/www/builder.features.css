@@ -663,6 +663,18 @@
   color: var(--c-text-muted);
   font-size: var(--builder-type-small);
 }
+.builder-immune-tabs { margin: var(--space-3) 0 0; }
+.builder-immune-tabs .control-label {
+  color: var(--c-text-muted);
+  font-size: var(--builder-type-caption);
+}
+.builder-immune-tabs .checkbox { margin: var(--space-1) 0 0; }
+.builder-immune-tabs .checkbox label { font-size: var(--builder-type-small); }
+.builder-immune-tabs .checkbox.disabled label { color: var(--c-text-muted); }
+.builder-immune-tab-reason {
+  margin-left: var(--space-2);
+  font-size: var(--builder-type-caption);
+}
 .builder-content-actions {
   display: flex;
   flex-wrap: wrap;

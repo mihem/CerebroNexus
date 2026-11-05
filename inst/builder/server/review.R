@@ -1077,6 +1077,7 @@ render_configure_workbench <- function() {
         entry$profile$content$immune_repertoire %||%
         list(),
       content_sources = settings$content_sources %||% list(),
+      immune_repertoire_tabs = settings$immune_repertoire_tabs,
       content_action_owner = content_action_owner,
       analysis_acknowledgements = if (inherits(state, "try-error")) {
         character()

@@ -410,6 +410,7 @@ environment(builder_runtime_assert_identity) <- baseenv()
       "initial_projections",
       "default_trajectory",
       "viewer_display",
+      "immune_repertoire_tabs",
       "extra_material_table_index",
       "overview_point_size",
       "overview_point_opacity",

@@ -499,6 +499,53 @@ lapply(
 )
 
 observeEvent(
+  input[["core-immune_repertoire_tabs"]],
+  {
+    entry <- rendered_core_entry()
+    if (
+      is.null(entry) ||
+        !builder_operation_allowed("edit_dataset", notify = FALSE)
+    ) {
+      return()
+    }
+    state <- try(
+      builder_cached_dataset_state(entry, builder_dataset_state_cache),
+      silent = TRUE
+    )
+    if (inherits(state, "try-error")) {
+      return()
+    }
+    applied <- builder_apply_immune_repertoire_tabs(
+      entry,
+      input[["core-immune_repertoire_tabs"]],
+      builder_immune_repertoire_sample_count(state$manifest %||% list())
+    )
+    if (!is.null(applied$error)) {
+      ## Put the last tab back: an empty choice is never stored.
+      updateCheckboxGroupInput(
+        session,
+        "core-immune_repertoire_tabs",
+        selected = viewerImmuneRepertoireTabSelection(
+          entry$settings$immune_repertoire_tabs
+        )
+      )
+      builder_notify(
+        "error",
+        applied$error,
+        target = list(selector = ".builder-immune-tabs")
+      )
+      return()
+    }
+    if (!identical(applied$entry$settings, entry$settings)) {
+      replace_entry(applied$entry)
+    }
+  },
+  ignoreInit = TRUE,
+  ## Unticking every box sends NULL; it must be refused, not ignored.
+  ignoreNULL = FALSE
+)
+
+observeEvent(
   input[["core-projection_action"]],
   {
     entry <- rendered_core_entry()

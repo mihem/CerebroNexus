@@ -53,58 +53,53 @@ output$ir_visualizations_UI <- renderUI({
     ))
   }
 
+  ## Every sub-tab, keyed by its value; the App shows the ones the Builder
+  ## kept for this dataset (all of them without a choice) that its sample
+  ## count supports: Compare and SizeDist need at least two samples.
   tabs <- list(
-    tabPanel(
+    "Clonal UMAP" = tabPanel(
       # Clonal expansion overlaid on the cell UMAP — the default landing tab,
       # so the first thing the user sees is where expanded clones sit.
       "Clonal projection",
       value = "Clonal UMAP"
       # Drawn by the shared cell-view host in UI.R, grouped or not.
     ),
-    tabPanel(
+    "Abundance" = tabPanel(
       "Abundance",
       ir_fill_plot("ir_plot_clonalAbundance", plotly = TRUE)
     ),
-    tabPanel(
+    "Diversity" = tabPanel(
       "Diversity",
       ir_fill_plot("ir_plot_clonalDiversity", plotly = TRUE)
     ),
-    tabPanel(
+    "Homeostasis" = tabPanel(
       "Homeostasis",
       ir_fill_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
     ),
-    tabPanel(
+    "Isotype" = tabPanel(
       "Isotype",
       ir_fill_plot("ir_plot_isotype", plotly = TRUE)
     ),
-    tabPanel(
+    "Paired Scatter" = tabPanel(
       "Paired Scatter",
       shinycssloaders::withSpinner(uiOutput(
         "ir_ui_pairedScatter"
       ))
     ),
-    tabPanel(
+    "Clone Sharing" = tabPanel(
       "Clone Sharing",
       ir_fill_plot("ir_plot_cloneSharing", plotly = TRUE)
+    ),
+    "Compare" = tabPanel(
+      "Compare",
+      ir_fill_plot("ir_plot_clonalCompare", plotly = TRUE)
+    ),
+    "SizeDist" = tabPanel(
+      "SizeDist",
+      ir_fill_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
     )
   )
-
-  ## Tabs requiring >= 2 samples
-  if (n_samples() >= 2) {
-    tabs <- c(
-      tabs,
-      list(
-        tabPanel(
-          "Compare",
-          ir_fill_plot("ir_plot_clonalCompare", plotly = TRUE)
-        ),
-        tabPanel(
-          "SizeDist",
-          ir_fill_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
-        )
-      )
-    )
-  }
+  tabs <- unname(tabs[ir_visible_tabs()])
 
   # Preserve the user's current tab across rebuilds (when this renderUI
   # re-runs). Without `selected`, the rebuilt tabsetPanel would reset to the

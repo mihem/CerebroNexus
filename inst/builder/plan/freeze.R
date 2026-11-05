@@ -664,6 +664,9 @@ builder_freeze_plan <- function(
         saved$viewer_display <- builderViewerDisplayDefaults(
           settings$viewer_display
         )
+        saved$immune_repertoire_tabs <- viewerImmuneRepertoireTabSelection(
+          settings$immune_repertoire_tabs
+        )
         saved$overview_point_size <- settings$overview_point_size %||% 5
         saved$overview_point_opacity <- settings$overview_point_opacity %||% 1
         saved$overview_percentage_cells_to_show <- settings[[
@@ -850,6 +853,9 @@ builder_freeze_plan <- function(
           if (length(settings$reductions)) settings$reductions[[1L]],
         default_trajectory = settings$default_trajectory %||% NULL,
         viewer_display = builderViewerDisplayDefaults(settings$viewer_display),
+        immune_repertoire_tabs = viewerImmuneRepertoireTabSelection(
+          settings$immune_repertoire_tabs
+        ),
         spatial_percentage_cells_to_show = settings$spatial_percentage_cells_to_show %||%
           100,
         overview_point_size = settings$overview_point_size %||% 5,
@@ -1140,6 +1146,7 @@ builder_make_plan <- function(
 .builder_plan_reuse_viewer_fields <- c(
   "initial_projections",
   "viewer_display",
+  "immune_repertoire_tabs",
   "overview_point_size",
   "overview_point_opacity",
   "overview_percentage_cells_to_show",

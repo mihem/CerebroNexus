@@ -41,6 +41,7 @@
       initial_projections = .subset2(item, "initial_projections"),
       default_trajectory = .subset2(item, "default_trajectory"),
       viewer_display = .subset2(item, "viewer_display"),
+      immune_repertoire_tabs = .subset2(item, "immune_repertoire_tabs"),
       extra_material_table_index = if (!is.null(.subset2(item, "tables"))) {
         .builder_app_table_index(.subset2(item, "tables"))
       } else {

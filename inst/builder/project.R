@@ -4571,6 +4571,7 @@ builder_project_artifact_configuration_digest <- function(
   viewer_only <- c(
     "initial_projections",
     "viewer_display",
+    "immune_repertoire_tabs",
     "overview_point_size",
     "overview_point_opacity",
     "overview_percentage_cells_to_show",

@@ -725,6 +725,19 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   if (!is.null(settings$viewer_display)) {
     builderViewerDisplayDefaults(settings$viewer_display)
   }
+  ir_tabs <- settings$immune_repertoire_tabs
+  if (
+    !is.null(ir_tabs) &&
+      (!is.character(ir_tabs) ||
+        is.object(ir_tabs) ||
+        !length(ir_tabs) ||
+        !identical(ir_tabs, viewerImmuneRepertoireTabSelection(ir_tabs)))
+  ) {
+    .builder_state_abort(
+      "invalid_viewer_content_settings",
+      "Immune repertoire tabs must be known tabs in Viewer order."
+    )
+  }
   if (!identical(settings$viewer_content_schema_version, 1L)) {
     .builder_state_abort(
       "invalid_viewer_content_settings",

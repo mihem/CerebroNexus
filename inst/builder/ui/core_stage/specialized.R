@@ -385,6 +385,63 @@ builder_content_disposition_button <- function(id, action) {
   )
 }
 
+## Samples in the immune repertoire the build keeps (the chosen source first).
+builder_immune_repertoire_sample_count <- function(manifest) {
+  evidence <- manifest$immune_repertoire$evidence %||% list()
+  value <- evidence$selected_candidate$normalized$n_samples %||%
+    evidence$normalized$n_samples %||%
+    0L
+  if (
+    !is.numeric(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !is.finite(value) ||
+      value < 0
+  ) {
+    return(0L)
+  }
+  as.integer(value)
+}
+
+## The Immune repertoire sub-tabs offered in the App, in Viewer order. A tab
+## the data cannot support stays as chosen but cannot be changed.
+builder_immune_repertoire_tabs_model <- function(selected, n_samples) {
+  tabs <- viewerImmuneRepertoireTabs()
+  chosen <- viewerImmuneRepertoireTabSelection(selected)
+  lapply(seq_len(nrow(tabs)), function(index) {
+    available <- n_samples >= tabs$min_samples[[index]]
+    list(
+      id = tabs$id[[index]],
+      label = tabs$label[[index]],
+      selected = tabs$id[[index]] %in% chosen,
+      available = available,
+      reason = if (!available) {
+        paste0("Needs at least ", tabs$min_samples[[index]], " samples")
+      }
+    )
+  })
+}
+
+## Store the sub-tabs the author keeps. Every tab kept is stored as no choice,
+## so an App built later shows tabs a newer Viewer adds. At least one tab the
+## data supports must stay.
+builder_apply_immune_repertoire_tabs <- function(entry, value, n_samples) {
+  tabs <- viewerImmuneRepertoireTabs()
+  value <- as.character(unlist(value %||% character(), use.names = FALSE))
+  chosen <- tabs$id[tabs$id %in% value]
+  supported <- tabs$id[tabs$min_samples <= n_samples]
+  if (!length(intersect(chosen, supported))) {
+    return(list(
+      entry = entry,
+      error = "Keep at least one Immune repertoire tab."
+    ))
+  }
+  entry$settings$immune_repertoire_tabs <- if (!identical(chosen, tabs$id)) {
+    chosen
+  }
+  list(entry = entry, error = NULL)
+}
+
 builder_specialized_content_model <- function(model) {
   manifest <- model$content_manifest %||%
     model$analysis_manifest %||%
@@ -737,6 +794,15 @@ builder_specialized_content_model <- function(model) {
       )
     )
   )
+  items <- lapply(items, function(item) {
+    if (identical(item$id, "immune_repertoire") && item$state == "included") {
+      item$tabs <- builder_immune_repertoire_tabs_model(
+        model$immune_repertoire_tabs,
+        builder_immune_repertoire_sample_count(manifest)
+      )
+    }
+    item
+  })
   states <- if (length(items)) {
     vapply(items, `[[`, character(1), "state")
   } else {
@@ -773,6 +839,48 @@ builder_specialized_content_model <- function(model) {
   )
 }
 
+## A Shiny checkbox group whose unsupported tabs are disabled: a disabled
+## box keeps the author's choice, so it still reaches the server checked.
+builder_immune_repertoire_tabs_ui <- function(tabs, ns) {
+  input_id <- ns("immune_repertoire_tabs")
+  div(
+    id = input_id,
+    class = paste(
+      "form-group shiny-input-checkboxgroup shiny-input-container",
+      "builder-immune-tabs"
+    ),
+    role = "group",
+    `aria-labelledby` = paste0(input_id, "-label"),
+    tags$label(
+      class = "control-label",
+      id = paste0(input_id, "-label"),
+      `for` = input_id,
+      "Tabs in the App"
+    ),
+    div(
+      class = "shiny-options-group",
+      lapply(tabs, function(tab) {
+        div(
+          class = paste("checkbox", if (!isTRUE(tab$available)) "disabled"),
+          tags$label(
+            tags$input(
+              type = "checkbox",
+              name = input_id,
+              value = tab$id,
+              checked = if (isTRUE(tab$selected)) "checked",
+              disabled = if (!isTRUE(tab$available)) "disabled"
+            ),
+            tags$span(tab$label),
+            if (!is.null(tab$reason)) {
+              tags$span(class = "builder-immune-tab-reason", tab$reason)
+            }
+          )
+        )
+      })
+    )
+  )
+}
+
 builder_specialized_content_ui <- function(model, id = NULL) {
   ns <- if (is.null(id)) identity else NS(id)
   badge <- function(state) {
@@ -805,6 +913,9 @@ builder_specialized_content_ui <- function(model, id = NULL) {
           p(class = "viewer-specialized-directory", line)
         }),
         p(class = "viewer-specialized-page", item$message),
+        if (length(item$tabs)) {
+          builder_immune_repertoire_tabs_ui(item$tabs, ns)
+        },
         div(
           class = "builder-content-actions",
           builder_acknowledgement_button(id, item$acknowledgement),

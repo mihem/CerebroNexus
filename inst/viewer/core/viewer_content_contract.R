@@ -69,6 +69,66 @@ viewerExtraMaterialTableIndex <- function(value = NULL, table_names = NULL) {
   result
 }
 
+## Immune repertoire sub-tabs in Viewer order: the tab value (`id`), its title
+## (`label`) and how many samples the tab needs before the Viewer offers it.
+## The Builder's sub-tab choice and the Viewer's tab strip both read this table.
+viewerImmuneRepertoireTabs <- function() {
+  data.frame(
+    id = c(
+      "Clonal UMAP",
+      "Abundance",
+      "Diversity",
+      "Homeostasis",
+      "Isotype",
+      "Paired Scatter",
+      "Clone Sharing",
+      "Compare",
+      "SizeDist"
+    ),
+    label = c(
+      "Clonal projection",
+      "Abundance",
+      "Diversity",
+      "Homeostasis",
+      "Isotype",
+      "Paired Scatter",
+      "Clone Sharing",
+      "Compare",
+      "SizeDist"
+    ),
+    min_samples = c(rep(1L, 7L), 2L, 2L),
+    stringsAsFactors = FALSE
+  )
+}
+
+## The chosen sub-tabs in Viewer order. No choice (an older App or Project)
+## means every tab; ids this Viewer does not know are dropped.
+viewerImmuneRepertoireTabSelection <- function(value = NULL) {
+  ids <- viewerImmuneRepertoireTabs()$id
+  if (is.null(value) || !is.character(value) || is.object(value)) {
+    return(ids)
+  }
+  ids[ids %in% value]
+}
+
+## The sub-tabs one dataset shows: the chosen tabs its sample count supports,
+## or every supported tab when none of the chosen ones is.
+viewerImmuneRepertoireVisibleTabs <- function(options, dataset, n_samples) {
+  tabs <- viewerImmuneRepertoireTabs()
+  supported <- tabs$id[tabs$min_samples <= max(0, n_samples, na.rm = TRUE)]
+  content <- options[["viewer_content"]]
+  value <- if (
+    is.list(content) &&
+      is.character(dataset) &&
+      length(dataset) == 1L &&
+      !is.na(dataset)
+  ) {
+    content[[dataset]][["immune_repertoire_tabs"]]
+  }
+  visible <- intersect(viewerImmuneRepertoireTabSelection(value), supported)
+  if (length(visible)) visible else supported
+}
+
 ## Author defaults, independent of transient browsing selections. Keep the
 ## schema small and typed; arbitrary CSS and executable font URLs are excluded.
 builderViewerDisplayDefaults <- function(value = NULL) {

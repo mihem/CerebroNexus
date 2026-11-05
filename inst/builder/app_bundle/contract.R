@@ -723,7 +723,8 @@ builder_planned_viewer_packs <- function(items) {
               "spatial_roi_settings",
               "display",
               "gene_expression",
-              "extra_material_table_index"
+              "extra_material_table_index",
+              "immune_repertoire_tabs"
             )
           )
       ) {
@@ -763,6 +764,12 @@ builder_planned_viewer_packs <- function(items) {
         identical(
           item$extra_material_table_index,
           viewerExtraMaterialTableIndex(item$extra_material_table_index)
+        ) &&
+        is.character(item$immune_repertoire_tabs) &&
+        length(item$immune_repertoire_tabs) > 0L &&
+        identical(
+          item$immune_repertoire_tabs,
+          viewerImmuneRepertoireTabSelection(item$immune_repertoire_tabs)
         ) &&
         identical(
           item$gene_expression,
@@ -919,7 +926,11 @@ builder_planned_viewer_packs <- function(items) {
       }),
       extra_material_table_index = viewerExtraMaterialTableIndex(
         item$extra_material_table_index
-      )
+      ),
+      immune_repertoire_tabs = local({
+        tabs <- viewerImmuneRepertoireTabSelection(item$immune_repertoire_tabs)
+        if (length(tabs)) tabs else viewerImmuneRepertoireTabSelection()
+      })
     )
   })
   names(values) <- labels

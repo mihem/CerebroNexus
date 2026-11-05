@@ -53,7 +53,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
     if (!has_scRepertoire()) {
       return(ir_scRepertoire_missing_ui())
     }
-    tab <- ir_param("ir_tabs", "Clonal UMAP")
+    tab <- ir_param("ir_tabs", ir_default_tab())
     packed_landing <- identical(tab, "Clonal UMAP")
     summary <- getImmuneRepertoireSummary()
     summary_chains <- as.character(summary$chains)

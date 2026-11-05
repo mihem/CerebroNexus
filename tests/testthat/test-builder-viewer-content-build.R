@@ -198,6 +198,7 @@ test_that("Viewer-only edits reuse CRBs and refresh the frozen App item", {
   digest_entry <- entry
   viewer_only <- c(
     "initial_projections",
+    "immune_repertoire_tabs",
     "overview_point_size",
     "overview_point_opacity",
     "overview_percentage_cells_to_show",
@@ -226,6 +227,7 @@ test_that("Viewer-only edits reuse CRBs and refresh the frozen App item", {
   artifacts <- list(`dataset-a` = artifact)
   changes <- list(
     initial_projections = "pca",
+    immune_repertoire_tabs = c("Clonal UMAP", "Diversity"),
     overview_point_size = 11,
     overview_point_opacity = 0.55,
     overview_percentage_cells_to_show = 80,
@@ -374,10 +376,52 @@ test_that("generated-App content freezes defaults for every dataset", {
           panel_mode = "shared",
           panel_palette = "default"
         ),
-        extra_material_table_index = viewerExtraMaterialTableIndex(NULL)
+        extra_material_table_index = viewerExtraMaterialTableIndex(NULL),
+        immune_repertoire_tabs = viewerImmuneRepertoireTabs()$id
       )
     )
   )
+})
+
+test_that("chosen Immune repertoire tabs reach the generated-App content", {
+  entry <- builder_viewer_content_plan_entry()
+  entry$settings$immune_repertoire_tabs <- c("Abundance", "Compare")
+  plan <- builder_make_plan(
+    list(entry),
+    withr::local_tempdir(),
+    make_app = TRUE
+  )
+  expect_null(plan$error)
+  item <- plan$items[[1L]]
+  expect_identical(item$immune_repertoire_tabs, c("Abundance", "Compare"))
+  frozen <- .builder_app_viewer_content(
+    list(item),
+    "Dataset A",
+    list(overview_projection_point_size = 5)
+  )
+  expect_identical(
+    frozen[["Dataset A"]]$immune_repertoire_tabs,
+    c("Abundance", "Compare")
+  )
+
+  ## No choice (an older Project) freezes every tab.
+  entry$settings$immune_repertoire_tabs <- NULL
+  item <- builder_make_plan(
+    list(entry),
+    withr::local_tempdir(),
+    make_app = TRUE
+  )$items[[1L]]
+  expect_identical(item$immune_repertoire_tabs, viewerImmuneRepertoireTabs()$id)
+
+  ## A choice out of Viewer order or naming an unknown tab is refused.
+  for (value in list(c("Compare", "Abundance"), "Nope", character())) {
+    entry$settings$immune_repertoire_tabs <- value
+    expect_error(
+      .builder_state_validate_viewer_content_settings(entry),
+      "Immune repertoire tabs",
+      info = paste(value, collapse = ",")
+    )
+  }
 })
 
 test_that("an explicit legacy App point-size option still wins", {
