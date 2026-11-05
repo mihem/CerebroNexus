@@ -714,7 +714,7 @@ test_that("duplicate spatial image names open a usable naming modal", {
         "confirm.offsetParent !== null && ",
         "modal.textContent.includes('Name this image'); })()"
       ),
-      timeout = 10000
+      timeout = 30000
     ),
     error = function(error) {
       logs <- app$get_logs()
@@ -736,7 +736,7 @@ test_that("duplicate spatial image names open a usable naming modal", {
     }
   )
   app$set_inputs(`enhance-new_image_label` = "Repeated tissue image")
-  app$wait_for_idle(timeout = 10000)
+  app$wait_for_idle(timeout = 30000)
   expect_identical(
     app$get_js("document.getElementById('enhance-new_image_label').value"),
     "Repeated tissue image"
@@ -744,7 +744,7 @@ test_that("duplicate spatial image names open a usable naming modal", {
   app$click("enhance-add_image_confirm")
   app$wait_for_js(
     "document.getElementById('shiny-modal') === null",
-    timeout = 10000
+    timeout = 30000
   )
   app$wait_for_js(
     sprintf(
@@ -800,17 +800,17 @@ test_that("builder explains a mocked old privacy contract exactly", {
   builder_browser_check_all_datasets(app)
   app$wait_for_js(
     "document.getElementById('continue_to_review') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   builder_browser_click_dynamic(app, "#continue_to_review")
   app$wait_for_js(
     "document.getElementById('confirm_review') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   builder_browser_click_dynamic(app, "#confirm_review")
   app$wait_for_js(
     "document.querySelector('.builder-app-capability-reason') !== null",
-    timeout = 10000
+    timeout = 30000
   )
   expect_true(app$get_js(
     "document.querySelector('input[name=build_output_mode][value=app]').matches(':disabled')"
@@ -1006,14 +1006,14 @@ test_that("a ruled-out output choice is faded and cannot be picked", {
     builder_browser_click_dynamic(app, "#continue_to_review")
     app$wait_for_js(
       "document.getElementById('confirm_review') !== null",
-      timeout = 10000
+      timeout = 30000
     )
     builder_browser_click_dynamic(app, "#confirm_review")
     app$wait_for_js(
       "document.querySelector('.builder-app-required-reason') !== null",
       timeout = 30000
     )
-    app$wait_for_idle(timeout = 10000)
+    app$wait_for_idle(timeout = 30000)
   })
   card_state <- function() {
     app$get_js(paste0(
@@ -1079,7 +1079,7 @@ test_that("a ruled-out output choice is faded and cannot be picked", {
       )
     }
   }
-  app$wait_for_idle(timeout = 10000)
+  app$wait_for_idle(timeout = 30000)
   expect_identical(app$get_value(input = "build_output_mode"), "app")
   expect_identical(card_state(), before)
   builder_expect_clean_browser_logs(app)

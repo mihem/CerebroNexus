@@ -114,7 +114,10 @@ builder_browser_click_dynamic <- function(app, selector) {
   invisible(TRUE)
 }
 
-builder_browser_check_all_datasets <- function(app, timeout = 10000) {
+## Checking a dataset can keep Shiny busy for more than 10 s on a busy CI
+## runner, and wait_for_idle() then fails with "An error occurred while
+## waiting for Shiny to be stable".
+builder_browser_check_all_datasets <- function(app, timeout = 60000) {
   for (attempt in seq_len(20L)) {
     can_continue <- app$get_js(paste0(
       "document.getElementById('continue_to_review') !== null && ",
