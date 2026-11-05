@@ -313,6 +313,58 @@ builder_server_path_roots_label <- function(roots) {
   paste(roots, collapse = "; ")
 }
 
+## One folder of the server, for browsing in the server path dialog: its
+## subfolders and, for a file choice, the files matching `pattern`. Without a
+## folder the allowed roots are listed. The folder goes through
+## builder_server_path_resolve(), so browsing reaches only what a typed path
+## may reach; `parent` is NULL where going up would leave the allowed roots.
+builder_server_path_entries <- function(
+  folder = NULL,
+  type = c("directory", "file"),
+  pattern = NULL,
+  roots = builder_server_path_roots(),
+  limit = 500L
+) {
+  type <- match.arg(type)
+  roots <- builder_server_path_roots(roots)
+  entry <- function(path, kind, name = basename(path)) {
+    list(name = name, path = path, type = kind)
+  }
+  if (!is.character(folder) || length(folder) != 1L || !nzchar(folder)) {
+    return(list(
+      path = NULL,
+      parent = NULL,
+      entries = lapply(roots, entry, kind = "directory", name = roots),
+      truncated = FALSE
+    ))
+  }
+  folder <- builder_server_path_resolve(folder, "directory", roots = roots)
+  children <- sort(list.files(folder, full.names = TRUE, no.. = TRUE))
+  folders <- children[dir.exists(children)]
+  files <- if (identical(type, "file")) {
+    found <- setdiff(children, folders)
+    if (is.character(pattern) && length(pattern) == 1L) {
+      found <- found[grepl(pattern, basename(found), ignore.case = TRUE)]
+    }
+    found
+  } else {
+    character()
+  }
+  entries <- c(
+    lapply(folders, entry, kind = "directory"),
+    lapply(files, entry, kind = "file")
+  )
+  parent <- dirname(folder)
+  within <- !identical(parent, folder) &&
+    any(vapply(roots, function(root) .pathWithin(parent, root), logical(1)))
+  list(
+    path = folder,
+    parent = if (within) parent else NULL,
+    entries = utils::head(entries, limit),
+    truncated = length(entries) > limit
+  )
+}
+
 builder_native_picker_kinds <- function() {
   c(
     "output_directory",

@@ -1129,6 +1129,78 @@ builder_cancel_native_picker <- function(key) {
   invisible(TRUE)
 }
 
+## Browsing the allowed server folders in the server path dialog, the
+## fallback when no system picker can be opened. Every listed folder and every
+## chosen entry is checked by builder_server_path_resolve(), the same check a
+## typed path gets; a typed path still works.
+builder_server_browser <- reactiveVal(NULL)
+
+show_builder_server_path_dialog <- function(
+  ...,
+  input_id,
+  type = c("directory", "file"),
+  pattern = NULL
+) {
+  type <- match.arg(type)
+  builder_server_browser(list(
+    input_id = input_id,
+    type = type,
+    pattern = pattern,
+    folder = NULL
+  ))
+  shiny::showModal(builder_server_path_dialog(..., input_id = input_id))
+  invisible(TRUE)
+}
+
+output$builder_server_browser <- renderUI({
+  state <- builder_server_browser()
+  if (!is.list(state)) {
+    return(NULL)
+  }
+  builder_server_browser_ui(tryCatch(
+    builder_server_path_entries(
+      state$folder,
+      type = state$type,
+      pattern = state$pattern
+    ),
+    error = identity
+  ))
+})
+
+observeEvent(input$builder_server_browse, {
+  state <- builder_server_browser()
+  event <- input$builder_server_browse
+  if (!is.list(state) || !is.list(event)) {
+    return()
+  }
+  path <- event$path %||% ""
+  type <- if (identical(event$type, "file")) "file" else "directory"
+  if (!builder_has_text(path)) {
+    state$folder <- NULL
+    builder_server_browser(state)
+    return()
+  }
+  resolved <- tryCatch(
+    builder_server_path_resolve(path, type),
+    error = identity
+  )
+  if (inherits(resolved, "condition")) {
+    builder_notify(
+      "error",
+      conditionMessage(resolved),
+      target = list(field = state$input_id)
+    )
+    return()
+  }
+  if (identical(type, "directory")) {
+    state$folder <- resolved
+    builder_server_browser(state)
+  }
+  if (identical(type, state$type)) {
+    updateTextInput(session, state$input_id, value = resolved)
+  }
+})
+
 builder_schedule_native_picker <- function(
   kind,
   on_result,

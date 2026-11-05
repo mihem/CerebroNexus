@@ -3099,7 +3099,9 @@ show_builder_project_server_path <- function(
   detail = NULL
 ) {
   kind <- match.arg(kind)
-  shiny::showModal(builder_server_path_dialog(
+  show_builder_server_path_dialog(
+    type = if (identical(kind, "create")) "directory" else "file",
+    pattern = if (identical(kind, "open")) "[.]json$",
     title = if (identical(kind, "create")) {
       "Choose project folder"
     } else {
@@ -3127,8 +3129,7 @@ show_builder_project_server_path <- function(
     },
     detail = detail,
     note = if (identical(kind, "create")) builder_project_save_location_note()
-  ))
-  invisible(TRUE)
+  )
 }
 
 builder_project_server_path <- function(

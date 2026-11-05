@@ -731,16 +731,16 @@ builder_build_output_preflight <- function(path) {
 }
 
 show_builder_build_server_path <- function(detail = NULL) {
-  shiny::showModal(builder_server_path_dialog(
+  show_builder_server_path_dialog(
     title = "Choose output folder",
     input_id = "builder_build_server_folder",
+    type = "directory",
     action_id = "use_builder_build_server_folder",
     label = "Parent folder",
     action_label = "Build here",
     detail = detail,
     kicker = "Build output"
-  ))
-  invisible(TRUE)
+  )
 }
 
 choose_build_folder <- function() {

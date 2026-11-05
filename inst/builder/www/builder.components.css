@@ -676,6 +676,74 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   margin: var(--space-2) 0 0;
   overflow-wrap: anywhere;
 }
+/* Folder browser of the server path dialog. */
+.builder-server-browser {
+  margin-top: var(--space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.builder-server-browser-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-2);
+}
+.builder-server-browser-path {
+  min-width: 0;
+  color: var(--c-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--builder-type-caption);
+  overflow-wrap: anywhere;
+}
+.builder-server-browser-list {
+  max-height: 15rem;
+  margin: 0;
+  padding: var(--space-1) 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.builder-server-browser-entry {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  font-size: var(--builder-type-small);
+  text-align: left;
+  cursor: pointer;
+}
+.builder-server-browser-entry:hover,
+.builder-server-browser-entry:focus-visible {
+  background: var(--c-surface-2);
+}
+.builder-server-browser-entry:focus-visible {
+  outline: 2px solid var(--c-amber-300);
+  outline-offset: -2px;
+}
+.builder-server-browser-entry > span:first-child { color: var(--c-text-muted); }
+.builder-server-browser-head .builder-server-browser-up {
+  width: auto;
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  font-size: var(--builder-type-caption);
+}
+#shiny-modal .modal-body .builder-server-browser-empty,
+#shiny-modal .modal-body .builder-server-browser-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--builder-type-caption);
+}
+#shiny-modal .modal-body .builder-server-browser-empty { color: var(--c-text-muted); }
+#shiny-modal .modal-body .builder-server-browser-error { color: var(--c-error-700); }
 #shiny-modal .modal-body dl {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);

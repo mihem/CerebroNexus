@@ -261,7 +261,8 @@ builder_server_path_dialog <- function(
   modalDialog(
     title = builder_dialog_title(title, kicker),
     tags$p(
-      "Enter an absolute path on this server."
+      "Browse the allowed folders below, or enter an absolute path on this ",
+      "server."
     ),
     if (is.character(note) && length(note) == 1L && nzchar(note)) {
       tags$p(class = "builder-project-dialog-note", note)
@@ -285,6 +286,7 @@ builder_server_path_dialog <- function(
         paste0("Allowed folders: ", builder_server_path_roots_label(roots))
       )
     },
+    uiOutput("builder_server_browser"),
     footer = tagList(
       modalButton("Cancel"),
       actionButton(action_id, action_label, class = "btn btn-primary")
@@ -292,6 +294,71 @@ builder_server_path_dialog <- function(
     # Typed paths must not be lost to a stray backdrop click or Escape.
     easyClose = FALSE,
     size = "m"
+  )
+}
+
+## One folder listed by builder_server_path_entries(): a button per entry.
+## A folder opens (and, for a folder choice, becomes the path); a file becomes
+## the path. Without a current folder the allowed roots are listed.
+builder_server_browser_ui <- function(listing) {
+  if (inherits(listing, "condition")) {
+    return(tags$p(
+      class = "builder-server-browser-error",
+      role = "alert",
+      conditionMessage(listing)
+    ))
+  }
+  entry_button <- function(path, type, label, icon_name, class = NULL) {
+    tags$button(
+      type = "button",
+      class = paste(c("builder-server-browser-entry", class), collapse = " "),
+      `data-server-browse` = path,
+      `data-server-browse-type` = type,
+      tags$span(`aria-hidden` = "true", shiny::icon(icon_name)),
+      tags$span(label)
+    )
+  }
+  current <- listing$path %||% NULL
+  div(
+    class = "builder-server-browser",
+    div(
+      class = "builder-server-browser-head",
+      if (!is.null(current)) {
+        entry_button(
+          listing$parent %||% "",
+          "directory",
+          if (is.null(listing$parent)) "Allowed folders" else "Up",
+          "arrow-up",
+          class = "builder-server-browser-up"
+        )
+      },
+      tags$span(
+        class = "builder-server-browser-path",
+        current %||% "Allowed folders"
+      )
+    ),
+    if (length(listing$entries)) {
+      tags$ul(
+        class = "builder-server-browser-list",
+        `aria-label` = paste("Contents of", current %||% "the allowed folders"),
+        lapply(listing$entries, function(entry) {
+          tags$li(entry_button(
+            entry$path,
+            entry$type,
+            entry$name,
+            if (identical(entry$type, "directory")) "folder" else "file"
+          ))
+        })
+      )
+    } else {
+      tags$p(class = "builder-server-browser-empty", "This folder is empty.")
+    },
+    if (isTRUE(listing$truncated)) {
+      tags$p(
+        class = "builder-server-browser-empty",
+        "Only the first entries are listed; type the rest of the path."
+      )
+    }
   )
 }
 

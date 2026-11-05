@@ -101,3 +101,70 @@ test_that("the first Save opens the folder picker without an extra dialog", {
     expect_null(open_message$busy_detail)
   })
 })
+
+test_that("the server path dialog browses only the allowed folders", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_dialogs_app()
+  root <- withr::local_tempdir()
+  allowed <- normalizePath(
+    file.path(root, "allowed"),
+    winslash = "/",
+    mustWork = FALSE
+  )
+  dir.create(file.path(allowed, "project"), recursive = TRUE)
+  writeLines("{}", file.path(allowed, "project", "builder-project.json"))
+  dir.create(file.path(root, "outside"))
+  allowed <- normalizePath(allowed, winslash = "/", mustWork = TRUE)
+  withr::local_options(CerebroNexus.builder.server_path_roots = allowed)
+  shown <- list()
+  testthat::local_mocked_bindings(
+    showModal = function(ui, ...) {
+      shown[[length(shown) + 1L]] <<- as.character(ui)
+      invisible()
+    },
+    .package = "shiny"
+  )
+
+  shiny::testServer(app_env$server, {
+    show_builder_project_server_path("open")
+    expect_match(shown[[1L]], "builder_server_browser", fixed = TRUE)
+    expect_identical(builder_server_browser()$type, "file")
+    expect_match(
+      as.character(output$builder_server_browser$html),
+      sprintf('data-server-browse="%s"', allowed),
+      fixed = TRUE
+    )
+
+    session$setInputs(
+      builder_server_browse = list(
+        path = file.path(allowed, "project"),
+        type = "directory"
+      )
+    )
+    expect_identical(
+      builder_server_browser()$folder,
+      file.path(allowed, "project")
+    )
+    expect_match(
+      as.character(output$builder_server_browser$html),
+      "builder-project.json",
+      fixed = TRUE
+    )
+
+    ## A path outside the allowed folders is refused and changes nothing.
+    session$setInputs(
+      builder_server_browse = list(
+        path = file.path(root, "outside"),
+        type = "directory"
+      )
+    )
+    expect_identical(
+      builder_server_browser()$folder,
+      file.path(allowed, "project")
+    )
+
+    show_builder_build_server_path()
+    expect_identical(builder_server_browser()$type, "directory")
+    expect_null(builder_server_browser()$folder)
+  })
+})

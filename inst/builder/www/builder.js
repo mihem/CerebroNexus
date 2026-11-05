@@ -6375,4 +6375,17 @@
       window.Shiny.setInputValue(id, field.value, {priority: "event"});
     }
   }, true);
+
+  // The server path dialog's folder browser: a folder opens (and, for a
+  // folder choice, becomes the path); a file becomes the path. The server
+  // checks every entry against the allowed folders.
+  document.addEventListener("click", function (event) {
+    var entry = event.target.closest("[data-server-browse]");
+    if (!entry || !window.Shiny || !window.Shiny.setInputValue) return;
+    event.preventDefault();
+    window.Shiny.setInputValue("builder_server_browse", {
+      path: entry.getAttribute("data-server-browse") || "",
+      type: entry.getAttribute("data-server-browse-type") || "directory"
+    }, {priority: "event"});
+  });
 })();
