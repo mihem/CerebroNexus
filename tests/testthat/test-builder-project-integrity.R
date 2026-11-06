@@ -388,3 +388,26 @@ test_that("checkpoint cleanup cannot remove manifest or backup configurations", 
   expect_true(runtime$builder_project_diagnose(second$path)$manifest$valid)
   expect_true(runtime$builder_project_diagnose(second$path)$backup$valid)
 })
+
+test_that("a negative zero setting saves and reads back with its identity", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  entry <- builder_project_integrity_entry("zero", 6L)
+  entry$settings$alignment <- list(dx = round(-0.3), dy = c(0, -0))
+
+  descriptor <- runtime$builder_project_write_dataset_config(entry, root)
+  record <- list(
+    id = entry$id,
+    configuration = utils::modifyList(
+      descriptor,
+      list(digest = runtime$builder_project_configuration_digest(entry))
+    )
+  )
+  restored <- runtime$builder_project_read_dataset_config(record, root)
+
+  expect_identical(restored$settings$alignment$dx, 0)
+  expect_identical(
+    runtime$builder_project_configuration_digest(restored),
+    record$configuration$digest
+  )
+})

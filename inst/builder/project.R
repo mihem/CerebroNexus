@@ -3383,7 +3383,7 @@ builder_project_write_dataset_config <- function(
       call. = FALSE
     )
   }
-  payload <- jsonlite::serializeJSON(config, digits = NA, pretty = TRUE)
+  payload <- builder_project_serialize_json(config, pretty = TRUE)
   payload_md5 <- unclass(as.character(digest::digest(
     charToRaw(enc2utf8(payload)),
     algo = "md5",
@@ -4518,6 +4518,24 @@ builder_project_configuration_digest_value <- function(entry) {
   )
 }
 
+## serializeJSON() writes -0 (e.g. round(-0.3)), which reads back as 0 and so
+## changes the digest of what was saved; write every zero as 0.
+builder_project_serialize_json <- function(value, pretty = FALSE) {
+  positive_zero <- function(value) {
+    if (is.double(value)) {
+      value[!is.na(value) & value == 0] <- 0
+    } else if (is.list(value)) {
+      for (index in seq_along(value)) {
+        if (!is.null(value[[index]])) {
+          value[[index]] <- positive_zero(value[[index]])
+        }
+      }
+    }
+    value
+  }
+  jsonlite::serializeJSON(positive_zero(value), digits = NA, pretty = pretty)
+}
+
 ## The digest hashes the canonical UTF-8 JSON bytes themselves, not an R
 ## serialization, so a Project saved by one R runtime opens identically in
 ## another.
@@ -4542,11 +4560,7 @@ builder_project_configuration_digest <- function(
   if (.builder_project_text(cached %||% NULL)) {
     return(cached)
   }
-  canonical <- jsonlite::serializeJSON(
-    value,
-    digits = NA,
-    pretty = FALSE
-  )
+  canonical <- builder_project_serialize_json(value, pretty = FALSE)
   result <- unclass(as.character(digest::digest(
     charToRaw(enc2utf8(canonical)),
     algo = "md5",
