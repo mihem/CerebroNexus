@@ -199,3 +199,31 @@ test_that("a dataset added twice gets a distinct name", {
     "visium (3)"
   )
 })
+
+test_that("Reveal Folder passes the release path as one quoted argument", {
+  skip_on_os(c("windows", "mac"))
+  app_env <- builder_ui_fixes_app()
+  root <- withr::local_tempdir()
+  bin <- file.path(root, "bin")
+  dir.create(bin)
+  args_file <- file.path(root, "args.txt")
+  writeLines(
+    c(
+      "#!/bin/sh",
+      paste0(
+        "for a in \"$@\"; do printf '%s\n' \"$a\"; done > '",
+        args_file,
+        "'"
+      )
+    ),
+    file.path(bin, "xdg-open")
+  )
+  Sys.chmod(file.path(bin, "xdg-open"), "755")
+  withr::local_path(bin, action = "prefix")
+  withr::local_dir(root)
+  release <- file.path(root, "my release `touch marker`")
+  result <- app_env$builder_result_success(release = list(target = release))
+  expect_true(app_env$builder_reveal_release(result))
+  expect_identical(readLines(args_file), release)
+  expect_false(file.exists(file.path(root, "marker")))
+})

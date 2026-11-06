@@ -1037,14 +1037,21 @@ builder_reveal_release <- function(result, .reveal = NULL) {
     stop("A final release directory is required.", call. = FALSE)
   }
   if (is.null(.reveal)) {
+    # system2() runs through the shell, so the path must be quoted.
     .reveal <- function(path) {
       if (identical(Sys.info()[["sysname"]], "Darwin")) {
-        identical(system2("open", path, stdout = FALSE, stderr = FALSE), 0L)
+        identical(
+          system2("open", shQuote(path), stdout = FALSE, stderr = FALSE),
+          0L
+        )
       } else if (.Platform$OS.type == "windows") {
         shell.exec(path)
         TRUE
       } else {
-        identical(system2("xdg-open", path, stdout = FALSE, stderr = FALSE), 0L)
+        identical(
+          system2("xdg-open", shQuote(path), stdout = FALSE, stderr = FALSE),
+          0L
+        )
       }
     }
   }
