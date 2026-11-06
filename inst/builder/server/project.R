@@ -1541,7 +1541,8 @@ builder_project_receive_open <- function(
   if (is.list(opened) && is.list(opened$recovery_offer)) {
     offer <- opened$recovery_offer
     if (
-      !is.list(offer$primary_fingerprint) ||
+      !(is.list(offer$primary_fingerprint) ||
+        isTRUE(offer$primary_missing)) ||
         !is.list(offer$backup_fingerprint) ||
         !builder_has_text(offer$backup_fingerprint$md5 %||% NULL)
     ) {
@@ -1666,8 +1667,10 @@ builder_project_start_open <- function(
         recover_backup = recover_backup,
         expected_primary_fingerprint = expected_primary_fingerprint,
         expected_backup_fingerprint = expected_backup_fingerprint,
+        # Backup recovery moves files with the bundle path helpers.
         runtime_files = builder_project_open_runtime_files(
-          include_server_paths = !is.null(external_roots)
+          include_server_paths = !is.null(external_roots) ||
+            isTRUE(recover_backup)
         ),
         external_roots = external_roots,
         source_utf8 = builder_source_utf8
