@@ -1,4 +1,6 @@
+builder_repo_source("extras.R", local = environment())
 builder_repo_source("marker_import.R", local = environment())
+builder_repo_source("ui/marker_import.R", local = environment())
 
 test_that("Marker import module exposes its inventory contract", {
   expect_true(exists("builder_marker_import_inventory", mode = "function"))
@@ -371,4 +373,70 @@ test_that("a frozen Marker import, as the Builder stores it, freezes again", {
     ))),
     "resolved"
   )
+})
+
+test_that("sources with different columns are refused before ready", {
+  known <- c("T", "B")
+  make_source <- function(name, level, table) {
+    builder_marker_import_map_single(
+      builder_marker_import_source(name, NULL, table),
+      "cluster",
+      level,
+      known,
+      confirmed = TRUE
+    )
+  }
+  sources <- list(
+    make_source("T.csv", "T", data.frame(gene = "CD3D", score = 1)),
+    make_source("B.csv", "B", data.frame(gene = "MS4A1", logFC = 2))
+  )
+
+  validation <- builder_marker_import_validate("m", "cluster", sources, known)
+
+  expect_false(validation$ready)
+  expect_true("mismatched_columns" %in% validation$errors)
+  message <- builder_marker_import_columns_message(sources)
+  expect_match(message, "T.csv has cluster, gene, score", fixed = TRUE)
+  expect_match(message, "B.csv has cluster, gene, logFC", fixed = TRUE)
+
+  ## The same columns in another order still combine.
+  sources[[2L]] <- make_source(
+    "B.csv",
+    "B",
+    data.frame(score = 2, gene = "MS4A1")
+  )
+  expect_true(
+    builder_marker_import_validate("m", "cluster", sources, known)$ready
+  )
+})
+
+test_that("Marker CSV cells keep their text and semicolon CSVs split", {
+  zero <- tempfile(fileext = ".csv")
+  writeLines(c("cluster,gene,p_val", "01,CD3D,0.01", "02,NA,0.2"), zero)
+  semicolon <- tempfile(fileext = ".csv")
+  writeLines(
+    c("cluster;gene;logFC", "01;CD3D;1,5", "02;MS4A1;-0,25"),
+    semicolon
+  )
+
+  sources <- builder_marker_import_inventory(
+    c(zero, semicolon),
+    c("zero.csv", "semicolon.csv")
+  )
+
+  plain <- sources[[1L]]$raw_table
+  expect_identical(plain$cluster, c("01", "02"))
+  expect_identical(plain$gene, c("CD3D", "NA"))
+  expect_identical(plain$p_val, c(0.01, 0.2))
+  split <- sources[[2L]]$raw_table
+  expect_identical(names(split), c("cluster", "gene", "logFC"))
+  expect_identical(split$logFC, c(1.5, -0.25))
+  mapped <- builder_marker_import_map_multiple(
+    sources[[1L]],
+    "cluster",
+    "cluster",
+    c("01", "02")
+  )
+  expect_true(builder_marker_import_source_ready(mapped))
+  expect_identical(mapped$levels, c("01", "02"))
 })

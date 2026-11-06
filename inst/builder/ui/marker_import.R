@@ -86,8 +86,35 @@ builder_marker_import_status_label <- function(source) {
     too_many_rows = "This source has too many rows.",
     unreadable_table = "This table could not be read.",
     unreadable_sheet = "This worksheet could not be read.",
+    readxl_missing = "Install the readxl package to read XLSX files.",
     unsupported_format = "Use CSV, TSV, or XLSX files.",
     "Resolve this source before saving."
+  )
+}
+
+## Name two sources whose columns differ, with the columns of each.
+builder_marker_import_columns_message <- function(sources) {
+  ready <- Filter(builder_marker_import_source_ready, sources)
+  columns <- lapply(ready, function(source) names(source$table))
+  keys <- vapply(
+    columns,
+    function(names) paste(sort(names), collapse = "\r"),
+    character(1)
+  )
+  other <- which(keys != keys[[1L]])[[1L]]
+  describe <- function(index) {
+    paste0(
+      ready[[index]]$source_name,
+      " has ",
+      paste(columns[[index]], collapse = ", ")
+    )
+  }
+  paste0(
+    "Every source of one method needs the same columns: ",
+    describe(1L),
+    "; ",
+    describe(other),
+    "."
   )
 }
 
@@ -229,7 +256,18 @@ builder_marker_import_ui <- function(id, groups, draft = NULL) {
       if (length(validation$warnings %||% character())) {
         p(class = "marker-import-warning", validation$warnings)
       },
-      if (length(validation$errors %||% character())) {
+      if ("mismatched_columns" %in% (validation$errors %||% character())) {
+        p(
+          class = "marker-import-error",
+          builder_marker_import_columns_message(sources)
+        )
+      },
+      if (
+        length(setdiff(
+          validation$errors %||% character(),
+          "mismatched_columns"
+        ))
+      ) {
         p(
           class = "marker-import-error",
           paste(

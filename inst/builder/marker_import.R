@@ -58,21 +58,22 @@ builder_marker_import_source <- function(filename, sheet = NULL, table) {
   )
 }
 
+## Cells are read as text first (helpers in extras.R), so "01" stays "01";
+## only columns whose values all survive the change become numbers.
 builder_marker_import_read_delimited <- function(path, extension) {
-  separator <- switch(extension, csv = ",", tsv = "\t", NULL)
-  if (is.null(separator)) {
+  if (!extension %in% c("csv", "tsv")) {
     return(NULL)
   }
-  result <- suppressWarnings(try(
-    utils::read.delim(
-      path,
-      sep = separator,
-      stringsAsFactors = FALSE,
-      check.names = FALSE
-    ),
-    silent = TRUE
-  ))
-  if (inherits(result, "try-error")) NULL else result
+  tryCatch(
+    {
+      separator <- builder_table_delimiter(path, extension)
+      builder_table_type_columns(
+        builder_table_read_delimited(path, separator),
+        dec = if (identical(separator, ";")) "," else "."
+      )
+    },
+    error = function(error) NULL
+  )
 }
 
 builder_marker_import_file_inventory <- function(
@@ -110,6 +111,12 @@ builder_marker_import_file_inventory <- function(
     return(list(builder_marker_import_source(filename, NULL, table)))
   }
   if (identical(extension, "xlsx")) {
+    if (!requireNamespace("readxl", quietly = TRUE)) {
+      return(list(builder_marker_import_error(
+        filename,
+        error = "readxl_missing"
+      )))
+    }
     sheets <- try(readxl::excel_sheets(path), silent = TRUE)
     if (inherits(sheets, "try-error") || !length(sheets)) {
       return(list(builder_marker_import_error(
@@ -118,10 +125,7 @@ builder_marker_import_file_inventory <- function(
       )))
     }
     return(lapply(sheets, function(sheet) {
-      table <- try(
-        as.data.frame(readxl::read_excel(path, sheet = sheet)),
-        silent = TRUE
-      )
+      table <- try(builder_table_read_excel(path, sheet), silent = TRUE)
       if (inherits(table, "try-error")) {
         return(builder_marker_import_error(filename, sheet, "unreadable_sheet"))
       }
@@ -316,6 +320,15 @@ builder_marker_import_validate <- function(
   single_levels <- vapply(single, function(source) source$cluster, character(1))
   if (anyDuplicated(single_levels)) {
     errors <- c(errors, "duplicate_cluster_assignment")
+  }
+  ## The sources of one method become one table, so their columns must match.
+  if (
+    length(unique(lapply(ready_sources, function(source) {
+      sort(names(source$table))
+    }))) >
+      1L
+  ) {
+    errors <- c(errors, "mismatched_columns")
   }
   covered <- unique(unlist(
     lapply(ready_sources, `[[`, "levels"),
