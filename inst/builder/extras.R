@@ -61,6 +61,9 @@ builder_table_inventory <- function(path, filename = path) {
       )
     ))
   }
+  if (!requireNamespace("readxl", quietly = TRUE)) {
+    return(list(error = "Install the readxl package to read Excel tables."))
+  }
   sheets <- suppressWarnings(try(readxl::excel_sheets(path), silent = TRUE))
   if (inherits(sheets, "try-error") || !length(sheets)) {
     return(list(error = "Could not read this Excel workbook."))
@@ -91,6 +94,115 @@ builder_table_inventory_metadata <- function(path, filename = path) {
   })
 }
 
+## Pick the separator from the header line: tab, comma or semicolon.
+builder_table_delimiter <- function(path, extension) {
+  if (identical(extension, "tsv")) {
+    return("\t")
+  }
+  line <- readLines(path, n = 1L, warn = FALSE)
+  candidates <- if (identical(extension, "csv")) {
+    c(",", ";", "\t")
+  } else {
+    c("\t", ",", ";")
+  }
+  counts <- vapply(
+    candidates,
+    function(separator) {
+      sum(
+        strsplit(paste(line, collapse = ""), "", fixed = TRUE)[[1L]] ==
+          separator
+      )
+    },
+    numeric(1)
+  )
+  if (!any(counts > 0)) candidates[[1L]] else candidates[[which.max(counts)]]
+}
+
+## A column becomes numeric only when no value changes: leading zeros, hex,
+## too many digits or words keep the whole column as text.
+builder_table_numeric_column <- function(values, dec = ".") {
+  text <- trimws(values)
+  present <- text[!is.na(text) & !text %in% c("", "NA")]
+  if (
+    !length(present) ||
+      any(grepl("^[+-]?0[0-9xX]", present))
+  ) {
+    return(values)
+  }
+  converted <- utils::type.convert(
+    text,
+    as.is = TRUE,
+    na.strings = c("", "NA"),
+    dec = dec,
+    numerals = "no.loss"
+  )
+  if (is.numeric(converted)) converted else values
+}
+
+builder_table_type_columns <- function(table, dec = ".", keep = character()) {
+  for (name in setdiff(names(table), keep)) {
+    if (is.character(table[[name]])) {
+      table[[name]] <- builder_table_numeric_column(table[[name]], dec)
+    }
+  }
+  table
+}
+
+## Read a delimited file with every cell as text. Tab files are read without
+## quote handling, so one stray quote cannot swallow the following rows.
+builder_table_read_delimited <- function(path, separator) {
+  tab <- identical(separator, "\t")
+  ## An odd number of quotes means one is never closed and would swallow rows.
+  if (!tab) {
+    bytes <- readBin(path, "raw", file.size(path))
+    if (sum(bytes == as.raw(34L)) %% 2L) {
+      stop("a quote is not closed", call. = FALSE)
+    }
+  }
+  table <- withCallingHandlers(
+    utils::read.table(
+      path,
+      header = TRUE,
+      sep = separator,
+      quote = if (tab) "" else "\"",
+      colClasses = "character",
+      na.strings = character(),
+      stringsAsFactors = FALSE,
+      check.names = FALSE,
+      comment.char = ""
+    ),
+    warning = function(warning) invokeRestart("muffleWarning")
+  )
+  if (tab) {
+    unquote <- function(values) {
+      quoted <- grepl('^".*"$', values)
+      values[quoted] <- gsub(
+        '""',
+        '"',
+        substr(
+          values[quoted],
+          2L,
+          nchar(values[quoted]) - 1L
+        ),
+        fixed = TRUE
+      )
+      values
+    }
+    names(table) <- unquote(names(table))
+    table[] <- lapply(table, unquote)
+  }
+  table
+}
+
+## Excel types are guessed from every row (a sheet has at most 1048576), so
+## text below many numbers stays text and dates stay dates.
+builder_table_read_excel <- function(path, sheet) {
+  builder_table_type_columns(as.data.frame(
+    readxl::read_excel(path, sheet = sheet, guess_max = 1048576L),
+    stringsAsFactors = FALSE
+  ))
+}
+
 #' Read one selected table only when it becomes part of a build.
 builder_read_table_source <- function(record) {
   if (is.data.frame(record$table)) {
@@ -102,34 +214,47 @@ builder_read_table_source <- function(record) {
     return(list(error = paste0(filename, ": File not found.")))
   }
   extension <- tolower(tools::file_ext(filename))
-  table <- suppressWarnings(try(
-    if (extension %in% c("csv", "tsv", "txt")) {
-      utils::read.table(
-        path,
-        header = TRUE,
-        sep = if (extension == "csv") "," else "\t",
-        stringsAsFactors = FALSE,
-        check.names = FALSE,
-        comment.char = "",
-        quote = "\""
+  label <- record$sheet_name %||%
+    record$sheet %||%
+    record$display_name %||%
+    "Table"
+  excel <- extension %in% c("xls", "xlsx", "xlsm")
+  if (excel && !requireNamespace("readxl", quietly = TRUE)) {
+    return(list(
+      error = paste0(
+        filename,
+        ": install the readxl package to read Excel tables."
       )
-    } else if (extension %in% c("xls", "xlsx", "xlsm")) {
-      readxl::read_excel(path, sheet = record$sheet_name %||% record$sheet)
+    ))
+  }
+  table <- tryCatch(
+    if (extension %in% c("csv", "tsv", "txt")) {
+      separator <- builder_table_delimiter(path, extension)
+      builder_table_type_columns(
+        builder_table_read_delimited(path, separator),
+        dec = if (identical(separator, ";")) "," else "."
+      )
+    } else if (excel) {
+      builder_table_read_excel(path, record$sheet_name %||% record$sheet)
     } else {
-      stop("Unsupported table format.")
+      stop("unsupported table format", call. = FALSE)
     },
-    silent = TRUE
-  ))
-  if (inherits(table, "try-error") || !is.data.frame(table)) {
+    error = function(error) error
+  )
+  if (inherits(table, "condition") || !is.data.frame(table)) {
+    reason <- if (inherits(table, "condition")) {
+      conditionMessage(table)
+    } else {
+      "no table found"
+    }
     return(list(
       error = paste0(
         filename,
         ": ",
-        record$sheet_name %||%
-          record$sheet %||%
-          record$display_name %||%
-          "Table",
-        " could not be read."
+        label,
+        " could not be read (",
+        reason,
+        ")."
       )
     ))
   }
