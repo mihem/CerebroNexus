@@ -29,10 +29,10 @@ Automated tests run in a reproducible Nix environment.
 ```r
 install.packages("remotes")
 remotes::install_github("mihem/CerebroNexus")
-install.packages(c("Seurat", "shinymanager")) # Builder and login-enabled Apps
+install.packages(c("Seurat", "callr", "processx", "ps", "shinymanager")) # Builder and login-enabled Apps
 ```
 
-Seurat is needed for Builder; `shinymanager >= 1.1.0` is needed only for login-enabled Apps. Optional input/backend packages are listed in the [Builder guide](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html). Exported Apps still require R and the Viewer dependencies on the destination machine.
+Seurat, callr, processx and ps are needed for Builder; `shinymanager >= 1.1.0` is needed only for login-enabled Apps. Optional input/backend packages are listed in the [Builder guide](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html). Exported Apps still require R and the Viewer dependencies on the destination machine.
 
 ## Run Builder
 

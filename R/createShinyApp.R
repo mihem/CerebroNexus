@@ -2398,6 +2398,7 @@
 #'
 #' @importFrom later later
 #' @importFrom mirai mirai
+#' @importFrom promises promise
 #' @importFrom stats setNames
 #' @export
 createShinyApp <- function(

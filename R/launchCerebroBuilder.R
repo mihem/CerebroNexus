@@ -63,6 +63,7 @@ launchCerebroBuilder <- function(
 
   # These dependencies are used by the isolated inst/builder runtime. Load
   # them only when Builder launches, without adding to Viewer startup work.
+  # callr, processx and ps are Suggests: only the Builder needs them.
   available <- c(
     callr = requireNamespace("callr", quietly = TRUE),
     digest = requireNamespace("digest", quietly = TRUE),
@@ -71,10 +72,13 @@ launchCerebroBuilder <- function(
     ps = requireNamespace("ps", quietly = TRUE)
   )
   if (!all(available)) {
+    missing <- names(available)[!available]
     stop(
-      "Builder dependencies are unavailable: ",
-      paste(names(available)[!available], collapse = ", "),
-      ". Reinstall CerebroNexus with its dependencies.",
+      "The Builder needs these packages: ",
+      paste(missing, collapse = ", "),
+      ". Install them with install.packages(",
+      paste(deparse(missing), collapse = ""),
+      ") and try again.",
       call. = FALSE
     )
   }

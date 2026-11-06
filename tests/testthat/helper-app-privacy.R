@@ -43,6 +43,7 @@ privacy_start_app <- function(
   exclude_package = FALSE,
   test_mode = FALSE
 ) {
+  skip_if_not_installed("callr")
   stdout <- file.path(root, paste0("app-", port, ".stdout"))
   stderr <- file.path(root, paste0("app-", port, ".stderr"))
   process <- callr::r_bg(

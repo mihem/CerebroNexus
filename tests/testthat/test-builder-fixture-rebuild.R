@@ -1,7 +1,14 @@
 test_that("the Trekker Builder fixture rebuilds offline with stable content and images", {
   script <- test_path("../../data-raw/build_builder_spatial_fixtures.R")
   skip_if_not(file.exists(script), "Regeneration scripts are repository-only")
-  for (package in c("Seurat", "SeuratObject", "qs2", "jpeg", "future")) {
+  for (package in c(
+    "Seurat",
+    "SeuratObject",
+    "qs2",
+    "jpeg",
+    "future",
+    "callr"
+  )) {
     skip_if_not_installed(package)
   }
   first <- withr::local_tempdir()
@@ -88,7 +95,14 @@ test_that("the Visium Builder fixture rebuilds from the 10x files", {
   }
   matrix <- find("_filtered_feature_bc_matrix[.]h5$")
   spatial <- find("_spatial[.]tar[.]gz$")
-  for (package in c("Seurat", "SeuratObject", "rhdf5", "jpeg", "png")) {
+  for (package in c(
+    "Seurat",
+    "SeuratObject",
+    "rhdf5",
+    "jpeg",
+    "png",
+    "callr"
+  )) {
     skip_if_not_installed(package)
   }
   first <- withr::local_tempdir()

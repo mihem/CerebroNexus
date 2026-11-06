@@ -1,4 +1,5 @@
 test_that("import callbacks do not serialize the live Builder environment", {
+  skip_if_not_installed("callr")
   runtime <- new.env(parent = globalenv())
   for (file in c("project.R", "session.R")) {
     builder_repo_source(file, local = runtime)
@@ -170,6 +171,7 @@ test_that("WSL picker paths preserve spaces and reject failed translation", {
 
 test_that("a real attachment worker verifies images and reports changed sources", {
   skip_if_not_installed("png")
+  skip_if_not_installed("callr")
   runtime <- new.env(parent = baseenv())
   builder_repo_source("prerequisite.R", local = runtime)
   files <- vapply(
