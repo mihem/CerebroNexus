@@ -1847,6 +1847,76 @@ builder_worker_poll_startup <- function(worker, timeout = 0) {
   }
 }
 
+## NULL once no process carrying a worker's tree marker is left, killing any
+## survivors until `deadline`; otherwise the reason it cannot be confirmed.
+.builder_worker_confirm_gone <- function(marker, deadline) {
+  if (!.builder_worker_scalar_text(marker)) {
+    return("A lost background worker process cannot be traced.")
+  }
+  if (!requireNamespace("ps", quietly = TRUE)) {
+    return("The ps package is required to verify worker descendants.")
+  }
+  repeat {
+    found <- try(ps::ps_find_tree(marker), silent = TRUE)
+    if (inherits(found, "try-error")) {
+      return(paste0(
+        "The lost background worker processes could not be inspected: ",
+        conditionMessage(attr(found, "condition"))
+      ))
+    }
+    alive <- Filter(.builder_worker_handle_alive, found)
+    if (!length(alive)) {
+      return(NULL)
+    }
+    if (Sys.time() >= deadline) {
+      return("A process of a lost background worker did not exit.")
+    }
+    .builder_worker_kill_handles(alive)
+    Sys.sleep(0.05)
+  }
+}
+
+## Snapshot cleanup stops while any process of a lost worker may still write
+## into the snapshot root. The worker remembers the lost process trees.
+.builder_worker_quarantine <- function(worker, reason) {
+  marker <- .builder_worker_tree_marker(worker$process) %||% NA_character_
+  worker$lost_trees <- unique(c(worker$lost_trees, marker))
+  worker$quarantine_reason <- reason
+  worker$ready <- FALSE
+  worker$cleanup_safe <- FALSE
+  worker
+}
+
+## Cleanup is safe again once every lost process tree is confirmed gone.
+.builder_worker_settle_lost <- function(worker, deadline) {
+  lost <- worker$lost_trees
+  if (!length(lost)) {
+    return(worker)
+  }
+  reasons <- vapply(
+    lost,
+    function(marker) .builder_worker_confirm_gone(marker, deadline) %||% "",
+    character(1)
+  )
+  worker$lost_trees <- lost[nzchar(reasons)]
+  if (length(worker$lost_trees)) {
+    worker$quarantine_reason <- reasons[nzchar(reasons)][[1L]]
+  } else {
+    worker$quarantine_reason <- NULL
+    worker$cleanup_safe <- TRUE
+  }
+  worker
+}
+
+.builder_worker_stop_cleanup <- function(worker) {
+  cleanup <- try(.builder_worker_cleanup_orphans(worker), silent = TRUE)
+  if (inherits(cleanup, "try-error")) {
+    cleanup <- .builder_worker_cleanup_report()
+    cleanup$errors <- "snapshot-root"
+  }
+  cleanup
+}
+
 #' Stop a worker, confirm process death, then clean verified orphan artifacts.
 #'
 #' `verify_tree = TRUE` lets an idle or busy worker unwind first and confirms
@@ -1885,36 +1955,49 @@ builder_worker_stop <- function(worker, grace_ms = 5000L, verify_tree = TRUE) {
   graceful_deadline <- Sys.time() + grace_ms / 1000
   force_ms <- max(2000L, min(grace_ms, 5000L))
   force_deadline <- graceful_deadline + force_ms / 1000
-  cleanup_safe <- .builder_worker_cleanup_safe(worker)
   alive <- try(worker$process$is_alive(), silent = TRUE)
   if (inherits(alive, "try-error")) {
-    worker$ready <- FALSE
-    worker$cleanup_safe <- FALSE
+    error <- "The background worker state could not be inspected."
     return(list(
-      worker = worker,
+      worker = .builder_worker_quarantine(worker, error),
       stopped = FALSE,
       tree_verified = FALSE,
       restart_allowed = FALSE,
       quarantined = TRUE,
-      error = "The background worker state could not be inspected.",
+      error = error,
       cleanup = NULL
     ))
   }
 
   if (!isTRUE(alive)) {
+    # The parent crashed. Kill and confirm its marked descendants (they may
+    # still write snapshots) before any cleanup.
     worker$ready <- FALSE
-    worker$cleanup_safe <- FALSE
+    lost <- .builder_worker_confirm_gone(
+      .builder_worker_tree_marker(worker$process),
+      Sys.time() + force_ms / 1000
+    )
+    if (!is.null(lost)) {
+      return(list(
+        worker = .builder_worker_quarantine(worker, lost),
+        stopped = FALSE,
+        tree_verified = FALSE,
+        restart_allowed = TRUE,
+        quarantined = TRUE,
+        error = lost,
+        cleanup = NULL
+      ))
+    }
+    worker <- .builder_worker_settle_lost(worker, Sys.time() + force_ms / 1000)
+    cleanup_safe <- .builder_worker_cleanup_safe(worker)
     return(list(
       worker = worker,
-      stopped = FALSE,
-      tree_verified = FALSE,
+      stopped = TRUE,
+      tree_verified = TRUE,
       restart_allowed = TRUE,
-      quarantined = TRUE,
-      error = paste0(
-        "The background worker parent already exited; its process tree ",
-        "cannot be verified."
-      ),
-      cleanup = NULL
+      quarantined = !cleanup_safe,
+      error = NULL,
+      cleanup = if (cleanup_safe) .builder_worker_stop_cleanup(worker)
     ))
   }
 
@@ -1924,10 +2007,8 @@ builder_worker_stop <- function(worker, grace_ms = 5000L, verify_tree = TRUE) {
     list(handles = list(), error = NULL)
   }
   if (!is.null(tree$error)) {
-    worker$ready <- FALSE
-    worker$cleanup_safe <- FALSE
     return(list(
-      worker = worker,
+      worker = .builder_worker_quarantine(worker, tree$error),
       stopped = FALSE,
       tree_verified = FALSE,
       restart_allowed = FALSE,
@@ -2042,21 +2123,7 @@ builder_worker_stop <- function(worker, grace_ms = 5000L, verify_tree = TRUE) {
   tree_stopped <- .builder_worker_wait_tree(handles, force_deadline)
   parent_stopped <- !inherits(alive, "try-error") && !isTRUE(alive)
   stopped <- parent_stopped && tree_stopped && tree_verified
-  if (!isTRUE(stopped)) {
-    cleanup_safe <- FALSE
-  }
-
   worker$ready <- FALSE
-  worker$cleanup_safe <- cleanup_safe
-
-  cleanup <- NULL
-  if (isTRUE(stopped) && cleanup_safe) {
-    cleanup <- try(.builder_worker_cleanup_orphans(worker), silent = TRUE)
-    if (inherits(cleanup, "try-error")) {
-      cleanup <- .builder_worker_cleanup_report()
-      cleanup$errors <- "snapshot-root"
-    }
-  }
   error <- NULL
   if (!isTRUE(stopped)) {
     error <- if (!parent_stopped) {
@@ -2068,6 +2135,15 @@ builder_worker_stop <- function(worker, grace_ms = 5000L, verify_tree = TRUE) {
     } else {
       "The background worker process tree cannot be verified."
     }
+    worker <- .builder_worker_quarantine(worker, error)
+  } else {
+    worker <- .builder_worker_settle_lost(worker, Sys.time() + force_ms / 1000)
+  }
+  cleanup_safe <- .builder_worker_cleanup_safe(worker)
+
+  cleanup <- NULL
+  if (isTRUE(stopped) && cleanup_safe) {
+    cleanup <- .builder_worker_stop_cleanup(worker)
   }
   list(
     worker = worker,
@@ -2130,6 +2206,8 @@ builder_worker_restart <- function(
   }
   restarted$owns_root <- worker$owns_root
   restarted$cleanup_safe <- .builder_worker_cleanup_safe(stopped$worker)
+  restarted$lost_trees <- stopped$worker$lost_trees
+  restarted$quarantine_reason <- stopped$worker$quarantine_reason
   restarted["cleanup"] <- list(stopped$cleanup)
   restarted
 }

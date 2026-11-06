@@ -648,3 +648,33 @@ test_that("a failed worker restart ends the import and reports why", {
     expect_match(isolate(add_error()), "no longer owned", fixed = TRUE)
   })
 })
+
+test_that("session end removes the snapshot folder of a crashed worker", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  skip_if_not_installed("callr")
+  skip_if_not_installed("ps")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this import queue test.")
+  }
+  crashed <- app_env$builder_worker_start(getwd())
+  root <- crashed$snapshot_root
+  withr::defer(unlink(root, recursive = TRUE, force = TRUE))
+  crashed$snapshot_registry[["ds1"]] <- app_env$builder_snapshot_seurat(
+    SeuratObject::pbmc_small,
+    file.path(root, "dataset-ds1"),
+    available_bytes = 2^40
+  )
+  crashed$process$kill()
+  expect_false(crashed$process$is_alive())
+
+  shiny::testServer(app_env$server, {
+    worker(crashed)
+    session$close()
+  })
+
+  expect_false(dir.exists(root))
+})

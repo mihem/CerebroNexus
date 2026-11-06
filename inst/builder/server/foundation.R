@@ -1453,10 +1453,16 @@ session$onSessionEnded(function() {
         silent = TRUE
       )
     }
-    if (inherits(stopped, "try-error") || !isTRUE(stopped$stopped)) {
-      return()
+    kept <- if (inherits(stopped, "try-error")) {
+      conditionMessage(attr(stopped, "condition"))
+    } else if (!isTRUE(stopped$stopped)) {
+      stopped$error %||% "The background worker did not stop."
+    } else if (!isTRUE(stopped$worker$cleanup_safe)) {
+      stopped$worker$quarantine_reason %||%
+        "A background worker process could not be confirmed gone."
     }
-    if (!isTRUE(stopped$worker$cleanup_safe)) {
+    if (!is.null(kept)) {
+      message("Builder kept its session folder ", snapshot_root, ": ", kept)
       return()
     }
     current_worker <- stopped$worker

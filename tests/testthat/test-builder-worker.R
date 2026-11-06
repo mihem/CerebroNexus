@@ -1339,7 +1339,7 @@ test_that("worker interrupts use CTRL+BREAK on Windows", {
   expect_identical(calls, "interrupt")
 })
 
-test_that("dead-parent restart quarantines artifacts from a lost child", {
+test_that("dead-parent restart kills a lost child before snapshot cleanup", {
   skip_if_not_installed("callr")
   skip_if_not_installed("processx")
   skip_if_not_installed("ps")
@@ -1398,29 +1398,58 @@ test_that("dead-parent restart quarantines artifacts from a lost child", {
   })
 
   expect_s3_class(restarted, "builder_worker")
-  expect_false(restarted$cleanup_safe)
-  expect_null(restarted$cleanup)
-  expect_true(ps::ps_is_running(child_handle))
+  expect_true(restarted$cleanup_safe)
+  expect_length(restarted$lost_trees, 0L)
+  expect_false(.builder_test_pid_alive(child_pid))
+  expect_identical(restarted$cleanup$snapshots, "dataset-orphan")
   expect_true(dir.exists(registered$path))
-  expect_true(dir.exists(orphan$path))
+  expect_false(dir.exists(orphan$path))
   expect_equal(builder_worker_cell_count(restarted, "dataset-a"), 80L)
-
-  identity <- .builder_worker_identity(registered)
-  restarted <- builder_worker_release_snapshot(
-    restarted,
-    "dataset-a",
-    expected_identity = identity
-  )
-  expect_null(restarted$snapshot_registry[["dataset-a"]])
-  expect_true(dir.exists(registered$path))
 
   stopped <- builder_worker_stop(restarted)
 
   expect_true(stopped$stopped)
-  expect_false(stopped$worker$cleanup_safe)
-  expect_null(stopped$cleanup)
+  expect_true(stopped$worker$cleanup_safe)
   expect_true(dir.exists(registered$path))
-  expect_true(dir.exists(orphan$path))
+})
+
+test_that("an untraceable crashed worker keeps the snapshot root", {
+  process <- .builder_fake_process("closed")
+  process$is_alive <- function() FALSE
+  worker <- .builder_fake_worker(process)
+
+  stopped <- builder_worker_stop(worker)
+
+  expect_false(stopped$stopped)
+  expect_true(stopped$restart_allowed)
+  expect_true(stopped$quarantined)
+  expect_false(stopped$worker$cleanup_safe)
+  expect_identical(stopped$worker$lost_trees, NA_character_)
+  expect_match(stopped$worker$quarantine_reason, "cannot be traced")
+  settled <- .builder_worker_settle_lost(stopped$worker, Sys.time() + 1)
+  expect_false(settled$cleanup_safe)
+})
+
+test_that("a quarantine ends once the lost processes are gone", {
+  skip_if_not_installed("processx")
+  skip_if_not_installed("ps")
+  marker <- paste0("PSbuildertest", Sys.getpid(), "_", sample.int(1e6, 1L))
+  sleeper <- processx::process$new(
+    .builder_test_sleeper_binary(),
+    c("--vanilla", "--slave", "-e", "repeat { Sys.sleep(1) }"),
+    env = stats::setNames(c("current", "YES"), c("", marker))
+  )
+  withr::defer(try(sleeper$kill(), silent = TRUE))
+  worker <- .builder_fake_worker(.builder_fake_process("closed"))
+  worker$cleanup_safe <- FALSE
+  worker$lost_trees <- marker
+
+  settled <- .builder_worker_settle_lost(worker, Sys.time() + 5)
+
+  expect_false(sleeper$is_alive())
+  expect_true(settled$cleanup_safe)
+  expect_length(settled$lost_trees, 0L)
+  expect_null(settled$quarantine_reason)
 })
 
 test_that("worker stop kills descendants before snapshot cleanup", {
