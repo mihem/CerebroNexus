@@ -1063,7 +1063,7 @@ await_restarted_worker <- function(detail) {
     function() {
       shiny::withReactiveDomain(
         builder_lifecycle_session,
-        poll_builder_worker_startup()
+        shiny::isolate(poll_builder_worker_startup())
       )
     },
     delay = 0.1
@@ -1102,7 +1102,7 @@ start_builder_worker <- function() {
     function() {
       shiny::withReactiveDomain(
         builder_lifecycle_session,
-        poll_builder_worker_startup()
+        shiny::isolate(poll_builder_worker_startup())
       )
     },
     delay = 0.1
@@ -1292,6 +1292,8 @@ observeEvent(
   ignoreInit = TRUE
 )
 
+## Runs from later() callbacks, so callers wrap it in isolate(): a failed
+## restart reads reactive state while it ends the queued work.
 poll_builder_worker_startup <- function() {
   if (builder_session_closed()) {
     return(invisible(FALSE))
@@ -1307,7 +1309,7 @@ poll_builder_worker_startup <- function() {
       function() {
         shiny::withReactiveDomain(
           builder_lifecycle_session,
-          poll_builder_worker_startup()
+          shiny::isolate(poll_builder_worker_startup())
         )
       },
       delay = 0.1

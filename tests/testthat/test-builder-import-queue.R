@@ -595,3 +595,56 @@ test_that("a Build that ignores Stop is ended after the grace period", {
     expect_false(calls$items[[1L]]$notify)
   })
 })
+
+test_that("a failed worker restart ends the import and reports why", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this import queue test.")
+  }
+  app_env$builder_session_example <- function(...) invisible(TRUE)
+  app_env$builder_session_poll <- function(worker, ...) {
+    list(worker = worker, event = NULL, result = NULL)
+  }
+  app_env$builder_session_poll_startup <- function(worker, ...) {
+    worker$state <- "failed"
+    list(
+      worker = worker,
+      state = "failed",
+      error = "A registered Builder snapshot is no longer owned."
+    )
+  }
+
+  shiny::testServer(app_env$server, {
+    worker(list(epoch = "worker-restart-failed", state = "ready"))
+    worker_available(TRUE)
+    protocol(app_env$builder_request_protocol("worker-restart-failed"))
+    expect_true(start_load(
+      "example",
+      "complete_viewer_data",
+      "Complete Viewer data"
+    ))
+    session$flushReact()
+    expect_identical(isolate(protocol())$pending$dataset, "ds1")
+    worker(list(epoch = "worker-restart-failed", state = "starting"))
+
+    await_restarted_worker("Reopening datasets from their snapshots…")
+    ## later() runs the startup poll outside any reactive context.
+    deadline <- Sys.time() + 5
+    while (
+      !identical(isolate(worker())$state, "failed") && Sys.time() < deadline
+    ) {
+      shiny:::.getReactiveEnvironment()$runWith(NULL, function() {
+        later::run_now(0.2)
+      })
+    }
+
+    entry <- app_env$builder_import_find(isolate(imports()), "ds1")
+    expect_identical(entry$load_state, "error")
+    expect_null(isolate(protocol())$pending)
+    expect_match(isolate(add_error()), "no longer owned", fixed = TRUE)
+  })
+})
