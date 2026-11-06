@@ -583,3 +583,95 @@ test_that("a project left with only its backup can be opened and restored", {
   ## With the manifest back, choosing the backup opens the backup itself.
   expect_identical(runtime$builder_project_open_manifest_path(backup), backup)
 })
+
+test_that("a skipped dataset whose source is gone no longer blocks Save", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  uploads <- withr::local_tempdir()
+  entry_for <- function(id, name) {
+    source <- file.path(uploads, paste0(id, ".rds"))
+    saveRDS(list(id = id), source)
+    list(
+      id = id,
+      revision = 1L,
+      path = source,
+      filename = "sample.rds",
+      settings = list(name = name),
+      acknowledgements = character(),
+      spatial_drafts = list(),
+      snapshot = list(
+        source_fingerprint = paste0(
+          "builder-snapshot-v2:",
+          unname(tools::md5sum(source))
+        )
+      )
+    )
+  }
+  first_entry <- entry_for("ds1", "Sample A")
+  second_entry <- entry_for("ds2", "Sample B")
+  context <- list(
+    checked = character(),
+    artifacts = list(),
+    skipped_ids = character(),
+    configuration = list(),
+    last_ui = list()
+  )
+  save <- function(manifest, entries, context) {
+    built <- runtime$builder_project_build_manifest(
+      entries,
+      list(root = root, manifest = manifest),
+      context
+    )
+    results <- lapply(built$jobs, runtime$builder_project_copy_source_job)
+    runtime$builder_project_write(
+      runtime$builder_project_apply_source_results(
+        built$manifest,
+        results,
+        root
+      ),
+      root,
+      expected_revision = manifest$project$revision
+    )
+  }
+  saved <- save(
+    runtime$builder_project_new_manifest(root, "Skip"),
+    list(first_entry, second_entry),
+    context
+  )
+  expect_true(runtime$builder_project_diagnose(saved$path)$manifest$valid)
+
+  ## ds2's source is deleted; the Project is reopened and ds2 skipped.
+  unlink(file.path(root, "sources", "ds2"), recursive = TRUE)
+  expect_error(
+    runtime$builder_project_assert_manifest_integrity(saved$manifest, root),
+    "Sample B: required dataset source is missing or changed",
+    fixed = TRUE
+  )
+  context$skipped_ids <- "ds2"
+  again <- save(saved$manifest, list(first_entry), context)
+  kept <- Filter(function(record) record$id == "ds2", again$manifest$datasets)
+  expect_length(kept, 1L)
+  expect_identical(kept[[1L]]$source$status, "failed")
+  expect_identical(
+    kept[[1L]]$configuration$path,
+    Filter(function(record) record$id == "ds2", saved$manifest$datasets)[[
+      1L
+    ]]$configuration$path
+  )
+  expect_identical(again$manifest$project$revision, 2L)
+
+  third <- save(again$manifest, list(first_entry), context)
+  expect_identical(third$manifest$project$revision, 3L)
+
+  ## A broken configuration still blocks the overwrite.
+  sidecar <- runtime$builder_project_resolve_path(
+    kept[[1L]]$configuration$path,
+    root,
+    "managed"
+  )
+  unlink(sidecar)
+  expect_error(
+    save(third$manifest, list(first_entry), context),
+    "incomplete"
+  )
+})

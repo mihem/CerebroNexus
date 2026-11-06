@@ -4063,10 +4063,13 @@ builder_project_manifest_integrity <- function(
   )
 }
 
+## `failed_source_ids`: datasets whose missing source is already accepted
+## (recorded as failed in the manifest about to replace this one).
 builder_project_assert_manifest_integrity <- function(
   manifest,
   root,
-  verification_cache = NULL
+  verification_cache = NULL,
+  failed_source_ids = character()
 ) {
   status <- builder_project_manifest_integrity(
     manifest,
@@ -4076,11 +4079,41 @@ builder_project_assert_manifest_integrity <- function(
   if (isTRUE(status$valid)) {
     return(invisible(status))
   }
-  broken <- Filter(function(dataset) !isTRUE(dataset$valid), status$datasets)
+  source_error <- "required dataset source is missing or changed"
+  broken <- Filter(
+    function(dataset) {
+      !isTRUE(dataset$valid) &&
+        !(dataset$id %in%
+          failed_source_ids &&
+          identical(dataset$errors, source_error))
+    },
+    status$datasets
+  )
+  if (!length(broken)) {
+    return(invisible(status))
+  }
+  records <- manifest$datasets %||% list()
+  labels <- vapply(
+    records,
+    function(record) {
+      name <- record$name %||% NULL
+      if (.builder_project_text(name)) as.character(name) else ""
+    },
+    character(1)
+  )
+  names(labels) <- vapply(
+    records,
+    function(record) as.character(record$id %||% ""),
+    character(1)
+  )
   detail <- vapply(
     broken,
     function(dataset) {
-      paste0(dataset$id, ": ", paste(dataset$errors, collapse = "; "))
+      label <- unname(labels[dataset$id])
+      if (is.na(label) || !nzchar(label)) {
+        label <- dataset$id
+      }
+      paste0(label, ": ", paste(dataset$errors, collapse = "; "))
     },
     character(1)
   )
@@ -7384,6 +7417,17 @@ builder_project_build_manifest <- function(
       if (!record$id %in% skipped_ids) {
         record$release <- list(included = FALSE)
       }
+      # A kept dataset whose source is gone is saved as failed, as a loaded
+      # one is, so it does not block every later Save.
+      source <- builder_project_dataset_integrity(
+        record,
+        project$root,
+        verification_cache = verification_cache
+      )$source
+      if (isTRUE(source$required) && !isTRUE(source$valid)) {
+        record$source$status <- "failed"
+        record$source$error <- "The dataset source is no longer available."
+      }
       record
     })
     records <- c(records, unname(inactive))
@@ -8033,12 +8077,20 @@ builder_project_write <- function(
       call. = FALSE
     )
   }
+  # Sources this manifest already records as failed may be missing on disk.
+  failed_source_ids <- as.character(unlist(lapply(
+    manifest$datasets %||% list(),
+    function(record) {
+      if (identical(record$source$status %||% NULL, "failed")) record$id
+    }
+  )))
   if (!is.null(disk)) {
     tryCatch(
       builder_project_assert_manifest_integrity(
         disk,
         root,
-        verification_cache = verification_cache
+        verification_cache = verification_cache,
+        failed_source_ids = failed_source_ids
       ),
       error = function(error) {
         stop(
@@ -8250,7 +8302,8 @@ builder_project_write <- function(
           builder_project_assert_manifest_integrity(
             backup_manifest,
             root,
-            verification_cache = verification_cache
+            verification_cache = verification_cache,
+            failed_source_ids = failed_source_ids
           )
           TRUE
         },
