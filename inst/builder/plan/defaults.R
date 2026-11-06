@@ -290,6 +290,10 @@ builder_default_settings <- function(
     color_overrides = list(),
     group_color_overrides = list()
   )
+  ## describe_seurat() puts the preferred projection (UMAP, then t-SNE) first.
+  if (length(profile$reduction_preselect)) {
+    settings$default_projection <- profile$reduction_preselect[[1L]]
+  }
   if (!is.null(recommendations)) {
     settings$groups <- recommendations$groups$included %||% character()
     settings$reductions <- recommendations$projections$included %||% character()

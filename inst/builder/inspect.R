@@ -236,6 +236,19 @@ builder_qc_numeric_values <- function(values) {
   )
 }
 
+#' The projection a new dataset opens on: the first UMAP, else the first
+#' t-SNE, else the first one. NULL without projections.
+builder_preferred_projection <- function(reductions) {
+  reductions <- as.character(reductions %||% character())
+  for (pattern in c("umap", "t[-_.]?sne")) {
+    hits <- reductions[grepl(pattern, reductions, ignore.case = TRUE)]
+    if (length(hits)) {
+      return(hits[[1L]])
+    }
+  }
+  if (length(reductions)) reductions[[1L]] else NULL
+}
+
 #' Describe a Seurat object in the terms the exporter cares about.
 describe_seurat <- function(object, metadata_groups = NULL) {
   meta <- object@meta.data
@@ -346,7 +359,12 @@ describe_seurat <- function(object, metadata_groups = NULL) {
   } else {
     for (col in colnames(meta)) {
       values <- meta[[col]]
-      if (!(is.character(values) || is.factor(values) || is.integer(values))) {
+      if (
+        !(is.character(values) ||
+          is.factor(values) ||
+          is.integer(values) ||
+          is.logical(values))
+      ) {
         next
       }
       n <- length(unique(values))
@@ -413,18 +431,13 @@ describe_seurat <- function(object, metadata_groups = NULL) {
   if (!length(reduction_preselect) && length(reductions) == 1L) {
     reduction_preselect <- reductions
   }
+  ## The preferred default projection leads.
+  reduction_preselect <- unique(c(
+    builder_preferred_projection(reduction_preselect),
+    reduction_preselect
+  ))
 
-  ## Gene name shape is the only cheap signal for species.
-  genes <- utils::head(rownames(object), 200)
-  organism_guess <- if (!length(genes)) {
-    "other"
-  } else if (mean(genes == toupper(genes)) > 0.8) {
-    "hg"
-  } else if (mean(grepl("^[A-Z][a-z]", genes)) > 0.6) {
-    "mm"
-  } else {
-    "other"
-  }
+  organism_guess <- builder_profile_organism(rownames(object))$code
 
   list(
     n_cells = n_cells,

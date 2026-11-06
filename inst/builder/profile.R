@@ -1150,7 +1150,14 @@ builder_profile_metadata <- function(meta, expected_cells) {
       )
       attr(entry$level_counts, "builder_full_counts") <- NULL
       catalog[[name]] <- entry
-      if (is.character(values) || is.factor(values) || is.integer(values)) {
+      ## Every type .builder_profile_group_reason() accepts needs levels; a
+      ## logical group exports as "FALSE"/"TRUE".
+      if (
+        is.character(values) ||
+          is.factor(values) ||
+          is.integer(values) ||
+          is.logical(values)
+      ) {
         legacy_columns <- c(legacy_columns, name)
         legacy_distinct[[name]] <- length(full_counts)
         if (length(full_counts) <= 100L) {
@@ -1353,15 +1360,58 @@ builder_profile_projection_catalog <- function(reductions) {
   catalog
 }
 
+## The one organism guess used by the profile and by describe_seurat().
 builder_profile_organism <- function(features) {
   features <- .builder_profile_ids(features)
   features <- features[!is.na(features) & nzchar(features)]
-  features <- utils::head(features, 200L)
   if (!length(features)) {
     return(list(
       code = "other",
       confidence = 0,
       reason = "No feature identifiers were available for inference."
+    ))
+  }
+
+  ## Ensembl gene ids carry the species in their prefix: ENSG is human,
+  ## ENSMUSG mouse; any other species prefix gives no guess.
+  ensembl <- grepl("^ENS[A-Z]*G[0-9]{6,}", features)
+  if (mean(ensembl) > 0.5) {
+    ids <- features[ensembl]
+    human <- mean(grepl("^ENSG[0-9]", ids))
+    mouse <- mean(grepl("^ENSMUSG[0-9]", ids))
+    code <- if (human > 0.8) {
+      "hg"
+    } else if (mouse > 0.8) {
+      "mm"
+    } else {
+      "other"
+    }
+    return(list(
+      code = code,
+      confidence = if (identical(code, "other")) 0 else max(human, mouse),
+      reason = if (identical(code, "other")) {
+        "Feature identifiers are Ensembl ids of an unsupported species."
+      } else {
+        "Most feature identifiers carry this species' Ensembl prefix."
+      }
+    ))
+  }
+
+  ## Symbols: skip names that do not start with a letter (a sorted mouse list
+  ## starts with 0610009B22Rik...) and sample across the whole list.
+  features <- features[grepl("^[A-Za-z]", features) & !ensembl]
+  if (length(features) > 200L) {
+    features <- features[unique(round(seq(
+      1,
+      length(features),
+      length.out = 200L
+    )))]
+  }
+  if (!length(features)) {
+    return(list(
+      code = "other",
+      confidence = 0,
+      reason = "Feature identifiers do not strongly match one supported style."
     ))
   }
 

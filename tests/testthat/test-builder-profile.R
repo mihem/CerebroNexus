@@ -984,3 +984,122 @@ test_that("describe_seurat carries bounded spatial scene labels", {
   expect_match(described$spatial_scenes[[1L]]$label, "2 samples", fixed = TRUE)
   expect_match(described$spatial_scenes[[1L]]$label, "2 ROIs", fixed = TRUE)
 })
+
+test_that("a logical metadata column is a group with FALSE/TRUE levels", {
+  cells <- paste0("cell-", seq_len(8L))
+  metadata <- data.frame(
+    cluster = rep(c("A", "B"), 4L),
+    is_doublet = c(TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE),
+    with_na = c(TRUE, FALSE, NA, TRUE, FALSE, FALSE, TRUE, FALSE),
+    row.names = cells
+  )
+
+  profiled <- builder_profile_metadata(metadata, cells)
+
+  ## Eligibility and levels agree: every eligible column has levels.
+  expect_true(profiled$catalog$is_doublet$group_eligible)
+  expect_true("is_doublet" %in% profiled$groups$candidates)
+  expect_identical(profiled$groups$legacy$levels$is_doublet, c("FALSE", "TRUE"))
+  expect_identical(
+    profiled$groups$legacy$levels$with_na,
+    c("FALSE", "TRUE", "N/A")
+  )
+})
+
+test_that("describe_seurat offers a logical column as a group", {
+  skip_if_not_installed("SeuratObject")
+  builder_repo_source("inspect.R")
+  object <- builder_profile_reduction_object("umap")
+  object$is_doublet <- rep(c(TRUE, FALSE), 3L)
+  profile <- builder_dataset_profile(object, builder_profile_source_fixture())
+
+  described <- describe_seurat(object, metadata_groups = profile$groups)
+  expect_true("is_doublet" %in% described$group_candidates)
+  expect_identical(
+    profile$groups$legacy$levels[["is_doublet"]],
+    c("FALSE", "TRUE")
+  )
+  expect_true("is_doublet" %in% describe_seurat(object)$group_candidates)
+})
+
+test_that("organism guess reads Ensembl prefixes and skips digit-led symbols", {
+  guess <- function(features) builder_profile_organism(features)$code
+  ensembl <- function(prefix) sprintf("%s%011d", prefix, seq_len(300L))
+
+  expect_identical(guess(ensembl("ENSG")), "hg")
+  expect_identical(guess(paste0(ensembl("ENSG"), ".4")), "hg")
+  expect_identical(guess(ensembl("ENSMUSG")), "mm")
+  ## Other species are not human, and there is no guess for them.
+  expect_identical(guess(ensembl("ENSRNOG")), "other")
+  expect_identical(guess(ensembl("ENSDARG")), "other")
+  expect_identical(guess(ensembl("ENSGALG")), "other")
+
+  ## A sorted mouse list starts with hundreds of digit-led Riken names.
+  mouse <- c(
+    sprintf("%07dRik", seq_len(250L)),
+    paste0(
+      c("Gapdh", "Actb", "Cd3e", "Cd4", "Ptprc"),
+      rep(seq_len(60L), each = 5L)
+    )
+  )
+  expect_identical(guess(mouse), "mm")
+  human <- c(sprintf("%07d", seq_len(250L)), paste0("CD", seq_len(300L)))
+  expect_identical(guess(human), "hg")
+  expect_identical(guess(sprintf("%07d", seq_len(10L))), "other")
+})
+
+test_that("describe_seurat uses the profile organism guess", {
+  skip_if_not_installed("SeuratObject")
+  builder_repo_source("inspect.R")
+  cells <- paste0("cell", seq_len(6L))
+  features <- sprintf("ENSMUSG%011d", seq_len(5L))
+  object <- SeuratObject::CreateSeuratObject(
+    builder_profile_matrix(cells, features)
+  )
+  expect_identical(describe_seurat(object)$organism_guess, "mm")
+  rat <- SeuratObject::CreateSeuratObject(
+    builder_profile_matrix(cells, sprintf("ENSRNOG%011d", seq_len(5L)))
+  )
+  expect_identical(describe_seurat(rat)$organism_guess, "other")
+})
+
+test_that("a UMAP leads the preselected projections, then a t-SNE", {
+  expect_identical(
+    builder_preferred_projection(c(
+      "nmf",
+      "stacas.ss.all",
+      "umap.stacas.ss.all"
+    )),
+    "umap.stacas.ss.all"
+  )
+  expect_identical(
+    builder_preferred_projection(c("nmf", "TSNE", "UMAP")),
+    "UMAP"
+  )
+  expect_identical(builder_preferred_projection(c("nmf", "t-SNE")), "t-SNE")
+  expect_identical(builder_preferred_projection(c("nmf", "harmony")), "nmf")
+  expect_null(builder_preferred_projection(character()))
+
+  skip_if_not_installed("SeuratObject")
+  builder_repo_source("inspect.R")
+  cells <- paste0("cell", seq_len(6L))
+  object <- SeuratObject::CreateSeuratObject(builder_profile_matrix(cells))
+  for (name in c("nmf", "stacas.ss.all", "umap.stacas.ss.all")) {
+    key <- paste0(gsub("[^a-z]", "", name), "_")
+    object[[name]] <- SeuratObject::CreateDimReducObject(
+      embeddings = matrix(
+        seq_len(12L),
+        ncol = 2L,
+        dimnames = list(cells, paste0(key, 1:2))
+      ),
+      key = key,
+      assay = "RNA"
+    )
+  }
+  described <- describe_seurat(object)
+  expect_identical(described$reduction_preselect[[1L]], "umap.stacas.ss.all")
+  expect_setequal(
+    described$reduction_preselect,
+    c("nmf", "stacas.ss.all", "umap.stacas.ss.all")
+  )
+})
