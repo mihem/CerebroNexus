@@ -916,6 +916,15 @@ test_that("ready Marker imports enter BuildPlan without upload metadata", {
     expect_identical(imports[[1L]]$method, "Scanpy Wilcoxon")
     expect_null(imports[[1L]]$sources[[1L]]$raw_table)
     expect_null(imports[[1L]]$sources[[1L]]$datapath)
+
+    ## The Save button stores the frozen record, not the draft.
+    entry$settings$marker_imports <- list(
+      `marker-import-1` = builder_freeze_marker_imports(list(draft))[[1L]]
+    )
+    saved <- builder_freeze_plan(list(entry), tempdir(), FALSE)
+
+    expect_null(saved$error)
+    expect_identical(saved$items[[1L]]$marker_imports, imports)
   })
 })
 

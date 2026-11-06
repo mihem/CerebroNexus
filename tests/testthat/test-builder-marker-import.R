@@ -331,3 +331,44 @@ test_that("attaching imports preserves existing methods and rejects collisions",
     "already exists"
   )
 })
+
+test_that("a frozen Marker import, as the Builder stores it, freezes again", {
+  source <- builder_marker_import_map_single(
+    builder_marker_import_source(
+      "T.csv",
+      NULL,
+      data.frame(gene = c("CD3D", "IL7R"), score = c(4, 3))
+    ),
+    "cluster",
+    "T",
+    c("T", "B"),
+    confirmed = TRUE
+  )
+  source$id <- "source-001"
+  draft <- builder_marker_import_refresh_draft(list(
+    id = "marker-import-1",
+    method = "Scanpy Wilcoxon",
+    group = "cluster",
+    known_levels = c("T", "B"),
+    existing_methods = character(),
+    sources = list(source)
+  ))
+  draft$ready <- TRUE
+  ## server/enhancements.R stores this record in entry$settings.
+  stored <- builder_freeze_marker_imports(list(draft))[[1L]]
+
+  again <- builder_freeze_marker_imports(list(`marker-import-1` = stored))
+
+  expect_identical(again[[1L]], stored)
+  expect_identical(again[[1L]]$sources[[1L]]$table, source$table)
+  expect_error(
+    builder_freeze_marker_imports(list(list(
+      id = "x",
+      method = "m",
+      group = "cluster",
+      ready = TRUE,
+      sources = list(list(mapping = "single", table = data.frame()))
+    ))),
+    "resolved"
+  )
+})

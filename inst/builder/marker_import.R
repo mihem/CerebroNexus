@@ -436,8 +436,22 @@ builder_marker_import_confirm_source <- function(
   builder_marker_import_refresh_draft(draft)
 }
 
+## The Builder stores the frozen record, so a plan freezes it again.
+builder_marker_import_source_frozen <- function(source) {
+  is.list(source) &&
+    is.null(source$status) &&
+    is.null(source$raw_table) &&
+    length(source$mapping) == 1L &&
+    source$mapping %in% c("single", "multiple") &&
+    is.data.frame(source$table) &&
+    nrow(source$table) > 0L
+}
+
 builder_marker_import_safe_source <- function(source) {
-  if (!builder_marker_import_source_ready(source)) {
+  if (
+    !builder_marker_import_source_ready(source) &&
+      !builder_marker_import_source_frozen(source)
+  ) {
     stop("Only resolved Marker import sources can be frozen.", call. = FALSE)
   }
   list(
