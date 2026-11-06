@@ -691,7 +691,7 @@ test_that("failed sign-ins lock the account and the client with backoff", {
   expect_false(check("alice", "right")$result)
   now <- 31 + 61
   expect_true(check("alice", "right")$result)
-  ## A success clears both keys.
+  ## The client's wait has passed as well.
   expect_true(check("bob", "right")$result)
   ## Attempts during a wait are refused without counting; each failure after
   ## a wait doubles it, up to 15 minutes.
@@ -704,6 +704,66 @@ test_that("failed sign-ins lock the account and the client with backoff", {
   expect_false(check("carol", "right")$result)
   now <- now + 1
   expect_true(check("carol", "right")$result)
+})
+
+test_that("a client's own sign-ins do not reset its guesses at other accounts", {
+  runtime <- viewer_auth_runtime_environment()
+  now <- 0
+  limiter <- runtime$.viewer_auth_limiter(clock = function() now)
+  checker <- function(user, password) {
+    list(result = identical(password, "right"), user_info = NULL)
+  }
+  waits <- numeric()
+  check <- runtime$.viewer_auth_limited_checker(
+    checker,
+    limiter,
+    "10.0.0.1",
+    on_wait = function(seconds) waits <<- c(waits, seconds)
+  )
+  for (i in 1:4) {
+    expect_false(check(paste0("user", i), "guess")$result)
+    expect_true(check("me", "right")$result)
+  }
+  expect_false(check("user5", "guess")$result)
+  ## Five failures from the client: it waits 30 s for any account.
+  now <- 10
+  expect_false(check("user6", "right")$result)
+  expect_equal(waits, 20)
+  ## Another client may still sign in to those accounts.
+  other <- runtime$.viewer_auth_limited_checker(checker, limiter, "10.0.0.2")
+  expect_true(other("user6", "right")$result)
+})
+
+test_that("the sign-in limiter drops expired entries", {
+  runtime <- viewer_auth_runtime_environment()
+  now <- 0
+  limiter <- runtime$.viewer_auth_limiter(clock = function() now)
+  state <- environment(limiter$failure)$state
+  for (i in 1:100) {
+    limiter$failure(paste0("account:user", i))
+  }
+  expect_length(ls(state), 100L)
+  now <- runtime$.viewer_auth_limit_max_seconds + 1
+  limiter$failure("account:new")
+  expect_identical(ls(state), "account:new")
+})
+
+test_that("the sign-in client can come from a proxy header", {
+  runtime <- viewer_auth_runtime_environment()
+  session <- list(
+    request = list(
+      REMOTE_ADDR = "10.0.0.9",
+      HTTP_X_FORWARDED_FOR = "203.0.113.5, 198.51.100.7"
+    )
+  )
+  withr::local_envvar(CEREBRO_AUTH_CLIENT_HEADER = NA)
+  expect_identical(runtime$.viewer_auth_client(session), "10.0.0.9")
+  withr::local_envvar(CEREBRO_AUTH_CLIENT_HEADER = "X-Forwarded-For")
+  expect_identical(runtime$.viewer_auth_client(session), "198.51.100.7")
+  ## Without the header the proxy address is used.
+  session$request$HTTP_X_FORWARDED_FOR <- NULL
+  expect_identical(runtime$.viewer_auth_client(session), "10.0.0.9")
+  expect_identical(runtime$.viewer_auth_client(list()), "unknown")
 })
 
 test_that("the sign-in limiter is applied to the provider's checker", {

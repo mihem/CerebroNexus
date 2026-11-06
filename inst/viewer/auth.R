@@ -214,28 +214,45 @@
 ## Failed sign-ins, counted per account and per client address. From the
 ## fifth consecutive failure of a key, that key waits 30 s, doubling with each
 ## further failure up to 15 min; while it waits the password is not checked.
-## A success clears the account and the client.
+## A success clears only the account, so one client's own sign-ins do not
+## reset its count of guesses against other accounts.
 .viewer_auth_limit_free <- 4L
 .viewer_auth_limit_base_seconds <- 30
 .viewer_auth_limit_max_seconds <- 900
 
 .viewer_auth_limiter <- function(clock = function() as.numeric(Sys.time())) {
   state <- new.env(parent = emptyenv())
+  pruned <- -Inf
+  expired <- function(value) {
+    clock() - value$last > .viewer_auth_limit_max_seconds
+  }
   entry <- function(key) {
     value <- get0(key, envir = state, inherits = FALSE)
-    if (
-      is.null(value) || clock() - value$last > .viewer_auth_limit_max_seconds
-    ) {
+    if (is.null(value) || expired(value)) {
       list(failures = 0L, until = -Inf, last = -Inf)
     } else {
       value
     }
   }
+  ## Drop expired keys, at most once a minute.
+  prune <- function() {
+    if (clock() - pruned < 60) {
+      return(invisible(NULL))
+    }
+    pruned <<- clock()
+    old <- names(Filter(isTRUE, eapply(state, expired)))
+    if (length(old)) {
+      rm(list = old, envir = state)
+    }
+    invisible(NULL)
+  }
   list(
+    ## Seconds until every key may try again; 0 when none waits.
     waiting = function(keys) {
-      any(vapply(keys, function(key) clock() < entry(key)$until, logical(1)))
+      max(0, vapply(keys, function(key) entry(key)$until - clock(), numeric(1)))
     },
     failure = function(keys) {
+      prune()
       for (key in keys) {
         value <- entry(key)
         value$failures <- value$failures + 1L
@@ -268,11 +285,19 @@
   )
 }
 
-.viewer_auth_limited_checker <- function(checker, limiter, client) {
+## `on_wait(seconds)` is called when a sign-in is refused without a check.
+.viewer_auth_limited_checker <- function(
+  checker,
+  limiter,
+  client,
+  on_wait = function(seconds) NULL
+) {
   function(user, password) {
     account <- tolower(trimws(paste(as.character(user), collapse = "")))
     keys <- c(paste0("account:", account), paste0("client:", client))
-    if (limiter$waiting(keys)) {
+    wait <- limiter$waiting(keys)
+    if (wait > 0) {
+      on_wait(wait)
       return(list(
         result = FALSE,
         expired = FALSE,
@@ -282,7 +307,7 @@
     }
     result <- checker(user, password)
     if (isTRUE(result$result)) {
-      limiter$success(keys)
+      limiter$success(keys[[1L]])
     } else {
       limiter$failure(keys)
     }
@@ -290,16 +315,56 @@
   }
 }
 
-.viewer_auth_client <- function(session) {
-  address <- tryCatch(
-    suppressWarnings(as.character(session$request$REMOTE_ADDR)),
-    error = function(condition) character()
-  )
-  if (length(address) == 1L && !is.na(address) && nzchar(address)) {
-    address
-  } else {
-    "unknown"
+## Replace the provider's "incorrect" message with the wait. Runs on flush,
+## after the provider queued its own message.
+.viewer_auth_show_wait <- function(session) {
+  function(seconds) {
+    session$onFlush(
+      function() {
+        shiny::removeUI("#auth-msg_auth", session = session)
+        shiny::insertUI(
+          "#auth-result_auth",
+          ui = shiny::tags$div(
+            id = "auth-msg_auth",
+            class = "alert alert-danger",
+            shiny::icon("triangle-exclamation"),
+            sprintf(
+              "Too many sign-in attempts. Try again in %d s.",
+              as.integer(ceiling(seconds))
+            )
+          ),
+          session = session
+        )
+      },
+      once = TRUE
+    )
   }
+}
+
+## The client is REMOTE_ADDR, or behind a reverse proxy the last entry of the
+## header named by CEREBRO_AUTH_CLIENT_HEADER (e.g. X-Forwarded-For or
+## X-Real-IP), which is the address the proxy itself saw.
+.viewer_auth_client <- function(session) {
+  pick <- function(name) {
+    value <- tryCatch(
+      suppressWarnings(as.character(session$request[[name]])),
+      error = function(condition) character()
+    )
+    if (length(value) != 1L || is.na(value) || !nzchar(value)) {
+      return("")
+    }
+    trimws(utils::tail(strsplit(value, ",", fixed = TRUE)[[1L]], 1L))
+  }
+  header <- trimws(Sys.getenv("CEREBRO_AUTH_CLIENT_HEADER"))
+  address <- if (nzchar(header)) {
+    pick(paste0("HTTP_", toupper(gsub("-", "_", header, fixed = TRUE))))
+  } else {
+    ""
+  }
+  if (!nzchar(address)) {
+    address <- pick("REMOTE_ADDR")
+  }
+  if (nzchar(address)) address else "unknown"
 }
 
 ## After sign-in the provider puts its login token in the page URL, and its
@@ -456,7 +521,8 @@ viewer_auth_apply <- function(ui, server, config, cerebro_root = ".") {
       check_credentials = .viewer_auth_limited_checker(
         checker,
         limiter,
-        .viewer_auth_client(session)
+        .viewer_auth_client(session),
+        .viewer_auth_show_wait(session)
       ),
       timeout = config$timeout_minutes,
       keep_token = FALSE,

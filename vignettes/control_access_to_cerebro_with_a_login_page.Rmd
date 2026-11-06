@@ -306,6 +306,25 @@ that the proxy rejects further attempts temporarily.
 Configure source-aware rate limiting at the reverse proxy. The read-only Viewer
 does not persist failed-login counters or account locks.
 
+The Viewer also slows down guessing in memory: after five failed sign-ins for
+one account or from one client address, that account or address waits 30
+seconds, doubling with each further failure up to 15 minutes. The counters are
+lost when the R process restarts.
+
+Behind a reverse proxy every request comes from the proxy's address, so the
+per-client limit would apply to all users together. Set
+`CEREBRO_AUTH_CLIENT_HEADER` in the R process to the header your proxy sets to
+the client address, for example `X-Forwarded-For` or `X-Real-IP`. The Viewer
+uses the last address in that header, the one the proxy saw. Set it only when
+every request passes through the proxy, because clients can send the header
+themselves.
+
+```ini
+# systemd override — add next to the passphrase EnvironmentFile.
+[Service]
+Environment=CEREBRO_AUTH_CLIENT_HEADER=X-Forwarded-For
+```
+
 # Add, remove, or rotate users
 
 **Run this as:** the credential administrator on the trusted build host.
