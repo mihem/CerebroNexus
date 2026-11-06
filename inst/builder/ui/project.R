@@ -343,7 +343,11 @@ builder_project_backup_recovery_dialog <- function(offer) {
   modalDialog(
     title = builder_dialog_title("Recover Builder project?", "Open project"),
     tags$p(
-      "The project file is damaged. A verified backup is available."
+      if (isTRUE(offer$primary_missing)) {
+        "The project file is missing. A verified backup is available."
+      } else {
+        "The project file is damaged. A verified backup is available."
+      }
     ),
     tags$dl(
       tags$dt("Project"),
@@ -354,7 +358,11 @@ builder_project_backup_recovery_dialog <- function(offer) {
       tags$dd(as.character(offer$dataset_count %||% 0L))
     ),
     tags$p(
-      "The damaged file will be kept. The backup is checked before restoring."
+      if (isTRUE(offer$primary_missing)) {
+        "The backup is checked before restoring."
+      } else {
+        "The damaged file will be kept. The backup is checked before restoring."
+      }
     ),
     footer = tagList(
       actionButton(

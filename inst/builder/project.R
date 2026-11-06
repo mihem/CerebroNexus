@@ -627,6 +627,19 @@ builder_project_manifest_path <- function(root) {
   file.path(root, .builder_project_manifest_name)
 }
 
+## Choosing the backup of a project whose manifest is gone opens the project,
+## which then offers to restore that backup.
+builder_project_open_manifest_path <- function(path) {
+  if (
+    !.builder_project_text(path) ||
+      !identical(basename(path), paste0(.builder_project_manifest_name, ".bak"))
+  ) {
+    return(path)
+  }
+  primary <- builder_project_manifest_path(dirname(path))
+  if (file.exists(primary)) path else primary
+}
+
 builder_project_normalize_root <- function(root, must_work = TRUE) {
   if (!.builder_project_text(root)) {
     stop("Choose a project folder.", call. = FALSE)
@@ -697,10 +710,110 @@ builder_project_manifest_lock_path <- function(root) {
     identical(stored, token)
 }
 
-builder_project_acquire_manifest_lock <- function(root) {
+.builder_project_host <- function() {
+  host <- unname(Sys.info()[["nodename"]])
+  if (.builder_project_text(host)) host else "unknown"
+}
+
+.builder_project_pid_alive <- function(pid) {
+  if (identical(.Platform$OS.type, "windows")) {
+    if (!requireNamespace("ps", quietly = TRUE)) {
+      return(TRUE)
+    }
+    return(isTRUE(tryCatch(
+      ps::ps_is_running(ps::ps_handle(as.integer(pid))),
+      error = function(error) !inherits(error, "no_such_process")
+    )))
+  }
+  isTRUE(tryCatch(tools::pskill(pid, signal = 0L), error = function(error) {
+    FALSE
+  }))
+}
+
+## A lock is stale when its owner was a process on this host that is gone, or
+## when its owner file was never written (full disk, killed while locking)
+## and the lock is older than `grace` seconds.
+.builder_project_manifest_lock_stale <- function(path, grace = 60) {
+  if (
+    !dir.exists(path) ||
+      nzchar(tryCatch(Sys.readlink(path), error = function(error) ""))
+  ) {
+    return(FALSE)
+  }
+  owner <- tryCatch(
+    suppressWarnings(readLines(file.path(path, "owner.txt"), warn = FALSE)),
+    error = function(error) character()
+  )
+  field <- function(name) {
+    line <- grep(paste0("^", name, "="), owner, value = TRUE)
+    if (length(line)) sub("^[^=]*=", "", line[[1L]]) else NA_character_
+  }
+  pid <- suppressWarnings(as.integer(field("pid")))
+  host <- sub('^"(.*)"$', "\\1", field("host"))
+  if (!is.na(pid) && !is.na(host)) {
+    return(
+      identical(host, .builder_project_host()) &&
+        !identical(pid, Sys.getpid()) &&
+        !.builder_project_pid_alive(pid)
+    )
+  }
+  age <- suppressWarnings(as.double(difftime(
+    Sys.time(),
+    file.info(path)$mtime[[1L]],
+    units = "secs"
+  )))
+  is.finite(age) && age > grace
+}
+
+## Moves a stale lock aside and removes it; a lock that turns out to be live
+## once isolated (another window took over first) is put back.
+.builder_project_remove_stale_manifest_lock <- function(path, grace = 60) {
+  isolated <- tempfile(
+    pattern = ".builder-project-write.lock-stale-",
+    tmpdir = dirname(path)
+  )
+  if (!isTRUE(suppressWarnings(file.rename(path, isolated)))) {
+    return(FALSE)
+  }
+  if (!.builder_project_manifest_lock_stale(isolated, grace)) {
+    if (!dir.exists(path)) {
+      file.rename(isolated, path)
+    }
+    return(FALSE)
+  }
+  unlink(isolated, recursive = TRUE, force = TRUE) == 0L
+}
+
+builder_project_acquire_manifest_lock <- function(root, stale_after = 60) {
   root <- builder_project_normalize_root(root)
   path <- builder_project_manifest_lock_path(root)
-  if (!dir.create(path, mode = "0700", showWarnings = FALSE)) {
+  create <- function() {
+    tryCatch(
+      dir.create(path, mode = "0700"),
+      warning = function(warning) warning
+    )
+  }
+  created <- create()
+  if (
+    !isTRUE(created) &&
+      .builder_project_manifest_lock_stale(path, stale_after) &&
+      .builder_project_remove_stale_manifest_lock(path, stale_after)
+  ) {
+    created <- create()
+  }
+  if (!isTRUE(created)) {
+    if (!dir.exists(path)) {
+      stop(
+        paste0(
+          "The project folder cannot be written",
+          if (inherits(created, "condition")) {
+            paste0(": ", conditionMessage(created))
+          },
+          ". Check that the folder exists and that you can write to it."
+        ),
+        call. = FALSE
+      )
+    }
     stop(
       paste0(
         "Another Builder window is saving this project, or its write lock ",
@@ -713,33 +826,44 @@ builder_project_acquire_manifest_lock <- function(root) {
   token <- basename(tempfile(pattern = paste0("owner-", Sys.getpid(), "-")))
   token_path <- file.path(path, "owner-token")
   owner_path <- file.path(path, "owner.txt")
-  host <- unname(Sys.info()[["nodename"]])
-  if (!.builder_project_text(host)) {
-    host <- "unknown"
-  }
+  # writeLines() only warns on a full disk; any warning fails the lock.
   initialized <- tryCatch(
-    {
-      writeLines(token, token_path, useBytes = TRUE)
-      writeLines(
-        c(
-          "schema=1",
-          paste0("pid=", Sys.getpid()),
-          paste0("host=", encodeString(host, quote = '"')),
-          paste0("acquired_at=", format(Sys.time(), tz = "UTC", usetz = TRUE))
-        ),
-        owner_path,
-        useBytes = TRUE
-      )
-      Sys.chmod(c(token_path, owner_path), mode = "0600")
-      TRUE
-    },
-    error = function(error) error
+    withCallingHandlers(
+      {
+        writeLines(token, token_path, useBytes = TRUE)
+        writeLines(
+          c(
+            "schema=1",
+            paste0("pid=", Sys.getpid()),
+            paste0(
+              "host=",
+              encodeString(.builder_project_host(), quote = '"')
+            ),
+            paste0(
+              "acquired_at=",
+              format(Sys.time(), tz = "UTC", usetz = TRUE)
+            )
+          ),
+          owner_path,
+          useBytes = TRUE
+        )
+        Sys.chmod(c(token_path, owner_path), mode = "0600")
+        if (!.builder_project_manifest_lock_owned(path, token)) {
+          stop("the lock files did not read back", call. = FALSE)
+        }
+        TRUE
+      },
+      warning = function(warning) stop(conditionMessage(warning), call. = FALSE)
+    ),
+    error = identity
   )
   if (inherits(initialized, "condition")) {
+    unlink(path, recursive = TRUE, force = TRUE)
     stop(
       paste0(
-        "The Project write lock could not be initialized. An incomplete ",
-        "lock may remain and should be inspected before retrying."
+        "The Project write lock could not be written (",
+        conditionMessage(initialized),
+        "). Check that the project disk has free space."
       ),
       call. = FALSE
     )
@@ -6977,6 +7101,7 @@ builder_project_backup_recovery_offer <- function(path) {
     path = path,
     backup_path = backup_path,
     primary_error = conditionMessage(current),
+    primary_missing = !file.exists(path),
     primary_fingerprint = primary_fingerprint,
     backup_fingerprint = backup$fingerprint,
     project_name = backup$manifest$project$name %||% basename(dirname(path)),
@@ -6997,11 +7122,15 @@ builder_project_recover_backup <- function(
   write_lock <- builder_project_acquire_manifest_lock(root)
   on.exit(builder_project_release_manifest_lock(write_lock), add = TRUE)
   offer <- builder_project_backup_recovery_offer(path)
+  # A Save killed between its two renames leaves only the backup.
+  primary_missing <- isTRUE(offer$primary_missing) &&
+    is.null(expected_primary_fingerprint)
   if (
-    !builder_project_content_fingerprint_matches(
-      expected_primary_fingerprint,
-      offer$primary_fingerprint
-    ) ||
+    !(primary_missing ||
+      builder_project_content_fingerprint_matches(
+        expected_primary_fingerprint,
+        offer$primary_fingerprint
+      )) ||
       !builder_project_content_fingerprint_matches(
         expected_backup_fingerprint,
         offer$backup_fingerprint
@@ -7060,12 +7189,14 @@ builder_project_recover_backup <- function(
     staged_snapshot$manifest,
     root
   )
-  attempt(
-    "preserve damaged Project manifest",
-    path,
-    displaced,
-    function() .move(path, displaced)
-  )
+  if (!primary_missing) {
+    attempt(
+      "preserve damaged Project manifest",
+      path,
+      displaced,
+      function() .move(path, displaced)
+    )
+  }
   committed <- tryCatch(
     {
       attempt(
@@ -7098,6 +7229,9 @@ builder_project_recover_backup <- function(
     if (file.exists(path)) {
       unlink(path, force = TRUE)
     }
+    if (primary_missing) {
+      stop(conditionMessage(committed), call. = FALSE)
+    }
     rollback <- tryCatch(
       {
         attempt(
@@ -7126,7 +7260,9 @@ builder_project_recover_backup <- function(
     manifest = committed$manifest,
     path = path,
     backup_path = offer$backup_path,
-    displaced_path = normalizePath(displaced, winslash = "/", mustWork = TRUE)
+    displaced_path = if (!primary_missing) {
+      normalizePath(displaced, winslash = "/", mustWork = TRUE)
+    }
   )
 }
 

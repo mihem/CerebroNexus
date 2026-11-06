@@ -1601,6 +1601,7 @@ builder_project_start_open <- function(
   if (builder_session_closed()) {
     return(invisible(FALSE))
   }
+  selected_path <- builder_project_open_manifest_path(selected_path)
   if (
     !is.null(isolate(builder_project_open_task())) ||
       !is.null(isolate(builder_project_open_request()))

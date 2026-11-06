@@ -442,3 +442,144 @@ test_that("non-ASCII text survives two saves in a non-UTF-8 locale", {
     first$manifest$datasets[[1L]]$configuration$path
   )
 })
+
+builder_project_integrity_lock_owner <- function(path, pid, host) {
+  dir.create(path)
+  writeLines("stale-token", file.path(path, "owner-token"))
+  writeLines(
+    c(
+      "schema=1",
+      paste0("pid=", pid),
+      paste0("host=", encodeString(host, quote = '"'))
+    ),
+    file.path(path, "owner.txt")
+  )
+}
+
+test_that("a stale Project write lock is taken over, a live one is not", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  path <- runtime$builder_project_manifest_lock_path(root)
+  host <- runtime$.builder_project_host()
+  candidates <- seq(4194303L, by = -1L, length.out = 200L)
+  dead <- candidates[
+    !vapply(
+      candidates,
+      runtime$.builder_project_pid_alive,
+      logical(1)
+    )
+  ][[1L]]
+
+  builder_project_integrity_lock_owner(path, Sys.getpid(), host)
+  expect_error(
+    runtime$builder_project_acquire_manifest_lock(root),
+    "Another Builder window",
+    fixed = TRUE
+  )
+  unlink(path, recursive = TRUE)
+
+  builder_project_integrity_lock_owner(path, dead, "another-host")
+  expect_error(
+    runtime$builder_project_acquire_manifest_lock(root),
+    "Another Builder window",
+    fixed = TRUE
+  )
+  unlink(path, recursive = TRUE)
+
+  builder_project_integrity_lock_owner(path, dead, host)
+  lock <- runtime$builder_project_acquire_manifest_lock(root)
+  expect_true(runtime$builder_project_release_manifest_lock(lock))
+  expect_false(dir.exists(path))
+
+  ## An owner file that was never written is stale after the grace period.
+  dir.create(path)
+  file.create(file.path(path, "owner.txt"))
+  expect_error(
+    runtime$builder_project_acquire_manifest_lock(root),
+    "Another Builder window",
+    fixed = TRUE
+  )
+  Sys.setFileTime(path, Sys.time() - 120)
+  lock <- runtime$builder_project_acquire_manifest_lock(root)
+  expect_true(runtime$builder_project_release_manifest_lock(lock))
+  expect_length(list.files(root, all.files = TRUE, no.. = TRUE), 0L)
+})
+
+test_that("a Project write lock that cannot be written fails and is removed", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  runtime$writeLines <- function(...) {
+    warning("No space left on device")
+  }
+  expect_error(
+    runtime$builder_project_acquire_manifest_lock(root),
+    "could not be written (No space left on device)",
+    fixed = TRUE
+  )
+  expect_false(dir.exists(runtime$builder_project_manifest_lock_path(root)))
+  rm("writeLines", envir = runtime)
+  lock <- runtime$builder_project_acquire_manifest_lock(root)
+  expect_true(runtime$builder_project_release_manifest_lock(lock))
+})
+
+test_that("an unwritable project folder is not reported as a busy lock", {
+  skip_on_os("windows")
+  skip_if(identical(unname(Sys.info()[["effective_user"]]), "root"))
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  Sys.chmod(root, mode = "0500")
+  withr::defer(Sys.chmod(root, mode = "0700"))
+  expect_error(
+    runtime$builder_project_acquire_manifest_lock(root),
+    "The project folder cannot be written",
+    fixed = TRUE
+  )
+})
+
+test_that("a project left with only its backup can be opened and restored", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  first_entry <- builder_project_integrity_entry("first", 1L)
+  first <- runtime$builder_project_write(
+    builder_project_integrity_manifest(runtime, root, first_entry),
+    root
+  )
+  second_entry <- builder_project_integrity_entry("second", 2L)
+  second_manifest <- builder_project_integrity_manifest(
+    runtime,
+    root,
+    second_entry
+  )
+  second_manifest$project <- first$manifest$project
+  second <- runtime$builder_project_write(
+    second_manifest,
+    root,
+    expected_revision = first$manifest$project$revision
+  )
+  ## Killed after "manifest -> .bak", before "staged -> manifest".
+  backup <- paste0(second$path, ".bak")
+  expect_true(file.rename(second$path, backup))
+
+  expect_identical(
+    runtime$builder_project_open_manifest_path(backup),
+    second$path
+  )
+  expect_error(runtime$builder_project_open_snapshot(second$path))
+  offer <- runtime$builder_project_backup_recovery_offer(second$path)
+  expect_true(offer$primary_missing)
+  expect_null(offer$primary_fingerprint)
+
+  recovered <- runtime$builder_project_recover_backup(
+    second$path,
+    offer$primary_fingerprint,
+    offer$backup_fingerprint
+  )
+  expect_null(recovered$displaced_path)
+  expect_identical(
+    runtime$builder_project_read(second$path)$project$revision,
+    second$manifest$project$revision
+  )
+  expect_true(file.exists(backup))
+  ## With the manifest back, choosing the backup opens the backup itself.
+  expect_identical(runtime$builder_project_open_manifest_path(backup), backup)
+})
