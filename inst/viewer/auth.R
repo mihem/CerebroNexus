@@ -294,7 +294,12 @@
 ) {
   function(user, password) {
     account <- tolower(trimws(paste(as.character(user), collapse = "")))
-    keys <- c(paste0("account:", account), paste0("client:", client))
+    keys <- paste0("account:", account)
+    ## A loopback or unknown address is a proxy on this host (Shiny Server
+    ## always is one), shared by every user: then only the account counts.
+    if (!.viewer_auth_shared_client(client)) {
+      keys <- c(keys, paste0("client:", client))
+    }
     wait <- limiter$waiting(keys)
     if (wait > 0) {
       on_wait(wait)
@@ -365,6 +370,11 @@
     address <- pick("REMOTE_ADDR")
   }
   if (nzchar(address)) address else "unknown"
+}
+
+.viewer_auth_shared_client <- function(client) {
+  identical(client, "unknown") ||
+    grepl("^(127\\.|::1$|::ffff:127\\.)", client)
 }
 
 ## After sign-in the provider puts its login token in the page URL, and its

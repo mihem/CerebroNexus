@@ -734,6 +734,27 @@ test_that("a client's own sign-ins do not reset its guesses at other accounts", 
   expect_true(other("user6", "right")$result)
 })
 
+test_that("a loopback or unknown client does not lock out every user", {
+  runtime <- viewer_auth_runtime_environment()
+  limiter <- runtime$.viewer_auth_limiter(clock = function() 0)
+  checker <- function(user, password) {
+    list(result = identical(password, "right"), user_info = NULL)
+  }
+  for (client in c("127.0.0.1", "::1", "::ffff:127.0.0.1", "unknown")) {
+    check <- runtime$.viewer_auth_limited_checker(checker, limiter, client)
+    for (i in 1:5) {
+      expect_false(check(paste0(client, "-user", i), "guess")$result)
+    }
+    ## Other accounts behind the same proxy still sign in.
+    expect_true(check(paste0(client, "-other"), "right")$result)
+    ## Each account is still limited.
+    for (i in 1:5) {
+      check(paste0(client, "-target"), "guess")
+    }
+    expect_false(check(paste0(client, "-target"), "right")$result)
+  }
+})
+
 test_that("the sign-in limiter drops expired entries", {
   runtime <- viewer_auth_runtime_environment()
   now <- 0
