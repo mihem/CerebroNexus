@@ -563,10 +563,16 @@ builder_project_restore_row_ui <- function(record) {
   labels <- c(
     reuse = "Open from cache (fast)",
     resume = "Reload from source file",
+    relink = "Load chosen file · Keep settings",
     reload = "Re-import source · Reset settings",
-    skip = "Skip · Not loaded"
+    skip = "Skip · Not loaded",
+    remove = "Remove from project"
   )
-  choices <- stats::setNames(status$actions, labels[status$actions])
+  actions <- unique(c(status$actions, "remove"))
+  choices <- stats::setNames(actions, labels[actions])
+  # A dataset whose saved source cannot be loaded can be pointed at a file.
+  relinkable <- !identical(record$source$kind %||% NULL, "example") &&
+    !"resume" %in% status$actions
   selected <- status$default_action
   status_tone <- if (!is.null(status$problem)) {
     "warning"
@@ -662,7 +668,19 @@ builder_project_restore_row_ui <- function(record) {
         selected = selected,
         selectize = FALSE,
         width = "100%"
-      )
+      ),
+      if (relinkable) {
+        tags$button(
+          type = "button",
+          class = "btn btn-default btn-sm builder-project-restore-relink",
+          `data-project-restore-relink` = record$id,
+          title = paste(
+            "Choose a source file for",
+            record$name %||% "this dataset"
+          ),
+          "Choose source file…"
+        )
+      }
     )
   )
 }
@@ -687,7 +705,7 @@ builder_project_restore_dialog <- function(manifest) {
   skipped <- sum(actions == "skip")
   reloaded <- sum(actions == "reload")
   reused <- sum(actions == "reuse")
-  sourced <- sum(actions %in% c("resume", "reload"))
+  sourced <- sum(actions %in% c("resume", "reload", "relink"))
   selected <- total - skipped
   notice_tone <- if (skipped > 0L) {
     "warning"

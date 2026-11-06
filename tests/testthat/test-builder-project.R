@@ -1677,6 +1677,55 @@ test_that("missing saved settings reload the source instead of forcing a skip", 
   expect_identical(prepared$skipped_ids, character())
 })
 
+test_that("a dataset whose source is gone offers Remove and a file choice", {
+  skip_if_not_installed("shiny")
+  runtime <- builder_project_test_runtime()
+  runtime$tags <- shiny::tags
+  runtime$selectInput <- shiny::selectInput
+  runtime$builder_source_utf8(
+    builder_test_inst_path("builder", "ui", "project.R"),
+    envir = runtime
+  )
+  record <- list(
+    id = "ds_internal_7",
+    name = "Liver atlas",
+    source = list(kind = "managed", path = "sources/ds_internal_7/x.rds"),
+    runtime_restore_status = list(
+      actions = "skip",
+      default_action = "skip",
+      message = "Source unavailable"
+    )
+  )
+  html <- htmltools::renderTags(
+    runtime$builder_project_restore_row_ui(record)
+  )$html
+  expect_match(html, '<option value="remove">Remove from project', fixed = TRUE)
+  expect_match(
+    html,
+    'data-project-restore-relink="ds_internal_7"',
+    fixed = TRUE
+  )
+  expect_match(html, "Choose source file…", fixed = TRUE)
+  expect_match(html, "Choose a source file for Liver atlas", fixed = TRUE)
+
+  ## A loadable source needs no file choice.
+  record$runtime_restore_status$actions <- c("resume", "skip")
+  html <- htmltools::renderTags(
+    runtime$builder_project_restore_row_ui(record)
+  )$html
+  expect_false(grepl("data-project-restore-relink", html, fixed = TRUE))
+
+  ## Remove is kept when the choices dialog is shown again.
+  manifest <- runtime$builder_project_manifest_with_restore_actions(
+    list(datasets = list(record)),
+    list(ds_internal_7 = "remove")
+  )
+  expect_identical(
+    manifest$datasets[[1L]]$runtime_restore_status$default_action,
+    "remove"
+  )
+})
+
 test_that("project lifecycle capabilities lock only conflicting operations", {
   runtime <- builder_project_test_runtime()
 

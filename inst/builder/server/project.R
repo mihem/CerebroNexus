@@ -5,6 +5,10 @@ builder_project_restore <- reactiveVal(NULL)
 builder_project_pending_entries <- reactiveVal(list())
 builder_project_artifacts <- reactiveVal(list())
 builder_project_skipped_ids <- reactiveVal(character())
+# Datasets Open removed from the Project or relinked to a chosen file; both
+# wait for the next Save.
+builder_project_removed_ids <- reactiveVal(character())
+builder_project_relinked_ids <- reactiveVal(character())
 builder_project_build_plan <- reactiveVal(NULL)
 builder_project_auto_save_signature <- reactiveVal(NULL)
 builder_project_operation_phase <- reactiveVal("idle")
@@ -234,6 +238,24 @@ builder_project_dirty <- reactive({
   project <- builder_project()
   if (is.null(project)) {
     return(FALSE)
+  }
+  records <- builder_project_record_map(project$manifest)
+  relinked <- records[intersect(
+    intersect(
+      builder_project_relinked_ids(),
+      vapply(sets(), `[[`, character(1), "id")
+    ),
+    names(records)
+  )]
+  if (
+    any(builder_project_removed_ids() %in% names(records)) ||
+      any(vapply(
+        relinked,
+        function(record) identical(record$source$status %||% NULL, "failed"),
+        logical(1)
+      ))
+  ) {
+    return(TRUE)
   }
   builder_project_live_dirty(
     sets(),
@@ -2201,6 +2223,7 @@ builder_project_manifest_context <- function(last_ui = NULL) {
     checked = isolate(checked_dataset_ids()),
     artifacts = isolate(builder_project_artifacts()),
     skipped_ids = isolate(builder_project_skipped_ids()),
+    removed_ids = isolate(builder_project_removed_ids()),
     configuration = builder_project_configuration(
       review_options = isolate(review_options()),
       build_mode = isTRUE(isolate(build_mode())),
@@ -3185,6 +3208,8 @@ create_builder_project_in_folder <- function(folder, existing = NULL) {
     manifest = manifest
   ))
   builder_project_skipped_ids(character())
+  builder_project_removed_ids(character())
+  builder_project_relinked_ids(character())
   shiny::removeModal()
   request_builder_project_save(show_actions = TRUE, materialize = TRUE)
   invisible(TRUE)
@@ -3682,7 +3707,9 @@ start_builder_project_record_load <- function(record, root) {
       source_origin = source$origin %||% "upload",
       example_id = source$example %||% NULL,
       retained_path = if (identical(kind, "managed")) path,
-      expected_md5 = if (identical(record$runtime_restore_action, "reload")) {
+      expected_md5 = if (
+        (record$runtime_restore_action %||% "") %in% c("reload", "relink")
+      ) {
         NULL
       } else {
         builder_project_recorded_fingerprint_md5(source$fingerprint)
@@ -3934,11 +3961,24 @@ complete_builder_project_open <- function(actions = NULL) {
   builder_project_pending_entries(pending_entries)
   builder_project_artifacts(artifacts)
   builder_project_skipped_ids(skipped_ids)
+  builder_project_removed_ids(prepared$removed_ids)
+  relinked_ids <- character()
   manifest$datasets <- lapply(manifest$datasets %||% list(), function(record) {
+    if (is.list(record$runtime_relink)) {
+      # The Project keeps the gone source until a Save copies the chosen
+      # file in.
+      if (!record$id %in% skipped_ids) {
+        relinked_ids <<- c(relinked_ids, record$id)
+      }
+      record$source <- record$runtime_relink$source
+      record$source$status <- "failed"
+      record$runtime_relink <- NULL
+    }
     record$runtime_restore_status <- NULL
     record$runtime_restore_action <- NULL
     record
   })
+  builder_project_relinked_ids(relinked_ids)
   builder_project(list(
     root = root,
     path = pending$path,
@@ -4046,6 +4086,64 @@ observeEvent(input$confirm_builder_project_open, {
     return()
   }
   complete_builder_project_open(actions)
+})
+
+## "Choose source file…" in the dataset choices: point a dataset whose
+## source is gone at another file, then show the choices again.
+observeEvent(input$project_restore_relink, {
+  pending <- isolate(builder_project_restore())
+  id <- as.character(input$project_restore_relink$dataset %||% "")
+  record <- if (is.null(pending)) {
+    NULL
+  } else {
+    builder_project_record_map(pending$manifest)[[id]] %||% NULL
+  }
+  if (is.null(record)) {
+    return()
+  }
+  label <- record$name %||% record$source$filename %||% "this dataset"
+  actions <- lapply(
+    builder_project_record_map(pending$manifest),
+    function(item) input[[paste0("project_restore_", item$id)]] %||% NULL
+  )
+  failed <- function(message) {
+    builder_notify(
+      "error",
+      paste0("The file chosen for ", label, " cannot be used: ", message)
+    )
+  }
+  builder_schedule_native_picker(
+    "dataset_files",
+    key = "project-relink",
+    on_result = function(choice) {
+      if (identical(choice$status, "cancelled")) {
+        return(invisible(FALSE))
+      }
+      if (!identical(choice$status, "selected")) {
+        return(failed(choice$error %||% "the file picker could not be opened."))
+      }
+      current <- isolate(builder_project_restore())
+      if (!identical(current$path, pending$path)) {
+        return(invisible(FALSE))
+      }
+      path <- as.character(choice$paths %||% choice$path)[[1L]]
+      relinked <- tryCatch(
+        builder_project_relink_record(record, path, current$root),
+        error = identity
+      )
+      if (inherits(relinked, "condition")) {
+        return(failed(conditionMessage(relinked)))
+      }
+      current$manifest$datasets <- lapply(
+        current$manifest$datasets,
+        function(item) if (identical(item$id, id)) relinked else item
+      )
+      builder_project_restore(current)
+      actions[[id]] <- relinked$runtime_restore_status$default_action
+      show_builder_project_restore_choices(actions)
+    },
+    on_error = function(error) failed(conditionMessage(error))
+  )
 })
 
 observeEvent(input$confirm_discard_builder_project_open, {

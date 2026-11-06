@@ -3248,19 +3248,24 @@
       var action = select ? select.value : "skip";
       row.dataset.currentAction = action;
       summary.total += 1;
-      if (action === "skip") {
+      if (action === "remove") {
+        summary.removed += 1;
+      } else if (action === "skip") {
         summary.skipped += 1;
       } else {
         summary.selected += 1;
       }
       if (action === "reuse") summary.reused += 1;
-      if (action === "resume" || action === "reload") summary.sourced += 1;
+      if (action === "resume" || action === "reload" || action === "relink") {
+        summary.sourced += 1;
+      }
       if (action === "reload") summary.reloaded += 1;
       return summary;
     }, {
       total: 0,
       selected: 0,
       skipped: 0,
+      removed: 0,
       reused: 0,
       sourced: 0,
       reloaded: 0
@@ -3291,6 +3296,12 @@
           " set to Skip and will stay unloaded in this session."
       );
     }
+    if (counts.removed > 0) {
+      messages.push(
+        counts.removed + " " + projectRestoreDatasetLabel(counts.removed) +
+          " will be removed from the project at the next Save."
+      );
+    }
     if (counts.reloaded > 0) {
       messages.push(
         counts.reloaded + " " + projectRestoreDatasetLabel(counts.reloaded) +
@@ -3309,7 +3320,7 @@
     }
     noticeText.textContent = messages.join(" ");
     // Success only when something actually opens from the cache.
-    notice.dataset.tone = counts.skipped > 0
+    notice.dataset.tone = counts.skipped > 0 || counts.removed > 0
       ? "warning"
       : (counts.reloaded > 0 ? "caution" : (counts.reused > 0 ? "ready" : "neutral"));
     var icon = notice.querySelector(".builder-project-restore-notice-icon i");
@@ -3330,6 +3341,15 @@
     document.addEventListener("change", function (event) {
       if (!event.target.matches(".builder-project-restore-row select")) return;
       syncProjectRestoreDialog(event.target.closest(".modal"));
+    });
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest &&
+        event.target.closest("[data-project-restore-relink]");
+      if (!button) return;
+      send("project_restore_relink", {
+        dataset: button.getAttribute("data-project-restore-relink"),
+        nonce: Date.now()
+      });
     });
   }
 

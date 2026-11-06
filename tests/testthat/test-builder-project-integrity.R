@@ -731,3 +731,255 @@ test_that("Open accepts a source blob that finished copying after the Save", {
   damaged <- runtime$builder_project_open_snapshot(saved$path)
   expect_identical(damaged$manifest$datasets[[1L]]$source$status, "pending")
 })
+
+## Two saved datasets; the source of "Sample B" is deleted afterwards.
+builder_project_gone_source_fixture <- function(runtime, root, uploads) {
+  entry_for <- function(id, name) {
+    source <- file.path(uploads, paste0(id, ".rds"))
+    saveRDS(list(id = id), source)
+    list(
+      id = id,
+      revision = 1L,
+      path = source,
+      filename = "sample.rds",
+      settings = list(name = name, groups = c("a", "b"), default_group = "b"),
+      acknowledgements = character(),
+      spatial_drafts = list(),
+      snapshot = list(
+        source_fingerprint = paste0(
+          "builder-snapshot-v2:",
+          unname(tools::md5sum(source))
+        )
+      )
+    )
+  }
+  entries <- list(entry_for("ds1", "Sample A"), entry_for("ds2", "Sample B"))
+  context <- list(
+    checked = character(),
+    artifacts = list(),
+    skipped_ids = character(),
+    configuration = list(),
+    last_ui = list()
+  )
+  built <- runtime$builder_project_build_manifest(
+    entries,
+    list(root = root, manifest = runtime$builder_project_new_manifest(root)),
+    context
+  )
+  results <- lapply(built$jobs, runtime$builder_project_copy_source_job)
+  saved <- runtime$builder_project_write(
+    runtime$builder_project_apply_source_results(built$manifest, results, root),
+    root,
+    expected_revision = 0L
+  )
+  unlink(file.path(root, "sources", "ds2"), recursive = TRUE)
+  opened <- runtime$builder_project_open_snapshot(saved$path)
+  list(entries = entries, context = context, manifest = opened$manifest)
+}
+
+test_that("Open can remove a dataset whose source is gone", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  fixture <- builder_project_gone_source_fixture(
+    runtime,
+    root,
+    withr::local_tempdir()
+  )
+  manifest <- fixture$manifest
+  expect_identical(
+    manifest$datasets[[2L]]$runtime_restore_status$actions,
+    "skip"
+  )
+  prepared <- runtime$builder_project_prepare_open_selection(
+    manifest,
+    root,
+    list(ds1 = "resume", ds2 = "remove")
+  )
+  expect_identical(prepared$removed_ids, "ds2")
+  expect_identical(prepared$skipped_ids, "ds2")
+  expect_named(prepared$pending_entries, "ds1")
+
+  context <- fixture$context
+  context$skipped_ids <- prepared$skipped_ids
+  context$removed_ids <- prepared$removed_ids
+  built <- runtime$builder_project_build_manifest(
+    fixture$entries[1L],
+    list(root = root, manifest = manifest),
+    context
+  )
+  expect_identical(
+    vapply(built$manifest$datasets, `[[`, character(1), "id"),
+    "ds1"
+  )
+  ## The gone source of the removed dataset does not block the overwrite.
+  written <- runtime$builder_project_write(
+    built$manifest,
+    root,
+    expected_revision = manifest$project$revision
+  )
+  expect_length(written$manifest$datasets, 1L)
+  expect_true(runtime$builder_project_diagnose(written$path)$manifest$valid)
+})
+
+test_that("Open can relink a dataset whose source is gone to a chosen file", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  uploads <- withr::local_tempdir()
+  fixture <- builder_project_gone_source_fixture(runtime, root, uploads)
+  record <- fixture$manifest$datasets[[2L]]
+  expect_error(
+    runtime$builder_project_relink_record(
+      record,
+      file.path(uploads, "absent.rds"),
+      root
+    )
+  )
+
+  ## The same bytes again: the saved settings come back unchanged.
+  same <- file.path(withr::local_tempdir(), "moved.rds")
+  file.copy(file.path(uploads, "ds2.rds"), same)
+  relinked <- runtime$builder_project_relink_record(record, same, root)
+  status <- relinked$runtime_restore_status
+  expect_identical(status$actions, c("relink", "reload", "skip"))
+  expect_identical(status$default_action, "relink")
+  expect_identical(relinked$source$kind, "external")
+  expect_identical(relinked$runtime_relink$source, record$source)
+  loaded_from <- function(path, settings) {
+    list(
+      id = "ds2",
+      settings = settings,
+      profile = list(group_candidates = c("a", "c")),
+      snapshot = list(
+        source_state = c(
+          runtime$builder_project_file_metadata(path),
+          list(location = path)
+        ),
+        source_fingerprint = paste0(
+          "builder-snapshot-v2:",
+          unname(tools::md5sum(path))
+        )
+      )
+    )
+  }
+  relinked$runtime_restore_action <- "relink"
+  defaults <- list(name = "moved", groups = "c", default_group = "c")
+  restored <- runtime$builder_project_finalize_loaded_entry(
+    loaded_from(same, defaults),
+    relinked,
+    root
+  )
+  expect_true(runtime$builder_project_relink_matched(relinked, restored))
+  expect_identical(restored$settings, status$configuration_entry$settings)
+  expect_identical(restored$settings$default_group, "b")
+
+  ## Different bytes: settings the new file cannot use fall back.
+  changed <- file.path(withr::local_tempdir(), "changed.rds")
+  saveRDS(list(id = "other"), changed)
+  relinked <- runtime$builder_project_relink_record(record, changed, root)
+  relinked$runtime_restore_action <- "relink"
+  restored <- runtime$builder_project_finalize_loaded_entry(
+    loaded_from(changed, defaults),
+    relinked,
+    root
+  )
+  expect_false(runtime$builder_project_relink_matched(relinked, restored))
+  expect_identical(restored$settings$name, "Sample B")
+  expect_identical(restored$settings$groups, "a")
+  expect_identical(restored$settings$default_group, "c")
+  expect_null(runtime$builder_project_restored_check_identity(
+    relinked,
+    restored
+  ))
+
+  ## Save copies the chosen file in although the old source is gone.
+  restored$path <- changed
+  restored$filename <- "changed.rds"
+  manifest <- fixture$manifest
+  manifest$datasets[[2L]]$source$status <- "failed"
+  built <- runtime$builder_project_build_manifest(
+    c(fixture$entries[1L], list(restored)),
+    list(root = root, manifest = manifest),
+    fixture$context
+  )
+  written <- runtime$builder_project_write(
+    built$manifest,
+    root,
+    expected_revision = manifest$project$revision
+  )
+  results <- lapply(built$jobs, runtime$builder_project_copy_source_job)
+  final <- runtime$builder_project_write(
+    runtime$builder_project_apply_source_results(
+      written$manifest,
+      results,
+      root
+    ),
+    root,
+    expected_revision = written$manifest$project$revision
+  )
+  expect_identical(final$manifest$datasets[[2L]]$source$status, "ready")
+  expect_identical(
+    final$manifest$datasets[[2L]]$source$fingerprint$md5,
+    unname(tools::md5sum(changed))
+  )
+  expect_true(runtime$builder_project_diagnose(final$path)$manifest$valid)
+})
+
+test_that("a relinked different file keeps the saved choices it still has", {
+  runtime <- builder_project_integrity_runtime()
+  saved <- list(
+    name = "Sample B",
+    organism = "mm",
+    palette = "viridis",
+    assay = "RNA",
+    layer = "counts",
+    groups = c("a", "b"),
+    included_groups = c("a", "b"),
+    default_group = "b",
+    reductions = c("UMAP", "PCA"),
+    included_projections = c("UMAP", "PCA"),
+    initial_projections = "PCA",
+    default_projection = "PCA",
+    tables = list(list(name = "old table"))
+  )
+  loaded <- list(
+    profile = list(
+      assay_profiles = list(RNA = list(layers = c("counts", "data"))),
+      group_candidates = c("a", "c"),
+      reductions = c("UMAP", "TSNE")
+    ),
+    settings = list(
+      name = "moved",
+      organism = "hg",
+      palette = "cerebro",
+      assay = "RNA",
+      layer = "data",
+      groups = "c",
+      included_groups = "c",
+      default_group = "c",
+      reductions = "TSNE",
+      included_projections = "TSNE",
+      initial_projections = "TSNE",
+      default_projection = "TSNE",
+      tables = list()
+    )
+  )
+  settings <- runtime$builder_project_relinked_settings(saved, loaded)
+  expect_identical(settings$name, "Sample B")
+  expect_identical(settings$organism, "mm")
+  expect_identical(settings$palette, "viridis")
+  expect_identical(settings$layer, "counts")
+  expect_identical(settings$included_groups, "a")
+  expect_identical(settings$default_group, "a")
+  expect_identical(settings$included_projections, "UMAP")
+  ## PCA is gone, so the initial projection falls back to a kept one.
+  expect_identical(settings$initial_projections, "UMAP")
+  expect_identical(settings$default_projection, "UMAP")
+  expect_identical(settings$tables, list())
+
+  ## An assay or layer the new file lacks takes the new defaults.
+  saved$layer <- "scaled"
+  expect_identical(
+    runtime$builder_project_relinked_settings(saved, loaded)$layer,
+    "data"
+  )
+})

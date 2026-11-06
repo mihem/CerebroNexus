@@ -4064,12 +4064,14 @@ builder_project_manifest_integrity <- function(
 }
 
 ## `failed_source_ids`: datasets whose missing source is already accepted
-## (recorded as failed in the manifest about to replace this one).
+## (recorded as failed or still copying in the manifest about to replace this
+## one). `dropped_ids`: datasets that manifest no longer lists.
 builder_project_assert_manifest_integrity <- function(
   manifest,
   root,
   verification_cache = NULL,
-  failed_source_ids = character()
+  failed_source_ids = character(),
+  dropped_ids = character()
 ) {
   status <- builder_project_manifest_integrity(
     manifest,
@@ -4083,6 +4085,7 @@ builder_project_assert_manifest_integrity <- function(
   broken <- Filter(
     function(dataset) {
       !isTRUE(dataset$valid) &&
+        !dataset$id %in% dropped_ids &&
         !(dataset$id %in%
           failed_source_ids &&
           identical(dataset$errors, source_error))
@@ -5071,7 +5074,7 @@ builder_project_finalize_loaded_entry <- function(loaded, record, root) {
     )
   }
   action <- as.character(record$runtime_restore_action %||% "")
-  if (!action %in% c("resume", "reload", "edit")) {
+  if (!action %in% c("resume", "reload", "edit", "relink")) {
     stop("The Project restore action is missing.", call. = FALSE)
   }
   status <- record$runtime_restore_status %||% NULL
@@ -5086,7 +5089,7 @@ builder_project_finalize_loaded_entry <- function(loaded, record, root) {
     loaded,
     record,
     root,
-    require_match = !identical(action, "reload")
+    require_match = !action %in% c("reload", "relink")
   )
   if (identical(action, "reload")) {
     return(loaded)
@@ -5108,13 +5111,177 @@ builder_project_finalize_loaded_entry <- function(loaded, record, root) {
   if (!is.list(saved)) {
     stop("The saved dataset configuration is unavailable.", call. = FALSE)
   }
-  loaded$settings <- saved$settings
-  loaded$acknowledgements <- saved$acknowledgements %||% NULL
-  loaded$spatial_drafts <- saved$spatial_drafts %||% NULL
   loaded$revision <- as.integer(
     saved$revision %||% record$configuration$revision %||% 0L
   )
+  if (
+    identical(action, "relink") &&
+      !builder_project_relink_matched(record, loaded)
+  ) {
+    # A different file keeps only the settings it can still use.
+    loaded$settings <- builder_project_relinked_settings(
+      saved$settings,
+      loaded
+    )
+    return(loaded)
+  }
+  loaded$settings <- saved$settings
+  loaded$acknowledgements <- saved$acknowledgements %||% NULL
+  loaded$spatial_drafts <- saved$spatial_drafts %||% NULL
   loaded
+}
+
+## Points a dataset whose source is gone at a file the user chose. The file
+## loads with the "relink" action; whether its MD5 matches the saved source
+## is known only once it has loaded.
+builder_project_relink_record <- function(record, path, root) {
+  path <- normalizePath(path.expand(path), winslash = "/", mustWork = TRUE)
+  if (dir.exists(path)) {
+    stop("Choose a file, not a folder.", call. = FALSE)
+  }
+  original <- record$runtime_relink$source %||% record$source %||% list()
+  record$runtime_relink <- list(
+    source = original,
+    md5 = builder_project_recorded_fingerprint_md5(
+      original$fingerprint %||% NULL
+    )
+  )
+  record$source <- list(
+    kind = "external",
+    path = path,
+    filename = basename(path),
+    origin = "local",
+    status = "ready",
+    fingerprint = builder_project_file_fingerprint(path, content = FALSE)
+  )
+  status <- builder_project_dataset_status(record, root)
+  if (is.list(status$configuration_entry) && "reload" %in% status$actions) {
+    status$actions <- append(
+      status$actions,
+      "relink",
+      after = match("reload", status$actions) - 1L
+    )
+    status$default_action <- "relink"
+    status$problem <- NULL
+    status$detail <- paste(
+      "Loads",
+      basename(path),
+      "with the saved settings that still apply."
+    )
+  }
+  record$runtime_restore_status <- status
+  record
+}
+
+## Whether a relinked file has the bytes the dataset was saved from.
+builder_project_relink_matched <- function(record, loaded) {
+  expected <- as.character(record$runtime_relink$md5 %||% "")
+  actual <- as.character(loaded$project_source_fingerprint$md5 %||% "")
+  .builder_project_text(expected) &&
+    identical(tolower(expected), tolower(actual))
+}
+
+## Settings for a dataset relinked to a different file: the new file's
+## defaults, plus the saved name, organism and display options, and the saved
+## assay, layer, groups and projections the new file still has.
+builder_project_relinked_settings <- function(saved, loaded) {
+  saved <- saved %||% list()
+  defaults <- loaded$settings %||% list()
+  profile <- loaded$profile %||% list()
+  settings <- defaults
+  for (key in c(
+    "name",
+    "organism",
+    "palette",
+    "overview_point_size",
+    "overview_point_opacity",
+    "overview_percentage_cells_to_show",
+    "spatial_percentage_cells_to_show",
+    "viewer_display"
+  )) {
+    if (!is.null(saved[[key]])) {
+      settings[[key]] <- saved[[key]]
+    }
+  }
+  plain <- settings
+  if (
+    builder_project_loaded_settings_compatible(list(
+      profile = profile,
+      settings = saved
+    ))
+  ) {
+    for (key in c("assay", "layer", "nUMI", "nGene")) {
+      settings[key] <- list(saved[[key]])
+    }
+  }
+  # Saved choices the new file still has; none left takes the defaults.
+  kept <- function(key, available, required = FALSE) {
+    available <- unname(as.character(available %||% character()))
+    for (values in list(saved[[key]], settings[[key]])) {
+      values <- intersect(as.character(values %||% character()), available)
+      if (length(values)) {
+        return(values)
+      }
+    }
+    if (required) utils::head(available, 1L) else settings[[key]]
+  }
+  pick <- function(key, choices) {
+    for (value in list(saved[[key]], settings[[key]])) {
+      if (.builder_project_text(value) && value %in% choices) {
+        return(value)
+      }
+    }
+    if (length(choices)) choices[[1L]] else NULL
+  }
+  groups <- profile$group_candidates
+  projections <- profile$reductions
+  if (!is.null(groups)) {
+    settings["groups"] <- list(kept("groups", groups))
+    if (!is.null(settings$included_groups)) {
+      settings["included_groups"] <- list(kept("included_groups", groups))
+      settings["default_group"] <- list(pick(
+        "default_group",
+        settings$included_groups
+      ))
+    }
+  }
+  if (!is.null(projections)) {
+    settings["reductions"] <- list(kept("reductions", projections))
+    if (!is.null(settings$included_projections)) {
+      settings["included_projections"] <- list(kept(
+        "included_projections",
+        projections
+      ))
+      settings$initial_projections <- kept(
+        "initial_projections",
+        settings$included_projections,
+        required = TRUE
+      )
+      settings["default_projection"] <- list(pick(
+        "default_projection",
+        settings$initial_projections
+      ))
+    }
+  }
+  # Choices that do not fit together fall back to the new file's defaults.
+  if (
+    !is.null(settings$viewer_content_schema_version) &&
+      exists(".builder_state_validate_viewer_content_settings")
+  ) {
+    entry <- loaded
+    entry$settings <- settings
+    valid <- tryCatch(
+      {
+        .builder_state_validate_viewer_content_settings(entry)
+        TRUE
+      },
+      error = function(error) FALSE
+    )
+    if (!valid) {
+      settings <- plain
+    }
+  }
+  settings
 }
 
 builder_project_verified_spatial_sidecar <- function(built, verification) {
@@ -7443,7 +7610,10 @@ builder_project_build_manifest <- function(
     )
   }
   retained_ids <- vapply(records, `[[`, character(1), "id")
-  inactive <- previous[setdiff(names(previous), retained_ids)]
+  inactive <- previous[setdiff(
+    names(previous),
+    c(retained_ids, context$removed_ids)
+  )]
   if (length(inactive)) {
     skipped_ids <- context$skipped_ids
     inactive <- lapply(inactive, function(record) {
@@ -8110,20 +8280,31 @@ builder_project_write <- function(
       call. = FALSE
     )
   }
-  # Sources this manifest already records as failed may be missing on disk.
+  # Sources this manifest records as failed or still copying, or datasets it
+  # no longer lists (removed at Open), may be missing on disk.
+  record_ids <- function(records) {
+    as.character(unlist(lapply(records %||% list(), `[[`, "id")))
+  }
   failed_source_ids <- as.character(unlist(lapply(
     manifest$datasets %||% list(),
     function(record) {
-      if (identical(record$source$status %||% NULL, "failed")) record$id
+      if ((record$source$status %||% "") %in% c("failed", "pending")) {
+        record$id
+      }
     }
   )))
+  dropped_ids <- setdiff(
+    record_ids(disk$datasets),
+    record_ids(manifest$datasets)
+  )
   if (!is.null(disk)) {
     tryCatch(
       builder_project_assert_manifest_integrity(
         disk,
         root,
         verification_cache = verification_cache,
-        failed_source_ids = failed_source_ids
+        failed_source_ids = failed_source_ids,
+        dropped_ids = dropped_ids
       ),
       error = function(error) {
         stop(
@@ -8336,7 +8517,8 @@ builder_project_write <- function(
             backup_manifest,
             root,
             verification_cache = verification_cache,
-            failed_source_ids = failed_source_ids
+            failed_source_ids = failed_source_ids,
+            dropped_ids = dropped_ids
           )
           TRUE
         },
@@ -8445,7 +8627,7 @@ builder_project_manifest_with_restore_actions <- function(manifest, actions) {
       is.list(status) &&
         is.character(action) &&
         length(action) == 1L &&
-        action %in% c(status$actions %||% character(), "skip")
+        action %in% c(status$actions %||% character(), "skip", "remove")
     ) {
       status$default_action <- action
       record$runtime_restore_status <- status
@@ -8469,9 +8651,16 @@ builder_project_prepare_open_selection <- function(manifest, root, actions) {
   artifacts <- list()
   marks <- character()
   skipped_ids <- character()
+  removed_ids <- character()
   for (record in records) {
     action <- as.character(actions[[record$id]] %||% "skip")
     status <- record$runtime_restore_status %||% NULL
+    if (identical(action, "remove")) {
+      # Not loaded now; the next Save drops it from the Project.
+      skipped_ids <- c(skipped_ids, record$id)
+      removed_ids <- c(removed_ids, record$id)
+      next
+    }
     if (!is.list(status) || !action %in% status$actions) {
       stop(
         "The selected action is no longer valid for dataset ",
@@ -8526,7 +8715,8 @@ builder_project_prepare_open_selection <- function(manifest, root, actions) {
     pending_entries = pending_entries,
     artifacts = artifacts,
     marks = marks,
-    skipped_ids = skipped_ids
+    skipped_ids = skipped_ids,
+    removed_ids = removed_ids
   )
 }
 
@@ -8711,7 +8901,9 @@ builder_project_restored_check_identity <- function(record, entry) {
     entry$load_state %||% "loaded",
     "artifact_ready"
   ) ||
-    (record$runtime_restore_action %||% "") %in% c("resume", "edit")
+    (record$runtime_restore_action %||% "") %in% c("resume", "edit") ||
+    (identical(record$runtime_restore_action %||% "", "relink") &&
+      builder_project_relink_matched(record, entry))
   if (
     !is.list(record) ||
       !is.list(entry) ||

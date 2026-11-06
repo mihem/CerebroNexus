@@ -1172,6 +1172,7 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 }
 .builder-project-restore-action { min-width: 0; }
 .builder-project-restore-action-label { display: none; }
+.builder-project-restore-relink { margin-top: var(--space-1); }
 .builder-project-restore-row .form-group {
   min-width: 0;
   margin: 0;
