@@ -734,3 +734,102 @@ test_that("a hung worker is restarted and its import offers Retry", {
     expect_match(rail_html, "builder-retry-import", fixed = TRUE)
   })
 })
+
+builder_import_queue_restart_app <- function(startup_state) {
+  app_env <- new.env(parent = globalenv())
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this import queue test.")
+  }
+  app_env$builder_session_example <- function(...) invisible(TRUE)
+  app_env$builder_session_poll <- function(worker, ...) {
+    list(worker = worker, event = NULL, result = NULL)
+  }
+  app_env$builder_session_poll_startup <- function(worker, ...) {
+    worker$state <- startup_state
+    list(
+      worker = worker,
+      state = startup_state,
+      error = if (identical(startup_state, "failed")) {
+        "The replacement worker could not start."
+      }
+    )
+  }
+  app_env
+}
+
+builder_import_queue_finish_restart <- function(worker, done) {
+  deadline <- Sys.time() + 5
+  while (!done() && Sys.time() < deadline) {
+    shiny:::.getReactiveEnvironment()$runWith(NULL, function() {
+      later::run_now(0.2)
+    })
+  }
+}
+
+test_that("imports queued during a worker restart run on the new worker", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  withr::local_dir(builder_profile_inst_path("builder"))
+  app_env <- builder_import_queue_restart_app("ready")
+
+  shiny::testServer(app_env$server, {
+    worker(list(epoch = "worker-restarting", state = "starting"))
+    worker_available(FALSE)
+    protocol(app_env$builder_request_protocol("worker-restarting"))
+    expect_true(start_load(
+      "example",
+      "complete_viewer_data",
+      "Complete Viewer data"
+    ))
+    expect_true(start_load("example", "trekker_spatial", "Trekker demo"))
+    session$flushReact()
+    expect_null(isolate(protocol())$pending)
+    expect_length(isolate(protocol())$queue, 2L)
+    expect_identical(
+      app_env$builder_import_find(isolate(imports()), "ds2")$load_state,
+      "queued"
+    )
+
+    await_restarted_worker("Reopening datasets from their snapshots…")
+    builder_import_queue_finish_restart(
+      worker,
+      function() isTRUE(isolate(worker_available()))
+    )
+    session$flushReact()
+
+    expect_identical(isolate(protocol())$pending$dataset, "ds1")
+    expect_length(isolate(protocol())$queue, 1L)
+    expect_null(isolate(add_error()))
+  })
+})
+
+test_that("imports queued during a failed worker restart end with an error", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  withr::local_dir(builder_profile_inst_path("builder"))
+  app_env <- builder_import_queue_restart_app("failed")
+
+  shiny::testServer(app_env$server, {
+    worker(list(epoch = "worker-restarting", state = "starting"))
+    worker_available(FALSE)
+    protocol(app_env$builder_request_protocol("worker-restarting"))
+    expect_true(start_load(
+      "example",
+      "complete_viewer_data",
+      "Complete Viewer data"
+    ))
+    session$flushReact()
+
+    await_restarted_worker("Reopening datasets from their snapshots…")
+    builder_import_queue_finish_restart(
+      worker,
+      function() identical(isolate(worker())$state, "failed")
+    )
+
+    entry <- app_env$builder_import_find(isolate(imports()), "ds1")
+    expect_identical(entry$load_state, "error")
+    expect_length(isolate(protocol())$queue, 0L)
+    expect_match(isolate(add_error()), "could not start", fixed = TRUE)
+  })
+})

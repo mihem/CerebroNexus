@@ -753,7 +753,10 @@ release_pending_source <- function(payload, drop_import = TRUE) {
 }
 enqueue <- function(req) {
   current_protocol <- protocol()
-  if (is.null(current_protocol) || !isTRUE(worker_available())) {
+  ## While the worker starts or restarts, requests queue; the dispatcher
+  ## sends them once it is ready, and a failed restart ends them.
+  starting <- identical(isolate(worker())$state %||% NULL, "starting")
+  if (is.null(current_protocol) || !(isTRUE(worker_available()) || starting)) {
     add_error("The background worker is not ready yet.")
     return(invisible(FALSE))
   }
