@@ -87,6 +87,42 @@ test_that("spatial alignment draws an FOV without any reduction", {
   expect_false(is.null(model$bounds))
 })
 
+test_that("spatial alignment draws every FOV of a Xenium-like object without reductions", {
+  skip_if_not_installed("SeuratObject")
+  ## A full section "fov" and a "zoom" FOV that holds only part of the cells.
+  object <- builder_no_reduction_object(spatial = FALSE)
+  object$cluster <- rep(c("a", "b"), length.out = ncol(object))
+  object <- .builder_fixture_add_section(
+    object,
+    "fov",
+    colnames(object),
+    c(0, 0),
+    c(100, 100)
+  )
+  zoom <- colnames(object)[seq_len(10L)]
+  object <- .builder_fixture_add_section(
+    object,
+    "zoom",
+    zoom,
+    c(0, 0),
+    c(40, 40)
+  )
+  for (section in c("fov", "zoom")) {
+    model <- builder_alignment_preview_model(
+      object,
+      group = "cluster",
+      layer = "counts",
+      section_id = section
+    )
+    expect_true(model$available, info = paste(section, model$message))
+    expect_identical(model$section$id, section)
+    expect_setequal(
+      model$spatial$cell_barcode,
+      if (section == "zoom") zoom else colnames(object)
+    )
+  }
+})
+
 for (spatial in c(FALSE, TRUE)) {
   local({
     spatial <- spatial
