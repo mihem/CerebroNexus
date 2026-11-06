@@ -71,6 +71,27 @@ test_that("the real worker defers the package runtime until Build", {
   expect_true(after$exporter)
 })
 
+test_that("an installed worker can check the HLA page without a content check", {
+  skip_if_not_installed("callr")
+  skip_if_not(
+    nzchar(base::system.file(package = "CerebroNexus", lib.loc = .libPaths())),
+    "CerebroNexus is not installed for a background R process"
+  )
+  ## A worker restarted after Stop goes straight to Build. With an installed
+  ## package the HLA core is bound only by the immune capability.
+  original <- .builder_worker_package_source
+  assign(".builder_worker_package_source", function(...) NULL, globalenv())
+  withr::defer(assign(".builder_worker_package_source", original, globalenv()))
+  worker <- builder_worker_start(builder_profile_inst_path("builder"))
+  withr::defer(try(builder_worker_stop(worker), silent = TRUE))
+
+  found <- worker$process$run(function() {
+    builder_worker_require_capability("build")
+    exists("hla_detect_chains", mode = "function")
+  })
+  expect_true(found)
+})
+
 test_that("authentication accounts are redacted from every protocol owner", {
   raw_contains <- function(value, text) {
     bytes <- serialize(value, NULL)

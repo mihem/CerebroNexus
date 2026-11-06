@@ -1357,6 +1357,9 @@ builder_worker_start <- function(
       build = function() {
         builder_worker_ensure_capability(capabilities, "package")
         builder_worker_ensure_capability(capabilities, "analysis")
+        # The page check needs the HLA core; a restarted worker (after Stop)
+        # has not inspected content yet, so it is not loaded otherwise.
+        builder_worker_ensure_capability(capabilities, "immune")
         source_files(c(
           file.path(dir, "app_bundle.R"),
           file.path(dir, "build.R")
