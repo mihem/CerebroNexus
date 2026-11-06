@@ -411,3 +411,34 @@ test_that("a negative zero setting saves and reads back with its identity", {
     record$configuration$digest
   )
 })
+
+test_that("non-ASCII text survives two saves in a non-UTF-8 locale", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  withr::local_locale(c(LC_CTYPE = "C"))
+  skip_if_not(identical(Sys.getlocale("LC_CTYPE"), "C"))
+  name <- "Zürich"
+  entry <- builder_project_integrity_entry(name, 7L)
+
+  first <- runtime$builder_project_write(
+    builder_project_integrity_manifest(runtime, root, entry),
+    root,
+    expected_revision = 0L
+  )
+  reopened <- runtime$builder_project_read(first$path)
+  restored <- runtime$builder_project_read_dataset_config(
+    reopened$datasets[[1L]],
+    root
+  )
+  expect_identical(restored$settings$name, name)
+  expect_identical(reopened$datasets[[1L]]$name, name)
+
+  second_descriptor <- runtime$builder_project_write_dataset_config(
+    restored,
+    root
+  )
+  expect_identical(
+    second_descriptor$path,
+    first$manifest$datasets[[1L]]$configuration$path
+  )
+})

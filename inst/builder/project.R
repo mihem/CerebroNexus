@@ -615,6 +615,14 @@ builder_project_id <- function() {
   )
 }
 
+## Project JSON is UTF-8; marking it keeps non-ASCII text intact when R runs
+## in a non-UTF-8 locale.
+.builder_project_utf8_text <- function(bytes) {
+  text <- rawToChar(bytes)
+  Encoding(text) <- "UTF-8"
+  text
+}
+
 builder_project_manifest_path <- function(root) {
   file.path(root, .builder_project_manifest_name)
 }
@@ -3168,7 +3176,7 @@ builder_project_read_configuration_file <- function(path, fingerprint = FALSE) {
     )
   }
   config <- tryCatch(
-    jsonlite::unserializeJSON(rawToChar(bytes)),
+    jsonlite::unserializeJSON(.builder_project_utf8_text(bytes)),
     error = identity
   )
   parse_error <- inherits(config, "condition")
@@ -6799,7 +6807,7 @@ builder_project_read_manifest_payload <- function(path, payload = NULL) {
     stop("The Builder project exceeds its input size limit.", call. = FALSE)
   }
   manifest <- jsonlite::fromJSON(
-    rawToChar(payload),
+    .builder_project_utf8_text(payload),
     simplifyVector = FALSE
   )
   schema_version <- tryCatch(
