@@ -147,8 +147,11 @@
 
   # Identify cells with non-NA repertoire data
   primary_col <- if ("CTgene" %in% present_core) "CTgene" else present_core[1]
-  has_data <- !is.na(seurat@meta.data[[primary_col]]) &
-    nzchar(as.character(seurat@meta.data[[primary_col]]))
+  ## "NA", "None" and "nan" are missing receptors written as text.
+  primary <- as.character(seurat@meta.data[[primary_col]])
+  has_data <- !is.na(primary) &
+    nzchar(primary) &
+    !toupper(trimws(primary)) %in% c("NA", "NONE", "NAN")
 
   if (sum(has_data) == 0) {
     if (verbose) {

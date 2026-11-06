@@ -434,6 +434,13 @@
   motif_records <- character()
   motif_payload <- list()
   n_rows <- 0L
+  ## The build drops rows whose barcodes are not in the object, and samples
+  ## left without rows, so only those rows and samples are counted.
+  cells <- as.character(cells)
+  in_dataset <- function(barcodes) {
+    !length(cells) | (!is.na(barcodes) & barcodes %in% cells)
+  }
+  kept_samples <- character()
 
   for (index in seq_along(payload)) {
     table <- .subset2(payload, index)
@@ -514,6 +521,9 @@
       barcodes <- rep(NA_character_, table_rows)
       usable_barcodes <- character()
     }
+    if (any(in_dataset(barcodes))) {
+      kept_samples <- c(kept_samples, sample_names[[index]])
+    }
     if ("CTgene" %in% names(normalized)) {
       all_chains <- c(
         all_chains,
@@ -558,7 +568,7 @@
     if (length(empty_columns)) {
       diagnostics <- c(diagnostics, "empty_required_column")
     }
-    n_rows <- n_rows + nrow(normalized)
+    n_rows <- n_rows + sum(in_dataset(normalized$barcode))
     full_records <- c(
       full_records,
       .builder_immune_comparison_records(
@@ -572,7 +582,6 @@
   if (anyDuplicated(all_barcodes)) {
     diagnostics <- c(diagnostics, "duplicate_barcodes")
   }
-  cells <- as.character(cells)
   outside <- setdiff(unique(all_barcodes), unique(cells))
   overlap <- intersect(unique(all_barcodes), unique(cells))
   if (length(outside)) {
@@ -648,6 +657,7 @@
   overlap_fraction <- if (denominator) length(overlap) / denominator else 0
   full_records <- full_records[!duplicated(names(full_records))]
   motif_records <- motif_records[!duplicated(names(motif_records))]
+  kept_samples <- unique(intersect(nonblank_samples, kept_samples))
   sample_preview <- .builder_immune_preview_info(nonblank_samples)
   barcode_preview <- .builder_immune_preview_info(all_barcodes)
   outside_preview <- .builder_immune_preview_info(outside)
@@ -665,13 +675,13 @@
     detected = TRUE,
     valid = full_ir_ready,
     normalized = list(
-      n_samples = as.integer(length(unique(nonblank_samples))),
+      n_samples = as.integer(length(kept_samples)),
       n_rows = as.integer(n_rows),
       barcode_count = as.integer(length(unique(all_barcodes))),
       dataset_overlap_count = as.integer(length(overlap)),
       dataset_overlap_fraction = overlap_fraction,
       sample_names = sample_preview$value,
-      sample_count = as.integer(length(unique(nonblank_samples))),
+      sample_count = as.integer(length(kept_samples)),
       chains = all_chains,
       receptor_types = .builder_immune_receptor_types(all_chains),
       columns = .builder_immune_required_columns,
@@ -790,14 +800,6 @@
     }
     sample_ids <- sample_result$value
   }
-  if (anyNA(sample_ids) || any(!nzchar(sample_ids))) {
-    return(invalid_candidate(
-      "blank_sample_names",
-      missing_columns = missing,
-      sample_columns = sample_columns,
-      sample_column = sample_column
-    ))
-  }
   barcodes <- row_name_attribute$value
   safe_core <- vector("list", length(present))
   names(safe_core) <- present
@@ -818,12 +820,25 @@
     safe_core[[column]] <- result$value
   }
   if ("CTgene" %in% metadata_columns) {
+    ## "NA", "None" and "nan" are missing receptors written as text, as in
+    ## .extractRepertoireFromMetadata().
     primary <- safe_core[["CTgene"]]
-    keep <- !is.na(primary) & nzchar(primary)
+    keep <- !is.na(primary) &
+      nzchar(primary) &
+      !toupper(trimws(primary)) %in% c("NA", "NONE", "NAN")
   } else {
     keep <- rep(TRUE, metadata_rows)
   }
   indices <- which(keep)
+  ## Only cells with a receptor need a sample identity.
+  if (anyNA(sample_ids[indices]) || any(!nzchar(sample_ids[indices]))) {
+    return(invalid_candidate(
+      "blank_sample_names",
+      missing_columns = missing,
+      sample_columns = sample_columns,
+      sample_column = sample_column
+    ))
+  }
   if (!length(indices)) {
     return(.builder_immune_record(
       detected = TRUE,

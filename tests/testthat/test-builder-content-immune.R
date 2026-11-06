@@ -698,3 +698,69 @@ test_that("HLA locus summaries stay bounded for many valid loci", {
   expect_gte(hla$preview_truncated_count, 1980L)
   expect_lt(as.numeric(object.size(hla)), 200000)
 })
+
+test_that("repertoire counts only rows and samples the build keeps", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_immune_fixture_object()
+  cells <- SeuratObject::Cells(object)
+  object@misc$immune_repertoire <- list(
+    S1 = builder_immune_fixture_table(c(cells[1:5], "outside-0"), "TRB"),
+    S2 = builder_immune_fixture_table(paste0("outside-", 1:3), "TRB", "two")
+  )
+  candidate <- builder_profile_immune_content(
+    object,
+    builder_immune_fixture_context(object)
+  )$immune_repertoire$candidates$unified_misc
+
+  expect_identical(candidate$normalized$n_samples, 1L)
+  expect_identical(candidate$normalized$sample_count, 1L)
+  expect_identical(candidate$normalized$n_rows, 5L)
+  ## So the Builder does not offer Compare, which needs two samples.
+  tabs <- CerebroNexus:::viewerImmuneRepertoireTabs()
+  expect_lt(
+    candidate$normalized$n_samples,
+    tabs$min_samples[tabs$id == "Compare"]
+  )
+
+  built <- suppressWarnings(
+    CerebroNexus::addImmuneRepertoire(object, verbose = FALSE)
+  )
+  expect_identical(names(built@misc$immune_repertoire), "S1")
+  expect_identical(nrow(built@misc$immune_repertoire$S1), 5L)
+})
+
+test_that("metadata repertoire needs a sample only where a receptor exists", {
+  skip_if_not_installed("SeuratObject")
+  object <- builder_immune_fixture_object()
+  cells <- SeuratObject::Cells(object)
+  for (column in c("CTgene", "CTnt", "CTaa", "CTstrict")) {
+    object@meta.data[[column]] <- NA_character_
+  }
+  rows <- cells[c(1L, 2L, 3L)]
+  table <- builder_immune_fixture_table(rows, "TRB", "metadata")
+  object@meta.data[rows, c("CTgene", "CTnt", "CTaa", "CTstrict")] <-
+    table[, c("CTgene", "CTnt", "CTaa", "CTstrict")]
+  ## Text spellings of a missing receptor and a missing sample on a cell
+  ## without a receptor.
+  object@meta.data[cells[4:6], "CTgene"] <- c("NA", "None", "nan")
+  object@meta.data[cells[4:8], "orig.ident"] <- NA_character_
+  context <- builder_immune_fixture_context(object)
+  context$metadata <- object@meta.data
+
+  candidate <- builder_profile_immune_content(
+    object,
+    context
+  )$immune_repertoire$candidates$metadata
+  expect_true(candidate$valid, info = paste(candidate$diagnostics))
+  expect_false("blank_sample_names" %in% candidate$diagnostics)
+  expect_identical(candidate$normalized$n_rows, 3L)
+
+  repertoire <- CerebroNexus:::.extractRepertoireFromMetadata(
+    object,
+    verbose = FALSE
+  )
+  expect_identical(
+    sort(unlist(lapply(repertoire, `[[`, "barcode"), use.names = FALSE)),
+    sort(rows)
+  )
+})
