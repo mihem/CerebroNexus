@@ -8,12 +8,7 @@
       ## leave an empty environment behind for later calls.
       loaded <- new.env(parent = baseenv())
       sys.source(
-        system.file(
-          "viewer",
-          "core",
-          "crb_contract.R",
-          package = "CerebroNexus"
-        ),
+        .cerebroPackageResource("viewer", "core", "crb_contract.R"),
         loaded
       )
       contract <<- loaded

@@ -6,12 +6,7 @@
     if (is.null(contract)) {
       contract <<- new.env(parent = baseenv())
       sys.source(
-        system.file(
-          "viewer",
-          "core",
-          "viewer_content_contract.R",
-          package = "CerebroNexus"
-        ),
+        .cerebroPackageResource("viewer", "core", "viewer_content_contract.R"),
         contract
       )
     }

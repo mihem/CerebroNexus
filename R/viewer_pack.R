@@ -234,13 +234,7 @@
     if (is.null(scope)) {
       scope <<- new.env(parent = baseenv())
       sys.source(
-        system.file(
-          "viewer",
-          "immune_repertoire",
-          "encode.R",
-          package = "CerebroNexus",
-          mustWork = TRUE
-        ),
+        .cerebroPackageResource("viewer", "immune_repertoire", "encode.R"),
         envir = scope
       )
     }
@@ -697,12 +691,7 @@
     if (is.null(compact)) {
       scope <- new.env(parent = baseenv())
       sys.source(
-        system.file(
-          "viewer",
-          "plotting_functions.R",
-          package = "CerebroNexus",
-          mustWork = TRUE
-        ),
+        .cerebroPackageResource("viewer", "plotting_functions.R"),
         envir = scope
       )
       compact <<- scope$compactViolinData

@@ -1630,3 +1630,28 @@ test_that("Seurat before 5.0 is refused", {
   )
   expect_error(.checkSeuratAvailable(), "at least v5.0 is required")
 })
+
+test_that("the Viewer contracts load from a source checkout", {
+  root <- withr::local_tempdir()
+  writeLines(
+    c("Package: CerebroNexus", "Version: 0.0.0"),
+    file.path(root, "DESCRIPTION")
+  )
+  dir.create(file.path(root, "R"))
+  writeLines("NULL", file.path(root, "R", "a.R"))
+  dir.create(file.path(root, "inst", "viewer", "core"), recursive = TRUE)
+  for (file in c("crb_contract.R", "viewer_content_contract.R")) {
+    writeLines(
+      "from_source_tree <- TRUE",
+      file.path(root, "inst", "viewer", "core", file)
+    )
+  }
+  withr::local_envvar(CEREBRO_PACKAGE_SOURCE = root)
+  for (loader in list(.crbContract, .viewerContentContract)) {
+    ## A fresh copy of the loader, so the process-wide cache is not used.
+    fresh <- loader
+    environment(fresh) <- new.env(parent = environment(loader))
+    assign("contract", NULL, envir = environment(fresh))
+    expect_true(isTRUE(fresh()$from_source_tree))
+  }
+})
