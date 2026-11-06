@@ -70,14 +70,13 @@
   trimws(values)
 }
 
-.builder_report_restricted_strings <- function(value, path = character()) {
-  restricted <- any(grepl(
-    "warning|diagnostic|provenance|operational|runtime|source|host|pid|raw",
-    path,
-    ignore.case = TRUE
-  ))
+## Every string of the report, named by its field path (datasets.1.name).
+.builder_report_string_fields <- function(value, path = character()) {
   if (is.character(value)) {
-    return(if (restricted) value else character())
+    return(stats::setNames(
+      value,
+      rep(paste(path, collapse = "."), length(value))
+    ))
   }
   if (!is.list(value)) {
     return(character())
@@ -85,11 +84,24 @@
   value_names <- names(value)
   unlist(
     lapply(seq_along(value), function(index) {
-      name <- if (is.null(value_names)) "" else value_names[[index]]
-      .builder_report_restricted_strings(value[[index]], c(path, name))
+      name <- if (is.null(value_names) || !nzchar(value_names[[index]])) {
+        as.character(index)
+      } else {
+        value_names[[index]]
+      }
+      .builder_report_string_fields(value[[index]], c(path, name))
     }),
-    use.names = FALSE
+    use.names = TRUE
   )
+}
+
+## Only real absolute paths: a POSIX path with two or more segments, a drive
+## letter or a UNC share. "CD4+/CD8+", "WT vs /KO" and "Exp\1" are names.
+.builder_report_absolute_path <- function(values) {
+  boundary <- "(^|[[:space:]\"'=:,;(\\[])"
+  grepl(paste0(boundary, "/[^/[:space:]]+/"), values) |
+    grepl("(^|[^[:alnum:]])[A-Za-z]:[/\\]", values) |
+    grepl(paste0(boundary, "\\\\\\\\[^\\[:space:]]+\\\\"), values)
 }
 
 .builder_report_sensitive_key_paths <- function(value, path = character()) {
@@ -437,14 +449,16 @@
       call. = FALSE
     )
   }
-  strings <- .builder_report_strings(report)
-  restricted_strings <- .builder_report_restricted_strings(report)
+  strings <- .builder_report_string_fields(report)
+  restricted_strings <- strings[grepl(
+    "warning|diagnostic|provenance|operational|runtime|source|host|pid|raw",
+    names(strings),
+    ignore.case = TRUE
+  )]
   normalized_tokens <- .builder_report_normalize_sensitive_tokens(
     restricted_strings
   )
-  absolute <- grepl("(^|[^[:alnum:]])/[[:graph:]]+", strings) |
-    grepl("(^|[^[:alnum:]])[A-Za-z]:[/\\]", strings) |
-    grepl("\\\\", strings)
+  absolute <- .builder_report_absolute_path(strings)
   private_runtime <- grepl(
     "[.]cerebro-builder|builder-stage|control-root|backup-root|lock-root",
     restricted_strings,
@@ -468,14 +482,25 @@
     "(^| )(host|pid|source) [^ ]+",
     normalized_tokens
   )
-  if (
-    any(absolute) ||
-      any(private_runtime) ||
-      any(operational_identity) ||
-      any(sensitive_phrase) ||
-      any(sensitive_identity_token)
-  ) {
-    stop("The portable Builder report failed redaction.", call. = FALSE)
+  restricted_hit <- private_runtime |
+    operational_identity |
+    sensitive_phrase |
+    sensitive_identity_token
+  if (any(absolute) || any(restricted_hit)) {
+    hit <- c(strings[absolute], restricted_strings[restricted_hit])[1L]
+    stop(
+      "The portable Builder report failed redaction: ",
+      names(hit),
+      " \"",
+      substr(hit, 1L, 80L),
+      "\" ",
+      if (any(absolute)) {
+        "looks like an absolute path."
+      } else {
+        "looks like private diagnostic text."
+      },
+      call. = FALSE
+    )
   }
   if (!identical(.builder_report_identity(report), report$identity)) {
     stop(

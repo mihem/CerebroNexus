@@ -219,6 +219,33 @@ test_that("artifact-visible labels may use provenance-like words", {
   expect_true(file.exists(path))
 })
 
+test_that("slashes in names are not absolute paths", {
+  fixture <- builder_report_fixture()
+  report <- builder_build_report(fixture$plan, fixture$result)
+  report$datasets[[1L]]$name <- "CD4+/CD8+ T cells"
+  report$datasets[[1L]]$groups <- c("WT vs /KO", "Exp\\1")
+  report$datasets[[1L]]$metadata_columns <- c("CD3+/CD4+", "a/b")
+  report$identity <- .builder_report_identity(report)
+
+  expect_silent(.builder_report_validate(report, require_class = TRUE))
+
+  for (leak in c(
+    "/Users/alice/object.rds",
+    "see C:\\data\\x.rds",
+    "\\\\server\\share\\x.rds"
+  )) {
+    leaked <- report
+    leaked$datasets[[1L]]$groups <- c("WT", leak)
+    leaked$identity <- .builder_report_identity(leaked)
+    expect_error(
+      .builder_report_validate(leaked, require_class = TRUE),
+      "failed redaction: datasets.1.groups",
+      fixed = TRUE,
+      info = leak
+    )
+  }
+})
+
 test_that("report v1 rejects sensitive keys and malformed nested schemas", {
   fixture <- builder_report_fixture()
   base <- builder_build_report(fixture$plan, fixture$result)
