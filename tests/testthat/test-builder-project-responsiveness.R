@@ -1331,3 +1331,42 @@ test_that("a Save adopts the staged attachment copies into the workspace", {
     )
   })
 })
+
+test_that("two copies of the same source never share a partial file", {
+  runtime <- builder_responsiveness_runtime()
+  root <- withr::local_tempdir()
+  project <- file.path(root, "project")
+  dir.create(project)
+  source <- file.path(root, "upload", "source.rds")
+  dir.create(dirname(source))
+  writeBin(as.raw(seq_len(200000L) %% 251L), source)
+  md5 <- unname(tools::md5sum(source))
+  entry <- list(
+    id = "ds1",
+    path = source,
+    filename = "sample.rds",
+    snapshot = list(source_fingerprint = paste0("builder-snapshot-v2:", md5))
+  )
+  first <- runtime$builder_project_source_job(entry, project)
+  second <- runtime$builder_project_source_job(entry, project)
+  expect_identical(first$target, second$target)
+  expect_false(identical(first$part, second$part))
+  expect_identical(dirname(first$part), dirname(first$target))
+
+  ## The second copy is still writing its own part when the first publishes.
+  interleaved <- NULL
+  result <- runtime$builder_project_copy_source_job(
+    first,
+    progress = function(bytes) {
+      if (is.null(interleaved)) {
+        interleaved <<- runtime$builder_project_copy_source_job(second)
+      }
+    }
+  )
+  expect_identical(interleaved$status, "ready")
+  expect_identical(result$status, "ready")
+  expect_identical(result$path, interleaved$path)
+  expect_identical(unname(tools::md5sum(result$path)), md5)
+  expect_false(file.exists(first$part))
+  expect_false(file.exists(second$part))
+})

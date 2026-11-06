@@ -1267,7 +1267,14 @@ builder_project_source_job <- function(entry, root) {
     root = root,
     relative = relative,
     target = target,
-    part = paste0(target, ".part"),
+    # Unique per job: two Builder processes copying the same source must not
+    # write into, or publish, each other's partial file.
+    part = paste0(
+      target,
+      ".",
+      basename(tempfile(paste0(Sys.getpid(), "-"))),
+      ".part"
+    ),
     filename = filename,
     storage_name = storage_name,
     source_md5 = source_md5,
