@@ -2855,6 +2855,34 @@ import_read_progress <- function(current_worker, payload) {
   )
 }
 
+## A worker call that made no progress for its stall timeout is hung: kill
+## the worker and fail that call (not resend it), as after a crash. Queued
+## work resumes on the replacement.
+worker_watch <- new.env(parent = emptyenv())
+builder_worker_stall_message <- paste(
+  "The background worker stopped responding and was restarted.",
+  "Retry the action."
+)
+stop_stalled_worker <- function(current_worker, current_protocol) {
+  message(
+    "Builder worker call '",
+    current_protocol$pending$kind,
+    "' made no progress; restarting the worker."
+  )
+  current_protocol$pending$transport_retries <- 1L
+  recovered <- restart_worker_protocol(
+    current_worker,
+    current_protocol,
+    builder_worker_stall_message,
+    grace_ms = 0L,
+    notify = FALSE
+  )
+  if (isTRUE(recovered)) {
+    add_error(builder_worker_stall_message)
+  }
+  invisible(recovered)
+}
+
 ## -- one poller drains whatever the worker was asked to do ---------------
 observe({
   current_protocol <- protocol()
@@ -2919,6 +2947,17 @@ observe({
   p <- request$payload
   consume_transport_retained(p)
   if (is.null(got$result)) {
+    watch <- builder_worker_watchdog(
+      worker_watch$state,
+      got$worker,
+      request$request_id,
+      builder_worker_stall_timeout(request)
+    )
+    worker_watch$state <- watch$state
+    if (isTRUE(watch$stalled)) {
+      stop_stalled_worker(got$worker, current_protocol)
+      return()
+    }
     if (identical(p$kind, "load") && !is.null(p$progress_path)) {
       progress <- builder_import_progress_read(
         p$progress_path,

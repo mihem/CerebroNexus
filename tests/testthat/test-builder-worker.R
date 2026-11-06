@@ -1801,3 +1801,89 @@ test_that("a verified stop of a busy worker settles in seconds", {
   )
   expect_false(any(alive))
 })
+
+test_that("worker stall timeouts default per call type and can be set", {
+  withr::local_options(CerebroNexus.builder.worker_stall_timeout = NULL)
+  withr::local_envvar(CEREBRO_BUILDER_WORKER_STALL_TIMEOUT = NA)
+  expect_identical(builder_worker_stall_timeout(list(persistent = FALSE)), 120)
+  expect_identical(builder_worker_stall_timeout(list(persistent = TRUE)), 600)
+  withr::local_envvar(CEREBRO_BUILDER_WORKER_STALL_TIMEOUT = "3")
+  expect_identical(builder_worker_stall_timeout(list(persistent = TRUE)), 3)
+  withr::local_options(CerebroNexus.builder.worker_stall_timeout = 0.5)
+  expect_identical(builder_worker_stall_timeout(list(persistent = FALSE)), 0.5)
+})
+
+test_that("the watchdog flags a call only after it stops using CPU", {
+  cpu <- 1
+  watch <- function(state, now, request_id = "r1", timeout = 10) {
+    builder_worker_watchdog(
+      state,
+      list(process = NULL),
+      request_id,
+      timeout,
+      now = now,
+      .cpu = function(process) cpu
+    )
+  }
+  step <- watch(NULL, 0)
+  for (now in 1:9) {
+    cpu <- cpu + 0.01
+    step <- watch(step$state, now)
+    expect_false(step$stalled)
+  }
+  for (now in 10:18) {
+    step <- watch(step$state, now)
+    expect_false(step$stalled)
+  }
+  step <- watch(step$state, 19)
+  expect_true(step$stalled)
+
+  # A new call, a long pause of this process, or timeout 0 starts over.
+  expect_false(watch(step$state, 20, request_id = "r2")$stalled)
+  expect_false(watch(step$state, 40)$stalled)
+  expect_false(watch(step$state, 20, timeout = 0)$stalled)
+  # CPU that cannot be measured never counts as a stall.
+  cpu <- NA_real_
+  step <- watch(NULL, 0)
+  for (now in 1:30) {
+    step <- watch(step$state, now)
+  }
+  expect_false(step$stalled)
+})
+
+test_that("a worker that sleeps forever is seen as stalled", {
+  skip_if_not_installed("callr")
+  skip_if_not_installed("ps")
+  worker <- builder_worker_start(builder_profile_inst_path("builder"))
+  withr::defer(try(builder_worker_stop(worker, grace_ms = 0L), silent = TRUE))
+  worker$process$call(function() Sys.sleep(600))
+
+  step <- builder_worker_watchdog(NULL, worker, "sleep", 1)
+  deadline <- Sys.time() + 10
+  while (!isTRUE(step$stalled) && Sys.time() < deadline) {
+    Sys.sleep(0.1)
+    step <- builder_worker_watchdog(step$state, worker, "sleep", 1)
+  }
+  expect_true(step$stalled)
+  expect_false(is.na(step$state$cpu))
+})
+
+test_that("a busy worker is not seen as stalled", {
+  skip_if_not_installed("callr")
+  skip_if_not_installed("ps")
+  worker <- builder_worker_start(builder_profile_inst_path("builder"))
+  withr::defer(try(builder_worker_stop(worker, grace_ms = 0L), silent = TRUE))
+  worker$process$call(function() {
+    repeat {
+      sum(stats::runif(1e5))
+    }
+  })
+
+  step <- builder_worker_watchdog(NULL, worker, "busy", 1)
+  deadline <- Sys.time() + 3
+  while (Sys.time() < deadline) {
+    Sys.sleep(0.1)
+    step <- builder_worker_watchdog(step$state, worker, "busy", 1)
+    expect_false(step$stalled)
+  }
+})

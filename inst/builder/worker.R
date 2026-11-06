@@ -2332,3 +2332,79 @@ builder_worker_poll <- function(worker, timeout = 0) {
   }
   list(worker = worker, result = NULL, event = NULL, error = NULL)
 }
+
+## -- hung worker calls ---------------------------------------------------
+## A call whose worker and child processes use no CPU for this many seconds
+## counts as hung. Reading or writing a large file keeps using CPU, so slow
+## calls that still make progress are never stopped. Previews get 120 s,
+## loads, Builds and other commands 600 s. The option (or the
+## CEREBRO_BUILDER_WORKER_STALL_TIMEOUT env var) sets both; 0 turns it off.
+builder_worker_stall_timeout <- function(request) {
+  value <- getOption(
+    "CerebroNexus.builder.worker_stall_timeout",
+    Sys.getenv("CEREBRO_BUILDER_WORKER_STALL_TIMEOUT", "")
+  )
+  value <- suppressWarnings(as.numeric(value)[1L])
+  if (length(value) == 1L && !is.na(value) && value >= 0) {
+    return(value)
+  }
+  if (isTRUE(request$persistent)) 600 else 120
+}
+
+## CPU seconds used so far by the worker and its marked descendants, or NA.
+.builder_worker_tree_cpu <- function(process) {
+  tree <- .builder_worker_tree_handles(process)
+  if (!is.null(tree$error) || !length(tree$handles)) {
+    return(NA_real_)
+  }
+  sum(vapply(
+    tree$handles,
+    function(handle) {
+      times <- tryCatch(ps::ps_cpu_times(handle), error = function(error) 0)
+      sum(times, na.rm = TRUE)
+    },
+    numeric(1)
+  ))
+}
+
+## Follows the CPU use of the pending call. Returns the new state and
+## `stalled = TRUE` once the call used no CPU for `timeout` seconds.
+builder_worker_watchdog <- function(
+  state,
+  worker,
+  request_id,
+  timeout,
+  now = as.numeric(Sys.time()),
+  .cpu = .builder_worker_tree_cpu
+) {
+  # A long gap between polls means this process was paused too (a laptop
+  # asleep), so the count starts again.
+  if (
+    !is.list(state) ||
+      !identical(state$request_id, request_id) ||
+      now - state$polled_at > 10
+  ) {
+    state <- list(
+      request_id = request_id,
+      cpu = NA_real_,
+      progress_at = now,
+      sampled_at = -Inf
+    )
+  }
+  state$polled_at <- now
+  if (!is.numeric(timeout) || !is.finite(timeout) || timeout <= 0) {
+    return(list(state = state, stalled = FALSE))
+  }
+  # One sample scans the process table, so sample at most every few seconds.
+  if (now - state$sampled_at < min(5, max(0.25, timeout / 10))) {
+    return(list(state = state, stalled = FALSE))
+  }
+  state$sampled_at <- now
+  cpu <- .cpu(worker$process)
+  if (is.na(cpu) || !identical(cpu, state$cpu)) {
+    state$cpu <- cpu
+    state$progress_at <- now
+    return(list(state = state, stalled = FALSE))
+  }
+  list(state = state, stalled = now - state$progress_at >= timeout)
+}

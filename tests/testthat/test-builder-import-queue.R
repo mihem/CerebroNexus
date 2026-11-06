@@ -678,3 +678,59 @@ test_that("session end removes the snapshot folder of a crashed worker", {
 
   expect_false(dir.exists(root))
 })
+
+test_that("a hung worker is restarted and its import offers Retry", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  withr::local_options(CerebroNexus.builder.worker_stall_timeout = 0.5)
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this import queue test.")
+  }
+  app_env$builder_session_example <- function(...) invisible(TRUE)
+  app_env$builder_session_poll <- function(worker, ...) {
+    list(worker = worker, event = NULL, result = NULL)
+  }
+  ## The hung worker uses no CPU.
+  app_env$.builder_worker_tree_cpu <- function(process) 1
+  restarts <- list()
+  app_env$builder_worker_restart <- function(worker, grace_ms, ...) {
+    restarts[[length(restarts) + 1L]] <<- grace_ms
+    list(epoch = "worker-replaced", state = "ready")
+  }
+
+  shiny::testServer(app_env$server, {
+    worker(list(epoch = "worker-hung", state = "ready"))
+    worker_available(TRUE)
+    protocol(app_env$builder_request_protocol("worker-hung"))
+    expect_true(start_load(
+      "example",
+      "complete_viewer_data",
+      "Complete Viewer data"
+    ))
+    session$flushReact()
+    expect_identical(isolate(protocol())$pending$dataset, "ds1")
+
+    deadline <- Sys.time() + 10
+    while (!length(restarts) && Sys.time() < deadline) {
+      Sys.sleep(0.1)
+      session$elapse(100)
+    }
+
+    expect_identical(restarts, list(0L))
+    entry <- app_env$builder_import_find(isolate(imports()), "ds1")
+    expect_identical(entry$load_state, "error")
+    expect_match(entry$error, "stopped responding", fixed = TRUE)
+    expect_null(isolate(protocol())$pending)
+    expect_length(isolate(protocol())$queue, 0L)
+    expect_match(isolate(add_error()), "stopped responding", fixed = TRUE)
+    session$flushReact()
+    rail_html <- paste(
+      vapply(last_import_rail_patch()$rows, `[[`, character(1), "html"),
+      collapse = " "
+    )
+    expect_match(rail_html, "builder-retry-import", fixed = TRUE)
+  })
+})
