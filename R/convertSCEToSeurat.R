@@ -229,8 +229,12 @@ convertSCEToSeurat <- function(
       )
     }
     sections <- list()
-    for (library in names(spatial$cells)) {
-      cells <- spatial$cells[[library]]
+    ## Seurat stores an image under make.names() of its name ("1" as "X1");
+    ## the pictures use that same name so they stay with their section.
+    fov_names <- make.unique(make.names(names(spatial$cells)))
+    for (index in seq_along(spatial$cells)) {
+      library <- names(spatial$cells)[[index]]
+      cells <- spatial$cells[[index]]
       coordinates <- data.frame(
         x = spatial$coordinates[cells, 1L],
         y = spatial$coordinates[cells, 2L],
@@ -242,8 +246,8 @@ convertSCEToSeurat <- function(
         assay = main_assay,
         key = paste0("section", length(sections) + 1L, "_")
       )
-      result[[library]] <- fov
-      sections[[library]] <- spatial$images[[library]]
+      result[[fov_names[[index]]]] <- fov
+      sections[[fov_names[[index]]]] <- spatial$images[[library]]
     }
     sections <- Filter(length, sections)
     if (length(sections)) {
@@ -332,6 +336,17 @@ convertSCEToSeurat <- function(
   } else {
     NULL
   }
+  if (!is.null(library_of) && anyNA(library_of) && !all(is.na(library_of))) {
+    stop(
+      "`library_id` is missing for ",
+      sum(is.na(library_of)),
+      " of ",
+      length(library_of),
+      " cells, so their tissue section is unknown. Fill in `library_id` ",
+      "for every cell, or remove the column to keep one section.",
+      call. = FALSE
+    )
+  }
   if (
     !is.null(library_of) &&
       !anyNA(library_of) &&
@@ -351,8 +366,13 @@ convertSCEToSeurat <- function(
     cells <- list(spatial = colnames(object))
     images <- list()
   } else {
-    name <- if (length(images) == 1L) names(images) else "spatial"
+    ## one picture, named or not, belongs to the one section
+    name <- if (length(images) == 1L) names(images) else NULL
+    if (is.null(name) || is.na(name) || !nzchar(name)) {
+      name <- "spatial"
+    }
     cells <- stats::setNames(list(colnames(object)), name)
+    images <- stats::setNames(images, rep(name, length(images)))
   }
   if (any(!nzchar(names(cells)))) {
     return(NULL)

@@ -501,3 +501,68 @@ test_that("a SingleCellExperiment's ADT alternative experiment is added, spike-i
   ## without the argument nothing is added
   expect_equal(nrow(quiet(convertSCEToSeurat(sce))), 60)
 })
+
+test_that("section names, picture keys and library ids agree after conversion", {
+  section_sce <- function(library_id = NULL, images = NULL) {
+    counts <- matrix(
+      1:24,
+      nrow = 3L,
+      dimnames = list(paste0("g", 1:3), paste0("c", 1:8))
+    )
+    sce <- SingleCellExperiment::SingleCellExperiment(
+      assays = list(counts = counts)
+    )
+    SingleCellExperiment::reducedDim(sce, "spatial") <- cbind(
+      x = as.numeric(1:8),
+      y = as.numeric(8:1)
+    )
+    if (!is.null(library_id)) {
+      sce$library_id <- library_id
+    }
+    sce@metadata$spatial_images <- images
+    sce
+  }
+  picture <- function(id) list(hires = list(id = id))
+
+  numbers <- convertSCEToSeurat(
+    section_sce(
+      rep(c("1", "2"), each = 4L),
+      list(`1` = picture(1), `2` = picture(2))
+    ),
+    verbose = FALSE
+  )
+  expect_identical(SeuratObject::Images(numbers), c("X1", "X2"))
+  expect_identical(names(numbers@misc$cerebro_source_images), c("X1", "X2"))
+  expect_identical(numbers@misc$cerebro_source_images$X2, picture(2))
+
+  spaced <- convertSCEToSeurat(
+    section_sce(
+      rep(c("sec 1", "sec-2"), each = 4L),
+      list(`sec 1` = picture(1), `sec-2` = picture(2))
+    ),
+    verbose = FALSE
+  )
+  expect_identical(SeuratObject::Images(spaced), c("sec.1", "sec.2"))
+  expect_identical(
+    names(spaced@misc$cerebro_source_images),
+    SeuratObject::Images(spaced)
+  )
+
+  unnamed <- convertSCEToSeurat(
+    section_sce(images = list(picture(1))),
+    verbose = FALSE
+  )
+  expect_identical(SeuratObject::Images(unnamed), "spatial")
+  expect_identical(
+    unnamed@misc$cerebro_source_images,
+    list(spatial = picture(1))
+  )
+
+  expect_error(
+    convertSCEToSeurat(
+      section_sce(c(rep("A", 4L), NA, rep("B", 3L))),
+      verbose = FALSE
+    ),
+    "`library_id` is missing for 1 of 8 cells"
+  )
+})
