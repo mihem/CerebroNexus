@@ -953,3 +953,102 @@ test_that("default settings build a source with its own nUMI and nGene columns",
   expect_equal(meta$nUMI, object@meta.data[meta$cell_barcode, "nCount_RNA"])
   expect_equal(meta$nGene, object@meta.data[meta$cell_barcode, "nFeature_RNA"])
 })
+
+## Inspect `object` as an uploaded file, set it up as the import handler does,
+## let `edit` change the settings, then freeze and build it.
+builder_e2e_build_object <- function(object, root, edit = identity) {
+  path <- file.path(root, "source.rds")
+  saveRDS(object, path)
+  inspected <- builder_adapter_inspect(builder_seurat_file_adapter(path))
+  settings <- builder_default_settings(
+    inspected$legacy_profile,
+    "Dataset",
+    dataset_profile = inspected$profile
+  )
+  metadata <- builder_recommend_metadata(inspected$profile)
+  settings$recommendations <- list(metadata = metadata)
+  settings$metadata_policy <- metadata
+  settings$expression_backend <- "embedded"
+  settings <- edit(settings)
+  snapshot <- builder_snapshot_seurat(
+    inspected$object,
+    file.path(root, "snapshot"),
+    available_bytes = 2^40
+  )
+  entry <- list(
+    id = "ds",
+    source_id = "ds",
+    output_id = "ds",
+    path = path,
+    filename = basename(path),
+    source_origin = "upload",
+    format = inspected$format,
+    profile = inspected$legacy_profile,
+    dataset_profile = inspected$profile,
+    snapshot = snapshot,
+    revision = 1L,
+    levels = inspected$levels %||% list(),
+    settings = settings
+  )
+  plan <- builder_freeze_plan(list(entry), file.path(root, "release"))
+  stage <- file.path(root, "stage")
+  dir.create(stage)
+  result <- if (is.null(plan$error)) {
+    builder_execute_plan(plan, stage, list(ds = snapshot))
+  }
+  list(entry = entry, plan = plan, result = result)
+}
+
+test_that("a logical metadata column builds as a FALSE/TRUE group", {
+  root <- withr::local_tempdir()
+  path <- builder_test_inst_path("extdata", "examples", "pbmc_SCE.rds")
+  object <- builder_adapter_inspect(builder_seurat_file_adapter(path))$object
+  object$is_doublet <- rep_len(c(TRUE, FALSE, FALSE), ncol(object))
+  built <- builder_e2e_build_object(object, root, function(settings) {
+    settings$groups <- unique(c(settings$groups, "is_doublet"))
+    settings$included_groups <- unique(c(
+      settings$included_groups,
+      "is_doublet"
+    ))
+    settings
+  })
+  expect_identical(built$entry$levels$is_doublet, c("FALSE", "TRUE"))
+  expect_null(built$plan$error)
+  expect_identical(
+    built$result$state,
+    "success",
+    info = built$result$error %||% ""
+  )
+  crb <- qs2::qs_read(built$result$built[[1L]])
+  expect_identical(
+    as.character(crb$getGroupLevels("is_doublet")),
+    c("FALSE", "TRUE")
+  )
+})
+
+test_that("a source without numeric UMI/gene QC columns builds without them", {
+  root <- withr::local_tempdir()
+  path <- builder_test_inst_path("extdata", "examples", "pbmc_SCE.rds")
+  object <- builder_adapter_inspect(builder_seurat_file_adapter(path))$object
+  qc <- c("nCount_RNA", "nFeature_RNA", "nUMI", "nGene")
+  object@meta.data <- object@meta.data[,
+    setdiff(colnames(object@meta.data), qc),
+    drop = FALSE
+  ]
+  ## A scanpy-style count column is plain metadata, not a QC choice.
+  object@meta.data$n_counts <- as.numeric(seq_len(ncol(object)))
+  built <- builder_e2e_build_object(object, root)
+  profile <- built$entry$profile$assay_profiles$RNA
+  expect_length(profile$nUMI_choices, 0L)
+  expect_length(profile$nGene_choices, 0L)
+  expect_null(built$entry$settings$nUMI)
+  expect_null(built$entry$settings$nGene)
+  expect_null(built$plan$error)
+  expect_identical(
+    built$result$state,
+    "success",
+    info = built$result$error %||% ""
+  )
+  meta <- qs2::qs_read(built$result$built[[1L]])$getMetaData()
+  expect_false(any(c("nUMI", "nGene") %in% colnames(meta)))
+})

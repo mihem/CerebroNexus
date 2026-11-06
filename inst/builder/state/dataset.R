@@ -23,6 +23,18 @@
   builder_content_manifest(entries)
 }
 
+## TRUE when the assay offers no numeric column for this QC field
+## ("nUMI"/"nGene"): the dataset is then built without that column.
+builder_qc_column_optional <- function(profile, assay, field) {
+  assay_profile <- if (is.list(profile) && .builder_state_text(assay)) {
+    profile$assay_profiles[[assay]]
+  }
+  choices <- paste0(field, "_choices")
+  is.list(assay_profile) &&
+    choices %in% names(assay_profile) &&
+    !length(assay_profile[[choices]])
+}
+
 .builder_state_apply_output_setup <- function(state) {
   entry <- state$entry
   if (
@@ -45,6 +57,7 @@
     "reductions" %in% names(profile) &&
     !length(profile$reductions)
   missing <- c(
+    if (!.builder_state_text(settings$name)) "settings_name",
     if (!length(settings$groups)) "settings_groups",
     if (!length(settings$reductions) && !without_reductions) {
       "settings_reductions"
@@ -59,8 +72,18 @@
     ) {
       "settings_layer"
     },
-    if (!.builder_state_text(settings$nUMI)) "settings_nUMI",
-    if (!.builder_state_text(settings$nGene)) "settings_nGene"
+    if (
+      !.builder_state_text(settings$nUMI) &&
+        !builder_qc_column_optional(profile, settings$assay, "nUMI")
+    ) {
+      "settings_nUMI"
+    },
+    if (
+      !.builder_state_text(settings$nGene) &&
+        !builder_qc_column_optional(profile, settings$assay, "nGene")
+    ) {
+      "settings_nGene"
+    }
   )
   if (length(missing)) {
     state$readiness <- "blocked"

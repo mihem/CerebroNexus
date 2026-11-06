@@ -49,14 +49,63 @@ builder_stage_text_items <- function(values, class = NULL) {
   )
 }
 
-builder_inspect_issue_label <- function(value) {
+builder_inspect_issue_label <- function(value, policy = NULL) {
   value <- as.character(value %||% "")
+  if (identical(value, "metadata_policy")) {
+    detail <- builder_inspect_policy_issue(policy)
+    if (!is.null(detail)) {
+      return(detail)
+    }
+  }
   switch(
     value,
+    settings_name = "Type a dataset name in Essentials.",
     settings_organism = "Choose an organism in Essentials.",
     dataset = "Review this dataset before continuing.",
     tools::toTitleCase(gsub("[_:]", " ", value))
   )
+}
+
+## Which metadata columns hold up the metadata policy, and why. NULL when the
+## policy names none.
+builder_inspect_policy_issue <- function(policy) {
+  columns <- if (is.list(policy) && is.list(policy$columns)) {
+    policy$columns
+  } else {
+    list()
+  }
+  disposition <- function(kind) {
+    names(columns)[vapply(
+      columns,
+      function(column) identical(column$disposition %||% "", kind),
+      logical(1)
+    )]
+  }
+  blocking <- disposition("blocking")
+  if (length(blocking)) {
+    reasons <- vapply(
+      blocking,
+      function(id) {
+        reason <- columns[[id]]$reason
+        if (builder_stage_has_text(reason)) {
+          reason
+        } else {
+          paste0("Metadata column ", id, " cannot be exported.")
+        }
+      },
+      character(1)
+    )
+    return(paste(unique(reasons), collapse = " "))
+  }
+  attention <- disposition("attention")
+  if (length(attention)) {
+    return(paste0(
+      "Confirm the metadata choices for: ",
+      paste(attention, collapse = ", "),
+      "."
+    ))
+  }
+  NULL
 }
 
 builder_inspect_content_tag <- function(entry) {
@@ -143,12 +192,14 @@ builder_inspect_model <- function(
     attention = vapply(
       state$attention_ids %||% character(),
       builder_inspect_issue_label,
-      character(1)
+      character(1),
+      policy = state$metadata_policy
     ),
     blockers = vapply(
       state$blocking_ids %||% character(),
       builder_inspect_issue_label,
-      character(1)
+      character(1),
+      policy = state$metadata_policy
     ),
     content_tags = content_tags,
     diagnostics = c(paste("Format", format), paste("Dataset id", dataset_id))

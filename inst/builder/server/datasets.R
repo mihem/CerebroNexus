@@ -163,7 +163,10 @@ observe({
     return()
   }
   for (field in names(assay_controls)) {
-    next_settings[[field]] <- assay_controls[[field]]$selected
+    ## An empty choice (no QC column at all) is stored as NULL: the settings
+    ## reducer rejects character(0) and would drop the whole edit.
+    selected <- assay_controls[[field]]$selected
+    next_settings[field] <- list(if (length(selected)) selected)
   }
   if (
     layer_missing &&

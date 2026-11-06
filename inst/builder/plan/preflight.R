@@ -443,8 +443,14 @@ builder_plan_requires_app <- function(entries) {
     function(entry) {
       settings <- entry$settings
       profile <- if (is.list(entry$profile)) entry$profile else list()
-      builder_has_text(settings$nUMI %||% profile$nUMI) &&
-        builder_has_text(settings$nGene %||% profile$nGene)
+      all(vapply(
+        c("nUMI", "nGene"),
+        function(field) {
+          builder_has_text(settings[[field]] %||% profile[[field]]) ||
+            builder_qc_column_optional(profile, settings$assay, field)
+        },
+        logical(1)
+      ))
     },
     logical(1)
   )

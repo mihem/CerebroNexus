@@ -311,6 +311,51 @@ test_that("Inspect uses actionable issue labels and removes duplicate content", 
   )
 })
 
+test_that("Inspect names the metadata column that blocks the policy", {
+  reason <- "The object has a metadata column named cell_barcode. Rename it."
+  policy <- list(
+    columns = list(
+      cell_barcode = list(disposition = "blocking", reason = reason),
+      cluster = list(disposition = "included", reason = "Fine.")
+    )
+  )
+  expect_identical(
+    builder_inspect_issue_label("metadata_policy", policy),
+    reason
+  )
+  model <- builder_inspect_model(
+    profile = list(n_cells = 12L, n_genes = 8L),
+    state = list(
+      attention_ids = character(),
+      blocking_ids = "metadata_policy",
+      metadata_policy = policy,
+      manifest = list()
+    ),
+    format = "RDS",
+    dataset_id = "ds1"
+  )
+  html <- builder_stage_html(builder_inspect_stage_ui("inspect", model))
+  expect_match(html, "named cell_barcode", fixed = TRUE)
+
+  ## Columns waiting for confirmation are named too.
+  policy$columns$cell_barcode$disposition <- "included"
+  policy$columns$donor <- list(disposition = "attention", reason = "Check.")
+  expect_match(
+    builder_inspect_issue_label("metadata_policy", policy),
+    "donor",
+    fixed = TRUE
+  )
+  ## Without a policy the generic label stays.
+  expect_identical(
+    builder_inspect_issue_label("metadata_policy"),
+    "Metadata Policy"
+  )
+  expect_identical(
+    builder_inspect_issue_label("settings_name"),
+    "Type a dataset name in Essentials."
+  )
+})
+
 test_that("group catalog lists eligible columns before ineligible columns", {
   metadata <- list(
     score = list(name = "Score", group_eligible = FALSE),

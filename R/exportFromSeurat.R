@@ -702,9 +702,11 @@
 #' (\code{object@meta.data}) that contain cell cycle information, e.g.
 #' \code{c("Phase")}; defaults to \code{NULL}.
 #' @param nUMI Column in \code{object@meta.data} that contains information about
-#' number of transcripts per cell; defaults to \code{nUMI}.
+#' number of transcripts per cell; defaults to \code{nUMI}. \code{NULL} leaves
+#' it out.
 #' @param nGene Column in \code{object@meta.data} that contains information
 #' about number of expressed genes per cell; defaults to \code{nGene}.
+#' \code{NULL} leaves it out.
 #' @param add_all_meta_data If set to \code{TRUE}, all further meta data columns
 #' will be extracted as well.
 #' @param use_delayed_array When set to \code{TRUE}, the expression matrix will

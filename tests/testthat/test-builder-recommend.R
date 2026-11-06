@@ -117,6 +117,11 @@ test_that("reserved and required metadata fail closed", {
     recommendation$columns$cell_barcode$disposition,
     "blocking"
   )
+  ## The reason names the column and says what to do.
+  expect_match(
+    recommendation$columns$cell_barcode$reason,
+    "column named cell_barcode.*Rename that column"
+  )
   expect_true("cell_type" %in% recommendation$included)
   expect_true("missing_qc" %in% recommendation$blocking)
   expect_identical(

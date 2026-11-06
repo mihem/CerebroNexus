@@ -600,6 +600,54 @@ test_that("plan validation requires explicit QC fields", {
     plan <- builder_make_plan(list(entry), tempdir())
 
     expect_match(plan$error, "UMI|count", ignore.case = TRUE)
+
+    ## An assay that has no numeric QC column at all builds without one.
+    entry$profile$assay_profiles <- list(
+      RNA = list(
+        layers = "data",
+        nUMI_choices = character(),
+        nGene_choices = character()
+      )
+    )
+    plan <- builder_make_plan(list(entry), tempdir())
+    expect_false(grepl("UMI|count", plan$error %||% "", ignore.case = TRUE))
+    expect_null(builder_qc_field(entry$settings, entry$profile, "nUMI"))
+  })
+})
+
+test_that("dataset names must be non-blank and differ beyond letter case", {
+  local({
+    builder_repo_source("plan.R")
+    expect_null(builder_dataset_name_problem(c("PBMC", "Lung")))
+    expect_null(builder_dataset_name_problem(character()))
+    expect_match(builder_dataset_name_problem(c("PBMC", " ")), "needs a name")
+    expect_match(builder_dataset_name_problem(c("PBMC", NA)), "needs a name")
+    expect_match(
+      builder_dataset_name_problem(c("PBMC", "Lung", "pbmc ")),
+      "\"PBMC\", \"pbmc\"",
+      fixed = TRUE
+    )
+    expect_match(builder_dataset_name_problem(c("A", "A")), "share a name")
+    ## A new import does not take a name that differs only in case.
+    expect_identical(builder_unique_dataset_name("pbmc", "PBMC"), "pbmc (2)")
+  })
+})
+
+test_that("a new dataset opens on the preselected UMAP", {
+  local({
+    builder_repo_source("plan.R")
+    profile <- list(
+      default_assay = "RNA",
+      assay_profiles = list(RNA = list(default_layer = "data")),
+      group_preselect = "cluster",
+      ## describe_seurat() puts the UMAP first.
+      reduction_preselect = c("umap.stacas.ss.all", "nmf", "stacas.ss.all"),
+      reductions = c("nmf", "stacas.ss.all", "umap.stacas.ss.all"),
+      organism_guess = "hg"
+    )
+    settings <- builder_default_settings(profile, "Dataset A")
+    expect_identical(settings$default_projection, "umap.stacas.ss.all")
+    expect_true("umap.stacas.ss.all" %in% settings$initial_projections)
   })
 })
 

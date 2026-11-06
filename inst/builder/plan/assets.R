@@ -341,8 +341,8 @@
   } else {
     character()
   }
-  nUMI <- settings$nUMI %||% entry$profile$nUMI
-  nGene <- settings$nGene %||% entry$profile$nGene
+  nUMI <- builder_qc_field(settings, entry$profile, "nUMI")
+  nGene <- builder_qc_field(settings, entry$profile, "nGene")
   ## "nUMI" and "nGene" are the CRB's own QC columns, filled from the chosen
   ## nUMI/nGene source columns; source columns of those names are not
   ## exported (.addExportMetaData()).
@@ -358,8 +358,9 @@
   metadata <- make.unique(c(
     "cell_barcode",
     included_groups,
-    "nUMI",
-    "nGene",
+    ## Without a chosen QC column the CRB has no such column.
+    if (!is.null(nUMI)) "nUMI",
+    if (!is.null(nGene)) "nGene",
     setdiff(cell_cycle, included_groups),
     additional_metadata,
     setdiff(generated_metadata, source_metadata)

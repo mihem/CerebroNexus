@@ -123,6 +123,70 @@ test_that("source settings require an assay layer that is actually available", {
   expect_identical(builder_dataset_state(entry)$readiness, "ready")
 })
 
+test_that("an assay without numeric QC columns is ready without them", {
+  entry <- builder_minimal_entry()
+  entry$dataset_profile <- builder_state_entry()$dataset_profile
+  entry$output_id <- entry$id
+  entry$load_state <- "loaded"
+  entry$profile <- list(
+    assay_profiles = list(
+      RNA = list(
+        layers = "counts",
+        nUMI_choices = character(),
+        nGene_choices = character()
+      )
+    )
+  )
+  entry$settings <- utils::modifyList(
+    entry$settings,
+    list(
+      organism = "hg",
+      assay = "RNA",
+      layer = "counts",
+      groups = "cluster",
+      reductions = "umap"
+    )
+  )
+  entry$settings[c("nUMI", "nGene")] <- list(NULL)
+
+  expect_identical(builder_dataset_state(entry)$readiness, "ready")
+
+  ## With a column on offer, an empty choice still blocks.
+  entry$profile$assay_profiles$RNA$nUMI_choices <- "nCount_RNA"
+  blocked <- builder_dataset_state(entry)
+  expect_contains(blocked$blocking_ids, "settings_nUMI")
+  expect_false("settings_nGene" %in% blocked$blocking_ids)
+
+  ## character(0) is not a valid setting; NULL is what Configure stores.
+  bad <- entry
+  bad$settings$nUMI <- character()
+  expect_error(builder_dataset_state(bad), "one plain text value")
+})
+
+test_that("a blank dataset name blocks the dataset check", {
+  entry <- builder_minimal_entry()
+  entry$dataset_profile <- builder_state_entry()$dataset_profile
+  entry$output_id <- entry$id
+  entry$load_state <- "loaded"
+  entry$profile <- list(assay_profiles = list(RNA = list(layers = "counts")))
+  entry$settings <- utils::modifyList(
+    entry$settings,
+    list(
+      name = "  ",
+      organism = "hg",
+      assay = "RNA",
+      layer = "counts",
+      nUMI = "nCount_RNA",
+      nGene = "nFeature_RNA",
+      groups = "cluster",
+      reductions = "umap"
+    )
+  )
+  expect_contains(builder_dataset_state(entry)$blocking_ids, "settings_name")
+  entry$settings$name <- "PBMC"
+  expect_identical(builder_dataset_state(entry)$readiness, "ready")
+})
+
 test_that("metadata retention automatically removes incompatible Groups", {
   skip_if_not(exists(
     "builder_metadata_policy_set_retained",

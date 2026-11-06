@@ -366,8 +366,10 @@ builder_recommend_metadata <- function(
     value = if (reserved_collision) "blocking" else "included",
     reason = if (reserved_collision) {
       paste0(
-        "The metadata name cell_barcode is reserved for mandatory identity; ",
-        "rename the metadata column before export."
+        "The object has a metadata column named cell_barcode, a name the ",
+        "Builder keeps for the cell barcodes. Rename that column in the ",
+        "object (for example to cell_barcode_source), save it and import ",
+        "the file again."
       )
     } else {
       "Cell barcodes are required to preserve dataset identity."

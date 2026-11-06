@@ -216,6 +216,19 @@ builder_core_stage_ui <- function(id, model) {
 ## material), so Configure renders this below the enhancement stack.
 builder_core_advanced_ui <- function(id, model) {
   ns <- NS(id)
+  ## An object without a numeric QC column is built without one; the empty
+  ## select says so.
+  qc_select <- function(input_id, label, choices, selected) {
+    if (length(choices)) {
+      return(selectInput(ns(input_id), label, choices, selected))
+    }
+    selectizeInput(
+      ns(input_id),
+      label,
+      choices = character(),
+      options = list(placeholder = "None in this dataset")
+    )
+  }
   tags$section(
     class = paste(
       "builder-stage-section builder-stage-advanced",
@@ -226,18 +239,8 @@ builder_core_advanced_ui <- function(id, model) {
       "Advanced settings",
       div(
         class = "builder-advanced-grid",
-        selectInput(
-          ns("nUMI"),
-          "UMI QC column",
-          choices = model$nUMI_choices,
-          selected = model$nUMI
-        ),
-        selectInput(
-          ns("nGene"),
-          "Gene QC column",
-          choices = model$nGene_choices,
-          selected = model$nGene
-        ),
+        qc_select("nUMI", "UMI QC column", model$nUMI_choices, model$nUMI),
+        qc_select("nGene", "Gene QC column", model$nGene_choices, model$nGene),
         selectInput(
           ns("backend"),
           "Expression backend",

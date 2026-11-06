@@ -861,6 +861,59 @@ test_that("incomplete datasets focus their first unresolved setting", {
   })
 })
 
+test_that("a dataset name another dataset uses blocks the check", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this state-only test.")
+  }
+  shiny::testServer(app_env$server, {
+    focus <- list()
+    notices <- list()
+    original_send <- session$sendCustomMessage
+    session$sendCustomMessage <- function(type, message) {
+      if (identical(type, "builder_focus_incomplete_setting")) {
+        focus[[length(focus) + 1L]] <<- message$blocker
+      }
+      if (identical(type, "builder_notify") && is.null(message$clear)) {
+        notices[[length(notices) + 1L]] <<- message$html
+      }
+      original_send(type, message)
+    }
+    entry <- function(id, name) {
+      list(
+        id = id,
+        revision = 0L,
+        snapshot = list(
+          path = paste0("/private/", id),
+          owner_token = paste0("owner-", id),
+          object_md5 = strrep("a", 32L)
+        ),
+        profile = list(marker = id, extras = list()),
+        settings = list(name = name, organism = "hg")
+      )
+    }
+    use_state_only_fixture(list(
+      entry("dataset-a", "PBMC"),
+      entry("dataset-b", "pbmc ")
+    ))
+    session$flushReact()
+
+    expect_match(configure_readiness()$message, "share a name")
+    expect_false(configure_readiness()$can_continue)
+    expect_match(review_report()$msg, "share a name")
+
+    session$setInputs(complete_dataset_check = 1)
+    session$flushReact()
+    expect_length(dataset_check_marks(), 0L)
+    expect_identical(focus, list("settings_name"))
+    expect_match(notices[[1L]], "PBMC", fixed = TRUE)
+  })
+})
+
 test_that("Next from a checked CRB opens the next unchecked dataset", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")

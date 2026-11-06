@@ -5856,8 +5856,13 @@
   }
 
   function focusIncompleteSetting(message) {
+    // The check is answered: drop "Checking settings…" even when nothing on
+    // the page changes.
+    var pending = document.getElementById("builder-project-pending-feedback");
+    if (pending) pending.remove();
     if (!datasetMessageIsCurrent(message)) return;
     var selectors = {
+      settings_name: "#core-name",
       settings_organism: "#core-organism",
       settings_groups: "#core-groups",
       settings_reductions: ".builder-viewer-projections",
@@ -5865,7 +5870,8 @@
       settings_nUMI: "#core-nUMI",
       settings_nGene: "#core-nGene",
       metadata: "#core-groups",
-      metadata_policy: "#core-groups",
+      // The dataset summary says which column holds the policy up.
+      metadata_policy: ".builder-stage-inspect .notice",
       groups: "#core-groups",
       projection: ".builder-viewer-projections",
       trajectory: ".builder-viewer-trajectories",
@@ -5875,7 +5881,8 @@
     stageFocusToken += 1;
     var selector = selectors[message && message.blocker] ||
       ".builder-configure-inspect";
-    var node = document.querySelector(selector);
+    var node = document.querySelector(selector) ||
+      document.querySelector(".builder-configure-inspect");
     if (!node) return;
     var details = node.matches("details") ? node : node.closest("details");
     if (details) details.open = true;

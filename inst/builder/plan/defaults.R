@@ -234,18 +234,45 @@ builder_detected_organism <- function(profile, dataset_profile = NULL) {
 ## The same file added twice would show two identical names in the rail and in
 ## the generated Viewer's dataset menu; number the later copy instead.
 builder_unique_dataset_name <- function(name, existing) {
-  existing <- existing[!is.na(existing)]
-  if (!length(name) || !name %in% existing) {
+  existing <- tolower(trimws(existing[!is.na(existing)]))
+  taken <- function(candidate) tolower(trimws(candidate)) %in% existing
+  if (!length(name) || !taken(name)) {
     return(name)
   }
   index <- 2L
   repeat {
     candidate <- paste0(name, " (", index, ")")
-    if (!candidate %in% existing) {
+    if (!taken(candidate)) {
       return(candidate)
     }
     index <- index + 1L
   }
+}
+
+## What is wrong with these dataset names, or NULL. Names must be non-blank
+## and differ by more than letter case or surrounding spaces.
+builder_dataset_name_problem <- function(names) {
+  names <- trimws(as.character(names))
+  names[is.na(names)] <- ""
+  if (any(!nzchar(names))) {
+    return("Every dataset needs a name. Type one under Dataset name.")
+  }
+  keys <- tolower(names)
+  clash <- keys[duplicated(keys)]
+  if (length(clash)) {
+    return(paste0(
+      "Two datasets cannot share a name (letter case does not count): ",
+      paste0("\"", unique(names[keys == clash[[1L]]]), "\"", collapse = ", "),
+      ". Give each dataset its own name."
+    ))
+  }
+  NULL
+}
+
+## The chosen QC column for "nUMI"/"nGene", or NULL when there is none.
+builder_qc_field <- function(settings, profile, field) {
+  value <- settings[[field]] %||% profile[[field]]
+  if (builder_has_text(value)) value else NULL
 }
 
 builder_default_settings <- function(

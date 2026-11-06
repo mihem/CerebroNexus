@@ -333,6 +333,18 @@ current_review_snapshot <- bindEvent(
   ignoreNULL = FALSE
 )
 
+## Blank or clashing dataset names, said before Review rather than at Build.
+dataset_name_problem <- reactive({
+  builder_dataset_name_problem(vapply(
+    sets(),
+    function(entry) {
+      name <- entry$settings$name
+      if (is.character(name) && length(name) == 1L) name else ""
+    },
+    character(1)
+  ))
+})
+
 review_report <- reactive({
   pending <- imports()$entries
   if (length(pending)) {
@@ -347,6 +359,10 @@ review_report <- reactive({
       ok = FALSE,
       msg = "Wait for all datasets to finish loading before building."
     ))
+  }
+  name_problem <- dataset_name_problem()
+  if (!is.null(name_problem)) {
+    return(list(ok = FALSE, msg = name_problem))
   }
   snapshot <- current_review_snapshot()
   if (!builder_review_snapshot_valid(snapshot)) {
@@ -371,6 +387,14 @@ configure_readiness <- reactive({
     return(list(
       can_continue = FALSE,
       message = "Wait for all datasets to finish loading.",
+      snapshot = NULL
+    ))
+  }
+  name_problem <- dataset_name_problem()
+  if (!is.null(name_problem)) {
+    return(list(
+      can_continue = FALSE,
+      message = name_problem,
       snapshot = NULL
     ))
   }
@@ -875,6 +899,27 @@ observeEvent(input$complete_dataset_check, {
       )
     }
   )
+  ## A blank name or one another dataset already uses.
+  names <- vapply(
+    entries,
+    function(entry) {
+      name <- entry$settings$name
+      if (is.character(name) && length(name) == 1L && !is.na(name)) name else ""
+    },
+    character(1)
+  )
+  keys <- tolower(trimws(names))
+  if (!nzchar(keys[[index]]) || sum(keys == keys[[index]]) > 1L) {
+    unresolved <- c("settings_name", unresolved)
+    builder_notify(
+      "warning",
+      builder_dataset_name_problem(names[keys == keys[[index]]]),
+      target = list(field = "core-name"),
+      id = "builder-dataset-name"
+    )
+  } else {
+    builder_notify_clear("builder-dataset-name")
+  }
   unresolved <- unique(unresolved)
   if (length(unresolved)) {
     session$sendCustomMessage(

@@ -48,6 +48,7 @@ test_that("a dataset without reductions is not missing a projection setting", {
         output_id = "dataset",
         profile = list(reductions = reductions),
         settings = list(
+          name = "Dataset",
           groups = "sample",
           reductions = character(),
           organism = "hg",

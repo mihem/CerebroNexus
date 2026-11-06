@@ -1157,3 +1157,57 @@ test_that("rail patches are sent when they change and in full on a resync", {
     expect_identical(sent[[1L]], last_import_rail_patch())
   })
 })
+
+test_that("a dataset without QC columns keeps applying later Core edits", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- configure_observer_app()
+  shiny::testServer(app_env$server, {
+    entry <- configure_observer_entry(app_env, "dataset-a")
+    entry$profile$default_assay <- "RNA"
+    entry$profile$assays <- "RNA"
+    entry$profile$assay_profiles <- list(
+      RNA = list(
+        layers = "data",
+        default_layer = "data",
+        nUMI_choices = character(),
+        nGene_choices = character(),
+        nUMI = NA_character_,
+        nGene = NA_character_
+      )
+    )
+    entry$settings$organism <- "hg"
+    entry$settings$assay <- "RNA"
+    entry$settings$layer <- "data"
+    entry$settings$expression_backend <- "embedded"
+    entry$settings[c("nUMI", "nGene")] <- list(NULL)
+    use_state_only_fixture(list(entry))
+    session$flushReact()
+
+    ## The empty QC selects send "" as Shiny selectize does.
+    session$setInputs(
+      `core-rendered_for` = "dataset-a",
+      `core-name` = "Renamed",
+      `core-organism` = "mm",
+      `core-assay` = "RNA",
+      `core-layer` = "data",
+      `core-nUMI` = "",
+      `core-nGene` = "",
+      `core-backend` = "embedded"
+    )
+    session$flushReact()
+    stored <- configure_observer_stored(sets)
+    expect_identical(stored$settings$name, "Renamed")
+    expect_identical(stored$settings$organism, "mm")
+    expect_true(all(c("nUMI", "nGene") %in% names(stored$settings)))
+    expect_null(stored$settings$nUMI)
+    expect_null(stored$settings$nGene)
+
+    session$setInputs(`core-name` = "Renamed again")
+    session$flushReact()
+    expect_identical(
+      configure_observer_stored(sets)$settings$name,
+      "Renamed again"
+    )
+  })
+})

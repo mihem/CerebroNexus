@@ -65,10 +65,12 @@ must be one of the grouping variables specified in \code{groups}; defaults to
 \code{c("Phase")}; defaults to \code{NULL}.}
 
 \item{nUMI}{Column in \code{object@meta.data} that contains information about
-number of transcripts per cell; defaults to \code{nUMI}.}
+number of transcripts per cell; defaults to \code{nUMI}. \code{NULL} leaves
+it out.}
 
 \item{nGene}{Column in \code{object@meta.data} that contains information
-about number of expressed genes per cell; defaults to \code{nGene}.}
+about number of expressed genes per cell; defaults to \code{nGene}.
+\code{NULL} leaves it out.}
 
 \item{add_all_meta_data}{If set to \code{TRUE}, all further meta data columns
 will be extracted as well.}

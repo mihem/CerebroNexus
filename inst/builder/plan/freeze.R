@@ -845,8 +845,8 @@ builder_freeze_plan <- function(
         colors = builder_resolve_colors(settings, entry$levels %||% list()),
         group_color_overrides = selected_color_overrides,
         color_custom_count = as.integer(custom_color_count),
-        nUMI = settings$nUMI %||% entry$profile$nUMI,
-        nGene = settings$nGene %||% entry$profile$nGene,
+        nUMI = builder_qc_field(settings, entry$profile, "nUMI"),
+        nGene = builder_qc_field(settings, entry$profile, "nGene"),
         default_group = default_group,
         ## NULL for an object without reductions
         default_projection = settings$default_projection %||%
@@ -870,8 +870,8 @@ builder_freeze_plan <- function(
               "cell_barcode",
               included_groups[[index]],
               cell_cycle[[index]],
-              settings$nUMI %||% entry$profile$nUMI,
-              settings$nGene %||% entry$profile$nGene
+              builder_qc_field(settings, entry$profile, "nUMI"),
+              builder_qc_field(settings, entry$profile, "nGene")
             )),
             excluded = character()
           ),

@@ -27,7 +27,9 @@
       call. = FALSE
     )
   }
-  if (!(nUMI %in% meta_names)) {
+  ## NULL nUMI/nGene: the object has no such column and the export leaves it
+  ## out.
+  if (!is.null(nUMI) && !(nUMI %in% meta_names)) {
     stop(
       'Column with number of transcripts per cell (`',
       nUMI,
@@ -35,7 +37,7 @@
       call. = FALSE
     )
   }
-  if (!(nGene %in% meta_names)) {
+  if (!is.null(nGene) && !(nGene %in% meta_names)) {
     stop(
       'Column with number of expressed genes per cell (`',
       nGene,
@@ -137,8 +139,12 @@
   for (group in groups) {
     meta_data[[group]] <- .exportGroupColumn(meta[[group]], group, verbose)
   }
-  meta_data[["nUMI"]] <- meta[[nUMI]]
-  meta_data[["nGene"]] <- meta[[nGene]]
+  if (!is.null(nUMI)) {
+    meta_data[["nUMI"]] <- meta[[nUMI]]
+  }
+  if (!is.null(nGene)) {
+    meta_data[["nGene"]] <- meta[[nGene]]
+  }
   for (column in cell_cycle) {
     values <- meta[[column]]
     meta_data[[column]] <- factor(
