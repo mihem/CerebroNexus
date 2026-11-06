@@ -22,7 +22,8 @@
 #' `.rds` runs whatever code is inside it.
 #'
 #' @param host Address to bind; defaults to \code{127.0.0.1}, i.e. this machine
-#'   only.
+#'   only. Any other address (for example \code{0.0.0.0}) gives a warning,
+#'   because other machines could then reach the Builder.
 #' @param port Port to bind; defaults to a free one chosen by Shiny.
 #' @param launch_browser Open a browser; defaults to \code{TRUE}.
 #' @param max_file_size Optional maximum size in MB for each local upload;
@@ -107,10 +108,30 @@ launchCerebroBuilder <- function(
     add = TRUE
   )
 
+  if (!.builderHostIsLoopback(host)) {
+    warning(
+      "The Builder is listening on '",
+      host,
+      "', so other machines may reach it. It reads any path it is given ",
+      "and runs the code inside `.rds` files; use host = \"127.0.0.1\" ",
+      "unless this network is trusted.",
+      call. = FALSE,
+      immediate. = TRUE
+    )
+  }
+
   shiny::runApp(
     appDir = app_dir,
     host = host,
     port = port,
     launch.browser = launch_browser
   )
+}
+
+## TRUE for addresses that only this machine can reach.
+.builderHostIsLoopback <- function(host) {
+  is.character(host) &&
+    length(host) == 1L &&
+    !is.na(host) &&
+    grepl("^(localhost|127([.][0-9]{1,3}){3}|::1|[[]::1[]])$", tolower(host))
 }

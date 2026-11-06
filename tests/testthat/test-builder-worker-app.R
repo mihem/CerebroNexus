@@ -24,6 +24,30 @@ test_that("Builder launcher defaults to unlimited local uploads", {
   )
 })
 
+test_that("Builder launcher warns when it listens beyond this machine", {
+  skip_if_not_installed("Seurat")
+  hosts <- character()
+  local_mocked_bindings(
+    runApp = function(appDir, host, ...) hosts <<- c(hosts, host),
+    .package = "shiny"
+  )
+  expect_warning(
+    CerebroNexus::launchCerebroBuilder(
+      host = "0.0.0.0",
+      launch_browser = FALSE
+    ),
+    "other machines may reach it"
+  )
+  for (host in c("127.0.0.1", "localhost", "::1")) {
+    expect_no_warning(
+      CerebroNexus::launchCerebroBuilder(host = host, launch_browser = FALSE)
+    )
+  }
+  expect_identical(hosts, c("0.0.0.0", "127.0.0.1", "localhost", "::1"))
+  expect_false(CerebroNexus:::.builderHostIsLoopback("192.168.1.5"))
+  expect_false(CerebroNexus:::.builderHostIsLoopback("127.0.0.1.example.com"))
+})
+
 test_that("Builder app preserves the launch request-size limit", {
   configured <- as.double(1024^2)
   withr::local_options(list(shiny.maxRequestSize = configured))

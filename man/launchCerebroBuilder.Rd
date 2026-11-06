@@ -13,7 +13,8 @@ launchCerebroBuilder(
 }
 \arguments{
 \item{host}{Address to bind; defaults to \code{127.0.0.1}, i.e. this machine
-only.}
+only. Any other address (for example \code{0.0.0.0}) gives a warning,
+because other machines could then reach the Builder.}
 
 \item{port}{Port to bind; defaults to a free one chosen by Shiny.}
 
