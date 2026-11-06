@@ -400,10 +400,18 @@ builder_native_picker_contract <- function(
       kind = kind,
       type = "file",
       prompt = "Open a Builder project.",
-      windows_filter = "Builder project (*.json)|*.json|All files (*.*)|*.*",
-      macos_types = "public.json",
-      zenity_filter = "Builder project | *.json",
-      kdialog_filter = "Builder project (*.json)",
+      ## The `.bak` backup stays selectable so a damaged project can be
+      ## recovered from it.
+      windows_filter = paste0(
+        "Builder project (*.json;*.json.bak)|*.json;*.json.bak|",
+        "All files (*.*)|*.*"
+      ),
+      macos_types = c("public.json", "bak"),
+      zenity_filter = c(
+        "Builder project | *.json *.json.bak",
+        "All files | *"
+      ),
+      kdialog_filter = "Builder project (*.json *.json.bak)",
       unavailable = "The selected project file is not available."
     ),
     dataset_files = {

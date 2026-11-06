@@ -48,6 +48,11 @@ test_that("Windows native pickers use modern STA shell dialogs", {
     fixed = TRUE
   )
   expect_match(
+    builder_windows_picker_script("project_manifest"),
+    "Builder project (*.json;*.json.bak)|*.json;*.json.bak|",
+    fixed = TRUE
+  )
+  expect_match(
     builder_windows_picker_script("dataset_files"),
     "$dialog.Multiselect = $true",
     fixed = TRUE
@@ -279,7 +284,7 @@ test_that("macOS specs cover every directory and file picker", {
   )))
   expect_match(
     paste(specs[[3L]]$args, collapse = "\n"),
-    'choose file with prompt "Open a Builder project." of type {"public.json"}',
+    'choose file with prompt "Open a Builder project." of type {"public.json", "bak"}',
     fixed = TRUE
   )
   expect_match(
@@ -326,7 +331,11 @@ test_that("Linux Zenity and KDialog specs cover every picker", {
     },
     logical(1)
   )))
-  expect_true("--file-filter=Builder project | *.json" %in% zenity[[3L]]$args)
+  ## The project backup can be chosen to recover a project.
+  expect_true(
+    "--file-filter=Builder project | *.json *.json.bak" %in% zenity[[3L]]$args
+  )
+  expect_true("--file-filter=All files | *" %in% zenity[[3L]]$args)
   expect_true("--multiple" %in% zenity[[4L]]$args)
   ## Dataset files without an extension stay selectable.
   expect_true("--file-filter=All files | *" %in% zenity[[4L]]$args)
@@ -339,7 +348,7 @@ test_that("Linux Zenity and KDialog specs cover every picker", {
     logical(1)
   )))
   expect_true("--getopenfilename" %in% kdialog[[3L]]$args)
-  expect_true("Builder project (*.json)" %in% kdialog[[3L]]$args)
+  expect_true("Builder project (*.json *.json.bak)" %in% kdialog[[3L]]$args)
   expect_true("--multiple" %in% kdialog[[4L]]$args)
   expect_true("--separate-output" %in% kdialog[[4L]]$args)
   expect_true(all(vapply(
