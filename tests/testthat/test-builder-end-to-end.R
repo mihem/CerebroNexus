@@ -1035,8 +1035,8 @@ test_that("a source without numeric UMI/gene QC columns builds without them", {
     setdiff(colnames(object@meta.data), qc),
     drop = FALSE
   ]
-  ## A scanpy-style count column is plain metadata, not a QC choice.
-  object@meta.data$n_counts <- as.numeric(seq_len(ncol(object)))
+  ## A numeric column whose name is not a count is plain metadata.
+  object@meta.data$doublet_prob <- seq_len(ncol(object)) / ncol(object)
   built <- builder_e2e_build_object(object, root)
   profile <- built$entry$profile$assay_profiles$RNA
   expect_length(profile$nUMI_choices, 0L)
@@ -1051,4 +1051,38 @@ test_that("a source without numeric UMI/gene QC columns builds without them", {
   )
   meta <- qs2::qs_read(built$result$built[[1L]])$getMetaData()
   expect_false(any(c("nUMI", "nGene") %in% colnames(meta)))
+})
+
+test_that("scanpy-style QC columns are pre-selected and built as nUMI/nGene", {
+  root <- withr::local_tempdir()
+  path <- builder_test_inst_path("extdata", "examples", "pbmc_SCE.rds")
+  object <- builder_adapter_inspect(builder_seurat_file_adapter(path))$object
+  qc <- c("nCount_RNA", "nFeature_RNA", "nUMI", "nGene")
+  object@meta.data <- object@meta.data[,
+    setdiff(colnames(object@meta.data), qc),
+    drop = FALSE
+  ]
+  object@meta.data$n_counts <- as.numeric(seq_len(ncol(object)) + 100)
+  object@meta.data$n_genes_by_counts <- seq_len(ncol(object)) + 10L
+  built <- builder_e2e_build_object(object, root)
+  profile <- built$entry$profile$assay_profiles$RNA
+  expect_identical(profile$nUMI_choices, "n_counts")
+  expect_identical(profile$nGene_choices, "n_genes_by_counts")
+  expect_identical(built$entry$settings$nUMI, "n_counts")
+  expect_identical(built$entry$settings$nGene, "n_genes_by_counts")
+  expect_false(
+    "n_genes_by_counts" %in% built$entry$profile$group_candidates
+  )
+  expect_null(built$plan$error)
+  expect_identical(
+    built$result$state,
+    "success",
+    info = built$result$error %||% ""
+  )
+  meta <- qs2::qs_read(built$result$built[[1L]])$getMetaData()
+  expect_identical(as.numeric(meta$nUMI), object@meta.data$n_counts)
+  expect_identical(
+    as.integer(meta$nGene),
+    object@meta.data$n_genes_by_counts
+  )
 })

@@ -260,11 +260,17 @@ describe_seurat <- function(object, metadata_groups = NULL) {
     error = function(e) assays[1]
   )
 
+  ## Seurat, scanpy and other common names for UMI and gene counts per cell.
+  umi_pattern <- paste0(
+    "^(nCount|nUMI)|^total[._]?(count|UMI)s?$|",
+    "^n[._]?counts?$|^(n[._])?UMIs?([._]counts?)?$"
+  )
+  gene_pattern <- paste0(
+    "^(nFeature|nGene)|^total[._]?genes?$|",
+    "^n[._]?genes?([._]by[._]counts)?$|^n[._]?features?$"
+  )
   qc_columns <- names(meta)[grepl(
-    paste0(
-      "^(nCount|nFeature|nUMI|nGene)|",
-      "^total[._]?(count|UMI|gene)s?$"
-    ),
+    paste0(umi_pattern, "|", gene_pattern),
     names(meta),
     ignore.case = TRUE
   )]
@@ -280,17 +286,21 @@ describe_seurat <- function(object, metadata_groups = NULL) {
         "nUMI",
         "nCount_RNA",
         "total_counts",
-        "total_UMIs"
+        "n_counts",
+        "total_UMIs",
+        "UMI"
       )
-      pattern <- "^(nCount|nUMI)|^total[._]?(count|UMI)s?$"
+      pattern <- umi_pattern
     } else {
       preferred <- c(
         paste0("nFeature_", assay),
         "nGene",
         "nFeature_RNA",
+        "n_genes_by_counts",
+        "n_genes",
         "total_genes"
       )
-      pattern <- "^(nFeature|nGene)|^total[._]?genes?$"
+      pattern <- gene_pattern
     }
     relevant <- numeric_cols[grepl(pattern, numeric_cols, ignore.case = TRUE)]
     unique(c(intersect(preferred, numeric_cols), relevant))
@@ -328,8 +338,10 @@ describe_seurat <- function(object, metadata_groups = NULL) {
   ## count column like nFeature_RNA has few enough distinct values to look like
   ## a grouping variable and is never one.
   qc_pattern <- paste0(
-    "^(nCount|nFeature|nUMI|nGene)_?|^total[._]?(count|UMI|gene)s?$|",
-    "^percent[._]|[._]score$|^S\\.Score$|^G2M\\.Score$"
+    umi_pattern,
+    "|",
+    gene_pattern,
+    "|^percent[._]|[._]score$|^S\\.Score$|^G2M\\.Score$"
   )
 
   legacy_metadata <- metadata_groups$legacy %||% NULL

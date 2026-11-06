@@ -1022,6 +1022,50 @@ test_that("describe_seurat offers a logical column as a group", {
   expect_true("is_doublet" %in% describe_seurat(object)$group_candidates)
 })
 
+test_that("describe_seurat recognises scanpy and other QC column names", {
+  skip_if_not_installed("SeuratObject")
+  builder_repo_source("inspect.R")
+  object <- builder_profile_reduction_object("umap")
+  qc <- function(columns) {
+    meta <- object@meta.data["group"]
+    for (column in columns) {
+      meta[[column]] <- seq_len(nrow(meta)) + 1
+    }
+    object@meta.data <- meta
+    described <- describe_seurat(object)
+    described$assay_profiles$RNA[c(
+      "nUMI_choices",
+      "nGene_choices",
+      "nUMI",
+      "nGene"
+    )]
+  }
+
+  scanpy <- qc(c(
+    "n_genes",
+    "total_counts",
+    "total_counts_mt",
+    "n_genes_by_counts",
+    "n_counts"
+  ))
+  expect_identical(scanpy$nUMI_choices, c("total_counts", "n_counts"))
+  expect_identical(scanpy$nGene_choices, c("n_genes_by_counts", "n_genes"))
+  expect_identical(scanpy$nUMI, "total_counts")
+  expect_identical(scanpy$nGene, "n_genes_by_counts")
+
+  other <- qc(c("UMI", "nFeature_ADT", "nCount_ADT", "percent_mt"))
+  expect_identical(other$nUMI_choices, c("UMI", "nCount_ADT"))
+  expect_identical(other$nGene_choices, "nFeature_ADT")
+
+  seurat <- qc(c("n_counts", "nCount_RNA", "nFeature_RNA", "n_genes"))
+  expect_identical(seurat$nUMI, "nCount_RNA")
+  expect_identical(seurat$nGene, "nFeature_RNA")
+
+  none <- qc(c("percent_mt", "doublet_prob"))
+  expect_length(none$nUMI_choices, 0L)
+  expect_length(none$nGene_choices, 0L)
+})
+
 test_that("organism guess reads Ensembl prefixes and skips digit-led symbols", {
   guess <- function(features) builder_profile_organism(features)$code
   ensembl <- function(prefix) sprintf("%s%011d", prefix, seq_len(300L))

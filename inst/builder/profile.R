@@ -1043,6 +1043,8 @@ BUILDER_METADATA_TEXT_MAX_BYTES <- 120L
 ) {
   qc_pattern <- paste0(
     "^(nCount|nFeature|nUMI|nGene)_?|^total[._]?(count|UMI|gene)s?$|",
+    "^n[._]?(count|gene|feature)s?$|^n[._]?genes[._]by[._]counts$|",
+    "^(n[._])?UMIs?([._]counts?)?$|",
     "^percent[._]|[._]score$|^S\\.Score$|^G2M\\.Score$"
   )
   if (!is.atomic(values) || is.list(values)) {
