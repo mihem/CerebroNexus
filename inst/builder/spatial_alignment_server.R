@@ -644,15 +644,13 @@ builder_spatial_alignment_server <- function(
         if (!is.null(min)) {
           value <- pmax(min, value)
         }
+        ## A scale of 0 is a partial entry on the way to 0.8. The box is
+        ## not rewritten while typing; the browser normalises it on blur.
         if (identical(id, "img_scale") && value <= 0) {
-          value <- 0.02
+          return()
         }
         if (!is.null(max) && !identical(id, "img_scale")) {
           value <- pmin(max, value)
-        }
-        if (!isTRUE(all.equal(input[[number_id]], value))) {
-          shiny::freezeReactiveValue(input, number_id)
-          shiny::updateNumericInput(session, number_id, value = value)
         }
         if (!isTRUE(all.equal(input[[slider_id]], value))) {
           shiny::updateSliderInput(session, slider_id, value = value)

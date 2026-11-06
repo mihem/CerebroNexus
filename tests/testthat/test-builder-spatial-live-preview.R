@@ -202,6 +202,30 @@ test_that("Canvas runtime persists point-safe View areas and deduplicates Ion ev
   )
   expect_identical(as.integer(result$stopped), 2L)
   expect_identical(as.integer(result$pendingTimers), 0L)
+
+  ## Typed values stay in the number box; partial entries change nothing.
+  boxes <- function(steps) vapply(steps, `[[`, character(1), "box")
+  sliders <- function(steps) vapply(steps, `[[`, character(1), "slider")
+  expect_identical(boxes(result$typedScale), c("1", "1.", "1.1"))
+  expect_identical(sliders(result$typedScale), c("1", "1", "1.1"))
+  expect_identical(as.integer(result$typedInteractionsWhileTyping), 0L)
+  expect_identical(as.integer(result$typedCommitsWhileTyping), 0L)
+  expect_length(result$typedScaleCommits, 1L)
+  expect_identical(
+    as.numeric(result$typedScaleCommits[[1L]]$value$controls$scale),
+    1.1
+  )
+  expect_identical(boxes(result$typedZeroScale), c("0", "0.", "0.8"))
+  expect_identical(sliders(result$typedZeroScale), c("1.1", "1.1", "0.8"))
+  expect_identical(result$typedZeroScaleBox, "0.8")
+  expect_identical(boxes(result$typedPartial), "")
+  expect_identical(result$typedPartialBox, "0.8")
+  expect_identical(as.numeric(result$typedScaleControls), 0.8)
+  expect_identical(unlist(result$typedDx), c("", "-8", "-80"))
+  expect_identical(result$typedDxBox, "-80")
+  expect_identical(as.numeric(result$typedDxControls), -80)
+  ## Tab onto an alignment slider does not move it; other sliders keep Ion's.
+  expect_identical(as.integer(unlist(result$ionFocusBlocked)), c(1L, 0L))
 })
 
 test_that("Canvas hover coalesces pointer work and reuses rendered screen points", {

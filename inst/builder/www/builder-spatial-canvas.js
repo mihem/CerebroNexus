@@ -965,17 +965,27 @@
     var digits = Math.max(0, fraction - (Number.isFinite(exponent) ? exponent : 0));
     return Math.min(defaultStep, Math.pow(10, -digits));
   }
-  function syncSliderControl(number, slider) {
-    var value = finite(number.value, finite(slider.value, 0));
+  // A number box reads "" while it holds a partial entry such as "-".
+  function typedValue(node) {
+    var raw = String(node.value).trim();
+    return raw === "" ? NaN : Number(raw);
+  }
+  // While typing, the box keeps what was typed: a partial entry ("-", "1.",
+  // a scale of 0 on the way to 0.8) changes nothing and a valid one moves the
+  // slider. On blur or Enter the box is rewritten with the value in use.
+  function syncSliderControl(number, slider, typing) {
+    var value = typedValue(number);
+    if (typing && !Number.isFinite(value)) return false;
+    if (!Number.isFinite(value)) value = finite(slider.value, 0);
     var minimum = number.min === "" ? NaN : Number(number.min);
     var maximum = number.max === "" ? NaN : Number(number.max);
     if (Number.isFinite(minimum)) value = Math.max(minimum, value);
     if (Number.isFinite(maximum)) value = Math.min(maximum, value);
     var isScale = controlMap[slider.id][0] === "scale";
     if (isScale && value <= 0) {
+      if (typing) return false;
       value = NONPOSITIVE_SCALE_FALLBACK;
     }
-    number.value = value;
     slider.value = value;
     var range = window.jQuery && window.jQuery(slider).data("ionRangeSlider");
     if (isScale) {
@@ -986,6 +996,9 @@
     } else if (range) {
       range.update({from: value});
     }
+    // the slider rounds to its step ("12.5" to 13 for rotation): show that
+    if (!typing) number.value = finite(slider.value, value);
+    return true;
   }
   function syncNumberControl(target) {
     var number = document.getElementById(target.id + "_number");
@@ -1101,18 +1114,23 @@
     });
     window.setTimeout(function () { state.controlsHeld = false; }, 0);
   }
-  function consumeControl(target) {
+  function consumeControl(target, typing) {
     var spec = controlMap[target.id];
     if (!spec || !state.controls) return false;
     if (state.controlsHeld) return false;
+    var value;
     if (spec[0] === "dx" || spec[0] === "dy") {
-      target.value = Math.round(finite(target.value, 0));
+      value = typedValue(target);
+      value = Math.round(
+        Number.isFinite(value) ? value : finite(state.controls[spec[0]], 0)
+      );
+      if (!typing) target.value = value;
     }
     if (spec[0] === "scale" && finite(target.value, 0) <= 0) {
       target.value = NONPOSITIVE_SCALE_FALLBACK;
       resetControl(target.id, NONPOSITIVE_SCALE_FALLBACK);
     }
-    var value = controlValue(target, spec[1]);
+    if (value === undefined) value = controlValue(target, spec[1]);
     state.activeTransform = spec[0] === "coordinateRotation" ||
       spec[0] === "point_opacity" || spec[0] === "point_size" ||
       spec[0] === "cell_percentage" ?
@@ -1190,16 +1208,48 @@
       event.stopImmediatePropagation();
       return;
     }
-    if (target !== event.target) syncSliderControl(event.target, target);
-    beginInteraction();
-    if (!consumeControl(target)) return;
+    // Typing in a number box is committed on blur or Enter (change), so it
+    // does not hold an interaction open that keeps Finish Checking off.
+    var typing = event.target.type === "number";
+    if (typing) {
+      var valid = target !== event.target ?
+        syncSliderControl(event.target, target, true) :
+        Number.isFinite(typedValue(target));
+      if (!valid) {
+        event.stopImmediatePropagation();
+        return;
+      }
+    } else {
+      beginInteraction();
+    }
+    if (!consumeControl(target, typing)) return;
     event.stopImmediatePropagation();
+  }, true);
+  // Ion turns keyboard focus on a slider into a click at the handle's pixel,
+  // which moves the value (Tab from a box set a scale of 1.1 to 0). The
+  // number box beside each alignment slider is the keyboard route.
+  function stopIonFocusClick(event) {
+    var line = event.target && event.target.closest &&
+      event.target.closest(".irs-line");
+    // the outer Ion element sits right before its input
+    var root = line && line.closest("[class*='js-irs-']");
+    var input = root && root.nextElementSibling;
+    if (input && controlMap[input.id]) event.stopPropagation();
+  }
+  document.addEventListener("focus", stopIonFocusClick, true);
+  document.addEventListener("focusin", stopIonFocusClick, true);
+  // Enter commits a typed value like leaving the box does.
+  document.addEventListener("keydown", function (event) {
+    if (
+      event.key !== "Enter" || event.target.type !== "number" ||
+      !pairedSlider(event.target)
+    ) return;
+    event.target.dispatchEvent(new Event("change", {bubbles: true}));
   }, true);
   document.addEventListener("focusin", function (event) {
     var target = pairedSlider(event.target);
     var spec = target && controlMap[target.id];
     if (!spec) return;
-    beginInteraction();
     state.activeTransform = spec[0] === "coordinateRotation" ||
       spec[0] === "point_opacity" || spec[0] === "point_size" ||
       spec[0] === "cell_percentage" ?

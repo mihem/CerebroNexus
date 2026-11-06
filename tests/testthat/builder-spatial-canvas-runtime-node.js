@@ -80,8 +80,17 @@ const percentageNumber = {
   max: "100",
   step: "1",
 };
+const dxNumber = {
+  id: "enhance-img_dx",
+  type: "number",
+  value: "0",
+  min: "",
+  max: "",
+  step: "1",
+};
 const elements = {
   "enhance-alignment_spatial_plot": canvas,
+  "enhance-img_dx": dxNumber,
   "enhance-img_scale": slider,
   "enhance-img_scale_number": number,
   "enhance-cell_percentage": percentageSlider,
@@ -618,6 +627,91 @@ Array.from(timers.entries()).forEach(function (entry) {
   entry[1]();
 });
 
+// Typing into a number box: the box keeps what was typed, valid values move
+// the slider, and the value is committed on change (blur or Enter).
+const typedCommitStart = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_alignment_controls";
+}).length;
+const typedInteractionStart = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_interaction_state";
+}).length;
+nativeHandlers.focusin.forEach(function (handler) { handler({target: number}); });
+document.activeElement = number;
+const typeInto = function (values) {
+  return values.map(function (value) {
+    number.value = value;
+    nativeHandlers.input.forEach(function (handler) {
+      handler({target: number, stopImmediatePropagation: function () {}});
+    });
+    return {box: String(number.value), slider: String(slider.value)};
+  });
+};
+const changeNumber = function () {
+  nativeHandlers.change.forEach(function (handler) {
+    handler({target: number, stopImmediatePropagation: function () {}});
+  });
+  Array.from(timers.entries()).forEach(function (entry) {
+    timers.delete(entry[0]);
+    entry[1]();
+  });
+};
+// Chrome reports "" for a partial entry such as "-".
+const typedScale = typeInto(["1", "1.", "1.1"]);
+const typedInteractionsWhileTyping = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_interaction_state";
+}).length - typedInteractionStart;
+const typedCommitsWhileTyping = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_alignment_controls";
+}).length - typedCommitStart;
+changeNumber();
+const typedScaleCommits = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_alignment_controls";
+}).slice(typedCommitStart);
+const typedZeroScale = typeInto(["0", "0.", "0.8"]);
+changeNumber();
+const typedZeroScaleBox = String(number.value);
+const typedPartial = typeInto([""]);
+changeNumber();
+const typedPartialBox = String(number.value);
+// X position is a number box without a slider.
+const typedDx = ["", "-8", "-80"].map(function (value) {
+  dxNumber.value = value;
+  nativeHandlers.input.forEach(function (handler) {
+    handler({target: dxNumber, stopImmediatePropagation: function () {}});
+  });
+  return String(dxNumber.value);
+});
+nativeHandlers.change.forEach(function (handler) {
+  handler({target: dxNumber, stopImmediatePropagation: function () {}});
+});
+Array.from(timers.entries()).forEach(function (entry) {
+  timers.delete(entry[0]);
+  entry[1]();
+});
+const typedDxControls = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_alignment_controls";
+}).slice(-1)[0].value.controls.dx;
+// Keyboard focus on an alignment slider must not reach Ion's focus click.
+const ionFocus = function (input) {
+  const root = {nextElementSibling: input};
+  const line = {
+    closest: function (selector) {
+      if (selector === ".irs-line") return line;
+      return selector === "[class*='js-irs-']" ? root : null;
+    },
+  };
+  let blocked = 0;
+  nativeHandlers.focus.forEach(function (handler) {
+    handler({target: line, stopPropagation: function () { blocked += 1; }});
+  });
+  return blocked;
+};
+const ionFocusBlocked = [ionFocus(slider), ionFocus({id: "other-slider"})];
+document.activeElement = null;
+const typedScaleControls = inputs.filter(function (entry) {
+  return entry.id === "builder_spatial_alignment_controls";
+}).slice(-1)[0].value.controls.scale;
+
 console.log(JSON.stringify({
   overlay: overlayViewport,
   resizedOverlay: resizedOverlayViewport,
@@ -661,5 +755,18 @@ console.log(JSON.stringify({
   percentageSceneMessages: percentageSceneMessages,
   percentageCommits: percentageCommits,
   stopped: stopped,
+  typedScale: typedScale,
+  typedInteractionsWhileTyping: typedInteractionsWhileTyping,
+  typedCommitsWhileTyping: typedCommitsWhileTyping,
+  typedScaleCommits: typedScaleCommits,
+  typedZeroScale: typedZeroScale,
+  typedZeroScaleBox: typedZeroScaleBox,
+  typedPartial: typedPartial,
+  typedPartialBox: typedPartialBox,
+  typedScaleControls: typedScaleControls,
+  typedDx: typedDx,
+  ionFocusBlocked: ionFocusBlocked,
+  typedDxBox: String(dxNumber.value),
+  typedDxControls: typedDxControls,
   pendingTimers: timers.size,
 }));
