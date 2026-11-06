@@ -1838,6 +1838,79 @@ builder_release_cleanup_control <- function(target) {
   TRUE
 }
 
+## Remove the hidden control folders that stopped, failed or killed new-release
+## builds left in `parent`. A control is touched only when its release folder
+## was never published and no live process on this host holds its lock;
+## anything else (an in-place release with a backup, another machine's lock)
+## is kept for the recovery dialog.
+builder_release_sweep_parent <- function(parent) {
+  parent <- tryCatch(
+    normalizePath(parent, winslash = "/", mustWork = TRUE),
+    error = function(error) NULL
+  )
+  if (is.null(parent) || !dir.exists(parent)) {
+    return(invisible(character()))
+  }
+  controls <- list.files(
+    parent,
+    pattern = "^[.]cbr-[0-9a-f]{16}$",
+    all.files = TRUE,
+    full.names = TRUE
+  )
+  removed <- character()
+  for (control in controls) {
+    swept <- tryCatch(
+      {
+        journal <- .builder_release_read_rds(
+          .builder_release_journal_path(control),
+          "The release journal"
+        )
+        target <- journal$target
+        if (
+          !.builder_release_text(target) ||
+            !identical(
+              builder_release_control_path(target),
+              .canonicalTargetPath(control)
+            ) ||
+            .builder_release_exists(target)
+        ) {
+          stop("The release is not an abandoned new release.", call. = FALSE)
+        }
+        recovery <- builder_discover_recovery(target)
+        if (identical(recovery$state, "stale_lock")) {
+          .builder_release_isolate_stale_lock(control, recovery$journal)
+        } else if (identical(recovery$state, "recovery_required")) {
+          if (!isTRUE(recovery$safe_to_abort)) {
+            stop("The release needs manual recovery.", call. = FALSE)
+          }
+          # Stops when a live process still owns the lock.
+          builder_recover_release(target, action = "abort")
+        }
+        if (dir.exists(control)) {
+          .builder_release_assert_control(control)
+          journal <- .builder_release_journal(target, control = control)
+          stages <- file.path(control, "stages")
+          if (
+            !journal$phase %in% c("complete", "aborted", "recovered") ||
+              .builder_release_exists(file.path(control, "lock")) ||
+              .builder_release_exists(file.path(control, "backup")) ||
+              length(list.files(stages, all.files = TRUE, no.. = TRUE))
+          ) {
+            stop("The release control is still in use.", call. = FALSE)
+          }
+          unlink(control, recursive = TRUE, force = TRUE)
+        }
+        !dir.exists(control)
+      },
+      error = function(error) FALSE
+    )
+    if (isTRUE(swept)) {
+      removed <- c(removed, control)
+    }
+  }
+  invisible(removed)
+}
+
 builder_prepare_release <- function(
   target,
   build_id,

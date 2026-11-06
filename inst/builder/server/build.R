@@ -600,6 +600,8 @@ enqueue_build_plan <- function(
 }
 
 prepare_selected_output <- function(path) {
+  # Earlier stopped, failed or killed builds left hidden control folders.
+  try(builder_release_sweep_parent(dirname(path)), silent = TRUE)
   isolate({
     plan <- freeze_materialized_plan_for_output(
       path,
@@ -693,6 +695,15 @@ builder_new_release_target <- function(
 }
 
 builder_build_last_parent <- reactiveVal(NULL)
+
+# Failure diagnostics stay while the page shows them; remove them when the
+# session ends.
+session$onSessionEnded(function() {
+  output <- isolate(selected_output())
+  if (builder_has_text(output %||% "")) {
+    try(builder_release_sweep_parent(dirname(output)), silent = TRUE)
+  }
+})
 
 start_builder_new_release <- function(parent) {
   request <- builder_build_output_preflight(parent)

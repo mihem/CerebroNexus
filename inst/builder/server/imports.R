@@ -3026,13 +3026,19 @@ observe({
       )
       diagnostics_path <- NULL
       if (!is.null(release)) {
-        recorded <- builder_persist_worker_transport_failure(
-          release,
-          release_result,
-          worker_transport,
-          process = got$worker$process %||% NULL
-        )
-        diagnostics_path <- recorded$path
+        # A user Stop needs no diagnostics; without them the abort removes
+        # the hidden control folder from the output folder.
+        stopped <- isTRUE(isolate(builder_build_stop_requested())) ||
+          builder_build_cancel_requested(p$progress_path %||% "")
+        if (!stopped) {
+          recorded <- builder_persist_worker_transport_failure(
+            release,
+            release_result,
+            worker_transport,
+            process = got$worker$process %||% NULL
+          )
+          diagnostics_path <- recorded$path
+        }
         release_result <- abort_release_result(release, worker_error)
         if (.builder_diagnostics_text(diagnostics_path %||% NULL)) {
           release_result$diagnostics_path <- diagnostics_path

@@ -1035,3 +1035,49 @@ test_that("post-rename payload verification restores the old release", {
     expect_true(dir.exists(handle$stage))
   })
 })
+
+test_that("abandoned new-release controls are swept from their parent", {
+  local({
+    builder_publish_source()
+    root <- withr::local_tempdir()
+
+    ## killed: the lock owner is gone and the staged data is still there
+    killed <- builder_prepare_release(file.path(root, "killed"), "build-killed")
+    writeLines("staged", file.path(killed$stage, "dataset.crb"))
+    owner <- readRDS(file.path(killed$lock, "owner.rds"))
+    owner$pid <- .Machine$integer.max
+    saveRDS(owner, file.path(killed$lock, "owner.rds"))
+
+    ## failed: aborted, but diagnostics kept the control
+    failed <- builder_prepare_release(file.path(root, "failed"), "build-failed")
+    writeLines("log", file.path(failed$control, "diagnostics", "trace.txt"))
+    expect_false(builder_abort_release(failed)$control_cleaned)
+    expect_true(dir.exists(failed$control))
+
+    ## running: this process still owns the lock
+    running <- builder_prepare_release(file.path(root, "running"), "build-live")
+    writeLines("staged", file.path(running$stage, "dataset.crb"))
+
+    ## published: the target exists
+    published_target <- file.path(root, "published")
+    published <- builder_prepare_release(published_target, "build-done")
+    writeLines("log", file.path(published$control, "diagnostics", "keep.txt"))
+    writeLines("done", file.path(published$stage, "dataset.crb"))
+    expect_true(builder_publish_release(published)$published)
+
+    removed <- builder_release_sweep_parent(root)
+    expect_setequal(
+      basename(removed),
+      basename(c(killed$control, failed$control))
+    )
+    expect_false(dir.exists(killed$control))
+    expect_false(dir.exists(failed$control))
+    expect_true(file.exists(file.path(running$stage, "dataset.crb")))
+    expect_true(dir.exists(published$control))
+    expect_true(builder_abort_release(running)$aborted)
+    expect_identical(
+      builder_release_sweep_parent(file.path(root, "none")),
+      character()
+    )
+  })
+})
