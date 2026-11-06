@@ -6707,6 +6707,7 @@ builder_project_open_snapshot <- function(path, external_roots = NULL) {
   manifest$datasets <- lapply(
     manifest$datasets %||% list(),
     function(record) {
+      record <- builder_project_accept_finished_source(record, root)
       record$runtime_restore_status <- builder_project_dataset_status(
         record,
         root,
@@ -6722,6 +6723,38 @@ builder_project_open_snapshot <- function(path, external_roots = NULL) {
     manifest_fingerprint = snapshot$fingerprint,
     legacy_qs = builder_project_legacy_qs_datasets(manifest$datasets)
   )
+}
+
+## A source copy that finished after the last Save (page closed meanwhile)
+## leaves its blob on disk while the manifest still says pending; accept the
+## blob when its bytes match the MD5 in its content address.
+builder_project_accept_finished_source <- function(record, root) {
+  source <- record$source %||% NULL
+  if (
+    !is.list(source) ||
+      !identical(source$kind %||% "managed", "managed") ||
+      !as.character(source$status %||% "") %in% c("pending", "failed") ||
+      !builder_project_content_addressed_source(source$path, record$id)
+  ) {
+    return(record)
+  }
+  path <- tryCatch(
+    builder_project_resolve_path(source$path, root, "managed"),
+    error = function(error) NULL
+  )
+  if (!.builder_project_text(path) || !file.exists(path) || dir.exists(path)) {
+    return(record)
+  }
+  expected <- tolower(strsplit(source$path, "/", fixed = TRUE)[[1L]][[4L]])
+  fingerprint <- builder_project_file_fingerprint(path, content = TRUE)
+  if (!identical(tolower(as.character(fingerprint$md5 %||% "")), expected)) {
+    return(record)
+  }
+  source$status <- "ready"
+  source$error <- NULL
+  source$fingerprint <- fingerprint
+  record$source <- source
+  record
 }
 
 builder_project_new_manifest <- function(root, name = basename(root)) {

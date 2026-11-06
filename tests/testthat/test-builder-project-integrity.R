@@ -675,3 +675,59 @@ test_that("a skipped dataset whose source is gone no longer blocks Save", {
     "incomplete"
   )
 })
+
+test_that("Open accepts a source blob that finished copying after the Save", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  uploads <- withr::local_tempdir()
+  source <- file.path(uploads, "ds1.rds")
+  saveRDS(list(id = "ds1"), source)
+  md5 <- unname(tools::md5sum(source))
+  entry <- list(
+    id = "ds1",
+    revision = 1L,
+    path = source,
+    filename = "sample.rds",
+    settings = list(name = "Sample A"),
+    acknowledgements = character(),
+    spatial_drafts = list(),
+    snapshot = list(source_fingerprint = paste0("builder-snapshot-v2:", md5))
+  )
+  built <- runtime$builder_project_build_manifest(
+    list(entry),
+    list(root = root, manifest = runtime$builder_project_new_manifest(root)),
+    list(
+      checked = character(),
+      artifacts = list(),
+      skipped_ids = character(),
+      configuration = list(),
+      last_ui = list()
+    )
+  )
+  saved <- runtime$builder_project_write(
+    built$manifest,
+    root,
+    expected_revision = 0L
+  )
+  expect_identical(saved$manifest$datasets[[1L]]$source$status, "pending")
+
+  pending <- runtime$builder_project_open_snapshot(saved$path)
+  expect_identical(
+    pending$manifest$datasets[[1L]]$runtime_restore_status$actions,
+    "skip"
+  )
+
+  ## The copy finishes, but the page is gone before the manifest is updated.
+  copied <- runtime$builder_project_copy_source_job(built$jobs[[1L]])
+  expect_identical(copied$status, "ready")
+  opened <- runtime$builder_project_open_snapshot(saved$path)
+  record <- opened$manifest$datasets[[1L]]
+  expect_identical(record$source$status, "ready")
+  expect_identical(record$source$fingerprint$md5, md5)
+  expect_true("resume" %in% record$runtime_restore_status$actions)
+
+  ## A blob whose bytes do not match its address is not accepted.
+  writeBin(charToRaw("truncated"), copied$path)
+  damaged <- runtime$builder_project_open_snapshot(saved$path)
+  expect_identical(damaged$manifest$datasets[[1L]]$source$status, "pending")
+})
