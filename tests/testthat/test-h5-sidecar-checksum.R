@@ -77,6 +77,24 @@ test_that("readCerebro refuses an H5 sidecar with other values", {
   )
 })
 
+test_that("createShinyApp refuses an H5 sidecar with other values", {
+  skip_if_not_installed("HDF5Array")
+  dir <- withr::local_tempdir()
+  out <- h5_checksum_export(dir)
+  h5_checksum_rewrite(out$h5)
+  app <- file.path(dir, "app")
+  expect_error(
+    createShinyApp(
+      cerebro_data = c(pbmc = out$crb),
+      result_dir = app,
+      launch_browser = FALSE,
+      verbose = FALSE
+    ),
+    "The h5 expression sidecar checksum does not match CRB 'pbmc.crb'."
+  )
+  expect_false(dir.exists(app))
+})
+
 test_that("the expression-backend checksum is validated", {
   object <- Cerebro$new()
   expect_error(

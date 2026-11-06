@@ -671,11 +671,31 @@
       call. = FALSE
     )
   }
-  .crbContract()$.readRuntimeBackendDescriptor(
+  descriptor <- .crbContract()$.readRuntimeBackendDescriptor(
     object,
     crb_path,
     portable = FALSE
   )
+  ## A replaced h5 sidecar must fail the build, not the first Viewer read.
+  ## Other location problems are reported later with their own messages.
+  md5 <- .subset2(object$expression_backend, "md5")
+  if (!is.null(md5) && !identical(descriptor$type, "embedded")) {
+    if (!.validMd5(md5)) {
+      stop(
+        "The Cerebro expression-backend descriptor is invalid.",
+        call. = FALSE
+      )
+    }
+    sidecar <- file.path(dirname(crb_path), descriptor$location)
+    if (
+      .cerebroSiblingName(descriptor$location) &&
+        file.exists(sidecar) &&
+        !dir.exists(sidecar)
+    ) {
+      .verifyExpressionSidecar(sidecar, md5, crb_path)
+    }
+  }
+  descriptor
 }
 
 .readBundleSpatialCatalog <- function(object, dataset) {
