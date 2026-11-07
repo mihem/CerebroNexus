@@ -438,7 +438,12 @@ builder_viewer_display_ui <- function(id, entry, epoch) {
       select(
         "color_clip",
         "Continuous colour range",
-        c("Full range" = 0, "1–99%" = .01, "2–98%" = .02, "5–95%" = .05)
+        # Names set as strings: an argument name is turned into the native
+        # encoding, which mangles the dash in a C locale.
+        stats::setNames(
+          c(0, .01, .02, .05),
+          c("Full range", "1–99%", "2–98%", "5–95%")
+        )
       )
     ),
     h5("Gene expression and Spatial feature plots"),

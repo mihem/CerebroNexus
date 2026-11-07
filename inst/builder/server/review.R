@@ -782,7 +782,9 @@ observe({
     configure_dataset_name(name)
   }
 })
-output$configure_dataset_name <- renderText(configure_dataset_name())
+# renderUI, not renderText: renderText goes through cat(), which escapes
+# non-ASCII names ("Z<U+00FC>rich") when R runs in a C locale.
+output$configure_dataset_name <- renderUI(configure_dataset_name())
 
 output$configure_actions <- renderUI({
   state <- configure_actions_state()
@@ -1237,7 +1239,7 @@ render_configure_workbench <- function() {
         # dataset name the way the rail does.
         tags$span(
           id = "configure_dataset_name",
-          class = "shiny-text-output",
+          class = "shiny-html-output",
           entry$settings$name %||% entry$id
         )
       ),

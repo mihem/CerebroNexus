@@ -2152,14 +2152,20 @@ test_that("the Configure title follows a dataset rename", {
       settings = list(name = "Dataset A")
     )))
     session$flushReact()
-    expect_identical(output$configure_dataset_name, "Dataset A")
+    expect_identical(
+      as.character(output$configure_dataset_name$html),
+      "Dataset A"
+    )
 
     ## A rename does not rebuild the workbench; the title follows it.
     entries <- isolate(sets())
     entries[[1L]]$settings$name <- "Renamed A"
     sets(entries)
     session$flushReact()
-    expect_identical(output$configure_dataset_name, "Renamed A")
+    expect_identical(
+      as.character(output$configure_dataset_name$html),
+      "Renamed A"
+    )
   })
 })
 

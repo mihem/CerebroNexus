@@ -443,6 +443,113 @@ test_that("non-ASCII text survives two saves in a non-UTF-8 locale", {
   )
 })
 
+test_that("Save, Open and Save again under LC_ALL=C keep non-ASCII bytes", {
+  skip_if_not_installed("callr")
+  skip_on_os("windows")
+  files <- vapply(
+    c(
+      "builder/prerequisite.R",
+      "builder/core/bundle_path_contract.R",
+      "viewer/core/spatial_coordinate_transform.R",
+      "builder/io.R",
+      "builder/worker.R",
+      "builder/extras.R",
+      "builder/project.R",
+      "builder/build.R"
+    ),
+    function(file) normalizePath(builder_test_inst_path(file)),
+    character(1)
+  )
+  make_entry <- builder_project_integrity_entry
+  make_manifest <- builder_project_integrity_manifest
+  environment(make_entry) <- globalenv()
+  environment(make_manifest) <- globalenv()
+  root <- withr::local_tempdir()
+  utf8 <- intToUtf8(c(90L, 252L, 114L, 105L, 99L, 104L, 32L, 8230L))
+
+  cycle <- callr::r(
+    function(files, root, make_entry, make_manifest, utf8) {
+      runtime <- new.env(parent = globalenv())
+      sys.source(files[[1L]], envir = runtime)
+      for (file in files[-1L]) {
+        runtime$builder_source_utf8(file, envir = runtime)
+      }
+      bytes <- function(path) {
+        readBin(path, what = "raw", n = file.info(path)$size)
+      }
+      # Text the way R holds it after readRDS() of an object saved by a UTF-8
+      # session or from a file name: UTF-8 bytes without an encoding mark.
+      native <- rawToChar(charToRaw(utf8))
+      entry <- make_entry(native, 7L)
+      entry$settings$groups <- list(
+        column = native,
+        levels = factor(native),
+        labels = stats::setNames(native, native)
+      )
+      first <- runtime$builder_project_write(
+        make_manifest(runtime, root, entry),
+        root,
+        expected_revision = 0L
+      )
+      sidecar <- file.path(
+        root,
+        first$manifest$datasets[[1L]]$configuration$path
+      )
+      first_sidecar <- bytes(sidecar)
+      first_manifest <- bytes(first$path)
+
+      reopened <- runtime$builder_project_read(first$path)
+      restored <- runtime$builder_project_read_dataset_config(
+        reopened$datasets[[1L]],
+        root
+      )
+      second <- runtime$builder_project_write(
+        make_manifest(runtime, root, restored),
+        root,
+        expected_revision = 1L
+      )
+      list(
+        locale = Sys.getlocale("LC_CTYPE"),
+        native_encoding = Encoding(native),
+        reopened_name = restored$settings$name,
+        reopened_level = levels(restored$settings$groups$levels),
+        first_sidecar = first_sidecar,
+        second_sidecar = bytes(
+          file.path(root, second$manifest$datasets[[1L]]$configuration$path)
+        ),
+        first_manifest = first_manifest,
+        second_manifest = bytes(second$path)
+      )
+    },
+    args = list(
+      files = files,
+      root = root,
+      make_entry = make_entry,
+      make_manifest = make_manifest,
+      utf8 = utf8
+    ),
+    env = c(callr::rcmd_safe_env(), LC_ALL = "C", LANG = "C")
+  )
+
+  expect_identical(cycle$locale, "C")
+  expect_identical(cycle$native_encoding, "unknown")
+  expect_identical(enc2utf8(cycle$reopened_name), utf8)
+  expect_identical(enc2utf8(cycle$reopened_level), utf8)
+  has_bytes <- function(haystack, needle) {
+    grepl(needle, rawToChar(haystack), fixed = TRUE, useBytes = TRUE)
+  }
+  for (payload in cycle[c(
+    "first_sidecar",
+    "second_sidecar",
+    "first_manifest",
+    "second_manifest"
+  )]) {
+    expect_true(has_bytes(payload, rawToChar(charToRaw(utf8))))
+    expect_false(has_bytes(payload, "<c3>"))
+  }
+  expect_identical(cycle$second_sidecar, cycle$first_sidecar)
+})
+
 builder_project_integrity_lock_owner <- function(path, pid, host) {
   dir.create(path)
   writeLines("stale-token", file.path(path, "owner-token"))

@@ -404,7 +404,7 @@ builder_project_save_unchanged <- function(
   same <- function(left, right) {
     canonical <- function(value) {
       jsonlite::toJSON(
-        value %||% list(),
+        builder_project_utf8_value(value %||% list()),
         auto_unbox = TRUE,
         null = "null",
         na = "null",
@@ -622,6 +622,43 @@ builder_project_id <- function() {
   text <- rawToChar(bytes)
   Encoding(text) <- "UTF-8"
   text
+}
+
+## jsonlite converts unmarked text from the native encoding to UTF-8. In a C
+## (ASCII) locale that turns every non-ASCII byte into "<c3>"-style escapes,
+## although such bytes can only be UTF-8 there (an object saved by a UTF-8
+## session, a file name). Mark them as UTF-8 before Project JSON is written.
+builder_project_utf8_value <- function(value) {
+  info <- l10n_info()
+  codeset <- toupper(as.character(info$codeset %||% NA_character_))
+  if (
+    isTRUE(info[["UTF-8"]]) ||
+      !codeset %in% c("ANSI_X3.4-1968", "ASCII", "US-ASCII", "646")
+  ) {
+    return(value)
+  }
+  mark <- function(value) {
+    if (is.character(value)) {
+      fix <- !is.na(value) & Encoding(value) == "unknown" & validUTF8(value)
+      if (any(fix)) {
+        Encoding(value)[fix] <- "UTF-8"
+      }
+    } else if (is.list(value)) {
+      for (index in seq_along(value)) {
+        if (!is.null(value[[index]])) {
+          value[[index]] <- mark(value[[index]])
+        }
+      }
+    }
+    for (name in names(attributes(value))) {
+      field <- attr(value, name, exact = TRUE)
+      if (is.character(field) || is.list(field)) {
+        attr(value, name) <- mark(field)
+      }
+    }
+    value
+  }
+  mark(value)
 }
 
 builder_project_manifest_path <- function(root) {
@@ -4709,7 +4746,11 @@ builder_project_serialize_json <- function(value, pretty = FALSE) {
     }
     value
   }
-  jsonlite::serializeJSON(positive_zero(value), digits = NA, pretty = pretty)
+  jsonlite::serializeJSON(
+    builder_project_utf8_value(positive_zero(value)),
+    digits = NA,
+    pretty = pretty
+  )
 }
 
 ## The digest hashes the canonical UTF-8 JSON bytes themselves, not an R
@@ -6314,7 +6355,7 @@ builder_project_prepare_build_artifacts <- function(
       }
       artifacts[[item$id]] <- previous_artifact
       artifacts[[item$id]]$plan_payload <- jsonlite::serializeJSON(
-        stored_item,
+        builder_project_utf8_value(stored_item),
         digits = NA,
         pretty = FALSE
       )
@@ -6398,7 +6439,7 @@ builder_project_prepare_build_artifacts <- function(
       },
       built_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC"),
       plan_payload = jsonlite::serializeJSON(
-        stored_item,
+        builder_project_utf8_value(stored_item),
         digits = NA,
         pretty = FALSE
       ),
@@ -7676,7 +7717,7 @@ builder_project_build_manifest <- function(
             !.builder_project_text(artifact$plan_payload %||% "")
         ) {
           artifact$plan_payload <- jsonlite::serializeJSON(
-            artifact$plan_item,
+            builder_project_utf8_value(artifact$plan_item),
             digits = NA,
             pretty = FALSE
           )
@@ -7790,7 +7831,7 @@ builder_project_manifest_with_artifact <- function(
       !.builder_project_text(stored$plan_payload %||% "")
   ) {
     stored$plan_payload <- jsonlite::serializeJSON(
-      stored$plan_item,
+      builder_project_utf8_value(stored$plan_item),
       digits = NA,
       pretty = FALSE
     )
@@ -8689,7 +8730,7 @@ builder_project_write <- function(
   }
   write_result <- tryCatch(
     .write_json(
-      manifest,
+      builder_project_utf8_value(manifest),
       temporary,
       auto_unbox = TRUE,
       null = "null",
