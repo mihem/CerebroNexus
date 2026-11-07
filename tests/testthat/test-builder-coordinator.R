@@ -1926,14 +1926,16 @@ test_that("App build and publication hash an H5 payload three times", {
     .builder_app_tree_identity <- function(
       root,
       .digest_file = tools::md5sum,
-      .previous = NULL
+      .previous = NULL,
+      .allow_hard_links = FALSE
     ) {
       original_tree_identity(
         root,
         .digest_file = function(path) {
           record_hash(path, .digest_file)
         },
-        .previous = .previous
+        .previous = .previous,
+        .allow_hard_links = .allow_hard_links
       )
     }
     release_hashed <- character()

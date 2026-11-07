@@ -303,7 +303,8 @@
 .builder_app_tree_identity <- function(
   root,
   .digest_file = tools::md5sum,
-  .previous = NULL
+  .previous = NULL,
+  .allow_hard_links = FALSE
 ) {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   enumerated <- .builder_app_enumerate_tree(root)
@@ -337,7 +338,8 @@
       }
       identity <- .builder_app_capture_file_identity(
         paths[[index]],
-        .digest_file = .digest_file
+        .digest_file = .digest_file,
+        .allow_hard_links = .allow_hard_links
       )
       return(list(
         path = relative[[index]],
@@ -568,7 +570,14 @@
     "viewer",
     "_bundle_app.R"
   )
-  expected_app <- .builder_app_capture_file_identity(app_template)
+  ## The package's own templates are only read and compared by size and MD5
+  ## with the staged copies, which must still be single-link files. A package
+  ## library may hard-link its files (conda, Nix store optimisation, cp -al);
+  ## that does not let anyone change the staged App.
+  expected_app <- .builder_app_capture_file_identity(
+    app_template,
+    .allow_hard_links = TRUE
+  )
   actual_app <- identity$entries[["app.R"]]
   if (
     is.null(actual_app) ||
@@ -600,7 +609,10 @@
     }
     expected <- .builder_app_portable_tree_entries(
       .builder_app_without_system_metadata(
-        .builder_app_tree_identity(trusted_roots[[relative_root]])
+        .builder_app_tree_identity(
+          trusted_roots[[relative_root]],
+          .allow_hard_links = TRUE
+        )
       )
     )
     if (identical(relative_root, "extdata")) {

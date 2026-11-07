@@ -40,6 +40,48 @@ test_that("trusted App templates prefer the active source tree", {
   )
 })
 
+test_that("trusted templates may be hard-linked in the package library", {
+  source_root <- withr::local_tempdir()
+  file.copy(builder_test_description_path(), source_root)
+  dir.create(file.path(source_root, "R"))
+  file.create(file.path(source_root, "R", "source.R"))
+  viewer <- file.path(source_root, "inst", "viewer")
+  extdata <- file.path(source_root, "inst", "extdata")
+  dir.create(viewer, recursive = TRUE)
+  dir.create(extdata)
+  templates <- c(
+    file.path(viewer, "_bundle_app.R"),
+    file.path(viewer, "ui.R"),
+    file.path(extdata, "colors.txt")
+  )
+  for (path in templates) {
+    writeLines(basename(path), path)
+  }
+  # Second names for every library file, as conda, a Nix store optimise or
+  # cp -al leave them.
+  aliases <- withr::local_tempdir()
+  linked <- file.link(templates, file.path(aliases, seq_along(templates)))
+  skip_if_not(all(linked), "hard links are unavailable")
+  withr::local_envvar(CEREBRO_PACKAGE_SOURCE = source_root)
+
+  app_dir <- file.path(withr::local_tempdir(), "cerebro_app")
+  dir.create(file.path(app_dir, "extdata"), recursive = TRUE)
+  expect_true(file.copy(viewer, app_dir, recursive = TRUE))
+  expect_true(file.copy(templates[[3L]], file.path(app_dir, "extdata")))
+  expect_true(file.copy(templates[[1L]], file.path(app_dir, "app.R")))
+
+  expect_no_error(.builder_app_assert_trusted_templates(
+    .builder_app_tree_identity(app_dir)
+  ))
+
+  # A staged file with a second name is still refused.
+  expect_true(file.link(
+    file.path(app_dir, "app.R"),
+    file.path(aliases, "staged")
+  ))
+  expect_error(.builder_app_tree_identity(app_dir), "hard link")
+})
+
 builder_app_bundle_fixture <- function(
   stage = withr::local_tempdir(.local_envir = parent.frame()),
   initial_dataset = "dataset-b",

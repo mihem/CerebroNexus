@@ -1124,7 +1124,8 @@ builder_planned_viewer_packs <- function(items) {
   path,
   label = NULL,
   .digest_file = tools::md5sum,
-  .previous = NULL
+  .previous = NULL,
+  .allow_hard_links = FALSE
 ) {
   before <- tryCatch(
     fs::file_info(path, fail = TRUE, follow = FALSE),
@@ -1138,7 +1139,9 @@ builder_planned_viewer_packs <- function(items) {
     stop("A staged App regular file is missing or invalid.", call. = FALSE)
   }
   before_fingerprint <- .builder_app_file_fingerprint(before)
-  if (!identical(before_fingerprint$hard_links, 1)) {
+  if (
+    !isTRUE(.allow_hard_links) && !identical(before_fingerprint$hard_links, 1)
+  ) {
     stop("A staged App regular file cannot be a hard link.", call. = FALSE)
   }
   .builder_app_assert_readable_file(path)
@@ -1201,9 +1204,16 @@ builder_planned_viewer_packs <- function(items) {
   path,
   label = NULL,
   .digest_file = tools::md5sum,
-  .previous = NULL
+  .previous = NULL,
+  .allow_hard_links = FALSE
 ) {
-  .builder_app_regular_file_identity(path, label, .digest_file, .previous)
+  .builder_app_regular_file_identity(
+    path,
+    label,
+    .digest_file,
+    .previous,
+    .allow_hard_links = .allow_hard_links
+  )
 }
 
 .builder_app_request_error <- function() {
