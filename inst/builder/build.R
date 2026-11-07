@@ -2517,8 +2517,12 @@ builder_execute_plan <- function(
     }
     report_step("Writing CRB")
     export_from <- steps_done
+    ## Parts that do not apply (no spatial data, no Viewer Pack) are never
+    ## reported, so count the parts that run instead of their position.
+    parts_run <- 0L
     export_progress <- function(part) {
-      steps_done <<- export_from + match(part, export_parts, nomatch = 1L) - 1L
+      steps_done <<- export_from + parts_run
+      parts_run <<- parts_run + 1L
       report_step(paste0("Writing CRB: ", part))
     }
     export_diagnostics <- NULL
@@ -2585,7 +2589,12 @@ builder_execute_plan <- function(
     analyses <- NULL
     extras <- NULL
     invisible(gc(FALSE))
-    steps_done <- export_from + length(export_parts)
+    if (parts_run > 0L) {
+      steps_total <- steps_total - (length(export_parts) - parts_run)
+    } else {
+      parts_run <- length(export_parts)
+    }
+    steps_done <- export_from + parts_run
     report_step("Verifying CRB")
     verified <- .builder_build_raise_cancel(tryCatch(
       hooks$verify(exported, item),

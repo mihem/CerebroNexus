@@ -613,8 +613,9 @@ test_that("build progress names the dataset and step in progress", {
     },
     character(1)
   )
-  ## Opening, preparing, one analysis, six export parts and verifying: the
-  ## finished steps are counted, and an export part counts the parts before it.
+  ## Opening, preparing, one analysis, up to six export parts and verifying:
+  ## the finished steps are counted. Only the two export parts that ran count,
+  ## so the total drops to six once the export is done.
   per_dataset <- function(index) {
     paste0(
       index,
@@ -624,9 +625,9 @@ test_that("build progress names the dataset and step in progress", {
         "Preparing dataset|1/10",
         "Marker genes|2/10",
         "Writing CRB|3/10",
-        "Writing CRB: writing expression|4/10",
-        "Writing CRB: saving the CRB file|7/10",
-        "Verifying CRB|9/10"
+        "Writing CRB: writing expression|3/10",
+        "Writing CRB: saving the CRB file|4/10",
+        "Verifying CRB|5/6"
       )
     )
   }
