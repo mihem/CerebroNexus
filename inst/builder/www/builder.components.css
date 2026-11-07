@@ -1464,6 +1464,12 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   overflow-wrap: anywhere;
 }
 .builder-stage-footer-status:empty { display: none; }
+.builder-stage-footer-status.is-warning {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--c-warning);
+  background: var(--c-warning-50);
+  color: var(--c-warning-700);
+}
 .builder-stage-footer:has(.builder-stage-footer-status:empty) {
   justify-content: flex-end;
 }
@@ -1507,6 +1513,8 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
 .builder-stage-footer-actions {
   display: flex;
   min-width: 0;
+  /* A long status wraps instead of sliding under the buttons. */
+  flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;

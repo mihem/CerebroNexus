@@ -728,8 +728,13 @@ observe({
   } else {
     configure_readiness()
   }
+  ## A blank or clashing name is said next to the button the user clicks,
+  ## not only under the name field.
+  name_problem <- dataset_name_problem()
   message <- if (!alignment_settled) {
     "Saving the latest spatial adjustment…"
+  } else if (!is.null(name_problem)) {
+    name_problem
   } else if (length(unchecked)) {
     builder_configure_check_message(
       length(ids) - length(unchecked),
@@ -761,7 +766,8 @@ observe({
       alignment_settled,
     check_ready = alignment_settled,
     dataset_checked = current_checked,
-    remaining = length(unchecked)
+    remaining = length(unchecked),
+    warning = alignment_settled && !is.null(name_problem)
   )
   if (!identical(state, isolate(configure_actions_state()))) {
     configure_actions_state(state)
@@ -795,7 +801,8 @@ output$configure_actions <- renderUI({
     state$can_continue,
     dataset_checked = state$dataset_checked,
     remaining = state$remaining,
-    check_ready = state$check_ready
+    check_ready = state$check_ready,
+    warning = isTRUE(state$warning)
   )
 })
 

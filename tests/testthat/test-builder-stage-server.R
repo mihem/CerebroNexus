@@ -135,6 +135,16 @@ test_that("Configure footer renders the primary action for each check state", {
     1L
   )
   expect_match(actions_html, " disabled", fixed = TRUE)
+  warning_html <- htmltools::renderTags(ui_env$builder_configure_actions_ui(
+    "Every dataset needs a name.",
+    can_continue = FALSE,
+    warning = TRUE
+  ))$html
+  expect_match(
+    warning_html,
+    'class="builder-stage-footer-status is-warning"',
+    fixed = TRUE
+  )
 
   primary_states <- list(
     unchecked = list(
@@ -928,6 +938,11 @@ test_that("a dataset name another dataset uses blocks the check", {
 
     expect_match(configure_readiness()$message, "share a name")
     expect_false(configure_readiness()$can_continue)
+    ## The footer beside Finish Checking says it too, as a warning.
+    expect_match(configure_actions_state()$message, "share a name")
+    expect_true(configure_actions_state()$warning)
+    footer <- as.character(output$configure_actions$html)
+    expect_match(footer, "is-warning", fixed = TRUE)
     expect_match(review_report()$msg, "share a name")
 
     session$setInputs(complete_dataset_check = 1)

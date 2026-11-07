@@ -205,7 +205,8 @@ builder_configure_actions_ui <- function(
   can_continue,
   dataset_checked = FALSE,
   remaining = 0L,
-  check_ready = TRUE
+  check_ready = TRUE,
+  warning = FALSE
 ) {
   stopifnot(
     is.character(message),
@@ -242,7 +243,11 @@ builder_configure_actions_ui <- function(
       remaining = remaining,
       check_ready = check_ready
     ),
-    status_class = if (review_ready) "is-review-ready" else NULL
+    status_class = if (review_ready) {
+      "is-review-ready"
+    } else if (isTRUE(warning)) {
+      "is-warning"
+    }
   )
 }
 
