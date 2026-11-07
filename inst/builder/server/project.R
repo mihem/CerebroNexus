@@ -817,10 +817,10 @@ builder_project_prewarm_workers <- function(
       # session start and the warm-up so it is done before the first Save.
       poll <- function() {
         if (isTRUE(tryCatch(warmed$is_alive(), error = function(e) FALSE))) {
-          later::later(poll, delay = 0.1)
+          builder_later(poll, delay = 0.1)
         }
       }
-      later::later(poll, delay = 0.1)
+      builder_later(poll, delay = 0.1)
     }
   }
   if (is.null(warm_key)) {
@@ -848,7 +848,7 @@ observe({
   if (is.null(builder_project()) && !isTRUE(workflow_has_datasets())) {
     return()
   }
-  later::later(
+  builder_later(
     function() {
       if (!builder_session_closed()) {
         builder_project_prewarm_workers()
@@ -994,7 +994,7 @@ builder_project_finish_crb_job <- function(id, token, prepared, output) {
     job <- isolate(builder_project_crb_jobs())[[id]]
     job$status <- "registering"
     builder_project_update_crb_job(id, job)
-    later::later(
+    builder_later(
       function() {
         shiny::withReactiveDomain(session, {
           builder_project_finish_crb_job(id, token, prepared, output)
@@ -1790,7 +1790,7 @@ builder_project_schedule_source_sync_poll <- function(delay = 0.2) {
   builder_project_source_poll_scheduled(TRUE)
   scheduled <- tryCatch(
     {
-      later::later(
+      builder_later(
         function() {
           builder_project_source_poll_scheduled(FALSE)
           if (builder_session_closed()) {
@@ -2420,7 +2420,7 @@ dispatch_builder_project_manifest_write <- function() {
     invisible(TRUE)
   }
   deliver_later <- function(value) {
-    later::later(function() deliver(value), delay = 0)
+    builder_later(function() deliver(value), delay = 0)
     invisible(TRUE)
   }
   current <- isolate(builder_project())
@@ -2472,12 +2472,12 @@ dispatch_builder_project_manifest_write <- function() {
   }
   poll <- function() {
     if (isTRUE(tryCatch(process$is_alive(), error = function(e) FALSE))) {
-      later::later(poll, delay = 0.05)
+      builder_later(poll, delay = 0.05)
       return(invisible(TRUE))
     }
     deliver(tryCatch(process$get_result(), error = identity))
   }
-  later::later(poll, delay = 0.05)
+  builder_later(poll, delay = 0.05)
   invisible(TRUE)
 }
 
@@ -2926,7 +2926,7 @@ start_builder_project_table_asset_save <- function(
       ))
     }
     if (isTRUE(alive)) {
-      later::later(
+      builder_later(
         function() shiny::withReactiveDomain(session, shiny::isolate(poll())),
         delay = 0.1
       )
@@ -2987,7 +2987,7 @@ start_builder_project_table_asset_save <- function(
       table_asset_results = results
     )
   }
-  later::later(
+  builder_later(
     function() shiny::withReactiveDomain(session, shiny::isolate(poll())),
     delay = 0
   )
@@ -3101,7 +3101,7 @@ request_builder_project_save <- function(
         # Queuing CRBs freezes a plan and checks free disk space on the main
         # thread (over a second on Windows). Let the flush that ends "Saving
         # project…" reach the browser first.
-        later::later(
+        builder_later(
           function() {
             if (!builder_session_closed()) {
               shiny::withReactiveDomain(builder_lifecycle_session, {
@@ -3901,7 +3901,7 @@ wait_for_builder_project_open_worker <- function(actions, ready) {
         }
         state <- builder_project_open_worker_ready()
         if (!isTRUE(state$protocol) || !isTRUE(state$worker)) {
-          later::later(check, delay = 0.25)
+          builder_later(check, delay = 0.25)
           return(invisible(TRUE))
         }
         builder_project_open_wait(NULL)
@@ -3917,7 +3917,7 @@ wait_for_builder_project_open_worker <- function(actions, ready) {
       })
     )
   }
-  later::later(check, delay = 0.25)
+  builder_later(check, delay = 0.25)
   invisible("waiting")
 }
 
@@ -4542,7 +4542,7 @@ observe({
             c("syncing", "cancelling") ||
             !is.null(isolate(builder_project_source_process()))
         ) {
-          later::later(
+          builder_later(
             function() {
               shiny::withReactiveDomain(
                 session,

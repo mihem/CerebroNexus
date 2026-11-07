@@ -738,7 +738,7 @@ announce_opened_app <- function(app, waited = 0) {
   }
   state <- builder_opened_app_state(app)
   if (identical(state, "starting") && waited < 120) {
-    later::later(function() announce_opened_app(app, waited + 0.25), 0.25)
+    builder_later(function() announce_opened_app(app, waited + 0.25), 0.25)
     return(invisible(TRUE))
   }
   session$sendCustomMessage(

@@ -621,7 +621,7 @@ observeEvent(input$builder_client_import_dispatch, {
     }
   }
   token <- event$nonce %||% NULL
-  later::later(
+  builder_later(
     function() {
       if (builder_session_closed()) {
         return(invisible(FALSE))
@@ -650,7 +650,7 @@ observeEvent(input$dataset_files, {
     token = token
   ))
   consume_client_import_upload()
-  later::later(
+  builder_later(
     function() expire_pending_client_upload(token),
     delay = 30
   )
@@ -724,7 +724,7 @@ remove_pending_import <- function(id) {
       request_id <- current_protocol$pending$request_id
       session$onFlushed(
         function() {
-          later::later(
+          builder_later(
             function() {
               if (!builder_session_closed()) {
                 shiny::withReactiveDomain(
@@ -1046,7 +1046,7 @@ observe({
   )
   poll <- function() {
     if (!inherits(preparation, "condition") && preparation$is_alive()) {
-      later::later(poll, delay = 0.05)
+      builder_later(poll, delay = 0.05)
       return(invisible(TRUE))
     }
     prepared <- if (inherits(preparation, "condition")) {
@@ -1082,7 +1082,7 @@ observe({
     dispatched$request$payload$auth_accounts <- NULL
     invisible(TRUE)
   }
-  later::later(poll, delay = 0.05)
+  builder_later(poll, delay = 0.05)
 })
 
 dispatch_builder_worker_request <- function(dispatched, preparation = NULL) {
@@ -2307,7 +2307,7 @@ fail_builder_release_settlement_monitor <- function(message) {
 
 schedule_builder_release_settlement_poll <- function(
   delay = 0.1,
-  .schedule = later::later
+  .schedule = builder_later
 ) {
   if (isTRUE(isolate(release_settlement_poll_scheduled()))) {
     return(invisible(FALSE))
@@ -2736,7 +2736,7 @@ builder_build_stop_grace_ms <- function() {
 ## export call can run for minutes. If the Build is still pending after the
 ## grace period, kill the worker and settle the Build as stopped.
 schedule_builder_build_stop_fallback <- function(request_id) {
-  later::later(
+  builder_later(
     function() {
       if (builder_session_closed()) {
         return(invisible(FALSE))

@@ -862,7 +862,7 @@ schedule_selected_output_build <- function(path) {
   result(NULL)
   build_flow(list(stage = "preparing", plan = NULL))
   session$sendCustomMessage("builder_focus_build_status", list())
-  later::later(
+  builder_later(
     function() {
       shiny::withReactiveDomain(builder_lifecycle_session, {
         prepare_selected_output(path)

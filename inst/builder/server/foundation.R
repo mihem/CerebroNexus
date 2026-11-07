@@ -1068,7 +1068,7 @@ await_restarted_worker <- function(detail) {
       detail = detail
     )
   )
-  later::later(
+  builder_later(
     function() {
       shiny::withReactiveDomain(
         builder_lifecycle_session,
@@ -1107,7 +1107,7 @@ start_builder_worker <- function() {
   }
   worker(started$worker)
   protocol(builder_request_protocol(started$worker$epoch))
-  later::later(
+  builder_later(
     function() {
       shiny::withReactiveDomain(
         builder_lifecycle_session,
@@ -1124,6 +1124,23 @@ builder_lifecycle_session <- session
 builder_session_closed <- function() {
   is.function(builder_lifecycle_session$isClosed) &&
     isTRUE(builder_lifecycle_session$isClosed())
+}
+
+## later::later() for this session's callbacks. Shiny destroys a session's
+## reactive values when the page closes, and a callback still queued then (a
+## copy, import or save poll) fails reading them; an error in a later()
+## callback stops the whole Builder process. Such a callback has nothing left
+## to update, so that error is dropped; any other error is not.
+builder_later <- function(func, delay = 0) {
+  later::later(
+    function() {
+      tryCatch(
+        func(),
+        shiny.destroyed.error = function(error) invisible(NULL)
+      )
+    },
+    delay = delay
+  )
 }
 
 builder_native_pickers <- new.env(parent = emptyenv())
@@ -1245,7 +1262,7 @@ builder_schedule_native_picker <- function(
       return(invisible(FALSE))
     }
     if (builder_native_picker_is_alive(current)) {
-      later::later(
+      builder_later(
         function() shiny::withReactiveDomain(builder_lifecycle_session, poll()),
         delay = 0.1
       )
@@ -1265,7 +1282,7 @@ builder_schedule_native_picker <- function(
     shiny::isolate(on_result(result))
     invisible(TRUE)
   }
-  later::later(
+  builder_later(
     function() shiny::withReactiveDomain(builder_lifecycle_session, poll()),
     delay = 0
   )
@@ -1314,7 +1331,7 @@ poll_builder_worker_startup <- function() {
   startup <- builder_session_poll_startup(current_worker)
   worker(startup$worker)
   if (identical(startup$state, "starting")) {
-    later::later(
+    builder_later(
       function() {
         shiny::withReactiveDomain(
           builder_lifecycle_session,

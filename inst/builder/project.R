@@ -6890,7 +6890,17 @@ builder_project_dataset_status <- function(
       length(record$source) > 0L &&
       !any(actions %in% c("reuse", "resume", "reload"))
   ) {
-    problem <- "No dataset cache or available source was found."
+    problem <- if (
+      identical(source_kind, "managed") && identical(source_status, "pending")
+    ) {
+      # The page closed while the source was still being copied in.
+      paste(
+        "Copying the source file into the Project did not finish.",
+        "Choose the source file again, Skip or Remove from project."
+      )
+    } else {
+      "No dataset cache or available source was found."
+    }
   }
   detail <- if (!is.null(source_format_problem) && artifact_ready) {
     paste(

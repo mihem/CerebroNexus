@@ -1428,3 +1428,38 @@ test_that("a Project copy changed after Save is reported as such on load", {
     )
   })
 })
+
+test_that("a session callback that runs after the page closed does not stop the Builder", {
+  program <- parse(
+    builder_test_inst_path("builder", "server", "foundation.R"),
+    keep.source = FALSE,
+    encoding = "UTF-8"
+  )
+  definition <- Filter(
+    function(expression) {
+      is.call(expression) &&
+        identical(expression[[1L]], as.name("<-")) &&
+        identical(expression[[2L]], as.name("builder_later"))
+    },
+    as.list(program)
+  )
+  expect_length(definition, 1L)
+  env <- new.env(parent = globalenv())
+  eval(definition[[1L]], envir = env)
+
+  ## What Shiny raises when a callback reads a reactive of a closed session.
+  destroyed <- structure(
+    class = c("shiny.destroyed.error", "error", "condition"),
+    list(message = "its module session has been destroyed", call = NULL)
+  )
+  ran <- FALSE
+  env$builder_later(function() {
+    ran <<- TRUE
+    stop(destroyed)
+  })
+  expect_no_error(later::run_now(0.5))
+  expect_true(ran)
+
+  env$builder_later(function() stop("a real failure"))
+  expect_error(later::run_now(0.5), "a real failure")
+})

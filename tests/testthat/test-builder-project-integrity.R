@@ -842,6 +842,11 @@ test_that("Open accepts a source blob that finished copying after the Save", {
     pending$manifest$datasets[[1L]]$runtime_restore_status$actions,
     "skip"
   )
+  expect_match(
+    pending$manifest$datasets[[1L]]$runtime_restore_status$problem,
+    "did not finish. Choose the source file again",
+    fixed = TRUE
+  )
 
   ## The copy finishes, but the page is gone before the manifest is updated.
   copied <- runtime$builder_project_copy_source_job(built$jobs[[1L]])
