@@ -602,8 +602,13 @@
   evidence <- .builder_state_optional_evidence(fact)
   choice <- .builder_state_content_choice(entry, id)
   generated <- id %in% .builder_state_generated_content(entry)
+  ## A saved Marker import is attached to the CRB at build time, so the
+  ## Marker genes page opens even when the object has no markers.
+  imported <- identical(id, "marker_genes") &&
+    length(.subset2(.subset2(entry, "settings"), "marker_imports")) > 0L &&
+    !evidence$detected
 
-  if (!evidence$detected && !generated && is.null(choice)) {
+  if (!evidence$detected && !generated && !imported && is.null(choice)) {
     return(.builder_state_manifest_record(
       id,
       source,
@@ -619,11 +624,16 @@
     choice
   } else if (generated) {
     "generated"
+  } else if (imported) {
+    "attached"
   } else {
     "preserved"
   }
   filtered <- disposition %in% c("filtered", "stored_only")
-  valid <- (evidence$detected && evidence$valid) || generated || filtered
+  valid <- (evidence$detected && evidence$valid) ||
+    generated ||
+    imported ||
+    filtered
   attention <- evidence$detected &&
     evidence$valid &&
     evidence$attention &&
@@ -643,7 +653,7 @@
       c("valid", "attention") &&
       disposition %in% c("preserved", "generated", "converted", "attached")
   ) {
-    if (generated) {
+    if (generated || imported) {
       .builder_state_generated_page(id)
     } else {
       evidence$page_candidates
