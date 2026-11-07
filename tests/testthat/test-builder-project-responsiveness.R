@@ -1463,3 +1463,55 @@ test_that("a session callback that runs after the page closed does not stop the 
   env$builder_later(function() stop("a real failure"))
   expect_error(later::run_now(0.5), "a real failure")
 })
+
+test_that("an Open that works clears the error of an earlier failed Open", {
+  skip_if_not_installed("shiny")
+  runtime <- builder_responsiveness_runtime()
+  root <- withr::local_tempdir()
+  written <- runtime$builder_project_write(
+    runtime$builder_project_new_manifest(root),
+    root,
+    expected_revision = 0L
+  )
+  app_env <- builder_responsiveness_app()
+  shiny::testServer(app_env$server, {
+    shown <- character()
+    cleared <- character()
+    fn_env <- environment(complete_builder_project_open)
+    assign(
+      "builder_notify",
+      function(type, message, target = NULL, id = NULL, ...) {
+        if (identical(type, "error")) {
+          shown <<- c(shown, id %||% "<none>")
+        }
+        invisible(TRUE)
+      },
+      envir = fn_env
+    )
+    assign(
+      "builder_notify_clear",
+      function(id, ...) {
+        cleared <<- c(cleared, as.character(id))
+        invisible(TRUE)
+      },
+      envir = fn_env
+    )
+
+    builder_project_fail_open(
+      isolate(builder_project_open_generation()),
+      simpleError("The project file is damaged and cannot be read.")
+    )
+    expect_identical(shown, "builder-project-open-error")
+    expect_false("builder-project-open-error" %in% cleared)
+
+    builder_project_restore(list(
+      path = written$path,
+      root = root,
+      manifest = written$manifest,
+      manifest_fingerprint = runtime$builder_project_file_metadata(written$path)
+    ))
+    expect_true(isTRUE(complete_builder_project_open(list())))
+    expect_true("builder-project-open-error" %in% cleared)
+    expect_identical(isolate(builder_project())$root, root)
+  })
+})

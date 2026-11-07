@@ -1541,7 +1541,12 @@ builder_project_fail_open <- function(generation, error) {
   } else {
     as.character(error %||% "The project file could not be opened.")
   }
-  builder_notify("error", message, session = session)
+  builder_notify(
+    "error",
+    message,
+    id = "builder-project-open-error",
+    session = session
+  )
   invisible(FALSE)
 }
 
@@ -3283,6 +3288,7 @@ create_builder_project_in_folder <- function(folder, existing = NULL) {
   builder_project_skipped_ids(character())
   builder_project_removed_ids(character())
   builder_project_relinked_ids(character())
+  builder_notify_clear("builder-project-open-error")
   shiny::removeModal()
   request_builder_project_save(show_actions = TRUE, materialize = TRUE)
   invisible(TRUE)
@@ -3954,7 +3960,8 @@ complete_builder_project_open <- function(actions = NULL) {
       paste(
         "The Project changed while dataset choices were open.",
         "Reopen it and review the current choices."
-      )
+      ),
+      id = "builder-project-open-error"
     )
     return(invisible(FALSE))
   }
@@ -3975,7 +3982,8 @@ complete_builder_project_open <- function(actions = NULL) {
       paste0(
         "The selected Project datasets could not be opened: ",
         conditionMessage(prepared)
-      )
+      ),
+      id = "builder-project-open-error"
     )
     return(invisible(FALSE))
   }
@@ -4002,7 +4010,8 @@ complete_builder_project_open <- function(actions = NULL) {
       paste0(
         "The dataset caches could not be attached to this session: ",
         conditionMessage(next_store)
-      )
+      ),
+      id = "builder-project-open-error"
     )
     return(invisible(FALSE))
   }
@@ -4058,6 +4067,10 @@ complete_builder_project_open <- function(actions = NULL) {
     name = manifest$project$name,
     manifest = manifest
   ))
+  # An Open that worked ends the errors of an earlier failed Open, and of
+  # Saves of the project it replaces.
+  builder_notify_clear("builder-project-open-error")
+  builder_notify_clear("builder-project-save-error")
   restore_builder_project_preferences(manifest)
   builder_project_restore(NULL)
   builder_project_open_actions(NULL)
