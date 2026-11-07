@@ -2553,7 +2553,7 @@
   }
 
   function clientQueueStatus(entry, index) {
-    if (entry.state === "paused") return "Connection lost · Waiting to restore the import state…";
+    if (entry.state === "paused") return "Connection lost · Reload the page to continue";
     if (entry.state === "unknown") return "Import state could not be restored";
     if (entry.state === "awaiting_dispatch") return "Preparing upload…";
     if (entry.state === "awaiting_upload") return "Waiting to upload…";
@@ -6253,29 +6253,9 @@
     }
   }
 
-  function requestClientImportSync() {
-    uploadConnectionReady = true;
-    importSyncPending = true;
-    registerBuildDialogHandler();
-    registerClientImportHandlers();
-    registerViewerGroupHandler();
-    registerViewerContentHandlers();
-    send("builder_dataset_rail_sync", { nonce: Date.now() });
-    send("builder_import_rail_sync", { nonce: Date.now() });
-    send("builder_import_sync_request", { nonce: Date.now() });
-    if (document.body) scheduleDynamicContentEnhancement();
-  }
-
-  document.addEventListener("shiny:connected", function () {
-    builderConnectionReady = true;
-    requestClientImportSync();
-    reportClientImportQueueState();
-    send("builder_client_connection", {
-      status: "connected",
-      nonce: Date.now(),
-    });
-    applyBuilderActivityState();
-  });
+  // The Builder never reconnects to a session (no allowReconnect), so there
+  // is nothing to resync on shiny:connected: initializeBuilder() registers
+  // the handlers and a new session sends its own state.
   function handleShinyDisconnected() {
     showDisconnectedNotice();
     var feedback = document.getElementById("builder-project-pending-feedback");
@@ -6318,12 +6298,6 @@
       },
     });
   }
-  document.addEventListener("shiny:sessioninitialized", function () {
-    requestClientImportSync();
-  });
-  document.addEventListener("shiny:conditional", function () {
-    scheduleSpatialAlignmentScrollbars();
-  });
   window.addEventListener("beforeunload", function (event) {
     if (builderReloadRequested) return;
     if (

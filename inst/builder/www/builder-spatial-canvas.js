@@ -1413,7 +1413,6 @@
     });
   }
   window.addEventListener("resize", schedule);
-  document.addEventListener("shiny:connected", schedule);
   if (window.jQuery) {
     window.jQuery(document).on(
       "change.builderSpatialCanvas input.builderSpatialCanvas",
