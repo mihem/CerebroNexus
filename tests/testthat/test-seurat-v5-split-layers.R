@@ -94,6 +94,19 @@ test_that("alignment cell resolution never reads expression matrices", {
   expect_false("JoinLayers" %in% calls)
 })
 
+test_that("alignment resolves split layers without the package internals", {
+  ## The Builder worker sources preview.R into an environment that does not
+  ## see the package's internal layer helpers (an installed package).
+  isolated <- new.env(parent = baseenv())
+  builder_repo_source("preview.R", local = isolated)
+  expect_null(get0(".layer_prefix_candidates", envir = isolated))
+  object <- make_split_object(rep(c("s1", "s2"), each = 10L))
+  expect_identical(
+    isolated$builder_alignment_layer_cells(object, "RNA", "counts"),
+    as.character(SeuratObject::Cells(object[["RNA"]]))
+  )
+})
+
 test_that("alignment resolves exact Assay5 and legacy Assay memberships", {
   object <- make_split_object(rep(c("s1", "s2"), each = 10L))
   exact_layer <- grep(

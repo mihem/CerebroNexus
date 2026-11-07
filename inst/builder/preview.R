@@ -129,8 +129,16 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
   cells %||% as.character(SeuratObject::Cells(assay_object))
 }
 
+## A package-internal function. The Builder worker sources this file without
+## the package internals in scope, so take them from the namespace there.
+.builder_package_function <- function(name) {
+  get0(name, mode = "function") %||%
+    get(name, envir = asNamespace("CerebroNexus"), inherits = FALSE)
+}
+
 ## The cells of one layer, or NULL when the assay has no such layer.
 .builder_alignment_layer_cohort <- function(assay_object, layer) {
+  package_helper <- .builder_package_function
   if (!inherits(assay_object, "Assay5")) {
     if (!layer %in% methods::slotNames(assay_object)) {
       return(NULL)
@@ -151,8 +159,14 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
     return(as.character(cells))
   }
 
-  protected_candidates <- .layer_prefix_candidates(assay_object, layer)
-  candidates <- .layer_partition_candidates(protected_candidates, layer)
+  protected_candidates <- package_helper(".layer_prefix_candidates")(
+    assay_object,
+    layer
+  )
+  candidates <- package_helper(".layer_partition_candidates")(
+    protected_candidates,
+    layer
+  )
   if (!length(candidates)) {
     return(NULL)
   }
@@ -161,15 +175,18 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
   })
   names(memberships) <- candidates
   assay_cells <- SeuratObject::Cells(assay_object)
-  direct_candidates <- .direct_layer_partition_candidates(candidates, layer)
-  direct_partition <- .find_layer_partition(
+  direct_candidates <- package_helper(".direct_layer_partition_candidates")(
+    candidates,
+    layer
+  )
+  direct_partition <- package_helper(".find_layer_partition")(
     assay_cells,
     memberships[direct_candidates]
   )
   partition <- if (identical(direct_partition$status, "unique")) {
     direct_partition
   } else {
-    .find_layer_partition(assay_cells, memberships)
+    package_helper(".find_layer_partition")(assay_cells, memberships)
   }
   if (identical(partition$status, "ambiguous")) {
     stop(
@@ -180,7 +197,7 @@ builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
   nested_root <- if (identical(direct_partition$status, "unique")) {
     NULL
   } else if (identical(partition$status, "unique")) {
-    .nested_partition_root(layer, partition$layers)
+    package_helper(".nested_partition_root")(layer, partition$layers)
   } else {
     NULL
   }
