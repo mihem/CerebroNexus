@@ -1436,7 +1436,6 @@ builder_worker_start <- function(
       builder_dir = normalizePath(builder_dir, mustWork = TRUE),
       snapshot_root = normalizePath(snapshot_root, mustWork = TRUE),
       snapshot_registry = snapshot_registry,
-      snapshot_cache = list(),
       epoch = epoch,
       state = if (isTRUE(.async)) "starting" else "ready",
       ready = !isTRUE(.async),
@@ -2252,10 +2251,6 @@ builder_worker_register_snapshot <- function(worker, id, snapshot) {
     stop("The snapshot is outside this worker's snapshot root.", call. = FALSE)
   }
   worker$snapshot_registry[[id]] <- snapshot
-  fingerprint <- snapshot$source_fingerprint %||% NULL
-  if (.builder_worker_scalar_text(fingerprint)) {
-    worker$snapshot_cache[[fingerprint]] <- snapshot
-  }
   worker
 }
 
@@ -2285,9 +2280,6 @@ builder_worker_release_snapshot <- function(
     if (!isTRUE(.builder_snapshot_release(snapshot))) {
       stop("The owned immutable snapshot could not be released.", call. = FALSE)
     }
-  }
-  if (cacheable) {
-    worker$snapshot_cache[[fingerprint]] <- snapshot
   }
   worker$snapshot_registry[[id]] <- NULL
   worker

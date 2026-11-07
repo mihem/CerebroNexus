@@ -952,8 +952,7 @@ test_that("main registry trusts the worker MD5 instead of rehashing", {
   worker <- structure(
     list(
       snapshot_root = fixture$root,
-      snapshot_registry = list(),
-      snapshot_cache = list()
+      snapshot_registry = list()
     ),
     class = "builder_worker"
   )
@@ -1713,10 +1712,6 @@ test_that("load returns a descriptor and drop releases only after main ACK", {
 
   expect_true(dir.exists(snapshot$path))
   expect_null(worker$snapshot_registry[["dataset-a"]])
-  expect_identical(
-    worker$snapshot_cache[[snapshot$source_fingerprint]],
-    snapshot
-  )
   expect_length(completed_drop$protocol$awaiting_ack, 0L)
 })
 
