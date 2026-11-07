@@ -1554,8 +1554,13 @@ test_that("Open writes back a source copy that finished after the last Save", {
   ## The copy finished, but the page was gone before the manifest said so.
   dir.create(dirname(built$jobs[[1L]]$target), recursive = TRUE)
   file.copy(source, built$jobs[[1L]]$target)
+  ## The write-back swaps the file through a backup, so a poll can land in
+  ## the moment it is missing.
   status_on_disk <- function() {
-    runtime$builder_project_read(saved$path)$datasets[[1L]]$source$status
+    tryCatch(
+      runtime$builder_project_read(saved$path)$datasets[[1L]]$source$status,
+      error = function(error) NA_character_
+    )
   }
   expect_identical(status_on_disk(), "pending")
   snapshot <- runtime$builder_project_open_snapshot(saved$path)
