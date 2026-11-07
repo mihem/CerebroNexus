@@ -113,14 +113,18 @@ test_that("reserved and required metadata fail closed", {
     dependency_ids = list(missing_qc = "core.qc")
   )
 
+  ## A plain source cell_barcode column is kept under another name.
   expect_identical(
     recommendation$columns$cell_barcode$disposition,
-    "blocking"
+    "included"
   )
-  ## The reason names the column and says what to do.
+  expect_identical(
+    recommendation$columns$cell_barcode$renamed_to,
+    "cell_barcode_source"
+  )
   expect_match(
     recommendation$columns$cell_barcode$reason,
-    "column named cell_barcode.*Rename that column"
+    "column named cell_barcode.*keeps that column as cell_barcode_source"
   )
   expect_true("cell_type" %in% recommendation$included)
   expect_true("missing_qc" %in% recommendation$blocking)
@@ -128,6 +132,29 @@ test_that("reserved and required metadata fail closed", {
     recommendation$columns$missing_qc$dependency_ids,
     "core.qc"
   )
+})
+
+test_that("a source cell_barcode column gets a free name or blocks", {
+  taken <- recommendation_profile(
+    columns = list(
+      cell_barcode = metadata_fact("cell_barcode"),
+      cell_barcode_source = metadata_fact("cell_barcode_source")
+    )
+  )
+  expect_identical(
+    builder_recommend_metadata(taken)$columns$cell_barcode$renamed_to,
+    "cell_barcode_source.1"
+  )
+  unsupported <- recommendation_profile(
+    columns = list(
+      cell_barcode = metadata_fact("cell_barcode", "list", supported = FALSE)
+    )
+  )
+  blocked <- builder_recommend_metadata(unsupported)$columns$cell_barcode
+  expect_identical(blocked$disposition, "blocking")
+  expect_null(blocked$renamed_to)
+  ## The reason names the column and says what to do.
+  expect_match(blocked$reason, "column named cell_barcode.*Rename that column")
 })
 
 test_that("malformed metadata facts fail closed", {

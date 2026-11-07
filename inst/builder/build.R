@@ -1822,6 +1822,19 @@ builder_verify_crb <- function(
     item$artifact_identity$source_metadata
   ))
   retained <- setdiff(retained, "cell_barcode")
+  ## The export writes its own cell_barcode column; a source column of that
+  ## name is kept under the name the plan chose.
+  renamed_to <- item$metadata_policy$columns$cell_barcode$renamed_to
+  source_names <- colnames(object@meta.data)
+  if (
+    is.character(renamed_to) &&
+      length(renamed_to) == 1L &&
+      "cell_barcode" %in% source_names
+  ) {
+    source_names[source_names == "cell_barcode"] <- renamed_to
+    colnames(object@meta.data) <- source_names
+    retained <- c(retained, renamed_to)
+  }
   missing <- setdiff(retained, colnames(object@meta.data))
   if (length(missing)) {
     stop(

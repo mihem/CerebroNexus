@@ -547,10 +547,13 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
       "The final metadata policy must include required cell barcodes."
     )
   }
+  ## A source cell_barcode column is either kept under another name
+  ## (renamed_to) or blocks the dataset.
   if (
     "cell_barcode" %in%
       source_ids &&
-      !identical(barcode$disposition, "blocking")
+      !identical(barcode$disposition, "blocking") &&
+      !.builder_state_fact_text(barcode$renamed_to)
   ) {
     .builder_state_metadata_policy_abort(
       "A reserved cell_barcode source collision cannot be downgraded."
@@ -566,7 +569,11 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
         !isTRUE(fact$supported) ||
         !is.character(classes) ||
         any(classes %in% c("list", "data.frame"))
-      unsafe && isTRUE(record$retain_in_crb)
+      ## An unsupported source cell_barcode column already blocks the
+      ## dataset; the reserved record stands for the cell barcodes.
+      blocked_barcode <- identical(id, "cell_barcode") &&
+        identical(record$disposition, "blocking")
+      unsafe && isTRUE(record$retain_in_crb) && !blocked_barcode
     },
     logical(1)
   )]

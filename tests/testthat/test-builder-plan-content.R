@@ -551,10 +551,11 @@ test_that("reserved barcode collisions remain valid blocking policies", {
       ),
       metadata = list(
         columns = list(
+          ## A list column cannot be kept under another name.
           cell_barcode = list(
             name = "cell_barcode",
-            class = "character",
-            supported = TRUE,
+            class = "list",
+            supported = FALSE,
             non_missing = 4L,
             unique_non_missing = 4L
           )
@@ -603,10 +604,11 @@ test_that("final metadata cannot weaken profiled hard blockers", {
       ),
       metadata = list(
         columns = list(
+          ## A list column cannot be kept under another name.
           cell_barcode = list(
             name = "cell_barcode",
-            class = "character",
-            supported = TRUE,
+            class = "list",
+            supported = FALSE,
             non_missing = 4L,
             unique_non_missing = 4L
           )

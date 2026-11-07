@@ -184,6 +184,17 @@ builder_inspect_model <- function(
     labels <- tolower(vapply(content_tags, `[[`, character(1), "label"))
     content_tags <- content_tags[!duplicated(labels)]
   }
+  ## Says that a source cell_barcode column is kept under another name.
+  barcode <- state$metadata_policy$columns$cell_barcode
+  notes <- if (
+    is.list(barcode) &&
+      builder_stage_has_text(barcode$renamed_to) &&
+      builder_stage_has_text(barcode$reason)
+  ) {
+    barcode$reason
+  } else {
+    character()
+  }
   list(
     summary = c(
       paste(format(profile$n_cells, big.mark = ","), "cells"),
@@ -201,6 +212,7 @@ builder_inspect_model <- function(
       character(1),
       policy = state$metadata_policy
     ),
+    notes = notes,
     content_tags = content_tags,
     diagnostics = c(paste("Format", format), paste("Dataset id", dataset_id))
   )
@@ -219,6 +231,12 @@ builder_inspect_stage_ui <- function(id, model) {
         class = "notice warn",
         h4("Needs attention"),
         builder_stage_text_items(c(attention, blockers))
+      )
+    },
+    if (length(model$notes %||% character())) {
+      div(
+        class = "notice builder-inspect-notes",
+        builder_stage_text_items(as.character(model$notes))
       )
     },
     div(

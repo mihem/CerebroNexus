@@ -16,6 +16,15 @@
     nzchar(trimws(value))
 }
 
+## A source metadata column named cell_barcode would clash with the CRB's own
+## cell barcode column, so the build keeps it under this free name instead.
+builder_barcode_source_name <- function(column_names) {
+  column_names <- as.character(column_names)
+  make.unique(c(column_names, "cell_barcode_source"))[[
+    length(column_names) + 1L
+  ]]
+}
+
 .builder_recommend_record <- function(
   value,
   reason,
@@ -361,7 +370,18 @@ builder_recommend_metadata <- function(
     )
   }
 
-  reserved_collision <- "cell_barcode" %in% column_names
+  ## A plain source column named cell_barcode is kept under another name; one
+  ## that cannot be exported at all still blocks the dataset.
+  source_barcode <- columns[["cell_barcode"]]
+  renamed_to <- if (
+    is.list(source_barcode) &&
+      isTRUE(source_barcode$supported) &&
+      is.character(source_barcode$class) &&
+      !any(source_barcode$class %in% c("list", "data.frame"))
+  ) {
+    builder_barcode_source_name(column_names)
+  }
+  reserved_collision <- "cell_barcode" %in% column_names && is.null(renamed_to)
   cell_barcode <- .builder_recommend_record(
     value = if (reserved_collision) "blocking" else "included",
     reason = if (reserved_collision) {
@@ -370,6 +390,13 @@ builder_recommend_metadata <- function(
         "Builder keeps for the cell barcodes. Rename that column in the ",
         "object (for example to cell_barcode_source), save it and import ",
         "the file again."
+      )
+    } else if (!is.null(renamed_to)) {
+      paste0(
+        "The object has a metadata column named cell_barcode, a name the ",
+        "Builder keeps for the cell barcodes. The CRB keeps that column as ",
+        renamed_to,
+        "."
       )
     } else {
       "Cell barcodes are required to preserve dataset identity."
@@ -392,6 +419,9 @@ builder_recommend_metadata <- function(
     sensitive = FALSE,
     required = TRUE
   )
+  if (!is.null(renamed_to)) {
+    cell_barcode$renamed_to <- renamed_to
+  }
   metadata_names <- setdiff(column_names, "cell_barcode")
   records <- lapply(metadata_names, function(name) {
     .builder_recommend_metadata_fact(

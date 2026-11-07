@@ -363,6 +363,8 @@
     if (!is.null(nGene)) "nGene",
     setdiff(cell_cycle, included_groups),
     additional_metadata,
+    ## The source's own cell_barcode column, renamed by the build.
+    if (is.list(policy)) policy$columns$cell_barcode$renamed_to,
     setdiff(generated_metadata, source_metadata)
   ))
   spatial <- if (is.list(profile$spatial)) profile$spatial else list()

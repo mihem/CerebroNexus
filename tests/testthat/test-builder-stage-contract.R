@@ -311,6 +311,34 @@ test_that("Inspect uses actionable issue labels and removes duplicate content", 
   )
 })
 
+test_that("Inspect notes a source cell_barcode column the CRB renames", {
+  reason <- "The CRB keeps that column as cell_barcode_source."
+  model <- builder_inspect_model(
+    profile = list(n_cells = 12L, n_genes = 8L),
+    state = list(
+      attention_ids = character(),
+      blocking_ids = character(),
+      metadata_policy = list(
+        columns = list(
+          cell_barcode = list(
+            disposition = "included",
+            reason = reason,
+            renamed_to = "cell_barcode_source"
+          )
+        )
+      ),
+      manifest = list()
+    ),
+    format = "RDS",
+    dataset_id = "ds1"
+  )
+  expect_identical(model$notes, reason)
+  html <- builder_stage_html(builder_inspect_stage_ui("inspect", model))
+  expect_match(html, "builder-inspect-notes", fixed = TRUE)
+  expect_match(html, reason, fixed = TRUE)
+  expect_false(grepl("Needs attention", html, fixed = TRUE))
+})
+
 test_that("Inspect names the metadata column that blocks the policy", {
   reason <- "The object has a metadata column named cell_barcode. Rename it."
   policy <- list(
