@@ -455,50 +455,6 @@ test_that("terminal and transport handlers apply different state transitions", {
   expect_identical(out, "ok")
 })
 
-test_that("sync replay of retained transport advances the browser queue", {
-  js <- builder_browser_pipeline_text("www", "builder.js")
-  handlers <- c(
-    builder_browser_pipeline_js_function(
-      js,
-      "handleClientImportTransportRelease"
-    ),
-    builder_browser_pipeline_js_function(js, "handleClientImportSync")
-  )
-  out <- builder_browser_pipeline_run_node(
-    handlers,
-    c(
-      "const assert = require('assert');",
-      "const a = {clientId: 'A', serverId: null, kind: 'file', state: 'paused'};",
-      "const b = {clientId: 'B', serverId: null, kind: 'file', state: 'queued'};",
-      "let clientImportQueue = [a, b];",
-      "let activeClientImport = a;",
-      "let importSyncPending = true;",
-      "let serverImportGate = false;",
-      "const dispatched = [];",
-      "function renderClientImportQueue() {}",
-      "function dispatchNextClientImport() {",
-      "  if (activeClientImport || !clientImportQueue.length) return;",
-      "  activeClientImport = clientImportQueue[0];",
-      "  dispatched.push(activeClientImport.clientId);",
-      "}",
-      "function failClientImportReconciliation() { throw new Error('unexpected reconciliation failure'); }",
-      "function handleClientImportRelease() { throw new Error('unexpected terminal release'); }",
-      "function startFileTransport() { throw new Error('unexpected upload restart'); }",
-      "handleClientImportSync({imports: [{",
-      "  client_id: 'A', server_id: 'server-A', state: 'reading', transport_retained: true",
-      "}], server_busy: false});",
-      "assert.strictEqual(importSyncPending, false);",
-      "assert.deepStrictEqual(clientImportQueue, [b]);",
-      "assert.strictEqual(activeClientImport, b);",
-      "assert.deepStrictEqual(dispatched, ['B']);",
-      "console.log('ok');"
-    )
-  )
-
-  expect_equal(attr(out, "status"), NULL)
-  expect_identical(out, "ok")
-})
-
 ## A minimal DOM for the rail and Build helpers below: elements keep children,
 ## classes and text, and `document` answers exactly the selectors they use.
 builder_browser_pipeline_fake_dom <- c(

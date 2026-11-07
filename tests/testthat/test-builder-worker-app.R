@@ -177,47 +177,6 @@ test_that("failed Builder prewarm is discarded without blocking startup", {
   expect_null(app_env$.builder_app_process_state$prewarmed_worker)
 })
 
-test_that("Builder replays ready worker status when the client connects", {
-  skip_if_not_installed("shiny")
-  skip_if_not_installed("plotly")
-  app_env <- new.env(parent = globalenv())
-  withr::local_dir(builder_profile_inst_path("builder"))
-  sys.source("app.R", envir = app_env)
-  app_env$builder_session_start <- function(...) {
-    list(error = "Worker startup is disabled in this status replay test.")
-  }
-
-  shiny::testServer(app_env$server, {
-    messages <- list()
-    original_send <- session$sendCustomMessage
-    session$sendCustomMessage <- function(type, message) {
-      if (identical(type, "builder_worker_status")) {
-        messages[[length(messages) + 1L]] <<- message
-      }
-      original_send(type, message)
-    }
-    worker(structure(
-      list(state = "ready", error = NULL),
-      class = c("builder_worker", "list")
-    ))
-    worker_available(TRUE)
-
-    session$setInputs(
-      builder_client_connection = list(
-        status = "connected",
-        nonce = 1
-      )
-    )
-    session$flushReact()
-
-    expect_true(any(vapply(
-      messages,
-      function(message) identical(message$state, "ready"),
-      logical(1)
-    )))
-  })
-})
-
 test_that("Builder runApp restores default process settings on stop", {
   skip_if_not_installed("httpuv")
   withr::local_options(list(shiny.maxRequestSize = NULL))

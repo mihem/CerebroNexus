@@ -41,7 +41,6 @@
   var uploadConnectionReady = true;
   var datasetPickerOpening = false;
   var datasetPickerTimer = null;
-  var importSyncPending = false;
   var serverImportGate = false;
   var clientImportHandlersRegistered = false;
   var viewerDisclosureState = new Map();
@@ -2811,7 +2810,6 @@
 
   function dispatchNextClientImport() {
     if (!uploadConnectionReady) return;
-    if (importSyncPending) return;
     if (serverImportGate) return;
     if (activeClientImport) return;
     if (!clientImportQueue.length) return;
@@ -2955,82 +2953,6 @@
     }
     renderClientImportQueue();
     dispatchNextClientImport();
-  }
-
-  function failClientImportReconciliation(entry, message) {
-    entry.state = "error";
-    entry.outcome = "error";
-    entry.error = message;
-    entry.serverId = null;
-    var index = clientImportQueue.indexOf(entry);
-    if (index >= 0) clientImportQueue.splice(index, 1);
-    if (activeClientImport === entry) activeClientImport = null;
-    importSyncPending = false;
-    if (!clientImportFailures.includes(entry)) clientImportFailures.push(entry);
-    scheduleStatusAnnouncement(entry.name + ". " + message);
-    renderClientImportQueue();
-    dispatchNextClientImport();
-  }
-
-  function handleClientImportSync(message) {
-    var records = Array.isArray(message && message.imports) ? message.imports : [];
-    serverImportGate = Boolean(message && message.server_busy);
-    if (!activeClientImport) {
-      importSyncPending = false;
-      dispatchNextClientImport();
-      return;
-    }
-    var entry = activeClientImport;
-    var record = records.find(function (item) {
-      return item && item.client_id === entry.clientId;
-    });
-    if (!record) {
-      if (!entry.serverId && ["uploading", "awaiting_accept", "paused"].includes(entry.state)) {
-        entry.serverId = null;
-        entry.state = "queued";
-        activeClientImport = null;
-        importSyncPending = false;
-        renderClientImportQueue();
-        dispatchNextClientImport();
-        return;
-      }
-      failClientImportReconciliation(entry, "The server could not match this import after reconnecting.");
-      return;
-    }
-    if (entry.serverId && record.server_id !== entry.serverId) {
-      failClientImportReconciliation(entry, "The restored import identity did not match.");
-      return;
-    }
-    entry.serverId = record.server_id || entry.serverId;
-    if (["ready", "error", "cancelled", "rejected"].includes(record.state)) {
-      importSyncPending = false;
-      handleClientImportRelease({
-        client_id: entry.clientId,
-        server_id: entry.serverId,
-        outcome: record.state,
-        message: record.message || null,
-      });
-      return;
-    }
-    if (record.transport_retained === true) {
-      importSyncPending = false;
-      handleClientImportTransportRelease({
-        client_id: entry.clientId,
-        server_id: entry.serverId,
-      });
-      return;
-    }
-    if (record.state === "awaiting_upload") {
-      var uploadWasStarted = ["uploading", "awaiting_accept"].includes(entry.stateBeforePause);
-      entry.state = uploadWasStarted ? "awaiting_accept" : "awaiting_upload";
-      importSyncPending = false;
-      renderClientImportQueue();
-      if (!uploadWasStarted) startFileTransport(entry);
-      return;
-    }
-    entry.state = record.state || entry.stateBeforePause || "unknown";
-    importSyncPending = false;
-    renderClientImportQueue();
   }
 
   function updateDialogLock() {
@@ -6165,7 +6087,6 @@
       "builder_client_import_accepted": handleClientImportAccepted,
       "builder_client_import_transport_release": handleClientImportTransportRelease,
       "builder_client_import_release": handleClientImportRelease,
-      "builder_import_sync": handleClientImportSync,
       "builder_dataset_picker_fallback": function (message) {
         setDatasetPickerOpening(false);
         openDatasetPicker(message);
@@ -6263,9 +6184,7 @@
     builderConnectionReady = false;
     uploadConnectionReady = false;
     setDatasetPickerOpening(false);
-    importSyncPending = true;
     clientImportQueue.forEach(function (entry) {
-      entry.stateBeforePause = entry.state;
       entry.state = "paused";
     });
     renderClientImportQueue();

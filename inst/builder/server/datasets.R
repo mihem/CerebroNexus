@@ -2,7 +2,8 @@
 
 ## -- the rail ------------------------------------------------------------
 ## Send `patch()` whenever it changes, and `sync_patch()` when the browser
-## asks for a resync; returns the last patch the change observer sent.
+## asks for a resync through `sync_input` (NULL: no resync); returns the last
+## patch the change observer sent.
 rail_patch_channel <- function(message, sync_input, patch, sync_patch = patch) {
   last_patch <- reactiveVal(NULL)
   observe({
@@ -13,13 +14,15 @@ rail_patch_channel <- function(message, sync_input, patch, sync_patch = patch) {
     last_patch(next_patch)
     session$sendCustomMessage(message, next_patch)
   })
-  observeEvent(
-    input[[sync_input]],
-    {
-      session$sendCustomMessage(message, sync_patch())
-    },
-    ignoreInit = TRUE
-  )
+  if (!is.null(sync_input)) {
+    observeEvent(
+      input[[sync_input]],
+      {
+        session$sendCustomMessage(message, sync_patch())
+      },
+      ignoreInit = TRUE
+    )
+  }
   last_patch
 }
 
@@ -43,7 +46,7 @@ last_dataset_rail_patch <- rail_patch_channel(
 )
 last_import_rail_patch <- rail_patch_channel(
   "builder_import_rail_patch",
-  "builder_import_rail_sync",
+  NULL,
   function() {
     builder_import_rail_patch(
       imports()$entries,

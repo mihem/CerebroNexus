@@ -43,7 +43,6 @@ builder_project_open_wait <- reactiveVal(NULL)
 builder_project_table_asset_process <- reactiveVal(NULL)
 builder_project_table_asset_generation <- reactiveVal(0)
 builder_client_import_state <- reactiveVal(list(nonce = 0, pending = 0L))
-builder_connection_state <- reactiveVal("connected")
 builder_project_restore_progress <- reactiveVal(list(
   mode = "idle",
   total = 0L,
@@ -323,7 +322,8 @@ builder_activity <- reactive({
   project <- builder_project()
   client_state <- builder_client_import_state()
   builder_activity_state(
-    connection = builder_connection_state(),
+    ## The server only runs while connected; the browser shows disconnects.
+    connection = "connected",
     client_imports = client_state$pending %||% 0L,
     server_imports = length(imports()$entries %||% list()) > 0L,
     project_phase = builder_project_phase(),
@@ -400,31 +400,6 @@ observeEvent(
       nonce = as.double(state$nonce),
       pending = as.integer(state$pending)
     ))
-  },
-  ignoreInit = TRUE
-)
-
-observeEvent(
-  input$builder_client_connection,
-  {
-    state <- input$builder_client_connection
-    if (is.list(state) && identical(state$status %||% NULL, "connected")) {
-      builder_connection_state("connected")
-      activity_message <- builder_activity_message(
-        isolate(builder_activity()),
-        build_overlay = isolate(builder_build_overlay()),
-        picker_kind = isolate(builder_project_picker_kind())
-      )
-      session$onFlushed(
-        function() {
-          session$sendCustomMessage(
-            "builder_activity_state",
-            activity_message
-          )
-        },
-        once = TRUE
-      )
-    }
   },
   ignoreInit = TRUE
 )

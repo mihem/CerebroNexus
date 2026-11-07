@@ -1369,46 +1369,6 @@ poll_builder_worker_startup <- function() {
   invisible(TRUE)
 }
 
-observeEvent(
-  input$builder_client_connection,
-  {
-    connection <- input$builder_client_connection
-    if (
-      !is.list(connection) ||
-        !identical(connection$status %||% NULL, "connected")
-    ) {
-      return()
-    }
-    current_worker <- isolate(worker())
-    state <- if (isTRUE(isolate(worker_available()))) {
-      "ready"
-    } else {
-      current_worker$state %||% "starting"
-    }
-    status <- switch(
-      state,
-      ready = list(
-        state = "ready",
-        title = "Builder is ready",
-        detail = "Datasets can now be added."
-      ),
-      failed = list(
-        state = "error",
-        title = "Background workspace unavailable",
-        detail = current_worker$error %||%
-          "Restart this Builder session to try again."
-      ),
-      list(
-        state = "starting",
-        title = "Starting Builder…",
-        detail = "Preparing your workspace…"
-      )
-    )
-    session$sendCustomMessage("builder_worker_status", status)
-  },
-  ignoreInit = FALSE
-)
-
 session$onFlushed(
   function() {
     session$sendCustomMessage(

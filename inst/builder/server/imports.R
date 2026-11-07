@@ -684,47 +684,6 @@ observeEvent(input$builder_import_example, {
   )
 })
 
-observeEvent(input$builder_import_sync_request, {
-  ids <- isolate(client_import_server_ids())
-  transport_released <- isolate(transport_released_imports())
-  queue <- isolate(imports())
-  active <- lapply(names(ids), function(server_id) {
-    entry <- builder_import_find(queue, server_id)
-    if (is.null(entry)) {
-      return(NULL)
-    }
-    list(
-      client_id = unname(ids[[server_id]]),
-      server_id = server_id,
-      state = entry$load_state,
-      transport_retained = server_id %in% transport_released,
-      message = entry$error
-    )
-  })
-  active <- Filter(Negate(is.null), active)
-  terminal <- unname(isolate(released_client_import_records()))
-  dispatch <- isolate(pending_client_import_dispatch())
-  if (is.list(dispatch) && builder_has_text(dispatch$client_id)) {
-    active <- c(
-      active,
-      list(list(
-        client_id = dispatch$client_id,
-        server_id = NULL,
-        state = "awaiting_upload",
-        transport_retained = FALSE,
-        message = NULL
-      ))
-    )
-  }
-  session$sendCustomMessage(
-    "builder_import_sync",
-    list(
-      imports = unname(c(active, terminal)),
-      server_busy = builder_has_text(isolate(external_import_active()))
-    )
-  )
-})
-
 remove_pending_import <- function(id) {
   entry <- isolate(import_of(id))
   if (

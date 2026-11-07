@@ -1147,14 +1147,6 @@ test_that("rail patches are sent when they change and in full on a resync", {
     expect_identical(has_html(sent[[1L]]), c(TRUE, TRUE))
     expect_identical(last_dataset_rail_patch(), before)
     expect_length(import_patches(), 0L)
-
-    configure_observer_reset(log)
-    session$setInputs(builder_import_rail_sync = list(nonce = 1))
-    session$flushReact()
-    expect_length(dataset_patches(), 0L)
-    sent <- import_patches()
-    expect_length(sent, 1L)
-    expect_identical(sent[[1L]], last_import_rail_patch())
   })
 })
 
