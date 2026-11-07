@@ -241,6 +241,9 @@ builder_app_start <- function(
   if (!is.null(builder_source_package)) {
     builder_activate_source_package(builder_source_package)
   }
+  ## A killed Builder never ended its session: sweep the output folders its
+  ## builds used.
+  try(builder_release_sweep_remembered(), silent = TRUE)
   ## Start the empty isolated worker before the browser creates its first
   ## session. Windows can spend several seconds starting a cold R process; by
   ## overlapping that work with browser launch and asset loading, the first

@@ -1844,33 +1844,6 @@ builder_start_release_settlement_process <- function(
         }
         invisible(moved)
       }
-      preserve_on_abort <- !is.list(value) ||
-        !identical(value$state, "needs_decision")
-      abort_with_diagnostics <- function(handle) {
-        if (isTRUE(preserve_on_abort)) {
-          try(
-            {
-              diagnostics <- runtime$.builder_release_atomic_directory(
-                handle$control
-              )
-              marker_id <- gsub(
-                "[^A-Za-z0-9._-]",
-                "-",
-                substr(handle$build_id, 1L, 80L)
-              )
-              marker <- file.path(
-                diagnostics,
-                paste0("settlement-pending-", marker_id)
-              )
-              if (!dir.exists(marker) && !file.exists(marker)) {
-                dir.create(marker, mode = "0700", showWarnings = FALSE)
-              }
-            },
-            silent = TRUE
-          )
-        }
-        runtime$builder_coordinator_abort(handle)
-      }
       publish_with_progress <- function(handle, build_result) {
         runtime$builder_coordinator_publish(
           handle,
@@ -1898,7 +1871,7 @@ builder_start_release_settlement_process <- function(
         handle,
         value,
         .publish = publish_with_progress,
-        .abort = abort_with_diagnostics
+        .abort = runtime$builder_coordinator_abort
       )
     },
     list(
@@ -2159,25 +2132,6 @@ finish_builder_release_settlement <- function(settled) {
     )
     context$diagnostics <- recorded$capture
     diagnostics_path <- recorded$path
-    pending <- file.path(
-      context$release$handle$control,
-      "diagnostics",
-      paste0(
-        "settlement-pending-",
-        gsub(
-          "[^A-Za-z0-9._-]",
-          "-",
-          substr(context$release$handle$build_id, 1L, 80L)
-        )
-      )
-    )
-    if (
-      dir.exists(pending) &&
-        !.builder_diagnostics_link(pending) &&
-        !length(list.files(pending, all.files = TRUE, no.. = TRUE))
-    ) {
-      unlink(pending, recursive = FALSE, force = TRUE)
-    }
     if (.builder_diagnostics_text(diagnostics_path %||% NULL)) {
       try(
         message("Builder release diagnostics saved to ", diagnostics_path),
@@ -2262,6 +2216,7 @@ finish_builder_release_settlement <- function(settled) {
     selected_output(NULL)
   }
   active_release(NULL)
+  builder_build_sweep_output(context$release$handle$target %||% NULL)
   acknowledge_builder_build(context$request_id)
   busy_note(NULL)
   build_operation_phase(NULL)
@@ -2465,6 +2420,8 @@ finish_builder_release_cancellation <- function() {
     context$diagnostics <- recorded$capture
     diagnostics_path <- recorded$path
   }
+  # A release process killed mid-write can leave files that kept its control.
+  builder_build_sweep_output(context$release$handle$target %||% NULL)
   release_settlement_process(NULL)
   release_settlement_context(NULL)
   builder_build_progress_remove(context$progress_path %||% "")

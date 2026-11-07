@@ -295,6 +295,12 @@ builder_diagnostics_settlement_failed <- function(value) {
   invisible(path)
 }
 
+## Failure diagnostics live in this R session's temporary folder, not in the
+## output folder: a stopped or failed build leaves no hidden folder there.
+builder_diagnostics_root <- function() {
+  file.path(tempdir(), "builder-diagnostics")
+}
+
 builder_diagnostics_persist_release <- function(
   release,
   result,
@@ -311,23 +317,11 @@ builder_diagnostics_persist_release <- function(
       }
       if (
         !is.list(handle) ||
-          !.builder_diagnostics_text(handle$control %||% NULL) ||
           !.builder_diagnostics_text(handle$build_id %||% NULL)
       ) {
         return(NULL)
       }
-      control <- handle$control
-      parent <- dirname(control)
-      if (
-        !dir.exists(parent) ||
-          .builder_diagnostics_link(parent) ||
-          !dir.exists(control) ||
-          .builder_diagnostics_link(control) ||
-          !.builder_diagnostics_owner_only(control)
-      ) {
-        return(NULL)
-      }
-      diagnostics <- file.path(control, "diagnostics")
+      diagnostics <- builder_diagnostics_root()
       if (!.builder_diagnostics_directory(diagnostics)) {
         return(NULL)
       }

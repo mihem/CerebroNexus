@@ -143,7 +143,7 @@ test_that("failed release diagnostics preserve result, trace, and output", {
   )
 })
 
-test_that("diagnostics never recreate a retired release control", {
+test_that("diagnostics stay out of the output folder", {
   runtime <- builder_diagnostics_test_runtime()
   root <- withr::local_tempdir()
   control <- file.path(root, ".retired-control")
@@ -154,8 +154,13 @@ test_that("diagnostics never recreate a retired release control", {
     list(worker_result = NULL, settlement_result = simpleError("failed"))
   )
 
-  expect_null(path)
+  expect_true(dir.exists(path))
+  expect_identical(
+    dirname(path),
+    normalizePath(runtime$builder_diagnostics_root(), winslash = "/")
+  )
   expect_false(dir.exists(control))
+  expect_identical(list.files(root, all.files = TRUE, no.. = TRUE), character())
 })
 
 test_that("settlement diagnostics are retained only for terminal failures", {

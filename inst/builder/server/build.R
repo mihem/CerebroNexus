@@ -606,9 +606,19 @@ enqueue_build_plan <- function(
   invisible(TRUE)
 }
 
+## Remove hidden control folders that finished, stopped, failed or killed
+## builds left beside `target`.
+builder_build_sweep_output <- function(target) {
+  if (builder_has_text(target %||% "")) {
+    try(builder_release_sweep_parent(dirname(target)), silent = TRUE)
+  }
+  invisible(NULL)
+}
+
 prepare_selected_output <- function(path) {
-  # Earlier stopped, failed or killed builds left hidden control folders.
-  try(builder_release_sweep_parent(dirname(path)), silent = TRUE)
+  builder_build_sweep_output(path)
+  # A Builder started after a crash sweeps this folder again.
+  builder_release_remember_parent(dirname(path))
   isolate({
     plan <- freeze_materialized_plan_for_output(
       path,
@@ -703,12 +713,12 @@ builder_new_release_target <- function(
 
 builder_build_last_parent <- reactiveVal(NULL)
 
-# Failure diagnostics stay while the page shows them; remove them when the
-# session ends.
+# A successful build clears selected_output; the last parent still counts.
 session$onSessionEnded(function() {
-  output <- isolate(selected_output())
-  if (builder_has_text(output %||% "")) {
-    try(builder_release_sweep_parent(dirname(output)), silent = TRUE)
+  builder_build_sweep_output(isolate(selected_output()))
+  parent <- isolate(builder_build_last_parent())
+  if (builder_has_text(parent %||% "")) {
+    builder_build_sweep_output(file.path(parent, "release"))
   }
 })
 

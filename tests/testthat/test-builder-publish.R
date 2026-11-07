@@ -1085,26 +1085,84 @@ test_that("abandoned new-release controls are swept from their parent", {
     running <- builder_prepare_release(file.path(root, "running"), "build-live")
     writeLines("staged", file.path(running$stage, "dataset.crb"))
 
-    ## published: the target exists
+    ## published (a Retry after Stop): leftover files kept the finished
+    ## control beside the published release
     published_target <- file.path(root, "published")
     published <- builder_prepare_release(published_target, "build-done")
     writeLines("log", file.path(published$control, "diagnostics", "keep.txt"))
     writeLines("done", file.path(published$stage, "dataset.crb"))
-    expect_true(builder_publish_release(published)$published)
+    published_result <- builder_publish_release(published)
+    expect_true(published_result$published)
+    expect_false(published_result$control_cleaned)
+
+    ## occupied: an interrupted release whose target exists needs recovery
+    occupied_target <- file.path(root, "occupied")
+    occupied <- builder_prepare_release(occupied_target, "build-occupied")
+    owner <- readRDS(file.path(occupied$lock, "owner.rds"))
+    owner$pid <- .Machine$integer.max
+    saveRDS(owner, file.path(occupied$lock, "owner.rds"))
+    dir.create(occupied_target)
 
     removed <- builder_release_sweep_parent(root)
     expect_setequal(
       basename(removed),
-      basename(c(killed$control, failed$control))
+      basename(c(killed$control, failed$control, published$control))
     )
     expect_false(dir.exists(killed$control))
     expect_false(dir.exists(failed$control))
+    expect_false(dir.exists(published$control))
+    expect_identical(
+      readLines(file.path(published_target, "dataset.crb")),
+      "done"
+    )
     expect_true(file.exists(file.path(running$stage, "dataset.crb")))
-    expect_true(dir.exists(published$control))
+    expect_true(dir.exists(occupied$control))
+    expect_true(dir.exists(occupied$lock))
     expect_true(builder_abort_release(running)$aborted)
     expect_identical(
       builder_release_sweep_parent(file.path(root, "none")),
       character()
     )
+  })
+})
+
+test_that("a new Builder sweeps the output folders a killed Builder used", {
+  local({
+    builder_publish_source()
+    withr::local_envvar(CEREBRO_BUILDER_STATE_DIR = withr::local_tempdir())
+    killed_parent <- withr::local_tempdir()
+    live_parent <- withr::local_tempdir()
+    expect_true(builder_release_remember_parent(killed_parent))
+    expect_true(builder_release_remember_parent(killed_parent))
+    expect_true(builder_release_remember_parent(live_parent))
+    expect_length(readLines(builder_release_registry_path()), 2L)
+
+    ## kill -9: no session end, the lock owner is gone
+    killed <- builder_prepare_release(
+      file.path(killed_parent, "CerebroNexus_viewer_000001"),
+      "build-killed"
+    )
+    writeLines("staged", file.path(killed$stage, "dataset.crb"))
+    owner <- readRDS(file.path(killed$lock, "owner.rds"))
+    owner$pid <- .Machine$integer.max
+    saveRDS(owner, file.path(killed$lock, "owner.rds"))
+    ## another Builder is still building here
+    running <- builder_prepare_release(
+      file.path(live_parent, "CerebroNexus_viewer_000002"),
+      "build-live"
+    )
+
+    kept <- builder_release_sweep_remembered()
+    expect_false(dir.exists(killed$control))
+    expect_true(dir.exists(running$lock))
+    expect_identical(
+      kept,
+      normalizePath(live_parent, winslash = "/", mustWork = TRUE)
+    )
+    expect_identical(readLines(builder_release_registry_path()), kept)
+
+    expect_true(builder_abort_release(running)$aborted)
+    expect_identical(builder_release_sweep_remembered(), character())
+    expect_false(file.exists(builder_release_registry_path()))
   })
 })

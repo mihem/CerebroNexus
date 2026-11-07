@@ -1855,10 +1855,11 @@ builder_release_cleanup_control <- function(target) {
 }
 
 ## Remove the hidden control folders that stopped, failed or killed new-release
-## builds left in `parent`. A control is touched only when its release folder
-## was never published and no live process on this host holds its lock;
-## anything else (an in-place release with a backup, another machine's lock)
-## is kept for the recovery dialog.
+## builds left in `parent`. A control is touched only when no live process on
+## this host holds its lock and it holds no backup. An unpublished release is
+## aborted first; a published one is removed only when its journal is
+## finished. Anything else (an in-place release with a backup, another
+## machine's lock, an interrupted publication) is kept for the recovery dialog.
 builder_release_sweep_parent <- function(parent) {
   parent <- tryCatch(
     normalizePath(parent, winslash = "/", mustWork = TRUE),
@@ -1887,16 +1888,18 @@ builder_release_sweep_parent <- function(parent) {
             !identical(
               builder_release_control_path(target),
               .canonicalTargetPath(control)
-            ) ||
-            .builder_release_exists(target)
+            )
         ) {
-          stop("The release is not an abandoned new release.", call. = FALSE)
+          stop("The release control does not match its journal.", call. = FALSE)
         }
+        # A published release (e.g. a Retry after Stop) keeps its folder; only
+        # its finished control is removed below.
+        published <- .builder_release_exists(target)
         recovery <- builder_discover_recovery(target)
         if (identical(recovery$state, "stale_lock")) {
           .builder_release_isolate_stale_lock(control, recovery$journal)
         } else if (identical(recovery$state, "recovery_required")) {
-          if (!isTRUE(recovery$safe_to_abort)) {
+          if (published || !isTRUE(recovery$safe_to_abort)) {
             stop("The release needs manual recovery.", call. = FALSE)
           }
           # Stops when a live process still owns the lock.
@@ -1925,6 +1928,73 @@ builder_release_sweep_parent <- function(parent) {
     }
   }
   invisible(removed)
+}
+
+## Output folders that had a build, kept on disk so a Builder started after a
+## crash (kill -9, power loss) can sweep what that build left behind.
+builder_release_registry_path <- function() {
+  root <- Sys.getenv("CEREBRO_BUILDER_STATE_DIR", "")
+  if (!nzchar(root)) {
+    root <- tools::R_user_dir("CerebroNexus", "cache")
+  }
+  file.path(root, "release-parents.txt")
+}
+
+.builder_release_registry_read <- function(path) {
+  if (!file.exists(path)) {
+    return(character())
+  }
+  parents <- readLines(path, warn = FALSE, encoding = "UTF-8")
+  unique(parents[nzchar(parents)])
+}
+
+builder_release_remember_parent <- function(parent) {
+  tryCatch(
+    {
+      parent <- normalizePath(parent, winslash = "/", mustWork = TRUE)
+      path <- builder_release_registry_path()
+      if (parent %in% .builder_release_registry_read(path)) {
+        return(invisible(TRUE))
+      }
+      dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+      connection <- file(path, open = "ab")
+      on.exit(close(connection), add = TRUE)
+      writeLines(enc2utf8(parent), connection, useBytes = TRUE)
+      invisible(TRUE)
+    },
+    error = function(error) invisible(FALSE)
+  )
+}
+
+## Sweep every remembered output folder; forget the ones left clean.
+builder_release_sweep_remembered <- function() {
+  tryCatch(
+    {
+      path <- builder_release_registry_path()
+      kept <- character()
+      for (parent in .builder_release_registry_read(path)) {
+        if (!dir.exists(parent)) {
+          next
+        }
+        builder_release_sweep_parent(parent)
+        left <- list.files(
+          parent,
+          pattern = "^[.]cbr-[0-9a-f]{16}$",
+          all.files = TRUE
+        )
+        if (length(left)) {
+          kept <- c(kept, parent)
+        }
+      }
+      if (length(kept)) {
+        writeLines(enc2utf8(kept), path, useBytes = TRUE)
+      } else if (file.exists(path)) {
+        unlink(path, force = TRUE)
+      }
+      invisible(kept)
+    },
+    error = function(error) invisible(character())
+  )
 }
 
 builder_prepare_release <- function(
