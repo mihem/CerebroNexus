@@ -833,3 +833,73 @@ test_that("imports queued during a failed worker restart end with an error", {
     expect_match(isolate(add_error()), "could not start", fixed = TRUE)
   })
 })
+
+test_that("adding a file that is already added or loading says so", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this duplicate test.")
+  }
+  app_env$builder_session_poll <- function(worker, ...) {
+    list(worker = worker, event = NULL, result = NULL)
+  }
+  notices <- character()
+  app_env$builder_notify <- function(type, message, ...) {
+    notices <<- c(notices, message)
+    invisible(TRUE)
+  }
+  progress_root <- tempfile("builder-import-duplicate-")
+  dir.create(progress_root, mode = "0700")
+  withr::defer(unlink(progress_root, recursive = TRUE, force = TRUE))
+  source <- file.path(progress_root, "pbmc.rds")
+  saveRDS(list(a = 1), source)
+  meta <- list(name = "pbmc.rds", type = "", size = file.size(source))
+
+  shiny::testServer(app_env$server, {
+    worker(list(epoch = "worker-duplicate", snapshot_root = progress_root))
+    worker_available(TRUE)
+    protocol(app_env$builder_request_protocol("worker-duplicate"))
+
+    expect_true(start_load(
+      "file",
+      source,
+      "pbmc",
+      file_meta = meta,
+      source_origin = "local"
+    ))
+    expect_length(notices, 0L)
+    ## Picked again while it still loads: refused, and said on any page.
+    expect_false(start_load(
+      "file",
+      source,
+      "pbmc",
+      file_meta = meta,
+      source_origin = "local"
+    ))
+    expect_identical(
+      notices,
+      "This source is already loading in the background."
+    )
+    ## Picked again once it is a dataset: added again, with a notice.
+    pending_sources(character())
+    entry <- builder_minimal_entry("ds9", "pbmc")
+    entry$path <- source
+    entry$filename <- "pbmc.rds"
+    entry$source_origin <- "local"
+    sets(list(entry))
+    expect_true(start_load(
+      "file",
+      source,
+      "pbmc",
+      file_meta = meta,
+      source_origin = "local"
+    ))
+    expect_match(
+      notices[[length(notices)]],
+      "^pbmc[.]rds is already added; it is added again as another dataset[.]"
+    )
+  })
+})

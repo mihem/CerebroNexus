@@ -328,3 +328,16 @@ test_that("a project stores an extensionless source under its real format", {
     "source.qs2"
   )
 })
+
+test_that("a picked file without an extension is labelled by its format", {
+  runtime <- new.env(parent = globalenv())
+  sys.source(builder_test_inst_path("builder", "extras.R"), envir = runtime)
+  label <- runtime$builder_file_type_label
+  expect_identical(label("sc_tcr", "application/octet-stream", "rds"), "RDS")
+  expect_identical(label("sc_tcr", "application/octet-stream"), "FILE")
+  expect_identical(label("sc_tcr", "application/x-hdf5"), "X-HDF5")
+  expect_identical(
+    label("object.qs2", "application/octet-stream", "rds"),
+    "QS2"
+  )
+})

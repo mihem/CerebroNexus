@@ -626,10 +626,18 @@ ui <- shiny::bootstrapPage(
             ),
             tags$strong(class = "builder-add-label", "Add files")
           ),
-          tags$small(
-            class = "rail-add-detail",
-            paste(builder_advertised_format_labels(), collapse = ", ")
-          )
+          {
+            ## The rail may cut the list short; the tooltip keeps it whole.
+            format_hint <- paste(
+              builder_advertised_format_labels(),
+              collapse = ", "
+            )
+            tags$small(
+              class = "rail-add-detail",
+              title = format_hint,
+              format_hint
+            )
+          }
         ),
         builder_deprecated_format_note_ui(),
         builder_format_unavailable_ui(builder_format_capabilities()),

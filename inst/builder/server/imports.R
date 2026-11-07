@@ -134,19 +134,53 @@ start_load <- function(
     arg
   )
   if (!isTRUE(reservation$ok)) {
-    add_error(
-      if (identical(reservation$code, "source_pending")) {
-        "This source is already loading in the background."
-      } else {
-        "This dataset has already been added or is already waiting."
-      }
-    )
+    refusal <- if (identical(reservation$code, "source_pending")) {
+      "This source is already loading in the background."
+    } else {
+      "This dataset has already been added or is already waiting."
+    }
+    add_error(refusal)
+    ## A browser upload shows the refusal in its queue row; a picked path has
+    ## only add_error, which the Configure page does not show.
+    if (!builder_has_text(client_id)) {
+      builder_notify("info", refusal, duration = 6)
+    }
     release_client_import(
       client_id,
       outcome = "rejected",
       message = "This dataset has already been added or is already waiting."
     )
     return(invisible(FALSE))
+  }
+  if (!isTRUE(restoring_source) && identical(kind, "file")) {
+    ## Adding a file again is allowed (two set-ups of one file), but say so:
+    ## the same path, or an upload with the same name and size.
+    upload_name <- builder_safe_file_name(file_meta$name %||% "", "")
+    upload_size <- suppressWarnings(as.numeric(file_meta$size %||% NA_real_))
+    again <- identical(reservation$code, "source_in_store") ||
+      (nzchar(upload_name) &&
+        any(vapply(
+          reservation_entries,
+          function(entry) {
+            identical(entry$filename %||% "", upload_name) &&
+              identical(entry$source_origin %||% "", "upload") &&
+              isTRUE(
+                suppressWarnings(file.size(entry$path %||% "")) == upload_size
+              )
+          },
+          logical(1)
+        )))
+    if (isTRUE(again)) {
+      builder_notify(
+        "info",
+        paste0(
+          builder_safe_file_name(source_name, "This file"),
+          " is already added; it is added again as another dataset. ",
+          "Remove one if that was not intended."
+        ),
+        duration = 8
+      )
+    }
   }
   pending_sources(reservation$pending)
   add_error(NULL)
@@ -179,7 +213,11 @@ start_load <- function(
   if (identical(kind, "file") && is.list(file_meta)) {
     uploads <- pending_uploads()
     filename <- builder_safe_file_name(file_meta$name, paste0(label, ".rds"))
-    file_type <- builder_file_type_label(filename, file_meta$type)
+    file_type <- builder_file_type_label(
+      filename,
+      file_meta$type,
+      format = if (is.list(source_format)) source_format$extensions[1L]
+    )
     file_size <- suppressWarnings(as.numeric(file_meta$size %||% NA_real_))
     uploads[[id]] <- list(
       id = id,

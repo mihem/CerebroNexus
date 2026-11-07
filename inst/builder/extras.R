@@ -289,13 +289,25 @@ builder_safe_file_name <- function(name, fallback = "File") {
   if (nzchar(name)) name else fallback
 }
 
-builder_file_type_label <- function(name, type = NULL) {
+## `format`: the extension of the format the content was recognised as, for a
+## name without one. "application/octet-stream" says nothing, so it is not
+## shown.
+builder_file_type_label <- function(name, type = NULL, format = NULL) {
   extension <- toupper(tools::file_ext(builder_safe_file_name(name, "")))
   if (nzchar(extension)) {
     return(extension)
   }
+  format <- as.character(format %||% character())
+  if (length(format) == 1L && !is.na(format) && nzchar(format)) {
+    return(toupper(format))
+  }
   type <- as.character(type %||% character())
-  if (length(type) == 1L && !is.na(type) && nzchar(type)) {
+  if (
+    length(type) == 1L &&
+      !is.na(type) &&
+      nzchar(type) &&
+      !identical(tolower(type), "application/octet-stream")
+  ) {
     return(toupper(sub("^.*/", "", type)))
   }
   "FILE"
