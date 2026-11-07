@@ -100,7 +100,9 @@ build_options_auth_summary <- function() {
     enabled = isTRUE(isolate(auth_enabled())),
     account_count = as.integer(length(isolate(auth_accounts()))),
     error = isolate(auth_validation())$error %||% NULL,
-    available = isTRUE(auth_capability()$available)
+    available = isTRUE(auth_capability()$available),
+    ## Names the missing package in the "Login is unavailable" hint.
+    reason = auth_capability()$reason %||% NULL
   )
 }
 
@@ -130,7 +132,8 @@ output$build_output_options <- renderUI({
       enabled = isTRUE(isolate(auth_enabled())),
       account_count = as.integer(length(isolate(auth_accounts()))),
       error = isolate(auth_validation())$error %||% NULL,
-      available = isTRUE(auth$available)
+      available = isTRUE(auth$available),
+      reason = auth$reason %||% NULL
     ),
     auth_controls = uiOutput("build_auth_controls"),
     controls_disabled = controls_disabled,

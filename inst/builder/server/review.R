@@ -52,7 +52,8 @@ observeEvent(
       auth_accounts(builder_auth_empty_accounts())
       auth_validation(list(
         ok = FALSE,
-        error = "Login is unavailable for the current App settings."
+        error = auth_capability()$reason %||%
+          "Login is unavailable for the current App settings."
       ))
       session$sendCustomMessage("builder_auth_reset", list(reset = TRUE))
       return()

@@ -504,6 +504,23 @@ test_that("mode and starting dataset do not re-render the options form", {
   expect_match(settings, 'id="build_initial_dataset"', fixed = TRUE)
 })
 
+test_that("the Login is unavailable hint names the missing package", {
+  app_env <- builder_build_session_app()
+  app_env$auth_capability <- function() {
+    app_env$builder_auth_capability(.available = function(package) FALSE)
+  }
+  shiny::testServer(app_env$server, {
+    session$flushReact()
+    summary <- build_options_auth_summary()
+    expect_false(summary$available)
+    settings <- as.character(app_env$builder_build_app_settings_ui(
+      build_options_current(TRUE, NULL),
+      auth = summary
+    ))
+    expect_match(settings, "missing or too old: shinymanager", fixed = TRUE)
+  })
+})
+
 test_that("missing login accounts are requested in place before a Build", {
   app_env <- builder_build_session_app()
   shiny::testServer(app_env$server, {
