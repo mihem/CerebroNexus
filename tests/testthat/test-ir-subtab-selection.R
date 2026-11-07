@@ -41,6 +41,14 @@ test_that("one table names the sub-tabs for the Builder and the Viewer", {
   ## Nothing chosen is supported: every supported tab, never an empty strip.
   expect_identical(visible(options("Compare"), "A", 1L), all_ir_tabs[1:7])
   expect_identical(visible(options("Compare"), "B", 1L), all_ir_tabs[1:7])
+  ## An unknown sample count offers the single-sample tabs.
+  for (count in list(NULL, NA_integer_, 0L)) {
+    expect_identical(visible(list(), "A", count), all_ir_tabs[1:7])
+    expect_identical(
+      visible(options(c("Abundance", "Compare")), "A", count),
+      "Abundance"
+    )
+  }
 })
 
 ir_tabs_manifest <- function(n_samples) {
@@ -242,4 +250,67 @@ test_that("the App's tab strip shows only the kept sub-tabs", {
     "Abundance"
   )
   expect_identical(strip("Compare", 3L)$default, "Compare")
+})
+
+test_that("an App without the Clonal projection does not point to it", {
+  viz <- viewer_server_statements("immune_repertoire", "visualizations.R")
+  settings <- viewer_server_statements("immune_repertoire", "settings.R")
+  tabs_file <- viewer_server_statements("immune_repertoire", "tabs.R")
+  ## `bound`: the strip has reached the browser; before that the status
+  ## follows the tab the strip will open on.
+  page <- function(choice, tab, bound = TRUE) {
+    values <- NULL
+    shiny::testServer(
+      function(input, output, session) {
+        scope <- environment()
+        Cerebro.options <- list(
+          viewer_content = list(A = list(immune_repertoire_tabs = choice))
+        )
+        has_scRepertoire <- function() TRUE
+        ir_repertoire_available <- function() TRUE
+        ir_settings_requested <- function() TRUE
+        n_samples <- shiny::reactive(3L)
+        ir_tab <- shiny::reactive(tab)
+        viewer_requested_dataset_context <- shiny::reactive(
+          list(dataset_key = "A")
+        )
+        viewer_server_load(
+          tabs_file,
+          scope,
+          names = "ir_visible_tabs"
+        )
+        viewer_server_load(
+          viz,
+          scope,
+          names = "output$ir_selection_status_UI"
+        )
+        viewer_server_load(
+          settings,
+          scope,
+          names = "output$ir_group_filters_UI"
+        )
+      },
+      {
+        if (bound) {
+          session$setInputs(ir_tabs = tab)
+        }
+        values <<- list(
+          status = output$ir_selection_status_UI$html,
+          filters = if (bound) output$ir_group_filters_UI$html
+        )
+      }
+    )
+    values
+  }
+
+  kept <- page(c("Clonal UMAP", "Abundance"), "Abundance")
+  expect_match(kept$status, "Selection is available in Clonal projection.")
+  expect_match(kept$filters, "apply to the Clonal projection tab")
+
+  left_out <- page(c("Abundance", "Clone Sharing"), "Abundance")
+  expect_false(grepl("Clonal", paste(left_out$status, collapse = "")))
+  expect_false(grepl("Clonal", left_out$filters))
+  ## Nor while its strip is on the way.
+  early <- page(c("Abundance", "Clone Sharing"), "Abundance", bound = FALSE)
+  expect_null(early$status)
 })

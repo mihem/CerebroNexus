@@ -356,8 +356,14 @@ output[["ir_selection_status_UI"]] <- renderUI({
   if (!has_scRepertoire() || !ir_repertoire_available()) {
     return(NULL)
   }
-  active_tab <- input[["ir_tabs"]]
+  ## The tab the strip shows or will open on, so an App without the Clonal
+  ## projection never shows its selection status.
+  active_tab <- ir_tab()
   if (!is.null(active_tab) && !identical(active_tab, "Clonal UMAP")) {
+    ## No selection on this page when the App leaves the Clonal projection out.
+    if (!"Clonal UMAP" %in% ir_visible_tabs()) {
+      return(NULL)
+    }
     return(
       div(
         class = "cerebro-selection-status-slot",

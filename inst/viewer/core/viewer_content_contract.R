@@ -112,10 +112,11 @@ viewerImmuneRepertoireTabSelection <- function(value = NULL) {
 }
 
 ## The sub-tabs one dataset shows: the chosen tabs its sample count supports,
-## or every supported tab when none of the chosen ones is.
+## or every supported tab when none of the chosen ones is. An unknown count
+## (NULL, NA or 0) counts as one sample, so the strip is never empty.
 viewerImmuneRepertoireVisibleTabs <- function(options, dataset, n_samples) {
   tabs <- viewerImmuneRepertoireTabs()
-  supported <- tabs$id[tabs$min_samples <= max(0, n_samples, na.rm = TRUE)]
+  supported <- tabs$id[tabs$min_samples <= max(1, n_samples, na.rm = TRUE)]
   content <- options[["viewer_content"]]
   value <- if (
     is.list(content) &&

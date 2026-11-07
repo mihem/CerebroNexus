@@ -594,6 +594,9 @@ output$ir_group_filters_UI <- renderUI({
     return(NULL)
   }
   if (!identical(input$ir_tabs, "Clonal UMAP")) {
+    if (!"Clonal UMAP" %in% ir_visible_tabs()) {
+      return(helpText("These tabs have no group filters."))
+    }
     return(helpText("Group filters apply to the Clonal projection tab."))
   }
   groups <- tryCatch(getGroups(), error = function(e) character(0))
