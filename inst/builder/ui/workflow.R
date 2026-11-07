@@ -356,7 +356,12 @@ builder_server_browser_ui <- function(listing) {
     if (isTRUE(listing$truncated)) {
       tags$p(
         class = "builder-server-browser-empty",
-        "Only the first entries are listed; type the rest of the path."
+        paste0(
+          "Showing ",
+          length(listing$entries),
+          if (is.numeric(listing$total)) paste0(" of ", listing$total),
+          " entries. Type the path of one that is not listed."
+        )
       )
     }
   )

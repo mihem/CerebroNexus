@@ -344,7 +344,9 @@ builder_server_path_entries <- function(
     return(list(
       path = NULL,
       parent = NULL,
-      entries = lapply(roots, entry, kind = "directory", name = roots),
+      entries = lapply(unname(roots), function(root) {
+        entry(root, "directory", name = root)
+      }),
       truncated = FALSE
     ))
   }
@@ -360,6 +362,11 @@ builder_server_path_entries <- function(
   } else {
     character()
   }
+  ## Files are what a file choice is after, so they take the places first and
+  ## many subfolders cannot push them out of the list.
+  total <- length(folders) + length(files)
+  files <- utils::head(files, limit)
+  folders <- utils::head(folders, limit - length(files))
   entries <- c(
     lapply(folders, entry, kind = "directory"),
     lapply(files, entry, kind = "file")
@@ -370,8 +377,9 @@ builder_server_path_entries <- function(
   list(
     path = folder,
     parent = if (within) parent else NULL,
-    entries = utils::head(entries, limit),
-    truncated = length(entries) > limit
+    entries = entries,
+    truncated = total > limit,
+    total = total
   )
 }
 

@@ -167,5 +167,40 @@ test_that("the server path browser lists only inside the allowed folders", {
       "role=\"alert\"",
       fixed = TRUE
     )
+
+    ## Each allowed root is its own entry, named by itself.
+    second <- file.path(root, "second")
+    dir.create(second)
+    roots <- builder_server_path_entries(NULL, roots = c(allowed, second))
+    expect_identical(
+      names_of(roots),
+      c(allowed_real, normalizePath(second, winslash = "/"))
+    )
+
+    ## Many subfolders do not push the files out of a truncated list.
+    crowded <- file.path(allowed, "crowded")
+    dir.create(crowded)
+    for (i in seq_len(6L)) {
+      dir.create(file.path(crowded, sprintf("folder%02d", i)))
+    }
+    writeLines("{}", file.path(crowded, "zz-builder-project.json"))
+    listing <- builder_server_path_entries(
+      crowded,
+      "file",
+      pattern = "[.]json$",
+      roots = allowed,
+      limit = 4L
+    )
+    expect_true(listing$truncated)
+    expect_identical(listing$total, 7L)
+    expect_identical(
+      names_of(listing),
+      c("folder01", "folder02", "folder03", "zz-builder-project.json")
+    )
+    expect_match(
+      as.character(builder_server_browser_ui(listing)),
+      "Showing 4 of 7 entries. Type the path of one that is not listed.",
+      fixed = TRUE
+    )
   })
 })
