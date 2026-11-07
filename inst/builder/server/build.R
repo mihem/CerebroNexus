@@ -230,7 +230,10 @@ build_stage_status_projection <- reactive({
     } else {
       busy_note()
     },
-    result = result(),
+    result = builder_build_mark_stopped(
+      result(),
+      builder_build_stop_requested()
+    ),
     finalizing = finalizing,
     last_output_parent = builder_build_last_parent()
   )
@@ -572,6 +575,7 @@ enqueue_build_plan <- function(
     }
   }
   result(NULL)
+  builder_build_stop_requested(FALSE)
   build_operation_phase("preflight")
   queued <- enqueue(list(
     kind = "build",

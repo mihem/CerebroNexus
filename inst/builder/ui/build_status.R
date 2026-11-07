@@ -680,7 +680,9 @@ builder_build_status_model <- function(result) {
     failure_reasons = builder_build_failed_analysis_reasons(
       result$analysis_log
     ),
-    analysis_log = builder_build_text_lines(result$analysis_log)
+    analysis_log = builder_build_text_lines(result$analysis_log),
+    ## Set by builder_build_mark_stopped() when the user pressed Stop.
+    stopped = identical(type, "failure") && isTRUE(result$stopped)
   )
   structure(model, class = c("builder_build_status", "list"))
 }
@@ -1493,11 +1495,21 @@ builder_build_stage_status_validate <- function(model) {
 }
 
 builder_build_was_stopped <- function(model) {
-  identical(model$type, "failure") &&
-    is.character(model$message) &&
-    length(model$message) == 1L &&
-    !is.na(model$message) &&
-    startsWith(model$message, "Build stopped by the user")
+  identical(model$type, "failure") && isTRUE(model$stopped)
+}
+
+## A Build that failed after the user pressed Stop ended because of that Stop.
+## The flag is set here, from the session's Stop state, instead of matching
+## the many messages a stopped Build can end with.
+builder_build_mark_stopped <- function(result, stop_requested) {
+  if (
+    isTRUE(stop_requested) &&
+      is.list(result) &&
+      identical(result$state, "failure")
+  ) {
+    result$stopped <- TRUE
+  }
+  result
 }
 
 builder_build_stage_status_label <- function(model) {

@@ -299,13 +299,18 @@ test_that("an intentional build stop is distinct from a build failure", {
   env <- new.env(parent = environment())
   sys.source(builder_test_inst_path("builder", "ui", "inspect_stage.R"), env)
   sys.source(builder_test_inst_path("builder", "ui", "build_status.R"), env)
-  stopped <- env$builder_build_status_model(env$builder_result_failure(
-    "Build stopped by the user. The staged output was not published."
+  # The Stop state, not the message text, marks a stopped Build.
+  stopped <- env$builder_build_status_model(env$builder_build_mark_stopped(
+    env$builder_result_failure("The background worker stopped."),
+    stop_requested = TRUE
   ))
-  failed <- env$builder_build_status_model(env$builder_result_failure(
-    "Disk full."
+  failed <- env$builder_build_status_model(env$builder_build_mark_stopped(
+    env$builder_result_failure("Build stopped by the user."),
+    stop_requested = FALSE
   ))
   expect_true(env$builder_build_was_stopped(stopped))
+  expect_false(env$builder_build_was_stopped(failed))
+  expect_null(env$builder_build_mark_stopped(NULL, stop_requested = TRUE))
   expect_identical(
     env$builder_build_stage_status_label(list(
       state = "result",

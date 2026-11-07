@@ -2772,6 +2772,7 @@ observeEvent(
   {
     context <- isolate(release_settlement_context())
     if (is.list(context) && identical(context$status, "settling")) {
+      builder_build_stop_requested(TRUE)
       stop_builder_release_settlement(paste(
         "Build stopped by the user during release finalization.",
         "The staged output was not published."
