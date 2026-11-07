@@ -314,8 +314,15 @@ lost when the R process restarts.
 Behind a reverse proxy every request comes from the proxy's address. A
 loopback address (`127.0.0.1`, `::1`) or none at all is never counted as a
 client, so with a proxy on the same host only the per-account limit applies.
-A proxy on another host would make the per-client limit apply to all users
-together.
+
+**A proxy on another host (or a shared NAT or VPN address):** the Viewer sees
+one address that is not loopback for every user and counts it as one client.
+Five failed sign-ins from any users behind that address, for example five
+people each mistyping their own password, then make every user behind it wait,
+including a sixth user with the correct password. This is by design: the
+Viewer cannot tell users apart by an address they share. To count each user's
+own address instead, set `CEREBRO_AUTH_CLIENT_HEADER` as described below
+(`shiny::runApp()` behind nginx).
 
 **`shiny::runApp()` behind nginx or another proxy:** set
 `CEREBRO_AUTH_CLIENT_HEADER` in the R process to the header your proxy sets to
