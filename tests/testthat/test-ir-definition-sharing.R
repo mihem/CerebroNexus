@@ -357,10 +357,19 @@ test_that("the Clone Sharing bar labels name the chosen sharing unit", {
     unname(ir_env$ir_sharing_display_labels(NULL)["Private"]),
     "Private (1 sample)"
   )
-  ## A unit that already ends in "s" is not pluralised again.
+  ## A plural column name is singular for one value; a singular one ending
+  ## in "s" still gets its plural.
   expect_identical(
-    unname(ir_env$ir_sharing_display_labels("status")["Public"]),
-    "Shared (≥ 2 status)"
+    unname(ir_env$ir_sharing_display_labels("donors")[c("Private", "Public")]),
+    c("Private (1 donor)", "Shared (≥ 2 donors)")
+  )
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("status")[c("Private", "Public")]),
+    c("Private (1 status)", "Shared (≥ 2 statuses)")
+  )
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("batches")[c("Private", "Public")]),
+    c("Private (1 batch)", "Shared (≥ 2 batches)")
   )
 
   mk <- function(barcode, v, sample, site) {

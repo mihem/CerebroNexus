@@ -1420,7 +1420,9 @@ IR_BCR_SHM_CAVEAT <- "BCR: CDR3 not collapsed by SHM; clones may be split."
 ## them to self-explanatory axis labels. Two-class mode reuses the first two.
 ## The count in the Private and Shared labels is of the sharing unit's values,
 ## so it names the unit the user chose: "sample" -> "1 sample" / "≥ 2 samples",
-## "tissue_site" -> "1 tissue site" / "≥ 2 tissue sites".
+## "tissue_site" -> "1 tissue site" / "≥ 2 tissue sites". Column names may be
+## singular or plural, so the last word is put in both forms by common English
+## endings: "donors" -> "1 donor", "status" -> "≥ 2 statuses".
 ir_sharing_unit_noun <- function(unit_col) {
   noun <- if (
     is.character(unit_col) &&
@@ -1432,10 +1434,27 @@ ir_sharing_unit_noun <- function(unit_col) {
   } else {
     "sample"
   }
-  list(
-    one = noun,
-    many = if (grepl("s$", noun)) noun else paste0(noun, "s")
-  )
+  sub_end <- function(pattern, replacement, x) {
+    sub(pattern, replacement, x, ignore.case = TRUE, perl = TRUE)
+  }
+  one <- noun
+  one <- if (grepl("[^aeiou]ies$", one, ignore.case = TRUE)) {
+    sub_end("ies$", "y", one)
+  } else if (grepl("(ss|us|x|z|ch|sh)es$", one, ignore.case = TRUE)) {
+    sub_end("es$", "", one)
+  } else {
+    sub_end("([^sui])s$", "\\1", one)
+  }
+  many <- if (grepl("is$", one, ignore.case = TRUE)) {
+    sub_end("is$", "es", one)
+  } else if (grepl("(s|x|z|ch|sh)$", one, ignore.case = TRUE)) {
+    paste0(one, "es")
+  } else if (grepl("[^aeiou]y$", one, ignore.case = TRUE)) {
+    sub_end("y$", "ies", one)
+  } else {
+    paste0(one, "s")
+  }
+  list(one = one, many = many)
 }
 
 ir_sharing_display_labels <- function(unit_col = "sample") {
