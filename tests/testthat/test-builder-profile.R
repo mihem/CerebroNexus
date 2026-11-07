@@ -1006,6 +1006,28 @@ test_that("a logical metadata column is a group with FALSE/TRUE levels", {
   )
 })
 
+test_that("unused factor levels are not group levels", {
+  cells <- paste0("cell-", seq_len(8L))
+  unused <- paste0("unused-", seq_len(3000L))
+  metadata <- data.frame(
+    cluster = factor(
+      rep(c("B", "A", NA, "C"), 2L),
+      levels = c(unused[1:1500], "C", "B", unused[1501:3000], "A")
+    ),
+    row.names = cells
+  )
+
+  profiled <- builder_profile_metadata(metadata, cells)
+
+  expect_true(profiled$catalog$cluster$group_eligible)
+  expect_identical(profiled$groups$legacy$distinct[["cluster"]], 4L)
+  ## Level order is kept; only the used levels (and N/A for NA) remain.
+  expect_identical(
+    profiled$groups$legacy$levels$cluster,
+    c("C", "B", "A", "N/A")
+  )
+})
+
 test_that("describe_seurat offers a logical column as a group", {
   skip_if_not_installed("SeuratObject")
   builder_repo_source("inspect.R")

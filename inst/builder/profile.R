@@ -1165,7 +1165,9 @@ builder_profile_metadata <- function(meta, expected_cells) {
         if (length(full_counts) <= 100L) {
           legacy_counts[[name]] <- full_counts
           if (is.factor(values)) {
-            levels <- base::levels(values)
+            ## Unused levels would each get a colour; the build sets the
+            ## factor to exactly these levels, so the CRB drops them too.
+            levels <- base::levels(droplevels(values))
             if (anyNA(values) && !"N/A" %in% levels) {
               levels <- c(levels, "N/A")
             }

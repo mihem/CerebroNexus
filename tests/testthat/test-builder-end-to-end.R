@@ -1026,6 +1026,32 @@ test_that("a logical metadata column builds as a FALSE/TRUE group", {
   )
 })
 
+test_that("a factor with thousands of unused levels builds with its used levels", {
+  root <- withr::local_tempdir()
+  path <- builder_test_inst_path("extdata", "examples", "pbmc_SCE.rds")
+  object <- builder_adapter_inspect(builder_seurat_file_adapter(path))$object
+  used <- c("beta", "alpha", "gamma")
+  object$batch <- factor(
+    rep_len(used, ncol(object)),
+    levels = c(paste0("unused-", seq_len(3000L)), used)
+  )
+  built <- builder_e2e_build_object(object, root, function(settings) {
+    settings$groups <- unique(c(settings$groups, "batch"))
+    settings$included_groups <- unique(c(settings$included_groups, "batch"))
+    settings
+  })
+  expect_identical(built$entry$levels$batch, used)
+  expect_null(built$plan$error)
+  expect_identical(names(built$plan$items[[1L]]$colors$batch), used)
+  expect_identical(
+    built$result$state,
+    "success",
+    info = built$result$error %||% ""
+  )
+  crb <- qs2::qs_read(built$result$built[[1L]])
+  expect_identical(as.character(crb$getGroupLevels("batch")), used)
+})
+
 test_that("a source without numeric UMI/gene QC columns builds without them", {
   root <- withr::local_tempdir()
   path <- builder_test_inst_path("extdata", "examples", "pbmc_SCE.rds")
