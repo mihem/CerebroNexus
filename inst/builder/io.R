@@ -273,8 +273,13 @@ builder_server_path_resolve <- function(
   ) {
     stop("Enter an absolute server path.", call. = FALSE)
   }
+  ## A folder whose name really ends in a space keeps it; otherwise stray
+  ## spaces around a typed path are dropped.
+  if (!file.exists(path.expand(value))) {
+    value <- trimws(value)
+  }
   path <- tryCatch(
-    as.character(fs::path_real(path.expand(trimws(value)))),
+    as.character(fs::path_real(path.expand(value))),
     error = function(error) NULL
   )
   valid_path <- is.character(path) &&
@@ -1020,8 +1025,9 @@ builder_native_picker_result <- function(kind, select) {
       fallback = TRUE
     ))
   }
-  chosen <- trimws(as.character(chosen))
-  chosen <- chosen[!is.na(chosen) & nzchar(chosen)]
+  ## Keep the name as picked: a folder name may end in a space.
+  chosen <- as.character(chosen)
+  chosen <- chosen[!is.na(chosen) & nzchar(trimws(chosen))]
   if (!isTRUE(contract$multiple) && length(chosen)) {
     chosen <- chosen[[1L]]
   }

@@ -470,6 +470,22 @@ test_that("dataset picker returns every selected local path", {
   expect_identical(selected$paths, expected)
 })
 
+test_that("output folder picker keeps a trailing space in the name", {
+  skip_on_os("windows")
+  root <- withr::local_tempdir()
+  spaced <- file.path(root, "out ")
+  dir.create(spaced)
+  dir.create(file.path(root, "out"))
+
+  selected <- builder_native_picker_result(
+    "output_directory",
+    function() spaced
+  )
+
+  expect_identical(selected$status, "selected")
+  expect_identical(basename(selected$path), "out ")
+})
+
 test_that("native picker subprocess hides the Windows console host", {
   arguments <- NULL
   process <- builder_platform_picker_process(1L)

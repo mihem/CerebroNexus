@@ -345,8 +345,9 @@ builder_freeze_plan <- function(
       "invalid_output_directory"
     ))
   }
-  out_dir <- trimws(out_dir)
-  if (!nzchar(out_dir)) {
+  ## Not trimmed: a folder name may end in a space, and trimming would build
+  ## into a different folder.
+  if (!nzchar(trimws(out_dir))) {
     return(builder_plan_error(
       "Choose an output directory.",
       "missing_output_directory"

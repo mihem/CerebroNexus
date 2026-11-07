@@ -86,6 +86,24 @@ test_that("server path fallback resolves symlinks inside explicit roots", {
         fixed = TRUE
       )
     }
+
+    if (!identical(.Platform$OS.type, "windows")) {
+      spaced <- file.path(allowed, "out ")
+      dir.create(spaced)
+      dir.create(file.path(allowed, "out"))
+      expect_identical(
+        builder_server_path_resolve(spaced, "directory", roots = allowed),
+        normalizePath(spaced, winslash = "/", mustWork = TRUE)
+      )
+      expect_identical(
+        builder_server_path_resolve(
+          paste0(" ", file.path(allowed, "project"), "  "),
+          "directory",
+          roots = allowed
+        ),
+        normalizePath(inside, winslash = "/", mustWork = TRUE)
+      )
+    }
   })
 })
 
