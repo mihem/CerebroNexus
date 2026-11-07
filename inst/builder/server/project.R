@@ -3429,6 +3429,12 @@ observeEvent(input$cancel_builder_project_folder, {
 
 session$onSessionEnded(function() {
   builder_project_pending_folder(NULL)
+  # Partial files of the copy stopped here; removed once its worker is gone.
+  copy_parts <- vapply(
+    isolate(builder_project_source_run())$jobs %||% list(),
+    function(job) as.character(job$part %||% "")[[1L]],
+    character(1)
+  )
   invalidate_builder_project_source_sync(kill = TRUE)
   invalidate_builder_project_table_asset_save(kill = TRUE)
   invalidate_builder_project_open(kill = TRUE)
@@ -3455,6 +3461,7 @@ session$onSessionEnded(function() {
   # A running manifest transaction finishes before the writer ends; copies
   # were cancelled above and need no grace.
   builder_project_worker_close(builder_project_copier, kill = TRUE)
+  unlink(copy_parts[!is.na(copy_parts) & nzchar(copy_parts)], force = TRUE)
   builder_project_worker_close(builder_project_writer)
 })
 

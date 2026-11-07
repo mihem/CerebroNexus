@@ -1224,6 +1224,20 @@ test_that("a Save prunes Project files that nothing refers to any more", {
   )
   expect_true(file.exists(old_blob))
 
+  ## A few minutes on, only the partial file of the dead copy goes.
+  soon <- Sys.time() + 2 * runtime$.builder_project_dead_part_grace_seconds
+  expect_identical(
+    runtime$builder_project_prune_unreferenced(
+      root,
+      second$manifest,
+      now = soon
+    ),
+    substring(killed_part, nchar(root) + 2L)
+  )
+  expect_true(file.exists(live_part))
+  expect_true(file.exists(old_blob))
+  writeBin(charToRaw("partial"), killed_part)
+
   later <- Sys.time() + 2 * runtime$.builder_project_prune_grace_seconds
   removed <- runtime$builder_project_prune_unreferenced(
     root,

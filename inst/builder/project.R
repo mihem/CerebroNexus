@@ -8434,6 +8434,11 @@ builder_project_worker_close <- function(worker, kill = FALSE) {
 ## An unreferenced file touched more recently than this may belong to a copy,
 ## build or Save still running in another Builder window, so it is kept.
 .builder_project_prune_grace_seconds <- 3600
+## A partial copy whose process is gone on this host and that has not been
+## written to for this long is left over from a killed copy. A copy running
+## on another host (same pid number, other machine) keeps writing its file,
+## so its age stays below this.
+.builder_project_dead_part_grace_seconds <- 120
 
 ## Managed relative paths named anywhere in `value`, either as a relative
 ## path or as an absolute path under `root`.
@@ -8535,13 +8540,20 @@ builder_project_prune_unreferenced <- function(
     info <- file.info(paths, extra_cols = FALSE)
     as.double(difftime(now, pmax(info$mtime, info$ctime), units = "secs"))
   }
-  live_part <- function(path) {
+  # "live" or "dead" for a partial copy named after its process, else NA.
+  part_owner <- function(path) {
     matched <- regmatches(
       basename(path),
       regexec("\\.([0-9]+)-[^/]*\\.part$", basename(path))
     )[[1L]]
-    length(matched) == 2L &&
-      .builder_project_pid_alive(as.integer(matched[[2L]]))
+    if (length(matched) != 2L) {
+      return(NA_character_)
+    }
+    if (.builder_project_pid_alive(as.integer(matched[[2L]]))) {
+      "live"
+    } else {
+      "dead"
+    }
   }
   candidates <- character()
   for (name in .builder_project_prunable_root_names) {
@@ -8559,12 +8571,18 @@ builder_project_prune_unreferenced <- function(
   removed <- character()
   for (index in seq_along(candidates)) {
     path <- paths[[index]]
+    owner <- part_owner(path)
+    minimum_age <- if (identical(owner, "dead")) {
+      min(grace, .builder_project_dead_part_grace_seconds)
+    } else {
+      grace
+    }
     if (
       !is.finite(ages[[index]]) ||
-        ages[[index]] < grace ||
+        ages[[index]] < minimum_age ||
         dir.exists(path) ||
         .builder_project_path_has_link_within(path, root) ||
-        live_part(path)
+        identical(owner, "live")
     ) {
       next
     }
