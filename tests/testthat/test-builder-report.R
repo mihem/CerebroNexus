@@ -168,6 +168,24 @@ test_that("report JSON writes atomically and rereads exact schema identity", {
   expect_false(file.exists(paste0(path, ".tmp")))
 })
 
+test_that("report JSON keeps one-element lists as arrays", {
+  fixture <- builder_report_fixture()
+  report <- builder_build_report(fixture$plan, fixture$result)
+  path <- builder_write_build_report(fixture$stage, report)
+  json <- jsonlite::read_json(path, simplifyVector = FALSE)
+  dataset <- json$datasets[[1L]]
+
+  # One dataset, one method, one excluded column: still arrays.
+  expect_identical(json$dataset_order, list("dataset-a"))
+  expect_identical(json$private_assets, list("dataset-a.crb"))
+  expect_identical(json$warnings, list("Filtered orphan repertoire rows"))
+  expect_identical(dataset$methods, list("marker_genes"))
+  expect_identical(dataset$groups, list("cluster"))
+  expect_identical(dataset$metadata$excluded, list("secret_note"))
+  expect_identical(dataset$id, "dataset-a")
+  expect_identical(json$plan_revision, 12L)
+})
+
 test_that("not-applicable manifest dispositions round-trip as portable null", {
   fixture <- builder_report_fixture()
   fixture$plan$manifest$marker_genes <- list(

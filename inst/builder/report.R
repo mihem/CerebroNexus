@@ -232,6 +232,43 @@
   report
 }
 
+## The report as written to JSON: list-like fields stay arrays even with one
+## element, so a reader never gets a string where it expects a list.
+## builder_read_build_report() turns them back into character vectors.
+.builder_report_json_arrays <- function(report) {
+  as_array <- function(value) if (is.character(value)) I(value) else value
+  for (field in c(
+    "dataset_order",
+    "viewer_bundle_assets",
+    "private_assets",
+    "output_members",
+    "warnings"
+  )) {
+    report[[field]] <- as_array(report[[field]])
+  }
+  report$datasets <- lapply(report$datasets, function(dataset) {
+    for (field in c(
+      "artifact_members",
+      "methods",
+      "groups",
+      "projections",
+      "metadata_columns",
+      "pages"
+    )) {
+      dataset[[field]] <- as_array(dataset[[field]])
+    }
+    for (field in c("retained", "excluded", "forced")) {
+      dataset$metadata[[field]] <- as_array(dataset$metadata[[field]])
+    }
+    dataset
+  })
+  report$content <- lapply(report$content, function(entry) {
+    entry$pages <- as_array(entry$pages)
+    entry
+  })
+  report
+}
+
 .builder_report_nested_schema_valid <- function(report) {
   dataset_fields <- c(
     "id",
@@ -753,7 +790,7 @@ builder_write_build_report <- function(
   on.exit(unlink(temporary, force = TRUE), add = TRUE)
   tryCatch(
     .write_json(
-      unclass(report),
+      .builder_report_json_arrays(unclass(report)),
       temporary,
       auto_unbox = TRUE,
       null = "null",
