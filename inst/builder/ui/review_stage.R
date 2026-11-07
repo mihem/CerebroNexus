@@ -42,6 +42,11 @@ builder_review_options <- function(
   ) {
     stop("Review options are invalid.", call. = FALSE)
   }
+  ## The App server (httpuv) binds only IP addresses; "localhost" is this
+  ## machine.
+  if (identical(tolower(trimws(host)), "localhost")) {
+    host <- "127.0.0.1"
+  }
   structure(
     list(
       welcome_message = welcome_message,

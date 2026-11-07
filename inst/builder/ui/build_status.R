@@ -804,19 +804,29 @@ builder_app_run_options <- function(app_dir) {
   }
   port <- suppressWarnings(as.integer(options$port %||% NA_integer_))
   host <- options$host
+  ## httpuv binds only IP addresses; Apps built before "localhost" was
+  ## mapped at Review still carry the name.
+  if (
+    !builder_stage_has_text(host %||% "") ||
+      identical(tolower(trimws(host)), "localhost")
+  ) {
+    host <- "127.0.0.1"
+  }
   list(
     port = if (length(port) == 1L && !is.na(port) && port >= 1L) {
       port
     } else {
       8080L
     },
-    host = if (builder_stage_has_text(host %||% "")) host else "127.0.0.1"
+    host = host
   )
 }
 
 builder_port_is_free <- function(host, port) {
+  ## quiet: a busy port must not print "createTcpServer: address already in
+  ## use" to the console.
   server <- tryCatch(
-    suppressWarnings(httpuv::startServer(host, port, list())),
+    suppressWarnings(httpuv::startServer(host, port, list(), quiet = TRUE)),
     error = function(error) NULL
   )
   if (is.null(server)) {
