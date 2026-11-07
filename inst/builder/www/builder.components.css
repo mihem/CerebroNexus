@@ -2071,17 +2071,17 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
    the organism helper never makes its row taller than its neighbours. */
 .builder-stage-configure .builder-form-grid > .builder-field {
   position: relative;
-  padding-bottom: var(--space-6);
+  padding-bottom: var(--space-8);
 }
 .builder-stage-configure .builder-form-grid > .builder-field > .form-group {
   margin-bottom: 0;
 }
 .builder-field-help {
   position: absolute;
-  bottom: var(--space-1);
+  bottom: 0;
   left: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
   color: var(--c-text-muted);
   font-size: var(--builder-type-caption);
@@ -2102,11 +2102,14 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   color: var(--c-text-subtle);
   content: "·";
 }
-/* A text action, not a bordered button. */
+/* A text action, not a bordered button, but with the 2rem hit area of the
+   other small Builder buttons; the padding sits outside the text. */
 .btn.builder-organism-apply-all {
-  min-height: 0;
-  margin: 0;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  margin: 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
   border: 0;
   background: transparent;
   color: var(--builder-action);
@@ -2493,6 +2496,9 @@ body.modal-open #shiny-modal.modal { z-index: 2020; }
   margin: 0 auto;
 }
 .builder-notice-bar:empty { display: none; }
+/* After the R session ends the lost-connection notice stays readable and
+   clickable above Shiny's grey overlay (z-index 99999). */
+.builder-notice-bar.is-disconnected { z-index: 100000; }
 .builder-notice {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;

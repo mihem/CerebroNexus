@@ -264,6 +264,56 @@ test_that("builder interaction reflows and preserves accessible state", {
     "getComputedStyle(document.body).overflowY === 'hidden'"
   ))
 
+  ## Real Tab presses: from the open Organism list into "Custom organism",
+  ## then (Add is disabled while it is empty) on out of the closed list. The
+  ## list used to close under the moving focus and drop it to <body>.
+  chrome <- app$get_chromote_session()
+  press_tab <- function() {
+    for (type in c("rawKeyDown", "keyUp")) {
+      chrome$Input$dispatchKeyEvent(
+        type = type,
+        key = "Tab",
+        code = "Tab",
+        windowsVirtualKeyCode = 9L,
+        nativeVirtualKeyCode = 9L
+      )
+    }
+  }
+  app$run_js(paste0(
+    "var organism = document.getElementById('core-organism').selectize;",
+    "organism.$control[0].scrollIntoView({block: 'center'});",
+    "organism.focus(); organism.open();"
+  ))
+  app$wait_for_js(
+    "document.getElementById('core-organism').selectize.isOpen === true",
+    timeout = 5000
+  )
+  press_tab()
+  app$wait_for_js(
+    paste0(
+      "document.activeElement.classList.contains(",
+      "'builder-creatable-select-input') && ",
+      "document.getElementById('core-organism').selectize.isOpen === true"
+    ),
+    timeout = 5000
+  )
+  press_tab()
+  app$wait_for_js(
+    paste0(
+      "document.activeElement !== document.body && ",
+      "document.getElementById('core-organism').selectize.isOpen === false"
+    ),
+    timeout = 5000
+  )
+  ## "Apply to all unchecked" has the 2rem hit area of the small buttons.
+  expect_gte(
+    app$get_js(paste0(
+      "document.getElementById('core-organism_apply_all')",
+      ".getBoundingClientRect().height"
+    )),
+    31.5
+  )
+
   expect_false(app$get_js(
     "document.querySelector('.builder-select-initial') !== null"
   ))
@@ -636,6 +686,25 @@ test_that("builder interaction reflows and preserves accessible state", {
     ),
     timeout = 30000
   )
+
+  ## A lost session says so, with a Reload button above Shiny's grey overlay.
+  app$run_js("Shiny.shinyapp.$socket.close();")
+  app$wait_for_js(
+    paste0(
+      "document.querySelector('[data-notice-id=builder-disconnected] ",
+      ".builder-notice-action') !== null"
+    ),
+    timeout = 30000
+  )
+  expect_true(app$get_js(paste0(
+    "(() => {",
+    "const action = document.querySelector(",
+    "'[data-notice-id=builder-disconnected] .builder-notice-action');",
+    "const box = action.getBoundingClientRect();",
+    "return action.textContent === 'Reload' && document.elementFromPoint(",
+    "box.left + box.width / 2, box.top + box.height / 2) === action;",
+    "})()"
+  )))
 })
 
 test_that("duplicate spatial image names open a usable naming modal", {

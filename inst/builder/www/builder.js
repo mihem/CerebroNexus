@@ -48,6 +48,8 @@
   var managerTransitionSequence = 0;
   var datasetMutationsLocked = false;
   var builderConnectionReady = true;
+  // Set by the Reload button of the lost-connection notice: no leave prompt.
+  var builderReloadRequested = false;
   var builderWorkerReady = false;
   var builderWorkerStatusTimer = null;
   var datasetStartFocusToken = 0;
@@ -997,12 +999,15 @@
     else text.textContent = noticePlainText(message);
     node.appendChild(icon);
     node.appendChild(text);
-    if (message.action && message.action.label && message.action.click) {
+    var clientAction = message.action && typeof message.action.run === "function";
+    if (message.action && message.action.label && (message.action.click || clientAction)) {
       var action = document.createElement("button");
       action.type = "button";
       action.className = "builder-notice-action";
       action.textContent = message.action.label;
       action.addEventListener("click", function () {
+        // Notices made here in the browser may run a function instead.
+        if (clientAction) return message.action.run();
         var trigger = document.getElementById(message.action.click);
         if (trigger) trigger.click();
         dismissNotice(message);
@@ -4733,6 +4738,28 @@
       }, 0);
     }
 
+    // Tab from the open list goes into the custom field. Left to the browser,
+    // the list closes as the control loses focus, hiding the field that was
+    // about to receive it, and focus falls back to <body>.
+    var listInput = selectize.$control_input && selectize.$control_input[0];
+    if (listInput) {
+      listInput.addEventListener("keydown", function (event) {
+        if (event.key !== "Tab" || event.shiftKey || !selectize.isOpen) return;
+        event.preventDefault();
+        selectize.ignoreFocus = true;
+        input.focus();
+      });
+    }
+    // Leaving the custom field or Add by keyboard closes the list; a mouse
+    // click elsewhere is already handled by selectize.
+    row.addEventListener("focusout", function (event) {
+      var next = event.relatedTarget;
+      if (!next || row.contains(next) || selectize.$control[0].contains(next)) return;
+      selectize.ignoreFocus = false;
+      selectize.isFocused = false;
+      selectize.$control.removeClass("focus");
+      selectize.close();
+    });
     row.addEventListener("mousedown", function (event) {
       event.stopPropagation();
     });
@@ -6249,7 +6276,8 @@
     });
     applyBuilderActivityState();
   });
-  document.addEventListener("shiny:disconnected", function () {
+  function handleShinyDisconnected() {
+    showDisconnectedNotice();
     var feedback = document.getElementById("builder-project-pending-feedback");
     if (feedback) feedback.remove();
     builderConnectionReady = false;
@@ -6261,11 +6289,35 @@
       entry.state = "paused";
     });
     renderClientImportQueue();
-    scheduleStatusAnnouncement(
-      "Connection lost. Waiting to restore the import state."
-    );
     applyBuilderActivityState();
-  });
+  }
+  // Shiny triggers shiny:disconnected through jQuery, which never reaches a
+  // document.addEventListener() listener.
+  if (window.jQuery) {
+    window.jQuery(document).on("shiny:disconnected", handleShinyDisconnected);
+  } else {
+    document.addEventListener("shiny:disconnected", handleShinyDisconnected);
+  }
+  // Shiny greys the page out and says nothing; tell the user and offer a
+  // reload. The bar sits above Shiny's grey overlay while disconnected.
+  function showDisconnectedNotice() {
+    var bar = document.getElementById("builder-notice-bar");
+    if (bar) bar.classList.add("is-disconnected");
+    clearNoticesById("builder-disconnected");
+    showGlobalNotice({
+      id: "builder-disconnected",
+      type: "error",
+      text: "The Builder lost its connection to R. Reload the page to " +
+        "continue; if it does not load, start the Builder again in R.",
+      action: {
+        label: "Reload",
+        run: function () {
+          builderReloadRequested = true;
+          window.location.reload();
+        },
+      },
+    });
+  }
   document.addEventListener("shiny:sessioninitialized", function () {
     requestClientImportSync();
   });
@@ -6273,6 +6325,7 @@
     scheduleSpatialAlignmentScrollbars();
   });
   window.addEventListener("beforeunload", function (event) {
+    if (builderReloadRequested) return;
     if (
       builderActivityState.warn_before_unload !== true &&
       builderConnectionReady
