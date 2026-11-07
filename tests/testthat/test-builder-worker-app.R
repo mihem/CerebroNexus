@@ -1166,6 +1166,11 @@ test_that("release conversion keeps recovery secondary to the first error", {
     lost_lock$settlement_error,
     "The coordinator no longer owns the release lock."
   )
+  lost_process <- runtime$builder_release_settlement_result(
+    simpleError("The coordinator no longer owns the release lock."),
+    list(handle = list(target = moved))
+  )
+  expect_identical(lost_process$error, lost_lock$error)
 
   converted <- runtime$builder_release_settlement_result(
     list(

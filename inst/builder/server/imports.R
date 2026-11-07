@@ -1949,7 +1949,12 @@ builder_release_settlement_result <- function(
       builder_release_process_message(settled, target)
     )
     return(preserve_settlement_error(
-      builder_release_error_result(worker_error %||% settlement_error, target),
+      builder_release_error_result(
+        builder_release_gone_folder_message(target) %||%
+          worker_error %||%
+          settlement_error,
+        target
+      ),
       settlement_error
     ))
   }
@@ -1962,7 +1967,12 @@ builder_release_settlement_result <- function(
     try(builder_coordinator_abort(release$handle), silent = TRUE)
     settlement_error <- "The release process returned an invalid result."
     return(preserve_settlement_error(
-      builder_release_error_result(worker_error %||% settlement_error, target),
+      builder_release_error_result(
+        builder_release_gone_folder_message(target) %||%
+          worker_error %||%
+          settlement_error,
+        target
+      ),
       settlement_error
     ))
   }
