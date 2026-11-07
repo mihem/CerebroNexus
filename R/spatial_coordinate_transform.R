@@ -71,11 +71,17 @@
       is.na(value) ||
       !is.finite(value)
   ) {
-    stop(context, name, " must be one finite numeric scalar.", call. = FALSE)
+    stop(
+      context,
+      " ",
+      name,
+      " must be one finite numeric scalar.",
+      call. = FALSE
+    )
   }
   value <- as.numeric(value)
   if (isTRUE(positive) && value <= 0) {
-    stop(context, name, " must be strictly positive.", call. = FALSE)
+    stop(context, " ", name, " must be strictly positive.", call. = FALSE)
   }
   value
 }

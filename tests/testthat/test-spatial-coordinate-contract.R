@@ -424,14 +424,16 @@ test_that("coordinate transforms reject invalid scalar records", {
       list(rotation_degrees = Inf, scale = 1),
       data.frame(x = 0, y = 0)
     ),
-    "finite"
+    "Spatial coordinate transform rotation_degrees must be one finite",
+    fixed = TRUE
   )
   expect_error(
     .spx_coordinate_transform_normalize(
       list(rotation_degrees = 0, scale = 0),
       data.frame(x = 0, y = 0)
     ),
-    "strictly positive"
+    "Spatial coordinate transform scale must be strictly positive",
+    fixed = TRUE
   )
   expect_error(
     .spx_coordinate_transforms_normalize(

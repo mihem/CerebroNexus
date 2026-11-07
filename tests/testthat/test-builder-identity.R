@@ -254,6 +254,20 @@ test_that("projection downsampling preserves matched barcode identity", {
   )
 })
 
+test_that("preview sampling leaves the caller's random numbers alone", {
+  withr::local_seed(123L)
+  expected <- stats::runif(3L)
+  set.seed(123L)
+  first <- .builder_alignment_sample(500L, 20L)
+  expect_identical(stats::runif(3L), expected)
+  expect_identical(.builder_alignment_sample(500L, 20L), first)
+  expect_length(first, 20L)
+
+  rm(".Random.seed", envir = globalenv())
+  .builder_alignment_sample(500L, 20L)
+  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+})
+
 test_that("matching ids gives what the set operations on each id vector give", {
   set.seed(7)
   pool <- c(paste0("cell-", 1:40), "", NA)

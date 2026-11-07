@@ -12,6 +12,24 @@
 BUILDER_PREVIEW_MAX <- 1000L
 BUILDER_SPATIAL_PREVIEW_MAX <- 5000L
 
+## Sorted sample of `size` rows from `n`, the same every time, without
+## changing the caller's random number stream (.Random.seed is put back).
+.builder_seeded_sample <- function(n, size, seed) {
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  if (had_seed) {
+    saved <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  }
+  on.exit(
+    if (had_seed) {
+      assign(".Random.seed", saved, envir = globalenv())
+    } else {
+      rm(".Random.seed", envir = globalenv())
+    }
+  )
+  set.seed(seed)
+  sort(sample.int(n, size))
+}
+
 .builder_alignment_sample <- function(rows, max_cells) {
   max_cells <- suppressWarnings(as.integer(max_cells %||% BUILDER_PREVIEW_MAX))
   if (is.na(max_cells) || max_cells < 1L) {
@@ -20,8 +38,7 @@ BUILDER_SPATIAL_PREVIEW_MAX <- 5000L
   if (rows <= max_cells) {
     return(seq_len(rows))
   }
-  set.seed(42L)
-  sort(sample.int(rows, max_cells))
+  .builder_seeded_sample(rows, max_cells, 42L)
 }
 
 .builder_alignment_bounds <- function(frame) {
@@ -670,8 +687,7 @@ builder_preview_frame <- function(
   ## Deterministic downsampling: the same object always previews the same way,
   ## so a difference on screen means a difference in the data.
   if (nrow(df) > max_cells) {
-    set.seed(42L)
-    df <- df[sort(sample.int(nrow(df), max_cells)), , drop = FALSE]
+    df <- df[.builder_seeded_sample(nrow(df), max_cells, 42L), , drop = FALSE]
   }
   attr(df, "reduction") <- reduction
   attr(df, "capped") <- nrow(emb) > max_cells
@@ -811,9 +827,8 @@ builder_trajectory_preview_catalog <- function(
           drop = FALSE
         ]
         if (nrow(edge_frame) > max_edges) {
-          set.seed(43L)
           edge_frame <- edge_frame[
-            sort(sample.int(nrow(edge_frame), max_edges)),
+            .builder_seeded_sample(nrow(edge_frame), max_edges, 43L),
             ,
             drop = FALSE
           ]
