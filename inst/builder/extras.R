@@ -1603,7 +1603,7 @@ BUILDER_IMAGE_FULL_DECODE_THRESHOLD <- 32 * 1024^2
       return(
         chunk_length == 0 &&
           has_pixel_data &&
-          position + 12 == size &&
+          position + 12 <= size &&
           identical(checksum, .builder_png_crc32(chunk_type))
       )
     } else {
@@ -1894,7 +1894,10 @@ BUILDER_IMAGE_FULL_DECODE_THRESHOLD <- 32 * 1024^2
         return(missing_pixels())
       }
       seek(connection, where = total - 2L, origin = "start")
-      if (!identical(read_bytes(2L), as.raw(c(0xff, 0xd9)))) {
+      if (
+        !identical(read_bytes(2L), as.raw(c(0xff, 0xd9))) &&
+          !.builder_jpeg_has_end_marker(connection, entropy_start)
+      ) {
         return(incomplete())
       }
       if (orientation %in% 5:8) {
@@ -1925,24 +1928,55 @@ builder_image_file_dimensions <- function(path, filename = path) {
   .builder_jpeg_dimensions_from_connection(connection, file.size(path))
 }
 
+## Whether an end-of-image marker (FF D9) follows `from`. Entropy-coded JPEG
+## data never holds FF D9, so the first one ends the image; bytes after it
+## (camera trailers, padding) are ignored, as decoders do.
+.builder_jpeg_has_end_marker <- function(connection, from) {
+  seek(connection, where = from, origin = "start")
+  marker <- as.raw(c(0xff, 0xd9))
+  carry <- raw()
+  repeat {
+    chunk <- readBin(connection, what = "raw", n = 4L * 1024L^2)
+    if (!length(chunk)) {
+      return(FALSE)
+    }
+    bytes <- c(carry, chunk)
+    if (length(grepRaw(marker, bytes, fixed = TRUE))) {
+      return(TRUE)
+    }
+    carry <- bytes[length(bytes)]
+  }
+}
+
+## A complete image may be followed by extra bytes, which decoders ignore. The
+## JPEG end marker is checked while reading its dimensions; a PNG must reach
+## its IEND chunk.
 .builder_image_has_complete_terminator <- function(path, mime) {
   size <- suppressWarnings(as.numeric(file.info(path)$size[[1L]]))
   if (!is.finite(size) || size < 12) {
     return(FALSE)
   }
+  if (!identical(mime, "image/png")) {
+    return(TRUE)
+  }
   connection <- file(path, open = "rb")
   on.exit(close(connection), add = TRUE)
-  if (identical(mime, "image/png")) {
-    seek(connection, where = size - 12, origin = "start")
-    tail <- readBin(connection, what = "raw", n = 12L)
-    return(
-      length(tail) == 12L &&
-        identical(tail[1:4], as.raw(c(0x00, 0x00, 0x00, 0x00))) &&
-        identical(tail[5:8], charToRaw("IEND"))
-    )
+  position <- 8
+  repeat {
+    seek(connection, where = position, origin = "start")
+    header <- readBin(connection, what = "raw", n = 8L)
+    if (length(header) != 8L) {
+      return(FALSE)
+    }
+    chunk_length <- .builder_image_uint32_be(header[1:4])
+    if (!is.finite(chunk_length) || position + chunk_length + 12 > size) {
+      return(FALSE)
+    }
+    if (identical(header[5:8], charToRaw("IEND"))) {
+      return(chunk_length == 0)
+    }
+    position <- position + chunk_length + 12
   }
-  seek(connection, where = size - 2L, origin = "start")
-  identical(readBin(connection, what = "raw", n = 2L), as.raw(c(0xff, 0xd9)))
 }
 
 #' Validate PNG/JPEG metadata while retaining its canonical source path.

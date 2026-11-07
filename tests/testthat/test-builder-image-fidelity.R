@@ -235,6 +235,44 @@ test_that("Builder has no default decoded-pixel budget", {
   )
 })
 
+test_that("a complete PNG or JPEG followed by extra bytes is accepted", {
+  skip_if_not_installed("png")
+  skip_if_not_installed("jpeg")
+  pixels <- array(seq(0, 1, length.out = 90L), c(5L, 6L, 3L))
+  sources <- c(
+    png = withr::local_tempfile(fileext = ".png"),
+    jpeg = withr::local_tempfile(fileext = ".jpg")
+  )
+  png::writePNG(pixels, sources[["png"]])
+  jpeg::writeJPEG(pixels, sources[["jpeg"]])
+  trailers <- list(
+    zeros = raw(64L),
+    text = charToRaw("trailing camera data"),
+    big = as.raw(rep(0x41, 5L * 1024L^2))
+  )
+  for (kind in names(sources)) {
+    bytes <- readBin(sources[[kind]], "raw", n = file.size(sources[[kind]]))
+    for (trailer in names(trailers)) {
+      padded <- withr::local_tempfile(
+        fileext = paste0(".", tools::file_ext(sources[[kind]]))
+      )
+      writeBin(c(bytes, trailers[[trailer]]), padded)
+      image <- builder_read_image(padded)
+      expect_null(image$error, info = paste(kind, trailer))
+      expect_equal(image$width, 6, info = paste(kind, trailer))
+      expect_equal(image$height, 5, info = paste(kind, trailer))
+    }
+  }
+  ## A JPEG cut short stays refused even with bytes appended after the cut.
+  bytes <- readBin(sources[["jpeg"]], "raw", n = file.size(sources[["jpeg"]]))
+  cut <- withr::local_tempfile(fileext = ".jpg")
+  writeBin(c(bytes[seq_len(length(bytes) - 2L)], raw(16L)), cut)
+  expect_identical(
+    builder_read_image(cut)$error,
+    "The image file is incomplete or truncated."
+  )
+})
+
 test_that("truncated JPEG uploads are rejected before they enter a project", {
   skip_if_not_installed("jpeg")
   complete <- withr::local_tempfile(fileext = ".jpg")
