@@ -321,3 +321,44 @@ test_that("an intentional build stop is distinct from a build failure", {
     "Build failed"
   )
 })
+
+test_that("release process errors name a gone or read-only output folder", {
+  env <- new.env(parent = environment())
+  sys.source(builder_test_inst_path("builder", "ui", "inspect_stage.R"), env)
+  sys.source(builder_test_inst_path("builder", "ui", "build_status.R"), env)
+  parent <- withr::local_tempdir()
+  target <- file.path(parent, "CerebroNexus_viewer_abcdef")
+  wrapped <- structure(
+    class = c("callr_status_error", "callr_error", "error", "condition"),
+    list(
+      message = "! in callr subprocess.",
+      parent = simpleError(
+        "The release control directory could not be created."
+      )
+    )
+  )
+
+  expect_identical(
+    env$builder_release_process_message(wrapped, target),
+    "The release control directory could not be created."
+  )
+  expect_identical(
+    env$builder_release_process_message(simpleError("Plain."), NULL),
+    "Plain."
+  )
+  gone <- file.path(parent, "moved", "CerebroNexus_viewer_abcdef")
+  expect_match(
+    env$builder_release_process_message(wrapped, gone),
+    paste0("The output folder ", dirname(gone), " no longer exists"),
+    fixed = TRUE
+  )
+  skip_on_os("windows")
+  skip_if(identical(unname(Sys.info()[["user"]]), "root"))
+  Sys.chmod(parent, "0555")
+  withr::defer(Sys.chmod(parent, "0755"))
+  expect_match(
+    env$builder_release_process_message(wrapped, target),
+    paste0("The output folder ", parent, " is read-only"),
+    fixed = TRUE
+  )
+})

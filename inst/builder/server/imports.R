@@ -1188,7 +1188,9 @@ dispatch_builder_worker_request <- function(dispatched, preparation = NULL) {
       finish_builder_build_dispatch_failure(
         isolate(protocol()),
         request,
-        builder_result_failure(conditionMessage(preparation))
+        builder_result_failure(
+          builder_release_process_message(preparation, plan$out_dir)
+        )
       )
       return()
     }
@@ -1985,7 +1987,7 @@ builder_release_settlement_result <- function(
     try(builder_coordinator_abort(release$handle), silent = TRUE)
     settlement_error <- paste0(
       "The completed Build could not be published: ",
-      conditionMessage(settled)
+      builder_release_process_message(settled, target)
     )
     return(preserve_settlement_error(
       builder_release_error_result(worker_error %||% settlement_error, target),

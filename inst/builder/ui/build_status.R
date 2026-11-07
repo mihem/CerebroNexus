@@ -538,6 +538,33 @@ builder_release_error_result <- function(
   builder_result_failure(message)
 }
 
+## A plain message for an error raised in a release process. A gone or
+## read-only output folder is named; any other error loses callr's
+## "in callr subprocess" wrapper.
+builder_release_process_message <- function(error, target = NULL) {
+  folder <- if (builder_stage_has_text(target %||% "")) dirname(target)
+  if (!is.null(folder) && !dir.exists(folder)) {
+    return(paste0(
+      "The output folder ",
+      folder,
+      " no longer exists. Choose another folder and build again."
+    ))
+  }
+  if (!is.null(folder) && !identical(unname(file.access(folder, 2L)), 0L)) {
+    return(paste0(
+      "The output folder ",
+      folder,
+      " is read-only. Choose a folder you can write to and build again."
+    ))
+  }
+  while (
+    inherits(error, "callr_error") && inherits(error$parent, "condition")
+  ) {
+    error <- error$parent
+  }
+  if (inherits(error, "condition")) conditionMessage(error) else error
+}
+
 builder_as_result <- function(result) {
   if (
     !is.list(result) ||

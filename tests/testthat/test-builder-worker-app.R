@@ -1176,8 +1176,10 @@ test_that("release conversion keeps recovery secondary to the first error", {
   runtime$builder_result_recovery_required <- builder_result_recovery_required
   runtime$builder_result_failure <- builder_result_failure
   runtime$builder_as_result <- builder_as_result
+  runtime$builder_release_process_message <- builder_release_process_message
   runtime$builder_coordinator_abort <- function(handle) list(aborted = TRUE)
   eval(parse(text = paste(lines[first:(last - 1L)], collapse = "\n")), runtime)
+  release <- file.path(withr::local_tempdir(), "release")
 
   converted <- runtime$builder_release_settlement_result(
     list(
@@ -1189,7 +1191,7 @@ test_that("release conversion keeps recovery secondary to the first error", {
         message = "Restore the preserved release."
       )
     ),
-    list(handle = list(target = "/release"))
+    list(handle = list(target = release))
   )
 
   expect_s3_class(converted, "builder_result_recovery_required")
@@ -1202,7 +1204,7 @@ test_that("release conversion keeps recovery secondary to the first error", {
 
   child_exit <- runtime$builder_release_settlement_result(
     simpleError("owner subprocess exited", call = quote(settle_release())),
-    list(handle = list(target = "/release")),
+    list(handle = list(target = release)),
     builder_result_failure("original worker build failure")
   )
 
@@ -1221,7 +1223,7 @@ test_that("release conversion keeps recovery secondary to the first error", {
       error = "The release process could not start: unavailable",
       recovery = NULL
     ),
-    list(handle = list(target = "/release")),
+    list(handle = list(target = release)),
     builder_result_failure("original worker build failure")
   )
   expect_identical(start_failure$error, "original worker build failure")
