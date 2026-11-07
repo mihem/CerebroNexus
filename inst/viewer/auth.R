@@ -293,7 +293,10 @@
   on_wait = function(seconds) NULL
 ) {
   function(user, password) {
-    account <- tolower(trimws(paste(as.character(user), collapse = "")))
+    ## The name exactly as typed: the provider matches account names exactly
+    ## (case and Unicode form included), so "Alice" and "alice" are different
+    ## accounts and share no count.
+    account <- paste(as.character(user), collapse = "")
     keys <- paste0("account:", account)
     ## A loopback or unknown address is a proxy on this host (Shiny Server
     ## always is one), shared by every user: then only the account counts.

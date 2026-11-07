@@ -755,6 +755,28 @@ test_that("a loopback or unknown client does not lock out every user", {
   }
 })
 
+test_that("the sign-in limiter counts account names as the provider matches them", {
+  runtime <- viewer_auth_runtime_environment()
+  limiter <- runtime$.viewer_auth_limiter(clock = function() 0)
+  ## Account names match exactly, like shinymanager's check.
+  accounts <- c("alice", "Alice", "caf\u00e9", "cafe\u0301")
+  checker <- function(user, password) {
+    list(result = user %in% accounts && identical(password, "right"))
+  }
+  check <- runtime$.viewer_auth_limited_checker(checker, limiter, "unknown")
+  for (i in 1:5) {
+    check("Alice", "guess")
+    check("caf\u00e9", "guess")
+  }
+  expect_false(check("Alice", "right")$result)
+  expect_false(check("caf\u00e9", "right")$result)
+  ## A different case or Unicode form is a different account.
+  expect_true(check("alice", "right")$result)
+  expect_true(check("cafe\u0301", "right")$result)
+  ## And its sign-in does not clear the locked account's count.
+  expect_false(check("Alice", "right")$result)
+})
+
 test_that("the sign-in limiter drops expired entries", {
   runtime <- viewer_auth_runtime_environment()
   now <- 0
