@@ -794,6 +794,38 @@ builder_wsl_picker_paths <- function(paths, .run = processx::run) {
   converted
 }
 
+## Shiny refuses an upload above shiny.maxRequestSize (set by
+## launchCerebroBuilder(max_file_size)) without telling the page. NULL when
+## the file fits.
+builder_upload_limit_message <- function(
+  name,
+  size,
+  limit = getOption("shiny.maxRequestSize")
+) {
+  limit <- suppressWarnings(as.numeric(limit)[1L])
+  size <- suppressWarnings(as.numeric(size)[1L])
+  if (
+    length(limit) != 1L ||
+      !is.finite(limit) ||
+      limit <= 0 ||
+      length(size) != 1L ||
+      !is.finite(size) ||
+      size <= limit
+  ) {
+    return(NULL)
+  }
+  mb <- function(bytes) format(signif(bytes / 1024^2, 3), big.mark = ",")
+  paste0(
+    name %||% "The file",
+    " is ",
+    mb(size),
+    " MB, larger than the ",
+    mb(limit),
+    " MB upload limit. Restart the Builder with a larger ",
+    "launchCerebroBuilder(max_file_size = ...) to add it."
+  )
+}
+
 builder_native_picker_spec <- function(
   kind = c(
     "output_directory",

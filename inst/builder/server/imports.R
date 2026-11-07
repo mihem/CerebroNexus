@@ -595,6 +595,15 @@ observeEvent(input$builder_client_import_dispatch, {
     pending_client_import_dispatch(NULL)
     return()
   }
+  too_large <- builder_upload_limit_message(event$name, event$size)
+  if (!is.null(too_large)) {
+    release_client_import(
+      event$client_id %||% NULL,
+      outcome = "rejected",
+      message = too_large
+    )
+    return()
+  }
   pending_client_import_dispatch(list(
     client_id = event$client_id %||% NULL,
     name = event$name %||% NULL,

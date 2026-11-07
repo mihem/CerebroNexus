@@ -486,6 +486,20 @@ test_that("output folder picker keeps a trailing space in the name", {
   expect_identical(basename(selected$path), "out ")
 })
 
+test_that("an upload above max_file_size is refused with the limit", {
+  message <- builder_upload_limit_message(
+    "big.rds",
+    12 * 1024^2,
+    limit = 5 * 1024^2
+  )
+  expect_match(message, "big.rds is 12 MB", fixed = TRUE)
+  expect_match(message, "larger than the 5 MB upload limit", fixed = TRUE)
+  expect_match(message, "max_file_size", fixed = TRUE)
+  expect_null(builder_upload_limit_message("ok.rds", 1024, limit = 5 * 1024^2))
+  expect_null(builder_upload_limit_message("big.rds", 1e12, limit = Inf))
+  expect_null(builder_upload_limit_message("big.rds", 1e12, limit = NULL))
+})
+
 test_that("native picker subprocess hides the Windows console host", {
   arguments <- NULL
   process <- builder_platform_picker_process(1L)
