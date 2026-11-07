@@ -3927,6 +3927,36 @@ wait_for_builder_project_open_worker <- function(actions, ready) {
   invisible("waiting")
 }
 
+## A source copy that finished after the last Save was accepted at Open; the
+## manifest on disk still says "pending". Write it, so the Project file says
+## what the page shows ("Saved").
+write_builder_project_accepted_sources <- function(manifest) {
+  start_builder_project_manifest_write(
+    manifest,
+    isolate(builder_project()),
+    function(written) {
+      if (inherits(written, "condition")) {
+        builder_project_last_save_error(conditionMessage(written))
+        builder_notify(
+          "error",
+          paste(
+            "The finished source copy could not be recorded in the Project:",
+            conditionMessage(written),
+            "Select Save to retry."
+          ),
+          id = "builder-project-save-error"
+        )
+        return(invisible(FALSE))
+      }
+      project <- isolate(builder_project())
+      project$manifest <- written$manifest
+      project$path <- written$path
+      builder_project(project)
+      invisible(TRUE)
+    }
+  )
+}
+
 complete_builder_project_open <- function(actions = NULL) {
   pending <- isolate(builder_project_restore())
   operation <- isolate(builder_project_operation_phase())
@@ -4045,7 +4075,12 @@ complete_builder_project_open <- function(actions = NULL) {
   builder_project_skipped_ids(skipped_ids)
   builder_project_removed_ids(prepared$removed_ids)
   relinked_ids <- character()
+  accepted_ids <- character()
   manifest$datasets <- lapply(manifest$datasets %||% list(), function(record) {
+    if (isTRUE(record$runtime_source_accepted)) {
+      accepted_ids <<- c(accepted_ids, record$id)
+    }
+    record$runtime_source_accepted <- NULL
     if (is.list(record$runtime_relink)) {
       # The Project keeps the gone source until a Save copies the chosen
       # file in.
@@ -4072,6 +4107,9 @@ complete_builder_project_open <- function(actions = NULL) {
   builder_notify_clear("builder-project-open-error")
   builder_notify_clear("builder-project-save-error")
   restore_builder_project_preferences(manifest)
+  if (length(accepted_ids)) {
+    write_builder_project_accepted_sources(manifest)
+  }
   builder_project_restore(NULL)
   builder_project_open_actions(NULL)
   builder_project_open_wait(NULL)

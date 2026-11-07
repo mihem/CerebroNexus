@@ -1515,3 +1515,62 @@ test_that("an Open that works clears the error of an earlier failed Open", {
     expect_identical(isolate(builder_project())$root, root)
   })
 })
+
+test_that("Open writes back a source copy that finished after the last Save", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("callr")
+  runtime <- builder_responsiveness_runtime()
+  root <- withr::local_tempdir()
+  uploads <- withr::local_tempdir()
+  source <- file.path(uploads, "ds1.rds")
+  saveRDS(list(id = "ds1"), source)
+  md5 <- unname(tools::md5sum(source))
+  entry <- list(
+    id = "ds1",
+    revision = 1L,
+    path = source,
+    filename = "sample.rds",
+    settings = list(name = "Sample A"),
+    acknowledgements = character(),
+    spatial_drafts = list(),
+    snapshot = list(source_fingerprint = paste0("builder-snapshot-v2:", md5))
+  )
+  built <- runtime$builder_project_build_manifest(
+    list(entry),
+    list(root = root, manifest = runtime$builder_project_new_manifest(root)),
+    list(
+      checked = character(),
+      artifacts = list(),
+      skipped_ids = character(),
+      configuration = list(),
+      last_ui = list()
+    )
+  )
+  saved <- runtime$builder_project_write(
+    built$manifest,
+    root,
+    expected_revision = 0L
+  )
+  ## The copy finished, but the page was gone before the manifest said so.
+  dir.create(dirname(built$jobs[[1L]]$target), recursive = TRUE)
+  file.copy(source, built$jobs[[1L]]$target)
+  status_on_disk <- function() {
+    runtime$builder_project_read(saved$path)$datasets[[1L]]$source$status
+  }
+  expect_identical(status_on_disk(), "pending")
+  snapshot <- runtime$builder_project_open_snapshot(saved$path)
+  expect_identical(snapshot$manifest$datasets[[1L]]$source$status, "ready")
+
+  app_env <- builder_responsiveness_app()
+  shiny::testServer(app_env$server, {
+    builder_project_restore(snapshot)
+    expect_true(isTRUE(complete_builder_project_open(list(ds1 = "skip"))))
+    expect_true(builder_responsiveness_run_later(
+      function() identical(status_on_disk(), "ready"),
+      timeout = 60
+    ))
+    expect_null(
+      isolate(builder_project())$manifest$datasets[[1L]]$runtime_source_accepted
+    )
+  })
+})

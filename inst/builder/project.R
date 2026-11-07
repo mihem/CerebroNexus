@@ -7031,6 +7031,8 @@ builder_project_accept_finished_source <- function(record, root) {
   source$error <- NULL
   source$fingerprint <- fingerprint
   record$source <- source
+  # Open writes the accepted source back, so the file says what the page does.
+  record$runtime_source_accepted <- TRUE
   record
 }
 
@@ -7164,6 +7166,7 @@ builder_project_normalize_manifest <- function(manifest) {
     record$cache <- NULL
     record$runtime_restore_status <- NULL
     record$runtime_restore_action <- NULL
+    record$runtime_source_accepted <- NULL
     record
   })
   last_ui <- manifest$last_ui %||% list()
@@ -8605,6 +8608,7 @@ builder_project_write <- function(
   manifest$datasets <- lapply(manifest$datasets %||% list(), function(record) {
     record$runtime_restore_status <- NULL
     record$runtime_restore_action <- NULL
+    record$runtime_source_accepted <- NULL
     record
   })
   target <- builder_project_manifest_path(root)
