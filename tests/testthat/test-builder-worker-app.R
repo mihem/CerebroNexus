@@ -1136,9 +1136,36 @@ test_that("release conversion keeps recovery secondary to the first error", {
   runtime$builder_result_failure <- builder_result_failure
   runtime$builder_as_result <- builder_as_result
   runtime$builder_release_process_message <- builder_release_process_message
+  runtime$builder_release_gone_folder_message <-
+    builder_release_gone_folder_message
   runtime$builder_coordinator_abort <- function(handle) list(aborted = TRUE)
   eval(parse(text = paste(lines[first:(last - 1L)], collapse = "\n")), runtime)
   release <- file.path(withr::local_tempdir(), "release")
+
+  # An output folder moved during the build names the folder, not the lock.
+  moved <- file.path(withr::local_tempdir(), "moved", "release")
+  lost_lock <- runtime$builder_release_settlement_result(
+    list(
+      ok = FALSE,
+      error = "The coordinator no longer owns the release lock.",
+      recovery = NULL
+    ),
+    list(handle = list(target = moved)),
+    builder_result_failure("cannot open file")
+  )
+  expect_identical(
+    lost_lock$error,
+    paste0(
+      "The output folder ",
+      dirname(moved),
+      " was moved or deleted during the build. ",
+      "Choose a folder and build again."
+    )
+  )
+  expect_identical(
+    lost_lock$settlement_error,
+    "The coordinator no longer owns the release lock."
+  )
 
   converted <- runtime$builder_release_settlement_result(
     list(

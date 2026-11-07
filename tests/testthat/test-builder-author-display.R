@@ -354,7 +354,7 @@ test_that("release process errors name a gone or read-only output folder", {
   gone <- file.path(parent, "moved", "CerebroNexus_viewer_abcdef")
   expect_match(
     env$builder_release_process_message(wrapped, gone),
-    paste0("The output folder ", dirname(gone), " no longer exists"),
+    paste0("The output folder ", dirname(gone), " was moved or deleted"),
     fixed = TRUE
   )
   skip_on_os("windows")

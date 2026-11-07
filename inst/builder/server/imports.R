@@ -1971,7 +1971,10 @@ builder_release_settlement_result <- function(
     settlement_error <- settled$settlement_error %||%
       settled$error %||%
       "The completed Build could not be published."
-    primary_error <- worker_error %||% settlement_error
+    # A moved or deleted output folder explains any error that follows.
+    primary_error <- builder_release_gone_folder_message(target) %||%
+      worker_error %||%
+      settlement_error
     if (
       is.list(recovery) &&
         identical(recovery$state, "recovery_required")

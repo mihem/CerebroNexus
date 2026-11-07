@@ -538,18 +538,28 @@ builder_release_error_result <- function(
   builder_result_failure(message)
 }
 
+## The Build card message when the output folder of `target` is gone, or NULL.
+builder_release_gone_folder_message <- function(target = NULL) {
+  folder <- if (builder_stage_has_text(target %||% "")) dirname(target)
+  if (is.null(folder) || dir.exists(folder)) {
+    return(NULL)
+  }
+  paste0(
+    "The output folder ",
+    folder,
+    " was moved or deleted during the build. Choose a folder and build again."
+  )
+}
+
 ## A plain message for an error raised in a release process. A gone or
 ## read-only output folder is named; any other error loses callr's
 ## "in callr subprocess" wrapper.
 builder_release_process_message <- function(error, target = NULL) {
-  folder <- if (builder_stage_has_text(target %||% "")) dirname(target)
-  if (!is.null(folder) && !dir.exists(folder)) {
-    return(paste0(
-      "The output folder ",
-      folder,
-      " no longer exists. Choose another folder and build again."
-    ))
+  gone <- builder_release_gone_folder_message(target)
+  if (!is.null(gone)) {
+    return(gone)
   }
+  folder <- if (builder_stage_has_text(target %||% "")) dirname(target)
   if (!is.null(folder) && !identical(unname(file.access(folder, 2L)), 0L)) {
     return(paste0(
       "The output folder ",
