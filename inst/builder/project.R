@@ -3556,7 +3556,8 @@ builder_project_write_dataset_config <- function(
       !dir.create(target_dir, recursive = TRUE, showWarnings = FALSE)
   ) {
     stop(
-      "The dataset configuration directory could not be created.",
+      "The dataset configuration directory could not be created. ",
+      "Check that you can write to the project folder.",
       call. = FALSE
     )
   }
@@ -3608,9 +3609,23 @@ builder_project_write_dataset_config <- function(
     fileext = ".part"
   )
   on.exit(unlink(temporary, force = TRUE), add = TRUE)
-  written <- tryCatch(.write(payload, temporary), error = identity)
+  # file() only warns why it cannot open ("Permission denied"); keep that.
+  written <- tryCatch(
+    withCallingHandlers(
+      .write(payload, temporary),
+      warning = function(warning) stop(conditionMessage(warning), call. = FALSE)
+    ),
+    error = identity
+  )
   if (inherits(written, "condition") || !file.exists(temporary)) {
-    stop("A Project configuration could not be written.", call. = FALSE)
+    stop(
+      "A Project configuration could not be written",
+      if (inherits(written, "condition")) {
+        paste0(": ", conditionMessage(written))
+      },
+      ". Check that you can write to the project folder.",
+      call. = FALSE
+    )
   }
   staged_fingerprint <- builder_project_file_fingerprint(
     temporary,

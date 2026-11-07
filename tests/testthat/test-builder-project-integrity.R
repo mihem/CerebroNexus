@@ -121,6 +121,25 @@ test_that("configuration publication closes, parses, and verifies before commit"
   )
 })
 
+test_that("a configuration write into a read-only folder names the cause", {
+  skip_on_os("windows")
+  skip_if(identical(unname(Sys.info()[["effective_user"]]), "root"))
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  configs <- file.path(root, "datasets", "ds1", "configs")
+  dir.create(configs, recursive = TRUE)
+  Sys.chmod(configs, "0555")
+  withr::defer(Sys.chmod(configs, "0755"))
+
+  expect_error(
+    runtime$builder_project_write_dataset_config(
+      builder_project_integrity_entry(),
+      root
+    ),
+    "could not be written: .*Permission denied.*write to the project folder"
+  )
+})
+
 test_that("unchanged immutable configurations skip temporary publication", {
   runtime <- builder_project_integrity_runtime()
   root <- withr::local_tempdir()
