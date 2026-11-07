@@ -1371,6 +1371,34 @@ test_that("two copies of the same source never share a partial file", {
   expect_false(file.exists(second$part))
 })
 
+test_that("a Save drops datasets removed in this session", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_responsiveness_app()
+
+  shiny::testServer(app_env$server, {
+    server_env <- environment(builder_project_session_removed_ids)
+    server_env$sets <- function(value) list(list(id = "ds1"))
+    builder_project(list(
+      root = withr::local_tempdir(),
+      path = "builder-project.json",
+      name = "P",
+      manifest = list(
+        schema_version = 3L,
+        project = list(id = "p1", name = "P", revision = 2L),
+        datasets = lapply(
+          c("ds1", "ds2", "ds3", "ds4"),
+          function(id) list(id = id)
+        )
+      )
+    ))
+    ## ds3 was skipped at Open and ds4 is still loading; ds2 was removed.
+    builder_project_skipped_ids("ds3")
+    builder_project_pending_entries(list(ds4 = list(id = "ds4")))
+    expect_identical(builder_project_session_removed_ids(), "ds2")
+    expect_identical(builder_project_manifest_context()$removed_ids, "ds2")
+  })
+})
+
 test_that("a Project copy changed after Save is reported as such on load", {
   skip_if_not_installed("shiny")
   app_env <- builder_responsiveness_app()

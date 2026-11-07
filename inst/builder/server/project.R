@@ -2260,12 +2260,33 @@ request_builder_project_source_sync <- function(jobs) {
   invisible(isTRUE(builder_project_start_source_sync()))
 }
 
+## Saved datasets that are not in the workspace, were not skipped at Open and
+## are not still loading were removed in this session; the Save drops them
+## instead of keeping them as Skip rows.
+builder_project_session_removed_ids <- function() {
+  project <- isolate(builder_project())
+  saved_ids <- names(builder_project_record_map(project$manifest))
+  kept_ids <- c(
+    vapply(isolate(sets()), `[[`, character(1), "id"),
+    isolate(builder_project_skipped_ids()),
+    names(isolate(builder_project_pending_entries())),
+    tryCatch(
+      builder_import_active_ids(isolate(imports())),
+      error = function(error) saved_ids
+    )
+  )
+  setdiff(saved_ids, kept_ids)
+}
+
 builder_project_manifest_context <- function(last_ui = NULL) {
   list(
     checked = isolate(checked_dataset_ids()),
     artifacts = isolate(builder_project_artifacts()),
     skipped_ids = isolate(builder_project_skipped_ids()),
-    removed_ids = isolate(builder_project_removed_ids()),
+    removed_ids = unique(c(
+      isolate(builder_project_removed_ids()),
+      builder_project_session_removed_ids()
+    )),
     configuration = builder_project_configuration(
       review_options = isolate(review_options()),
       build_mode = isTRUE(isolate(build_mode())),
@@ -2369,7 +2390,8 @@ start_builder_project_manifest_write <- function(
   on_closed = NULL,
   entries = NULL,
   context = NULL,
-  artifact_record = NULL
+  artifact_record = NULL,
+  keep = NULL
 ) {
   queue <- builder_project_manifest_writes$queue
   queue[[length(queue) + 1L]] <- list(
@@ -2379,7 +2401,8 @@ start_builder_project_manifest_write <- function(
     on_closed = on_closed,
     entries = entries,
     context = context,
-    artifact_record = artifact_record
+    artifact_record = artifact_record,
+    keep = keep
   )
   builder_project_manifest_writes$queue <- queue
   dispatch_builder_project_manifest_write()
@@ -2460,6 +2483,7 @@ dispatch_builder_project_manifest_write <- function() {
       entries = request$entries,
       context = request$context,
       artifact_record = request$artifact_record,
+      keep = request$keep,
       configuration_cache = if (is.null(request$entries)) {
         list()
       } else {
@@ -2536,7 +2560,8 @@ save_builder_project_state <- function(
         builder_notify(
           "error",
           materialized$error %||%
-            "Current spatial settings could not be saved."
+            "Current spatial settings could not be saved.",
+          id = "builder-project-save-error"
         )
       }
       return(save_failed(
@@ -2554,11 +2579,21 @@ save_builder_project_state <- function(
   }
   live_base <- isolate(sets())
   context <- builder_project_manifest_context(last_ui)
+  # Project files the Save keeps although the saved entries no longer name
+  # them: the dataset Undo can bring back and the registered dataset caches.
+  keep <- list(
+    isolate(store())$last_removed,
+    isolate(builder_project_artifacts())
+  )
   built <- NULL
   apply_written <- function(written) {
     if (inherits(written, "condition")) {
       if (isTRUE(notify)) {
-        builder_notify("error", conditionMessage(written))
+        builder_notify(
+          "error",
+          conditionMessage(written),
+          id = "builder-project-save-error"
+        )
       }
       return(save_failed(conditionMessage(written)))
     }
@@ -2610,6 +2645,8 @@ save_builder_project_state <- function(
       ))
     }
     builder_project_last_save_error(NULL)
+    # A Save that worked ends the error of the one that failed before it.
+    builder_notify_clear("builder-project-save-error")
     if (isTRUE(manage_lifecycle)) {
       builder_project_operation_phase("idle")
     }
@@ -2676,7 +2713,8 @@ save_builder_project_state <- function(
         on_complete(isTRUE(ok))
       },
       entries = entries,
-      context = context
+      context = context,
+      keep = keep
     )
     return(invisible("pending"))
   }
@@ -2691,7 +2729,11 @@ save_builder_project_state <- function(
   )
   if (inherits(built, "condition")) {
     if (isTRUE(notify)) {
-      builder_notify("error", conditionMessage(built))
+      builder_notify(
+        "error",
+        conditionMessage(built),
+        id = "builder-project-save-error"
+      )
     }
     return(save_failed(conditionMessage(built)))
   }
@@ -2702,7 +2744,8 @@ save_builder_project_state <- function(
     builder_project_write(
       built$manifest,
       project$root,
-      expected_revision = project$manifest$project$revision
+      expected_revision = project$manifest$project$revision,
+      keep = list(entries, built$entries, keep)
     ),
     error = function(error) error
   )
@@ -2802,7 +2845,11 @@ complete_builder_project_save_request <- function(
     error = function(error) {
       builder_project_last_save_error(conditionMessage(error))
       if (isTRUE(notify)) {
-        builder_notify("error", conditionMessage(error))
+        builder_notify(
+          "error",
+          conditionMessage(error),
+          id = "builder-project-save-error"
+        )
       }
       FALSE
     }
@@ -3143,7 +3190,16 @@ observe({
     background = TRUE,
     after = function(ok) {
       if (!isTRUE(ok)) {
-        builder_notify("error", "Dataset not saved. Select Save to retry.")
+        reason <- isolate(builder_project_last_save_error())
+        builder_notify(
+          "error",
+          if (builder_has_text(reason %||% "")) {
+            paste0("Dataset not saved: ", reason, " Select Save to retry.")
+          } else {
+            "Dataset not saved. Select Save to retry."
+          },
+          id = "builder-project-save-error"
+        )
       }
     }
   )

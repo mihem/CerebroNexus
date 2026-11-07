@@ -1027,6 +1027,123 @@ builder_project_two_source_fixture <- function(runtime, root, uploads) {
   list(entries = entries, context = context, saved = saved)
 }
 
+test_that("a Save prunes Project files that nothing refers to any more", {
+  runtime <- builder_project_integrity_runtime()
+  root <- normalizePath(withr::local_tempdir(), winslash = "/")
+  fixture <- builder_project_two_source_fixture(
+    runtime,
+    root,
+    withr::local_tempdir()
+  )
+  saved <- fixture$saved
+  record_of <- function(manifest, id) {
+    Filter(function(record) record$id == id, manifest$datasets)[[1L]]
+  }
+  managed <- function(relative) file.path(root, relative)
+  ds2_source <- managed(record_of(saved$manifest, "ds2")$source$path)
+  ds2_config <- managed(record_of(saved$manifest, "ds2")$configuration$path)
+
+  ## ds2 is removed in the session and the Project saved again: the backup
+  ## still lists it, so its files stay.
+  context <- fixture$context
+  context$removed_ids <- "ds2"
+  built <- runtime$builder_project_build_manifest(
+    fixture$entries[1L],
+    list(root = root, manifest = saved$manifest),
+    context
+  )
+  second <- runtime$builder_project_write(
+    built$manifest,
+    root,
+    expected_revision = saved$manifest$project$revision,
+    keep = list()
+  )
+
+  write_stray <- function(relative) {
+    path <- managed(relative)
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    writeBin(charToRaw("stray"), path)
+    path
+  }
+  ds1 <- record_of(second$manifest, "ds1")
+  ds1_blob <- managed(ds1$source$path)
+  old_blob <- write_stray(paste0(
+    "sources/ds1/blobs/",
+    strrep("0", 32L),
+    "/source.rds"
+  ))
+  old_config <- write_stray(paste0(
+    "datasets/ds1/configs/",
+    strrep("1", 32L),
+    ".json"
+  ))
+  old_asset <- write_stray("spatial-assets/ds9/fov/image.png")
+  killed_part <- paste0(ds1_blob, ".999999999-dead.part")
+  writeBin(charToRaw("partial"), killed_part)
+  live_part <- paste0(ds1_blob, ".", Sys.getpid(), "-live.part")
+  writeBin(charToRaw("partial"), live_part)
+  outside <- file.path(root, "notes.txt")
+  writeBin(charToRaw("mine"), outside)
+  checkpoint <- write_stray("checkpoints/run/file.txt")
+
+  ## Every stray is new: within the grace period nothing is removed.
+  expect_length(
+    runtime$builder_project_prune_unreferenced(root, second$manifest),
+    0L
+  )
+  expect_true(file.exists(old_blob))
+
+  later <- Sys.time() + 2 * runtime$.builder_project_prune_grace_seconds
+  removed <- runtime$builder_project_prune_unreferenced(
+    root,
+    second$manifest,
+    now = later
+  )
+  expect_setequal(
+    removed,
+    c(
+      paste0("sources/ds1/blobs/", strrep("0", 32L), "/source.rds"),
+      paste0("datasets/ds1/configs/", strrep("1", 32L), ".json"),
+      "spatial-assets/ds9/fov/image.png",
+      substring(killed_part, nchar(root) + 2L)
+    )
+  )
+  expect_false(file.exists(old_config))
+  expect_false(dir.exists(managed("spatial-assets/ds9")))
+  expect_false(dir.exists(dirname(old_blob)))
+  expect_true(file.exists(live_part))
+  expect_true(file.exists(outside))
+  expect_true(file.exists(checkpoint))
+  expect_true(file.exists(ds1_blob))
+  expect_true(file.exists(ds2_source))
+  expect_true(file.exists(ds2_config))
+  expect_true(runtime$builder_project_diagnose(second$path)$manifest$valid)
+  expect_no_error(runtime$builder_project_assert_manifest_integrity(
+    runtime$builder_project_read(paste0(second$path, ".bak")),
+    root
+  ))
+
+  ## Once the backup no longer lists ds2 either, its files go, except what
+  ## the live workspace still refers to (a dataset Undo can bring back).
+  third <- runtime$builder_project_write(
+    second$manifest,
+    root,
+    expected_revision = second$manifest$project$revision,
+    keep = list()
+  )
+  runtime$builder_project_prune_unreferenced(
+    root,
+    third$manifest,
+    keep = list(entry = list(path = ds2_source)),
+    now = later
+  )
+  expect_true(file.exists(ds2_source))
+  expect_false(file.exists(ds2_config))
+  runtime$builder_project_prune_unreferenced(root, third$manifest, now = later)
+  expect_false(file.exists(ds2_source))
+  expect_true(runtime$builder_project_diagnose(third$path)$manifest$valid)
+})
+
 test_that("Open offers no resume for an unreadable or changed Project source", {
   runtime <- builder_project_integrity_runtime()
   root <- normalizePath(withr::local_tempdir(), winslash = "/")

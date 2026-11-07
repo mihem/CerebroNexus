@@ -7868,7 +7868,10 @@ builder_project_write_task <- function(runtime_for, args) {
     if (is.null(built)) manifest else built$manifest,
     root,
     args$expected_revision,
-    verification_cache = verification_cache
+    verification_cache = verification_cache,
+    # A full Save prunes Project files that neither the manifest nor the live
+    # workspace refers to.
+    keep = if (!is.null(args$keep)) list(entries, built$entries, args$keep)
   )
   written$built <- built
   written$configuration_cache <- as.list(cache)
@@ -8012,7 +8015,8 @@ builder_project_write_process <- function(
   configuration_cache = list(),
   artifact_record = NULL,
   full_runtime_files = runtime_files,
-  worker = NULL
+  worker = NULL,
+  keep = NULL
 ) {
   call_args <- list(
     task = builder_project_portable_function(builder_project_write_task),
@@ -8023,7 +8027,8 @@ builder_project_write_process <- function(
       entries = entries,
       context = context,
       configuration_cache = configuration_cache,
-      artifact_record = artifact_record
+      artifact_record = artifact_record,
+      keep = keep
     ),
     runtime_files = runtime_files,
     full_runtime_files = full_runtime_files,
@@ -8347,6 +8352,179 @@ builder_project_worker_close <- function(worker, kill = FALSE) {
   invisible(TRUE)
 }
 
+## Project clean-up after a verified Save ------------------------------------
+## Roots a Save may prune. Checkpoints are build folders with their own
+## clean-up; session-sources live in the session folder, not the Project.
+.builder_project_prunable_root_names <- c(
+  "artifacts",
+  "attachments",
+  "datasets",
+  "sources",
+  "spatial-assets"
+)
+## An unreferenced file touched more recently than this may belong to a copy,
+## build or Save still running in another Builder window, so it is kept.
+.builder_project_prune_grace_seconds <- 3600
+
+## Managed relative paths named anywhere in `value`, either as a relative
+## path or as an absolute path under `root`.
+.builder_project_referenced_paths <- function(value, root) {
+  prefix <- paste0(root, "/")
+  fold <- if (identical(.Platform$OS.type, "windows")) tolower else identity
+  found <- character()
+  walk <- function(item) {
+    if (is.character(item)) {
+      item <- gsub("\\\\", "/", item[!is.na(item)])
+      absolute <- startsWith(fold(item), fold(prefix))
+      item[absolute] <- substring(item[absolute], nchar(prefix) + 1L)
+      top <- sub("/.*$", "", item)
+      found <<- c(
+        found,
+        item[fold(top) %in% .builder_project_managed_root_names]
+      )
+    } else if (is.list(item) && !is.data.frame(item)) {
+      for (child in item) {
+        walk(child)
+      }
+    }
+  }
+  walk(value)
+  unique(fold(found))
+}
+
+## Paths a manifest and the configuration sidecars it lists refer to. Fails
+## when a listed sidecar exists but cannot be read, so nothing is pruned.
+.builder_project_manifest_references <- function(manifest, root) {
+  references <- .builder_project_referenced_paths(manifest, root)
+  for (record in manifest$datasets %||% list()) {
+    path <- builder_project_resolve_path(
+      record$configuration$path %||% NULL,
+      root,
+      "managed"
+    )
+    if (.builder_project_text(path) && file.exists(path)) {
+      references <- c(
+        references,
+        .builder_project_referenced_paths(
+          builder_project_read_configuration_file(path),
+          root
+        )
+      )
+    }
+  }
+  unique(references)
+}
+
+## Deletes files under the prunable roots that neither the saved manifest,
+## its backup nor `keep` (live Builder state) refers to: replaced sources, old
+## configuration sidecars, assets of removed datasets and partial files of
+## killed copies. Recent files, partial files of a live process and anything
+## reached through a link are kept. Runs under the Project write lock.
+builder_project_prune_unreferenced <- function(
+  root,
+  manifest,
+  keep = NULL,
+  grace = .builder_project_prune_grace_seconds,
+  now = Sys.time()
+) {
+  root <- builder_project_normalize_root(root)
+  windows <- identical(.Platform$OS.type, "windows")
+  fold <- if (windows) tolower else identity
+  references <- c(
+    .builder_project_manifest_references(manifest, root),
+    .builder_project_referenced_paths(keep, root)
+  )
+  backup <- paste0(builder_project_manifest_path(root), ".bak")
+  if (file.exists(backup)) {
+    references <- c(
+      references,
+      .builder_project_manifest_references(
+        builder_project_read_manifest_payload(backup),
+        root
+      )
+    )
+  }
+  references <- unique(references)
+  referenced <- function(relative) {
+    parts <- strsplit(fold(relative), "/", fixed = TRUE)[[1L]]
+    # A stored artifact generation is kept or removed as a whole.
+    unit <- if (identical(parts[[1L]], "artifacts") && length(parts) > 4L) {
+      4L
+    } else {
+      length(parts)
+    }
+    ancestors <- vapply(
+      seq_along(parts),
+      function(index) paste(parts[seq_len(index)], collapse = "/"),
+      character(1)
+    )
+    any(ancestors %in% references) ||
+      any(startsWith(references, paste0(ancestors[[unit]], "/")))
+  }
+  # Ages are read before anything is removed: a removal touches its folder.
+  age <- function(paths) {
+    info <- file.info(paths, extra_cols = FALSE)
+    as.double(difftime(now, pmax(info$mtime, info$ctime), units = "secs"))
+  }
+  live_part <- function(path) {
+    matched <- regmatches(
+      basename(path),
+      regexec("\\.([0-9]+)-[^/]*\\.part$", basename(path))
+    )[[1L]]
+    length(matched) == 2L &&
+      .builder_project_pid_alive(as.integer(matched[[2L]]))
+  }
+  candidates <- character()
+  for (name in .builder_project_prunable_root_names) {
+    top <- file.path(root, name)
+    if (dir.exists(top) && !.builder_project_path_has_link_within(top, root)) {
+      files <- list.files(top, recursive = TRUE, all.files = TRUE, no.. = TRUE)
+      candidates <- c(candidates, paste(name, files, sep = "/"))
+    }
+  }
+  candidates <- candidates[
+    !vapply(candidates, referenced, logical(1), USE.NAMES = FALSE)
+  ]
+  paths <- file.path(root, candidates)
+  ages <- pmin(age(paths), age(dirname(paths)))
+  removed <- character()
+  for (index in seq_along(candidates)) {
+    path <- paths[[index]]
+    if (
+      !is.finite(ages[[index]]) ||
+        ages[[index]] < grace ||
+        dir.exists(path) ||
+        .builder_project_path_has_link_within(path, root) ||
+        live_part(path)
+    ) {
+      next
+    }
+    if (unlink(path, force = TRUE) == 0L && !file.exists(path)) {
+      removed <- c(removed, candidates[[index]])
+    }
+  }
+  # Folders emptied above, deepest first, up to (not including) each root.
+  folders <- character()
+  for (relative in removed) {
+    parts <- strsplit(relative, "/", fixed = TRUE)[[1L]]
+    for (depth in seq_len(length(parts) - 2L)) {
+      folders <- c(folders, paste(parts[seq_len(depth + 1L)], collapse = "/"))
+    }
+  }
+  folders <- unique(folders)
+  for (folder in folders[order(-nchar(folders))]) {
+    path <- file.path(root, folder)
+    if (
+      dir.exists(path) &&
+        !.builder_project_path_has_link_within(path, root) &&
+        !length(list.files(path, all.files = TRUE, no.. = TRUE))
+    ) {
+      unlink(path, recursive = TRUE, force = TRUE)
+    }
+  }
+  invisible(removed)
+}
+
 builder_project_write <- function(
   manifest,
   root,
@@ -8354,7 +8532,8 @@ builder_project_write <- function(
   .move = file.rename,
   .write_json = jsonlite::write_json,
   .after_commit = function(path) invisible(path),
-  verification_cache = new.env(parent = emptyenv())
+  verification_cache = new.env(parent = emptyenv()),
+  keep = NULL
 ) {
   root <- builder_project_normalize_root(root)
   manifest$datasets <- lapply(manifest$datasets %||% list(), function(record) {
@@ -8682,6 +8861,14 @@ builder_project_write <- function(
     )
   }
   unlink(backup_hold, force = TRUE)
+  # A full Save also removes Project files nothing refers to any more. The
+  # Save itself already succeeded, so a clean-up failure is ignored.
+  if (!is.null(keep)) {
+    tryCatch(
+      builder_project_prune_unreferenced(root, manifest, keep),
+      error = function(error) NULL
+    )
+  }
   list(manifest = manifest, path = target)
 }
 
