@@ -108,6 +108,9 @@ launchCerebroBuilder <- function(
     add = TRUE
   )
 
+  restore_locale <- .builderUseUtf8Locale()
+  on.exit(restore_locale(), add = TRUE)
+
   if (!.builderHostIsLoopback(host)) {
     warning(
       "The Builder is listening on '",
@@ -134,4 +137,52 @@ launchCerebroBuilder <- function(
     length(host) == 1L &&
     !is.na(host) &&
     grepl("^(localhost|127([.][0-9]{1,3}){3}|::1|[[]::1[]])$", tolower(host))
+}
+
+## In a C/POSIX (ASCII) locale R cannot hold "ü" in its native encoding: a
+## picked or uploaded file "Zürich.rds" is not found, basename() fails and
+## names reach the page as "Z<U+00FC>rich". The Builder, and the workers it
+## starts, then run with a UTF-8 character type; the caller's settings come
+## back when it stops. Returns the function that restores them.
+.builderUseUtf8Locale <- function(
+  candidates = c("C.UTF-8", "en_US.UTF-8", "UTF-8")
+) {
+  info <- l10n_info()
+  codeset <- toupper(as.character(info$codeset %||% NA_character_))
+  if (
+    isTRUE(info[["UTF-8"]]) ||
+      !codeset %in% c("ANSI_X3.4-1968", "ASCII", "US-ASCII", "646")
+  ) {
+    return(function() invisible(FALSE))
+  }
+  old_ctype <- Sys.getlocale("LC_CTYPE")
+  old_env <- Sys.getenv(c("LC_ALL", "LC_CTYPE"), unset = NA)
+  for (candidate in candidates) {
+    if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", candidate)))) {
+      # Workers read the locale from the environment; LC_ALL wins there.
+      if (!is.na(old_env[["LC_ALL"]]) && nzchar(old_env[["LC_ALL"]])) {
+        Sys.setenv(LC_ALL = candidate)
+      } else {
+        Sys.setenv(LC_CTYPE = candidate)
+      }
+      return(function() {
+        suppressWarnings(Sys.setlocale("LC_CTYPE", old_ctype))
+        for (name in names(old_env)) {
+          if (is.na(old_env[[name]])) {
+            Sys.unsetenv(name)
+          } else {
+            do.call(Sys.setenv, stats::setNames(list(old_env[[name]]), name))
+          }
+        }
+        invisible(TRUE)
+      })
+    }
+  }
+  warning(
+    "R runs in a C locale and no UTF-8 locale is available, so file and ",
+    "dataset names with non-ASCII characters may not work in the Builder.",
+    call. = FALSE,
+    immediate. = TRUE
+  )
+  function() invisible(FALSE)
 }

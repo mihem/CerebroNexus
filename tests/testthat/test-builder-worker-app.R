@@ -48,6 +48,49 @@ test_that("Builder launcher warns when it listens beyond this machine", {
   expect_false(CerebroNexus:::.builderHostIsLoopback("127.0.0.1.example.com"))
 })
 
+test_that("the Builder runs with UTF-8 names when R starts in a C locale", {
+  skip_on_os("windows")
+  skip_if_not_installed("callr")
+  use_utf8 <- CerebroNexus:::.builderUseUtf8Locale
+  environment(use_utf8) <- baseenv()
+  result <- callr::r(
+    function(use_utf8) {
+      name <- intToUtf8(c(90L, 252L, 114L, 105L, 99L, 104L, 32L, 8230L))
+      path <- file.path(tempdir(), paste0(name, ".rds"))
+      # Write it through its bytes: the C locale cannot name it.
+      saveRDS(1, rawToChar(charToRaw(path)))
+      before <- c(
+        Sys.getlocale("LC_CTYPE"),
+        file.exists(path),
+        inherits(try(basename(path), silent = TRUE), "try-error")
+      )
+      restore <- use_utf8()
+      during <- c(
+        Sys.getlocale("LC_CTYPE"),
+        file.exists(path),
+        basename(path),
+        callr::r(function() Sys.getlocale("LC_CTYPE"))
+      )
+      restore()
+      list(
+        before = before,
+        during = during,
+        after = c(Sys.getlocale("LC_CTYPE"), Sys.getenv("LC_ALL")),
+        name = name
+      )
+    },
+    args = list(use_utf8 = use_utf8),
+    env = c(callr::rcmd_safe_env(), LC_ALL = "C", LANG = "C")
+  )
+  ## In a C locale R cannot find or name the file.
+  expect_identical(result$before, c("C", "FALSE", "TRUE"))
+  skip_if(identical(result$during[[1L]], "C"), "no UTF-8 locale available")
+  expect_identical(result$during[[2L]], "TRUE")
+  expect_identical(result$during[[3L]], paste0(result$name, ".rds"))
+  expect_match(result$during[[4L]], "UTF-8", ignore.case = TRUE)
+  expect_identical(result$after, c("C", "C"))
+})
+
 test_that("Builder app preserves the launch request-size limit", {
   configured <- as.double(1024^2)
   withr::local_options(list(shiny.maxRequestSize = configured))
