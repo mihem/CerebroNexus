@@ -1370,3 +1370,33 @@ test_that("two copies of the same source never share a partial file", {
   expect_false(file.exists(first$part))
   expect_false(file.exists(second$part))
 })
+
+test_that("a Project copy changed after Save is reported as such on load", {
+  skip_if_not_installed("shiny")
+  app_env <- builder_responsiveness_app()
+
+  shiny::testServer(app_env$server, {
+    builder_project_pending_entries(list(
+      ds1 = list(id = "ds1", source = list(kind = "managed")),
+      ds2 = list(id = "ds2", source = list(kind = "external"))
+    ))
+    md5_error <- "The copied file does not match its saved MD5."
+    expect_match(
+      builder_project_restore_error_message("ds1", md5_error),
+      "changed outside the Builder",
+      fixed = TRUE
+    )
+    expect_identical(
+      builder_project_restore_error_message("ds2", md5_error),
+      md5_error
+    )
+    expect_identical(
+      builder_project_restore_error_message("ds1", "Out of memory."),
+      "Out of memory."
+    )
+    expect_identical(
+      builder_project_restore_error_message("ds9", md5_error),
+      md5_error
+    )
+  })
+})

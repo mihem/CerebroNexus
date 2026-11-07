@@ -272,7 +272,7 @@ test_that("verified Project backups require explicit atomic recovery", {
   expect_identical(offer$dataset_count, 1L)
   expect_error(
     runtime$builder_project_read(second$path),
-    "lexical error|parse error"
+    "project file is damaged"
   )
 
   recovered <- runtime$builder_project_recover_backup(
@@ -981,5 +981,132 @@ test_that("a relinked different file keeps the saved choices it still has", {
   expect_identical(
     runtime$builder_project_relinked_settings(saved, loaded)$layer,
     "data"
+  )
+})
+
+## Two datasets saved with their sources copied into the Project.
+builder_project_two_source_fixture <- function(runtime, root, uploads) {
+  entry_for <- function(id, name) {
+    source <- file.path(uploads, paste0(id, ".rds"))
+    saveRDS(list(id = id), source)
+    list(
+      id = id,
+      revision = 1L,
+      path = source,
+      filename = "sample.rds",
+      settings = list(name = name),
+      acknowledgements = character(),
+      spatial_drafts = list(),
+      snapshot = list(
+        source_fingerprint = paste0(
+          "builder-snapshot-v2:",
+          unname(tools::md5sum(source))
+        )
+      )
+    )
+  }
+  entries <- list(entry_for("ds1", "Sample A"), entry_for("ds2", "Sample B"))
+  context <- list(
+    checked = character(),
+    artifacts = list(),
+    skipped_ids = character(),
+    configuration = list(),
+    last_ui = list()
+  )
+  built <- runtime$builder_project_build_manifest(
+    entries,
+    list(root = root, manifest = runtime$builder_project_new_manifest(root)),
+    context
+  )
+  results <- lapply(built$jobs, runtime$builder_project_copy_source_job)
+  saved <- runtime$builder_project_write(
+    runtime$builder_project_apply_source_results(built$manifest, results, root),
+    root,
+    expected_revision = 0L
+  )
+  list(entries = entries, context = context, saved = saved)
+}
+
+test_that("Open offers no resume for an unreadable or changed Project source", {
+  runtime <- builder_project_integrity_runtime()
+  root <- normalizePath(withr::local_tempdir(), winslash = "/")
+  saved <- builder_project_two_source_fixture(
+    runtime,
+    root,
+    withr::local_tempdir()
+  )$saved
+  blob_of <- function(id) {
+    record <- Filter(function(record) record$id == id, saved$manifest$datasets)
+    file.path(root, record[[1L]]$source$path)
+  }
+  ## A file of another size was put in place of ds1's copy.
+  writeBin(charToRaw("swapped"), blob_of("ds1"))
+  opened <- runtime$builder_project_open_snapshot(saved$path)
+  status <- opened$manifest$datasets[[1L]]$runtime_restore_status
+  expect_false(any(c("resume", "reload") %in% status$actions))
+  expect_match(status$problem, "changed outside the Builder", fixed = TRUE)
+  expect_identical(status$message, "Source cannot be used")
+  expect_true(
+    "resume" %in% opened$manifest$datasets[[2L]]$runtime_restore_status$actions
+  )
+
+  skip_on_os("windows")
+  skip_if(identical(unname(Sys.info()[["effective_user"]]), "root"))
+  Sys.chmod(blob_of("ds2"), mode = "0000")
+  withr::defer(Sys.chmod(blob_of("ds2"), mode = "0600"))
+  opened <- runtime$builder_project_open_snapshot(saved$path)
+  status <- opened$manifest$datasets[[2L]]$runtime_restore_status
+  expect_false(any(c("resume", "reload") %in% status$actions))
+  expect_match(status$problem, "cannot be read", fixed = TRUE)
+})
+
+test_that("a damaged or unsupported project file says what is wrong", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  path <- runtime$builder_project_manifest_path(root)
+  writeLines("{damaged", path, useBytes = TRUE)
+  expect_error(
+    runtime$builder_project_read(path),
+    "The project file is damaged and cannot be read",
+    fixed = TRUE
+  )
+  write_version <- function(version) {
+    jsonlite::write_json(
+      list(
+        schema_version = version,
+        project = list(id = "project-safe", revision = 1L),
+        datasets = list()
+      ),
+      path,
+      auto_unbox = TRUE
+    )
+  }
+  write_version(9L)
+  expect_error(
+    runtime$builder_project_read(path),
+    "uses format version 9, and this Builder reads version 3. Update",
+    fixed = TRUE
+  )
+  write_version(2L)
+  expect_error(
+    runtime$builder_project_read(path),
+    "uses format version 2, and this Builder reads version 3. Open it with",
+    fixed = TRUE
+  )
+  jsonlite::write_json(list(project = list()), path, auto_unbox = TRUE)
+  expect_error(
+    runtime$builder_project_read(path),
+    "it has no project format version",
+    fixed = TRUE
+  )
+})
+
+test_that("attachments count as a managed Project folder", {
+  runtime <- builder_project_integrity_runtime()
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "attachments"))
+  expect_identical(
+    runtime$builder_project_folder_state(root)$managed_conflicts,
+    "attachments"
   )
 })

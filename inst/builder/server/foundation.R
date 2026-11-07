@@ -628,6 +628,12 @@ import_of <- function(id) {
   builder_import_find(imports(), id)
 }
 set_import_state <- function(id, state, generation, error = NULL) {
+  if (
+    identical(state, "error") &&
+      exists("builder_project_restore_error_message", mode = "function")
+  ) {
+    error <- builder_project_restore_error_message(id, error)
+  }
   updated <- try(
     builder_import_transition(
       isolate(imports()),

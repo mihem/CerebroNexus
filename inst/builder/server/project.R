@@ -170,6 +170,33 @@ send_builder_project_source_load_state <- function(
   invisible(TRUE)
 }
 
+## A Project copy that fails its saved MD5 while loading was changed outside
+## the Builder. Say so and point at the choices Open offers for it.
+builder_project_restore_error_message <- function(id, message) {
+  record <- isolate(builder_project_pending_entries())[[id %||% ""]] %||% NULL
+  if (
+    is.null(record) ||
+      !identical(record$source$kind %||% "managed", "managed") ||
+      !builder_has_text(message %||% "") ||
+      !grepl(
+        paste(
+          "does not match its saved MD5",
+          "its MD5 no longer matches",
+          "changed while it was being read",
+          sep = "|"
+        ),
+        message
+      )
+  ) {
+    return(message)
+  }
+  paste(
+    "The Project copy of this dataset's source file was changed outside the",
+    "Builder. Open the Project again and choose another source file, Skip or",
+    "Remove from project for this dataset."
+  )
+}
+
 builder_project_commit_restored_entry <- function(entry, error = NULL) {
   id <- as.character(entry$id %||% "")
   if (!builder_has_text(id)) {
@@ -185,6 +212,9 @@ builder_project_commit_restored_entry <- function(entry, error = NULL) {
   # Batch Open must retain the saved selected dataset. Only an explicit
   # "edit source" action should move focus as its background load completes.
   focus_source <- editing_source
+  if (!is.null(error)) {
+    error <- builder_project_restore_error_message(id, error)
+  }
   pending[[id]] <- NULL
   builder_project_pending_entries(pending)
   marks <- isolate(dataset_check_marks())
@@ -1530,8 +1560,9 @@ builder_project_fail_open <- function(generation, error) {
     restore_previous = TRUE
   )
   shiny::removeModal()
+  # Show the reason from the background check, not the process wrapper.
   message <- if (inherits(error, "condition")) {
-    conditionMessage(error)
+    conditionMessage(.builder_project_worker_error(error))
   } else {
     as.character(error %||% "The project file could not be opened.")
   }
@@ -1673,10 +1704,21 @@ builder_project_start_open <- function(
             error = identity
           )
           if (inherits(offer, "condition")) {
+            # Mention the backup only when there is one that cannot be used.
+            backup <- paste0(selected_path, ".bak")
             stop(
               conditionMessage(opened),
-              " No verified Project backup is available: ",
-              conditionMessage(offer),
+              if (
+                file.exists(backup) &&
+                  !grepl("manifest is readable", conditionMessage(offer))
+              ) {
+                paste0(
+                  " Its backup ",
+                  basename(backup),
+                  " cannot be used either: ",
+                  conditionMessage(offer)
+                )
+              },
               call. = FALSE
             )
           }

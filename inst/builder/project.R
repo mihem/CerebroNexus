@@ -437,6 +437,7 @@ builder_project_retain_check_marks <- function(
 .builder_project_manifest_name <- "builder-project.json"
 .builder_project_managed_root_names <- c(
   "artifacts",
+  "attachments",
   "checkpoints",
   "datasets",
   "session-sources",
@@ -6654,6 +6655,20 @@ builder_project_record_configuration_confirmed <- function(record) {
     )
 }
 
+## TRUE when the file can be opened for reading. Opening is the only check
+## that works for Windows ACLs too.
+.builder_project_file_readable <- function(path) {
+  isTRUE(tryCatch(
+    {
+      connection <- file(path, open = "rb")
+      close(connection)
+      TRUE
+    },
+    warning = function(warning) FALSE,
+    error = function(error) FALSE
+  ))
+}
+
 builder_project_dataset_status <- function(
   record,
   root,
@@ -6707,7 +6722,29 @@ builder_project_dataset_status <- function(
   } else {
     NULL
   }
-  source_loadable <- source_available && is.null(source_format_problem)
+  # An unreadable source, or a Project copy whose size no longer matches the
+  # saved one, would only fail once loading starts. Say so here and leave
+  # Skip, Remove and choosing another file.
+  source_problem <- if (!source_available || source_is_example) {
+    NULL
+  } else if (!.builder_project_file_readable(source_path)) {
+    "The saved source file cannot be read. Check its permissions, or choose another source file, Skip or Remove from project."
+  } else if (
+    identical(source_kind, "managed") &&
+      !identical(
+        suppressWarnings(as.double(source$fingerprint$bytes %||% NA)),
+        suppressWarnings(as.double(source_observation$bytes %||% NA))
+      ) &&
+      is.finite(suppressWarnings(as.double(source$fingerprint$bytes %||% NA)))
+  ) {
+    paste(
+      "The Project copy of the source file was changed outside the Builder.",
+      "Choose another source file, Skip or Remove from project."
+    )
+  }
+  source_loadable <- source_available &&
+    is.null(source_format_problem) &&
+    is.null(source_problem)
   recorded_md5 <- builder_project_recorded_fingerprint_md5(
     source$fingerprint %||% NULL
   )
@@ -6774,6 +6811,8 @@ builder_project_dataset_status <- function(
   }
   message <- if (!is.null(source_format_problem) && !artifact_ready) {
     "Source reader unavailable"
+  } else if (!is.null(source_problem) && !artifact_ready) {
+    "Source cannot be used"
   } else if (!configuration_ready) {
     "Settings unavailable"
   } else if (artifact_ready && checked) {
@@ -6785,7 +6824,10 @@ builder_project_dataset_status <- function(
   } else {
     "Source unavailable"
   }
-  problem <- source_format_problem %||% configuration$error %||% NULL
+  problem <- source_format_problem %||%
+    source_problem %||%
+    configuration$error %||%
+    NULL
   if (
     is.null(problem) &&
       is.list(record$source) &&
@@ -6806,9 +6848,11 @@ builder_project_dataset_status <- function(
     )
   } else if (artifact_ready && checked) {
     "The cached copy can be used immediately; the source is not loaded."
-  } else if (checked && identical(source_state, "verify")) {
+  } else if (
+    checked && identical(source_state, "verify") && is.null(source_problem)
+  ) {
     "The original source will be verified while loading with saved settings."
-  } else if (checked && source_available) {
+  } else if (checked && source_available && is.null(source_problem)) {
     "The original source will load with saved settings."
   } else if (checked) {
     problem
@@ -7142,6 +7186,47 @@ builder_project_last_ui_target <- function(
   )
 }
 
+## Why a parsed file is not a project this Builder can open, with the format
+## version it has and the one this Builder reads.
+.builder_project_unsupported_message <- function(manifest, schema_version) {
+  supported <- .builder_project_schema_version
+  if (!is.list(manifest) || is.null(manifest$schema_version)) {
+    return(paste0(
+      "This is not a supported Builder project: it has no project format ",
+      "version (this Builder reads version ",
+      supported,
+      ")."
+    ))
+  }
+  if (is.na(schema_version)) {
+    return(paste0(
+      "This is not a supported Builder project: its format version is not ",
+      "a valid number (this Builder reads version ",
+      supported,
+      ")."
+    ))
+  }
+  if (!identical(schema_version, supported)) {
+    return(paste0(
+      "This is not a supported Builder project: it uses format version ",
+      schema_version,
+      ", and this Builder reads version ",
+      supported,
+      ".",
+      if (schema_version > supported) {
+        " Update CerebroNexus to open it."
+      } else {
+        " Open it with the CerebroNexus version that saved it."
+      }
+    ))
+  }
+  paste0(
+    "This is not a supported Builder project: the project format version ",
+    supported,
+    " file is missing required fields."
+  )
+}
+
 builder_project_read_manifest_payload <- function(path, payload = NULL) {
   if (!.builder_project_text(path) || !file.exists(path) || dir.exists(path)) {
     stop("Choose a Builder project JSON file.", call. = FALSE)
@@ -7170,9 +7255,17 @@ builder_project_read_manifest_payload <- function(path, payload = NULL) {
   if (length(payload) > .builder_project_manifest_max_bytes) {
     stop("The Builder project exceeds its input size limit.", call. = FALSE)
   }
-  manifest <- jsonlite::fromJSON(
-    .builder_project_utf8_text(payload),
-    simplifyVector = FALSE
+  manifest <- tryCatch(
+    jsonlite::fromJSON(
+      .builder_project_utf8_text(payload),
+      simplifyVector = FALSE
+    ),
+    error = function(error) {
+      stop(
+        "The project file is damaged and cannot be read (it is not valid JSON).",
+        call. = FALSE
+      )
+    }
   )
   schema_version <- tryCatch(
     .builder_project_stored_integer(manifest$schema_version),
@@ -7194,7 +7287,10 @@ builder_project_read_manifest_payload <- function(path, payload = NULL) {
       is.na(project_revision) ||
       !is.list(manifest$datasets)
   ) {
-    stop("This is not a supported Builder project.", call. = FALSE)
+    stop(
+      .builder_project_unsupported_message(manifest, schema_version),
+      call. = FALSE
+    )
   }
   dataset_ids <- vapply(
     manifest$datasets,
