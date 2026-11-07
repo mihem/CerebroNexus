@@ -381,6 +381,19 @@ builder_example_adapter <- function(id, object) {
       )
     }
     if (!is.null(read$error)) {
+      ## A saved file that no longer parses is most likely changed or damaged;
+      ## say so instead of passing on the reader's complaint.
+      actual_md5 <- if (is.null(adapter$expected_md5)) {
+        NA_character_
+      } else {
+        tolower(unname(as.character(tools::md5sum(adapter$location))))
+      }
+      if (!is.na(actual_md5) && !identical(actual_md5, adapter$expected_md5)) {
+        .builder_adapter_abort(paste0(
+          "The file changed after it was saved: its MD5 no longer matches. ",
+          "It may be damaged; replace it with the original file."
+        ))
+      }
       .builder_adapter_abort(read$error)
     }
     object <- read$object

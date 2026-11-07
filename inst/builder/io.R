@@ -84,6 +84,13 @@ builder_copy_file_verified <- function(
   ) {
     stop("The expected file MD5 is invalid.", call. = FALSE)
   }
+  if (!identical(unname(file.access(source, 4L)), 0L)) {
+    stop(
+      "The file cannot be opened for reading. Check that this account may ",
+      "read it.",
+      call. = FALSE
+    )
+  }
   input <- output <- NULL
   complete <- FALSE
   on.exit(
@@ -170,7 +177,10 @@ builder_copy_file_verified <- function(
     )
   }
   if (!is.null(expected_md5) && !identical(actual_md5, expected_md5)) {
-    stop("The copied file does not match its saved MD5.", call. = FALSE)
+    stop(
+      "The file does not match its saved MD5: it changed after it was saved.",
+      call. = FALSE
+    )
   }
   complete <- TRUE
   list(path = destination, bytes = as.double(copied), md5 = actual_md5)
@@ -1455,22 +1465,28 @@ builder_deprecated_format_note_ui <- function(
   )
 }
 
-## `content`: when the name has no extension we read, the file to recognise by
-## its first bytes instead (see builder_sniff_format()).
+## `content`: the file, recognised by its first bytes when they name a format
+## we read (a qs2 file renamed to .rds); otherwise the name's extension decides
+## (see builder_sniff_format()).
 builder_path_format_capability <- function(
   path,
   capabilities = builder_cached_format_capabilities(),
   content = NULL
 ) {
-  extension <- tolower(tools::file_ext(path %||% ""))
-  matches <- Filter(
-    function(format) extension %in% tolower(format$extensions %||% character()),
-    capabilities
-  )
-  if (!length(matches) && !is.null(content)) {
+  matches <- list()
+  if (!is.null(content)) {
     sniffed <- builder_sniff_format(content)
     matches <- Filter(
       function(format) identical(format$id, sniffed),
+      capabilities
+    )
+  }
+  if (!length(matches)) {
+    extension <- tolower(tools::file_ext(path %||% ""))
+    matches <- Filter(
+      function(format) {
+        extension %in% tolower(format$extensions %||% character())
+      },
       capabilities
     )
   }
@@ -1591,15 +1607,57 @@ builder_sniff_format <- function(path) {
   "hdf5"
 }
 
+## Which other HDF5 layout a file has, from its top two levels: "loom",
+## "h5seurat", "10x" (Cell Ranger .h5) or NULL.
+.builder_hdf5_kind <- function(path) {
+  if (!requireNamespace("rhdf5", quietly = TRUE)) {
+    return(NULL)
+  }
+  listing <- tryCatch(
+    rhdf5::h5ls(path, recursive = 2L, datasetinfo = FALSE),
+    error = function(error) NULL
+  )
+  if (!is.data.frame(listing)) {
+    return(NULL)
+  }
+  top <- listing$name[listing$group == "/"]
+  if (all(c("matrix", "row_attrs", "col_attrs") %in% top)) {
+    return("loom")
+  }
+  if ("assays" %in% top && any(c("cell.names", "meta.data") %in% top)) {
+    return("h5seurat")
+  }
+  if ("barcodes" %in% listing$name[listing$group != "/"]) {
+    return("10x")
+  }
+  NULL
+}
+
 ## Why a file with no readable extension could not be recognised either.
 builder_unrecognised_format_message <- function(name, path = NULL) {
   name <- basename(as.character(name %||% "This file")[[1L]])
   if (identical(builder_sniff_format(path), "hdf5")) {
-    return(paste0(
-      name,
-      " is an HDF5 file, but its content does not show whether it holds ",
-      "AnnData or MuData. Save it with the .h5ad or .h5mu extension."
-    ))
+    advice <- switch(
+      .builder_hdf5_kind(path) %||% "",
+      loom = paste0(
+        " is a loom file, which the Builder does not read. Convert it to a ",
+        "Seurat object (for example with SeuratDisk) and save that as .rds."
+      ),
+      h5seurat = paste0(
+        " is an h5Seurat file, which the Builder does not read. Load it with ",
+        "SeuratDisk::LoadH5Seurat() and save the object as .rds."
+      ),
+      `10x` = paste0(
+        " is a 10x Genomics count matrix (.h5), which the Builder does not ",
+        "read. Load it with Seurat::Read10X_h5(), make a Seurat object and ",
+        "save it as .rds."
+      ),
+      paste0(
+        " is an HDF5 file, but its content does not show whether it holds ",
+        "AnnData or MuData. Save it with the .h5ad or .h5mu extension."
+      )
+    )
+    return(paste0(name, advice))
   }
   formats <- Filter(
     function(format) !isTRUE(format$deprecated),
@@ -1630,20 +1688,21 @@ builder_unrecognised_format_message <- function(name, path = NULL) {
   )
 }
 
-#' Pick the format for a path: by extension, else by content.
+#' Pick the format for a path: by content when its first bytes name a format
+#' we read (a qs2 file renamed to .rds), else by extension.
 #'
 #' @return The format entry, or `NULL` when neither the extension nor the
 #'   file's first bytes are a format we read.
 builder_match_format <- function(path) {
-  ext <- tolower(tools::file_ext(path))
-  for (f in builder_formats) {
-    if (ext %in% f$extensions) {
-      return(f)
-    }
-  }
   sniffed <- builder_sniff_format(path)
   for (f in builder_formats) {
     if (identical(f$id, sniffed)) {
+      return(f)
+    }
+  }
+  ext <- tolower(tools::file_ext(path))
+  for (f in builder_formats) {
+    if (ext %in% f$extensions) {
       return(f)
     }
   }
@@ -1663,6 +1722,14 @@ builder_read_object <- function(path) {
   }
   if (dir.exists(path)) {
     return(list(error = "This path is a directory, not a file."))
+  }
+  if (!identical(unname(file.access(path, 4L)), 0L)) {
+    return(list(
+      error = paste0(
+        "The file cannot be opened for reading. Check that this account may ",
+        "read it."
+      )
+    ))
   }
 
   fmt <- builder_match_format(path)
@@ -1686,13 +1753,20 @@ builder_read_object <- function(path) {
 
   obj <- try(fmt$read(path), silent = TRUE)
   if (inherits(obj, "try-error")) {
-    return(list(
-      error = paste0(
-        "Could not read with ",
-        fmt$label,
-        ": ",
-        conditionMessage(attr(obj, "condition"))
+    reason <- conditionMessage(attr(obj, "condition"))
+    ## readRDS() says only "error reading from connection" when the file
+    ## is empty or stops early.
+    if (identical(unname(file.size(path)), 0)) {
+      return(list(error = "The file is empty (0 bytes)."))
+    }
+    if (grepl("error reading from connection", reason, fixed = TRUE)) {
+      reason <- paste0(
+        "the file ends early. It looks truncated, for example by an ",
+        "incomplete copy or download."
       )
+    }
+    return(list(
+      error = paste0("Could not read with ", fmt$label, ": ", reason)
     ))
   }
   if (methods::is(obj, "SingleCellExperiment")) {
@@ -1716,6 +1790,19 @@ builder_read_object <- function(path) {
     }
   }
   if (!inherits(obj, "Seurat")) {
+    if (is.list(obj) && !is.object(obj) && length(obj)) {
+      seurat <- sum(vapply(obj, inherits, logical(1), what = "Seurat"))
+      return(list(
+        error = paste0(
+          "The file contains a list of ",
+          length(obj),
+          if (seurat == length(obj)) " Seurat object" else " object",
+          if (length(obj) > 1L) "s",
+          ", not one Seurat object. The Builder reads one Seurat object per ",
+          "file: save each object to its own file and add those files."
+        )
+      ))
+    }
     return(list(
       error = paste0(
         "The file contains a ",

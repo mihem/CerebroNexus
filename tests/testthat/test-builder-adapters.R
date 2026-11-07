@@ -102,6 +102,34 @@ test_that("QS snapshots use strict reads and stable file identity", {
   )
 })
 
+test_that("a saved source that no longer parses is reported as changed", {
+  root <- withr::local_tempdir()
+  path <- file.path(root, "source.rds")
+  saveRDS(SeuratObject::pbmc_small, path)
+  saved_md5 <- unname(tools::md5sum(path))
+  bytes <- readBin(path, "raw", n = file.size(path))
+  middle <- length(bytes) %/% 2L
+  bytes[middle] <- xor(bytes[middle], as.raw(0xff))
+  writeBin(bytes, path)
+  expect_false(is.null(builder_read_object(path)$error))
+  adapter <- .builder_seurat_file_adapter(
+    path,
+    expected_md5 = saved_md5,
+    snapshot_reusable = TRUE
+  )
+  expect_error(
+    builder_adapter_inspect(adapter),
+    "The file changed after it was saved: its MD5 no longer matches.",
+    fixed = TRUE
+  )
+  ## Without a saved MD5 the reader's own message stays.
+  expect_error(
+    builder_adapter_inspect(builder_seurat_file_adapter(path)),
+    "Could not read with RDS",
+    fixed = TRUE
+  )
+})
+
 test_that("a saved source MD5 is deferred to snapshot verification", {
   root <- withr::local_tempdir()
   writers <- list(

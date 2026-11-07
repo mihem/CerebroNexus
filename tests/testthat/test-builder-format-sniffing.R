@@ -110,7 +110,97 @@ test_that("an HDF5 file that is neither AnnData nor MuData asks for the extensio
   )
 })
 
-test_that("a wrong extension falls back to content; a supported one is kept", {
+test_that("loom, h5Seurat and 10x HDF5 files get advice for their own kind", {
+  skip_if_not_installed("rhdf5")
+  dir <- sniff_dir()
+  make <- function(name, groups) {
+    path <- file.path(dir, name)
+    rhdf5::h5createFile(path)
+    for (group in groups) {
+      rhdf5::h5createGroup(path, group)
+    }
+    rhdf5::h5closeAll()
+    path
+  }
+  loom <- make("cells.loom", c("matrix", "row_attrs", "col_attrs", "layers"))
+  h5seurat <- make("cells.h5seurat", c("assays", "meta.data", "cell.names"))
+  tenx_v3 <- make("filtered.h5", c("matrix", "matrix/barcodes"))
+  tenx_v2 <- make("filtered_v2.h5", c("GRCh38", "GRCh38/barcodes"))
+  expect_match(
+    builder_unrecognised_format_message("cells.loom", loom),
+    "^cells\\.loom is a loom file.*\\.rds\\.$"
+  )
+  expect_match(
+    builder_unrecognised_format_message("cells.h5seurat", h5seurat),
+    "is an h5Seurat file.*LoadH5Seurat"
+  )
+  for (path in c(tenx_v3, tenx_v2)) {
+    message <- builder_unrecognised_format_message(basename(path), path)
+    expect_match(message, "10x Genomics count matrix.*Read10X_h5", info = path)
+    expect_false(grepl(".h5ad", message, fixed = TRUE), info = path)
+  }
+  expect_identical(
+    builder_read_object(loom)$error,
+    builder_unrecognised_format_message("cells.loom", loom)
+  )
+})
+
+test_that("empty, truncated and multi-object files say what is wrong", {
+  dir <- sniff_dir()
+  empty <- file.path(dir, "empty.rds")
+  file.create(empty)
+  expect_identical(
+    builder_read_object(empty)$error,
+    "The file is empty (0 bytes)."
+  )
+  whole <- file.path(dir, "whole.rds")
+  saveRDS(as.list(seq_len(5000)), whole, compress = FALSE)
+  truncated <- file.path(dir, "truncated.rds")
+  writeBin(readBin(whole, "raw", n = 2000L), truncated)
+  expect_match(
+    builder_read_object(truncated)$error,
+    "^Could not read with RDS: the file ends early\\. It looks truncated"
+  )
+
+  skip_if_not_installed("SeuratObject")
+  several <- file.path(dir, "several.rds")
+  saveRDS(rep(list(SeuratObject::pbmc_small), 8L), several)
+  expect_identical(
+    builder_read_object(several)$error,
+    paste0(
+      "The file contains a list of 8 Seurat objects, not one Seurat object. ",
+      "The Builder reads one Seurat object per file: save each object to ",
+      "its own file and add those files."
+    )
+  )
+  mixed <- file.path(dir, "mixed.rds")
+  saveRDS(list(1), mixed)
+  expect_match(
+    builder_read_object(mixed)$error,
+    "^The file contains a list of 1 object, not one Seurat object\\."
+  )
+})
+
+test_that("an unreadable file is reported as such", {
+  skip_on_os("windows")
+  dir <- sniff_dir()
+  path <- file.path(dir, "locked.rds")
+  saveRDS(list(a = 1), path)
+  Sys.chmod(path, "000")
+  withr::defer(Sys.chmod(path, "644"))
+  skip_if(identical(unname(file.access(path, 4L)), 0L), "running as root")
+  expect_match(
+    builder_read_object(path)$error,
+    "^The file cannot be opened for reading\\."
+  )
+  expect_error(
+    builder_copy_file_verified(path, file.path(dir, "copy")),
+    "The file cannot be opened for reading.",
+    fixed = TRUE
+  )
+})
+
+test_that("content beats a wrong extension; a supported one is kept", {
   dir <- sniff_dir()
   wrong <- file.path(dir, "sc_tcr.dat")
   saveRDS(list(a = 1), wrong)
@@ -125,14 +215,27 @@ test_that("a wrong extension falls back to content; a supported one is kept", {
   ## Without content only the name counts.
   expect_null(builder_path_format_capability("sc_tcr.dat"))
 
+  ## A qs2 file named .rds is read as qs2.
   skip_if_not_installed("qs2")
   misnamed <- file.path(dir, "object.rds")
   qs2::qs_save(list(a = 1), misnamed)
-  expect_identical(builder_match_format(misnamed)$id, "rds")
+  expect_identical(builder_match_format(misnamed)$id, "qs2")
   expect_identical(
     builder_path_format_capability("object.rds", content = misnamed)$id,
-    "rds"
+    "qs2"
   )
+  ## Without content only the name counts.
+  expect_identical(builder_path_format_capability("object.rds")$id, "rds")
+  expect_match(
+    builder_read_object(misnamed)$error,
+    "^The file contains a list of 1 object"
+  )
+  skip_if_not_installed("SeuratObject")
+  seurat <- file.path(dir, "seurat.rds")
+  qs2::qs_save(SeuratObject::pbmc_small, seurat)
+  read <- builder_read_object(seurat)
+  expect_null(read$error)
+  expect_identical(read$format, "qs2")
 })
 
 test_that("unrecognised content fails with a message naming the formats", {
