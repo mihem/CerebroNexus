@@ -124,6 +124,72 @@ test_that("spatial alignment draws every FOV of a Xenium-like object without red
   }
 })
 
+test_that("spatial alignment of a raw Xenium object needs no data layer", {
+  skip_if_not_installed("SeuratObject")
+  ## As LoadXenium leaves it: a `counts` layer only, no normalisation, no
+  ## reductions, a full FOV and a cropped "zoom" FOV.
+  counts <- SeuratObject::LayerData(
+    builder_no_reduction_object()[["RNA"]],
+    layer = "counts"
+  )
+  object <- SeuratObject::CreateSeuratObject(counts = counts, assay = "Xenium")
+  coordinates <- data.frame(
+    x = rep(seq(0, 50, length.out = 6L), 4L),
+    y = rep(seq(0, 30, length.out = 4L), each = 6L),
+    cell = colnames(object)
+  )
+  ## The zoom FOV holds the cells of the cropped box, as Crop() leaves it
+  ## (Crop itself needs the sf package).
+  fov <- function(coordinates, key) {
+    SeuratObject::CreateFOV(
+      coords = list(centroids = SeuratObject::CreateCentroids(coordinates)),
+      type = "centroids",
+      assay = "Xenium",
+      key = key
+    )
+  }
+  object[["fov"]] <- fov(coordinates, "fov_")
+  object[["zoom"]] <- fov(
+    coordinates[coordinates$x <= 25 & coordinates$y <= 15, ],
+    "zoom_"
+  )
+  split_object <- object
+  split_object[["Xenium"]] <- split(
+    split_object[["Xenium"]],
+    f = rep(c("a", "b"), length.out = ncol(object))
+  )
+  expect_identical(SeuratObject::Layers(object[["Xenium"]]), "counts")
+  expect_identical(
+    SeuratObject::Layers(split_object[["Xenium"]]),
+    c("counts.a", "counts.b")
+  )
+  zoom <- SeuratObject::Cells(object[["zoom"]])
+  expect_true(length(zoom) > 0L && length(zoom) < ncol(object))
+
+  variants <- list(raw = object, split = split_object)
+  for (variant in names(variants)) {
+    for (layer in list(NULL, "data", "counts")) {
+      expect_setequal(
+        builder_alignment_layer_cells(variants[[variant]], "Xenium", layer),
+        colnames(object)
+      )
+      for (section in c("fov", "zoom")) {
+        model <- builder_alignment_preview_model(
+          variants[[variant]],
+          section_id = section,
+          layer = layer
+        )
+        label <- paste(variant, section, format(layer))
+        expect_true(model$available, info = paste(label, model$message))
+        expect_setequal(
+          model$spatial$cell_barcode,
+          if (section == "zoom") zoom else colnames(object)
+        )
+      }
+    }
+  }
+})
+
 for (spatial in c(FALSE, TRUE)) {
   local({
     spatial <- spatial

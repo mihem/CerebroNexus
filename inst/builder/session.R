@@ -393,7 +393,7 @@ builder_session_spatial_preview <- function(
   roi = NULL,
   section_id = NULL,
   assay = NULL,
-  layer = "data",
+  layer = NULL,
   base_coordinate_transform = NULL,
   max_cells = BUILDER_PREVIEW_MAX,
   request = NULL

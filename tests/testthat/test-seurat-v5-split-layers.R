@@ -74,6 +74,7 @@ test_that("alignment resolves split-layer cells without joining expression", {
 test_that("alignment cell resolution never reads expression matrices", {
   cohort_helpers <- c(
     "builder_alignment_layer_cells",
+    ".builder_alignment_layer_cohort",
     ".layer_prefix_pattern",
     ".layer_prefix_candidates",
     ".layer_partition_candidates",

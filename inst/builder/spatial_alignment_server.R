@@ -992,7 +992,7 @@ builder_spatial_alignment_server <- function(
         coordinate_spec_for(entry, section, "")
       },
       assay = entry$settings$assay %||% NULL,
-      layer = entry$settings$layer %||% "data"
+      layer = entry$settings$layer
     )
   }
   preview_matches_owner <- function(preview, entry, section) {
@@ -1181,7 +1181,7 @@ builder_spatial_alignment_server <- function(
       roi = contract$roi,
       base_coordinate_transform = contract$base_coordinate_transform,
       assay = entry$settings$assay %||% NULL,
-      layer = entry$settings$layer %||% "data",
+      layer = entry$settings$layer,
       max_cells = BUILDER_SPATIAL_PREVIEW_MAX,
       replaces = "spatial_alignment",
       note = paste0("Loading paired views for ", section, "…")

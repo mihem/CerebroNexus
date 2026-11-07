@@ -95,7 +95,11 @@ BUILDER_SPATIAL_PREVIEW_MAX <- 5000L
 #' layer with JoinLayers can be orders of magnitude more expensive than the
 #' preview itself, so reproduce the resolver's partition proof using layer
 #' membership metadata and never request LayerData for an Assay5 object.
-builder_alignment_layer_cells <- function(object, assay, layer) {
+#'
+#' A missing or unavailable layer (a raw Xenium object has only `counts`) falls
+#' back to `data`, then `counts`, as the Configure default does, and then to
+#' the assay's cells: the alignment never needs expression values.
+builder_alignment_layer_cells <- function(object, assay, layer = NULL) {
   if (
     !is.character(assay) ||
       length(assay) != 1L ||
@@ -105,19 +109,31 @@ builder_alignment_layer_cells <- function(object, assay, layer) {
   ) {
     stop("The selected assay is not available.", call. = FALSE)
   }
-  if (
-    !is.character(layer) ||
-      length(layer) != 1L ||
-      is.na(layer) ||
-      !nzchar(layer)
-  ) {
-    stop("The selected layer is not available.", call. = FALSE)
-  }
-
   assay_object <- object[[assay]]
+  usable <- is.character(layer) &&
+    length(layer) == 1L &&
+    !is.na(layer) &&
+    nzchar(layer)
+  cells <- if (usable) {
+    .builder_alignment_layer_cohort(assay_object, layer)
+  }
+  for (fallback in c("data", "counts")) {
+    if (!is.null(cells)) {
+      break
+    }
+    cells <- tryCatch(
+      .builder_alignment_layer_cohort(assay_object, fallback),
+      error = function(error) NULL
+    )
+  }
+  cells %||% as.character(SeuratObject::Cells(assay_object))
+}
+
+## The cells of one layer, or NULL when the assay has no such layer.
+.builder_alignment_layer_cohort <- function(assay_object, layer) {
   if (!inherits(assay_object, "Assay5")) {
     if (!layer %in% methods::slotNames(assay_object)) {
-      stop("The selected layer is not available.", call. = FALSE)
+      return(NULL)
     }
     cells <- colnames(methods::slot(assay_object, layer))
     if (!length(cells)) {
@@ -138,7 +154,7 @@ builder_alignment_layer_cells <- function(object, assay, layer) {
   protected_candidates <- .layer_prefix_candidates(assay_object, layer)
   candidates <- .layer_partition_candidates(protected_candidates, layer)
   if (!length(candidates)) {
-    stop("The selected layer is not available.", call. = FALSE)
+    return(NULL)
   }
   memberships <- lapply(candidates, function(candidate) {
     SeuratObject::Cells(assay_object, layer = candidate)
@@ -198,7 +214,7 @@ builder_alignment_preview_model <- function(
   roi = NULL,
   section_id = NULL,
   assay = NULL,
-  layer = "data",
+  layer = NULL,
   base_coordinate_transform = NULL,
   max_cells = BUILDER_PREVIEW_MAX
 ) {
