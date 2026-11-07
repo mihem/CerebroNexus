@@ -289,3 +289,22 @@ test_that("truncated JPEG uploads are rejected before they enter a project", {
   reader <- paste(deparse(body(builder_image_file_dimensions)), collapse = "\n")
   expect_false(grepl("n = file.size(path)", reader, fixed = TRUE))
 })
+
+test_that("an image name with a trailing space is still read by its extension", {
+  skip_if_not_installed("png")
+  path <- withr::local_tempfile(fileext = ".png")
+  png::writePNG(matrix(seq(0, 1, length.out = 30L), nrow = 5L), path)
+  image <- builder_read_image(path, filename = "slide.png ")
+  expect_null(image$error)
+  expect_identical(image$mime, "image/png")
+  expect_null(builder_read_image(path, filename = "slide .png")$error)
+  expect_identical(builder_file_type_label("slide.png "), "PNG")
+  expect_identical(
+    builder_read_image(path, filename = "slide")$error,
+    "Supported image formats are PNG and JPEG; this file name has no extension."
+  )
+  expect_identical(
+    builder_read_image(path, filename = "slide.gif")$error,
+    "Supported image formats are PNG and JPEG, not .gif."
+  )
+})

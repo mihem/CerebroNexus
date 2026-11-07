@@ -13,9 +13,24 @@
 ## Supplementary tables -> @misc$extra_material$tables
 ## ---------------------------------------------------------------------------
 
+## The lower-case extension of a file name. Surrounding spaces are ignored, so
+## "slide.png " still reads as a PNG.
+.builder_file_extension <- function(filename) {
+  tolower(tools::file_ext(trimws(as.character(filename %||% ""))))
+}
+
+## The end of a "Supported formats are ..." message: which extension was given.
+.builder_unsupported_extension <- function(ext) {
+  if (nzchar(ext)) {
+    paste0(", not .", ext, ".")
+  } else {
+    "; this file name has no extension."
+  }
+}
+
 builder_table_default_name <- function(filename) {
-  name <- tools::file_path_sans_ext(basename(as.character(filename %||% "")))
-  name <- trimws(name)
+  name <- basename(trimws(as.character(filename %||% "")))
+  name <- trimws(tools::file_path_sans_ext(name))
   if (nzchar(name)) name else "Table"
 }
 
@@ -38,7 +53,7 @@ builder_table_inventory <- function(path, filename = path) {
   if (!file.exists(path) || dir.exists(path)) {
     return(list(error = "File not found."))
   }
-  ext <- tolower(tools::file_ext(filename))
+  ext <- .builder_file_extension(filename)
   if (ext %in% c("csv", "tsv", "txt")) {
     name <- builder_table_default_name(filename)
     return(stats::setNames(
@@ -55,9 +70,8 @@ builder_table_inventory <- function(path, filename = path) {
   if (!ext %in% c("xls", "xlsx", "xlsm")) {
     return(list(
       error = paste0(
-        "Supported table formats are CSV, TSV, TXT, XLS, XLSX and XLSM, not .",
-        ext,
-        "."
+        "Supported table formats are CSV, TSV, TXT, XLS, XLSX and XLSM",
+        .builder_unsupported_extension(ext)
       )
     ))
   }
@@ -213,7 +227,7 @@ builder_read_table_source <- function(record) {
   if (!file.exists(path)) {
     return(list(error = paste0(filename, ": File not found.")))
   }
-  extension <- tolower(tools::file_ext(filename))
+  extension <- .builder_file_extension(filename)
   label <- record$sheet_name %||%
     record$sheet %||%
     record$display_name %||%
@@ -293,7 +307,10 @@ builder_safe_file_name <- function(name, fallback = "File") {
 ## name without one. "application/octet-stream" says nothing, so it is not
 ## shown.
 builder_file_type_label <- function(name, type = NULL, format = NULL) {
-  extension <- toupper(tools::file_ext(builder_safe_file_name(name, "")))
+  extension <- toupper(.builder_file_extension(builder_safe_file_name(
+    name,
+    ""
+  )))
   if (nzchar(extension)) {
     return(extension)
   }
@@ -1926,7 +1943,7 @@ BUILDER_IMAGE_FULL_DECODE_THRESHOLD <- 32 * 1024^2
 
 #' Read PNG/JPEG dimensions without decoding the raster.
 builder_image_file_dimensions <- function(path, filename = path) {
-  ext <- tolower(tools::file_ext(filename))
+  ext <- .builder_file_extension(filename)
   if (!file.exists(path) || !ext %in% c("png", "jpg", "jpeg")) {
     return(NULL)
   }
@@ -2012,7 +2029,7 @@ builder_read_image <- function(
   if (!valid_pixel_budget) {
     return(list(error = "The decoded-pixel limit is invalid."))
   }
-  ext <- tolower(tools::file_ext(filename))
+  ext <- .builder_file_extension(filename)
   if (ext %in% c("png", "jpg", "jpeg")) {
     source_bytes <- suppressWarnings(as.numeric(file.info(path)$size[[1L]]))
     if (!is.finite(source_bytes)) {
@@ -2049,9 +2066,8 @@ builder_read_image <- function(
   } else {
     return(list(
       error = paste0(
-        "Supported image formats are PNG and JPEG, not .",
-        ext,
-        "."
+        "Supported image formats are PNG and JPEG",
+        .builder_unsupported_extension(ext)
       )
     ))
   }

@@ -135,3 +135,18 @@ test_that("a missing readxl names the package", {
     fixed = TRUE
   )
 })
+
+test_that("a table name with a trailing space keeps its format", {
+  path <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("a,b", "1,2"), path)
+  inventory <- builder_table_inventory(path, "table.csv ")
+  expect_null(inventory$error)
+  expect_identical(names(inventory), "table")
+  expect_identical(
+    builder_table_inventory(path, "table")$error,
+    paste0(
+      "Supported table formats are CSV, TSV, TXT, XLS, XLSX and XLSM; ",
+      "this file name has no extension."
+    )
+  )
+})
