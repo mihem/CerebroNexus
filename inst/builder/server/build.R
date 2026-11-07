@@ -687,14 +687,14 @@ builder_new_release_target <- function(
       stop("A release identifier could not be generated.", call. = FALSE)
     }
     suffix <- paste(sprintf("%02x", as.integer(bytes)), collapse = "")
-    candidate <- .builder_release_path(file.path(
-      parent,
-      paste0(prefix, suffix)
-    ))
-    if (
-      !.builder_release_exists(candidate) &&
-        !.builder_release_link(candidate)
-    ) {
+    candidate <- file.path(parent, paste0(prefix, suffix))
+    # Any existing entry takes the name, a dangling symbolic link included;
+    # it is never followed or removed.
+    if (.builder_release_exists(candidate)) {
+      next
+    }
+    candidate <- .builder_release_path(candidate)
+    if (!.builder_release_exists(candidate)) {
       return(candidate)
     }
   }

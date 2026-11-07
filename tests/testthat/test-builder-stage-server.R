@@ -345,6 +345,30 @@ test_that("Build result survives unsafe folder selection and clears on acceptanc
       "CerebroNexus_crb_3d4e5f"
     )
     expect_false(file.exists(crb_target))
+    # A dangling symbolic link takes its name; it is skipped, not followed
+    # or removed.
+    dangling <- file.path(release_parent, "CerebroNexus_viewer_6a7b8c")
+    if (isTRUE(file.symlink(file.path(release_parent, "gone"), dangling))) {
+      identifiers <- list(
+        as.raw(c(0x6a, 0x7b, 0x8c)),
+        as.raw(c(0x9d, 0x0e, 0x1f))
+      )
+      linked_target <- builder_new_release_target(
+        release_parent,
+        make_app = TRUE,
+        .random_bytes = function(size) {
+          value <- identifiers[[1L]]
+          identifiers <<- identifiers[-1L]
+          value
+        }
+      )
+      expect_identical(
+        basename(linked_target),
+        "CerebroNexus_viewer_9d0e1f"
+      )
+      expect_true(nzchar(Sys.readlink(dangling)))
+      expect_false(file.exists(file.path(release_parent, "gone")))
+    }
     expect_error(
       builder_new_release_target(release_parent, make_app = NA),
       "release parent is unsafe",
