@@ -142,6 +142,8 @@ This is a packaging boundary, not a substitute for host authentication. Deploy t
 
 Run `shiny::runApp("path/to/release/cerebro_app")` for a Viewer App. On Linux, run `bash viewer/start-linux.sh` from `cerebro_app/` to prepare login-file permissions and start it, including after a Windows transfer. For a service account use `sudo bash viewer/start-linux.sh --prepare-only --user shiny`, replacing `shiny` with the actual account, then start the service normally. The bundled `viewer/AUTHENTICATION-DEPLOYMENT.md` explains parent-directory access, read-only storage and external secrets.
 
+While a release is built it stays in a private, owner-only folder. The published release folder follows your umask like any folder you create: with the common `umask 022` another account (a Shiny Server service, an `rsync` to a deployment user) can read it; with `umask 077` only you can. Login credentials are always owner-only, and so is the Builder's ownership record `.cerebro-builder-release-v1`, which the App does not need.
+
 # Results, replacement, and recovery
 
 A successful result names the published artifacts. Every published release offers **Reveal Folder**, **Copy Path**, and **Copy Report**. The report is portable and redacted; it describes artifact-visible datasets, methods, and metadata columns without source paths, host/PID data, lock paths, or raw values.

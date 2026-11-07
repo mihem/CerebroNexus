@@ -142,6 +142,22 @@ if (!exists(".builderRandomBytes", mode = "function", inherits = TRUE)) {
   length(mode) == 1L && !is.na(mode) && bitwAnd(as.integer(mode), 63L) == 0L
 }
 
+## The stage is owner-only (0700) while it is built. The published release
+## folder then follows the umask, like any folder the user creates and like
+## createShinyApp() output, so another account (a Shiny Server service, an
+## rsync to a deployment user) can read it when the umask allows. Login
+## credentials keep their own 0600/0700 modes.
+.builder_release_follow_umask <- function(path) {
+  if (identical(.Platform$OS.type, "windows")) {
+    return(invisible(FALSE))
+  }
+  umask <- strtoi(as.character(Sys.umask(NA)), base = 8L)
+  mode <- as.octmode(bitwAnd(strtoi("777", base = 8L), bitwNot(umask)))
+  invisible(isTRUE(suppressWarnings(
+    Sys.chmod(path, mode, use_umask = FALSE)
+  )))
+}
+
 .builder_release_path <- function(target) {
   if (!.builder_release_text(target)) {
     stop("A release target is required.", call. = FALSE)
@@ -2548,6 +2564,7 @@ builder_publish_release <- function(
   handle <- .builder_release_write_phase(handle, "old_moved")
   .after_phase("old_moved")
   verify_or_restore(handle$stage, "before_rename")
+  .builder_release_follow_umask(handle$stage)
   install_attempt <- NULL
   if (isTRUE(in_place)) {
     handle <- .builder_release_write_phase(handle, "new_moving_in_place")

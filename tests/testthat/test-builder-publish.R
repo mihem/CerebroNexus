@@ -524,6 +524,33 @@ test_that("compare-and-swap rejects a release changed after Review", {
   })
 })
 
+test_that("a published release folder follows the umask", {
+  skip_on_os("windows")
+  local({
+    builder_publish_source()
+    root <- withr::local_tempdir()
+    old_umask <- Sys.umask("022")
+    withr::defer(Sys.umask(old_umask))
+    publish <- function(name, build_id) {
+      target <- file.path(root, name)
+      handle <- builder_prepare_release(
+        target,
+        build_id,
+        builder_release_identity(target)
+      )
+      # Owner-only while it is built.
+      expect_identical(as.character(file.info(handle$stage)$mode), "700")
+      writeLines("new", file.path(handle$stage, "dataset.crb"))
+      builder_publish_release(handle)
+      as.character(file.info(target)$mode)
+    }
+
+    expect_identical(publish("shared", "build-umask"), "755")
+    Sys.umask("077")
+    expect_identical(publish("private", "build-umask-private"), "700")
+  })
+})
+
 test_that("release stages use bounded names and guard before payload creation", {
   local({
     builder_publish_source()
