@@ -471,12 +471,16 @@ schedule_enhance_table_files <- function(
     }
     return(invisible(FALSE))
   }
-  notification_id <- builder_notify(
+  ## builder_notify() returns TRUE, not an id; name the notice so finish()
+  ## can clear it.
+  notification_id <- basename(tempfile("builder-workbook-read-"))
+  builder_notify(
     "info",
     "Reading workbook sheets…",
     target = list(
       selector = ".builder-viewer-extra-material .builder-viewer-card-body"
     ),
+    id = notification_id,
     duration = Inf,
     session = session
   )

@@ -2123,3 +2123,163 @@ test_that("the Configure title follows a dataset rename", {
     expect_identical(output$configure_dataset_name, "Renamed A")
   })
 })
+
+test_that("a stale back_to_settings without a reviewed configuration is ignored", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this workflow test.")
+  }
+  shiny::testServer(app_env$server, {
+    use_state_only_fixture(list(list(
+      id = "dataset-a",
+      revision = 0L,
+      snapshot = list(
+        path = "/private/dataset-a",
+        owner_token = "owner-a",
+        object_md5 = strrep("a", 32L)
+      ),
+      profile = list(marker = "a", extras = list()),
+      settings = list(name = "Dataset A")
+    )))
+    session$setInputs(make_app = FALSE)
+    session$flushReact()
+    stage <- workflow()$stage
+    expect_null(workflow()$review_snapshot)
+    session$setInputs(back_to_settings = 1L)
+    session$flushReact()
+    expect_identical(workflow()$stage, stage)
+    expect_false(session$isClosed())
+
+    ## From Review the button still goes back to Configure.
+    dataset_check_marks(builder_stage_checked_marks(
+      isolate(sets()),
+      app_env$builder_project_check_identity,
+      builder_configuration_identity_cache
+    ))
+    workflow(app_env$builder_reduce_workflow(
+      isolate(workflow()),
+      list(type = "open_review", snapshot = current_review_snapshot())
+    ))
+    session$setInputs(back_to_settings = 2L)
+    session$flushReact()
+    expect_identical(workflow()$stage, "configure")
+  })
+})
+
+test_that("the workbook reading notice is cleared when reading ends", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this workflow test.")
+  }
+  shiny::testServer(app_env$server, {
+    use_state_only_fixture(list(list(
+      id = "dataset-a",
+      revision = 0L,
+      snapshot = list(
+        path = "/private/dataset-a",
+        owner_token = "owner-a",
+        object_md5 = strrep("a", 32L)
+      ),
+      profile = list(marker = "a", extras = list()),
+      settings = list(name = "Dataset A")
+    )))
+    session$flushReact()
+    shown <- character()
+    cleared <- character()
+    fn_env <- environment(schedule_enhance_table_files)
+    assign(
+      "builder_notify",
+      function(type, message, target = NULL, id = NULL, ...) {
+        if (startsWith(as.character(message), "Reading workbook sheets")) {
+          shown <<- c(shown, id %||% "<none>")
+        }
+        invisible(TRUE)
+      },
+      envir = fn_env
+    )
+    assign(
+      "builder_notify_clear",
+      function(id, ...) {
+        cleared <<- c(cleared, as.character(id))
+        invisible(TRUE)
+      },
+      envir = fn_env
+    )
+    assign(
+      "start_enhance_table_inventory",
+      function(...) stop("No worker in this test."),
+      envir = fn_env
+    )
+    schedule_enhance_table_files(
+      data.frame(name = "a.xlsx", datapath = "/x/a.xlsx"),
+      id = "dataset-a"
+    )
+    expect_length(shown, 1L)
+    expect_true(nzchar(shown))
+    expect_identical(cleared, shown)
+  })
+})
+
+test_that("a dataset without any eligible Group points the check at Groups", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- new.env(parent = globalenv())
+  withr::local_dir(builder_profile_inst_path("builder"))
+  sys.source("app.R", envir = app_env)
+  app_env$builder_session_start <- function(...) {
+    list(error = "Worker startup is disabled in this state-only test.")
+  }
+  shiny::testServer(app_env$server, {
+    messages <- list()
+    original_send <- session$sendCustomMessage
+    session$sendCustomMessage <- function(type, message) {
+      if (identical(type, "builder_focus_incomplete_setting")) {
+        messages[[length(messages) + 1L]] <<- message
+      }
+      original_send(type, message)
+    }
+    use_state_only_fixture(list(list(
+      id = "dataset-a",
+      revision = 0L,
+      snapshot = list(
+        path = "/private/dataset-a",
+        owner_token = "owner-dataset-a",
+        object_md5 = strrep("a", 32L)
+      ),
+      profile = list(
+        marker = "dataset-a",
+        extras = list(),
+        group_candidates = character()
+      ),
+      settings = list(name = "Dataset A", organism = NULL)
+    )))
+    session$flushReact()
+    ## What a loaded dataset without groups reports (a state-only fixture
+    ## skips the settings checks).
+    assign(
+      "builder_cached_dataset_state",
+      function(...) {
+        list(
+          blocking_ids = c("groups", "settings_groups", "settings_organism"),
+          attention_ids = character(),
+          checking_ids = character()
+        )
+      },
+      envir = environment(open_next_unchecked_dataset)
+    )
+
+    session$setInputs(complete_dataset_check = 1)
+    session$flushReact()
+
+    expect_length(messages, 1L)
+    expect_identical(messages[[1L]]$blocker, "settings_groups")
+  })
+})

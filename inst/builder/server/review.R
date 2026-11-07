@@ -922,6 +922,17 @@ observeEvent(input$complete_dataset_check, {
     builder_notify_clear("builder-dataset-name")
   }
   unresolved <- unique(unresolved)
+  ## With no column that can be a Group, choosing an organism does not help:
+  ## point at Groups, which says why each column is unavailable.
+  profile <- entries[[index]]$profile
+  if (
+    is.list(profile) &&
+      "group_candidates" %in% names(profile) &&
+      !length(profile$group_candidates)
+  ) {
+    first <- intersect(c("settings_groups", "groups"), unresolved)
+    unresolved <- c(first, setdiff(unresolved, first))
+  }
   if (length(unresolved)) {
     session$sendCustomMessage(
       "builder_focus_incomplete_setting",
@@ -1266,8 +1277,14 @@ observeEvent(input$back_to_settings, {
   ) {
     return()
   }
+  ## Only Review has this button; a stale or forged click from elsewhere
+  ## would make the reducer stop and end the session.
+  state <- isolate(workflow())
+  if (!identical(state$stage, "review") || is.null(state$review_snapshot)) {
+    return()
+  }
   workflow(builder_reduce_workflow(
-    isolate(workflow()),
+    state,
     list(type = "back_to_settings")
   ))
   session$onFlushed(
