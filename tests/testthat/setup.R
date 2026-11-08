@@ -29,3 +29,20 @@ options(cerebro.builder.precompile = FALSE)
 ## The Builder remembers its output folders for a crash sweep; keep that
 ## record out of the user's cache during tests.
 Sys.setenv(CEREBRO_BUILDER_STATE_DIR = tempfile("builder-state-"))
+
+## Plots that tests draw go to a null device, not to Rplots.pdf in the
+## working directory.
+grDevices::pdf(NULL)
+withr::defer(grDevices::dev.off(), teardown_env())
+
+## R processes that tests start (mirai tasks, callr) create their own temporary
+## directory, and one that is stopped leaves it behind. Under R CMD check on
+## CRAN, put those inside this process's temporary directory, which R removes
+## when the test process ends.
+if (!identical(Sys.getenv("NOT_CRAN"), "true")) {
+  local({
+    children <- file.path(tempdir(), "c")
+    dir.create(children, showWarnings = FALSE)
+    Sys.setenv(TMPDIR = children)
+  })
+}
