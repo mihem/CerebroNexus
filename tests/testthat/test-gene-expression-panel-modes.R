@@ -148,7 +148,9 @@ test_that("Viewer H5 gene means read rows without attaching the matrix", {
 })
 
 test_that("RGB expression reads all channels in one backend call", {
-  scope <- new.env(parent = globalenv())
+  ## The sourced server code uses bare reactiveVal()/observe()/isolate(), so do
+  ## not rely on shiny being attached by an earlier test file.
+  scope <- new.env(parent = asNamespace("shiny"))
   scope$reactive <- shiny::reactive
   scope$req <- shiny::req
   scope$withProgress <- function(expr, ...) force(expr)
