@@ -1025,7 +1025,7 @@ restart_worker_protocol <- function(
       current_worker
     }
     restart_error <- if (inherits(restarted, "try-error")) {
-      conditionMessage(attr(restarted, "condition"))
+      builder_plain_error_text(conditionMessage(attr(restarted, "condition")))
     } else {
       restarted$error %||% "The background worker could not restart."
     }

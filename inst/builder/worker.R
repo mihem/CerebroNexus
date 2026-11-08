@@ -1449,6 +1449,25 @@ builder_worker_start <- function(
   )
 }
 
+## callr reports an error raised in a background R process as
+## "! in callr subprocess.\nCaused by error in `fn(...)`:\n! <message>". The
+## page shows the cause only; any other text is returned unchanged.
+builder_plain_error_text <- function(text) {
+  if (!is.character(text) || !length(text)) {
+    return(text)
+  }
+  lines <- unlist(strsplit(text, "\n", fixed = TRUE), use.names = FALSE)
+  if (!length(lines) || !grepl("^\\s*! in callr subprocess", lines[[1L]])) {
+    return(text)
+  }
+  cause <- which(startsWith(trimws(lines), "! "))
+  cause <- cause[cause > 1L]
+  if (!length(cause)) {
+    return(text)
+  }
+  sub("^\\s*!\\s*", "", lines[[cause[[1L]]]])
+}
+
 builder_worker_poll_startup <- function(worker, timeout = 0) {
   .builder_worker_assert(worker)
   state <- worker$state %||% if (isTRUE(worker$ready)) "ready" else "failed"
@@ -1488,7 +1507,7 @@ builder_worker_poll_startup <- function(worker, timeout = 0) {
   if (!is.null(result$error)) {
     worker$state <- "failed"
     worker$ready <- FALSE
-    worker$error <- result$error
+    worker$error <- builder_plain_error_text(result$error)
     return(list(worker = worker, state = "failed", error = worker$error))
   }
   worker$restored <- result$value

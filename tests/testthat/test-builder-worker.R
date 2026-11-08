@@ -1882,3 +1882,22 @@ test_that("a busy worker is not seen as stalled", {
     expect_false(step$stalled)
   }
 })
+
+test_that("a callr startup error is shown by its cause", {
+  raw <- paste(
+    "! in callr subprocess.",
+    "Caused by error in `(function (dir, root, registry) {  ... })()`:",
+    "! A registered Builder snapshot is no longer owned.",
+    sep = "\n"
+  )
+  expect_identical(
+    builder_plain_error_text(raw),
+    "A registered Builder snapshot is no longer owned."
+  )
+  expect_identical(
+    builder_plain_error_text("The background worker startup timed out."),
+    "The background worker startup timed out."
+  )
+  expect_identical(builder_plain_error_text("! in callr subprocess."), "! in callr subprocess.")
+  expect_null(builder_plain_error_text(NULL))
+})
