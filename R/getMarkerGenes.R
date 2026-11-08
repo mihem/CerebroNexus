@@ -29,13 +29,15 @@
 #' Seurat object with marker gene results for the specified grouping variables
 #' stored in \code{object@misc$marker_genes}.
 #'
-#' @examples
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
+#' ## organism = NULL skips the online lookup of cell surface genes; use
+#' ## organism = 'hg' or 'mm' to annotate them (needs internet access).
 #' pbmc <- getMarkerGenes(
 #'   object = pbmc,
 #'   assay = 'RNA',
-#'   organism = 'hg',
+#'   organism = NULL,
 #'   groups = c('sample','seurat_clusters'),
 #'   name = 'cerebro_seurat',
 #'   only_pos = TRUE,

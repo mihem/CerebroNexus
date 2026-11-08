@@ -50,6 +50,7 @@ labels to cell clusters from single-cell RNA-sequencing data", Diaz-Mejia et
 al., F1000Research (2019).
 }
 \examples{
+\dontshow{if (all(sapply(c("Seurat", "GSVA", "qvalue", "future.apply"), requireNamespace, quietly = TRUE))) withAutoprint(\{ # examplesIf}
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 example_gene_set <- system.file("extdata/example_gene_set.gmt",
@@ -61,5 +62,5 @@ pbmc <- performGeneSetEnrichmentAnalysis(
   thresh_p_val = 0.05,
   thresh_q_val = 0.1
 )
-
+\dontshow{\}) # examplesIf}
 }

@@ -496,10 +496,12 @@
 #'
 #' @return \code{file}, invisibly.
 #'
-#' @examples
-#' \dontrun{
-#' exportToH5ad("cerebro_pbmc.crb", "pbmc.h5ad")
-#' # then, in Python: adata = anndata.read_h5ad("pbmc.h5ad")
+#' @examplesIf requireNamespace("rhdf5", quietly = TRUE)
+#' \donttest{
+#' crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
+#' h5ad <- file.path(tempdir(), "example.h5ad")
+#' exportToH5ad(crb, h5ad)
+#' # then, in Python: adata = anndata.read_h5ad("example.h5ad")
 #' }
 #'
 #' @seealso \code{\link{convertH5adToCerebro}}, \code{\link{readH5adAsSCE}},

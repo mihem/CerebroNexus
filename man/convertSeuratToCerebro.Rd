@@ -173,13 +173,13 @@ multiple user-named backgrounds, or coordinates only. Seurat v4
 \code{VisiumV2} images.
 }
 \examples{
-\dontrun{
-library(CerebroNexus)
-
+\dontshow{if (requireNamespace("Seurat", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\donttest{
 input_dir <- system.file("extdata/examples", package = "CerebroNexus")
+result_dir <- file.path(tempdir(), "output")
 convertSeuratToCerebro(
   seurat_file = file.path(input_dir, "pbmc_seurat.rds"),
-  result_dir = "output",
+  result_dir = result_dir,
   assay = "RNA",
   slot = "data",
   experiment_name = "PBMC example",
@@ -187,9 +187,9 @@ convertSeuratToCerebro(
   groups = c("sample", "seurat_clusters"),
   groups_naming = list("seurat_clusters" = "cluster")
 )
-# Creates output/cerebro_pbmc_seurat.crb.
+# Creates cerebro_pbmc_seurat.crb in result_dir.
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{exportFromSeurat}}

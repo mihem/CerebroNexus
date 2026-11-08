@@ -117,17 +117,18 @@ like their \code{@misc} counterparts on a Seurat object. Attaching BCR/TCR
 files (\code{bcr_file}/\code{tcr_file}) is not available for SCE yet.
 }
 \examples{
-\dontrun{
+\dontshow{if (requireNamespace("SingleCellExperiment", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\donttest{
 convertSCEToCerebro(
   sce_file = system.file("extdata/examples/pbmc_SCE.rds",
     package = "CerebroNexus"),
-  result_dir = "output",
+  result_dir = file.path(tempdir(), "output"),
   experiment_name = "PBMC (SCE)",
   organism = "Human",
   groups = c("sample", "cluster")
 )
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{exportFromSCE}}, \code{\link{convertSeuratToCerebro}}

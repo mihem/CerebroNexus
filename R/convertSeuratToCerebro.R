@@ -415,14 +415,13 @@
 #' \code{VisiumV1} images are rejected with guidance to rebuild them as
 #' \code{VisiumV2} images.
 #'
-#' @examples
-#' \dontrun{
-#' library(CerebroNexus)
-#'
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
+#' \donttest{
 #' input_dir <- system.file("extdata/examples", package = "CerebroNexus")
+#' result_dir <- file.path(tempdir(), "output")
 #' convertSeuratToCerebro(
 #'   seurat_file = file.path(input_dir, "pbmc_seurat.rds"),
-#'   result_dir = "output",
+#'   result_dir = result_dir,
 #'   assay = "RNA",
 #'   slot = "data",
 #'   experiment_name = "PBMC example",
@@ -430,7 +429,7 @@
 #'   groups = c("sample", "seurat_clusters"),
 #'   groups_naming = list("seurat_clusters" = "cluster")
 #' )
-#' # Creates output/cerebro_pbmc_seurat.crb.
+#' # Creates cerebro_pbmc_seurat.crb in result_dir.
 #' }
 #'
 #' @seealso \code{\link{exportFromSeurat}}
@@ -633,7 +632,7 @@ convertSeuratToCerebro <- function(
         .expression_resolution = expr_resolution
       )
       if (!isTRUE(getOption("cerebro.quiet_runtime", FALSE))) {
-        cat("Successfully exported:", file_name, "\n")
+        message("Successfully exported: ", file_name)
       }
     },
     error = function(e) {

@@ -65,11 +65,14 @@ exported; a message names what was left out. The file is written to a
 private temporary file and moved into place only when complete.
 }
 \examples{
-\dontrun{
-exportToH5ad("cerebro_pbmc.crb", "pbmc.h5ad")
-# then, in Python: adata = anndata.read_h5ad("pbmc.h5ad")
+\dontshow{if (requireNamespace("rhdf5", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\donttest{
+crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
+h5ad <- file.path(tempdir(), "example.h5ad")
+exportToH5ad(crb, h5ad)
+# then, in Python: adata = anndata.read_h5ad("example.h5ad")
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{convertH5adToCerebro}}, \code{\link{readH5adAsSCE}},

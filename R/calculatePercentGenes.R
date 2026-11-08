@@ -14,7 +14,7 @@
 #' List of lists containing the percentages of expression for each provided
 #' gene list.
 #'
-#' @examples
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- calculatePercentGenes(

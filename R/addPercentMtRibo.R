@@ -17,7 +17,7 @@
 #' Seurat object with two new meta data columns containing the percentage of
 #' mitochondrial and ribosomal gene expression for each cell.
 #'
-#' @examples
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- addPercentMtRibo(

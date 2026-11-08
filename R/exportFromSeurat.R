@@ -826,7 +826,7 @@
 #' @return
 #' No data returned.
 #'
-#' @examples
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' exportFromSeurat(

@@ -132,15 +132,21 @@ embedding exists, as on the other routes. Receptor chains written by scirpy
 (\code{obsm["airr"]}) fill the Immune repertoire page.
 }
 \examples{
-\dontrun{
+\dontshow{if (requireNamespace("rhdf5") && requireNamespace("SingleCellExperiment")) withAutoprint(\{ # examplesIf}
+\donttest{
+h5ad <- file.path(tempdir(), "example.h5ad")
+exportToH5ad(
+  system.file("extdata/examples/example.crb", package = "CerebroNexus"),
+  h5ad
+)
 convertH5adToCerebro(
-  h5ad_file = "pbmc.h5ad",
-  result_dir = "output",
-  groups = c("cell_type", "sample"),
+  h5ad_file = h5ad,
+  result_dir = file.path(tempdir(), "output"),
+  groups = c("seurat_clusters", "sample"),
   expression_matrix_mode = "h5"
 )
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{readH5adAsSCE}}, \code{\link{convertSCEToCerebro}}

@@ -14,7 +14,7 @@
 #' Seurat object with most expressed genes stored for every group level of the
 #' specified groups stored in \code{object@misc$most_expressed_genes}.
 #'
-#' @examples
+#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- getMostExpressedGenes(

@@ -34,8 +34,8 @@
 #' @return Does not return; runs until the app is stopped.
 #'
 #' @examples
-#' \dontrun{
-#' launchCerebroBuilder()
+#' if (interactive()) {
+#'   launchCerebroBuilder()
 #' }
 #'
 #' @export

@@ -83,7 +83,7 @@
 #' @return
 #' No data returned.
 #'
-#' @examples
+#' @examplesIf requireNamespace("SingleCellExperiment", quietly = TRUE)
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_SCE.rds",
 #'   package = "CerebroNexus"))
 #' exportFromSCE(
