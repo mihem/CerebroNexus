@@ -159,6 +159,23 @@ IR_EXPANSION_COLORS <- stats::setNames(
 ## bar/point tabs; plots that ggplotly cannot represent well (alluvial, custom
 ## facet/bootstrap renderers) keep renderPlot.
 ir_render_ggplotly <- function(expr, plot_name, tooltip = NULL) {
+  # A throwaway null PDF device (no platform device, no file) for the whole
+  # call. In the renderPlotly context Shiny has not opened a device, so
+  # anything that touches graphics while the plot is built (ggdendro's
+  # dendro_data() does) opens R's default one: Rplots.pdf in the working
+  # directory, which fails with "cannot open file 'Rplots.pdf'" when the App
+  # folder is read-only, as under Shiny Server in a container. ggplotly() needs
+  # an open device to measure text/layout too; on macOS the default quartz
+  # device is requested with a zero size and errors with
+  # "invalid quartz() device size".
+  grDevices::pdf(NULL)
+  null_device <- grDevices::dev.cur()
+  on.exit(
+    if (null_device %in% grDevices::dev.list()) {
+      grDevices::dev.off(null_device)
+    },
+    add = TRUE
+  )
   p <- safeRenderPlot(expr, plot_name)
   ## Plots built as Plotly traces directly only need the shared toolbar.
   if (inherits(p, "plotly")) {
@@ -169,13 +186,6 @@ ir_render_ggplotly <- function(expr, plot_name, tooltip = NULL) {
   }
   tryCatch(
     {
-      # ggplotly() needs an open graphics device to measure text/layout. In the
-      # renderPlotly context Shiny has not opened one, so on macOS the default
-      # quartz device is requested with a zero size and errors with
-      # "invalid quartz() device size". Open a throwaway null PDF device (no
-      # platform device, no file) for the duration of the conversion.
-      grDevices::pdf(NULL)
-      on.exit(grDevices::dev.off(), add = TRUE)
       # No toWebGL() here: these are bar plots, which have no WebGL trace
       # equivalent — converting them only emits "don't have a WebGL equivalent"
       # and "'scattergl' object don't have 'hoveron'" warnings. WebGL is only
