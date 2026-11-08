@@ -1,3 +1,14 @@
+# CerebroNexus 7.2.0
+
+- The Immune repertoire SizeDist tab draws in an App whose folder is read-only,
+  such as one run by Shiny Server in a container. Building its dendrogram
+  (`ggdendro::dendro_data()`) opened R's default graphics device, which writes
+  `Rplots.pdf` into the working directory: the tab showed "Could not render
+  this plot: cannot open file 'Rplots.pdf'", and where the folder is writable a
+  stray `Rplots.pdf` was left behind. The Immune repertoire plotly renderers now
+  open a null graphics device for the whole render, plot building included, and
+  close only that device.
+
 # CerebroNexus 7.1.0
 
 - An App run by Shiny Server shows its plots again. Shiny Server's SockJS
