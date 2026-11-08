@@ -1919,6 +1919,9 @@ test_that("a callr startup error is shown by its cause", {
     builder_plain_error_text("The background worker startup timed out."),
     "The background worker startup timed out."
   )
-  expect_identical(builder_plain_error_text("! in callr subprocess."), "! in callr subprocess.")
+  expect_identical(
+    builder_plain_error_text("! in callr subprocess."),
+    "! in callr subprocess."
+  )
   expect_null(builder_plain_error_text(NULL))
 })
