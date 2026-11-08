@@ -1,7 +1,7 @@
 ## Pan-cancer T-cell atlas (Zheng et al., Science 374:abe6474, 2021): 397,810
 ## T cells of 316 patients and 21 cancer types, with TCR sequences and the
 ## published CD8 T-cell exhaustion continuum. See tcell.ATTRIBUTION.md.
-.viewerTcellVersion <- 1L
+.viewerTcellVersion <- 2L
 
 .viewerTcellZenodo <- "https://zenodo.org/api/records/5461803/files/"
 
@@ -424,9 +424,35 @@
 
 ## ---- immune repertoire --------------------------------------------------------
 
-## The atlas's own recombinant identifier is "V_junction_J"; the first and last
-## fields are the V and J genes.
+## The atlas's recombinant identifier is "V_junction_J" for Smart-seq2 cells
+## and "V|D|J|C|junction" for 10x cells; the 10x layout is rewritten to the
+## Smart-seq2 one.
+.viewerTcellIdentifier <- function(identifier) {
+  identifier <- sub(
+    "^([^|]*)\\|[^|]*\\|([^|]*)\\|[^|]*\\|([^|]*)$",
+    "\\1_\\3_\\2",
+    as.character(identifier)
+  )
+  ## Any other layout would drop out of CTgene but stay raw in CTnt.
+  unknown <- unique(identifier[grepl("|", identifier, fixed = TRUE)])
+  if (length(unknown)) {
+    stop(
+      "The T-cell TCR table has ",
+      length(unknown),
+      " identifier(s) in an unknown layout (expected V_junction_J or ",
+      "V|D|J|C|junction), e.g. ",
+      paste(utils::head(unknown, 3L), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+  identifier
+}
+
+## The first and last fields of a "V_junction_J" identifier are the V and J
+## genes.
 .viewerTcellGenePair <- function(identifier) {
+  identifier <- .viewerTcellIdentifier(identifier)
   fields <- strsplit(as.character(identifier), "_", fixed = TRUE)
   vapply(
     fields,
@@ -450,9 +476,10 @@
 
 ## scRepertoire-style clone calls from the atlas's TCR table. Of the up to two
 ## alpha and two beta chains of a cell the first listed (A1, B1) is used; A2 or
-## B2 stand in only when it is absent. `CTnt` is the recombinant identifier
+## B2 stand in when the first lacks its identifier or a CDR3, and a chain with
+## neither complete is left out. `CTnt` is the recombinant identifier
 ## (V, junction nucleotides, J) of both chains: the table has no CDR3
-## nucleotide sequence; its fields are joined with ":".
+## nucleotide column; its fields are joined with ":".
 .viewerTcellRepertoire <- function(tcr, cells) {
   required <- c(
     "Cell_Name",
@@ -474,15 +501,37 @@
       call. = FALSE
     )
   }
-  pick <- function(first, second) {
-    first <- as.character(first)
-    second <- as.character(second)
-    ifelse(is.na(first), second, first)
+  ## 10x rows mark an absent chain with "-". Some Smart-seq2 CDR3 cells hold
+  ## the assembler's message ("Couldn't find FGXG") instead of a sequence;
+  ## such a chain has no CDR3. The chain is chosen once, so a call's
+  ## identifier and CDR3 always come from the same chain.
+  absent <- function(x) {
+    x <- as.character(x)
+    x[x %in% c("-", "")] <- NA_character_
+    x
   }
-  alpha_id <- pick(tcr$Identifier.A1, tcr$Identifier.A2)
-  beta_id <- pick(tcr$Identifier.B1, tcr$Identifier.B2)
-  alpha_aa <- pick(tcr$CDR3.A1, tcr$CDR3.A2)
-  beta_aa <- pick(tcr$CDR3.B1, tcr$CDR3.B2)
+  no_sequence <- function(x) {
+    x <- absent(x)
+    x[!grepl("^[A-Za-z*]+$", x)] <- NA_character_
+    x
+  }
+  pick <- function(id1, aa1, id2, aa2) {
+    id1 <- as.character(id1)
+    aa1 <- as.character(aa1)
+    id2 <- as.character(id2)
+    aa2 <- as.character(aa2)
+    complete1 <- !is.na(absent(id1)) & !is.na(no_sequence(aa1))
+    complete2 <- !is.na(absent(id2)) & !is.na(no_sequence(aa2))
+    id <- ifelse(complete1, id1, ifelse(complete2, id2, NA_character_))
+    aa <- ifelse(complete1, aa1, ifelse(complete2, aa2, NA_character_))
+    list(id = .viewerTcellIdentifier(as.character(id)), aa = as.character(aa))
+  }
+  alpha <- pick(tcr$Identifier.A1, tcr$CDR3.A1, tcr$Identifier.A2, tcr$CDR3.A2)
+  beta <- pick(tcr$Identifier.B1, tcr$CDR3.B1, tcr$Identifier.B2, tcr$CDR3.B2)
+  alpha_id <- alpha$id
+  beta_id <- beta$id
+  alpha_aa <- alpha$aa
+  beta_aa <- beta$aa
   gene <- .viewerTcellJoin(
     .viewerTcellGenePair(alpha_id),
     .viewerTcellGenePair(beta_id)

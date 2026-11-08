@@ -189,6 +189,17 @@ launchCerebro <- function(
       '##---------------------------------------------------------------------------##'
     )
   )
+  ## Shiny Server cannot carry binary WebSocket frames; wrap them there only.
+  transport_env <- new.env(parent = globalenv())
+  sys.source(
+    system.file("viewer/transport_compat.R", package = "CerebroNexus"),
+    envir = transport_env
+  )
+  transport <- transport_env$viewerApplyTransportCompat(
+    ui,
+    server,
+    system.file(package = "CerebroNexus")
+  )
   ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
   ## value is restored when it stops. A user `onStart` still runs afterwards.
   app_args <- list(...)
@@ -203,6 +214,6 @@ launchCerebro <- function(
   }
   do.call(
     shiny::shinyApp,
-    c(list(ui = ui, server = server), app_args)
+    c(list(ui = transport$ui, server = transport$server), app_args)
   )
 }
