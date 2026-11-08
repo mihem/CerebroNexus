@@ -1,5 +1,22 @@
 # Changelog
 
+## CerebroNexus 7.1.0
+
+- An App run by Shiny Server shows its plots again. Shiny Server’s
+  SockJS transport cannot carry the raw binary WebSocket frames the
+  Viewer sends cell-view data in, so pages opened but projections never
+  arrived and datasets loaded forever. When Shiny Server started the R
+  process (it sets `SHINY_SERVER_VERSION`), the frames now go as base64
+  text and the browser restores them; everywhere else they are sent
+  unchanged. The choice is made when the App starts, so an App built on
+  one machine and copied to a Shiny Server works as it is.
+  `options(cerebro.sockjs_compat = TRUE)` or `FALSE` (or `sockjs_compat`
+  in `Cerebro.options`) forces it. This covers
+  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  the bundled demo App and Apps written by
+  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md);
+  an App built with an earlier version has to be built again to get it.
+
 ## CerebroNexus 7.0.1
 
 - The pan-cancer T-cell demo now fills `CTgene` and `CTnt` for 10x

@@ -223,6 +223,15 @@ while systemd reads the separate env file before starting the service.
 **Verify:** inspect service status and logs, then open the real HTTPS
 App URL and test valid and invalid login.
 
+Shiny Server’s SockJS transport cannot carry the raw binary WebSocket
+frames the Viewer sends its plot data in; without a workaround the page
+opens, but plots never arrive. The App detects Shiny Server when it
+starts (Shiny Server sets `SHINY_SERVER_VERSION`) and sends those frames
+as base64 text instead, so an App built on your workstation and copied
+here needs no change. Elsewhere the frames go unchanged. To force the
+choice, put `options(cerebro.sockjs_compat = TRUE)` (or `FALSE`) in a
+`.Rprofile` in the App folder.
+
 Publish the App and secret separately:
 
 For access beyond the local host, use a TLS-terminating reverse proxy in

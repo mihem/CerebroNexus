@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,10 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="7.1.0" id="cerebronexus-710">CerebroNexus 7.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-710"></a></h2>
+<ul><li>An App run by Shiny Server shows its plots again. Shiny Server’s SockJS transport cannot carry the raw binary WebSocket frames the Viewer sends cell-view data in, so pages opened but projections never arrived and datasets loaded forever. When Shiny Server started the R process (it sets <code>SHINY_SERVER_VERSION</code>), the frames now go as base64 text and the browser restores them; everywhere else they are sent unchanged. The choice is made when the App starts, so an App built on one machine and copied to a Shiny Server works as it is. <code>options(cerebro.sockjs_compat = TRUE)</code> or <code>FALSE</code> (or <code>sockjs_compat</code> in <code>Cerebro.options</code>) forces it. This covers <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, the bundled demo App and Apps written by <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>; an App built with an earlier version has to be built again to get it.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="7.0.1" id="cerebronexus-701">CerebroNexus 7.0.1<a class="anchor" aria-label="anchor" href="#cerebronexus-701"></a></h2>
 <ul><li>The pan-cancer T-cell demo now fills <code>CTgene</code> and <code>CTnt</code> for 10x cells: 10x <code>V|D|J|C|junction</code> identifiers are rewritten to the Smart-seq2 <code>V_junction_J</code> layout, and <code>-</code> no longer counts as a chain. An identifier in any other layout stops the preparation with examples, and a clone call takes its identifier and CDR3 from the same chain. A CDR3 that holds the assembler’s message (“Couldn’t find FGXG”, 1,290 Smart-seq2 cells) counts as missing instead of becoming a clone. Cached T-cell demo data is rebuilt (<code>.viewerTcellVersion</code> is now 2).</li>

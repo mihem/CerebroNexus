@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -362,6 +362,15 @@ Server tree, while systemd reads the separate env file before starting
 the service.</p>
 <p><strong>Verify:</strong> inspect service status and logs, then open
 the real HTTPS App URL and test valid and invalid login.</p>
+<p>Shiny Server’s SockJS transport cannot carry the raw binary WebSocket
+frames the Viewer sends its plot data in; without a workaround the page
+opens, but plots never arrive. The App detects Shiny Server when it
+starts (Shiny Server sets <code>SHINY_SERVER_VERSION</code>) and sends
+those frames as base64 text instead, so an App built on your workstation
+and copied here needs no change. Elsewhere the frames go unchanged. To
+force the choice, put <code>options(cerebro.sockjs_compat = TRUE)</code>
+(or <code>FALSE</code>) in a <code>.Rprofile</code> in the App
+folder.</p>
 <p>Publish the App and secret separately:</p>
 <p>For access beyond the local host, use a TLS-terminating reverse proxy
 in front of Shiny Server and expose only its HTTPS endpoint.</p>
