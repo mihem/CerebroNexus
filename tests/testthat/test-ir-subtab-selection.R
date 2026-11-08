@@ -194,6 +194,7 @@ test_that("the sub-tab choice survives a Project save and reopen", {
 })
 
 test_that("the App's tab strip shows only the kept sub-tabs", {
+  skip_if_not_installed("shinycssloaders")
   viz <- viewer_server_statements("immune_repertoire", "visualizations.R")
   tabs_file <- viewer_server_statements("immune_repertoire", "tabs.R")
   strip <- function(choice, samples) {

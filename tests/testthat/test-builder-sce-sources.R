@@ -167,6 +167,7 @@ test_that("scanpy / scVelo trajectories are offered and built by the Builder", {
 })
 
 test_that("a scirpy repertoire is offered and built by the Builder", {
+  skip_if_not_installed("scRepertoire")
   skip_if_not_installed("qs2")
   built <- build_through_builder(fixture("small_airr.h5ad"), "h5ad_airr")
   expect_true(

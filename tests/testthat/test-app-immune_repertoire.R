@@ -4,6 +4,9 @@
 # tab is present by default and its UI can be exercised directly.
 
 skip_if_not_installed("shinytest2")
+skip_if_not_installed("scRepertoire")
+skip_if_not_installed("ggplot2")
+skip_if_not_installed("shinycssloaders")
 library(shinytest2)
 
 inst_dir <- viewer_app_test_path()

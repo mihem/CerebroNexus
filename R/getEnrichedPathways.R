@@ -41,7 +41,6 @@
 #'
 #' @import dplyr
 #' @importFrom rlang .data
-#' @importFrom tidyselect all_of
 #'
 #' @export
 #'
@@ -68,6 +67,10 @@ getEnrichedPathways <- function(
   ##--------------------------------------------------------------------------##
 
   .checkSeuratAvailable()
+  rlang::check_installed(
+    c("httr", "future.apply"),
+    reason = "to query the Enrichr API."
+  )
   .checkSeuratObject(object)
 
   ## check if marker genes are present and stop if they aren't
@@ -314,7 +317,7 @@ getEnrichedPathways <- function(
         ## - put columns in right order
         results <- do.call(rbind, results) %>%
           dplyr::select(
-            tidyselect::all_of(current_group),
+            dplyr::all_of(current_group),
             'db',
             dplyr::everything()
           )

@@ -1,5 +1,7 @@
 # Tests for the shared CDR3 motif-network core (R/hla_motif_core.R).
 # Pure functions, no Shiny app required.
+skip_if_not_installed("igraph")
+skip_if_not_installed("stringdist")
 
 ## ---- helpers ---------------------------------------------------------- ##
 

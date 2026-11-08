@@ -345,6 +345,7 @@ test_that("MSigDB helpers retain only compact process-level results", {
 })
 
 test_that("MSigDB catalogue retries failures and malformed responses", {
+  skip_if_not_installed("msigdbr")
   cache <- utils_env$.msigdbCache()
   original_query <- utils_env$.msigdbFunction
   rm(list = ls(cache, all.names = TRUE), envir = cache)
@@ -395,6 +396,7 @@ test_that("MSigDB catalogue retries failures and malformed responses", {
 })
 
 test_that("MSigDB catalogue rejects empty and invalid results", {
+  skip_if_not_installed("msigdbr")
   cache <- utils_env$.msigdbCache()
   original_query <- utils_env$.msigdbFunction
   rm(list = ls(cache, all.names = TRUE), envir = cache)

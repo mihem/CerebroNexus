@@ -226,7 +226,7 @@ test_that("full dependency inventory includes every declared hard dependency", {
   )
 
   expect_true(all(
-    c("qs2", "scRepertoire", "digest") %in% requirements
+    c("qs2", "shiny") %in% requirements
   ))
   expect_false(any(grepl("\\(", requirements)))
 

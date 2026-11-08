@@ -46,7 +46,7 @@ calculatePercentGenes <- function(
 
   ## for every supplied gene list, get the genes that are present in the data
   ## set and calculate the percentage of transcripts that they account for
-  pbapply::pblapply(genes, function(x) {
+  .progressLapply(genes, function(x) {
     genes_here <- intersect(x, rownames(counts_matrix))
     Matrix::colSums(counts_matrix[genes_here, , drop = FALSE]) /
       Matrix::colSums(counts_matrix)

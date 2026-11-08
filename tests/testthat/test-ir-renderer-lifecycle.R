@@ -31,6 +31,7 @@ test_that("IR error handling preserves validation and renders useful failures", 
 })
 
 test_that("IR renderers update parameters and isolate their session caches", {
+  skip_if_not_installed("scRepertoire")
   # Keep the real render expression and bindCache; replace only graphics-device
   # serialization and the external scRepertoire call to observe its inputs.
   render_value <- function(expr, ...) {

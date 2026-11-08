@@ -83,6 +83,7 @@ test_that("createShinyApp rejects invalid nested colour values", {
 })
 
 test_that("colour pickers stay mounted while shared colours update", {
+  skip_if_not_installed("colourpicker")
   files <- c(A = "/data/a.crb", B = "/data/b.crb")
   server <- function(input, output, session) {
     Cerebro.options <- list(crb_file_to_load = files)

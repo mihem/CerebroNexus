@@ -45,7 +45,6 @@
 #' @import dplyr
 #' @importFrom Matrix colMeans colSums rowSums t
 #' @importFrom rlang .data :=
-#' @importFrom tibble tibble
 #'
 #' @export
 #'
@@ -64,6 +63,14 @@ performGeneSetEnrichmentAnalysis <- function(
   ##--------------------------------------------------------------------------##
 
   .checkSeuratAvailable()
+  .checkBiocInstalled(
+    c("GSVA", "qvalue"),
+    "to run gene set enrichment analysis"
+  )
+  rlang::check_installed(
+    "future.apply",
+    reason = "to run gene set enrichment analysis."
+  )
   .checkSeuratObject(object)
   .checkSeuratAssay(object, assay)
 
@@ -106,7 +113,7 @@ performGeneSetEnrichmentAnalysis <- function(
 
   ## make tibble that contains name and description for each set
   ## with the number of genes and the collapsed gene list of each set
-  gene_sets_tibble <- tibble::tibble(
+  gene_sets_tibble <- dplyr::tibble(
     name = gene_sets$geneset.names,
     description = gene_sets$geneset.description,
     length = unname(lengths(gene_sets$genesets)),
@@ -190,7 +197,7 @@ performGeneSetEnrichmentAnalysis <- function(
       enrichment_scores <- GSVA::gsva(gsva_param)
 
       ## create empty tibble for results
-      results <- tibble::tibble(
+      results <- dplyr::tibble(
         group = character(),
         name = character(),
         enrichment_score = numeric(),
@@ -202,7 +209,7 @@ performGeneSetEnrichmentAnalysis <- function(
       ## pass the specified tresholds
       for (i in seq_len(ncol(enrichment_scores))) {
         ## collect enrichment scores
-        temp_results <- tibble::tibble(
+        temp_results <- dplyr::tibble(
           group = colnames(matrix_mean_by_group)[i],
           name = rownames(enrichment_scores),
           enrichment_score = enrichment_scores[, i]
