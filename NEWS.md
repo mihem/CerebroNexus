@@ -1,4 +1,4 @@
-# CerebroNexus (development version)
+# CerebroNexus 7.1.0
 
 - An App run by Shiny Server shows its plots again. Shiny Server's SockJS
   transport cannot carry the raw binary WebSocket frames the Viewer sends
