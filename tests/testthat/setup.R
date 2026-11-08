@@ -33,7 +33,13 @@ Sys.setenv(CEREBRO_BUILDER_STATE_DIR = tempfile("builder-state-"))
 ## Plots that tests draw go to a null device, not to Rplots.pdf in the
 ## working directory.
 grDevices::pdf(NULL)
-withr::defer(grDevices::dev.off(), teardown_env())
+## A test may close every device (graphics.off()), so close ours only if it is
+## still open.
+test_device <- grDevices::dev.cur()
+withr::defer(
+  if (test_device %in% grDevices::dev.list()) grDevices::dev.off(test_device),
+  teardown_env()
+)
 
 ## R processes that tests start (mirai tasks, callr) create their own temporary
 ## directory, and one that is stopped leaves it behind. Under R CMD check on
