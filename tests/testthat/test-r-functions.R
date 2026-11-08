@@ -560,6 +560,16 @@ test_that("launchCerebro requires named files when several are given", {
   )
 })
 
+## launchCerebro()'s own environment: under the transport wrapper the app's
+## server function is a wrapper around the Viewer server.
+launch_server_env <- function(app) {
+  env <- environment(app$serverFuncSource())
+  if (!exists("Cerebro.options", envir = env, inherits = FALSE)) {
+    env <- environment(get("server", envir = env, inherits = FALSE))
+  }
+  env
+}
+
 test_that("launchCerebro loads the installed Viewer", {
   had_options <- exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
 
@@ -571,7 +581,7 @@ test_that("launchCerebro loads the installed Viewer", {
     exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE),
     had_options
   )
-  launch_options <- environment(app$serverFuncSource())$Cerebro.options
+  launch_options <- launch_server_env(app)$Cerebro.options
   expect_identical(launch_options$mode, "closed")
   # The installed Viewer ships no HLA core source; core_shim.R binds this.
   expect_identical(launch_options$.hla_core, .viewerHLACore())
@@ -603,10 +613,10 @@ test_that("launchCerebro builds dataset information for configured files", {
     exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE),
     had_options
   )
-  launch_options <- environment(app$serverFuncSource())$Cerebro.options
+  launch_options <- launch_server_env(app)$Cerebro.options
   catalog <- launch_options[[".dataset_catalog"]]
   expect_null(launch_options[[".dataset_prototypes"]])
-  prototypes <- environment(app$serverFuncSource())$.crb_launch_state$prototypes
+  prototypes <- launch_server_env(app)$.crb_launch_state$prototypes
 
   expect_s3_class(app, "shiny.appobj")
   expect_named(catalog, crb)

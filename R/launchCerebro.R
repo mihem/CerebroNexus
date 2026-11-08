@@ -190,7 +190,8 @@ launchCerebro <- function(
     )
   )
   ## Shiny Server cannot carry binary WebSocket frames; wrap them there only.
-  transport_env <- new.env(parent = globalenv())
+  ## Its helpers read `Cerebro.options` from this function's environment.
+  transport_env <- new.env(parent = environment())
   sys.source(
     system.file("viewer/transport_compat.R", package = "CerebroNexus"),
     envir = transport_env
