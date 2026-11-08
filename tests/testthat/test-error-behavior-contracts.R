@@ -16,8 +16,9 @@ test_that("launchers do not replace the process-wide Shiny error handler", {
     scope$ui <- shiny::div("test")
     scope$server <- function(input, output, session) NULL
     scope$source <- function(file, local, ...) {
-      if (basename(file) == "million_cell_demo.R") {
-        sys.source(viewer_test_path("million_cell_demo.R"), scope)
+      ## The helpers app.R sources besides the UI and server, which are stubs.
+      if (basename(file) %in% c("million_cell_demo.R", "transport_compat.R")) {
+        sys.source(viewer_test_path(basename(file)), scope)
       }
       invisible(NULL)
     }

@@ -31,10 +31,15 @@ embedded_options[c(
 source(file.path(cerebro_root, "viewer/shiny_UI.R"))
 source(file.path(cerebro_root, "viewer/shiny_server.R"))
 source(file.path(cerebro_root, "viewer/auth.R"), local = TRUE)
+source(file.path(cerebro_root, "viewer/transport_compat.R"), local = TRUE)
+
+## Shiny Server cannot carry binary WebSocket frames; wrap them there only.
+## Decided when the App starts, so a build copied to a Shiny Server works.
+transport <- viewerApplyTransportCompat(ui, server, cerebro_root)
 
 viewer_app <- viewer_auth_apply(
-  ui,
-  server,
+  transport$ui,
+  transport$server,
   Cerebro.options[[".viewer_auth"]],
   Cerebro.options[["cerebro_root"]]
 )

@@ -196,6 +196,16 @@ source("viewer/shiny_UI.R", local = TRUE)
 source("viewer/shiny_server.R", local = TRUE)
 
 ##----------------------------------------------------------------------------##
+## Shiny Server cannot carry binary WebSocket frames; wrap them there only
+##----------------------------------------------------------------------------##
+source("viewer/transport_compat.R", local = TRUE)
+app_transport <- viewerApplyTransportCompat(
+  ui,
+  server,
+  Cerebro.options[["cerebro_root"]]
+)
+
+##----------------------------------------------------------------------------##
 ## launch app
 ##----------------------------------------------------------------------------##
-shiny::shinyApp(ui = ui, server = server)
+shiny::shinyApp(ui = app_transport$ui, server = app_transport$server)
