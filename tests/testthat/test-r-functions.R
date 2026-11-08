@@ -562,28 +562,16 @@ test_that("launchCerebro requires named files when several are given", {
 
 test_that("launchCerebro loads the installed Viewer", {
   had_options <- exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  previous_options <- if (had_options) {
-    get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  } else {
-    NULL
-  }
-  on.exit(
-    {
-      if (had_options) {
-        assign("Cerebro.options", previous_options, envir = .GlobalEnv)
-      } else if (
-        exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-      ) {
-        rm("Cerebro.options", envir = .GlobalEnv)
-      }
-    },
-    add = TRUE
-  )
 
   app <- launchCerebro(mode = "closed")
 
   expect_s3_class(app, "shiny.appobj")
-  launch_options <- get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
+  # The options live with the app, not in the global environment.
+  expect_identical(
+    exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE),
+    had_options
+  )
+  launch_options <- environment(app$serverFuncSource())$Cerebro.options
   expect_identical(launch_options$mode, "closed")
   # The installed Viewer ships no HLA core source; core_shim.R binds this.
   expect_identical(launch_options$.hla_core, .viewerHLACore())
@@ -591,23 +579,6 @@ test_that("launchCerebro loads the installed Viewer", {
 
 test_that("launchCerebro builds dataset information for configured files", {
   had_options <- exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  previous_options <- if (had_options) {
-    get("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-  } else {
-    NULL
-  }
-  on.exit(
-    {
-      if (had_options) {
-        assign("Cerebro.options", previous_options, envir = .GlobalEnv)
-      } else if (
-        exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE)
-      ) {
-        rm("Cerebro.options", envir = .GlobalEnv)
-      }
-    },
-    add = TRUE
-  )
   cells <- c("cell-1", "cell-2", "cell-3")
   object <- Cerebro$new()
   object$setMetaData(data.frame(cell_barcode = cells, row.names = cells))
@@ -628,11 +599,11 @@ test_that("launchCerebro builds dataset information for configured files", {
     mode = "closed",
     crb_file_to_load = c(Ren = crb, Missing = paste0(crb, ".missing"))
   )
-  launch_options <- get(
-    "Cerebro.options",
-    envir = .GlobalEnv,
-    inherits = FALSE
+  expect_identical(
+    exists("Cerebro.options", envir = .GlobalEnv, inherits = FALSE),
+    had_options
   )
+  launch_options <- environment(app$serverFuncSource())$Cerebro.options
   catalog <- launch_options[[".dataset_catalog"]]
   expect_null(launch_options[[".dataset_prototypes"]])
   prototypes <- environment(app$serverFuncSource())$.crb_launch_state$prototypes

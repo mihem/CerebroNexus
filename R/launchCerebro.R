@@ -131,8 +131,9 @@ launchCerebro <- function(
   }
 
   ## --------------------------------------------------------------------------##
-  ## Create global variable with options that need to be available inside the
-  ## Shiny app.
+  ## Options the Viewer reads. The Viewer files are sourced into this function's
+  ## environment below, so they find `Cerebro.options` here without touching
+  ## the global environment.
   ## --------------------------------------------------------------------------##
   dataset_catalog <- .datasetCatalogFromFiles(
     crb_file_to_load,
@@ -160,12 +161,7 @@ launchCerebro <- function(
     "percentage_cells_to_show" = percentage_cells_to_show,
     "projections_show_hover_info" = projections_show_hover_info
   )
-  assign("Cerebro.options", cerebro_options, envir = .GlobalEnv)
-
-  ##--------------------------------------------------------------------------##
-  ## Allow upload of files up to 800 MB.
-  ##--------------------------------------------------------------------------##
-  options(shiny.maxRequestSize = maxFileSize * 1024^2)
+  Cerebro.options <- cerebro_options
 
   ##--------------------------------------------------------------------------##
   ## Load server and UI functions.
@@ -186,7 +182,7 @@ launchCerebro <- function(
   )
   ## The server's one-time handoff now owns these references. Keeping copies
   ## in launch options/closure would defeat later prototype eviction.
-  .GlobalEnv$Cerebro.options[[".dataset_prototypes"]] <- NULL
+  Cerebro.options[[".dataset_prototypes"]] <- NULL
   rm(dataset_prototypes, cerebro_options)
 
   ##--------------------------------------------------------------------------##
@@ -199,9 +195,20 @@ launchCerebro <- function(
       '##---------------------------------------------------------------------------##'
     )
   )
-  shiny::shinyApp(
-    ui = ui,
-    server = server,
-    ...
+  ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
+  ## value is restored when it stops. A user `onStart` still runs afterwards.
+  app_args <- list(...)
+  user_on_start <- app_args[["onStart"]]
+  max_request_size <- maxFileSize * 1024^2
+  app_args[["onStart"]] <- function() {
+    previous <- options(shiny.maxRequestSize = max_request_size)
+    shiny::onStop(function() options(previous))
+    if (is.function(user_on_start)) {
+      user_on_start()
+    }
+  }
+  do.call(
+    shiny::shinyApp,
+    c(list(ui = ui, server = server), app_args)
   )
 }
