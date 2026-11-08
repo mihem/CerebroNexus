@@ -481,6 +481,24 @@ test_that("10x TCR identifiers give the same clone calls as Smart-seq2 ones", {
   expect_identical(mixed_calls$CTgene, "TRAV3.TRAJ4_TRBV20-1.TRBJ2-3")
   expect_identical(mixed_calls$CTaa, "CDDF_CASF")
 
+  ## An assembler message in place of a CDR3 is no sequence: A2 stands in, or
+  ## without a complete A2 the alpha chain is left out of every column.
+  failed <- tcr[c(3, 3), ]
+  failed$Cell_Name <- c("s1", "s2")
+  failed$CDR3.A1 <- "Couldn't find FGXG"
+  failed$Identifier.A2 <- c("TRAV3_TTT_TRAJ4", "-")
+  failed$CDR3.A2 <- c("CDDF", "-")
+  failed_calls <- env$.viewerTcellRepertoire(failed, failed$Cell_Name)
+  expect_identical(
+    failed_calls$CTgene,
+    c("TRAV3.TRAJ4_TRBV5-1.TRBJ2-3", "TRBV5-1.TRBJ2-3")
+  )
+  expect_identical(
+    failed_calls$CTnt,
+    c("TRAV3:TTT:TRAJ4_TRBV5-1:GGG:TRBJ2-3", "TRBV5-1:GGG:TRBJ2-3")
+  )
+  expect_identical(failed_calls$CTaa, c("CDDF_CBBF", "CBBF"))
+
   ## Any other layout with "|" stops instead of reaching CTnt raw.
   for (identifier in c(
     "TRAV1|None|TRAJ1|TRAC",

@@ -476,8 +476,8 @@
 
 ## scRepertoire-style clone calls from the atlas's TCR table. Of the up to two
 ## alpha and two beta chains of a cell the first listed (A1, B1) is used; A2 or
-## B2 stand in only when the first lacks its identifier or CDR3 and the second
-## has both. `CTnt` is the recombinant identifier
+## B2 stand in when the first lacks its identifier or a CDR3, and a chain with
+## neither complete is left out. `CTnt` is the recombinant identifier
 ## (V, junction nucleotides, J) of both chains: the table has no CDR3
 ## nucleotide column; its fields are joined with ":".
 .viewerTcellRepertoire <- function(tcr, cells) {
@@ -501,23 +501,26 @@
       call. = FALSE
     )
   }
-  ## 10x rows mark an absent chain with "-". The chain is chosen once, so a
-  ## call's identifier and CDR3 always come from the same chain.
+  ## 10x rows mark an absent chain with "-". Some Smart-seq2 CDR3 cells hold
+  ## the assembler's message ("Couldn't find FGXG") instead of a sequence;
+  ## such a chain has no CDR3. The chain is chosen once, so a call's
+  ## identifier and CDR3 always come from the same chain.
   absent <- function(x) {
     x <- as.character(x)
     x[x %in% c("-", "")] <- NA_character_
     x
   }
+  no_sequence <- function(x) {
+    x <- absent(x)
+    x[!grepl("^[A-Za-z*]+$", x)] <- NA_character_
+    x
+  }
   pick <- function(id1, aa1, id2, aa2) {
-    id1 <- absent(id1)
-    aa1 <- absent(aa1)
-    id2 <- absent(id2)
-    aa2 <- absent(aa2)
-    second <- (is.na(id1) | is.na(aa1)) & !is.na(id2) & !is.na(aa2)
-    list(
-      id = .viewerTcellIdentifier(ifelse(second, id2, id1)),
-      aa = ifelse(second, aa2, aa1)
-    )
+    complete1 <- !is.na(absent(id1)) & !is.na(no_sequence(aa1))
+    complete2 <- !is.na(absent(id2)) & !is.na(no_sequence(aa2))
+    id <- ifelse(complete1, id1, ifelse(complete2, id2, NA_character_))
+    aa <- ifelse(complete1, aa1, ifelse(complete2, aa2, NA_character_))
+    list(id = .viewerTcellIdentifier(as.character(id)), aa = as.character(aa))
   }
   alpha <- pick(tcr$Identifier.A1, tcr$CDR3.A1, tcr$Identifier.A2, tcr$CDR3.A2)
   beta <- pick(tcr$Identifier.B1, tcr$CDR3.B1, tcr$Identifier.B2, tcr$CDR3.B2)
