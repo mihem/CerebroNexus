@@ -203,7 +203,7 @@ env file.
 **What happens:** `readRenviron()` places the passphrase in this R process;
 `runApp()` reads it to unlock the bundled database and start the login page.
 
-**Verify:** open <http://localhost:3838>, confirm a valid login succeeds and an
+**Verify:** open `http://localhost:3838`, confirm a valid login succeeds and an
 invalid login fails, then stop the R process with Ctrl+C.
 
 Every new R process must load the external secret:

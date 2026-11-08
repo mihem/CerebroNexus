@@ -10,7 +10,7 @@
 ![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 
 
-**CerebroNexus** (**Ce**ll**Re**port**Bro**wser **Nexus**) is a [Shiny](https://shiny.posit.co/) platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses. See the [full documentation](https://mihem.github.io/CerebroNexus/).
+**CerebroNexus** (**Ce**ll**Re**port**Bro**wser **Nexus**) is a [Shiny](https://shiny.posit.co/) platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses. See the [full documentation](https://www.mheming.com/CerebroNexus/).
 
 [Try the live demo](https://osmzhlab.uni-muenster.de/shiny/demo/).
 
@@ -41,7 +41,7 @@ CerebroNexus::launchCerebroBuilder()
 ```
 
 Add your data files, choose the groups and content, and build a `.crb` file or a
-standalone App. See [Build a data set by pointing](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+standalone App. See [Build a data set by pointing](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 **From a script:**
 

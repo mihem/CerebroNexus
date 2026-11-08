@@ -1,15 +1,21 @@
 Package: CerebroNexus
-Title: Interactive visualization of single cell transcriptomics
+Title: Interactive Visualization of Single-Cell and Spatial Transcriptomics
 Version: 7.0.0
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
   person("Xuesong", "Wang", email = "wangxuesong29@gmail.com", role = c("aut"))
   )
-Author: Michael Heming, Roman Hillje, Xuesong Wang
-Maintainer: Michael Heming <mihem@mailbox.org>
-Description: CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.
-URL: https://mihem.github.io/CerebroNexus/, https://github.com/mihem/CerebroNexus
+Description: Interactive 'Shiny' application for exploring and sharing
+    single-cell and spatial transcriptomics data, extending 'Cerebro'
+    (Hillje et al. (2020) <doi:10.1093/bioinformatics/btz877>). Data from
+    'Seurat', 'SingleCellExperiment', 'AnnData', 'MuData' or 'SpatialData'
+    objects are converted into a portable data file that can be browsed with
+    coordinated views of gene expression, immune repertoires, trajectories,
+    spatial images and HLA-TCR motifs. A point-and-click builder creates
+    these files and standalone apps for deployment on a 'Shiny' server.
+URL: https://www.mheming.com/CerebroNexus/,
+    https://github.com/mihem/CerebroNexus
 BugReports: https://github.com/mihem/CerebroNexus/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
@@ -103,8 +109,6 @@ Suggests:
   xml2,
   zip
 VignetteBuilder: knitr
-Enhances:
-  qs
 Config/testthat/edition: 3
 Config/testthat/parallel: true
 Config/testthat/start-first: app-immune_repertoire, app-inst,

@@ -1701,7 +1701,7 @@ previous releases and refreshes documentation for the current codebase.
 
 ## Documentation
 
-- Added pkgdown site at <https://mihem.github.io/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
+- Added pkgdown site at <https://www.mheming.com/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to master
 
 # Version 1.5.3
