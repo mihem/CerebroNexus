@@ -37,8 +37,58 @@
   apps with optional login. Review planned payload targets before publication.
 - Preserve dataset and cell identities across export; publish ROI, image alignment
   and content settings through shared contracts consumed by the Viewer.
+- `launchCerebroBuilder()` listens on `127.0.0.1` only and warns for any other
+  `host`: it reads any path it is given and runs the code inside `.rds` files.
+  `max_file_size` limits uploads; a file above it is refused with a message that
+  names its size and the limit. In a C locale it switches the character type to
+  UTF-8 while it runs. The Builder needs `callr`, `processx` and `ps` (and
+  `readxl` for Excel tables), which are suggested packages; it checks them at
+  launch and names what is missing.
+- Projects: Save writes an editable project with its own copy of each source
+  file. A source that has gone missing can be removed from the project or
+  replaced by another file when the project is opened. Copies, settings files
+  and partial copies that nothing refers to any more are removed by a later
+  Save, after an hour.
+- Open App starts a built App from the Builder (on its configured port, or a
+  free one when that is taken). Loading a dataset and building the output show a
+  percentage by step. Without a native file dialog (no `zenity` or `kdialog`),
+  the folder and project pickers use a folder browser limited to
+  `options(CerebroNexus.builder.server_path_roots)` (default: the home folder).
+- A background worker that has used no CPU for a minute gets a notice, and is
+  restarted after 10 minutes (2 minutes for previews; reading a very large file
+  from a slow disk can look idle). `CEREBRO_BUILDER_WORKER_STALL_TIMEOUT` or
+  `options(CerebroNexus.builder.worker_stall_timeout)` sets the seconds; 0 turns
+  it off.
+- Objects without dimensional reductions, such as an unclustered Xenium
+  section, can be built. `exportFromSeurat(projections = character())` exports
+  none, and the App then hides the Projection and Linked views pages.
+- Immune repertoire: Configure > Specialized content chooses which tabs the App
+  shows. Placeholder `CTgene` values ("NA", "None", "nan") count as missing, not
+  as clonotypes.
+- A metadata column named `cell_barcode` no longer blocks a build: it is
+  exported as `cell_barcode_source`, with a notice in Configure.
+- Extra material tables are read as text first, so values such as `007`, long
+  ids and a gene called `NA` are kept; comma, semicolon and tab delimiters are
+  detected.
+- `convertSCEToSeurat()` is exported. Spatial sections and their pictures keep
+  the same names, and a `library_id` that is missing for some cells stops with
+  a message that says so.
+- `createShinyApp()` checks the saved MD5 of an h5 expression file and stops
+  with an error if the file was replaced, instead of failing at the first read.
 
 ## Viewer fixes
+
+- Sign-in limit: failed sign-ins are counted per account name (as typed), and a
+  successful sign-in clears only that account. A client on a loopback address,
+  or with no address, such as a proxy on the same host, is not counted as a
+  client, so only the per-account limit applies. The lockout message is "Too
+  many sign-in attempts. Try again in N s.", and expired entries are dropped.
+  Users behind one proxy address on another host still share one client
+  counter; set `CEREBRO_AUTH_CLIENT_HEADER` (for example `X-Forwarded-For`) to
+  count each client address instead. See the login vignette.
+- Apps built from large data sets (above the Viewer Pack threshold) show the
+  Immune repertoire page: the App's catalog no longer records "no repertoire"
+  when the CRB holds only a thin payload.
 
 - Linked views no longer stays busy after it is opened: the output that shows the
   selected cells had no value until the first selection, and shiny >= 1.9 keeps
