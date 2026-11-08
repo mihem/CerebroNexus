@@ -1,3 +1,6 @@
+## Slow and starts worker processes: CI only.
+skip_on_cran()
+
 demo_h5_helper <- function() {
   testthat::test_path(
     "..",

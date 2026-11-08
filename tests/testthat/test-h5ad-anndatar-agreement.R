@@ -1,3 +1,6 @@
+## Slow full-fixture comparison with anndataR: CI only.
+skip_on_cran()
+
 ## The h5ad reader against a reference ----------------------------------------
 ##
 ## readH5adAsSCE() is written from the AnnData on-disk specification. The check

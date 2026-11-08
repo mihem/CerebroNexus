@@ -2882,6 +2882,8 @@ test_that("embedded CRBs do not require sibling files", {
 })
 
 test_that("old configs attach through field fallback", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   root <- withr::local_tempdir()
   modern_source <- file.path(root, "modern")
@@ -3287,6 +3289,8 @@ test_that("a thin H5 CRB is bundled with its H5 file and keeps its gene count", 
 })
 
 test_that("the App lists the immune repertoire of every kind of CRB", {
+  ## Starts an R process.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("rhdf5")
   root <- withr::local_tempdir()

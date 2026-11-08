@@ -454,6 +454,8 @@ test_that("exportFromSeurat rejects Seurat v4 VisiumV1 images only", {
 })
 
 test_that("a Cerebro object checks spatial images without the package namespace", {
+  ## Starts an R process.
+  skip_on_cran()
   skip_if_not_installed("callr")
   crb <- Cerebro$new()
   payload <- valid_spatial_image_payload()

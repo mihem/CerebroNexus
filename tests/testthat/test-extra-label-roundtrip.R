@@ -22,6 +22,8 @@ test_that("table label normalization filters stale entries and private source me
 })
 
 test_that("Builder builds portable CRBs and an app with workbook and sheet renames", {
+  ## Slow (full Builder build).
+  skip_on_cran()
   root <- Sys.getenv("CEREBRO_EXTRA_LABEL_QA_ROOT", "")
   if (!nzchar(root)) {
     root <- withr::local_tempdir()

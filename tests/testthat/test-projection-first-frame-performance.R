@@ -678,6 +678,8 @@ test_that("attaching a thin H5 CRB reads the schema, not the matrix", {
 })
 
 test_that("attaching a thin H5 CRB does not load HDF5Array", {
+  ## Slow, starts an R process.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("callr")
   root <- withr::local_tempdir()
@@ -721,6 +723,8 @@ test_that("attaching a thin H5 CRB does not load HDF5Array", {
 })
 
 test_that("H5 expression rows are read without loading HDF5Array", {
+  ## Slow, starts an R process.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("callr")
   root <- withr::local_tempdir()
