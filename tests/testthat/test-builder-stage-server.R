@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_stage_contract_source_runtime(environment())
 builder_profile_source_runtime(environment())
 builder_plan_contract_source_runtime(environment())

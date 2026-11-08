@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## A precomputed Marker import, saved the way the Enhance dialog saves it,
 ## is frozen, built and written into the CRB.
 builder_e2e_source_runtime(environment())

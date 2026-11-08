@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_app_bundle_path <- builder_profile_inst_path("builder", "app_bundle.R")
 builder_app_bundle_test_env <- new.env(parent = asNamespace("CerebroNexus"))
 builder_app_bundle_test_runtime <- function() {

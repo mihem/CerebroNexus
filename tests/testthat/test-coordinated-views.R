@@ -412,6 +412,8 @@ test_that("Open JSON ignores reports of other views, plain selections and later 
 })
 
 test_that("Trekker depth views form one collapsed insights region", {
+  ## Slow.
+  skip_on_cran()
   ui <- htmltools::tagQuery(viewer_ui_test_pages()$coordinated_views)
   region <- ui$find("#cv-tk-insights")
   expect_equal(region$length(), 1L)
@@ -2520,6 +2522,8 @@ test_that("bundling two images of the same basename keeps both", {
 })
 
 test_that("Linked labels remain reachable in Settings", {
+  ## Slow.
+  skip_on_cran()
   ui <- htmltools::tagQuery(viewer_ui_test_pages()$coordinated_views)
   expect_equal(ui$find(".cerebro-settings-drawer #cv-labels")$length(), 1L)
 })

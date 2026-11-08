@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_plan_contract_source_runtime(environment())
 
 test_that("immune source and gate decisions remain truthful", {

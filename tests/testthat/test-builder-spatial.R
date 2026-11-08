@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_spatial_test_source <- function(file, local = parent.frame()) {
   path <- builder_spatial_test_inst_path("builder", file)
   if (file.exists(path)) {

@@ -615,6 +615,8 @@ test_that("stage cleanup errors cannot strand the build lock", {
 })
 
 test_that("the bundle lock excludes a second R process", {
+  ## Starts an R process and waits on it.
+  skip_on_cran()
   skip_if_not_installed("callr")
   root <- withr::local_tempdir()
   result <- file.path(root, "app")

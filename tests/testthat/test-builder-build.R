@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_build_source_runtime <- function(local = parent.frame()) {
   source_root <- testthat::test_path("..", "..", "R")
   for (file in sort(list.files(

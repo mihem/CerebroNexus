@@ -56,6 +56,8 @@ test_that("function coordinate settings validate dataset, FOV and numeric bounds
 })
 
 test_that("Builder freeze and full publication preserve projection and spatial settings", {
+  ## Slow (full Builder publication).
+  skip_on_cran()
   generated_app_fixture_source_runtime()
   root <- Sys.getenv("CEREBRO_SCATTER_QA_ROOT", "")
   if (!nzchar(root)) {

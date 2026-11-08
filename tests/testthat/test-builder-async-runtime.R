@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("Builder async runtime owns one bounded callr pool", {
   path <- builder_profile_inst_path("builder", "async.R")
   expect_true(file.exists(path))

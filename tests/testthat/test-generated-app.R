@@ -89,6 +89,8 @@ generated_app_expected_content_pages <- function(expected) {
 
 
 test_that("canonical fixtures freeze into one explicit multi-dataset plan", {
+  ## Slow (full Builder plan).
+  skip_on_cran()
   bundle <- generated_app_e2e_bundle()
 
   expect_s3_class(bundle$plan, "builder_build_plan")
@@ -350,6 +352,8 @@ test_that("private App config and all outputs remain inside the temporary releas
 })
 
 test_that("generated private App reaches semantic HTTP readiness", {
+  ## Starts an app server.
+  skip_on_cran()
   bundle <- generated_app_e2e_bundle()
   server <- generated_app_e2e_server()
 

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("release runtime resolves contracts without source namespace injection", {
   skip_without_installed_package()
   skip_if_not_installed("callr")

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_repo_source("io.R", local = globalenv())
 
 ## qs is not on CRAN, so it is reached through a variable: R CMD check would

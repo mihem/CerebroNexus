@@ -266,6 +266,8 @@ test_that("database preflight rejects missing authentication tables", {
 })
 
 test_that("database preflight rejects corrupt auxiliary tables", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   path <- withr::local_tempfile(fileext = ".sqlite")
   passphrase <- "test database passphrase"
@@ -536,6 +538,8 @@ test_that("authentication preflight fails before output mutation", {
 })
 
 test_that("a real encrypted multi-user database survives app generation", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   fixture <- auth_test_build_fixture()
   database <- file.path(fixture$root, "real-credentials.sqlite")

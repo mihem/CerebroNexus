@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_e2e_source_runtime()
 
 ## A dataset over saveCerebro()'s Viewer Pack threshold (100,000 cells) gets a

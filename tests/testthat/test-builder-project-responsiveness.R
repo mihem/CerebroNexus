@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## Project open/save responsiveness: background copies, queued writes and
 ## work skipped when nothing changed.
 
