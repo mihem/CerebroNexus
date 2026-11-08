@@ -27,6 +27,7 @@ test_that("new and restored projects use explicit spatial image storage", {
 })
 
 test_that("the Builder example catalog is a stable product contract", {
+  skip_if_builder_examples_missing()
   expect_true(exists("builder_example_catalog", mode = "function"))
   catalog <- builder_example_catalog()
   expected_ids <- c(
@@ -113,6 +114,7 @@ test_that("the Builder example catalog is a stable product contract", {
 })
 
 test_that("sourced Builder resources stay in the io.R inst tree", {
+  skip_if_builder_examples_missing()
   root <- withr::local_tempdir(pattern = "builder-resource-root-")
   source_inst <- file.path(root, "checkout", "inst")
   installed_inst <- file.path(root, "current-library", "CerebroNexus")
@@ -212,6 +214,7 @@ test_that("sourced Builder resources stay in the io.R inst tree", {
 })
 
 test_that("example and file adapters inspect the same immutable objects", {
+  skip_if_builder_examples_missing()
   catalog <- builder_example_catalog()
   set.seed(1401)
   caller_seed <- .Random.seed
@@ -411,6 +414,7 @@ test_that("Viewer defaults lead included group and projection order", {
 })
 
 test_that("catalog expectations are derived from real inspection and Review", {
+  skip_if_builder_examples_missing()
   for (record in builder_example_catalog()) {
     entry <- builder_e2e_entry(record)
     recommendations <- entry$settings$recommendations
@@ -495,6 +499,7 @@ test_that("catalog expectations are derived from real inspection and Review", {
 })
 
 test_that("all valid examples build and reopen", {
+  skip_if_builder_examples_missing()
   root <- withr::local_tempdir()
   for (record in builder_example_catalog()) {
     entry <- builder_e2e_entry(record)

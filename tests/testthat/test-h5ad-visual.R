@@ -9,7 +9,7 @@
 skip_if_not_installed("rhdf5")
 skip_if_not_installed("SingleCellExperiment")
 
-fixture <- function(name) testthat::test_path("fixtures", "anndata", name)
+fixture <- anndata_test_fixture
 quiet <- function(x) suppressWarnings(suppressMessages(x))
 read_h5ad <- function(path, ...) quiet(readH5adAsSCE(path, ...))
 

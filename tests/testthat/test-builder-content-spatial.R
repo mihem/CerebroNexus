@@ -435,6 +435,7 @@ test_that("the current Trekker demo defines a valid small Viewer payload", {
 })
 
 test_that("the complete current Trekker demo stays valid and profiles small", {
+  skip_if_inst_missing("extdata/examples/demo_trekker.crb")
   path <- builder_content_spatial_inst_path(
     "extdata",
     "examples",

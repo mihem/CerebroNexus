@@ -9,7 +9,7 @@
 skip_if_not_installed("rhdf5")
 skip_if_not_installed("SingleCellExperiment")
 
-fixture <- function(name) testthat::test_path("fixtures", "anndata", name)
+fixture <- anndata_test_fixture
 read_fixture <- function(name, ...) {
   suppressWarnings(suppressMessages(readH5adAsSCE(fixture(name), ...)))
 }
@@ -220,7 +220,7 @@ test_that("the trajectories reach the .crb and the Viewer's methods", {
 
 test_that("exportToH5ad writes pseudotime as obs columns, NaN where a cell has none", {
   crb <- suppressWarnings(suppressMessages(convertH5adToCerebro(
-    testthat::test_path("fixtures", "anndata", "small_trajectory.h5ad"),
+    anndata_test_fixture("small_trajectory.h5ad"),
     withr::local_tempdir(),
     groups = "cell_type",
     viewer_binary = "never",
@@ -232,7 +232,7 @@ test_that("exportToH5ad writes pseudotime as obs columns, NaN where a cell has n
   columns <- colnames(SummarizedExperiment::colData(back))
   expect_true("dpt_pseudotime" %in% columns)
   source <- suppressWarnings(suppressMessages(readH5adAsSCE(
-    testthat::test_path("fixtures", "anndata", "small_trajectory.h5ad")
+    anndata_test_fixture("small_trajectory.h5ad")
   )))
   expect_true(
     "dpt_pseudotime" %in% colnames(SummarizedExperiment::colData(source))

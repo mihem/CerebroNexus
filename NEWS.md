@@ -1,5 +1,16 @@
 # CerebroNexus 7.0.0
 
+## Package size
+
+- The package keeps three vignettes (Seurat workflow, SCE and AnnData data,
+  the Cerebro class); the other guides are articles on the website.
+- The spatial, Trekker and HLA & TCR demo data sets and the Trekker and Visium
+  Builder examples are no longer installed with the package. `downloadDemoData()`
+  downloads the spatial and HLA & TCR demo data sets into the user cache (the
+  Trekker demo, derived from vendor data, stays in the source repository), and
+  the Builder downloads its two examples the first time they are loaded.
+- The human and mouse gene ID tables are stored xz-compressed.
+
 ## Input formats in the Builder and the export
 
 - Reads SingleCellExperiment (`convertSCEToCerebro()`, `exportFromSCE()`) and
@@ -1445,7 +1456,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   whose layer bands align with the cells, so cell types visibly stratify across
   the cortex out of the box. Both the coordinates and the image are synthetic —
   no patient data.
-- **Documentation**: added the `vignette("spatial_analysis")` guide.
+- **Documentation**: added the [spatial analysis guide](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.html).
 - **Bundled demo set**: the app now opens on `demo_full_tcr_bcr.crb` (PBMC,
   TCR + BCR + trajectory) plus four real spatial sections (Visium, Slide-seq v2,
   MERFISH, Xenium), so the dataset switcher spans immune-repertoire, trajectory,
@@ -1506,7 +1517,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   10x Genomics `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the
   reproducible build. The bundled app (`shiny::runApp("inst")`) now opens on
   these three data sets so the switcher is visible out of the box; pass a named
-  vector to `createShinyApp()` for your own data (see `vignette("multi_crb")`).
+  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://www.mheming.com/CerebroNexus/articles/multi_crb.html)).
   New vignette: *Loading multiple data sets (multi-crb) with a dataset
   switcher*.
 

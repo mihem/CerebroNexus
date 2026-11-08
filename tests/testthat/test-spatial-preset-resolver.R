@@ -54,6 +54,7 @@ test_that("one resolver rotates spatial coordinates for every Viewer surface", {
 })
 
 test_that("MERFISH plot and image rotations are configured independently", {
+  skip_if_inst_missing("extdata/examples/demo_spatial_merfish.crb")
   options <- viewer_demo_options()
 
   expect_identical(

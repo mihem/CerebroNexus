@@ -83,11 +83,11 @@ test_that("qs2, qs, AnnData, MuData and SpatialData zip are recognised by conten
 
   skip_if_not_installed("rhdf5")
   anndata <- file.path(dir, "anndata")
-  file.copy(test_path("fixtures", "anndata", "small_dense.h5ad"), anndata)
+  file.copy(anndata_test_fixture("small_dense.h5ad"), anndata)
   expect_identical(builder_sniff_format(anndata), "h5ad")
   expect_identical(builder_match_format(anndata)$id, "h5ad")
   mudata <- file.path(dir, "mudata")
-  file.copy(test_path("fixtures", "anndata", "small_mudata.h5mu"), mudata)
+  file.copy(anndata_test_fixture("small_mudata.h5mu"), mudata)
   expect_identical(builder_sniff_format(mudata), "h5mu")
   expect_identical(builder_match_format(mudata)$id, "h5mu")
 })

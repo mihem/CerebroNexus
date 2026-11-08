@@ -523,7 +523,7 @@ dir.create(output, recursive = TRUE, showWarnings = FALSE)
 set.seed(2026L)
 object <- stabilize_fixture(make_complete_viewer_data_fixture())
 fixture_path <- file.path(output, "complete_viewer_data.rds")
-saveRDS(object, fixture_path, version = 3L, compress = FALSE)
+saveRDS(object, fixture_path, version = 3L, compress = "xz")
 if (!methods::is(readRDS(fixture_path), "Seurat")) {
   stop(
     "The permanent Complete Viewer data fixture did not round-trip as Seurat."

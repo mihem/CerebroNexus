@@ -82,7 +82,11 @@ test_that("shipped demo panels retain usable sparse expression and spatial ident
     pattern = "\\.crb$",
     full.names = TRUE
   )
-  expect_length(files, 9L)
+  ## The package tarball ships three of them; the larger demos are downloaded.
+  expect_true(all(
+    c("example.crb", "demo_full_tcr_bcr.crb", "demo_spatial.crb") %in%
+      basename(files)
+  ))
   for (file in files) {
     x <- readCerebro(file)
     expect_s4_class(x$expression, "sparseMatrix")

@@ -4,14 +4,14 @@
 output[["gene_info"]] <- DT::renderDataTable({
   if (input[["geneIdConversion_organism"]] == "mouse") {
     conversion_table <- read.table(
-      paste0(Cerebro.options$cerebro_root, "/extdata/mm10_gene_ID_name.tsv.gz"),
+      paste0(Cerebro.options$cerebro_root, "/extdata/mm10_gene_ID_name.tsv.xz"),
       sep = "\t",
       header = TRUE,
       stringsAsFactors = FALSE
     )
   } else if (input[["geneIdConversion_organism"]] == "human") {
     conversion_table <- read.table(
-      paste0(Cerebro.options$cerebro_root, "/extdata/hg38_gene_ID_name.tsv.gz"),
+      paste0(Cerebro.options$cerebro_root, "/extdata/hg38_gene_ID_name.tsv.xz"),
       sep = "\t",
       header = TRUE,
       stringsAsFactors = FALSE

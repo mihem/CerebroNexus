@@ -54,7 +54,7 @@ viewer_r_assignment <- function(path, name) {
 
 viewer_demo_options <- function() {
   scope <- new.env(parent = globalenv())
-  path <- file.path(viewer_app_test_path(), "app.R")
+  path <- normalizePath(file.path(viewer_app_test_path(), "app.R"))
   withr::local_envvar(c(
     CEREBRO_1M_DEMO_CRB = NA,
     CEREBRO_REN_DEMO_CRB = NA,
@@ -63,6 +63,8 @@ viewer_demo_options <- function() {
   ))
   sys.source(viewer_test_path("million_cell_demo.R"), scope)
   eval(viewer_r_assignment(path, "custom_welcome_message"), scope)
+  ## app.R checks its demo files relative to the app directory, as runApp() does.
+  withr::local_dir(dirname(path))
   for (statement in parse(path)) {
     if (
       is.call(statement) &&
