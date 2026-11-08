@@ -48,6 +48,7 @@ test_that("dataset changes bypass pending gene edits and remap canonical names i
 })
 
 test_that("mounted gene selections and completion survive a dataset round trip", {
+  skip_if_demo_data_missing()
   skip_on_cran()
   skip_if_not_installed("shinytest2")
   inst_dir <- viewer_app_test_path()

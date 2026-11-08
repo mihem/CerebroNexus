@@ -1,4 +1,5 @@
 test_that("all visualization pages keep usable controls, legends and canvases", {
+  skip_if_demo_data_missing()
   skip_if_not_installed("scRepertoire")
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("shinycssloaders")

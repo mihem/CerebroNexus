@@ -3,6 +3,7 @@
 ## `cluster`, arrives with per-cell values; `celltype` is fetched on demand.
 
 test_that("filtering a deferred group in Linked views shows the intersection", {
+  skip_if_demo_data_missing()
   skip_on_cran()
   skip_if_not_installed("shinytest2")
   inst_dir <- viewer_app_test_path()

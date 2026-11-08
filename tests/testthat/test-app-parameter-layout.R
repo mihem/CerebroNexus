@@ -1,4 +1,5 @@
 test_that("parameter bars use available width and wrap without losing controls", {
+  skip_if_demo_data_missing()
   skip_if_not_installed("scRepertoire")
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("shinycssloaders")
