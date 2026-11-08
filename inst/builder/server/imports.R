@@ -2838,6 +2838,27 @@ import_read_progress <- function(current_worker, payload) {
 ## the worker and fail that call (not resend it), as after a crash. Queued
 ## work resumes on the replacement.
 worker_watch <- new.env(parent = emptyenv())
+## A call that has used no CPU for this long gets a notice that the worker is
+## waiting, so a slow disk or a hung worker does not look like a frozen page.
+## It is shown only when the stall timeout is longer, and cleared when the
+## call makes progress again or ends.
+update_worker_quiet_hint <- function(quiet_for = 0, timeout = 0) {
+  text <- builder_worker_quiet_hint(quiet_for, timeout)
+  if (!is.null(text) && is.null(worker_watch$hint)) {
+    worker_watch$hint <- basename(tempfile("builder-worker-quiet-"))
+    builder_notify(
+      "warning",
+      text,
+      id = worker_watch$hint,
+      duration = Inf,
+      session = session
+    )
+  } else if (is.null(text) && !is.null(worker_watch$hint)) {
+    builder_notify_clear(worker_watch$hint, session = session)
+    worker_watch$hint <- NULL
+  }
+  invisible(!is.null(text))
+}
 builder_worker_stall_message <- paste(
   "The background worker stopped responding and was restarted.",
   "Retry the action."
@@ -2897,6 +2918,9 @@ observe({
     return()
   }
   worker(got$worker)
+  if (!is.null(got$event)) {
+    update_worker_quiet_hint()
+  }
   if (identical(got$event, "restarted")) {
     recovered <- apply_protocol_recovery(
       current_protocol,
@@ -2926,17 +2950,23 @@ observe({
   p <- request$payload
   consume_transport_retained(p)
   if (is.null(got$result)) {
+    stall_timeout <- builder_worker_stall_timeout(request)
     watch <- builder_worker_watchdog(
       worker_watch$state,
       got$worker,
       request$request_id,
-      builder_worker_stall_timeout(request)
+      stall_timeout
     )
     worker_watch$state <- watch$state
     if (isTRUE(watch$stalled)) {
+      update_worker_quiet_hint()
       stop_stalled_worker(got$worker, current_protocol)
       return()
     }
+    update_worker_quiet_hint(
+      as.numeric(Sys.time()) - (watch$state$progress_at %||% Inf),
+      stall_timeout
+    )
     if (identical(p$kind, "load") && !is.null(p$progress_path)) {
       progress <- builder_import_progress_read(
         p$progress_path,
@@ -2974,6 +3004,7 @@ observe({
     }
     return()
   }
+  update_worker_quiet_hint()
   terminal_progress <- NULL
   if (identical(p$kind, "build")) {
     # A stop can arrive after the worker has completed but before settlement.

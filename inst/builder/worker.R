@@ -2362,6 +2362,36 @@ builder_worker_stall_timeout <- function(request) {
   if (isTRUE(request$persistent)) 600 else 120
 }
 
+## The notice for a call that has used no CPU for `quiet_for` seconds, or NULL.
+## It appears after `after` seconds and only when the stall timeout is longer,
+## so the page says why nothing moves and when the worker is restarted.
+builder_worker_quiet_hint <- function(quiet_for, timeout, after = 60) {
+  if (
+    !is.numeric(quiet_for) ||
+      !is.numeric(timeout) ||
+      length(quiet_for) != 1L ||
+      length(timeout) != 1L ||
+      !is.finite(quiet_for) ||
+      !is.finite(timeout) ||
+      timeout <= after ||
+      quiet_for < after
+  ) {
+    return(NULL)
+  }
+  wait <- if (timeout >= 120) {
+    paste(round(timeout / 60), "minutes")
+  } else {
+    paste(round(timeout), "seconds")
+  }
+  paste0(
+    "The background worker has shown no progress for over a minute. ",
+    "It is restarted automatically after ",
+    wait,
+    " without progress; you can cancel or stop the operation now. ",
+    "CEREBRO_BUILDER_WORKER_STALL_TIMEOUT changes the wait."
+  )
+}
+
 ## CPU seconds used so far by the worker and its marked descendants, or NA.
 .builder_worker_tree_cpu <- function(process) {
   tree <- .builder_worker_tree_handles(process)

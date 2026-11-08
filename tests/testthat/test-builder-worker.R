@@ -1808,6 +1808,27 @@ test_that("worker stall timeouts default per call type and can be set", {
   expect_identical(builder_worker_stall_timeout(list(persistent = FALSE)), 0.5)
 })
 
+test_that("a quiet worker call gets a waiting notice before the stall timeout", {
+  expect_null(builder_worker_quiet_hint(30, 600))
+  hint <- builder_worker_quiet_hint(61, 600)
+  expect_match(hint, "no progress for over a minute", fixed = TRUE)
+  expect_match(hint, "restarted automatically after 10 minutes", fixed = TRUE)
+  expect_match(hint, "CEREBRO_BUILDER_WORKER_STALL_TIMEOUT", fixed = TRUE)
+  expect_match(
+    builder_worker_quiet_hint(61, 90),
+    "after 90 seconds",
+    fixed = TRUE
+  )
+  ## No notice when the worker is restarted as soon as it would show, when the
+  ## timeout is off, or when the values are not usable.
+  expect_null(builder_worker_quiet_hint(61, 60))
+  expect_null(builder_worker_quiet_hint(61, 0))
+  expect_null(builder_worker_quiet_hint(61, 30))
+  expect_null(builder_worker_quiet_hint(Inf, 600))
+  expect_null(builder_worker_quiet_hint(NA_real_, 600))
+  expect_null(builder_worker_quiet_hint(NULL, 600))
+})
+
 test_that("the watchdog flags a call only after it stops using CPU", {
   cpu <- 1
   watch <- function(state, now, request_id = "r1", timeout = 10) {
