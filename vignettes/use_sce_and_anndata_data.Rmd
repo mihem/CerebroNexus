@@ -2,11 +2,8 @@
 title: "Use SingleCellExperiment and AnnData data"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
-  html_document:
+  rmarkdown::html_vignette:
     toc: true
-    number_sections: true
-    self_contained: yes
-    mode: selfcontained
 vignette: >
   %\VignetteIndexEntry{Use SingleCellExperiment and AnnData data}
   %\VignetteEngine{knitr::rmarkdown}

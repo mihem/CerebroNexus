@@ -29,3 +29,6 @@ Rplots\.pdf$
 
 ^scripts$
 ^tests/testthat/_artifacts$
+
+# CRAN size (cran-size)
+^vignettes/articles$

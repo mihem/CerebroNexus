@@ -3,11 +3,8 @@ title: "Overview of the Cerebro class"
 author: "Roman Hillje"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
-  html_document:
+  rmarkdown::html_vignette:
     toc: true
-    number_sections: true
-    self_contained: yes
-    mode: selfcontained
 vignette: >
   %\VignetteIndexEntry{Overview of the Cerebro class}
   %\VignetteEngine{knitr::rmarkdown}
@@ -66,7 +63,7 @@ Interaction with the Cerebro object will be done through internal methods, provi
 
 The expression matrix is either embedded in the `.crb` or kept in an H5 file next to it; `expression_backend` records which (`setExpressionBackend()` accepts only `"embedded"` and `"h5"`), and `saveCerebro()` / `readCerebro()` take care of the rest. T-cell and B-cell receptors live together in `immune_repertoire`; there are no separate `tcr_data` / `bcr_data` fields, and `getTCR()` / `getBCR()` return the TCR or BCR rows of that repertoire. A very large repertoire can sit in a sibling `<stem>.immune.qs2` file that `getImmuneRepertoire()` loads on demand. A `.crb` written by an older release that does not follow this layout is rejected with a pointer to `convertCerebro()`.
 
-As long as you follow the described scheme, you can export and visualize any data frame that is stored in the `marker_genes` or `enriched_pathways` slots. I have prepared a vignette with some more details that you can find [here](export_and_visualize_custom_tables_and_plots.html).
+As long as you follow the described scheme, you can export and visualize any data frame that is stored in the `marker_genes` or `enriched_pathways` slots. I have prepared a vignette with some more details that you can find [here](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.html).
 
 Please make sure to use names for items in lists, otherwise it will likely result in an error.
 
