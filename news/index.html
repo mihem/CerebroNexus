@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,10 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="7.2.0" id="cerebronexus-720">CerebroNexus 7.2.0<a class="anchor" aria-label="anchor" href="#cerebronexus-720"></a></h2>
+<ul><li>The Immune repertoire SizeDist tab draws in an App whose folder is read-only, such as one run by Shiny Server in a container. Building its dendrogram (<code><a href="https://andrie.github.io/ggdendro/reference/dendro_data.html" class="external-link">ggdendro::dendro_data()</a></code>) opened R’s default graphics device, which writes <code>Rplots.pdf</code> into the working directory: the tab showed “Could not render this plot: cannot open file ‘Rplots.pdf’”, and where the folder is writable a stray <code>Rplots.pdf</code> was left behind. The Immune repertoire plotly renderers now open a null graphics device for the whole render, plot building included, and close only that device.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="7.1.0" id="cerebronexus-710">CerebroNexus 7.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-710"></a></h2>
 <ul><li>An App run by Shiny Server shows its plots again. Shiny Server’s SockJS transport cannot carry the raw binary WebSocket frames the Viewer sends cell-view data in, so pages opened but projections never arrived and datasets loaded forever. When Shiny Server started the R process (it sets <code>SHINY_SERVER_VERSION</code>), the frames now go as base64 text and the browser restores them; everywhere else they are sent unchanged. The choice is made when the App starts, so an App built on one machine and copied to a Shiny Server works as it is. <code>options(cerebro.sockjs_compat = TRUE)</code> or <code>FALSE</code> (or <code>sockjs_compat</code> in <code>Cerebro.options</code>) forces it. This covers <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code>, the bundled demo App and Apps written by <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>; an App built with an earlier version has to be built again to get it.</li>
