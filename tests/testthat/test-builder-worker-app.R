@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## -------------------------------------------------------------------------
 ## Builder worker integration contracts owned by the Shiny main process.
 ## -------------------------------------------------------------------------

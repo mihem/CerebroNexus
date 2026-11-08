@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## Project dialogs and the save/open picker flow.
 
 builder_dialogs_app <- function(env = parent.frame()) {

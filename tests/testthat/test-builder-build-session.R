@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_build_session_app <- function(scope = parent.frame()) {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")

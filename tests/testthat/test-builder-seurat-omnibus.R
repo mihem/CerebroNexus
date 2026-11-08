@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_omnibus_env <- new.env(parent = globalenv())
 sys.source(
   builder_profile_inst_path("builder", "prerequisite.R"),

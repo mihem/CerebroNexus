@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_open_app_env <- function() {
   env <- new.env(parent = environment())
   sys.source(builder_test_inst_path("builder", "ui", "inspect_stage.R"), env)

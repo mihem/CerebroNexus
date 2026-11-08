@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_repo_source("prerequisite.R")
 builder_repo_source("app_bundle.R")
 

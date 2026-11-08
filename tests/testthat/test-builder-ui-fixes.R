@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## Builder UI regressions found while walking the real-data workflow.
 
 builder_ui_fixes_app <- function(scope = parent.frame()) {

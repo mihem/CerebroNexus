@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("the live app exposes imports before their worker result", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")

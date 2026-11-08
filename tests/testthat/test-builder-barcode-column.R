@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## A metadata column named cell_barcode does not block the dataset: the CRB
 ## keeps the cell barcodes as cell_barcode and the source column under a
 ## free name.

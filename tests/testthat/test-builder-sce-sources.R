@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## SingleCellExperiment and AnnData files as Builder sources.
 ##
 ## They enter through builder_read_object(), which hands everything downstream a

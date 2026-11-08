@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## A Seurat object without dimensional reductions (an unclustered Xenium
 ## section, an expression-only object) is added, checked, reviewed and built
 ## to a CRB and to an App that opens.

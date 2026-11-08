@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_repo_source("io.R", local = globalenv())
 
 .builder_adapter_source_contracts <- function() {
