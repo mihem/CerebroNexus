@@ -159,8 +159,15 @@ test_that("the wrapper puts a locked sendBinaryMessage binding back", {
 })
 
 test_that("the R and browser halves agree on the message name", {
-  js <- paste(readLines(viewer_test_path("transport_compat.js")), collapse = "\n")
+  js <- paste(
+    readLines(viewer_test_path("transport_compat.js")),
+    collapse = "\n"
+  )
   r <- paste(readLines(viewer_test_path("transport_compat.R")), collapse = "\n")
-  expect_match(js, "addCustomMessageHandler('cerebro_sockjs_binary'", fixed = TRUE)
+  expect_match(
+    js,
+    "addCustomMessageHandler('cerebro_sockjs_binary'",
+    fixed = TRUE
+  )
   expect_match(r, '"cerebro_sockjs_binary"', fixed = TRUE)
 })
