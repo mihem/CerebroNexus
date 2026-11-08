@@ -20,7 +20,7 @@ Cerebro.options <<- list(
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "7.0.1",
+  "cerebro_version" = "7.1.0",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -196,6 +196,16 @@ source("viewer/shiny_UI.R", local = TRUE)
 source("viewer/shiny_server.R", local = TRUE)
 
 ##----------------------------------------------------------------------------##
+## Shiny Server cannot carry binary WebSocket frames; wrap them there only
+##----------------------------------------------------------------------------##
+source("viewer/transport_compat.R", local = TRUE)
+app_transport <- viewerApplyTransportCompat(
+  ui,
+  server,
+  Cerebro.options[["cerebro_root"]]
+)
+
+##----------------------------------------------------------------------------##
 ## launch app
 ##----------------------------------------------------------------------------##
-shiny::shinyApp(ui = ui, server = server)
+shiny::shinyApp(ui = app_transport$ui, server = app_transport$server)
