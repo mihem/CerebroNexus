@@ -39,10 +39,10 @@ test_that("a plotly renderer builds its plot without writing a graphics file", {
   skip_on_os("windows")
   skip_if_not_installed("ggdendro")
   skip_if_not_installed("plotly")
-  skip_if(
-    !is.null(grDevices::dev.list()),
-    "a graphics device is already open"
-  )
+  ## The bug needs no device to be open: with one, dendro_data() draws on it.
+  ## Tests of one R process share devices, and an earlier test may have left
+  ## one open, so close any before the check rather than skipping it.
+  grDevices::graphics.off()
 
   ## A read-only working directory, like the App folder in the container.
   work <- withr::local_tempdir()
@@ -77,11 +77,16 @@ test_that("the renderer closes only the device it opened", {
   skip_if_not_installed("plotly")
 
   scope <- ir_null_device_scope()
+  ## Devices an earlier test left open stay in the list; compare the list, not
+  ## the current device: after a close, R makes the next device current, which
+  ## is not always the one that was current before.
   grDevices::pdf(NULL)
   outer <- grDevices::dev.cur()
   withr::defer(
     if (outer %in% grDevices::dev.list()) grDevices::dev.off(outer)
   )
+  before <- grDevices::dev.list()
+  expect_true(outer %in% before)
 
   suppressMessages(
     scope$ir_render_ggplotly(
@@ -89,12 +94,11 @@ test_that("the renderer closes only the device it opened", {
       "clonalSizeDistribution"
     )
   )
-  expect_identical(unname(grDevices::dev.list()), unname(outer))
-  expect_identical(grDevices::dev.cur(), outer)
+  expect_identical(grDevices::dev.list(), before)
 
   ## It also cleans up when building the plot fails.
   suppressMessages(
     scope$ir_render_ggplotly(stop("disk unavailable"), "clonalSizeDistribution")
   )
-  expect_identical(unname(grDevices::dev.list()), unname(outer))
+  expect_identical(grDevices::dev.list(), before)
 })
