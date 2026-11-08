@@ -47,6 +47,8 @@ jobs:
         run: nix-shell default.nix --run "R CMD build ."
 
       # Check the distributable outside the checkout, without development tools.
+      # The test suite runs in the three shards of R-tests.yaml; running it
+      # here again took about 9 of this job's 12 minutes.
       - name: Run R-CMD-check
         run: |
           mkdir -p "$RUNNER_TEMP/cerebro-cran-check"
@@ -56,9 +58,7 @@ jobs:
             set -eu
             unset CI NOT_CRAN NODE_PATH
             export NODE_OPTIONS=--no-global-search-paths
-            # testthat runs 2 test processes by default; the runner has 4 cores.
-            export TESTTHAT_CPUS=4
-            R CMD check --as-cran --no-manual CerebroNexus_*.tar.gz
+            R CMD check --as-cran --no-manual --no-tests CerebroNexus_*.tar.gz
             test -f CerebroNexus.Rcheck/00check.log
             ! grep -E "^Status:.*(ERROR|WARNING)" CerebroNexus.Rcheck/00check.log
           '
