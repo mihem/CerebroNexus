@@ -32,3 +32,11 @@ Rplots\.pdf$
 
 # CRAN size (cran-size)
 ^vignettes/articles$
+^man/figures/(featured|builder)\.png$
+^tests/testthat/fixtures/anndata$
+^inst/extdata/examples/demo_spatial_(visium|slideseq|merfish|xenium)\.crb$
+^inst/extdata/examples/demo_spatial_(visium_he\.png|histology\.svg)$
+^inst/extdata/examples/spatial$
+^inst/extdata/examples/demo_trekker\.crb$
+^inst/extdata/examples/demo_hla_tcr_dextramer\.crb$
+^inst/builder/fixtures/(trekker_spatial|spatial_alignment)$

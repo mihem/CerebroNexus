@@ -1568,11 +1568,12 @@ test_that("the privacy allowlist covers every bundled demo data file", {
   )
   relative <- file.path("extdata", "examples", basename(files))
 
-  expect_setequal(names(.builder_app_demo_data), relative)
-  ordered <- files[match(names(.builder_app_demo_data), relative)]
+  ## The package tarball leaves the larger demos out, so only the files that
+  ## are here are compared.
+  expect_true(all(relative %in% names(.builder_app_demo_data)))
   expect_identical(
-    unname(tools::md5sum(ordered)),
-    unname(.builder_app_demo_data)
+    unname(tools::md5sum(files)),
+    unname(.builder_app_demo_data[relative])
   )
 })
 

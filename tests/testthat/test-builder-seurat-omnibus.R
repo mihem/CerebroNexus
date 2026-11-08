@@ -9,6 +9,7 @@ builder_omnibus_env$builder_source_utf8(
 )
 
 test_that("Spatial alignment demo restores the Visium H&E and transform", {
+  skip_if_builder_examples_missing()
   skip_if_not_installed("jpeg")
   builder_omnibus_env$builder_source_utf8(
     builder_profile_inst_path("builder", "extras.R"),
@@ -140,6 +141,7 @@ test_that("omnibus Trekker payload satisfies the Builder content contract", {
 })
 
 test_that("gallery examples leave tissue images for manual upload", {
+  skip_if_builder_examples_missing()
   for (relative in c("extras.R", "marker_import.R")) {
     builder_omnibus_env$builder_source_utf8(
       builder_profile_inst_path("builder", relative),

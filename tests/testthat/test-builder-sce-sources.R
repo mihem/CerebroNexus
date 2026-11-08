@@ -13,7 +13,7 @@ builder_profile_source_runtime(local = globalenv())
 builder_repo_source("inspect.R", local = globalenv())
 builder_repo_source("adapters.R", local = globalenv())
 
-fixture <- function(name) testthat::test_path("fixtures", "anndata", name)
+fixture <- anndata_test_fixture
 quiet <- function(x) suppressWarnings(suppressMessages(x))
 
 test_that("the format registry claims AnnData files next to the Seurat ones", {

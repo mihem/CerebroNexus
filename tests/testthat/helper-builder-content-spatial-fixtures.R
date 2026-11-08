@@ -115,6 +115,7 @@ builder_content_spatial_context <- function(object) {
     if (!is.null(cached)) {
       return(cached)
     }
+    skip_if_inst_missing("extdata/examples/demo_trekker.crb")
     path <- builder_content_spatial_inst_path(
       "extdata",
       "examples",

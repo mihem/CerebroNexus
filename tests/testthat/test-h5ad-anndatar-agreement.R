@@ -7,7 +7,7 @@
 ## Skipped where anndataR is not installed.
 
 anndata_fixture <- function(name) {
-  test_path("fixtures", "anndata", paste0(name, ".h5ad"))
+  anndata_test_fixture(paste0(name, ".h5ad"))
 }
 
 read_quietly <- function(expr) {

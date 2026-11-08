@@ -1945,7 +1945,8 @@ builder_example_record <- function(
   expected_pages = character(),
   expected_supporting_content = character(),
   histology_images = list(),
-  gallery_visible = TRUE
+  gallery_visible = TRUE,
+  fetch = NULL
 ) {
   require_string <- function(value, name, nonempty = TRUE) {
     valid <- is.character(value) && length(value) == 1L && !is.na(value)
@@ -2095,6 +2096,13 @@ builder_example_record <- function(
     make <- local({
       path <- serialized_path
       function() {
+        ## An example that is not in the package is downloaded on first use.
+        if (nzchar(path) && !file.exists(path) && is.function(fetch)) {
+          failure <- fetch()
+          if (!is.null(failure)) {
+            return(list(error = failure))
+          }
+        }
         if (!nzchar(path) || !file.exists(path)) {
           return(list(error = "The package example object was not found."))
         }
@@ -2137,6 +2145,45 @@ builder_example_catalog <- function() {
     .builder_example_path(
       file.path("builder", "fixtures", ...)
     )
+  }
+  ## The Trekker and Visium examples are not in the CRAN package. Their files
+  ## are downloaded into the user cache the first time the example is loaded.
+  downloadable <- function(...) {
+    path <- fixture(...)
+    if (nzchar(path)) {
+      return(path)
+    }
+    get(".demoDataPath", envir = asNamespace("CerebroNexus"))(
+      file.path("builder", "fixtures", ...)
+    )
+  }
+  download <- function(label, directory) {
+    function() {
+      .builder_io_require_package()
+      namespace <- asNamespace("CerebroNexus")
+      tryCatch(
+        {
+          namespace$.demoDataFetch(
+            namespace$.demoDataFiles(file.path(
+              "builder",
+              "fixtures",
+              directory
+            )),
+            quiet = TRUE
+          )
+          NULL
+        },
+        error = function(error) {
+          paste0(
+            "The ",
+            label,
+            " is downloaded on first use and the download failed: ",
+            conditionMessage(error),
+            " The other examples still work."
+          )
+        }
+      )
+    }
   }
   core <- function(reductions = "umap", groups = "preserved") {
     values <- stats::setNames(
@@ -2310,7 +2357,7 @@ builder_example_catalog <- function() {
       "spatial section and four H&E images"
     ),
     "synthetic",
-    fixture("trekker_spatial", "trekker_4_tissues.qs2"),
+    downloadable("trekker_spatial", "trekker_4_tissues.qs2"),
     expected_dispositions = with_content(
       core(c("pca", "umap", "SPATIAL")),
       spatial = "preserved"
@@ -2322,7 +2369,8 @@ builder_example_catalog <- function() {
       character(1),
       "path"
     )),
-    histology_images = trekker_histology_images
+    histology_images = trekker_histology_images,
+    fetch = download("Trekker spatial demo", "trekker_spatial")
   )
   spatial_alignment <- record(
     "spatial_alignment",
@@ -2333,14 +2381,15 @@ builder_example_catalog <- function() {
       "Data: 10x Genomics, CC BY 4.0"
     ),
     "real",
-    fixture("spatial_alignment", "visium_breast_cancer.rds"),
+    downloadable("spatial_alignment", "visium_breast_cancer.rds"),
     expected_dispositions = with_content(
       core("umap"),
       spatial = "preserved"
     ),
     expected_pages = "spatial",
     expected_supporting_content = "visium_breast_cancer_he.jpg",
-    histology_images = alignment_histology_images
+    histology_images = alignment_histology_images,
+    fetch = download("Visium breast cancer demo", "spatial_alignment")
   )
   list(
     complete_viewer_data = complete_viewer_data,

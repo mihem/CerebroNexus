@@ -328,7 +328,7 @@ test_that("private App config and all outputs remain inside the temporary releas
   )
 
   mouse_conversion <- utils::read.delim(
-    gzfile(file.path(bundle$app_dir, "extdata", "mm10_gene_ID_name.tsv.gz")),
+    gzfile(file.path(bundle$app_dir, "extdata", "mm10_gene_ID_name.tsv.xz")),
     nrows = 1L,
     stringsAsFactors = FALSE,
     check.names = FALSE
