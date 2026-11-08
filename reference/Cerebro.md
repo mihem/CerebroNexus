@@ -652,7 +652,7 @@ that sits next to it.
 
 #### Usage
 
-    Cerebro$setExpressionBackend(type = "embedded", location = NULL)
+    Cerebro$setExpressionBackend(type = "embedded", location = NULL, md5 = NULL)
 
 #### Arguments
 
@@ -664,6 +664,11 @@ that sits next to it.
 
   File name of the H5 file next to the `.crb`; `NULL` when
   `type == "embedded"`.
+
+- `md5`:
+
+  MD5 checksum of the H5 file, recorded when it is written and checked
+  when it is attached; `NULL` when not recorded.
 
 ------------------------------------------------------------------------
 

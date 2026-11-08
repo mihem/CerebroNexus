@@ -456,7 +456,7 @@ key is `v_gene+cdr3` rather than CDR3 alone.
 sessionInfo()
 #> R version 4.6.1 (2026-06-24)
 #> Platform: x86_64-pc-linux-gnu
-#> Running under: Ubuntu 24.04.5 LTS
+#> Running under: Ubuntu 26.04.1 LTS
 #> 
 #> Matrix products: default
 #> BLAS/LAPACK: /nix/store/25fsigqyn8wpkjavqf74zcvlcrfzma4c-blas-3/lib/libblas.so.3;  LAPACK version 3.12.0

@@ -17,7 +17,7 @@ al., F1000Research (2019)."><meta property="og:image" content="https://mihem.git
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">6.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,7 @@ al., F1000Research (2019)."><meta property="og:image" content="https://mihem.git
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
@@ -170,10 +171,10 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 <span class="r-in"><span>  thresh_p_val <span class="op">=</span> <span class="fl">0.05</span>,</span></span>
 <span class="r-in"><span>  thresh_q_val <span class="op">=</span> <span class="fl">0.1</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:36] Loading gene sets...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:36] Loaded 2 gene sets from GMT file.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:36] Extracting transcript counts from `data` slot of `RNA` assay...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:36] Performing analysis for 2 subgroups of group `sample`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:29] Loading gene sets...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:29] Loaded 2 gene sets from GMT file.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:29] Extracting transcript counts from `data` slot of `RNA` assay...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:29] Performing analysis for 2 subgroups of group `sample`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA version 2.6.12</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Searching for rows with constant values</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA ranks</span>
@@ -185,8 +186,8 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA dense (classical) algorithm</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA scores for 2 gene sets</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Calculations finished</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:39] 0 gene sets passed the thresholds across all subgroups of group `sample`.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:39] Performing analysis for 2 subgroups of group `seurat_clusters`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:32] 0 gene sets passed the thresholds across all subgroups of group `sample`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:32] Performing analysis for 2 subgroups of group `seurat_clusters`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA version 2.6.12</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Searching for rows with constant values</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA ranks</span>
@@ -198,7 +199,7 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA dense (classical) algorithm</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA scores for 2 gene sets</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Calculations finished</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [15:42:40] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [12:50:33] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

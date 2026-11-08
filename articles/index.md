@@ -16,6 +16,8 @@
 
 ### How-to guides
 
+- [Build a data set without writing
+  code](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.md):
 - [Data integrity from Seurat to a self-contained Cerebro
   app](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md):
 - [Seurat v5 layered assays: complete and safe expression

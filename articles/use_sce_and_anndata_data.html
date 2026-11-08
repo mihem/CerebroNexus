@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">6.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,6 +42,7 @@
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
@@ -99,7 +100,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Use SingleCellExperiment and AnnData data</h1>
             
-            <h4 data-toc-skip class="date">31 October, 2026</h4>
+            <h4 data-toc-skip class="date">08 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/use_sce_and_anndata_data.Rmd" class="external-link"><code>vignettes/use_sce_and_anndata_data.Rmd</code></a></small>
       <div class="d-none name"><code>use_sce_and_anndata_data.Rmd</code></div>
@@ -219,7 +220,7 @@ written. A message lists what <code>.h5ad</code> has no place for
 <div class="section level2">
 <h2 id="in-the-builder">In the Builder<a class="anchor" aria-label="anchor" href="#in-the-builder"></a>
 </h2>
-<p><code>launchCerebroBuilder()</code> accepts <code>.h5ad</code>,
+<p><code><a href="../reference/launchCerebroBuilder.html">launchCerebroBuilder()</a></code> accepts <code>.h5ad</code>,
 <code>.h5mu</code>, a <code>.zip</code> of a SpatialData
 <code>.zarr</code> folder, and SingleCellExperiment <code>.rds</code> /
 <code>.qs2</code> files like Seurat ones, and offers PAGA, scVelo and

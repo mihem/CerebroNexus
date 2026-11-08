@@ -4,6 +4,9 @@
 
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
   : Launch CerebroNexus
+- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  : Build a Cerebro data set from a Seurat object, by pointing and
+  clicking.
 
 ## Export data
 
@@ -22,6 +25,8 @@
   : Convert an AnnData (h5ad) file to a Cerebro file
 - [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
   : Convert a SingleCellExperiment object to a Cerebro file
+- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  : Convert a SingleCellExperiment into a Seurat object
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
@@ -68,6 +73,8 @@
   : Convert an AnnData (h5ad) file to a Cerebro file
 - [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
   : Convert a SingleCellExperiment object to a Cerebro file
+- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  : Convert a SingleCellExperiment into a Seurat object
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
@@ -97,6 +104,9 @@
   : Normalize any accepted HLA input into the canonical long table
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
   : Launch CerebroNexus
+- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  : Build a Cerebro data set from a Seurat object, by pointing and
+  clicking.
 - [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   : Perform gene set enrichment analysis with GSVA.
 - [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)

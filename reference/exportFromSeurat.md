@@ -29,6 +29,8 @@ exportFromSeurat(
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L,
   .expression_resolution = NULL,
+  .finalize_export = NULL,
+  .on_progress = NULL,
   projections = NULL,
   spatial_coordinate_transforms = NULL
 )
@@ -84,12 +86,12 @@ exportFromSeurat(
 - nUMI:
 
   Column in `object@meta.data` that contains information about number of
-  transcripts per cell; defaults to `nUMI`.
+  transcripts per cell; defaults to `nUMI`. `NULL` leaves it out.
 
 - nGene:
 
   Column in `object@meta.data` that contains information about number of
-  expressed genes per cell; defaults to `nGene`.
+  expressed genes per cell; defaults to `nGene`. `NULL` leaves it out.
 
 - add_all_meta_data:
 
@@ -206,12 +208,27 @@ exportFromSeurat(
   to reuse a matrix that has already been resolved and validated. Users
   should leave this as `NULL`.
 
+- .finalize_export:
+
+  Internal hook used by the Builder: a function called with the Cerebro
+  object just before it is written, so the object can be completed
+  without reading the written file back. Users should leave this as
+  `NULL`.
+
+- .on_progress:
+
+  Internal hook used by the Builder: a function called with the name of
+  each part of the export as it starts, so a long export can report how
+  far it has got. Users should leave this as `NULL`.
+
 - projections:
 
   Optional ordered names of dimensional reductions to export. When
   supplied, every named reduction is exported in that order, including
-  PCA beside other projections. The default `NULL` preserves the legacy
-  behavior that uses non-PCA reductions when they are available.
+  PCA beside other projections. An empty vector exports none (an object
+  without reductions, such as an unclustered spatial section). The
+  default `NULL` preserves the legacy behavior that uses non-PCA
+  reductions when they are available.
 
 - spatial_coordinate_transforms:
 
@@ -263,22 +280,22 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [15:42:18] Initializing Cerebro object...
-#> [15:42:18] Adding expression data (embedded)...
-#> [15:42:18] Collecting available meta data...
-#> [15:42:18] Extracting all meta data columns...
-#> [15:42:18] Extracting dimensional reductions...
-#> [15:42:18] Will export the following dimensional reductions: umap
-#> [15:42:18] Extracting marker genes table...
-#> [15:42:18] No trajectories to extract...
-#> [15:42:18] Checking for spatial data...
-#> [15:42:18] Overview of Cerebro object:
+#> [12:50:10] Initializing Cerebro object...
+#> [12:50:10] Adding expression data (embedded)...
+#> [12:50:10] Collecting available meta data...
+#> [12:50:10] Extracting all meta data columns...
+#> [12:50:10] Extracting dimensional reductions...
+#> [12:50:10] Will export the following dimensional reductions: umap
+#> [12:50:10] Extracting marker genes table...
+#> [12:50:10] No trajectories to extract...
+#> [12:50:10] Checking for spatial data...
+#> [12:50:10] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 6.0.0
+#> exporter package version: 7.0.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-10-31
+#> date of export: 2026-11-08
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, seurat_clusters
@@ -294,6 +311,6 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [15:42:18] Saving Cerebro object to: /tmp/nix-shell-4538-1835496194/RtmpvvJWXP/pbmc_Seurat.crb
-#> [15:42:18] Done!
+#> [12:50:10] Saving Cerebro object to: /tmp/nix-shell-4301-2804680715/RtmpXWpPVy/pbmc_Seurat.crb
+#> [12:50:10] Done!
 ```

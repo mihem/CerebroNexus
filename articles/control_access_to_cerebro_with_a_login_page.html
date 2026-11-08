@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">6.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,6 +42,7 @@
     <li><a class="dropdown-item" href="../articles/overview_of_cerebro_class.html">Overview of the Cerebro class</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>How-to</h6></li>
+    <li><a class="dropdown-item" href="../articles/build_a_data_set_by_pointing.html">Build a data set without writing code</a></li>
     <li><a class="dropdown-item" href="../articles/data_integrity_contracts.html">Data integrity from Seurat to a self-contained Cerebro app</a></li>
     <li><a class="dropdown-item" href="../articles/seurat_v5_layered_assays.html">Seurat v5 layered assays: complete and safe expression matrices</a></li>
     <li><a class="dropdown-item" href="../articles/create_a_self_contained_shiny_app.html">Create a self-contained Shiny app from a Cerebro data file</a></li>
@@ -103,7 +104,7 @@ Hillje</h4>
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">31 October, 2026</h4>
+            <h4 data-toc-skip class="date">08 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
       <div class="d-none name"><code>control_access_to_cerebro_with_a_login_page.Rmd</code></div>
@@ -418,6 +419,51 @@ temporarily.</p>
 <p>Configure source-aware rate limiting at the reverse proxy. The
 read-only Viewer does not persist failed-login counters or account
 locks.</p>
+<p>The Viewer also slows down guessing in memory: after five failed
+sign-ins for one account or from one client address, that account or
+address waits 30 seconds, doubling with each further failure up to 15
+minutes. The counters are lost when the R process restarts.</p>
+<p>Behind a reverse proxy every request comes from the proxy’s address.
+A loopback address (<code>127.0.0.1</code>, <code>::1</code>) or none at
+all is never counted as a client, so with a proxy on the same host only
+the per-account limit applies.</p>
+<p><strong>A proxy on another host (or a shared NAT or VPN
+address):</strong> the Viewer sees one address that is not loopback for
+every user and counts it as one client. Five failed sign-ins from any
+users behind that address, for example five people each mistyping their
+own password, then make every user behind it wait, including a sixth
+user with the correct password. This is by design: the Viewer cannot
+tell users apart by an address they share. To count each user’s own
+address instead, set <code>CEREBRO_AUTH_CLIENT_HEADER</code> as
+described below (<code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code> behind nginx).</p>
+<p><strong><code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code> behind nginx or another
+proxy:</strong> set <code>CEREBRO_AUTH_CLIENT_HEADER</code> in the R
+process to the header your proxy sets to the client address, for example
+<code>X-Forwarded-For</code> or <code>X-Real-IP</code>. The proxy must
+send it on the WebSocket upgrade request too; nginx does when the header
+is set in the same <code>location</code> that proxies the WebSocket. The
+Viewer uses the last address in that header, the one the proxy saw. Set
+it only when every request passes through the proxy, because clients can
+send the header themselves.</p>
+<pre class="nginx"><code># nginx — the location that proxies the Viewer, WebSocket included.
+location / {
+  proxy_pass http://127.0.0.1:3838;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}</code></pre>
+<div class="sourceCode" id="cb15"><pre class="sourceCode ini"><code class="sourceCode ini"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="co"># systemd override — add next to the passphrase EnvironmentFile.</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="kw">[Service]</span></span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="dt">Environment</span><span class="ot">=</span><span class="st">CEREBRO_AUTH_CLIENT_HEADER=X-Forwarded-For</span></span></code></pre></div>
+<p><strong>Shiny Server (open source):</strong> the setting has no
+effect. Shiny Server opens its own WebSocket to the R process and passes
+on no request headers, so the Viewer sees only Shiny Server’s local
+address and counts failures per account. For a per-client limit, run the
+App with <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code> behind nginx as above. A rate
+limit at the proxy (nginx <code>limit_req</code> or
+<code>limit_conn</code>) caps how many sessions a client opens, not how
+many sign-ins it tries in one session.</p>
 </div>
 <div class="section level2">
 <h2 id="add-remove-or-rotate-users">Add, remove, or rotate users<a class="anchor" aria-label="anchor" href="#add-remove-or-rotate-users"></a>

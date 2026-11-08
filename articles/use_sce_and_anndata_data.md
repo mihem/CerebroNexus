@@ -92,9 +92,10 @@ trajectories, trees, …).
 
 ## In the Builder
 
-`launchCerebroBuilder()` accepts `.h5ad`, `.h5mu`, a `.zip` of a
-SpatialData `.zarr` folder, and SingleCellExperiment `.rds` / `.qs2`
-files like Seurat ones, and offers PAGA, scVelo and pseudotime
-trajectories next to monocle2. Spatial coordinates arrive as one spatial
-section per `library_id`, and Visium tissue pictures are attached to
-their sections as images at the position their scale factor gives.
+[`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+accepts `.h5ad`, `.h5mu`, a `.zip` of a SpatialData `.zarr` folder, and
+SingleCellExperiment `.rds` / `.qs2` files like Seurat ones, and offers
+PAGA, scVelo and pseudotime trajectories next to monocle2. Spatial
+coordinates arrive as one spatial section per `library_id`, and Visium
+tissue pictures are attached to their sections as images at the position
+their scale factor gives.

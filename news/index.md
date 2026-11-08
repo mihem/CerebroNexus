@@ -1,5 +1,137 @@
 # Changelog
 
+## CerebroNexus 7.0.0
+
+### Input formats in the Builder and the export
+
+- Reads SingleCellExperiment
+  ([`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md),
+  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md))
+  and AnnData
+  ([`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md),
+  [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md);
+  `.h5ad` and `.h5mu`) natively, without Python, through the same export
+  core as Seurat. The `.crb` is the hub: Seurat, SCE and h5ad convert to
+  each other through it, and
+  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  writes a `.crb` back as `.h5ad`.
+- From AnnData it also carries scanpy marker tables and category
+  colours, Visium tissue images, spatial sections, scirpy TCR/BCR
+  repertoires and scanpy / scVelo trajectories.
+  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  writes spatial coordinates and tissue images back so scanpy and
+  squidpy can draw them, the immune repertoire as scirpy’s
+  `obsm["airr"]` and each trajectory’s pseudotime as an `obs` column.
+- SpatialData (`.zarr`) stores are read natively too:
+  [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+  and
+  [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
+  take the cell table, its coordinates (from `obsm["spatial"]` or from
+  the annotated shapes) and the tissue pictures placed in each section,
+  one spatial section per region. Plain AnnData `.zarr` stores open in
+  [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md).
+- CITE-seq data: `extra_modalities =` (MuData, e.g. `"prot"`) and
+  `extra_features =` (SingleCellExperiment `altExp`, e.g. `"ADT"`) add
+  the antibody features to the expression data as
+  `<experiment>:<feature>`.
+- The Builder opens `.h5ad`, `.h5mu` and SingleCellExperiment
+  `.rds`/`.qs2` files like Seurat ones
+  ([`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  is the conversion it uses), and offers PAGA, scVelo and pseudotime
+  trajectories next to monocle2. A SpatialData store can be added as a
+  `.zip` of its `.zarr` folder, and the antibody features of an `.h5mu`
+  file (or a SingleCellExperiment’s `ADT` alternative experiment) are
+  added to the genes as `<experiment>:<feature>`. Spatial coordinates
+  arrive as one spatial section per `library_id`, and Visium tissue
+  pictures are attached to their sections as images at the position
+  their scale factor gives.
+
+### Builder
+
+- Add
+  [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  for importing data, configuring content, saving reusable projects,
+  previewing spatial alignment, and publishing private Viewer apps with
+  optional login. Review planned payload targets before publication.
+- Preserve dataset and cell identities across export; publish ROI, image
+  alignment and content settings through shared contracts consumed by
+  the Viewer.
+- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  listens on `127.0.0.1` only and warns for any other `host`: it reads
+  any path it is given and runs the code inside `.rds` files.
+  `max_file_size` limits uploads; a file above it is refused with a
+  message that names its size and the limit. In a C locale it switches
+  the character type to UTF-8 while it runs. The Builder needs `callr`,
+  `processx` and `ps` (and `readxl` for Excel tables), which are
+  suggested packages; it checks them at launch and names what is
+  missing.
+- Projects: Save writes an editable project with its own copy of each
+  source file. A source that has gone missing can be removed from the
+  project or replaced by another file when the project is opened.
+  Copies, settings files and partial copies that nothing refers to any
+  more are removed by a later Save, after an hour.
+- Open App starts a built App from the Builder (on its configured port,
+  or a free one when that is taken). Loading a dataset and building the
+  output show a percentage by step. Without a native file dialog (no
+  `zenity` or `kdialog`), the folder and project pickers use a folder
+  browser limited to `options(CerebroNexus.builder.server_path_roots)`
+  (default: the home folder).
+- A background worker that has used no CPU for a minute gets a notice,
+  and is restarted after 10 minutes (2 minutes for previews; reading a
+  very large file from a slow disk can look idle).
+  `CEREBRO_BUILDER_WORKER_STALL_TIMEOUT` or
+  `options(CerebroNexus.builder.worker_stall_timeout)` sets the seconds;
+  0 turns it off.
+- Objects without dimensional reductions, such as an unclustered Xenium
+  section, can be built. `exportFromSeurat(projections = character())`
+  exports none, and the App then hides the Projection and Linked views
+  pages.
+- Immune repertoire: Configure \> Specialized content chooses which tabs
+  the App shows. Placeholder `CTgene` values (“NA”, “None”, “nan”) count
+  as missing, not as clonotypes.
+- A metadata column named `cell_barcode` no longer blocks a build: it is
+  exported as `cell_barcode_source`, with a notice in Configure.
+- Extra material tables are read as text first, so values such as `007`,
+  long ids and a gene called `NA` are kept; comma, semicolon and tab
+  delimiters are detected.
+- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  is exported. Spatial sections and their pictures keep the same names,
+  and a `library_id` that is missing for some cells stops with a message
+  that says so.
+- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  checks the saved MD5 of an h5 expression file and stops with an error
+  if the file was replaced, instead of failing at the first read.
+
+### Viewer fixes
+
+- Sign-in limit: failed sign-ins are counted per account name (as
+  typed), and a successful sign-in clears only that account. A client on
+  a loopback address, or with no address, such as a proxy on the same
+  host, is not counted as a client, so only the per-account limit
+  applies. The lockout message is “Too many sign-in attempts. Try again
+  in N s.”, and expired entries are dropped. Users behind one proxy
+  address on another host still share one client counter; set
+  `CEREBRO_AUTH_CLIENT_HEADER` (for example `X-Forwarded-For`) to count
+  each client address instead. See the login vignette.
+
+- Apps built from large data sets (above the Viewer Pack threshold) show
+  the Immune repertoire page: the App’s catalog no longer records “no
+  repertoire” when the CRB holds only a thin payload.
+
+- Linked views no longer stays busy after it is opened: the output that
+  shows the selected cells had no value until the first selection, and
+  shiny \>= 1.9 keeps an output marked as recalculating until its first
+  value arrives.
+
+- Immune repertoire: the Clone Sharing bars name the chosen sharing unit
+  (“Private (1 tissue site)”) instead of always saying “sample”, and a
+  Group by chosen on Clone Sharing no longer becomes the one on Compare
+  and Paired Scatter.
+
+- Opening a saved Trajectory view reports how many of the saved cells
+  the trajectory kept (“Restored 31 of 34 selected cells”) instead of
+  the number in the file.
+
 ## CerebroNexus 6.0.0
 
 ### New

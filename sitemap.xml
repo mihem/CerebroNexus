@@ -2,6 +2,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/404.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/LICENSE-text.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/LICENSE.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.html</loc></url>
@@ -43,6 +44,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/createShinyApp.html</loc></url>
@@ -104,6 +106,7 @@
 <url><loc>https://mihem.github.io/CerebroNexus/reference/hla_validate_typing.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/index.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/launchCerebro.html</loc></url>
+<url><loc>https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/readCerebro.html</loc></url>
 <url><loc>https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.html</loc></url>

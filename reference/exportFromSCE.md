@@ -72,12 +72,13 @@ exportFromSCE(
 
   Column in `SingleCellExperiment::colData(object)` that contains
   information about number of transcripts per cell; defaults to `nUMI`.
+  `NULL` leaves it out.
 
 - nGene:
 
   Column in `SingleCellExperiment::colData(object)` that contains
   information about number of expressed genes per cell; defaults to
-  `nGene`.
+  `nGene`. `NULL` leaves it out.
 
 - add_all_meta_data:
 
@@ -189,20 +190,20 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [15:42:18] Initializing Cerebro object...
-#> [15:42:18] Adding expression data (embedded)...
-#> [15:42:18] Collecting available meta data...
-#> [15:42:18] Extracting all meta data columns...
-#> [15:42:18] Extracting dimensional reductions...
-#> [15:42:18] Will export the following dimensional reductions: UMAP
-#> [15:42:18] No trajectories to extract...
-#> [15:42:18] Overview of Cerebro object:
+#> [12:50:10] Initializing Cerebro object...
+#> [12:50:10] Adding expression data (embedded)...
+#> [12:50:10] Collecting available meta data...
+#> [12:50:10] Extracting all meta data columns...
+#> [12:50:10] Extracting dimensional reductions...
+#> [12:50:10] Will export the following dimensional reductions: UMAP
+#> [12:50:10] No trajectories to extract...
+#> [12:50:10] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 6.0.0
+#> exporter package version: 7.0.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-10-31
+#> date of export: 2026-11-08
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, cluster
@@ -217,6 +218,6 @@ exportFromSCE(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [15:42:18] Saving Cerebro object to: /tmp/nix-shell-4538-1835496194/RtmpvvJWXP/pbmc_SCE.crb
-#> [15:42:18] Done!
+#> [12:50:10] Saving Cerebro object to: /tmp/nix-shell-4301-2804680715/RtmpXWpPVy/pbmc_SCE.crb
+#> [12:50:10] Done!
 ```

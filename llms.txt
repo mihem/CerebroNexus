@@ -33,7 +33,25 @@ CerebroNexus spatial data view
 remotes::install_github('mihem/CerebroNexus')
 ```
 
+The Builder (below) also needs a few suggested packages:
+
+``` r
+install.packages(c("Seurat", "callr", "processx", "ps"))
+```
+
 ## 2. Build an app for your own data
+
+**Without writing code**, open the Builder in your browser:
+
+``` r
+CerebroNexus::launchCerebroBuilder()
+```
+
+Add your data files, choose the groups and content, and build a `.crb`
+file or a standalone App. See [Build a data set by
+pointing](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+
+**From a script:**
 
 ``` r
 library(CerebroNexus)
@@ -69,6 +87,9 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
 
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
   : Launch CerebroNexus
+- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  : Build a Cerebro data set from a Seurat object, by pointing and
+  clicking.
 
 ## Export data
 
@@ -87,6 +108,8 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Convert an AnnData (h5ad) file to a Cerebro file
 - [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
   : Convert a SingleCellExperiment object to a Cerebro file
+- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  : Convert a SingleCellExperiment into a Seurat object
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
@@ -133,6 +156,8 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Convert an AnnData (h5ad) file to a Cerebro file
 - [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
   : Convert a SingleCellExperiment object to a Cerebro file
+- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  : Convert a SingleCellExperiment into a Seurat object
 - [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
   : Convert Seurat Object to Cerebro Format
 - [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
@@ -162,6 +187,9 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
   : Normalize any accepted HLA input into the canonical long table
 - [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
   : Launch CerebroNexus
+- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  : Build a Cerebro data set from a Seurat object, by pointing and
+  clicking.
 - [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   : Perform gene set enrichment analysis with GSVA.
 - [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
@@ -195,6 +223,8 @@ MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
 
 ### How-to guides
 
+- [Build a data set without writing
+  code](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.md):
 - [Data integrity from Seurat to a self-contained Cerebro
   app](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md):
 - [Seurat v5 layered assays: complete and safe expression
