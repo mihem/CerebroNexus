@@ -783,6 +783,9 @@ test_that("offline trajectory selection renders its complete source lineage", {
 
 
 test_that("TCR and HLA fixture renders repertoire data and stored typing", {
+  skip_if_not_installed("scRepertoire")
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("shinycssloaders")
   fixture <- generated_app_e2e_select_dataset("immune_tcr_hla")
 
   generated_app_e2e_activate_tab("immune_repertoire")
@@ -822,6 +825,9 @@ test_that("TCR and HLA fixture renders repertoire data and stored typing", {
 })
 
 test_that("BCR-only fixture renders IGH repertoire without an HLA page", {
+  skip_if_not_installed("scRepertoire")
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("shinycssloaders")
   fixture <- generated_app_e2e_select_dataset("immune_bcr")
   expect_false("hla_tcr_motifs" %in% generated_app_e2e_visible_pages())
 

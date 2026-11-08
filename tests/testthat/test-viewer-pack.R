@@ -430,6 +430,8 @@ test_that("saveCerebro forwards dataset-level Viewer Pack policy", {
 })
 
 test_that("Viewer Pack manifest validates canonical identity and assets", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   root <- tempfile("viewer-pack-manifest-")
   dir.create(root)
   crb <- viewer_pack_fixture(
@@ -510,6 +512,8 @@ test_that("Viewer Pack rejects corruption and preserves the CRB fallback", {
 })
 
 test_that("Viewer Pack runtime loads HLA assets with exact fallback", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   root <- tempfile("viewer-pack-runtime-")
   dir.create(root)
   crb <- viewer_pack_fixture(

@@ -1,4 +1,7 @@
 test_that("shared selection actions and layouts survive navigation and resize", {
+  skip_if_not_installed("scRepertoire")
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("shinycssloaders")
   inst_dir <- viewer_app_test_path()
   local_app_support(inst_dir)
   app <- shinytest2::AppDriver$new(

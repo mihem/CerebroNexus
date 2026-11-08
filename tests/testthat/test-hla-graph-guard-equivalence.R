@@ -87,6 +87,8 @@ guard_test_over_limit <- function() {
 }
 
 test_that("early total guard preserves counts, boundaries and normal graph payloads", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   core <- guard_test_core(4L)
   expected <- guard_test_expected()$graphs
   canonical <- function(g) {
@@ -120,6 +122,8 @@ test_that("early total guard preserves counts, boundaries and normal graph paylo
 })
 
 test_that("over-limit graphs skip aggregation and normal graphs group only once", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   e <- guard_test_core(4L)
   calls <- new.env()
   calls$keys <- calls$aggregation <- 0L

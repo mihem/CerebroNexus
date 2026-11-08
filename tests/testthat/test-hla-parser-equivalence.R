@@ -191,6 +191,8 @@ test_that("vectorized segments preserve the complete bd47f107 parser contract", 
 })
 
 test_that("parser equivalence preserves downstream graph inputs and identities", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   a <- hla_parser_expected()$graph_input
   b <- hla_parse_ir_segments(hla_parser_graph_input(), "TRB")
   expect_identical(b, a)

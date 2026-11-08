@@ -1,4 +1,6 @@
 test_that("HLA node colours, sizes and hover data survive vertex reordering", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   scope <- new.env(parent = asNamespace("CerebroNexus"))
   viewer_server_load(
     viewer_server_statements("hla_tcr_motifs", "visualizations.R"),
@@ -118,6 +120,8 @@ test_that("the HLA help action renders offline diagrams and evidence limits", {
 })
 
 test_that("HLA network tables and CSV follow graph membership and observation units", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()

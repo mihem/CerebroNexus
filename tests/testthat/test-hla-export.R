@@ -215,6 +215,8 @@ test_that("manifest carries QC warnings", {
 ## ---- graph tables ----------------------------------------------------- ##
 
 test_that("graph tables export nodes and edges", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   g <- make_export_graph()
   tabs <- hla_graph_tables(g)
   expect_equal(nrow(tabs$nodes), 2L) # CASSL + CASSF connect; CWWWW isolated
@@ -231,6 +233,8 @@ test_that("graph tables are empty frames for an unusable graph", {
 ## ---- motif summary ---------------------------------------------------- ##
 
 test_that("motif summary reports size, consensus and max mismatch", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   g <- make_export_graph()
   s <- hla_motif_summary(g)
   expect_equal(nrow(s), 1L)

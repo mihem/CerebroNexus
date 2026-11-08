@@ -136,6 +136,7 @@ test_that("prefetch is shared across sessions and releases completed task result
 })
 
 test_that("MSigDB catalogue queries collections separately and shares compact gene results", {
+  skip_if_not_installed("msigdbr")
   env <- boundary_utils()
   env$.msigdbCollectionsFunction <- function() {
     data.frame(gs_collection = c("H", "C2"))
@@ -180,6 +181,7 @@ test_that("MSigDB catalogue queries collections separately and shares compact ge
 })
 
 test_that("MSigDB catalogue needs the msigdbr collection metadata and warns otherwise", {
+  skip_if_not_installed("msigdbr")
   env <- boundary_utils()
   env$.msigdbCollectionsFunction <- function() data.frame(gs_cat = "H")
   env$.msigdbFunction <- function() {
@@ -193,6 +195,8 @@ test_that("MSigDB catalogue needs the msigdbr collection metadata and warns othe
 })
 
 test_that("Enrichr applies timeout and rejects HTTP errors before parsing", {
+  skip_if_not_installed("httr")
+  skip_if_not_installed("future.apply")
   requests <- list()
   fail_at <- Inf
   request <- function(url, ...) {
