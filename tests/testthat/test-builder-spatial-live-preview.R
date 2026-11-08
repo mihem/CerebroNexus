@@ -1,4 +1,5 @@
 builder_spatial_canvas_node <- function() {
+  skip_on_cran()
   skip_if(Sys.which("node") == "", "node not on PATH")
   skip_if_not_installed("jsonlite")
   runner <- testthat::test_path("builder-spatial-canvas-runtime-node.js")

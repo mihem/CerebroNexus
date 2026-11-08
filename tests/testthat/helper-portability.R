@@ -2,8 +2,9 @@
 ## machines.
 
 ## Returns the node path so callers that pass it to system2() need not look it
-## up again.
+## up again. Node.js checks run in CI, not on CRAN.
 skip_if_no_node <- function() {
+  skip_on_cran()
   node <- Sys.which("node")
   skip_if(!nzchar(node), "node not on PATH")
   invisible(unname(node))

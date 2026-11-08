@@ -49,6 +49,7 @@ builder_browser_pipeline_js_function <- function(js, name) {
 }
 
 builder_browser_pipeline_run_node <- function(functions, body) {
+  testthat::skip_on_cran()
   testthat::skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
