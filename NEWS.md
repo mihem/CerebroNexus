@@ -1,3 +1,12 @@
+# CerebroNexus 7.0.1
+
+- The pan-cancer T-cell demo now fills `CTgene` and `CTnt` for 10x cells: 10x
+  `V|D|J|C|junction` identifiers are rewritten to the Smart-seq2
+  `V_junction_J` layout, and `-` no longer counts as a chain. An identifier in
+  any other layout stops the preparation with examples, and a clone call takes
+  its identifier and CDR3 from the same chain. Cached T-cell demo data is
+  rebuilt (`.viewerTcellVersion` is now 2).
+
 # CerebroNexus 7.0.0
 
 ## Input formats in the Builder and the export
