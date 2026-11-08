@@ -415,7 +415,13 @@ Cerebro <- R6::R6Class(
     #' @param type Storage backend label, \code{"embedded"} or \code{"h5"}.
     #' @param location File name of the H5 file next to the \code{.crb};
     #' \code{NULL} when \code{type == "embedded"}.
-    setExpressionBackend = function(type = "embedded", location = NULL) {
+    #' @param md5 MD5 checksum of the H5 file, recorded when it is written and
+    #' checked when it is attached; \code{NULL} when not recorded.
+    setExpressionBackend = function(
+      type = "embedded",
+      location = NULL,
+      md5 = NULL
+    ) {
       allowed <- c("embedded", "h5")
       if (length(type) != 1L || !is.character(type) || !(type %in% allowed)) {
         stop(
@@ -438,7 +444,17 @@ Cerebro <- R6::R6Class(
           call. = FALSE
         )
       }
+      if (
+        !is.null(md5) &&
+          (type == "embedded" || !.validMd5(md5))
+      ) {
+        stop(
+          "`md5` must be one MD5 checksum of an external expression file.",
+          call. = FALSE
+        )
+      }
       self$expression_backend <- list(type = type, location = location)
+      if (!is.null(md5)) self$expression_backend$md5 <- md5
     },
 
     #' @description
@@ -1632,6 +1648,8 @@ Cerebro <- R6::R6Class(
     },
 
     ## Repertoire barcodes stored as metadata rows get their names back, once.
+    ## Self-contained like .restoreRepertoireByCell(): an App calls this
+    ## method without the CerebroNexus namespace.
     restoreRepertoireCells = function(repertoire) {
       indexed <- vapply(
         repertoire,
@@ -1643,10 +1661,29 @@ Cerebro <- R6::R6Class(
       if (!any(indexed)) {
         return(repertoire)
       }
-      repertoire <- .restoreRepertoireByCell(
-        repertoire,
-        private$storedCellNames()
-      )
+      cells <- private$storedCellNames()
+      repertoire <- lapply(repertoire, function(sample) {
+        column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
+        if (is.null(column)) {
+          return(sample)
+        }
+        index <- sample[[column]]
+        if (
+          !identical(column, "barcode") ||
+            !is.integer(index) ||
+            length(index) != nrow(sample) ||
+            anyNA(index) ||
+            any(index < 1L | index > length(cells))
+        ) {
+          stop(
+            "The thin CRB stores an invalid repertoire cell index.",
+            call. = FALSE
+          )
+        }
+        attr(sample, "cerebro_cell_index_column") <- NULL
+        sample[[column]] <- cells[index]
+        sample
+      })
       self$immune_repertoire <- repertoire
       repertoire
     },

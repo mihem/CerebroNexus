@@ -8,6 +8,41 @@ ir_keep_selection <- function(previous, choices, default) {
   }
 }
 
+## ---- Group by is remembered per kind of tab ---------------------------- ##
+## One control serves several tabs, rebuilt for each of them. Paired Scatter and
+## Compare use the groups as the units they compare ("Compare by:"); the other
+## tabs only split their results by them. A grouping chosen for one kind must
+## not carry over to the other: Clone Sharing grouped by a column would leave
+## Compare with that column's levels as its samples. Each kind keeps its own.
+ir_groupby_kind <- function(tab) {
+  if (!is.null(tab) && tab %in% c("Paired Scatter", "Compare")) {
+    "compare"
+  } else {
+    "results"
+  }
+}
+
+ir_groupby_memory <- reactiveVal(list())
+
+## The grouping the control had for this tab's kind the last time it was used.
+ir_remembered_groupby <- function(tab, memory = isolate(ir_groupby_memory())) {
+  value <- memory[[ir_groupby_kind(tab)]]
+  if (is.null(value)) "" else value
+}
+
+observeEvent(
+  input$ir_groupBy,
+  {
+    kind <- ir_groupby_kind(isolate(input$ir_tabs))
+    memory <- isolate(ir_groupby_memory())
+    if (!identical(memory[[kind]], input$ir_groupBy)) {
+      memory[[kind]] <- input$ir_groupBy
+      ir_groupby_memory(memory)
+    }
+  },
+  ignoreNULL = TRUE
+)
+
 ## ---- Main parameters (left column, box 1) ----------------------------- ##
 ## Core controls needed to select a plot: the global cloneCall / chain /
 ## group-by (shown only on tabs they apply to) plus the current tab's
@@ -18,7 +53,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
     if (!has_scRepertoire()) {
       return(ir_scRepertoire_missing_ui())
     }
-    tab <- ir_param("ir_tabs", "Clonal UMAP")
+    tab <- ir_param("ir_tabs", ir_default_tab())
     packed_landing <- identical(tab, "Clonal UMAP")
     summary <- getImmuneRepertoireSummary()
     summary_chains <- as.character(summary$chains)
@@ -115,7 +150,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
       # (the repertoire list elements); a metadata column makes that column's
       # levels the comparison units. scRepertoire rbinds + re-splits internally
       # (.groupList), so this fully defines what a plot compares.
-      prev_gb <- isolate(input$ir_groupBy)
+      prev_gb <- ir_remembered_groupby(tab)
       default_gb <- if (!is.null(prev_gb) && prev_gb %in% available_groups) {
         prev_gb
       } else {
@@ -559,6 +594,9 @@ output$ir_group_filters_UI <- renderUI({
     return(NULL)
   }
   if (!identical(input$ir_tabs, "Clonal UMAP")) {
+    if (!"Clonal UMAP" %in% ir_visible_tabs()) {
+      return(helpText("These tabs have no group filters."))
+    }
     return(helpText("Group filters apply to the Clonal projection tab."))
   }
   groups <- tryCatch(getGroups(), error = function(e) character(0))

@@ -148,6 +148,49 @@ test_that("exportFromSeurat: produces a valid .crb file from pbmc_seurat.rds", {
   expect_equal(nrow(expr), nrow(obj_raw))
 })
 
+test_that("exportFromSeurat: the finalize hook completes the object before it is written", {
+  outf <- tempfile(fileext = ".crb")
+  args <- valid_args
+  args$file <- outf
+  seen <- NULL
+  args$.finalize_export <- function(export) {
+    seen <<- class(export)
+    export$addParameters("hooked", "yes")
+  }
+
+  do.call(exportFromSeurat, args)
+
+  expect_true("Cerebro" %in% seen)
+  expect_identical(readRDS(outf)$getParameters()$hooked, "yes")
+
+  failing <- tempfile(fileext = ".crb")
+  args$file <- failing
+  args$.finalize_export <- function(export) stop("hook failed", call. = FALSE)
+  expect_error(do.call(exportFromSeurat, args), "hook failed")
+  expect_false(file.exists(failing))
+})
+
+test_that("exportFromSeurat names each part of the export as it starts", {
+  args <- valid_args
+  args$file <- tempfile(fileext = ".crb")
+  parts <- character()
+  args$.on_progress <- function(part) parts <<- c(parts, part)
+
+  do.call(exportFromSeurat, args)
+
+  ## A small dataset gets no Viewer Pack, so that part is not reported.
+  expect_identical(
+    parts,
+    setdiff(.exportProgressParts, "writing the Viewer Pack")
+  )
+
+  args$file <- tempfile(fileext = ".crb")
+  args$viewer_binary <- "always"
+  parts <- character()
+  do.call(exportFromSeurat, args)
+  expect_identical(parts, .exportProgressParts)
+})
+
 test_that("exportFromSeurat coalesces missing and existing N/A group levels", {
   object <- obj_raw
   values <- rep(c("A", "N/A", NA_character_), length.out = ncol(object))

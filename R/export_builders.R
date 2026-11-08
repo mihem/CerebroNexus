@@ -27,7 +27,9 @@
       call. = FALSE
     )
   }
-  if (!(nUMI %in% meta_names)) {
+  ## NULL nUMI/nGene: the object has no such column and the export leaves it
+  ## out.
+  if (!is.null(nUMI) && !(nUMI %in% meta_names)) {
     stop(
       'Column with number of transcripts per cell (`',
       nUMI,
@@ -35,7 +37,7 @@
       call. = FALSE
     )
   }
-  if (!(nGene %in% meta_names)) {
+  if (!is.null(nGene) && !(nGene %in% meta_names)) {
     stop(
       'Column with number of expressed genes per cell (`',
       nGene,
@@ -137,8 +139,12 @@
   for (group in groups) {
     meta_data[[group]] <- .exportGroupColumn(meta[[group]], group, verbose)
   }
-  meta_data[["nUMI"]] <- meta[[nUMI]]
-  meta_data[["nGene"]] <- meta[[nGene]]
+  if (!is.null(nUMI)) {
+    meta_data[["nUMI"]] <- meta[[nUMI]]
+  }
+  if (!is.null(nGene)) {
+    meta_data[["nGene"]] <- meta[[nGene]]
+  }
   for (column in cell_cycle) {
     values <- meta[[column]]
     meta_data[[column]] <- factor(
@@ -150,7 +156,12 @@
     if (verbose) {
       .logStep('Extracting all meta data columns...')
     }
-    other <- setdiff(names(meta), c(groups, nUMI, nGene, cell_cycle))
+    ## Source columns named like the reserved ones would overwrite the cell
+    ## barcodes and the chosen nUMI/nGene values, so they are left out.
+    other <- setdiff(
+      names(meta),
+      c("cell_barcode", "nUMI", "nGene", groups, nUMI, nGene, cell_cycle)
+    )
     for (column in other) {
       meta_data[[column]] <- meta[[column]]
     }
@@ -180,6 +191,13 @@
 ) {
   if (verbose) {
     .logStep('Extracting dimensional reductions...')
+  }
+  ## An explicit empty selection exports no projection.
+  if (explicit && !length(available)) {
+    if (verbose) {
+      .logStep('No dimensional reductions selected; exporting none.')
+    }
+    return(invisible())
   }
   if (length(available) == 0) {
     stop(

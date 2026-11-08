@@ -1,0 +1,89 @@
+/* CerebroNexus Builder: design tokens and semantic role variables. */
+
+:root {
+  /* Shared Builder/Viewer primitives. */
+
+  --c-blue-50: #eef4fb;
+  --c-blue-100: #d7e6f7;
+  --c-blue: #2f6fd6;
+  --c-blue-700: #1d4ea0;
+
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 0.16s;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Builder-only semantic roles. */
+  --builder-action: var(--c-amber-600);
+  --builder-action-hover: var(--c-amber-700);
+  --builder-action-active: #78300f;
+  --builder-accent-strong: #78300f;
+  --builder-focus-ring: var(--c-amber-600);
+  --builder-selection-bg: var(--builder-action);
+  --builder-text-muted: var(--c-text-2);
+  --builder-text-subtle: var(--c-text-3);
+  --builder-text-disabled: #a9adb4;
+  --builder-hover-bg: var(--c-surface-2);
+  --builder-hover-border: var(--c-amber-300);
+  --builder-rail-hover-bg: var(--c-surface-2);
+  --builder-rail-progress-bg: var(--c-amber-50);
+  --builder-rail-progress-fg: var(--c-amber);
+  --builder-rail-ready-fg: var(--c-success);
+  --builder-rail-error-bg: var(--c-error-50);
+  --builder-rail-error-fg: var(--c-error);
+  --builder-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+                       "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                       "Helvetica Neue", Arial, sans-serif;
+  /* Type scale. micro is for uppercase kickers and badges only. */
+  --builder-type-micro: .6875rem;
+  --builder-type-caption: .75rem;
+  --builder-type-small: .8125rem;
+  --builder-type-body: .875rem;
+  --builder-type-subtitle: 1rem;
+  --builder-type-title: 1.25rem;
+  --builder-type-display: 1.5rem;
+  --builder-measure-copy: 48rem;
+  --builder-measure-form: 56rem;
+  --builder-measure-data: none;
+  --spatial-preview-aspect: 4 / 3;
+
+  /* Semantic content and review tag palette. */
+  --builder-tag-spatial-bg: var(--c-surface-2);
+  --builder-tag-spatial-border: var(--c-border-2);
+  --builder-tag-spatial-text: var(--c-text-2);
+  --builder-tag-analysis-bg: var(--c-surface-2);
+  --builder-tag-analysis-border: var(--c-border-2);
+  --builder-tag-analysis-text: var(--c-text-2);
+  --builder-tag-trajectory-bg: var(--c-surface-2);
+  --builder-tag-trajectory-border: var(--c-border-2);
+  --builder-tag-trajectory-text: var(--c-text-2);
+  --builder-tag-immune-bg: var(--c-surface-2);
+  --builder-tag-immune-border: var(--c-border-2);
+  --builder-tag-immune-text: var(--c-text-2);
+  --builder-tag-extra-bg: var(--c-surface-2);
+  --builder-tag-extra-border: var(--c-border-2);
+  --builder-tag-extra-text: var(--c-text-2);
+  /* Compatibility aliases for existing Builder components. */
+  --c-surface-muted: var(--c-surface-2);
+  --c-border-strong: var(--c-border-2);
+  --c-text-muted: var(--builder-text-muted);
+  --c-text-subtle: var(--builder-text-subtle);
+  --c-error-50: #fff1f2;
+  --c-error-100: #ffe4e6;
+  --ease-standard: var(--ease);
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+  --duration-base: var(--duration-normal);
+  --motion-fast: var(--duration-fast);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+}

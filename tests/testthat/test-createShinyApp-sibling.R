@@ -187,6 +187,132 @@ test_that("CRB preflight preserves an inspection error when release also fails",
   expect_identical(events, c("backend", "release"))
 })
 
+test_that("CRB preflight consumes matching Builder verification once", {
+  path <- tempfile(fileext = ".crb")
+  on.exit(unlink(path), add = TRUE)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  writeBin(as.raw(1:8), path)
+  data <- c(First = path)
+  cached <- list(
+    backends = list(
+      First = list(
+        type = "embedded",
+        location = NULL,
+        legacy = FALSE
+      )
+    ),
+    spatial_backends = list(First = NULL),
+    spatial_catalogs = list(First = list(section = "H&E")),
+    dataset_catalog = list(First = NULL)
+  )
+  fingerprints <- list(First = .bundlePreflightFingerprint(path))
+
+  expect_true(.cacheBundlePreflightData(data, cached, fingerprints))
+  observed <- .preflightBundleData(
+    data,
+    read_object = function(path) stop("cached CRB was read again")
+  )
+
+  expect_identical(observed[names(cached)], cached)
+  expect_identical(observed$immune_backends, list(First = NULL))
+  reads <- 0L
+  .preflightBundleData(
+    data,
+    read_object = function(path) {
+      reads <<- reads + 1L
+      list(path = path)
+    },
+    inspect_backend = function(path, object) cached$backends$First,
+    inspect_spatial = function(object, dataset) cached$spatial_catalogs$First
+  )
+  expect_identical(reads, 1L)
+})
+
+test_that("CRB preflight rejects a same-size cache substitution", {
+  path <- tempfile(fileext = ".crb")
+  on.exit(unlink(path), add = TRUE)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  writeBin(as.raw(1:8), path)
+  data <- c(First = path)
+  cached <- list(
+    backends = list(
+      First = list(
+        type = "embedded",
+        location = NULL,
+        legacy = FALSE
+      )
+    ),
+    spatial_backends = list(First = NULL),
+    spatial_catalogs = list(First = list()),
+    dataset_catalog = list(First = NULL)
+  )
+  fingerprints <- list(First = .bundlePreflightFingerprint(path))
+  expect_true(.cacheBundlePreflightData(data, cached, fingerprints))
+
+  old_time <- file.info(path)$mtime
+  Sys.sleep(0.01)
+  writeBin(as.raw(9:16), path)
+  Sys.setFileTime(path, old_time)
+  reads <- 0L
+  observed <- .preflightBundleData(
+    data,
+    read_object = function(path) {
+      reads <<- reads + 1L
+      list(path = path)
+    },
+    inspect_backend = function(path, object) cached$backends$First,
+    inspect_spatial = function(object, dataset) cached$spatial_catalogs$First
+  )
+
+  expect_identical(reads, 1L)
+  expect_identical(observed[names(cached)], cached)
+  expect_identical(observed$immune_backends, list(First = NULL))
+})
+
+test_that("cached CRB preflight preserves spatial molecule sidecars", {
+  root <- withr::local_tempdir()
+  crb <- file.path(root, "dataset.crb")
+  object <- Cerebro$new()
+  object$expression <- matrix(
+    1:4,
+    nrow = 2L,
+    dimnames = list(c("gene-1", "gene-2"), c("cell-1", "cell-2"))
+  )
+  object$spatial <- list(
+    fov1 = list(
+      coordinates = data.frame(
+        x = c(0, 1),
+        y = c(0, 1),
+        row.names = c("cell-1", "cell-2")
+      ),
+      expression = object$expression,
+      molecules = data.frame(x = 1, y = 2, gene = "A")
+    )
+  )
+  saveCerebro(object, crb, codec = "rds")
+  data <- c(Dataset = crb)
+  preflight <- .preflightBundleData(data)
+  fingerprints <- list(Dataset = .bundlePreflightFingerprint(crb))
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+
+  expect_true(.cacheBundlePreflightData(data, preflight, fingerprints))
+  app <- file.path(root, "app")
+  createShinyApp(
+    cerebro_data = data,
+    result_dir = app,
+    launch_browser = FALSE,
+    verbose = FALSE
+  )
+
+  expect_true(dir.exists(file.path(app, "private-data", "dataset.spatial")))
+  expect_true(file.exists(file.path(
+    app,
+    "private-data",
+    "dataset.spatial",
+    "0001.rds"
+  )))
+})
+
 write_spatial_bundle_crb <- function(
   directory,
   name = "dataset.crb",
@@ -275,6 +401,36 @@ test_that("valid Viewer Packs are bundled beside their CRB", {
       file.path(app, "private-data", "dataset.viewer")
     )$valid
   )
+})
+
+test_that("a cached CRB preflight still bundles a valid Viewer Pack", {
+  root <- withr::local_tempdir()
+  crb <- write_bundle_crb(file.path(root, "source"))
+  object <- readCerebro(crb)
+  object$setMetaData(data.frame(
+    cell_barcode = c("cell-1", "cell-2"),
+    group = c("A", "B"),
+    stringsAsFactors = FALSE
+  ))
+  object$addProjection(
+    "umap",
+    data.frame(x = 1:2, y = 2:1, row.names = c("cell-1", "cell-2"))
+  )
+  saveCerebro(object, crb, codec = "rds", viewer_binary = "always")
+  data <- c(Dataset = crb)
+  preflight <- .preflightBundleData(data)
+  expect_true(preflight$viewer_pack_valid)
+  on.exit(.clearBundlePreflightCache(), add = TRUE)
+  expect_true(.cacheBundlePreflightData(
+    data,
+    preflight,
+    list(Dataset = .bundlePreflightFingerprint(crb))
+  ))
+
+  app <- file.path(root, "app")
+  build_test_app(data, app)
+
+  expect_true(dir.exists(file.path(app, "private-data", "dataset.viewer")))
 })
 
 test_that("scatter defaults accept one value or one value per dataset", {
@@ -3042,7 +3198,8 @@ test_that("dataset information reads immune chains from a file descriptor", {
 write_thin_h5_crb <- function(
   directory,
   name = "dataset.crb",
-  immune_sidecar = "never"
+  immune_sidecar = "never",
+  chain = "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC"
 ) {
   dir.create(directory, recursive = TRUE, showWarnings = FALSE)
   stem <- tools::file_path_sans_ext(name)
@@ -3063,7 +3220,7 @@ write_thin_h5_crb <- function(
   object$addImmuneRepertoire(list(
     donorA = data.frame(
       barcode = cells[1:2],
-      CTgene = "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC",
+      CTgene = chain,
       stringsAsFactors = FALSE
     )
   ))
@@ -3127,6 +3284,126 @@ test_that("a thin H5 CRB is bundled with its H5 file and keeps its gene count", 
     colnames(built$expected)
   )
   expect_attached_matrix(attached, built$expected)
+})
+
+test_that("the App lists the immune repertoire of every kind of CRB", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  root <- withr::local_tempdir()
+  tcr <- "TRAV1.TRAJ2.TRAC_TRBV3.TRBJ1.TRBC1"
+  bcr <- "IGHV1.IGHJ1.IGHC_IGKV1.IGKJ1.IGKC"
+  cases <- list(
+    ## thin: barcodes stored by cell index, no cell names in the payload
+    thin_embedded = write_thin_h5_crb(
+      file.path(root, "thin_embedded"),
+      chain = tcr
+    )$crb,
+    thin_sidecar = write_thin_h5_crb(
+      file.path(root, "thin_sidecar"),
+      immune_sidecar = "always",
+      chain = tcr
+    )$crb,
+    thin_bcr = write_thin_h5_crb(file.path(root, "thin_bcr"))$crb,
+    embedded_sidecar = write_immune_sidecar_crb(
+      file.path(root, "embedded_sidecar")
+    )
+  )
+  expect_identical(
+    readRDS(cases$thin_embedded)$crb_schema$cell_indexed,
+    "immune_repertoire"
+  )
+  for (name in names(cases)) {
+    payload <- .readCerebroPayload(cases[[name]])
+    info <- .readBundleDatasetInfo(payload, name, cases[[name]])
+    expect_true(info$immune_repertoire, info = name)
+    expect_identical(
+      info$tcr_repertoire,
+      !identical(name, "thin_bcr"),
+      info = name
+    )
+    ## the flags read from the payload agree with the hydrated object
+    expect_identical(
+      info$capabilities,
+      .viewerDatasetCapabilities(readCerebro(cases[[name]])),
+      info = name
+    )
+  }
+
+  app <- file.path(root, "app")
+  build_test_app(c(Dataset = cases$thin_embedded), app)
+  config <- readRDS(file.path(app, "cerebro_config.rds"))
+  entry <- config[[".dataset_catalog"]][["private-data/dataset.crb"]]
+  expect_true(entry$immune_repertoire)
+  expect_true(entry$tcr_repertoire)
+
+  ## the App reads the samples with their cell names restored
+  runtime <- source_bundle_runtime(app)
+  local_cerebro_options(config)
+  withr::local_dir(app)
+  attached <- runtime$get_or_load_crb(
+    unname(config$crb_file_to_load[[1L]]),
+    config[[".bundle_backend_plan"]],
+    unname(config$crb_file_to_load)
+  )
+  ## restored by the Viewer itself, also for a CRB whose own method needs
+  ## the package
+  cells <- as.character(attached$meta_data$cell_barcode)
+  expect_identical(attached$immune_repertoire$donorA$barcode, cells[1:2])
+  expect_identical(attached$getImmuneRepertoire()$donorA$barcode, cells[1:2])
+  expect_true(runtime$viewerImmuneRepertoireSummary(attached)$available)
+
+  ## and in an App that runs without CerebroNexus
+  skip_if_not_installed("callr")
+  standalone <- callr::r(
+    function(app, files) {
+      setwd(app)
+      config <- readRDS("cerebro_config.rds")
+      assign("Cerebro.options", config, envir = globalenv())
+      runtime <- new.env(parent = globalenv())
+      for (file in files) {
+        sys.source(file.path("viewer", file), envir = runtime)
+      }
+      attached <- runtime$get_or_load_crb(
+        unname(config$crb_file_to_load[[1L]]),
+        config[[".bundle_backend_plan"]],
+        unname(config$crb_file_to_load)
+      )
+      list(
+        package = "CerebroNexus" %in% loadedNamespaces(),
+        barcodes = attached$getImmuneRepertoire()$donorA$barcode,
+        available = runtime$viewerImmuneRepertoireSummary(attached)$available
+      )
+    },
+    args = list(
+      app = normalizePath(app),
+      files = c(
+        "plotting_functions.R",
+        "core/viewer_pack.R",
+        "core/crb_contract.R",
+        "msigdb.R",
+        "crb_cache.R",
+        "utility_functions.R"
+      )
+    ),
+    libpath = privacy_hermetic_library(root)
+  )
+  expect_false(standalone$package)
+  expect_identical(standalone$barcodes, cells[1:2])
+  expect_true(standalone$available)
+})
+
+test_that("an unreadable repertoire descriptor is an error, not no repertoire", {
+  object <- new_embedded_cerebro()
+  object$setMetaData(data.frame(
+    cell_barcode = "cell-1",
+    row.names = "cell-1",
+    stringsAsFactors = FALSE
+  ))
+  object$immune_repertoire_backend <- list(type = "unknown")
+  expect_error(
+    .readBundleDatasetInfo(object, "Dataset", "dataset.crb"),
+    "immune repertoire sidecar descriptor is invalid"
+  )
 })
 
 test_that("a thin H5 CRB bundles its H5 file and immune sidecar together", {

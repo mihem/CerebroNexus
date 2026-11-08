@@ -334,6 +334,16 @@
   result
 }
 
+#' A zip archive, by its first bytes, for a store zipped under another name.
+#' @keywords internal
+#' @noRd
+.sdIsZip <- function(path) {
+  head <- tryCatch(readBin(path, "raw", n = 4L), error = function(e) raw())
+  length(head) == 4L &&
+    (identical(head, as.raw(c(0x50, 0x4b, 0x03, 0x04))) ||
+      identical(head, as.raw(c(0x50, 0x4b, 0x05, 0x06))))
+}
+
 #' Unpack a .zip holding a SpatialData store into a temporary directory.
 #' @return list(directory = the temporary directory, store = the .zarr inside).
 #' @keywords internal
@@ -427,7 +437,7 @@ readSpatialDataAsSCE <- function(
       length(path) == 1L &&
       file.exists(path) &&
       !dir.exists(path) &&
-      identical(tolower(tools::file_ext(path)), "zip")
+      (identical(tolower(tools::file_ext(path)), "zip") || .sdIsZip(path))
   ) {
     unpacked <- .sdUnzip(path)
     on.exit(

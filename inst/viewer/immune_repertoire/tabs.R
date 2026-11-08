@@ -10,14 +10,41 @@ observeEvent(input$ir_tabs, {
   }
 })
 
+## The sub-tabs this dataset shows: those the Builder kept (every one when the
+## App has no choice) that its sample count supports.
+ir_visible_tabs <- reactive({
+  viewerImmuneRepertoireVisibleTabs(
+    Cerebro.options,
+    viewer_requested_dataset_context()$dataset_key,
+    n_samples()
+  )
+})
+
+## The first visible sub-tab: Clonal projection unless the Builder left it out.
+## The sample count is read only when the first chosen tab depends on it, so
+## the packed Clonal projection landing never waits for the repertoire.
+ir_default_tab <- function() {
+  first <- viewerImmuneRepertoireVisibleTabs(
+    Cerebro.options,
+    viewer_requested_dataset_context()$dataset_key,
+    Inf
+  )[[1L]]
+  tabs <- viewerImmuneRepertoireTabs()
+  if (tabs$min_samples[match(first, tabs$id)] <= 1L) {
+    first
+  } else {
+    ir_visible_tabs()[[1L]]
+  }
+}
+
 ## The tab the strip opens on (see visualizations.R): the remembered tab, else
-## the first one, Clonal projection. The clonal projection reads it through
+## the first visible one. The clonal projection reads it through
 ## viewerControlValue() and is drawn before the strip reaches the browser.
 ir_tab <- viewerControlValue(input, "ir_tabs", function() {
   if (!has_scRepertoire() || !ir_repertoire_available()) {
     return(NULL)
   }
-  isolate(ir_last_tab()) %||% "Clonal UMAP"
+  isolate(ir_last_tab()) %||% ir_default_tab()
 })
 
 ## ---- Attach tooltips to tab links via JS ------------------------------ ##

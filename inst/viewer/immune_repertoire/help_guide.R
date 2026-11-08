@@ -472,7 +472,7 @@ ir_guide_tab_content <- function(tab) {
 ## prose and element key. Rendered as a left tab rail + right content pane via
 ## the .ir-guide CSS (below), so the modal reads like a small doc site.
 observeEvent(input$ir_visualizations_info, {
-  panels <- lapply(IR_GUIDE_TABS, function(tab) {
+  panels <- lapply(intersect(IR_GUIDE_TABS, ir_visible_tabs()), function(tab) {
     label <- if (identical(tab, "Clonal UMAP")) "Clonal projection" else tab
     tabPanel(
       label,

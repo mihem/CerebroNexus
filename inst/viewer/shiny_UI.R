@@ -515,10 +515,14 @@ ui <- dashboardPage(
         icon = cerebroIcon("info"),
         selected = TRUE
       ),
-      menuItem(
-        "Projection",
-        tabName = "overview",
-        icon = cerebroIcon("home")
+      ## Shown by default; hidden for a data set without projections.
+      shiny::tagAppendAttributes(
+        menuItem(
+          "Projection",
+          tabName = "overview",
+          icon = cerebroIcon("home")
+        ),
+        id = "sidebar_item_overview"
       ),
       conditionalSidebarItem(
         "Linked views",

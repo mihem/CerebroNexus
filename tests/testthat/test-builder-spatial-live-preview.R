@@ -1,0 +1,324 @@
+builder_spatial_canvas_node <- function() {
+  skip_if(Sys.which("node") == "", "node not on PATH")
+  skip_if_not_installed("jsonlite")
+  runner <- testthat::test_path("builder-spatial-canvas-runtime-node.js")
+  output <- tryCatch(
+    system2(
+      "node",
+      c(
+        shQuote(runner),
+        shQuote(builder_test_inst_path(
+          "builder",
+          "www",
+          "builder-spatial-canvas.js"
+        ))
+      ),
+      stdout = TRUE,
+      stderr = TRUE
+    ),
+    error = function(error) NULL
+  )
+  if (is.null(output)) {
+    skip("node cannot be launched from this R test process")
+  }
+  expect_identical(attr(output, "status") %||% 0L, 0L, info = output)
+  jsonlite::fromJSON(tail(output, 1L), simplifyVector = FALSE)
+}
+
+test_that("Canvas runtime persists point-safe View areas and deduplicates Ion events", {
+  result <- builder_spatial_canvas_node()
+
+  legacy_view <- function(bounds, width, height, padding) {
+    view_width <- bounds$xmax - bounds$xmin
+    view_height <- bounds$ymax - bounds$ymin
+    plot_width <- width - padding * 2
+    plot_height <- height - padding * 2
+    target_aspect <- plot_width / plot_height
+    centre_x <- (bounds$xmin + bounds$xmax) / 2
+    centre_y <- (bounds$ymin + bounds$ymax) / 2
+    if (view_width / view_height < target_aspect) {
+      view_width <- view_height * target_aspect
+    } else {
+      view_height <- view_width / target_aspect
+    }
+    list(
+      xmin = centre_x - view_width / 2,
+      xmax = centre_x + view_width / 2,
+      ymin = centre_y - view_height / 2,
+      ymax = centre_y + view_height / 2
+    )
+  }
+  point_safe_view <- function(bounds, width, height, padding) {
+    fitted <- legacy_view(bounds, width, height, padding)
+    plot_width <- width - padding * 2
+    scale <- plot_width / (fitted$xmax - fitted$xmin)
+    expansion <- padding / scale
+    list(
+      xmin = fitted$xmin - expansion,
+      xmax = fitted$xmax + expansion,
+      ymin = fitted$ymin - expansion,
+      ymax = fitted$ymax + expansion
+    )
+  }
+  as_numeric_bounds <- function(value) {
+    lapply(value, as.numeric)
+  }
+
+  expect_equal(
+    as_numeric_bounds(result$overlay$viewports$`__section__`),
+    point_safe_view(
+      list(xmin = -5, xmax = 15, ymin = -10, ymax = 30),
+      500,
+      400,
+      18
+    ),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    as_numeric_bounds(result$resizedOverlay$viewports$`__section__`),
+    as_numeric_bounds(result$overlay$viewports$`__section__`),
+    tolerance = 1e-12
+  )
+  expect_equal(
+    mean(unlist(as_numeric_bounds(result$separate$viewports$A)[c(
+      "xmin",
+      "xmax"
+    )])),
+    -45,
+    tolerance = 1e-12
+  )
+  expect_equal(
+    mean(unlist(as_numeric_bounds(result$separate$viewports$A)[c(
+      "ymin",
+      "ymax"
+    )])),
+    100,
+    tolerance = 1e-12
+  )
+  expect_equal(
+    mean(unlist(as_numeric_bounds(result$separate$imageFitViewports$A)[c(
+      "xmin",
+      "xmax"
+    )])),
+    -45,
+    tolerance = 1e-12
+  )
+  expect_equal(
+    mean(unlist(as_numeric_bounds(result$separate$imageFitViewports$A)[c(
+      "ymin",
+      "ymax"
+    )])),
+    100,
+    tolerance = 1e-12
+  )
+  expect_equal(as.numeric(result$separateFirstPoint$x), 127, tolerance = 1e-12)
+  expect_equal(as.numeric(result$separateFirstPoint$y), 200, tolerance = 1e-12)
+  expect_length(result$overlayViewerFrames, 1L)
+  expect_length(result$separateViewerFrames, 2L)
+  overlay_frame <- result$overlayViewerFrames[[1L]]
+  expect_length(result$overlayPoints, 2L)
+  expect_true(all(vapply(
+    result$overlayPoints,
+    function(point) {
+      x <- as.numeric(point$x)
+      y <- as.numeric(point$y)
+      x - as.numeric(overlay_frame$left) >= 16 &&
+        as.numeric(overlay_frame$right) - x >= 16 &&
+        y - as.numeric(overlay_frame$top) >= 16 &&
+        as.numeric(overlay_frame$bottom) - y >= 16
+    },
+    logical(1)
+  )))
+  expect_true(all(vapply(
+    result$separateViewerFrames,
+    function(frame) {
+      as.numeric(frame$left) > 0 &&
+        as.numeric(frame$top) > 0 &&
+        as.numeric(frame$right) < 500 &&
+        as.numeric(frame$bottom) < 400
+    },
+    logical(1)
+  )))
+  expect_identical(result$nullControlsViewKey, "null-controls")
+  expect_false(isTRUE(all.equal(
+    result$overlay$viewports$`__section__`,
+    result$overlay$imageFitViewports$`__section__`
+  )))
+  expect_identical(result$numberValue, "0.01")
+  expect_length(result$commits, 1L)
+  expect_identical(as.numeric(result$commits[[1L]]$value$controls$scale), 0.01)
+  expect_identical(as.numeric(result$commits[[1L]]$value$resetToken), 0)
+  expect_identical(as.numeric(result$commits[[1L]]$value$sequence), 1)
+  expect_identical(result$tinyNumberValue, "0.001")
+  expect_identical(result$tinySliderValue, "0.001")
+  expect_identical(result$tinyStep, "0.001")
+  expect_identical(result$authoritativeStep, "0.001")
+  expect_length(result$tinyScaleCommits, 1L)
+  expect_identical(
+    as.numeric(result$tinyScaleCommits[[1L]]$value$controls$scale),
+    0.001
+  )
+  expect_identical(
+    as.numeric(result$tinyScaleCommits[[1L]]$value$sequence),
+    2
+  )
+  expect_length(result$resetRaceCommits, 1L)
+  expect_identical(
+    as.numeric(result$resetRaceCommits[[1L]]$value$controls$scale),
+    0.02
+  )
+  expect_identical(
+    as.numeric(result$resetRaceCommits[[1L]]$value$generation),
+    4
+  )
+  expect_identical(
+    as.numeric(result$resetRaceCommits[[1L]]$value$resetToken),
+    0
+  )
+  expect_identical(as.integer(result$imageLoads), 1L)
+  expect_identical(as.integer(result$imageDrawsAfterClear), 1L)
+  expect_identical(as.numeric(result$rotationAfterClear), -94.7)
+  expect_identical(as.integer(result$retryImageLoads), 3L)
+  expect_gte(as.integer(result$retryImageDraws), 1L)
+  expect_identical(as.integer(result$retryImageErrors), 1L)
+  expect_identical(result$retryImageErrorViewKey, "retry-image")
+  expect_identical(as.integer(result$retryImageErrorGeneration), 6L)
+  expect_identical(result$retryImageErrorSnapshot, "snapshot-a")
+  expect_identical(as.integer(result$deferredOverlayLoads), 0L)
+  expect_identical(as.integer(result$deferredSeparateLoads), 1L)
+  expect_identical(as.integer(result$evictedImageReloads), 2L)
+  expect_gte(as.integer(result$decodedCacheEvictions), 2L)
+  expect_identical(as.integer(result$imageRenderCacheBuilds), 1L)
+  expect_identical(as.integer(result$rasterBuildDraws), 1L)
+  expect_identical(as.integer(result$dragCommitsBeforeRelease), 0L)
+  expect_identical(as.integer(result$dragCommitsAfterRelease), 1L)
+  expect_identical(as.integer(result$percentage20Points), 20L)
+  expect_identical(as.integer(result$percentage50Points), 50L)
+  expect_identical(as.integer(result$percentageSceneMessages), 0L)
+  expect_length(result$percentageCommits, 1L)
+  expect_identical(
+    as.numeric(result$percentageCommits[[1L]]$value$controls$cell_percentage),
+    50
+  )
+  expect_identical(as.integer(result$stopped), 2L)
+  expect_identical(as.integer(result$pendingTimers), 0L)
+
+  ## Typed values stay in the number box; partial entries change nothing.
+  boxes <- function(steps) vapply(steps, `[[`, character(1), "box")
+  sliders <- function(steps) vapply(steps, `[[`, character(1), "slider")
+  expect_identical(boxes(result$typedScale), c("1", "1.", "1.1"))
+  expect_identical(sliders(result$typedScale), c("1", "1", "1.1"))
+  expect_identical(as.integer(result$typedInteractionsWhileTyping), 0L)
+  expect_identical(as.integer(result$typedCommitsWhileTyping), 0L)
+  expect_length(result$typedScaleCommits, 1L)
+  expect_identical(
+    as.numeric(result$typedScaleCommits[[1L]]$value$controls$scale),
+    1.1
+  )
+  expect_identical(boxes(result$typedZeroScale), c("0", "0.", "0.8"))
+  expect_identical(sliders(result$typedZeroScale), c("1.1", "1.1", "0.8"))
+  expect_identical(result$typedZeroScaleBox, "0.8")
+  expect_identical(boxes(result$typedPartial), "")
+  expect_identical(result$typedPartialBox, "0.8")
+  expect_identical(as.numeric(result$typedScaleControls), 0.8)
+  expect_identical(unlist(result$typedDx), c("", "-8", "-80"))
+  expect_identical(result$typedDxBox, "-80")
+  expect_identical(as.numeric(result$typedDxControls), -80)
+  ## Tab onto an alignment slider does not move it; other sliders keep Ion's.
+  expect_identical(as.integer(unlist(result$ionFocusBlocked)), c(1L, 0L))
+})
+
+test_that("Canvas hover coalesces pointer work and reuses rendered screen points", {
+  root <- builder_test_inst_path("builder")
+  js <- paste(
+    readLines(
+      file.path(root, "www", "builder-spatial-canvas.js"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+
+  expect_match(js, "screenPoints: []", fixed = TRUE)
+  expect_match(js, "state.screenPoints = new Array(p.x.length);", fixed = TRUE)
+  expect_match(js, "state.screenPoints[index] = at;", fixed = TRUE)
+  expect_match(
+    js,
+    "var cosine = Math.cos(angle), sine = Math.sin(angle);",
+    fixed = TRUE
+  )
+  expect_match(js, "function setupCanvasHover(node)", fixed = TRUE)
+  expect_match(js, 'node.addEventListener("pointermove"', fixed = TRUE)
+  expect_match(js, "if (!state.hoverFrame)", fixed = TRUE)
+  expect_match(js, "window.requestAnimationFrame(updateHover)", fixed = TRUE)
+  expect_match(
+    js,
+    "window.cancelAnimationFrame(state.hoverFrame)",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    'document.addEventListener("pointermove"',
+    js,
+    fixed = TRUE
+  ))
+})
+
+test_that("programmatic Image settings restore cannot commit partial values", {
+  root <- builder_test_inst_path("builder")
+  server <- paste(
+    readLines(file.path(root, "spatial_alignment_server.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  start <- regexpr(
+    "commit_alignment_controls <- function()",
+    server,
+    fixed = TRUE
+  )[[1L]]
+  block <- substr(server, start, start + 2200L)
+  expected_start <- regexpr(
+    "expected <- shiny::isolate(expected_controls())",
+    block,
+    fixed = TRUE
+  )[[1L]]
+  block <- substr(block, expected_start, nchar(block))
+  expect_match(
+    block,
+    paste0(
+      "if \\(\\s*!is.null\\(expected\\)\\s*\\) \\{",
+      "[\\s\\S]*?expected_controls\\(NULL\\)",
+      "[\\s\\S]*?!isTRUE\\(all.equal\\("
+    ),
+    perl = TRUE
+  )
+  expect_match(
+    server,
+    "settled_parameters <- shiny::debounce(parameters, millis = 50)",
+    fixed = TRUE
+  )
+  expect_match(
+    gsub("[[:space:]]+", " ", server),
+    paste0(
+      "parameters <- shiny::reactive({ browser <- browser_control_state() ",
+      "owner <- active_control_owner()"
+    ),
+    fixed = TRUE
+  )
+})
+
+test_that("Spatial preview worker receives only the ROI base transform", {
+  root <- builder_test_inst_path("builder")
+  worker_session <- paste(
+    readLines(file.path(root, "session.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  imports <- paste(
+    readLines(file.path(root, "server", "imports.R"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(
+    worker_session,
+    "base_coordinate_transform = base_coordinate_transform",
+    fixed = TRUE
+  )
+  expect_match(imports, "nxt$base_coordinate_transform", fixed = TRUE)
+})

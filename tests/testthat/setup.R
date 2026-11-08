@@ -20,3 +20,12 @@ if (
     browser$close()
   })
 }
+
+## inst/builder/app.R byte-compiles hundreds of closures when it is sourced, so
+## the first import does not stall the UI. Tests source it over a hundred times
+## and pay seconds each; R's JIT still compiles what a test calls.
+options(cerebro.builder.precompile = FALSE)
+
+## The Builder remembers its output folders for a crash sweep; keep that
+## record out of the user's cache during tests.
+Sys.setenv(CEREBRO_BUILDER_STATE_DIR = tempfile("builder-state-"))

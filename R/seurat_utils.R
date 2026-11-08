@@ -1920,7 +1920,11 @@
   }
 
   coords <- coords[common_cells, , drop = FALSE]
-  expr_data <- expr_data[, common_cells, drop = FALSE]
+  ## The cells usually are all the cells in the matrix's order; subsetting would
+  ## copy a matrix of millions of non-zeros to get the same one.
+  if (!identical(common_cells, colnames(expr_data))) {
+    expr_data <- expr_data[, common_cells, drop = FALSE]
+  }
 
   front <- intersect(
     c(".cell", ".image", ".coordinate_source", "x", "y"),

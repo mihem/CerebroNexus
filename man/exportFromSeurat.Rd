@@ -28,6 +28,8 @@ exportFromSeurat(
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L,
   .expression_resolution = NULL,
+  .finalize_export = NULL,
+  .on_progress = NULL,
   projections = NULL,
   spatial_coordinate_transforms = NULL
 )
@@ -63,10 +65,12 @@ must be one of the grouping variables specified in \code{groups}; defaults to
 \code{c("Phase")}; defaults to \code{NULL}.}
 
 \item{nUMI}{Column in \code{object@meta.data} that contains information about
-number of transcripts per cell; defaults to \code{nUMI}.}
+number of transcripts per cell; defaults to \code{nUMI}. \code{NULL} leaves
+it out.}
 
 \item{nGene}{Column in \code{object@meta.data} that contains information
-about number of expressed genes per cell; defaults to \code{nGene}.}
+about number of expressed genes per cell; defaults to \code{nGene}.
+\code{NULL} leaves it out.}
 
 \item{add_all_meta_data}{If set to \code{TRUE}, all further meta data columns
 will be extracted as well.}
@@ -157,10 +161,21 @@ defaults to \code{FALSE}.}
 \code{convertSeuratToCerebro()} to reuse a matrix that has already been
 resolved and validated. Users should leave this as \code{NULL}.}
 
+\item{.finalize_export}{Internal hook used by the Builder: a function called
+with the Cerebro object just before it is written, so the object can be
+completed without reading the written file back. Users should leave this
+as \code{NULL}.}
+
+\item{.on_progress}{Internal hook used by the Builder: a function called
+with the name of each part of the export as it starts, so a long export
+can report how far it has got. Users should leave this as \code{NULL}.}
+
 \item{projections}{Optional ordered names of dimensional reductions to
 export. When supplied, every named reduction is exported in that order,
-including PCA beside other projections. The default \code{NULL} preserves
-the legacy behavior that uses non-PCA reductions when they are available.}
+including PCA beside other projections. An empty vector exports none (an
+object without reductions, such as an unclustered spatial section). The
+default \code{NULL} preserves the legacy behavior that uses non-PCA
+reductions when they are available.}
 
 \item{spatial_coordinate_transforms}{Optional named list of coordinate
 transforms keyed by exact Seurat spatial FOV/image name. Each entry may

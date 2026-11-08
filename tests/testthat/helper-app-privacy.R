@@ -43,6 +43,7 @@ privacy_start_app <- function(
   exclude_package = FALSE,
   test_mode = FALSE
 ) {
+  skip_if_not_installed("callr")
   stdout <- file.path(root, paste0("app-", port, ".stdout"))
   stderr <- file.path(root, paste0("app-", port, ".stderr"))
   process <- callr::r_bg(
@@ -80,6 +81,49 @@ privacy_start_app <- function(
     stdout = stdout,
     stderr = stderr
   )
+}
+
+privacy_hermetic_library <- function(root) {
+  library <- tempfile("hermetic-library-", tmpdir = root)
+  dir.create(library)
+  linked <- FALSE
+  junctions <- character()
+  for (source in .libPaths()) {
+    packages <- list.dirs(source, recursive = FALSE, full.names = FALSE)
+    for (package in packages) {
+      if (identical(package, "CerebroNexus")) {
+        next
+      }
+      target <- file.path(library, package)
+      if (!file.exists(target)) {
+        ok <- suppressWarnings(tryCatch(
+          file.symlink(file.path(source, package), target),
+          error = function(error) FALSE
+        ))
+        if (!isTRUE(ok) && identical(.Platform$OS.type, "windows")) {
+          ok <- suppressWarnings(tryCatch(
+            Sys.junction(file.path(source, package), target),
+            error = function(error) FALSE
+          ))
+          if (isTRUE(ok)) {
+            junctions <- c(junctions, target)
+          }
+        }
+        linked <- linked || isTRUE(ok)
+      }
+    }
+  }
+  if (length(junctions)) {
+    cleanup_env <- tryCatch(
+      testthat::teardown_env(),
+      error = function(error) globalenv()
+    )
+    withr::defer(
+      unlink(junctions, recursive = FALSE, force = TRUE),
+      envir = cleanup_env
+    )
+  }
+  if (!linked) NULL else library
 }
 
 privacy_stop_app <- function(app) {

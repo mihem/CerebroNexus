@@ -50,10 +50,12 @@ contain cell cycle information, e.g. \code{c("Phase")}; defaults to
 \code{NULL}.}
 
 \item{nUMI}{Column in \code{SingleCellExperiment::colData(object)} that contains information about
-number of transcripts per cell; defaults to \code{nUMI}.}
+number of transcripts per cell; defaults to \code{nUMI}. \code{NULL} leaves
+it out.}
 
 \item{nGene}{Column in \code{SingleCellExperiment::colData(object)} that contains information about
-number of expressed genes per cell; defaults to \code{nGene}.}
+number of expressed genes per cell; defaults to \code{nGene}. \code{NULL}
+leaves it out.}
 
 \item{add_all_meta_data}{If set to \code{TRUE}, all further meta data columns
 will be extracted as well.}

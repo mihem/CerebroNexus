@@ -15,8 +15,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  ## The suite runs as three shards on three runners at once; each shard
+  ## takes every third test file (alphabetical), so the Builder files spread
+  ## evenly. `test` below is the check branch protection requires.
+  test-shard:
+    name: test (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -38,28 +46,39 @@ jobs:
       - name: Install R package dependencies
         run: nix-shell default.nix --run "echo 'R package dependencies installed'"
 
-      ## Run all tests from source. test_local() loads the package in each
+      ## Run this shard's tests from source. test_local() loads the package in each
       ## worker, so DESCRIPTION's Config/testthat/parallel takes effect; the
       ## runner's four cores run four test files at a time.
-      - name: Run all unit/integration tests
+      ## Builder workers and the Builder browser tests run library(CerebroNexus)
+      ## in their own processes, so install this checkout into a private library
+      ## first; without it those tests skip.
+      - name: Run this shard's unit/integration tests
         env:
           TESTTHAT_CPUS: "4"
+          CEREBRO_RUN_BROWSER_TESTS: "true"
+          SHARD: ${{ matrix.shard }}
+          SHARDS: "3"
         run: |
-          nix-shell default.nix --run "Rscript -e \"
-            testthat::test_local(
-              '.',
-              reporter = testthat::default_reporter(),
-              stop_on_failure = TRUE
-            )
-          \""
+          lib="$RUNNER_TEMP/cerebro-lib"
+          mkdir -p "$lib"
+          nix-shell default.nix --run "R CMD INSTALL --no-docs --library='$lib' ."
+          R_LIBS="$lib" nix-shell default.nix --run "Rscript .github/scripts/test-shard.R"
 
       ## Upload shinytest2 failure artifacts (PNG diffs, logs) — unit test failures are in the log
       - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: shinytest2-failures
+          name: shinytest2-failures-shard-${{ matrix.shard }}
           path: |
             tests/testthat/_snaps/
             /tmp/shinytest2*
           retention-days: 14
+
+  test:
+    needs: test-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All test shards passed
+        run: test "${{ needs.test-shard.result }}" = "success"

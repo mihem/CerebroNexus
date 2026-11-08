@@ -1,0 +1,938 @@
+/* Precision Scientific: the final presentation layer for Builder. */
+
+:root {
+  --c-white: #ffffff;
+  --c-bg: #f3f4f1;
+  --c-surface: #ffffff;
+  --c-surface-2: #f5f6f3;
+  --c-surface-3: #eceeea;
+  --c-border: #dfe2dd;
+  --c-border-2: #cdd2cc;
+  --c-text: #171a18;
+  --c-text-2: #5f6661;
+  --c-text-3: #68706b;
+
+  --c-amber-50: #fbf3ee;
+  --c-amber-100: #f4e1d5;
+  --c-amber-300: #d69a79;
+  --c-amber: #ad5a32;
+  --c-amber-600: #964722;
+  --c-amber-700: #773719;
+  --c-success: #397051;
+  --c-success-50: #eef5f0;
+  --c-success-700: #28553c;
+  --c-warning: #8a642b;
+  --c-warning-50: #faf4e8;
+  --c-warning-100: #eddfc2;
+  --c-warning-700: #684a1f;
+  --c-error: #b1443e;
+  --c-error-700: #82312d;
+
+  --shadow-1: none;
+  --shadow-2: 0 8px 24px rgb(24 29 26 / .055);
+  --shadow-3: 0 16px 40px rgb(24 29 26 / .08);
+  --shadow-4: 0 28px 72px rgb(24 29 26 / .12);
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 8px;
+
+  --builder-page-gutter: 24px;
+  --builder-stage-padding: clamp(1.5rem, 2.4vw, 2.5rem);
+  --builder-section-gap: 1.5rem;
+  --builder-rail-width: 17.5rem;
+  --builder-topbar-height: 3.25rem;
+  --builder-workflow-progress-height: 3.6rem;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--builder-font-sans);
+  line-height: 1.5;
+}
+
+:where(button, a, [role="button"]) {
+  -webkit-tap-highlight-color: rgb(150 71 34 / .14);
+  touch-action: manipulation;
+}
+
+:where(button:not(.rail-manager-backdrop), [role="button"]):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.builder-skip-link {
+  position: fixed;
+  top: .75rem;
+  left: .75rem;
+  z-index: 100;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-sm);
+  background: var(--c-text);
+  color: var(--c-white);
+  font-size: var(--builder-type-small);
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-.5rem);
+}
+
+.builder-skip-link:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.builder-skip-link:hover,
+.builder-skip-link:focus {
+  color: var(--c-white);
+}
+
+/* Application chrome */
+/* Fixed minimums: builder.js writes the measured heights back into
+   --builder-topbar-height / --builder-workflow-progress-height, so using those
+   variables here locked in the tallest height ever seen (a narrow window
+   that wrapped the toolbar kept the header tall after widening). */
+.topbar {
+  min-height: 3.25rem;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-color: var(--c-border-2);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: var(--c-surface);
+}
+
+.topbar h1 {
+  color: var(--c-text);
+  font-size: var(--builder-type-body);
+  font-weight: 650;
+  letter-spacing: -.012em;
+}
+
+.topbar .formats,
+.builder-project-status {
+  color: var(--c-text-3);
+}
+
+#workflow_progress .builder-workflow-progress {
+  min-height: 3.6rem;
+  padding-inline: clamp(1rem, 3vw, 2.25rem);
+  border-color: var(--c-border-2);
+  background: var(--c-surface);
+}
+
+#workflow_progress.is-workflow-compact .builder-workflow-progress {
+  border-color: var(--c-border-2);
+  border-top-color: transparent;
+  background: rgb(255 255 255 / .96);
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(12px);
+}
+
+.builder-workflow-progress li > button,
+.builder-workflow-progress li > span {
+  min-height: 3.55rem;
+  padding-block: var(--space-2);
+  border-radius: 0;
+}
+
+.builder-workflow-progress li:not(:last-child)::after {
+  right: -.45rem;
+  width: .9rem;
+  background: var(--c-border);
+}
+
+.builder-workflow-step-number {
+  width: 1.55rem;
+  height: 1.55rem;
+  flex-basis: 1.55rem;
+  border-color: var(--c-border-2);
+  border-radius: 50%;
+  background: var(--c-white);
+  font-size: var(--builder-type-micro);
+  font-weight: 650;
+}
+
+.builder-workflow-step-copy strong {
+  color: var(--c-text-2);
+  font-size: var(--builder-type-small);
+  font-weight: 600;
+}
+
+.builder-workflow-step-copy small {
+  color: var(--c-text-3);
+  font-size: var(--builder-type-micro);
+}
+
+.builder-workflow-progress li[aria-current="step"] > span,
+.builder-workflow-progress li[aria-current="step"] .builder-workflow-step-copy strong {
+  color: var(--c-text);
+}
+
+.builder-workflow-progress li[aria-current="step"] .builder-workflow-step-number {
+  border-color: var(--c-amber-600);
+  background: var(--c-amber-600);
+  color: var(--c-white);
+}
+
+.builder-workflow-progress li.is-complete .builder-workflow-step-number {
+  border-color: var(--c-success);
+  color: var(--c-success-700);
+}
+
+.shell,
+.builder-shell {
+  max-width: 1480px;
+  margin-bottom: var(--space-8);
+  border-color: var(--c-border-2);
+  border-radius: 0 0 var(--r-sm) var(--r-sm);
+  background: var(--c-surface);
+}
+
+.topbar,
+#workflow_progress {
+  max-width: 1480px;
+}
+
+/* Data entry */
+.builder-empty-state {
+  padding: clamp(2rem, 5vw, 4.5rem);
+  background: var(--c-surface);
+}
+
+.builder-loading-copy h2 {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--builder-type-title);
+  font-weight: 670;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+
+.builder-loading-copy p {
+  max-width: 42rem;
+  margin: var(--space-1) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--builder-type-body);
+  text-wrap: pretty;
+}
+.builder-import-failed-state .builder-loading-copy {
+  border-color: color-mix(in srgb, var(--c-error) 28%, var(--c-border));
+}
+.builder-import-failed-state .builder-loading-copy h2 {
+  color: var(--c-error);
+}
+
+.builder-import-loading-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  color: var(--c-text-2);
+  font-size: var(--builder-type-small);
+}
+
+.builder-import-loading-dot {
+  flex: 0 0 auto;
+  width: .7rem;
+  height: .7rem;
+  border: 2px solid var(--c-border-2);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.builder-dataset-dropzone {
+  min-height: 8.5rem;
+  padding: var(--space-6);
+  border-color: var(--c-border-2);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+}
+
+.builder-dataset-dropzone:hover,
+.builder-dataset-dropzone:focus-visible,
+.builder-dataset-dropzone.is-drag-over {
+  border-color: var(--c-amber-300);
+  background: var(--c-amber-50);
+  box-shadow: inset 0 0 0 1px var(--c-amber-300);
+}
+
+.builder-dataset-dropzone-icon,
+.builder-data-source-icon {
+  border-radius: var(--r-sm);
+  background: var(--c-surface-2);
+  color: var(--c-amber-700);
+}
+
+.builder-dataset-dropzone-copy h2 {
+  color: var(--c-text);
+  font-family: var(--builder-font-sans);
+  font-size: 1.65rem;
+  font-weight: 670;
+  letter-spacing: -.03em;
+}
+
+.builder-dataset-dropzone p,
+.builder-data-source-copy small {
+  color: var(--c-text-2);
+}
+
+.builder-data-sources-label {
+  color: var(--c-text-3);
+  font-size: var(--builder-type-micro);
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+
+.builder-data-source {
+  border-color: var(--c-border-2);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  box-shadow: none;
+}
+
+.builder-data-source:hover,
+.builder-data-source[open] {
+  border-color: var(--c-text-3);
+  background: var(--c-surface-2);
+  box-shadow: none;
+  transform: none;
+}
+
+.builder-data-source:focus-visible {
+  border-color: var(--c-amber-600);
+  background: var(--c-amber-50);
+  box-shadow: 0 0 0 3px rgb(150 71 34 / .12);
+  outline: 2px solid var(--c-amber-600);
+  outline-offset: 2px;
+}
+
+.builder-data-source-copy strong {
+  color: var(--c-text);
+  font-weight: 630;
+}
+
+/* Dataset rail */
+.rail {
+  border-right-color: var(--c-border);
+  background: var(--c-surface-2);
+}
+
+.rail-head {
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 0;
+  color: var(--c-text-3);
+  font-family: var(--builder-font-sans);
+  font-size: var(--builder-type-micro);
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.rail-head #undo_remove {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding-inline: var(--space-2);
+}
+
+.ds {
+  margin: .12rem var(--space-2);
+  border: 0;
+  border-radius: var(--r-xs);
+}
+
+.ds.is-active,
+.ds-picker .ds.is-active:has(.ds-pick:hover),
+.ds-picker .ds.is-active:has(.ds-pick:focus-visible) {
+  border-color: transparent;
+  background: var(--c-white);
+  box-shadow: 0 1px 0 rgb(24 29 26 / .04);
+}
+
+.ds-picker .ds:not(.is-active):has(.ds-pick:hover),
+.ds-picker .ds:not(.is-active):has(.ds-pick:focus-visible) {
+  background: var(--c-surface-3);
+  box-shadow: none;
+}
+
+.ds::before {
+  inset: .45rem auto .45rem 0;
+  width: 2px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ds.is-active::before {
+  background: var(--c-amber);
+}
+
+.ds-pick {
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+}
+
+.ds-idx {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-basis: 1.35rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: var(--builder-type-micro);
+  font-weight: 650;
+}
+
+.ds:has(.ds-ready-stamp.is-checked) .ds-idx {
+  background: var(--c-success);
+  color: var(--c-white);
+}
+
+.ds .nm {
+  color: var(--c-text);
+  font-size: var(--builder-type-small);
+  font-weight: 620;
+}
+
+.ds .meta {
+  color: var(--c-text-3);
+  font-size: var(--builder-type-micro);
+}
+
+.ds[data-load-state="ready"] .ds-ready-stamp.needs-review {
+  color: var(--c-warning-700);
+  font-size: var(--builder-type-micro);
+  font-weight: 600;
+}
+
+.ds-actions {
+  min-height: 2rem;
+  padding: 0 var(--space-3) var(--space-2);
+  opacity: 1;
+  transition: visibility var(--duration-fast), opacity var(--duration-fast);
+}
+
+.ds[data-load-state="ready"] .ds-actions {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.ds[data-load-state="ready"] .ds-actions > button {
+  min-width: 0;
+}
+
+/* Move buttons are icon-only (named by aria-label, shown by title). */
+.ds[data-load-state="ready"] .ds-actions > .ds-move {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  justify-content: center;
+  padding: 0;
+}
+
+.ds[data-load-state="ready"] .ds-actions > .ds-del {
+  justify-self: end;
+}
+
+.ds[data-load-state="ready"] .ds-action-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds:not(:hover):not(:focus-within) .ds-actions {
+  display: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ds-move,
+.ds-del {
+  min-height: 1.7rem;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--builder-type-micro);
+  font-weight: 560;
+}
+
+.ds-move:hover,
+.ds-del:hover {
+  background: var(--c-surface-3);
+}
+
+.rail-add-actions {
+  margin: var(--space-3) var(--space-3);
+  padding-top: var(--space-3);
+  border-top-color: var(--c-border);
+}
+
+.rail-add-actions .btn {
+  min-height: 2.75rem;
+  border-color: var(--c-border-2);
+  border-radius: var(--r-sm);
+  background: var(--c-white);
+}
+
+.rail-add-icon {
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+/* Content hierarchy */
+.builder-stage {
+  background: var(--c-surface);
+}
+
+.builder-stage-header {
+  max-width: 64rem;
+  margin-bottom: var(--space-7);
+}
+
+.builder-stage-header h2 {
+  max-width: 54rem;
+  margin: 0;
+  color: var(--c-text);
+  font-family: var(--builder-font-sans);
+  font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+  font-weight: 670;
+  letter-spacing: -.035em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.builder-stage-header .stage-intro,
+.stage-intro {
+  max-width: 52rem;
+  margin-top: var(--space-2);
+  color: var(--c-text-2);
+  font-size: var(--builder-type-body);
+  text-wrap: pretty;
+}
+
+.builder-stage-section > h3,
+.builder-stage-section-head h3,
+.builder-viewer-content-head h4 {
+  color: var(--c-text);
+  font-family: var(--builder-font-sans);
+  font-size: var(--builder-type-subtitle);
+  font-weight: 670;
+  letter-spacing: -.012em;
+}
+
+.builder-stage-configure .builder-stage-section > h3 {
+  margin-bottom: var(--space-3);
+  font-size: var(--builder-type-subtitle);
+}
+
+
+/* Forms */
+label,
+.control-label {
+  margin-bottom: var(--space-1);
+  color: var(--c-text-2);
+  font-size: var(--builder-type-caption);
+  font-weight: 620;
+}
+
+.form-control,
+.selectize-input {
+  min-height: 2.5rem;
+  border-color: var(--c-border-2) !important;
+  border-radius: var(--r-sm) !important;
+  background: var(--c-white) !important;
+  color: var(--c-text) !important;
+  box-shadow: none !important;
+  font-size: var(--builder-type-small);
+}
+
+.form-control:hover,
+.selectize-input:hover {
+  border-color: var(--c-text-3) !important;
+}
+
+.form-control:focus,
+.selectize-input.focus {
+  border-color: var(--c-amber-600) !important;
+  box-shadow: 0 0 0 3px rgb(150 71 34 / .12) !important;
+}
+
+.selectize-dropdown {
+  border-color: var(--c-border-2);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-3);
+}
+
+/* Closes the dataset summary, above Essentials. */
+.builder-configure-metadata {
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.builder-configure-metadata > summary {
+  padding: var(--space-2) 0;
+  color: var(--c-text-2);
+  cursor: pointer;
+  font-size: var(--builder-type-body);
+}
+
+.builder-configure-metadata > summary:focus-visible {
+  outline: 2px solid var(--c-amber);
+  outline-offset: 3px;
+}
+
+.builder-configure-metadata > summary .builder-detected-content-count {
+  margin-left: var(--space-3);
+}
+
+.builder-configure-metadata-chips {
+  gap: .15rem var(--space-2);
+  margin-top: var(--space-3);
+  max-height: 16rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.builder-configure-metadata-chips > span,
+.builder-content-tag {
+  padding: .12rem .18rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  font-family: var(--builder-font-sans);
+  font-size: var(--builder-type-micro);
+  font-weight: 540;
+}
+
+.builder-detected-content-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.builder-detected-content-count {
+  color: var(--c-text-3);
+  font-size: var(--builder-type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Detected content: quiet pills, left-aligned and wrapping. */
+.builder-detected-content .builder-content-tag {
+  padding: .15rem var(--space-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  background: var(--c-surface-2);
+  color: var(--c-text-2);
+  font-size: var(--builder-type-caption);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.builder-configure-metadata-chips > span:not(:last-child)::after {
+  margin-left: var(--space-2);
+  color: var(--c-border-2);
+  content: "/";
+}
+
+/* Disclosure rows */
+.builder-stage-configure .builder-viewer-content {
+  gap: 0;
+  margin-top: var(--space-7);
+  border-top: 1px solid var(--c-border-2);
+}
+
+/* Optional analyses and Extra material are rows of the same list. */
+.builder-stage-configure .builder-stage-enhance,
+.builder-stage-configure .enhance-group + .enhance-group { margin-top: 0; }
+
+/* Advanced settings continues the Viewer content list; no second rule. */
+.builder-stage-configure .builder-stage-advanced.builder-viewer-content {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.builder-stage-configure .builder-viewer-content-head {
+  padding: var(--space-5) 0 var(--space-3);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.builder-stage-configure .builder-viewer-card,
+.builder-viewer-card {
+  border: 0;
+  border-bottom: 1px solid var(--c-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.builder-stage-configure .builder-viewer-card:hover {
+  border-color: var(--c-border);
+}
+
+.builder-stage-configure .builder-viewer-card > summary,
+.builder-viewer-card > summary {
+  min-height: 3.35rem;
+  padding: var(--space-3) var(--space-2);
+  border-radius: 0;
+}
+
+.builder-viewer-card > summary:hover {
+  background: var(--c-surface-2);
+}
+
+/* A drawn chevron: larger and crisper than the "›" glyph, turning smoothly
+   from right to down and taking the accent on hover and when open. */
+.builder-viewer-card > summary::before {
+  flex: 0 0 auto;
+  width: .45rem;
+  height: .45rem;
+  margin: 0 var(--space-1) 0 .15rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  color: var(--c-text-3);
+  content: "";
+  transform: rotate(-45deg);
+  transition:
+    transform .2s var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.builder-viewer-card > summary:hover::before,
+.builder-viewer-card[open] > summary::before {
+  color: var(--builder-action);
+}
+
+.builder-viewer-card[open] > summary::before {
+  transform: rotate(45deg) translate(-.1rem, -.1rem);
+}
+
+.builder-stage-configure .builder-viewer-card-title,
+.builder-viewer-card-title {
+  color: var(--c-text);
+  font-size: var(--builder-type-body);
+  font-weight: 620;
+}
+
+.builder-viewer-card-count {
+  color: var(--c-text-3);
+  font-size: var(--builder-type-micro);
+  font-weight: 500;
+}
+
+/* Open state: a thin accent edge and a bolder title, not a peach bar. */
+.builder-viewer-card[open] {
+  box-shadow: inset 2px 0 0 var(--c-amber-300);
+}
+
+.builder-viewer-card[open] > summary {
+  background: transparent;
+}
+
+.builder-viewer-card[open] > summary:hover {
+  background: var(--c-surface-2);
+}
+
+.builder-viewer-card[open] > summary .builder-viewer-card-title {
+  font-weight: 700;
+}
+
+.builder-stage-configure .builder-viewer-card-body,
+.builder-viewer-card-body {
+  padding: var(--space-4) var(--space-3) var(--space-6);
+  border-top: 1px solid var(--c-border);
+  background: var(--c-white);
+}
+
+.enhance-module {
+  border-color: var(--c-border);
+  border-radius: var(--r-sm);
+  box-shadow: none;
+}
+
+.enhance-module:hover,
+.enhance-module:focus-within {
+  border-color: var(--c-border-2);
+  box-shadow: none;
+}
+
+/* One selected look for checkbox cards and the Marker genes button card,
+   hovered or not: amber edge (drawn 2px with the inset ring) on amber-50. */
+.enhance-module:has(input:checked),
+.enhance-module:has(input:checked):hover,
+.enhance-module:has(input:checked):focus-within,
+.enhance-module.is-selected,
+.enhance-module.is-selected:hover,
+.enhance-module.is-selected:focus-within {
+  border-color: var(--c-amber-300);
+  background: var(--c-amber-50);
+  box-shadow: inset 0 0 0 1px var(--c-amber-300);
+}
+
+.builder-dataset-summary,
+.builder-build-summary,
+.spatial-coordinate-settings {
+  border-color: var(--c-border);
+  border-radius: var(--r-sm);
+  background: var(--c-surface-2);
+  box-shadow: none;
+}
+
+/* No ruled box: the stats and pills sit on the page, so there is no empty
+   divider band between the summary and Essentials. */
+.builder-dataset-summary {
+  padding: var(--space-1) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Actions and feedback */
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 620;
+  box-shadow: none;
+}
+
+.btn-primary,
+.btn-action,
+.btn-primary:focus,
+.btn-action:focus,
+.btn-dataset-check {
+  border-color: var(--c-amber-600) !important;
+  background: var(--c-amber-600) !important;
+  color: var(--c-white) !important;
+}
+
+.btn-primary:hover,
+.btn-action:hover,
+.btn-dataset-check:hover,
+.btn-dataset-check:focus-visible {
+  border-color: var(--c-amber-700) !important;
+  background: var(--c-amber-700) !important;
+  box-shadow: none;
+}
+
+.btn-default,
+.btn-secondary {
+  border-color: var(--c-border-2);
+  background: var(--c-white);
+  color: var(--c-text-2);
+}
+
+.btn-default:hover,
+.btn-secondary:hover {
+  border-color: var(--c-text-3);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--c-amber-600);
+  outline-offset: 2px;
+}
+
+.builder-stage-footer {
+  margin-top: 2.25rem;
+  border-top-color: var(--c-border-2);
+  background: var(--c-surface-2);
+}
+
+
+@media (max-width: 68.75rem) {
+  :root {
+    --builder-page-gutter: 16px;
+    --builder-rail-width: 15.5rem;
+  }
+}
+
+@media (max-width: 58rem) {
+  :root {
+    --builder-page-gutter: 12px;
+    --builder-stage-padding: 1.35rem;
+  }
+
+  .topbar {
+    margin-top: var(--space-2);
+  }
+
+  .rail {
+    background: var(--c-surface-2);
+  }
+
+  .builder-stage-header h2 {
+    font-size: 1.75rem;
+  }
+}
+
+@media (hover: none) {
+  .ds-actions {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --builder-page-gutter: 8px;
+    --builder-stage-padding: 1rem;
+  }
+
+  .builder-empty-state {
+    padding: var(--space-5);
+  }
+
+  .builder-dataset-dropzone-copy h2,
+  .builder-stage-header h2 {
+    font-size: var(--builder-type-display);
+  }
+
+  .builder-viewer-card-count {
+    max-width: 48%;
+    text-align: right;
+  }
+
+  .ds[data-load-state="ready"] .ds-actions > .ds-move {
+    width: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  .btn,
+  .form-control,
+  .selectize-input,
+  .viewer-group-focus {
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-actions,
+  .builder-data-source,
+  .builder-dataset-dropzone {
+    transition: none !important;
+  }
+  .builder-import-loading-dot { animation: none; }
+}
+
+
+.builder-project-pending-feedback {
+  font-size: var(--builder-type-body);
+  color: var(--text-2, #515b54);
+}
+.builder-restore-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  color: #583c12;
+  background: #fff4db;
+  border-bottom: 1px solid #d8b879;
+  overflow-wrap: anywhere;
+}
+.builder-restore-status > span { min-width: 0; }
+.builder-restore-status > button { flex-shrink: 0; }

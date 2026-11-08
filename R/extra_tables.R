@@ -243,7 +243,8 @@
     sep = if (extension == "csv") "," else "\t",
     stringsAsFactors = FALSE,
     check.names = FALSE,
-    comment.char = ""
+    comment.char = "",
+    quote = "\""
   )
 }
 

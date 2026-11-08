@@ -702,9 +702,11 @@
 #' (\code{object@meta.data}) that contain cell cycle information, e.g.
 #' \code{c("Phase")}; defaults to \code{NULL}.
 #' @param nUMI Column in \code{object@meta.data} that contains information about
-#' number of transcripts per cell; defaults to \code{nUMI}.
+#' number of transcripts per cell; defaults to \code{nUMI}. \code{NULL} leaves
+#' it out.
 #' @param nGene Column in \code{object@meta.data} that contains information
 #' about number of expressed genes per cell; defaults to \code{nGene}.
+#' \code{NULL} leaves it out.
 #' @param add_all_meta_data If set to \code{TRUE}, all further meta data columns
 #' will be extracted as well.
 #' @param use_delayed_array When set to \code{TRUE}, the expression matrix will
@@ -782,10 +784,19 @@
 #' @param .expression_resolution Internal handoff used by
 #' \code{convertSeuratToCerebro()} to reuse a matrix that has already been
 #' resolved and validated. Users should leave this as \code{NULL}.
+#' @param .finalize_export Internal hook used by the Builder: a function called
+#' with the Cerebro object just before it is written, so the object can be
+#' completed without reading the written file back. Users should leave this
+#' as \code{NULL}.
+#' @param .on_progress Internal hook used by the Builder: a function called
+#' with the name of each part of the export as it starts, so a long export
+#' can report how far it has got. Users should leave this as \code{NULL}.
 #' @param projections Optional ordered names of dimensional reductions to
 #'   export. When supplied, every named reduction is exported in that order,
-#'   including PCA beside other projections. The default \code{NULL} preserves
-#'   the legacy behavior that uses non-PCA reductions when they are available.
+#'   including PCA beside other projections. An empty vector exports none (an
+#'   object without reductions, such as an unclustered spatial section). The
+#'   default \code{NULL} preserves the legacy behavior that uses non-PCA
+#'   reductions when they are available.
 #' @param spatial_coordinate_transforms Optional named list of coordinate
 #'   transforms keyed by exact Seurat spatial FOV/image name. Each entry may
 #'   specify \code{rotation_degrees} and positive uniform \code{scale}; the
@@ -860,6 +871,8 @@ exportFromSeurat <- function(
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L,
   .expression_resolution = NULL,
+  .finalize_export = NULL,
+  .on_progress = NULL,
   projections = NULL,
   spatial_coordinate_transforms = NULL
 ) {
@@ -911,7 +924,6 @@ exportFromSeurat <- function(
   if (
     !is.null(projections) &&
       (!is.character(projections) ||
-        !length(projections) ||
         anyNA(projections) ||
         any(!nzchar(projections)) ||
         anyDuplicated(projections) ||
@@ -952,6 +964,7 @@ exportFromSeurat <- function(
   ## add transcript counts
   ##--------------------------------------------------------------------------##
 
+  .exportReportPart(.on_progress, "reading expression")
   ## get expression data using shared utility function. A requested layer that
   ## does not exist is an error naming the layers that do (no other layer is
   ## substituted).
@@ -1006,6 +1019,7 @@ exportFromSeurat <- function(
     resolved_layer = expression_resolution$resolved
   )
 
+  .exportReportPart(.on_progress, "writing expression")
   expression_data <- .exportWriteExpression(
     export = export,
     expression_data = expression_data,
@@ -1017,6 +1031,7 @@ exportFromSeurat <- function(
     h5_compression_level = h5_compression_level
   )
 
+  .exportReportPart(.on_progress, "adding metadata and results")
   extras <- object@misc
   .addExportExperiment(export, extras)
   .addExportMetaData(
@@ -1056,6 +1071,7 @@ exportFromSeurat <- function(
   ##--------------------------------------------------------------------------##
   ## spatial data
   ##--------------------------------------------------------------------------##
+  .exportReportPart(.on_progress, "adding spatial data")
   if (verbose) {
     .logStep('Checking for spatial data...')
   }
@@ -1292,6 +1308,10 @@ exportFromSeurat <- function(
     }
   }
 
+  if (is.function(.finalize_export)) {
+    .finalize_export(export)
+  }
+
   .exportFinalize(
     export = export,
     final_file = final_file,
@@ -1299,6 +1319,7 @@ exportFromSeurat <- function(
     expression_matrix_mode = expression_matrix_mode,
     codec = codec,
     viewer_options = viewer_options,
-    immune_options = immune_options
+    immune_options = immune_options,
+    on_progress = .on_progress
   )
 }

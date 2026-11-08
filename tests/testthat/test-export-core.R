@@ -175,3 +175,38 @@ test_that("core projections keep the PCA-only fallback and the empty-input error
   )
   expect_identical(export$availableProjections(), "pca")
 })
+
+test_that("exported metadata keeps the chosen QC columns and cell barcodes", {
+  meta <- data.frame(
+    nCount_RNA = c(10, 20),
+    nFeature_RNA = c(3, 4),
+    nUMI = c(-1, -1),
+    nGene = c(-2, -2),
+    cell_barcode = c("x", "y"),
+    group = factor(c("a", "b")),
+    row.names = c("c1", "c2")
+  )
+  captured <- NULL
+  export <- list(
+    setMetaData = function(value) captured <<- value,
+    addGroup = function(...) invisible(NULL),
+    setCellCycle = function(...) invisible(NULL)
+  )
+  .addExportMetaData(
+    export,
+    meta,
+    c("c1", "c2"),
+    "group",
+    "nCount_RNA",
+    "nFeature_RNA",
+    character(),
+    TRUE,
+    FALSE
+  )
+  expect_identical(captured$cell_barcode, c("c1", "c2"))
+  expect_identical(captured$nUMI, c(10, 20))
+  expect_identical(captured$nGene, c(3, 4))
+  expect_false(any(
+    c("nUMI.1", "nGene.1", "cell_barcode.1") %in% colnames(captured)
+  ))
+})

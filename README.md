@@ -26,7 +26,24 @@ Automated tests run in a reproducible Nix environment.
 remotes::install_github('mihem/CerebroNexus')
 ```
 
+The Builder (below) also needs a few suggested packages:
+
+```r
+install.packages(c("Seurat", "callr", "processx", "ps"))
+```
+
 ## 2. Build an app for your own data
+
+**Without writing code**, open the Builder in your browser:
+
+```r
+CerebroNexus::launchCerebroBuilder()
+```
+
+Add your data files, choose the groups and content, and build a `.crb` file or a
+standalone App. See [Build a data set by pointing](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+
+**From a script:**
 
 ```r
 library(CerebroNexus)

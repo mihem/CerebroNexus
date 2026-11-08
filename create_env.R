@@ -47,6 +47,8 @@ rix(
     "shinymanager",
     "anndataR", # reference reader in a test (Suggests)
     "arrow", # SpatialData shapes (Suggests)
+    "jpeg", # Builder tissue images (Suggests)
+    "writexl", # Builder tables (Suggests)
     # runtime dependencies (DESCRIPTION Imports)
     "base64enc",
     "biomaRt",

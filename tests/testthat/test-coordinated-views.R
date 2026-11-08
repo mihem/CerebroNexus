@@ -319,6 +319,98 @@ test_that("JSON upload transport is atomic and ignores timed-out responses", {
   expect_identical(result$label, "Download PNG")
 })
 
+## A trajectory draws only some of the data set's cells, so opening a saved view
+## may keep fewer cells than the file names. The page reports what it kept after
+## it draws; the message must give that number, not the file's.
+open_specialist_view_js <- function(requested = 34L) {
+  c(
+    "window.cerebroSpecialistViews={get:id=>({",
+    sprintf("  apply:()=>({selectedCells:%d}),", requested),
+    "  ready:()=>true,capture:()=>({}),downloadPNG:()=>true})};",
+    "const upload=ids.coordviews_config_upload;",
+    "upload.files=[{name:'view.json',size:2,text:'{}'}];",
+    "upload.listeners.change({currentTarget:upload});",
+    "const request=sent[0].value;",
+    "handlers.coordviews_config_result({nonce:request.nonce,action:'apply',ok:true,",
+    "  dataset_context:request.dataset_context,",
+    "  config:{schema:'cerebronexus-specialist-view',page:{id:'trajectory_projection'}},",
+    sprintf("  selected_cells:%d});", requested),
+    "const status=()=>ids['cv-config-status'].textContent;",
+    "const first=status();"
+  )
+}
+
+test_that("Open JSON reports the cells a view kept, not the cells the file named", {
+  output <- run_config_transport_node(c(
+    open_specialist_view_js(34L),
+    "events['cerebro:specialist-state']({detail:{viewId:'trajectory_projection',",
+    "  selectedCells:31,selectionRestore:{requested:34,restored:31}}});",
+    "console.log(JSON.stringify({first:first,second:status()}));"
+  ))
+  expect_equal(attr(output, "status"), NULL)
+  result <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  expect_identical(
+    result$first,
+    "Restored 34 selected cells and view settings."
+  )
+  expect_identical(
+    result$second,
+    paste(
+      "Restored 31 of 34 selected cells; the others are not in this view.",
+      "View settings restored."
+    )
+  )
+})
+
+test_that("Open JSON says so when none of the saved cells are in the view", {
+  output <- run_config_transport_node(c(
+    open_specialist_view_js(5L),
+    "events['cerebro:specialist-state']({detail:{viewId:'trajectory_projection',",
+    "  selectedCells:0,selectionRestore:{requested:5,restored:0}}});",
+    "console.log(JSON.stringify({second:status()}));"
+  ))
+  result <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  expect_identical(
+    result$second,
+    "None of the 5 selected cells are in this view. View settings restored."
+  )
+})
+
+test_that("Open JSON keeps its message when every saved cell was restored", {
+  output <- run_config_transport_node(c(
+    open_specialist_view_js(34L),
+    "events['cerebro:specialist-state']({detail:{viewId:'trajectory_projection',",
+    "  selectedCells:34,selectionRestore:{requested:34,restored:34}}});",
+    "const equal=status();",
+    "console.log(JSON.stringify({first:first,equal:equal}));"
+  ))
+  result <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  expect_identical(result$equal, result$first)
+})
+
+test_that("Open JSON ignores reports of other views, plain selections and later messages", {
+  output <- run_config_transport_node(c(
+    open_specialist_view_js(34L),
+    ## Another page, and a report of an ordinary selection (no restore).
+    "events['cerebro:specialist-state']({detail:{viewId:'overview_projection',",
+    "  selectedCells:3,selectionRestore:{requested:5,restored:3}}});",
+    "events['cerebro:specialist-state']({detail:{viewId:'trajectory_projection',",
+    "  selectedCells:3,selectionRestore:null}});",
+    "const unchanged=status();",
+    ## A message another action wrote since is not overwritten.
+    "ids['cv-config-status'].textContent='Downloaded the configuration for 3 selected cells.';",
+    "events['cerebro:specialist-state']({detail:{viewId:'trajectory_projection',",
+    "  selectedCells:31,selectionRestore:{requested:34,restored:31}}});",
+    "console.log(JSON.stringify({first:first,unchanged:unchanged,later:status()}));"
+  ))
+  result <- jsonlite::fromJSON(output, simplifyVector = FALSE)
+  expect_identical(result$unchanged, result$first)
+  expect_identical(
+    result$later,
+    "Downloaded the configuration for 3 selected cells."
+  )
+})
+
 test_that("Trekker depth views form one collapsed insights region", {
   ui <- htmltools::tagQuery(viewer_ui_test_pages()$coordinated_views)
   region <- ui$find("#cv-tk-insights")

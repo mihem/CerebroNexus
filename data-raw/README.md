@@ -13,6 +13,7 @@ This directory reproducibly rebuilds every demo `.crb` shipped in `inst/extdata/
 | understand or rebuild the **HLA & TCR motif** demos | [`hla.md`](hla.md) |
 | understand or rebuild the **Trekker** demo | [`trekker.md`](trekker.md) |
 | prepare the **large demo data sets** (1M mouse brain, Ren COVID-19 atlas) for `run-demo.R` | [`large-demo/README.md`](large-demo/README.md) |
+| rebuild the three synthetic **Builder inputs** | [`builder_fixtures.md`](builder_fixtures.md) |
 | know what a sub-directory here is | [Directory layout](#directory-layout) below |
 | add a **new** dataset | copy the template in [`DATASETS.md`](DATASETS.md), then add a build script + a per-type notes file |
 

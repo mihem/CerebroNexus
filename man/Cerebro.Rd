@@ -555,7 +555,7 @@ carried inside the serialised \code{.crb}, or \code{"h5"} with the name
 of the H5 file that sits next to it.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Cerebro$setExpressionBackend(type = "embedded", location = NULL)}
+    \preformatted{Cerebro$setExpressionBackend(type = "embedded", location = NULL, md5 = NULL)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -564,6 +564,8 @@ of the H5 file that sits next to it.
       \item{\code{type}}{Storage backend label, \code{"embedded"} or \code{"h5"}.}
       \item{\code{location}}{File name of the H5 file next to the \code{.crb};
 \code{NULL} when \code{type == "embedded"}.}
+      \item{\code{md5}}{MD5 checksum of the H5 file, recorded when it is written and
+checked when it is attached; \code{NULL} when not recorded.}
     }
     \if{html}{\out{</div>}}
   }

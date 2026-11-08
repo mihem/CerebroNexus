@@ -341,6 +341,70 @@ test_that("ir_build_sharing_plot keeps 3-class x order Private -> within -> acro
 })
 
 
+test_that("the Clone Sharing bar labels name the chosen sharing unit", {
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("sample")[c("Private", "Public")]),
+    c("Private (1 sample)", "Shared (≥ 2 samples)")
+  )
+  expect_identical(
+    unname(
+      ir_env$ir_sharing_display_labels("tissue_site")[c("Private", "Public")]
+    ),
+    c("Private (1 tissue site)", "Shared (≥ 2 tissue sites)")
+  )
+  ## A missing unit falls back to the sample wording.
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels(NULL)["Private"]),
+    "Private (1 sample)"
+  )
+  ## A plural column name is singular for one value; a singular one ending
+  ## in "s" still gets its plural.
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("donors")[c("Private", "Public")]),
+    c("Private (1 donor)", "Shared (≥ 2 donors)")
+  )
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("status")[c("Private", "Public")]),
+    c("Private (1 status)", "Shared (≥ 2 statuses)")
+  )
+  expect_identical(
+    unname(ir_env$ir_sharing_display_labels("batches")[c("Private", "Public")]),
+    c("Private (1 batch)", "Shared (≥ 2 batches)")
+  )
+
+  mk <- function(barcode, v, sample, site) {
+    data.frame(
+      barcode = barcode,
+      CTgene = sprintf("%s..TRBJ2-6.TRBC2", v),
+      CTaa = "CASSX",
+      sample = sample,
+      tissue_site = site,
+      stringsAsFactors = FALSE
+    )
+  }
+  data <- list(
+    all = do.call(
+      rbind,
+      list(
+        mk("b1", "TRBV1", "s1", "tumour"), # private
+        mk("b2", "TRBV2", "s1", "tumour"), # in two tissue sites
+        mk("b3", "TRBV2", "s2", "blood")
+      )
+    )
+  )
+  p <- ir_env$ir_build_sharing_plot(
+    ir_encode(data),
+    chain = "TRB",
+    unit_col = "tissue_site"
+  )
+  x_labels <- ggplot2::ggplot_build(p)$layout$panel_params[[1]]$x$get_labels()
+  expect_equal(
+    x_labels,
+    c("Private (1 tissue site)", "Shared (≥ 2 tissue sites)")
+  )
+})
+
+
 test_that("clonal expansion is independent of display filtering", {
   scope <- new.env(parent = ir_env)
   f <- ir_env$ir_clonal_umap_data

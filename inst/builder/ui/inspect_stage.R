@@ -1,0 +1,297 @@
+## Guided Import / Inspect stage.
+
+builder_stage_has_text <- function(value) {
+  is.character(value) &&
+    length(value) == 1L &&
+    !is.na(value) &&
+    nzchar(trimws(value))
+}
+
+## The disclosure card used across Configure: a <details> with a title, an
+## optional count and a body. builder.js remembers the open state by
+## `data-disclosure-key` and updates counts through their `data-*` marker
+## (`count_attrs`), so both are emitted exactly as given.
+builder_viewer_card <- function(
+  class,
+  title,
+  ...,
+  key = NULL,
+  count = NULL,
+  count_attrs = list(),
+  id = NULL,
+  body_class = "builder-viewer-card-body"
+) {
+  tags$details(
+    id = id,
+    class = class,
+    `data-disclosure-key` = key,
+    tags$summary(
+      span(class = "builder-viewer-card-title", title),
+      if (!is.null(count)) {
+        do.call(
+          span,
+          c(list(class = "builder-viewer-card-count"), count_attrs, list(count))
+        )
+      }
+    ),
+    div(class = body_class, ...)
+  )
+}
+
+builder_stage_text_items <- function(values, class = NULL) {
+  values <- as.character(values %||% character())
+  if (!length(values)) {
+    return(NULL)
+  }
+  tags$ul(
+    class = class,
+    lapply(values, function(value) tags$li(value))
+  )
+}
+
+builder_inspect_issue_label <- function(value, policy = NULL) {
+  value <- as.character(value %||% "")
+  if (identical(value, "metadata_policy")) {
+    detail <- builder_inspect_policy_issue(policy)
+    if (!is.null(detail)) {
+      return(detail)
+    }
+  }
+  switch(
+    value,
+    settings_name = "Type a dataset name in Essentials.",
+    settings_organism = "Choose an organism in Essentials.",
+    dataset = "Review this dataset before continuing.",
+    tools::toTitleCase(gsub("[_:]", " ", value))
+  )
+}
+
+## Which metadata columns hold up the metadata policy, and why. NULL when the
+## policy names none.
+builder_inspect_policy_issue <- function(policy) {
+  columns <- if (is.list(policy) && is.list(policy$columns)) {
+    policy$columns
+  } else {
+    list()
+  }
+  disposition <- function(kind) {
+    names(columns)[vapply(
+      columns,
+      function(column) identical(column$disposition %||% "", kind),
+      logical(1)
+    )]
+  }
+  blocking <- disposition("blocking")
+  if (length(blocking)) {
+    reasons <- vapply(
+      blocking,
+      function(id) {
+        reason <- columns[[id]]$reason
+        if (builder_stage_has_text(reason)) {
+          reason
+        } else {
+          paste0("Metadata column ", id, " cannot be exported.")
+        }
+      },
+      character(1)
+    )
+    return(paste(unique(reasons), collapse = " "))
+  }
+  attention <- disposition("attention")
+  if (length(attention)) {
+    return(paste0(
+      "Confirm the metadata choices for: ",
+      paste(attention, collapse = ", "),
+      "."
+    ))
+  }
+  NULL
+}
+
+builder_inspect_content_tag <- function(entry) {
+  id <- entry$id %||% ""
+  if (
+    !identical(entry$status %||% "", "valid") ||
+      id %in% c("dataset_identity", "projection", "metadata_policy")
+  ) {
+    return(NULL)
+  }
+  label <- switch(
+    id,
+    expression = "Expression",
+    metadata = "Metadata",
+    groups = "Groups",
+    spatial = "Spatial",
+    trekker = "Trekker",
+    marker_genes = "Marker genes",
+    most_expressed_genes = "Most expressed genes",
+    mean_expression = "Mean expression",
+    enriched_pathways = "Enriched pathways",
+    trajectory = "Trajectory",
+    gene_lists = "Gene lists",
+    extra_material = "Extra material",
+    immune_repertoire = "Immune repertoire",
+    hla_tcr_motifs = "HLA & TCR motifs",
+    hla = "HLA",
+    if (startsWith(id, "reduction:")) {
+      toupper(sub("^reduction:", "", id))
+    } else {
+      tools::toTitleCase(gsub("_", " ", id))
+    }
+  )
+  tone <- if (startsWith(id, "reduction:")) {
+    "projection"
+  } else if (id %in% c("metadata", "groups")) {
+    "metadata"
+  } else if (id %in% c("spatial", "trekker")) {
+    "spatial"
+  } else if (
+    id %in%
+      c(
+        "marker_genes",
+        "most_expressed_genes",
+        "mean_expression",
+        "enriched_pathways",
+        "gene_lists"
+      )
+  ) {
+    "analysis"
+  } else if (identical(id, "trajectory")) {
+    "trajectory"
+  } else if (id %in% c("immune_repertoire", "hla_tcr_motifs", "hla")) {
+    "immune"
+  } else if (identical(id, "extra_material")) {
+    "extra"
+  } else {
+    "core"
+  }
+  list(label = label, tone = tone)
+}
+
+builder_inspect_model <- function(
+  profile,
+  state,
+  format,
+  dataset_id,
+  settings = list()
+) {
+  manifest <- state$manifest %||% list()
+  content_tags <- Filter(
+    Negate(is.null),
+    lapply(manifest, builder_inspect_content_tag)
+  )
+  if (length(content_tags)) {
+    labels <- tolower(vapply(content_tags, `[[`, character(1), "label"))
+    content_tags <- content_tags[!duplicated(labels)]
+  }
+  ## Says that a source cell_barcode column is kept under another name.
+  barcode <- state$metadata_policy$columns$cell_barcode
+  notes <- if (
+    is.list(barcode) &&
+      builder_stage_has_text(barcode$renamed_to) &&
+      builder_stage_has_text(barcode$reason)
+  ) {
+    barcode$reason
+  } else {
+    character()
+  }
+  list(
+    summary = c(
+      paste(format(profile$n_cells, big.mark = ","), "cells"),
+      paste(format(profile$n_genes, big.mark = ","), "genes")
+    ),
+    attention = vapply(
+      state$attention_ids %||% character(),
+      builder_inspect_issue_label,
+      character(1),
+      policy = state$metadata_policy
+    ),
+    blockers = vapply(
+      state$blocking_ids %||% character(),
+      builder_inspect_issue_label,
+      character(1),
+      policy = state$metadata_policy
+    ),
+    notes = notes,
+    content_tags = content_tags,
+    diagnostics = c(paste("Format", format), paste("Dataset id", dataset_id))
+  )
+}
+
+builder_inspect_stage_ui <- function(id, model) {
+  ns <- NS(id)
+  attention <- as.character(model$attention %||% character())
+  blockers <- as.character(model$blockers %||% character())
+  div(
+    id = ns("stage"),
+    class = "builder-stage-section builder-stage-inspect",
+    h3("Dataset summary"),
+    if (length(c(attention, blockers))) {
+      div(
+        class = "notice warn",
+        h4("Needs attention"),
+        builder_stage_text_items(c(attention, blockers))
+      )
+    },
+    if (length(model$notes %||% character())) {
+      div(
+        class = "notice builder-inspect-notes",
+        builder_stage_text_items(as.character(model$notes))
+      )
+    },
+    div(
+      class = "builder-dataset-summary",
+      div(
+        class = "facts builder-dataset-summary-facts",
+        lapply(as.character(model$summary %||% character()), function(value) {
+          # "5,020 cells" reads as a stat figure: the number over its unit.
+          parts <- regmatches(
+            value,
+            regexec("^([0-9][0-9,.]*) (.+)$", value)
+          )[[1L]]
+          if (length(parts) == 3L) {
+            div(
+              class = "fact builder-stat",
+              span(class = "builder-stat-value", parts[[2L]]),
+              span(class = "builder-stat-label", parts[[3L]])
+            )
+          } else {
+            div(class = "fact", value)
+          }
+        })
+      ),
+      if (length(model$content_tags %||% list())) {
+        div(
+          class = "builder-detected-content",
+          div(
+            class = "builder-detected-content-head",
+            h4("Detected content"),
+            span(
+              class = "builder-detected-content-count",
+              paste(
+                length(model$content_tags),
+                if (length(model$content_tags) == 1L) {
+                  "content type"
+                } else {
+                  "content types"
+                }
+              )
+            )
+          ),
+          div(
+            class = "builder-content-tags",
+            lapply(model$content_tags, function(tag) {
+              span(
+                class = paste(
+                  "builder-content-tag",
+                  paste0("is-", tag$tone)
+                ),
+                tag$label
+              )
+            })
+          )
+        )
+      }
+    )
+  )
+}
