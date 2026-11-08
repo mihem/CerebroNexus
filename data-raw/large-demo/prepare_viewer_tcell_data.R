@@ -428,11 +428,25 @@
 ## and "V|D|J|C|junction" for 10x cells; the 10x layout is rewritten to the
 ## Smart-seq2 one.
 .viewerTcellIdentifier <- function(identifier) {
-  sub(
+  identifier <- sub(
     "^([^|]*)\\|[^|]*\\|([^|]*)\\|[^|]*\\|([^|]*)$",
     "\\1_\\3_\\2",
     as.character(identifier)
   )
+  ## Any other layout would drop out of CTgene but stay raw in CTnt.
+  unknown <- unique(identifier[grepl("|", identifier, fixed = TRUE)])
+  if (length(unknown)) {
+    stop(
+      "The T-cell TCR table has ",
+      length(unknown),
+      " identifier(s) in an unknown layout (expected V_junction_J or ",
+      "V|D|J|C|junction), e.g. ",
+      paste(utils::head(unknown, 3L), collapse = ", "),
+      ".",
+      call. = FALSE
+    )
+  }
+  identifier
 }
 
 ## The first and last fields of a "V_junction_J" identifier are the V and J
@@ -462,7 +476,8 @@
 
 ## scRepertoire-style clone calls from the atlas's TCR table. Of the up to two
 ## alpha and two beta chains of a cell the first listed (A1, B1) is used; A2 or
-## B2 stand in only when it is absent. `CTnt` is the recombinant identifier
+## B2 stand in only when the first lacks its identifier or CDR3 and the second
+## has both. `CTnt` is the recombinant identifier
 ## (V, junction nucleotides, J) of both chains: the table has no CDR3
 ## nucleotide column; its fields are joined with ":".
 .viewerTcellRepertoire <- function(tcr, cells) {
@@ -486,18 +501,30 @@
       call. = FALSE
     )
   }
-  ## 10x rows mark an absent chain with "-".
-  pick <- function(first, second) {
-    first <- as.character(first)
-    second <- as.character(second)
-    first[first %in% "-"] <- NA_character_
-    second[second %in% "-"] <- NA_character_
-    ifelse(is.na(first), second, first)
+  ## 10x rows mark an absent chain with "-". The chain is chosen once, so a
+  ## call's identifier and CDR3 always come from the same chain.
+  absent <- function(x) {
+    x <- as.character(x)
+    x[x %in% c("-", "")] <- NA_character_
+    x
   }
-  alpha_id <- .viewerTcellIdentifier(pick(tcr$Identifier.A1, tcr$Identifier.A2))
-  beta_id <- .viewerTcellIdentifier(pick(tcr$Identifier.B1, tcr$Identifier.B2))
-  alpha_aa <- pick(tcr$CDR3.A1, tcr$CDR3.A2)
-  beta_aa <- pick(tcr$CDR3.B1, tcr$CDR3.B2)
+  pick <- function(id1, aa1, id2, aa2) {
+    id1 <- absent(id1)
+    aa1 <- absent(aa1)
+    id2 <- absent(id2)
+    aa2 <- absent(aa2)
+    second <- (is.na(id1) | is.na(aa1)) & !is.na(id2) & !is.na(aa2)
+    list(
+      id = .viewerTcellIdentifier(ifelse(second, id2, id1)),
+      aa = ifelse(second, aa2, aa1)
+    )
+  }
+  alpha <- pick(tcr$Identifier.A1, tcr$CDR3.A1, tcr$Identifier.A2, tcr$CDR3.A2)
+  beta <- pick(tcr$Identifier.B1, tcr$CDR3.B1, tcr$Identifier.B2, tcr$CDR3.B2)
+  alpha_id <- alpha$id
+  beta_id <- beta$id
+  alpha_aa <- alpha$aa
+  beta_aa <- beta$aa
   gene <- .viewerTcellJoin(
     .viewerTcellGenePair(alpha_id),
     .viewerTcellGenePair(beta_id)

@@ -470,6 +470,29 @@ test_that("10x TCR identifiers give the same clone calls as Smart-seq2 ones", {
   expect_identical(repertoire$CTaa, c("CAVF_CASF", "CDDF_CEEF", "CAAF_CBBF"))
   expect_false(any(grepl("|", unlist(repertoire), fixed = TRUE)))
   expect_false(any(grepl("-_|_-|^-$", unlist(repertoire))))
+
+  ## Identifier and CDR3 come from the same chain: A1 lacks its CDR3, so
+  ## both come from A2.
+  mixed <- tcr[1, ]
+  mixed$CDR3.A1 <- "-"
+  mixed$Identifier.A2 <- "TRAV3|None|TRAJ4|TRAC|TGTGAC"
+  mixed$CDR3.A2 <- "CDDF"
+  mixed_calls <- env$.viewerTcellRepertoire(mixed, mixed$Cell_Name)
+  expect_identical(mixed_calls$CTgene, "TRAV3.TRAJ4_TRBV20-1.TRBJ2-3")
+  expect_identical(mixed_calls$CTaa, "CDDF_CASF")
+
+  ## Any other layout with "|" stops instead of reaching CTnt raw.
+  for (identifier in c(
+    "TRAV1|None|TRAJ1|TRAC",
+    "TRAV1|None|TRAJ1|TRAC|TGC|X"
+  )) {
+    odd <- tcr[1, ]
+    odd$Identifier.A1 <- identifier
+    expect_error(
+      env$.viewerTcellRepertoire(odd, odd$Cell_Name),
+      "unknown layout"
+    )
+  }
 })
 
 test_that("T-cell expression objects are read by symbol and joined on their genes", {
