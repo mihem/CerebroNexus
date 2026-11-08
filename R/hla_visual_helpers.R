@@ -10,7 +10,6 @@
 #'
 #' @param levels Character vector of categorical levels in display order.
 #' @return Named character vector `level -> colour`.
-#' @importFrom htmlwidgets JS
 #' @keywords internal
 hla_distinct_colors <- function(levels) {
   levels <- unique(as.character(levels))

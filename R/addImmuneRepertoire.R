@@ -12,6 +12,10 @@
   sample_names = NULL,
   verbose = TRUE
 ) {
+  .checkBiocInstalled(
+    "scRepertoire",
+    "to read Cell Ranger contig annotation files"
+  )
   missing_paths <- paths[!file.exists(paths)]
   if (length(missing_paths) > 0) {
     stop(

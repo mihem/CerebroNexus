@@ -954,7 +954,16 @@
       )
     )
   }
-  chains <- intersect(hla_detect_chains(repertoire), c("TRA", "TRB"))
+  ## The HLA motif network needs igraph and stringdist (Suggests). Without
+  ## them the pack has no HLA assets and the Viewer page asks to install them.
+  chains <- if (
+    requireNamespace("igraph", quietly = TRUE) &&
+      requireNamespace("stringdist", quietly = TRUE)
+  ) {
+    intersect(hla_detect_chains(repertoire), c("TRA", "TRB"))
+  } else {
+    character()
+  }
   if (length(chains)) {
     modules <- c(modules, "hla_tcr")
     annotated <- hla_annotate_ir_metadata(repertoire, metadata)

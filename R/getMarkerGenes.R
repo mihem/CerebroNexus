@@ -48,7 +48,6 @@
 #'
 #' @import dplyr
 #' @importFrom rlang .data :=
-#' @importFrom tidyselect all_of any_of
 #'
 #' @export
 #'
@@ -91,6 +90,14 @@ getMarkerGenes <- function(
     .logStep(
       'No information about genes on cell surface because organism is ',
       'either not specified or not human/mouse.'
+    )
+
+    ## ... biomaRt (Suggests) is missing -> skip the annotation
+  } else if (!requireNamespace('biomaRt', quietly = TRUE)) {
+    .logStep(
+      'No information about genes on cell surface because the biomaRt ',
+      'package is not installed. Install it with ',
+      'BiocManager::install("biomaRt").'
     )
 
     ## ... organism is either "hg" or "mm" -> compatible
@@ -224,8 +231,8 @@ getMarkerGenes <- function(
         results <- results %>%
           dplyr::rename(!!current_group := "cluster") %>%
           dplyr::select(
-            tidyselect::all_of(current_group),
-            tidyselect::any_of("gene"),
+            dplyr::all_of(current_group),
+            dplyr::any_of("gene"),
             dplyr::everything()
           )
       }

@@ -42,18 +42,12 @@
 #'   )
 #' }
 #'
-#' @importFrom colourpicker colourInput
 #' @import dplyr
 #' @importFrom DT datatable formatPercentage formatRound formatSignif formatStyle styleColorBar styleEqual styleInterval
-#' @import ggplot2
 #' @importFrom grDevices col2rgb rgb
-#' @importFrom msigdbr msigdbr
 #' @importFrom plotly add_lines add_trace event_data layout plot_ly plotlyOutput renderPlotly toWebGL
-#' @importFrom stringr str_length
 #' @importFrom tidyr pivot_longer pivot_wider
-#' @import scales
 #' @import shiny
-#' @importFrom shinycssloaders withSpinner
 #' @import shinydashboard
 #' @importFrom shinyjs inlineCSS
 #' @importFrom shinyWidgets awesomeCheckbox dropdownButton materialSwitch radioGroupButtons sendSweetAlert

@@ -26,7 +26,6 @@
 #' @import dplyr
 #' @importFrom Matrix rowSums
 #' @importFrom rlang .data :=
-#' @importFrom tibble tibble
 #'
 #' @export
 #'
@@ -65,7 +64,7 @@ getMostExpressedGenes <- function(
       transcripts_counts_per_gene / sum(transcripts_counts_per_gene),
       decreasing = TRUE
     )
-    tibble::tibble(
+    dplyr::tibble(
       group = level,
       gene = names(transcripts_percent_per_gene)[1:100],
       pct = transcripts_percent_per_gene[1:100]
@@ -97,7 +96,7 @@ getMostExpressedGenes <- function(
         current_group,
         '`...'
       )
-      results <- pbapply::pblapply(group_levels, function(x) {
+      results <- .progressLapply(group_levels, function(x) {
         top_genes(
           x,
           rownames(object@meta.data)[which(

@@ -2833,7 +2833,7 @@ prettifyTable <- function(
       length(columns_character) >= 1
   ) {
     for (i in columns_character) {
-      if (max(stringr::str_length(table[[i]]), na.rm = TRUE) > 200) {
+      if (max(nchar(table[[i]], allowNA = TRUE), na.rm = TRUE) > 200) {
         columns_with_long_content <- c(columns_with_long_content, i)
       }
     }

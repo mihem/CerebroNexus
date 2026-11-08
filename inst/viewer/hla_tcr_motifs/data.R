@@ -8,8 +8,8 @@
 ##----------------------------------------------------------------------------##
 
 ## ---- Optional-dependency gate ----------------------------------------- ##
-## stringdist + igraph are Imports, so they are present in a normal install.
-## The gate stays as a defensive guard for unusual environments.
+## stringdist + igraph are Suggests; without them the page shows an install
+## hint instead of the network.
 hla_has_deps <- function() {
   requireNamespace("stringdist", quietly = TRUE) &&
     requireNamespace("igraph", quietly = TRUE)

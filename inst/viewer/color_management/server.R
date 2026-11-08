@@ -9,6 +9,15 @@
 
 output[["color_assignments_UI"]] <- renderUI({
   req(data_set())
+  ## colourpicker is a suggested package; say so instead of failing.
+  if (!requireNamespace("colourpicker", quietly = TRUE)) {
+    return(div(
+      class = "alert alert-warning",
+      "Changing colours needs the colourpicker package. Install it with ",
+      tags$code("install.packages(\"colourpicker\")"),
+      " and restart the app."
+    ))
+  }
   ## Inputs already display the user's selected values. Read initial colours
   ## without rebuilding every picker when one input (or its binding) changes.
   ## Group, cell-cycle and dataset dependencies below still rebuild the UI.
