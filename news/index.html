@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,10 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="7.0.1" id="cerebronexus-701">CerebroNexus 7.0.1<a class="anchor" aria-label="anchor" href="#cerebronexus-701"></a></h2>
+<ul><li>The pan-cancer T-cell demo now fills <code>CTgene</code> and <code>CTnt</code> for 10x cells: 10x <code>V|D|J|C|junction</code> identifiers are rewritten to the Smart-seq2 <code>V_junction_J</code> layout, and <code>-</code> no longer counts as a chain. An identifier in any other layout stops the preparation with examples, and a clone call takes its identifier and CDR3 from the same chain. A CDR3 that holds the assembler’s message (“Couldn’t find FGXG”, 1,290 Smart-seq2 cells) counts as missing instead of becoming a clone. Cached T-cell demo data is rebuilt (<code>.viewerTcellVersion</code> is now 2).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="7.0.0" id="cerebronexus-700">CerebroNexus 7.0.0<a class="anchor" aria-label="anchor" href="#cerebronexus-700"></a></h2>
 <div class="section level3">
