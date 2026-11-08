@@ -135,15 +135,20 @@ cells. Other \code{uns}, \code{obsp}, \code{varm} and \code{varp} content is
 not read.
 }
 \examples{
-\dontshow{if (requireNamespace("rhdf5") && requireNamespace("SingleCellExperiment")) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "rhdf5")) && nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
 \donttest{
-h5ad <- file.path(tempdir(), "example.h5ad")
+h5ad <- tempfile(fileext = ".h5ad")
 exportToH5ad(
   system.file("extdata/examples/example.crb", package = "CerebroNexus"),
   h5ad
 )
 sce <- readH5adAsSCE(h5ad)
-convertSCEToCerebro(sce, file.path(tempdir(), "output"), groups = "sample")
+convertSCEToCerebro(
+  sce,
+  file.path(tempdir(), "output"),
+  assay = "X",
+  groups = "sample"
+)
 }
 \dontshow{\}) # examplesIf}
 }

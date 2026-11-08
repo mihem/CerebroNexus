@@ -496,10 +496,10 @@
 #'
 #' @return \code{file}, invisibly.
 #'
-#' @examplesIf requireNamespace("rhdf5", quietly = TRUE)
+#' @examplesIf nzchar(system.file(package = "rhdf5"))
 #' \donttest{
 #' crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-#' h5ad <- file.path(tempdir(), "example.h5ad")
+#' h5ad <- tempfile(fileext = ".h5ad")
 #' exportToH5ad(crb, h5ad)
 #' # then, in Python: adata = anndata.read_h5ad("example.h5ad")
 #' }

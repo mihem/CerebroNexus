@@ -65,10 +65,10 @@ exported; a message names what was left out. The file is written to a
 private temporary file and moved into place only when complete.
 }
 \examples{
-\dontshow{if (requireNamespace("rhdf5", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "rhdf5"))) withAutoprint(\{ # examplesIf}
 \donttest{
 crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
-h5ad <- file.path(tempdir(), "example.h5ad")
+h5ad <- tempfile(fileext = ".h5ad")
 exportToH5ad(crb, h5ad)
 # then, in Python: adata = anndata.read_h5ad("example.h5ad")
 }

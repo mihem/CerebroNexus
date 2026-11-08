@@ -775,15 +775,20 @@
 #'   columns. Duplicate gene names are made unique with a message; duplicate
 #'   cell names are an error.
 #'
-#' @examplesIf requireNamespace("rhdf5") && requireNamespace("SingleCellExperiment")
+#' @examplesIf nzchar(system.file(package = "rhdf5")) && nzchar(system.file(package = "SingleCellExperiment"))
 #' \donttest{
-#' h5ad <- file.path(tempdir(), "example.h5ad")
+#' h5ad <- tempfile(fileext = ".h5ad")
 #' exportToH5ad(
 #'   system.file("extdata/examples/example.crb", package = "CerebroNexus"),
 #'   h5ad
 #' )
 #' sce <- readH5adAsSCE(h5ad)
-#' convertSCEToCerebro(sce, file.path(tempdir(), "output"), groups = "sample")
+#' convertSCEToCerebro(
+#'   sce,
+#'   file.path(tempdir(), "output"),
+#'   assay = "X",
+#'   groups = "sample"
+#' )
 #' }
 #'
 #' @seealso \code{\link{convertH5adToCerebro}}, \code{\link{convertSCEToCerebro}}

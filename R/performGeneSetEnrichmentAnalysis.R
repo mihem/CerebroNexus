@@ -27,7 +27,8 @@
 #' Seurat object with GSVA results for the specified grouping variables
 #' stored in object@misc$enriched_pathways$<name>
 #'
-#' @examplesIf all(sapply(c("Seurat", "GSVA", "qvalue", "future.apply"), requireNamespace, quietly = TRUE))
+#' @examplesIf all(nzchar(vapply(c("Seurat", "GSVA", "qvalue", "future.apply"), function(p) system.file(package = p), "")))
+#' \donttest{
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' example_gene_set <- system.file("extdata/example_gene_set.gmt",
@@ -35,10 +36,11 @@
 #' pbmc <- performGeneSetEnrichmentAnalysis(
 #'   object = pbmc,
 #'   GMT_file = example_gene_set,
-#'   groups = c('sample','seurat_clusters'),
+#'   groups = 'seurat_clusters',
 #'   thresh_p_val = 0.05,
 #'   thresh_q_val = 0.1
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom Matrix colMeans colSums rowSums t

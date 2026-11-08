@@ -117,7 +117,7 @@ like their \code{@misc} counterparts on a Seurat object. Attaching BCR/TCR
 files (\code{bcr_file}/\code{tcr_file}) is not available for SCE yet.
 }
 \examples{
-\dontshow{if (requireNamespace("SingleCellExperiment", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
 \donttest{
 convertSCEToCerebro(
   sce_file = system.file("extdata/examples/pbmc_SCE.rds",

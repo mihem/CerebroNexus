@@ -86,9 +86,9 @@
 #' embedding exists, as on the other routes. Receptor chains written by scirpy
 #' (\code{obsm["airr"]}) fill the Immune repertoire page.
 #'
-#' @examplesIf requireNamespace("rhdf5") && requireNamespace("SingleCellExperiment")
+#' @examplesIf nzchar(system.file(package = "rhdf5")) && nzchar(system.file(package = "SingleCellExperiment"))
 #' \donttest{
-#' h5ad <- file.path(tempdir(), "example.h5ad")
+#' h5ad <- tempfile(fileext = ".h5ad")
 #' exportToH5ad(
 #'   system.file("extdata/examples/example.crb", package = "CerebroNexus"),
 #'   h5ad
