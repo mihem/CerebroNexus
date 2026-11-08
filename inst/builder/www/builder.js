@@ -2543,6 +2543,33 @@
     enqueueClientFiles(event.dataTransfer && event.dataTransfer.files);
   }
 
+  // The table and marker pickers upload through Shiny directly, which refuses
+  // a file above shiny.maxRequestSize without telling the page. Report the
+  // picked names and sizes so the server can explain (see
+  // builder_upload_probe_message).
+  var sizeProbedInputs = {
+    "enhance-table_files": true,
+    "enhance-marker_import_files": true
+  };
+
+  function handleUploadSizeProbe(event) {
+    var input = event.target;
+    if (!input || input.type !== "file" || !sizeProbedInputs[input.id]) return;
+    var files = Array.prototype.map.call(input.files || [], function (file) {
+      return { name: file.name, size: file.size };
+    });
+    if (!files.length) return;
+    send("builder_upload_size_probe", {
+      input: input.id,
+      files: files,
+      nonce: Date.now() + Math.random()
+    });
+  }
+
+  function setupUploadSizeProbe() {
+    document.addEventListener("change", handleUploadSizeProbe, true);
+  }
+
   function setupWindowFileDrop() {
     if (windowFileDrag.bound) return;
     windowFileDrag.bound = true;
@@ -6233,6 +6260,7 @@
     registerClientImportHandlers();
     observeClientUploadProgress();
     setupWindowFileDrop();
+    setupUploadSizeProbe();
     registerViewerGroupHandler();
     registerViewerContentHandlers();
 

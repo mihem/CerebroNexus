@@ -420,3 +420,41 @@ test_that("files dropped anywhere in the window are added as datasets", {
   expect_identical(out$added, list("a.qs2", "b.rds"))
   expect_false(grepl("function setupDatasetDropzones(", js, fixed = TRUE))
 })
+
+test_that("the table and marker pickers report the picked file sizes", {
+  js <- builder_rail_js()
+  definitions <- builder_rail_js_functions(
+    js,
+    functions = c("handleUploadSizeProbe", "setupUploadSizeProbe"),
+    vars = "sizeProbedInputs"
+  )
+  out <- builder_rail_dom_run(
+    c(
+      paste0(
+        "document.body.innerHTML = '",
+        "<input type=\"file\" id=\"enhance-table_files\">",
+        "<input type=\"file\" id=\"enhance-marker_import_files\">",
+        "<input type=\"file\" id=\"other\">';"
+      ),
+      "const sent = [];",
+      "function send(name, value) { sent.push({ name: name, value: value }); return true; }",
+      definitions
+    ),
+    c(
+      "setupUploadSizeProbe();",
+      "const pick = (id, names) => { const data = new DataTransfer(); names.forEach(name => data.items.add(new File(['xyz'], name))); const input = document.getElementById(id); input.files = data.files; input.dispatchEvent(new Event('change', { bubbles: true })); };",
+      "pick('enhance-table_files', ['a.csv', 'b.csv']);",
+      "pick('enhance-marker_import_files', ['m.csv']);",
+      "pick('other', ['x.csv']);",
+      "pick('enhance-table_files', []);",
+      "return { sent: sent.map(item => ({ name: item.name, input: item.value.input, files: item.value.files.map(file => file.name + ':' + file.size) })) };"
+    )
+  )
+
+  expect_length(out$sent, 2L)
+  expect_identical(out$sent[[1L]]$name, "builder_upload_size_probe")
+  expect_identical(out$sent[[1L]]$input, "enhance-table_files")
+  expect_identical(out$sent[[1L]]$files, list("a.csv:3", "b.csv:3"))
+  expect_identical(out$sent[[2L]]$input, "enhance-marker_import_files")
+  expect_identical(out$sent[[2L]]$files, list("m.csv:3"))
+})

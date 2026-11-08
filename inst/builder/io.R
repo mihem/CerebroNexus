@@ -794,6 +794,47 @@ builder_wsl_picker_paths <- function(paths, .run = processx::run) {
   converted
 }
 
+## The notice for a file picker the page reports as `list(list(name, size), ...)`
+## (the table and marker pickers upload through Shiny directly, which refuses
+## a file above the limit without telling the page). The first file over the
+## limit is named; any others are counted. NULL when every file fits.
+builder_upload_probe_message <- function(
+  files,
+  limit = getOption("shiny.maxRequestSize")
+) {
+  if (is.data.frame(files)) {
+    files <- lapply(seq_len(nrow(files)), function(row) as.list(files[row, ]))
+  }
+  if (!is.list(files)) {
+    return(NULL)
+  }
+  messages <- Filter(
+    Negate(is.null),
+    lapply(files, function(file) {
+      name <- file$name
+      if (!is.character(name) || length(name) != 1L || is.na(name)) {
+        name <- NULL
+      }
+      builder_upload_limit_message(name, file$size, limit = limit)
+    })
+  )
+  if (!length(messages)) {
+    return(NULL)
+  }
+  extra <- length(messages) - 1L
+  paste0(
+    messages[[1L]],
+    if (extra > 0L) {
+      paste0(
+        " ",
+        extra,
+        if (extra == 1L) " other file is" else " other files are",
+        " over the limit too."
+      )
+    }
+  )
+}
+
 ## Shiny refuses an upload above shiny.maxRequestSize (set by
 ## launchCerebroBuilder(max_file_size)) without telling the page. NULL when
 ## the file fits.

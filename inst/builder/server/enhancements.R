@@ -536,6 +536,25 @@ observeEvent(input[["enhance-table_files"]], {
   )
 })
 
+## Shiny refuses a table or marker file above shiny.maxRequestSize before the
+## inputs above fire, so the page reports the names and sizes it picked and
+## the notice is shown here.
+observeEvent(input$builder_upload_size_probe, {
+  probe <- input$builder_upload_size_probe
+  message <- builder_upload_probe_message(probe$files)
+  target <- switch(
+    as.character(probe$input %||% "")[[1L]],
+    "enhance-table_files" = list(
+      selector = ".builder-viewer-extra-material .builder-viewer-card-body"
+    ),
+    "enhance-marker_import_files" = list(field = "enhance-marker_import_files")
+  )
+  if (is.null(message) || is.null(target)) {
+    return()
+  }
+  builder_notify("error", message, target = target, session = session)
+})
+
 observeEvent(
   input[["enhance-table_action"]],
   {

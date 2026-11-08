@@ -515,3 +515,26 @@ test_that("native picker subprocess hides the Windows console host", {
   expect_identical(started$process, process)
   expect_true(arguments$windows_hide_window)
 })
+
+test_that("a table or marker picker over max_file_size is explained", {
+  files <- list(
+    list(name = "a.csv", size = 12 * 1024^2),
+    list(name = "ok.csv", size = 1024),
+    list(name = "b.csv", size = 30 * 1024^2)
+  )
+  message <- builder_upload_probe_message(files, limit = 5 * 1024^2)
+  expect_match(message, "a.csv is 12 MB, larger than the 5 MB", fixed = TRUE)
+  expect_match(message, "1 other file is over the limit too.", fixed = TRUE)
+  expect_match(message, "max_file_size", fixed = TRUE)
+  ## Shiny may hand the page's list over as a data frame.
+  frame <- data.frame(name = c("a.csv", "ok.csv"), size = c(12, 0.5) * 1024^2)
+  expect_match(
+    builder_upload_probe_message(frame, limit = 5 * 1024^2),
+    "a.csv is 12 MB",
+    fixed = TRUE
+  )
+  expect_null(builder_upload_probe_message(files[2L], limit = 5 * 1024^2))
+  expect_null(builder_upload_probe_message(files, limit = Inf))
+  expect_null(builder_upload_probe_message(NULL, limit = 5 * 1024^2))
+  expect_null(builder_upload_probe_message("a.csv", limit = 5 * 1024^2))
+})
