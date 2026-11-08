@@ -499,6 +499,14 @@ test_that("10x TCR identifiers give the same clone calls as Smart-seq2 ones", {
   )
   expect_identical(failed_calls$CTaa, c("CDDF_CBBF", "CBBF"))
 
+  ## Factor columns give the same calls as character ones, not their codes.
+  as_factors <- tcr
+  as_factors[] <- lapply(as_factors, factor)
+  expect_identical(
+    env$.viewerTcellRepertoire(as_factors, tcr$Cell_Name),
+    repertoire
+  )
+
   ## Any other layout with "|" stops instead of reaching CTnt raw.
   for (identifier in c(
     "TRAV1|None|TRAJ1|TRAC",

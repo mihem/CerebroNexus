@@ -516,6 +516,10 @@
     x
   }
   pick <- function(id1, aa1, id2, aa2) {
+    id1 <- as.character(id1)
+    aa1 <- as.character(aa1)
+    id2 <- as.character(id2)
+    aa2 <- as.character(aa2)
     complete1 <- !is.na(absent(id1)) & !is.na(no_sequence(aa1))
     complete2 <- !is.na(absent(id2)) & !is.na(no_sequence(aa2))
     id <- ifelse(complete1, id1, ifelse(complete2, id2, NA_character_))
