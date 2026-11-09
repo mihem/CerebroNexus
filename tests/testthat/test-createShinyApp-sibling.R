@@ -2741,7 +2741,7 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
   }
 
   linked <- file.path(app, "spatial-assets", "linked.png")
-  if (isTRUE(file.symlink(outside, linked))) {
+  if (isTRUE(suppressWarnings(file.symlink(outside, linked)))) {
     rendered_meta <- render_bundle_spatial_background(
       app,
       config,
@@ -2825,7 +2825,7 @@ test_that("backend paths cannot resolve through symbolic links", {
   dir.create(source)
   dir.create(outside)
   writeLines("OUTSIDE", file.path(outside, "matrix.h5"))
-  linked <- file.symlink(outside, file.path(source, "alias"))
+  linked <- suppressWarnings(file.symlink(outside, file.path(source, "alias")))
   if (!isTRUE(linked)) {
     skip("Symbolic links are not available on this platform")
   }
@@ -2841,10 +2841,10 @@ test_that("backend paths cannot resolve through symbolic links", {
 
   app <- file.path(root, "existing-app")
   dir.create(app)
-  destination_linked <- file.symlink(
+  destination_linked <- suppressWarnings(file.symlink(
     outside,
     file.path(app, "private-data")
-  )
+  ))
   if (!isTRUE(destination_linked)) {
     skip("Destination symbolic links are not available on this platform")
   }

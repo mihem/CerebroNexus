@@ -79,7 +79,7 @@ test_that("server path fallback resolves symlinks inside explicit roots", {
     )
 
     linked <- file.path(allowed, "linked-outside")
-    if (isTRUE(file.symlink(outside, linked))) {
+    if (isTRUE(suppressWarnings(file.symlink(outside, linked)))) {
       expect_error(
         builder_server_path_resolve(linked, "directory", roots = allowed),
         "outside the allowed server folders",
@@ -165,7 +165,7 @@ test_that("the server path browser lists only inside the allowed folders", {
       fixed = TRUE
     )
     linked <- file.path(allowed, "linked-outside")
-    if (isTRUE(file.symlink(outside, linked))) {
+    if (isTRUE(suppressWarnings(file.symlink(outside, linked)))) {
       expect_error(
         builder_server_path_entries(linked, roots = allowed),
         "outside the allowed server folders",

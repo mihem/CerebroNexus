@@ -238,10 +238,13 @@ test_that("provided most expressed genes skip non-tables without shifting the re
     "not a data.frame"
   )
   expect_identical(names(result$misc$most_expressed_genes), c("a", "c"))
-  unnamed <- .convertAddProvidedMostExpressed(
-    list(),
-    list(table, "x", table),
-    verbose = FALSE
+  expect_warning(
+    unnamed <- .convertAddProvidedMostExpressed(
+      list(),
+      list(table, "x", table),
+      verbose = FALSE
+    ),
+    "not a data.frame"
   )
   expect_identical(
     names(unnamed$misc$most_expressed_genes),
