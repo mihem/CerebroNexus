@@ -34,9 +34,6 @@ Reads the store with \code{\link{readSpatialDataAsSCE}} and exports it with
 tissue picture, where the store has one), expression, cell data and any
 embeddings, markers and colours the table carries.
 }
-\seealso{
-\code{\link{readSpatialDataAsSCE}}
-}
 \examples{
 \dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
 \donttest{
@@ -52,4 +49,7 @@ list.files(dir)
 unlink(dir, recursive = TRUE)
 }
 \dontshow{\}) # examplesIf}
+}
+\seealso{
+\code{\link{readSpatialDataAsSCE}}
 }

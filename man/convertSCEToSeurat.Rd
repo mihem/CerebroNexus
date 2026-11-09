@@ -31,7 +31,7 @@ file opened with \code{\link[=readH5adAsSCE]{readH5adAsSCE()}}) the shape the Se
 so it can go through the Builder like any other dataset. Cells, genes, cell
 metadata and every reduced dimension are carried over; so are the results kept
 in \code{metadata(object)} (marker genes, immune repertoire, trajectories and
-category colours), which the export reads from \code{@misc}.
+category colours), which the export reads from \verb{@misc}.
 }
 \details{
 The expression matrix is placed by what it holds: a \code{counts} assay becomes
@@ -48,7 +48,7 @@ embedding, they are also kept as the projection \code{spatial_xy}, so there
 is one to open the data set with.
 
 The tissue pictures in \code{metadata(object)$spatial_images} are kept per section
-in \code{@misc$cerebro_source_images} (not in \code{cerebro_spatial_images}, which the
+in \verb{@misc$cerebro_source_images} (not in \code{cerebro_spatial_images}, which the
 export would embed in the \code{.crb}). The Builder takes them from there and
 attaches them to their sections as separate image files, placed at the extent
 their scale factor gives.

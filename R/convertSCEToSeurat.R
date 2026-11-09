@@ -33,6 +33,7 @@
 #'   \code{<experiment>:<feature>}: their names, or \code{TRUE} for all.
 #' @param verbose Print what was converted.
 #' @return A Seurat object.
+#' @md
 #' @examplesIf nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "SeuratObject"))
 #' \donttest{
 #' sce <- readRDS(

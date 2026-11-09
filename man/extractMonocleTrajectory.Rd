@@ -47,4 +47,5 @@ seurat <- extractMonocleTrajectory(
   column_pseudotime = 'Pseudotime'
 )
 }
+
 }

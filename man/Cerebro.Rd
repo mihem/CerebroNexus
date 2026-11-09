@@ -10,6 +10,12 @@ A new \code{Cerebro} object.
 A \code{Cerebro} object is an R6 class that contains several types of
 data that can be visualized in Cerebro.
 }
+\examples{
+cerebro <- Cerebro$new()
+cerebro$addExperiment("experiment_name", "PBMC")
+cerebro$addExperiment("organism", "hg")
+cerebro$getExperiment()
+}
 \section{Public fields}{
   \if{html}{\out{<div class="r6-fields">}}
   \describe{
@@ -1399,8 +1405,9 @@ Cerebro spatial entry).}
       \item{\code{data}}{\code{list} containing 'coordinates' (data.frame) and
 'expression' (sparse matrix). Embedded backgrounds are stored in
 'histology_images', a uniquely named list of image payloads. Each
-payload contains 'histology_image' (a base64 \code{data:} URI) and
-'histology_image_bounds' (xmin/xmax/ymin/ymax in coordinate space).
+payload contains 'histology_image' (a base64 \code{data:} URI),
+'histology_image_bounds' (xmin/xmax/ymin/ymax in coordinate space), and
+may contain a declarative 'histology_alignment'.
 Bounds omitted from a payload are derived from the coordinates. The
 singular 'histology_image' / 'histology_image_bounds' fields are
 rejected.}
@@ -1692,12 +1699,6 @@ materials.
 \if{latex}{\out{\hypertarget{method-Cerebro-print}{}}}
 \subsection{\code{Cerebro$print()}}{
   Show overview of object and the data it contains.
-Print overview of available marker gene results for \code{self$print()}
-function.
-Print overview of available enriched pathway results for
-\code{self$print()} function.
-Print overview of available trajectories for \code{self$print()} function.
-Print overview of extra material for \code{self$print()} function.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Cerebro$print()}
@@ -1724,10 +1725,4 @@ Print overview of extra material for \code{self$print()} function.
   }
 }
 
-}
-\examples{
-cerebro <- Cerebro$new()
-cerebro$addExperiment("experiment_name", "PBMC")
-cerebro$addExperiment("organism", "hg")
-cerebro$getExperiment()
 }
