@@ -19,3 +19,12 @@ A validation result.
 \description{
 Validate a Viewer Pack
 }
+\examples{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+crb <- file.path(dir, "example.crb")
+buildViewerPack(crb, viewer_binary = "always")
+validateViewerPack(crb)$valid
+unlink(dir, recursive = TRUE)
+}

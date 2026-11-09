@@ -33,3 +33,15 @@ A CRB whose expression storage is older than the formats this version reads
 (an unknown expression backend, thin schema 1 or 2) cannot be converted;
 re-export it with \code{\link{exportFromSeurat}}.
 }
+\examples{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+convertCerebro(
+  file.path(dir, "example.crb"),
+  file.path(dir, "example_rds.crb"),
+  codec = "rds"
+)
+list.files(dir)
+unlink(dir, recursive = TRUE)
+}

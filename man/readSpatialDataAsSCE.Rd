@@ -55,3 +55,14 @@ file.
 \seealso{
 \code{\link{convertSpatialDataToCerebro}}, \code{\link{readH5adAsSCE}}
 }
+\examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## A small SpatialData store (50 spots), zipped
+sce <- readSpatialDataAsSCE(
+  system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus")
+)
+sce
+}
+\dontshow{\}) # examplesIf}
+}

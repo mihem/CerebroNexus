@@ -37,3 +37,19 @@ embeddings, markers and colours the table carries.
 \seealso{
 \code{\link{readSpatialDataAsSCE}}
 }
+\examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+convertSpatialDataToCerebro(
+  system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus"),
+  result_dir = dir,
+  groups = "cell_type",
+  verbose = FALSE
+)
+list.files(dir)
+unlink(dir, recursive = TRUE)
+}
+\dontshow{\}) # examplesIf}
+}

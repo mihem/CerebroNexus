@@ -941,6 +941,13 @@
 #' @param immune_sidecar_threshold Number of repertoire rows (cells with
 #' receptor data) used by \code{immune_sidecar = "auto"}.
 #' @return The output path, invisibly.
+#' @examples
+#' cerebro <- readCerebro(system.file("extdata/examples/example.crb", package = "CerebroNexus"))
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' saveCerebro(cerebro, file.path(dir, "example.crb"))
+#' list.files(dir)
+#' unlink(dir, recursive = TRUE)
 #' @export
 saveCerebro <- function(
   object,
@@ -1092,6 +1099,10 @@ saveCerebro <- function(
 #'
 #' @param file Input \code{.crb} path.
 #' @return A current Cerebro object.
+#' @examples
+#' crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
+#' cerebro <- readCerebro(crb)
+#' cerebro
 #' @export
 readCerebro <- function(file) {
   file <- normalizePath(file, mustWork = TRUE)
@@ -1229,6 +1240,17 @@ readCerebro <- function(file) {
 #' @param codec Serialization codec. Defaults to \code{"qs2"}; use
 #' \code{"rds"} when direct compatibility with \code{readRDS()} is required.
 #' @return The output path, invisibly.
+#' @examples
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#' convertCerebro(
+#'   file.path(dir, "example.crb"),
+#'   file.path(dir, "example_rds.crb"),
+#'   codec = "rds"
+#' )
+#' list.files(dir)
+#' unlink(dir, recursive = TRUE)
 #' @export
 convertCerebro <- function(input, output = input, codec = c("qs2", "rds")) {
   codec <- match.arg(codec)

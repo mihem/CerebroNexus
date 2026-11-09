@@ -33,6 +33,14 @@
 #'   \code{<experiment>:<feature>}: their names, or \code{TRUE} for all.
 #' @param verbose Print what was converted.
 #' @return A Seurat object.
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "SeuratObject"))
+#' \donttest{
+#' sce <- readRDS(
+#'   system.file("extdata/examples/pbmc_SCE.rds", package = "CerebroNexus")
+#' )
+#' seurat <- convertSCEToSeurat(sce)
+#' seurat
+#' }
 #' @export
 convertSCEToSeurat <- function(
   object,

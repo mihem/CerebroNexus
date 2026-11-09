@@ -53,3 +53,14 @@ export would embed in the \code{.crb}). The Builder takes them from there and
 attaches them to their sections as separate image files, placed at the extent
 their scale factor gives.
 }
+\examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "SeuratObject"))) withAutoprint(\{ # examplesIf}
+\donttest{
+sce <- readRDS(
+  system.file("extdata/examples/pbmc_SCE.rds", package = "CerebroNexus")
+)
+seurat <- convertSCEToSeurat(sce)
+seurat
+}
+\dontshow{\}) # examplesIf}
+}

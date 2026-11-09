@@ -1725,3 +1725,9 @@ Print overview of extra material for \code{self$print()} function.
 }
 
 }
+\examples{
+cerebro <- Cerebro$new()
+cerebro$addExperiment("experiment_name", "PBMC")
+cerebro$addExperiment("organism", "hg")
+cerebro$getExperiment()
+}

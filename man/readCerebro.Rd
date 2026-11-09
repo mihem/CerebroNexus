@@ -21,3 +21,8 @@ longer reads (for example one without an expression-backend descriptor,
 or one with a singular spatial image or an embedded spatial molecule table) is
 rejected with a pointer to \code{\link{convertCerebro}}.
 }
+\examples{
+crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
+cerebro <- readCerebro(crb)
+cerebro
+}
