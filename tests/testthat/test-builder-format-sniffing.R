@@ -44,6 +44,32 @@ test_that("every RDS compression is recognised without an extension", {
   expect_identical(builder_sniff_format(native), "rds")
 })
 
+test_that("an ASCII RDS saved on Windows (CRLF line ends) is recognised", {
+  ## saveRDS(ascii = TRUE) on Windows writes "A\r\n3\r\n..."; build the same
+  ## bytes on any platform.
+  dir <- sniff_dir()
+  ascii <- serialize(list(a = 1:3, b = "x"), NULL, ascii = TRUE)
+  newline <- which(ascii == as.raw(0x0a))
+  crlf <- unlist(lapply(seq_along(ascii), function(i) {
+    if (i %in% newline) as.raw(c(0x0d, 0x0a)) else ascii[[i]]
+  }))
+  expect_identical(crlf[1:4], as.raw(c(0x41, 0x0d, 0x0a, 0x33)))
+
+  plain <- write_bytes(file.path(dir, "windows_ascii"), crlf)
+  expect_identical(builder_sniff_format(plain), "rds")
+  expect_identical(builder_match_format(plain)$id, "rds")
+
+  gz <- file.path(dir, "windows_ascii_gzip")
+  connection <- gzfile(gz, "wb")
+  writeBin(crlf, connection)
+  close(connection)
+  expect_identical(builder_sniff_format(gz), "rds")
+
+  ## A text file that only starts with "A" is still not an RDS.
+  text <- write_bytes(file.path(dir, "text"), charToRaw("A\r\nhello\r\n"))
+  expect_null(builder_sniff_format(text))
+})
+
 test_that("qs2, qs, AnnData, MuData and SpatialData zip are recognised by content", {
   dir <- sniff_dir()
   skip_if_not_installed("qs2")

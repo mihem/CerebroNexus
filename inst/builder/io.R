@@ -1631,6 +1631,7 @@ builder_sniff_format <- function(path) {
 ## readRDS() reads gzip, bzip2, xz, zstd and uncompressed serializations;
 ## gzfile() decompresses all of them, so the first decompressed bytes must be
 ## an R serialization header: "X\n", "A\n" or "B\n" and format version 2 or 3.
+## An ASCII save made on Windows starts "A\r\n".
 .builder_sniff_rds <- function(path, head) {
   compressed <- list(
     c(0x1f, 0x8b),
@@ -1638,7 +1639,12 @@ builder_sniff_format <- function(path) {
     c(0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00),
     c(0x28, 0xb5, 0x2f, 0xfd)
   )
-  plain <- list(c(0x58, 0x0a), c(0x41, 0x0a), c(0x42, 0x0a))
+  plain <- list(
+    c(0x58, 0x0a),
+    c(0x41, 0x0a),
+    c(0x41, 0x0d, 0x0a),
+    c(0x42, 0x0a)
+  )
   starts <- function(bytes) {
     bytes <- as.raw(bytes)
     length(head) >= length(bytes) &&
@@ -1652,18 +1658,24 @@ builder_sniff_format <- function(path) {
     return(FALSE)
   }
   header <- tryCatch(
-    suppressWarnings(readBin(connection, "raw", n = 6L)),
+    suppressWarnings(readBin(connection, "raw", n = 7L)),
     error = function(error) raw()
   )
   close(connection)
-  if (length(header) < 4L || header[[2L]] != as.raw(0x0a)) {
+  if (length(header) < 4L) {
+    return(FALSE)
+  }
+  crlf <- header[[1L]] == as.raw(0x41) &&
+    header[[2L]] == as.raw(0x0d) &&
+    header[[3L]] == as.raw(0x0a)
+  if (header[[2L]] != as.raw(0x0a) && !crlf) {
     return(FALSE)
   }
   version <- switch(
     rawToChar(header[1L]),
     X = if (length(header) >= 6L) as.integer(header[[6L]]) else NA_integer_,
     B = as.integer(header[[3L]]),
-    A = suppressWarnings(as.integer(rawToChar(header[3L]))),
+    A = suppressWarnings(as.integer(rawToChar(header[if (crlf) 4L else 3L]))),
     NA_integer_
   )
   isTRUE(version %in% c(2L, 3L))
