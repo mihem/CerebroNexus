@@ -22,8 +22,16 @@ Automated tests run in a reproducible Nix environment.
 
 ## 1. Installation
 
+From CRAN:
+
 ```r
-remotes::install_github('mihem/CerebroNexus')
+install.packages("CerebroNexus")
+```
+
+The development version from GitHub:
+
+```r
+remotes::install_github("mihem/CerebroNexus")
 ```
 
 The Builder (below) also needs a few suggested packages:
