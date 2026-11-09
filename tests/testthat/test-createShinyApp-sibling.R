@@ -2408,7 +2408,9 @@ test_that("spatial image targets bound long logical names and filenames", {
   dataset <- paste(rep("dataset", 25L), collapse = "-")
   spatial_name <- paste(rep("spatial", 25L), collapse = "-")
   image_label <- paste(rep("image", 35L), collapse = "-")
-  filename <- paste0(paste(rep("x", 180L), collapse = ""), ".png")
+  ## Longer than the 120-byte target bound, but short enough that the source
+  ## path fits Windows' 260-character limit in a deeper temporary directory.
+  filename <- paste0(paste(rep("x", 140L), collapse = ""), ".png")
   crb <- write_spatial_bundle_crb(
     file.path(root, "source"),
     spatials = stats::setNames(list(character()), spatial_name)

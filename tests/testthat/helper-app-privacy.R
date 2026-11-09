@@ -44,6 +44,21 @@ privacy_start_app <- function(
   test_mode = FALSE
 ) {
   skip_if_not_installed("callr")
+  ## R's own library (.Library, .Library.site) is always on a child's library
+  ## path, so with CerebroNexus installed there no App process can run
+  ## without it.
+  if (isTRUE(exclude_package)) {
+    ## file.exists(), not system.file(): pkgload's system.file() shim finds
+    ## the source tree whatever lib.loc says.
+    skip_if(
+      any(file.exists(file.path(
+        c(.Library, .Library.site),
+        "CerebroNexus",
+        "DESCRIPTION"
+      ))),
+      "CerebroNexus is installed in R's own library, so no package-free App process"
+    )
+  }
   stdout <- file.path(root, paste0("app-", port, ".stdout"))
   stderr <- file.path(root, paste0("app-", port, ".stderr"))
   process <- callr::r_bg(
