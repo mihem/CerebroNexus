@@ -2504,7 +2504,9 @@ createShinyApp <- function(
       any(data_labels == "")
   ) {
     stop(
-      "cerebro_data identities must be non-empty and non-missing.",
+      "cerebro_data identities must be non-empty and non-missing. ",
+      "Name every data set, for example ",
+      "cerebro_data = c(MyData = \"path/to/data.crb\").",
       call. = FALSE
     )
   }

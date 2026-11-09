@@ -464,3 +464,18 @@ test_that("a Spatial frame draws the current region-outline switch", {
     expect_true(state$drawn[[1]]$show_region_outlines)
   })
 })
+
+test_that("point styling without spatial controls does not stop the session", {
+  source <- paste(
+    readLines(
+      viewer_test_path("spatial", "obj_projection_parameters_plot.R"),
+      warn = FALSE
+    ),
+    collapse = "\n"
+  )
+  expect_match(
+    source,
+    "!is\\.list\\(previous\\)[\\s\\S]{0,80}return\\([\\s\\S]{0,160}modifyList\\(previous",
+    perl = TRUE
+  )
+})

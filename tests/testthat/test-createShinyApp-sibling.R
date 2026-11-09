@@ -3523,6 +3523,15 @@ test_that("Cerebro data identities cannot be missing", {
   expect_false(dir.exists(app))
 })
 
+test_that("an unnamed Cerebro data set says how to name it", {
+  root <- withr::local_tempdir()
+  crb <- write_bundle_crb(file.path(root, "source"))
+  expect_error(
+    build_test_app(unname(crb), file.path(root, "app")),
+    "Name every data set, for example"
+  )
+})
+
 test_that("Cerebro data identities must be unique", {
   root <- withr::local_tempdir()
   first <- write_bundle_crb(file.path(root, "first"), "first.crb")
