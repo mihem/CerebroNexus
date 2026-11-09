@@ -43,3 +43,4 @@ Rplots\.pdf$
 ^inst/extdata/examples/demo_trekker\.crb$
 ^inst/extdata/examples/demo_hla_tcr_dextramer\.crb$
 ^inst/builder/fixtures/(trekker_spatial|spatial_alignment)$
+^cran-comments\.md$
