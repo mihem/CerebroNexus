@@ -24,7 +24,7 @@ The `CerebroNexus` package has two main purposes: (1) provide access to the Cere
 The Cerebro user interface was built using the Shiny framework and designed to provide numerous perspectives on a given data set that should facilitate data interpretation.
 This vignette will give you an example of how scRNA-seq data can be processed using the [Seurat](https://satijalab.org/seurat/) toolkit and then exported for visualization in Cerebro.
 
-Ket features that can be accessed through Cerebro:
+Key features that can be accessed through Cerebro:
 
 * Interactive 2D and 3D dimensional reductions.
 * Overview panels for all grouping variables, e.g. samples and clusters.
@@ -301,7 +301,7 @@ seurat <- getMarkerGenes(
 
 ## Perform pathway enrichment on marker genes
 
-Using the previously identified marker genes, we can perform a pathway enrichmeny analysis using the `getEnrichedPathways()` function.
+Using the previously identified marker genes, we can perform a pathway enrichment analysis using the `getEnrichedPathways()` function.
 The function will internally use the [Enrichr](https://amp.pharm.mssm.edu/Enrichr/) API and store the results in the Seurat object under the `misc` slot.
 All we have to do is provide the name that we specified in `getMarkerGenes()`.
 

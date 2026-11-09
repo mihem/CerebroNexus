@@ -46,7 +46,7 @@ can be changed in the UI; defaults to 1.}
 cell scatter view. This value can be changed independently in each page;
 defaults to 100.}
 
-\item{projections_show_hover_info}{Show hover infos in projections. This
+\item{projections_show_hover_info}{Show hover information in projections. This
 setting can be changed in the UI; defaults to TRUE.}
 
 \item{...}{Further parameters that are used by \code{shiny::runApp}, e.g.

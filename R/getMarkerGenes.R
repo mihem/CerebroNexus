@@ -23,7 +23,7 @@
 #' @param test Statistical test used, defaults to 'wilcox' (Wilcoxon test).
 #' @param verbose Print progress bar; defaults to TRUE.
 #' @param ... Further parameters can be passed to control
-#' Seurat::FindAllMakers().
+#' Seurat::FindAllMarkers().
 #'
 #' @return
 #' Seurat object with marker gene results for the specified grouping variables

@@ -49,7 +49,7 @@ defaults to 0.25.}
 \item{verbose}{Print progress bar; defaults to TRUE.}
 
 \item{...}{Further parameters can be passed to control
-Seurat::FindAllMakers().}
+Seurat::FindAllMarkers().}
 }
 \value{
 Seurat object with marker gene results for the specified grouping variables

@@ -26,7 +26,7 @@
 #' @param percentage_cells_to_show Default percentage of cells shown in every
 #'   cell scatter view. This value can be changed independently in each page;
 #'   defaults to 100.
-#' @param projections_show_hover_info Show hover infos in projections. This
+#' @param projections_show_hover_info Show hover information in projections. This
 #' setting can be changed in the UI; defaults to TRUE.
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
 #' \code{host} or \code{port}.

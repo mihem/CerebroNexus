@@ -87,7 +87,7 @@ rsconnect::deployApp(app_directory, appName = "Cerebro")
 
 Uploading and preparing the app might take a few minutes, but once it finishes successfully, Cerebro should open in your browser.
 Using the shinyapps.io dashboard, you can manage the app, check usage metrics and logs, etc.
-An important parameter is the "Instance size", which controls the available memory and can be controled in the "Settings" tab of the dashboard.
+An important parameter is the "Instance size", which controls the available memory and can be controlled in the "Settings" tab of the dashboard.
 The larger the data set you want to upload to Cerebro, the more memory will be necessary.
 
 # See also
