@@ -1,3 +1,37 @@
+# CerebroNexus 8.0.0
+
+- The package is prepared for a CRAN submission. `R CMD check --as-cran` on the
+  built tarball reports only the "New submission" NOTE.
+- The tarball shrinks from 28.4 MB to 5.66 MB. Three vignettes (Seurat workflow,
+  SCE/AnnData, Cerebro class) stay in the package; the other guides move to
+  `vignettes/articles/` and remain on the website under the same URLs. The large
+  demo `.crb` files, the `.zarr`/`.h5ad` test fixtures and the Builder's Trekker
+  and Visium examples are no longer shipped in the tarball; they stay in git.
+- New `downloadDemoData()` downloads the Visium, Slide-seq, MERFISH, Xenium and
+  HLA & TCR demo data from the release tag into `tools::R_user_dir()` and checks
+  size and MD5. The demo App lists them once downloaded. The Builder's Trekker
+  (synthetic) and Visium examples download on first use; offline, the Builder
+  says so and the other examples still work.
+- Imports drop from 39 to 20 non-default packages. GSVA, qvalue, biomaRt,
+  scRepertoire, msigdbr, igraph, stringdist, colourpicker, ggplot2, scales,
+  shinycssloaders, htmlwidgets, httr, future.apply, pbapply and digest move to
+  Suggests. A missing package gives an install hint, a reduced but working path,
+  or a message on the Viewer page instead of an error. `stringr`, `tibble` and
+  `tidyselect` are no longer used.
+- `createShinyApp()` now explains how to name an unnamed data set. The Spatial
+  point-size observer no longer stops the session when the data set has no
+  spatial data.
+- `launchCerebro()` no longer assigns `Cerebro.options` in the global
+  environment.
+- Examples are runnable, with slow parts in `\donttest{}`; the `getMarkerGenes()`
+  example no longer queries Ensembl.
+- Tests run in about 4 minutes under CRAN settings (was about 10): slow Builder
+  integration, browser, Node/Chrome, server and subprocess tests are skipped on
+  CRAN, at most two processes run, plots go to a null device, and nothing is
+  written outside `tempdir()`. GitHub CI still runs everything.
+- DESCRIPTION title and description follow CRAN style, `qs` is dropped from
+  Enhances, and `CITATION` is a `bibentry()` with volume, issue and pages.
+
 # CerebroNexus 7.2.0
 
 - The Immune repertoire SizeDist tab draws in an App whose folder is read-only,
@@ -1493,7 +1527,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   whose layer bands align with the cells, so cell types visibly stratify across
   the cortex out of the box. Both the coordinates and the image are synthetic —
   no patient data.
-- **Documentation**: added the [spatial analysis guide](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.html).
+- **Documentation**: added the [spatial analysis guide](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html).
 - **Bundled demo set**: the app now opens on `demo_full_tcr_bcr.crb` (PBMC,
   TCR + BCR + trajectory) plus four real spatial sections (Visium, Slide-seq v2,
   MERFISH, Xenium), so the dataset switcher spans immune-repertoire, trajectory,
@@ -1554,7 +1588,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   10x Genomics `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the
   reproducible build. The bundled app (`shiny::runApp("inst")`) now opens on
   these three data sets so the switcher is visible out of the box; pass a named
-  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://www.mheming.com/CerebroNexus/articles/multi_crb.html)).
+  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://mihem.github.io/CerebroNexus/articles/multi_crb.html)).
   New vignette: *Loading multiple data sets (multi-crb) with a dataset
   switcher*.
 
@@ -1749,7 +1783,7 @@ previous releases and refreshes documentation for the current codebase.
 
 ## Documentation
 
-- Added pkgdown site at <https://www.mheming.com/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
+- Added pkgdown site at <https://mihem.github.io/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to master
 
 # Version 1.5.3

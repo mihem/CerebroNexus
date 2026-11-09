@@ -1,7 +1,7 @@
 # Authentication: offline deployment checklist
 
 Full setup, Shiny Server/systemd commands, rotation and troubleshooting:
-[Authentication guide](https://www.mheming.com/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html).
+[Authentication guide](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.html).
 
 ## Linux quick start (including Apps copied from Windows)
 

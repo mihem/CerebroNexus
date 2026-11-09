@@ -373,14 +373,14 @@ exportFromSeurat(
 )
 ```
 
-By default the expression matrix is embedded in the `.crb`. For large data sets, add `expression_matrix_mode = "h5"` to write the matrix to a sibling `.h5` file instead (the only other storage mode); keep the two files together. A very large immune repertoire is moved to a third sibling file (`immune_sidecar = "auto"`). See [Store the expression matrix in H5 format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
+By default the expression matrix is embedded in the `.crb`. For large data sets, add `expression_matrix_mode = "h5"` to write the matrix to a sibling `.h5` file instead (the only other storage mode); keep the two files together. A very large immune repertoire is moved to a third sibling file (`immune_sidecar = "auto"`). See [Store the expression matrix in H5 format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
 
 The Cerebro use interface can be launched using the `launchCerebro()` function.
 
 # See also
 
 If your Seurat v5 assay is split into one layer per sample, see
-[Seurat v5 layered assays: complete and safe expression matrices](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.html)
+[Seurat v5 layered assays: complete and safe expression matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.html)
 for the automatic resolution rules, custom-layer safeguards, and troubleshooting
 steps.
 
