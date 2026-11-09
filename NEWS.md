@@ -1527,7 +1527,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   whose layer bands align with the cells, so cell types visibly stratify across
   the cortex out of the box. Both the coordinates and the image are synthetic —
   no patient data.
-- **Documentation**: added the [spatial analysis guide](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.html).
+- **Documentation**: added the [spatial analysis guide](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.html).
 - **Bundled demo set**: the app now opens on `demo_full_tcr_bcr.crb` (PBMC,
   TCR + BCR + trajectory) plus four real spatial sections (Visium, Slide-seq v2,
   MERFISH, Xenium), so the dataset switcher spans immune-repertoire, trajectory,
@@ -1588,7 +1588,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   10x Genomics `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the
   reproducible build. The bundled app (`shiny::runApp("inst")`) now opens on
   these three data sets so the switcher is visible out of the box; pass a named
-  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://mihem.github.io/CerebroNexus/articles/multi_crb.html)).
+  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://www.mheming.com/CerebroNexus/articles/multi_crb.html)).
   New vignette: *Loading multiple data sets (multi-crb) with a dataset
   switcher*.
 
@@ -1783,7 +1783,7 @@ previous releases and refreshes documentation for the current codebase.
 
 ## Documentation
 
-- Added pkgdown site at <https://mihem.github.io/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
+- Added pkgdown site at <https://www.mheming.com/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to master
 
 # Version 1.5.3

@@ -302,7 +302,7 @@ seurat <- getMarkerGenes(
 ## Perform pathway enrichment on marker genes
 
 Using the previously identified marker genes, we can perform a pathway enrichment analysis using the `getEnrichedPathways()` function.
-The function will internally use the [Enrichr](https://amp.pharm.mssm.edu/Enrichr/) API and store the results in the Seurat object under the `misc` slot.
+The function will internally use the [Enrichr](https://maayanlab.cloud/Enrichr/) API and store the results in the Seurat object under the `misc` slot.
 All we have to do is provide the name that we specified in `getMarkerGenes()`.
 
 ```{r getEnrichedPathways, eval=FALSE}
@@ -316,7 +316,7 @@ seurat <- getEnrichedPathways(
 
 ## Gene set enrichment
 
-On top of querying the databases of the [Enrichr](https://amp.pharm.mssm.edu/Enrichr/) service, one can also perform gene set enrichment analysis on gene sets provided as a `.gmt` file, e.g. from the [MSigDB](https://www.gsea-msigdb.org/gsea/msigdb/index.jsp).
+On top of querying the databases of the [Enrichr](https://maayanlab.cloud/Enrichr/) service, one can also perform gene set enrichment analysis on gene sets provided as a `.gmt` file, e.g. from the [MSigDB](https://www.gsea-msigdb.org/gsea/msigdb/index.jsp).
 The `performGeneSetEnrichmentAnalysis()` function uses the [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html) method in combination with additional statistics as published by [Diaz-Mejia et. al.](https://f1000research.com/articles/8-296).
 
 ```{r performGeneSetEnrichmentAnalysis, eval=FALSE}
@@ -373,14 +373,14 @@ exportFromSeurat(
 )
 ```
 
-By default the expression matrix is embedded in the `.crb`. For large data sets, add `expression_matrix_mode = "h5"` to write the matrix to a sibling `.h5` file instead (the only other storage mode); keep the two files together. A very large immune repertoire is moved to a third sibling file (`immune_sidecar = "auto"`). See [Store the expression matrix in H5 format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
+By default the expression matrix is embedded in the `.crb`. For large data sets, add `expression_matrix_mode = "h5"` to write the matrix to a sibling `.h5` file instead (the only other storage mode); keep the two files together. A very large immune repertoire is moved to a third sibling file (`immune_sidecar = "auto"`). See [Store the expression matrix in H5 format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
 
 The Cerebro use interface can be launched using the `launchCerebro()` function.
 
 # See also
 
 If your Seurat v5 assay is split into one layer per sample, see
-[Seurat v5 layered assays: complete and safe expression matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.html)
+[Seurat v5 layered assays: complete and safe expression matrices](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.html)
 for the automatic resolution rules, custom-layer safeguards, and troubleshooting
 steps.
 

@@ -23,7 +23,7 @@ Seurat v3.0 or higher since the concept of assays wasn't implemented before.}
 
 \item{GMT_file}{Path to GMT file containing the gene sets to be tested.
 The Broad Institute provides many gene sets which can be downloaded:
-http://software.broadinstitute.org/gsea/msigdb/index.jsp}
+https://www.gsea-msigdb.org/gsea/msigdb/index.jsp}
 
 \item{groups}{Grouping variables (columns) in object@meta.data for which
 gene set enrichment analysis should be performed}

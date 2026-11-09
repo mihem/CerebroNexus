@@ -12,7 +12,7 @@ getEnrichedPathways(
     "Panther_2016", "Human_Gene_Atlas", "Mouse_Gene_Atlas"),
   adj_p_cutoff = 0.05,
   max_terms = 100,
-  URL_API = "http://maayanlab.cloud/Enrichr"
+  URL_API = "https://maayanlab.cloud/Enrichr"
 )
 }
 \arguments{
@@ -35,7 +35,7 @@ defaults to 0.05,}
 \item{URL_API}{URL to send requests to (Enrichr API). Allows to overwrite
 default URL with an alternative taken from the Enrichr website in case the
 original is out-of-service; defaults to
-'http://maayanlab.cloud/Enrichr'.}
+'https://maayanlab.cloud/Enrichr'.}
 }
 \value{
 Seurat object with Enrichr results for all provided grouping variables,
@@ -55,7 +55,7 @@ if (interactive()) {
     databases = c('GO_Biological_Process_2018'),
     adj_p_cutoff = 0.01,
     max_terms = 100,
-    URL_API = 'http://maayanlab.cloud/Enrichr'
+    URL_API = 'https://maayanlab.cloud/Enrichr'
   )
 }
 
