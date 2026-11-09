@@ -479,7 +479,7 @@ builder_source_image_payload <- function(object) {
         next
       }
       bytes <- tryCatch(
-        base64enc::base64decode(sub("^data:image/png;base64,", "", uri)),
+        jsonlite::base64_dec(sub("^data:image/png;base64,", "", uri)),
         error = function(e) NULL
       )
       if (is.null(bytes) || !length(bytes)) {

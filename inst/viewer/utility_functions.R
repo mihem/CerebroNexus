@@ -3225,17 +3225,21 @@ formatTableAB <- function(
   }
 
   if (identical(mode, "wide")) {
-    counts <- tidyr::pivot_wider(
-      counts,
-      id_cols = dplyr::all_of(c(groupA, "total_cell_count")),
-      names_from = dplyr::all_of(groupB),
-      values_from = "count",
-      values_fill = 0
-    ) %>%
-      dplyr::select(
-        dplyr::all_of(c(groupA, "total_cell_count")),
-        dplyr::any_of(levels_group_b)
-      )
+    ## One row per groupA level (in order of appearance), one column per
+    ## groupB level present, in levels_group_b order; absent pairs are 0.
+    id_cols <- c(groupA, "total_cell_count")
+    row_key <- paste(counts[[groupA]], counts[["total_cell_count"]], sep = "\r")
+    first <- !duplicated(row_key)
+    wide <- counts[first, id_cols, drop = FALSE]
+    rownames(wide) <- NULL
+    values_b <- as.character(counts[[groupB]])
+    for (level in intersect(levels_group_b, unique(values_b))) {
+      at <- values_b == level
+      value <- counts[["count"]][at][match(row_key[first], row_key[at])]
+      value[is.na(value)] <- if (is.integer(value)) 0L else 0
+      wide[[level]] <- value
+    }
+    counts <- dplyr::as_tibble(wide)
     ## cell cycle phases in their natural order
     if (all(c("G1", "G2M", "S") %in% colnames(counts))) {
       counts <- counts %>%
@@ -6123,7 +6127,7 @@ viewerEmbeddedImageUrl <- function(data_uri, session = NULL) {
       ## substring() stops at 1,000,000 characters by default, which cut
       ## images above ~750 KB short; pass the end explicitly.
       writeBin(
-        base64enc::base64decode(
+        jsonlite::base64_dec(
           substring(data_uri, nchar(header[[1L]]) + 1L, nchar(data_uri))
         ),
         file

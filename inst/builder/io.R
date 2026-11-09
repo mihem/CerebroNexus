@@ -888,12 +888,17 @@ builder_native_picker_spec <- function(
     if (nzchar(powershell) && nzchar(.which("wslpath"))) {
       script <- builder_windows_picker_script(kind)
       # EncodedCommand avoids WSL's extra Windows command-line quoting layer.
-      encoded <- base64enc::base64encode(iconv(
-        script,
-        from = "UTF-8",
-        to = "UTF-16LE",
-        toRaw = TRUE
-      )[[1L]])
+      encoded <- gsub(
+        "\n",
+        "",
+        jsonlite::base64_enc(iconv(
+          script,
+          from = "UTF-8",
+          to = "UTF-16LE",
+          toRaw = TRUE
+        )[[1L]]),
+        fixed = TRUE
+      )
       return(list(
         command = unname(powershell),
         args = c(

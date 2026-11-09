@@ -471,7 +471,16 @@
         "data:",
         mime,
         ";base64,",
-        base64enc::base64encode(descriptor$path)
+        gsub(
+          "\n",
+          "",
+          jsonlite::base64_enc(readBin(
+            descriptor$path,
+            "raw",
+            file.info(descriptor$path)$size
+          )),
+          fixed = TRUE
+        )
       ),
       histology_image_bounds = .spatialImageBounds(
         descriptor$bounds,

@@ -386,15 +386,14 @@
     images <- libraries[[library]]$images
     if (
       !length(images) ||
-        !requireNamespace("png", quietly = TRUE) ||
-        !requireNamespace("base64enc", quietly = TRUE)
+        !requireNamespace("png", quietly = TRUE)
     ) {
       next
     }
     for (label in intersect(c("hires", "lowres"), names(images))) {
       entry <- images[[label]]
       array <- tryCatch(
-        png::readPNG(base64enc::base64decode(sub(
+        png::readPNG(jsonlite::base64_dec(sub(
           "^data:image/png;base64,",
           "",
           entry$histology_image

@@ -422,15 +422,21 @@ cv_external_images <- function(
       image$asset_path <- img_path
       image$asset_mime <- mime
     } else {
-      if (!requireNamespace("base64enc", quietly = TRUE)) {
-        next
-      }
       image$uri <- viewerPrivateImageUrl(img_path) %||%
         paste0(
           "data:",
           mime,
           ";base64,",
-          base64enc::base64encode(img_path)
+          gsub(
+            "\n",
+            "",
+            jsonlite::base64_enc(readBin(
+              img_path,
+              "raw",
+              file.info(img_path)$size
+            )),
+            fixed = TRUE
+          )
         )
     }
     out[[length(out) + 1L]] <- image
@@ -2403,12 +2409,21 @@ cv_asset_data_uri <- function(asset) {
       !is.character(mime) ||
       length(mime) != 1L ||
       is.na(mime) ||
-      !(mime %in% c("image/png", "image/jpeg", "image/svg+xml")) ||
-      !requireNamespace("base64enc", quietly = TRUE)
+      !(mime %in% c("image/png", "image/jpeg", "image/svg+xml"))
   ) {
     return(NULL)
   }
-  paste0("data:", mime, ";base64,", base64enc::base64encode(path))
+  paste0(
+    "data:",
+    mime,
+    ";base64,",
+    gsub(
+      "\n",
+      "",
+      jsonlite::base64_enc(readBin(path, "raw", file.info(path)$size)),
+      fixed = TRUE
+    )
+  )
 }
 
 cv_defer_assets <- function(value) {
