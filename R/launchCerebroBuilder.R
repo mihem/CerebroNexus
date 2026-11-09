@@ -54,21 +54,14 @@ launchCerebroBuilder <- function(
   ) {
     stop("'max_file_size' must be one positive number or Inf.", call. = FALSE)
   }
-  if (!nzchar(system.file(package = "Seurat"))) {
-    stop(
-      "Building a data set from a Seurat object needs the Seurat package. ",
-      "Install it and try again.",
-      call. = FALSE
-    )
-  }
-
   # These dependencies are used by the isolated inst/builder runtime. Load
   # them only when Builder launches, without adding to Viewer startup work.
-  # callr, processx and ps are Suggests: only the Builder needs them.
+  # Seurat, callr, digest, processx and ps are Suggests: only the Builder needs
+  # them. Seurat is checked without loading it; one message names them all.
   available <- c(
+    Seurat = nzchar(system.file(package = "Seurat")),
     callr = requireNamespace("callr", quietly = TRUE),
     digest = requireNamespace("digest", quietly = TRUE),
-    htmltools = requireNamespace("htmltools", quietly = TRUE),
     processx = requireNamespace("processx", quietly = TRUE),
     ps = requireNamespace("ps", quietly = TRUE)
   )

@@ -46,8 +46,10 @@
 #' @importFrom DT datatable formatPercentage formatRound formatSignif formatStyle styleColorBar styleEqual styleInterval
 #' @importFrom grDevices col2rgb rgb
 #' @importFrom plotly add_lines add_trace event_data layout plot_ly plotlyOutput renderPlotly toWebGL
-#' @importFrom tidyr pivot_longer pivot_wider
 #' @import shiny
+#' @importFrom htmltools save_html
+#' @importFrom colourpicker colourInput
+#' @importFrom shinycssloaders withSpinner
 #' @import shinydashboard
 #' @importFrom shinyjs inlineCSS
 #' @importFrom shinyWidgets awesomeCheckbox dropdownButton materialSwitch radioGroupButtons sendSweetAlert

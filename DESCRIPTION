@@ -1,9 +1,9 @@
 Package: CerebroNexus
-Title: Interactive Visualization of Single-Cell and Spatial Transcriptomics
+Title: Interactive Viewer for Single-Cell and Spatial Transcriptomics
 Version: 8.0.0
 Authors@R: c(
   person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre", "cph"), comment = c(ORCID = "0000-0002-9568-2790")),
-  person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("aut")),
+  person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("ctb", "cph"), comment = "Author of the original Cerebro"),
   person("Xuesong", "Wang", email = "wangxuesong29@gmail.com", role = c("aut", "cph"))
   )
 Description: Interactive 'Shiny' application for exploring and sharing
@@ -14,7 +14,7 @@ Description: Interactive 'Shiny' application for exploring and sharing
     coordinated views of gene expression, immune repertoires, trajectories,
     spatial images and HLA-TCR motifs. A point-and-click builder creates
     these files and standalone apps for deployment on a 'Shiny' server.
-URL: https://mihem.github.io/CerebroNexus/,
+URL: https://www.mheming.com/CerebroNexus/,
     https://github.com/mihem/CerebroNexus
 BugReports: https://github.com/mihem/CerebroNexus/issues
 License: MIT + file LICENSE
@@ -32,7 +32,7 @@ biocViews:
   Transcriptomics,
   Visualization
 Imports:
-  base64enc,
+  colourpicker (>= 1.0),
   dplyr (>= 1.0.0),
   DT (>= 0.14.0),
   fs,
@@ -49,21 +49,21 @@ Imports:
   R6 (>= 2.4.0),
   rlang (>= 1.0.0),
   shiny (>= 1.8.1),
+  shinycssloaders (>= 1.0.0),
   shinydashboard (>= 0.7.1),
   shinyjs (>= 1.1),
   shinyWidgets (>= 0.5.0),
   stats,
-  tidyr (>= 1.1.0),
   utils
 Suggests:
   anndataR,
   arrow,
+  base64enc,
   biomaRt (>= 2.38.0),
   cachem,
   callr,
   chromote,
   codetools,
-  colourpicker (>= 1.0),
   DelayedArray,
   digest,
   future.apply (>= 1.1.0),
@@ -93,13 +93,12 @@ Suggests:
   scRepertoire (>= 2.0.0),
   Seurat (>= 5.0.0),
   SeuratObject (>= 5.0.0),
-  shinycssloaders (>= 1.0.0),
   shinymanager (>= 1.1.0),
+  shinytest2 (>= 0.2.0),
   SingleCellExperiment,
   stringdist,
   SummarizedExperiment,
   testthat (>= 3.0.0),
-  shinytest2 (>= 0.2.0),
   withr,
   writexl,
   xml2,
