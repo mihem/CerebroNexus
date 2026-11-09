@@ -173,7 +173,7 @@ multiple user-named backgrounds, or coordinates only. Seurat v4
 \code{VisiumV2} images.
 }
 \examples{
-\dontshow{if (requireNamespace("Seurat", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "SeuratObject"))) withAutoprint(\{ # examplesIf}
 \donttest{
 input_dir <- system.file("extdata/examples", package = "CerebroNexus")
 result_dir <- file.path(tempdir(), "output")

@@ -14,7 +14,9 @@
 #' Seurat object with most expressed genes stored for every group level of the
 #' specified groups stored in \code{object@misc$most_expressed_genes}.
 #'
-#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
+#' @examplesIf nzchar(system.file(package = "SeuratObject"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- getMostExpressedGenes(
@@ -22,6 +24,7 @@
 #'   assay = 'RNA',
 #'   groups = c('sample','seurat_clusters')
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom Matrix rowSums

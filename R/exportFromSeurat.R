@@ -826,7 +826,9 @@
 #' @return
 #' No data returned.
 #'
-#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
+#' @examplesIf nzchar(system.file(package = "Seurat"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' exportFromSeurat(
@@ -840,6 +842,7 @@
 #'   use_delayed_array = FALSE,
 #'   verbose = TRUE
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom methods as

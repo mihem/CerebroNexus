@@ -29,7 +29,9 @@
 #' Seurat object with marker gene results for the specified grouping variables
 #' stored in \code{object@misc$marker_genes}.
 #'
-#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
+#' @examplesIf nzchar(system.file(package = "Seurat"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' ## organism = NULL skips the online lookup of cell surface genes; use
@@ -47,6 +49,7 @@
 #'   test = 'wilcox',
 #'   verbose = TRUE
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom rlang .data :=

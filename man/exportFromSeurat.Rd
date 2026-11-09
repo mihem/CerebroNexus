@@ -214,7 +214,9 @@ genotype is never mistaken for a directly typed one.
 }
 
 \examples{
-\dontshow{if (requireNamespace("Seurat", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "Seurat"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 exportFromSeurat(
@@ -228,5 +230,6 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
+}
 \dontshow{\}) # examplesIf}
 }

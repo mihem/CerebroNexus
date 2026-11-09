@@ -60,7 +60,9 @@ This function gets marker genes for one or multiple grouping variables in
 the meta data of the provided Seurat object.
 }
 \examples{
-\dontshow{if (requireNamespace("Seurat", quietly = TRUE)) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "Seurat"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 ## organism = NULL skips the online lookup of cell surface genes; use
@@ -78,5 +80,6 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
+}
 \dontshow{\}) # examplesIf}
 }

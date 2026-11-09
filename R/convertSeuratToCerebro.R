@@ -415,7 +415,7 @@
 #' \code{VisiumV1} images are rejected with guidance to rebuild them as
 #' \code{VisiumV2} images.
 #'
-#' @examplesIf requireNamespace("Seurat", quietly = TRUE)
+#' @examplesIf nzchar(system.file(package = "SeuratObject"))
 #' \donttest{
 #' input_dir <- system.file("extdata/examples", package = "CerebroNexus")
 #' result_dir <- file.path(tempdir(), "output")
