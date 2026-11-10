@@ -148,6 +148,21 @@ Built by `data-raw/build_spatial_demos.R` (see [`spatial.md`](spatial.md) for de
 - **build**: `data-raw/build_spatial_demos.R` → `build_xenium()`
 - **output**: `inst/extdata/examples/demo_spatial_xenium.crb` (~726 KiB) plus `inst/extdata/examples/spatial/xenium/*.png`
 
+### demo_spatial.crb
+- **type**: spatial (small example shipped with the package)
+- **technology**: 10x Xenium (in-situ single-cell imaging)
+- **dropdown label**: none; not in the demo app's switcher. Used by tests and the App bundle.
+- **organism / tissue**: mouse (mm) / brain, coronal section, cortex + hippocampus
+- **source**: a random 500 of the 2,000 cells of `demo_spatial_xenium.crb` (above), i.e. the 10x Genomics public Xenium demo `Xenium_V1_FF_Mouse_Brain_Coronal_Subset_CTX_HP`. Replaces the earlier synthetic fixture of the same name, whose generator was never recorded.
+- **acquire**: none beyond `demo_spatial_xenium.crb`, which is in the repository
+- **object type**: `Cerebro` with one spatial entry `fov` (the rotated `fov_colour` copy of the source is dropped)
+- **sampling**: `set.seed(20261110)`; 500 cells drawn uniformly with `demo_subsample_cells()` from `subsample_demos.R`; the 100-gene demo panel recomputed on the kept cells by `save_demo_crb()`
+- **cell-type field**: `cluster` (Louvain, as in the source)
+- **embedded image**: none
+- **license**: 10x Genomics public dataset terms (freely redistributable), as for `demo_spatial_xenium.crb`
+- **build**: `Rscript data-raw/build_demo_spatial.R`
+- **output**: `inst/extdata/examples/demo_spatial.crb` (~211 KiB, md5 `6d3cd9772e844317dd438831c689c303`)
+
 ### Spatial — evaluated, not yet shipped
 
 These platforms were evaluated for a demo but are not shipped this round; the acquire path is recorded so the demo can be added later without re-researching sources.
