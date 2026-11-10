@@ -2,7 +2,7 @@ Package: CerebroNexus
 Title: Interactive Viewer for Single-Cell and Spatial Transcriptomics
 Version: 8.0.0
 Authors@R: c(
-  person("Michael", "Heming", email = "mihem@mailbox.org", role = c("aut", "cre", "cph"), comment = c(ORCID = "0000-0002-9568-2790")),
+  person("Michael", "Heming", email = "mhem@mailbox.org", role = c("aut", "cre", "cph"), comment = c(ORCID = "0000-0002-9568-2790")),
   person("Roman", "Hillje", email = "roman.hillje@googlemail.com", role = c("ctb", "cph"), comment = "Author of the original Cerebro"),
   person("Xuesong", "Wang", email = "wangxuesong29@gmail.com", role = c("aut", "cph"))
   )
