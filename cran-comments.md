@@ -14,7 +14,8 @@ immune repertoires, trajectories, spatial images and HLA-TCR motifs.
 * Ubuntu (WSL, local), R 4.6.1, also with `_R_CHECK_DEPENDS_ONLY_=true`
   (suggested packages not available)
 * Ubuntu (GitHub Actions), R 4.6.1
-* macOS (local), R 4.6.2: TO RUN on the final tarball
+* R-hub, R-devel (2026-11-09 r90865): Linux, Windows, macOS x86_64 and
+  macOS arm64
 * win-builder, R-devel: TO RUN on the final tarball (`devtools::check_win_devel()`)
 
 ## R CMD check results
