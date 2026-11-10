@@ -95,10 +95,13 @@ test_that("early total guard preserves counts, boundaries and normal graph paylo
     if (!inherits(g, "igraph")) {
       return(g)
     }
-    list(
-      data = igraph::as_data_frame(g, what = "both"),
-      attributes = igraph::graph_attr(g)
-    )
+    data <- igraph::as_data_frame(g, what = "both")
+    ## The layout is floating point: macOS gives the stored coordinates to
+    ## about 1e-10, so compare it to 6 digits; everything else is exact.
+    for (column in intersect(c("layout_x", "layout_y"), names(data$vertices))) {
+      data$vertices[[column]] <- round(data$vertices[[column]], 6L)
+    }
+    list(data = data, attributes = igraph::graph_attr(g))
   }
   cases <- guard_test_cases()
   expect_length(expected, length(cases))

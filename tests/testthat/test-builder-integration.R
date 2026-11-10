@@ -12,6 +12,8 @@ test_that("Builder secure credentials do not depend on R's random seed", {
 })
 
 test_that("a verified copy hashes while copying instead of rereading", {
+  ## macOS clones the file (cp -c) and hashes the clone instead of streaming.
+  skip_on_os("mac")
   builder_repo_source("io.R", local = environment())
   skip_if(is.null(.builder_md5_stream()))
   root <- withr::local_tempdir()
@@ -50,6 +52,39 @@ test_that("a verified copy hashes while copying instead of rereading", {
     "does not match"
   )
   expect_false(file.exists(file.path(root, "mismatch")))
+})
+
+test_that("on macOS a verified copy is a clone checked by one hash", {
+  skip_on_os(c("windows", "linux", "solaris"))
+  builder_repo_source("io.R", local = environment())
+  root <- withr::local_tempdir()
+  source <- file.path(root, "source")
+  bytes <- as.raw(sample(0:255, 300000L, replace = TRUE))
+  writeBin(bytes, source)
+  expected <- unname(tools::md5sum(source))
+  hashed <- 0L
+  result <- builder_copy_file_verified(
+    source,
+    file.path(root, "copy"),
+    expected_md5 = expected,
+    clone_md5 = function(path) {
+      hashed <<- hashed + 1L
+      unname(tolower(as.character(tools::md5sum(path))))
+    }
+  )
+  expect_identical(hashed, 1L)
+  expect_identical(result$md5, expected)
+  expect_identical(result$bytes, 300000)
+  expect_identical(readBin(result$path, "raw", n = 400000L), bytes)
+  expect_error(
+    builder_copy_file_verified(
+      source,
+      file.path(root, "wrong"),
+      expected_md5 = strrep("0", 32L)
+    ),
+    "could not be verified"
+  )
+  expect_false(file.exists(file.path(root, "wrong")))
 })
 
 test_that("a verified copy falls back to hashing the file", {
