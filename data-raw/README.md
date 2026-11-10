@@ -54,7 +54,7 @@ History: the 2026-10-12 artifacts were derived this way from master `4d74a839`, 
 | demo_spatial_slideseq.crb | 3000 | 2000 → 100 | 1.48 | 0.45 |
 | demo_spatial_visium.crb | 1000 | 1200 → 100 | 5.74 | 0.72 |
 | demo_spatial_xenium.crb | 2000 | 248 → 100 | 2.72 | 0.70 |
-| demo_spatial.crb | 1000 | 2500 → 100 | 0.62 | 0.16 |
+| demo_spatial.crb | 500 (of the Xenium demo) | 100 | — | 0.21 |
 | demo_trekker.crb | 1000 | 21374 → 100 | 6.79 | 0.91 |
 | example.crb | 1000 | 967 → 100 | 1.03 | 0.44 |
 

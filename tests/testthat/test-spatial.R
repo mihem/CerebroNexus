@@ -5,7 +5,7 @@
 # and UI/server wiring guards follow.
 
 shiny_root <- viewer_test_path()
-# demo_spatial.crb is the synthetic Xenium demo that carries spatial data;
+# demo_spatial.crb is a 500-cell subset of the real Xenium demo;
 # the other bundled demos (PBMC sets, trajectory) have no spatial field.
 spatial_crb <- system.file(
   "extdata/examples/demo_spatial.crb",

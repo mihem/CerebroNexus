@@ -947,7 +947,7 @@ builder_planned_viewer_packs <- function(items) {
   "extdata/examples/demo_spatial_slideseq.crb" = "c93472444c76588e6a68c3d082f79a02",
   "extdata/examples/demo_spatial_visium.crb" = "d90af44866611f1ed0a8b6bee69fecaf",
   "extdata/examples/demo_spatial_xenium.crb" = "48400923c2ae408858f32c65bef13e19",
-  "extdata/examples/demo_spatial.crb" = "b4b6683a1190c1d8e1b0587c65d0d88e",
+  "extdata/examples/demo_spatial.crb" = "6d3cd9772e844317dd438831c689c303",
   "extdata/examples/demo_trekker.crb" = "e1dc3ab3ba79a03b638ee7b5b7985f1d",
   "extdata/examples/example.crb" = "73edd91dea8cdc2f52f1b0d52246de8e",
   "extdata/examples/pbmc_SCE.rds" = "7b388677c44186cc8a6c13036065e1cb",
