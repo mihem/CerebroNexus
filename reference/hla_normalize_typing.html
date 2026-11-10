@@ -5,7 +5,7 @@
   * a named list (`sample -&amp;gt; c(&quot;HLA-A*02:01&quot;, ...)`)."><meta property="og:description" content="Accepts:
   * a canonical/near-canonical long data.frame (has `sample` + `allele`);
   * a wide data.frame (`sample` + `HLA-A_1`, `HLA-A_2`, ... columns);
-  * a named list (`sample -&amp;gt; c(&quot;HLA-A*02:01&quot;, ...)`)."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+  * a named list (`sample -&amp;gt; c(&quot;HLA-A*02:01&quot;, ...)`)."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -130,12 +130,31 @@ defaults to `source_type = "unknown"` with a blocking warning when absent –
 allele format is never used to guess `genotyped`.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">typing</span> <span class="op">&lt;-</span> <span class="fu">hla_normalize_typing</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  donor1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"HLA-A*02:01"</span>, <span class="st">"HLA-B*07:02"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  donor2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A*01:01"</span>, <span class="st">"B*08:01"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">typing</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sample donor_id locus copy      allele resolution source_type typing_method</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 donor1     &lt;NA&gt; HLA-A    1 HLA-A*02:01    2-field     unknown          &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 donor1     &lt;NA&gt; HLA-B    1 HLA-B*07:02    2-field     unknown          &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 donor2     &lt;NA&gt; HLA-A    1 HLA-A*01:01    2-field     unknown          &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 donor2     &lt;NA&gt; HLA-B    1 HLA-B*08:01    2-field     unknown          &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   source_reference confidence</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1             &lt;NA&gt;         NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2             &lt;NA&gt;         NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3             &lt;NA&gt;         NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4             &lt;NA&gt;         NA</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

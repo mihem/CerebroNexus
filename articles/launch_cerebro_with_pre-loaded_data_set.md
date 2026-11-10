@@ -10,7 +10,7 @@ want users to upload data to that server.
 ## How to do it
 
 Provide the data path and closed mode to
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md).
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md).
 Let’s say your data set is stored here:
 `~/Cerebro/data_sets/pbmc_v3.crb`. Then, launch Cerebro as shown below:
 
@@ -26,7 +26,7 @@ That’s it.
 To offer several data sets in one launch, give every file a unique,
 non-empty name. The name is the data set identity used in links
 (`?dataset=sampleA`) and saved state;
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
 stops with an error when more than one unnamed file is given.
 
 ``` r
@@ -37,14 +37,14 @@ launchCerebro(
 ```
 
 [![Load
-data](launch_cerebro_with_pre-loaded_data_set_files/landing_page.png)](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set_files/landing_page.png)
+data](launch_cerebro_with_pre-loaded_data_set_files/landing_page.png)](https://www.mheming.com/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set_files/landing_page.png)
 
 ## Modify welcome page
 
 If you would like to modify the message on the “Load data”/welcome page,
 e.g. to link to a publication or give an introduction to the data set,
 you can use the `welcome_message` parameter of
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md).
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md).
 The provided string for that parameter can/should be written in HTML as
 shown below:
 
@@ -62,11 +62,11 @@ launchCerebro(
 ```
 
 [![Load
-data](launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png)](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png)
+data](launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png)](https://www.mheming.com/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set_files/custom_welcome_message.png)
 
 ## See also
 
 - [Host Cerebro on
-  shinyapps.io](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
+  shinyapps.io](https://www.mheming.com/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
 - [Control access to Cerebro with a login
-  page](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md)
+  page](https://www.mheming.com/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md)

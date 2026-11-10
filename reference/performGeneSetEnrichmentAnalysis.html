@@ -9,7 +9,7 @@ provided gene sets for specified groups of cells in given Seurat object using
 gene set variation analysis (GSVA). Calculation of p- and q-values for gene
 sets is performed as done in &quot;Evaluation of methods to assign cell type
 labels to cell clusters from single-cell RNA-sequencing data&quot;, Diaz-Mejia et
-al., F1000Research (2019)."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+al., F1000Research (2019)."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -17,7 +17,7 @@ al., F1000Research (2019)."><meta property="og:image" content="https://mihem.git
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -127,7 +127,7 @@ Seurat v3.0 or higher since the concept of assays wasn't implemented before.</p>
 <dt id="arg-gmt-file">GMT_file<a class="anchor" aria-label="anchor" href="#arg-gmt-file"></a></dt>
 <dd><p>Path to GMT file containing the gene sets to be tested.
 The Broad Institute provides many gene sets which can be downloaded:
-http://software.broadinstitute.org/gsea/msigdb/index.jsp</p></dd>
+https://www.gsea-msigdb.org/gsea/msigdb/index.jsp</p></dd>
 
 
 <dt id="arg-groups">groups<a class="anchor" aria-label="anchor" href="#arg-groups"></a></dt>
@@ -160,21 +160,22 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/pbmc_seurat.rds"</span>,</span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/pbmc_seurat.rds"</span>,</span></span>
 <span class="r-in"><span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">example_gene_set</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/example_gene_set.gmt"</span>,</span></span>
 <span class="r-in"><span>  package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">pbmc</span> <span class="op">&lt;-</span> <span class="fu">performGeneSetEnrichmentAnalysis</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  object <span class="op">=</span> <span class="va">pbmc</span>,</span></span>
 <span class="r-in"><span>  GMT_file <span class="op">=</span> <span class="va">example_gene_set</span>,</span></span>
-<span class="r-in"><span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'sample'</span>,<span class="st">'seurat_clusters'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  groups <span class="op">=</span> <span class="st">'seurat_clusters'</span>,</span></span>
 <span class="r-in"><span>  thresh_p_val <span class="op">=</span> <span class="fl">0.05</span>,</span></span>
 <span class="r-in"><span>  thresh_q_val <span class="op">=</span> <span class="fl">0.1</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:45] Loading gene sets...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:45] Loaded 2 gene sets from GMT file.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:45] Extracting transcript counts from `data` slot of `RNA` assay...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:45] Performing analysis for 2 subgroups of group `sample`...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:26] Loading gene sets...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:26] Loaded 2 gene sets from GMT file.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:26] Extracting transcript counts from `data` slot of `RNA` assay...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:26] Performing analysis for 2 subgroups of group `seurat_clusters`...</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA version 2.6.12</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Searching for rows with constant values</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA ranks</span>
@@ -186,21 +187,8 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA dense (classical) algorithm</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA scores for 2 gene sets</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Calculations finished</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:48] 0 gene sets passed the thresholds across all subgroups of group `sample`.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:48] Performing analysis for 2 subgroups of group `seurat_clusters`...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA version 2.6.12</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Searching for rows with constant values</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA ranks</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> kcdf='auto' (default)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA dense (classical) algorithm</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Row-wise ECDF estimation with Gaussian kernels</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating row ECDFs</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating column ranks</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> GSVA dense (classical) algorithm</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">ℹ</span> Calculating GSVA scores for 2 gene sets</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BB00;">✔</span> Calculations finished</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [22:16:49] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.</span>
-<span class="r-in"><span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:27] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -208,7 +196,7 @@ stored in object@misc$enriched_pathways$&lt;name&gt;</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

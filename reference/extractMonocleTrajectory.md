@@ -51,12 +51,13 @@ pseudotime, projection and tree) will be stored in
 
 ``` r
 if (FALSE) { # \dontrun{
-  seurat <- extractMonocleTrajectory(
-    monocle = monocle,
-    seurat = seurat,
-    name = 'trajectory_1',
-    column_state = 'State',
-    column_pseudotime = 'Pseudotime'
-  )
+## Needs a monocle (version 2) CellDataSet; monocle is not on CRAN.
+seurat <- extractMonocleTrajectory(
+  monocle = monocle,
+  seurat = seurat,
+  trajectory_name = 'trajectory_1',
+  column_state = 'State',
+  column_pseudotime = 'Pseudotime'
+)
 } # }
 ```

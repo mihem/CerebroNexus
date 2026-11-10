@@ -4,7 +4,7 @@
 
 CerebroNexus can load **multiple `.crb` files** in a single app. When
 more than one file is supplied to
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),
 a **“Select dataset:”** switcher appears in the sidebar so users can
 move between data sets without restarting the app. Each data set keeps
 its own expression data, metadata, and module-specific slots — including

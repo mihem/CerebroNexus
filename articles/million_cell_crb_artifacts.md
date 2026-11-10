@@ -5,9 +5,9 @@
 CerebroNexus stores the expression matrix either inside the `.crb` or in
 a sparse HDF5 file next to it. Select the storage with
 `expression_matrix_mode` in
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 or
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md):
+[`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md):
 
 | Mode | Practical use | Files to keep together |
 |----|----|----|
@@ -16,13 +16,13 @@ or
 
 An H5-backed `.crb` is thin: the cell names live once in the H5 file and
 the `.crb` keeps a checksum of them (see [Data integrity
-contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)).
+contracts](https://www.mheming.com/CerebroNexus/articles/data_integrity_contracts.md)).
 A very large immune repertoire can also move to a third sibling,
 `<stem>.immune.qs2` (`immune_sidecar`, see
-[`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)).
+[`?saveCerebro`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)).
 
 Use the [benchmark
-guide](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md)
+guide](https://www.mheming.com/CerebroNexus/articles/expression_backend_benchmark.md)
 for measured workloads and their limits. Avoid converting a large
 delayed or on-disk matrix into a dense matrix merely to inspect or
 export it.
@@ -49,7 +49,7 @@ stopifnot(identical(restored$getMetaData()$cell_barcode, cells))
 
 For a prepared Seurat object, export with the required
 grouping/projection arguments for your dataset (see
-[`?exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)).
+[`?exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)).
 For example:
 
 ``` r
@@ -59,18 +59,18 @@ exportFromSeurat(seurat_object, file = "study.crb", experiment_name = "Study",
 ```
 
 This writes `study.crb` and `study.h5`.
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
 reads RDS and qs2 CRBs; `.crb` describes the logical format, not its
 physical codec. `saveCerebro(..., codec = "rds")` requests RDS
 compatibility, while the default uses qs2.
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 re-serializes a CRB while reusing its existing expression data:
 
 ``` r
 convertCerebro("study.crb", "study-rds.crb", codec = "rds")
 ```
 
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 is also the one-time migration path for a CRB written by an older
 release. Such a file is rejected with
 `uses a retired format ... Convert it once with CerebroNexus::convertCerebro()`.
@@ -96,11 +96,11 @@ cell-order checksum stored in the `.crb` rejects an H5 file whose cells
 differ from the ones the `.crb` was written for.
 
 For distribution,
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 builds a self-contained Viewer directory and copies the required
 resources. It resolves colliding CRB basenames and places each Viewer
 Pack beside the final CRB name. Follow the [app creation
-guide](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md).
+guide](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md).
 
 ## Viewer Packs and fallback
 
@@ -218,7 +218,7 @@ excitatory and inhibitory terminal branches. It is a labelled
 demonstration, not a formal trajectory-inference result. The same app
 also includes the bundled PBMC, immune-repertoire, trajectory, spatial,
 Trekker and HLA/TCR demos. See the [benchmark
-guide](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md)
+guide](https://www.mheming.com/CerebroNexus/articles/expression_backend_benchmark.md)
 before starting.
 
 ## Troubleshooting
@@ -227,7 +227,7 @@ before starting.
   `.immune.qs2`) file. A thin CRB alone is not a complete external
   dataset.
 - **Retired format:** convert the file once with
-  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md),
+  [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md),
   or re-export a dataset whose storage this version cannot read from its
   source Seurat object.
 - **Identity/checksum mismatch:** restore the matching sidecar or

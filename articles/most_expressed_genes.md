@@ -35,7 +35,7 @@ The results table is rendered as an interactive DT table:
 ## Data export
 
 Most expressed gene tables are computed automatically during
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md).
 No additional parameters are required.
 
 ``` r
@@ -44,5 +44,5 @@ exportFromSeurat(seurat_object, file = "my_data.crb")
 
 ## See also
 
-[`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+[`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
 for the complete export workflow.

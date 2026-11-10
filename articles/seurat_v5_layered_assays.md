@@ -217,7 +217,7 @@ The resolver honours `data.sample_b`. It does not join the layer away
 and return all samples while resolving the request.
 
 This matrix is intentionally partial.
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 requires the complete object and therefore rejects the example unless
 `object` itself has first been subset to those same sample B cells.
 
@@ -317,20 +317,20 @@ cell validator.
 
 | Function | Required semantic data |
 |----|----|
-| [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md) | requested `slot` |
-| [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md) | requested `slot` |
-| [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md) | `counts` |
-| [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md) | `counts` |
-| [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md) | `counts` |
-| [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md) | normalized `data` |
+| [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md) | requested `slot` |
+| [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md) | requested `slot` |
+| [`calculatePercentGenes()`](https://www.mheming.com/CerebroNexus/reference/calculatePercentGenes.md) | `counts` |
+| [`getMostExpressedGenes()`](https://www.mheming.com/CerebroNexus/reference/getMostExpressedGenes.md) | `counts` |
+| [`addPercentMtRibo()`](https://www.mheming.com/CerebroNexus/reference/addPercentMtRibo.md) | `counts` |
+| [`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md) | normalized `data` |
 
 No function substitutes another layer for the one it needs: raw counts
 and normalized values are not interchangeable inputs. If the requested
 layer does not exist, the call stops with an error that names the layer,
 lists the layers the assay does have and, for
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 and
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md),
+[`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md),
 tells you which `slot` to pass.
 
 During export, the validated expression matrix is reused by spatial
@@ -340,7 +340,7 @@ image’s coordinates. It does not independently resolve the assay again
 for every spatial image. Spatial payloads retain both the requested
 layer and the physical layer.
 
-[`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
+[`getMarkerGenes()`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md)
 delegates to Seurat’s marker machinery and does not use this direct
 matrix path.
 
@@ -388,7 +388,7 @@ matrix:
 - `"embedded"`: inside the `.crb`;
 - `"h5"`: a sibling HDF5 file (the `.crb` is then thin; see [Data
   integrity
-  contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)).
+  contracts](https://www.mheming.com/CerebroNexus/articles/data_integrity_contracts.md)).
 
 Choosing `expression_matrix_mode = "h5"` does not make a disk-backed
 source assay readable. Source resolution happens first; output storage
@@ -462,9 +462,9 @@ CerebroNexus reduces avoidable cost by:
 - not backing up full custom matrices;
 - resolving layer membership before matrix joining;
 - handing the validated matrix from
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   to
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   instead of joining the same split root twice.
 
 If the object is too large to materialise safely, join or convert it in
@@ -581,9 +581,9 @@ Follow the all-layer materialisation loop in the message. Changing
 
 The requested layer is not in the assay, and no other layer is used in
 its place. The message lists the available layers. For
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 and
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+[`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
 pass one of them, for example `slot = "counts"` for an assay that was
 never normalized, or create the layer you need (for example with
 [`Seurat::NormalizeData()`](https://satijalab.org/seurat/reference/NormalizeData.html)).
@@ -592,7 +592,7 @@ the assay.
 
 ### “Error processing …”
 
-[`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+[`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
 adds the input source to an export error and then rethrows it. Treat
 this as a failed conversion: no new `.crb` was produced. Remove or
 archive any older output with the same name before retrying if your
@@ -613,11 +613,11 @@ workflow discovers files by name alone.
 ## See also
 
 - [Introduction to the CerebroNexus workflow with
-  Seurat](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+  Seurat](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
 - [Create an expression matrix in HDF5
-  format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
+  format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
 - [Create a self-contained Shiny
-  application](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+  application](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 
 ## Session information
 

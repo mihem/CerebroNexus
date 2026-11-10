@@ -94,7 +94,7 @@ Seurat object under `object@misc`:
 | `hla_typing` | each donor’s HLA genotype | the HLA colouring and the Associations table |
 | `hla_typing_source_type` | where the genotype came from (`genotyped` / `imputed` / `synthetic` / `unknown`) | provenance, so a made-up genotype is never mistaken for a real one |
 
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 picks all three up automatically. We build them one at a time.
 
 ## Build a synthetic Seurat object
@@ -433,7 +433,7 @@ designed.
 
 ## Launch a Shiny app on the data set
 
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 wraps a self-contained app directory around one or more `.crb` files.
 Its **arguments are how you preconfigure the app** — the welcome text,
 colours, whether users may upload their own data, and so on.
@@ -570,7 +570,7 @@ You are typically starting from:
 
 | You have | From | Becomes |
 |----|----|----|
-| a Seurat object (clusters, a UMAP, cell types) | your scRNA-seq pipeline | the `.crb` itself, via [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md) |
+| a Seurat object (clusters, a UMAP, cell types) | your scRNA-seq pipeline | the `.crb` itself, via [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md) |
 | paired TCR / VDJ | Cell Ranger `filtered_contig_annotations.csv` → scRepertoire [`combineTCR()`](https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html) | `@misc$immune_repertoire` |
 | each donor’s HLA genotype | a genotyping lab report, or HLA imputed from the same reads | `@misc$hla_typing` |
 
@@ -612,7 +612,7 @@ combined <- combineTCR(contig_list, samples = donor_ids) # a list named by donor
 seurat <- addImmuneRepertoire(seurat, tcr = combined)
 ```
 
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 also takes the contig files directly, doing the
 [`combineTCR()`](https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html)
 step for you:
@@ -630,7 +630,7 @@ dot-separated token of `CTgene`) and the CDR3 amino acids (`CTaa`).
 Everything else is carried through untouched. Watch the barcodes: if
 `combineTCR(samples =)` prefixes them (`donorA_AACCTGA-1`), the same
 prefix must be on the `@meta.data` barcodes (via `RenameCells`).
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 stops with that mismatch instead of storing an empty join. The companion
 *Immune Repertoire Analysis* vignette walks the full scRepertoire path.
 
@@ -692,7 +692,7 @@ exportFromSeurat(
 
 Then `launchCerebro(crb_file_to_load = "my_study.crb")`, or wrap a
 shareable bundle with
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md).
 The **HLA & TCR Motifs** item appears whenever the object carries a
 TRA/TRB chain; HLA typing is optional.
 
@@ -734,10 +734,10 @@ they were would inflate any apparent contrast.
 - **Immune Repertoire Analysis in CerebroNexus** — the
   scRepertoire-based module that produces the same
   `@misc$immune_repertoire` slot from real 10x data.
-- [`?exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
-  [`?createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+- [`?exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
+  [`?createShinyApp`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),
   and
-  [`?Cerebro`](https://mihem.github.io/CerebroNexus/reference/Cerebro.md)
+  [`?Cerebro`](https://www.mheming.com/CerebroNexus/reference/Cerebro.md)
   (see `addHLATyping` / `getHLATyping`).
 
 ## Getting help
@@ -745,7 +745,7 @@ they were would inflate any apparent contrast.
 - Questions and bug reports:
   <https://github.com/mihem/CerebroNexus/issues>.
 - Function reference and other articles:
-  <https://mihem.github.io/CerebroNexus/>.
+  <https://www.mheming.com/CerebroNexus/>.
 - Provenance of every shipped demo data set: `data-raw/DATASETS.md`.
 
 ## Session info

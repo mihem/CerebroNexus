@@ -5,7 +5,7 @@ pictures that sit in each section's coordinate system, so the result goes to
 convertSCEToCerebro like any other SingleCellExperiment."><meta property="og:description" content="Reads the cell-by-gene table of a SpatialData .zarr store natively
 (no Python), with the spatial coordinates of its cells and the tissue
 pictures that sit in each section's coordinate system, so the result goes to
-convertSCEToCerebro like any other SingleCellExperiment."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+convertSCEToCerebro like any other SingleCellExperiment."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -13,7 +13,7 @@ convertSCEToCerebro like any other SingleCellExperiment."><meta property="og:ima
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -152,12 +152,35 @@ file.</p>
     <div class="dont-index"><p><code><a href="convertSpatialDataToCerebro.html">convertSpatialDataToCerebro</a></code>, <code><a href="readH5adAsSCE.html">readH5adAsSCE</a></code></p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="co">## A small SpatialData store (50 spots), zipped</span></span></span>
+<span class="r-in"><span><span class="va">sce</span> <span class="op">&lt;-</span> <span class="fu">readSpatialDataAsSCE</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/small_spatialdata.zip"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">sce</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> class: SingleCellExperiment </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> dim: 30 50 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> metadata(0):</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> assays(1): X</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> rownames(30): GENE00 GENE01 ... GENE28 GENE29</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> rowData names(1): var_index</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> colnames(50): spot000 spot001 ... spot048 spot049</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> colData names(5): cell_type region spot_id n_genes_by_counts</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   total_counts</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> reducedDimNames(2): UMAP spatial</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mainExpName: NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> altExpNames(0):</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -8,7 +8,3 @@ layout.
 ``` r
 HLA_NODE_R_MAX
 ```
-
-## Format
-
-An object of class `numeric` of length 1.

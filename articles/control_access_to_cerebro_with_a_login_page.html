@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -104,9 +104,9 @@ Hillje</h4>
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">08 November, 2026</h4>
+            <h4 data-toc-skip class="date">10 November, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/control_access_to_cerebro_with_a_login_page.Rmd" class="external-link"><code>vignettes/articles/control_access_to_cerebro_with_a_login_page.Rmd</code></a></small>
       <div class="d-none name"><code>control_access_to_cerebro_with_a_login_page.Rmd</code></div>
     </div>
 
@@ -166,7 +166,7 @@ invalid login locally.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># R console — run this once to install and load the authentication tools.</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"shinymanager"</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
 <p>Generate a database passphrase from the operating system random
 source on a trusted Linux machine:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Terminal — run this command and save the result privately.</span></span>
@@ -340,8 +340,9 @@ its matching external env file.</p>
 <p><strong>What happens:</strong> <code><a href="https://rdrr.io/r/base/readRenviron.html" class="external-link">readRenviron()</a></code> places the
 passphrase in this R process; <code>runApp()</code> reads it to unlock
 the bundled database and start the login page.</p>
-<p><strong>Verify:</strong> open <a href="http://localhost:3838" class="external-link uri">http://localhost:3838</a>, confirm a valid login succeeds
-and an invalid login fails, then stop the R process with Ctrl+C.</p>
+<p><strong>Verify:</strong> open <code>http://localhost:3838</code>,
+confirm a valid login succeeds and an invalid login fails, then stop the
+R process with Ctrl+C.</p>
 <p>Every new R process must load the external secret:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># R console — run this in every local App process.</span></span>
@@ -563,7 +564,7 @@ shinyapps.io</a></li>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

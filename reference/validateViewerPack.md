@@ -25,3 +25,17 @@ validateViewerPack(file, pack = .viewerPackPath(file), full = TRUE)
 ## Value
 
 A validation result.
+
+## Examples
+
+``` r
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#> [1] TRUE
+crb <- file.path(dir, "example.crb")
+buildViewerPack(crb, viewer_binary = "always")
+validateViewerPack(crb)$valid
+#> [1] TRUE
+unlink(dir, recursive = TRUE)
+```

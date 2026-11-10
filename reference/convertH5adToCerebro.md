@@ -2,12 +2,12 @@
 
 One-step route from a `.h5ad` file, the container of the Python scverse
 ecosystem (AnnData, scanpy), to a `.crb` file that
-[`createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 can serve. The file is read natively from HDF5 with
-[`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md),
+[`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md),
 so neither Python nor zellkonverter is needed, and the resulting
 `SingleCellExperiment` goes through
-[`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md),
+[`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md),
 so every option of that route applies here too.
 
 ## Usage
@@ -70,18 +70,18 @@ convertH5adToCerebro(
 - use_raw:
 
   Use `raw/X` (and `raw/var`) as the expression matrix; see
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md).
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md).
 
 - modality:
 
   For a MuData file, the modality to convert (e.g. `"gex"`); see
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md).
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md).
 
 - gene_names:
 
   `var` column to use as gene names (default: the index, or a symbol
   column when the index is Ensembl IDs); see
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md).
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md).
 
 - airr:
 
@@ -90,7 +90,7 @@ convertH5adToCerebro(
   the file has one, and imports nothing otherwise. Give a name to use
   another modality (or `obsm` entry), or `FALSE` to skip receptor data.
   See
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md).
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md).
 
 - airr_sample:
 
@@ -103,7 +103,7 @@ convertH5adToCerebro(
   For an `.h5mu` file, other modalities to add to the expression data as
   extra features, for example `"prot"`. Their features are named
   `<modality>:<feature>`. See
-  [`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md),
+  [`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md),
   argument `extra_features`.
 
 - experiment_name, organism, groups_naming, max_group_levels,
@@ -113,7 +113,7 @@ convertH5adToCerebro(
   most_expressed_genes:
 
   As in
-  [`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md).
+  [`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md).
   `experiment_name` defaults to the file's base name.
 
 - groups:
@@ -132,20 +132,20 @@ convertH5adToCerebro(
 - marker_file, marker_method:
 
   Optional marker table, as in
-  [`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md).
+  [`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md).
   When given, it replaces the marker results taken from scanpy.
 
 - spatial_split_by:
 
   `obs` column dividing `obsm["spatial"]` into one section per level
   (e.g. the tissue sections of a MERFISH data set); see
-  [`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md).
+  [`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md).
 
 - spatial_images:
 
   Which Visium tissue images to embed (`"auto"`, a vector of labels, or
   `FALSE`); see
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md).
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md).
 
 ## Value
 
@@ -173,18 +173,63 @@ fill the Immune repertoire page.
 
 ## See also
 
-[`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md),
-[`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
+[`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md),
+[`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md)
 
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
+# \donttest{
+h5ad <- tempfile(fileext = ".h5ad")
+exportToH5ad(
+  system.file("extdata/examples/example.crb", package = "CerebroNexus"),
+  h5ad
+)
+#> [INFO] Not exported to h5ad: immune repertoire (no chains found for the cells); enriched pathways; extra material.
 convertH5adToCerebro(
-  h5ad_file = "pbmc.h5ad",
-  result_dir = "output",
-  groups = c("cell_type", "sample"),
+  h5ad_file = h5ad,
+  result_dir = file.path(tempdir(), "output"),
+  groups = c("seurat_clusters", "sample"),
   expression_matrix_mode = "h5"
 )
-} # }
+#> [21:16:07] Calculating most expressed genes and mean expression for each group...
+#> [21:16:07] Processing group: seurat_clusters
+#> [21:16:07] Processing group: sample
+#> [21:16:07] Most expressed genes and mean expression calculation completed.
+#> [21:16:08] Initializing Cerebro object...
+#> [21:16:08] Writing expression matrix to TENx HDF5 file: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/.crb-stage-11de43b8dc87/cerebro_file11dea7bd4c9.h5
+#> [21:16:08] Collecting available meta data...
+#> [21:16:08] Extracting all meta data columns...
+#> [21:16:08] Extracting dimensional reductions...
+#> [21:16:08] Will export the following dimensional reductions: UMAP
+#> [21:16:08] Extracting tables of most expressed genes...
+#> [21:16:08] Extracting tables of mean expression...
+#> [21:16:08] Extracting marker genes table...
+#> [21:16:08] No trajectories to extract...
+#> [21:16:08] Overview of Cerebro object:
+#> class: Cerebro
+#> exporter package version: 8.0.0
+#> experiment name: file11dea7bd4c9
+#> organism: Human
+#> date of analysis: 
+#> date of export: 2026-11-10
+#> number of cells: NULL
+#> number of genes: NULL
+#> grouping variables (2): seurat_clusters, sample
+#> cell cycle variables (0): 
+#> projections (1): UMAP
+#> trees (0): 
+#> most expressed genes: seurat_clusters, sample
+#> marker genes:
+#>   - cerebro_seurat (1): seurat_clusters
+#> enriched pathways:
+#> trajectories:
+#> extra material:
+#> Immune repertoire:
+#> HLA typing: none
+#> Spatial data:
+#> [21:16:08] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/cerebro_file11dea7bd4c9.crb
+#> [21:16:09] Done!
+#> Successfully exported: cerebro_file11dea7bd4c9.crb
+# }
 ```

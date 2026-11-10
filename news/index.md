@@ -1,5 +1,71 @@
 # Changelog
 
+## CerebroNexus 8.0.0
+
+- The package is prepared for a CRAN submission. `R CMD check --as-cran`
+  on the built tarball reports only the “New submission” NOTE on Windows
+  and Linux, and also with the suggested packages unavailable.
+- The tarball shrinks from 28.4 MB to about 6 MB. Three vignettes
+  (Seurat workflow, SCE/AnnData, Cerebro class) stay in the package; the
+  other guides move to `vignettes/articles/` and remain on the website
+  under the same URLs. The large demo `.crb` files, the Zarr test
+  stores, the test files that are skipped as a whole on CRAN and the
+  Builder’s Trekker and Visium examples are no longer shipped in the
+  tarball; they stay in git.
+- New
+  [`downloadDemoData()`](https://www.mheming.com/CerebroNexus/reference/downloadDemoData.md)
+  downloads the Visium, Slide-seq, MERFISH, Xenium and HLA & TCR demo
+  data from the release tag into
+  [`tools::R_user_dir()`](https://rdrr.io/r/tools/userdir.html) and
+  checks size and MD5. The demo App lists them once downloaded. The
+  Builder’s Trekker (synthetic) and Visium examples download on first
+  use; offline, the Builder says so and the other examples still work.
+- Imports drop from 39 to 20 non-default packages. GSVA, qvalue,
+  biomaRt, scRepertoire, msigdbr, igraph, stringdist, ggplot2, scales,
+  htmlwidgets, httr, future.apply, pbapply and digest move to Suggests.
+  A missing package gives an install hint, a reduced but working path,
+  or a message on the Viewer page instead of an error. `tidyr`,
+  `base64enc`, `stringr`, `tibble` and `tidyselect` are no longer used.
+  The README lists the optional packages with one install command.
+- [`launchCerebroBuilder()`](https://www.mheming.com/CerebroNexus/reference/launchCerebroBuilder.md)
+  names every missing package it needs (Seurat, callr, digest, processx,
+  ps) in one message.
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
+  now explains how to name an unnamed data set. The Spatial point-size
+  observer no longer stops the session when the data set has no spatial
+  data.
+- [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
+  no longer assigns `Cerebro.options` in the global environment.
+- The Builder recognises an ASCII RDS saved on Windows (`A\r\n`) by
+  content.
+- Every exported function has a runnable example; examples that load
+  ‘SeuratObject’ or ‘SingleCellExperiment’ are in `\donttest{}`, and the
+  [`getMarkerGenes()`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md)
+  example no longer queries Ensembl.
+- Tests run in about 4 minutes under CRAN settings (was about 10): slow
+  Builder integration, browser, Node/Chrome, server and subprocess tests
+  are skipped on CRAN, at most two processes run, plots go to a null
+  device, and nothing is written outside
+  [`tempdir()`](https://rdrr.io/r/base/tempfile.html). The AnnData tests
+  run on the small `.h5ad` and `.h5mu` fixtures; the tests that need the
+  Zarr store fixtures run from a git checkout only. GitHub CI still runs
+  everything.
+- Authors: Roman Hillje, author of the original Cerebro, is listed as
+  contributor and copyright holder; Michael Heming, Roman Hillje and
+  Xuesong Wang are the copyright holders in `LICENSE`.
+- The title is “Interactive Viewer for Single-Cell and Spatial
+  Transcriptomics”, the description follows CRAN style, `qs` is dropped
+  from Enhances, and `CITATION` is a
+  [`bibentry()`](https://rdrr.io/r/utils/bibentry.html) with volume,
+  issue and pages.
+- Documentation links point to <https://www.mheming.com/CerebroNexus/>,
+  and Enrichr and MSigDB links use https.
+- `data-raw/DATASETS.md` records the source and license of every shipped
+  data set.
+- `demo_spatial.crb` is now a 500-cell subset of the real 10x Xenium
+  mouse brain demo (`data-raw/build_demo_spatial.R`), replacing a
+  synthetic fixture whose generator was never recorded.
+
 ## CerebroNexus 7.2.0
 
 - The Immune repertoire SizeDist tab draws in an App whose folder is
@@ -25,9 +91,9 @@
   one machine and copied to a Shiny Server works as it is.
   `options(cerebro.sockjs_compat = TRUE)` or `FALSE` (or `sockjs_compat`
   in `Cerebro.options`) forces it. This covers
-  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
   the bundled demo App and Apps written by
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md);
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md);
   an App built with an earlier version has to be built again to get it.
 
 ## CerebroNexus 7.0.1
@@ -43,41 +109,55 @@
 
 ## CerebroNexus 7.0.0
 
+### Package size
+
+- The package keeps three vignettes (Seurat workflow, SCE and AnnData
+  data, the Cerebro class); the other guides are articles on the
+  website.
+- The spatial, Trekker and HLA & TCR demo data sets and the Trekker and
+  Visium Builder examples are no longer installed with the package.
+  [`downloadDemoData()`](https://www.mheming.com/CerebroNexus/reference/downloadDemoData.md)
+  downloads the spatial and HLA & TCR demo data sets into the user cache
+  (the Trekker demo, derived from vendor data, stays in the source
+  repository), and the Builder downloads its two examples the first time
+  they are loaded.
+- The human and mouse gene ID tables are stored xz-compressed.
+
 ### Input formats in the Builder and the export
 
 - Reads SingleCellExperiment
-  ([`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md),
-  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md))
+  ([`convertSCEToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md),
+  [`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md))
   and AnnData
-  ([`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md),
-  [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md);
+  ([`convertH5adToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md),
+  [`readH5adAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md);
   `.h5ad` and `.h5mu`) natively, without Python, through the same export
   core as Seurat. The `.crb` is the hub: Seurat, SCE and h5ad convert to
   each other through it, and
-  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  [`exportToH5ad()`](https://www.mheming.com/CerebroNexus/reference/exportToH5ad.md)
   writes a `.crb` back as `.h5ad`.
 - From AnnData it also carries scanpy marker tables and category
   colours, Visium tissue images, spatial sections, scirpy TCR/BCR
   repertoires and scanpy / scVelo trajectories.
-  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  [`exportToH5ad()`](https://www.mheming.com/CerebroNexus/reference/exportToH5ad.md)
   writes spatial coordinates and tissue images back so scanpy and
   squidpy can draw them, the immune repertoire as scirpy’s
   `obsm["airr"]` and each trajectory’s pseudotime as an `obs` column.
 - SpatialData (`.zarr`) stores are read natively too:
-  [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+  [`readSpatialDataAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md)
   and
-  [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md)
+  [`convertSpatialDataToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSpatialDataToCerebro.md)
   take the cell table, its coordinates (from `obsm["spatial"]` or from
   the annotated shapes) and the tissue pictures placed in each section,
   one spatial section per region. Plain AnnData `.zarr` stores open in
-  [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md).
+  [`convertH5adToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md).
 - CITE-seq data: `extra_modalities =` (MuData, e.g. `"prot"`) and
   `extra_features =` (SingleCellExperiment `altExp`, e.g. `"ADT"`) add
   the antibody features to the expression data as
   `<experiment>:<feature>`.
 - The Builder opens `.h5ad`, `.h5mu` and SingleCellExperiment
   `.rds`/`.qs2` files like Seurat ones
-  ([`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+  ([`convertSCEToSeurat()`](https://www.mheming.com/CerebroNexus/reference/convertSCEToSeurat.md)
   is the conversion it uses), and offers PAGA, scVelo and pseudotime
   trajectories next to monocle2. A SpatialData store can be added as a
   `.zip` of its `.zarr` folder, and the antibody features of an `.h5mu`
@@ -90,14 +170,14 @@
 ### Builder
 
 - Add
-  [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+  [`launchCerebroBuilder()`](https://www.mheming.com/CerebroNexus/reference/launchCerebroBuilder.md)
   for importing data, configuring content, saving reusable projects,
   previewing spatial alignment, and publishing private Viewer apps with
   optional login. Review planned payload targets before publication.
 - Preserve dataset and cell identities across export; publish ROI, image
   alignment and content settings through shared contracts consumed by
   the Viewer.
-- [`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+- [`launchCerebroBuilder()`](https://www.mheming.com/CerebroNexus/reference/launchCerebroBuilder.md)
   listens on `127.0.0.1` only and warns for any other `host`: it reads
   any path it is given and runs the code inside `.rds` files.
   `max_file_size` limits uploads; a file above it is refused with a
@@ -135,11 +215,11 @@
 - Extra material tables are read as text first, so values such as `007`,
   long ids and a gene called `NA` are kept; comma, semicolon and tab
   delimiters are detected.
-- [`convertSCEToSeurat()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToSeurat.md)
+- [`convertSCEToSeurat()`](https://www.mheming.com/CerebroNexus/reference/convertSCEToSeurat.md)
   is exported. Spatial sections and their pictures keep the same names,
   and a `library_id` that is missing for some cells stops with a message
   that says so.
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   checks the saved MD5 of an h5 expression file and stops with an error
   if the file was replaced, instead of failing at the first read.
 
@@ -179,12 +259,12 @@
 
 - AnnData (`.h5ad`, `.h5mu`, `.zarr`) and SpatialData (`.zarr`) files
   are read natively, without Python:
-  [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md),
-  [`readSpatialDataAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md),
-  [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)
+  [`readH5adAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md),
+  [`readSpatialDataAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md),
+  [`convertH5adToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md)
   and
-  [`convertSpatialDataToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSpatialDataToCerebro.md);
-  [`exportToH5ad()`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  [`convertSpatialDataToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSpatialDataToCerebro.md);
+  [`exportToH5ad()`](https://www.mheming.com/CerebroNexus/reference/exportToH5ad.md)
   writes a CRB back as `.h5ad`. The readers are written here and not on
   anndataR, because anndataR 1.2.2 cannot read AIRR (awkward) arrays,
   `.h5mu` files or sharded Zarr v3 stores (nor the SpatialData tables in
@@ -200,7 +280,7 @@
   numcodecs default, at about 4 MB/s), so re-save a large store with
   zstd, or use an `.h5ad` file. Zarr arrays with a transpose codec are
   not read.
-- [`readH5adAsSCE()`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md)
+- [`readH5adAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md)
   says how many `obs` or `var` columns it skipped for an encoding it
   does not read, also with `verbose = FALSE`; a float tissue image whose
   maximum is just above 1 is no longer darkened (its type, not its
@@ -212,7 +292,7 @@
 
 ### Changes
 
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   exports faster and with less memory. Validating a Viewer Pack compares
   the pack’s own cell-order asset with the CRB’s cells instead of
   hashing every cell name again, and the preflight validates the pack
@@ -232,14 +312,14 @@
   URL or entity declaration is refused, and the image response carries a
   sandboxing `Content-Security-Policy`, so an SVG opened as a document
   cannot run script.
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   no longer refuses two `cerebro_data` entries that name the same CRB:
   the file is reused under both labels and the bundle holds one copy of
   the CRB and its H5 file per label.
 - Copying a directory into the bundle on Linux and macOS follows
   symbolic links inside it, so the App stays self-contained, and a copy
   that must not overwrite leaves an existing target alone.
-- [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+- [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
   of a read CRB with spatial molecule sidecars to another directory no
   longer looks for the sidecar next to the output file.
 - Spatial tables whose coordinate columns are called `X`, `Y` or `ID`
@@ -291,7 +371,7 @@
 - The prepared mouse brain demo data set is version 3: an existing
   `1m/cerebro-v2` folder is not reused, and `run-demo.R --data=1m`
   builds it again.
-- [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+- [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
   opens an H5-backed data file without loading HDF5Array: the cell names
   are read from the H5 file with rhdf5, and the expression matrix is
   attached when `$expression` is first used. Reading the 1.3 and 1.5
@@ -316,10 +396,10 @@
   version 2: the order of equally large clones in Compare is now the
   byte order of their names, not the locale’s, so a Pack with an earlier
   encoding counts as outdated and is rebuilt by the large demos.
-- [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md),
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+- [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md),
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   and
-  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  [`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
   build a Viewer Pack above 100,000 cells (was 500,000), so mid-sized
   data sets get one too.
 
@@ -399,19 +479,19 @@
 ### Fixes
 
 - Fixes
-  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  [`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
   failing on an object whose only reduction is PCA, and ignoring
   `use_delayed_array = TRUE`.
 - Fixes
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   dropping the spatial molecule sidecars of every data set when one data
   set before them had none.
 - Fixes
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   failing when `most_expressed_genes` holds a non-table element,
-  [`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
+  [`getMarkerGenes()`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md)
   failing with the default `organism = NULL`, and the gene lists of
-  [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
+  [`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   results carrying a stray space after every gene.
 - Fixes the Linked views group filters on a group that is not the one
   coloured at start, for example `celltype` on the Trekker example:
@@ -423,11 +503,11 @@
 ### Internal
 
 - Internal clean-up with no change in behaviour:
-  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  [`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
   and
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   share their builders, and repeated code in the analysis helpers,
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   and the `Cerebro` class is merged.
 - The expression backend types are listed once, in
   `inst/viewer/core/crb_contract.R`, and the export file-name stem is
@@ -444,9 +524,9 @@ that now fail” below.
 
 ### Stored files
 
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 and the Viewer now also reject, with “uses a retired format”, a `.crb`
 that
 
@@ -459,7 +539,7 @@ that
   `<stem>.spatial/` sidecar, or has a `getSpatialData()` without
   `hydrate_molecules`.
 
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 upgrades all of these in place: it rebuilds the object on the current
 class, converts a singular image to `histology_images` and moves
 molecule tables into the sidecar. The Viewer no longer carries guards
@@ -470,19 +550,19 @@ supported input.
 
 - **Seurat layers.** A requested layer that does not exist is an error
   in
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md),
-  [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md),
-  [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md),
-  [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md),
+  [`calculatePercentGenes()`](https://www.mheming.com/CerebroNexus/reference/calculatePercentGenes.md),
+  [`getMostExpressedGenes()`](https://www.mheming.com/CerebroNexus/reference/getMostExpressedGenes.md),
+  [`addPercentMtRibo()`](https://www.mheming.com/CerebroNexus/reference/addPercentMtRibo.md)
   and
-  [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md);
+  [`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md);
   no other layer is substituted. Before, an RNA assay with only `counts`
   exported at the default `slot = "data"` silently exported `counts`.
   The message lists the layers that exist; the fix is `slot = "counts"`
   (or running
   [`NormalizeData()`](https://satijalab.org/seurat/reference/NormalizeData.html)).
-- **[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- **[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   spatial arguments.** `spatial_images_flip_x/_y`,
   `spatial_images_scale_x/_y` and `spatial_images_offset_x/_y` are
   removed; use `spatial_image_settings`.
@@ -497,9 +577,9 @@ supported input.
 - **`addSpatialData()`** and `@misc$cerebro_spatial_images` reject the
   singular `histology_image` fields.
 - **Seurat v4 Visium images** (`VisiumV1`) are rejected by
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   and
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md).
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md).
   Rebuild the image as a `VisiumV2` image
   ([`Load10X_Spatial()`](https://satijalab.org/seurat/reference/Load10X_Spatial.html))
   or drop it from `object@images`; non-spatial Seurat v4 objects still
@@ -508,7 +588,7 @@ supported input.
   [`LoadCurioSeeker()`](https://satijalab.org/seurat/reference/LoadCurioSeeker.html),
   [`LoadSTARmap()`](https://satijalab.org/seurat/reference/LoadSTARmap.html)),
   keep exporting.
-- **[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)**
+- **[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)**
   needs unique, non-empty names when `crb_file_to_load` has more than
   one file, for example `c(sampleA = "a.crb", sampleB = "b.crb")`.
   Unnamed multi-file launches no longer get `legacy-N` ids.
@@ -529,7 +609,7 @@ supported input.
   and later) wrote both, so no released pack is affected. A pack built
   by development code before 5.0.0 is no longer refused and has to be
   rebuilt with
-  [`buildViewerPack()`](https://mihem.github.io/CerebroNexus/reference/buildViewerPack.md).
+  [`buildViewerPack()`](https://www.mheming.com/CerebroNexus/reference/buildViewerPack.md).
 - Saved specialist views whose canvas viewport uses `x0/x1/y0/y1` are
   rejected on import; views saved by the current Viewer are unaffected.
 - The Data info page no longer rebuilds category summaries that older
@@ -595,9 +675,9 @@ sets can be rebuilt as H5 in minutes.
 ### Storage
 
 - `expression_matrix_mode` of
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   and
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   is now `"embedded"` or `"h5"`. The BPCells storage mode is removed;
   the `h5` backend was the faster reader in the 2026-10-18 scale run.
   The recorded benchmark results, including the BPCells measurements,
@@ -616,28 +696,28 @@ sets can be rebuilt as H5 in minutes.
 - The immune repertoire of a large H5-backed data set is stored in a
   sibling file `<stem>.immune.qs2` (`.rds` with `codec = "rds"`) that
   the package writes itself:
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   and
-  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
   gain `immune_sidecar = c("auto", "always", "never")` and
   `immune_sidecar_threshold` (100,000 rows). The Viewer lists samples
   and chains from the descriptor and loads the file when the Immune
   repertoire page needs it;
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   copies it into the bundle.
 - The host-side overrides `expression_matrix_h5`,
   `expression_matrix_BPCells` and `expression_matrix_mode` are removed
   from
-  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
   and the matching `cerebro_options` entries from
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),
   which now stops with an error when `cerebro_options` still contains
   `expression_matrix_h5` or `expression_matrix_BPCells`. A `.crb` finds
   its matrix through its own descriptor, relative to its own directory.
 - `Cerebro` no longer has the `bcr_data` and `tcr_data` fields or
   `addBCRData()` / `addTCRData()`. `getBCR()` and `getTCR()` now return
   the BCR or TCR rows of the unified immune repertoire.
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   still accepts `@misc$tcr_data` / `@misc$bcr_data` as input and merges
   them into that repertoire.
 - The Nix environment (`create_env.R`, `default.nix`) no longer provides
@@ -647,9 +727,9 @@ sets can be rebuilt as H5 in minutes.
 
 ### Migrating existing files
 
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 and the Viewer stop with “uses a retired format” for a `.crb` that has
 no expression-backend descriptor, uses thin schema version 1 or 2, still
 holds `bcr_data` / `tcr_data`, keeps its immune repertoire in a retired
@@ -709,44 +789,44 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 ### Fixes
 
-- [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+- [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   accepts `h5_compression_level`, `immune_sidecar` and
   `immune_sidecar_threshold` and passes them to
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md);
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md);
   before, it always wrote an uncompressed H5 file and could not control
   the sidecar.
 - Re-exporting with
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   or saving with
-  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
   removes an immune repertoire sidecar of the replaced CRB that the new
   CRB no longer uses (a file another CRB in the directory still points
   to stays), and
-  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
   no longer leaves a staged sidecar behind when a later step fails. An
   object whose repertoire already sits in a sidecar keeps pointing to it
   whatever `immune_sidecar` is; see
-  [`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md).
+  [`?saveCerebro`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md).
 - `immune_sidecar` and `immune_sidecar_threshold` come after `verbose`
   in
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
   so the position of the arguments before them is the same as in 5.1.3.
 - The Viewer checks the H5 file’s cell names against the `.crb` before
   it reads gene expression, so expression of another data set with the
   same number of cells is no longer painted onto a thin `.crb`. The
   refusal is written to the log.
 - The “uses a retired format” error says to re-export the file with
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   when
-  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
   cannot repair it (a BPCells or thin schema 1 or 2 `.crb`); before, it
   sent every such file to
-  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md),
+  [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md),
   which then refused it.
-- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+- [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
   stops on an `expression_backend` that is not a descriptor instead of
   writing the file as embedded.
-- [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+- [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
   no longer rejects an `output` in the same directory on Windows because
   of a path-separator mismatch.
 - A background read of a `.crb` that does not finish within 30 s (for
@@ -788,7 +868,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   [duocang/CerebroNexus_paper_code](https://github.com/duocang/CerebroNexus_paper_code).
   `tests/bench/` is gone; the data preparation used by `run-demo.R` and
   its tests is now in `tests/demo/`.
-- [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+- [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   writes the H5 expression file at gzip level 0 (stored without
   compression; the shuffle and deflate filters are still applied),
   because export and read speed matter more than disk size. The file is
@@ -836,10 +916,10 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 ## CerebroNexus 5.1.0
 
 - Adds Viewer Packs:
-  [`buildViewerPack()`](https://mihem.github.io/CerebroNexus/reference/buildViewerPack.md)
+  [`buildViewerPack()`](https://www.mheming.com/CerebroNexus/reference/buildViewerPack.md)
   writes a sidecar directory next to a `.crb` file so that large data
   sets skip re-reading the object on every session, and
-  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
   builds one automatically above 500,000 cells.
 - Spatial scenes are grouped by sample and ROI, and background images
   are delivered per session: the browser receives a private URL for the
@@ -1002,10 +1082,10 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 ### Data format and I/O
 
 - Adds
-  [`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md),
-  [`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md),
+  [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
   and
-  [`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+  [`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
   with automatic legacy RDS compatibility and qs2 support. Thin CRB v2
   and Viewer Packs preserve lazy backend access, stable cell
   fingerprints and portable first-frame assets.
@@ -1070,7 +1150,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   lazy Extra material tables with optional display names for workbook
   sheets; formula-like cells and column names are neutralized before
   export.
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   now applies nested per-dataset colour palettes and rejects flat
   vectors or invalid colour values that generated Viewers cannot
   interpret.
@@ -1117,7 +1197,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 - Generated Viewers now disable user data uploads by default. Set
   `show_upload_ui = TRUE` in
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   to opt in. Closed Viewers also ignore upload input submitted outside
   the rendered UI.
 
@@ -1145,7 +1225,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 - Spatial backgrounds now use the public hierarchy
   `dataset -> spatial entry -> image label` in
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),
   while conversion starts at `spatial entry -> image label`. A spatial
   entry is a Seurat
   [`Images()`](https://satijalab.github.io/seurat-object/reference/Images.html)
@@ -1174,7 +1254,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 ### Viewer
 
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   can optionally protect a generated Viewer with an existing encrypted
   shinymanager SQLite database and an environment-variable key. The
   encrypted database is copied into the private app bundle; its
@@ -1193,7 +1273,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 ### Breaking changes
 
-- [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
+- [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
   is now the single application launcher. The obsolete version selector
   and deprecated version-specific launch exports were removed because
   CerebroNexus ships one Viewer implementation.
@@ -1251,12 +1331,12 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 ### Export
 
-- [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+- [`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
   now accepts scRepertoire lists, one `.rds`, explicitly named Cell
   Ranger CSVs, or existing scRepertoire metadata.
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   delegates to the same API users can call before
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md).
   TCR and BCR rows are merged by sample rather than leaving duplicate
   names that hide one receptor type.
 - Export now validates one named data.frame per sample, the five
@@ -1315,7 +1395,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 
 ### Export
 
-- **[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- **[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   now follows each `.crb` backend descriptor.** H5 files and BPCells
   directories are copied from the recorded portable relative location
   rather than guessed from the current `.crb` name, so renamed data
@@ -1330,7 +1410,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   content.
 - **Configured CRBs now use the exact backend decision validated at
   build time.**
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   derives a versioned per-CRB attachment plan from the ordinary
   `expression_backend` field and the deployment override, then stores it
   in the generated configuration. The standalone runtime consumes that
@@ -1396,13 +1476,13 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   a structured resolution failure, so it cannot short-circuit an
   explicitly enabled, complete compatibility fallback.
 - **Every complete-matrix consumer shares the same coverage contract.**
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md),
-  [`calculatePercentGenes()`](https://mihem.github.io/CerebroNexus/reference/calculatePercentGenes.md),
-  [`getMostExpressedGenes()`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md),
-  [`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md),
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md),
+  [`calculatePercentGenes()`](https://www.mheming.com/CerebroNexus/reference/calculatePercentGenes.md),
+  [`getMostExpressedGenes()`](https://www.mheming.com/CerebroNexus/reference/getMostExpressedGenes.md),
+  [`addPercentMtRibo()`](https://www.mheming.com/CerebroNexus/reference/addPercentMtRibo.md),
   and
-  [`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
+  [`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
   now resolve layered assays through one gateway. The resulting matrix
   must contain exactly the object’s cells and is reordered once before
   analysis or storage. `embedded`, `h5`, and `bpcells` therefore fail
@@ -1437,9 +1517,9 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   bounded independently. Highly overlapping prefix noise now stops
   before exhausting memory or R’s call stack, and the diagnostic asks
   the user to rename noise or join the intended layers.
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   also hands its already validated resolution to
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
   avoiding a second joined matrix and the corresponding peak-memory
   duplication.
 
@@ -1524,12 +1604,12 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 - Unified the R package, Shiny application, and GitHub repository under
   the `CerebroNexus` name. Install from `mihem/CerebroNexus` and load
   the package with
-  [`library(CerebroNexus)`](https://mihem.github.io/CerebroNexus/).
+  [`library(CerebroNexus)`](https://www.mheming.com/CerebroNexus/).
 - Kept the established Cerebro data model and public API, including
   `.crb` files, `Cerebro`, `Cerebro.options`,
-  [`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
+  [`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
   and
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md).
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md).
 - Updated the HLA export metadata field to `CerebroNexus_version`.
 
 ## Version 2.3.0
@@ -1554,7 +1634,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   `unknown`) so a synthetic or imputed genotype is never treated as
   directly typed.
 - **Export picks it up automatically.**
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   now reads `object@misc$hla_typing` (with
   `object@misc$hla_typing_source_type`), parallel to the existing
   `immune_repertoire` slot.
@@ -1776,7 +1856,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   whenever the loaded dataset carries spatial data, with plotly-based
   coloring, group filters, and box/lasso cell selection.
 - **Histology background overlay**:
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   gains `spatial_images` plus per-dataset `spatial_images_flip_x`,
   `spatial_images_flip_y`, `spatial_images_scale_x`,
   `spatial_images_scale_y`, and `spatial_plot_rotation` parameters.
@@ -1790,9 +1870,8 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   cortex-section SVG whose layer bands align with the cells, so cell
   types visibly stratify across the cortex out of the box. Both the
   coordinates and the image are synthetic — no patient data.
-- **Documentation**: added the
-  [`vignette("spatial_analysis")`](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.md)
-  guide.
+- **Documentation**: added the [spatial analysis
+  guide](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.html).
 - **Bundled demo set**: the app now opens on `demo_full_tcr_bcr.crb`
   (PBMC, TCR + BCR + trajectory) plus four real spatial sections
   (Visium, Slide-seq v2, MERFISH, Xenium), so the dataset switcher spans
@@ -1808,7 +1887,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   with `addSpatialData()`, `getSpatialData()`, and `availableSpatial()`
   accessors.
 - **Export support**:
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   now extracts spatial coordinates and expression from Seurat v5 image
   slots (Visium / Xenium / FOV) via the internal `.getSpatialData()`
   helper, storing them per image in the exported `.crb`.
@@ -1842,7 +1921,7 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
 ### Multiple data sets (multi-crb)
 
 - **Dataset switcher**:
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   now accepts a named vector of several `.crb` files and renders a
   “Select dataset:” dropdown in the sidebar, letting users move between
   data sets without restarting the app. Single-file usage is unchanged
@@ -1865,9 +1944,9 @@ sidecar layout, or is a pre-spatial `Cerebro_v1.3` object.
   reproducible build. The bundled app (`shiny::runApp("inst")`) now
   opens on these three data sets so the switcher is visible out of the
   box; pass a named vector to
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-  for your own data (see
-  [`vignette("multi_crb")`](https://mihem.github.io/CerebroNexus/articles/multi_crb.md)).
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
+  for your own data (see the [multi-crb
+  article](https://www.mheming.com/CerebroNexus/articles/multi_crb.html)).
   New vignette: *Loading multiple data sets (multi-crb) with a dataset
   switcher*.
 
@@ -2017,7 +2096,7 @@ previous releases and refreshes documentation for the current codebase.
 ### New features
 
 - External HDF5 expression backend, symmetric to the bpcells backend:
-  [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   with `expression_matrix_mode = "h5"` writes the matrix via
   [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
   to a TENx-format `.h5` next to the `.crb`. The runtime attach loads it
@@ -2027,22 +2106,22 @@ previous releases and refreshes documentation for the current codebase.
   `dgCMatrix` is never materialised, so RAM stays close to the `.crb`
   metadata size and attach is effectively instant
 - Introduced
-  [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   for bundling a self-contained Shiny app from one or more `.crb` files
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   now copies the `<stem>.h5` sibling alongside the `.crb` during app
   bundling, mirroring the existing `.bpcells/` handling
 - Legacy `.crb` files (predating the `expression_backend` field) are
   auto-tagged as `h5` when the host app sets
   `Cerebro.options[["expression_matrix_h5"]]`, finally giving
   `inst/extdata/v1.4/example.h5` a runtime consumer
-- [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+- [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   accepts an in-memory Seurat object alongside the `.rds` path; output
   basename derives from `experiment_name` when no path is given
-- [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+- [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
   opens a `...` passthrough so callers can forward extra options without
   signature churn
-- [`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+- [`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   with `expression_matrix_mode = "bpcells"` now auto-detects
   losslessly-integer values and calls
   `BPCells::convert_matrix_type("uint32_t")` before
@@ -2058,7 +2137,7 @@ previous releases and refreshes documentation for the current codebase.
 ### Bug fixes
 
 - Fixed
-  [`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+  [`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
   projections: `reducedDims()` output is now coerced to `data.frame`
   before `addProjection()`, matching the Seurat path and clearing a
   latent runtime error for SCE inputs with non-PCA reductions
@@ -2146,7 +2225,7 @@ previous releases and refreshes documentation for the current codebase.
 
 ### Documentation
 
-- Added pkgdown site at <https://mihem.github.io/CerebroNexus/> with
+- Added pkgdown site at <https://www.mheming.com/CerebroNexus/> with
   light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to
   master

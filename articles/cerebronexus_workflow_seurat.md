@@ -12,7 +12,7 @@ example of how scRNA-seq data can be processed using the
 [Seurat](https://satijalab.org/seurat/) toolkit and then exported for
 visualization in Cerebro.
 
-Ket features that can be accessed through Cerebro:
+Key features that can be accessed through Cerebro:
 
 - Interactive 2D and 3D dimensional reductions.
 - Overview panels for all grouping variables, e.g. samples and clusters.
@@ -285,7 +285,7 @@ data set and its clusters and cell types.
 
 First, for every cell we calculate the percentage of mitochondrial and
 ribosomal transcripts of all transcripts using the
-[`addPercentMtRibo()`](https://mihem.github.io/CerebroNexus/reference/addPercentMtRibo.md)
+[`addPercentMtRibo()`](https://www.mheming.com/CerebroNexus/reference/addPercentMtRibo.md)
 function.
 
 ``` r
@@ -317,7 +317,7 @@ Marker genes are genes which are particularly strongly or weakly
 expressed in a given cell population, e.g. a cluster. This information
 can help to distinguish the role of different cell groups in the data
 set. We can identify marker genes using the
-[`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md)
+[`getMarkerGenes()`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md)
 function which internally uses the
 [`Seurat::FindAllMarkers()`](https://satijalab.org/seurat/reference/FindAllMarkers.html)
 function but also stores the results in the Seurat object under the
@@ -337,13 +337,13 @@ seurat <- getMarkerGenes(
 ### Perform pathway enrichment on marker genes
 
 Using the previously identified marker genes, we can perform a pathway
-enrichmeny analysis using the
-[`getEnrichedPathways()`](https://mihem.github.io/CerebroNexus/reference/getEnrichedPathways.md)
+enrichment analysis using the
+[`getEnrichedPathways()`](https://www.mheming.com/CerebroNexus/reference/getEnrichedPathways.md)
 function. The function will internally use the
-[Enrichr](https://amp.pharm.mssm.edu/Enrichr/) API and store the results
-in the Seurat object under the `misc` slot. All we have to do is provide
+[Enrichr](https://maayanlab.cloud/Enrichr/) API and store the results in
+the Seurat object under the `misc` slot. All we have to do is provide
 the name that we specified in
-[`getMarkerGenes()`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md).
+[`getMarkerGenes()`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md).
 
 ``` r
 seurat <- getEnrichedPathways(
@@ -357,11 +357,11 @@ seurat <- getEnrichedPathways(
 ### Gene set enrichment
 
 On top of querying the databases of the
-[Enrichr](https://amp.pharm.mssm.edu/Enrichr/) service, one can also
+[Enrichr](https://maayanlab.cloud/Enrichr/) service, one can also
 perform gene set enrichment analysis on gene sets provided as a `.gmt`
 file, e.g. from the
 [MSigDB](https://www.gsea-msigdb.org/gsea/msigdb/index.jsp). The
-[`performGeneSetEnrichmentAnalysis()`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
+[`performGeneSetEnrichmentAnalysis()`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md)
 function uses the
 [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html)
 method in combination with additional statistics as published by
@@ -384,7 +384,7 @@ Then, we perform trajectory analysis with [Monocle
 v2](https://cole-trapnell-lab.github.io/monocle-release/) using the
 previously identified highly variable genes. We extract the trajectory
 from the generated Monocle object with the CerebroNexus
-[`extractMonocleTrajectory()`](https://mihem.github.io/CerebroNexus/reference/extractMonocleTrajectory.md)
+[`extractMonocleTrajectory()`](https://www.mheming.com/CerebroNexus/reference/extractMonocleTrajectory.md)
 function and attach it to our Seurat object.
 
 ``` r
@@ -408,7 +408,7 @@ seurat <- extractMonocleTrajectory(monocle, seurat, 'highly_variable_genes')
 ## Export to Cerebro format
 
 Finally, we use CerebroNexus
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 to export our Seurat object to a `.crb` file which can be loaded into
 CerebroNexus.
 
@@ -434,17 +434,17 @@ sibling `.h5` file instead (the only other storage mode); keep the two
 files together. A very large immune repertoire is moved to a third
 sibling file (`immune_sidecar = "auto"`). See [Store the expression
 matrix in H5
-format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md).
+format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.html).
 
 The Cerebro use interface can be launched using the
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
 function.
 
 ## See also
 
 If your Seurat v5 assay is split into one layer per sample, see [Seurat
 v5 layered assays: complete and safe expression
-matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md)
+matrices](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.html)
 for the automatic resolution rules, custom-layer safeguards, and
 troubleshooting steps.
 

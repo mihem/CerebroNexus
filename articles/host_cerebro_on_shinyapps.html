@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,9 +102,9 @@
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
             
-            <h4 data-toc-skip class="date">08 November, 2026</h4>
+            <h4 data-toc-skip class="date">10 November, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/host_cerebro_on_shinyapps.Rmd" class="external-link"><code>vignettes/host_cerebro_on_shinyapps.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/host_cerebro_on_shinyapps.Rmd" class="external-link"><code>vignettes/articles/host_cerebro_on_shinyapps.Rmd</code></a></small>
       <div class="d-none name"><code>host_cerebro_on_shinyapps.Rmd</code></div>
     </div>
 
@@ -131,7 +131,7 @@ figure out if this service fits your purpose.</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"remotes"</span>, <span class="st">"rsconnect"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"mihem/CerebroNexus"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span></code></pre></div>
 <p>Then, you need to provide <code>rsconnect</code> with your
 shinyapps.io account info. On the shinyapps.io website, in the left
 navigation bar, go to “Account” and then “Tokens”. A token should have
@@ -161,7 +161,7 @@ a label that users will see in the application.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>The generated directory contains <code>app.R</code>, the Viewer
 runtime, and the private data files needed by the deployed application.
-See <code><a href="../articles/create_a_self_contained_shiny_app.html">vignette("create_a_self_contained_shiny_app")</a></code> for
+See <code>vignette("create_a_self_contained_shiny_app")</code> for
 deployment options. An H5-backed <code>.crb</code> is bundled together
 with its <code>.h5</code> file (and its immune repertoire sidecar, if it
 has one), so the uploaded directory stays self-contained.</p>
@@ -177,7 +177,7 @@ has one), so the uploaded directory stays self-contained.</p>
 finishes successfully, Cerebro should open in your browser. Using the
 shinyapps.io dashboard, you can manage the app, check usage metrics and
 logs, etc. An important parameter is the “Instance size”, which controls
-the available memory and can be controled in the “Settings” tab of the
+the available memory and can be controlled in the “Settings” tab of the
 dashboard. The larger the data set you want to upload to Cerebro, the
 more memory will be necessary.</p>
 </div>
@@ -198,7 +198,7 @@ access to Cerebro with a login page</a></li>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

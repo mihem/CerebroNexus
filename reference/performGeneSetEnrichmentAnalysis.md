@@ -37,7 +37,7 @@ performGeneSetEnrichmentAnalysis(
 
   Path to GMT file containing the gene sets to be tested. The Broad
   Institute provides many gene sets which can be downloaded:
-  http://software.broadinstitute.org/gsea/msigdb/index.jsp
+  https://www.gsea-msigdb.org/gsea/msigdb/index.jsp
 
 - groups:
 
@@ -69,6 +69,7 @@ stored in object@misc\$enriched_pathways\$\<name\>
 ## Examples
 
 ``` r
+# \donttest{
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 example_gene_set <- system.file("extdata/example_gene_set.gmt",
@@ -76,14 +77,14 @@ example_gene_set <- system.file("extdata/example_gene_set.gmt",
 pbmc <- performGeneSetEnrichmentAnalysis(
   object = pbmc,
   GMT_file = example_gene_set,
-  groups = c('sample','seurat_clusters'),
+  groups = 'seurat_clusters',
   thresh_p_val = 0.05,
   thresh_q_val = 0.1
 )
-#> [22:16:45] Loading gene sets...
-#> [22:16:45] Loaded 2 gene sets from GMT file.
-#> [22:16:45] Extracting transcript counts from `data` slot of `RNA` assay...
-#> [22:16:45] Performing analysis for 2 subgroups of group `sample`...
+#> [21:16:26] Loading gene sets...
+#> [21:16:26] Loaded 2 gene sets from GMT file.
+#> [21:16:26] Extracting transcript counts from `data` slot of `RNA` assay...
+#> [21:16:26] Performing analysis for 2 subgroups of group `seurat_clusters`...
 #> ℹ GSVA version 2.6.12
 #> ℹ Searching for rows with constant values
 #> ℹ Calculating GSVA ranks
@@ -95,18 +96,6 @@ pbmc <- performGeneSetEnrichmentAnalysis(
 #> ℹ GSVA dense (classical) algorithm
 #> ℹ Calculating GSVA scores for 2 gene sets
 #> ✔ Calculations finished
-#> [22:16:48] 0 gene sets passed the thresholds across all subgroups of group `sample`.
-#> [22:16:48] Performing analysis for 2 subgroups of group `seurat_clusters`...
-#> ℹ GSVA version 2.6.12
-#> ℹ Searching for rows with constant values
-#> ℹ Calculating GSVA ranks
-#> ℹ kcdf='auto' (default)
-#> ℹ GSVA dense (classical) algorithm
-#> ℹ Row-wise ECDF estimation with Gaussian kernels
-#> ℹ Calculating row ECDFs
-#> ℹ Calculating column ranks
-#> ℹ GSVA dense (classical) algorithm
-#> ℹ Calculating GSVA scores for 2 gene sets
-#> ✔ Calculations finished
-#> [22:16:49] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.
+#> [21:16:27] 0 gene sets passed the thresholds across all subgroups of group `seurat_clusters`.
+# }
 ```

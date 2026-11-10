@@ -2,7 +2,7 @@
 
 ## Overview
 
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 bundles a CerebroNexus Shiny app into a single output directory. It
 copies the Shiny sources shipped under `inst/viewer/`, the requested
 `.crb` (or `.rds`) data file(s), and the `inst/extdata/` reference
@@ -191,15 +191,15 @@ downloads use the same neutralized data.
 ## Sibling files: `.h5` and `.immune.qs2`
 
 If your `.crb` was exported with `expression_matrix_mode = "h5"` in
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
 its descriptor records the H5 file relative to the `.crb`. Fresh exports
 use `<stem>.h5`, but the descriptor remains authoritative if the `.crb`
 is renamed. A large immune repertoire can sit in a second sibling,
 `<stem>.immune.qs2`, which the `.crb` also records by relative name (see
 `immune_sidecar` in
-[`?saveCerebro`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)).
+[`?saveCerebro`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)).
 
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 copies each recorded file to the same relative location under
 `result_dir/private-data/`, next to the copy of the `.crb`. The location
 must be a portable relative path; missing sidecars and conflicting
@@ -219,7 +219,7 @@ A `.crb` in a retired format is rejected during preflight, before
 anything is written, with
 `uses a retired format ... Convert it once with CerebroNexus::convertCerebro()`.
 See [Data integrity
-contracts](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md)
+contracts](https://www.mheming.com/CerebroNexus/articles/data_integrity_contracts.md)
 for what counts as retired.
 
 ### Private data and spatial assets
@@ -289,7 +289,7 @@ without immutable snapshots. Every CRB, sidecar, spatial image and
 source-path ancestor must remain trusted and unchanged for the complete
 build. The target build lock does not protect these input paths;
 concurrent producers should finish an immutable release directory before
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 consumes it.
 
 Launch settings are validated before target preparation and stored in a
@@ -346,8 +346,7 @@ rsconnect::deployApp(appDir = out_dir)
 
 ## Reference
 
-- [`?createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
-- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+- [`?createShinyApp`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for end-to-end Seurat → `.crb` → app
-- [`vignette("host_cerebro_on_shinyapps")`](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
-  for shinyapps.io specifics
+- `vignette("host_cerebro_on_shinyapps")` for shinyapps.io specifics

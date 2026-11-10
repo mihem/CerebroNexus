@@ -12,7 +12,7 @@ bundled alongside your single-cell data. Common use cases include:
 
 The tab appears *conditionally* — when the `.crb` contains embedded
 material or a generated app includes external tables through
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md).
 You control what appears, so the interface stays clean when no extra
 content is available.
 
@@ -40,7 +40,7 @@ download support.
 ## Embedding content in a CRB
 
 Use the `extra_material` parameter in
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md):
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md):
 
 ``` r
 exportFromSeurat(seurat_object,
@@ -58,7 +58,7 @@ wherever that data file is opened.
 ## Supplying external tables to a generated app
 
 Use `extra_tables` in
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 when tables should belong to one generated deployment rather than to the
 CRB itself:
 
@@ -90,5 +90,5 @@ external tables without modifying that CRB.
 
 ## See also
 
-[`vignette("export_and_visualize_custom_tables_and_plots")`](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.md)
-for a detailed walkthrough with examples.
+`vignette("export_and_visualize_custom_tables_and_plots")` for a
+detailed walkthrough with examples.

@@ -69,3 +69,15 @@ saveCerebro(
 ## Value
 
 The output path, invisibly.
+
+## Examples
+
+``` r
+cerebro <- readCerebro(system.file("extdata/examples/example.crb", package = "CerebroNexus"))
+dir <- tempfile("cerebro-")
+dir.create(dir)
+saveCerebro(cerebro, file.path(dir, "example.crb"))
+list.files(dir)
+#> [1] "example.crb"
+unlink(dir, recursive = TRUE)
+```

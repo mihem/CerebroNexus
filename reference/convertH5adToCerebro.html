@@ -11,7 +11,7 @@ createShinyApp can serve. The file is read natively from HDF5
 with readH5adAsSCE, so neither Python nor
 zellkonverter is needed, and the resulting
 SingleCellExperiment goes through convertSCEToCerebro,
-so every option of that route applies here too."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+so every option of that route applies here too."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -19,7 +19,7 @@ so every option of that route applies here too."><meta property="og:image" conte
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -262,15 +262,59 @@ embedding exists, as on the other routes. Receptor chains written by scirpy
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">h5ad</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".h5ad"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="exportToH5ad.html">exportToH5ad</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/example.crb"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="va">h5ad</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [INFO] Not exported to h5ad: immune repertoire (no chains found for the cells); enriched pathways; extra material.</span>
 <span class="r-in"><span><span class="fu">convertH5adToCerebro</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  h5ad_file <span class="op">=</span> <span class="st">"pbmc.h5ad"</span>,</span></span>
-<span class="r-in"><span>  result_dir <span class="op">=</span> <span class="st">"output"</span>,</span></span>
-<span class="r-in"><span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cell_type"</span>, <span class="st">"sample"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  h5ad_file <span class="op">=</span> <span class="va">h5ad</span>,</span></span>
+<span class="r-in"><span>  result_dir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"output"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"seurat_clusters"</span>, <span class="st">"sample"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  expression_matrix_mode <span class="op">=</span> <span class="st">"h5"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
-<span class="r-in"><span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:07] Calculating most expressed genes and mean expression for each group...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:07] Processing group: seurat_clusters</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:07] Processing group: sample</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:07] Most expressed genes and mean expression calculation completed.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Writing expression matrix to TENx HDF5 file: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/.crb-stage-11de43b8dc87/cerebro_file11dea7bd4c9.h5</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Will export the following dimensional reductions: UMAP</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Extracting tables of most expressed genes...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Extracting tables of mean expression...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.0.0</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: file11dea7bd4c9</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> organism: Human</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-11-10</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> number of cells: NULL</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> number of genes: NULL</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> grouping variables (2): seurat_clusters, sample</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> cell cycle variables (0): </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> projections (1): UMAP</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> trees (0): </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> most expressed genes: seurat_clusters, sample</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> marker genes:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   - cerebro_seurat (1): seurat_clusters</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> enriched pathways:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> trajectories:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> extra material:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:08] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/cerebro_file11dea7bd4c9.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:09] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Successfully exported: cerebro_file11dea7bd4c9.crb</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -278,7 +322,7 @@ embedding exists, as on the other routes. Receptor chains written by scirpy
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

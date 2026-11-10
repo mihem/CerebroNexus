@@ -8,7 +8,7 @@ the expression comes from. It then writes the \`.crb\` and, if asked,
 packages it into a standalone Shiny app.
 
 It does the same work as calling
-[`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 yourself. The difference is that it reads the object first and only
 offers what is actually there – the layers that exist, the columns that
 can serve as groups, the reductions that will survive the export – so
@@ -62,7 +62,7 @@ is given, and reading an \`.rds\` runs whatever code is inside it.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-launchCerebroBuilder()
-} # }
+if (interactive()) {
+  launchCerebroBuilder()
+}
 ```

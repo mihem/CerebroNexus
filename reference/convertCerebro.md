@@ -13,7 +13,7 @@ table embedded in a spatial entry moves into the per-FOV sidecar next to
 the CRB. A CRB whose expression storage is older than the formats this
 version reads (an unknown expression backend, thin schema 1 or 2) cannot
 be converted; re-export it with
-[`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md).
+[`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md).
 
 ## Usage
 
@@ -41,3 +41,20 @@ convertCerebro(input, output = input, codec = c("qs2", "rds"))
 ## Value
 
 The output path, invisibly.
+
+## Examples
+
+``` r
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#> [1] TRUE
+convertCerebro(
+  file.path(dir, "example.crb"),
+  file.path(dir, "example_rds.crb"),
+  codec = "rds"
+)
+list.files(dir)
+#> [1] "example.crb"     "example_rds.crb"
+unlink(dir, recursive = TRUE)
+```

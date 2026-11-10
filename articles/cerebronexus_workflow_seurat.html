@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,7 +102,7 @@
                         <h4 data-toc-skip class="author">Roman
 Hillje</h4>
             
-            <h4 data-toc-skip class="date">08 November, 2026</h4>
+            <h4 data-toc-skip class="date">10 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/cerebronexus_workflow_seurat.Rmd" class="external-link"><code>vignettes/cerebronexus_workflow_seurat.Rmd</code></a></small>
       <div class="d-none name"><code>cerebronexus_workflow_seurat.Rmd</code></div>
@@ -121,7 +121,7 @@ framework and designed to provide numerous perspectives on a given data
 set that should facilitate data interpretation. This vignette will give
 you an example of how scRNA-seq data can be processed using the <a href="https://satijalab.org/seurat/" class="external-link">Seurat</a> toolkit and then
 exported for visualization in Cerebro.</p>
-<p>Ket features that can be accessed through Cerebro:</p>
+<p>Key features that can be accessed through Cerebro:</p>
 <ul>
 <li>Interactive 2D and 3D dimensional reductions.</li>
 <li>Overview panels for all grouping variables, e.g. samples and
@@ -176,7 +176,7 @@ dplyr package and set a seed to make our analysis reproducible.</p>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">SingleR</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">monocle</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1234567</span><span class="op">)</span></span></code></pre></div>
@@ -436,8 +436,8 @@ results in the Seurat object under the <code>misc</code> slot.</p>
 <h3 id="perform-pathway-enrichment-on-marker-genes">Perform pathway enrichment on marker genes<a class="anchor" aria-label="anchor" href="#perform-pathway-enrichment-on-marker-genes"></a>
 </h3>
 <p>Using the previously identified marker genes, we can perform a
-pathway enrichmeny analysis using the <code><a href="../reference/getEnrichedPathways.html">getEnrichedPathways()</a></code>
-function. The function will internally use the <a href="https://amp.pharm.mssm.edu/Enrichr/" class="external-link">Enrichr</a> API and store the
+pathway enrichment analysis using the <code><a href="../reference/getEnrichedPathways.html">getEnrichedPathways()</a></code>
+function. The function will internally use the <a href="https://maayanlab.cloud/Enrichr/" class="external-link">Enrichr</a> API and store the
 results in the Seurat object under the <code>misc</code> slot. All we
 have to do is provide the name that we specified in
 <code><a href="../reference/getMarkerGenes.html">getMarkerGenes()</a></code>.</p>
@@ -452,7 +452,7 @@ have to do is provide the name that we specified in
 <div class="section level3">
 <h3 id="gene-set-enrichment">Gene set enrichment<a class="anchor" aria-label="anchor" href="#gene-set-enrichment"></a>
 </h3>
-<p>On top of querying the databases of the <a href="https://amp.pharm.mssm.edu/Enrichr/" class="external-link">Enrichr</a> service, one can
+<p>On top of querying the databases of the <a href="https://maayanlab.cloud/Enrichr/" class="external-link">Enrichr</a> service, one can
 also perform gene set enrichment analysis on gene sets provided as a
 <code>.gmt</code> file, e.g. from the <a href="https://www.gsea-msigdb.org/gsea/msigdb/index.jsp" class="external-link">MSigDB</a>. The
 <code><a href="../reference/performGeneSetEnrichmentAnalysis.html">performGeneSetEnrichmentAnalysis()</a></code> function uses the <a href="https://bioconductor.org/packages/release/bioc/html/GSVA.html" class="external-link">GSVA</a>
@@ -519,17 +519,18 @@ into CerebroNexus.</p>
 <code>expression_matrix_mode = "h5"</code> to write the matrix to a
 sibling <code>.h5</code> file instead (the only other storage mode);
 keep the two files together. A very large immune repertoire is moved to
-a third sibling file (<code>immune_sidecar = "auto"</code>). See <a href="create_expression_matrix_in_h5_format.html">Store the expression
-matrix in H5 format</a>.</p>
+a third sibling file (<code>immune_sidecar = "auto"</code>). See <a href="https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.html">Store
+the expression matrix in H5 format</a>.</p>
 <p>The Cerebro use interface can be launched using the
 <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> function.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a>
 </h2>
-<p>If your Seurat v5 assay is split into one layer per sample, see <a href="seurat_v5_layered_assays.html">Seurat v5 layered assays: complete
-and safe expression matrices</a> for the automatic resolution rules,
-custom-layer safeguards, and troubleshooting steps.</p>
+<p>If your Seurat v5 assay is split into one layer per sample, see <a href="https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.html">Seurat
+v5 layered assays: complete and safe expression matrices</a> for the
+automatic resolution rules, custom-layer safeguards, and troubleshooting
+steps.</p>
 </div>
 <div class="section level2">
 <h2 id="session-info">Session info<a class="anchor" aria-label="anchor" href="#session-info"></a>
@@ -544,7 +545,7 @@ custom-layer safeguards, and troubleshooting steps.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

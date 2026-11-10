@@ -61,9 +61,9 @@ object.
 The expression matrix is either embedded in the `.crb` or kept in an H5
 file next to it; `expression_backend` records which
 (`setExpressionBackend()` accepts only `"embedded"` and `"h5"`), and
-[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+[`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
 /
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
 take care of the rest. T-cell and B-cell receptors live together in
 `immune_repertoire`; there are no separate `tcr_data` / `bcr_data`
 fields, and `getTCR()` / `getBCR()` return the TCR or BCR rows of that
@@ -71,13 +71,13 @@ repertoire. A very large repertoire can sit in a sibling
 `<stem>.immune.qs2` file that `getImmuneRepertoire()` loads on demand. A
 `.crb` written by an older release that does not follow this layout is
 rejected with a pointer to
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md).
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md).
 
 As long as you follow the described scheme, you can export and visualize
 any data frame that is stored in the `marker_genes` or
 `enriched_pathways` slots. I have prepared a vignette with some more
 details that you can find
-[here](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.md).
+[here](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.html).
 
 Please make sure to use names for items in lists, otherwise it will
 likely result in an error.

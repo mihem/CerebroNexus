@@ -11,7 +11,7 @@ stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 [Shiny](https://shiny.posit.co/) platform for exploring and sharing
 single-cell and spatial transcriptomics data, with gene-expression,
 immune-repertoire, trajectory, and HLA-TCR analyses. See the [full
-documentation](https://mihem.github.io/CerebroNexus/).
+documentation](https://www.mheming.com/CerebroNexus/).
 
 [Try the live demo](https://osmzhlab.uni-muenster.de/shiny/demo/).
 
@@ -29,14 +29,43 @@ CerebroNexus spatial data view
 
 ## 1. Installation
 
+From CRAN:
+
 ``` r
-remotes::install_github('mihem/CerebroNexus')
+install.packages("CerebroNexus")
+```
+
+The development version from GitHub:
+
+``` r
+remotes::install_github("mihem/CerebroNexus")
 ```
 
 The Builder (below) also needs a few suggested packages:
 
 ``` r
 install.packages(c("Seurat", "callr", "processx", "ps"))
+```
+
+### Optional packages
+
+Some features use packages that are not installed with CerebroNexus:
+SingleCellExperiment, AnnData and HDF5 input, the immune repertoire and
+HLA pages, gene set enrichment and marker annotation. A feature that
+needs a missing package says which one and how to install it. To install
+all of them at once:
+
+``` r
+install.packages(c(
+  "Seurat", "callr", "processx", "ps", "digest", "readxl", "arrow",
+  "ggplot2", "ggdendro", "patchwork", "igraph", "stringdist", "msigdbr",
+  "httr", "future.apply", "pbapply", "png", "jpeg"
+))
+install.packages("BiocManager")
+BiocManager::install(c(
+  "SingleCellExperiment", "HDF5Array", "rhdf5", "anndataR",
+  "scRepertoire", "GSVA", "qvalue", "biomaRt"
+))
 ```
 
 ## 2. Build an app for your own data
@@ -49,7 +78,7 @@ CerebroNexus::launchCerebroBuilder()
 
 Add your data files, choose the groups and content, and build a `.crb`
 file or a standalone App. See [Build a data set by
-pointing](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html).
+pointing](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 **From a script:**
 
@@ -75,8 +104,8 @@ createShinyApp(
 
 No Python is needed to read AnnData or SpatialData; see the vignette
 [Use SingleCellExperiment and AnnData
-data](https://mihem.github.io/CerebroNexus/vignettes/use_sce_and_anndata_data.Rmd).
+data](https://www.mheming.com/CerebroNexus/vignettes/use_sce_and_anndata_data.Rmd).
 
 ## License
 
-MIT, see [LICENSE.md](https://mihem.github.io/CerebroNexus/LICENSE.md).
+MIT, see [LICENSE.md](https://www.mheming.com/CerebroNexus/LICENSE.md).

@@ -62,8 +62,8 @@ launchCerebro(
 
 - projections_show_hover_info:
 
-  Show hover infos in projections. This setting can be changed in the
-  UI; defaults to TRUE.
+  Show hover information in projections. This setting can be changed in
+  the UI; defaults to TRUE.
 
 - ...:
 

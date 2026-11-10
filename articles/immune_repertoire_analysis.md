@@ -95,14 +95,14 @@ combined_bcr <- combineBCR(bcr_contigs, samples = sample_names)
 ### Step 3 — attach to the Seurat object and export
 
 Hand both receptor types to
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 and export.
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 picks the slot up automatically. A sample is one biological sample
 rather than one receptor type, so the T- and B-cell clonotypes of a
 given sample are row-bound into a single table — cells are mutually
 exclusive, a cell has a TCR *or* a BCR.
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 does that for you and refuses a barcode present in both inputs (usually
 a doublet or an unresolved receptor assignment). It checks the result as
 it stores it, so a wrong shape or barcodes that reach no cell are
@@ -132,12 +132,12 @@ One thing to watch: `combineTCR(samples = )` and
 cell names have to carry the same prefix —
 [`SeuratObject::RenameCells()`](https://satijalab.github.io/seurat-object/reference/RenameCells.html)
 — or no receptor can be tied to a cell.
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 stops with that diagnosis rather than storing a repertoire that reaches
 nothing.
 
 If filtering the Seurat object removed only some repertoire cells,
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
 reports and removes those orphan rows before storage. They therefore
 cannot inflate clone abundance or diversity. A sample with no remaining
 cell is removed; a repertoire with no matching cell at all is an error.
@@ -183,18 +183,18 @@ Cerebro object has no separate `tcr_data` or `bcr_data` fields;
 `getTCR()` and `getBCR()` derive their tables from the repertoire (rows
 whose `CTgene` names a `TR[ABGD]` or `IG[HKL]` chain, samples without
 such rows dropped), and `getImmuneRepertoire()` returns the whole list.
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 still accepts Seurat objects that keep receptors in
 `object@misc$tcr_data` and `object@misc$bcr_data` and merges them into
 the unified repertoire, so older preparation workflows keep working. A
 `.crb` from an older release that stored receptors in those fields is a
 retired format; convert it once with
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md).
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md).
 
 A very large repertoire is kept out of the `.crb`.
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 and
-[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+[`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
 write it to a sibling file `<stem>.immune.qs2` (`.rds` with
 `codec = "rds"`) and record its name and checksum in the `.crb`, so the
 Viewer lists samples and chains without reading it and loads the tables
@@ -221,7 +221,7 @@ exportFromSeurat(
 
 The sidecar must travel with the `.crb`: keep the two files in one
 directory when moving them, and
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 copies the sidecar next to the bundled `.crb` automatically.
 
 ## Module interface

@@ -2,7 +2,7 @@
 
 ## Overview
 
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 creates a public Viewer unless you pass `auth`. Auth lite expects two
 existing inputs:
 
@@ -34,7 +34,7 @@ CRB files.
 external secret file, and one login-protected App directory.
 
 **Verify:** the final
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 call must succeed before anything is deployed; then test one valid and
 one invalid login locally.
 
@@ -196,7 +196,7 @@ external env file.
 passphrase in this R process; `runApp()` reads it to unlock the bundled
 database and start the login page.
 
-**Verify:** open <http://localhost:3838>, confirm a valid login succeeds
+**Verify:** open `http://localhost:3838`, confirm a valid login succeeds
 and an invalid login fails, then stop the R process with Ctrl+C.
 
 Every new R process must load the external secret:
@@ -410,7 +410,7 @@ rollback window.
 ## See also
 
 - [Create a self-contained Shiny
-  App](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+  App](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 - [Host CerebroNexus on
-  shinyapps.io](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
+  shinyapps.io](https://www.mheming.com/CerebroNexus/articles/host_cerebro_on_shinyapps.md)
 - [`shinymanager::create_db()`](https://datastorm-open.github.io/shinymanager/reference/create_db.html)

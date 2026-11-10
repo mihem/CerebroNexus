@@ -3,7 +3,7 @@
 Reads the AnnData on-disk format (anndata 0.8 or later) directly from
 HDF5 with rhdf5, without Python or zellkonverter, and returns a
 `SingleCellExperiment`. From there the object can go to
-[`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md),
+[`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md),
 or to any other tool that reads SCE.
 
 ## Usage
@@ -36,14 +36,6 @@ readH5adAsSCE(
   Use `raw/X` (and `raw/var`) as the expression matrix, as scanpy
   workflows often keep the full, unfiltered gene set there. `layers` are
   then not read, because their genes differ.
-
-- extra_modalities:
-
-  For a MuData file: other modalities to read next to the expression one
-  (for example `"prot"` for antibody counts), or `"all"` for every
-  modality except the expression and receptor ones. Each becomes an
-  alternative experiment of the result, with its own features and the
-  cells of the expression modality (cells it lacks get zeros).
 
 - modality:
 
@@ -80,6 +72,14 @@ readH5adAsSCE(
   (`"hires"`, `"lowres"`, `"fullres"`), or `FALSE` for none. Needs the
   png package.
 
+- extra_modalities:
+
+  For a MuData file: other modalities to read next to the expression one
+  (for example `"prot"` for antibody counts), or `"all"` for every
+  modality except the expression and receptor ones. Each becomes an
+  alternative experiment of the result, with its own features and the
+  cells of the expression modality (cells it lacks get zeros).
+
 - verbose:
 
   Print what was skipped.
@@ -113,7 +113,7 @@ The mapping is:
 - scanpy's `uns["rank_genes_groups"]` results become
   `metadata(sce)$marker_genes`, one table per `groupby` variable; marker
   tables written by
-  [`exportToH5ad`](https://mihem.github.io/CerebroNexus/reference/exportToH5ad.md)
+  [`exportToH5ad`](https://www.mheming.com/CerebroNexus/reference/exportToH5ad.md)
   under `uns["cerebro"]["marker_genes"]` are read back as they were.
 
 - immune receptor chains written by scirpy (an awkward array in
@@ -160,14 +160,63 @@ cells. Other `uns`, `obsp`, `varm` and `varp` content is not read.
 
 ## See also
 
-[`convertH5adToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md),
-[`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
+[`convertH5adToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md),
+[`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md)
 
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-sce <- readH5adAsSCE("pbmc.h5ad")
-convertSCEToCerebro(sce, "output", groups = "cell_type")
-} # }
+# \donttest{
+h5ad <- tempfile(fileext = ".h5ad")
+exportToH5ad(
+  system.file("extdata/examples/example.crb", package = "CerebroNexus"),
+  h5ad
+)
+#> [INFO] Not exported to h5ad: immune repertoire (no chains found for the cells); enriched pathways; extra material.
+sce <- readH5adAsSCE(h5ad)
+convertSCEToCerebro(
+  sce,
+  file.path(tempdir(), "output"),
+  assay = "X",
+  groups = "sample"
+)
+#> [21:16:28] Calculating most expressed genes and mean expression for each group...
+#> [21:16:28] Processing group: sample
+#> [21:16:28] Most expressed genes and mean expression calculation completed.
+#> [21:16:29] Initializing Cerebro object...
+#> [21:16:29] Adding expression data (embedded)...
+#> [21:16:29] Collecting available meta data...
+#> [21:16:29] Extracting all meta data columns...
+#> [21:16:29] Extracting dimensional reductions...
+#> [21:16:29] Will export the following dimensional reductions: UMAP
+#> [21:16:29] Extracting tables of most expressed genes...
+#> [21:16:29] Extracting tables of mean expression...
+#> [21:16:29] Extracting marker genes table...
+#> [21:16:29] No trajectories to extract...
+#> [21:16:29] Overview of Cerebro object:
+#> class: Cerebro
+#> exporter package version: 8.0.0
+#> experiment name: SingleCellExperiment
+#> organism: Human
+#> date of analysis: 
+#> date of export: 2026-11-10
+#> number of cells: 1,000
+#> number of genes: 100
+#> grouping variables (1): sample
+#> cell cycle variables (0): 
+#> projections (1): UMAP
+#> trees (0): 
+#> most expressed genes: sample
+#> marker genes:
+#>   - cerebro_seurat (1): seurat_clusters
+#> enriched pathways:
+#> trajectories:
+#> extra material:
+#> Immune repertoire:
+#> HLA typing: none
+#> Spatial data:
+#> [21:16:29] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/cerebro_SingleCellExperiment.crb
+#> [21:16:29] Done!
+#> Successfully exported: cerebro_SingleCellExperiment.crb
+# }
 ```

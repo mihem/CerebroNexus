@@ -15,7 +15,7 @@ analysis.
 The Spatial tab surfaces automatically once a dataset carrying spatial
 data is loaded. To also show a histological image behind the cells, pass
 its path through
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md).
 Images are declared per dataset, per spatial entry (the name of the
 Seurat image, `availableSpatial()`), and per image label; alignment goes
 in `spatial_image_settings` under the same three names:
@@ -96,7 +96,7 @@ Lasso or box-select cells in the projection to view:
 ## Data preparation
 
 Spatial data must be embedded in the `.crb` file by the export pipeline.
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 **automatically detects** spatial data on the Seurat object
 (`object@images`, covering Visium / Xenium / FOV) and stores the
 coordinates and expression — no special flag is required.
@@ -104,7 +104,7 @@ coordinates and expression — no special flag is required.
 ``` r
 library(CerebroNexus)
 
-seurat_obj <- qs::qread("path/to/seurat_object.qs")
+seurat_obj <- qs2::qs_read("path/to/seurat_object.qs2")
 
 exportFromSeurat(
   object = seurat_obj,
@@ -125,7 +125,7 @@ loaded.
 
 Histology images are **not** stored inside the `.crb`; they are passed
 to
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md),
 which copies them into the generated app bundle and references them by
 dataset, spatial entry, and image label. JPG, PNG, and SVG are
 supported. A plain `c(Dataset = path)` vector is rejected.
@@ -190,9 +190,8 @@ no rotation).
 
 ## See also
 
-- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for the complete export workflow.
-- [`vignette("create_a_self_contained_shiny_app")`](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
-  for app bundling options.
-- [`vignette("multi_crb")`](https://mihem.github.io/CerebroNexus/articles/multi_crb.md)
-  for hosting several datasets in one app.
+- `vignette("create_a_self_contained_shiny_app")` for app bundling
+  options.
+- `vignette("multi_crb")` for hosting several datasets in one app.

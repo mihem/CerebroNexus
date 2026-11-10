@@ -39,7 +39,7 @@ rsconnect::setAccountInfo(name="<ACCOUNT>", token="<TOKEN>", secret="<SECRET>")
 ## Build the application
 
 Use
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 to build a deployable application directory. The example below uses the
 data bundled with CerebroNexus; replace `crb` with your own `.crb` path
 and choose a label that users will see in the application.
@@ -60,10 +60,10 @@ createShinyApp(
 
 The generated directory contains `app.R`, the Viewer runtime, and the
 private data files needed by the deployed application. See
-[`vignette("create_a_self_contained_shiny_app")`](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
-for deployment options. An H5-backed `.crb` is bundled together with its
-`.h5` file (and its immune repertoire sidecar, if it has one), so the
-uploaded directory stays self-contained.
+`vignette("create_a_self_contained_shiny_app")` for deployment options.
+An H5-backed `.crb` is bundled together with its `.h5` file (and its
+immune repertoire sidecar, if it has one), so the uploaded directory
+stays self-contained.
 
 ## Deploy app
 
@@ -77,13 +77,13 @@ Uploading and preparing the app might take a few minutes, but once it
 finishes successfully, Cerebro should open in your browser. Using the
 shinyapps.io dashboard, you can manage the app, check usage metrics and
 logs, etc. An important parameter is the “Instance size”, which controls
-the available memory and can be controled in the “Settings” tab of the
+the available memory and can be controlled in the “Settings” tab of the
 dashboard. The larger the data set you want to upload to Cerebro, the
 more memory will be necessary.
 
 ## See also
 
 - [Launch Cerebro with pre-loaded data
-  set](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md)
+  set](https://www.mheming.com/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md)
 - [Control access to Cerebro with a login
-  page](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md)
+  page](https://www.mheming.com/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md)

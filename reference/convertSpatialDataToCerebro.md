@@ -1,9 +1,9 @@
 # Convert a SpatialData store to a Cerebro object
 
 Reads the store with
-[`readSpatialDataAsSCE`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+[`readSpatialDataAsSCE`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md)
 and exports it with
-[`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md):
+[`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md):
 one spatial section per region (with its tissue picture, where the store
 has one), expression, cell data and any embeddings, markers and colours
 the table carries.
@@ -34,7 +34,7 @@ convertSpatialDataToCerebro(
 - table, spatial_images:
 
   See
-  [`readSpatialDataAsSCE`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md).
+  [`readSpatialDataAsSCE`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md).
 
 - assay:
 
@@ -43,7 +43,7 @@ convertSpatialDataToCerebro(
 - ...:
 
   Further arguments of
-  [`convertSCEToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md)
+  [`convertSCEToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md)
   (for example `groups`, `organism`, `expression_matrix_mode`).
 
 ## Value
@@ -52,4 +52,48 @@ The path of the `.crb`, invisibly.
 
 ## See also
 
-[`readSpatialDataAsSCE`](https://mihem.github.io/CerebroNexus/reference/readSpatialDataAsSCE.md)
+[`readSpatialDataAsSCE`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md)
+
+## Examples
+
+``` r
+# \donttest{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+convertSpatialDataToCerebro(
+  system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus"),
+  result_dir = dir,
+  groups = "cell_type",
+  verbose = FALSE
+)
+#> [21:16:11] Start collecting data...
+#> [21:16:11] Adding expression data (embedded)...
+#> [21:16:11] Overview of Cerebro object:
+#> class: Cerebro
+#> exporter package version: 8.0.0
+#> experiment name: small_spatialdata
+#> organism: Human
+#> date of analysis: 
+#> date of export: 2026-11-10
+#> number of cells: 50
+#> number of genes: 30
+#> grouping variables (1): cell_type
+#> cell cycle variables (0): 
+#> projections (2): UMAP, spatial
+#> trees (0): 
+#> most expressed genes: cell_type
+#> marker genes:
+#> enriched pathways:
+#> trajectories:
+#> extra material:
+#> Immune repertoire:
+#> HLA typing: none
+#> Spatial data:spatial
+#> [21:16:11] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/cerebro-11de2111e11b/cerebro_small_spatialdata.crb
+#> [21:16:11] Done!
+#> Successfully exported: cerebro_small_spatialdata.crb
+list.files(dir)
+#> [1] "cerebro_small_spatialdata.crb"
+unlink(dir, recursive = TRUE)
+# }
+```

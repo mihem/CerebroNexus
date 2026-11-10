@@ -63,7 +63,7 @@ are enriched in specific trajectory branches.
 
 Trajectories must be computed with Monocle 2 (or compatible) and
 exported via
-[`extractMonocleTrajectory()`](https://mihem.github.io/CerebroNexus/reference/extractMonocleTrajectory.md)
+[`extractMonocleTrajectory()`](https://www.mheming.com/CerebroNexus/reference/extractMonocleTrajectory.md)
 before embedding in the `.crb` file.
 
 ``` r
@@ -80,5 +80,5 @@ exportFromSeurat(seurat_object,
 
 ## See also
 
-- [`vignette("cerebronexus_workflow_seurat")`](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+- [`vignette("cerebronexus_workflow_seurat")`](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
   for the complete export workflow

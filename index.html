@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Interactive visualization of single cell transcriptomics • CerebroNexus</title>
+<title>Interactive Viewer for Single-Cell and Spatial Transcriptomics • CerebroNexus</title>
 <script src="lightswitch.js"></script><script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Interactive visualization of single cell transcriptomics">
-<meta name="description" content="CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.">
-<meta property="og:description" content="CerebroNexus is a Shiny application that allows to interactively visualize scRNA-seq data. Data must be exported from a Seurat object.">
-<meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg">
+<script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Interactive Viewer for Single-Cell and Spatial Transcriptomics">
+<meta name="description" content="Interactive Shiny application for exploring and sharing single-cell and spatial transcriptomics data, extending Cerebro (Hillje et al. (2020) &lt;doi:10.1093/bioinformatics/btz877&gt;). Data from Seurat, SingleCellExperiment, AnnData, MuData or SpatialData objects are converted into a portable data file that can be browsed with coordinated views of gene expression, immune repertoires, trajectories, spatial images and HLA-TCR motifs. A point-and-click builder creates these files and standalone apps for deployment on a Shiny server.">
+<meta property="og:description" content="Interactive Shiny application for exploring and sharing single-cell and spatial transcriptomics data, extending Cerebro (Hillje et al. (2020) &lt;doi:10.1093/bioinformatics/btz877&gt;). Data from Seurat, SingleCellExperiment, AnnData, MuData or SpatialData objects are converted into a portable data file that can be browsed with coordinated views of gene expression, immune repertoires, trajectories, spatial images and HLA-TCR motifs. A point-and-click builder creates these files and standalone apps for deployment on a Shiny server.">
+<meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,7 +99,7 @@
   <main id="main" class="col-md-9"><p align="center">
 <picture><source media="(prefers-color-scheme: dark)" srcset="reference/figures/logo-dark.svg"><img src="reference/figures/logo.svg" alt="CerebroNexus" width="380"></picture></p>
 <p><a href="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml" class="external-link"><img src="https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg" alt="R-CMD-check (upstream)"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a> <img src="https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg" alt="Lifecycle: stable"></p>
-<p><strong>CerebroNexus</strong> (<strong>Ce</strong>ll<strong>Re</strong>port<strong>Bro</strong>wser <strong>Nexus</strong>) is a <a href="https://shiny.posit.co/" class="external-link">Shiny</a> platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses. See the <a href="https://mihem.github.io/CerebroNexus/">full documentation</a>.</p>
+<p><strong>CerebroNexus</strong> (<strong>Ce</strong>ll<strong>Re</strong>port<strong>Bro</strong>wser <strong>Nexus</strong>) is a <a href="https://shiny.posit.co/" class="external-link">Shiny</a> platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses. See the <a href="https://www.mheming.com/CerebroNexus/">full documentation</a>.</p>
 <p><a href="https://osmzhlab.uni-muenster.de/shiny/demo/" class="external-link">Try the live demo</a>.</p>
 <p><em>CerebroNexus began as a fork of <a href="https://github.com/romanhaa/cerebroApp" class="external-link">cerebroApp</a> by Roman Hillje and has since evolved with substantial new features and active development by <a href="https://github.com/mihem" class="external-link">mihem</a> and <a href="https://github.com/duocang" class="external-link">Xuesong Wang</a>.</em></p>
 <p>Automated tests run in a reproducible Nix environment.</p>
@@ -109,22 +109,42 @@
 <div class="section level2">
 <h2 id="id_1-installation">1. Installation<a class="anchor" aria-label="anchor" href="#id_1-installation"></a>
 </h2>
+<p>From CRAN:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">'mihem/CerebroNexus'</span><span class="op">)</span></span></code></pre></div>
-<p>The Builder (below) also needs a few suggested packages:</p>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"CerebroNexus"</span><span class="op">)</span></span></code></pre></div>
+<p>The development version from GitHub:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"mihem/CerebroNexus"</span><span class="op">)</span></span></code></pre></div>
+<p>The Builder (below) also needs a few suggested packages:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Seurat"</span>, <span class="st">"callr"</span>, <span class="st">"processx"</span>, <span class="st">"ps"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<div class="section level3">
+<h3 id="optional-packages">Optional packages<a class="anchor" aria-label="anchor" href="#optional-packages"></a>
+</h3>
+<p>Some features use packages that are not installed with CerebroNexus: SingleCellExperiment, AnnData and HDF5 input, the immune repertoire and HLA pages, gene set enrichment and marker annotation. A feature that needs a missing package says which one and how to install it. To install all of them at once:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Seurat"</span>, <span class="st">"callr"</span>, <span class="st">"processx"</span>, <span class="st">"ps"</span>, <span class="st">"digest"</span>, <span class="st">"readxl"</span>, <span class="st">"arrow"</span>,</span>
+<span>  <span class="st">"ggplot2"</span>, <span class="st">"ggdendro"</span>, <span class="st">"patchwork"</span>, <span class="st">"igraph"</span>, <span class="st">"stringdist"</span>, <span class="st">"msigdbr"</span>,</span>
+<span>  <span class="st">"httr"</span>, <span class="st">"future.apply"</span>, <span class="st">"pbapply"</span>, <span class="st">"png"</span>, <span class="st">"jpeg"</span></span>
+<span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
+<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"SingleCellExperiment"</span>, <span class="st">"HDF5Array"</span>, <span class="st">"rhdf5"</span>, <span class="st">"anndataR"</span>,</span>
+<span>  <span class="st">"scRepertoire"</span>, <span class="st">"GSVA"</span>, <span class="st">"qvalue"</span>, <span class="st">"biomaRt"</span></span>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="id_2-build-an-app-for-your-own-data">2. Build an app for your own data<a class="anchor" aria-label="anchor" href="#id_2-build-an-app-for-your-own-data"></a>
 </h2>
 <p><strong>Without writing code</strong>, open the Builder in your browser:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">CerebroNexus</span><span class="fu">::</span><span class="fu"><a href="reference/launchCerebroBuilder.html">launchCerebroBuilder</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Add your data files, choose the groups and content, and build a <code>.crb</code> file or a standalone App. See <a href="https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.html">Build a data set by pointing</a>.</p>
+<p>Add your data files, choose the groups and content, and build a <code>.crb</code> file or a standalone App. See <a href="https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html">Build a data set by pointing</a>.</p>
 <p><strong>From a script:</strong></p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Seurat, SingleCellExperiment, AnnData (.h5ad / .zarr), MuData (.h5mu)</span></span>
 <span><span class="co"># or SpatialData</span></span>
@@ -176,9 +196,9 @@
 <div class="developers">
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
-<li>Michael Heming <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0000-0002-9568-2790" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
-<li>Roman Hillje <br><small class="roles"> Author </small>   </li>
-<li>Xuesong Wang <br><small class="roles"> Author </small>   </li>
+<li>Michael Heming <br><small class="roles"> Author, maintainer, copyright holder </small> <a href="https://orcid.org/0000-0002-9568-2790" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>Xuesong Wang <br><small class="roles"> Author, copyright holder </small>   </li>
+<li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
 
@@ -189,7 +209,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

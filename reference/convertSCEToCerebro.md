@@ -2,9 +2,9 @@
 
 One-step route from a `SingleCellExperiment` (SCE) object, or a file
 holding one, to a `.crb` file that
-[`createShinyApp`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`createShinyApp`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 can serve. It is the SCE counterpart of
-[`convertSeuratToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md):
+[`convertSeuratToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md):
 both run the same preparation (group validation and renaming, marker
 tables, most-expressed genes and mean expression) and then hand over to
 an exporter built on the same core, so every storage option and feature
@@ -52,9 +52,9 @@ convertSCEToCerebro(
   ([`saveRDS()`](https://rdrr.io/r/base/readRDS.html)) or `.qs2`
   ([`qs2::qs_save()`](https://rdrr.io/pkg/qs2/man/qs_save.html)) file
   holding one, or to an `.h5ad` file (read with
-  [`readH5adAsSCE`](https://mihem.github.io/CerebroNexus/reference/readH5adAsSCE.md);
+  [`readH5adAsSCE`](https://www.mheming.com/CerebroNexus/reference/readH5adAsSCE.md);
   see
-  [`convertH5adToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)).
+  [`convertH5adToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md)).
   There is no SCE-specific file extension: an SCE is an ordinary R
   object, so it is stored with whichever of these serializers was used.
 
@@ -100,17 +100,17 @@ convertSCEToCerebro(
   verbose:
 
   As in
-  [`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md).
+  [`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md).
 
 - viewer_binary, viewer_binary_threshold:
 
   As in
-  [`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md).
+  [`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md).
 
 - cell_cycle, main_group, projections:
 
   As in
-  [`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md).
+  [`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md).
 
 - marker_file:
 
@@ -128,13 +128,13 @@ convertSCEToCerebro(
 - most_expressed_genes:
 
   Optional pre-computed most-expressed-genes table(s); see
-  [`convertSeuratToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md).
+  [`convertSeuratToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md).
 
 - spatial_split_by:
 
   Optional `colData` column dividing the spatial coordinates into one
   section per level; see
-  [`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md).
+  [`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md).
 
 - extra_features:
 
@@ -150,7 +150,7 @@ convertSCEToCerebro(
   Internal. Base name used for the output file and the default
   experiment name when `sce_file` is an object that was read from a file
   by a caller (see
-  [`convertH5adToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md)).
+  [`convertH5adToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md)).
 
 ## Value
 
@@ -164,20 +164,57 @@ files (`bcr_file`/`tcr_file`) is not available for SCE yet.
 
 ## See also
 
-[`exportFromSCE`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md),
-[`convertSeuratToCerebro`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+[`exportFromSCE`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md),
+[`convertSeuratToCerebro`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
 
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
+# \donttest{
 convertSCEToCerebro(
   sce_file = system.file("extdata/examples/pbmc_SCE.rds",
     package = "CerebroNexus"),
-  result_dir = "output",
+  result_dir = file.path(tempdir(), "output"),
   experiment_name = "PBMC (SCE)",
   organism = "Human",
   groups = c("sample", "cluster")
 )
-} # }
+#> [21:16:09] Calculating most expressed genes and mean expression for each group...
+#> [21:16:09] Processing group: sample
+#> [21:16:09] Processing group: cluster
+#> [21:16:09] Most expressed genes and mean expression calculation completed.
+#> [21:16:09] Initializing Cerebro object...
+#> [21:16:09] Adding expression data (embedded)...
+#> [21:16:09] Collecting available meta data...
+#> [21:16:09] Extracting all meta data columns...
+#> [21:16:09] Extracting dimensional reductions...
+#> [21:16:09] Will export the following dimensional reductions: UMAP
+#> [21:16:09] Extracting tables of most expressed genes...
+#> [21:16:09] Extracting tables of mean expression...
+#> [21:16:09] No trajectories to extract...
+#> [21:16:09] Overview of Cerebro object:
+#> class: Cerebro
+#> exporter package version: 8.0.0
+#> experiment name: PBMC (SCE)
+#> organism: Human
+#> date of analysis: 
+#> date of export: 2026-11-10
+#> number of cells: 80
+#> number of genes: 230
+#> grouping variables (2): sample, cluster
+#> cell cycle variables (0): 
+#> projections (1): UMAP
+#> trees (0): 
+#> most expressed genes: sample, cluster
+#> marker genes:
+#> enriched pathways:
+#> trajectories:
+#> extra material:
+#> Immune repertoire:
+#> HLA typing: none
+#> Spatial data:
+#> [21:16:09] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/cerebro_pbmc_SCE.crb
+#> [21:16:09] Done!
+#> Successfully exported: cerebro_pbmc_SCE.crb
+# }
 ```

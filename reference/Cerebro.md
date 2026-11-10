@@ -93,7 +93,7 @@ A new `Cerebro` object.
 
   `list` that contains a `data.frame` holding the most expressed genes
   for each grouping variable that was specified during the call to
-  [`getMostExpressedGenes`](https://mihem.github.io/CerebroNexus/reference/getMostExpressedGenes.md).
+  [`getMostExpressedGenes`](https://www.mheming.com/CerebroNexus/reference/getMostExpressedGenes.md).
 
 - `mean_expression`:
 
@@ -105,16 +105,16 @@ A new `Cerebro` object.
   `list` that contains a `list` for every method that was used to
   calculate marker genes, and a `data.frame` for each grouping variable,
   e.g. those that were specified during the call to
-  [`getMarkerGenes`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md).
+  [`getMarkerGenes`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md).
 
 - `enriched_pathways`:
 
   `list` that contains a `list` for every method that was used to
   calculate marker genes, and a `data.frame` for each grouping variable,
   e.g. those that were specified during the call to
-  [`getEnrichedPathways`](https://mihem.github.io/CerebroNexus/reference/getEnrichedPathways.md)
+  [`getEnrichedPathways`](https://www.mheming.com/CerebroNexus/reference/getEnrichedPathways.md)
   or
-  [`performGeneSetEnrichmentAnalysis`](https://mihem.github.io/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md).
+  [`performGeneSetEnrichmentAnalysis`](https://www.mheming.com/CerebroNexus/reference/performGeneSetEnrichmentAnalysis.md).
 
 - `trees`:
 
@@ -126,7 +126,7 @@ A new `Cerebro` object.
   `list` that contains a `list` for every method that was used to
   calculate trajectories, and, depending on the method, a `data.frame`
   or `list` for each specific trajectory, e.g. those extracted with
-  [`extractMonocleTrajectory`](https://mihem.github.io/CerebroNexus/reference/extractMonocleTrajectory.md).
+  [`extractMonocleTrajectory`](https://www.mheming.com/CerebroNexus/reference/extractMonocleTrajectory.md).
 
 - `extra_material`:
 
@@ -1479,10 +1479,11 @@ Add spatial data.
   `list` containing 'coordinates' (data.frame) and 'expression' (sparse
   matrix). Embedded backgrounds are stored in 'histology_images', a
   uniquely named list of image payloads. Each payload contains
-  'histology_image' (a base64 `data:` URI) and 'histology_image_bounds'
-  (xmin/xmax/ymin/ymax in coordinate space). Bounds omitted from a
-  payload are derived from the coordinates. The singular
-  'histology_image' / 'histology_image_bounds' fields are rejected.
+  'histology_image' (a base64 `data:` URI), 'histology_image_bounds'
+  (xmin/xmax/ymin/ymax in coordinate space), and may contain a
+  declarative 'histology_alignment'. Bounds omitted from a payload are
+  derived from the coordinates. The singular 'histology_image' /
+  'histology_image_bounds' fields are rejected.
 
 ------------------------------------------------------------------------
 
@@ -1752,11 +1753,7 @@ Requested plot made with `ggplot2`.
 
 ### `Cerebro$print()`
 
-Show overview of object and the data it contains. Print overview of
-available marker gene results for `self$print()` function. Print
-overview of available enriched pathway results for `self$print()`
-function. Print overview of available trajectories for `self$print()`
-function. Print overview of extra material for `self$print()` function.
+Show overview of object and the data it contains.
 
 #### Usage
 
@@ -1777,3 +1774,24 @@ The objects of this class are cloneable with this method.
 - `deep`:
 
   Whether to make a deep clone.
+
+## Examples
+
+``` r
+cerebro <- Cerebro$new()
+cerebro$addExperiment("experiment_name", "PBMC")
+cerebro$addExperiment("organism", "hg")
+cerebro$getExperiment()
+#> $experiment_name
+#> [1] "PBMC"
+#> 
+#> $organism
+#> [1] "hg"
+#> 
+#> $date_of_analysis
+#> NULL
+#> 
+#> $date_of_export
+#> NULL
+#> 
+```

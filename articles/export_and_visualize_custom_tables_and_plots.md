@@ -30,7 +30,7 @@ custom_table <- tribble(
 ```
 
 To make sure it is exported when running
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md),
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md),
 simply save it in a list with a name for both the method and the table,
 e.g. `custom_method` and `custom_table`:
 
@@ -93,7 +93,7 @@ and `custom_table`.
 Then, after loading the data into Cerebro, we will see this:
 
 [![Custom marker gene table in
-Cerebro](export_and_visualize_custom_tables_and_plots_files/table_marker_genes.png)](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/table_marker_genes.png)
+Cerebro](export_and_visualize_custom_tables_and_plots_files/table_marker_genes.png)](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/table_marker_genes.png)
 
 Granted, this isn’t a very pretty table, but you get the idea.
 
@@ -171,7 +171,7 @@ material, a tab will appear in the side bar which will give you access
 to the table, as shown in the screenshot:
 
 [![Custom table as extra material in
-Cerebro](export_and_visualize_custom_tables_and_plots_files/table_extra_material.png)](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/table_extra_material.png)
+Cerebro](export_and_visualize_custom_tables_and_plots_files/table_extra_material.png)](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/table_extra_material.png)
 
 Again, this table isn’t particularly informative, but hopefully you got
 an idea of the procedure.
@@ -250,7 +250,7 @@ In Cerebro, we can now access this table in the “Extra material” tab
 through the “plots” category.
 
 [![Custom plot as extra material in
-Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_1.png)](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_1.png)
+Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_1.png)](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_1.png)
 
 ### Example \#2
 
@@ -405,7 +405,7 @@ exportFromSeurat(
 Shown in the first screenshot is the interactive version of the plot:
 
 [![Custom plot as extra material in
-Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_interactive.png)](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_interactive.png)
+Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_interactive.png)](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_interactive.png)
 
 We notice that the legend for the dot size is missing. In cases where
 the plot isn’t shown correctly (conversion with plotly works well but
@@ -413,4 +413,4 @@ not always perfectly), you can switch of interactivity and see the
 plain, unmodified plot:
 
 [![Custom plot as extra material in
-Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_plain.png)](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_plain.png)
+Cerebro](export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_plain.png)](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots_files/plot_extra_material_2_plain.png)

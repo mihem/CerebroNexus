@@ -3,67 +3,67 @@
 ### Workflows
 
 - [Introduction to the CerebroNexus workflow
-  (Seurat)](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md):
+  (Seurat)](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md):
 - [Export a data set in SCE
-  format](https://mihem.github.io/CerebroNexus/articles/export_a_data_set_in_SCE_format.md):
+  format](https://www.mheming.com/CerebroNexus/articles/export_a_data_set_in_SCE_format.md):
 - [Use SingleCellExperiment and AnnData
-  data](https://mihem.github.io/CerebroNexus/articles/use_sce_and_anndata_data.md):
+  data](https://www.mheming.com/CerebroNexus/articles/use_sce_and_anndata_data.md):
 
 ### Data model
 
 - [Overview of the Cerebro
-  class](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md):
+  class](https://www.mheming.com/CerebroNexus/articles/overview_of_cerebro_class.md):
 
 ### How-to guides
 
 - [Build a data set without writing
-  code](https://mihem.github.io/CerebroNexus/articles/build_a_data_set_by_pointing.md):
+  code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.md):
 - [Data integrity from Seurat to a self-contained Cerebro
-  app](https://mihem.github.io/CerebroNexus/articles/data_integrity_contracts.md):
+  app](https://www.mheming.com/CerebroNexus/articles/data_integrity_contracts.md):
 - [Seurat v5 layered assays: complete and safe expression
-  matrices](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md):
+  matrices](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.md):
 - [Create a self-contained Shiny app from a Cerebro data
-  file](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md):
+  file](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md):
 - [Store the expression matrix in H5
-  format](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md):
+  format](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.md):
 - [Working with large
-  datasets](https://mihem.github.io/CerebroNexus/articles/million_cell_crb_artifacts.md):
+  datasets](https://www.mheming.com/CerebroNexus/articles/million_cell_crb_artifacts.md):
 - [Launch Cerebro with pre-loaded data
-  set](https://mihem.github.io/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md):
+  set](https://www.mheming.com/CerebroNexus/articles/launch_cerebro_with_pre-loaded_data_set.md):
 - [Loading multiple data sets (multi-crb) with a dataset
-  switcher](https://mihem.github.io/CerebroNexus/articles/multi_crb.md):
+  switcher](https://www.mheming.com/CerebroNexus/articles/multi_crb.md):
 - [Export and visualize custom tables and
-  plots](https://mihem.github.io/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.md):
+  plots](https://www.mheming.com/CerebroNexus/articles/export_and_visualize_custom_tables_and_plots.md):
 - [Control access to CerebroNexus with a login
-  page](https://mihem.github.io/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md):
+  page](https://www.mheming.com/CerebroNexus/articles/control_access_to_cerebro_with_a_login_page.md):
 - [Host Cerebro on
-  shinyapps.io](https://mihem.github.io/CerebroNexus/articles/host_cerebro_on_shinyapps.md):
+  shinyapps.io](https://www.mheming.com/CerebroNexus/articles/host_cerebro_on_shinyapps.md):
 
 ### Benchmarks
 
 - [Large-dataset benchmarks: expression, storage and
-  Viewer](https://mihem.github.io/CerebroNexus/articles/expression_backend_benchmark.md):
+  Viewer](https://www.mheming.com/CerebroNexus/articles/expression_backend_benchmark.md):
 
 ### Module guides
 
 - [Most Expressed
-  Genes](https://mihem.github.io/CerebroNexus/articles/most_expressed_genes.md):
+  Genes](https://www.mheming.com/CerebroNexus/articles/most_expressed_genes.md):
 - [Enriched
-  Pathways](https://mihem.github.io/CerebroNexus/articles/enriched_pathways.md):
+  Pathways](https://www.mheming.com/CerebroNexus/articles/enriched_pathways.md):
 - [Extra
-  Material](https://mihem.github.io/CerebroNexus/articles/extra_material.md):
+  Material](https://www.mheming.com/CerebroNexus/articles/extra_material.md):
 - [Immune Repertoire Analysis in
-  CerebroNexus](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.md):
+  CerebroNexus](https://www.mheming.com/CerebroNexus/articles/immune_repertoire_analysis.md):
 - [Trajectory
-  Analysis](https://mihem.github.io/CerebroNexus/articles/trajectory_analysis.md):
+  Analysis](https://www.mheming.com/CerebroNexus/articles/trajectory_analysis.md):
 - [Spatial Transcriptomics
-  Analysis](https://mihem.github.io/CerebroNexus/articles/spatial_analysis.md):
+  Analysis](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.md):
 - [Trekker single-cell spatial mapping: from a vendor bundle to an
   interactive
-  app](https://mihem.github.io/CerebroNexus/articles/trekker_spatial_mapping.md):
+  app](https://www.mheming.com/CerebroNexus/articles/trekker_spatial_mapping.md):
 - [HLA & TCR Motifs: from synthetic data to an interactive
-  app](https://mihem.github.io/CerebroNexus/articles/hla_tcr_motifs.md):
+  app](https://www.mheming.com/CerebroNexus/articles/hla_tcr_motifs.md):
 - [HLA Associations on bulk TCRβ with real donor
-  HLA](https://mihem.github.io/CerebroNexus/articles/hla_bulk_tcr_associations.md):
+  HLA](https://www.mheming.com/CerebroNexus/articles/hla_bulk_tcr_associations.md):
 - [A real antigen-selected single-cell TCR demo, end to
-  end](https://mihem.github.io/CerebroNexus/articles/hla_tcr_antigen_selected.md):
+  end](https://www.mheming.com/CerebroNexus/articles/hla_tcr_antigen_selected.md):

@@ -7,7 +7,7 @@ preparation, and browser rendering. Their timings have different
 boundaries and cannot be added into an overall Viewer speedup. For
 backend selection, sidecar portability and launching the demo, see
 [Working with large
-datasets](https://mihem.github.io/CerebroNexus/articles/million_cell_crb_artifacts.md).
+datasets](https://www.mheming.com/CerebroNexus/articles/million_cell_crb_artifacts.md).
 
 The first section reports the current real-data expression-backend
 benchmark. The sections after it are **historical experiments**, kept as
@@ -31,7 +31,7 @@ external expression only in H5 files.
 This study compares four ways to store the expression matrix: H5 with
 gzip level 6 (HDF5Array’s default, used by the exporter before 5.1.3),
 the same H5 file at gzip level 0, i.e. written without compression (the
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 default from 5.1.3; `h5_compression_level` changes it), BPCells, and
 embedded storage. In the tables and figures, `h5_uncompressed` is the
 gzip level 0 file. Two public datasets were used: the 10x mouse brain

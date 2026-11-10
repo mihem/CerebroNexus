@@ -5,7 +5,7 @@ tissue picture, where the store has one), expression, cell data and any
 embeddings, markers and colours the table carries."><meta property="og:description" content="Reads the store with readSpatialDataAsSCE and exports it with
 convertSCEToCerebro: one spatial section per region (with its
 tissue picture, where the store has one), expression, cell data and any
-embeddings, markers and colours the table carries."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+embeddings, markers and colours the table carries."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -13,7 +13,7 @@ embeddings, markers and colours the table carries."><meta property="og:image" co
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -137,12 +137,55 @@ embeddings, markers and colours the table carries.</p>
     <div class="dont-index"><p><code><a href="readSpatialDataAsSCE.html">readSpatialDataAsSCE</a></code></p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"cerebro-"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">dir</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">convertSpatialDataToCerebro</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/small_spatialdata.zip"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  result_dir <span class="op">=</span> <span class="va">dir</span>,</span></span>
+<span class="r-in"><span>  groups <span class="op">=</span> <span class="st">"cell_type"</span>,</span></span>
+<span class="r-in"><span>  verbose <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:11] Start collecting data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:11] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:11] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.0.0</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: small_spatialdata</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> organism: Human</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of analysis: </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> date of export: 2026-11-10</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> number of cells: 50</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> number of genes: 30</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> grouping variables (1): cell_type</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> cell cycle variables (0): </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> projections (2): UMAP, spatial</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> trees (0): </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> most expressed genes: cell_type</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> marker genes:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> enriched pathways:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> trajectories:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> extra material:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:spatial</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:11] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/cerebro-11de2111e11b/cerebro_small_spatialdata.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:16:11] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Successfully exported: cerebro_small_spatialdata.crb</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="va">dir</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "cerebro_small_spatialdata.crb"</span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">dir</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

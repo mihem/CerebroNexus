@@ -272,7 +272,7 @@ marker_genes_cell_type %>% select(1:6) %>% head() %>% knitr::kable(booktabs = T)
 ## Export to Cerebro format
 
 Finally, we use CerebroNexus
-[`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+[`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
 to export our SCE object to a `.crb` file which can be loaded into
 CerebroNexus.
 
@@ -292,7 +292,7 @@ exportFromSCE(
 ```
 
 The Cerebro use interface can be launched using the
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md)
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
 function.
 
 ## Session info

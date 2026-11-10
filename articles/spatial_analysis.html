@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,9 +102,9 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">08 November, 2026</h4>
+            <h4 data-toc-skip class="date">10 November, 2026</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/spatial_analysis.Rmd" class="external-link"><code>vignettes/spatial_analysis.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/spatial_analysis.Rmd" class="external-link"><code>vignettes/articles/spatial_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>spatial_analysis.Rmd</code></div>
     </div>
 
@@ -131,7 +131,7 @@ declared per dataset, per spatial entry (the name of the Seurat image,
 <code>availableSpatial()</code>), and per image label; alignment goes in
 <code>spatial_image_settings</code> under the same three names:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"path/to/sample_spatial.crb"</span><span class="op">)</span>,</span>
@@ -243,9 +243,9 @@ detects</strong> spatial data on the Seurat object
 (<code>object@images</code>, covering Visium / Xenium / FOV) and stores
 the coordinates and expression — no special flag is required.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mihem.github.io/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.mheming.com/CerebroNexus/">CerebroNexus</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">seurat_obj</span> <span class="op">&lt;-</span> <span class="fu">qs</span><span class="fu">::</span><span class="fu">qread</span><span class="op">(</span><span class="st">"path/to/seurat_object.qs"</span><span class="op">)</span></span>
+<span><span class="va">seurat_obj</span> <span class="op">&lt;-</span> <span class="fu">qs2</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/qs2/man/qs_read.html" class="external-link">qs_read</a></span><span class="op">(</span><span class="st">"path/to/seurat_object.qs2"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span></span>
 <span>  object <span class="op">=</span> <span class="va">seurat_obj</span>,</span>
@@ -374,10 +374,10 @@ no rotation).</p>
 <code><a href="../articles/cerebronexus_workflow_seurat.html">vignette("cerebronexus_workflow_seurat")</a></code> for the
 complete export workflow.</li>
 <li>
-<code><a href="../articles/create_a_self_contained_shiny_app.html">vignette("create_a_self_contained_shiny_app")</a></code> for app
+<code>vignette("create_a_self_contained_shiny_app")</code> for app
 bundling options.</li>
 <li>
-<code><a href="../articles/multi_crb.html">vignette("multi_crb")</a></code> for hosting several datasets in
+<code>vignette("multi_crb")</code> for hosting several datasets in
 one app.</li>
 </ul>
 </div>
@@ -388,7 +388,7 @@ one app.</li>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

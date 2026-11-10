@@ -173,19 +173,6 @@ exportFromSeurat(
 
   Dataset-level cell threshold used by `viewer_binary = "auto"`.
 
-- immune_sidecar:
-
-  Store the immune repertoire in a sibling file `<stem>.immune.qs2`
-  (`.rds` with `codec = "rds"`) instead of inside the `.crb`. `"auto"`
-  does so for `"h5"` exports whose repertoire has at least
-  `immune_sidecar_threshold` rows; `"always"` and `"never"` override
-  that. The sidecar must travel with the `.crb`.
-
-- immune_sidecar_threshold:
-
-  Number of repertoire rows (cells with receptor data) used by
-  `immune_sidecar = "auto"`.
-
 - spatial_images:
 
   Optional named list mapping Seurat image names to named image paths or
@@ -201,10 +188,23 @@ exportFromSeurat(
   Set this to `TRUE` if you want additional log messages; defaults to
   `FALSE`.
 
+- immune_sidecar:
+
+  Store the immune repertoire in a sibling file `<stem>.immune.qs2`
+  (`.rds` with `codec = "rds"`) instead of inside the `.crb`. `"auto"`
+  does so for `"h5"` exports whose repertoire has at least
+  `immune_sidecar_threshold` rows; `"always"` and `"never"` override
+  that. The sidecar must travel with the `.crb`.
+
+- immune_sidecar_threshold:
+
+  Number of repertoire rows (cells with receptor data) used by
+  `immune_sidecar = "auto"`.
+
 - .expression_resolution:
 
   Internal handoff used by
-  [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md)
+  [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md)
   to reuse a matrix that has already been resolved and validated. Users
   should leave this as `NULL`.
 
@@ -249,7 +249,7 @@ If `object@misc$immune_repertoire` contains a named list of data.frames
 (one per sample, with `barcode`, `CTgene`, `CTnt`, `CTaa`, and
 `CTstrict`), it will be automatically exported into the Cerebro object
 via
-[`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md).
+[`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md).
 When that slot is empty, receptors kept apart in `object@misc$tcr_data`
 and `object@misc$bcr_data` are merged into it.
 
@@ -267,6 +267,8 @@ typed one.
 ## Examples
 
 ``` r
+# \donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 exportFromSeurat(
@@ -280,22 +282,22 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-#> [22:16:18] Initializing Cerebro object...
-#> [22:16:18] Adding expression data (embedded)...
-#> [22:16:18] Collecting available meta data...
-#> [22:16:18] Extracting all meta data columns...
-#> [22:16:18] Extracting dimensional reductions...
-#> [22:16:18] Will export the following dimensional reductions: umap
-#> [22:16:18] Extracting marker genes table...
-#> [22:16:18] No trajectories to extract...
-#> [22:16:18] Checking for spatial data...
-#> [22:16:18] Overview of Cerebro object:
+#> [21:16:13] Initializing Cerebro object...
+#> [21:16:13] Adding expression data (embedded)...
+#> [21:16:13] Collecting available meta data...
+#> [21:16:13] Extracting all meta data columns...
+#> [21:16:13] Extracting dimensional reductions...
+#> [21:16:13] Will export the following dimensional reductions: umap
+#> [21:16:13] Extracting marker genes table...
+#> [21:16:13] No trajectories to extract...
+#> [21:16:13] Checking for spatial data...
+#> [21:16:13] Overview of Cerebro object:
 #> class: Cerebro
-#> exporter package version: 7.2.0
+#> exporter package version: 8.0.0
 #> experiment name: PBMC
 #> organism: hg
 #> date of analysis: 
-#> date of export: 2026-11-08
+#> date of export: 2026-11-10
 #> number of cells: 80
 #> number of genes: 230
 #> grouping variables (2): sample, seurat_clusters
@@ -311,6 +313,7 @@ exportFromSeurat(
 #> Immune repertoire:
 #> HLA typing: none
 #> Spatial data:
-#> [22:16:18] Saving Cerebro object to: /tmp/nix-shell-4578-919272457/RtmpUWywh2/pbmc_Seurat.crb
-#> [22:16:18] Done!
+#> [21:16:13] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/pbmc_Seurat.crb
+#> [21:16:13] Done!
+# }
 ```

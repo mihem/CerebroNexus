@@ -10,7 +10,7 @@ sets, although disk access can be slower than reading an already loaded
 in-memory matrix.
 
 The recommended workflow is a single call to
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 with `expression_matrix_mode = "h5"`. The Seurat object does **not**
 need to contain an H5-backed matrix: `h5` describes the export format,
 not the source storage used by Seurat.
@@ -111,7 +111,7 @@ is transposed here). The `.crb` itself is *thin* (schema version 3). It
 drops `meta_data$cell_barcode` and the row names of the projections, and
 instead stores a checksum of the cell names (`cell_names_hash`) together
 with the cell count.
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
 and the Viewer read the cell names back from the H5 file, verify the
 checksum and restore both fields, so the object you work with is
 identical to an embedded one:
@@ -139,7 +139,7 @@ launchCerebro(
 ```
 
 For deployment, pass the `.crb` to
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md).
 It reads the same descriptor and copies the referenced H5 sidecar, and
 the immune repertoire sidecar if there is one, into the self-contained
 app bundle. The files are stored under the app’s private `private-data/`
@@ -164,9 +164,9 @@ sidecar that belongs to the file.
 A data set with a very large immune repertoire gets a third file,
 `<stem>.immune.qs2`, next to the `.crb` and the `.h5` file. By default
 (`immune_sidecar = "auto"` in
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 and
-[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md))
+[`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md))
 this happens for H5-backed `.crb` files whose repertoire has at least
 `immune_sidecar_threshold = 100000L` rows; `"always"` and `"never"`
 override that decision. Move and bundle the sidecar together with the
@@ -177,7 +177,7 @@ override that decision. Move and bundle the sidecar together with the
 The direct export above is preferred for new Seurat exports. The manual
 workflow remains useful when only a current, embedded `.crb` is
 available, for example after an
-[`exportFromSCE()`](https://mihem.github.io/CerebroNexus/reference/exportFromSCE.md)
+[`exportFromSCE()`](https://www.mheming.com/CerebroNexus/reference/exportFromSCE.md)
 workflow, and the source object cannot be exported again.
 
 Load the existing `.crb`, transpose its conventional genes-by-cells
@@ -205,7 +205,7 @@ Remove the embedded matrix and record the sibling filename before saving
 the smaller `.crb`; otherwise the original matrix will still be loaded
 into memory, or the saved object will not know where its external matrix
 lives. Because the backend is H5,
-[`saveCerebro()`](https://mihem.github.io/CerebroNexus/reference/saveCerebro.md)
+[`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
 writes a thin `.crb`: it checks that the H5 cell names match
 `meta_data$cell_barcode` in the same order and then keeps only their
 checksum.
@@ -236,9 +236,9 @@ preferred, less error-prone route.
 ## Older files and retired formats
 
 Only the current layout is read.
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 and the Viewer reject a `.crb` that has no expression-backend
 descriptor, uses a thin schema other than version 3, still stores
 receptors in the `bcr_data` / `tcr_data` fields, or records an immune
@@ -249,7 +249,7 @@ The Cerebro data file 'x.crb' uses a retired format: <reason>.
 Convert it once with CerebroNexus::convertCerebro().
 ```
 
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 is the only migration path. It sets a missing descriptor to `embedded`,
 merges the old receptor fields into the unified immune repertoire, and
 rewrites an H5-backed `.crb` from CerebroNexus 5.1.x (which carried its
@@ -268,7 +268,7 @@ be converted. Re-export it from the source Seurat object with
 ## See also
 
 - [Create a self-contained Shiny
-  app](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+  app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 - [Seurat
-  workflow](https://mihem.github.io/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
-- [`?exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  workflow](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.md)
+- [`?exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)

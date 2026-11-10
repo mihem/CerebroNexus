@@ -37,7 +37,7 @@ Columns are auto-detected and formatted:
 ## Data export
 
 Enrichment results are passed to
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 via the `enriched_pathways` parameter.
 
 ``` r
@@ -51,10 +51,10 @@ exportFromSeurat(seurat_object,
 ```
 
 See
-[`vignette("overview_of_cerebro_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md)
+[`vignette("overview_of_cerebro_class")`](https://www.mheming.com/CerebroNexus/articles/overview_of_cerebro_class.md)
 for the expected format.
 
 ## See also
 
-[`vignette("overview_of_cerebro_class")`](https://mihem.github.io/CerebroNexus/articles/overview_of_cerebro_class.md)
+[`vignette("overview_of_cerebro_class")`](https://www.mheming.com/CerebroNexus/articles/overview_of_cerebro_class.md)
 for the Cerebro data model.

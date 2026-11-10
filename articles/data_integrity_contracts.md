@@ -58,7 +58,7 @@ once. Missing or unexpected cells are an error.
 
 For the complete algorithm, diagrams, performance limits, and
 troubleshooting, see [Seurat v5 layered
-assays](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md).
+assays](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.md).
 
 ## Contract 2: one repertoire row per cell
 
@@ -114,7 +114,7 @@ A valid `@misc$immune_repertoire` is authoritative. Stale
 block it.
 
 When only those two slots exist,
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 validates them and merges them into the one unified repertoire. The
 `.crb` stores only that unified repertoire; the Cerebro object has no
 `tcr_data` or `bcr_data` fields, and `getTCR()` / `getBCR()` derive
@@ -123,7 +123,7 @@ those fields is a retired format; see [Retired
 formats](#retired-formats).
 
 See [Immune repertoire
-analysis](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.md)
+analysis](https://www.mheming.com/CerebroNexus/articles/immune_repertoire_analysis.md)
 for Cell Ranger inputs, metadata extraction, scRepertoire integration,
 and module use.
 
@@ -185,7 +185,7 @@ carries the same cell names, and records a checksum of the cell names
 compacted in its `crb_schema` field.
 
 When the `.crb` is loaded,
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
 and the Viewer read the cell names back from the H5 file, verify them
 against the checksum and restore both fields. A `.crb` paired with the
 wrong H5 file, or an H5 file whose cells were reordered, therefore stops
@@ -196,9 +196,9 @@ field is still read as it is; every new H5 export is thin.
 ### Retired formats
 
 The readers accept only the current layout.
-[`readCerebro()`](https://mihem.github.io/CerebroNexus/reference/readCerebro.md),
-[`launchCerebro()`](https://mihem.github.io/CerebroNexus/reference/launchCerebro.md),
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+[`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md),
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md),
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
 and the Viewer all reject a `.crb` that
 
 - has no `expression_backend` descriptor;
@@ -217,7 +217,7 @@ The Cerebro data file 'x.crb' uses a retired format: <reason>.
 Convert it once with CerebroNexus::convertCerebro().
 ```
 
-[`convertCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md)
+[`convertCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md)
 is the only migration path. It sets a missing descriptor to `embedded`,
 rebuilds an object that lacks one of those methods on the current class,
 merges `bcr_data` / `tcr_data` into the unified repertoire and thins an
@@ -255,12 +255,12 @@ Warnings mean that the result remains interpretable:
     intended split layer first.
 2.  Export to a `.crb` path and choose `embedded` or `h5`.
 3.  Add repertoire data through
-    [`addImmuneRepertoire()`](https://mihem.github.io/CerebroNexus/reference/addImmuneRepertoire.md)
+    [`addImmuneRepertoire()`](https://www.mheming.com/CerebroNexus/reference/addImmuneRepertoire.md)
     rather than assigning an unchecked shape.
 4.  Keep the H5 file, and the immune repertoire sidecar if there is one,
     beside its CRB under the names recorded in the CRB.
 5.  Build the app with
-    [`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md)
+    [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
     and treat any error it raises as a request to fix identity, not as a
     file-copy inconvenience.
 6.  Move or deploy the resulting app directory as one unit.
@@ -268,10 +268,10 @@ Warnings mean that the result remains interpretable:
 ## Further reading
 
 - [Seurat v5 layered
-  assays](https://mihem.github.io/CerebroNexus/articles/seurat_v5_layered_assays.md)
+  assays](https://www.mheming.com/CerebroNexus/articles/seurat_v5_layered_assays.md)
 - [Create a self-contained Shiny
-  app](https://mihem.github.io/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
+  app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.md)
 - [Immune repertoire
-  analysis](https://mihem.github.io/CerebroNexus/articles/immune_repertoire_analysis.md)
+  analysis](https://www.mheming.com/CerebroNexus/articles/immune_repertoire_analysis.md)
 - [Create an H5 expression
-  matrix](https://mihem.github.io/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)
+  matrix](https://www.mheming.com/CerebroNexus/articles/create_expression_matrix_in_h5_format.md)

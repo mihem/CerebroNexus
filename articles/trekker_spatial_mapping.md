@@ -237,7 +237,7 @@ sub_bc <- bc_all[idx]
 ### Step 6 — export a Cerebro object and attach the `trekker` slot
 
 We build an ordinary `Cerebro` object with
-[`exportFromSeurat()`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 (whole- transcriptome expression + UMAP + `cluster`/`celltype` groups) —
 this is what powers gene colouring on the page. Then we attach a
 `trekker` slot with everything else the bespoke page needs.
@@ -307,7 +307,7 @@ shiny::runApp(system.file("app.R", package = "CerebroNexus"))
 ```
 
 To host your own Trekker `.crb`, pass it to
-[`createShinyApp()`](https://mihem.github.io/CerebroNexus/reference/createShinyApp.md).
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md).
 The **Trekker** tab appears automatically whenever the loaded `.crb`
 carries a `trekker` slot.
 

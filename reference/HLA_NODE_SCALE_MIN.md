@@ -12,9 +12,3 @@ HLA_NODE_SCALE_MIN
 
 HLA_NODE_SCALE_MAX
 ```
-
-## Format
-
-An object of class `numeric` of length 1.
-
-An object of class `numeric` of length 1.

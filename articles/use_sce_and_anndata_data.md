@@ -7,9 +7,9 @@ format, and three kinds of input lead to it:
 
 | You have | Convert with |
 |----|----|
-| Seurat object (`.rds`, `.qs2`) | [`convertSeuratToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSeuratToCerebro.md) |
-| SingleCellExperiment (`.rds`, `.qs2`) | [`convertSCEToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertSCEToCerebro.md) |
-| AnnData / scanpy file (`.h5ad`), MuData (`.h5mu`) | [`convertH5adToCerebro()`](https://mihem.github.io/CerebroNexus/reference/convertH5adToCerebro.md) |
+| Seurat object (`.rds`, `.qs2`) | [`convertSeuratToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSeuratToCerebro.md) |
+| SingleCellExperiment (`.rds`, `.qs2`) | [`convertSCEToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSCEToCerebro.md) |
+| AnnData / scanpy file (`.h5ad`), MuData (`.h5mu`) | [`convertH5adToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertH5adToCerebro.md) |
 
 Because `.crb` is the hub, the formats also convert into each other: a
 Seurat object can be written as `.h5ad` for scanpy, an `.h5ad` file can
@@ -92,7 +92,7 @@ trajectories, trees, …).
 
 ## In the Builder
 
-[`launchCerebroBuilder()`](https://mihem.github.io/CerebroNexus/reference/launchCerebroBuilder.md)
+[`launchCerebroBuilder()`](https://www.mheming.com/CerebroNexus/reference/launchCerebroBuilder.md)
 accepts `.h5ad`, `.h5mu`, a `.zip` of a SpatialData `.zarr` folder, and
 SingleCellExperiment `.rds` / `.qs2` files like Seurat ones, and offers
 PAGA, scVelo and pseudotime trajectories next to monocle2. Spatial

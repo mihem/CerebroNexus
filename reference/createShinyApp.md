@@ -272,16 +272,17 @@ its former `/data` HTTP resource mapping during an in-place replacement.
 Raw `.crb`, H5, and sidecar files are not registered as HTTP resources.
 Spatial background images are the deliberate exception: files explicitly
 supplied through `spatial_images` are copied verbatim under
-`spatial-assets/`. The server-side renderer reads these files and embeds
-them as data URIs; the directory is not registered as an HTTP resource.
-Callers must provide trusted image files. Preflight requires a minimum
-stable runtime API and reads the ordinary `expression_backend` field
-without invoking serialized methods or its getter. The generated
-configuration stores the effective per-CRB attachment plan, and
-configured CRBs consume that exact plan at runtime. Direct launches and
-uploads also read and validate the ordinary field without invoking the
-getter. A CRB from an older release that is no longer read (see
-[`convertCerebro`](https://mihem.github.io/CerebroNexus/reference/convertCerebro.md))
+`spatial-assets/`. The server exposes each selected file through a
+private, session-scoped URL; image bytes are not Base64-encoded and the
+directory is not registered as a public HTTP resource. Callers must
+provide trusted image files. Preflight requires a minimum stable runtime
+API and reads the ordinary `expression_backend` field without invoking
+serialized methods or its getter. The generated configuration stores the
+effective per-CRB attachment plan, and configured CRBs consume that
+exact plan at runtime. Direct launches and uploads also read and
+validate the ordinary field without invoking the getter. A CRB from an
+older release that is no longer read (see
+[`convertCerebro`](https://www.mheming.com/CerebroNexus/reference/convertCerebro.md))
 is rejected, as is an object containing only one of field and getter.
 Dataset labels are unique. Two labels may name the same input file; the
 bundle then holds one copy of it per label. While developing the
@@ -326,19 +327,38 @@ build lock does not protect inputs.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-library(CerebroNexus)
-
-createShinyApp(
+# \donttest{
+app_dir <- createShinyApp(
   cerebro_data = c(
-    "PBMC example" = "output/cerebro_pbmc_seurat.crb"
+    "PBMC example" = system.file("extdata/examples/example.crb",
+      package = "CerebroNexus")
   ),
-  result_dir = "my_app",
+  result_dir = file.path(tempdir(), "my_app"),
   port = 8080,
   host = "127.0.0.1",
   max_request_size = 8000,
   overwrite = TRUE
 )
-# Run with shiny::runApp("my_app") or deploy my_app/ to Shiny Server.
-} # }
+#> Creating staged directory structure...
+#> Copying Shiny source files...
+#> Copying data artifacts...
+#>   - private-data/example.crb (Cerebro data file)
+#> Copying extdata files...
+#> Generating app.R file...
+#> 
+#> ========================================
+#> Shiny app successfully created!
+#> ========================================
+#> App directory: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/my_app
+#> Data file(s):
+#>   - PBMC example : example.crb
+#> Port: 8080
+#> Host: 127.0.0.1
+#> Launch browser: TRUE
+#> 
+#> To launch the app, run:
+#>   shiny::runApp('/tmp/nix-shell-4512-1178884673/RtmpvSCtfG/my_app')
+#> ========================================
+# Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
+# }
 ```

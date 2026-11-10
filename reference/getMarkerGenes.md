@@ -76,7 +76,7 @@ getMarkerGenes(
 
 - ...:
 
-  Further parameters can be passed to control Seurat::FindAllMakers().
+  Further parameters can be passed to control Seurat::FindAllMarkers().
 
 ## Value
 
@@ -86,12 +86,16 @@ variables stored in `object@misc$marker_genes`.
 ## Examples
 
 ``` r
+# \donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
+## organism = NULL skips the online lookup of cell surface genes; use
+## organism = 'hg' or 'mm' to annotate them (needs internet access).
 pbmc <- getMarkerGenes(
   object = pbmc,
   assay = 'RNA',
-  organism = 'hg',
+  organism = NULL,
   groups = c('sample','seurat_clusters'),
   name = 'cerebro_seurat',
   only_pos = TRUE,
@@ -101,8 +105,8 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-#> [22:16:37] Genes in GO term "cell surface" (GO:0009986) could not be retrieved, possibly due to the server not being reachable at the moment.
-#> [22:16:37] Get marker genes for 2 groups in `sample`...
+#> [21:16:15] No information about genes on cell surface because organism is either not specified or not human/mouse.
+#> [21:16:15] Get marker genes for 2 groups in `sample`...
 #> Calculating cluster pbmc_1
 #> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
 #> (default method for FindMarkers) please install the presto package
@@ -114,7 +118,8 @@ pbmc <- getMarkerGenes(
 #> efficient implementation (no further action necessary).
 #> This message will be shown once per session
 #> Calculating cluster pbmc_2
-#> [22:16:38] Get marker genes for 2 groups in `seurat_clusters`...
+#> [21:16:15] Get marker genes for 2 groups in `seurat_clusters`...
 #> Calculating cluster 0
 #> Calculating cluster 1
+# }
 ```

@@ -112,7 +112,7 @@ convertSeuratToCerebro(
 
   How to persist the expression matrix in the generated `.crb`. One of
   `"embedded"` (default) or `"h5"`. See
-  [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+  [`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
   for details; briefly, `"embedded"` stores the matrix inside the
   `.crb`, and `"h5"` writes a TENx-format HDF5 file next to the `.crb`
   that the Viewer loads lazily, minimising RAM and startup time
@@ -186,7 +186,7 @@ convertSeuratToCerebro(
 - h5_compression_level, immune_sidecar, immune_sidecar_threshold:
 
   Passed to
-  [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md):
+  [`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md):
   the gzip level of the H5 file (default 0, uncompressed), and whether
   and from which size the immune repertoire is stored in a sibling file.
 
@@ -211,7 +211,7 @@ The function performs the following steps:
     - For single-sheet files, data is split by the first column
 
 4.  Exports the processed data using
-    [`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+    [`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 
 5.  Saves the result as `cerebro_<basename>.crb` in `result_dir`
 
@@ -228,18 +228,17 @@ them as `VisiumV2` images.
 
 ## See also
 
-[`exportFromSeurat`](https://mihem.github.io/CerebroNexus/reference/exportFromSeurat.md)
+[`exportFromSeurat`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md)
 
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-library(CerebroNexus)
-
+# \donttest{
 input_dir <- system.file("extdata/examples", package = "CerebroNexus")
+result_dir <- file.path(tempdir(), "output")
 convertSeuratToCerebro(
   seurat_file = file.path(input_dir, "pbmc_seurat.rds"),
-  result_dir = "output",
+  result_dir = result_dir,
   assay = "RNA",
   slot = "data",
   experiment_name = "PBMC example",
@@ -247,6 +246,48 @@ convertSeuratToCerebro(
   groups = c("sample", "seurat_clusters"),
   groups_naming = list("seurat_clusters" = "cluster")
 )
-# Creates output/cerebro_pbmc_seurat.crb.
-} # }
+#> [21:16:10] Calculating most expressed genes and mean expression for each group...
+#> [21:16:10] Processing group: sample
+#> [21:16:10] Processing group: cluster
+#> [21:16:10] Most expressed genes and mean expression calculation completed.
+#> [INFO] No scRepertoire columns found in metadata, skipping repertoire extraction.
+#> [INFO] No immune repertoire data to add; object returned unchanged.
+#> [21:16:10] Initializing Cerebro object...
+#> [21:16:10] Adding expression data (embedded)...
+#> [21:16:10] Collecting available meta data...
+#> [21:16:10] Extracting all meta data columns...
+#> [21:16:10] Extracting dimensional reductions...
+#> [21:16:10] Will export the following dimensional reductions: umap
+#> [21:16:10] Extracting tables of most expressed genes...
+#> [21:16:10] Extracting tables of mean expression...
+#> [21:16:10] Extracting marker genes table...
+#> [21:16:10] No trajectories to extract...
+#> [21:16:10] Checking for spatial data...
+#> [21:16:10] Overview of Cerebro object:
+#> class: Cerebro
+#> exporter package version: 8.0.0
+#> experiment name: PBMC example
+#> organism: Human
+#> date of analysis: 
+#> date of export: 2026-11-10
+#> number of cells: 80
+#> number of genes: 230
+#> grouping variables (2): sample, cluster
+#> cell cycle variables (0): 
+#> projections (1): umap
+#> trees (0): 
+#> most expressed genes: sample, cluster
+#> marker genes:
+#>   - cerebro_seurat (1): seurat_clusters
+#> enriched pathways:
+#> trajectories:
+#> extra material:
+#> Immune repertoire:
+#> HLA typing: none
+#> Spatial data:
+#> [21:16:10] Saving Cerebro object to: /tmp/nix-shell-4512-1178884673/RtmpvSCtfG/output/cerebro_pbmc_seurat.crb
+#> [21:16:10] Done!
+#> Successfully exported: cerebro_pbmc_seurat.crb
+# Creates cerebro_pbmc_seurat.crb in result_dir.
+# }
 ```

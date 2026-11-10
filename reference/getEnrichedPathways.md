@@ -14,7 +14,7 @@ getEnrichedPathways(
     "Panther_2016", "Human_Gene_Atlas", "Mouse_Gene_Atlas"),
   adj_p_cutoff = 0.05,
   max_terms = 100,
-  URL_API = "http://maayanlab.cloud/Enrichr"
+  URL_API = "https://maayanlab.cloud/Enrichr"
 )
 ```
 
@@ -23,13 +23,13 @@ getEnrichedPathways(
 - object:
 
   Seurat object with marker genes calculated by
-  [`getMarkerGenes`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md).
+  [`getMarkerGenes`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md).
 
 - marker_genes_input:
 
   Name of list of marker gene tables that will be used as input. This
   could be the "name" parameter used in
-  [`getMarkerGenes`](https://mihem.github.io/CerebroNexus/reference/getMarkerGenes.md).
+  [`getMarkerGenes`](https://www.mheming.com/CerebroNexus/reference/getMarkerGenes.md).
   Enriched pathways will be calculated for every group level of every
   grouping variable. Defaults to "cerebro_seurat".
 
@@ -51,7 +51,7 @@ getEnrichedPathways(
   URL to send requests to (Enrichr API). Allows to overwrite default URL
   with an alternative taken from the Enrichr website in case the
   original is out-of-service; defaults to
-  'http://maayanlab.cloud/Enrichr'.
+  'https://maayanlab.cloud/Enrichr'.
 
 ## Value
 
@@ -70,7 +70,7 @@ if (interactive()) {
     databases = c('GO_Biological_Process_2018'),
     adj_p_cutoff = 0.01,
     max_terms = 100,
-    URL_API = 'http://maayanlab.cloud/Enrichr'
+    URL_API = 'https://maayanlab.cloud/Enrichr'
   )
 }
 ```

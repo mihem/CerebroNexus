@@ -3,7 +3,7 @@
 shape CerebroNexus reads: a list named by sample, each element a data.frame
 whose barcode column matches the object's cell names."><meta property="og:description" content="Puts TCR and/or BCR data into object@misc$immune_repertoire in the
 shape CerebroNexus reads: a list named by sample, each element a data.frame
-whose barcode column matches the object's cell names."><meta property="og:image" content="https://mihem.github.io/CerebroNexus/logo.svg"></head><body>
+whose barcode column matches the object's cell names."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -11,7 +11,7 @@ whose barcode column matches the object's cell names."><meta property="og:image"
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">7.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -174,25 +174,32 @@ reported where it was made rather than surfacing as an empty page.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
-<span class="r-in"><span><span class="co">## from scRepertoire's output</span></span></span>
-<span class="r-in"><span><span class="va">combined</span> <span class="op">&lt;-</span> <span class="fu">scRepertoire</span><span class="fu">::</span><span class="fu"><a href="https://www.borch.dev/uploads/scRepertoire/reference/combineTCR.html" class="external-link">combineTCR</a></span><span class="op">(</span><span class="va">contig_list</span>, samples <span class="op">=</span> <span class="va">donor_ids</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">seurat</span>, tcr <span class="op">=</span> <span class="va">combined</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co">## or straight from Cell Ranger</span></span></span>
-<span class="r-in"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu">addImmuneRepertoire</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  <span class="va">seurat</span>,</span></span>
-<span class="r-in"><span>  tcr <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">sample_dirs</span>, <span class="st">"filtered_contig_annotations.csv"</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>  sample_names <span class="op">=</span> <span class="va">donor_ids</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/examples/pbmc_seurat.rds"</span>, package <span class="op">=</span> <span class="st">"CerebroNexus"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co">## A clone shared by ten cells of the first sample, in the shape</span></span></span>
+<span class="r-in"><span><span class="co">## scRepertoire::combineTCR() returns (one data.frame per sample).</span></span></span>
+<span class="r-in"><span><span class="va">sample</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">$</span><span class="va">sample</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">cells</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span><span class="op">[</span><span class="va">seurat</span><span class="op">$</span><span class="va">sample</span> <span class="op">==</span> <span class="va">sample</span><span class="op">]</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="va">tcr</span> <span class="op">&lt;-</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/setNames.html" class="external-link">setNames</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  barcode <span class="op">=</span> <span class="va">cells</span>,</span></span>
+<span class="r-in"><span>  CTgene <span class="op">=</span> <span class="st">"TRAV1-2.TRAJ33.TRAC_TRBV6-1.TRBJ2-1.TRBC2"</span>,</span></span>
+<span class="r-in"><span>  CTnt <span class="op">=</span> <span class="st">"TGTGCTGTGAGAGACAGC_TGCGCCAGCAGTGAA"</span>,</span></span>
+<span class="r-in"><span>  CTaa <span class="op">=</span> <span class="st">"CAVRDSNYQLIW_CASSPGQGNEQFF"</span>,</span></span>
+<span class="r-in"><span>  CTstrict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="st">"TRAV1-2.TRAJ33.TRAC;TGTGCTGTGAGAGACAGC_"</span>,</span></span>
+<span class="r-in"><span>    <span class="st">"TRBV6-1.TRBJ2-1.TRBC2;TGCGCCAGCAGTGAA"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span><span class="op">)</span>, <span class="va">sample</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">seurat</span>, tcr <span class="op">=</span> <span class="va">tcr</span>, sample_col <span class="op">=</span> <span class="st">"sample"</span>,</span></span>
+<span class="r-in"><span>                              verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co">## or from meta.data, after scRepertoire::combineExpression()</span></span></span>
-<span class="r-in"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu">addImmuneRepertoire</span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="exportFromSeurat.html">exportFromSeurat</a></span><span class="op">(</span><span class="va">seurat</span>, file <span class="op">=</span> <span class="st">"my_data.crb"</span>, experiment_name <span class="op">=</span> <span class="st">"mine"</span>,</span></span>
-<span class="r-in"><span>                 organism <span class="op">=</span> <span class="st">"hg"</span>, groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"seurat_clusters"</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
-<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co">## Other inputs: Cell Ranger files, e.g.</span></span></span>
+<span class="r-in"><span><span class="co">## addImmuneRepertoire(seurat, tcr = "filtered_contig_annotations.csv"),</span></span></span>
+<span class="r-in"><span><span class="co">## or meta.data columns after scRepertoire::combineExpression():</span></span></span>
+<span class="r-in"><span><span class="co">## addImmuneRepertoire(seurat)</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
@@ -200,7 +207,7 @@ reported where it was made rather than surfacing as an empty page.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Michael Heming, Roman Hillje, Xuesong Wang.</p>
+  <p>Developed by Michael Heming, Xuesong Wang.</p>
 </div>
 
 <div class="pkgdown-footer-right">

@@ -21,3 +21,18 @@ readViewerPack(file, pack = .viewerPackPath(file))
 ## Value
 
 A descriptor or \`NULL\`.
+
+## Examples
+
+``` r
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#> [1] TRUE
+crb <- file.path(dir, "example.crb")
+buildViewerPack(crb, viewer_binary = "always")
+pack <- readViewerPack(crb)
+names(pack)
+#> [1] "valid"    "reason"   "manifest" "path"    
+unlink(dir, recursive = TRUE)
+```

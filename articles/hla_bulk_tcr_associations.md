@@ -447,7 +447,7 @@ key is `v_gene+cdr3` rather than CDR3 alone.
 - Questions and bug reports:
   <https://github.com/mihem/CerebroNexus/issues>.
 - Function reference and other articles:
-  <https://mihem.github.io/CerebroNexus/>.
+  <https://www.mheming.com/CerebroNexus/>.
 - Provenance of every shipped demo data set: `data-raw/DATASETS.md`.
 
 ## Session info
