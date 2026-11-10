@@ -95,4 +95,4 @@ No Python is needed to read AnnData or SpatialData; see the vignette
 
 ## License
 
-MIT, see [LICENSE.md](LICENSE.md). 
+MIT, see [LICENSE.md](https://github.com/mihem/CerebroNexus/blob/master/LICENSE.md). 

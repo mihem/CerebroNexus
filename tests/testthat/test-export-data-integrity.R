@@ -29,7 +29,10 @@ test_that("external export basenames are portable across filesystems", {
       regexp = "portable|reserved|file name",
       ignore.case = TRUE
     )
-    expect_false(file.exists(output))
+    ## Windows treats names such as CON and COM1 as devices, so file.exists()
+    ## can be TRUE for them (win-builder, Windows Server 2022); look in the
+    ## folder instead: no file of that name may have been created.
+    expect_false(name %in% list.files(root, all.files = TRUE))
   }
 })
 
