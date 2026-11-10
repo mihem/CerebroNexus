@@ -4,7 +4,15 @@
 viewer_h5_matrix <- function(values, path) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   if (file.exists(path)) {
-    file.remove(path)
+    ## An earlier read may still hold the file open; Windows then refuses to
+    ## replace it.
+    gc(verbose = FALSE)
+    if (requireNamespace("rhdf5", quietly = TRUE)) {
+      rhdf5::h5closeAll()
+    }
+    if (!file.remove(path)) {
+      stop("Cannot replace the H5 test file ", path, call. = FALSE)
+    }
   }
   HDF5Array::writeTENxMatrix(
     methods::as(Matrix::Matrix(t(values), sparse = TRUE), "CsparseMatrix"),

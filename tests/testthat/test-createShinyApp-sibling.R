@@ -2825,7 +2825,7 @@ test_that("backend paths cannot resolve through symbolic links", {
   dir.create(source)
   dir.create(outside)
   writeLines("OUTSIDE", file.path(outside, "matrix.h5"))
-  linked <- suppressWarnings(file.symlink(outside, file.path(source, "alias")))
+  linked <- test_dir_link(outside, file.path(source, "alias"))
   if (!isTRUE(linked)) {
     skip("Symbolic links are not available on this platform")
   }
@@ -2841,10 +2841,7 @@ test_that("backend paths cannot resolve through symbolic links", {
 
   app <- file.path(root, "existing-app")
   dir.create(app)
-  destination_linked <- suppressWarnings(file.symlink(
-    outside,
-    file.path(app, "private-data")
-  ))
+  destination_linked <- test_dir_link(outside, file.path(app, "private-data"))
   if (!isTRUE(destination_linked)) {
     skip("Destination symbolic links are not available on this platform")
   }

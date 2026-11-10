@@ -44,20 +44,8 @@ privacy_start_app <- function(
   test_mode = FALSE
 ) {
   skip_if_not_installed("callr")
-  ## R's own library (.Library, .Library.site) is always on a child's library
-  ## path, so with CerebroNexus installed there no App process can run
-  ## without it.
   if (isTRUE(exclude_package)) {
-    ## file.exists(), not system.file(): pkgload's system.file() shim finds
-    ## the source tree whatever lib.loc says.
-    skip_if(
-      any(file.exists(file.path(
-        c(.Library, .Library.site),
-        "CerebroNexus",
-        "DESCRIPTION"
-      ))),
-      "CerebroNexus is installed in R's own library, so no package-free App process"
-    )
+    skip_if_package_in_r_library()
   }
   stdout <- file.path(root, paste0("app-", port, ".stdout"))
   stderr <- file.path(root, paste0("app-", port, ".stderr"))
@@ -98,7 +86,23 @@ privacy_start_app <- function(
   )
 }
 
+## R's own library (.Library, .Library.site) is always on a child process's
+## library path, so with CerebroNexus installed there no process can run
+## without it. file.exists(), not system.file(): pkgload's system.file() shim
+## finds the source tree whatever lib.loc says.
+skip_if_package_in_r_library <- function() {
+  skip_if(
+    any(file.exists(file.path(
+      c(.Library, .Library.site),
+      "CerebroNexus",
+      "DESCRIPTION"
+    ))),
+    "CerebroNexus is installed in R's own library, so no package-free process"
+  )
+}
+
 privacy_hermetic_library <- function(root) {
+  skip_if_package_in_r_library()
   library <- tempfile("hermetic-library-", tmpdir = root)
   dir.create(library)
   linked <- FALSE
@@ -111,20 +115,13 @@ privacy_hermetic_library <- function(root) {
       }
       target <- file.path(library, package)
       if (!file.exists(target)) {
-        ok <- suppressWarnings(tryCatch(
-          file.symlink(file.path(source, package), target),
-          error = function(error) FALSE
-        ))
-        if (!isTRUE(ok) && identical(.Platform$OS.type, "windows")) {
-          ok <- suppressWarnings(tryCatch(
-            Sys.junction(file.path(source, package), target),
-            error = function(error) FALSE
-          ))
-          if (isTRUE(ok)) {
-            junctions <- c(junctions, target)
-          }
+        ## Junctions on Windows: unlink() cannot delete a directory symbolic
+        ## link there, and it would stay in the temporary folder.
+        ok <- test_dir_link(file.path(source, package), target)
+        if (ok && identical(.Platform$OS.type, "windows")) {
+          junctions <- c(junctions, target)
         }
-        linked <- linked || isTRUE(ok)
+        linked <- linked || ok
       }
     }
   }
