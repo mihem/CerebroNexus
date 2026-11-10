@@ -47,6 +47,9 @@
   Enrichr and MSigDB links use https.
 - `data-raw/DATASETS.md` records the source and license of every shipped data
   set.
+- `demo_spatial.crb` is now a 500-cell subset of the real 10x Xenium mouse
+  brain demo (`data-raw/build_demo_spatial.R`), replacing a synthetic fixture
+  whose generator was never recorded.
 
 # CerebroNexus 7.2.0
 

@@ -382,7 +382,7 @@ download → extract → subsample → build walk-through).
 
 ## Package examples and test fixtures
 
-The files below are what the package's own examples, tests and vignettes read. Unlike the demos above, none of them has a build script in `data-raw/`, so each entry records what the git history and the files themselves show, and says so where something was never written down. `demo_full_tcr_bcr.crb` is recorded under [Immune repertoire](#immune-repertoire).
+The files below are what the package's own examples, tests and vignettes read. Unlike the demos above, none of them has a build script in `data-raw/`, so each entry records what the git history and the files themselves show, and says so where something was never written down. `demo_full_tcr_bcr.crb` is recorded under [Immune repertoire](#immune-repertoire). `demo_spatial.crb` is recorded under [Spatial](#spatial).
 
 ### example.crb
 - **type**: immune_repertoire (scRNA-seq + paired TCR/BCR)
@@ -399,22 +399,6 @@ The files below are what the package's own examples, tests and vignettes read. U
 - **build**: **not recorded** (no script in the repository); only the in-place cuts are reproducible (`subsample_demos.R`, `shrink_demos.R`). The file name predates this data: until `0e255d0d2` it held cerebroApp's original example (Roman Hillje, 2020), which no longer ships.
 - **output**: `inst/extdata/examples/example.crb` (~453 KiB)
 - **used by**: roxygen docs/examples in `R/cerebro_io.R`, `R/convertH5adToCerebro.R`, `R/createShinyApp.R`, `R/exportToH5ad.R`, `R/h5ad.R`, `R/viewer_pack.R` (and their `man/` pages); `inst/viewer/shiny_server.R`; `inst/builder/app_bundle/contract.R`; vignettes `create_a_self_contained_shiny_app`, `create_expression_matrix_in_h5_format`, `host_cerebro_on_shinyapps`, `immune_repertoire_analysis`, `million_cell_crb_artifacts`, `multi_crb`; tests `test-app-immune_repertoire.R`, `test-app-inst.R`, `test-cerebro-io.R`, `test-coordinated-views.R`, `test-demo-gene-panel.R`, `test-enriched_pathways.R`, `test-extra_material.R`, `test-immune_repertoire.R`, `test-most_expressed_genes.R`, `test-r-functions.R`. Also the input of `data-raw/build_ir_demos.R`.
-
-### demo_spatial.crb
-- **type**: spatial (test fixture)
-- **technology**: none, **synthetic**. The object imitates a Xenium export (spatial assay `Xenium`, image `fov`) but measures nothing.
-- **dropdown label**: none. It is not in the app's switcher; it was labelled `Cortex - Spatial (synthetic)` while it was.
-- **organism / tissue**: none sampled. `organism` is set to `hg` and the cell-type labels (`Excitatory L2/3`, `Excitatory L4`, `Excitatory L5/6`, `Oligodendrocyte`) are illustrative.
-- **source**: described as **synthetic** in commit `b13fee580` (2026-07-05, "Bundle a synthetic Xenium demo"), `a20568f2d` ("both the coordinates and the histology image are synthetic, not measured positions or patient data"), `NEWS.md`, `data-raw/spatial.md` and the header of `data-raw/build_spatial_demos.R`. Commit `0cf063b1c` re-synthesised the coordinates as cortical-depth bands. The file itself is consistent with that: cells are named `cell_<n>`, and 2,490 of the original 2,500 genes are placeholders `FIB0001`–`FIB2490`, with only 10 real symbols (`COL1A1`, `COL3A1`, `DCN`, `LUM`, `COL6A3`, `RGS5`, `TAGLN`, `VWF`, `GAPDH`, `ACTB`). **The generating code was never committed, so how the expression values were produced is not recorded.** Two details are unexplained and should be confirmed by the author: `b13fee580` says the file was "token-scrubbed so no source-study identifiers remain", and every cell has `orig.ident = "MS"`.
-- **acquire**: none (no download)
-- **object type**: `Cerebro` with one spatial entry `fov` (1,000 cells, coordinate source `GetTissueCoordinates`)
-- **sampling**: 1,000 cells in two pseudo-samples (`Sample_1` 484, `Sample_2` 516). Genes cut in place from 2,500 to 1,500 (`cac622b84`) and then to 100 by `data-raw/shrink_demos.R` (`parameters$demo_gene_panel`); no cell cut.
-- **cell-type field**: `cell_type`
-- **embedded image**: none. The companion `inst/extdata/examples/demo_spatial_histology.svg` is a synthetic (non-patient) H&E-style drawing added in `0cf063b1c`; no current code reads it by name, and `.Rbuildignore` keeps it out of the package tarball.
-- **license**: none applicable if synthetic as documented (no third-party data). Not independently verifiable, because the generator was not committed.
-- **build**: **not recorded** (no script in the repository); only the gene cut is reproducible (`shrink_demos.R`).
-- **output**: `inst/extdata/examples/demo_spatial.crb` (~160 KiB)
-- **used by**: tests `test-spatial.R`, `test-cerebro-io.R`, `test-demo-gene-panel.R`; `inst/builder/app_bundle/contract.R`. Not used in any `R/` example, `man/` page or vignette.
 
 ### pbmc_seurat.rds
 - **type**: example input object (scRNA-seq; not a `.crb`)
