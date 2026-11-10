@@ -108,7 +108,8 @@ data](https://www.mheming.com/CerebroNexus/vignettes/use_sce_and_anndata_data.Rm
 
 ## License
 
-MIT, see [LICENSE.md](https://www.mheming.com/CerebroNexus/LICENSE.md).
+MIT, see
+[LICENSE.md](https://github.com/mihem/CerebroNexus/blob/master/LICENSE.md).
 
 # Package index
 
