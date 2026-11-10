@@ -1,12 +1,12 @@
 # CerebroNexus 8.0.0
 
 - The package is prepared for a CRAN submission. `R CMD check --as-cran` on the
-  built tarball reports only the "New submission" NOTE on Windows, Linux and
-  macOS, and also with the suggested packages unavailable.
-- The tarball shrinks from 28.4 MB to 5.5 MB. Three vignettes (Seurat workflow,
-  SCE/AnnData, Cerebro class) stay in the package; the other guides move to
-  `vignettes/articles/` and remain on the website under the same URLs. The large
-  demo `.crb` files, most AnnData/Zarr test fixtures, the test files that are
+  built tarball reports only the "New submission" NOTE on Windows and Linux,
+  and also with the suggested packages unavailable.
+- The tarball shrinks from 28.4 MB to about 6 MB. Three vignettes (Seurat
+  workflow, SCE/AnnData, Cerebro class) stay in the package; the other guides
+  move to `vignettes/articles/` and remain on the website under the same URLs.
+  The large demo `.crb` files, the Zarr test stores, the test files that are
   skipped as a whole on CRAN and the Builder's Trekker and Visium examples are no
   longer shipped in the tarball; they stay in git.
 - New `downloadDemoData()` downloads the Visium, Slide-seq, MERFISH, Xenium and
@@ -35,8 +35,9 @@
 - Tests run in about 4 minutes under CRAN settings (was about 10): slow Builder
   integration, browser, Node/Chrome, server and subprocess tests are skipped on
   CRAN, at most two processes run, plots go to a null device, and nothing is
-  written outside `tempdir()`. The AnnData tests run on three small fixtures.
-  GitHub CI still runs everything.
+  written outside `tempdir()`. The AnnData tests run on the small `.h5ad` and
+  `.h5mu` fixtures; the tests that need the Zarr store fixtures run from a git
+  checkout only. GitHub CI still runs everything.
 - Authors: Roman Hillje, author of the original Cerebro, is listed as
   contributor and copyright holder; Michael Heming, Roman Hillje and Xuesong
   Wang are the copyright holders in `LICENSE`.
