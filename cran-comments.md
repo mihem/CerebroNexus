@@ -10,12 +10,12 @@ immune repertoires, trajectories, spatial images and HLA-TCR motifs.
 
 `R CMD check --as-cran` on the built tarball, with `_R_CHECK_LIMIT_CORES_=true`:
 
-* macOS (local), R 4.6.2
 * Windows 11 x64 (local), R 4.6.1 (ucrt), Rtools 4.5, including the PDF manual
 * Ubuntu (WSL, local), R 4.6.1, also with `_R_CHECK_DEPENDS_ONLY_=true`
   (suggested packages not available)
 * Ubuntu (GitHub Actions), R 4.6.1
-* R-devel: win-builder
+* macOS (local), R 4.6.2: TO RUN on the final tarball
+* win-builder, R-devel: TO RUN on the final tarball (`devtools::check_win_devel()`)
 
 ## R CMD check results
 

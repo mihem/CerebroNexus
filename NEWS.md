@@ -1,36 +1,52 @@
 # CerebroNexus 8.0.0
 
 - The package is prepared for a CRAN submission. `R CMD check --as-cran` on the
-  built tarball reports only the "New submission" NOTE.
-- The tarball shrinks from 28.4 MB to 5.66 MB. Three vignettes (Seurat workflow,
+  built tarball reports only the "New submission" NOTE on Windows, Linux and
+  macOS, and also with the suggested packages unavailable.
+- The tarball shrinks from 28.4 MB to 5.5 MB. Three vignettes (Seurat workflow,
   SCE/AnnData, Cerebro class) stay in the package; the other guides move to
   `vignettes/articles/` and remain on the website under the same URLs. The large
-  demo `.crb` files, the `.zarr`/`.h5ad` test fixtures and the Builder's Trekker
-  and Visium examples are no longer shipped in the tarball; they stay in git.
+  demo `.crb` files, most AnnData/Zarr test fixtures, the test files that are
+  skipped as a whole on CRAN and the Builder's Trekker and Visium examples are no
+  longer shipped in the tarball; they stay in git.
 - New `downloadDemoData()` downloads the Visium, Slide-seq, MERFISH, Xenium and
   HLA & TCR demo data from the release tag into `tools::R_user_dir()` and checks
   size and MD5. The demo App lists them once downloaded. The Builder's Trekker
   (synthetic) and Visium examples download on first use; offline, the Builder
   says so and the other examples still work.
 - Imports drop from 39 to 20 non-default packages. GSVA, qvalue, biomaRt,
-  scRepertoire, msigdbr, igraph, stringdist, colourpicker, ggplot2, scales,
-  shinycssloaders, htmlwidgets, httr, future.apply, pbapply and digest move to
-  Suggests. A missing package gives an install hint, a reduced but working path,
-  or a message on the Viewer page instead of an error. `stringr`, `tibble` and
-  `tidyselect` are no longer used.
+  scRepertoire, msigdbr, igraph, stringdist, ggplot2, scales, htmlwidgets,
+  httr, future.apply, pbapply and digest move to Suggests. A missing package
+  gives an install hint, a reduced but working path, or a message on the Viewer
+  page instead of an error. `tidyr`, `base64enc`, `stringr`, `tibble` and
+  `tidyselect` are no longer used. The README lists the optional packages with
+  one install command.
+- `launchCerebroBuilder()` names every missing package it needs (Seurat,
+  callr, digest, processx, ps) in one message.
 - `createShinyApp()` now explains how to name an unnamed data set. The Spatial
   point-size observer no longer stops the session when the data set has no
   spatial data.
 - `launchCerebro()` no longer assigns `Cerebro.options` in the global
   environment.
-- Examples are runnable, with slow parts in `\donttest{}`; the `getMarkerGenes()`
-  example no longer queries Ensembl.
+- The Builder recognises an ASCII RDS saved on Windows (`A\r\n`) by content.
+- Every exported function has a runnable example; examples that load
+  'SeuratObject' or 'SingleCellExperiment' are in `\donttest{}`, and the
+  `getMarkerGenes()` example no longer queries Ensembl.
 - Tests run in about 4 minutes under CRAN settings (was about 10): slow Builder
   integration, browser, Node/Chrome, server and subprocess tests are skipped on
   CRAN, at most two processes run, plots go to a null device, and nothing is
-  written outside `tempdir()`. GitHub CI still runs everything.
-- DESCRIPTION title and description follow CRAN style, `qs` is dropped from
+  written outside `tempdir()`. The AnnData tests run on three small fixtures.
+  GitHub CI still runs everything.
+- Authors: Roman Hillje, author of the original Cerebro, is listed as
+  contributor and copyright holder; Michael Heming, Roman Hillje and Xuesong
+  Wang are the copyright holders in `LICENSE`.
+- The title is "Interactive Viewer for Single-Cell and Spatial
+  Transcriptomics", the description follows CRAN style, `qs` is dropped from
   Enhances, and `CITATION` is a `bibentry()` with volume, issue and pages.
+- Documentation links point to https://www.mheming.com/CerebroNexus/, and
+  Enrichr and MSigDB links use https.
+- `data-raw/DATASETS.md` records the source and license of every shipped data
+  set.
 
 # CerebroNexus 7.2.0
 
