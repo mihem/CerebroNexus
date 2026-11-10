@@ -7,12 +7,11 @@ Authors@R: c(
   person("Xuesong", "Wang", email = "wangxuesong29@gmail.com", role = c("aut", "cph"))
   )
 Description: Interactive 'Shiny' application for exploring and sharing
-    single-cell and spatial transcriptomics data, extending 'Cerebro'
-    (Hillje et al. (2020) <doi:10.1093/bioinformatics/btz877>). Data from
-    'Seurat', 'SingleCellExperiment', 'AnnData', 'MuData' or 'SpatialData'
-    objects are converted into a portable data file that can be browsed with
-    coordinated views of gene expression, immune repertoires, trajectories,
-    spatial images and HLA-TCR motifs. A point-and-click builder creates
+    single-cell and spatial transcriptomics data, with coordinated views of
+    gene expression, immune repertoires, trajectories, spatial images and
+    HLA-TCR motifs. Data from 'Seurat', 'SingleCellExperiment', 'AnnData',
+    'MuData' or 'SpatialData' objects are converted into a portable data file
+    that can be browsed in the application. A point-and-click builder creates
     these files and standalone apps for deployment on a 'Shiny' server.
 URL: https://www.mheming.com/CerebroNexus/,
     https://github.com/mihem/CerebroNexus
