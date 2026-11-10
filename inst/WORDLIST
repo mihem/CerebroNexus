@@ -127,6 +127,7 @@ SIL
 SMI
 SNE
 Sankey
+SeuratObject
 Seuratv
 Shiny's
 SingleCellExperiment
@@ -203,6 +204,7 @@ bpcells
 broadinstitute
 btz
 bundleable
+callr
 catalogues
 categoricals
 cdr
@@ -367,6 +369,8 @@ preflight
 preload
 preloaded
 prewarm
+processx
+ps
 pseudotime
 pubtcrs
 px
