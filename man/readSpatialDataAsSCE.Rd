@@ -52,6 +52,17 @@ name. Blosc chunks are decoded in R, lz4 (the numcodecs default) at about
 4 MB/s of output: re-save a large store with zstd, or use an \code{.h5ad}
 file.
 }
+\examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## A small SpatialData store (50 spots), zipped
+sce <- readSpatialDataAsSCE(
+  system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus")
+)
+sce
+}
+\dontshow{\}) # examplesIf}
+}
 \seealso{
 \code{\link{convertSpatialDataToCerebro}}, \code{\link{readH5adAsSCE}}
 }

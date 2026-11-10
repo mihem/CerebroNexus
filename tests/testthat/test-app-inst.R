@@ -110,6 +110,7 @@ test_that("{shinytest2} recording: overview", {
 })
 
 test_that("Projection switches categorical spatial datasets coherently", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
 
   select_dataset(app, "Mouse ileum (MERFISH)")
@@ -147,6 +148,7 @@ test_that("Projection switches categorical spatial datasets coherently", {
 })
 
 test_that("Spatial canvas is replaced after switching datasets from Data info", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
 
   select_dataset(app, "Mouse ileum (MERFISH)")
@@ -188,6 +190,7 @@ test_that("Spatial canvas is replaced after switching datasets from Data info", 
 })
 
 test_that("Spatial backgrounds reset when the spatial dataset changes", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
 
   select_dataset(app, "Mouse brain (Visium)")
@@ -348,6 +351,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
 })
 
 test_that("Linked views resets the active background to its preset", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
   select_dataset(app, "Mouse brain (Xenium)")
   activate_tab(app, "coordinated_views", timeout = 30000)
@@ -430,6 +434,7 @@ test_that("Linked views resets the active background to its preset", {
 })
 
 test_that("Linked views Focus turns off when its view is replaced", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
   activate_tab(app, "coordinated_views", timeout = 30000)
   app$wait_for_js(
@@ -519,6 +524,7 @@ test_that("Linked views Focus turns off when its view is replaced", {
 
 
 test_that("Spatial panels refit when the page above them grows", {
+  skip_if_demo_data_missing()
   app <- viewer_new_session(switching_app())
   app$get_chromote_session()$set_viewport_size(width = 1143, height = 727)
   app$wait_for_js("window.innerHeight === 727", timeout = 10000)

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("the live app exposes imports before their worker result", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")
@@ -768,6 +771,7 @@ builder_import_queue_finish_restart <- function(worker, done) {
 }
 
 test_that("imports queued during a worker restart run on the new worker", {
+  skip_if_builder_examples_missing()
   skip_if_not_installed("shiny")
   skip_if_not_installed("plotly")
   withr::local_dir(builder_profile_inst_path("builder"))

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("author display settings validate and survive the project payload", {
   display <- builderViewerDisplayDefaults(list(
     label_size = 18,

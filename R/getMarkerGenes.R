@@ -23,19 +23,23 @@
 #' @param test Statistical test used, defaults to 'wilcox' (Wilcoxon test).
 #' @param verbose Print progress bar; defaults to TRUE.
 #' @param ... Further parameters can be passed to control
-#' Seurat::FindAllMakers().
+#' Seurat::FindAllMarkers().
 #'
 #' @return
 #' Seurat object with marker gene results for the specified grouping variables
 #' stored in \code{object@misc$marker_genes}.
 #'
-#' @examples
+#' @examplesIf nzchar(system.file(package = "Seurat"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
+#' ## organism = NULL skips the online lookup of cell surface genes; use
+#' ## organism = 'hg' or 'mm' to annotate them (needs internet access).
 #' pbmc <- getMarkerGenes(
 #'   object = pbmc,
 #'   assay = 'RNA',
-#'   organism = 'hg',
+#'   organism = NULL,
 #'   groups = c('sample','seurat_clusters'),
 #'   name = 'cerebro_seurat',
 #'   only_pos = TRUE,
@@ -45,10 +49,10 @@
 #'   test = 'wilcox',
 #'   verbose = TRUE
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom rlang .data :=
-#' @importFrom tidyselect all_of any_of
 #'
 #' @export
 #'
@@ -91,6 +95,14 @@ getMarkerGenes <- function(
     .logStep(
       'No information about genes on cell surface because organism is ',
       'either not specified or not human/mouse.'
+    )
+
+    ## ... biomaRt (Suggests) is missing -> skip the annotation
+  } else if (!requireNamespace('biomaRt', quietly = TRUE)) {
+    .logStep(
+      'No information about genes on cell surface because the biomaRt ',
+      'package is not installed. Install it with ',
+      'BiocManager::install("biomaRt").'
     )
 
     ## ... organism is either "hg" or "mm" -> compatible
@@ -224,8 +236,8 @@ getMarkerGenes <- function(
         results <- results %>%
           dplyr::rename(!!current_group := "cluster") %>%
           dplyr::select(
-            tidyselect::all_of(current_group),
-            tidyselect::any_of("gene"),
+            dplyr::all_of(current_group),
+            dplyr::any_of("gene"),
             dplyr::everything()
           )
       }

@@ -123,6 +123,15 @@ output[["expression_projection_input_type_UI"]] <- renderUI({
 
 output[["expression_select_gene_set_UI"]] <- renderUI({
   req(identical(input[["expression_analysis_mode"]], "Gene set"))
+  ## Gene sets come from the suggested msigdbr package.
+  if (!requireNamespace("msigdbr", quietly = TRUE)) {
+    return(div(
+      class = "alert alert-warning",
+      "Gene sets need the msigdbr package. Install it with ",
+      tags$code("install.packages(\"msigdbr\")"),
+      " and restart the app."
+    ))
+  }
   selectizeInput(
     "expression_select_gene_set",
     label = "Gene set",

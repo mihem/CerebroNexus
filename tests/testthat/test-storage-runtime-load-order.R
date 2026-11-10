@@ -1,3 +1,6 @@
+## Starts fresh R processes: CI only.
+skip_on_cran()
+
 test_that("BPCells and HDF5Array work in either namespace load order", {
   skip_if_not_installed("callr")
   packages <- c("BPCells", "HDF5Array")

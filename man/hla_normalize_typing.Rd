@@ -34,3 +34,10 @@ table but reported via attribute "qc" (a data.frame of warnings). Provenance
 defaults to `source_type = "unknown"` with a blocking warning when absent --
 allele format is never used to guess `genotyped`.
 }
+\examples{
+typing <- hla_normalize_typing(list(
+  donor1 = c("HLA-A*02:01", "HLA-B*07:02"),
+  donor2 = c("A*01:01", "B*08:01")
+))
+typing
+}

@@ -19,7 +19,7 @@
 #' @param URL_API URL to send requests to (Enrichr API). Allows to overwrite
 #' default URL with an alternative taken from the Enrichr website in case the
 #' original is out-of-service; defaults to
-#' 'http://maayanlab.cloud/Enrichr'.
+#' 'https://maayanlab.cloud/Enrichr'.
 #'
 #' @return
 #' Seurat object with Enrichr results for all provided grouping variables,
@@ -35,13 +35,12 @@
 #'     databases = c('GO_Biological_Process_2018'),
 #'     adj_p_cutoff = 0.01,
 #'     max_terms = 100,
-#'     URL_API = 'http://maayanlab.cloud/Enrichr'
+#'     URL_API = 'https://maayanlab.cloud/Enrichr'
 #'   )
 #' }
 #'
 #' @import dplyr
 #' @importFrom rlang .data
-#' @importFrom tidyselect all_of
 #'
 #' @export
 #'
@@ -61,13 +60,17 @@ getEnrichedPathways <- function(
   ),
   adj_p_cutoff = 0.05,
   max_terms = 100,
-  URL_API = 'http://maayanlab.cloud/Enrichr'
+  URL_API = 'https://maayanlab.cloud/Enrichr'
 ) {
   ##--------------------------------------------------------------------------##
   ## safety checks before starting to do anything
   ##--------------------------------------------------------------------------##
 
   .checkSeuratAvailable()
+  rlang::check_installed(
+    c("httr", "future.apply"),
+    reason = "to query the Enrichr API."
+  )
   .checkSeuratObject(object)
 
   ## check if marker genes are present and stop if they aren't
@@ -314,7 +317,7 @@ getEnrichedPathways <- function(
         ## - put columns in right order
         results <- do.call(rbind, results) %>%
           dplyr::select(
-            tidyselect::all_of(current_group),
+            dplyr::all_of(current_group),
             'db',
             dplyr::everything()
           )

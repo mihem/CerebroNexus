@@ -388,7 +388,7 @@ Bulk immunoSEQ reports only the V family and the CDR3; the parser leaves `j_gene
 # Getting help
 
 - Questions and bug reports: <https://github.com/mihem/CerebroNexus/issues>.
-- Function reference and other articles: <https://mihem.github.io/CerebroNexus/>.
+- Function reference and other articles: <https://www.mheming.com/CerebroNexus/>.
 - Provenance of every shipped demo data set: `data-raw/DATASETS.md`.
 
 # Session info

@@ -292,6 +292,7 @@ test_that("the Build card carries a step label and a hidden meter", {
 })
 
 test_that("the browser maps build phases to steps and clamps percents", {
+  testthat::skip_on_cran()
   testthat::skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)

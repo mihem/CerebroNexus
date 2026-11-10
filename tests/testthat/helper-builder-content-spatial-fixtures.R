@@ -40,7 +40,10 @@ builder_content_spatial_example_object <- local({
           paste0("Cell", seq_len(n_cells))
         )
       )
-      object <- SeuratObject::CreateSeuratObject(counts = counts)
+      ## Sparse already, so SeuratObject does not warn about coercing it.
+      object <- SeuratObject::CreateSeuratObject(
+        counts = Matrix::Matrix(counts, sparse = TRUE)
+      )
       object$sample <- rep(c("S1", "S2"), length.out = n_cells)
       object$seurat_clusters <- factor(rep(c("C1", "C2"), length.out = n_cells))
       object[["umap"]] <- SeuratObject::CreateDimReducObject(
@@ -115,6 +118,7 @@ builder_content_spatial_context <- function(object) {
     if (!is.null(cached)) {
       return(cached)
     }
+    skip_if_inst_missing("extdata/examples/demo_trekker.crb")
     path <- builder_content_spatial_inst_path(
       "extdata",
       "examples",

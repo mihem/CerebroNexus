@@ -1,4 +1,6 @@
 test_that("HLA tabs retain one allele and use it for both network colours and overlap counts", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()

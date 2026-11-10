@@ -256,6 +256,8 @@ test_that("both HLA association table consumers wait for a visible, valid featur
 })
 
 test_that("HLA association features come from the full graph and survive scope changes", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()

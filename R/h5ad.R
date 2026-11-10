@@ -775,10 +775,20 @@
 #'   columns. Duplicate gene names are made unique with a message; duplicate
 #'   cell names are an error.
 #'
-#' @examples
-#' \dontrun{
-#' sce <- readH5adAsSCE("pbmc.h5ad")
-#' convertSCEToCerebro(sce, "output", groups = "cell_type")
+#' @examplesIf nzchar(system.file(package = "rhdf5")) && nzchar(system.file(package = "SingleCellExperiment"))
+#' \donttest{
+#' h5ad <- tempfile(fileext = ".h5ad")
+#' exportToH5ad(
+#'   system.file("extdata/examples/example.crb", package = "CerebroNexus"),
+#'   h5ad
+#' )
+#' sce <- readH5adAsSCE(h5ad)
+#' convertSCEToCerebro(
+#'   sce,
+#'   file.path(tempdir(), "output"),
+#'   assay = "X",
+#'   groups = "sample"
+#' )
 #' }
 #'
 #' @seealso \code{\link{convertH5adToCerebro}}, \code{\link{convertSCEToCerebro}}

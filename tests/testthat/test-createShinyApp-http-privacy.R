@@ -187,6 +187,8 @@ privacy_write_legacy_app <- function(app_dir) {
 }
 
 test_that("generated apps expose no bundled artifacts over HTTP", {
+  ## Starts an app server.
+  skip_on_cran()
   skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
 
@@ -245,6 +247,8 @@ test_that("generated apps expose no bundled artifacts over HTTP", {
 })
 
 test_that("a running legacy data mapping cannot expose replacement data", {
+  ## Starts an app server.
+  skip_on_cran()
   skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
   skip_on_os("windows")

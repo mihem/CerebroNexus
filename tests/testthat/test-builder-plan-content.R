@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_plan_contract_source_runtime(environment())
 
 metadata_retention_entry <- function() {

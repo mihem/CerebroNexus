@@ -83,7 +83,8 @@
 #' @return
 #' No data returned.
 #'
-#' @examples
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' \donttest{
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_SCE.rds",
 #'   package = "CerebroNexus"))
 #' exportFromSCE(
@@ -97,6 +98,7 @@
 #'   use_delayed_array = FALSE,
 #'   verbose = TRUE
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom methods as

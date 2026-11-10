@@ -386,15 +386,14 @@
     images <- libraries[[library]]$images
     if (
       !length(images) ||
-        !requireNamespace("png", quietly = TRUE) ||
-        !requireNamespace("base64enc", quietly = TRUE)
+        !requireNamespace("png", quietly = TRUE)
     ) {
       next
     }
     for (label in intersect(c("hires", "lowres"), names(images))) {
       entry <- images[[label]]
       array <- tryCatch(
-        png::readPNG(base64enc::base64decode(sub(
+        png::readPNG(jsonlite::base64_dec(sub(
           "^data:image/png;base64,",
           "",
           entry$histology_image
@@ -496,10 +495,12 @@
 #'
 #' @return \code{file}, invisibly.
 #'
-#' @examples
-#' \dontrun{
-#' exportToH5ad("cerebro_pbmc.crb", "pbmc.h5ad")
-#' # then, in Python: adata = anndata.read_h5ad("pbmc.h5ad")
+#' @examplesIf nzchar(system.file(package = "rhdf5"))
+#' \donttest{
+#' crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
+#' h5ad <- tempfile(fileext = ".h5ad")
+#' exportToH5ad(crb, h5ad)
+#' # then, in Python: adata = anndata.read_h5ad("example.h5ad")
 #' }
 #'
 #' @seealso \code{\link{convertH5adToCerebro}}, \code{\link{readH5adAsSCE}},

@@ -1,4 +1,12 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_repo_source("io.R", local = globalenv())
+
+## qs is not on CRAN, so it is reached through a variable: R CMD check would
+## otherwise ask for it to be declared in DESCRIPTION.
+qs_package <- "qs"
+qs_save <- function(...) getExportedValue(qs_package, "qsave")(...)
 
 .builder_adapter_source_contracts <- function() {
   builder_profile_source_runtime(local = globalenv())
@@ -39,7 +47,7 @@ test_that("parallel QS reads preserve Seurat objects", {
   skip_if_not_installed("qs")
   path <- tempfile(fileext = ".qs")
   withr::defer(unlink(path))
-  qs::qsave(SeuratObject::pbmc_small, path, nthreads = 2L)
+  qs_save(SeuratObject::pbmc_small, path, nthreads = 2L)
 
   result <- builder_read_object(path)
 
@@ -51,7 +59,7 @@ test_that("QS snapshots use strict reads and stable file identity", {
   skip_if_not_installed("qs")
   root <- withr::local_tempdir()
   source <- file.path(root, "source.qs")
-  qs::qsave(SeuratObject::pbmc_small, source, nthreads = 2L)
+  qs_save(SeuratObject::pbmc_small, source, nthreads = 2L)
   inspected <- builder_adapter_inspect(builder_seurat_file_adapter(source))
   frozen <- .builder_snapshot_seurat_impl(
     inspected$object,
@@ -135,9 +143,9 @@ test_that("a saved source MD5 is deferred to snapshot verification", {
   writers <- list(
     rds = function(path) saveRDS(SeuratObject::pbmc_small, path)
   )
-  if (requireNamespace("qs", quietly = TRUE)) {
+  if (requireNamespace(qs_package, quietly = TRUE)) {
     writers$qs <- function(path) {
-      qs::qsave(SeuratObject::pbmc_small, path, nthreads = 2L)
+      qs_save(SeuratObject::pbmc_small, path, nthreads = 2L)
     }
   }
   expect_error(

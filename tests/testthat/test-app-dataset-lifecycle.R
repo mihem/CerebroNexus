@@ -1,4 +1,5 @@
 test_that("late frames cannot cross dataset switches or the reconnect handshake", {
+  skip_if_demo_data_missing()
   app_dir <- viewer_app_test_path()
   local_app_support(app_dir)
   app <- shinytest2::AppDriver$new(

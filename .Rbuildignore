@@ -29,3 +29,74 @@ Rplots\.pdf$
 
 ^scripts$
 ^tests/testthat/_artifacts$
+
+# CRAN preparation (cran-meta)
+^other_documents$
+
+# CRAN size (cran-size)
+^vignettes/articles$
+^man/figures/(featured|builder)\.png$
+## The AnnData .h5ad/.h5mu fixtures ship. The Zarr stores stay in git: their paths
+## exceed the 100 bytes a tarball portably holds, and small_v2.zarr has hidden
+## files.
+^tests/testthat/fixtures/anndata/make_fixtures\.py$
+^tests/testthat/fixtures/anndata/make_zarr_fixtures\.py$
+^tests/testthat/fixtures/anndata/make_zarr_shapes\.R$
+^tests/testthat/fixtures/anndata/small_sd_cells\.zarr$
+^tests/testthat/fixtures/anndata/small_sd_visium\.zarr$
+^tests/testthat/fixtures/anndata/small_v2\.zarr$
+^tests/testthat/fixtures/anndata/small_v3\.zarr$
+^inst/extdata/examples/demo_spatial_(visium|slideseq|merfish|xenium)\.crb$
+^inst/extdata/examples/demo_spatial_(visium_he\.png|histology\.svg)$
+^inst/extdata/examples/spatial$
+^inst/extdata/examples/demo_trekker\.crb$
+^inst/extdata/examples/demo_hla_tcr_dextramer\.crb$
+^inst/builder/fixtures/(trekker_spatial|spatial_alignment)$
+^cran-comments\.md$
+
+## Test files skipped as a whole on CRAN (skip_on_cran() at the top); they run on CI.
+^tests/testthat/test-builder-adapters.R$
+^tests/testthat/test-builder-app-bundle.R$
+^tests/testthat/test-builder-async-import.R$
+^tests/testthat/test-builder-async-runtime.R$
+^tests/testthat/test-builder-auth.R$
+^tests/testthat/test-builder-author-display.R$
+^tests/testthat/test-builder-background-write.R$
+^tests/testthat/test-builder-barcode-column.R$
+^tests/testthat/test-builder-build-session.R$
+^tests/testthat/test-builder-build.R$
+^tests/testthat/test-builder-configure-observers.R$
+^tests/testthat/test-builder-coordinator.R$
+^tests/testthat/test-builder-duplicate-identity.R$
+^tests/testthat/test-builder-end-to-end.R$
+^tests/testthat/test-builder-fixture-rebuild.R$
+^tests/testthat/test-builder-import-gc.R$
+^tests/testthat/test-builder-import-queue.R$
+^tests/testthat/test-builder-large-import-stress.R$
+^tests/testthat/test-builder-marker-import-build.R$
+^tests/testthat/test-builder-no-reductions.R$
+^tests/testthat/test-builder-open-app.R$
+^tests/testthat/test-builder-plan-assets.R$
+^tests/testthat/test-builder-plan-content.R$
+^tests/testthat/test-builder-plan-immune.R$
+^tests/testthat/test-builder-plan-readiness.R$
+^tests/testthat/test-builder-project-dialogs.R$
+^tests/testthat/test-builder-project-hydration.R$
+^tests/testthat/test-builder-project-integrity.R$
+^tests/testthat/test-builder-project-responsiveness.R$
+^tests/testthat/test-builder-project.R$
+^tests/testthat/test-builder-publish.R$
+^tests/testthat/test-builder-release-runtime.R$
+^tests/testthat/test-builder-sce-sources.R$
+^tests/testthat/test-builder-seurat-omnibus.R$
+^tests/testthat/test-builder-snapshots.R$
+^tests/testthat/test-builder-spatial.R$
+^tests/testthat/test-builder-stage-contract.R$
+^tests/testthat/test-builder-stage-server.R$
+^tests/testthat/test-builder-ui-fixes.R$
+^tests/testthat/test-builder-viewer-pack.R$
+^tests/testthat/test-builder-worker-app.R$
+^tests/testthat/test-builder-worker.R$
+^tests/testthat/test-demo-h5-transpose.R$
+^tests/testthat/test-h5ad-anndatar-agreement.R$
+^tests/testthat/test-storage-runtime-load-order.R$

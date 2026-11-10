@@ -2400,20 +2400,19 @@
 #'   during the build, warns and returns the frozen absolute publication path.
 #'
 #' @examples
-#' \dontrun{
-#' library(CerebroNexus)
-#'
-#' createShinyApp(
+#' \donttest{
+#' app_dir <- createShinyApp(
 #'   cerebro_data = c(
-#'     "PBMC example" = "output/cerebro_pbmc_seurat.crb"
+#'     "PBMC example" = system.file("extdata/examples/example.crb",
+#'       package = "CerebroNexus")
 #'   ),
-#'   result_dir = "my_app",
+#'   result_dir = file.path(tempdir(), "my_app"),
 #'   port = 8080,
 #'   host = "127.0.0.1",
 #'   max_request_size = 8000,
 #'   overwrite = TRUE
 #' )
-#' # Run with shiny::runApp("my_app") or deploy my_app/ to Shiny Server.
+#' # Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
 #' }
 #'
 #' @importFrom later later
@@ -2505,7 +2504,9 @@ createShinyApp <- function(
       any(data_labels == "")
   ) {
     stop(
-      "cerebro_data identities must be non-empty and non-missing.",
+      "cerebro_data identities must be non-empty and non-missing. ",
+      "Name every data set, for example ",
+      "cerebro_data = c(MyData = \"path/to/data.crb\").",
       call. = FALSE
     )
   }
@@ -3255,7 +3256,7 @@ createShinyApp <- function(
   build_ops <- .bundleBuildOps()
 
   if (verbose) {
-    cat("Creating staged directory structure...\n")
+    message("Creating staged directory structure...")
   }
   .bundleCreateDirectory(
     private_data_dir,
@@ -3269,7 +3270,7 @@ createShinyApp <- function(
   )
 
   if (verbose) {
-    cat("Copying Shiny source files...\n")
+    message("Copying Shiny source files...")
   }
   if (!build_ops$copy(shiny_source, stage_result_dir, recursive = TRUE)) {
     stop("Failed to copy Shiny source files.", call. = FALSE)
@@ -3282,7 +3283,7 @@ createShinyApp <- function(
   )
 
   if (verbose) {
-    cat("Copying data artifacts...\n")
+    message("Copying data artifacts...")
   }
   for (entry in copy_plan) {
     target <- file.path(stage_result_dir, entry$target)
@@ -3321,7 +3322,7 @@ createShinyApp <- function(
       )
     }
     if (verbose) {
-      cat("  -", entry$target, paste0("(", entry$artifact, ")\n"))
+      message("  - ", entry$target, " (", entry$artifact, ")")
     }
   }
 
@@ -3351,7 +3352,7 @@ createShinyApp <- function(
 
   # Copy extdata -------------------------------------------------------------##
   if (verbose) {
-    cat("Copying extdata files...\n")
+    message("Copying extdata files...")
   }
   extdata_target <- file.path(stage_result_dir, "extdata")
   extdata_files <- list.files(extdata_source, full.names = TRUE)
@@ -3367,7 +3368,7 @@ createShinyApp <- function(
 
   # Build Cerebro.options ----------------------------------------------------##
   if (verbose) {
-    cat("Generating app.R file...\n")
+    message("Generating app.R file...")
   }
 
   crb_files <- setNames(
@@ -3488,27 +3489,25 @@ createShinyApp <- function(
 
   # Summary ------------------------------------------------------------------##
   if (verbose) {
-    cat("\n")
-    cat("========================================\n")
-    cat("Shiny app successfully created!\n")
-    cat("========================================\n")
-    cat("App directory:", result_dir, "\n")
-    cat("Data file(s):\n")
+    message("\n========================================")
+    message("Shiny app successfully created!")
+    message("========================================")
+    message("App directory: ", result_dir)
+    message("Data file(s):")
     for (i in seq_along(cerebro_data)) {
       label <- names(cerebro_data)[i]
       if (!is.null(label) && nzchar(label)) {
-        cat("  -", label, ":", basename(cerebro_data[i]), "\n")
+        message("  - ", label, " : ", basename(cerebro_data[i]))
       } else {
-        cat("  -", basename(cerebro_data[i]), "\n")
+        message("  - ", basename(cerebro_data[i]))
       }
     }
-    cat("Port:", port, "\n")
-    cat("Host:", host, "\n")
-    cat("Launch browser:", launch_browser, "\n")
-    cat("\nTo launch the app, run:\n")
-    cat("  setwd('", result_dir, "')\n", sep = "")
-    cat("  shiny::runApp('app.R')\n")
-    cat("========================================\n")
+    message("Port: ", port)
+    message("Host: ", host)
+    message("Launch browser: ", launch_browser)
+    message("\nTo launch the app, run:")
+    message("  shiny::runApp('", result_dir, "')")
+    message("========================================")
   }
 
   returned_result_dir <- requested_result_dir

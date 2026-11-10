@@ -14,7 +14,7 @@
 #' Seurat v3.0 or higher since the concept of assays wasn't implemented before.
 #' @param GMT_file Path to GMT file containing the gene sets to be tested.
 #' The Broad Institute provides many gene sets which can be downloaded:
-#' http://software.broadinstitute.org/gsea/msigdb/index.jsp
+#' https://www.gsea-msigdb.org/gsea/msigdb/index.jsp
 #' @param groups Grouping variables (columns) in object@meta.data for which
 #' gene set enrichment analysis should be performed
 #' @param name Name of list that should be used to store the results in
@@ -27,7 +27,8 @@
 #' Seurat object with GSVA results for the specified grouping variables
 #' stored in object@misc$enriched_pathways$<name>
 #'
-#' @examples
+#' @examplesIf all(nzchar(vapply(c("Seurat", "GSVA", "qvalue", "future.apply"), function(p) system.file(package = p), "")))
+#' \donttest{
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' example_gene_set <- system.file("extdata/example_gene_set.gmt",
@@ -35,15 +36,15 @@
 #' pbmc <- performGeneSetEnrichmentAnalysis(
 #'   object = pbmc,
 #'   GMT_file = example_gene_set,
-#'   groups = c('sample','seurat_clusters'),
+#'   groups = 'seurat_clusters',
 #'   thresh_p_val = 0.05,
 #'   thresh_q_val = 0.1
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom Matrix colMeans colSums rowSums t
 #' @importFrom rlang .data :=
-#' @importFrom tibble tibble
 #'
 #' @export
 #'
@@ -62,6 +63,14 @@ performGeneSetEnrichmentAnalysis <- function(
   ##--------------------------------------------------------------------------##
 
   .checkSeuratAvailable()
+  .checkBiocInstalled(
+    c("GSVA", "qvalue"),
+    "to run gene set enrichment analysis"
+  )
+  rlang::check_installed(
+    "future.apply",
+    reason = "to run gene set enrichment analysis."
+  )
   .checkSeuratObject(object)
   .checkSeuratAssay(object, assay)
 
@@ -104,7 +113,7 @@ performGeneSetEnrichmentAnalysis <- function(
 
   ## make tibble that contains name and description for each set
   ## with the number of genes and the collapsed gene list of each set
-  gene_sets_tibble <- tibble::tibble(
+  gene_sets_tibble <- dplyr::tibble(
     name = gene_sets$geneset.names,
     description = gene_sets$geneset.description,
     length = unname(lengths(gene_sets$genesets)),
@@ -188,7 +197,7 @@ performGeneSetEnrichmentAnalysis <- function(
       enrichment_scores <- GSVA::gsva(gsva_param)
 
       ## create empty tibble for results
-      results <- tibble::tibble(
+      results <- dplyr::tibble(
         group = character(),
         name = character(),
         enrichment_score = numeric(),
@@ -200,7 +209,7 @@ performGeneSetEnrichmentAnalysis <- function(
       ## pass the specified tresholds
       for (i in seq_len(ncol(enrichment_scores))) {
         ## collect enrichment scores
-        temp_results <- tibble::tibble(
+        temp_results <- dplyr::tibble(
           group = colnames(matrix_mean_by_group)[i],
           name = rownames(enrichment_scores),
           enrichment_score = enrichment_scores[, i]

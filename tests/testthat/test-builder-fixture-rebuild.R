@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("the Trekker Builder fixture rebuilds offline with stable content and images", {
   script <- test_path("../../data-raw/build_builder_spatial_fixtures.R")
   skip_if_not(file.exists(script), "Regeneration scripts are repository-only")

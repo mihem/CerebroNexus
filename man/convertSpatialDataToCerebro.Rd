@@ -34,6 +34,22 @@ Reads the store with \code{\link{readSpatialDataAsSCE}} and exports it with
 tissue picture, where the store has one), expression, cell data and any
 embeddings, markers and colours the table carries.
 }
+\examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+convertSpatialDataToCerebro(
+  system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus"),
+  result_dir = dir,
+  groups = "cell_type",
+  verbose = FALSE
+)
+list.files(dir)
+unlink(dir, recursive = TRUE)
+}
+\dontshow{\}) # examplesIf}
+}
 \seealso{
 \code{\link{readSpatialDataAsSCE}}
 }

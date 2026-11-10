@@ -49,7 +49,7 @@ defaults to 0.25.}
 \item{verbose}{Print progress bar; defaults to TRUE.}
 
 \item{...}{Further parameters can be passed to control
-Seurat::FindAllMakers().}
+Seurat::FindAllMarkers().}
 }
 \value{
 Seurat object with marker gene results for the specified grouping variables
@@ -60,12 +60,17 @@ This function gets marker genes for one or multiple grouping variables in
 the meta data of the provided Seurat object.
 }
 \examples{
+\dontshow{if (nzchar(system.file(package = "Seurat"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
+## organism = NULL skips the online lookup of cell surface genes; use
+## organism = 'hg' or 'mm' to annotate them (needs internet access).
 pbmc <- getMarkerGenes(
   object = pbmc,
   assay = 'RNA',
-  organism = 'hg',
+  organism = NULL,
   groups = c('sample','seurat_clusters'),
   name = 'cerebro_seurat',
   only_pos = TRUE,
@@ -75,5 +80,6 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-
+}
+\dontshow{\}) # examplesIf}
 }

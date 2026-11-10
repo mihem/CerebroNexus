@@ -2,15 +2,17 @@
 
 export(Cerebro)
 export(addImmuneRepertoire)
-export(buildViewerPack)
 export(addPercentMtRibo)
+export(buildViewerPack)
 export(calculatePercentGenes)
 export(convertCerebro)
 export(convertH5adToCerebro)
 export(convertSCEToCerebro)
 export(convertSCEToSeurat)
 export(convertSeuratToCerebro)
+export(convertSpatialDataToCerebro)
 export(createShinyApp)
+export(downloadDemoData)
 export(exportFromSCE)
 export(exportFromSeurat)
 export(exportToH5ad)
@@ -25,60 +27,62 @@ export(performGeneSetEnrichmentAnalysis)
 export(readCerebro)
 export(readH5adAsSCE)
 export(readSpatialDataAsSCE)
-export(convertSpatialDataToCerebro)
 export(readViewerPack)
 export(saveCerebro)
 export(validateViewerPack)
 import(dplyr)
-import(ggplot2)
-import(scales)
 import(shiny)
 import(shinydashboard)
-importFrom(DT,datatable)
-importFrom(DT,formatPercentage)
-importFrom(DT,formatRound)
-importFrom(DT,formatSignif)
-importFrom(DT,formatStyle)
-importFrom(DT,styleColorBar)
-importFrom(DT,styleEqual)
-importFrom(DT,styleInterval)
-importFrom(Matrix,colMeans)
-importFrom(Matrix,colSums)
-importFrom(Matrix,rowSums)
-importFrom(Matrix,t)
-importFrom(mirai,mirai)
+importFrom(DT,
+  datatable,
+  formatPercentage,
+  formatRound,
+  formatSignif,
+  formatStyle,
+  styleColorBar,
+  styleEqual,
+  styleInterval
+)
+importFrom(Matrix,
+  colMeans,
+  colSums,
+  rowSums,
+  t
+)
 importFrom(R6,R6Class)
 importFrom(colourpicker,colourInput)
-importFrom(grDevices,col2rgb)
-importFrom(grDevices,rgb)
-importFrom(htmlwidgets,JS)
+importFrom(grDevices,
+  col2rgb,
+  rgb
+)
+importFrom(htmltools,save_html)
 importFrom(later,later)
 importFrom(methods,as)
-importFrom(msigdbr,msigdbr)
-importFrom(plotly,add_lines)
-importFrom(plotly,add_trace)
-importFrom(plotly,event_data)
-importFrom(plotly,layout)
-importFrom(plotly,plot_ly)
-importFrom(plotly,plotlyOutput)
-importFrom(plotly,renderPlotly)
-importFrom(plotly,toWebGL)
+importFrom(mirai,mirai)
+importFrom(plotly,
+  add_lines,
+  add_trace,
+  event_data,
+  layout,
+  plot_ly,
+  plotlyOutput,
+  renderPlotly,
+  toWebGL
+)
 importFrom(promises,promise)
-importFrom(rlang,"%||%")
-importFrom(rlang,":=")
-importFrom(rlang,.data)
-importFrom(shinyWidgets,awesomeCheckbox)
-importFrom(shinyWidgets,dropdownButton)
-importFrom(shinyWidgets,materialSwitch)
-importFrom(shinyWidgets,radioGroupButtons)
-importFrom(shinyWidgets,sendSweetAlert)
+importFrom(rlang,
+  "%||%",
+  ":=",
+  .data
+)
+importFrom(shinyWidgets,
+  awesomeCheckbox,
+  dropdownButton,
+  materialSwitch,
+  radioGroupButtons,
+  sendSweetAlert
+)
 importFrom(shinycssloaders,withSpinner)
 importFrom(shinyjs,inlineCSS)
 importFrom(stats,setNames)
-importFrom(stringr,str_length)
-importFrom(tibble,tibble)
-importFrom(tidyr,pivot_longer)
-importFrom(tidyr,pivot_wider)
-importFrom(tidyselect,all_of)
-importFrom(tidyselect,any_of)
 importFrom(utils,read.delim)

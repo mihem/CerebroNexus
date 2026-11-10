@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_app_bundle_path <- builder_profile_inst_path("builder", "app_bundle.R")
 builder_app_bundle_test_env <- new.env(parent = asNamespace("CerebroNexus"))
 builder_app_bundle_test_runtime <- function() {
@@ -1568,11 +1571,12 @@ test_that("the privacy allowlist covers every bundled demo data file", {
   )
   relative <- file.path("extdata", "examples", basename(files))
 
-  expect_setequal(names(.builder_app_demo_data), relative)
-  ordered <- files[match(names(.builder_app_demo_data), relative)]
+  ## The package tarball leaves the larger demos out, so only the files that
+  ## are here are compared.
+  expect_true(all(relative %in% names(.builder_app_demo_data)))
   expect_identical(
-    unname(tools::md5sum(ordered)),
-    unname(.builder_app_demo_data)
+    unname(tools::md5sum(files)),
+    unname(.builder_app_demo_data[relative])
   )
 })
 

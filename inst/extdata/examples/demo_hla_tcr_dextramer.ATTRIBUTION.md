@@ -30,5 +30,5 @@ declares in `technical_info$tcr_selection`.
 
 This file accompanies the installed demo so the CC-BY 4.0 attribution travels
 with the data (the full provenance and build steps live in `data-raw/DATASETS.md`
-and `vignettes/hla_tcr_antigen_selected.Rmd` in the source repository, which
+and `vignettes/articles/hla_tcr_antigen_selected.Rmd` in the source repository, which
 are not part of the installed package).

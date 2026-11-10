@@ -36,6 +36,7 @@ builder_import_progress_js_function <- function(js, name) {
 }
 
 builder_import_progress_run_node <- function(functions, body) {
+  testthat::skip_on_cran()
   testthat::skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- tempfile(fileext = ".js")
   on.exit(unlink(runner), add = TRUE)
@@ -213,6 +214,8 @@ test_that("the dataset rail row shows the copy percent", {
 })
 
 test_that("snapshot copies report bytes through the import progress", {
+  ## macOS clones the file (cp -c) in one step, so no byte progress is reported.
+  skip_on_os("mac")
   builder_profile_source_runtime(globalenv())
   builder_repo_source("io.R", local = globalenv())
   builder_repo_source("inspect.R", local = globalenv())

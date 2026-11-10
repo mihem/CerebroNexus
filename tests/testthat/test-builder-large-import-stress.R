@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_profile_source_runtime(globalenv())
 builder_repo_source("io.R", local = globalenv())
 builder_repo_source("profile.R", local = globalenv())

@@ -83,6 +83,7 @@ test_that("createShinyApp rejects invalid nested colour values", {
 })
 
 test_that("colour pickers stay mounted while shared colours update", {
+  skip_if_not_installed("colourpicker")
   files <- c(A = "/data/a.crb", B = "/data/b.crb")
   server <- function(input, output, session) {
     Cerebro.options <- list(crb_file_to_load = files)
@@ -210,6 +211,9 @@ test_that("colour input ids are the hex bytes of data set, variable and level", 
   scope$viewer_requested_dataset_context <- function() {
     list(dataset_key = "A data set")
   }
+  ## color_setup.R also registers an observer on `input`; outside a session it
+  ## would stay on the global reactive domain and fail in a later test.
+  scope$observe <- function(...) invisible(NULL)
   sys.source(viewer_test_path("color_setup.R"), envir = scope)
   hex <- function(value) {
     paste(format(charToRaw(enc2utf8(as.character(value)))), collapse = "")

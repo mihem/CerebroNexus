@@ -954,7 +954,16 @@
       )
     )
   }
-  chains <- intersect(hla_detect_chains(repertoire), c("TRA", "TRB"))
+  ## The HLA motif network needs igraph and stringdist (Suggests). Without
+  ## them the pack has no HLA assets and the Viewer page asks to install them.
+  chains <- if (
+    requireNamespace("igraph", quietly = TRUE) &&
+      requireNamespace("stringdist", quietly = TRUE)
+  ) {
+    intersect(hla_detect_chains(repertoire), c("TRA", "TRB"))
+  } else {
+    character()
+  }
   if (length(chains)) {
     modules <- c(modules, "hla_tcr")
     annotated <- hla_annotate_ir_metadata(repertoire, metadata)
@@ -1050,6 +1059,14 @@
 #' @param pack Optional Viewer Pack directory.
 #' @param full Verify every asset size and checksum.
 #' @return A validation result.
+#' @examples
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#' crb <- file.path(dir, "example.crb")
+#' buildViewerPack(crb, viewer_binary = "always")
+#' validateViewerPack(crb)$valid
+#' unlink(dir, recursive = TRUE)
 #' @export
 validateViewerPack <- function(
   file,
@@ -1148,6 +1165,15 @@ validateViewerPack <- function(
 #' Read a valid Viewer Pack descriptor
 #' @inheritParams validateViewerPack
 #' @return A descriptor or `NULL`.
+#' @examples
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#' crb <- file.path(dir, "example.crb")
+#' buildViewerPack(crb, viewer_binary = "always")
+#' pack <- readViewerPack(crb)
+#' names(pack)
+#' unlink(dir, recursive = TRUE)
 #' @export
 readViewerPack <- function(file, pack = .viewerPackPath(file)) {
   result <- validateViewerPack(file, pack, full = TRUE)
@@ -1160,6 +1186,14 @@ readViewerPack <- function(file, pack = .viewerPackPath(file)) {
 #' @param viewer_binary_threshold Dataset-level threshold used by `"auto"`.
 #' @param overwrite Replace an existing valid or invalid pack.
 #' @return The pack path invisibly, or `NULL` when disabled.
+#' @examples
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+#' crb <- file.path(dir, "example.crb")
+#' buildViewerPack(crb, viewer_binary = "always")
+#' validateViewerPack(crb)$valid
+#' unlink(dir, recursive = TRUE)
 #' @export
 buildViewerPack <- function(
   file,

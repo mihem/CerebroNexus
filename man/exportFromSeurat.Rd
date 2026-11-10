@@ -137,16 +137,6 @@ for large datasets, \code{"always"}, or \code{"never"}.}
 \item{viewer_binary_threshold}{Dataset-level cell threshold used by
 \code{viewer_binary = "auto"}.}
 
-\item{immune_sidecar}{Store the immune repertoire in a sibling file
-\code{<stem>.immune.qs2} (\code{.rds} with \code{codec = "rds"}) instead of
-inside the \code{.crb}. \code{"auto"} does so for \code{"h5"} exports whose
-repertoire has at least \code{immune_sidecar_threshold} rows; \code{"always"}
-and \code{"never"} override that. The sidecar must travel with the
-\code{.crb}.}
-
-\item{immune_sidecar_threshold}{Number of repertoire rows (cells with
-receptor data) used by \code{immune_sidecar = "auto"}.}
-
 \item{spatial_images}{Optional named list mapping Seurat image names to named
 image paths or descriptors of the form \code{list(path = ..., bounds = ...)}.
 Supported file extensions are png, jpg, jpeg, and svg. Missing bounds are
@@ -156,6 +146,16 @@ rebuild it as \code{VisiumV2} with \code{Seurat::Load10X_Spatial()}.}
 
 \item{verbose}{Set this to \code{TRUE} if you want additional log messages;
 defaults to \code{FALSE}.}
+
+\item{immune_sidecar}{Store the immune repertoire in a sibling file
+\code{<stem>.immune.qs2} (\code{.rds} with \code{codec = "rds"}) instead of
+inside the \code{.crb}. \code{"auto"} does so for \code{"h5"} exports whose
+repertoire has at least \code{immune_sidecar_threshold} rows; \code{"always"}
+and \code{"never"} override that. The sidecar must travel with the
+\code{.crb}.}
+
+\item{immune_sidecar_threshold}{Number of repertoire rows (cells with
+receptor data) used by \code{immune_sidecar = "auto"}.}
 
 \item{.expression_resolution}{Internal handoff used by
 \code{convertSeuratToCerebro()} to reuse a matrix that has already been
@@ -182,8 +182,8 @@ transforms keyed by exact Seurat spatial FOV/image name. Each entry may
 specify \code{rotation_degrees} and positive uniform \code{scale}; the
 pivot is the coordinate bounds center. The transform is applied once to
 the exported spatial coordinates and its normalized provenance is stored
-in the corresponding CRB spatial record. \code{NULL} preserves coordinates
-exactly as extracted from Seurat.}
+in the corresponding CRB spatial record. \code{NULL} preserves
+coordinates exactly as extracted from Seurat.}
 }
 \value{
 No data returned.
@@ -214,6 +214,9 @@ genotype is never mistaken for a directly typed one.
 }
 
 \examples{
+\dontshow{if (nzchar(system.file(package = "Seurat"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 exportFromSeurat(
@@ -227,5 +230,6 @@ exportFromSeurat(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-
+}
+\dontshow{\}) # examplesIf}
 }

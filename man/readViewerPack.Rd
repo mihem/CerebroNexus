@@ -17,3 +17,13 @@ A descriptor or `NULL`.
 \description{
 Read a valid Viewer Pack descriptor
 }
+\examples{
+dir <- tempfile("cerebro-")
+dir.create(dir)
+file.copy(system.file("extdata/examples/example.crb", package = "CerebroNexus"), dir)
+crb <- file.path(dir, "example.crb")
+buildViewerPack(crb, viewer_binary = "always")
+pack <- readViewerPack(crb)
+names(pack)
+unlink(dir, recursive = TRUE)
+}

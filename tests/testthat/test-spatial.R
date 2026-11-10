@@ -5,7 +5,7 @@
 # and UI/server wiring guards follow.
 
 shiny_root <- viewer_test_path()
-# demo_spatial.crb is the synthetic Xenium demo that carries spatial data;
+# demo_spatial.crb is a 500-cell subset of the real Xenium demo;
 # the other bundled demos (PBMC sets, trajectory) have no spatial field.
 spatial_crb <- system.file(
   "extdata/examples/demo_spatial.crb",
@@ -350,6 +350,7 @@ test_that("createShinyApp rejects the removed spatial keys in cerebro_options", 
 })
 
 test_that("createShinyApp bundles nested spatial image settings", {
+  skip_if_inst_missing("extdata/examples/demo_spatial_visium_he.png")
   img <- system.file(
     "extdata/examples/demo_spatial_visium_he.png",
     package = "CerebroNexus"
@@ -547,6 +548,10 @@ test_that("createShinyApp rejects unmatched spatial_images", {
 })
 
 test_that("Visium ships its H&E as an EXTERNAL image, not embedded", {
+  skip_if_inst_missing(
+    "extdata/examples/demo_spatial_visium.crb",
+    "extdata/examples/demo_spatial_visium_he.png"
+  )
   # Visium deliberately demonstrates the external-image path: the H&E lives in a
   # standalone PNG loaded via `spatial_images`, and the .crb carries NO embedded
   # image (unlike MERFISH/Xenium). This keeps the .crb small and exercises the
@@ -1303,6 +1308,7 @@ real_spatial_demos <- c(
 )
 
 test_that("each real spatial demo exposes coordinates and its kind of image", {
+  skip_if_inst_missing(real_spatial_demos)
   for (nm in names(real_spatial_demos)) {
     path <- system.file(real_spatial_demos[[nm]], package = "CerebroNexus")
     crb <- readCerebro(path)
@@ -1353,6 +1359,7 @@ test_that("each real spatial demo exposes coordinates and its kind of image", {
 })
 
 test_that("real spatial demos are wired into the bundled dropdown", {
+  skip_if_inst_missing(real_spatial_demos)
   files <- viewer_demo_options()$crb_file_to_load
   expect_true(all(basename(real_spatial_demos) %in% basename(files)))
   for (technology in c("Visium", "Slide-seq", "MERFISH", "Xenium")) {
@@ -1361,6 +1368,10 @@ test_that("real spatial demos are wired into the bundled dropdown", {
 })
 
 test_that("app.R ships the Visium H&E overlay pre-aligned", {
+  skip_if_inst_missing(
+    "extdata/examples/demo_spatial_visium.crb",
+    "extdata/examples/demo_spatial_visium_he.png"
+  )
   options <- viewer_demo_options()
   preset <- spatialImagePreset(
     options,

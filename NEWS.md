@@ -1,3 +1,57 @@
+# CerebroNexus 8.0.0
+
+- The package is prepared for a CRAN submission. `R CMD check --as-cran` on the
+  built tarball reports only the "New submission" NOTE on Windows and Linux,
+  and also with the suggested packages unavailable.
+- The tarball shrinks from 28.4 MB to about 6 MB. Three vignettes (Seurat
+  workflow, SCE/AnnData, Cerebro class) stay in the package; the other guides
+  move to `vignettes/articles/` and remain on the website under the same URLs.
+  The large demo `.crb` files, the Zarr test stores, the test files that are
+  skipped as a whole on CRAN and the Builder's Trekker and Visium examples are no
+  longer shipped in the tarball; they stay in git.
+- New `downloadDemoData()` downloads the Visium, Slide-seq, MERFISH, Xenium and
+  HLA & TCR demo data from the release tag into `tools::R_user_dir()` and checks
+  size and MD5. The demo App lists them once downloaded. The Builder's Trekker
+  (synthetic) and Visium examples download on first use; offline, the Builder
+  says so and the other examples still work.
+- Imports drop from 39 to 20 non-default packages. GSVA, qvalue, biomaRt,
+  scRepertoire, msigdbr, igraph, stringdist, ggplot2, scales, htmlwidgets,
+  httr, future.apply, pbapply and digest move to Suggests. A missing package
+  gives an install hint, a reduced but working path, or a message on the Viewer
+  page instead of an error. `tidyr`, `base64enc`, `stringr`, `tibble` and
+  `tidyselect` are no longer used. The README lists the optional packages with
+  one install command.
+- `launchCerebroBuilder()` names every missing package it needs (Seurat,
+  callr, digest, processx, ps) in one message.
+- `createShinyApp()` now explains how to name an unnamed data set. The Spatial
+  point-size observer no longer stops the session when the data set has no
+  spatial data.
+- `launchCerebro()` no longer assigns `Cerebro.options` in the global
+  environment.
+- The Builder recognises an ASCII RDS saved on Windows (`A\r\n`) by content.
+- Every exported function has a runnable example; examples that load
+  'SeuratObject' or 'SingleCellExperiment' are in `\donttest{}`, and the
+  `getMarkerGenes()` example no longer queries Ensembl.
+- Tests run in about 4 minutes under CRAN settings (was about 10): slow Builder
+  integration, browser, Node/Chrome, server and subprocess tests are skipped on
+  CRAN, at most two processes run, plots go to a null device, and nothing is
+  written outside `tempdir()`. The AnnData tests run on the small `.h5ad` and
+  `.h5mu` fixtures; the tests that need the Zarr store fixtures run from a git
+  checkout only. GitHub CI still runs everything.
+- Authors: Roman Hillje, author of the original Cerebro, is listed as
+  contributor and copyright holder; Michael Heming, Roman Hillje and Xuesong
+  Wang are the copyright holders in `LICENSE`.
+- The title is "Interactive Viewer for Single-Cell and Spatial
+  Transcriptomics", the description follows CRAN style, `qs` is dropped from
+  Enhances, and `CITATION` is a `bibentry()` with volume, issue and pages.
+- Documentation links point to https://www.mheming.com/CerebroNexus/, and
+  Enrichr and MSigDB links use https.
+- `data-raw/DATASETS.md` records the source and license of every shipped data
+  set.
+- `demo_spatial.crb` is now a 500-cell subset of the real 10x Xenium mouse
+  brain demo (`data-raw/build_demo_spatial.R`), replacing a synthetic fixture
+  whose generator was never recorded.
+
 # CerebroNexus 7.2.0
 
 - The Immune repertoire SizeDist tab draws in an App whose folder is read-only,
@@ -36,6 +90,17 @@
   (`.viewerTcellVersion` is now 2).
 
 # CerebroNexus 7.0.0
+
+## Package size
+
+- The package keeps three vignettes (Seurat workflow, SCE and AnnData data,
+  the Cerebro class); the other guides are articles on the website.
+- The spatial, Trekker and HLA & TCR demo data sets and the Trekker and Visium
+  Builder examples are no longer installed with the package. `downloadDemoData()`
+  downloads the spatial and HLA & TCR demo data sets into the user cache (the
+  Trekker demo, derived from vendor data, stays in the source repository), and
+  the Builder downloads its two examples the first time they are loaded.
+- The human and mouse gene ID tables are stored xz-compressed.
 
 ## Input formats in the Builder and the export
 
@@ -1482,7 +1547,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   whose layer bands align with the cells, so cell types visibly stratify across
   the cortex out of the box. Both the coordinates and the image are synthetic —
   no patient data.
-- **Documentation**: added the `vignette("spatial_analysis")` guide.
+- **Documentation**: added the [spatial analysis guide](https://www.mheming.com/CerebroNexus/articles/spatial_analysis.html).
 - **Bundled demo set**: the app now opens on `demo_full_tcr_bcr.crb` (PBMC,
   TCR + BCR + trajectory) plus four real spatial sections (Visium, Slide-seq v2,
   MERFISH, Xenium), so the dataset switcher spans immune-repertoire, trajectory,
@@ -1543,7 +1608,7 @@ immune repertoire in a retired sidecar layout, or is a pre-spatial
   10x Genomics `vdj_v1_hs_pbmc3` dataset; see `data-raw/README.md` for the
   reproducible build. The bundled app (`shiny::runApp("inst")`) now opens on
   these three data sets so the switcher is visible out of the box; pass a named
-  vector to `createShinyApp()` for your own data (see `vignette("multi_crb")`).
+  vector to `createShinyApp()` for your own data (see the [multi-crb article](https://www.mheming.com/CerebroNexus/articles/multi_crb.html)).
   New vignette: *Loading multiple data sets (multi-crb) with a dataset
   switcher*.
 
@@ -1738,7 +1803,7 @@ previous releases and refreshes documentation for the current codebase.
 
 ## Documentation
 
-- Added pkgdown site at <https://mihem.github.io/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
+- Added pkgdown site at <https://www.mheming.com/CerebroNexus/> with light/dark/auto theme switch, search, and all vignettes as articles
 - Site automatically builds and deploys to GitHub Pages on push to master
 
 # Version 1.5.3
@@ -1792,7 +1857,7 @@ Despite the minor version bump, this update contains substantial performance imp
 - Hover/tooltip info for cells in the gene expression projection no longer contain the gene expression value. This is because preparing the hover info is an expensive computation with little return. As a result of removing the gene expression value, the hover info does not need to be recalculated every time a gene is added to or removed from the list of genes to show expression for. For the same reason, when plotting a trajectory, the state and pseudotime are not added to the hover info either.
 - Internally, data for plotting in projections is rearranged, stored in different variables, and the final output is debounced to avoid unnecessary redrawing of the projections on initialization.
 - The feature to show expression of multiple genes in separate panels has been matured. Up to 9 genes can be shown in a 3x3 panel matrix but all share the same color scale. While cells can be selected in any of the panels, the expression levels shown in the other UI element, e.g. table of selected cells or expression by group, refers to the mean expression of all selected genes (not just the one the cells were selected in).
-- When coloring cells in projections by a caterogical variable, e.g. cell type, the dots in the legend are now larger and independent from the selected point size.
+- When coloring cells in projections by a categorical variable, e.g. cell type, the dots in the legend are now larger and independent from the selected point size.
 - Tables are now rendered server-side to improve performance for large tables.
 - Cellular barcodes in tables of selected cells are formatted in monospace font.
 - Columns in meta data tables, e.g. table of cells selected in projections, which are identified to contain percentage on a 0-100 scale are changed to a 0-1 scale to prevent non-sensical values such as 500%.

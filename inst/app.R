@@ -15,12 +15,12 @@ source("viewer/million_cell_demo.R", local = TRUE)
 ## set options
 ##----------------------------------------------------------------------------##
 custom_welcome_message <- "Explore single-cell and spatial data in CerebroNexus through coordinated, interactive views. Choose a sample data set to begin."
-Cerebro.options <<- list(
+Cerebro.options <- list(
   "mode" = "closed",
   ## Keep the source demo runnable directly from inst/ without requiring an
   ## installed CerebroNexus package. Exported apps receive this value in
   ## cerebro_config.rds when createShinyApp() builds them.
-  "cerebro_version" = "7.2.0",
+  "cerebro_version" = "8.0.0",
   ## This bundled app ships several distinct demo data sets so the sidebar
   ## "Select dataset:" switcher is visible out of the box: switching changes
   ## the UMAP, the cell-type composition, and the conditional tabs (Immune
@@ -170,6 +170,56 @@ Cerebro.options <<- list(
   "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = TRUE
 )
+## The CRAN package ships only the PBMC demo. The spatial and HLA & TCR demos are
+## used from the user cache when CerebroNexus::downloadDemoData() put them there;
+## missing demos are left out (the Trekker demo is only in the source
+## repository). A demo whose tissue images are missing is shown without them.
+Cerebro.options <<- local({
+  options <- Cerebro.options
+  image_paths <- function(x) {
+    unlist(lapply(x, function(entry) {
+      if (is.list(entry) && !is.null(entry$path)) {
+        entry$path
+      } else if (is.list(entry)) {
+        image_paths(entry)
+      } else {
+        entry
+      }
+    }))
+  }
+  files <- options[["crb_file_to_load"]]
+  if (requireNamespace("CerebroNexus", quietly = TRUE)) {
+    for (name in names(files)[!file.exists(files)]) {
+      files[[name]] <- CerebroNexus:::.demoDataPath(files[[name]])
+    }
+  }
+  if (!all(file.exists(files))) {
+    message(
+      "Demo data sets not installed: ",
+      paste(names(files)[!file.exists(files)], collapse = ", "),
+      ". CerebroNexus::downloadDemoData() adds the spatial and HLA & TCR demos."
+    )
+    files <- files[file.exists(files)]
+  }
+  options[["crb_file_to_load"]] <- files
+  for (key in c(
+    "point_size",
+    "point_opacity",
+    "spatial_image_settings",
+    "spatial_plot_rotation"
+  )) {
+    keep <- names(options[[key]]) %in% names(files)
+    options[[key]] <- options[[key]][keep]
+  }
+  for (name in names(options[["spatial_images"]])) {
+    images <- image_paths(options[["spatial_images"]][[name]])
+    if (!name %in% names(files) || !all(file.exists(images))) {
+      options[["spatial_images"]][[name]] <- NULL
+      options[["spatial_image_settings"]][[name]] <- NULL
+    }
+  }
+  options
+})
 ## core_shim.R sources the HLA core from a checkout's ../R/hla_*.R. The
 ## installed copy of this app (runApp(system.file("app.R", package = ...))) has
 ## no R/ sources beside it, so take the core from the package it came with.
@@ -177,15 +227,15 @@ if (
   length(list.files("../R", pattern = "^hla_.*[.]R$")) == 0L &&
     requireNamespace("CerebroNexus", quietly = TRUE)
 ) {
-  Cerebro.options <<- c(
+  Cerebro.options <- c(
     Cerebro.options,
     list(".hla_core" = CerebroNexus:::.viewerHLACore())
   )
 }
-Cerebro.options <<- viewerAddMillionCellDemo(Cerebro.options)
-Cerebro.options <<- viewerAddRenDemo(Cerebro.options)
-Cerebro.options <<- viewerAddCosMxDemo(Cerebro.options)
-Cerebro.options <<- viewerAddTcellDemo(Cerebro.options)
+Cerebro.options <- viewerAddMillionCellDemo(Cerebro.options)
+Cerebro.options <- viewerAddRenDemo(Cerebro.options)
+Cerebro.options <- viewerAddCosMxDemo(Cerebro.options)
+Cerebro.options <- viewerAddTcellDemo(Cerebro.options)
 
 options(shiny.maxRequestSize = 6 * 1024^2)
 

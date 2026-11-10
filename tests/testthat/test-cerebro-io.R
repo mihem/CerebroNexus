@@ -1235,7 +1235,11 @@ test_that("bundled demo CRBs use the current qs2 codec", {
     full.names = TRUE
   )
 
-  expect_length(demos, 9L)
+  ## The package tarball ships three of them; the larger demos are downloaded.
+  expect_true(all(
+    c("example.crb", "demo_full_tcr_bcr.crb", "demo_spatial.crb") %in%
+      basename(demos)
+  ))
   for (path in demos) {
     connection <- file(path, open = "rb")
     magic <- readBin(connection, "raw", n = 4L)

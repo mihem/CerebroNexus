@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_omnibus_env <- new.env(parent = globalenv())
 sys.source(
   builder_profile_inst_path("builder", "prerequisite.R"),
@@ -9,6 +12,7 @@ builder_omnibus_env$builder_source_utf8(
 )
 
 test_that("Spatial alignment demo restores the Visium H&E and transform", {
+  skip_if_builder_examples_missing()
   skip_if_not_installed("jpeg")
   builder_omnibus_env$builder_source_utf8(
     builder_profile_inst_path("builder", "extras.R"),
@@ -140,6 +144,7 @@ test_that("omnibus Trekker payload satisfies the Builder content contract", {
 })
 
 test_that("gallery examples leave tissue images for manual upload", {
+  skip_if_builder_examples_missing()
   for (relative in c("extras.R", "marker_import.R")) {
     builder_omnibus_env$builder_source_utf8(
       builder_profile_inst_path("builder", relative),

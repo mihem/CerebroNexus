@@ -69,6 +69,7 @@ builder_rail_js_functions <- function(
 ## Run `body` (statements ending in `return <value>;`) in a blank Chrome page
 ## and return its JSON-compatible value.
 builder_rail_dom_run <- function(definitions, body) {
+  testthat::skip_on_cran()
   testthat::skip_if_not_installed("chromote")
   session <- tryCatch(
     chromote::ChromoteSession$new(),

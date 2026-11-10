@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_task9_source <- function(local = parent.frame()) {
   root <- builder_test_inst_path("builder")
   if (!dir.exists(root)) {

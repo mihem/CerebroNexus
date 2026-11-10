@@ -1,3 +1,6 @@
+## Slow full-fixture comparison with anndataR: CI only.
+skip_on_cran()
+
 ## The h5ad reader against a reference ----------------------------------------
 ##
 ## readH5adAsSCE() is written from the AnnData on-disk specification. The check
@@ -7,7 +10,7 @@
 ## Skipped where anndataR is not installed.
 
 anndata_fixture <- function(name) {
-  test_path("fixtures", "anndata", paste0(name, ".h5ad"))
+  anndata_test_fixture(paste0(name, ".h5ad"))
 }
 
 read_quietly <- function(expr) {

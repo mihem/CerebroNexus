@@ -83,6 +83,8 @@ test_that("the cell-name resource describes the finished file", {
 })
 
 test_that("names go in messages while the cell-name file is written", {
+  ## Timing-sensitive; kills a background process.
+  skip_on_cran()
   skip_if_not_installed("mirai")
   scope <- new.env(parent = globalenv())
   viewer_server_load(

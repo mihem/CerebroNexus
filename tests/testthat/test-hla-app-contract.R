@@ -210,6 +210,8 @@ test_that("shipped demo carries donor ids, so counting is donor-level", {
 })
 
 test_that("shipped demo yields a readable TRB motif network on real sequences", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   # The whole argument for the page: a Hamming-1 CDR3 network is legible on an
   # ANTIGEN-SELECTED repertoire. An unselected one is sparse -- the real-sequence
   # predecessor gave 4 nodes in 2 motifs. Measured on the shipped random 2,000
@@ -368,6 +370,8 @@ test_that("the shipped demo ships its CC-BY attribution beside the data", {
 })
 
 test_that("a drawn network states area encoding; an undrawn one says why", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   shiny::testServer(
     function(input, output, session) {
       hla_require_active_page <- function() invisible(NULL)
@@ -539,6 +543,8 @@ test_that("every scrolling table keeps its cells on one line", {
 })
 
 test_that("Viewer Pack first frames bypass cold HLA preparation", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   withr::local_package("magrittr")
   shiny::testServer(
     function(input, output, session) {

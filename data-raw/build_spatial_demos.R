@@ -4,7 +4,7 @@
 ## Reproducible build of the REAL, public spatial-transcriptomics demo `.crb`
 ## files shipped in inst/extdata/examples/ for the Spatial tab.
 ##
-## Unlike demo_spatial.crb (which is fully SYNTHETIC), the datasets produced here
+## The datasets produced here
 ## are down-sampled subsets of genuinely measured, citeable public data. Each one
 ## exercises a different technology so the multi-crb dropdown demonstrates that
 ## the same platform-agnostic extraction pipeline (.getSpatialData) ingests them

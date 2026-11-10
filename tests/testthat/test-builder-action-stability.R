@@ -1,4 +1,5 @@
 test_that("progress updates preserve the actionable Stop button", {
+  skip_on_cran()
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- withr::local_tempfile(fileext = ".js")
   writeLines(
@@ -37,6 +38,7 @@ test_that("progress updates preserve the actionable Stop button", {
 })
 
 test_that("Save captures an unblurred numeric display edit before its action", {
+  skip_on_cran()
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- withr::local_tempfile(fileext = ".js")
   writeLines(
@@ -72,6 +74,7 @@ test_that("Save captures an unblurred numeric display edit before its action", {
 })
 
 test_that("Save success is nonmodal and failure preserves an actionable retry", {
+  skip_on_cran()
   skip_if(Sys.which("node") == "", "node not on PATH")
   runner <- withr::local_tempfile(fileext = ".js")
   writeLines(

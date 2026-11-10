@@ -10,7 +10,7 @@
 skip_if_not_installed("rhdf5")
 skip_if_not_installed("SingleCellExperiment")
 
-fixture <- function(name) testthat::test_path("fixtures", "anndata", name)
+fixture <- anndata_test_fixture
 quiet <- function(x) suppressWarnings(suppressMessages(x))
 read_h5ad <- function(path, ...) quiet(readH5adAsSCE(path, ...))
 
@@ -414,7 +414,7 @@ test_that("a missing reduction is reported with a way out", {
 ## ---------------------------------------------------------------------------
 
 test_that("extra_modalities reads a MuData modality as an alternative experiment", {
-  path <- testthat::test_path("fixtures", "anndata", "small_mudata.h5mu")
+  path <- anndata_test_fixture("small_mudata.h5mu")
   sce <- suppressWarnings(suppressMessages(readH5adAsSCE(
     path,
     modality = "gex",
@@ -432,7 +432,7 @@ test_that("extra_modalities reads a MuData modality as an alternative experiment
   )
   expect_error(
     readH5adAsSCE(
-      testthat::test_path("fixtures", "anndata", "small_csr.h5ad"),
+      anndata_test_fixture("small_csr.h5ad"),
       extra_modalities = "prot"
     ),
     "only for MuData"
@@ -440,7 +440,7 @@ test_that("extra_modalities reads a MuData modality as an alternative experiment
 })
 
 test_that("extra features reach the .crb as <experiment>:<feature>", {
-  path <- testthat::test_path("fixtures", "anndata", "small_mudata.h5mu")
+  path <- anndata_test_fixture("small_mudata.h5mu")
   crb <- readCerebro(suppressWarnings(suppressMessages(convertH5adToCerebro(
     path,
     withr::local_tempdir(),
@@ -471,7 +471,7 @@ test_that("extra features reach the .crb as <experiment>:<feature>", {
 
 test_that("a SingleCellExperiment's altExp can be added by name, and an unknown one is refused", {
   sce <- suppressWarnings(suppressMessages(readH5adAsSCE(
-    testthat::test_path("fixtures", "anndata", "small_mudata.h5mu"),
+    anndata_test_fixture("small_mudata.h5mu"),
     modality = "gex",
     extra_modalities = "prot"
   )))

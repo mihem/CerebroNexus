@@ -231,6 +231,12 @@ hla_read_typing_file <- function(path, name = path) {
 #' @param source_type One of [HLA_SOURCE_TYPES]; default "unknown".
 #' @param typing_method,source_reference Optional provenance strings.
 #' @return A canonical long data.frame with a "qc" attribute (warnings df).
+#' @examples
+#' typing <- hla_normalize_typing(list(
+#'   donor1 = c("HLA-A*02:01", "HLA-B*07:02"),
+#'   donor2 = c("A*01:01", "B*08:01")
+#' ))
+#' typing
 #' @export
 hla_normalize_typing <- function(
   x,

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## The Configure page observers in inst/builder/server/datasets.R, driven
 ## through the namespaced `core-*` inputs: each one is pinned with an accepted
 ## input and with the inputs it must ignore (another dataset rendered, a value

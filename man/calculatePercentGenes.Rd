@@ -23,6 +23,9 @@ Get percentage of transcripts of gene list compared to all transcripts per
 cell.
 }
 \examples{
+\dontshow{if (nzchar(system.file(package = "SeuratObject"))) withAutoprint(\{ # examplesIf}
+\donttest{
+## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 pbmc <- calculatePercentGenes(
@@ -30,5 +33,6 @@ pbmc <- calculatePercentGenes(
   assay = 'RNA',
   genes = list('example' = c('FCN1','CD3D'))
 )
-
+}
+\dontshow{\}) # examplesIf}
 }

@@ -20,13 +20,11 @@
   databases = NULL,
   URL_API = NULL
 ) {
-  ## check that httr is installed before contacting the Enrichr API
-  if (!requireNamespace("httr", quietly = TRUE)) {
-    stop(
-      "Package 'httr' is required for this function. Install it with install.packages(\"httr\").",
-      call. = FALSE
-    )
-  }
+  ## check that httr and future.apply are installed before contacting Enrichr
+  rlang::check_installed(
+    c("httr", "future.apply"),
+    reason = "to query the Enrichr API."
+  )
 
   ## A bounded request budget applies independently to submission, sharing and
   ## every database export. HTTP errors must not reach the TSV parser.

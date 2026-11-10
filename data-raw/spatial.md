@@ -95,7 +95,7 @@ They deliberately exercise **both** background-image paths the app supports:
 - **MERFISH** embeds its named DAPI image in the `.crb` under `histology_images`.
 - **Visium / Xenium** load images from external PNG files via `spatial_images` in `inst/app.R`. Xenium exposes `fov` with native DAPI and `fov_colour` with matching 90° pink and fluorescent-yellow variants.
 
-`demo_spatial.crb` + `demo_spatial_histology.svg` are lightweight **synthetic** fixtures used only by `test-spatial.R`; they are intentionally not in the app's dropdown.
+`demo_spatial.crb` is a 500-cell subset of the real Xenium demo (`data-raw/build_demo_spatial.R`), small enough to ship with the package for the tests; it is intentionally not in the app's dropdown. `demo_spatial_histology.svg` is a leftover synthetic drawing that nothing reads.
 
 # 2. Why these four
 

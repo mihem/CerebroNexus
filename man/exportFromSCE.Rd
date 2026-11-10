@@ -130,6 +130,8 @@ library named like its level. Both are filled in by
 \code{\link{readH5adAsSCE}} from scanpy's \code{uns}.
 }
 \examples{
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
 pbmc <- readRDS(system.file("extdata/examples/pbmc_SCE.rds",
   package = "CerebroNexus"))
 exportFromSCE(
@@ -143,5 +145,6 @@ exportFromSCE(
   use_delayed_array = FALSE,
   verbose = TRUE
 )
-
+}
+\dontshow{\}) # examplesIf}
 }

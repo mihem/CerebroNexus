@@ -209,8 +209,9 @@ not reused: a still-running older generated app may retain its former
 \code{.crb}, H5, and sidecar files are not registered as HTTP resources.
 Spatial background images are the deliberate exception: files explicitly
 supplied through \code{spatial_images} are copied verbatim under
-\code{spatial-assets/}. The server-side renderer reads these files and embeds
-them as data URIs; the directory is not registered as an HTTP resource.
+\code{spatial-assets/}. The server exposes each selected file through a
+private, session-scoped URL; image bytes are not Base64-encoded and the
+directory is not registered as a public HTTP resource.
 Callers must provide trusted image files. Preflight requires a minimum
 stable runtime API and reads the ordinary \code{expression_backend} field
 without invoking serialized methods or its getter. The generated
@@ -262,20 +263,19 @@ images and their source-path ancestors must remain trusted and unchanged
 while the build is running; the target build lock does not protect inputs.
 }
 \examples{
-\dontrun{
-library(CerebroNexus)
-
-createShinyApp(
+\donttest{
+app_dir <- createShinyApp(
   cerebro_data = c(
-    "PBMC example" = "output/cerebro_pbmc_seurat.crb"
+    "PBMC example" = system.file("extdata/examples/example.crb",
+      package = "CerebroNexus")
   ),
-  result_dir = "my_app",
+  result_dir = file.path(tempdir(), "my_app"),
   port = 8080,
   host = "127.0.0.1",
   max_request_size = 8000,
   overwrite = TRUE
 )
-# Run with shiny::runApp("my_app") or deploy my_app/ to Shiny Server.
+# Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.
 }
 
 }

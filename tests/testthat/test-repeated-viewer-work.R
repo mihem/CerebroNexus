@@ -184,6 +184,8 @@ test_that("Groups shares counts across display forms but refreshes data", {
 })
 
 test_that("compact SizeDist renders the identical geometry", {
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("ggdendro")
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("immune_repertoire", "encode.R"), env)
   repeat_definitions(viewer_test_path("immune_repertoire", "data.R"), env)

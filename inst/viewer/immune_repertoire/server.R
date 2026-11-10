@@ -13,9 +13,19 @@
 ## cascade — so startup stays cheap. The real load happens lazily on the first
 ## scRepertoire::fn() call, i.e. the first scRepertoire-backed plot; self-made
 ## IR plots (Clone Sharing) and the default Clonal UMAP never
-## trigger it.
+## trigger it. ggplot2 and shinycssloaders are suggested packages the page also
+## draws with, so they are part of the same check.
+IR_PACKAGES <- c("scRepertoire", "ggplot2", "shinycssloaders")
+ir_missing_packages <- function() {
+  installed <- vapply(
+    IR_PACKAGES,
+    function(package) nzchar(system.file(package = package)),
+    logical(1)
+  )
+  IR_PACKAGES[!installed]
+}
 has_scRepertoire <- function() {
-  nzchar(system.file(package = "scRepertoire"))
+  length(ir_missing_packages()) == 0L
 }
 
 ## ---- Lazy-load boundary ------------------------------------------------ ##
@@ -60,14 +70,29 @@ req_scRepertoire <- function() {
 ## a silent blank panel we show an explicit prompt telling the user how to
 ## reinstall it. Shown in both the settings and visualizations boxes.
 ir_scRepertoire_missing_ui <- function() {
+  missing <- ir_missing_packages()
+  bioc <- intersect(missing, "scRepertoire")
+  cran <- setdiff(missing, bioc)
   div(
     class = "alert alert-warning",
-    tags$b("scRepertoire is required for immune repertoire analysis."),
+    tags$b(
+      paste(missing, collapse = ", "),
+      if (length(missing) == 1L) "is" else "are",
+      "required for immune repertoire analysis."
+    ),
     tags$br(),
-    "Please install it to use the TCR/BCR features:",
-    tags$pre(
-      "BiocManager::install(\"scRepertoire\")"
-    )
+    "Please install to use the TCR/BCR features:",
+    tags$pre(paste(
+      c(
+        if (length(bioc)) {
+          paste0("BiocManager::install(", deparse(bioc), ")")
+        },
+        if (length(cran)) {
+          paste0("install.packages(", paste(deparse(cran), collapse = ""), ")")
+        }
+      ),
+      collapse = "\n"
+    ))
   )
 }
 

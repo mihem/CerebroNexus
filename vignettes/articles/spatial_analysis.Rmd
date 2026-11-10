@@ -112,7 +112,7 @@ expression — no special flag is required.
 ```{r, eval = FALSE}
 library(CerebroNexus)
 
-seurat_obj <- qs::qread("path/to/seurat_object.qs")
+seurat_obj <- qs2::qs_read("path/to/seurat_object.qs2")
 
 exportFromSeurat(
   object = seurat_obj,

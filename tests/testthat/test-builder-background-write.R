@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("import callbacks do not serialize the live Builder environment", {
   skip_if_not_installed("callr")
   runtime <- new.env(parent = globalenv())

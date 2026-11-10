@@ -151,12 +151,12 @@
 #' like their \code{@misc} counterparts on a Seurat object. Attaching BCR/TCR
 #' files (\code{bcr_file}/\code{tcr_file}) is not available for SCE yet.
 #'
-#' @examples
-#' \dontrun{
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' \donttest{
 #' convertSCEToCerebro(
 #'   sce_file = system.file("extdata/examples/pbmc_SCE.rds",
 #'     package = "CerebroNexus"),
-#'   result_dir = "output",
+#'   result_dir = file.path(tempdir(), "output"),
 #'   experiment_name = "PBMC (SCE)",
 #'   organism = "Human",
 #'   groups = c("sample", "cluster")
@@ -394,7 +394,7 @@ convertSCEToCerebro <- function(
         projections = projections,
         spatial_split_by = spatial_split_by
       )
-      cat("Successfully exported:", file_name, "\n")
+      message("Successfully exported: ", file_name)
     },
     error = function(e) {
       stop(

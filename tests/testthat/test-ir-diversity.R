@@ -51,6 +51,8 @@ ir_diversity_fixture <- function() {
 }
 
 test_that("Diversity bootstraps equal clonalDiversity for the same seed", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("scRepertoire")
   scope <- ir_diversity_scope()
   data <- ir_diversity_fixture()

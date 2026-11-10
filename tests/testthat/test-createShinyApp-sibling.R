@@ -2408,7 +2408,9 @@ test_that("spatial image targets bound long logical names and filenames", {
   dataset <- paste(rep("dataset", 25L), collapse = "-")
   spatial_name <- paste(rep("spatial", 25L), collapse = "-")
   image_label <- paste(rep("image", 35L), collapse = "-")
-  filename <- paste0(paste(rep("x", 180L), collapse = ""), ".png")
+  ## Longer than the 120-byte target bound, but short enough that the source
+  ## path fits Windows' 260-character limit in a deeper temporary directory.
+  filename <- paste0(paste(rep("x", 140L), collapse = ""), ".png")
   crb <- write_spatial_bundle_crb(
     file.path(root, "source"),
     spatials = stats::setNames(list(character()), spatial_name)
@@ -2739,7 +2741,7 @@ test_that("forged spatial backgrounds cannot read unconfigured files", {
   }
 
   linked <- file.path(app, "spatial-assets", "linked.png")
-  if (isTRUE(file.symlink(outside, linked))) {
+  if (isTRUE(suppressWarnings(file.symlink(outside, linked)))) {
     rendered_meta <- render_bundle_spatial_background(
       app,
       config,
@@ -2823,7 +2825,7 @@ test_that("backend paths cannot resolve through symbolic links", {
   dir.create(source)
   dir.create(outside)
   writeLines("OUTSIDE", file.path(outside, "matrix.h5"))
-  linked <- file.symlink(outside, file.path(source, "alias"))
+  linked <- test_dir_link(outside, file.path(source, "alias"))
   if (!isTRUE(linked)) {
     skip("Symbolic links are not available on this platform")
   }
@@ -2839,10 +2841,7 @@ test_that("backend paths cannot resolve through symbolic links", {
 
   app <- file.path(root, "existing-app")
   dir.create(app)
-  destination_linked <- file.symlink(
-    outside,
-    file.path(app, "private-data")
-  )
+  destination_linked <- test_dir_link(outside, file.path(app, "private-data"))
   if (!isTRUE(destination_linked)) {
     skip("Destination symbolic links are not available on this platform")
   }
@@ -2882,6 +2881,8 @@ test_that("embedded CRBs do not require sibling files", {
 })
 
 test_that("old configs attach through field fallback", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   root <- withr::local_tempdir()
   modern_source <- file.path(root, "modern")
@@ -3287,6 +3288,8 @@ test_that("a thin H5 CRB is bundled with its H5 file and keeps its gene count", 
 })
 
 test_that("the App lists the immune repertoire of every kind of CRB", {
+  ## Starts an R process.
+  skip_on_cran()
   skip_if_not_installed("HDF5Array")
   skip_if_not_installed("rhdf5")
   root <- withr::local_tempdir()
@@ -3517,6 +3520,15 @@ test_that("Cerebro data identities cannot be missing", {
     "identities must be non-empty and non-missing"
   )
   expect_false(dir.exists(app))
+})
+
+test_that("an unnamed Cerebro data set says how to name it", {
+  root <- withr::local_tempdir()
+  crb <- write_bundle_crb(file.path(root, "source"))
+  expect_error(
+    build_test_app(unname(crb), file.path(root, "app")),
+    "Name every data set, for example"
+  )
 })
 
 test_that("Cerebro data identities must be unique", {

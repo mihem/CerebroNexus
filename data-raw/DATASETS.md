@@ -1,6 +1,6 @@
 # Demo dataset registry
 
-Single source of truth for every demo `.crb` shipped in `inst/extdata/examples/`.
+Single source of truth for every demo `.crb` and example `.rds` shipped in `inst/extdata/examples/`.
 Whatever the data type — immune repertoire, spatial, trajectory — each dataset is recorded here with the **same fields** so provenance is complete and reproducible.
 
 `data-raw/` is excluded from the built package via `.Rbuildignore`; it stays in the repo for reproducibility only. The built `.crb` files are what ship.
@@ -39,6 +39,7 @@ When adding a dataset (spatial, trajectory, or otherwise), **copy the template a
 | **license** | data license / usage terms |
 | **build** | the script + function that produces the `.crb` |
 | **output** | shipped path + approx size |
+| **used by** | where the shipped file is read (R/ examples, tests, vignettes, app). Required for the entries under [Package examples and test fixtures](#package-examples-and-test-fixtures); optional elsewhere |
 
 ### Template (copy for new datasets)
 
@@ -148,6 +149,21 @@ Built by `data-raw/build_spatial_demos.R` (see [`spatial.md`](spatial.md) for de
 - **build**: `data-raw/build_spatial_demos.R` → `build_xenium()`
 - **output**: `inst/extdata/examples/demo_spatial_xenium.crb` (~726 KiB) plus `inst/extdata/examples/spatial/xenium/*.png`
 
+### demo_spatial.crb
+- **type**: spatial (small example shipped with the package)
+- **technology**: 10x Xenium (in-situ single-cell imaging)
+- **dropdown label**: none; not in the demo app's switcher. Used by tests and the App bundle.
+- **organism / tissue**: mouse (mm) / brain, coronal section, cortex + hippocampus
+- **source**: a random 500 of the 2,000 cells of `demo_spatial_xenium.crb` (above), i.e. the 10x Genomics public Xenium demo `Xenium_V1_FF_Mouse_Brain_Coronal_Subset_CTX_HP`. Replaces the earlier synthetic fixture of the same name, whose generator was never recorded.
+- **acquire**: none beyond `demo_spatial_xenium.crb`, which is in the repository
+- **object type**: `Cerebro` with one spatial entry `fov` (the rotated `fov_colour` copy of the source is dropped)
+- **sampling**: `set.seed(20261110)`; 500 cells drawn uniformly with `demo_subsample_cells()` from `subsample_demos.R`; the 100-gene demo panel recomputed on the kept cells by `save_demo_crb()`
+- **cell-type field**: `cluster` (Louvain, as in the source)
+- **embedded image**: none
+- **license**: 10x Genomics public dataset terms (freely redistributable), as for `demo_spatial_xenium.crb`
+- **build**: `Rscript data-raw/build_demo_spatial.R`
+- **output**: `inst/extdata/examples/demo_spatial.crb` (~211 KiB, md5 `6d3cd9772e844317dd438831c689c303`)
+
 ### Spatial — evaluated, not yet shipped
 
 These platforms were evaluated for a demo but are not shipped this round; the acquire path is recorded so the demo can be added later without re-researching sources.
@@ -188,7 +204,9 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
 - **technology**: 10x Chromium 5' V(D)J (scRNA-seq + TCR/BCR)
 - **dropdown label**: `PBMC - Full (T+B)`
 - **organism / tissue**: human (hg) / PBMC, healthy donor
-- **source**: 10x Genomics public dataset `vdj_v1_hs_pbmc3` (Human PBMC, Chromium 5' V(D)J, Cell Ranger 3.1.0).
+- **source**: two 10x Genomics public datasets, **combined, not from one experiment**:
+  - cells, expression, metadata, projections and analyses: inherited from `example.crb`, i.e. `sc5p_v2_hs_PBMC_10k` (see the `example.crb` entry below);
+  - clonotype sequences: `vdj_v1_hs_pbmc3` (Human PBMC of a healthy donor, Chromium 5' V(D)J v1, Cell Ranger 3.1.0; files under `https://cf.10xgenomics.com/samples/cell-vdj/3.1.0/vdj_v1_hs_pbmc3/`; dataset page <https://www.10xgenomics.com/datasets/pbm-cs-of-a-healthy-donor-v-1-1-1-standard-3-1-0>).
 - **acquire**:
   ```bash
   mkdir -p data-raw/vdj_10x
@@ -199,12 +217,13 @@ Built by `data-raw/build_ir_demos.R` (see [`immune_repertoire.md`](immune_repert
     "$BASE/vdj_v1_hs_pbmc3_b_filtered_contig_annotations.csv"
   ```
 - **object type**: `Cerebro`, built from a cell subset of `example.crb` (T + B + Mono, 1,476 cells). The shipped file keeps a random 1,000 of them (950 repertoire rows). `example.crb` was cut independently, so the two shipped files share only 685 cells and 97 genes: the shipped demo is no longer a subset of the shipped `example.crb`.
-- **sampling**: `set.seed()`-pinned cell subset; TCR clonotypes assigned only to T cells, BCR only to B cells.
+- **sampling**: `set.seed()`-pinned cell subset; TCR clonotypes assigned only to T cells, BCR only to B cells. The receptors are **real `vdj_v1_hs_pbmc3` sequences but are not the cells' own**: `assign_ir()` draws one clonotype per lineage cell from the pooled contigs, at random and with replacement (`set.seed(42)`). The pairing of receptor to transcriptome is therefore synthetic, and so is any clonal expansion it shows (23% of the shipped CDR3 strings are repeats). Measured on the shipped files: of the 650 barcodes that carry a receptor in both `example.crb` and this demo, none has the same `CTaa`. Final cut: `parameters$demo_cell_subsample` (1,000 of 1,476 cells, seed 20261027).
 - **cell-type field**: existing `cell_type` from `example.crb`
 - **embedded image**: none (n/a for immune repertoire)
-- **license**: 10x Genomics public dataset terms
+- **license**: CC BY 4.0 for both inputs, as stated on the 10x Genomics dataset pages (copyright 10x Genomics). Attribution: 10x Genomics, *Human PBMC from a Healthy Donor, 10k cells (v2)* and *PBMCs of a Healthy Donor (v1)*.
 - **build**: `data-raw/build_ir_demos.R` (also carries the monocle2 trajectory — see the Trajectory section)
 - **output**: `inst/extdata/examples/demo_full_tcr_bcr.crb` (~466 KiB)
+- **used by**: the bundled app `inst/app.R` (default data set); `vignettes/articles/multi_crb.Rmd`; the Builder bundle checksum list `inst/builder/app_bundle/contract.R`; tests `test-app-immune_repertoire.R`, `test-app-share-single-view.R`, `test-app-trajectory.R`, `test-app-viewport-layout.R`, `test-builder-content-tables.R`, `test-cerebro-io.R`, `test-coordinated-views.R`, `test-demo-gene-panel.R`, `test-gene-dataset-transition.R`, `test-h5ad-export.R`, `test-immune-repertoire-validation.R`, `test-trajectory.R`. Not used in any `R/` example or `man/` page.
 
 > `build_ir_demos.R` can also emit two narrower subsets — `demo_healthy_t.crb` (T + Mono, TCR only) and `demo_bcell_rich.crb` (B + few T, BCR only) — as a multi-sample switcher demo. They are **not shipped** by default; the Full set is their superset.
 
@@ -318,7 +337,7 @@ Built by `data-raw/build_trajectory_demo.R` (see [`trajectory.md`](trajectory.md
 - **sampling**: `set.seed(42)`; all B cells of the demo (915 in the full build, 603 in the shipped file); ordering filter on high-variance genes. The stored `meta` has `DR_1`, `DR_2`, `pseudotime`, `state`.
 - **cell-type field**: `state` (monocle2 DDRTree state) / continuous `pseudotime`
 - **embedded image**: none (n/a for trajectory)
-- **license**: 10x Genomics public dataset terms (inherited from the IR demo)
+- **license**: CC BY 4.0 (inherited from the IR demo; see there)
 - **build**: `data-raw/build_trajectory_demo.R` (needs `monocle` from Bioconductor; build-time-only, not a runtime dependency)
 - **output**: no new file — overwrites the trajectory slot inside `inst/extdata/examples/demo_full_tcr_bcr.crb`
 
@@ -358,3 +377,57 @@ download → extract → subsample → build walk-through).
 - **output**: `inst/extdata/examples/demo_trekker.crb` (self-contained incl. evidence images; see README for current measured size)
 
 **Honest scope**: `ConfPositioned` ≠ "exactly one location" — 264 of the 7,420 (3.56%) are vendor-salvaged multi-location nuclei, and the RDS's `number_clusters` is all `1` (the salvage trace is erased), so the page labels the set `vendor_confidently_positioned`. The vendor's own 2+-location rate (22.56%) exceeds its own manual's `<20%` guideline; the page shows "below vendor reference range" and does **not** adjudicate sample usability. Moran's I is the **upstream** vendor value (`..._variable_features_spatial_moransi.txt`), computed differently from Cerebro's own — labelled `Upstream` and never mixed.
+
+---
+
+## Package examples and test fixtures
+
+The files below are what the package's own examples, tests and vignettes read. Unlike the demos above, none of them has a build script in `data-raw/`, so each entry records what the git history and the files themselves show, and says so where something was never written down. `demo_full_tcr_bcr.crb` is recorded under [Immune repertoire](#immune-repertoire). `demo_spatial.crb` is recorded under [Spatial](#spatial).
+
+### example.crb
+- **type**: immune_repertoire (scRNA-seq + paired TCR/BCR)
+- **technology**: 10x Chromium Single Cell 5' v2 (gene expression + TCR + BCR enriched libraries from the same cells)
+- **dropdown label**: none (not in the bundled app's switcher); its `experiment_name` is `pbmc5p_v2_hs`
+- **organism / tissue**: human (hg) / PBMC, one healthy donor
+- **source**: 10x Genomics public dataset `sc5p_v2_hs_PBMC_10k`, *Human PBMC from a Healthy Donor, 10k cells (v2)* (healthy male donor, cells from AllCells; Cell Ranger 4.0.0 and 5.0.0 releases, published 2020): <https://www.10xgenomics.com/datasets/human-pbmc-from-a-healthy-donor-10-k-cells-v-2-2-standard-5-0-0>. Recorded in commit `0e255d0d2` (2026-06-25, "Rebuild example.crb from real 10x sc5p_v2_hs_PBMC_10k"), `NEWS.md` and `vignettes/articles/immune_repertoire_analysis.Rmd`. The receptors are the cells' own: the TCR/BCR rows are joined to the expression by cell barcode from the same experiment.
+- **acquire**: files under `https://cf.10xgenomics.com/samples/cell-vdj/5.0.0/sc5p_v2_hs_PBMC_10k/` (and `.../4.0.0/...`): `sc5p_v2_hs_PBMC_10k_filtered_feature_bc_matrix.h5`, `..._t_filtered_contig_annotations.csv`, `..._b_filtered_contig_annotations.csv`. **Which Cell Ranger release was used is not recorded.**
+- **object type**: `Cerebro` (qs2-serialised `.crb`)
+- **sampling**: the 2026-06-25 build kept 1,476 cells (915 B cells, 493 T cells, 68 monocytes) and 967 genes, every one of them carrying a receptor. **How these 1,476 cells were selected from the ~10,500 in the source, and the analysis code, were not recorded**; the build script was never committed. The single donor was randomly partitioned into `sample_1`–`sample_3`; these labels are not distinct donors. Later cut in place by `data-raw/subsample_demos.R` to 1,000 random cells (seed 20261026, `parameters$demo_cell_subsample`) and by `data-raw/shrink_demos.R` to 100 genes (`parameters$demo_gene_panel`).
+- **cell-type field**: `cell_type` (`B cells`, `T cells`, `Monocytes`); also `seurat_clusters`
+- **embedded image**: none (n/a)
+- **license**: CC BY 4.0, as stated on the 10x Genomics dataset page (copyright 10x Genomics). Attribution: 10x Genomics, *Human PBMC from a Healthy Donor, 10k cells (v2)*.
+- **build**: **not recorded** (no script in the repository); only the in-place cuts are reproducible (`subsample_demos.R`, `shrink_demos.R`). The file name predates this data: until `0e255d0d2` it held cerebroApp's original example (Roman Hillje, 2020), which no longer ships.
+- **output**: `inst/extdata/examples/example.crb` (~453 KiB)
+- **used by**: roxygen docs/examples in `R/cerebro_io.R`, `R/convertH5adToCerebro.R`, `R/createShinyApp.R`, `R/exportToH5ad.R`, `R/h5ad.R`, `R/viewer_pack.R` (and their `man/` pages); `inst/viewer/shiny_server.R`; `inst/builder/app_bundle/contract.R`; vignettes `create_a_self_contained_shiny_app`, `create_expression_matrix_in_h5_format`, `host_cerebro_on_shinyapps`, `immune_repertoire_analysis`, `million_cell_crb_artifacts`, `multi_crb`; tests `test-app-immune_repertoire.R`, `test-app-inst.R`, `test-cerebro-io.R`, `test-coordinated-views.R`, `test-demo-gene-panel.R`, `test-enriched_pathways.R`, `test-extra_material.R`, `test-immune_repertoire.R`, `test-most_expressed_genes.R`, `test-r-functions.R`. Also the input of `data-raw/build_ir_demos.R`.
+
+### pbmc_seurat.rds
+- **type**: example input object (scRNA-seq; not a `.crb`)
+- **technology**: 10x Chromium Single Cell 3' (Cell Ranger 1.1.0; the source of `pbmc_small`)
+- **dropdown label**: n/a
+- **organism / tissue**: human / PBMC, one healthy donor
+- **source**: Seurat's bundled `pbmc_raw.txt` (`system.file("extdata", "pbmc_raw.txt", package = "Seurat")`), which is the count matrix of `SeuratObject::pbmc_small`: 80 cells × 230 genes, documented as "A subsetted version of 10X Genomics' 3k PBMC dataset", i.e. 10x Genomics *3k PBMCs from a Healthy Donor* (Cell Ranger 1.1.0, 2016): <https://www.10xgenomics.com/datasets/3-k-pbm-cs-from-a-healthy-donor-1-standard-1-1-0>. Verified on the shipped file: same cells, same genes and identical raw counts as `SeuratObject::pbmc_small` (SeuratObject 5.4.0).
+- **acquire**: `install.packages("Seurat")`; the counts are `system.file("extdata", "pbmc_raw.txt", package = "Seurat")` or `SeuratObject::pbmc_small`.
+- **object type**: Seurat v5 object (`SeuratObject` 5.3.0), assay `RNA`, with PCA/UMAP and marker genes in `Misc(obj, "marker_genes")`
+- **sampling**: none; all 80 cells and 230 genes. Cells are split by position into `sample` `pbmc_1` (39) / `pbmc_2` (41); this split is arbitrary, not biological.
+- **cell-type field**: `seurat_clusters` (no cell-type labels)
+- **embedded image**: none (n/a)
+- **license**: data CC BY 4.0, as stated on the 10x Genomics dataset page (copyright 10x Genomics); redistributed in Seurat / SeuratObject, both `MIT + file LICENSE`.
+- **build**: original script by Roman Hillje for cerebroApp, `other_documents/prepare_pbmc_example_with_Seurat.Rmd` (in git history at commit `6e1494ee5`, 2020-09-21; file since removed): `CreateSeuratObject` → normalise / variable features / scale / PCA / neighbours / clusters → UMAP (`seed.use = 100`) → `getMarkerGenes(groups = c("sample", "seurat_clusters"))`. Updated to Seurat v5 in commits `5914c7195`, `291f7a82a` and `5598c44d4` (May 2026, data/PCA/UMAP and markers re-added). **The code for that v5 update was not recorded.**
+- **output**: `inst/extdata/examples/pbmc_seurat.rds` (~206 KiB)
+- **used by**: roxygen docs/examples in `R/addImmuneRepertoire.R`, `R/addPercentMtRibo.R`, `R/calculatePercentGenes.R`, `R/convertSeuratToCerebro.R`, `R/exportFromSeurat.R`, `R/getEnrichedPathways.R`, `R/getMarkerGenes.R`, `R/getMostExpressedGenes.R`, `R/performGeneSetEnrichmentAnalysis.R` (and their `man/` pages); `inst/builder/app_bundle/contract.R`; vignette `create_expression_matrix_in_h5_format`; tests `test-builder-content-tables.R`, `test-export-pinning.R`, `test-exportFromSeurat.R`, `test-gene-set-enrichment.R`, `test-getMarkerGenes.R`, `test-h5-sidecar-checksum.R`, `test-seurat-pipeline.R`.
+
+### pbmc_SCE.rds
+- **type**: example input object (scRNA-seq; not a `.crb`)
+- **technology**: 10x Chromium Single Cell 3' (Cell Ranger 1.1.0; the source of `pbmc_small`)
+- **dropdown label**: n/a
+- **organism / tissue**: human / PBMC, one healthy donor
+- **source**: the same Seurat `pbmc_raw.txt` / `SeuratObject::pbmc_small` counts as `pbmc_seurat.rds`, i.e. a subset of 10x Genomics *3k PBMCs from a Healthy Donor*. Verified on the shipped file: same 80 cells, same 230 genes and identical `counts` as `SeuratObject::pbmc_small`.
+- **acquire**: as for `pbmc_seurat.rds`.
+- **object type**: `SingleCellExperiment` with assays `counts` and `logcounts`, reduced dims `PCA` and `UMAP`
+- **sampling**: none; all 80 cells and 230 genes, one sample (`pbmc`).
+- **cell-type field**: `cluster` (walktrap clusters on an SNN graph; no cell-type labels)
+- **embedded image**: none (n/a)
+- **license**: data CC BY 4.0, as stated on the 10x Genomics dataset page (copyright 10x Genomics); redistributed in Seurat / SeuratObject, both `MIT + file LICENSE`.
+- **build**: script by Roman Hillje for cerebroApp, `other_documents/prepare_pbmc_example_with_SCE.Rmd` (in git history at commit `6e1494ee5`, 2020-09-21; file since removed): `scater::logNormCounts` → `runPCA` → `scran::buildSNNGraph` + `igraph::cluster_walktrap` → `runUMAP`. The file has not changed since that commit apart from being moved to `examples/`.
+- **output**: `inst/extdata/examples/pbmc_SCE.rds` (~61 KiB)
+- **used by**: roxygen docs/examples in `R/convertSCEToCerebro.R`, `R/convertSCEToSeurat.R`, `R/exportFromSCE.R` (and their `man/` pages); `inst/builder/app_bundle/contract.R`; tests `test-builder-end-to-end.R`, `test-export-pinning.R`, `test-exportFromSCE.R`, `test-sce-pipeline.R`.

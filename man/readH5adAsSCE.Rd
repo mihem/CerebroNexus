@@ -26,12 +26,6 @@ together with \code{modality}. Files written by anndata before 0.7
 matrix, as scanpy workflows often keep the full, unfiltered gene set
 there. \code{layers} are then not read, because their genes differ.}
 
-\item{extra_modalities}{For a MuData file: other modalities to read next to
-the expression one (for example \code{"prot"} for antibody counts), or
-\code{"all"} for every modality except the expression and receptor ones. Each
-becomes an alternative experiment of the result, with its own features and
-the cells of the expression modality (cells it lacks get zeros).}
-
 \item{modality}{For a MuData file (\code{.h5mu}), the modality to read, e.g.
 \code{"gex"}. Optional when the file has one modality or one obviously
 expression-like name (\code{rna}, \code{gex}).}
@@ -58,6 +52,12 @@ all cells are one sample (\code{"Sample_1"}).}
 (default; \code{hires} when present, otherwise \code{lowres}), a character
 vector of image labels (\code{"hires"}, \code{"lowres"},
 \code{"fullres"}), or \code{FALSE} for none. Needs the \pkg{png} package.}
+
+\item{extra_modalities}{For a MuData file: other modalities to read next to
+the expression one (for example \code{"prot"} for antibody counts), or
+\code{"all"} for every modality except the expression and receptor ones. Each
+becomes an alternative experiment of the result, with its own features and
+the cells of the expression modality (cells it lacks get zeros).}
 
 \item{verbose}{Print what was skipped.}
 
@@ -135,11 +135,22 @@ cells. Other \code{uns}, \code{obsp}, \code{varm} and \code{varp} content is
 not read.
 }
 \examples{
-\dontrun{
-sce <- readH5adAsSCE("pbmc.h5ad")
-convertSCEToCerebro(sce, "output", groups = "cell_type")
+\dontshow{if (nzchar(system.file(package = "rhdf5")) && nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\donttest{
+h5ad <- tempfile(fileext = ".h5ad")
+exportToH5ad(
+  system.file("extdata/examples/example.crb", package = "CerebroNexus"),
+  h5ad
+)
+sce <- readH5adAsSCE(h5ad)
+convertSCEToCerebro(
+  sce,
+  file.path(tempdir(), "output"),
+  assay = "X",
+  groups = "sample"
+)
 }
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \code{\link{convertH5adToCerebro}}, \code{\link{convertSCEToCerebro}}

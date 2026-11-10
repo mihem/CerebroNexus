@@ -338,6 +338,8 @@ test_that("Viewer authentication fails closed when branding is incomplete", {
 })
 
 test_that("Viewer starts after server-authoritative authentication", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   runtime <- viewer_auth_runtime_environment()
   root <- withr::local_tempdir()
@@ -403,6 +405,8 @@ test_that("Viewer starts after server-authoritative authentication", {
 })
 
 test_that("Viewer keeps account management outside the runtime", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   runtime <- viewer_auth_runtime_environment()
   root <- withr::local_tempdir()
@@ -810,6 +814,8 @@ test_that("the sign-in client can come from a proxy header", {
 })
 
 test_that("the sign-in limiter is applied to the provider's checker", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("shinymanager", minimum_version = "1.1.0")
   auth_state <- shiny::reactiveValues(user = NULL)
   captured <- NULL

@@ -888,12 +888,17 @@ builder_native_picker_spec <- function(
     if (nzchar(powershell) && nzchar(.which("wslpath"))) {
       script <- builder_windows_picker_script(kind)
       # EncodedCommand avoids WSL's extra Windows command-line quoting layer.
-      encoded <- base64enc::base64encode(iconv(
-        script,
-        from = "UTF-8",
-        to = "UTF-16LE",
-        toRaw = TRUE
-      )[[1L]])
+      encoded <- gsub(
+        "\n",
+        "",
+        jsonlite::base64_enc(iconv(
+          script,
+          from = "UTF-8",
+          to = "UTF-16LE",
+          toRaw = TRUE
+        )[[1L]]),
+        fixed = TRUE
+      )
       return(list(
         command = unname(powershell),
         args = c(
@@ -1631,6 +1636,7 @@ builder_sniff_format <- function(path) {
 ## readRDS() reads gzip, bzip2, xz, zstd and uncompressed serializations;
 ## gzfile() decompresses all of them, so the first decompressed bytes must be
 ## an R serialization header: "X\n", "A\n" or "B\n" and format version 2 or 3.
+## An ASCII save made on Windows starts "A\r\n".
 .builder_sniff_rds <- function(path, head) {
   compressed <- list(
     c(0x1f, 0x8b),
@@ -1638,7 +1644,12 @@ builder_sniff_format <- function(path) {
     c(0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00),
     c(0x28, 0xb5, 0x2f, 0xfd)
   )
-  plain <- list(c(0x58, 0x0a), c(0x41, 0x0a), c(0x42, 0x0a))
+  plain <- list(
+    c(0x58, 0x0a),
+    c(0x41, 0x0a),
+    c(0x41, 0x0d, 0x0a),
+    c(0x42, 0x0a)
+  )
   starts <- function(bytes) {
     bytes <- as.raw(bytes)
     length(head) >= length(bytes) &&
@@ -1652,18 +1663,24 @@ builder_sniff_format <- function(path) {
     return(FALSE)
   }
   header <- tryCatch(
-    suppressWarnings(readBin(connection, "raw", n = 6L)),
+    suppressWarnings(readBin(connection, "raw", n = 7L)),
     error = function(error) raw()
   )
   close(connection)
-  if (length(header) < 4L || header[[2L]] != as.raw(0x0a)) {
+  if (length(header) < 4L) {
+    return(FALSE)
+  }
+  crlf <- header[[1L]] == as.raw(0x41) &&
+    header[[2L]] == as.raw(0x0d) &&
+    header[[3L]] == as.raw(0x0a)
+  if (header[[2L]] != as.raw(0x0a) && !crlf) {
     return(FALSE)
   }
   version <- switch(
     rawToChar(header[1L]),
     X = if (length(header) >= 6L) as.integer(header[[6L]]) else NA_integer_,
     B = as.integer(header[[3L]]),
-    A = suppressWarnings(as.integer(rawToChar(header[3L]))),
+    A = suppressWarnings(as.integer(rawToChar(header[if (crlf) 4L else 3L]))),
     NA_integer_
   )
   isTRUE(version %in% c(2L, 3L))
@@ -1945,7 +1962,8 @@ builder_example_record <- function(
   expected_pages = character(),
   expected_supporting_content = character(),
   histology_images = list(),
-  gallery_visible = TRUE
+  gallery_visible = TRUE,
+  fetch = NULL
 ) {
   require_string <- function(value, name, nonempty = TRUE) {
     valid <- is.character(value) && length(value) == 1L && !is.na(value)
@@ -2095,6 +2113,13 @@ builder_example_record <- function(
     make <- local({
       path <- serialized_path
       function() {
+        ## An example that is not in the package is downloaded on first use.
+        if (nzchar(path) && !file.exists(path) && is.function(fetch)) {
+          failure <- fetch()
+          if (!is.null(failure)) {
+            return(list(error = failure))
+          }
+        }
         if (!nzchar(path) || !file.exists(path)) {
           return(list(error = "The package example object was not found."))
         }
@@ -2137,6 +2162,45 @@ builder_example_catalog <- function() {
     .builder_example_path(
       file.path("builder", "fixtures", ...)
     )
+  }
+  ## The Trekker and Visium examples are not in the CRAN package. Their files
+  ## are downloaded into the user cache the first time the example is loaded.
+  downloadable <- function(...) {
+    path <- fixture(...)
+    if (nzchar(path)) {
+      return(path)
+    }
+    get(".demoDataPath", envir = asNamespace("CerebroNexus"))(
+      file.path("builder", "fixtures", ...)
+    )
+  }
+  download <- function(label, directory) {
+    function() {
+      .builder_io_require_package()
+      namespace <- asNamespace("CerebroNexus")
+      tryCatch(
+        {
+          namespace$.demoDataFetch(
+            namespace$.demoDataFiles(file.path(
+              "builder",
+              "fixtures",
+              directory
+            )),
+            quiet = TRUE
+          )
+          NULL
+        },
+        error = function(error) {
+          paste0(
+            "The ",
+            label,
+            " is downloaded on first use and the download failed: ",
+            conditionMessage(error),
+            " The other examples still work."
+          )
+        }
+      )
+    }
   }
   core <- function(reductions = "umap", groups = "preserved") {
     values <- stats::setNames(
@@ -2310,7 +2374,7 @@ builder_example_catalog <- function() {
       "spatial section and four H&E images"
     ),
     "synthetic",
-    fixture("trekker_spatial", "trekker_4_tissues.qs2"),
+    downloadable("trekker_spatial", "trekker_4_tissues.qs2"),
     expected_dispositions = with_content(
       core(c("pca", "umap", "SPATIAL")),
       spatial = "preserved"
@@ -2322,7 +2386,8 @@ builder_example_catalog <- function() {
       character(1),
       "path"
     )),
-    histology_images = trekker_histology_images
+    histology_images = trekker_histology_images,
+    fetch = download("Trekker spatial demo", "trekker_spatial")
   )
   spatial_alignment <- record(
     "spatial_alignment",
@@ -2333,14 +2398,15 @@ builder_example_catalog <- function() {
       "Data: 10x Genomics, CC BY 4.0"
     ),
     "real",
-    fixture("spatial_alignment", "visium_breast_cancer.rds"),
+    downloadable("spatial_alignment", "visium_breast_cancer.rds"),
     expected_dispositions = with_content(
       core("umap"),
       spatial = "preserved"
     ),
     expected_pages = "spatial",
     expected_supporting_content = "visium_breast_cancer_he.jpg",
-    histology_images = alignment_histology_images
+    histology_images = alignment_histology_images,
+    fetch = download("Visium breast cancer demo", "spatial_alignment")
   )
   list(
     complete_viewer_data = complete_viewer_data,

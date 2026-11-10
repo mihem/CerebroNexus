@@ -89,6 +89,8 @@ generated_app_expected_content_pages <- function(expected) {
 
 
 test_that("canonical fixtures freeze into one explicit multi-dataset plan", {
+  ## Slow (full Builder plan).
+  skip_on_cran()
   bundle <- generated_app_e2e_bundle()
 
   expect_s3_class(bundle$plan, "builder_build_plan")
@@ -328,7 +330,7 @@ test_that("private App config and all outputs remain inside the temporary releas
   )
 
   mouse_conversion <- utils::read.delim(
-    gzfile(file.path(bundle$app_dir, "extdata", "mm10_gene_ID_name.tsv.gz")),
+    gzfile(file.path(bundle$app_dir, "extdata", "mm10_gene_ID_name.tsv.xz")),
     nrows = 1L,
     stringsAsFactors = FALSE,
     check.names = FALSE
@@ -350,6 +352,8 @@ test_that("private App config and all outputs remain inside the temporary releas
 })
 
 test_that("generated private App reaches semantic HTTP readiness", {
+  ## Starts an app server.
+  skip_on_cran()
   bundle <- generated_app_e2e_bundle()
   server <- generated_app_e2e_server()
 
@@ -783,6 +787,9 @@ test_that("offline trajectory selection renders its complete source lineage", {
 
 
 test_that("TCR and HLA fixture renders repertoire data and stored typing", {
+  skip_if_not_installed("scRepertoire")
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("shinycssloaders")
   fixture <- generated_app_e2e_select_dataset("immune_tcr_hla")
 
   generated_app_e2e_activate_tab("immune_repertoire")
@@ -822,6 +829,9 @@ test_that("TCR and HLA fixture renders repertoire data and stored typing", {
 })
 
 test_that("BCR-only fixture renders IGH repertoire without an HLA page", {
+  skip_if_not_installed("scRepertoire")
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("shinycssloaders")
   fixture <- generated_app_e2e_select_dataset("immune_bcr")
   expect_false("hla_tcr_motifs" %in% generated_app_e2e_visible_pages())
 

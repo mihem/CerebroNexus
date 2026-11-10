@@ -23,7 +23,7 @@ Seurat v3.0 or higher since the concept of assays wasn't implemented before.}
 
 \item{GMT_file}{Path to GMT file containing the gene sets to be tested.
 The Broad Institute provides many gene sets which can be downloaded:
-http://software.broadinstitute.org/gsea/msigdb/index.jsp}
+https://www.gsea-msigdb.org/gsea/msigdb/index.jsp}
 
 \item{groups}{Grouping variables (columns) in object@meta.data for which
 gene set enrichment analysis should be performed}
@@ -50,6 +50,8 @@ labels to cell clusters from single-cell RNA-sequencing data", Diaz-Mejia et
 al., F1000Research (2019).
 }
 \examples{
+\dontshow{if (all(nzchar(vapply(c("Seurat", "GSVA", "qvalue", "future.apply"), function(p) system.file(package = p), "")))) withAutoprint(\{ # examplesIf}
+\donttest{
 pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
   package = "CerebroNexus"))
 example_gene_set <- system.file("extdata/example_gene_set.gmt",
@@ -57,9 +59,10 @@ example_gene_set <- system.file("extdata/example_gene_set.gmt",
 pbmc <- performGeneSetEnrichmentAnalysis(
   object = pbmc,
   GMT_file = example_gene_set,
-  groups = c('sample','seurat_clusters'),
+  groups = 'seurat_clusters',
   thresh_p_val = 0.05,
   thresh_q_val = 0.1
 )
-
+}
+\dontshow{\}) # examplesIf}
 }

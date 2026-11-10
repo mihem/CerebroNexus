@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 ## SingleCellExperiment and AnnData files as Builder sources.
 ##
 ## They enter through builder_read_object(), which hands everything downstream a
@@ -13,7 +16,7 @@ builder_profile_source_runtime(local = globalenv())
 builder_repo_source("inspect.R", local = globalenv())
 builder_repo_source("adapters.R", local = globalenv())
 
-fixture <- function(name) testthat::test_path("fixtures", "anndata", name)
+fixture <- anndata_test_fixture
 quiet <- function(x) suppressWarnings(suppressMessages(x))
 
 test_that("the format registry claims AnnData files next to the Seurat ones", {
@@ -164,6 +167,7 @@ test_that("scanpy / scVelo trajectories are offered and built by the Builder", {
 })
 
 test_that("a scirpy repertoire is offered and built by the Builder", {
+  skip_if_not_installed("scRepertoire")
   skip_if_not_installed("qs2")
   built <- build_through_builder(fixture("small_airr.h5ad"), "h5ad_airr")
   expect_true(

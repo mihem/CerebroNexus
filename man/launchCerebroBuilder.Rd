@@ -51,8 +51,8 @@ people to upload data to: it reads whatever path it is given, and reading an
 }
 
 \examples{
-\dontrun{
-launchCerebroBuilder()
+if (interactive()) {
+  launchCerebroBuilder()
 }
 
 }

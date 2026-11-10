@@ -26,7 +26,7 @@
 #' @param percentage_cells_to_show Default percentage of cells shown in every
 #'   cell scatter view. This value can be changed independently in each page;
 #'   defaults to 100.
-#' @param projections_show_hover_info Show hover infos in projections. This
+#' @param projections_show_hover_info Show hover information in projections. This
 #' setting can be changed in the UI; defaults to TRUE.
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
 #' \code{host} or \code{port}.
@@ -42,17 +42,13 @@
 #'   )
 #' }
 #'
-#' @importFrom colourpicker colourInput
 #' @import dplyr
 #' @importFrom DT datatable formatPercentage formatRound formatSignif formatStyle styleColorBar styleEqual styleInterval
-#' @import ggplot2
 #' @importFrom grDevices col2rgb rgb
-#' @importFrom msigdbr msigdbr
 #' @importFrom plotly add_lines add_trace event_data layout plot_ly plotlyOutput renderPlotly toWebGL
-#' @importFrom stringr str_length
-#' @importFrom tidyr pivot_longer pivot_wider
-#' @import scales
 #' @import shiny
+#' @importFrom htmltools save_html
+#' @importFrom colourpicker colourInput
 #' @importFrom shinycssloaders withSpinner
 #' @import shinydashboard
 #' @importFrom shinyjs inlineCSS
@@ -131,8 +127,9 @@ launchCerebro <- function(
   }
 
   ## --------------------------------------------------------------------------##
-  ## Create global variable with options that need to be available inside the
-  ## Shiny app.
+  ## Options the Viewer reads. The Viewer files are sourced into this function's
+  ## environment below, so they find `Cerebro.options` here without touching
+  ## the global environment.
   ## --------------------------------------------------------------------------##
   dataset_catalog <- .datasetCatalogFromFiles(
     crb_file_to_load,
@@ -160,12 +157,7 @@ launchCerebro <- function(
     "percentage_cells_to_show" = percentage_cells_to_show,
     "projections_show_hover_info" = projections_show_hover_info
   )
-  assign("Cerebro.options", cerebro_options, envir = .GlobalEnv)
-
-  ##--------------------------------------------------------------------------##
-  ## Allow upload of files up to 800 MB.
-  ##--------------------------------------------------------------------------##
-  options(shiny.maxRequestSize = maxFileSize * 1024^2)
+  Cerebro.options <- cerebro_options
 
   ##--------------------------------------------------------------------------##
   ## Load server and UI functions.
@@ -186,7 +178,7 @@ launchCerebro <- function(
   )
   ## The server's one-time handoff now owns these references. Keeping copies
   ## in launch options/closure would defeat later prototype eviction.
-  .GlobalEnv$Cerebro.options[[".dataset_prototypes"]] <- NULL
+  Cerebro.options[[".dataset_prototypes"]] <- NULL
   rm(dataset_prototypes, cerebro_options)
 
   ##--------------------------------------------------------------------------##
@@ -200,7 +192,8 @@ launchCerebro <- function(
     )
   )
   ## Shiny Server cannot carry binary WebSocket frames; wrap them there only.
-  transport_env <- new.env(parent = globalenv())
+  ## Its helpers read `Cerebro.options` from this function's environment.
+  transport_env <- new.env(parent = environment())
   sys.source(
     system.file("viewer/transport_compat.R", package = "CerebroNexus"),
     envir = transport_env
@@ -210,9 +203,20 @@ launchCerebro <- function(
     server,
     system.file(package = "CerebroNexus")
   )
-  shiny::shinyApp(
-    ui = transport$ui,
-    server = transport$server,
-    ...
+  ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
+  ## value is restored when it stops. A user `onStart` still runs afterwards.
+  app_args <- list(...)
+  user_on_start <- app_args[["onStart"]]
+  max_request_size <- maxFileSize * 1024^2
+  app_args[["onStart"]] <- function() {
+    previous <- options(shiny.maxRequestSize = max_request_size)
+    shiny::onStop(function() options(previous))
+    if (is.function(user_on_start)) {
+      user_on_start()
+    }
+  }
+  do.call(
+    shiny::shinyApp,
+    c(list(ui = transport$ui, server = transport$server), app_args)
   )
 }

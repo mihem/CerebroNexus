@@ -121,6 +121,8 @@ test_that("the Ren h5ad selectors accept standard AnnData paths", {
 })
 
 test_that("the Ren preparation keeps large categorical and repertoire data lazy", {
+  ## Slow.
+  skip_on_cran()
   skip_if_not_installed("data.table")
   skip_if_not_installed("qs2")
   script <- ren_demo_script()

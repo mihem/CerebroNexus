@@ -54,3 +54,11 @@ sibling per-FOV sidecar, and a large immune repertoire to a sibling file (see
 \code{immune_sidecar}). The input object and existing sidecars are not
 modified.
 }
+\examples{
+cerebro <- readCerebro(system.file("extdata/examples/example.crb", package = "CerebroNexus"))
+dir <- tempfile("cerebro-")
+dir.create(dir)
+saveCerebro(cerebro, file.path(dir, "example.crb"))
+list.files(dir)
+unlink(dir, recursive = TRUE)
+}

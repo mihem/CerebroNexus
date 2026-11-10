@@ -756,7 +756,10 @@ hla_motif_blocked <- reactive({
   if (!hla_has_deps()) {
     return(list(
       kind = "empty",
-      text = "The motif network requires the 'stringdist' and 'igraph' packages."
+      text = paste(
+        "The motif network requires the 'stringdist' and 'igraph' packages.",
+        'Install them with install.packages(c("stringdist", "igraph")).'
+      )
     ))
   }
   ## The Viewer Pack's snapshot is the graph these settings build, and is

@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 test_that("worker progress records are private, atomic, and bounded", {
   loading_path <- builder_profile_inst_path("builder", "loading.R")
   sys.source(loading_path, envir = globalenv())

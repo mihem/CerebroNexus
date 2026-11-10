@@ -425,6 +425,14 @@
 #' @param verbose Print what was read.
 #' @return A SingleCellExperiment.
 #' @seealso \code{\link{convertSpatialDataToCerebro}}, \code{\link{readH5adAsSCE}}
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' \donttest{
+#' ## A small SpatialData store (50 spots), zipped
+#' sce <- readSpatialDataAsSCE(
+#'   system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus")
+#' )
+#' sce
+#' }
 #' @export
 readSpatialDataAsSCE <- function(
   path,
@@ -606,6 +614,19 @@ readSpatialDataAsSCE <- function(
 #'   \code{groups}, \code{organism}, \code{expression_matrix_mode}).
 #' @return The path of the \code{.crb}, invisibly.
 #' @seealso \code{\link{readSpatialDataAsSCE}}
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' \donttest{
+#' dir <- tempfile("cerebro-")
+#' dir.create(dir)
+#' convertSpatialDataToCerebro(
+#'   system.file("extdata/examples/small_spatialdata.zip", package = "CerebroNexus"),
+#'   result_dir = dir,
+#'   groups = "cell_type",
+#'   verbose = FALSE
+#' )
+#' list.files(dir)
+#' unlink(dir, recursive = TRUE)
+#' }
 #' @export
 convertSpatialDataToCerebro <- function(
   path,

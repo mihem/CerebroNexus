@@ -92,7 +92,10 @@
 #' @noRd
 .h5adImageDataUri <- function(array) {
   bytes <- png::writePNG(array, target = raw())
-  paste0("data:image/png;base64,", base64enc::base64encode(bytes))
+  paste0(
+    "data:image/png;base64,",
+    gsub("\n", "", jsonlite::base64_enc(bytes), fixed = TRUE)
+  )
 }
 
 #' Visium tissue images from uns["spatial"][<library_id>]["images"], ready to

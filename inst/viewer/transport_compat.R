@@ -54,7 +54,10 @@ viewerApplyTransportCompat <- function(
       stopifnot(is.character(type), length(type) == 1L, is.raw(message))
       session$sendCustomMessage(
         "cerebro_sockjs_binary",
-        list(type = type, data = base64enc::base64encode(message))
+        list(
+          type = type,
+          data = gsub("\n", "", jsonlite::base64_enc(message), fixed = TRUE)
+        )
       )
     }
     locked <- bindingIsLocked("sendBinaryMessage", session)

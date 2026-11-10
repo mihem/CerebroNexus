@@ -32,6 +32,8 @@ test_that("a daemon confirms an H5 file's cell names once per process", {
 })
 
 test_that("an unfinished daemon check is not waited for", {
+  ## Timing-sensitive; kills a background process.
+  skip_on_cran()
   skip_if_not_installed("mirai")
   crb_cache <- new.env()
   sys.source(viewer_test_path("crb_cache.R"), crb_cache)

@@ -205,7 +205,7 @@ as cross-UID integration coverage.
 
 `test-viewer-linux-launcher.R` covers permission preparation, repeated setup, linked-file rejection and failed or ineffective chmod for the Linux deployment entry point. It runs as a non-root Linux user and does not replace testing a real service account on the deployment host.
 
-See the [authentication guide](../vignettes/control_access_to_cerebro_with_a_login_page.Rmd)
+See the [authentication guide](../vignettes/articles/control_access_to_cerebro_with_a_login_page.Rmd)
 for deployment and Windows-to-Linux transfer limitations. Generated Apps retain
 a brief offline checklist.
 

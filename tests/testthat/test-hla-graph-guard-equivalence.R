@@ -87,16 +87,21 @@ guard_test_over_limit <- function() {
 }
 
 test_that("early total guard preserves counts, boundaries and normal graph payloads", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   core <- guard_test_core(4L)
   expected <- guard_test_expected()$graphs
   canonical <- function(g) {
     if (!inherits(g, "igraph")) {
       return(g)
     }
-    list(
-      data = igraph::as_data_frame(g, what = "both"),
-      attributes = igraph::graph_attr(g)
-    )
+    data <- igraph::as_data_frame(g, what = "both")
+    ## The layout is floating point: macOS gives the stored coordinates to
+    ## about 1e-10, so compare it to 6 digits; everything else is exact.
+    for (column in intersect(c("layout_x", "layout_y"), names(data$vertices))) {
+      data$vertices[[column]] <- round(data$vertices[[column]], 6L)
+    }
+    list(data = data, attributes = igraph::graph_attr(g))
   }
   cases <- guard_test_cases()
   expect_length(expected, length(cases))
@@ -120,6 +125,8 @@ test_that("early total guard preserves counts, boundaries and normal graph paylo
 })
 
 test_that("over-limit graphs skip aggregation and normal graphs group only once", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("stringdist")
   e <- guard_test_core(4L)
   calls <- new.env()
   calls$keys <- calls$aggregation <- 0L

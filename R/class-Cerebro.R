@@ -32,6 +32,11 @@ setOldClass(Classes = 'package_version')
 #'
 #' @importFrom R6 R6Class
 #
+#' @examples
+#' cerebro <- Cerebro$new()
+#' cerebro$addExperiment("experiment_name", "PBMC")
+#' cerebro$addExperiment("organism", "hg")
+#' cerebro$getExperiment()
 #' @export
 #
 Cerebro <- R6::R6Class(

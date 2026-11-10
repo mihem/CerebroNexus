@@ -70,23 +70,32 @@ Each non-empty sample table must contain \code{barcode},
   mismatch is an error. Zero-row sample tables are treated as absent.
 }
 \examples{
-\dontrun{
-## from scRepertoire's output
-combined <- scRepertoire::combineTCR(contig_list, samples = donor_ids)
-seurat <- addImmuneRepertoire(seurat, tcr = combined)
-
-## or straight from Cell Ranger
-seurat <- addImmuneRepertoire(
-  seurat,
-  tcr = file.path(sample_dirs, "filtered_contig_annotations.csv"),
-  sample_names = donor_ids
+\dontshow{if (nzchar(system.file(package = "SeuratObject"))) withAutoprint(\{ # examplesIf}
+\donttest{
+seurat <- readRDS(
+  system.file("extdata/examples/pbmc_seurat.rds", package = "CerebroNexus")
 )
-
-## or from meta.data, after scRepertoire::combineExpression()
-seurat <- addImmuneRepertoire(seurat)
-
-exportFromSeurat(seurat, file = "my_data.crb", experiment_name = "mine",
-                 organism = "hg", groups = c("sample", "seurat_clusters"))
+## A clone shared by ten cells of the first sample, in the shape
+## scRepertoire::combineTCR() returns (one data.frame per sample).
+sample <- as.character(seurat$sample[[1]])
+cells <- colnames(seurat)[seurat$sample == sample][1:10]
+tcr <- stats::setNames(list(data.frame(
+  barcode = cells,
+  CTgene = "TRAV1-2.TRAJ33.TRAC_TRBV6-1.TRBJ2-1.TRBC2",
+  CTnt = "TGTGCTGTGAGAGACAGC_TGCGCCAGCAGTGAA",
+  CTaa = "CAVRDSNYQLIW_CASSPGQGNEQFF",
+  CTstrict = paste0(
+    "TRAV1-2.TRAJ33.TRAC;TGTGCTGTGAGAGACAGC_",
+    "TRBV6-1.TRBJ2-1.TRBC2;TGCGCCAGCAGTGAA"
+  )
+)), sample)
+seurat <- addImmuneRepertoire(seurat, tcr = tcr, sample_col = "sample",
+                              verbose = FALSE)
 }
 
+## Other inputs: Cell Ranger files, e.g.
+## addImmuneRepertoire(seurat, tcr = "filtered_contig_annotations.csv"),
+## or meta.data columns after scRepertoire::combineExpression():
+## addImmuneRepertoire(seurat)
+\dontshow{\}) # examplesIf}
 }

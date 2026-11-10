@@ -14,7 +14,9 @@
 #' List of lists containing the percentages of expression for each provided
 #' gene list.
 #'
-#' @examples
+#' @examplesIf nzchar(system.file(package = "SeuratObject"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- calculatePercentGenes(
@@ -22,6 +24,7 @@
 #'   assay = 'RNA',
 #'   genes = list('example' = c('FCN1','CD3D'))
 #' )
+#' }
 #'
 #' @importFrom Matrix colSums
 #'
@@ -46,7 +49,7 @@ calculatePercentGenes <- function(
 
   ## for every supplied gene list, get the genes that are present in the data
   ## set and calculate the percentage of transcripts that they account for
-  pbapply::pblapply(genes, function(x) {
+  .progressLapply(genes, function(x) {
     genes_here <- intersect(x, rownames(counts_matrix))
     Matrix::colSums(counts_matrix[genes_here, , drop = FALSE]) /
       Matrix::colSums(counts_matrix)

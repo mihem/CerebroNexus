@@ -91,7 +91,11 @@ test_that("self-contained app vignette never purls interactive runApp calls", {
   output <- tempfile(fileext = ".R")
   on.exit(unlink(output), add = TRUE)
   knitr::purl(
-    source_file("vignettes", "create_a_self_contained_shiny_app.Rmd"),
+    source_file(
+      "vignettes",
+      "articles",
+      "create_a_self_contained_shiny_app.Rmd"
+    ),
     output = output,
     quiet = TRUE
   )

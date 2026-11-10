@@ -198,6 +198,8 @@ test_that("new run options preserve historical positional arguments", {
 })
 
 test_that("createShinyApp freezes typed run options into config", {
+  ## Starts an R process.
+  skip_on_cran()
   skip_if_not_installed("callr")
   fixture <- run_options_test_fixture()
   request_mb <- 37.125

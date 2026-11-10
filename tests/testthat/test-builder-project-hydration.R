@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_project_open_runtime <- function() {
   runtime <- new.env(parent = globalenv())
   sys.source(

@@ -14,7 +14,9 @@
 #' Seurat object with most expressed genes stored for every group level of the
 #' specified groups stored in \code{object@misc$most_expressed_genes}.
 #'
-#' @examples
+#' @examplesIf nzchar(system.file(package = "SeuratObject"))
+#' \donttest{
+#' ## Reading the Seurat object loads SeuratObject, which takes a few seconds.
 #' pbmc <- readRDS(system.file("extdata/examples/pbmc_seurat.rds",
 #'   package = "CerebroNexus"))
 #' pbmc <- getMostExpressedGenes(
@@ -22,11 +24,11 @@
 #'   assay = 'RNA',
 #'   groups = c('sample','seurat_clusters')
 #' )
+#' }
 #'
 #' @import dplyr
 #' @importFrom Matrix rowSums
 #' @importFrom rlang .data :=
-#' @importFrom tibble tibble
 #'
 #' @export
 #'
@@ -65,7 +67,7 @@ getMostExpressedGenes <- function(
       transcripts_counts_per_gene / sum(transcripts_counts_per_gene),
       decreasing = TRUE
     )
-    tibble::tibble(
+    dplyr::tibble(
       group = level,
       gene = names(transcripts_percent_per_gene)[1:100],
       pct = transcripts_percent_per_gene[1:100]
@@ -97,7 +99,7 @@ getMostExpressedGenes <- function(
         current_group,
         '`...'
       )
-      results <- pbapply::pblapply(group_levels, function(x) {
+      results <- .progressLapply(group_levels, function(x) {
         top_genes(
           x,
           rownames(object@meta.data)[which(

@@ -194,6 +194,10 @@ observeEvent(
     ))
     previous <- spatial_point_patch_values[[key]] %||%
       spatial_projection_controls()[c("point_size", "point_opacity")]
+    ## Without a spatial plot there are no controls to patch.
+    if (!is.list(previous)) {
+      return(invisible(NULL))
+    }
     spatial_point_patch_values[[key]] <- utils::modifyList(previous, values)
     changed <- values[
       !vapply(

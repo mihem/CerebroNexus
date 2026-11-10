@@ -1,3 +1,6 @@
+## Slow Builder integration tests (app sourcing, worker processes): CI only.
+skip_on_cran()
+
 builder_stage_contract_source_runtime(environment())
 sys.source(
   builder_profile_inst_path("builder", "analysis.R"),
