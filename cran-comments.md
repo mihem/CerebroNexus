@@ -23,8 +23,7 @@ immune repertoires, trajectories, spatial images and HLA-TCR motifs.
 
 * This is a new submission.
 * "Possibly misspelled words in DESCRIPTION" (win-builder): HLA and TCR are
-  immunology abbreviations, Hillje is the author of the cited paper, "et al"
-  belongs to that citation, and transcriptomics is a standard term. All are
+  immunology abbreviations and transcriptomics is a standard term. All are
   spelled correctly.
 
 ## Reverse dependencies
