@@ -36,24 +36,16 @@ Rplots\.pdf$
 # CRAN size (cran-size)
 ^vignettes/articles$
 ^man/figures/(featured|builder)\.png$
-## Only three small AnnData fixtures ship; the rest stay in git.
+## The AnnData .h5ad/.h5mu fixtures ship. The Zarr stores stay in git: their paths
+## exceed the 100 bytes a tarball portably holds, and small_v2.zarr has hidden
+## files.
 ^tests/testthat/fixtures/anndata/make_fixtures\.py$
 ^tests/testthat/fixtures/anndata/make_zarr_fixtures\.py$
 ^tests/testthat/fixtures/anndata/make_zarr_shapes\.R$
-^tests/testthat/fixtures/anndata/small_airr\.h5ad$
-^tests/testthat/fixtures/anndata/small_airr\.h5mu$
-^tests/testthat/fixtures/anndata/small_csc\.h5ad$
-^tests/testthat/fixtures/anndata/small_ensembl\.h5ad$
-^tests/testthat/fixtures/anndata/small_mudata\.h5mu$
-^tests/testthat/fixtures/anndata/small_pseudotime\.h5ad$
 ^tests/testthat/fixtures/anndata/small_sd_cells\.zarr$
 ^tests/testthat/fixtures/anndata/small_sd_visium\.zarr$
-^tests/testthat/fixtures/anndata/small_spatial\.h5ad$
-^tests/testthat/fixtures/anndata/small_trajectory\.h5ad$
 ^tests/testthat/fixtures/anndata/small_v2\.zarr$
 ^tests/testthat/fixtures/anndata/small_v3\.zarr$
-^tests/testthat/fixtures/anndata/small_visium\.h5ad$
-^tests/testthat/fixtures/anndata/small_zarr_twin\.h5ad$
 ^inst/extdata/examples/demo_spatial_(visium|slideseq|merfish|xenium)\.crb$
 ^inst/extdata/examples/demo_spatial_(visium_he\.png|histology\.svg)$
 ^inst/extdata/examples/spatial$
