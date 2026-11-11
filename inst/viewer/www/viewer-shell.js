@@ -1113,7 +1113,14 @@
         element.hidden = false;
         // Avoid a flash for cached or near-instant loads. The transparent layer
         // still blocks interaction with the outgoing dataset while waiting.
-        revealTimer = window.setTimeout(function () {
+        revealTimer = window.setTimeout(function reveal() {
+          // The startup cover owns the screen. Keep the card back until it is
+          // gone, so a load that ends under the cover is never shown (no flash
+          // as the cover fades) and one that outlasts it appears normally.
+          if (document.documentElement.classList.contains("cerebro-starting")) {
+            revealTimer = window.setTimeout(reveal, 50);
+            return;
+          }
           revealTimer = null;
           visibleAt = window.performance.now();
           element.classList.add("is-visible");

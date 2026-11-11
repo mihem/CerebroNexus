@@ -11,6 +11,7 @@ function session(reducedMotion = false) {
     getElementById: () => null,
     querySelector: () => pane,
     body: {classList: classes(), appendChild: e => {overlay = e;}},
+    documentElement: {classList: classes()},
     createElement: () => {
       const nodes = {};
       return {classList: classes(), querySelector: s => nodes[s] || (nodes[s] = {textContent:'', style:{}})};
@@ -33,6 +34,7 @@ vm.runInNewContext(fs.readFileSync(require('path').join(require('path').dirname(
   return {
     get overlay() {return overlay;},
     get busy() {return document.body.classList.contains('cerebro-dataset-is-loading');},
+    startup: on => document.documentElement.classList[on ? 'add' : 'remove']('cerebro-starting'),
     setPane: value => {pane = value;},
     emit: (name, detail = {}) => events[name]({detail}),
     window,
@@ -56,6 +58,20 @@ const visible = s => s.overlay.classList.contains('is-visible');
   const s = session(); s.update(); assert(s.busy); assert(!s.overlay.hidden); assert(!visible(s));
   s.tick(80); s.update({done:true,percent:100}); assert(s.overlay.hidden); assert(!s.busy);
   s.tick(1000); assert(!visible(s));
+}
+// Under the startup cover the card stays back: a load that ends there is never
+// shown, so nothing flashes as the cover fades.
+{
+  const s = session(); s.startup(true); s.update(); s.tick(2000);
+  assert(s.busy); assert(!visible(s));
+  s.startup(false); s.update({done:true,percent:100});
+  assert(s.overlay.hidden); assert(!s.busy); s.tick(1000); assert(!visible(s));
+}
+// A load that outlasts the cover shows the card once the cover is gone.
+{
+  const s = session(); s.startup(true); s.update(); s.tick(2000); assert(!visible(s));
+  s.startup(false); s.tick(60); assert(visible(s)); assert(s.busy);
+  s.update({done:true,percent:100}); s.tick(400); assert(s.overlay.hidden); assert(!s.busy);
 }
 // Repeated progress updates do not postpone revealing the card or restart time.
 {
