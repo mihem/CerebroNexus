@@ -97,6 +97,47 @@ builder_default_percentage_cells_to_show <- function(
   FALSE
 }
 
+## The same answer as `.builder_state_has_reference(value)` when `known` holds
+## no reference: a part of `value` identical to the same part of `known` cannot
+## hold one either and is not walked. An edit replaces a few settings of an
+## entry whose profile, with every metadata column and level, stays the same
+## object, so only what the edit touched is walked.
+.builder_state_has_new_reference <- function(value, known, depth = 0L) {
+  if (identical(value, known)) {
+    return(FALSE)
+  }
+  fields <- names(value)
+  if (
+    depth > 50L ||
+      typeof(value) != "list" ||
+      typeof(known) != "list" ||
+      isS4(value) ||
+      inherits(value, "connection") ||
+      is.null(fields) ||
+      anyNA(fields) ||
+      !all(nzchar(fields)) ||
+      anyDuplicated(fields) ||
+      anyDuplicated(names(known))
+  ) {
+    return(.builder_state_has_reference(value, depth))
+  }
+  if (.builder_state_has_reference(attributes(value), depth)) {
+    return(TRUE)
+  }
+  for (field in fields) {
+    if (
+      .builder_state_has_new_reference(
+        .subset2(value, field),
+        .subset2(known, field),
+        depth + 1L
+      )
+    ) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
 .builder_state_plain_record <- function(value, recursive = TRUE) {
   if (!is.list(value) || is.object(value)) {
     return(FALSE)

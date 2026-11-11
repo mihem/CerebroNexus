@@ -279,9 +279,16 @@ builder_dataset_state_cache_clear <- function(cache) {
   invisible(length(keys) > 0L)
 }
 
-.builder_store_validate_entry <- function(entry) {
+## `known` is an entry that already passed: the stored one an edit replaces.
+## Only what differs from it is searched for references.
+.builder_store_validate_entry <- function(entry, known = NULL) {
   invisible(builder_dataset_state(entry))
-  if (.builder_state_has_reference(entry)) {
+  has_reference <- if (is.null(known)) {
+    .builder_state_has_reference(entry)
+  } else {
+    .builder_state_has_new_reference(entry, known)
+  }
+  if (has_reference) {
     .builder_state_abort(
       "invalid_dataset_entry",
       "Dataset store entries must not contain deep mutable references."
@@ -512,14 +519,19 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
         "Builder dataset ids must be unique."
       )
     }
-    .builder_store_validate_entry(entry)
+    # The upgrade leaves a current entry as it is; only a changed one is new.
+    if (!identical(entry, action$entry)) {
+      .builder_store_validate_entry(entry)
+    }
     next_state$datasets[[length(next_state$datasets) + 1L]] <- entry
     if (is.null(next_state$current_dataset)) {
       next_state$current_dataset <- entry$id
     }
   } else if (identical(type, "replace")) {
     index <- require_id(action$id)
-    .builder_store_validate_entry(action$entry)
+    # The entry in the store passed this check when it was stored.
+    stored <- state$datasets[[index]]
+    .builder_store_validate_entry(action$entry, known = stored)
     entry <- builder_upgrade_viewer_content_entry(action$entry)
     if (!is.list(entry) || !identical(entry$id, action$id)) {
       .builder_state_abort(
@@ -527,7 +539,9 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
         "A replacement entry must retain its dataset id."
       )
     }
-    .builder_store_validate_entry(entry)
+    if (!identical(entry, action$entry)) {
+      .builder_store_validate_entry(entry, known = stored)
+    }
     next_state$datasets[[index]] <- entry
   } else if (identical(type, "replace_all")) {
     invisible(.builder_store_ids(action$datasets))
