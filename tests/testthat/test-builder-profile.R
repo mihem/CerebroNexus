@@ -1169,3 +1169,70 @@ test_that("a UMAP leads the preselected projections, then a t-SNE", {
     c("nmf", "stacas.ss.all", "umap.stacas.ss.all")
   )
 })
+
+test_that("columns with many distinct values are counted without sorting them", {
+  set.seed(1)
+  ## 150 values with distinct frequencies, so the table-based path and the
+  ## hashed one must list the same values in the same order.
+  frequent <- rep(seq_len(150L), times = seq_len(150L))
+  n <- length(frequent)
+  cases <- list(
+    integer = frequent,
+    double = frequent + 0.5,
+    character = paste0("clone", frequent),
+    factor = factor(paste0("clone", frequent))
+  )
+  for (type in names(cases)) {
+    values <- cases[[type]]
+    values[c(3L, 9L)] <- NA
+    distinct <- length(unique(values[!is.na(values)]))
+    expect_gt(distinct, BUILDER_METADATA_FULL_COUNT_MAX)
+    hashed <- .builder_profile_level_counts(values, distinct)
+    sorted <- .builder_profile_level_counts(values)
+    expect_null(attr(hashed, "builder_full_counts"), info = type)
+    expect_identical(
+      attr(hashed, "builder_level_stats"),
+      attr(sorted, "builder_level_stats"),
+      info = type
+    )
+    attributes(hashed) <- attributes(sorted) <- list(names = names(sorted))
+    expect_identical(hashed, sorted, info = type)
+  }
+
+  ## Missing and blank values are merged with the labels they are shown under.
+  text <- c(sprintf("id%04d", seq_len(200L)), NA, "N/A", "", "", "(blank)")
+  counted <- .builder_profile_level_counts(text, 203L)
+  shown <- stats::setNames(
+    vapply(counted$items, `[[`, integer(1), "count"),
+    vapply(counted$items, `[[`, character(1), "value")
+  )
+  expect_identical(shown[1:2], c("(blank)" = 3L, "N/A" = 2L))
+  expect_identical(counted$total, 202L)
+  expect_identical(counted$remaining_count, 190L)
+  expect_identical(
+    attr(counted, "builder_level_stats"),
+    list(distinct = 203L, blanks = 2L)
+  )
+
+  ## One value per cell: nothing is sorted, the first values are listed.
+  barcodes <- sprintf("cell-%05d", sample.int(n))
+  metadata <- data.frame(
+    barcode = barcodes,
+    score = stats::rnorm(n),
+    clone = cases$character,
+    cluster = factor(sample(c("A", "B", "C"), n, replace = TRUE)),
+    row.names = barcodes
+  )
+  profiled <- builder_profile_metadata(metadata, barcodes)
+  expect_identical(profiled$catalog$barcode$level_counts$total, n)
+  expect_identical(
+    vapply(profiled$catalog$barcode$level_counts$items, `[[`, "", "value"),
+    barcodes[1:12]
+  )
+  expect_true(profiled$catalog$score$level_counts$truncated)
+  expect_identical(profiled$columns$clone$blanks, 0L)
+  expect_identical(profiled$groups$legacy$distinct[["clone"]], 150L)
+  expect_null(profiled$groups$legacy$counts$clone)
+  expect_identical(profiled$groups$legacy$levels$cluster, c("A", "B", "C"))
+  expect_identical(profiled$groups$candidates, "cluster")
+})

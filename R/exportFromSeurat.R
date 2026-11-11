@@ -498,6 +498,7 @@
       stop("Failed to install the staged expression sidecar.", call. = FALSE)
     }
     installed_sidecar <- TRUE
+    .rememberExpressionSidecar(final_sidecar, backend$md5)
   }
 
   payload <- if (.recognizedCerebroObject(export)) {
@@ -656,7 +657,8 @@
       .removeRetiredSidecar(retired)
     }
   }
-  invisible(final_file)
+  ## The object that was serialized, for a caller that goes on to read the CRB.
+  invisible(payload)
 }
 
 .spx_export_projection_coordinates <- function(coordinates) {
@@ -722,7 +724,8 @@
 #' \code{"embedded"} (default) or \code{"h5"}.
 #' \itemize{
 #'   \item \code{"embedded"} stores the matrix inside the \code{.crb} file.
-#'   \item \code{"h5"} writes the matrix via \code{HDF5Array::writeTENxMatrix()}
+#'   \item \code{"h5"} writes the matrix, laid out as
+#'   \code{HDF5Array::writeTENxMatrix()} writes it,
 #'   to a TENx-format sparse HDF5 file next to the \code{.crb} (sibling
 #'   \code{<stem>.h5}) and tags the backend with that file name. The
 #'   file holds a single \code{/expression} group with \code{data},

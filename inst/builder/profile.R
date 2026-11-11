@@ -888,7 +888,95 @@ BUILDER_METADATA_TEXT_MAX_BYTES <- 120L
   "other"
 }
 
-.builder_profile_level_counts <- function(values) {
+## A column with more distinct values than this cannot be a Viewer group, and
+## its levels are never listed in full.
+BUILDER_METADATA_FULL_COUNT_MAX <- 100L
+
+.builder_profile_level_summary <- function(names, counts, total, cells) {
+  items <- lapply(seq_along(names), function(index) {
+    list(
+      value = .builder_profile_bounded_text(names[[index]]),
+      count = as.integer(counts[[index]])
+    )
+  })
+  list(
+    items = items,
+    total = as.integer(total),
+    truncated = total > length(names),
+    remaining_count = if (total > length(names)) {
+      as.integer(cells - sum(counts))
+    } else {
+      0L
+    }
+  )
+}
+
+## The most frequent values of a column with many distinct values. table()
+## sorts every distinct value as text, which takes seconds per column at a
+## million cells; here the values are counted by hashing and only the listed
+## ones become text. Equally frequent values keep their order of first
+## appearance (level order for a factor).
+.builder_profile_frequent_level_counts <- function(values) {
+  textual <- is.factor(values) || is.character(values)
+  if (is.factor(values)) {
+    keys <- levels(values)
+    counts <- tabulate(values, nbins = length(keys))
+    missing <- sum(is.na(values))
+    keys <- keys[counts > 0L]
+    counts <- counts[counts > 0L]
+    if (missing > 0L) {
+      keys <- c(keys, NA_character_)
+      counts <- c(counts, missing)
+    }
+  } else {
+    keys <- unique(values)
+    counts <- tabulate(match(values, keys), nbins = length(keys))
+  }
+  merge <- function() {
+    if (anyDuplicated(keys)) {
+      counts <<- as.vector(rowsum(counts, keys, reorder = FALSE))
+      keys <<- unique(keys)
+    }
+  }
+  distinct <- length(keys)
+  blanks <- 0L
+  if (textual) {
+    keys[is.na(keys)] <- "N/A"
+    merge()
+    distinct <- length(keys)
+    blanks <- as.integer(sum(counts[keys == ""]))
+    keys[keys == ""] <- "(blank)"
+    merge()
+  }
+  shown <- utils::head(
+    order(counts, decreasing = TRUE, method = "radix"),
+    BUILDER_METADATA_LEVEL_MAX
+  )
+  names <- as.character(keys[shown])
+  names[is.na(names)] <- "N/A"
+  summary <- .builder_profile_level_summary(
+    names,
+    counts[shown],
+    length(keys),
+    sum(counts)
+  )
+  attr(summary, "builder_level_stats") <- list(
+    distinct = distinct,
+    blanks = blanks
+  )
+  summary
+}
+
+## `distinct` is the number of distinct non-missing values when the caller has
+## counted them already.
+.builder_profile_level_counts <- function(values, distinct = NULL) {
+  if (
+    !is.null(distinct) &&
+      distinct > BUILDER_METADATA_FULL_COUNT_MAX &&
+      (is.factor(values) || (is.atomic(values) && !is.null(values)))
+  ) {
+    return(.builder_profile_frequent_level_counts(values))
+  }
   text <- if (is.factor(values) || is.atomic(values)) {
     as.character(values)
   } else {
@@ -903,23 +991,17 @@ BUILDER_METADATA_TEXT_MAX_BYTES <- 120L
     counts <- tapply(counts, display_names, sum)
   }
   counts <- sort(counts, decreasing = TRUE)
-  total <- length(counts)
   shown <- utils::head(counts, BUILDER_METADATA_LEVEL_MAX)
-  items <- lapply(seq_along(shown), function(index) {
-    list(
-      value = .builder_profile_bounded_text(names(shown)[[index]]),
-      count = as.integer(shown[[index]])
-    )
-  })
-  summary <- list(
-    items = items,
-    total = as.integer(total),
-    truncated = total > length(shown),
-    remaining_count = if (total > length(shown)) {
-      as.integer(sum(counts[-seq_along(shown)]))
-    } else {
-      0L
-    }
+  summary <- .builder_profile_level_summary(
+    names(shown),
+    shown,
+    length(counts),
+    sum(counts)
+  )
+  blanks <- full_counts[names(full_counts) == ""]
+  attr(summary, "builder_level_stats") <- list(
+    distinct = length(full_counts),
+    blanks = if (length(blanks)) as.integer(blanks[[1L]]) else 0L
   )
   attr(summary, "builder_full_counts") <- full_counts
   summary
@@ -989,7 +1071,7 @@ BUILDER_METADATA_TEXT_MAX_BYTES <- 120L
       0
     },
     sample_values = .builder_profile_sample_values(values),
-    level_counts = .builder_profile_level_counts(values)
+    level_counts = .builder_profile_level_counts(values, distinct)
   )
 }
 
@@ -997,17 +1079,16 @@ BUILDER_METADATA_TEXT_MAX_BYTES <- 120L
   values,
   name,
   stats = NULL,
-  full_counts = NULL
+  blanks = NULL
 ) {
-  if (!is.null(stats) && !is.null(full_counts)) {
-    blanks <- full_counts[names(full_counts) == ""]
+  if (!is.null(stats) && !is.null(blanks)) {
     return(list(
       name = name,
       class = class(values),
       storage_type = typeof(values),
       count = length(values),
       missing = stats$missing,
-      blanks = if (length(blanks)) as.integer(blanks[[1L]]) else 0L,
+      blanks = blanks,
       unique = stats$distinct + as.integer(stats$missing > 0L),
       non_missing = length(values) - stats$missing,
       unique_non_missing = stats$distinct,
@@ -1116,8 +1197,9 @@ builder_profile_metadata <- function(meta, expected_cells) {
         values,
         column_names[[index]],
         stats,
-        attr(entry$level_counts, "builder_full_counts")
+        attr(entry$level_counts, "builder_level_stats")$blanks
       )
+      attr(entry$level_counts, "builder_level_stats") <- NULL
       attr(entry$level_counts, "builder_full_counts") <- NULL
       entry
     })
@@ -1143,13 +1225,16 @@ builder_profile_metadata <- function(meta, expected_cells) {
         reason,
         stats
       )
+      ## Only a column with few enough values to be a group has the full table.
       full_counts <- attr(entry$level_counts, "builder_full_counts")
+      level_stats <- attr(entry$level_counts, "builder_level_stats")
       columns[[index]] <- .builder_profile_metadata_column(
         values,
         name,
         stats,
-        full_counts
+        level_stats$blanks
       )
+      attr(entry$level_counts, "builder_level_stats") <- NULL
       attr(entry$level_counts, "builder_full_counts") <- NULL
       catalog[[name]] <- entry
       ## Every type .builder_profile_group_reason() accepts needs levels; a
@@ -1161,8 +1246,8 @@ builder_profile_metadata <- function(meta, expected_cells) {
           is.logical(values)
       ) {
         legacy_columns <- c(legacy_columns, name)
-        legacy_distinct[[name]] <- length(full_counts)
-        if (length(full_counts) <= 100L) {
+        legacy_distinct[[name]] <- level_stats$distinct
+        if (!is.null(full_counts) && length(full_counts) <= 100L) {
           legacy_counts[[name]] <- full_counts
           if (is.factor(values)) {
             ## Unused levels would each get a colour; the build sets the

@@ -121,6 +121,61 @@
   export
 }
 
+#' Write a matrix as a TENxMatrix-format group. A `dgCMatrix` already holds the
+#' three arrays of that format, so they are written as they are, into the
+#' datasets HDF5Array creates for its own writer; `writeTENxMatrix()` would cut
+#' the matrix into blocks first, which takes several times as long as the
+#' writing. Any other matrix goes through `writeTENxMatrix()`.
+#' @keywords internal
+#' @noRd
+.writeTENxExpression <- function(
+  x,
+  path,
+  group,
+  level = NULL,
+  slice = 2^24
+) {
+  if (!inherits(x, "dgCMatrix")) {
+    HDF5Array::writeTENxMatrix(x, path, group = group, level = level)
+    return(invisible(path))
+  }
+  ## Creates the group, its shape and names, and the empty, extensible `data`,
+  ## `indices` and `indptr` datasets (rhdf5 comes with HDF5Array).
+  HDF5Array::TENxRealizationSink(
+    dim(x),
+    dimnames(x),
+    "double",
+    filepath = path,
+    group = group,
+    level = level
+  )
+  write <- function(name, values, n) {
+    dataset <- paste0(group, "/", name)
+    rhdf5::h5set_extent(path, dataset, n)
+    for (start in seq(1, n, by = slice)) {
+      end <- min(start + slice - 1, n)
+      rhdf5::h5write(
+        values(start, end),
+        path,
+        dataset,
+        start = start,
+        count = end - start + 1
+      )
+    }
+  }
+  n <- length(x@x)
+  if (n > 0) {
+    write("data", function(start, end) x@x[start:end], n)
+    write("indices", function(start, end) x@i[start:end], n)
+  }
+  write(
+    "indptr",
+    function(start, end) as.double(x@p[start:end]),
+    length(x@p)
+  )
+  invisible(path)
+}
+
 #' Persist the genes x cells matrix (embedded / h5). Returns the
 #' matrix as it stands afterwards, because the spatial block reuses it.
 #' @keywords internal
@@ -178,7 +233,7 @@
     ## deflate filters are still applied): on 1.3-1.5M-cell sources single genes
     ## read ~30% faster than at HDF5Array's default level 6, at roughly 7x the
     ## file size. NULL leaves HDF5Array's default.
-    HDF5Array::writeTENxMatrix(
+    .writeTENxExpression(
       m_disk,
       h5_abs,
       group = "expression",
@@ -320,7 +375,7 @@
   .exportReportPart(on_progress, "saving the CRB file")
 
   ## Replace the sidecar and .crb with best-effort rollback on ordinary errors.
-  .publishCerebroExport(
+  payload <- .publishCerebroExport(
     export = export,
     final_file = final_file,
     stage_dir = export_stage_dir,
@@ -337,11 +392,11 @@
     )
   ) {
     .exportReportPart(on_progress, "writing the Viewer Pack")
-    buildViewerPack(
+    .buildViewerPack(
       final_file,
-      viewer_binary = "always",
-      viewer_binary_threshold = viewer_options$threshold,
-      overwrite = TRUE
+      .viewerPackOptions("always", viewer_options$threshold),
+      overwrite = TRUE,
+      payload = if (.recognizedCerebroObject(payload)) payload
     )
   }
 
