@@ -258,4 +258,10 @@ app_transport <- viewerApplyTransportCompat(
 ##----------------------------------------------------------------------------##
 ## launch app
 ##----------------------------------------------------------------------------##
-shiny::shinyApp(ui = app_transport$ui, server = app_transport$server)
+shiny::shinyApp(
+  ui = app_transport$ui,
+  server = app_transport$server,
+  uiPattern = viewerDatasetUiPattern(
+    names(Cerebro.options[["crb_file_to_load"]])
+  )
+)

@@ -37,6 +37,29 @@
     function install() {
       if (installed || !window.Shiny || !window.Shiny.addCustomMessageHandler) return;
       installed = true;
+      // Keep ?page= and ?dataset= in the address bar (other query parameters
+      // stay) without adding history entries. The query wins over a /name path
+      // on reload, so switching data sets never rewrites the path, which may be
+      // the App's mount point.
+      function setQuery(name, value) {
+        if (typeof value !== "string" || !window.history.replaceState) return;
+        var url = new URL(window.location.href);
+        url.searchParams.set(name, value);
+        window.history.replaceState(window.history.state, "", url.toString());
+      }
+      window.Shiny.addCustomMessageHandler("cerebro_page_url", function (message) {
+        if (message) setQuery("page", message.page);
+      });
+      window.Shiny.addCustomMessageHandler("cerebro_dataset_url", function (message) {
+        if (!message || typeof message.dataset !== "string") return;
+        var url = new URL(window.location.href);
+        var segments = url.pathname.split("/").filter(Boolean);
+        var named = segments.length &&
+          decodeURIComponent(segments[segments.length - 1]) === message.dataset;
+        // Already addressed by /name: leave the first load's URL alone.
+        if (named && !url.searchParams.has("dataset")) return;
+        setQuery("dataset", message.dataset);
+      });
       window.Shiny.addCustomMessageHandler("cerebro_initial_page", function (message) {
         if (navigated || !message || typeof message.selected !== "string") return;
         var links = document.querySelectorAll('.main-sidebar a[data-toggle="tab"]');

@@ -206,6 +206,11 @@ launchCerebro <- function(
   ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
   ## value is restored when it stops. A user `onStart` still runs afterwards.
   app_args <- list(...)
+  if (is.null(app_args[["uiPattern"]])) {
+    app_args[["uiPattern"]] <- transport_env$viewerDatasetUiPattern(
+      names(Cerebro.options[["crb_file_to_load"]])
+    )
+  }
   user_on_start <- app_args[["onStart"]]
   max_request_size <- maxFileSize * 1024^2
   app_args[["onStart"]] <- function() {

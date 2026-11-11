@@ -171,3 +171,30 @@ test_that("the R and browser halves agree on the message name", {
   )
   expect_match(r, '"cerebro_sockjs_binary"', fixed = TRUE)
 })
+
+test_that("the UI pattern serves the root and each data set id, nothing else", {
+  pattern_for <- transport_compat_env()$viewerDatasetUiPattern
+  ## shiny::shinyApp() anchors the pattern the same way
+  serves <- function(ids, path) {
+    grepl(sprintf("^%s$", pattern_for(ids)), path)
+  }
+
+  expect_identical(pattern_for(NULL), "/")
+  expect_identical(pattern_for(character()), "/")
+  expect_true(serves(NULL, "/"))
+  expect_false(serves(NULL, "/TCR"))
+
+  ids <- c("TCR", "sample 2", "a.b", "x+y")
+  expect_true(serves(ids, "/"))
+  expect_true(serves(ids, "/TCR"))
+  expect_true(serves(ids, "/sample%202"))
+  expect_true(serves(ids, "/sample 2"))
+  expect_true(serves(ids, "/a.b"))
+  expect_true(serves(ids, "/x+y"))
+  ## regex characters in an id are literal, and only whole paths match
+  expect_false(serves(ids, "/aXb"))
+  expect_false(serves(ids, "/TCR/"))
+  expect_false(serves(ids, "/TC"))
+  expect_false(serves(ids, "/shared/shiny.js"))
+  expect_false(serves(ids, "/other"))
+})

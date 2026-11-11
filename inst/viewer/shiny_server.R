@@ -288,6 +288,14 @@ server <- function(input, output, session) {
     about = "about"
   )
   initial_page <- Cerebro.options[["initial_page"]]
+  ## A `?page=<id>` link overrides the author's initial page for this visit.
+  url_page <- viewerPageFromQuery(
+    isolate(session$clientData$url_search),
+    names(viewer_initial_page_tabs)
+  )
+  if (!is.null(url_page)) {
+    initial_page <- url_page
+  }
   initial_tab <- if (
     is.character(initial_page) &&
       length(initial_page) == 1L &&
@@ -310,6 +318,19 @@ server <- function(input, output, session) {
     "hla_tcr_motifs"
   )])
   initial_page_applied <- reactiveVal(FALSE)
+  ## Keep the address bar on the page being read, so the copied URL reopens it.
+  observeEvent(
+    input[["sidebar"]],
+    {
+      page <- names(viewer_initial_page_tabs)[
+        match(input[["sidebar"]], viewer_initial_page_tabs)
+      ]
+      if (!is.na(page)) {
+        session$sendCustomMessage("cerebro_page_url", list(page = page))
+      }
+    },
+    ignoreInit = TRUE
+  )
   if (!is.null(initial_tab) && !initial_tab %in% conditional_tabs) {
     session$onFlushed(
       function() {
@@ -778,6 +799,25 @@ server <- function(input, output, session) {
         )
       }
     }
+  )
+
+  ## Keep the address bar on the data set being read, like the page above. Only
+  ## the configured data sets have ids a link can name; an upload has none.
+  observeEvent(
+    available_crb_files$selected,
+    {
+      selected <- available_crb_files$selected
+      if (
+        length(selected) == 1L &&
+          selected %in% available_crb_files$names
+      ) {
+        session$sendCustomMessage(
+          "cerebro_dataset_url",
+          list(dataset = as.character(selected))
+        )
+      }
+    },
+    ignoreNULL = TRUE
   )
 
   ## Keep the lightweight Data Info page independent of the full CRB: while the

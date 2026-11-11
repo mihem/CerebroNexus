@@ -17,6 +17,19 @@ viewerUploadPath <- function(input_file, options) {
   datapath
 }
 
+## Page named by a `?page=<id>` link, or NULL. Ids are the `initial_page`
+## ids; an unknown, repeated or empty value is ignored rather than guessed.
+viewerPageFromQuery <- function(search, page_ids) {
+  if (!is.character(search) || length(search) != 1L || is.na(search)) {
+    return(NULL)
+  }
+  page <- shiny::parseQueryString(search)[["page"]]
+  if (!is.character(page) || length(page) != 1L || !page %in% page_ids) {
+    return(NULL)
+  }
+  page
+}
+
 viewerInitialPageDecision <- function(
   initial_tab,
   tab_name,

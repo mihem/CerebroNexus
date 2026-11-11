@@ -47,6 +47,9 @@ viewer_app <- viewer_auth_apply(
 app <- shiny::shinyApp(
   ui = viewer_app$ui,
   server = viewer_app$server,
+  uiPattern = viewerDatasetUiPattern(
+    names(Cerebro.options[["crb_file_to_load"]])
+  ),
   onStart = function() {
     previous <- options(
       shiny.maxRequestSize = bundle_run_options$max_request_size_bytes
