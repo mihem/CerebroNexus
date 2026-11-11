@@ -27,22 +27,27 @@ test_that("launchCerebro reserves heap for a large CRB before reading it", {
   writeBin(raw(17 * 1024^2), large)
   expect_true(.reserveHeapForCrb(c(small, large)))
 
-  ## The data sets are read after the UI is built and the heap is raised, and
-  ## the Viewer does not raise it again once it was handed the prototypes.
+  ## The data sets are read after the UI is built, the heap is raised and the
+  ## server functions are loaded (which starts the background work on the
+  ## configured files), and the Viewer does not raise the heap again.
   launch <- deparse(body(launchCerebro))
   position <- function(pattern) grep(pattern, launch, fixed = TRUE)[[1L]]
   expect_lt(position("viewer/shiny_UI.R"), position(".reserveHeapForCrb("))
   expect_lt(
     position(".reserveHeapForCrb("),
+    position("viewer/shiny_server.R")
+  )
+  expect_lt(
+    position("viewer/shiny_server.R"),
     position(".datasetCatalogFromFiles(")
   )
   expect_lt(
     position(".datasetCatalogFromFiles("),
-    position("viewer/shiny_server.R")
+    position("viewerLaunchPrototypes(")
   )
   ## and collected once before the first session can start
   expect_lt(
-    position("viewer/shiny_server.R"),
+    position("viewerLaunchPrototypes("),
     position(".collectBeforeSessions(")
   )
   expect_lt(position(".collectBeforeSessions("), position("shiny::shinyApp"))
@@ -53,7 +58,8 @@ test_that("launchCerebro reserves heap for a large CRB before reading it", {
   expect_length(reserve, 1L)
   expect_match(
     server_file[[reserve - 1L]],
-    'if (!length(Cerebro.options[[".dataset_prototypes"]]))',
+    "if (!.viewer_launch_reads_datasets)",
     fixed = TRUE
   )
+  expect_true(any(grepl(".launch_reads_datasets", launch, fixed = TRUE)))
 })

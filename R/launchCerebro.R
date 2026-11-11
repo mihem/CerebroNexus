@@ -14,8 +14,9 @@
 #' Cerebro. Useful when using/hosting Cerebro in \code{closed} mode. To offer
 #' several data sets, pass a \emph{named} character vector, e.g.
 #' \code{c(sampleA = "a.crb", sampleB = "b.crb")}: every name is the stable,
-#' unique data set identity used in links and saved state. Defaults to
-#' \code{NULL}.
+#' unique data set identity used in links and saved state. The files are read
+#' when the App starts, so a file that cannot be read stops the running App
+#' with its error. Defaults to \code{NULL}.
 #' @param welcome_message \code{string} with custom welcome message to display
 #' in the "Load data" tab. Can contain HTML formatting, e.g.
 #' \code{'<h3>Hi!</h3>'}. Defaults to \code{NULL}.
@@ -133,63 +134,118 @@ launchCerebro <- function(
     "crb_file_to_load" = crb_file_to_load,
     "welcome_message" = welcome_message,
     "cerebro_root" = system.file(package = "CerebroNexus"),
-    ## The installed Viewer has no HLA core source; core_shim.R binds these.
-    ".hla_core" = .viewerHLACore(),
     "point_size" = point_size,
     "point_opacity" = point_opacity,
     "percentage_cells_to_show" = percentage_cells_to_show,
     "projections_show_hover_info" = projections_show_hover_info,
     ## Imports left unloaded so far; the Viewer loads them while it is idle.
-    ".idle_packages" = .lazy_imports_idle
+    ".idle_packages" = .lazy_imports_idle,
+    ## The Viewer does not read the configured CRBs at its first session:
+    ## viewer_prepare() below reads them and hands them over.
+    ".launch_reads_datasets" = TRUE
   )
+  viewer_env <- environment()
 
   ##--------------------------------------------------------------------------##
-  ## Load the UI functions before the data sets are read: the UI needs none of
-  ## their content, and with a large CRB in memory every garbage collection
-  ## while it is built costs more (0.5 s for a 1.3 million cell data set).
+  ## Prepare the Viewer: everything a session needs, done once.
+  ##
+  ## Not while launchCerebro() runs. It takes 1.3 s with 10,000 cells and 4.5 s
+  ## with 1.3 million, and none of it is needed to start the web server or to
+  ## send the page (see below). It runs as soon as the App has started, or when
+  ## the App is first asked for its page or a session, whichever comes first;
+  ## what it reports (a CRB file that cannot be read) then stops the App.
   ##--------------------------------------------------------------------------##
-  source(
-    system.file(
-      paste0("viewer/shiny_UI.R"),
-      package = "CerebroNexus"
-    ),
-    local = TRUE
-  )
-
-  ##--------------------------------------------------------------------------##
-  ## Read the data sets, then load the server functions that take them over.
-  ## What every session needs is loaded first (see R/lazy_imports.R).
-  ##--------------------------------------------------------------------------##
-  for (package in .lazy_imports_session) {
-    loadNamespace(package)
+  viewer_prepared <- FALSE
+  viewer_prepare_error <- NULL
+  viewer_prepare <- function() {
+    if (viewer_prepared) {
+      return(invisible(FALSE))
+    }
+    if (!is.null(viewer_prepare_error)) {
+      stop(viewer_prepare_error)
+    }
+    tryCatch(
+      {
+        ## The installed Viewer has no HLA core source; core_shim.R binds
+        ## these.
+        Cerebro.options[[".hla_core"]] <<- .viewerHLACore()
+        ## The UI functions before the data sets are read: the UI needs none
+        ## of their content, and with a large CRB in memory every garbage
+        ## collection while it is built costs more (0.5 s for a 1.3 million
+        ## cell data set).
+        source(
+          system.file(
+            paste0("viewer/shiny_UI.R"),
+            package = "CerebroNexus"
+          ),
+          local = viewer_env
+        )
+        ## What every session needs is loaded before the data sets are in
+        ## memory too (see R/lazy_imports.R), and so are the server
+        ## functions: loading them starts the background work on the
+        ## configured files (the cell names of a Viewer Pack), which then
+        ## runs while the data sets are read.
+        for (package in .lazy_imports_session) {
+          loadNamespace(package)
+        }
+        .reserveHeapForCrb(crb_file_to_load)
+        source(
+          system.file(
+            paste0("viewer/shiny_server.R"),
+            package = "CerebroNexus"
+          ),
+          local = viewer_env
+        )
+        dataset_catalog <- .datasetCatalogFromFiles(
+          crb_file_to_load,
+          retain_prototypes = TRUE
+        )
+        ## Dataset cataloguing already validated and deserialized these
+        ## immutable CRB prototypes. Hand them to the Viewer process cache so
+        ## the first analysis page does not read the same multi-gigabyte file
+        ## a second time. The server's one-time handoff then owns these
+        ## references: a copy kept here would defeat later prototype
+        ## eviction.
+        viewerLaunchPrototypes(attr(
+          dataset_catalog,
+          "prototypes",
+          exact = TRUE
+        ))
+        attr(dataset_catalog, "prototypes") <- NULL
+        Cerebro.options[[".dataset_catalog"]] <<- dataset_catalog
+        rm(dataset_catalog)
+        .collectBeforeSessions()
+        viewer_prepared <<- TRUE
+      },
+      error = function(error) {
+        viewer_prepare_error <<- error
+        stop(error)
+      }
+    )
+    invisible(TRUE)
   }
-  .reserveHeapForCrb(crb_file_to_load)
-  dataset_catalog <- .datasetCatalogFromFiles(
-    crb_file_to_load,
-    retain_prototypes = TRUE
-  )
-  ## Dataset cataloguing already validated and deserialized these immutable
-  ## CRB prototypes. Hand them to the Viewer process cache so the first
-  ## analysis page does not read the same multi-gigabyte file a second time.
-  Cerebro.options[[".dataset_prototypes"]] <- attr(
-    dataset_catalog,
-    "prototypes",
-    exact = TRUE
-  )
-  attr(dataset_catalog, "prototypes") <- NULL
-  Cerebro.options[[".dataset_catalog"]] <- dataset_catalog
-  rm(dataset_catalog)
-  source(
-    system.file(
-      paste0("viewer/shiny_server.R"),
-      package = "CerebroNexus"
-    ),
-    local = TRUE
-  )
-  ## The server's one-time handoff now owns these references. Keeping copies
-  ## in launch options/closure would defeat later prototype eviction.
-  Cerebro.options[[".dataset_prototypes"]] <- NULL
-  .collectBeforeSessions()
+  ## The page and the server function Shiny is given: the Viewer's own, once
+  ## it is prepared.
+  viewer_ui <- function(request) {
+    ## A request for the page that reaches R before the Viewer is prepared
+    ## (the web server answers "/" from the file only once viewer_started()
+    ## has run) gets the kept page as it is, without waiting for the Viewer.
+    if (!viewer_prepared && !is.null(viewer_document)) {
+      document <- file.path(viewer_document, "index.html")
+      return(shiny::httpResponse(
+        200L,
+        "text/html; charset=UTF-8",
+        readBin(document, "raw", n = file.size(document)),
+        headers = list("Cache-Control" = "no-cache")
+      ))
+    }
+    viewer_prepare()
+    ui
+  }
+  viewer_server <- function(input, output, session) {
+    viewer_prepare()
+    server(input, output, session)
+  }
 
   ##--------------------------------------------------------------------------##
   ## Launch Cerebro.
@@ -209,10 +265,97 @@ launchCerebro <- function(
     envir = transport_env
   )
   transport <- transport_env$viewerApplyTransportCompat(
-    ui,
-    server,
+    viewer_ui,
+    viewer_server,
     system.file(package = "CerebroNexus")
   )
+
+  ##--------------------------------------------------------------------------##
+  ## What a page can be given before the Viewer is prepared: the page as a
+  ## file (viewer/core/kept_document.R) and the first views kept from earlier
+  ## runs (viewer/core/shared_resources.R, published in viewer_started()). Both
+  ## only read small files. Without them the App starts as before and the first
+  ## page waits for the Viewer.
+  ##--------------------------------------------------------------------------##
+  viewer_document <- NULL
+  viewer_document_capture <- FALSE
+  ## The key of the page (viewerUiCacheKey() in viewer/ui_cache.R), as
+  ## shiny_UI.R computes it. www/ is served under "cerebro_www" unless another
+  ## App of this process holds that name, which shiny_UI.R finds out.
+  viewer_document_key <- function(www_prefix = "cerebro_www") {
+    viewerUiCacheKey(
+      file.path(system.file(package = "CerebroNexus"), "viewer"),
+      c(
+        version = Cerebro.options[["cerebro_version"]],
+        www_prefix = as.character(www_prefix)
+      )
+    )
+  }
+  try(
+    {
+      for (file in c(
+        "viewer/core/shared_resources.R",
+        "viewer/ui_cache.R",
+        "viewer/core/kept_document.R"
+      )) {
+        source(system.file(file, package = "CerebroNexus"), local = viewer_env)
+      }
+      if (
+        isTRUE(getOption("CerebroNexus.ui_cache", TRUE)) &&
+          !isTRUE(transport_env$viewerSockjsCompatEnabled())
+      ) {
+        viewer_document <- viewerDocumentRestore(viewer_document_key())
+        viewer_document_capture <- is.null(viewer_document)
+      }
+    },
+    silent = TRUE
+  )
+  ## Once the web server runs: the page as a file, the first views kept from
+  ## earlier runs with the headers of their Viewer Pack files, and then the
+  ## Viewer itself.
+  viewer_started <- function() {
+    web_server <- shiny::getShinyOption("server", default = NULL)
+    if (!is.null(web_server) && !is.null(viewer_document)) {
+      try(viewerDocumentServe(web_server, viewer_document), silent = TRUE)
+    }
+    try(viewerFirstViewPublishKept(Cerebro.options), silent = TRUE)
+    try(viewerSharedResourceHeaders(), silent = TRUE)
+    later::later(
+      function() {
+        prepared <- tryCatch(
+          {
+            viewer_prepare()
+            TRUE
+          },
+          error = function(error) {
+            ## runApp() reports it, as launchCerebro() used to.
+            shiny::stopApp(stop(error))
+            FALSE
+          }
+        )
+        ## The first process of an installation keeps the page it sends.
+        if (prepared && viewer_document_capture && !is.null(web_server)) {
+          viewer_document_capture <<- FALSE
+          later::later(
+            function() {
+              try(
+                viewerDocumentCapture(
+                  web_server,
+                  viewer_document_key(cerebro_www_prefix)
+                ),
+                silent = TRUE
+              )
+            },
+            1
+          )
+        }
+      },
+      ## Not at once: a request that arrived before "/" was answered from the
+      ## file is on its way to R, and is answered first (viewer_ui()).
+      0.05
+    )
+  }
+
   ## Allow uploads up to `maxFileSize` MB while the app runs; the previous
   ## value is restored when it stops. A user `onStart` still runs afterwards.
   app_args <- list(...)
@@ -226,9 +369,7 @@ launchCerebro <- function(
   app_args[["onStart"]] <- function() {
     previous <- options(shiny.maxRequestSize = max_request_size)
     shiny::onStop(function() options(previous))
-    ## Viewer Pack files a page may ask for before its session exists get their
-    ## headers as soon as the web server runs (viewer/core/shared_resources.R).
-    later::later(viewerSharedResourceHeaders, 0)
+    later::later(viewer_started, 0)
     if (is.function(user_on_start)) {
       user_on_start()
     }

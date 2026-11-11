@@ -1,12 +1,19 @@
 ## Suppress R CMD check NOTEs about undefined global variables.
-## - `ui`, `server` and `viewerSharedResourceHeaders` are created by
-##   source(..., local = TRUE) inside launchCerebro().
+## - `ui`, `server`, `cerebro_www_prefix` and the `viewer...` functions are
+##   created by the Viewer files launchCerebro() sources into its environment.
 ## - `group` is used as a column name in dplyr pipelines (tibble).
 ## - `.` is used in magrittr/dplyr pipe expressions.
 utils::globalVariables(c(
   "ui",
   "server",
+  "cerebro_www_prefix",
   "viewerSharedResourceHeaders",
+  "viewerFirstViewPublishKept",
+  "viewerLaunchPrototypes",
+  "viewerUiCacheKey",
+  "viewerDocumentRestore",
+  "viewerDocumentServe",
+  "viewerDocumentCapture",
   "group",
   "."
 ))

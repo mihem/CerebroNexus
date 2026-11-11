@@ -29,8 +29,9 @@ data set (\code{closed}, removes the "Load data" element); defaults to
 Cerebro. Useful when using/hosting Cerebro in \code{closed} mode. To offer
 several data sets, pass a \emph{named} character vector, e.g.
 \code{c(sampleA = "a.crb", sampleB = "b.crb")}: every name is the stable,
-unique data set identity used in links and saved state. Defaults to
-\code{NULL}.}
+unique data set identity used in links and saved state. The files are read
+when the App starts, so a file that cannot be read stops the running App
+with its error. Defaults to \code{NULL}.}
 
 \item{welcome_message}{\code{string} with custom welcome message to display
 in the "Load data" tab. Can contain HTML formatting, e.g.

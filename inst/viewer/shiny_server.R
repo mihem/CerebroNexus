@@ -22,26 +22,17 @@ viewerSource(cerebro_root_path("viewer/plotting_functions.R"), environment())
 viewerSource(cerebro_root_path("viewer/color_config.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/viewer_pack.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/crb_contract.R"), environment())
-viewerSource(
-  cerebro_root_path("viewer/core/shared_resources.R"),
-  environment()
-)
-## Where a page finds the first view of its Projection before its session
-## exists. Only where Pack files are shared: not with a login.
-if (length(viewerSharedResourceRoots(Cerebro.options))) {
-  shiny::addResourcePath("cerebro-first-view", viewerFirstViewDirectory())
-  ## The first views kept from earlier runs, so that the first visitor of
-  ## this process has one too.
-  try(
-    viewerFirstViewRestore(
-      viewerSharedResourceRoots(Cerebro.options),
-      viewerFirstViewBasis(Cerebro.options),
-      viewerSharedResourceRegisterEarly,
-      viewerSharedResourceSources(Cerebro.options)
-    ),
-    silent = TRUE
+## launchCerebro() has loaded this file already, before the App started, and
+## the URL prefixes it gave out then are in its state: not a second time.
+if (!exists("viewerFirstViewPublishKept", mode = "function")) {
+  viewerSource(
+    cerebro_root_path("viewer/core/shared_resources.R"),
+    environment()
   )
 }
+## Where a page finds the first view of its Projection before its session
+## exists.
+viewerFirstViewPublishKept(Cerebro.options)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -50,10 +41,13 @@ if (length(viewerSharedResourceRoots(Cerebro.options))) {
 ## Process-owned query/cache functions do not capture a browser session.
 viewerSource(cerebro_root_path("viewer/msigdb.R"), environment())
 viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
-## launchCerebro() hands over the CRBs it has read, and raised the heap before
-## reading them: raising it again here, with them in memory, only cost a full
-## collection (0.7 s with a 1.3 million cell data set).
-if (!length(Cerebro.options[[".dataset_prototypes"]])) {
+## launchCerebro() reads the configured CRBs itself once this file is loaded
+## (viewerLaunchPrototypes() below takes them), and has raised the heap for
+## them already.
+.viewer_launch_reads_datasets <- isTRUE(
+  Cerebro.options[[".launch_reads_datasets"]]
+)
+if (!.viewer_launch_reads_datasets) {
   .reserveCrbHeap(Cerebro.options[["crb_file_to_load"]])
 }
 .viewer_pack_process_cache <- new.env(parent = emptyenv())
@@ -168,12 +162,24 @@ viewerCellNamesFile <- function(pack) {
 }
 viewerSource(cerebro_root_path("viewer/core/dataset_overview.R"), environment())
 .crb_launch_state <- new.env(parent = emptyenv())
-.crb_launch_state$prototypes <- Cerebro.options[[".dataset_prototypes"]]
-if (!is.list(.crb_launch_state$prototypes)) {
-  .crb_launch_state$prototypes <- list()
+.crb_launch_state$prototypes <- list()
+## The CRBs launchCerebro() has read, by path. The first session hands them to
+## the Viewer's caches, so that no page reads the same file a second time.
+viewerLaunchPrototypes <- function(prototypes) {
+  .crb_launch_state$prototypes <- if (is.list(prototypes)) {
+    prototypes
+  } else {
+    list()
+  }
+  invisible(NULL)
 }
-if (length(.crb_launch_state$prototypes)) {
-  for (prototype_path in names(.crb_launch_state$prototypes)) {
+## The cell names of the configured Viewer Packs are written while
+## launchCerebro() reads the CRBs. Started after them, the file of a 1.3
+## million cell data set was not there yet when a browser that was already
+## waiting got its first view, and the names went into the message instead
+## (29 MB, 3 s).
+if (.viewer_launch_reads_datasets) {
+  for (prototype_path in Cerebro.options[["crb_file_to_load"]]) {
     viewerCellNamesFile(viewerPackOpenCached(
       prototype_path,
       .viewer_pack_process_cache

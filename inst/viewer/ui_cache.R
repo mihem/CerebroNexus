@@ -55,19 +55,6 @@ viewerUiCacheKey <- function(viewer, inputs) {
 ## The packages a kept page depends on, with their version and location: the
 ## ones whose files the page names, and the ones its tags are made by.
 viewerUiCachePackages <- function(ui, resource_paths = character()) {
-  loaded <- setdiff(loadedNamespaces(), "CerebroNexus")
-  paths <- vapply(
-    loaded,
-    function(package) {
-      path <- tryCatch(find.package(package), error = function(error) "")
-      if (length(path)) {
-        normalizePath(path[[1L]], winslash = "/", mustWork = FALSE)
-      } else {
-        ""
-      }
-    },
-    character(1)
-  )
   sources <- unlist(lapply(
     htmltools::renderTags(ui)$dependencies,
     function(dependency) {
@@ -81,7 +68,25 @@ viewerUiCachePackages <- function(ui, resource_paths = character()) {
       normalizePath(source, winslash = "/", mustWork = FALSE)
     }
   ))
-  sources <- c(sources, unname(resource_paths))
+  viewerUiCachePackageTable(c(sources, unname(resource_paths)))
+}
+
+## The loaded packages that own one of the directories `sources`, and the ones
+## that make the tags, with their version and location.
+viewerUiCachePackageTable <- function(sources) {
+  loaded <- setdiff(loadedNamespaces(), "CerebroNexus")
+  paths <- vapply(
+    loaded,
+    function(package) {
+      path <- tryCatch(find.package(package), error = function(error) "")
+      if (length(path)) {
+        normalizePath(path[[1L]], winslash = "/", mustWork = FALSE)
+      } else {
+        ""
+      }
+    },
+    character(1)
+  )
   owns <- vapply(
     paths,
     function(path) {
@@ -102,6 +107,25 @@ viewerUiCachePackages <- function(ui, resource_paths = character()) {
     ),
     stringsAsFactors = FALSE
   )
+}
+
+## TRUE while every package of a kept table is where and what it was.
+viewerUiCachePackagesValid <- function(packages) {
+  is.data.frame(packages) &&
+    nrow(packages) > 0L &&
+    all(vapply(
+      seq_len(nrow(packages)),
+      function(index) {
+        identical(
+          viewerUiCachePackageVersion(
+            packages$package[[index]],
+            packages$path[[index]]
+          ),
+          packages$version[[index]]
+        )
+      },
+      logical(1)
+    ))
 }
 
 viewerUiCachePackageVersion <- function(package, path) {
@@ -136,24 +160,9 @@ viewerUiCacheRead <- function(key, directory = viewerUiCacheDirectory()) {
     return(NULL)
   }
   kept <- tryCatch(readRDS(file), error = function(error) NULL)
-  packages <- kept$packages
   valid <- is.list(kept) &&
     !is.null(kept$ui) &&
-    is.data.frame(packages) &&
-    nrow(packages) > 0L &&
-    all(vapply(
-      seq_len(nrow(packages)),
-      function(index) {
-        identical(
-          viewerUiCachePackageVersion(
-            packages$package[[index]],
-            packages$path[[index]]
-          ),
-          packages$version[[index]]
-        )
-      },
-      logical(1)
-    ))
+    viewerUiCachePackagesValid(kept$packages)
   resource_paths <- kept$resource_paths
   valid <- isTRUE(valid) &&
     is.character(resource_paths) &&

@@ -567,6 +567,11 @@ launch_server_env <- function(app) {
   if (!exists("Cerebro.options", envir = env, inherits = FALSE)) {
     env <- environment(get("server", envir = env, inherits = FALSE))
   }
+  ## launchCerebro() prepares the Viewer when the App starts or is first used,
+  ## not while it runs.
+  if (exists("viewer_prepare", envir = env, inherits = FALSE)) {
+    env$viewer_prepare()
+  }
   env
 }
 

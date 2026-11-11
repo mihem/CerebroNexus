@@ -675,3 +675,30 @@ viewerFirstViewCapture <- function(
   }
   file
 }
+
+## Makes `cerebro-first-view/` reachable and publishes the first views kept
+## from earlier runs, so that the first visitor of this process has one too.
+## Only where Pack files are shared: not with a login. Once per process:
+## launchCerebro() calls it as soon as its web server runs, shiny_server.R
+## when the Viewer is prepared.
+viewerFirstViewPublishKept <- function(options) {
+  if (isTRUE(.viewer_shared_resources$published)) {
+    return(invisible(FALSE))
+  }
+  .viewer_shared_resources$published <- TRUE
+  sources <- viewerSharedResourceSources(options)
+  if (!length(sources)) {
+    return(invisible(FALSE))
+  }
+  shiny::addResourcePath("cerebro-first-view", viewerFirstViewDirectory())
+  try(
+    viewerFirstViewRestore(
+      viewerSharedResourceRoots(options),
+      viewerFirstViewBasis(options),
+      viewerSharedResourceRegisterEarly,
+      sources
+    ),
+    silent = TRUE
+  )
+  invisible(TRUE)
+}
