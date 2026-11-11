@@ -56,13 +56,53 @@ if (!.viewer_launch_reads_datasets) {
 ## process decodes a Pack's cell names and writes the file, started when the
 ## Pack is opened: decoding a million names took 0.7-2 s of the R thread right
 ## after the first view of a page.
+##
+## The file is also kept in the user's cache directory, by cell order: the
+## background process needs 3.8 s for 1.3 million cells, during which a view
+## waits for its names, and the next process of the same data set copies the
+## kept file instead (viewerCellNamesKept()). A kept file that was not used
+## for 60 days is removed.
 .viewer_cell_names_files <- new.env(parent = emptyenv())
+viewerCellNamesCache <- function() {
+  file.path(tools::R_user_dir("CerebroNexus", "cache"), "cell-names")
+}
+## Copies the kept file of a cell order to `target` and returns what the
+## background process would (the cell count and the decompressed size), or
+## NULL: nothing kept, or not for these cells.
+viewerCellNamesKept <- function(fingerprint, n, target) {
+  kept <- file.path(viewerCellNamesCache(), basename(target))
+  description <- sub("[.]bin[.]gz$", ".rds", kept)
+  if (!file.exists(kept) || !file.exists(description)) {
+    return(NULL)
+  }
+  meta <- tryCatch(readRDS(description), error = function(error) NULL)
+  valid <- is.list(meta) &&
+    identical(meta$fingerprint, fingerprint) &&
+    is.numeric(meta$cells) &&
+    length(meta$cells) == 1L &&
+    isTRUE(meta$cells == n) &&
+    is.numeric(meta$bytes) &&
+    length(meta$bytes) == 1L &&
+    !is.na(meta$bytes) &&
+    isTRUE(as.numeric(file.size(kept)) == as.numeric(meta$size))
+  if (!valid) {
+    return(NULL)
+  }
+  if (!file.exists(target) && !isTRUE(file.copy(kept, target))) {
+    return(NULL)
+  }
+  ## Renewed by use.
+  try(Sys.setFileTime(c(kept, description), Sys.time()), silent = TRUE)
+  list(cells = meta$cells, bytes = meta$bytes)
+}
 ## Immune repertoire results that depend only on a data set's files (control
 ## choices scanned from the whole repertoire), shared by every session of the
 ## process that opens the same files (see ir_process_memo()).
 .ir_process_cache <- new.env(parent = emptyenv())
 ## Evaluated in a mirai daemon with `cells` (or NULL and the Pack's
-## `asset_file`), the cell count `n` and the target `file`.
+## `asset_file`), the cell count `n`, the target `file` and, to keep the file
+## for later processes, the directory `keep` and the `fingerprint` of the cell
+## order.
 .viewer_cell_names_job <- quote({
   if (is.null(cells)) {
     cells <- qs2::qs_read(asset_file)
@@ -83,11 +123,39 @@ if (!.viewer_launch_reads_datasets) {
       close(connection)
       file.rename(partial, file)
     }
-    list(
+    result <- list(
       cells = length(cells),
       ## Decompressed size: every name and its terminating NUL.
       bytes = sum(nchar(cells, type = "bytes")) + length(cells)
     )
+    if (is.character(keep) && file.exists(file)) {
+      try(
+        {
+          dir.create(keep, showWarnings = FALSE, recursive = TRUE)
+          kept <- file.path(keep, basename(file))
+          partial <- tempfile("cell-names-", keep)
+          if (file.copy(file, partial)) {
+            file.rename(partial, kept)
+            description <- tempfile("cell-names-", keep)
+            saveRDS(
+              c(
+                list(fingerprint = fingerprint, size = file.size(kept)),
+                result
+              ),
+              description
+            )
+            file.rename(description, sub("[.]bin[.]gz$", ".rds", kept))
+          }
+          unlink(partial)
+          old <- list.files(keep, full.names = TRUE)
+          unlink(old[
+            difftime(Sys.time(), file.mtime(old), units = "days") > 60
+          ])
+        },
+        silent = TRUE
+      )
+    }
+    result
   }
 })
 viewerCellNamesFile <- function(pack) {
@@ -118,11 +186,23 @@ viewerCellNamesFile <- function(pack) {
     directory,
     paste0(gsub("[^A-Za-z0-9_-]", "_", fingerprint), ".bin.gz")
   )
+  ## A file kept by an earlier process of these cells: nothing to decode.
+  kept <- tryCatch(
+    viewerCellNamesKept(fingerprint, pack$cell_count, entry$file),
+    error = function(error) NULL
+  )
+  if (is.list(kept)) {
+    entry$result <- kept
+    assign(fingerprint, entry, envir = .viewer_cell_names_files)
+    return(entry)
+  }
   entry$arguments <- list(
     cells = cells,
     asset_file = asset$file,
     n = pack$cell_count,
-    file = entry$file
+    file = entry$file,
+    keep = viewerCellNamesCache(),
+    fingerprint = fingerprint
   )
   ## A daemon that cannot start (a blocked socket) times out; the file is then
   ## written in the session. .viewerMirai() gives it the Viewer's library paths.
@@ -138,6 +218,75 @@ viewerCellNamesFile <- function(pack) {
   )
   assign(fingerprint, entry, envir = .viewer_cell_names_files)
   entry
+}
+## The names of the canonical rows `index` of `pack`, cut out of its cell
+## names file: only these strings are created. Naming the 100,000 cells of one
+## spatial section took 0.9 s when the 800,000 names of the Pack were read for
+## it. NULL while the file is not there; a caller then reads the Pack's cell
+## order (viewerPackCellBarcodesAt() in core/viewer_pack.R).
+viewerCellNamesRead <- function(pack, index) {
+  fingerprint <- as.character(pack$manifest$cell_order_fingerprint %||% "")
+  if (
+    !viewerPackCanonical(pack) ||
+      !is.environment(pack$cache) ||
+      length(fingerprint) != 1L ||
+      !nzchar(fingerprint)
+  ) {
+    return(NULL)
+  }
+  entry <- .viewer_cell_names_files[[fingerprint]]
+  if (
+    is.null(entry) ||
+      !is.list(entry$result) ||
+      !file.exists(entry$file) ||
+      !is.integer(index) ||
+      anyNA(index) ||
+      any(index < 1L | index > entry$result$cells)
+  ) {
+    return(NULL)
+  }
+  ## The bytes of the file and where each name ends, for the session.
+  layout <- get0("cell names file", envir = pack$cache, inherits = FALSE)
+  if (is.null(layout)) {
+    connection <- gzfile(entry$file, "rb")
+    on.exit(close(connection), add = TRUE)
+    bytes <- readBin(connection, "raw", n = entry$result$bytes)
+    ends <- which(bytes == as.raw(0L))
+    if (
+      length(bytes) != entry$result$bytes ||
+        length(ends) != entry$result$cells
+    ) {
+      return(NULL)
+    }
+    layout <- list(bytes = bytes, ends = ends)
+    assign("cell names file", layout, envir = pack$cache)
+  }
+  starts <- c(1L, layout$ends[-length(layout$ends)] + 1L)[index]
+  ## Each name with its terminating NUL, one after the other.
+  positions <- sequence(layout$ends[index] - starts + 1L, from = starts)
+  cells <- readBin(layout$bytes[positions], "character", n = length(index))
+  if (length(cells) != length(index)) {
+    return(NULL)
+  }
+  Encoding(cells) <- "UTF-8"
+  cells
+}
+## TRUE while the background process still writes the cell names of `pack`.
+## Only looks: viewerCellNamesFile() starts the process.
+viewerCellNamesPending <- function(pack) {
+  fingerprint <- as.character(pack$manifest$cell_order_fingerprint %||% "")
+  if (
+    !viewerPackCanonical(pack) ||
+      length(fingerprint) != 1L ||
+      !nzchar(fingerprint)
+  ) {
+    return(FALSE)
+  }
+  entry <- .viewer_cell_names_files[[fingerprint]]
+  !is.null(entry) &&
+    is.null(entry$result) &&
+    inherits(entry$task, "mirai") &&
+    mirai::unresolved(entry$task)
 }
 ## CRBs without a stored cell fingerprint would otherwise hash every barcode on
 ## each session's load. The value depends only on the file's cells.
@@ -234,14 +383,63 @@ server <- function(input, output, session) {
     .crb_launch_state$prototypes <- NULL
   }
   source(cerebro_root_path("viewer/coordinated_views/config.R"), local = TRUE)
+  ## A view asks for the names and hover columns of its cells once it is
+  ## drawn. While the cell names file of the data set is still being written
+  ## the answer would carry every name itself: 29 MB for 1.3 million cells,
+  ## which kept R busy for 3 to 5 s right after the first view of a browser
+  ## that was waiting for the App. Such a request waits for the file instead;
+  ## the view is drawn already, and the background process ends within its
+  ## timeout whatever happens to it.
+  viewer_aux_waiting <- new.env(parent = emptyenv())
+  viewer_aux_waiting$requests <- list()
+  viewer_aux_waiting_tick <- reactiveVal(0L)
+  ## Answers `request`, or keeps it (FALSE) while the file is written or
+  ## earlier requests wait.
+  viewerAuxRequestReceive <- function(request) {
+    if (
+      length(viewer_aux_waiting$requests) ||
+        viewerCellNamesPending(viewerPackCurrent())
+    ) {
+      viewer_aux_waiting$requests <- c(
+        viewer_aux_waiting$requests,
+        list(request)
+      )
+      return(invisible(FALSE))
+    }
+    cerebroCellViewAuxRequest(request)
+    invisible(TRUE)
+  }
+  ## Answers the requests that waited, in the order they came; FALSE while the
+  ## file is still being written.
+  viewerAuxRequestRelease <- function() {
+    if (!length(viewer_aux_waiting$requests)) {
+      return(invisible(TRUE))
+    }
+    if (viewerCellNamesPending(viewerPackCurrent())) {
+      return(invisible(FALSE))
+    }
+    requests <- viewer_aux_waiting$requests
+    viewer_aux_waiting$requests <- list()
+    for (request in requests) {
+      cerebroCellViewAuxRequest(request)
+    }
+    invisible(TRUE)
+  }
   observeEvent(
     input[["cell_view_aux_request"]],
     {
-      request <- input[["cell_view_aux_request"]]
-      cerebroCellViewAuxRequest(request)
+      if (!viewerAuxRequestReceive(input[["cell_view_aux_request"]])) {
+        viewer_aux_waiting_tick(viewer_aux_waiting_tick() + 1L)
+      }
     },
     ignoreInit = TRUE
   )
+  observe({
+    viewer_aux_waiting_tick()
+    if (!isolate(viewerAuxRequestRelease())) {
+      invalidateLater(50, session)
+    }
+  })
   source(cerebro_root_path("viewer/clone_contract.R"), local = TRUE)
 
   ##--------------------------------------------------------------------------##
