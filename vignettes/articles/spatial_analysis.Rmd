@@ -128,6 +128,37 @@ exportFromSeurat(
 If the Seurat object carries images, the resulting `.crb` gains a spatial
 projection and the Spatial tab becomes available when it is loaded.
 
+## Xenium and 10x Atera objects
+
+Objects from Seurat's imaging readers (`LoadXenium()`, and in Seurat 6
+`LoadAtera()` for 10x Atera) keep their counts in an assay named after the
+platform, not `RNA`, and Seurat names the per-cell totals after it
+(`nCount_Xenium`, `nCount_Atera`). Pass the assay and these two columns; the
+Builder picks them on its own. The readers add no dimensional reduction, so
+run e.g. `RunPCA()` and `RunUMAP()` first. The cell centroids, segmentation
+and molecules of the FOV are exported; the Atera morphology image that
+`LoadAtera()` keeps in `Misc()` is not, so supply it through `spatial_images`
+like any other background.
+
+```{r, eval = FALSE}
+atera <- Seurat::LoadAtera("path/to/atera_outs")
+atera <- Seurat::NormalizeData(atera)
+atera <- Seurat::FindVariableFeatures(atera)
+atera <- Seurat::ScaleData(atera)
+atera <- Seurat::RunPCA(atera)
+atera <- Seurat::RunUMAP(atera, dims = 1:30)
+
+convertSeuratToCerebro(
+  atera,
+  result_dir = "output",
+  assay = "Atera",
+  nUMI = "nCount_Atera",
+  nGene = "nFeature_Atera",
+  organism = "Mouse",
+  groups = "seurat_clusters"
+)
+```
+
 ## Placing histological images
 
 Histology images are **not** stored inside the `.crb`; they are passed to

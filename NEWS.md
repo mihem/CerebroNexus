@@ -51,6 +51,11 @@
 - `demo_spatial.crb` is now a 500-cell subset of the real 10x Xenium mouse
   brain demo (`data-raw/build_demo_spatial.R`), replacing a synthetic fixture
   whose generator was never recorded.
+- Tested with Seurat 6.0.0 (SeuratObject 5.4.0); no change is needed. Seurat 6
+  keeps the v5 object and assay classes, and the Seurat, spatial and Builder
+  tests give the same results on Seurat 6.0.0 as on 5.5.1. The Spatial
+  analysis article shows how to export a 10x Atera object read with Seurat 6's
+  `LoadAtera()`, the same way as a Xenium object.
 
 # CerebroNexus 7.2.0
 
