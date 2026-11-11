@@ -218,8 +218,12 @@
 ## A thin CRB keeps the cell names once, in the H5 file. Version 4 also stores
 ## the barcodes of repertoire samples whose barcodes are all cells as metadata
 ## rows (the column named by the attribute "cerebro_cell_index_column" holds
-## integers). Reading restores the barcodes from the cell names in memory, which
-## costs a vector of pointers instead of decoding every barcode again.
+## integers), and the row names of a trajectory's `meta` and of a spatial
+## section's `coordinates` whose rows are all cells (integer row names, marked
+## by the attribute "cerebro_cell_index_rownames"). Reading restores the
+## barcodes from the cell names in memory, which costs a vector of pointers
+## instead of decoding every barcode again: the 1.28 million row names of one
+## trajectory made a 1.3 million cell CRB take 2.5 s to read instead of 0.2 s.
 
 .validCellIndex <- function(index, n, n_cells) {
   is.integer(index) &&
@@ -267,8 +271,88 @@
   })
 }
 
-## The repertoire samples of a thin payload stored by cell index where their
-## barcodes allow it. Returns the names of the fields that changed.
+## TRUE for a data frame whose row names are stored as metadata rows.
+.cellIndexedRowNames <- function(frame) {
+  is.data.frame(frame) &&
+    isTRUE(attr(frame, "cerebro_cell_index_rownames", exact = TRUE))
+}
+
+## A data frame whose rows are all cells keeps metadata rows instead of names.
+.indexRowNamesByCell <- function(frame, cells) {
+  names <- attr(frame, "row.names")
+  if (!is.character(names) || !length(names)) {
+    return(frame)
+  }
+  index <- match(names, cells)
+  if (anyNA(index)) {
+    return(frame)
+  }
+  attr(frame, "row.names") <- index
+  attr(frame, "cerebro_cell_index_rownames") <- TRUE
+  frame
+}
+
+.restoreRowNamesByCell <- function(frame, cells, what) {
+  if (!.cellIndexedRowNames(frame)) {
+    return(frame)
+  }
+  index <- attr(frame, "row.names")
+  if (
+    !.validCellIndex(index, nrow(frame), length(cells)) ||
+      anyDuplicated(index)
+  ) {
+    stop(
+      "The thin CRB stores an invalid ",
+      what,
+      " cell index.",
+      call. = FALSE
+    )
+  }
+  attr(frame, "cerebro_cell_index_rownames") <- NULL
+  attr(frame, "row.names") <- cells[index]
+  frame
+}
+
+## Applies `change` to the `meta` data frame of every trajectory that has one.
+.mapTrajectoryMeta <- function(trajectories, change) {
+  for (method in names(trajectories)) {
+    for (name in names(trajectories[[method]])) {
+      trajectory <- trajectories[[method]][[name]]
+      if (
+        !is.list(trajectory) ||
+          is.data.frame(trajectory) ||
+          !is.data.frame(trajectory[["meta"]])
+      ) {
+        next
+      }
+      trajectory[["meta"]] <- change(trajectory[["meta"]])
+      trajectories[[method]][[name]] <- trajectory
+    }
+  }
+  trajectories
+}
+
+## Applies `change` to the `coordinates` data frame of every spatial section
+## that has one.
+.mapSpatialCoordinates <- function(spatial, change) {
+  for (name in names(spatial)) {
+    section <- spatial[[name]]
+    if (
+      !is.list(section) ||
+        is.data.frame(section) ||
+        !is.data.frame(section[["coordinates"]])
+    ) {
+      next
+    }
+    section[["coordinates"]] <- change(section[["coordinates"]])
+    spatial[[name]] <- section
+  }
+  spatial
+}
+
+## What a thin payload stores by cell index where the barcodes allow it: the
+## repertoire samples, the trajectories and the coordinates of the spatial
+## sections. Returns the names of the fields that changed.
 .indexThinPayloadByCell <- function(payload, cells) {
   indexed <- character()
   repertoire <- payload$immune_repertoire
@@ -279,6 +363,26 @@
       indexed <- union(indexed, "immune_repertoire")
     }
   }
+  trajectories <- payload$trajectories
+  if (is.list(trajectories) && length(trajectories)) {
+    compact <- .mapTrajectoryMeta(trajectories, function(meta) {
+      .indexRowNamesByCell(meta, cells)
+    })
+    if (!identical(compact, trajectories)) {
+      payload$trajectories <- compact
+      indexed <- union(indexed, "trajectories")
+    }
+  }
+  spatial <- payload$spatial
+  if (is.list(spatial) && length(spatial)) {
+    compact <- .mapSpatialCoordinates(spatial, function(coordinates) {
+      .indexRowNamesByCell(coordinates, cells)
+    })
+    if (!identical(compact, spatial)) {
+      payload$spatial <- compact
+      indexed <- union(indexed, "spatial")
+    }
+  }
   indexed
 }
 
@@ -287,6 +391,18 @@
   repertoire <- object$immune_repertoire
   if (is.list(repertoire) && length(repertoire)) {
     object$immune_repertoire <- .restoreRepertoireByCell(repertoire, cells)
+  }
+  trajectories <- object$trajectories
+  if (is.list(trajectories) && length(trajectories)) {
+    object$trajectories <- .mapTrajectoryMeta(trajectories, function(meta) {
+      .restoreRowNamesByCell(meta, cells, "trajectory")
+    })
+  }
+  spatial <- object$spatial
+  if (is.list(spatial) && length(spatial)) {
+    object$spatial <- .mapSpatialCoordinates(spatial, function(coordinates) {
+      .restoreRowNamesByCell(coordinates, cells, "spatial")
+    })
   }
   object
 }

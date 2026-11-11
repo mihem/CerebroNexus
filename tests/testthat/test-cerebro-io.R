@@ -1572,6 +1572,195 @@ test_that("a thin CRB stores repertoire barcodes by cell index", {
   expect_identical(viewer_object$getImmuneRepertoire(), repertoire)
 })
 
+indexed_trajectories <- function(cells) {
+  trajectory <- function(rows) {
+    list(
+      meta = data.frame(
+        DR_1 = as.double(seq_along(rows)),
+        DR_2 = as.double(rev(seq_along(rows))),
+        pseudotime = as.double(seq_along(rows)) / 10,
+        state = factor(rep_len(c("1", "2"), length(rows))),
+        row.names = rows
+      ),
+      edges = data.frame(
+        source_dim_1 = 1,
+        source_dim_2 = 2,
+        target_dim_1 = 3,
+        target_dim_2 = 4
+      )
+    )
+  }
+  list(
+    ## some of the cells, not in the order of the metadata
+    subset = trajectory(cells[c(4L, 2L, 3L)]),
+    ## a row that is not a cell: this one keeps its names
+    foreign = trajectory(c(cells[1L], "not-a-cell"))
+  )
+}
+
+test_that("a thin CRB stores the row names of a trajectory by cell index", {
+  skip_if_no_h5()
+  root <- withr::local_tempdir()
+  fixture <- make_h5_cerebro(root)
+  trajectories <- indexed_trajectories(fixture$cells)
+  for (name in names(trajectories)) {
+    fixture$object$addTrajectory("monocle2", name, trajectories[[name]])
+  }
+  path <- file.path(root, "trajectory.crb")
+  saveCerebro(fixture$object, path)
+  ## the object that was saved keeps its names
+  expect_identical(
+    fixture$object$getTrajectory("monocle2", "subset"),
+    trajectories$subset
+  )
+
+  payload <- .readCerebroPayload(path)
+  expect_identical(payload$crb_schema$version, 4L)
+  expect_identical(payload$crb_schema$cell_indexed, "trajectories")
+  stored <- payload$trajectories$monocle2
+  expect_identical(attr(stored$subset$meta, "row.names"), c(4L, 2L, 3L))
+  expect_true(attr(stored$subset$meta, "cerebro_cell_index_rownames"))
+  expect_identical(
+    attr(stored$foreign$meta, "row.names"),
+    c("cell-1", "not-a-cell")
+  )
+  expect_null(attr(stored$foreign$meta, "cerebro_cell_index_rownames"))
+
+  ## read with its cell names, every trajectory is what was saved
+  object <- readCerebro(path)
+  expect_identical(object$trajectories$monocle2, trajectories)
+  for (name in names(trajectories)) {
+    expect_identical(
+      object$getTrajectory("monocle2", name),
+      trajectories[[name]]
+    )
+  }
+
+  ## The Viewer uses the payload as it was read: the names of the trajectories
+  ## need no cell name, and a trajectory gets its row names when it is asked
+  ## for.
+  runtime <- viewer_runtime_env()
+  viewer_object <- runtime$.attachExternalExpression(
+    runtime$read_cerebro_file(path),
+    path
+  )
+  expect_identical(viewer_object$getMethodsForTrajectories(), "monocle2")
+  expect_identical(
+    viewer_object$getNamesOfTrajectories("monocle2"),
+    names(trajectories)
+  )
+  expect_true(rlang::env_binding_are_lazy(viewer_object, "meta_data"))
+  for (name in names(trajectories)) {
+    expect_identical(
+      viewer_object$getTrajectory("monocle2", name),
+      trajectories[[name]]
+    )
+  }
+  expect_false(rlang::env_binding_are_lazy(viewer_object, "meta_data"))
+
+  ## an index that is not a row of the metadata, or one given twice, is
+  ## refused
+  for (bad in list(c(9L, 2L, 3L), c(2L, 2L, 3L))) {
+    broken <- .currentCerebroCopy(payload)
+    broken$crb_schema <- payload$crb_schema
+    attr(broken$trajectories$monocle2$subset$meta, "row.names") <- bad
+    broken_path <- file.path(root, "broken.crb")
+    saveRDS(broken, broken_path)
+    expect_error(readCerebro(broken_path), "invalid trajectory cell index")
+    viewer_broken <- runtime$.attachExternalExpression(
+      runtime$read_cerebro_file(broken_path),
+      broken_path
+    )
+    expect_error(
+      viewer_broken$getTrajectory("monocle2", "subset"),
+      "invalid trajectory cell index"
+    )
+  }
+})
+
+test_that("a thin CRB stores the cells of a spatial section by cell index", {
+  skip_if_no_h5()
+  root <- withr::local_tempdir()
+  fixture <- make_h5_cerebro(root)
+  section <- function(rows) {
+    list(
+      coordinates = data.frame(
+        x = as.double(seq_along(rows)),
+        y = as.double(rev(seq_along(rows))),
+        row.names = rows
+      ),
+      expression = matrix(numeric(), nrow = 0L, ncol = length(rows)),
+      histology_images = list()
+    )
+  }
+  ## some of the cells, not in the order of the metadata
+  cells_of_section <- fixture$cells[c(3L, 1L, 4L)]
+  fixture$object$addSpatialData("slice", section(cells_of_section))
+  ## a row that is not a cell: this section keeps its names
+  fixture$object$addSpatialData(
+    "foreign",
+    section(c(fixture$cells[2L], "not-a-cell"))
+  )
+  saved <- fixture$object$getSpatialData("slice")$coordinates
+  path <- file.path(root, "spatial.crb")
+  saveCerebro(fixture$object, path)
+
+  payload <- .readCerebroPayload(path)
+  expect_identical(payload$crb_schema$version, 4L)
+  expect_identical(payload$crb_schema$cell_indexed, "spatial")
+  stored <- payload$spatial$slice$coordinates
+  expect_identical(attr(stored, "row.names"), c(3L, 1L, 4L))
+  expect_true(attr(stored, "cerebro_cell_index_rownames"))
+  expect_identical(
+    attr(payload$spatial$foreign$coordinates, "row.names"),
+    c("cell-2", "not-a-cell")
+  )
+
+  ## read with its cell names, the section is what was saved
+  object <- readCerebro(path)
+  expect_identical(object$getSpatialData("slice")$coordinates, saved)
+  expect_identical(object$spatial$slice$coordinates, saved)
+
+  ## The payload as it was read has no cell names: the sections are listed and
+  ## their images checked with the rows as they are stored.
+  expect_identical(payload$getSpatialData("slice")$coordinates, stored)
+  expect_named(
+    .readBundleSpatialCatalog(payload, "label"),
+    c("slice", "foreign")
+  )
+
+  ## In the Viewer a section gets the names of the metadata when it is asked
+  ## for (test-viewer-pack.R: from the Viewer Pack, where there is one).
+  runtime <- viewer_runtime_env()
+  viewer_object <- runtime$.attachExternalExpression(
+    runtime$read_cerebro_file(path),
+    path
+  )
+  expect_identical(viewer_object$availableSpatial(), c("slice", "foreign"))
+  expect_true(rlang::env_binding_are_lazy(viewer_object, "meta_data"))
+  expect_identical(viewer_object$getSpatialData("slice")$coordinates, saved)
+  expect_identical(viewer_object$spatial$slice$coordinates, saved)
+
+  ## an index that is not a row of the metadata, or one given twice, is
+  ## refused
+  for (bad in list(c(9L, 1L, 4L), c(1L, 1L, 4L))) {
+    broken <- .currentCerebroCopy(payload)
+    broken$crb_schema <- payload$crb_schema
+    attr(broken$spatial$slice$coordinates, "row.names") <- bad
+    broken_path <- file.path(root, "broken.crb")
+    saveRDS(broken, broken_path)
+    expect_error(readCerebro(broken_path), "invalid spatial cell index")
+    viewer_broken <- runtime$.attachExternalExpression(
+      runtime$read_cerebro_file(broken_path),
+      broken_path
+    )
+    expect_error(
+      viewer_broken$getSpatialData("slice"),
+      "invalid spatial cell index"
+    )
+  }
+})
+
 test_that("a thin CRB with nothing to index stays at schema version 3", {
   skip_if_no_h5()
   root <- withr::local_tempdir()
@@ -1592,7 +1781,7 @@ test_that("the schema contract checks the cell-indexed fields of version 4", {
   read_schema <- .crbContract()$.readRuntimeCrbSchema
   expect_identical(read_schema(payload, path)$version, 4L)
   bad_fields <- list(
-    "trajectories",
+    "projections",
     character(),
     c("immune_repertoire", "immune_repertoire")
   )

@@ -194,6 +194,8 @@ test_that("validated spatial coordinates reuse canonical storage with fallback",
     ),
     envir = environment
   )
+  ## viewerPackRestoreSpatialNames(), which names rows stored by cell index
+  sys.source(viewer_test_path("core", "viewer_pack.R"), environment)
   eval(assignment, envir = environment)
 
   expect_identical(environment$viewerSpatialCoordinates("slice"), coordinates)
@@ -202,6 +204,15 @@ test_that("validated spatial coordinates reuse canonical storage with fallback",
   dataset$spatial$slice$coordinates <- data.frame(a = 1:3, b = 4:6)
   expect_identical(environment$viewerSpatialCoordinates("slice"), coordinates)
   expect_identical(calls, 1L)
+
+  ## Rows a thin CRB stores as metadata rows, and no Viewer Pack to name them:
+  ## the getter does.
+  indexed <- coordinates
+  attr(indexed, "row.names") <- c(3L, 1L, 2L)
+  attr(indexed, "cerebro_cell_index_rownames") <- TRUE
+  dataset$spatial$slice$coordinates <- indexed
+  expect_identical(environment$viewerSpatialCoordinates("slice"), coordinates)
+  expect_identical(calls, 2L)
 })
 
 test_that("spatial coordinates retain subset and dataset-switch fallbacks", {
@@ -1506,6 +1517,65 @@ test_that("first-frame metadata finds section cells without the cell names", {
     c(3L, 2L)
   )
   expect_identical(hydrated, 1L)
+})
+
+test_that("sections a thin CRB stores by row are named only when shown", {
+  scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("spatial", "func_spatial_helpers.R"), scope)
+  stored <- function(rows) {
+    coordinates <- data.frame(x = seq_along(rows), y = seq_along(rows))
+    attr(coordinates, "row.names") <- rows
+    attr(coordinates, "cerebro_cell_index_rownames") <- TRUE
+    coordinates
+  }
+  cells <- c("a2", "b1", "a1", "b2")
+  dataset <- new.env(parent = emptyenv())
+  dataset$spatial <- list(
+    A = list(coordinates = stored(c(3L, 1L))),
+    B = list(coordinates = stored(c(2L, 4L)))
+  )
+  named <- character()
+  scope$data_set <- function() dataset
+  scope$availableSpatial <- function() names(dataset$spatial)
+  ## as viewerSpatialCoordinates() does: the section gets its cell names
+  scope$viewerSpatialCoordinates <- function(name) {
+    coordinates <- dataset$spatial[[name]]$coordinates
+    if (isTRUE(attr(coordinates, "cerebro_cell_index_rownames"))) {
+      named <<- c(named, name)
+      rows <- attr(coordinates, "row.names")
+      attr(coordinates, "cerebro_cell_index_rownames") <- NULL
+      attr(coordinates, "row.names") <- cells[rows]
+      dataset$spatial[[name]]$coordinates <- coordinates
+    }
+    coordinates
+  }
+  scope$getSpatialData <- function(name) stop("not needed for the samples")
+  scope$viewerPackCurrent <- function() list(cell_count = 4L)
+  scope$viewerPackSpatialIndex <- function(pack, name) {
+    list(A = c(3L, 1L), B = c(2L, 4L))[[name]]
+  }
+  scope$getMetaData <- function() stop("the thin CRB is not hydrated")
+  first_frame <- data.frame(Sample = c("S1", "S1", "S2", "S2"))
+  scope$viewerProjectionFirstFrameMetadata <- function() first_frame
+
+  expect_identical(scope$spatial_stored_section_rows("A"), c(3L, 1L))
+  expect_null(scope$spatial_stored_section_rows("none"))
+  ## the samples of every section, and no section named for them
+  samples <- scope$spatial_section_samples()
+  expect_identical(samples$values, list(A = c("S2", "S1"), B = c("S1", "S2")))
+  expect_identical(samples$fields, "Sample")
+  expect_identical(named, character())
+
+  ## The section that is shown is named; its cells are found in it, and the
+  ## other section keeps its rows.
+  shown <- scope$viewerSpatialCoordinates("A")
+  expect_null(scope$spatial_stored_section_rows("A"))
+  facet <- scope$spatial_metadata_facet(first_frame, rownames(shown), "sample")
+  expect_identical(facet$by_cell, c(a1 = "S2", a2 = "S1"))
+  expect_identical(named, "A")
+  ## cells of the section that is not named yet name it
+  expect_identical(scope$spatial_metadata_rows(first_frame, "b2"), 4L)
+  expect_identical(named, c("A", "B"))
 })
 
 test_that("ROI rotation pivots use the selected sample and ROI field", {

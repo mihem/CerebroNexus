@@ -4978,6 +4978,12 @@ getSpatialData <- function(name) {
   value
 }
 viewerReadSpatialData <- function(ds, name) {
+  ## Rows a thin CRB stores as metadata rows get the Pack's cell names first.
+  viewerPackRestoreSpatialNames(
+    attr(ds, "cerebro_viewer_pack", exact = TRUE),
+    ds,
+    name
+  )
   tryCatch(
     ds$getSpatialData(name, hydrate_molecules = FALSE),
     error = function(e) NULL
@@ -4994,11 +5000,18 @@ viewerSpatialCoordinates <- function(name) {
   if (!is_cerebro_dataset(ds)) {
     return(NULL)
   }
+  viewerPackRestoreSpatialNames(
+    attr(ds, "cerebro_viewer_pack", exact = TRUE),
+    ds,
+    name
+  )
   coordinates <- tryCatch(
     ds$spatial[[name]][["coordinates"]],
     error = function(error) NULL
   )
+  ## Rows still stored as metadata rows are named by the getter below.
   valid <- is.data.frame(coordinates) &&
+    !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) &&
     all(c("x", "y") %in% colnames(coordinates)) &&
     is.numeric(coordinates[["x"]]) &&
     is.numeric(coordinates[["y"]]) &&

@@ -50,10 +50,12 @@
 }
 
 ## Thin-CRB schema versions the readers open: 3 keeps the cell names once, in
-## the H5 file; 4 also stores repertoire barcodes by cell index
-## (`cell_indexed` names which fields). A release that reads only 3 refuses 4.
+## the H5 file; 4 also stores repertoire barcodes and the row names of
+## trajectories and spatial coordinates by cell index (`cell_indexed` names
+## which fields). A release that reads only 3 refuses 4, and one that does not
+## know a field named there refuses the file.
 .runtimeThinSchemaVersions <- c(3L, 4L)
-.runtimeCellIndexedFields <- "immune_repertoire"
+.runtimeCellIndexedFields <- c("immune_repertoire", "trajectories", "spatial")
 
 .readRuntimeCrbSchema <- function(obj, crb_path) {
   field <- "crb_schema"

@@ -255,6 +255,27 @@ viewerPackCellBarcodes <- function(pack, index = NULL) {
   cells[index]
 }
 
+## The names of some cells of the Pack. Where the Viewer has written the cell
+## names file of the process (viewerCellNamesRead() in shiny_server.R) they
+## are cut out of it, which creates only these strings; a session that has
+## read every name of the Pack already, or a process without that file, takes
+## them from the Pack's cell order.
+viewerPackCellBarcodesAt <- function(pack, index) {
+  read <- get0("viewerCellNamesRead", mode = "function")
+  if (
+    is.function(read) &&
+      is.list(pack) &&
+      is.environment(pack$cache) &&
+      !exists("common/cell_order.qs2", envir = pack$cache, inherits = FALSE)
+  ) {
+    cells <- tryCatch(read(pack, index), error = function(error) NULL)
+    if (!is.null(cells)) {
+      return(cells)
+    }
+  }
+  viewerPackCellBarcodes(pack, index)
+}
+
 viewerPackTrajectoryIndex <- function(pack, method, name) {
   indexes <- viewerPackReadAsset(
     pack,
@@ -266,24 +287,34 @@ viewerPackTrajectoryIndex <- function(pack, method, name) {
 
 ## Every reader finds a trajectory's cells through the Pack's cell index, so the
 ## row names of its `meta` (1.28 M strings, about 90 MB for mouse brain 1M)
-## are dropped from `object` in place.
+## are dropped from `object` in place. A thin CRB that stores them as metadata
+## rows (the attribute "cerebro_cell_index_rownames") has none to drop; its
+## rows are then the Pack's too, and the object's getTrajectory() is not left
+## to read every cell name for them.
 viewerPackDropTrajectoryNames <- function(pack, object) {
   trajectories <- object$trajectories
   changed <- FALSE
   for (method in names(trajectories)) {
     for (name in names(trajectories[[method]])) {
       meta <- trajectories[[method]][[name]][["meta"]]
-      if (!is.data.frame(meta) || !is.character(attr(meta, "row.names"))) {
+      if (!is.data.frame(meta)) {
+        next
+      }
+      stored <- attr(meta, "row.names")
+      indexed <- isTRUE(attr(meta, "cerebro_cell_index_rownames", exact = TRUE))
+      if (!indexed && !is.character(stored)) {
         next
       }
       index <- viewerPackTrajectoryIndex(pack, method, name)
       if (
         length(index) != nrow(meta) ||
           anyNA(index) ||
-          !all(index >= 1L & index <= pack$cell_count)
+          !all(index >= 1L & index <= pack$cell_count) ||
+          (indexed && !identical(as.integer(stored), index))
       ) {
         next
       }
+      attr(meta, "cerebro_cell_index_rownames") <- NULL
       rownames(meta) <- NULL
       trajectories[[method]][[name]][["meta"]] <- meta
       changed <- TRUE
@@ -390,6 +421,79 @@ viewerPackTrajectoryEdges <- function(pack, method, name) {
     return(NULL)
   }
   edges
+}
+
+## The Spatial page names the cells of a section by the row names of its
+## coordinates. A thin CRB may store them as metadata rows (the attribute
+## "cerebro_cell_index_rownames"): they are set in `object`, in place, from the
+## Pack's cell names, so that the object's getSpatialData() does not hydrate
+## the thin CRB for them. FALSE when there is nothing to name or no Pack to
+## name it from; getSpatialData() then takes the names of the metadata.
+viewerPackRestoreSpatialNames <- function(pack, object, name) {
+  coordinates <- tryCatch(
+    object$spatial[[name]][["coordinates"]],
+    error = function(error) NULL
+  )
+  if (
+    !is.data.frame(coordinates) ||
+      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE)) ||
+      !viewerPackCanonical(pack)
+  ) {
+    return(invisible(FALSE))
+  }
+  index <- attr(coordinates, "row.names")
+  if (!is.integer(index) || anyDuplicated(index)) {
+    return(invisible(FALSE))
+  }
+  cells <- viewerPackCellBarcodesAt(pack, index)
+  if (is.null(cells)) {
+    return(invisible(FALSE))
+  }
+  attr(coordinates, "cerebro_cell_index_rownames") <- NULL
+  attr(coordinates, "row.names") <- cells
+  ## In the object the sessions of the process are cloned from too: reading
+  ## the Pack's cell names takes a second for 800,000 cells, and only the
+  ## first session that opens a section pays it then.
+  for (target in list(object, viewerPackPrototype(object))) {
+    stored <- if (is.environment(target)) {
+      tryCatch(
+        target$spatial[[name]][["coordinates"]],
+        error = function(error) NULL
+      )
+    }
+    if (
+      is.data.frame(stored) &&
+        isTRUE(attr(stored, "cerebro_cell_index_rownames", exact = TRUE)) &&
+        identical(attr(stored, "row.names"), index)
+    ) {
+      spatial <- target$spatial
+      spatial[[name]][["coordinates"]] <- coordinates
+      target$spatial <- spatial
+    }
+  }
+  invisible(TRUE)
+}
+
+## The object the sessions of this process clone the data set of `object` from
+## (crb_cache.R), or NULL.
+viewerPackPrototype <- function(object) {
+  path <- attr(object, "cerebro_dataset_path", exact = TRUE)
+  if (
+    !is.character(path) ||
+      length(path) != 1L ||
+      is.na(path) ||
+      !exists(".crb_process_cache", mode = "environment")
+  ) {
+    return(NULL)
+  }
+  prototype <- get(".crb_process_cache", mode = "environment")[[normalizePath(
+    path,
+    winslash = "/",
+    mustWork = FALSE
+  )]]$object
+  if (is.environment(prototype) && !identical(prototype, object)) {
+    prototype
+  }
 }
 
 viewerPackSpatialIndex <- function(pack, name) {
