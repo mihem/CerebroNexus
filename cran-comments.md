@@ -15,7 +15,8 @@ immune repertoires, trajectories, spatial images and HLA-TCR motifs.
   (suggested packages not available)
 * Ubuntu (GitHub Actions), R 4.6.1
 * R-hub, R-devel (2026-11-09 r90865): Linux, Windows and macOS arm64
-* win-builder, R-devel: TO RUN on the final tarball (`devtools::check_win_devel()`)
+* win-builder, R-devel (2026-11-07 r90850 ucrt), Windows Server 2022: 0 errors
+  | 0 warnings | 1 note (below), on the tarball submitted here
 
 ## R CMD check results
 
