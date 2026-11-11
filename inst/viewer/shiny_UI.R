@@ -428,6 +428,24 @@ idleTimer();",
 )
 
 ##----------------------------------------------------------------------------##
+## The Spatial page's scroll indicator.
+##
+## shinyjs::extendShinyjs() does two things: it returns the script for the
+## page, and it defines the functions in shinyjs::js, in this R process, for
+## the server to call (spatial/obj_projection_selected_cells.R). The second has
+## to happen in every process, also in one that reads its page from the cache
+## and evaluates no page file: so it is called here, and spatial/UI.R only
+## places the script.
+##----------------------------------------------------------------------------##
+viewer_spatial_page_script <- shinyjs::extendShinyjs(
+  text = cerebro_read_file(file.path(
+    Cerebro.options[["cerebro_root"]],
+    "viewer/spatial/js_page_helpers.js"
+  )),
+  functions = c("showScrollDownIndicator", "hideScrollDownIndicator")
+)
+
+##----------------------------------------------------------------------------##
 ## The page.
 ##
 ## Building it (the 17 UI.R files, the dashboard and the one-time rendering of

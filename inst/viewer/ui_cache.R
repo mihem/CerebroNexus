@@ -21,6 +21,12 @@
 ## packages that are registered once the page is built, and reading it
 ## registers them again.
 ##
+## Anything else a page file would do to the R process besides making the page
+## is lost with a page read back: a page file must not do it. The one case there
+## was, shinyjs::extendShinyjs() defining the functions the server calls, is in
+## shiny_UI.R, which every process evaluates; a test keeps the page files free
+## of such calls.
+##
 ## options(CerebroNexus.ui_cache = FALSE) turns it off.
 
 viewerUiCacheDirectory <- function() {

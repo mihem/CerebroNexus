@@ -15,6 +15,9 @@ viewer_ui_test_env <- function() {
       eval(expression, scope)
     }
   }
+  ## The script of the Spatial page, which shiny_UI.R makes outside the page
+  ## files (it also defines the server's shinyjs functions).
+  scope$viewer_spatial_page_script <- NULL
   scope
 }
 

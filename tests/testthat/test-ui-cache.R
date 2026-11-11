@@ -221,6 +221,36 @@ test_that("the page files define nothing the server uses", {
   ## `ui` is the page itself, which shiny_UI.R takes from viewerUiCached().
   expect_identical(setdiff(intersect(assigned, used), "ui"), character())
 
+  ## Nor may a page file change the R process: a page read back skips it. The
+  ## paths useShinyjs() registers are kept with the page; extendShinyjs(),
+  ## which defines the functions the server calls, is in shiny_UI.R.
+  calls <- unique(unlist(lapply(files[page_file], function(file) {
+    all.names(parse(file, keep.source = FALSE), unique = TRUE)
+  })))
+  expect_identical(
+    intersect(
+      calls,
+      c(
+        "extendShinyjs",
+        "registerInputHandler",
+        "addResourcePath",
+        "shinyOptions",
+        "options",
+        "Sys.setenv",
+        "<<-",
+        "assign",
+        "library",
+        "require",
+        "setMethod",
+        "registerS3method"
+      )
+    ),
+    character()
+  )
+  expect_true("viewer_spatial_page_script" %in% calls)
+  ui_file <- parse(file.path(viewer, "shiny_UI.R"), keep.source = FALSE)
+  expect_true("extendShinyjs" %in% all.names(ui_file))
+
   ## and the options the page is made from are the ones in its key
   options_read <- unique(unlist(lapply(
     c(files[page_file], file.path(viewer, "shiny_UI.R")),
