@@ -45,6 +45,13 @@
         md5 = unname(tools::md5sum(path)),
         r_version = R.version.string,
         index = index,
+        ## the helpers' names, for a file that takes one function's byte code
+        ## (`server` of shiny_server.R) instead of evaluating all of them
+        names = vapply(
+          expressions[index],
+          function(expression) as.character(expression[[2L]]),
+          character(1)
+        ),
         code = code
       ),
       target

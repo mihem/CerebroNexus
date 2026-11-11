@@ -131,23 +131,12 @@ launchCerebro <- function(
   ## environment below, so they find `Cerebro.options` here without touching
   ## the global environment.
   ## --------------------------------------------------------------------------##
-  dataset_catalog <- .datasetCatalogFromFiles(
-    crb_file_to_load,
-    retain_prototypes = TRUE
-  )
-  dataset_prototypes <- attr(dataset_catalog, "prototypes", exact = TRUE)
-  attr(dataset_catalog, "prototypes") <- NULL
-  cerebro_options <- list(
+  Cerebro.options <- list(
     "mode" = mode,
     "cerebro_version" = as.character(
       utils::packageVersion("CerebroNexus")
     ),
     "crb_file_to_load" = crb_file_to_load,
-    ".dataset_catalog" = dataset_catalog,
-    ## Dataset cataloguing already validated and deserialized these immutable
-    ## CRB prototypes. Hand them to the Viewer process cache so the first
-    ## analysis page does not read the same multi-gigabyte file a second time.
-    ".dataset_prototypes" = dataset_prototypes,
     "welcome_message" = welcome_message,
     "cerebro_root" = system.file(package = "CerebroNexus"),
     ## The installed Viewer has no HLA core source; core_shim.R binds these.
@@ -157,10 +146,11 @@ launchCerebro <- function(
     "percentage_cells_to_show" = percentage_cells_to_show,
     "projections_show_hover_info" = projections_show_hover_info
   )
-  Cerebro.options <- cerebro_options
 
   ##--------------------------------------------------------------------------##
-  ## Load server and UI functions.
+  ## Load the UI functions before the data sets are read: the UI needs none of
+  ## their content, and with a large CRB in memory every garbage collection
+  ## while it is built costs more (0.5 s for a 1.3 million cell data set).
   ##--------------------------------------------------------------------------##
   source(
     system.file(
@@ -169,6 +159,26 @@ launchCerebro <- function(
     ),
     local = TRUE
   )
+
+  ##--------------------------------------------------------------------------##
+  ## Read the data sets, then load the server functions that take them over.
+  ##--------------------------------------------------------------------------##
+  .reserveHeapForCrb(crb_file_to_load)
+  dataset_catalog <- .datasetCatalogFromFiles(
+    crb_file_to_load,
+    retain_prototypes = TRUE
+  )
+  ## Dataset cataloguing already validated and deserialized these immutable
+  ## CRB prototypes. Hand them to the Viewer process cache so the first
+  ## analysis page does not read the same multi-gigabyte file a second time.
+  Cerebro.options[[".dataset_prototypes"]] <- attr(
+    dataset_catalog,
+    "prototypes",
+    exact = TRUE
+  )
+  attr(dataset_catalog, "prototypes") <- NULL
+  Cerebro.options[[".dataset_catalog"]] <- dataset_catalog
+  rm(dataset_catalog)
   source(
     system.file(
       paste0("viewer/shiny_server.R"),
@@ -179,7 +189,7 @@ launchCerebro <- function(
   ## The server's one-time handoff now owns these references. Keeping copies
   ## in launch options/closure would defeat later prototype eviction.
   Cerebro.options[[".dataset_prototypes"]] <- NULL
-  rm(dataset_prototypes, cerebro_options)
+  .collectBeforeSessions()
 
   ##--------------------------------------------------------------------------##
   ## Launch Cerebro.
@@ -224,4 +234,50 @@ launchCerebro <- function(
     shiny::shinyApp,
     c(list(ui = transport$ui, server = transport$server), app_args)
   )
+}
+
+## Raises R's heap trigger before large CRBs are read, as .reserveCrbHeap() in
+## inst/viewer/crb_cache.R does for a Viewer that reads them itself: a request
+## larger than the free heap makes R collect once and grow its trigger, instead
+## of collecting several times while a CRB is deserialized. The unused block
+## is released by the next collection.
+.reserveHeapForCrb <- function(paths) {
+  sizes <- suppressWarnings(file.size(as.character(paths)))
+  largest <- max(c(0, sizes), na.rm = TRUE)
+  bytes <- min(16 * largest, 4 * 1024^3)
+  if (bytes < 256 * 1024^2) {
+    return(invisible(FALSE))
+  }
+  invisible(tryCatch(
+    {
+      block <- raw(bytes)
+      rm(block)
+      TRUE
+    },
+    error = function(error) FALSE
+  ))
+}
+
+## Collects at the end of launchCerebro(), while nobody waits. Everything read
+## and built there is still young to R's collector, so the first browser
+## session would start with a full collection of it (0.5-1 s with a 1.3 million
+## cell data set in memory, counted against the first view); after this one its
+## collections only look at what the session itself allocates.
+##
+## How often a session collects depends on the room left above what is in use.
+## R enlarges its heap only after a full collection that leaves it more than
+## 70 % full, and a process can end up just below that: the first session then
+## collected 11 to 15 times before its first view instead of 4, which took
+## 0.25 s with 10,000 cells and up to 0.7 s with 1.3 million. A block held
+## through a second collection makes R take that step now.
+.collectBeforeSessions <- function() {
+  usage <- gc(verbose = FALSE, full = TRUE)
+  cells <- ceiling(0.72 * usage["Ncells", 3L] - usage["Ncells", 1L])
+  if (cells <= 0) {
+    return(invisible(FALSE))
+  }
+  block <- as.list(seq_len(cells))
+  gc(verbose = FALSE, full = TRUE)
+  rm(block)
+  invisible(TRUE)
 }

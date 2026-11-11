@@ -334,6 +334,53 @@ test_that("viewer source runs the installed byte code of a file's helpers", {
   expect_identical(edited$helper(1), 11)
 })
 
+test_that("the installed byte code gives one named function, compiled", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "viewer"), recursive = TRUE)
+  source_file <- file.path(root, "viewer", "shiny_server.R")
+  writeLines(
+    c(
+      "offset <- 1",
+      "helper <- function(x) x",
+      "server <- function(input, output, session) input + offset"
+    ),
+    source_file
+  )
+  .writeViewerBytecode(root)
+  bytecode <- readRDS(
+    file.path(root, "viewer-bytecode", "shiny_server.R.rds")
+  )
+  expect_identical(bytecode$names, c("helper", "server"))
+  expect_identical(bytecode$index, 2:3)
+
+  ## As the end of inst/viewer/shiny_server.R does: the file's own `server`,
+  ## defined in the file's environment, with a compiled body.
+  scope <- new.env(parent = globalenv())
+  scope$offset <- 1
+  eval(bytecode$code[[match("server", bytecode$names)]], scope)
+  expect_true(any(grepl(
+    "<bytecode",
+    utils::capture.output(print(scope$server)),
+    fixed = TRUE
+  )))
+  expect_identical(environment(scope$server), scope)
+  expect_identical(scope$server(2), 3)
+})
+
+test_that("the Viewer server takes its byte code from the installation", {
+  server_file <- readLines(viewer_test_path("shiny_server.R"))
+  ## A plain compiler::cmpfun(server) at the end of the file would compile on
+  ## every process start again; it may only be the fallback.
+  compile <- grep("compiler::cmpfun(server)", server_file, fixed = TRUE)
+  expect_length(compile, 1L)
+  expect_match(server_file[[compile - 1L]], "if (is.na(", fixed = TRUE)
+  expect_true(any(grepl(
+    'match("server", .viewer_server_bytecode$names)',
+    server_file,
+    fixed = TRUE
+  )))
+})
+
 test_that("viewer source reuses process-safe utility functions", {
   cache_env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("source_cache.R"), envir = cache_env)

@@ -30,7 +30,12 @@ viewerSource(cerebro_root_path("viewer/core/crb_contract.R"), environment())
 ## Process-owned query/cache functions do not capture a browser session.
 viewerSource(cerebro_root_path("viewer/msigdb.R"), environment())
 viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
-.reserveCrbHeap(Cerebro.options[["crb_file_to_load"]])
+## launchCerebro() hands over the CRBs it has read, and raised the heap before
+## reading them: raising it again here, with them in memory, only cost a full
+## collection (0.7 s with a 1.3 million cell data set).
+if (!length(Cerebro.options[[".dataset_prototypes"]])) {
+  .reserveCrbHeap(Cerebro.options[["crb_file_to_load"]])
+}
 .viewer_pack_process_cache <- new.env(parent = emptyenv())
 ## Canonical cell-name files by cell-order fingerprint, shared by all sessions
 ## of the process (see viewerCellNamesResource() in server()). A background
@@ -2455,6 +2460,20 @@ server <- function(input, output, session) {
   )
 }
 
-## Pay compilation cost at process startup, before accepting a login. This
-## compiles code only; it does not create a session or read any dataset.
-server <- compiler::cmpfun(server)
+## server() runs compiled from its first session. The installed package holds
+## its byte code (R/viewer_bytecode.R): compiling it here took 0.4-0.6 s of
+## every process start. A bundled App or a source checkout has none and pays
+## the compilation at process startup, before accepting a login. Either way
+## this handles code only; it creates no session and reads no dataset.
+.viewer_server_bytecode <- .viewerBytecode(
+  cerebro_root_path("viewer/shiny_server.R")
+)
+.viewer_server_index <- match("server", .viewer_server_bytecode$names)
+if (is.na(.viewer_server_index)) {
+  server <- compiler::cmpfun(server)
+} else {
+  ## The compiled `server <- function(...)` of this file, evaluated where the
+  ## file is: the same closure, with a compiled body.
+  eval(.viewer_server_bytecode$code[[.viewer_server_index]], environment())
+}
+rm(.viewer_server_bytecode, .viewer_server_index)
