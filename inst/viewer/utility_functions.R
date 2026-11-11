@@ -2040,6 +2040,15 @@ cerebroCellViewRender <- function(
     message$hover <- auxiliary$hover
   }
 
+  ## The first frame of a session is the page's default view: a running Viewer
+  ## keeps what a later page needs to preview it before its own session starts
+  ## (viewer_first_view_capture() in shiny_server.R).
+  if (
+    identical(message$render_token, 1) &&
+      exists("viewer_first_view_capture", mode = "function")
+  ) {
+    viewer_first_view_capture(message)
+  }
   session$sendBinaryMessage("cell_view_binary", cv_wire_pack_message(message))
 
   if (progressive) {

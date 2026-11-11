@@ -20,6 +20,12 @@
       window.removeEventListener('cerebro:page-ready', finish);
       window.removeEventListener('cerebro:view-terminal', finish);
       window.removeEventListener('cerebro:dataset-context', failed);
+      window.removeEventListener('cerebro:first-view', previewed);
+    }
+    function previewed() {
+      // first-view.js drew the page's plot from the Viewer Pack: there is
+      // something to show before the session has finished the page.
+      finish(true);
     }
     function failed(event) {
       // Let the normal error and global dataset picker remain usable.
@@ -34,6 +40,8 @@
     window.addEventListener('cerebro:page-ready', finish);
     window.addEventListener('cerebro:view-terminal', finish);
     window.addEventListener('cerebro:dataset-context', failed);
+    window.addEventListener('cerebro:first-view', previewed);
+    if (window.CerebroFirstView && window.CerebroFirstView.shown) previewed();
     finish();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true});

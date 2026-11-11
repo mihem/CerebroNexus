@@ -22,6 +22,26 @@ viewerSource(cerebro_root_path("viewer/plotting_functions.R"), environment())
 viewerSource(cerebro_root_path("viewer/color_config.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/viewer_pack.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/crb_contract.R"), environment())
+viewerSource(
+  cerebro_root_path("viewer/core/shared_resources.R"),
+  environment()
+)
+## Where a page finds the first view of its Projection before its session
+## exists. Only where Pack files are shared: not with a login.
+if (length(viewerSharedResourceRoots(Cerebro.options))) {
+  shiny::addResourcePath("cerebro-first-view", viewerFirstViewDirectory())
+  ## The first views kept from earlier runs, so that the first visitor of
+  ## this process has one too.
+  try(
+    viewerFirstViewRestore(
+      viewerSharedResourceRoots(Cerebro.options),
+      viewerFirstViewBasis(Cerebro.options),
+      viewerSharedResourceRegisterEarly,
+      viewerSharedResourceSources(Cerebro.options)
+    ),
+    silent = TRUE
+  )
+}
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -1251,9 +1271,89 @@ server <- function(input, output, session) {
   viewer_resource_prefixes <- character()
   viewer_resource_counts <- new.env(parent = emptyenv())
   viewer_resource_by_directory <- new.env(parent = emptyenv())
+  ## Makes `directory` reachable under `prefix`.
+  viewerRegisterStaticResource <- function(
+    prefix,
+    directory,
+    immutable = FALSE
+  ) {
+    shiny::addResourcePath(prefix, directory)
+    ## These files are binary arrays or already gzip files, which httpuv would
+    ## otherwise gzip again for every request (10 MB of coordinates by 7 %,
+    ## in half a second).
+    server <- shiny::getShinyOption("server", default = NULL)
+    if (!is.null(server)) {
+      path <- if (immutable) {
+        ## A shared prefix: later sessions take the file from the browser cache.
+        viewerSharedResourceStaticPath(directory)
+      } else {
+        httpuv::staticPath(
+          normalizePath(directory, mustWork = TRUE),
+          headers = list("Content-Encoding" = "identity")
+        )
+      }
+      server$setStaticPath(.list = stats::setNames(list(path), prefix))
+    }
+  }
+  viewer_shared_resource_roots <- viewerSharedResourceRoots(Cerebro.options)
+  viewerSharedResourceHeaders()
+  ## The CRB file of the data set on screen when it is a configured one, whose
+  ## first view may be published; NULL for an upload.
+  viewer_shared_resource_sources <- viewerSharedResourceSources(Cerebro.options)
+  viewer_first_view_source <- function() {
+    path <- tryCatch(
+      isolate(viewerDatasetPath(
+        available_crb_files$files,
+        available_crb_files$selected
+      )),
+      error = function(error) NULL
+    )
+    if (
+      !is.character(path) ||
+        length(path) != 1L ||
+        is.na(path) ||
+        !file.exists(path)
+    ) {
+      return(NULL)
+    }
+    path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+    if (path %in% viewer_shared_resource_sources) path else NULL
+  }
+  ## Publishes the first view of this session's page from its first frame
+  ## (viewer/core/shared_resources.R). Never fails a render.
+  viewer_first_view_capture <- function(message) {
+    if (!length(viewer_shared_resource_sources)) {
+      return(invisible(NULL))
+    }
+    try(
+      viewerFirstViewCapture(
+        message,
+        isolate(session$clientData$url_pathname),
+        isolate(session$clientData$url_search),
+        viewer_shared_resource_roots,
+        viewerFirstViewBasis(Cerebro.options),
+        viewer_first_view_source()
+      ),
+      silent = TRUE
+    )
+    invisible(NULL)
+  }
   viewerStaticResourcePrefix <- function(kind, directory) {
-    ## One prefix per directory and session: a new prefix for the same files
-    ## gives them a new URL, so the browser downloads and keeps them again
+    ## The Pack of a configured data set has one prefix for the whole process
+    ## (viewer/core/shared_resources.R).
+    shared <- viewerSharedResourcePrefix(
+      kind,
+      directory,
+      viewer_shared_resource_roots,
+      function(prefix, directory) {
+        viewerRegisterStaticResource(prefix, directory, immutable = TRUE)
+      }
+    )
+    if (!is.null(shared)) {
+      return(shared)
+    }
+    ## Otherwise one prefix per directory and session: a new prefix for the same
+    ## files gives them a new URL, so the browser downloads and keeps them again
     ## (the cell names, 1.46 million strings on Ren, on every frame).
     directory_key <- paste(kind, normalizePath(directory, mustWork = FALSE))
     if (
@@ -1284,21 +1384,7 @@ server <- function(input, output, session) {
       "-",
       count
     )
-    shiny::addResourcePath(prefix, directory)
-    ## These files are binary arrays or already gzip files, which httpuv would
-    ## otherwise gzip again for every request (10 MB of coordinates by 7 %).
-    server <- shiny::getShinyOption("server", default = NULL)
-    if (!is.null(server)) {
-      server$setStaticPath(
-        .list = stats::setNames(
-          list(httpuv::staticPath(
-            normalizePath(directory, mustWork = TRUE),
-            headers = list(`Content-Encoding` = "identity")
-          )),
-          prefix
-        )
-      )
-    }
+    viewerRegisterStaticResource(prefix, directory)
     assign(kind, count, envir = viewer_resource_counts)
     assign(directory_key, prefix, envir = viewer_resource_by_directory)
     viewer_resource_prefixes <<- c(viewer_resource_prefixes, prefix)

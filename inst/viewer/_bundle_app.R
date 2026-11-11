@@ -57,6 +57,9 @@ app <- shiny::shinyApp(
     shiny::onStop(function() {
       options(previous)
     })
+    ## Viewer Pack files a page may ask for before its session exists get
+    ## their headers as soon as the web server runs.
+    later::later(viewerSharedResourceHeaders, 0)
   },
   options = embedded_options
 )

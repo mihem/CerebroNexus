@@ -633,6 +633,11 @@ ui <- dashboardPage(
       tags$script(HTML(
         "document.documentElement.classList.add('cerebro-starting');"
       )),
+      ## Inline and first: it asks for the page's first view before any other
+      ## file is requested (www/first-view.js).
+      tags$script(HTML(cerebro_read_file(
+        file.path(cerebro_www_dir, "first-view.js")
+      ))),
       cerebro_js("page-lifecycle.js", defer = TRUE),
       cerebro_js("startup.js", defer = TRUE),
       cerebro_css("custom.css"),

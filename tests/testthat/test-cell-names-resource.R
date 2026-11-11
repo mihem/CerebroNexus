@@ -109,12 +109,17 @@ test_that("names go in messages while the cell-name file is written", {
 test_that("the same files keep one resource URL for the session", {
   scope <- new.env(parent = globalenv())
   scope$viewer_resource_by_directory <- new.env(parent = emptyenv())
+  ## No configured data set shares these directories: each gets the session's
+  ## own prefix (test-shared-resources.R covers the shared ones).
+  sys.source(viewer_test_path("core", "shared_resources.R"), scope)
+  scope$viewer_shared_resource_roots <- character()
   viewer_server_load(
     viewer_server_statements("shiny_server.R", server = TRUE),
     scope,
     names = c(
       "viewer_resource_prefixes",
       "viewer_resource_counts",
+      "viewerRegisterStaticResource",
       "viewerStaticResourcePrefix"
     )
   )

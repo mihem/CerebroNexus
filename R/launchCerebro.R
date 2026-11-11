@@ -226,6 +226,9 @@ launchCerebro <- function(
   app_args[["onStart"]] <- function() {
     previous <- options(shiny.maxRequestSize = max_request_size)
     shiny::onStop(function() options(previous))
+    ## Viewer Pack files a page may ask for before its session exists get their
+    ## headers as soon as the web server runs (viewer/core/shared_resources.R).
+    later::later(viewerSharedResourceHeaders, 0)
     if (is.function(user_on_start)) {
       user_on_start()
     }
