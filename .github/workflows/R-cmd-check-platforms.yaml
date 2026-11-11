@@ -1,11 +1,13 @@
 name: R-CMD-check (Windows, macOS)
 
 ## CRAN also checks on Windows and macOS. The one failure win-builder found in
-## 8.0.0 was Windows-only (device names such as CON.crb), so run both here.
+## 8.0.0 was Windows-only (device names such as CON.crb), so Windows runs on
+## every relevant PR. macOS (about 11 min) runs on manual dispatch only.
 ##
 ## NOT a required check yet: watch a few runs for stability and run time first,
-## then add the two jobs to the ruleset. When that happens, drop the `paths`
+## then add the Windows job to the ruleset. When that happens, drop the `paths`
 ## filter below: a required check whose workflow does not run stays pending
+## forever and blocks the PR.
 ## forever and blocks the PR.
 
 on:
@@ -42,9 +44,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - { os: windows-latest, r: release, cpus: 4 }
-          - { os: macos-latest, r: release, cpus: 3 }
+        ## Windows on every relevant PR (about 9 min). macOS needs about 11 min even
+        ## with 3 test workers and no vignettes, so it runs only on manual dispatch
+        ## (run it before a release).
+        config: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"os":"windows-latest","r":"release","cpus":4},{"os":"macos-latest","r":"release","cpus":3}]' || '[{"os":"windows-latest","r":"release","cpus":4}]') }}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
