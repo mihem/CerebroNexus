@@ -42,17 +42,11 @@
 #'   )
 #' }
 #'
-#' @import dplyr
-#' @importFrom DT datatable formatPercentage formatRound formatSignif formatStyle styleColorBar styleEqual styleInterval
 #' @importFrom grDevices col2rgb rgb
-#' @importFrom plotly add_lines add_trace event_data layout plot_ly plotlyOutput renderPlotly toWebGL
 #' @import shiny
 #' @importFrom htmltools save_html
-#' @importFrom colourpicker colourInput
-#' @importFrom shinycssloaders withSpinner
 #' @import shinydashboard
 #' @importFrom shinyjs inlineCSS
-#' @importFrom shinyWidgets awesomeCheckbox dropdownButton materialSwitch radioGroupButtons sendSweetAlert
 #'
 #' @export
 #'
@@ -144,7 +138,9 @@ launchCerebro <- function(
     "point_size" = point_size,
     "point_opacity" = point_opacity,
     "percentage_cells_to_show" = percentage_cells_to_show,
-    "projections_show_hover_info" = projections_show_hover_info
+    "projections_show_hover_info" = projections_show_hover_info,
+    ## Imports left unloaded so far; the Viewer loads them while it is idle.
+    ".idle_packages" = .lazy_imports_idle
   )
 
   ##--------------------------------------------------------------------------##
@@ -162,7 +158,11 @@ launchCerebro <- function(
 
   ##--------------------------------------------------------------------------##
   ## Read the data sets, then load the server functions that take them over.
+  ## What every session needs is loaded first (see R/lazy_imports.R).
   ##--------------------------------------------------------------------------##
+  for (package in .lazy_imports_session) {
+    loadNamespace(package)
+  }
   .reserveHeapForCrb(crb_file_to_load)
   dataset_catalog <- .datasetCatalogFromFiles(
     crb_file_to_load,

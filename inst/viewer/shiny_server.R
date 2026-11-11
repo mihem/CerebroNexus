@@ -2424,6 +2424,45 @@ server <- function(input, output, session) {
     once = TRUE
   )
 
+  ## launchCerebro() starts without the packages only some pages use
+  ## (`.idle_packages`: plotly, Matrix, ...). Load them once this session has
+  ## sent nothing for three seconds, one per turn of the event loop, and stop
+  ## as soon as it is busy again: the first page is never delayed, and a click
+  ## waits for one package at most. An App that attaches its packages has
+  ## nothing to load here.
+  viewer_idle_packages <- function() {
+    setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
+  }
+  if (length(viewer_idle_packages())) {
+    viewer_idle_quiet <- FALSE
+    viewer_idle_cancel <- function() NULL
+    viewer_idle_load <- function() {
+      packages <- viewer_idle_packages()
+      if (session$isClosed() || !length(packages)) {
+        return()
+      }
+      viewer_idle_quiet <<- TRUE
+      tasks <- lapply(packages, function(package) {
+        function() loadNamespace(package)
+      })
+      names(tasks) <- paste0("load package ", packages)
+      viewerIdleRun(tasks, function() {
+        !session$isClosed() && viewer_idle_quiet
+      })
+    }
+    viewer_idle_flushed <- function() {
+      viewer_idle_quiet <<- FALSE
+      viewer_idle_cancel()
+      if (!length(viewer_idle_packages())) {
+        return()
+      }
+      viewer_idle_cancel <<- later::later(viewer_idle_load, 3)
+      session$onFlushed(viewer_idle_flushed, once = TRUE)
+    }
+    session$onFlushed(viewer_idle_flushed, once = TRUE)
+    session$onSessionEnded(function() viewer_idle_cancel())
+  }
+
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).
   ##--------------------------------------------------------------------------##

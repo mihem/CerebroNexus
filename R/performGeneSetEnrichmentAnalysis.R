@@ -42,8 +42,6 @@
 #' )
 #' }
 #'
-#' @import dplyr
-#' @importFrom Matrix colMeans colSums rowSums t
 #' @importFrom rlang .data :=
 #'
 #' @export

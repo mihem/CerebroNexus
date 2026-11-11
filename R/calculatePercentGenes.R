@@ -26,7 +26,6 @@
 #' )
 #' }
 #'
-#' @importFrom Matrix colSums
 #'
 #' @export
 #'

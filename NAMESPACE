@@ -30,27 +30,9 @@ export(readSpatialDataAsSCE)
 export(readViewerPack)
 export(saveCerebro)
 export(validateViewerPack)
-import(dplyr)
 import(shiny)
 import(shinydashboard)
-importFrom(DT,
-  datatable,
-  formatPercentage,
-  formatRound,
-  formatSignif,
-  formatStyle,
-  styleColorBar,
-  styleEqual,
-  styleInterval
-)
-importFrom(Matrix,
-  colMeans,
-  colSums,
-  rowSums,
-  t
-)
 importFrom(R6,R6Class)
-importFrom(colourpicker,colourInput)
 importFrom(grDevices,
   col2rgb,
   rgb
@@ -58,31 +40,12 @@ importFrom(grDevices,
 importFrom(htmltools,save_html)
 importFrom(later,later)
 importFrom(methods,as)
-importFrom(mirai,mirai)
-importFrom(plotly,
-  add_lines,
-  add_trace,
-  event_data,
-  layout,
-  plot_ly,
-  plotlyOutput,
-  renderPlotly,
-  toWebGL
-)
 importFrom(promises,promise)
 importFrom(rlang,
   "%||%",
   ":=",
   .data
 )
-importFrom(shinyWidgets,
-  awesomeCheckbox,
-  dropdownButton,
-  materialSwitch,
-  radioGroupButtons,
-  sendSweetAlert
-)
-importFrom(shinycssloaders,withSpinner)
 importFrom(shinyjs,inlineCSS)
 importFrom(stats,setNames)
 importFrom(utils,read.delim)

@@ -26,8 +26,6 @@
 #' )
 #' }
 #'
-#' @import dplyr
-#' @importFrom Matrix rowSums
 #' @importFrom rlang .data :=
 #'
 #' @export
