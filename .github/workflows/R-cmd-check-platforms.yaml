@@ -8,7 +8,6 @@ name: R-CMD-check (Windows, macOS)
 ## then add the Windows job to the ruleset. When that happens, drop the `paths`
 ## filter below: a required check whose workflow does not run stays pending
 ## forever and blocks the PR.
-## forever and blocks the PR.
 
 on:
   pull_request:
