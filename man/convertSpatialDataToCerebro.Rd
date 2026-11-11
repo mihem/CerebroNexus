@@ -35,7 +35,7 @@ tissue picture, where the store has one), expression, cell data and any
 embeddings, markers and colours the table carries.
 }
 \examples{
-\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "arrow"))) withAutoprint(\{ # examplesIf}
 \donttest{
 dir <- tempfile("cerebro-")
 dir.create(dir)

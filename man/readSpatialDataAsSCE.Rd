@@ -53,7 +53,7 @@ name. Blosc chunks are decoded in R, lz4 (the numcodecs default) at about
 file.
 }
 \examples{
-\dontshow{if (nzchar(system.file(package = "SingleCellExperiment"))) withAutoprint(\{ # examplesIf}
+\dontshow{if (nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "arrow"))) withAutoprint(\{ # examplesIf}
 \donttest{
 ## A small SpatialData store (50 spots), zipped
 sce <- readSpatialDataAsSCE(
