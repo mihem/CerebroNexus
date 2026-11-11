@@ -2,9 +2,10 @@
 
 This is a new submission of CerebroNexus 8.0.0.
 
-CerebroNexus extends the 'Cerebro' viewer (Hillje et al. 2020,
-<doi:10.1093/bioinformatics/btz877>) to coordinated views of gene expression,
-immune repertoires, trajectories, spatial images and HLA-TCR motifs.
+CerebroNexus is an interactive 'Shiny' application for exploring and sharing
+single-cell and spatial transcriptomics data, with coordinated views of gene
+expression, immune repertoires, trajectories, spatial images and HLA-TCR
+motifs.
 
 ## Test environments
 
@@ -15,7 +16,8 @@ immune repertoires, trajectories, spatial images and HLA-TCR motifs.
   (suggested packages not available)
 * Ubuntu (GitHub Actions), R 4.6.1
 * R-hub, R-devel (2026-11-09 r90865): Linux, Windows and macOS arm64
-* win-builder, R-devel: TO RUN on the final tarball (`devtools::check_win_devel()`)
+* win-builder, R-devel (2026-11-07 r90850 ucrt), Windows Server 2022: 0 errors
+  | 0 warnings | 1 note (below), on the tarball submitted here
 
 ## R CMD check results
 
