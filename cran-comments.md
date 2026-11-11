@@ -2,9 +2,10 @@
 
 This is a new submission of CerebroNexus 8.0.0.
 
-CerebroNexus extends the 'Cerebro' viewer (Hillje et al. 2020,
-<doi:10.1093/bioinformatics/btz877>) to coordinated views of gene expression,
-immune repertoires, trajectories, spatial images and HLA-TCR motifs.
+CerebroNexus is an interactive 'Shiny' application for exploring and sharing
+single-cell and spatial transcriptomics data, with coordinated views of gene
+expression, immune repertoires, trajectories, spatial images and HLA-TCR
+motifs.
 
 ## Test environments
 
