@@ -3422,3 +3422,45 @@ body .shiny-bound-output.cerebro-output-waiting {
   gap: 6px;
 }
 .cerebro-selection-table .cst-menu .cst-range input { width: 110px; }
+
+/* About tab: the logo sits at the right, the text wraps to its left. The text
+   keeps a readable measure so long lines never run up against the logo. */
+#about {
+  max-width: 820px;
+}
+.cerebro-about-logo {
+  float: right;
+  width: 340px;
+  max-width: 35%;
+  height: auto;
+  margin: 12px 24px 16px 32px;
+}
+@media (max-width: 767px) {
+  .cerebro-about-logo {
+    float: none;
+    display: block;
+    width: 200px;
+    max-width: 60%;
+    margin: 12px auto 16px;
+  }
+}
+
+/* About tab: a small coloured icon leads every heading, line and link. */
+.cerebro-about-ico {
+  display: inline-block;
+  width: 1.5em;
+  margin-right: 6px;
+  text-align: center;
+}
+.cerebro-about-ico-blue   { color: var(--c-blue); }
+.cerebro-about-ico-amber  { color: var(--c-amber); }
+.cerebro-about-ico-green  { color: var(--c-success); }
+.cerebro-about-ico-pink   { color: #e8527a; }
+.cerebro-about-ico-purple { color: #8a5cc2; }
+.cerebro-about-ico-teal   { color: #14a3a3; }
+.cerebro-about-ico-muted  { color: var(--c-text-3); }
+.cerebro-about-ico-dark   { color: var(--c-text); }
+#about ul.cerebro-about-links {
+  list-style: none;
+  padding-left: 0;
+}

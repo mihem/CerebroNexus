@@ -1,14 +1,8 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="man/figures/logo-dark.svg">
-    <img src="man/figures/logo.svg" alt="CerebroNexus" width="380">
-  </picture>
-</p>
-
 [![R-CMD-check (upstream)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Lifecycle: stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
 
+<img src="man/figures/logo.png" alt="CerebroNexus logo" align="right" width="260">
 
 **CerebroNexus** (**Ce**ll**Re**port**Bro**wser **Nexus**) is a [Shiny](https://shiny.posit.co/) platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses. See the [full documentation](https://www.mheming.com/CerebroNexus/).
 
@@ -17,6 +11,8 @@
 *CerebroNexus began as a fork of [cerebroApp](https://github.com/romanhaa/cerebroApp) by Roman Hillje and has since evolved with substantial new features and active development by [mihem](https://github.com/mihem) and [Xuesong Wang](https://github.com/duocang).*
 
 Automated tests run in a reproducible Nix environment.
+
+<br clear="right">
 
 ![CerebroNexus spatial data view](man/figures/featured.png)
 
