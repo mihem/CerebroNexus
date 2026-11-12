@@ -10,6 +10,11 @@ builder_project_skipped_ids <- reactiveVal(character())
 builder_project_removed_ids <- reactiveVal(character())
 builder_project_relinked_ids <- reactiveVal(character())
 builder_project_build_plan <- reactiveVal(NULL)
+# What a Build started without a Project was built from, per dataset.
+builder_project_build_identities <- reactiveVal(NULL)
+# That Build's published CRBs, kept until a Save creates the Project that can
+# adopt them (see builder_project_adopt_deferred_build).
+builder_project_deferred_build <- reactiveVal(NULL)
 builder_project_auto_save_signature <- reactiveVal(NULL)
 builder_project_operation_phase <- reactiveVal("idle")
 builder_project_last_save_error <- reactiveVal(NULL)
@@ -602,11 +607,51 @@ observe({
   )
 })
 
+## What a cache is built from: the artifact configuration and the source file.
+builder_project_entry_build_identity <- function(entry) {
+  list(
+    artifact_digest = builder_project_artifact_configuration_digest(entry),
+    source_fingerprint = as.character(
+      entry$snapshot$source_fingerprint %||% ""
+    )
+  )
+}
+
+builder_project_build_identities_of <- function(plan, entries) {
+  ids <- vapply(plan$items %||% list(), `[[`, character(1), "id")
+  entry_map <- stats::setNames(
+    entries,
+    vapply(entries, `[[`, character(1), "id")
+  )
+  stats::setNames(
+    lapply(ids, function(id) {
+      entry <- entry_map[[id]] %||% NULL
+      if (!is.list(entry)) {
+        return(NULL)
+      }
+      tryCatch(
+        builder_project_entry_build_identity(entry),
+        error = function(error) NULL
+      )
+    }),
+    ids
+  )
+}
+
+## Without a Project the plan is kept too, with what each dataset was built
+## from, so that the Save that creates the Project can adopt the published CRBs
+## instead of building them again.
 builder_project_capture_build_plan <- function(plan) {
+  builder_project_deferred_build(NULL)
   if (is.null(isolate(builder_project()))) {
-    builder_project_build_plan(NULL)
+    builder_project_build_identities(tryCatch(
+      builder_project_build_identities_of(plan, isolate(sets())),
+      error = function(error) list()
+    ))
+    builder_project_build_plan(plan)
     return(invisible(FALSE))
   }
+  builder_project_build_identities(NULL)
   builder_project_build_plan(plan)
   invisible(plan)
 }
@@ -1316,6 +1361,13 @@ start_next_builder_project_crb_job <- function() {
 }
 
 queue_builder_project_crbs <- function(ids = checked_dataset_ids()) {
+  force(ids)
+  if (!is.null(isolate(builder_project_deferred_build()))) {
+    return(builder_project_adopt_deferred_build(
+      ids = ids,
+      then = function() queue_builder_project_crbs(ids)
+    ))
+  }
   ids <- intersect(as.character(ids), isolate(checked_dataset_ids()))
   added <- 0L
   entries <- isolate(sets())
@@ -4068,6 +4120,8 @@ complete_builder_project_open <- function(actions = NULL) {
   # instead of holding Open back.
   cancel_builder_project_crb_queue()
   reset_builder_project_crb_pipeline()
+  builder_project_deferred_build(NULL)
+  builder_project_build_identities(NULL)
   protocol(next_protocol)
   store(next_store)
   projection_previews(list())
@@ -4411,42 +4465,31 @@ observeEvent(input$project_resume_current_source, {
   send_builder_project_source_load_state(id, "loading")
 })
 
-observe({
-  value <- result()
-  plan <- isolate(builder_project_build_plan())
-  project <- isolate(builder_project())
-  if (is.null(plan) || !is.list(value)) {
-    return()
+## Records the CRBs a published Build wrote as the Project's dataset caches and
+## saves the manifest. `quiet` is for a Build that ran before the Project
+## existed: its files may be gone by now, and then the caller simply builds the
+## caches, so a failure reports nothing and leaves the phase as it was.
+## `on_done(ok)` runs once the registration has ended, whatever its outcome.
+builder_project_register_build <- function(
+  plan,
+  value,
+  project,
+  quiet = FALSE,
+  on_done = NULL
+) {
+  done <- function(ok) {
+    if (is.function(on_done)) {
+      on_done(isTRUE(ok))
+    }
+    invisible(isTRUE(ok))
   }
-  terminal <- any(vapply(
-    c("success", "failure", "needs_decision"),
-    identical,
-    logical(1),
-    y = value$state
-  )) ||
-    isTRUE(value$published)
-  if (!isTRUE(terminal)) {
-    return()
+  previous_phase <- isolate(builder_project_operation_phase())
+  restore_phase <- function() {
+    if (identical(isolate(builder_project_operation_phase()), "registering")) {
+      builder_project_operation_phase(previous_phase)
+    }
   }
-  ordinary_registration_required <-
-    identical(value$state, "success") &&
-    length(value$built %||% character()) > 0L &&
-    any(vapply(
-      plan$items,
-      function(item) !is.list(item$reused_artifact),
-      logical(1)
-    ))
-  if (!isTRUE(ordinary_registration_required)) {
-    builder_project_build_plan(NULL)
-    return()
-  }
-  if (is.null(project)) {
-    builder_project_build_plan(NULL)
-    return()
-  }
-
   builder_project_operation_phase("registering")
-  builder_project_build_plan(NULL)
 
   project_before_registration <- project
   previous_artifacts <- isolate(builder_project_artifacts())
@@ -4476,9 +4519,13 @@ observe({
       as.character(error %||% "Dataset caches could not be registered.")
     }
     builder_project_registration_task(NULL)
-    builder_project_operation_phase("save_failed")
-    builder_notify("error", message)
-    invisible(FALSE)
+    if (isTRUE(quiet)) {
+      restore_phase()
+    } else {
+      builder_project_operation_phase("save_failed")
+      builder_notify("error", message)
+    }
+    done(FALSE)
   }
 
   task <- tryCatch(
@@ -4514,8 +4561,7 @@ observe({
     error = identity
   )
   if (inherits(task, "condition")) {
-    fail_registration(task)
-    return()
+    return(fail_registration(task))
   }
   builder_project_registration_task(task)
   builder_async_then(
@@ -4523,7 +4569,7 @@ observe({
     session,
     on_fulfilled = function(prepared) {
       if (!identical(isolate(builder_project_registration_task()), task)) {
-        return(invisible(FALSE))
+        return(done(FALSE))
       }
       builder_project_registration_task(NULL)
       current_project <- isolate(builder_project())
@@ -4559,9 +4605,13 @@ observe({
         }
       }
       finish_registration <- function(saved) {
-        builder_project_operation_phase(
-          if (isTRUE(saved)) "idle" else "save_failed"
-        )
+        if (isTRUE(saved)) {
+          builder_project_operation_phase("idle")
+        } else if (isTRUE(quiet)) {
+          restore_phase()
+        } else {
+          builder_project_operation_phase("save_failed")
+        }
         if (!isTRUE(saved)) {
           if (artifacts_changed) {
             builder_project_artifacts(previous_artifacts)
@@ -4569,7 +4619,7 @@ observe({
           builder_project(project_before_registration)
         }
         if (builder_has_text(registration_error)) {
-          if (isTRUE(prepared$build_succeeded)) {
+          if (isTRUE(prepared$build_succeeded) && !isTRUE(quiet)) {
             builder_notify("error", registration_error)
           }
         } else if (isTRUE(saved)) {
@@ -4582,7 +4632,7 @@ observe({
             )
           }
         }
-        invisible(isTRUE(saved) && !builder_has_text(registration_error))
+        done(isTRUE(saved) && !builder_has_text(registration_error))
       }
       if (!save_required) {
         return(finish_registration(TRUE))
@@ -4627,4 +4677,169 @@ observe({
     },
     on_rejected = fail_registration
   )
+  invisible(TRUE)
+}
+
+## What a finished Build made: registered in the open Project, or kept for the
+## Project a later Save creates.
+builder_project_handle_build_result <- function(value) {
+  plan <- isolate(builder_project_build_plan())
+  project <- isolate(builder_project())
+  if (is.null(plan) || !is.list(value)) {
+    return(invisible(FALSE))
+  }
+  terminal <- any(vapply(
+    c("success", "failure", "needs_decision"),
+    identical,
+    logical(1),
+    y = value$state
+  )) ||
+    isTRUE(value$published)
+  if (!isTRUE(terminal)) {
+    return(invisible(FALSE))
+  }
+  ordinary_registration_required <-
+    identical(value$state, "success") &&
+    length(value$built %||% character()) > 0L &&
+    any(vapply(
+      plan$items,
+      function(item) !is.list(item$reused_artifact),
+      logical(1)
+    ))
+  if (
+    isTRUE(ordinary_registration_required) &&
+      is.null(project) &&
+      !is.list(value$release)
+  ) {
+    # Not published yet: keep the plan for the result that carries the release.
+    return(invisible(FALSE))
+  }
+  identities <- isolate(builder_project_build_identities())
+  builder_project_build_plan(NULL)
+  builder_project_build_identities(NULL)
+  if (!isTRUE(ordinary_registration_required)) {
+    return(invisible(FALSE))
+  }
+  if (is.null(project)) {
+    return(builder_project_defer_build(plan, value, identities))
+  }
+  if (is.list(identities)) {
+    # The Build began before this Project existed; Save has queued its caches.
+    return(invisible(FALSE))
+  }
+  builder_project_register_build(plan, value, project)
+  invisible(TRUE)
+}
+
+observe({
+  # Read the result here, not in the handler: a promise that the handler never
+  # forces would leave this observer without a dependency on it.
+  value <- result()
+  builder_project_handle_build_result(value)
 })
+
+## Keeps a published Build that ran without a Project, to be adopted by the
+## Save that creates one. Only a Build whose release identity is known is kept:
+## the adoption checks every copied byte against it.
+builder_project_defer_build <- function(plan, value, identities) {
+  if (
+    !is.list(identities) ||
+      !is.list(value$release) ||
+      !length(value$release$identity$entries %||% list())
+  ) {
+    return(invisible(FALSE))
+  }
+  listed <- function(path) {
+    target <- tryCatch(
+      normalizePath(value$release$target, winslash = "/", mustWork = TRUE),
+      error = function(error) NULL
+    )
+    path <- tryCatch(
+      normalizePath(path, winslash = "/", mustWork = TRUE),
+      error = function(error) NULL
+    )
+    if (
+      is.null(target) || is.null(path) || !startsWith(path, paste0(target, "/"))
+    ) {
+      return(FALSE)
+    }
+    paths <- vapply(
+      value$release$identity$entries,
+      function(entry) as.character(entry$path %||% ""),
+      character(1)
+    )
+    sum(paths == substring(path, nchar(target) + 2L)) == 1L
+  }
+  if (
+    !all(vapply(as.character(value$built %||% character()), listed, logical(1)))
+  ) {
+    return(invisible(FALSE))
+  }
+  items <- lapply(plan$items, function(item) {
+    item$reused_artifact <- NULL
+    item
+  })
+  builder_project_deferred_build(list(
+    plan = list(items = items),
+    value = value[intersect(
+      names(value),
+      c("state", "built", "verifications", "release", "error")
+    )],
+    identities = identities
+  ))
+  invisible(TRUE)
+}
+
+## The caches of a Build that ran before the Project existed, for the datasets
+## that are still what that Build made. The CRB files keep the checks of any
+## registration: every copied byte is compared with the release's MD5s. What
+## cannot be adopted (changed, removed, files gone) is left to the CRB queue,
+## which `then` runs.
+builder_project_adopt_deferred_build <- function(ids = NULL, then = NULL) {
+  deferred <- isolate(builder_project_deferred_build())
+  builder_project_deferred_build(NULL)
+  finish <- function(ok = FALSE) {
+    if (is.function(then)) {
+      then()
+    }
+    invisible(isTRUE(ok))
+  }
+  project <- isolate(builder_project())
+  if (!is.list(deferred) || is.null(project)) {
+    return(finish())
+  }
+  entries <- isolate(sets())
+  entry_map <- stats::setNames(
+    entries,
+    vapply(entries, `[[`, character(1), "id")
+  )
+  current <- function(item) {
+    tryCatch(
+      {
+        id <- item$id
+        built <- unname(deferred$value$built[id])
+        entry <- entry_map[[id]] %||% NULL
+        identity <- deferred$identities[[id]] %||% NULL
+        (is.null(ids) || id %in% ids) &&
+          is.list(entry) &&
+          is.list(identity) &&
+          length(built) == 1L &&
+          builder_has_text(built) &&
+          file.exists(built) &&
+          identical(builder_project_entry_build_identity(entry), identity)
+      },
+      error = function(error) FALSE
+    )
+  }
+  items <- Filter(current, deferred$plan$items)
+  if (!length(items)) {
+    return(finish())
+  }
+  builder_project_register_build(
+    list(items = items),
+    deferred$value,
+    project,
+    quiet = TRUE,
+    on_done = finish
+  )
+}
