@@ -16,6 +16,11 @@
 
 # CerebroNexus 8.0.1
 
+- **Page links.** `?page=<id>` opens the Viewer on a page (the `initial_page`
+  IDs, e.g. `?dataset=TCR&page=immune_repertoire`). The address bar now follows
+  the page and the data set being read, so a copied URL reopens them. A
+  `/<data set id>` link also works when the App is started with
+  `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
 - `R CMD check --as-cran` no longer stops in the `readSpatialDataAsSCE()` and
   `convertSpatialDataToCerebro()` examples when 'arrow' is not installed; the
   examples now run only if 'SingleCellExperiment' and 'arrow' are available.
@@ -28,11 +33,6 @@
 
 # CerebroNexus 8.0.0
 
-- **Page links.** `?page=<id>` opens the Viewer on a page (the `initial_page`
-  IDs, e.g. `?dataset=TCR&page=immune_repertoire`). The address bar now follows
-  the page and the data set being read, so a copied URL reopens them. A
-  `/<data set id>` link also works when the App is started with
-  `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
 - The package is prepared for a CRAN submission. `R CMD check --as-cran` on the
   built tarball reports only the "New submission" NOTE on Windows and Linux,
   and also with the suggested packages unavailable.
