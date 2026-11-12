@@ -135,13 +135,28 @@ Objects from Seurat's imaging readers (`LoadXenium()`, and in Seurat 6
 platform, not `RNA`, and Seurat names the per-cell totals after it
 (`nCount_Xenium`, `nCount_Atera`). Pass the assay and these two columns; the
 Builder picks them on its own. The readers add no dimensional reduction, so
-run e.g. `RunPCA()` and `RunUMAP()` first. The cell centroids, segmentation
-and molecules of the FOV are exported; the Atera morphology image that
-`LoadAtera()` keeps in `Misc()` is not, so supply it through `spatial_images`
-like any other background.
+run e.g. `RunPCA()` and `RunUMAP()` first.
+
+`LoadAtera()` needs the `blosc`, `jsonlite` and `data.table` packages, and by
+default reads the cell centroids only. Whatever the FOV holds is exported, so
+ask for the rest when reading:
+
+- `segmentations = "cell"` (or `"nucleus"`) for the cell outlines;
+- `molecule.coordinates = TRUE` together with `genes` for transcript
+  positions. Without `genes` Seurat only keeps a handle to the transcript
+  file, and no molecules reach the FOV or the `.crb`.
+
+The morphology image that `LoadAtera(morphology.image = TRUE)` stores in
+`Misc()` is not exported; supply a background through `spatial_images` like
+any other.
 
 ```{r, eval = FALSE}
-atera <- Seurat::LoadAtera("path/to/atera_outs")
+atera <- Seurat::LoadAtera(
+  "path/to/atera_outs",
+  segmentations = "cell",
+  molecule.coordinates = TRUE,
+  genes = c("CD19", "ATOX1")
+)
 atera <- Seurat::NormalizeData(atera)
 atera <- Seurat::FindVariableFeatures(atera)
 atera <- Seurat::ScaleData(atera)
@@ -154,8 +169,9 @@ convertSeuratToCerebro(
   assay = "Atera",
   nUMI = "nCount_Atera",
   nGene = "nFeature_Atera",
-  organism = "Mouse",
-  groups = "seurat_clusters"
+  organism = "hg",
+  experiment_name = "Atera kidney",
+  groups = "azimuth_broad"
 )
 ```
 

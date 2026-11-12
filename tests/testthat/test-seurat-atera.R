@@ -4,10 +4,14 @@
 skip_if_not_installed("Seurat")
 skip_if_not_installed("SeuratObject")
 
-## What LoadAtera() leaves: counts in an `Atera` assay, codeword/control
-## assays next to it, one FOV "fov" with centroids, segmentation and
-## molecules, Azimuth labels in the metadata, and Atera entries in Misc(),
-## one of them holding a live handle to the transcript store.
+## What LoadAtera(segmentations = "cell", molecule.coordinates = TRUE,
+## genes = ...) leaves, as seen on 10x's tiny Atera dataset: counts in an
+## `Atera` assay, codeword/control assays next to it, one FOV "fov" with
+## centroids, segmentation and the molecules of the requested genes,
+## `azimuth_*` labels in the metadata, and in Misc() the run metadata and a
+## live handle to the transcript file, plus the morphology entry that
+## `morphology.image = TRUE` adds. (By default LoadAtera() reads the
+## centroids only.)
 atera_like_object <- function(n_cells = 30L, n_genes = 40L) {
   set.seed(11)
   cells <- sprintf("aaab%04d-1", seq_len(n_cells))
@@ -61,13 +65,13 @@ atera_like_object <- function(n_cells = 30L, n_genes = 40L) {
   object[["fov"]] <- SeuratObject::CreateFOV(
     coords = list(
       centroids = SeuratObject::CreateCentroids(centroids),
-      segmentation = SeuratObject::CreateSegmentation(segmentation)
+      segmentations = SeuratObject::CreateSegmentation(segmentation)
     ),
-    type = c("centroids", "segmentation"),
+    type = c("centroids", "segmentations"),
     molecules = SeuratObject::CreateMolecules(molecules),
     assay = "Atera"
   )
-  object$azimuth_label <- rep(
+  object$azimuth_broad <- rep(
     c("Podocyte", "Tubule", "Immune"),
     length.out = n_cells
   )
@@ -106,7 +110,7 @@ test_that("an Atera object exports like a Xenium one", {
     nUMI = "nCount_Atera",
     nGene = "nFeature_Atera",
     organism = "hg",
-    groups = "azimuth_label",
+    groups = "azimuth_broad",
     add_most_expressed_genes = FALSE,
     verbose = FALSE
   ))
@@ -122,7 +126,7 @@ test_that("an Atera object exports like a Xenium one", {
     unname(meta$nUMI[match(colnames(object), data$getCellNames())]),
     unname(object$nCount_Atera)
   )
-  expect_true("azimuth_label" %in% data$getGroups())
+  expect_true("azimuth_broad" %in% data$getGroups())
   expression <- data$getExpressionMatrix(genes = c("Gene1", "Gene2"))
   reference <- as.matrix(SeuratObject::LayerData(
     object,
