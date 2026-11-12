@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.0.1" id="cerebronexus-801">CerebroNexus 8.0.1<a class="anchor" aria-label="anchor" href="#cerebronexus-801"></a></h2>
+<ul><li>
+<code>R CMD check --as-cran</code> no longer stops in the <code><a href="../reference/readSpatialDataAsSCE.html">readSpatialDataAsSCE()</a></code> and <code><a href="../reference/convertSpatialDataToCerebro.html">convertSpatialDataToCerebro()</a></code> examples when ‘arrow’ is not installed; the examples now run only if ‘SingleCellExperiment’ and ‘arrow’ are available.</li>
+<li>GitHub CI mirrors CRAN’s checks: a check fails on any NOTE other than “New submission”, a <code>noSuggests</code> job runs with only the hard dependencies installed, and Windows and macOS checks run on pull requests. The tarball must stay under 8 MB.</li>
+<li>A test no longer compares two saves of a Cerebro object byte by byte; their source references differ between saves.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.0.0" id="cerebronexus-800">CerebroNexus 8.0.0<a class="anchor" aria-label="anchor" href="#cerebronexus-800"></a></h2>
 <ul><li>The package is prepared for a CRAN submission. <code>R CMD check --as-cran</code> on the built tarball reports only the “New submission” NOTE on Windows and Linux, and also with the suggested packages unavailable.</li>

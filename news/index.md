@@ -1,5 +1,20 @@
 # Changelog
 
+## CerebroNexus 8.0.1
+
+- `R CMD check --as-cran` no longer stops in the
+  [`readSpatialDataAsSCE()`](https://www.mheming.com/CerebroNexus/reference/readSpatialDataAsSCE.md)
+  and
+  [`convertSpatialDataToCerebro()`](https://www.mheming.com/CerebroNexus/reference/convertSpatialDataToCerebro.md)
+  examples when ‘arrow’ is not installed; the examples now run only if
+  ‘SingleCellExperiment’ and ‘arrow’ are available.
+- GitHub CI mirrors CRAN’s checks: a check fails on any NOTE other than
+  “New submission”, a `noSuggests` job runs with only the hard
+  dependencies installed, and Windows and macOS checks run on pull
+  requests. The tarball must stay under 8 MB.
+- A test no longer compares two saves of a Cerebro object byte by byte;
+  their source references differ between saves.
+
 ## CerebroNexus 8.0.0
 
 - The package is prepared for a CRAN submission. `R CMD check --as-cran`

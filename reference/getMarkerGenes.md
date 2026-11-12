@@ -105,8 +105,8 @@ pbmc <- getMarkerGenes(
   test = 'wilcox',
   verbose = TRUE
 )
-#> [19:52:53] No information about genes on cell surface because organism is either not specified or not human/mouse.
-#> [19:52:53] Get marker genes for 2 groups in `sample`...
+#> [20:51:47] No information about genes on cell surface because organism is either not specified or not human/mouse.
+#> [20:51:47] Get marker genes for 2 groups in `sample`...
 #> Calculating cluster pbmc_1
 #> For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
 #> (default method for FindMarkers) please install the presto package
@@ -118,7 +118,7 @@ pbmc <- getMarkerGenes(
 #> efficient implementation (no further action necessary).
 #> This message will be shown once per session
 #> Calculating cluster pbmc_2
-#> [19:52:53] Get marker genes for 2 groups in `seurat_clusters`...
+#> [20:51:47] Get marker genes for 2 groups in `seurat_clusters`...
 #> Calculating cluster 0
 #> Calculating cluster 1
 # }
