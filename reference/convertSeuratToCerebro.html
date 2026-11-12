@@ -3,7 +3,7 @@
 optionally renames grouping variables, loads marker gene tables, and exports
 the data to Cerebro format for visualization."><meta property="og:description" content="This function accepts a Seurat object or reads one from an RDS file,
 optionally renames grouping variables, loads marker gene tables, and exports
-the data to Cerebro format for visualization."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.svg"></head><body>
+the data to Cerebro format for visualization."><meta property="og:image" content="https://www.mheming.com/CerebroNexus/logo.png"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -77,7 +77,7 @@ the data to Cerebro format for visualization."><meta property="og:image" content
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="../logo.svg" class="logo" alt=""><h1>Convert Seurat Object to Cerebro Format</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>Convert Seurat Object to Cerebro Format</h1>
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/R/convertSeuratToCerebro.R" class="external-link"><code>R/convertSeuratToCerebro.R</code></a></small>
       <div class="d-none name"><code>convertSeuratToCerebro.Rd</code></div>
     </div>
@@ -323,24 +323,24 @@ multiple user-named backgrounds, or coordinates only. Seurat v4
 <span class="r-in"><span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"sample"</span>, <span class="st">"seurat_clusters"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>  groups_naming <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"seurat_clusters"</span> <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Calculating most expressed genes and mean expression for each group...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Processing group: sample</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Processing group: cluster</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Most expressed genes and mean expression calculation completed.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Calculating most expressed genes and mean expression for each group...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Processing group: sample</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Processing group: cluster</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Most expressed genes and mean expression calculation completed.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> [INFO] No scRepertoire columns found in metadata, skipping repertoire extraction.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> [INFO] No immune repertoire data to add; object returned unchanged.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Initializing Cerebro object...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Adding expression data (embedded)...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Collecting available meta data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Extracting all meta data columns...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Extracting dimensional reductions...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Will export the following dimensional reductions: umap</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Extracting tables of most expressed genes...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Extracting tables of mean expression...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Extracting marker genes table...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] No trajectories to extract...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Checking for spatial data...</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Overview of Cerebro object:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Initializing Cerebro object...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Adding expression data (embedded)...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Collecting available meta data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Extracting all meta data columns...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Extracting dimensional reductions...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Will export the following dimensional reductions: umap</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Extracting tables of most expressed genes...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Extracting tables of mean expression...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Extracting marker genes table...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] No trajectories to extract...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Checking for spatial data...</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Overview of Cerebro object:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> class: Cerebro</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> exporter package version: 8.0.1</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> experiment name: PBMC example</span>
@@ -362,8 +362,8 @@ multiple user-named backgrounds, or coordinates only. Seurat v4
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Immune repertoire:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> HLA typing: none</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Spatial data:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Saving Cerebro object to: /tmp/nix-shell-4510-4209629192/RtmpnPz3zU/output/cerebro_pbmc_seurat.crb</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> [20:51:42] Done!</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Saving Cerebro object to: /tmp/nix-shell-4570-2316783235/RtmpAvQ98G/output/cerebro_pbmc_seurat.crb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> [21:44:44] Done!</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Successfully exported: cerebro_pbmc_seurat.crb</span>
 <span class="r-in"><span><span class="co"># Creates cerebro_pbmc_seurat.crb in result_dir.</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

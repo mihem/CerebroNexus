@@ -1,11 +1,4 @@
-![CerebroNexus](reference/figures/logo.svg)
-
-[![R-CMD-check
-(upstream)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml/badge.svg)](https://github.com/mihem/CerebroNexus/actions/workflows/R-cmd-check.yaml)
-[![License:
-MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Lifecycle:
-stable](https://lifecycle.r-lib.org/articles/figures/lifecycle-stable.svg)
+![CerebroNexus logo](reference/figures/logo.png)
 
 **CerebroNexus** (**Ce**ll**Re**port**Bro**wser **Nexus**) is a
 [Shiny](https://shiny.posit.co/) platform for exploring and sharing
@@ -22,6 +15,8 @@ by [mihem](https://github.com/mihem) and [Xuesong
 Wang](https://github.com/duocang).*
 
 Automated tests run in a reproducible Nix environment.
+
+  
 
 ![CerebroNexus spatial data view](reference/figures/featured.png)
 
