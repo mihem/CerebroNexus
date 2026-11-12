@@ -425,7 +425,7 @@
 #' @param verbose Print what was read.
 #' @return A SingleCellExperiment.
 #' @seealso \code{\link{convertSpatialDataToCerebro}}, \code{\link{readH5adAsSCE}}
-#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "arrow"))
 #' \donttest{
 #' ## A small SpatialData store (50 spots), zipped
 #' sce <- readSpatialDataAsSCE(
@@ -614,7 +614,7 @@ readSpatialDataAsSCE <- function(
 #'   \code{groups}, \code{organism}, \code{expression_matrix_mode}).
 #' @return The path of the \code{.crb}, invisibly.
 #' @seealso \code{\link{readSpatialDataAsSCE}}
-#' @examplesIf nzchar(system.file(package = "SingleCellExperiment"))
+#' @examplesIf nzchar(system.file(package = "SingleCellExperiment")) && nzchar(system.file(package = "arrow"))
 #' \donttest{
 #' dir <- tempfile("cerebro-")
 #' dir.create(dir)
