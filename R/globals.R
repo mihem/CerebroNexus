@@ -9,6 +9,8 @@ utils::globalVariables(c(
   "cerebro_www_prefix",
   "viewerSharedResourceHeaders",
   "viewerFirstViewPublishKept",
+  "viewerSharedResourceAdopt",
+  "viewerEarlyServerAdopt",
   "viewerLaunchPrototypes",
   "viewerUiCacheKey",
   "viewerDocumentRestore",

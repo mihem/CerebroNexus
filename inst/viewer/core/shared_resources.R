@@ -681,7 +681,15 @@ viewerFirstViewCapture <- function(
 ## Only where Pack files are shared: not with a login. Once per process:
 ## launchCerebro() calls it as soon as its web server runs, shiny_server.R
 ## when the Viewer is prepared.
-viewerFirstViewPublishKept <- function(options) {
+## `register(prefix, directory)` makes a Viewer Pack directory reachable and
+## `serve(prefix, directory)` the directory of the first views: through Shiny,
+## or as static paths of the early server, which runs before Shiny is loaded
+## (early_server.R).
+viewerFirstViewPublishKept <- function(
+  options,
+  register = viewerSharedResourceRegisterEarly,
+  serve = function(prefix, directory) shiny::addResourcePath(prefix, directory)
+) {
   if (isTRUE(.viewer_shared_resources$published)) {
     return(invisible(FALSE))
   }
@@ -690,15 +698,36 @@ viewerFirstViewPublishKept <- function(options) {
   if (!length(sources)) {
     return(invisible(FALSE))
   }
-  shiny::addResourcePath("cerebro-first-view", viewerFirstViewDirectory())
+  serve("cerebro-first-view", viewerFirstViewDirectory())
   try(
     viewerFirstViewRestore(
       viewerSharedResourceRoots(options),
       viewerFirstViewBasis(options),
-      viewerSharedResourceRegisterEarly,
+      register,
       sources
     ),
     silent = TRUE
   )
+  invisible(TRUE)
+}
+
+## Continues with what the early server of this process published
+## (viewerEarlyServerStart() in early_server.R): the URL prefixes it gave out
+## stay the ones of the process, and Shiny learns their directories. First
+## views it published for other files or other options are published again.
+viewerSharedResourceAdopt <- function(early, options) {
+  list2env(
+    as.list(early$state, all.names = TRUE),
+    envir = .viewer_shared_resources
+  )
+  for (prefix in names(early$registered)) {
+    shiny::addResourcePath(prefix, early$registered[[prefix]])
+  }
+  if (
+    !identical(early$basis, viewerFirstViewBasis(options)) ||
+      !identical(early$sources, viewerSharedResourceSources(options))
+  ) {
+    .viewer_shared_resources$published <- NULL
+  }
   invisible(TRUE)
 }

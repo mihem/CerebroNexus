@@ -32,6 +32,19 @@
 #' @param ... Further parameters that are used by \code{shiny::runApp}, e.g.
 #' \code{host} or \code{port}.
 #'
+#' @details
+#' To answer the first request sooner, start the App with the file
+#' \code{start.R} of the installed package instead of calling this function:
+#' \code{Rscript <package directory>/start.R --port=3838 data.crb}, with
+#' \code{system.file(package = "CerebroNexus")} as the package directory, or
+#' \code{source(system.file("start.R", package = "CerebroNexus"));
+#' cerebroStart("data.crb", port = 3838)} in R. It starts a small web server
+#' before CerebroNexus is loaded, which sends the page of the previous run,
+#' its files and the first view of the Projection page, and then runs
+#' \code{launchCerebro()} behind it; the App keeps the address it was given.
+#' The first start of an installation has no page to send yet and starts as
+#' \code{launchCerebro()} does.
+#'
 #' @return
 #' Shiny application.
 #'
@@ -279,10 +292,28 @@ launchCerebro <- function(
   ##--------------------------------------------------------------------------##
   viewer_document <- NULL
   viewer_document_capture <- FALSE
+  ## start.R (in the package directory) answers on the App's address before
+  ## this package is loaded: a web server that already sends the kept page,
+  ## its files and the first views (viewer/core/early_server.R). The App then
+  ## continues with what that server published, and takes its requests once
+  ## Shiny's own server runs.
+  viewer_early <- getOption("CerebroNexus.early_server")
+  if (
+    !inherits(viewer_early, "cerebro_early_server") ||
+      !isTRUE(tryCatch(
+        viewer_early$server$isRunning(),
+        error = function(error) FALSE
+      ))
+  ) {
+    viewer_early <- NULL
+  }
   ## The key of the page (viewerUiCacheKey() in viewer/ui_cache.R), as
   ## shiny_UI.R computes it. www/ is served under "cerebro_www" unless another
   ## App of this process holds that name, which shiny_UI.R finds out.
   viewer_document_key <- function(www_prefix = "cerebro_www") {
+    if (!is.null(viewer_early) && identical(www_prefix, "cerebro_www")) {
+      return(viewer_early$key)
+    }
     viewerUiCacheKey(
       file.path(system.file(package = "CerebroNexus"), "viewer"),
       c(
@@ -300,7 +331,14 @@ launchCerebro <- function(
       )) {
         source(system.file(file, package = "CerebroNexus"), local = viewer_env)
       }
-      if (
+      if (!is.null(viewer_early)) {
+        source(
+          system.file("viewer/core/early_server.R", package = "CerebroNexus"),
+          local = viewer_env
+        )
+        viewerSharedResourceAdopt(viewer_early, Cerebro.options)
+        viewer_document <- viewerDocumentRestore(viewer_document_key())
+      } else if (
         isTRUE(getOption("CerebroNexus.ui_cache", TRUE)) &&
           !isTRUE(transport_env$viewerSockjsCompatEnabled())
       ) {
@@ -315,6 +353,13 @@ launchCerebro <- function(
   ## Viewer itself.
   viewer_started <- function() {
     web_server <- shiny::getShinyOption("server", default = NULL)
+    if (!is.null(viewer_early) && !is.null(web_server)) {
+      ## From here on "the server" is the early one and Shiny's together.
+      web_server <- tryCatch(
+        viewerEarlyServerAdopt(viewer_early, web_server),
+        error = function(error) web_server
+      )
+    }
     if (!is.null(web_server) && !is.null(viewer_document)) {
       try(viewerDocumentServe(web_server, viewer_document), silent = TRUE)
     }

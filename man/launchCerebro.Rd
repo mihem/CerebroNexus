@@ -59,6 +59,19 @@ Shiny application.
 \description{
 Launch the CerebroNexus Shiny application.
 }
+\details{
+To answer the first request sooner, start the App with the file
+\code{start.R} of the installed package instead of calling this function:
+\code{Rscript <package directory>/start.R --port=3838 data.crb}, with
+\code{system.file(package = "CerebroNexus")} as the package directory, or
+\code{source(system.file("start.R", package = "CerebroNexus"));
+cerebroStart("data.crb", port = 3838)} in R. It starts a small web server
+before CerebroNexus is loaded, which sends the page of the previous run,
+its files and the first view of the Projection page, and then runs
+\code{launchCerebro()} behind it; the App keeps the address it was given.
+The first start of an installation has no page to send yet and starts as
+\code{launchCerebro()} does.
+}
 \examples{
 if ( interactive() ) {
   launchCerebro(
