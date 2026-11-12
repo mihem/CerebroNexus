@@ -36,22 +36,36 @@ output[["about"]] <- renderText({
     )
   }
   paste0(
-    '<b>', ico("fas fa-tag", "amber"), 'Version of CerebroNexus</b><br>
+    '<b>',
+    ico("fas fa-tag", "amber"),
+    'Version of CerebroNexus</b><br>
     v',
     version,
     '<br>
     <br>
-    <b>', ico("fas fa-users", "blue"), 'Current developers and maintainers</b><br>
-    ', ico("fas fa-user", "muted"), 'Michael Heming<br>
-    ', ico("fas fa-user", "muted"), 'Xuesong Wang<br>
+    <b>',
+    ico("fas fa-users", "blue"),
+    'Current developers and maintainers</b><br>
+    ',
+    ico("fas fa-user", "muted"),
+    'Michael Heming<br>
+    ',
+    ico("fas fa-user", "muted"),
+    'Xuesong Wang<br>
     <br>
-    ', ico("fas fa-brain", "pink"), 'CerebroNexus (CellReportBrowser Nexus) is a Shiny platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses.<br>
+    ',
+    ico("fas fa-brain", "pink"),
+    'CerebroNexus (CellReportBrowser Nexus) is a Shiny platform for exploring and sharing single-cell and spatial transcriptomics data, with gene-expression, immune-repertoire, trajectory, and HLA-TCR analyses.<br>
     <br>
-    ', ico("fas fa-code-branch", "teal"), 'CerebroNexus originated as a fork of
+    ',
+    ico("fas fa-code-branch", "teal"),
+    'CerebroNexus originated as a fork of
     <a href="https://github.com/romanhaa/cerebroApp" target="_blank" rel="noopener noreferrer">cerebroApp</a>,
     originally developed by Roman Hillje.<br>
     <br>
-    <b>', ico("fas fa-link", "green"), 'Links</b><br>
+    <b>',
+    ico("fas fa-link", "green"),
+    'Links</b><br>
     <ul class="cerebro-about-links">',
     link(
       "https://github.com/mihem/CerebroNexus",
@@ -73,7 +87,9 @@ output[["about"]] <- renderText({
     ),
     '</ul>
     <br>
-    <b>', ico("fas fa-quote-left", "purple"), 'Citation</b><br>
+    <b>',
+    ico("fas fa-quote-left", "purple"),
+    'Citation</b><br>
     If you used CerebroNexus for your research, please cite:<br>
     Michael Heming, Xuesong Wang.
     <i>CerebroNexus</i> [software]. Version ',
@@ -81,12 +97,18 @@ output[["about"]] <- renderText({
     '.
     <a href="https://github.com/mihem/CerebroNexus" target="_blank" rel="noopener noreferrer">https://github.com/mihem/CerebroNexus</a>.<br>
     <br>
-    <b>', ico("fas fa-scale-balanced", "green"), 'License</b><br>
+    <b>',
+    ico("fas fa-scale-balanced", "green"),
+    'License</b><br>
     CerebroNexus is distributed under the terms of the <a href=https://github.com/mihem/CerebroNexus/blob/master/LICENSE.md title="MIT license" target="_blank">MIT license.</a><br>
     <br>
-    <b>', ico("fas fa-palette", "pink"), 'Credit where credit is due</b><br>
+    <b>',
+    ico("fas fa-palette", "pink"),
+    'Credit where credit is due</b><br>
     <ul class="cerebro-about-links">
-      <li>', ico("fas fa-droplet", "blue"), 'The default plot palettes are a custom low-saturation set; several colours draw on <a href="https://flatuicolors.com/" title="Flat UI Colors 2" target="_blank">Flat UI Colors 2</a>.</li>
+      <li>',
+    ico("fas fa-droplet", "blue"),
+    'The default plot palettes are a custom low-saturation set; several colours draw on <a href="https://flatuicolors.com/" title="Flat UI Colors 2" target="_blank">Flat UI Colors 2</a>.</li>
     </ul>
     <br>'
   )
