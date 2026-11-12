@@ -1,6 +1,6 @@
 ## Submission
 
-This is a new submission of CerebroNexus 8.0.1.
+This is a new submission of CerebroNexus 8.0.0.
 
 CerebroNexus is an interactive 'Shiny' application for exploring and sharing
 single-cell and spatial transcriptomics data, with coordinated views of gene

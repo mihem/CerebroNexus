@@ -319,16 +319,18 @@ server <- function(input, output, session) {
   )])
   initial_page_applied <- reactiveVal(FALSE)
   ## Keep the address bar on the page being read, so the copied URL reopens it.
+  ## A tab without a page id (none today) leaves the address bar alone.
+  viewer_send_page_url <- function(tab) {
+    page <- names(viewer_initial_page_tabs)[
+      match(tab, viewer_initial_page_tabs)
+    ]
+    if (length(page) == 1L && !is.na(page)) {
+      session$sendCustomMessage("cerebro_page_url", list(page = page))
+    }
+  }
   observeEvent(
     input[["sidebar"]],
-    {
-      page <- names(viewer_initial_page_tabs)[
-        match(input[["sidebar"]], viewer_initial_page_tabs)
-      ]
-      if (!is.na(page)) {
-        session$sendCustomMessage("cerebro_page_url", list(page = page))
-      }
-    },
+    viewer_send_page_url(input[["sidebar"]]),
     ignoreInit = TRUE
   )
   if (!is.null(initial_tab) && !initial_tab %in% conditional_tabs) {
@@ -803,20 +805,20 @@ server <- function(input, output, session) {
 
   ## Keep the address bar on the data set being read, like the page above. Only
   ## the configured data sets have ids a link can name; an upload has none.
+  viewer_send_dataset_url <- function(selected, ids) {
+    if (length(selected) == 1L && !is.na(selected) && selected %in% ids) {
+      session$sendCustomMessage(
+        "cerebro_dataset_url",
+        list(dataset = as.character(selected))
+      )
+    }
+  }
   observeEvent(
     available_crb_files$selected,
-    {
-      selected <- available_crb_files$selected
-      if (
-        length(selected) == 1L &&
-          selected %in% available_crb_files$names
-      ) {
-        session$sendCustomMessage(
-          "cerebro_dataset_url",
-          list(dataset = as.character(selected))
-        )
-      }
-    },
+    viewer_send_dataset_url(
+      available_crb_files$selected,
+      available_crb_files$names
+    ),
     ignoreNULL = TRUE
   )
 

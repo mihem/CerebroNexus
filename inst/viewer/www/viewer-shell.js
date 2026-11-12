@@ -54,8 +54,13 @@
         if (!message || typeof message.dataset !== "string") return;
         var url = new URL(window.location.href);
         var segments = url.pathname.split("/").filter(Boolean);
-        var named = segments.length &&
-          decodeURIComponent(segments[segments.length - 1]) === message.dataset;
+        var named = false;
+        try {
+          named = segments.length > 0 &&
+            decodeURIComponent(segments[segments.length - 1]) === message.dataset;
+        } catch (e) {
+          // A malformed escape in the path (/%E0%A4%A) is just not a name.
+        }
         // Already addressed by /name: leave the first load's URL alone.
         if (named && !url.searchParams.has("dataset")) return;
         setQuery("dataset", message.dataset);
