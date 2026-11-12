@@ -9,6 +9,10 @@
 ## files that launchCerebro() sources call them as before. A function this
 ## package defines itself, or one that another import already provides, keeps
 ## its binding.
+##
+## R CMD check evaluates every object of the namespace and takes the functions
+## it gets for the package's own code, so the packages these functions call
+## (cli, vctrs, tidyselect, ...) are named in the Suggests field of DESCRIPTION.
 
 ## Matrix's generics for an S4 object, the base function for everything else:
 ## what importFrom(Matrix, colMeans, colSums, rowSums, t) dispatched to, without
