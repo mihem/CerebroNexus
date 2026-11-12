@@ -1,0 +1,89 @@
+name: R-CMD-check (Windows, macOS)
+
+## CRAN also checks on Windows and macOS. The one failure win-builder found in
+## 8.0.0 was Windows-only (device names such as CON.crb), so both run on every
+## relevant PR.
+##
+## NOT required checks yet: watch a few runs for stability and run time first
+## (macOS takes about 11 min; if it stays well past the test shards, move it back
+## to manual dispatch), then add the jobs to the ruleset. When that happens, drop the `paths`
+## filter below: a required check whose workflow does not run stays pending
+## forever and blocks the PR.
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "R/**"
+      - "tests/**"
+      - "inst/**"
+      - "man/**"
+      - "vignettes/**"
+      - "DESCRIPTION"
+      - "NAMESPACE"
+      - ".Rbuildignore"
+      - ".github/scripts/check-log-notes.R"
+      - ".github/workflows/R-cmd-check-platforms.yaml"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual run'
+        required: false
+        default: 'Manual run'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  R-CMD-check-platform:
+    name: ${{ matrix.config.os }} (R ${{ matrix.config.r }})
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ## One test worker per core (windows-latest 4, macos-latest 3). Measured:
+        ## Windows 6.5-9 min, macOS about 11 min, in parallel with the other checks.
+        config:
+          - { os: windows-latest, r: release, cpus: 4 }
+          - { os: macos-latest, r: release, cpus: 3 }
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      ## CRAN runs the checks without NOT_CRAN, so skip_on_cran() tests skip.
+      NOT_CRAN: "false"
+      ## One test worker per core: windows-latest has 4, macos-latest 3 (public repos).
+      TESTTHAT_CPUS: ${{ matrix.config.cpus }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          ## Vignettes are built and checked by the Linux jobs; skip them here.
+          args: 'c("--as-cran", "--no-manual", "--ignore-vignettes")'
+          build_args: 'c("--no-manual", "--no-build-vignettes")'
+          error-on: '"warning"'
+          upload-snapshots: true
+
+      ## error-on only covers ERROR and WARNING; fail on unexpected NOTEs too.
+      - name: Fail on unexpected NOTEs
+        shell: Rscript {0}
+        run: |
+          log <- Sys.glob("check/*.Rcheck/00check.log")
+          stopifnot(length(log) == 1L)
+          status <- system2("Rscript", c(".github/scripts/check-log-notes.R", shQuote(log)))
+          quit(status = status)

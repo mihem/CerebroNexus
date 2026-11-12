@@ -52,21 +52,57 @@ jobs:
           mkdir -p "$RUNNER_TEMP/cerebro-cran-check"
           cp CerebroNexus_*.tar.gz "$RUNNER_TEMP/cerebro-cran-check/"
           cd "$RUNNER_TEMP/cerebro-cran-check"
-          nix-shell "$GITHUB_WORKSPACE/default.nix" --run '
-            set -eu
-            unset CI NOT_CRAN NODE_PATH
-            export NODE_OPTIONS=--no-global-search-paths
-            # testthat runs 2 test processes by default; the runner has 4 cores.
-            export TESTTHAT_CPUS=4
-            R CMD check --as-cran --no-manual CerebroNexus_*.tar.gz
-            test -f CerebroNexus.Rcheck/00check.log
-            ! grep -E "^Status:.*(ERROR|WARNING)" CerebroNexus.Rcheck/00check.log
-          '
+          nix-shell "$GITHUB_WORKSPACE/default.nix" --run \
+            "bash '$GITHUB_WORKSPACE/.github/scripts/run-cran-check.sh' standard"
 
       - name: Upload check results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: r-cmd-check-results
+          path: "${{ runner.temp }}/cerebro-cran-check/*.Rcheck/"
+          retention-days: 14
+
+  ## CRAN's noSuggests flavor: Suggests packages are hidden
+  ## (_R_CHECK_DEPENDS_ONLY_) and tests get CRAN's two cores, so code that
+  ## assumes an optional package is installed fails here.
+  R-CMD-check-nosuggests:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      R_REPOSITORIES: ${{ github.workspace }}/.github/ci-repositories
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create this folder to silence warning
+        run: mkdir -p ~/.nix-defexpr/channels
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Configure osmzhlab Attic cache
+        run: bash .github/scripts/setup-osmzhlab-cache.sh
+
+      - name: Install R package dependencies
+        run: nix-shell default.nix --run "echo 'R package dependencies installed'"
+
+      - name: Build source tarball
+        run: nix-shell default.nix --run "R CMD build ."
+
+      - name: Run R-CMD-check without Suggests
+        run: |
+          mkdir -p "$RUNNER_TEMP/cerebro-cran-check"
+          cp CerebroNexus_*.tar.gz "$RUNNER_TEMP/cerebro-cran-check/"
+          cd "$RUNNER_TEMP/cerebro-cran-check"
+          nix-shell "$GITHUB_WORKSPACE/default.nix" --run \
+            "bash '$GITHUB_WORKSPACE/.github/scripts/run-cran-check.sh' nosuggests"
+
+      - name: Upload check results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-cmd-check-nosuggests-results
           path: "${{ runner.temp }}/cerebro-cran-check/*.Rcheck/"
           retention-days: 14
