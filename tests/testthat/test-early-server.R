@@ -101,6 +101,66 @@ test_that("the early server sends the kept page and its files by itself", {
   expect_false(env$viewerEarlyServerRunning(early))
 })
 
+test_that("the early server sends the bundled form of the page, kept for good", {
+  skip_on_cran()
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  ## scripts outside the session's temporary directory, as a package's are
+  scripts <- withr::local_tempdir(tmpdir = dirname(tempdir()))
+  writeLines("window.first = 1;", file.path(scripts, "one.js"))
+  writeLines("window.second = 2;", file.path(scripts, "two.js"))
+  shiny::addResourcePath("earlybundlefiles", scripts)
+  withr::defer(try(
+    shiny::removeResourcePath("earlybundlefiles"),
+    silent = TRUE
+  ))
+  html <- charToRaw(paste0(
+    "<!DOCTYPE html>
+<html><head>",
+    "<script src=\"earlybundlefiles/one.js\"></script>",
+    "<script src=\"earlybundlefiles/two.js\"></script>",
+    "</head><body>shiny</body></html>"
+  ))
+  kept <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("ui_cache.R"), kept)
+  sys.source(viewer_test_path("core", "kept_document.R"), kept)
+  key <- kept$viewerUiCacheKey(
+    file.path(early_server_root(), "viewer"),
+    c(version = "0.0.1", www_prefix = "cerebro_www")
+  )
+  kept$viewerDocumentKeep(key, html)
+
+  env <- early_server_env()
+  withr::defer(unlink(kept$viewerDocumentBundleDirectory(), recursive = TRUE))
+  port <- httpuv::randomPort()
+  early <- env$viewerEarlyServerStart(
+    early_server_root(),
+    "127.0.0.1",
+    port,
+    early_server_options()
+  )
+  withr::defer(try(early$server$stop(), silent = TRUE))
+  page <- rawToChar(early_server_get(port, "/"))
+  name <- regmatches(page, regexpr("bundle-[0-9a-f]{16}[.]js", page))
+  expect_length(name, 1L)
+  expect_false(grepl("one.js", page, fixed = TRUE))
+  script <- rawToChar(early_server_get(port, paste0("/cerebro-bundle/", name)))
+  expect_match(script, "window.first = 1;", fixed = TRUE)
+  expect_match(script, "window.second = 2;", fixed = TRUE)
+  expect_lt(regexpr("first", script), regexpr("second", script))
+  headers <- early$server$getStaticPaths()[["/cerebro-bundle"]]$options$headers
+  expect_match(headers[["Cache-Control"]], "immutable")
+  ## the page as it was kept is there for options(CerebroNexus.bundle = FALSE)
+  withr::local_options(CerebroNexus.bundle = FALSE)
+  off <- env$viewerEarlyServerStart(
+    early_server_root(),
+    "127.0.0.1",
+    httpuv::randomPort(),
+    early_server_options()
+  )
+  withr::defer(try(off$server$stop(), silent = TRUE))
+  expect_identical(early_server_get(off$port, "/"), html)
+})
+
 test_that("requests reach the App of Shiny's server once that runs", {
   skip_on_cran()
   skip_if_not_installed("mirai")

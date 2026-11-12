@@ -64,6 +64,7 @@ viewerEarlyServerStart <- function(root, host, port, options) {
   env <- new.env(parent = globalenv())
   sys.source(file.path(root, "viewer", "ui_cache.R"), env)
   sys.source(file.path(root, "viewer", "core", "shared_resources.R"), env)
+  sys.source(file.path(root, "viewer", "core", "kept_document.R"), env)
   key <- env$viewerUiCacheKey(
     file.path(root, "viewer"),
     c(
@@ -93,7 +94,9 @@ viewerEarlyServerStart <- function(root, host, port, options) {
   }
   document <- file.path(tempdir(), "cerebro-early-document")
   dir.create(document, showWarnings = FALSE, recursive = TRUE)
-  writeBin(kept$html, file.path(document, "index.html"))
+  page <- env$viewerDocumentPage(kept)
+  writeBin(page$html, file.path(document, "index.html"))
+  bundle <- env$viewerDocumentWriteFiles(page$files)
 
   files <- function(directory) {
     httpuv::staticPath(
@@ -112,6 +115,9 @@ viewerEarlyServerStart <- function(root, host, port, options) {
   )
   for (prefix in names(resource_paths)) {
     static[[paste0("/", prefix)]] <- files(resource_paths[[prefix]])
+  }
+  if (!is.null(bundle)) {
+    static[["/cerebro-bundle"]] <- env$viewerDocumentBundleStaticPath(bundle)
   }
   gate <- new.env(parent = emptyenv())
   unavailable <- function() {
