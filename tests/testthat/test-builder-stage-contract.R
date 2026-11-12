@@ -795,3 +795,37 @@ test_that("Apply to all targets loaded unchecked datasets", {
     list(organism = "hg")
   )
 })
+
+test_that("the group colours show the cells of every level, not only the first 12", {
+  levels <- paste0("level_", 1:15)
+  cells <- stats::setNames(seq(1500, by = -100, length.out = 15), levels)
+  profile <- list(
+    group_counts = list(
+      cluster = as.table(cells)
+    )
+  )
+  full <- builder_group_full_distribution(profile, "cluster")
+  expect_length(full, 15L)
+  expect_identical(full[[15L]], list(value = "level_15", count = 100))
+
+  ## The catalog lists 12 levels: the rest would show no cells.
+  listed <- builder_group_colors_model(
+    "cluster",
+    levels,
+    distribution = full[1:12]
+  )
+  expect_identical(
+    vapply(listed$items, `[[`, numeric(1), "count")[13:15],
+    c(0, 0, 0)
+  )
+
+  shown <- builder_group_colors_model("cluster", levels, distribution = full)
+  expect_identical(
+    vapply(shown$items, `[[`, numeric(1), "count"),
+    unname(cells)
+  )
+
+  ## No profile, no counts of its own, or another group: nothing to add.
+  expect_identical(builder_group_full_distribution(NULL, "cluster"), list())
+  expect_identical(builder_group_full_distribution(profile, "other"), list())
+})

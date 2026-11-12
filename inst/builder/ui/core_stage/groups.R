@@ -1,3 +1,17 @@
+## The catalog lists the counts of a group's 12 most frequent levels only, and a
+## colour is set for every level. The import profile keeps the counts of all the
+## levels of a group (up to 100), so a level beyond the 12th shows its cells.
+builder_group_full_distribution <- function(profile, group) {
+  counts <- profile$group_counts[[group]] %||% NULL
+  values <- names(counts)
+  if (is.null(counts) || !length(counts) || is.null(values)) {
+    return(list())
+  }
+  lapply(seq_along(counts), function(index) {
+    list(value = values[[index]], count = as.numeric(counts[[index]]))
+  })
+}
+
 builder_group_colors_model <- function(
   group,
   levels,
