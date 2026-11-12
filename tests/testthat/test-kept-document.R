@@ -100,6 +100,8 @@ test_that("a kept document is used only while its packages and paths are there",
 
 test_that("the web server answers the page from the file, and Shiny the rest", {
   env <- kept_document_env()
+  ## no bundle written by another test of this process
+  unlink(env$viewerDocumentBundleDirectory(), recursive = TRUE)
   directory <- withr::local_tempdir()
   writeBin(kept_document_page(), file.path(directory, "index.html"))
   paths <- NULL
