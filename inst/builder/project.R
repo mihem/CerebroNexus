@@ -6230,6 +6230,31 @@ builder_project_artifact_source_fingerprint <- function(
   NULL
 }
 
+## The HDF5 expression sidecars of a dataset's registered cache with the MD5
+## recorded for each, for an export to take instead of writing the matrix
+## again (the option `cerebro.expression_sidecars`). The export verifies both
+## the MD5 and the sidecar's own digest of its matrix before it takes one.
+builder_project_expression_sidecars <- function(artifact, root) {
+  found <- list()
+  for (member in artifact$members %||% list()) {
+    md5 <- member$fingerprint$md5 %||% NULL
+    if (
+      !grepl("[.]h5$", as.character(member$target %||% "")) ||
+        !.builder_project_text(md5)
+    ) {
+      next
+    }
+    path <- tryCatch(
+      builder_project_resolve_path(member$path %||% "", root, "managed"),
+      error = function(error) NULL
+    )
+    if (.builder_project_text(path %||% NULL)) {
+      found[[length(found) + 1L]] <- list(path = path, md5 = tolower(md5))
+    }
+  }
+  found
+}
+
 ## What a Project dataset-cache job runs in its background R process. An
 ## installed Builder has no package source among `runtime_files`, so
 ## `load_package` attaches CerebroNexus for the exporter functions.
@@ -6250,6 +6275,15 @@ builder_project_crb_job_expression <- function() {
       function(identity) {
         if (is.null(identity$snapshot)) NULL else identity$snapshot
       }
+    )
+    ## The expression matrix does not depend on what a change of
+    ## configuration touches; the export copies the last cache's sidecar when
+    ## it is the same matrix.
+    options(
+      cerebro.expression_sidecars = runtime$builder_project_expression_sidecars(
+        previous_artifacts[[entry$id]] %||% NULL,
+        root
+      )
     )
     value <- runtime$builder_execute_plan(plan, output, snapshots)
     runtime$builder_project_prepare_build_artifacts(

@@ -210,3 +210,146 @@ test_that("exported metadata keeps the chosen QC columns and cell barcodes", {
     c("nUMI.1", "nGene.1", "cell_barcode.1") %in% colnames(captured)
   ))
 })
+
+## An h5 export offered an earlier sidecar -------------------------------------
+
+h5_reuse_export <- function(fx, sidecars = list()) {
+  file <- file.path(
+    withr::local_tempdir(.local_envir = parent.frame()),
+    "x.crb"
+  )
+  withr::local_options(
+    cerebro.expression_sidecars = sidecars,
+    .local_envir = parent.frame()
+  )
+  run_core_export(fx, file, mode = "h5")
+  list(
+    file = file,
+    sidecar = file.path(dirname(file), "x.h5")
+  )
+}
+
+test_that("an h5 export takes an earlier sidecar written from the same matrix", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  fx <- core_fixture()
+  first <- h5_reuse_export(fx)
+  md5 <- unname(tools::md5sum(first$sidecar))
+  expect_match(
+    rhdf5::h5readAttributes(first$sidecar, "expression")$content_digest,
+    "^[[:xdigit:]]{32}$"
+  )
+
+  ## The matrix is not transposed and written a second time.
+  testthat::local_mocked_bindings(
+    .writeTENxExpression = function(...) {
+      stop("the matrix must not be written again")
+    }
+  )
+  second <- h5_reuse_export(fx, list(list(path = first$sidecar, md5 = md5)))
+  expect_identical(unname(tools::md5sum(second$sidecar)), md5)
+  obj <- readCerebro(second$file)
+  expect_identical(obj$getExpressionBackend()$md5, md5)
+  expect_equal(
+    unname(as.matrix(obj$getExpressionBlock(fx$genes[1:3]))),
+    unname(as.matrix(fx$counts[1:3, ])),
+    ignore_attr = TRUE
+  )
+})
+
+test_that("an earlier sidecar is not taken for another matrix or a changed file", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  fx <- core_fixture()
+  first <- h5_reuse_export(fx)
+  md5 <- unname(tools::md5sum(first$sidecar))
+  candidate <- list(list(path = first$sidecar, md5 = md5))
+
+  ## Count the times the matrix is written; every export below must write it.
+  writes <- 0L
+  write_matrix <- .writeTENxExpression
+  testthat::local_mocked_bindings(
+    .writeTENxExpression = function(...) {
+      writes <<- writes + 1L
+      write_matrix(...)
+    }
+  )
+  expect_block <- function(exported, counts) {
+    expect_equal(
+      unname(as.matrix(readCerebro(exported$file)$getExpressionBlock(
+        fx$genes[1:3]
+      ))),
+      unname(as.matrix(counts[1:3, ])),
+      ignore_attr = TRUE
+    )
+  }
+
+  ## Another matrix: the sidecar is written again, from that matrix.
+  other <- fx
+  other$counts@x <- other$counts@x + 1
+  rewritten <- h5_reuse_export(other, candidate)
+  expect_identical(writes, 1L)
+  expect_block(rewritten, other$counts)
+
+  ## The recorded MD5 no longer describes the file (it was modified).
+  tampered <- withr::local_tempfile(fileext = ".h5")
+  file.copy(first$sidecar, tampered)
+  connection <- file(tampered, "r+b")
+  seek(connection, 2048)
+  writeBin(as.raw(0:7), connection)
+  close(connection)
+  retaken <- h5_reuse_export(fx, list(list(path = tampered, md5 = md5)))
+  expect_identical(writes, 2L)
+  expect_block(retaken, fx$counts)
+
+  ## A sidecar without a digest, a missing file and a malformed record.
+  plain <- withr::local_tempfile(fileext = ".h5")
+  HDF5Array::writeTENxMatrix(
+    Matrix::t(fx$counts),
+    plain,
+    group = "expression",
+    level = 0L
+  )
+  bad <- list(
+    list(path = plain, md5 = unname(tools::md5sum(plain))),
+    list(path = file.path(tempdir(), "missing.h5"), md5 = md5),
+    list(path = first$sidecar, md5 = "not-a-md5"),
+    "not a record"
+  )
+  for (index in seq_along(bad)) {
+    written <- h5_reuse_export(fx, list(bad[[index]]))
+    expect_identical(writes, 2L + index)
+    expect_block(written, fx$counts)
+  }
+})
+
+test_that("the digest of an expression matrix follows its content and writer", {
+  fx <- core_fixture()
+  digest <- .expressionContentDigest(fx$counts, 0L)
+  expect_match(digest, "^[[:xdigit:]]{32}$")
+  expect_identical(.expressionContentDigest(fx$counts, 0L), digest)
+  expect_false(identical(.expressionContentDigest(fx$counts, 6L), digest))
+  expect_false(identical(.expressionContentDigest(fx$counts, NULL), digest))
+  changed <- fx$counts
+  changed@x[[1L]] <- changed@x[[1L]] + 1
+  expect_false(identical(.expressionContentDigest(changed, 0L), digest))
+  renamed <- fx$counts
+  rownames(renamed)[[1L]] <- "other"
+  expect_false(identical(.expressionContentDigest(renamed, 0L), digest))
+  expect_null(.expressionContentDigest(as.matrix(fx$counts), 0L))
+})
+
+test_that("an h5 export that is offered no sidecars does not hash the matrix", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  testthat::local_mocked_bindings(
+    .expressionContentDigest = function(...) {
+      stop("a plain export must not hash the matrix")
+    }
+  )
+  exported <- h5_reuse_export(core_fixture(), sidecars = NULL)
+  expect_null(
+    rhdf5::h5readAttributes(exported$sidecar, "expression")$content_digest
+  )
+  expect_true(file.exists(exported$sidecar))
+})

@@ -4281,3 +4281,60 @@ test_that("source sync context is bound to project identity, not revision", {
   expect_match(server, "builder_project_source_queue_add(", fixed = TRUE)
   expect_false(grepl("if (!job$id %in% active)", server, fixed = TRUE))
 })
+
+test_that("a cache job offers the expression sidecars of the registered cache", {
+  runtime <- builder_project_test_runtime()
+  root <- withr::local_tempdir()
+  generation <- file.path(root, "artifacts", "ds1", "generations", "abc")
+  dir.create(generation, recursive = TRUE)
+  crb <- file.path(generation, "01-ds1.crb")
+  sidecar <- file.path(generation, "01-ds1.h5")
+  viewer <- file.path(generation, "01-ds1.viewer", "manifest.json")
+  dir.create(dirname(viewer))
+  writeBin(charToRaw("crb"), crb)
+  writeBin(charToRaw("expression"), sidecar)
+  writeBin(charToRaw("{}"), viewer)
+  member <- function(target, file) {
+    list(
+      target = target,
+      path = runtime$builder_project_relative_path(file, root),
+      fingerprint = runtime$builder_project_file_fingerprint(
+        file,
+        content = TRUE
+      )
+    )
+  }
+  artifact <- list(
+    status = "ready",
+    path = runtime$builder_project_relative_path(crb, root),
+    members = list(
+      member("01-ds1.h5", sidecar),
+      member("01-ds1.viewer/manifest.json", viewer)
+    )
+  )
+
+  offered <- runtime$builder_project_expression_sidecars(artifact, root)
+  expect_length(offered, 1L)
+  expect_identical(
+    normalizePath(offered[[1L]]$path, winslash = "/"),
+    normalizePath(sidecar, winslash = "/")
+  )
+  expect_identical(offered[[1L]]$md5, unname(tools::md5sum(sidecar)))
+
+  ## Nothing to offer without a registered cache, a record or an MD5.
+  expect_identical(
+    runtime$builder_project_expression_sidecars(NULL, root),
+    list()
+  )
+  artifact$members[[1L]]$fingerprint$md5 <- NULL
+  expect_identical(
+    runtime$builder_project_expression_sidecars(artifact, root),
+    list()
+  )
+  artifact$members[[1L]]$path <- "../outside.h5"
+  artifact$members[[1L]]$fingerprint$md5 <- "0123456789abcdef0123456789abcdef"
+  expect_identical(
+    runtime$builder_project_expression_sidecars(artifact, root),
+    list()
+  )
+})

@@ -24,7 +24,13 @@ test_that("a Project cache job attaches CerebroNexus when no source is sourced",
   writeLines(
     c(
       "builder_execute_plan <- function(plan, output, snapshots) {",
-      "  list(found = exists('exportFromSeurat', mode = 'function'))",
+      "  list(",
+      "    found = exists('exportFromSeurat', mode = 'function'),",
+      "    offered = getOption('cerebro.expression_sidecars')",
+      "  )",
+      "}",
+      "builder_project_expression_sidecars <- function(artifact, root) {",
+      "  list(list(path = root, md5 = artifact$marker))",
       "}",
       "builder_project_prepare_build_artifacts <- function(value, ...) value"
     ),
@@ -42,7 +48,7 @@ test_that("a Project cache job attaches CerebroNexus when no source is sourced",
           plan = list(source_snapshot_identities = list(), items = list()),
           output = tempdir(),
           root = tempdir(),
-          previous_artifacts = list(),
+          previous_artifacts = list(ds1 = list(marker = "earlier-cache")),
           entry = list(id = "ds1"),
           runtime_files = runtime,
           load_package = load_package,
@@ -54,6 +60,8 @@ test_that("a Project cache job attaches CerebroNexus when no source is sourced",
   }
   expect_true(run(TRUE)$found)
   expect_false(run(FALSE)$found)
+  ## The job offers the export the sidecars of the dataset's registered cache.
+  expect_identical(run(FALSE)$offered[[1L]]$md5, "earlier-cache")
 })
 
 test_that("a Build that needs a decision names the failed analysis and why", {
