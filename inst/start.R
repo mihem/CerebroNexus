@@ -43,6 +43,17 @@ cerebroStart <- function(
     .libPaths(c(library, .libPaths()))
   }
   port <- as.integer(port)
+  ## launchCerebro() explains: no byte-code compiling while the first session
+  ## makes its page. It puts the setting back after that.
+  jit <- compiler::enableJIT(0L)
+  previous_jit <- options(CerebroNexus.jit_level = jit)
+  on.exit(
+    {
+      compiler::enableJIT(jit)
+      options(previous_jit)
+    },
+    add = TRUE
+  )
   early <- NULL
   if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
     early <- tryCatch(

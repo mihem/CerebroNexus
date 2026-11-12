@@ -221,3 +221,25 @@ test_that("a started App stops with what preparing the Viewer reports", {
     "recognized Cerebro object"
   )
 })
+
+test_that("an App process compiles no byte code until its first session is served", {
+  skip_if(interactive())
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  level <- compiler::enableJIT(3L)
+  withr::defer(compiler::enableJIT(level))
+  withr::defer(options(CerebroNexus.jit_level = NULL))
+  app <- launchCerebro(mode = "closed")
+  env <- environment(app$serverFuncSource())
+  expect_identical(compiler::enableJIT(-1L), 0L)
+  env$viewer_jit_restore()
+  expect_identical(compiler::enableJIT(-1L), 3L)
+  ## start.R has switched it off already, and says what to put back
+  options(CerebroNexus.jit_level = 2L)
+  compiler::enableJIT(0L)
+  app <- launchCerebro(mode = "closed")
+  env <- environment(app$serverFuncSource())
+  expect_identical(compiler::enableJIT(-1L), 0L)
+  env$viewer_jit_restore()
+  expect_identical(compiler::enableJIT(-1L), 2L)
+  expect_null(getOption("CerebroNexus.jit_level"))
+})

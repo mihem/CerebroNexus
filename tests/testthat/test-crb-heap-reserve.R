@@ -45,7 +45,7 @@ test_that("launchCerebro reserves heap for a large CRB before reading it", {
     position(".datasetCatalogFromFiles("),
     position("viewerLaunchPrototypes(")
   )
-  ## and collected once before the first session can start
+  ## and collected once after the first session has its page
   expect_lt(
     position("viewerLaunchPrototypes("),
     position(".collectBeforeSessions(")

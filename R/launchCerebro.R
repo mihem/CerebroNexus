@@ -135,6 +135,33 @@ launchCerebro <- function(
   }
 
   ## --------------------------------------------------------------------------##
+  ## R compiles a function to byte code the second time it is called. The
+  ## functions a session creates (its server function and everything it
+  ## defines) are new for every session and run once or twice while the first
+  ## page is made, so compiling them costs more than it saves: 0.3 s of the
+  ## 1.4 s from the start of the session to the plot with 10,000 cells, 0.6 s
+  ## of 2.7 s with 1.3 million. A process that only runs the App (`Rscript`,
+  ## or start.R, which has done this already) does without until the first
+  ## session has its page. An R session someone is working in keeps its
+  ## setting.
+  ## --------------------------------------------------------------------------##
+  viewer_jit <- getOption("CerebroNexus.jit_level")
+  if (is.null(viewer_jit) && !interactive()) {
+    viewer_jit <- compiler::enableJIT(0L)
+  }
+  viewer_jit_restore <- function() {
+    if (!is.null(viewer_jit)) {
+      compiler::enableJIT(viewer_jit)
+      viewer_jit <<- NULL
+      options(CerebroNexus.jit_level = NULL)
+    }
+    invisible()
+  }
+  viewer_jit_scheduled <- FALSE
+  viewer_launched <- FALSE
+  on.exit(if (!viewer_launched) viewer_jit_restore(), add = TRUE)
+
+  ## --------------------------------------------------------------------------##
   ## Options the Viewer reads. The Viewer files are sourced into this function's
   ## environment below, so they find `Cerebro.options` here without touching
   ## the global environment.
@@ -227,7 +254,6 @@ launchCerebro <- function(
         attr(dataset_catalog, "prototypes") <- NULL
         Cerebro.options[[".dataset_catalog"]] <<- dataset_catalog
         rm(dataset_catalog)
-        .collectBeforeSessions()
         viewer_prepared <<- TRUE
       },
       error = function(error) {
@@ -257,6 +283,21 @@ launchCerebro <- function(
   }
   viewer_server <- function(input, output, session) {
     viewer_prepare()
+    if (!viewer_jit_scheduled) {
+      ## The first session has its page long before this, and the collection
+      ## of everything read and built so far (.collectBeforeSessions()) no
+      ## longer holds it back: before the session it took 0.4 s of the 1.4 s
+      ## to the plot with 10,000 cells, and the session's own collections
+      ## cost as much with 1.3 million.
+      viewer_jit_scheduled <<- TRUE
+      later::later(
+        function() {
+          viewer_jit_restore()
+          try(.collectBeforeSessions(), silent = TRUE)
+        },
+        8
+      )
+    }
     server(input, output, session)
   }
 
@@ -413,12 +454,18 @@ launchCerebro <- function(
   max_request_size <- maxFileSize * 1024^2
   app_args[["onStart"]] <- function() {
     previous <- options(shiny.maxRequestSize = max_request_size)
-    shiny::onStop(function() options(previous))
+    shiny::onStop(function() {
+      options(previous)
+      viewer_jit_restore()
+    })
     later::later(viewer_started, 0)
     if (is.function(user_on_start)) {
       user_on_start()
     }
   }
+  viewer_launched <- TRUE
+  ## An App nobody opens does not keep it off.
+  later::later(viewer_jit_restore, 60)
   do.call(
     shiny::shinyApp,
     c(list(ui = transport$ui, server = transport$server), app_args)
@@ -447,18 +494,18 @@ launchCerebro <- function(
   ))
 }
 
-## Collects at the end of launchCerebro(), while nobody waits. Everything read
-## and built there is still young to R's collector, so the first browser
-## session would start with a full collection of it (0.5-1 s with a 1.3 million
-## cell data set in memory, counted against the first view); after this one its
-## collections only look at what the session itself allocates.
+## Collects once the first session has its page, while nobody waits. Everything
+## read and built before is still young to R's collector: the first collection
+## of it takes 0.4 s with 10,000 cells and more with 1.3 million, which is why
+## it does not run before that session (it did, and delayed the plot by as
+## much). After this one the collections of later sessions only look at what
+## they allocate themselves.
 ##
 ## How often a session collects depends on the room left above what is in use.
 ## R enlarges its heap only after a full collection that leaves it more than
-## 70 % full, and a process can end up just below that: the first session then
-## collected 11 to 15 times before its first view instead of 4, which took
-## 0.25 s with 10,000 cells and up to 0.7 s with 1.3 million. A block held
-## through a second collection makes R take that step now.
+## 70 % full, and a process can end up just below that: a session then
+## collects 11 to 15 times instead of 4. A block held through a second
+## collection makes R take that step now.
 .collectBeforeSessions <- function() {
   usage <- gc(verbose = FALSE, full = TRUE)
   cells <- ceiling(0.72 * usage["Ncells", 3L] - usage["Ncells", 1L])
