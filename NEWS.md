@@ -9,6 +9,9 @@
   stay under 8 MB.
 - A test no longer compares two saves of a Cerebro object byte by byte; their
   source references differ between saves.
+- CerebroNexus has a logo. It heads the README, replaces the wordmark logo on
+  the pkgdown site and appears in the Viewer's About tab, where each heading
+  and link now carries an icon.
 
 # CerebroNexus 8.0.0
 
