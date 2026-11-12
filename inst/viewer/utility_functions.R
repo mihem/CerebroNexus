@@ -4387,10 +4387,44 @@ get_or_load_crb <- function(
   )
 }
 
-## Verified files are remembered in this function's own environment (the
-## process environment of source_cache.R), keyed by path, size and
-## modification time: each file is hashed once per process until it changes.
-.verifyRuntimeH5Checksum <- function(path, md5, crb_path) {
+## What a verified H5 file is remembered by: path, size, modification time and
+## checksum. `kept` is the file in the user's cache directory that says so to
+## the processes after this one; NULL for a file of the session's temporary
+## directory, which goes with the process.
+.runtimeH5ChecksumRecord <- function(path, md5) {
+  info <- file.info(path, extra_cols = FALSE)
+  full <- normalizePath(path, mustWork = TRUE)
+  modified <- format(as.numeric(info$mtime), digits = 17)
+  key <- paste(full, info$size, modified, md5, sep = "\r")
+  temporary <- startsWith(
+    normalizePath(path, winslash = "/", mustWork = TRUE),
+    paste0(normalizePath(tempdir(), winslash = "/", mustWork = FALSE), "/")
+  )
+  list(
+    key = key,
+    size = info$size,
+    note = c(full, format(info$size, scientific = FALSE), modified, md5),
+    kept = if (!temporary) {
+      file.path(
+        tools::R_user_dir("CerebroNexus", "cache"),
+        "h5-verified",
+        rlang::hash(key)
+      )
+    }
+  )
+}
+
+## Hashing takes 0.9 s for a 234 MB file and grows with the file, and it ran
+## before the first view of every process. A verified file is remembered
+## instead: in this function's own environment (the process environment of
+## source_cache.R) for the process, and in the user's cache directory for the
+## processes after it, until its size or modification time changes.
+##
+## With `defer`, a file that is not known yet is hashed by a background process
+## and the task is returned instead of TRUE: nothing of the file's expression
+## has been read by then, and the call without `defer`, made before the first
+## read, waits for that task rather than hashing a second time.
+.verifyRuntimeH5Checksum <- function(path, md5, crb_path, defer = FALSE) {
   if (is.null(md5)) {
     return(invisible(TRUE))
   }
@@ -4407,19 +4441,70 @@ get_or_load_crb <- function(
   ) {
     stop("The Cerebro expression-backend descriptor is invalid.", call. = FALSE)
   }
-  info <- file.info(path)
-  key <- paste(
-    normalizePath(path, mustWork = TRUE),
-    info$size,
-    format(as.numeric(info$mtime), digits = 17),
-    md5,
-    sep = "\r"
-  )
-  if (isTRUE(get0(key, envir = verified, inherits = FALSE))) {
+  record <- .runtimeH5ChecksumRecord(path, md5)
+  key <- record$key
+  known <- get0(key, envir = verified, inherits = FALSE)
+  if (isTRUE(known)) {
     return(invisible(TRUE))
   }
+  if (!is.null(record$kept) && file.exists(record$kept)) {
+    assign(key, TRUE, envir = verified)
+    return(invisible(TRUE))
+  }
+  if (isTRUE(defer)) {
+    if (is.null(known) && exists(".viewerMirai", mode = "function")) {
+      ## The task ends by itself when no process answers: the time a slow disk
+      ## needs for the file, and half a minute for the process to start.
+      known <- tryCatch(
+        .viewerMirai(
+          {
+            actual <- unname(tools::md5sum(path))
+            if (!is.null(kept) && identical(tolower(actual), tolower(md5))) {
+              try(
+                {
+                  dir.create(
+                    dirname(kept),
+                    recursive = TRUE,
+                    showWarnings = FALSE
+                  )
+                  writeLines(note, kept)
+                },
+                silent = TRUE
+              )
+            }
+            actual
+          },
+          path = path,
+          md5 = md5,
+          kept = record$kept,
+          note = record$note,
+          .timeout = 30000 + ceiling(record$size / 2e4)
+        ),
+        error = function(error) NULL
+      )
+      if (!is.null(known)) {
+        assign(key, known, envir = verified)
+        message(glue::glue(
+          "[{Sys.time()}] Checking the h5 checksum in the background: {path}"
+        ))
+      }
+    }
+    if (inherits(known, "mirai")) {
+      return(invisible(known))
+    }
+  }
   started <- proc.time()[["elapsed"]]
-  actual <- unname(tools::md5sum(path))
+  actual <- if (inherits(known, "mirai")) {
+    mirai::call_mirai(known)$data
+  }
+  if (
+    !is.character(actual) ||
+      length(actual) != 1L ||
+      !grepl("^[[:xdigit:]]{32}$", actual)
+  ) {
+    ## no background process, or one that did not answer
+    actual <- unname(tools::md5sum(path))
+  }
   print(glue::glue(
     "[{Sys.time()}] Verified h5 checksum in ",
     "{round(proc.time()[['elapsed']] - started, 2)} s: {path}"
@@ -4433,6 +4518,15 @@ get_or_load_crb <- function(
     )
   }
   assign(key, TRUE, envir = verified)
+  if (!is.null(record$kept)) {
+    try(
+      {
+        dir.create(dirname(record$kept), recursive = TRUE, showWarnings = FALSE)
+        writeLines(record$note, record$kept)
+      },
+      silent = TRUE
+    )
+  }
   invisible(TRUE)
 }
 
@@ -4490,8 +4584,18 @@ get_or_load_crb <- function(
   }
   ## The CRB records the checksum of the H5 file it was written with (CRBs from
   ## before that record none): a replaced file with the same cell and gene
-  ## names must not be painted as this data set.
-  .verifyRuntimeH5Checksum(loc_abs, obj$expression_backend$md5, crb_path)
+  ## names must not be painted as this data set. A file that is not known yet
+  ## is hashed in the background, and verify_cells() below, which runs before
+  ## the first read of its expression, has the answer or waits for it.
+  h5_md5 <- obj$expression_backend$md5
+  h5_checksum <- new.env(parent = emptyenv())
+  h5_checksum$task <- .verifyRuntimeH5Checksum(
+    loc_abs,
+    h5_md5,
+    crb_path,
+    defer = TRUE
+  )
+  h5_checksum$verified <- isTRUE(h5_checksum$task)
   cell_names_state <- new.env(parent = emptyenv())
   if (!is.null(crb_schema)) {
     obj <- .deferThinCrbHydration(
@@ -4518,6 +4622,16 @@ get_or_load_crb <- function(
     crb_h5_cell_check_start(loc_abs, crb_schema$cell_names_hash)
   }
   verify_cells <- function() {
+    if (!isTRUE(h5_checksum$verified)) {
+      tryCatch(
+        .verifyRuntimeH5Checksum(loc_abs, h5_md5, crb_path),
+        error = function(error) {
+          message(glue::glue("[{Sys.time()}] {conditionMessage(error)}"))
+          stop(error)
+        }
+      )
+      h5_checksum$verified <- TRUE
+    }
     if (!is.null(crb_schema) && !isTRUE(cell_names_state$verified)) {
       if (
         process_check &&
@@ -4543,9 +4657,12 @@ get_or_load_crb <- function(
   attr(obj, "cerebro_h5_rows") <- .h5ExpressionRows(loc_abs, verify_cells)
   ## Lets optional work wait for the daemon without blocking the session.
   attr(obj, "cerebro_h5_cells_pending") <- function() {
-    process_check &&
-      !isTRUE(cell_names_state$verified) &&
-      crb_h5_cells_pending(loc_abs, crb_schema$cell_names_hash)
+    (!isTRUE(h5_checksum$verified) &&
+      inherits(h5_checksum$task, "mirai") &&
+      mirai::unresolved(h5_checksum$task)) ||
+      (process_check &&
+        !isTRUE(cell_names_state$verified) &&
+        crb_h5_cells_pending(loc_abs, crb_schema$cell_names_hash))
   }
   delayedAssign(
     "expression",

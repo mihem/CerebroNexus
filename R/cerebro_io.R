@@ -100,18 +100,32 @@
     grepl("^[[:xdigit:]]{32}$", x)
 }
 
-## Checksums of expression sidecars already verified in this process, keyed by
-## path, size and modification time: a file is hashed once until it changes.
+## Checksums of expression sidecars already verified, keyed by path, size and
+## modification time: a file is hashed once until it changes. This process
+## remembers them here, the processes after it by a file in the user's cache
+## directory (the Viewer's .runtimeH5ChecksumRecord() names the same file).
 .cerebroH5Verified <- new.env(parent = emptyenv())
 
-.expressionSidecarKey <- function(sidecar, md5) {
-  info <- file.info(sidecar)
-  paste(
-    normalizePath(sidecar, mustWork = TRUE),
-    info$size,
-    format(as.numeric(info$mtime), digits = 17),
-    md5,
-    sep = "\r"
+.expressionSidecarRecord <- function(sidecar, md5) {
+  info <- file.info(sidecar, extra_cols = FALSE)
+  full <- normalizePath(sidecar, mustWork = TRUE)
+  modified <- format(as.numeric(info$mtime), digits = 17)
+  key <- paste(full, info$size, modified, md5, sep = "\r")
+  ## A file of the session's temporary directory goes with the process.
+  temporary <- startsWith(
+    normalizePath(sidecar, winslash = "/", mustWork = TRUE),
+    paste0(normalizePath(tempdir(), winslash = "/", mustWork = FALSE), "/")
+  )
+  list(
+    key = key,
+    note = c(full, format(info$size, scientific = FALSE), modified, md5),
+    kept = if (!temporary) {
+      file.path(
+        tools::R_user_dir("CerebroNexus", "cache"),
+        "h5-verified",
+        rlang::hash(key)
+      )
+    }
   )
 }
 
@@ -123,7 +137,7 @@
     return(invisible(FALSE))
   }
   assign(
-    .expressionSidecarKey(sidecar, md5),
+    .expressionSidecarRecord(sidecar, md5)$key,
     TRUE,
     envir = .cerebroH5Verified
   )
@@ -134,19 +148,34 @@
   if (is.null(md5)) {
     return(invisible(TRUE))
   }
-  key <- .expressionSidecarKey(sidecar, md5)
-  if (isTRUE(get0(key, envir = .cerebroH5Verified, inherits = FALSE))) {
+  record <- .expressionSidecarRecord(sidecar, md5)
+  if (isTRUE(get0(record$key, envir = .cerebroH5Verified, inherits = FALSE))) {
     return(invisible(TRUE))
   }
-  if (!identical(tolower(unname(tools::md5sum(sidecar))), tolower(md5))) {
-    stop(
-      "The h5 expression sidecar checksum does not match CRB '",
-      basename(crb),
-      "'.",
-      call. = FALSE
-    )
+  if (is.null(record$kept) || !file.exists(record$kept)) {
+    if (!identical(tolower(unname(tools::md5sum(sidecar))), tolower(md5))) {
+      stop(
+        "The h5 expression sidecar checksum does not match CRB '",
+        basename(crb),
+        "'.",
+        call. = FALSE
+      )
+    }
+    if (!is.null(record$kept)) {
+      try(
+        {
+          dir.create(
+            dirname(record$kept),
+            recursive = TRUE,
+            showWarnings = FALSE
+          )
+          writeLines(record$note, record$kept)
+        },
+        silent = TRUE
+      )
+    }
   }
-  assign(key, TRUE, envir = .cerebroH5Verified)
+  assign(record$key, TRUE, envir = .cerebroH5Verified)
   invisible(TRUE)
 }
 
