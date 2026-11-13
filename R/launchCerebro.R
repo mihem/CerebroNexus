@@ -135,33 +135,6 @@ launchCerebro <- function(
   }
 
   ## --------------------------------------------------------------------------##
-  ## R compiles a function to byte code the second time it is called. The
-  ## functions a session creates (its server function and everything it
-  ## defines) are new for every session and run once or twice while the first
-  ## page is made, so compiling them costs more than it saves: 0.3 s of the
-  ## 1.4 s from the start of the session to the plot with 10,000 cells, 0.6 s
-  ## of 2.7 s with 1.3 million. A process that only runs the App (`Rscript`,
-  ## or start.R, which has done this already) does without until the first
-  ## session has its page. An R session someone is working in keeps its
-  ## setting.
-  ## --------------------------------------------------------------------------##
-  viewer_jit <- getOption("CerebroNexus.jit_level")
-  if (is.null(viewer_jit) && !interactive()) {
-    viewer_jit <- compiler::enableJIT(0L)
-  }
-  viewer_jit_restore <- function() {
-    if (!is.null(viewer_jit)) {
-      compiler::enableJIT(viewer_jit)
-      viewer_jit <<- NULL
-      options(CerebroNexus.jit_level = NULL)
-    }
-    invisible()
-  }
-  viewer_jit_scheduled <- FALSE
-  viewer_launched <- FALSE
-  on.exit(if (!viewer_launched) viewer_jit_restore(), add = TRUE)
-
-  ## --------------------------------------------------------------------------##
   ## Options the Viewer reads. The Viewer files are sourced into this function's
   ## environment below, so they find `Cerebro.options` here without touching
   ## the global environment.
@@ -195,6 +168,8 @@ launchCerebro <- function(
   ## the App is first asked for its page or a session, whichever comes first;
   ## what it reports (a CRB file that cannot be read) then stops the App.
   ##--------------------------------------------------------------------------##
+  viewer_jit_release <- function() invisible()
+  viewer_jit_scheduled <- FALSE
   viewer_prepared <- FALSE
   viewer_prepare_error <- NULL
   viewer_prepare <- function() {
@@ -228,7 +203,6 @@ launchCerebro <- function(
         for (package in .lazy_imports_session) {
           loadNamespace(package)
         }
-        .reserveHeapForCrb(crb_file_to_load)
         source(
           system.file(
             paste0("viewer/shiny_server.R"),
@@ -236,6 +210,9 @@ launchCerebro <- function(
           ),
           local = viewer_env
         )
+        ## The Viewer's own helper (viewer/crb_cache.R, which a bundled App
+        ## has no other way to reach): raised before the data sets are read.
+        .reserveCrbHeap(crb_file_to_load)
         dataset_catalog <- .datasetCatalogFromFiles(
           crb_file_to_load,
           retain_prototypes = TRUE
@@ -292,7 +269,7 @@ launchCerebro <- function(
       viewer_jit_scheduled <<- TRUE
       later::later(
         function() {
-          viewer_jit_restore()
+          viewer_jit_release()
           try(.collectBeforeSessions(), silent = TRUE)
         },
         8
@@ -454,44 +431,68 @@ launchCerebro <- function(
   max_request_size <- maxFileSize * 1024^2
   app_args[["onStart"]] <- function() {
     previous <- options(shiny.maxRequestSize = max_request_size)
+    ## From here the App runs, and its first session has no use for compiling
+    ## (see .viewerJitSuspend()). Put back after that session has its page
+    ## (viewer_server()), when the App stops, and after a minute at the latest.
+    viewer_jit_release <<- .viewerJitSuspend()
     shiny::onStop(function() {
       options(previous)
-      viewer_jit_restore()
+      viewer_jit_release()
     })
+    later::later(viewer_jit_release, 60)
     later::later(viewer_started, 0)
     if (is.function(user_on_start)) {
       user_on_start()
     }
   }
-  viewer_launched <- TRUE
-  ## An App nobody opens does not keep it off.
-  later::later(viewer_jit_restore, 60)
   do.call(
     shiny::shinyApp,
     c(list(ui = transport$ui, server = transport$server), app_args)
   )
 }
 
-## Raises R's heap trigger before large CRBs are read, as .reserveCrbHeap() in
-## inst/viewer/crb_cache.R does for a Viewer that reads them itself: a request
-## larger than the free heap makes R collect once and grow its trigger, instead
-## of collecting several times while a CRB is deserialized. The unused block
-## is released by the next collection.
-.reserveHeapForCrb <- function(paths) {
-  sizes <- suppressWarnings(file.size(as.character(paths)))
-  largest <- max(c(0, sizes), na.rm = TRUE)
-  bytes <- min(16 * largest, 4 * 1024^3)
-  if (bytes < 256 * 1024^2) {
-    return(invisible(FALSE))
+## R compiles a function to byte code the second time it is called. The
+## functions a session creates (its server function and everything it defines)
+## are new for every session and run once or twice while the first page is
+## made, so compiling them costs more than it saves: 0.3 s of the 1.4 s from
+## the start of the session to the plot with 10,000 cells, 0.6 s of 2.7 s with
+## 1.3 million. A process that only runs the App (`Rscript`, or start.R, which
+## has switched compiling off already and says what to put back in
+## `options(CerebroNexus.jit_level)`) does without until the first session has
+## its page. An R session someone is working in keeps its setting.
+##
+## The setting to return to is remembered once for the process, by the first
+## App that switches compiling off; every App that does counts, and compiling
+## is switched on again when the last of them has let go. Returns the function
+## that lets go (once).
+.viewer_jit <- new.env(parent = emptyenv())
+.viewerJitSuspend <- function() {
+  started <- getOption("CerebroNexus.jit_level")
+  if (is.null(.viewer_jit$original)) {
+    if (!is.null(started)) {
+      .viewer_jit$original <- as.integer(started)
+    } else if (interactive()) {
+      return(function() invisible())
+    } else {
+      .viewer_jit$original <- compiler::enableJIT(0L)
+    }
+    .viewer_jit$holders <- 0L
   }
-  invisible(tryCatch(
-    {
-      block <- raw(bytes)
-      rm(block)
-      TRUE
-    },
-    error = function(error) FALSE
-  ))
+  .viewer_jit$holders <- .viewer_jit$holders + 1L
+  released <- FALSE
+  function() {
+    if (released) {
+      return(invisible())
+    }
+    released <<- TRUE
+    .viewer_jit$holders <- .viewer_jit$holders - 1L
+    if (.viewer_jit$holders <= 0L) {
+      compiler::enableJIT(.viewer_jit$original)
+      .viewer_jit$original <- NULL
+      options(CerebroNexus.jit_level = NULL)
+    }
+    invisible()
+  }
 }
 
 ## Collects once the first session has its page, while nobody waits. Everything

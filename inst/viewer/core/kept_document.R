@@ -150,6 +150,25 @@ viewerDocumentMoveStyles <- function(css, path) {
   unlist(chunks, use.names = FALSE)
 }
 
+## TRUE for a script that begins with a string (after comments): a directive
+## such as "use strict", which would apply to every file joined after it. Such
+## a file stays a script of its own.
+viewerDocumentStartsWithDirective <- function(bytes) {
+  text <- tryCatch(
+    rawToChar(bytes[seq_len(min(length(bytes), 65536L))]),
+    error = function(error) NULL
+  )
+  if (is.null(text)) {
+    return(TRUE)
+  }
+  grepl(
+    "(?s)^(\\xef\\xbb\\xbf)?\\s*(?:(?://[^\\n]*|/\\*.*?\\*/)\\s*)*[\"']",
+    text,
+    perl = TRUE,
+    useBytes = TRUE
+  )
+}
+
 ## The page `html` (raw) with each run of scripts, and each run of styles, that
 ## follow one another as one file. Returns list(html = raw, files = named list
 ## of raw), or NULL when nothing is joined. Only what the resource paths name
@@ -159,7 +178,9 @@ viewerDocumentMoveStyles <- function(css, path) {
 ## `defer` run in the order of the page after it is parsed, whatever lies
 ## between them: they are joined among themselves, and only another script
 ## with `defer` that stays ends their run. The bytes of the page are never
-## converted.
+## converted. Joined scripts share one fate: a file that begins with a directive
+## is left alone (above), but one that throws at its top level stops the files
+## after it, which separate tags would not.
 viewerDocumentBundle <- function(html, resource_paths) {
   text <- rawToChar(html)
   pattern <- paste0(
@@ -278,7 +299,8 @@ viewerDocumentBundle <- function(html, resource_paths) {
       if (
         is.null(file) ||
           !runs_js ||
-          !plain(opening, c("script", "src", "type", "defer"))
+          !plain(opening, c("script", "src", "type", "defer")) ||
+          viewerDocumentStartsWithDirective(read(file))
       ) {
         flush(kind)
         next

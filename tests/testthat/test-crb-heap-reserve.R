@@ -16,29 +16,18 @@ test_that("only a large configured CRB reserves heap", {
 })
 
 test_that("launchCerebro reserves heap for a large CRB before reading it", {
-  small <- withr::local_tempfile(fileext = ".crb")
-  writeBin(raw(1024), small)
-  expect_false(.reserveHeapForCrb(NULL))
-  expect_false(.reserveHeapForCrb(c(
-    small,
-    file.path(tempdir(), "missing.crb")
-  )))
-  large <- withr::local_tempfile(fileext = ".crb")
-  writeBin(raw(17 * 1024^2), large)
-  expect_true(.reserveHeapForCrb(c(small, large)))
+  ## with the Viewer's helper, not a copy of it
+  expect_false(exists(".reserveHeapForCrb", mode = "function"))
 
-  ## The data sets are read after the UI is built, the heap is raised and the
-  ## server functions are loaded (which starts the background work on the
-  ## configured files), and the Viewer does not raise the heap again.
+  ## The data sets are read after the UI is built, the server functions are
+  ## loaded (which starts the background work on the configured files) and the
+  ## heap is raised, and the Viewer does not raise the heap again.
   launch <- deparse(body(launchCerebro))
   position <- function(pattern) grep(pattern, launch, fixed = TRUE)[[1L]]
-  expect_lt(position("viewer/shiny_UI.R"), position(".reserveHeapForCrb("))
+  expect_lt(position("viewer/shiny_UI.R"), position("viewer/shiny_server.R"))
+  expect_lt(position("viewer/shiny_server.R"), position(".reserveCrbHeap("))
   expect_lt(
-    position(".reserveHeapForCrb("),
-    position("viewer/shiny_server.R")
-  )
-  expect_lt(
-    position("viewer/shiny_server.R"),
+    position(".reserveCrbHeap("),
     position(".datasetCatalogFromFiles(")
   )
   expect_lt(

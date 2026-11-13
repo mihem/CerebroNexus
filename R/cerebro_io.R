@@ -1269,6 +1269,10 @@ saveCerebro <- function(
 #' cerebro
 #' @export
 readCerebro <- function(file) {
+  ## The tables of a CRB may be tibbles, whose methods (`[` among them) are
+  ## registered when tibble is loaded; nothing else in the package's imports
+  ## loads it, since dplyr is bound lazily (R/lazy_imports.R).
+  loadNamespace("dplyr")
   file <- normalizePath(file, mustWork = TRUE)
   .hydrateCerebroPayload(.readCurrentCerebroPayload(file), file)
 }

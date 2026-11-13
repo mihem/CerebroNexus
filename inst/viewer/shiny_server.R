@@ -601,6 +601,11 @@ server <- function(input, output, session) {
   viewer_dataset_generation <- 0
   viewer_upload_serial <- 0L
   viewer_dataset_request <- reactiveVal(NULL)
+  ## The data set this session's address opens: the one its first request
+  ## selects, or NA when the address names a data set the app does not have.
+  ## The first view is published for that address, and only from a frame of
+  ## that data set (viewer_first_view_capture()).
+  viewer_first_view_dataset <- NULL
 
   viewer_send_dataset_phase <- function(
     phase,
@@ -960,6 +965,19 @@ server <- function(input, output, session) {
         available_crb_files$files,
         selection
       )
+    }
+    if (is.null(viewer_first_view_dataset)) {
+      link <- parseQueryString(session$clientData$url_search)[["dataset"]]
+      viewer_first_view_dataset <<- if (
+        is.character(link) &&
+          length(link) == 1L &&
+          nzchar(link) &&
+          !link %in% names(available_crb_files$files)
+      ) {
+        NA_character_
+      } else {
+        as.character(selection)
+      }
     }
     viewer_request_dataset(
       selection = selection,
@@ -1527,6 +1545,20 @@ server <- function(input, output, session) {
   ## (viewer/core/shared_resources.R). Never fails a render.
   viewer_first_view_capture <- function(message) {
     if (!length(viewer_shared_resource_sources)) {
+      return(invisible(NULL))
+    }
+    ## Not the frame of another data set than the address opens (one the user
+    ## switched to), and not for a link that names a data set the app does not
+    ## have: either would file cells under an address they do not belong to,
+    ## and a link can vary without end.
+    if (
+      is.null(viewer_first_view_dataset) ||
+        is.na(viewer_first_view_dataset) ||
+        !identical(
+          as.character(isolate(available_crb_files$selected)),
+          viewer_first_view_dataset
+        )
+    ) {
       return(invisible(NULL))
     }
     try(

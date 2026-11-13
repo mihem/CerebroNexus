@@ -164,3 +164,12 @@ test_that("launchCerebro loads what every session uses and leaves the rest", {
     fixed = TRUE
   )))
 })
+
+test_that("reading a CRB loads dplyr, so the tibbles in it keep their methods", {
+  ## tibble is loaded by dplyr; none of the NAMESPACE imports loads either
+  expect_true(any(grepl(
+    "loadNamespace(\"dplyr\")",
+    deparse(body(readCerebro)),
+    fixed = TRUE
+  )))
+})

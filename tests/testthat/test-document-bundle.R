@@ -135,6 +135,40 @@ test_that("an inline script, another site and a plain script apart end a run", {
   ))
 })
 
+test_that("a script that begins with a directive is not joined to the others", {
+  env <- document_bundle_env()
+  files <- document_bundle_files()
+  write <- function(name, text) writeLines(text, file.path(files$root, name))
+  write("liba/strict.js", c("// a comment", "'use strict';", "undeclared = 1;"))
+  write("liba/commented.js", c("/* licence", "*/", "\"use strict\";"))
+  write("liba/plain.js", c("/* licence */", "window.order.push('p');"))
+  html <- document_bundle_html(paste(
+    "<script src=\"liba/a.js\"></script>",
+    "<script src=\"liba/b.js\"></script>",
+    "<script src=\"liba/strict.js\"></script>",
+    "<script src=\"libb/c.js\"></script>",
+    "<script src=\"liba/plain.js\"></script>",
+    "<script src=\"liba/commented.js\"></script>",
+    "<script src=\"libb/d.js\"></script>",
+    sep = "
+"
+  ))
+  bundle <- env$viewerDocumentBundle(html, files$paths)
+  page <- rawToChar(bundle$html)
+  tags <- regmatches(page, gregexpr("<script[^>]*>", page))[[1L]]
+  ## a and b; strict alone; c and plain; commented alone; d alone
+  expect_length(bundle$files, 2L)
+  expect_length(tags, 5L)
+  expect_match(tags[[1L]], "cerebro-bundle")
+  expect_identical(tags[[2L]], "<script src=\"liba/strict.js\">")
+  expect_match(tags[[3L]], "cerebro-bundle")
+  expect_identical(tags[[4L]], "<script src=\"liba/commented.js\">")
+  expect_identical(tags[[5L]], "<script src=\"libb/d.js\">")
+  for (bytes in bundle$files) {
+    expect_false(grepl("use strict", rawToChar(bytes), fixed = TRUE))
+  }
+})
+
 test_that("scripts with defer are joined across what lies between them", {
   env <- document_bundle_env()
   files <- document_bundle_files()

@@ -194,7 +194,7 @@ test_that("what preparing the Viewer reports is reported again, not retried", {
   env <- environment(app$serverFuncSource())
   calls <- 0L
   ## as when a CRB file cannot be read
-  env$.reserveHeapForCrb <- function(paths) {
+  env$.datasetCatalogFromFiles <- function(files, ...) {
     calls <<- calls + 1L
     stop("this CRB file cannot be read")
   }
@@ -224,24 +224,34 @@ test_that("a started App stops with what preparing the Viewer reports", {
   )
 })
 
-test_that("an App process compiles no byte code until its first session is served", {
+test_that("byte-code compiling is switched off while Apps run, and back on after the last", {
   skip_if(interactive())
-  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
   level <- compiler::enableJIT(3L)
   withr::defer(compiler::enableJIT(level))
   withr::defer(options(CerebroNexus.jit_level = NULL))
+  jit <- function() compiler::enableJIT(-1L)
+
+  ## two Apps that overlap: the level to return to is the one before the first
+  first <- .viewerJitSuspend()
+  expect_identical(jit(), 0L)
+  second <- .viewerJitSuspend()
+  expect_identical(jit(), 0L)
+  first()
+  first()
+  expect_identical(jit(), 0L)
+  second()
+  expect_identical(jit(), 3L)
+
+  ## an App that was created and never run does nothing: the switch happens
+  ## when it starts
   app <- launchCerebro(mode = "closed")
-  env <- environment(app$serverFuncSource())
-  expect_identical(compiler::enableJIT(-1L), 0L)
-  env$viewer_jit_restore()
-  expect_identical(compiler::enableJIT(-1L), 3L)
+  expect_identical(jit(), 3L)
+
   ## start.R has switched it off already, and says what to put back
   options(CerebroNexus.jit_level = 2L)
   compiler::enableJIT(0L)
-  app <- launchCerebro(mode = "closed")
-  env <- environment(app$serverFuncSource())
-  expect_identical(compiler::enableJIT(-1L), 0L)
-  env$viewer_jit_restore()
-  expect_identical(compiler::enableJIT(-1L), 2L)
+  release <- .viewerJitSuspend()
+  release()
+  expect_identical(jit(), 2L)
   expect_null(getOption("CerebroNexus.jit_level"))
 })
