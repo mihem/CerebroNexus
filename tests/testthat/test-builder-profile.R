@@ -1199,6 +1199,35 @@ test_that("columns with many distinct values are counted without sorting them", 
     expect_identical(hashed, sorted, info = type)
   }
 
+  ## Doubles that print alike are one level, as table() counted them, and no
+  ## label is listed twice: 0.1 + 0.2 and 0.3, NaN, and NA.
+  alike <- c(
+    frequent + 0.5,
+    rep(0.1 + 0.2, 151L),
+    rep(0.3, 152L),
+    rep(NaN, 160L),
+    rep(NA_real_, 161L)
+  )
+  distinct <- length(unique(alike[!is.na(alike)]))
+  hashed <- .builder_profile_level_counts(alike, distinct)
+  sorted <- .builder_profile_level_counts(alike)
+  expect_identical(
+    vapply(hashed$items, `[[`, character(1), "value"),
+    vapply(sorted$items, `[[`, character(1), "value")
+  )
+  expect_identical(
+    vapply(hashed$items, `[[`, integer(1), "count"),
+    vapply(sorted$items, `[[`, integer(1), "count")
+  )
+  expect_identical(hashed$total, sorted$total)
+  expect_false(anyDuplicated(vapply(hashed$items, `[[`, "", "value")) > 0L)
+  expect_identical(hashed$items[[1L]]$value, "0.3")
+  expect_identical(hashed$items[[1L]]$count, 303L)
+  expect_identical(
+    attr(hashed, "builder_level_stats")$distinct,
+    attr(sorted, "builder_level_stats")$distinct
+  )
+
   ## Missing and blank values are merged with the labels they are shown under.
   text <- c(sprintf("id%04d", seq_len(200L)), NA, "N/A", "", "", "(blank)")
   counted <- .builder_profile_level_counts(text, 203L)

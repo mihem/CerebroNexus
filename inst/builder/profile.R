@@ -913,10 +913,16 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
 
 ## The most frequent values of a column with many distinct values. table()
 ## sorts every distinct value as text, which takes seconds per column at a
-## million cells; here the values are counted by hashing and only the listed
-## ones become text. Equally frequent values keep their order of first
-## appearance (level order for a factor).
+## million cells; here the values are counted by hashing (a double by its text,
+## as table() did) and only the listed ones of the others become text. Equally
+## frequent values keep their order of first appearance (level order for a
+## factor).
 .builder_profile_frequent_level_counts <- function(values) {
+  ## Doubles are grouped by their text, as table() did: 0.1 + 0.2 and 0.3 are
+  ## one level (15 significant digits), and a level is named once.
+  if (is.double(values)) {
+    values <- as.character(values)
+  }
   textual <- is.factor(values) || is.character(values)
   if (is.factor(values)) {
     keys <- levels(values)
