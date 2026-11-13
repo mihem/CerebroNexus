@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -241,7 +241,35 @@ when the app is mounted under a sub-path such as <code>/app/</code>), or
 the value of the <code>dataset</code> query parameter. It is matched
 against the <strong>names</strong> you gave in
 <code>cerebro_data</code>; file names are not links. If no match is
-found, the smallest-file default applies.</p>
+found, the smallest-file default applies. The path form also works when
+you start the App yourself with <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> or
+<code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code>; write it without a trailing slash
+(<code>/TCR</code>, not <code>/TCR/</code>). When both forms are
+present, the query parameter wins.</p>
+<p>The address bar follows the data set you are reading: when you pick
+another one from the dropdown, <code>?dataset=</code> changes to its
+name, so the copied URL reopens the same data set. The path is never
+rewritten, because under Shiny Server it is the App’s mount point.</p>
+</div>
+<div class="section level2">
+<h2 id="linking-to-a-specific-page">Linking to a specific page<a class="anchor" aria-label="anchor" href="#linking-to-a-specific-page"></a>
+</h2>
+<p>Add <code>page=</code> with a stable page ID to open the App on that
+page, with or without <code>dataset=</code>:</p>
+<pre><code>https://your-host/app/?dataset=TCR&amp;page=immune_repertoire</code></pre>
+<p>The IDs are those of <code>initial_page</code> in
+<code><a href="../reference/createShinyApp.html">createShinyApp()</a></code>: <code>data_info</code>,
+<code>projection</code>, <code>linked_views</code>, <code>groups</code>,
+<code>marker_genes</code>, <code>most_expressed_genes</code>,
+<code>enriched_pathways</code>, <code>extra_material</code>,
+<code>immune_repertoire</code>, <code>trajectory</code>,
+<code>spatial</code>, <code>trekker</code>, <code>hla_tcr_motifs</code>,
+<code>gene_expression</code>, <code>gene_id_conversion</code>,
+<code>color_management</code> and <code>about</code>. A link overrides
+the author’s <code>initial_page</code> for that visit. An unknown ID is
+ignored, and a page the data set does not have opens Data info. While
+you read, the address bar follows the page you are on, so the copied URL
+reopens it.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

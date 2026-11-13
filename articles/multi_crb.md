@@ -100,4 +100,32 @@ The token is the **last path segment** (so it works even when the app is
 mounted under a sub-path such as `/app/`), or the value of the `dataset`
 query parameter. It is matched against the **names** you gave in
 `cerebro_data`; file names are not links. If no match is found, the
-smallest-file default applies.
+smallest-file default applies. The path form also works when you start
+the App yourself with
+[`launchCerebro()`](https://www.mheming.com/CerebroNexus/reference/launchCerebro.md)
+or [`shiny::runApp()`](https://rdrr.io/pkg/shiny/man/runApp.html); write
+it without a trailing slash (`/TCR`, not `/TCR/`). When both forms are
+present, the query parameter wins.
+
+The address bar follows the data set you are reading: when you pick
+another one from the dropdown, `?dataset=` changes to its name, so the
+copied URL reopens the same data set. The path is never rewritten,
+because under Shiny Server it is the App’s mount point.
+
+## Linking to a specific page
+
+Add `page=` with a stable page ID to open the App on that page, with or
+without `dataset=`:
+
+    https://your-host/app/?dataset=TCR&page=immune_repertoire
+
+The IDs are those of `initial_page` in
+[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md):
+`data_info`, `projection`, `linked_views`, `groups`, `marker_genes`,
+`most_expressed_genes`, `enriched_pathways`, `extra_material`,
+`immune_repertoire`, `trajectory`, `spatial`, `trekker`,
+`hla_tcr_motifs`, `gene_expression`, `gene_id_conversion`,
+`color_management` and `about`. A link overrides the author’s
+`initial_page` for that visit. An unknown ID is ignored, and a page the
+data set does not have opens Data info. While you read, the address bar
+follows the page you are on, so the copied URL reopens it.

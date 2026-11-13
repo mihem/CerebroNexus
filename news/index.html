@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,12 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.1.0" id="cerebronexus-810">CerebroNexus 8.1.0<a class="anchor" aria-label="anchor" href="#cerebronexus-810"></a></h2>
+<ul><li>
+<strong>Page links.</strong> <code>?page=&lt;id&gt;</code> opens the Viewer on a page (the <code>initial_page</code> IDs, e.g. <code>?dataset=TCR&amp;page=immune_repertoire</code>). The address bar now follows the page and the data set being read, so a copied URL reopens them. A <code>/&lt;data set id&gt;</code> link also works when the App is started with <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> or <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code>, not only under Shiny Server.</li>
+<li>Opening the Viewer on a page that needs the data set no longer flashes the “Loading dataset” card as the startup cover fades; the card waits until the cover is gone.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.0.2" id="cerebronexus-802">CerebroNexus 8.0.2<a class="anchor" aria-label="anchor" href="#cerebronexus-802"></a></h2>
 <ul><li>CerebroNexus has a logo. It heads the README, replaces the wordmark logo on the pkgdown site and appears in the Viewer’s About tab, where each heading and link now carries an icon.</li>
