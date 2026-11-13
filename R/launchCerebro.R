@@ -260,6 +260,7 @@ launchCerebro <- function(
   }
   viewer_server <- function(input, output, session) {
     viewer_prepare()
+    .viewerSessionActivity()
     if (!viewer_jit_scheduled) {
       ## The first session has its page long before this, and the collection
       ## of everything read and built so far (.collectBeforeSessions()) no
@@ -270,7 +271,7 @@ launchCerebro <- function(
       later::later(
         function() {
           viewer_jit_release()
-          try(.collectBeforeSessions(), silent = TRUE)
+          .viewerWhenQuiet(function() .collectBeforeSessions())
         },
         8
       )
@@ -399,18 +400,15 @@ launchCerebro <- function(
         ## The first process of an installation keeps the page it sends.
         if (prepared && viewer_document_capture && !is.null(web_server)) {
           viewer_document_capture <<- FALSE
-          later::later(
-            function() {
-              try(
-                viewerDocumentCapture(
-                  web_server,
-                  viewer_document_key(cerebro_www_prefix)
-                ),
-                silent = TRUE
-              )
-            },
-            1
-          )
+          .viewerWhenQuiet(function() {
+            try(
+              viewerDocumentCapture(
+                web_server,
+                viewer_document_key(cerebro_www_prefix)
+              ),
+              silent = TRUE
+            )
+          })
         }
       },
       ## Not at once: a request that arrived before "/" was answered from the

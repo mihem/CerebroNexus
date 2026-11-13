@@ -215,7 +215,13 @@ viewerUiCached <- function(key, build) {
     return(ui)
   }
   ui <- build()
-  ## A page that cannot be kept is built again next time.
-  try(viewerUiCacheWrite(key, ui), silent = TRUE)
+  ## A page that cannot be kept is built again next time. It is written when
+  ## the Viewer is quiet (R/quiet_queue.R), not in the middle of the start.
+  keep <- function() try(viewerUiCacheWrite(key, ui), silent = TRUE)
+  if (exists(".viewerWhenQuiet", mode = "function")) {
+    .viewerWhenQuiet(keep)
+  } else {
+    keep()
+  }
   ui
 }

@@ -2746,6 +2746,12 @@ server <- function(input, output, session) {
     once = TRUE
   )
 
+  ## What keeps something for the next start waits for the sessions to be quiet
+  ## (R/quiet_queue.R).
+  if (exists(".viewerSessionActivity", mode = "function")) {
+    session$onFlushed(function() .viewerSessionActivity(), once = FALSE)
+  }
+
   ## launchCerebro() starts without the packages only some pages use
   ## (`.idle_packages`: plotly, Matrix, ...). Load them once this session has
   ## sent nothing for three seconds, one per turn of the event loop, and stop

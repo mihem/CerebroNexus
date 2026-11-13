@@ -3,6 +3,8 @@
 ui_cache_env <- function() {
   env <- new.env()
   sys.source(viewer_test_path("ui_cache.R"), env)
+  ## the page is kept when the Viewer is quiet (R/quiet_queue.R): at once here
+  env$.viewerWhenQuiet <- function(task, ...) task()
   env
 }
 
@@ -264,4 +266,27 @@ test_that("the page files define nothing the server uses", {
     }
   )))
   expect_setequal(options_read, c("cerebro_root", "cerebro_version"))
+})
+
+test_that("the page is written through the quiet queue when there is one", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  env <- new.env()
+  sys.source(viewer_test_path("ui_cache.R"), env)
+  queued <- list()
+  env$.viewerWhenQuiet <- function(task, ...) {
+    queued[[length(queued) + 1L]] <<- task
+  }
+  ui <- env$viewerUiCached("queued-key", function() "page")
+  expect_identical(ui, "page")
+  ## built and returned, not yet written
+  expect_false(file.exists(file.path(
+    env$viewerUiCacheDirectory(),
+    "queued-key.rds"
+  )))
+  expect_length(queued, 1L)
+  queued[[1L]]()
+  expect_true(file.exists(file.path(
+    env$viewerUiCacheDirectory(),
+    "queued-key.rds"
+  )))
 })
