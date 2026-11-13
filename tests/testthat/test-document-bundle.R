@@ -19,7 +19,10 @@ document_bundle_files <- function() {
   write <- function(path, text) {
     path <- file.path(root, path)
     dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-    writeLines(text, path)
+    ## binary, so that a new line stays one byte on Windows too
+    connection <- file(path, "wb")
+    on.exit(close(connection))
+    writeLines(text, connection)
   }
   write("liba/a.js", "window.order = ['a'];")
   write("liba/b.js", "window.order.push('b')")
@@ -138,7 +141,11 @@ test_that("an inline script, another site and a plain script apart end a run", {
 test_that("a script that begins with a directive is not joined to the others", {
   env <- document_bundle_env()
   files <- document_bundle_files()
-  write <- function(name, text) writeLines(text, file.path(files$root, name))
+  write <- function(name, text) {
+    connection <- file(file.path(files$root, name), "wb")
+    on.exit(close(connection))
+    writeLines(text, connection)
+  }
   write("liba/strict.js", c("// a comment", "'use strict';", "undeclared = 1;"))
   write("liba/commented.js", c("/* licence", "*/", "\"use strict\";"))
   write("liba/plain.js", c("/* licence */", "window.order.push('p');"))
