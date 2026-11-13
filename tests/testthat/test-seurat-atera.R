@@ -5,13 +5,15 @@ skip_if_not_installed("Seurat")
 skip_if_not_installed("SeuratObject")
 
 ## What LoadAtera(segmentations = "cell", molecule.coordinates = TRUE,
-## genes = ...) leaves, as seen on 10x's tiny Atera dataset: counts in an
-## `Atera` assay, codeword/control assays next to it, one FOV "fov" with
-## centroids, segmentation and the molecules of the requested genes,
-## `azimuth_*` labels in the metadata, and in Misc() the run metadata and a
-## live handle to the transcript file, plus the morphology entry that
-## `morphology.image = TRUE` adds. (By default LoadAtera() reads the
-## centroids only.)
+## genes = ..., morphology.image = TRUE) leaves, following the Seurat 6.0.0
+## source and 10x's tiny Atera dataset: counts in an `Atera` assay,
+## codeword/control assays next to it, one FOV "fov" with centroids,
+## segmentation and the molecules of the requested genes, and `azimuth_*`
+## labels in the metadata. Misc() holds the run metadata, a live handle to
+## the transcript file, the morphology payload (image matrix and its
+## calibration), and each feature type that has a single feature as a sparse
+## one-row matrix (`atera.ControlCodeword` here) instead of an assay. (By
+## default LoadAtera() reads the centroids only.)
 atera_like_object <- function(n_cells = 30L, n_genes = 40L) {
   set.seed(11)
   cells <- sprintf("aaab%04d-1", seq_len(n_cells))
@@ -83,7 +85,21 @@ atera_like_object <- function(n_cells = 30L, n_genes = 40L) {
     fov = "fov"
   )
   SeuratObject::Misc(object, "atera.morphology") <- list(
-    path = "morphology.ome.tif"
+    image = matrix(stats::runif(60L * 40L), 60L, 40L),
+    channel = "dapi",
+    resolution = 1L,
+    n.resolutions = 1L,
+    pixel.size = 5,
+    origin = c(x = 0, y = 0)
+  )
+  SeuratObject::Misc(object, "atera.ControlCodeword") <- methods::as(
+    matrix(
+      stats::rpois(n_cells, 0.2),
+      1L,
+      n_cells,
+      dimnames = list("NegControlCodeword-1", cells)
+    ),
+    "dgCMatrix"
   )
   object
 }
@@ -103,7 +119,7 @@ test_that("an Atera object exports like a Xenium one", {
   )
 
   out <- withr::local_tempdir()
-  expect_no_error(convertSeuratToCerebro(
+  expect_no_error(suppressMessages(convertSeuratToCerebro(
     object,
     out,
     assay = "Atera",
@@ -113,7 +129,7 @@ test_that("an Atera object exports like a Xenium one", {
     groups = "azimuth_broad",
     add_most_expressed_genes = FALSE,
     verbose = FALSE
-  ))
+  )))
   crb <- list.files(out, "\\.crb$", full.names = TRUE)
   expect_length(crb, 1L)
   skip_if(length(crb) != 1L, "conversion failed; see the failure above")
