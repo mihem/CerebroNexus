@@ -10,6 +10,7 @@ utils::globalVariables(c(
   "viewerSharedResourceHeaders",
   "viewerFirstViewPublishKept",
   "viewerSharedResourceAdopt",
+  ".reserveCrbHeap",
   "viewerEarlyServerAdopt",
   "viewerLaunchPrototypes",
   "viewerUiCacheKey",
