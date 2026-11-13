@@ -924,3 +924,26 @@ test_that("a Viewer Pack is built without reading the CRB more than once", {
     )$valid
   )
 })
+
+test_that("a pack built from the object in memory agrees with a qs2 CRB read back", {
+  skip_if_not_installed("qs2")
+  root <- tempfile("pack-qs2-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE), add = TRUE)
+  object <- readCerebro(viewer_pack_fixture(
+    file.path(root, "seed.crb"),
+    immune = TRUE,
+    groups = TRUE
+  ))
+  crb <- file.path(root, "data.crb")
+  ## The writer builds the pack from `object`; nothing reads the CRB back.
+  saveCerebro(object, crb, codec = "qs2", viewer_binary = "always")
+  expect_identical(.cerebroPayloadCodec(crb), "qs2")
+
+  ## The file is what a later check sees, after qs2 and a fresh deserialize.
+  pack <- .viewerPackPath(crb)
+  expect_true(dir.exists(pack))
+  expect_true(validateViewerPack(crb)$valid)
+  expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
+  expect_true(.bundleViewerPackValid(crb, .readCerebroPayload(crb)))
+})

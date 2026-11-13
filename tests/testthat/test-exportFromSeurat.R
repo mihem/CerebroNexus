@@ -191,6 +191,32 @@ test_that("exportFromSeurat names each part of the export as it starts", {
   expect_identical(parts, .exportProgressParts)
 })
 
+test_that("the Viewer Pack of an export agrees with the CRB that is read back", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  skip_if_not_installed("qs2")
+  ## The pack is built and checked against the object the export holds in
+  ## memory. validateViewerPack() reads the file, so it sees any difference
+  ## between that object and what is written, for the h5 export that takes the
+  ## .publishCerebroExport() path and for either codec.
+  for (codec in c("rds", "qs2")) {
+    args <- valid_args
+    args$file <- file.path(withr::local_tempdir(), "dataset.crb")
+    args$expression_matrix_mode <- "h5"
+    args$codec <- codec
+    args$viewer_binary <- "always"
+    do.call(exportFromSeurat, args)
+
+    expect_identical(.cerebroPayloadCodec(args$file), codec, info = codec)
+    pack <- .viewerPackPath(args$file)
+    expect_true(dir.exists(pack), info = codec)
+    expect_true(
+      validateViewerPack(args$file, pack, full = TRUE)$valid,
+      info = codec
+    )
+  }
+})
+
 test_that("exportFromSeurat coalesces missing and existing N/A group levels", {
   object <- obj_raw
   values <- rep(c("A", "N/A", NA_character_), length.out = ncol(object))
