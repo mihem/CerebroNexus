@@ -48,6 +48,7 @@ test_that("the packages loaded on first use are not NAMESPACE imports", {
 })
 
 test_that("a lazy import is bound without evaluating it", {
+  ## the imports sit between the namespace and the base namespace
   provided <- new.env(parent = emptyenv())
   assign("sd", "from another import", envir = provided)
   namespace <- new.env(parent = provided)
@@ -68,11 +69,14 @@ test_that("a lazy import is bound without evaluating it", {
   expect_identical(namespace$median, "defined by the package")
   expect_false(exists("sd", envir = namespace, inherits = FALSE))
   expect_identical(get("sd", envir = namespace), "from another import")
+  ## the others are found from the namespace, and are in the imports
+  expect_false(exists("var", envir = namespace, inherits = FALSE))
+  expect_true(exists("var", envir = provided, inherits = FALSE))
   ## the value is fetched on first use, once
-  expect_identical(namespace$var, stats::var)
-  expect_identical(namespace$var, stats::var)
+  expect_identical(get("var", envir = namespace), stats::var)
+  expect_identical(get("var", envir = namespace), stats::var)
   expect_identical(evaluated, "var")
-  expect_error(namespace$missing, "only when used")
+  expect_error(get("missing", envir = namespace), "only when used")
 })
 
 test_that("every lazy import names an export of its package", {
@@ -88,11 +92,17 @@ test_that("every lazy import names an export of its package", {
       name %in% getNamespaceExports(package),
       info = paste0(package, "::", name)
     )
-    ## Bound in the package namespace. Not compared with the package's
+    ## Found from the package namespace. Not compared with the package's
     ## function: another test may have mocked that one when the name was
     ## first used here.
     expect_true(
       is.function(get(name, envir = namespace)),
+      info = paste0(package, "::", name)
+    )
+    ## not an object of the namespace: R CMD check evaluates those and reads
+    ## the functions it gets as the package's own code
+    expect_false(
+      exists(name, envir = namespace, inherits = FALSE),
       info = paste0(package, "::", name)
     )
   }

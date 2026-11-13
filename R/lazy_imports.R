@@ -9,10 +9,6 @@
 ## files that launchCerebro() sources call them as before. A function this
 ## package defines itself, or one that another import already provides, keeps
 ## its binding.
-##
-## R CMD check evaluates every object of the namespace and takes the functions
-## it gets for the package's own code, so the packages these functions call
-## (cli, vctrs, tidyselect, ...) are named in the Suggests field of DESCRIPTION.
 
 ## Matrix's generics for an S4 object, the base function for everything else:
 ## what importFrom(Matrix, colMeans, colSums, rowSums, t) dispatched to, without
@@ -42,10 +38,15 @@ colMeans <- function(x, na.rm = FALSE, dims = 1L, ...) {
   }
 }
 
-## Binds one name in `namespace` as a promise for `value`, which is only
-## evaluated (loading its package) when the name is first used. A name the
-## package defines itself, or that one of its NAMESPACE imports provides, is
-## left alone, as it took precedence over import(dplyr) too.
+## Binds one name as a promise for `value`, which is only evaluated (loading
+## its package) when the name is first used. It is bound where import(dplyr)
+## put the names, in the imports environment between the namespace and the base
+## namespace: code in the package finds it as before, and R CMD check, which
+## evaluates every object of the namespace and reads the functions it gets as
+## the package's own code, does not see dplyr's and plotly's internals as ours
+## (cli, vctrs, tidyselect, ...). A name the package defines itself, or that one
+## of its NAMESPACE imports provides, is left alone, as it took precedence over
+## import(dplyr) too.
 .lazyBind <- function(namespace, name, value) {
   if (
     exists(name, envir = namespace, inherits = FALSE) ||
@@ -53,7 +54,7 @@ colMeans <- function(x, na.rm = FALSE, dims = 1L, ...) {
   ) {
     return(invisible(FALSE))
   }
-  delayedAssign(name, value, assign.env = namespace)
+  delayedAssign(name, value, assign.env = parent.env(namespace))
   invisible(TRUE)
 }
 

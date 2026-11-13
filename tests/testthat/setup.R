@@ -30,6 +30,12 @@ options(cerebro.builder.precompile = FALSE)
 ## record out of the user's cache during tests.
 Sys.setenv(CEREBRO_BUILDER_STATE_DIR = tempfile("builder-state-"))
 
+## The Viewer keeps its page, first views and cell names in the user's cache
+## directory (tools::R_user_dir("CerebroNexus", "cache")). A test that prepares
+## the Viewer must not leave them there: R CMD check on CRAN reports files
+## outside the check directory.
+Sys.setenv(R_USER_CACHE_DIR = tempfile("user-cache-"))
+
 ## Plots that tests draw go to a null device, not to Rplots.pdf in the
 ## working directory.
 grDevices::pdf(NULL)

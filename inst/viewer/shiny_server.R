@@ -2837,7 +2837,10 @@ server <- function(input, output, session) {
 )
 .viewer_server_index <- match("server", .viewer_server_bytecode$names)
 if (is.na(.viewer_server_index)) {
-  server <- compiler::cmpfun(server)
+  ## Where the package is loaded from source (pkgload: the tests), the compiler
+  ## cannot place the names the lazy imports bind (R/lazy_imports.R), and the
+  ## server stays as it is; an installed package has its byte code already.
+  server <- tryCatch(compiler::cmpfun(server), error = function(error) server)
 } else {
   ## The compiled `server <- function(...)` of this file, evaluated where the
   ## file is: the same closure, with a compiled body.
