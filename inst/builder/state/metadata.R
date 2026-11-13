@@ -295,12 +295,14 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
   profile,
   entry,
   recommendation = NULL,
-  validate_dependencies = TRUE
+  validate_dependencies = TRUE,
+  inert = FALSE
 ) {
+  # `inert`: the caller has already searched this policy for references.
   if (
     !is.list(policy) ||
       is.object(policy) ||
-      .builder_state_has_reference(policy) ||
+      (!isTRUE(inert) && .builder_state_has_reference(policy)) ||
       !is.list(policy$columns) ||
       is.object(policy$columns)
   ) {
@@ -394,10 +396,10 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
   allowed <- c("included", "attention", "excluded", "blocking")
   for (id in column_ids) {
     record <- policy$columns[[id]]
+    # The policy holds no reference, so neither does one of its columns.
     if (
       !is.list(record) ||
         is.object(record) ||
-        .builder_state_has_reference(record) ||
         !identical(record$name, id) ||
         !.builder_state_text(record$disposition) ||
         !record$disposition %in% allowed ||
@@ -629,12 +631,21 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
     )
   }
   effective <- .builder_state_or(policy, recommendation)
-  for (candidate in list(recommendation, policy)) {
+  # The recommendation was searched as part of `recommendations`, and the
+  # policy starts as a copy of it: only what the upgrade, the Group sync and
+  # the user's choices changed is searched again.
+  candidates <- list(
+    list(value = recommendation, known = recommendations$metadata),
+    list(value = policy, known = recommendation)
+  )
+  for (candidate in candidates) {
+    known <- candidate$known
+    candidate <- candidate$value
     if (
       !is.null(candidate) &&
         (!is.list(candidate) ||
           is.object(candidate) ||
-          .builder_state_has_reference(candidate))
+          .builder_state_has_new_reference(candidate, known))
     ) {
       .builder_state_metadata_policy_abort(
         "Metadata policy values must be inert records."
@@ -647,7 +658,8 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
         recommendation,
         profile,
         entry,
-        validate_dependencies = is.null(policy)
+        validate_dependencies = is.null(policy),
+        inert = TRUE
       )
     }
     if (!is.null(policy)) {
@@ -655,7 +667,8 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
         policy,
         profile,
         entry,
-        recommendation = recommendation
+        recommendation = recommendation,
+        inert = TRUE
       )
     }
   }

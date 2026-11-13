@@ -644,3 +644,48 @@ test_that("the search for new references agrees with the full search", {
   expect_true(.builder_state_has_new_reference(changed$nested, known))
   expect_false(.builder_state_has_new_reference(changed$leaf, known))
 })
+
+test_that("an accepted edit leaves its state for the rail, a refused one nothing", {
+  stored <- builder_upgrade_viewer_content_entry(
+    builder_viewer_settings_entry("a")
+  )
+  state <- builder_state(list(stored))
+  cache <- new.env(parent = emptyenv())
+
+  edited <- stored
+  edited$settings$default_group <- "cluster"
+  edited$revision <- 2L
+  refused <- edited
+  refused$note <- list(new.env(parent = emptyenv()))
+  error <- capture_builder_state_error(builder_reduce_state(
+    state,
+    list(type = "replace", id = "a", entry = refused),
+    trusted = TRUE,
+    state_cache = cache
+  ))
+  expect_identical(error$code, "invalid_dataset_entry")
+  expect_length(ls(cache, all.names = TRUE), 0L)
+
+  next_state <- builder_reduce_state(
+    state,
+    list(type = "replace", id = "a", entry = edited),
+    trusted = TRUE,
+    state_cache = cache
+  )
+  expect_length(ls(cache, all.names = TRUE), 1L)
+  expected <- builder_dataset_state(next_state$datasets[[1L]])
+
+  states <- 0L
+  testthat::local_mocked_bindings(
+    builder_dataset_state = function(entry) {
+      states <<- states + 1L
+      stop("the state of an accepted edit is derived once")
+    },
+    .env = globalenv()
+  )
+  expect_identical(
+    builder_cached_dataset_state(next_state$datasets[[1L]], cache),
+    expected
+  )
+  expect_identical(states, 0L)
+})
