@@ -1180,7 +1180,10 @@ test_that("columns with many distinct values are counted without sorting them", 
     integer = frequent,
     double = frequent + 0.5,
     character = paste0("clone", frequent),
-    factor = factor(paste0("clone", frequent))
+    factor = factor(paste0("clone", frequent)),
+    ## Doubles with a class: not rounded like plain numbers.
+    date = as.Date("2020-01-01") + frequent,
+    datetime = as.POSIXct("2020-01-01 12:00:00", tz = "UTC") + 60 * frequent
   )
   for (type in names(cases)) {
     values <- cases[[type]]

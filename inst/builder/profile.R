@@ -913,17 +913,20 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
 
 ## The most frequent values of a column with many distinct values. table()
 ## sorts every distinct value as text, which takes seconds per column at a
-## million cells; here the values are counted by hashing (a double by its text,
-## as table() did) and only the listed ones of the others become text. Equally
-## frequent values keep their order of first appearance (level order for a
-## factor).
+## million cells; here the values are counted by hashing (a double rounded to
+## the 15 significant digits its text has, as table() grouped it) and only the
+## listed ones become text. Equally frequent values keep their order of first
+## appearance (level order for a factor).
 .builder_profile_frequent_level_counts <- function(values) {
-  ## Doubles are grouped by their text, as table() did: 0.1 + 0.2 and 0.3 are
-  ## one level (15 significant digits), and a level is named once. table() also
-  ## leaves NaN out (its `exclude` is c(NA, NaN)), so NaN is not counted here
-  ## either; NA is, as "N/A".
-  if (is.double(values)) {
-    values <- as.character(values)[!is.nan(values)]
+  ## Doubles are grouped as their text would group them: 0.1 + 0.2 and 0.3 are
+  ## one level (15 significant digits), and a level is named once. Rounding
+  ## with signif() gives the same groups as as.character() at a tenth of the
+  ## time (a million values: ~0.1 s against ~1.5 s). table() also leaves NaN
+  ## out (its `exclude` is c(NA, NaN)), so NaN is not counted here either; NA
+  ## is, as "N/A". A Date or POSIXct is a double too, but whole days and
+  ## seconds have no such digits, and signif() is not defined for them.
+  if (is.double(values) && !is.object(values)) {
+    values <- signif(values[!is.nan(values)], 15L)
   }
   textual <- is.factor(values) || is.character(values)
   if (is.factor(values)) {
