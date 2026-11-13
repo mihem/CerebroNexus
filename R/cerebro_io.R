@@ -144,12 +144,31 @@
   invisible(TRUE)
 }
 
+## Leaves the note that the Viewer's .runtimeH5ChecksumRecord() and the next
+## process read, unless it is there or the file belongs to the session.
+.keepExpressionSidecar <- function(record) {
+  if (is.null(record$kept) || file.exists(record$kept)) {
+    return(invisible(FALSE))
+  }
+  try(
+    {
+      dir.create(dirname(record$kept), recursive = TRUE, showWarnings = FALSE)
+      writeLines(record$note, record$kept)
+    },
+    silent = TRUE
+  )
+  invisible(TRUE)
+}
+
 .verifyExpressionSidecar <- function(sidecar, md5, crb) {
   if (is.null(md5)) {
     return(invisible(TRUE))
   }
   record <- .expressionSidecarRecord(sidecar, md5)
+  ## Verified in this process, by this function or by the export that wrote the
+  ## file: the next process is told too, without hashing the file again.
   if (isTRUE(get0(record$key, envir = .cerebroH5Verified, inherits = FALSE))) {
+    .keepExpressionSidecar(record)
     return(invisible(TRUE))
   }
   if (is.null(record$kept) || !file.exists(record$kept)) {
@@ -161,19 +180,7 @@
         call. = FALSE
       )
     }
-    if (!is.null(record$kept)) {
-      try(
-        {
-          dir.create(
-            dirname(record$kept),
-            recursive = TRUE,
-            showWarnings = FALSE
-          )
-          writeLines(record$note, record$kept)
-        },
-        silent = TRUE
-      )
-    }
+    .keepExpressionSidecar(record)
   }
   assign(record$key, TRUE, envir = .cerebroH5Verified)
   invisible(TRUE)
