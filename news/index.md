@@ -1,5 +1,47 @@
 # Changelog
 
+## CerebroNexus 8.1.1
+
+- **Faster Builder import.** The Builder no longer sorts every value of
+  a metadata column to count its levels. A column with more than 100
+  distinct values (continuous values, cell identifiers, clone names)
+  cannot be a group; its most frequent values are now counted by
+  hashing. Inspecting a data set of 1 M cells with 60 metadata columns
+  took 324 s and takes 23 s.
+- **Faster H5 export.** `expression_matrix_mode = "h5"` writes a
+  `dgCMatrix` straight into the TENx datasets instead of block by block
+  through
+  [`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html).
+  The file is laid out as before. Writing 100,000 cells (198 M values)
+  took 68 s and takes 12 s.
+- **A CRB is not read back to build its Viewer Pack.** The export
+  functions and
+  [`saveCerebro()`](https://www.mheming.com/CerebroNexus/reference/saveCerebro.md)
+  hand over the object they have just written, and
+  [`buildViewerPack()`](https://www.mheming.com/CerebroNexus/reference/buildViewerPack.md)
+  reads the CRB once instead of twice. An export no longer hashes its H5
+  sidecar a second time. A Builder build of a 100,000-cell CRB with an
+  embedded matrix read the CRB four times and reads it once.
+- **Group colours show every level’s cells.** For a group with more than
+  12 levels the colour panel showed 0 cells from the 13th level on. It
+  now reads the counts of all levels (up to 100) from the import
+  profile.
+- **A Save adopts the caches of a Build that came first.** A Build run
+  before the Project existed left its CRBs unregistered, so the Save
+  that created the Project built every dataset cache again. The Save now
+  registers those CRBs for the datasets that have not changed since;
+  every copied byte is still checked against the release’s MD5s. Saving
+  100,000 cells right after a Build took 67 s (86 s on Windows) and
+  takes 11 s (20 s).
+- **An H5 sidecar is reused when only the configuration changed.** The
+  Builder records a digest of the matrix in the sidecar and offers a
+  cache build the sidecar of the dataset’s earlier cache. It is copied,
+  after its MD5 and digest are checked, instead of writing the same 2.4
+  GB again: that part of the cache build takes 7 s instead of 21 s for
+  100,000 cells. Scripted exports
+  ([`exportFromSeurat()`](https://www.mheming.com/CerebroNexus/reference/exportFromSeurat.md))
+  do not hash the matrix and are unchanged.
+
 ## CerebroNexus 8.1.0
 
 - **Page links.** `?page=<id>` opens the Viewer on a page (the

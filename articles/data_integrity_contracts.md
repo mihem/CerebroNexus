@@ -174,15 +174,14 @@ any artifact is written.
 
 ### Thin H5 CRBs
 
-For an H5-backed export,
-[`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
-stores the matrix cells by genes, so the file’s `/expression/genes`
-dataset holds the **cell** names and `/expression/barcodes` the **gene**
-names. The `.crb` (thin-CRB schema version 3) then drops
-`meta_data$cell_barcode` and the row names of every projection that
-carries the same cell names, and records a checksum of the cell names
-(`cell_names_hash`), the cell count, and which projections were
-compacted in its `crb_schema` field.
+An H5-backed export stores the matrix cells by genes, in the layout of
+[`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html),
+so the file’s `/expression/genes` dataset holds the **cell** names and
+`/expression/barcodes` the **gene** names. The `.crb` (thin-CRB schema
+version 3) then drops `meta_data$cell_barcode` and the row names of
+every projection that carries the same cell names, and records a
+checksum of the cell names (`cell_names_hash`), the cell count, and
+which projections were compacted in its `crb_schema` field.
 
 When the `.crb` is loaded,
 [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)

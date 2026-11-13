@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -263,8 +263,8 @@ punctuation are rejected before any artifact is written.</p>
 <div class="section level3">
 <h3 id="thin-h5-crbs">Thin H5 CRBs<a class="anchor" aria-label="anchor" href="#thin-h5-crbs"></a>
 </h3>
-<p>For an H5-backed export, <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>
-stores the matrix cells by genes, so the file’s
+<p>An H5-backed export stores the matrix cells by genes, in the layout
+of <code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>, so the file’s
 <code>/expression/genes</code> dataset holds the <strong>cell</strong>
 names and <code>/expression/barcodes</code> the <strong>gene</strong>
 names. The <code>.crb</code> (thin-CRB schema version 3) then drops

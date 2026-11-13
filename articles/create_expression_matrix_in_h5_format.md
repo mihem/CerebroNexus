@@ -97,8 +97,9 @@ crb$getExpressionBackend()
 #> [1] "pbmc.h5"
 ```
 
-[`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html)
-stores the on-disk matrix as cells by genes in the `/expression` group.
+The on-disk matrix is stored as cells by genes in the `/expression`
+group, in the layout of
+[`HDF5Array::writeTENxMatrix()`](https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html).
 CerebroNexus reconnects it lazily and exposes the usual genes-by-cells
 matrix to the application.
 

@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -197,9 +197,10 @@ only its relative location in the <code>.crb</code>.</p>
 <span><span class="co">#&gt;</span></span>
 <span><span class="co">#&gt; $location</span></span>
 <span><span class="co">#&gt; [1] "pbmc.h5"</span></span></code></pre></div>
-<p><code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code> stores the on-disk matrix
-as cells by genes in the <code>/expression</code> group. CerebroNexus
-reconnects it lazily and exposes the usual genes-by-cells matrix to the
+<p>The on-disk matrix is stored as cells by genes in the
+<code>/expression</code> group, in the layout of
+<code><a href="https://rdrr.io/pkg/HDF5Array/man/writeTENxMatrix.html" class="external-link">HDF5Array::writeTENxMatrix()</a></code>. CerebroNexus reconnects it
+lazily and exposes the usual genes-by-cells matrix to the
 application.</p>
 <div class="section level3">
 <h3 id="a-thin--crb">A thin <code>.crb</code><a class="anchor" aria-label="anchor" href="#a-thin--crb"></a>
