@@ -1077,7 +1077,8 @@ validateViewerPack <- function(
 }
 
 ## `payload` is the CRB's serialized object when the caller has read it
-## already; a thin CRB is then matched through its recorded cell-name hash.
+## already (or has just written it): the CRB is then not read a second time, and
+## a thin CRB is matched through its recorded cell-name hash.
 .validateViewerPack <- function(file, pack, full, payload = NULL) {
   if (!file.exists(file) || dir.exists(file)) {
     return(.viewerPackInvalid("CRB is missing"))
@@ -1108,7 +1109,17 @@ validateViewerPack <- function(
     !is.null(payload) &&
     .viewerPackMatchesThinCrb(file, pack, manifest, payload)
   if (!thin_match) {
-    object <- tryCatch(readCerebro(file), error = function(error) NULL)
+    object <- tryCatch(
+      if (is.null(payload)) {
+        readCerebro(file)
+      } else {
+        .hydrateCerebroPayload(
+          .assertCurrentCerebroPayload(payload, file),
+          file
+        )
+      },
+      error = function(error) NULL
+    )
     if (is.null(object)) {
       return(.viewerPackInvalid("CRB could not be read"))
     }
@@ -1202,8 +1213,22 @@ buildViewerPack <- function(
   overwrite = FALSE
 ) {
   options <- .viewerPackOptions(viewer_binary, viewer_binary_threshold)
+  .buildViewerPack(file, options, overwrite)
+}
+
+## `payload` is the serialized object of the CRB at `file` when the caller has
+## just written it. Reading a CRB with an embedded matrix back takes about as
+## long as writing it, and the pack needs the object twice (to build, and to
+## check what it built), so a writer hands its payload over and the CRB is not
+## read at all; otherwise it is read once.
+.buildViewerPack <- function(file, options, overwrite = FALSE, payload = NULL) {
   file <- normalizePath(file, mustWork = TRUE)
-  object <- readCerebro(file)
+  payload <- if (is.null(payload)) {
+    .readCurrentCerebroPayload(file)
+  } else {
+    .assertCurrentCerebroPayload(payload, file)
+  }
+  object <- .hydrateCerebroPayload(payload, file)
   cells <- .viewerPackCells(object)
   enabled <- .viewerPackEnabled(options$mode, options$threshold, length(cells))
   if (!enabled) {
@@ -1263,7 +1288,7 @@ buildViewerPack <- function(
     pretty = TRUE,
     dataframe = "rows"
   )
-  check <- validateViewerPack(file, stage, full = TRUE)
+  check <- .validateViewerPack(file, stage, full = TRUE, payload = payload)
   if (!isTRUE(check$valid)) {
     stop("Built Viewer Pack failed validation: ", check$reason, call. = FALSE)
   }

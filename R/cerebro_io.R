@@ -104,18 +104,37 @@
 ## path, size and modification time: a file is hashed once until it changes.
 .cerebroH5Verified <- new.env(parent = emptyenv())
 
-.verifyExpressionSidecar <- function(sidecar, md5, crb) {
-  if (is.null(md5)) {
-    return(invisible(TRUE))
-  }
+.expressionSidecarKey <- function(sidecar, md5) {
   info <- file.info(sidecar)
-  key <- paste(
+  paste(
     normalizePath(sidecar, mustWork = TRUE),
     info$size,
     format(as.numeric(info$mtime), digits = 17),
     md5,
     sep = "\r"
   )
+}
+
+## An export hashes the sidecar it has just written and then renames it into
+## place. Recording that checksum for the published path saves hashing the
+## same bytes again when the export goes on to read its own CRB.
+.rememberExpressionSidecar <- function(sidecar, md5) {
+  if (!.validMd5(md5) || !file.exists(sidecar)) {
+    return(invisible(FALSE))
+  }
+  assign(
+    .expressionSidecarKey(sidecar, md5),
+    TRUE,
+    envir = .cerebroH5Verified
+  )
+  invisible(TRUE)
+}
+
+.verifyExpressionSidecar <- function(sidecar, md5, crb) {
+  if (is.null(md5)) {
+    return(invisible(TRUE))
+  }
+  key <- .expressionSidecarKey(sidecar, md5)
   if (isTRUE(get0(key, envir = .cerebroH5Verified, inherits = FALSE))) {
     return(invisible(TRUE))
   }
@@ -1064,11 +1083,11 @@ saveCerebro <- function(
       n_cells
     )
   ) {
-    buildViewerPack(
+    .buildViewerPack(
       file,
-      viewer_binary = "always",
-      viewer_binary_threshold = viewer_options$threshold,
-      overwrite = TRUE
+      .viewerPackOptions("always", viewer_options$threshold),
+      overwrite = TRUE,
+      payload = payload
     )
   }
   invisible(file)
@@ -1106,12 +1125,20 @@ saveCerebro <- function(
 #' @export
 readCerebro <- function(file) {
   file <- normalizePath(file, mustWork = TRUE)
-  serialized <- .readCerebroPayload(file)
+  .hydrateCerebroPayload(.readCurrentCerebroPayload(file), file)
+}
+
+## The serialized object of a CRB this version reads, before it is hydrated.
+.readCurrentCerebroPayload <- function(file) {
+  .assertCurrentCerebroPayload(.readCerebroPayload(file), file)
+}
+
+.assertCurrentCerebroPayload <- function(serialized, file) {
   if (!.recognizedCerebroObject(serialized)) {
     stop("`object` must be a serialized Cerebro object.", call. = FALSE)
   }
   .crbContract()$.assertCurrentRuntimeCrb(serialized, file)
-  .hydrateCerebroPayload(serialized, file)
+  serialized
 }
 
 ## The one place that still knows the singular spatial image form: one

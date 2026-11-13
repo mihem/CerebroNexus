@@ -977,12 +977,18 @@ output[["core-group_colors"]] <- renderUI({
     return(NULL)
   }
   levels <- entry$levels[[group]] %||% character()
+  distribution <- builder_group_detail_model(
+    catalog,
+    group
+  )$item$distribution %||%
+    list()
+  full <- builder_group_full_distribution(entry$profile, group)
   model <- builder_group_colors_model(
     group,
     levels,
     entry$settings$palette %||% "cerebro",
     builder_settings_color_overrides(entry$settings),
-    builder_group_detail_model(catalog, group)$item$distribution %||% list()
+    if (length(full) > length(distribution)) full else distribution
   )
   builder_group_colors_ui("core", model)
 })

@@ -121,6 +121,61 @@
   export
 }
 
+#' Write a matrix as a TENxMatrix-format group. A `dgCMatrix` already holds the
+#' three arrays of that format, so they are written as they are, into the
+#' datasets HDF5Array creates for its own writer; `writeTENxMatrix()` would cut
+#' the matrix into blocks first, which takes several times as long as the
+#' writing. Any other matrix goes through `writeTENxMatrix()`.
+#' @keywords internal
+#' @noRd
+.writeTENxExpression <- function(
+  x,
+  path,
+  group,
+  level = NULL,
+  slice = 2^24
+) {
+  if (!inherits(x, "dgCMatrix")) {
+    HDF5Array::writeTENxMatrix(x, path, group = group, level = level)
+    return(invisible(path))
+  }
+  ## Creates the group, its shape and names, and the empty, extensible `data`,
+  ## `indices` and `indptr` datasets (rhdf5 comes with HDF5Array).
+  HDF5Array::TENxRealizationSink(
+    dim(x),
+    dimnames(x),
+    "double",
+    filepath = path,
+    group = group,
+    level = level
+  )
+  write <- function(name, values, n) {
+    dataset <- paste0(group, "/", name)
+    rhdf5::h5set_extent(path, dataset, n)
+    for (start in seq(1, n, by = slice)) {
+      end <- min(start + slice - 1, n)
+      rhdf5::h5write(
+        values(start, end),
+        path,
+        dataset,
+        start = start,
+        count = end - start + 1
+      )
+    }
+  }
+  n <- length(x@x)
+  if (n > 0) {
+    write("data", function(start, end) x@x[start:end], n)
+    write("indices", function(start, end) x@i[start:end], n)
+  }
+  write(
+    "indptr",
+    function(start, end) as.double(x@p[start:end]),
+    length(x@p)
+  )
+  invisible(path)
+}
+
 #' Persist the genes x cells matrix (embedded / h5). Returns the
 #' matrix as it stands afterwards, because the spatial block reuses it.
 #' @keywords internal
@@ -160,30 +215,54 @@
       }
     }
 
-    ## transpose genes x cells -> cells x genes for storage
-    m_disk <- if (inherits(expression_data, c("RleMatrix", "DelayedMatrix"))) {
-      DelayedArray::t(expression_data)
-    } else {
-      methods::as(Matrix::t(expression_data), "CsparseMatrix")
-    }
-
-    if (verbose) {
-      .logStep("Writing expression matrix to TENx HDF5 file: ", h5_abs)
-    }
-
     if (file.exists(h5_abs)) {
       file.remove(h5_abs)
     }
-    ## A level of 0 stores the data without compression (the shuffle and
-    ## deflate filters are still applied): on 1.3-1.5M-cell sources single genes
-    ## read ~30% faster than at HDF5Array's default level 6, at roughly 7x the
-    ## file size. NULL leaves HDF5Array's default.
-    HDF5Array::writeTENxMatrix(
-      m_disk,
-      h5_abs,
-      group = "expression",
-      level = h5_compression_level
-    )
+    ## Hashing the matrix pays only for a caller that keeps sidecars to
+    ## reuse (the Builder sets the option, if only to an empty list).
+    content_digest <- if (!is.null(getOption("cerebro.expression_sidecars"))) {
+      .expressionContentDigest(expression_data, h5_compression_level)
+    }
+    ## An earlier sidecar written from this very matrix is taken as it is.
+    h5_md5 <- if (!is.null(content_digest)) {
+      .takeExpressionSidecar(
+        getOption("cerebro.expression_sidecars"),
+        content_digest,
+        h5_abs
+      )
+    }
+
+    if (is.null(h5_md5)) {
+      ## transpose genes x cells -> cells x genes for storage
+      m_disk <- if (
+        inherits(expression_data, c("RleMatrix", "DelayedMatrix"))
+      ) {
+        DelayedArray::t(expression_data)
+      } else {
+        methods::as(Matrix::t(expression_data), "CsparseMatrix")
+      }
+
+      if (verbose) {
+        .logStep("Writing expression matrix to TENx HDF5 file: ", h5_abs)
+      }
+
+      ## A level of 0 stores the data without compression (the shuffle and
+      ## deflate filters are still applied): on 1.3-1.5M-cell sources single
+      ## genes read ~30% faster than at HDF5Array's default level 6, at roughly
+      ## 7x the file size. NULL leaves HDF5Array's default.
+      .writeTENxExpression(
+        m_disk,
+        h5_abs,
+        group = "expression",
+        level = h5_compression_level
+      )
+      if (!is.null(content_digest)) {
+        .tagExpressionSidecar(h5_abs, content_digest)
+      }
+      h5_md5 <- unname(tools::md5sum(h5_abs))
+    } else if (verbose) {
+      .logStep("Reusing the expression matrix of an earlier export: ", h5_abs)
+    }
 
     ## self$expression stays NULL — saveRDS therefore does not embed the
     ## matrix inside the .crb. The runtime attach reads the sibling back
@@ -191,11 +270,118 @@
     export$setExpressionBackend(
       type = "h5",
       location = h5_filename,
-      md5 = unname(tools::md5sum(h5_abs))
+      md5 = h5_md5
     )
   }
 
   expression_data
+}
+
+## Reusing an expression sidecar --------------------------------------------
+## An HDF5 sidecar holds the matrix and nothing that depends on how a dataset
+## is configured, so exporting the same data again after a change of groups or
+## metadata would write the same bytes. The sidecar carries a digest of the
+## matrix it was written from (an attribute of its "expression" group); an
+## export that is offered earlier sidecars (the option
+## `cerebro.expression_sidecars`: a list of `list(path, md5)`) copies one when
+## the file still has the MD5 it was recorded with and its digest is that of
+## the matrix to write. Without that option (every plain `exportFromSeurat()`)
+## the matrix is not hashed and the sidecar is written untagged. The Builder
+## sets it in every process that exports, an empty list when there is nothing
+## to offer yet, so that its sidecars carry the digest for the next time.
+
+#' Bump when the way a sidecar is written changes its bytes, so that a sidecar
+#' of the older way is not taken.
+#' @keywords internal
+#' @noRd
+.expressionSidecarWriter <- 1L
+
+#' Digest of a `dgCMatrix` and of how it is written; `NULL` for other classes.
+#' @keywords internal
+#' @noRd
+.expressionContentDigest <- function(x, level = NULL) {
+  if (!inherits(x, "dgCMatrix")) {
+    return(NULL)
+  }
+  rlang::hash(list(
+    writer = .expressionSidecarWriter,
+    level = if (is.null(level)) NA_integer_ else as.integer(level),
+    dim = dim(x),
+    dimnames = dimnames(x),
+    p = x@p,
+    i = x@i,
+    x = x@x
+  ))
+}
+
+#' @keywords internal
+#' @noRd
+.tagExpressionSidecar <- function(path, digest) {
+  tryCatch(
+    {
+      file <- rhdf5::H5Fopen(path)
+      on.exit(rhdf5::H5Fclose(file), add = TRUE)
+      group <- rhdf5::H5Gopen(file, "expression")
+      on.exit(rhdf5::H5Gclose(group), add = TRUE, after = FALSE)
+      rhdf5::h5writeAttribute(digest, group, "content_digest")
+      TRUE
+    },
+    error = function(error) FALSE
+  )
+}
+
+.expressionSidecarHasDigest <- function(path, digest) {
+  tryCatch(
+    identical(
+      as.character(rhdf5::h5readAttributes(path, "expression")$content_digest),
+      digest
+    ),
+    error = function(error) FALSE
+  )
+}
+
+#' Copies the first candidate sidecar that still has its recorded MD5 and was
+#' written from the matrix with `digest` to `target`. Returns the MD5 of the
+#' copy, or `NULL` (leaving no `target`) when none qualifies.
+#' @keywords internal
+#' @noRd
+.takeExpressionSidecar <- function(candidates, digest, target) {
+  for (candidate in candidates) {
+    if (!is.list(candidate)) {
+      next
+    }
+    path <- candidate$path
+    md5 <- candidate$md5
+    if (
+      !is.character(path) ||
+        length(path) != 1L ||
+        is.na(path) ||
+        !file.exists(path) ||
+        dir.exists(path) ||
+        !is.character(md5) ||
+        length(md5) != 1L ||
+        !grepl("^[[:xdigit:]]{32}$", md5)
+    ) {
+      next
+    }
+    ## The digest is an attribute: reading it costs nothing, copying a sidecar
+    ## of a matrix that has changed (a filter, say) costs gigabytes.
+    if (!.expressionSidecarHasDigest(path, digest)) {
+      next
+    }
+    copied <- isTRUE(file.copy(path, target, overwrite = TRUE))
+    taken <- copied &&
+      tryCatch(
+        identical(tolower(unname(tools::md5sum(target))), tolower(md5)) &&
+          .expressionSidecarHasDigest(target, digest),
+        error = function(error) FALSE
+      )
+    if (isTRUE(taken)) {
+      return(tolower(md5))
+    }
+    unlink(target)
+  }
+  NULL
 }
 
 #' Trees, most expressed genes, mean expression, immune repertoire, HLA,
@@ -320,7 +506,7 @@
   .exportReportPart(on_progress, "saving the CRB file")
 
   ## Replace the sidecar and .crb with best-effort rollback on ordinary errors.
-  .publishCerebroExport(
+  payload <- .publishCerebroExport(
     export = export,
     final_file = final_file,
     stage_dir = export_stage_dir,
@@ -337,11 +523,11 @@
     )
   ) {
     .exportReportPart(on_progress, "writing the Viewer Pack")
-    buildViewerPack(
+    .buildViewerPack(
       final_file,
-      viewer_binary = "always",
-      viewer_binary_threshold = viewer_options$threshold,
-      overwrite = TRUE
+      .viewerPackOptions("always", viewer_options$threshold),
+      overwrite = TRUE,
+      payload = if (.recognizedCerebroObject(payload)) payload
     )
   }
 

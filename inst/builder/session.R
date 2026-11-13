@@ -702,6 +702,11 @@ builder_session_build <- function(
       runtime_assert_fn
     ) {
       on.exit(auth_material <- NULL, add = TRUE)
+      # Offer no earlier sidecar, but let the export tag the one it writes, so
+      # that a later cache build of this dataset can reuse it.
+      if (is.null(getOption("cerebro.expression_sidecars"))) {
+        options(cerebro.expression_sidecars = list())
+      }
       build_diagnostics <- NULL
       tryCatch(
         withCallingHandlers(
