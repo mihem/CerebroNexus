@@ -323,6 +323,46 @@ test_that("an earlier sidecar is not taken for another matrix or a changed file"
   }
 })
 
+test_that("a sidecar of another matrix is not copied before its digest is read", {
+  skip_if_not_installed("HDF5Array")
+  skip_if_not_installed("rhdf5")
+  fx <- core_fixture()
+  first <- h5_reuse_export(fx)
+  md5 <- unname(tools::md5sum(first$sidecar))
+  target <- withr::local_tempfile(fileext = ".h5")
+  digest <- rhdf5::h5readAttributes(first$sidecar, "expression")$content_digest
+  other_digest <- strrep("0", 32L)
+
+  copies <- 0L
+  real_copy <- base::file.copy
+  testthat::local_mocked_bindings(
+    file.copy = function(...) {
+      copies <<- copies + 1L
+      real_copy(...)
+    },
+    .package = "base"
+  )
+  ## The sidecar was written from `fx`: a digest of a changed matrix skips it.
+  expect_null(.takeExpressionSidecar(
+    list(list(path = first$sidecar, md5 = md5)),
+    other_digest,
+    target
+  ))
+  expect_identical(copies, 0L)
+  expect_false(file.exists(target))
+
+  ## The digest it carries: the sidecar is copied, its MD5 checked on the copy.
+  expect_identical(
+    .takeExpressionSidecar(
+      list(list(path = first$sidecar, md5 = md5)),
+      digest,
+      target
+    ),
+    tolower(md5)
+  )
+  expect_identical(copies, 1L)
+})
+
 test_that("the digest of an expression matrix follows its content and writer", {
   fx <- core_fixture()
   digest <- .expressionContentDigest(fx$counts, 0L)

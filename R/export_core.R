@@ -330,6 +330,16 @@
   )
 }
 
+.expressionSidecarHasDigest <- function(path, digest) {
+  tryCatch(
+    identical(
+      as.character(rhdf5::h5readAttributes(path, "expression")$content_digest),
+      digest
+    ),
+    error = function(error) FALSE
+  )
+}
+
 #' Copies the first candidate sidecar that still has its recorded MD5 and was
 #' written from the matrix with `digest` to `target`. Returns the MD5 of the
 #' copy, or `NULL` (leaving no `target`) when none qualifies.
@@ -354,16 +364,16 @@
     ) {
       next
     }
+    ## The digest is an attribute: reading it costs nothing, copying a sidecar
+    ## of a matrix that has changed (a filter, say) costs gigabytes.
+    if (!.expressionSidecarHasDigest(path, digest)) {
+      next
+    }
     copied <- isTRUE(file.copy(path, target, overwrite = TRUE))
     taken <- copied &&
       tryCatch(
         identical(tolower(unname(tools::md5sum(target))), tolower(md5)) &&
-          identical(
-            as.character(
-              rhdf5::h5readAttributes(target, "expression")$content_digest
-            ),
-            digest
-          ),
+          .expressionSidecarHasDigest(target, digest),
         error = function(error) FALSE
       )
     if (isTRUE(taken)) {
