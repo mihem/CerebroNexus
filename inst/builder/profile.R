@@ -919,9 +919,11 @@ BUILDER_METADATA_FULL_COUNT_MAX <- 100L
 ## factor).
 .builder_profile_frequent_level_counts <- function(values) {
   ## Doubles are grouped by their text, as table() did: 0.1 + 0.2 and 0.3 are
-  ## one level (15 significant digits), and a level is named once.
+  ## one level (15 significant digits), and a level is named once. table() also
+  ## leaves NaN out (its `exclude` is c(NA, NaN)), so NaN is not counted here
+  ## either; NA is, as "N/A".
   if (is.double(values)) {
-    values <- as.character(values)
+    values <- as.character(values)[!is.nan(values)]
   }
   textual <- is.factor(values) || is.character(values)
   if (is.factor(values)) {

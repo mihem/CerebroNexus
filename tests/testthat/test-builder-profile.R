@@ -1200,7 +1200,7 @@ test_that("columns with many distinct values are counted without sorting them", 
   }
 
   ## Doubles that print alike are one level, as table() counted them, and no
-  ## label is listed twice: 0.1 + 0.2 and 0.3, NaN, and NA.
+  ## label is listed twice: 0.1 + 0.2 and 0.3, and NA. table() leaves NaN out.
   alike <- c(
     frequent + 0.5,
     rep(0.1 + 0.2, 151L),
@@ -1223,6 +1223,7 @@ test_that("columns with many distinct values are counted without sorting them", 
   expect_false(anyDuplicated(vapply(hashed$items, `[[`, "", "value")) > 0L)
   expect_identical(hashed$items[[1L]]$value, "0.3")
   expect_identical(hashed$items[[1L]]$count, 303L)
+  expect_false("NaN" %in% vapply(hashed$items, `[[`, "", "value"))
   expect_identical(
     attr(hashed, "builder_level_stats")$distinct,
     attr(sorted, "builder_level_stats")$distinct

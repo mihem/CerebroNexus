@@ -330,7 +330,9 @@ test_that("a sidecar of another matrix is not copied before its digest is read",
   first <- h5_reuse_export(fx)
   md5 <- unname(tools::md5sum(first$sidecar))
   target <- withr::local_tempfile(fileext = ".h5")
-  digest <- rhdf5::h5readAttributes(first$sidecar, "expression")$content_digest
+  digest <- as.character(
+    rhdf5::h5readAttributes(first$sidecar, "expression")$content_digest
+  )
   other_digest <- strrep("0", 32L)
 
   copies <- 0L

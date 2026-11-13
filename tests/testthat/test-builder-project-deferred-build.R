@@ -135,12 +135,14 @@ test_that("a Build of the workspace that was replaced is not registered into the
 
 test_that("opening a Project forgets the Build of the workspace it replaces", {
   app_env <- deferred_build_app()
-  open_body <- paste(
-    deparse(body(app_env$complete_builder_project_open)),
-    collapse = "
+  shiny::testServer(app_env$server, {
+    open_body <- paste(
+      deparse(body(complete_builder_project_open)),
+      collapse = "
 "
-  )
-  expect_match(open_body, "builder_project_forget_build()", fixed = TRUE)
+    )
+    expect_match(open_body, "builder_project_forget_build()", fixed = TRUE)
+  })
 })
 
 test_that("a Build whose release identity is unknown is not kept", {
