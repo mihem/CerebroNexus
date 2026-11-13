@@ -37,6 +37,132 @@
   the page and the data set being read, so a copied URL reopens them. A
   `/<data set id>` link also works when the App is started with
   `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
+- **First view.** A `?page=projection` link shows its plot before the session
+  has started: 0.5 s instead of 1.2 s after the page is requested with 10,000
+  cells, and 0.6 s with 1.3 million, on one Windows desktop.
+  The page draws a preview of the cells with the colours and point size of the
+  first frame, and the plot replaces it when it is ready; until then the
+  preview does not zoom or select. The preview is taken from a frame the Viewer
+  has sent, so the first visit of a data set still opens as before; it is kept
+  in the user's cache directory, and the first visitor after the next start
+  has it too. An App with a login shows no preview. The page also opens
+  directly, without showing Data info first, and the Viewer Pack files of a
+  configured data set keep one URL for all sessions, so a browser downloads
+  them once. The view of an address comes only from a frame of the data set
+  that address opens, not from one the visitor switched to, and not for a link
+  that names a data set the App does not have.
+- **Start before the data sets.** `launchCerebro()` starts its web server
+  before it reads the data sets, so the App answers 0.7 s after the R process
+  starts whatever their size: before, after the data sets were read (1.7 s
+  with 10,000 cells, and later the larger they are), on one Windows desktop.
+  A page requested meanwhile is sent at once, with the preview of its first
+  view; it is the HTML document of the previous run, kept in the user's cache
+  directory with the page. Its session starts once the data sets are read: a
+  browser that asks as soon as the App answers has a page that responds to
+  input 1.1 s instead of 2.1 s after the R process starts with 10,000 cells,
+  and the plot replaces the preview after 2.0 s instead of 3.3 s. The first
+  process of an installation has no document yet and sends its page when the
+  data sets are read. A CRB file that cannot be read is now reported when the
+  App runs (`runApp()` stops with the error) instead of by `launchCerebro()`.
+  `options(CerebroNexus.ui_cache = FALSE)` turns the kept document off as
+  well.
+- **Start without loading the package first.** The file `start.R` of the
+  installed package starts the App behind a web server that needs only httpuv:
+  `Rscript <package directory>/start.R --port=3838 data.crb` (or
+  `source(system.file("start.R", package = "CerebroNexus"))` and
+  `cerebroStart()` in R; see `?launchCerebro`). It sends the kept page, its
+  files, the first view and the Viewer Pack files before CerebroNexus and
+  Shiny are loaded, then runs `launchCerebro()` and hands the requests it does
+  not know to the App. The App answers 0.5 s after the R process starts
+  instead of 0.6 s, and the preview of the Projection is on screen 1.0 s after
+  the process starts instead of 1.1 s, with a browser that asks as soon as the
+  App answers. Its session starts as soon as with
+  `launchCerebro()`: its input works 1.0 s after the process starts with
+  10,000 cells (1.1 s otherwise). The first process of an installation has
+  no page kept and starts as `launchCerebro()` does, and so does an
+  installation where the server of the early process cannot be handed on.
+- **No byte-code compiling while the first session starts.** R compiles a
+  function the second time it is called, and the functions of a session are
+  new and called once or twice while its first page is made. A process that
+  only runs the App (`Rscript`, and `start.R`) now does without compiling
+  until the first session has its page, and collects what it has read and built
+  then instead of before the session starts. Started with `start.R`, a browser
+  that asks as soon as the App answers has the plot replace the preview 0.45 s
+  sooner with 10,000 cells (1.4 s instead of 1.8 s after the page is
+  requested) and 0.65 s sooner with 1.3 million (2.2 s instead of 2.9 s);
+  with `launchCerebro()` 0.1 s sooner with 10,000 cells. An R session that
+  is being worked in keeps its setting.
+- **One file for each run of scripts and of styles.** The page names 64 files
+  (the scripts and styles of shiny, bootstrap and the other packages the page
+  uses, and the Viewer's own), which a browser fetches six at a time over
+  HTTP/1.1. The kept page now comes with a second form in which every run of
+  scripts, and every run of styles, that follow one another is one file,
+  served from `cerebro-bundle/` with a header that lets the browser keep it:
+  14 requests instead of 64. On this machine nothing changes; with a round
+  trip of 40 ms between browser and App the preview is on screen 0.26 s
+  sooner, with 100 ms 0.8 s sooner. An inline script ends a run, so
+  everything runs in the order of the page; scripts with `defer` are joined
+  among themselves. `options(CerebroNexus.bundle = FALSE)` serves the page as
+  it was.
+- **The H5 file is hashed once, and not before the first view.** A CRB
+  written with its expression in an H5 file records the MD5 of that file, and
+  the file was hashed twice in every process before the first session had its
+  data: by `launchCerebro()` for the gene count of the overview, and by the
+  Viewer when it opened the data set. That is 0.9 s each time for the 234 MB
+  file of 10,000 cells and grows with the file. `launchCerebro()` no longer
+  hashes it. The Viewer has a background process hash it and asks for the
+  answer before it reads expression from the file, so a file with other
+  values is refused then, with the same message, instead of when the data set
+  is opened. A file that was verified is remembered in the user's cache
+  directory by its path, size and modification time, and neither the Viewer
+  nor `readCerebro()` hashes it again in a later process. With 10,000 cells
+  the plot of a `?page=projection` link replaces its preview 1.3 to 1.6 s
+  after the page is requested instead of 2.3 to 2.6 s, and the first process
+  of an installation answers 1.8 s after it starts instead of 2.6 to 2.8 s,
+  on one Windows desktop. `createShinyApp()` hashes the file when it builds
+  an App, as before.
+- **Trajectories and spatial sections by cell index.** An H5-backed CRB keeps
+  its cell names once, in the H5 file, but still stored the row names of every
+  trajectory and of the coordinates of every spatial section: 1.28 million
+  barcodes in a 1.3 million cell data set, which made the file take 2.5 s to
+  read instead of 0.2 s, and all 800,000 in a CosMx data set of eight
+  sections. `saveCerebro()` and the export functions now store such rows as
+  rows of the metadata where they are all cells (thin-CRB schema version 4,
+  as for repertoire barcodes). `readCerebro()`, `getTrajectory()` and
+  `getSpatialData()` give the names back. The Viewer reads no name for a
+  trajectory where a Viewer Pack has its rows, and names the cells of a
+  spatial section when the section is shown: the other sections keep their
+  rows, and no other page waits for any of them. With 1.3 million cells the
+  session of the Projection page starts 0.75 s after the page is requested
+  instead of 2.9 s, the plot replaces its preview after 2.0 s instead of
+  4.8 s, and the session is settled after 2.4 s instead of 5.2 s; the Spatial
+  page of a CosMx data set shows its first plot 0.6 s sooner (2.3 s instead of
+  2.9 s). A CRB written before opens as before; `convertCerebro()` rewrites it
+  (rebuild its Viewer Pack afterwards with `buildViewerPack()`). Earlier
+  releases refuse a CRB that stores trajectories or spatial sections this way.
+- **Cell names of a view.** A view that is drawn while the cell names file of
+  its data set is still being written waits for the file before it gets its
+  cell names, instead of receiving every name in a message (29 MB for 1.3
+  million cells, which kept the session busy for seconds). The file is also
+  kept in the user's cache directory, by cell order: writing it takes a few
+  seconds in the background with 1.3 million cells, and the next process of the same
+  data set has it at once. A kept file that was not used for 60 days is
+  removed.
+- **Faster start.** `launchCerebro()` answers its first request sooner: after
+  4.2 s -> 2.7 s with 10,000 cells and 8.8 s -> 5.5 s with 1.3 million, from
+  the start of the R process on one Windows desktop; the first view of the
+  Projection page takes as long as before. `library(CerebroNexus)` no longer
+  loads Matrix, plotly, dplyr, DT, shinyWidgets, colourpicker, shinycssloaders
+  and mirai (2.1 s -> 0.5 s); their functions are loaded when first used
+  (`readCerebro()` loads dplyr, so that the tibbles in a CRB keep their
+  methods), and the Viewer loads the ones only some pages need while a session
+  is quiet. The
+  Viewer's server function is byte-compiled when the package is installed
+  instead of at every start, and the data sets are read after the UI is built.
+  The finished page is kept in the user's cache directory and read back at the
+  next start instead of being built again (0.5 s); it is built anew when a
+  Viewer file or a package the page uses changes.
+  `options(CerebroNexus.ui_cache = FALSE)` turns that off.
 - Opening the Viewer on a page that needs the data set no longer flashes the
   "Loading dataset" card as the startup cover fades; the card waits until the
   cover is gone.
