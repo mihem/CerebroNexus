@@ -512,6 +512,22 @@ test_that("MSigDB gene queries retry failures and ignore invalid names", {
   expect_identical(calls, 2L)
 })
 
+test_that("a ?page= link names a known page and nothing else", {
+  page_from <- utils_env$viewerPageFromQuery
+  ids <- c("data_info", "spatial", "gene_expression")
+
+  expect_identical(page_from("?page=spatial", ids), "spatial")
+  expect_identical(page_from("?dataset=TCR&page=spatial", ids), "spatial")
+  expect_null(page_from("?page=nope", ids))
+  expect_null(page_from("?dataset=TCR", ids))
+  expect_null(page_from("?page=", ids))
+  expect_null(page_from("", ids))
+  expect_null(page_from(NULL, ids))
+  expect_null(page_from(NA_character_, ids))
+  ## the id table is the only authority: a tab name is not a page id
+  expect_null(page_from("?page=geneExpression", ids))
+})
+
 test_that("conditional initial routing is consumed by the first dataset", {
   decide <- utils_env$viewerInitialPageDecision
 

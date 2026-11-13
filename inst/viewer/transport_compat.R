@@ -26,6 +26,20 @@ viewerSockjsCompatEnabled <- function(options = Cerebro.options) {
   stop("`sockjs_compat` must be TRUE, FALSE or \"auto\".", call. = FALSE)
 }
 
+## `uiPattern` for shiny::shinyApp(): the root plus `/<data set id>`, so a link
+## to /name opens the App where nothing else maps that path (Shiny Server does,
+## and its sub-path then reaches the App as the root). Shiny anchors the pattern.
+viewerDatasetUiPattern <- function(ids) {
+  ids <- as.character(ids)
+  ids <- unique(ids[!is.na(ids) & nzchar(ids)])
+  if (!length(ids)) {
+    return("/")
+  }
+  escape <- function(x) gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", x)
+  forms <- unique(c(ids, utils::URLencode(ids, reserved = TRUE)))
+  paste0("(/|/(", paste(escape(forms), collapse = "|"), "))")
+}
+
 ## Returns list(ui, server). `ui` is the page or a function of the request;
 ## `root` holds viewer/transport_compat.js. Apply it before any wrapper that
 ## needs the finished ui and server, such as the login page.

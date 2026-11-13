@@ -1,3 +1,14 @@
+# CerebroNexus 8.1.0
+
+- **Page links.** `?page=<id>` opens the Viewer on a page (the `initial_page`
+  IDs, e.g. `?dataset=TCR&page=immune_repertoire`). The address bar now follows
+  the page and the data set being read, so a copied URL reopens them. A
+  `/<data set id>` link also works when the App is started with
+  `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
+- Opening the Viewer on a page that needs the data set no longer flashes the
+  "Loading dataset" card as the startup cover fades; the card waits until the
+  cover is gone.
+
 # CerebroNexus 8.0.2
 
 - CerebroNexus has a logo. It heads the README, replaces the wordmark logo on
