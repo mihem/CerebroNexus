@@ -121,6 +121,58 @@ If the Seurat object carries images, the resulting `.crb` gains a
 spatial projection and the Spatial tab becomes available when it is
 loaded.
 
+### Xenium and 10x Atera objects
+
+Objects from Seurat’s imaging readers
+([`LoadXenium()`](https://satijalab.org/seurat/reference/ReadXenium.html),
+and in Seurat 6 `LoadAtera()` for 10x Atera) keep their counts in an
+assay named after the platform, not `RNA`, and Seurat names the per-cell
+totals after it (`nCount_Xenium`, `nCount_Atera`). Pass the assay and
+these two columns; the Builder picks them on its own. The readers add no
+dimensional reduction, so run
+e.g. [`RunPCA()`](https://satijalab.org/seurat/reference/RunPCA.html)
+and [`RunUMAP()`](https://satijalab.org/seurat/reference/RunUMAP.html)
+first.
+
+`LoadAtera()` needs the `blosc`, `jsonlite` and `data.table` packages,
+and by default reads the cell centroids only. Whatever the FOV holds is
+exported, so ask for the rest when reading:
+
+- `segmentations = "cell"` (or `"nucleus"`) for the cell outlines;
+- `molecule.coordinates = TRUE` together with `genes` for transcript
+  positions. Without `genes` Seurat only keeps a handle to the
+  transcript file, and no molecules reach the FOV or the `.crb`.
+
+The morphology image that `LoadAtera(morphology.image = TRUE)` stores in
+[`Misc()`](https://satijalab.github.io/seurat-object/reference/Misc.html)
+is not exported; supply a background through `spatial_images` like any
+other.
+
+``` r
+atera <- Seurat::LoadAtera(
+  "path/to/atera_outs",
+  segmentations = "cell",
+  molecule.coordinates = TRUE,
+  genes = c("CD19", "ATOX1")
+)
+atera <- Seurat::NormalizeData(atera)
+atera <- Seurat::FindVariableFeatures(atera)
+atera <- Seurat::ScaleData(atera)
+atera <- Seurat::RunPCA(atera)
+atera <- Seurat::RunUMAP(atera, dims = 1:30)
+
+convertSeuratToCerebro(
+  atera,
+  result_dir = "output",
+  assay = "Atera",
+  nUMI = "nCount_Atera",
+  nGene = "nFeature_Atera",
+  organism = "hg",
+  experiment_name = "Atera kidney",
+  groups = "azimuth_broad"
+)
+```
+
 ### Placing histological images
 
 Histology images are **not** stored inside the `.crb`; they are passed

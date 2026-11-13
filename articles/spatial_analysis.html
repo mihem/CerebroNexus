@@ -102,7 +102,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">12 November, 2026</h4>
+            <h4 data-toc-skip class="date">13 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/spatial_analysis.Rmd" class="external-link"><code>vignettes/articles/spatial_analysis.Rmd</code></a></small>
       <div class="d-none name"><code>spatial_analysis.Rmd</code></div>
@@ -260,6 +260,58 @@ the coordinates and expression — no special flag is required.</p>
 gains a spatial projection and the Spatial tab becomes available when it
 is loaded.</p>
 <div class="section level3">
+<h3 id="xenium-and-10x-atera-objects">Xenium and 10x Atera objects<a class="anchor" aria-label="anchor" href="#xenium-and-10x-atera-objects"></a>
+</h3>
+<p>Objects from Seurat’s imaging readers (<code><a href="https://satijalab.org/seurat/reference/ReadXenium.html" class="external-link">LoadXenium()</a></code>, and
+in Seurat 6 <code>LoadAtera()</code> for 10x Atera) keep their counts in
+an assay named after the platform, not <code>RNA</code>, and Seurat
+names the per-cell totals after it (<code>nCount_Xenium</code>,
+<code>nCount_Atera</code>). Pass the assay and these two columns; the
+Builder picks them on its own. The readers add no dimensional reduction,
+so run e.g. <code><a href="https://satijalab.org/seurat/reference/RunPCA.html" class="external-link">RunPCA()</a></code> and <code><a href="https://satijalab.org/seurat/reference/RunUMAP.html" class="external-link">RunUMAP()</a></code> first.</p>
+<p><code>LoadAtera()</code> needs the <code>blosc</code>,
+<code>jsonlite</code> and <code>data.table</code> packages, and by
+default reads the cell centroids only. Whatever the FOV holds is
+exported, so ask for the rest when reading:</p>
+<ul>
+<li>
+<code>segmentations = "cell"</code> (or <code>"nucleus"</code>) for
+the cell outlines;</li>
+<li>
+<code>molecule.coordinates = TRUE</code> together with
+<code>genes</code> for transcript positions. Without <code>genes</code>
+Seurat only keeps a handle to the transcript file, and no molecules
+reach the FOV or the <code>.crb</code>.</li>
+</ul>
+<p>The morphology image that
+<code>LoadAtera(morphology.image = TRUE)</code> stores in
+<code><a href="https://satijalab.github.io/seurat-object/reference/Misc.html" class="external-link">Misc()</a></code> is not exported; supply a background through
+<code>spatial_images</code> like any other.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu">LoadAtera</span><span class="op">(</span></span>
+<span>  <span class="st">"path/to/atera_outs"</span>,</span>
+<span>  segmentations <span class="op">=</span> <span class="st">"cell"</span>,</span>
+<span>  molecule.coordinates <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  genes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CD19"</span>, <span class="st">"ATOX1"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/NormalizeData.html" class="external-link">NormalizeData</a></span><span class="op">(</span><span class="va">atera</span><span class="op">)</span></span>
+<span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/FindVariableFeatures.html" class="external-link">FindVariableFeatures</a></span><span class="op">(</span><span class="va">atera</span><span class="op">)</span></span>
+<span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/ScaleData.html" class="external-link">ScaleData</a></span><span class="op">(</span><span class="va">atera</span><span class="op">)</span></span>
+<span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/RunPCA.html" class="external-link">RunPCA</a></span><span class="op">(</span><span class="va">atera</span><span class="op">)</span></span>
+<span><span class="va">atera</span> <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.org/seurat/reference/RunUMAP.html" class="external-link">RunUMAP</a></span><span class="op">(</span><span class="va">atera</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">30</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/convertSeuratToCerebro.html">convertSeuratToCerebro</a></span><span class="op">(</span></span>
+<span>  <span class="va">atera</span>,</span>
+<span>  result_dir <span class="op">=</span> <span class="st">"output"</span>,</span>
+<span>  assay <span class="op">=</span> <span class="st">"Atera"</span>,</span>
+<span>  nUMI <span class="op">=</span> <span class="st">"nCount_Atera"</span>,</span>
+<span>  nGene <span class="op">=</span> <span class="st">"nFeature_Atera"</span>,</span>
+<span>  organism <span class="op">=</span> <span class="st">"hg"</span>,</span>
+<span>  experiment_name <span class="op">=</span> <span class="st">"Atera kidney"</span>,</span>
+<span>  groups <span class="op">=</span> <span class="st">"azimuth_broad"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
 <h3 id="placing-histological-images">Placing histological images<a class="anchor" aria-label="anchor" href="#placing-histological-images"></a>
 </h3>
 <p>Histology images are <strong>not</strong> stored inside the
@@ -268,7 +320,7 @@ which copies them into the generated app bundle and references them by
 dataset, spatial entry, and image label. JPG, PNG, and SVG are
 supported. A plain <code>c(Dataset = path)</code> vector is
 rejected.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"My spatial sample"</span> <span class="op">=</span> <span class="st">"my_spatial_data.crb"</span><span class="op">)</span>,</span>
 <span>  result_dir <span class="op">=</span> <span class="st">"cerebro_app"</span>,</span>
@@ -286,7 +338,7 @@ rejected.</p>
 and use the flip / scale / rotation parameters to align each image with
 its coordinate system. Every dataset name must match a name of
 <code>cerebro_data</code>:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="st">"Ctrl sample"</span> <span class="op">=</span> <span class="st">"ctrl_spatial.crb"</span>,</span>
