@@ -656,6 +656,16 @@ builder_project_capture_build_plan <- function(plan) {
   invisible(plan)
 }
 
+## Opening a Project replaces the workspace: a Build of the old one, kept or
+## still to publish, must not be registered or adopted into the new one (dataset
+## ids are ds1, ds2, ... in every session).
+builder_project_forget_build <- function() {
+  builder_project_deferred_build(NULL)
+  builder_project_build_identities(NULL)
+  builder_project_build_plan(NULL)
+  invisible(NULL)
+}
+
 builder_project_source_runtime_file <- function() {
   candidates <- c(
     file.path(getwd(), "project.R"),
@@ -4120,8 +4130,7 @@ complete_builder_project_open <- function(actions = NULL) {
   # instead of holding Open back.
   cancel_builder_project_crb_queue()
   reset_builder_project_crb_pipeline()
-  builder_project_deferred_build(NULL)
-  builder_project_build_identities(NULL)
+  builder_project_forget_build()
   protocol(next_protocol)
   store(next_store)
   projection_previews(list())

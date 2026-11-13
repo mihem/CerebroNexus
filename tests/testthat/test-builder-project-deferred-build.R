@@ -97,6 +97,52 @@ test_that("a published Build without a Project is kept for the Save that creates
   })
 })
 
+test_that("a Build of the workspace that was replaced is not registered into the new Project", {
+  app_env <- deferred_build_app()
+  built <- withr::local_tempfile(fileext = ".crb")
+  writeLines("crb", built)
+  shiny::testServer(app_env$server, {
+    use_state_only_fixture(list(deferred_build_entry()))
+    registered <- 0L
+    assign(
+      "builder_project_register_build",
+      function(...) {
+        registered <<- registered + 1L
+        TRUE
+      },
+      envir = environment(builder_project_handle_build_result)
+    )
+    plan <- list(items = list(list(id = "ds1")))
+    ## The Build starts without a Project, and its result is not published yet.
+    builder_project_capture_build_plan(plan)
+    value <- deferred_build_value(built)
+    unpublished <- value
+    unpublished$release <- NULL
+    builder_project_handle_build_result(unpublished)
+
+    ## A Project is opened: what Open resets is the Build as well.
+    builder_project_forget_build()
+    builder_project(list(root = tempdir(), manifest = list()))
+    expect_null(isolate(builder_project_build_plan()))
+    expect_null(isolate(builder_project_build_identities()))
+    expect_null(isolate(builder_project_deferred_build()))
+
+    ## The published result of the old Build arrives after that.
+    builder_project_handle_build_result(value)
+    expect_identical(registered, 0L)
+  })
+})
+
+test_that("opening a Project forgets the Build of the workspace it replaces", {
+  app_env <- deferred_build_app()
+  open_body <- paste(
+    deparse(body(app_env$complete_builder_project_open)),
+    collapse = "
+"
+  )
+  expect_match(open_body, "builder_project_forget_build()", fixed = TRUE)
+})
+
 test_that("a Build whose release identity is unknown is not kept", {
   app_env <- deferred_build_app()
   built <- withr::local_tempfile(fileext = ".crb")
