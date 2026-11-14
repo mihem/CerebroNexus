@@ -1,5 +1,12 @@
 # Changelog
 
+## CerebroNexus 8.2.2
+
+- **New logo.** The hexagon logo is redrawn: the brain sits in the
+  middle with its two halves in the colours of the clusters, linked to a
+  UMAP, a spatial section and antibodies, over the name. It heads the
+  README and the pkgdown site and appears in the Viewer’s About tab.
+
 ## CerebroNexus 8.2.1
 
 - **Faster edits in the Builder’s Configure page.** A change (a Group
