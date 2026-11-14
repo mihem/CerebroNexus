@@ -2337,7 +2337,10 @@
 #'   \code{"about"}. A conditional page is selected only when it is available
 #'   for the first loaded dataset. Initial routing is attempted only once, so
 #'   switching datasets later never triggers a delayed redirect. Shared links
-#'   take precedence after restoration.
+#'   take precedence after restoration. \code{NULL} (the default) opens
+#'   \code{"projection"}, with a preview of its plot from an earlier start
+#'   while the session starts; \code{"data_info"} when the App has no dataset
+#'   to show.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Point size from 1 through 20. Supply one number for every
 #'   dataset, or a named numeric vector/list whose names exactly match

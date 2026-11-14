@@ -100,4 +100,29 @@ test_that("the first view is published only for the data set an address opens", 
   own <- plotted()
   expect_false(own == other)
   expect_equal(published("/"), own)
+
+  ## The address without ?page= starts on the Projection of an App with data
+  ## sets: its first view says so, and the page shows the preview and opens
+  ## there without a visit to Data info.
+  view <- httr::content(
+    httr::GET(paste0(
+      sub("/$", "", app$get_url()),
+      "/cerebro-first-view/",
+      key("/"),
+      ".json"
+    )),
+    "text",
+    encoding = "UTF-8"
+  )
+  expect_identical(jsonlite::fromJSON(view)$start_page, "projection")
+  open("")
+  expect_true(app$get_js(
+    "!!(window.CerebroFirstView && window.CerebroFirstView.shown)"
+  ))
+  expect_identical(
+    app$get_js(
+      "document.querySelector('.tab-pane.active[id^=\"shiny-tab-\"]').id"
+    ),
+    "shiny-tab-overview"
+  )
 })

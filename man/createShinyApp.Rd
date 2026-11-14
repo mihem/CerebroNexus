@@ -168,7 +168,10 @@ session's current selection take precedence.}
 \code{"about"}. A conditional page is selected only when it is available
 for the first loaded dataset. Initial routing is attempted only once, so
 switching datasets later never triggers a delayed redirect. Shared links
-take precedence after restoration.}
+take precedence after restoration. \code{NULL} (the default) opens
+\code{"projection"}, with a preview of its plot from an earlier start
+while the session starts; \code{"data_info"} when the App has no dataset
+to show.}
 
 \item{initial_projections}{Optional projection names to show when Linked
 views first opens. A character vector applies to every data set. A named

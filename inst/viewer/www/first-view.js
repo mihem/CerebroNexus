@@ -10,6 +10,10 @@
    draws the cells where the plot will be. The plot itself replaces the preview
    when it has painted its first frame.
 
+   An address without `?page=` opens the Projection too when the session will
+   start there (an App with a data set and no other start page set by its
+   author): the description says so (`start_page`).
+
    The preview is a picture: it does not zoom, select or answer the pointer.
    Without a description (a first visit, a login, a data set without a Viewer
    Pack) nothing here runs and the page opens as before. */
@@ -41,7 +45,11 @@
   } catch (error) {
     return;
   }
-  if (params.get('page') !== 'projection' || !window.fetch ||
+  var page = params.get('page');
+  // Without `?page=`, only where the description names the Projection as the
+  // address's start page.
+  var byDefault = page === null;
+  if ((page !== 'projection' && !byDefault) || !window.fetch ||
       !window.TextEncoder || !window.Promise || !window.requestAnimationFrame) {
     return;
   }
@@ -401,8 +409,25 @@
     }
   }
 
-  whenParsed(function () {
-    if (!startOnPage()) {
+  // The page once shinydashboard has shown its start tab (the description came
+  // later), as the session's own start page message shows it (viewer-shell.js):
+  // not a click, which would count as the visitor's own navigation. Not when
+  // the visitor has gone to another page than Data info meanwhile.
+  function openPage(active) {
+    if (active.id === 'shiny-tab-' + TAB) return true;
+    if (active.id !== 'shiny-tab-loadData' || !window.jQuery) return false;
+    var link = document.querySelector('.main-sidebar a[data-toggle="tab"][data-value="' + TAB + '"]');
+    if (!link) return false;
+    window.jQuery(link).tab('show');
+    // What Shiny reads as the page when it binds the sidebar: before that, only
+    // this attribute (as shinydashboard's own ensureActivatedTab() sets it).
+    window.jQuery('.sidebarMenuSelectedTabItem').attr('data-value', TAB);
+    return true;
+  }
+
+  function start() {
+    var active = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
+    if (!(active ? openPage(active) : startOnPage())) {
       finish(null);
       return;
     }
@@ -410,6 +435,16 @@
       if (!data || finished) return finish(null);
       installStyle();
       mount(data);
+    });
+  }
+
+  whenParsed(function () {
+    if (!byDefault) return start();
+    // The description is usually here before the document is parsed; its
+    // promise then resolves before shinydashboard shows a tab.
+    description.then(function (view) {
+      if (!view || view.start_page !== 'projection') return finish(null);
+      start();
     });
   });
 })();

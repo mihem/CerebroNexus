@@ -84,6 +84,16 @@
   accepted edit is derived once, and the search for references skips what the
   stored entry already has. With 63 metadata columns an edit takes 0.27 to 0.43 s
   in the browser.
+- **The App opens on the Projection, with its preview.** An address without
+  `?page=` opened Data info, and the plot came only after a click on
+  Projection and the start of the session; the preview of 8.2.0 was drawn only
+  for a `?page=projection` link. An App with a data set now opens the
+  Projection, previewed from an earlier start: with 1.3 million cells the
+  cells are on screen 1.0 s after the R process starts (before: 4.3 s at the
+  earliest, with a click the moment the session existed), and the plot takes
+  over at 3.8 s. `initial_page` in `createShinyApp()` still chooses another
+  start page (`"data_info"` for the earlier one); an App without a data set
+  opens Data info, for the upload.
 - **A page opened while the App connects no longer stays "Loading".** Since
   the page is on screen before its session starts, a page could be clicked
   while the browser was connecting. Shiny then sent that click ahead of its

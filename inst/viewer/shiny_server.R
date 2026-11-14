@@ -516,8 +516,10 @@ server <- function(input, output, session) {
     color_management = "color_management",
     about = "about"
   )
-  initial_page <- Cerebro.options[["initial_page"]]
-  ## A `?page=<id>` link overrides the author's initial page for this visit.
+  ## The author's start page, or the Projection when there is a data set to show
+  ## (viewerStartPage() in viewer/core/shared_resources.R).
+  initial_page <- viewerStartPage(Cerebro.options)
+  ## A `?page=<id>` link overrides the start page for this visit.
   url_page <- viewerPageFromQuery(
     isolate(session$clientData$url_search),
     names(viewer_initial_page_tabs)
@@ -1568,7 +1570,8 @@ server <- function(input, output, session) {
         isolate(session$clientData$url_search),
         viewer_shared_resource_roots,
         viewerFirstViewBasis(Cerebro.options),
-        viewer_first_view_source()
+        viewer_first_view_source(),
+        viewerStartPage(Cerebro.options)
       ),
       silent = TRUE
     )

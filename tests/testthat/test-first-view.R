@@ -197,6 +197,59 @@ test_that("a first frame is published once and kept for later processes", {
   expect_length(list.files(env$viewerFirstViewDirectory()), 1L)
 })
 
+test_that("an address without ?page= starts on the Projection when there is data", {
+  env <- first_view_env()
+  crb <- withr::local_tempfile(fileext = ".crb")
+  writeLines("x", crb)
+  ## the author's start page wins; otherwise the Projection of a data set
+  expect_identical(env$viewerStartPage(list(initial_page = "groups")), "groups")
+  expect_identical(
+    env$viewerStartPage(list(initial_page = "data_info", crb_file_to_load = crb)),
+    "data_info"
+  )
+  expect_identical(
+    env$viewerStartPage(list(crb_file_to_load = c(A = crb))),
+    "projection"
+  )
+  ## nothing to show (an App for uploads): Data info, as before
+  expect_null(env$viewerStartPage(list()))
+  expect_null(env$viewerStartPage(list(crb_file_to_load = file.path(
+    tempdir(),
+    "missing.crb"
+  ))))
+})
+
+test_that("a first view names the start page, also when a new process publishes it", {
+  cache <- withr::local_tempdir()
+  withr::local_envvar(R_USER_CACHE_DIR = cache)
+  earlier <- first_view_env()
+  pack <- first_view_pack(withr::local_tempdir())
+  basis <- earlier$viewerFirstViewBasis(list(cerebro_version = "1"))
+  file <- earlier$viewerFirstViewCapture(
+    first_view_message(earlier, pack),
+    "/",
+    "",
+    pack,
+    basis,
+    start_page = "projection"
+  )
+  expect_identical(jsonlite::fromJSON(file)$start_page, "projection")
+  unlink(earlier$viewerFirstViewDirectory(), recursive = TRUE)
+  later <- first_view_env()
+  written <- later$viewerFirstViewRestore(pack, basis, function(...) NULL)
+  expect_identical(jsonlite::fromJSON(written)$start_page, "projection")
+  ## without a start page the description says none: no preview at "/"
+  plain <- first_view_env()
+  file <- plain$viewerFirstViewCapture(
+    first_view_message(plain, pack),
+    "/",
+    "?dataset=other",
+    pack,
+    NULL
+  )
+  expect_null(jsonlite::fromJSON(file)$start_page)
+})
+
 test_that("a new process publishes what an earlier one kept", {
   cache <- withr::local_tempdir()
   withr::local_envvar(R_USER_CACHE_DIR = cache)

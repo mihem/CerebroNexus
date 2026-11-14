@@ -379,6 +379,26 @@ viewerFirstViewBasis <- function(options) {
   unname(tools::md5sum(file))
 }
 
+## The page an address without `?page=` opens: the author's start page, or the
+## Projection when the App has a data set to show (and Data info, where one is
+## uploaded, when it has none). A first view says it (`start_page`), so that
+## first-view.js previews the Projection at such an address only when the
+## session will open it; the basis above keeps a description to the author's
+## options it was taken with.
+viewerStartPage <- function(options) {
+  page <- options[["initial_page"]]
+  if (is.character(page) && length(page) == 1L && !is.na(page) && nzchar(page)) {
+    return(page)
+  }
+  files <- as.character(unlist(options[["crb_file_to_load"]], use.names = FALSE))
+  files <- files[!is.na(files) & nzchar(files)]
+  if (length(files) && any(file.exists(files) & !dir.exists(files))) {
+    "projection"
+  } else {
+    NULL
+  }
+}
+
 ## When the Pack in `root` was built: its manifest is written last.
 viewerFirstViewBuilt <- function(root) {
   format(
@@ -632,14 +652,16 @@ viewerFirstViewRestore <- function(
 ## is a frame a preview can stand in for. Returns the file, or NULL.
 ## With `basis` it is also kept for the processes started later. `source` is
 ## the CRB file of the frame when that is a configured data set: a frame that
-## carries its cells is described only then.
+## carries its cells is described only then. `start_page` is the page the
+## address opens without `?page=` (viewerStartPage()).
 viewerFirstViewCapture <- function(
   message,
   pathname,
   search,
   roots = character(),
   basis = NULL,
-  source = NULL
+  source = NULL,
+  start_page = NULL
 ) {
   key <- viewerFirstViewKey(pathname, search)
   payload <- viewerFirstViewPayload(message)
@@ -656,6 +678,9 @@ viewerFirstViewCapture <- function(
   }
   if (is.null(payload)) {
     return(NULL)
+  }
+  if (is.character(start_page) && length(start_page) == 1L) {
+    payload$start_page <- start_page
   }
   json <- jsonlite::toJSON(payload, auto_unbox = TRUE, digits = NA)
   file <- file.path(viewerFirstViewDirectory(), paste0(key, ".json"))

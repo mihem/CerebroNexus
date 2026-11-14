@@ -566,6 +566,8 @@ test_that("Spatial panels refit when the page above them grows", {
 
 test_that("Data info bars carry the colour of their category", {
   app <- shared_app()
+  ## The App opens on the Projection: Data info draws its bars once shown.
+  activate_tab(app, "loadData", timeout = 30000)
   wait_for_input(app, "load_data_annotation", timeout = 30000)
   ## The bars start in the accent colour and take their category colours once
   ## the data set is loaded, the same ones the other pages draw.
