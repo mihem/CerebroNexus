@@ -568,7 +568,12 @@ replace_entry <- function(updated, internal = FALSE) {
     builder_reduce_state(
       current_state,
       list(type = "replace", id = existing$id, entry = existing),
-      trusted = TRUE
+      trusted = TRUE,
+      state_cache = get0(
+        "builder_dataset_state_cache",
+        mode = "environment",
+        inherits = TRUE
+      )
     ),
     silent = TRUE
   )

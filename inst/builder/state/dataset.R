@@ -209,20 +209,25 @@ builder_dataset_state <- function(entry) {
   ))
 }
 
-builder_cached_dataset_state <- function(entry, cache = NULL) {
+## `state` is a state just derived from this very entry: it takes the entry's
+## slot instead of being derived a second time.
+builder_cached_dataset_state <- function(entry, cache = NULL, state = NULL) {
+  derive <- function() {
+    if (is.null(state)) builder_dataset_state(entry) else state
+  }
   if (
     !is.environment(cache) ||
       !is.list(entry) ||
       !.builder_state_fact_text(entry$id %||% NULL)
   ) {
-    return(builder_dataset_state(entry))
+    return(derive())
   }
   revision <- tryCatch(
     .builder_state_revision(entry$revision %||% 0L),
     error = function(error) NULL
   )
   if (is.null(revision)) {
-    return(builder_dataset_state(entry))
+    return(derive())
   }
   prefix <- paste0(entry$id, "::")
   ## A Project can replace an artifact-backed placeholder with its Source
@@ -232,11 +237,11 @@ builder_cached_dataset_state <- function(entry, cache = NULL) {
   ## Source profile (including spatial sections).
   load_state <- .builder_state_load_state(entry)
   key <- paste(prefix, revision, load_state, sep = "::")
-  cached <- get0(key, envir = cache, inherits = FALSE)
+  cached <- if (is.null(state)) get0(key, envir = cache, inherits = FALSE)
   if (inherits(cached, "builder_dataset_state")) {
     return(cached)
   }
-  value <- builder_dataset_state(entry)
+  value <- derive()
   stale <- Filter(
     function(candidate) startsWith(candidate, prefix),
     ls(cache, all.names = TRUE)
@@ -279,15 +284,23 @@ builder_dataset_state_cache_clear <- function(cache) {
   invisible(length(keys) > 0L)
 }
 
-.builder_store_validate_entry <- function(entry) {
-  invisible(builder_dataset_state(entry))
-  if (.builder_state_has_reference(entry)) {
+## `known` is an entry that already passed: the stored one an edit replaces.
+## Only what differs from it is searched for references. Returns the state
+## derived from the entry.
+.builder_store_validate_entry <- function(entry, known = NULL) {
+  dataset_state <- builder_dataset_state(entry)
+  has_reference <- if (is.null(known)) {
+    .builder_state_has_reference(entry)
+  } else {
+    .builder_state_has_new_reference(entry, known)
+  }
+  if (has_reference) {
     .builder_state_abort(
       "invalid_dataset_entry",
       "Dataset store entries must not contain deep mutable references."
     )
   }
-  invisible(entry)
+  invisible(dataset_state)
 }
 
 .builder_store_ids <- function(datasets, validate_entries = TRUE) {
@@ -471,7 +484,16 @@ builder_state <- function(
 }
 
 #' Apply a typed event to the persistent dataset rail state.
-builder_reduce_state <- function(state, action, trusted = FALSE) {
+#'
+#' `state_cache` is the cache `builder_cached_dataset_state()` reads: an edit
+#' that is accepted leaves there the state its validation derived, so the rail
+#' does not derive it again.
+builder_reduce_state <- function(
+  state,
+  action,
+  trusted = FALSE,
+  state_cache = NULL
+) {
   ids <- .builder_store_assert(
     state,
     validate_entries = !isTRUE(trusted)
@@ -486,6 +508,7 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
   # reducer purity without serializing every dataset on every input event.
   next_state <- state
   type <- action$type
+  edited <- NULL
 
   require_id <- function(id) {
     if (!.builder_state_fact_text(id) || !id %in% ids) {
@@ -512,14 +535,19 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
         "Builder dataset ids must be unique."
       )
     }
-    .builder_store_validate_entry(entry)
+    # The upgrade leaves a current entry as it is; only a changed one is new.
+    if (!identical(entry, action$entry)) {
+      .builder_store_validate_entry(entry)
+    }
     next_state$datasets[[length(next_state$datasets) + 1L]] <- entry
     if (is.null(next_state$current_dataset)) {
       next_state$current_dataset <- entry$id
     }
   } else if (identical(type, "replace")) {
     index <- require_id(action$id)
-    .builder_store_validate_entry(action$entry)
+    # The entry in the store passed this check when it was stored.
+    stored <- state$datasets[[index]]
+    dataset_state <- .builder_store_validate_entry(action$entry, known = stored)
     entry <- builder_upgrade_viewer_content_entry(action$entry)
     if (!is.list(entry) || !identical(entry$id, action$id)) {
       .builder_state_abort(
@@ -527,8 +555,11 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
         "A replacement entry must retain its dataset id."
       )
     }
-    .builder_store_validate_entry(entry)
+    if (!identical(entry, action$entry)) {
+      dataset_state <- .builder_store_validate_entry(entry, known = stored)
+    }
     next_state$datasets[[index]] <- entry
+    edited <- list(entry = entry, state = dataset_state)
   } else if (identical(type, "replace_all")) {
     invisible(.builder_store_ids(action$datasets))
     replacement <- lapply(
@@ -665,6 +696,9 @@ builder_reduce_state <- function(state, action, trusted = FALSE) {
   next_state$revision <- .builder_state_revision(state$revision) + 1L
   next_state <- structure(next_state, class = c("builder_state", "list"))
   .builder_store_assert(next_state, validate_entries = FALSE)
+  if (is.environment(state_cache) && is.list(edited)) {
+    builder_cached_dataset_state(edited$entry, state_cache, edited$state)
+  }
   next_state
 }
 

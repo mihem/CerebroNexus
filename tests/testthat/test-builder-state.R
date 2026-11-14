@@ -550,3 +550,142 @@ test_that("dataset state keeps canonical acknowledgement semantics", {
     "needs_attention"
   )
 })
+
+test_that("an edit is validated once and only where it differs from the store", {
+  stored <- builder_upgrade_viewer_content_entry(
+    builder_viewer_settings_entry("a")
+  )
+  state <- builder_state(list(stored))
+
+  states <- 0L
+  dataset_state <- builder_dataset_state
+  testthat::local_mocked_bindings(
+    builder_dataset_state = function(entry) {
+      states <<- states + 1L
+      dataset_state(entry)
+    },
+    .env = globalenv()
+  )
+  edited <- stored
+  edited$settings$default_group <- "cluster"
+  edited$revision <- 2L
+  next_state <- builder_reduce_state(
+    state,
+    list(type = "replace", id = "a", entry = edited),
+    trusted = TRUE
+  )
+  expect_identical(next_state$datasets[[1L]]$settings$default_group, "cluster")
+  expect_identical(states, 1L)
+
+  # A reference anywhere the edit touched is still refused.
+  reference <- new.env(parent = emptyenv())
+  hidden <- list(
+    field = function(entry) {
+      entry$note <- list(inner = list(reference))
+      entry
+    },
+    attribute = function(entry) {
+      entry$note <- structure("text", owner = reference)
+      entry
+    },
+    closure = function(entry) {
+      entry$path <- function() NULL
+      entry
+    }
+  )
+  for (label in names(hidden)) {
+    error <- capture_builder_state_error(builder_reduce_state(
+      state,
+      list(type = "replace", id = "a", entry = hidden[[label]](edited)),
+      trusted = TRUE
+    ))
+    expect_s3_class(error, "builder_state_error")
+    expect_identical(error$code, "invalid_dataset_entry", info = label)
+  }
+})
+
+test_that("the search for new references agrees with the full search", {
+  reference <- new.env(parent = emptyenv())
+  known <- list(
+    id = "a",
+    profile = list(columns = list(one = 1:3, two = letters)),
+    settings = structure(
+      list(groups = "one", nested = list(1, "x")),
+      note = "n"
+    )
+  )
+  changed <- list(
+    same = known,
+    leaf = utils::modifyList(known, list(id = "b")),
+    added = c(known, list(extra = list(deep = list(reference)))),
+    nested = local({
+      value <- known
+      value$settings$nested[[2L]] <- reference
+      value
+    }),
+    attribute = structure(known, owner = reference),
+    inner_attribute = local({
+      value <- known
+      attr(value$profile$columns, "owner") <- reference
+      value
+    }),
+    unnamed = list(known, reference),
+    duplicated = c(known, list(id = reference)),
+    closure = utils::modifyList(known, list(profile = function() NULL)),
+    atomic = "text"
+  )
+  for (label in names(changed)) {
+    expect_identical(
+      .builder_state_has_new_reference(changed[[label]], known),
+      .builder_state_has_reference(changed[[label]]),
+      info = label
+    )
+  }
+  expect_true(.builder_state_has_new_reference(changed$nested, known))
+  expect_false(.builder_state_has_new_reference(changed$leaf, known))
+})
+
+test_that("an accepted edit leaves its state for the rail, a refused one nothing", {
+  stored <- builder_upgrade_viewer_content_entry(
+    builder_viewer_settings_entry("a")
+  )
+  state <- builder_state(list(stored))
+  cache <- new.env(parent = emptyenv())
+
+  edited <- stored
+  edited$settings$default_group <- "cluster"
+  edited$revision <- 2L
+  refused <- edited
+  refused$note <- list(new.env(parent = emptyenv()))
+  error <- capture_builder_state_error(builder_reduce_state(
+    state,
+    list(type = "replace", id = "a", entry = refused),
+    trusted = TRUE,
+    state_cache = cache
+  ))
+  expect_identical(error$code, "invalid_dataset_entry")
+  expect_length(ls(cache, all.names = TRUE), 0L)
+
+  next_state <- builder_reduce_state(
+    state,
+    list(type = "replace", id = "a", entry = edited),
+    trusted = TRUE,
+    state_cache = cache
+  )
+  expect_length(ls(cache, all.names = TRUE), 1L)
+  expected <- builder_dataset_state(next_state$datasets[[1L]])
+
+  states <- 0L
+  testthat::local_mocked_bindings(
+    builder_dataset_state = function(entry) {
+      states <<- states + 1L
+      stop("the state of an accepted edit is derived once")
+    },
+    .env = globalenv()
+  )
+  expect_identical(
+    builder_cached_dataset_state(next_state$datasets[[1L]], cache),
+    expected
+  )
+  expect_identical(states, 0L)
+})
