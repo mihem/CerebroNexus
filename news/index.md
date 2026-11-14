@@ -1,5 +1,13 @@
 # Changelog
 
+## CerebroNexus 8.1.2
+
+- **Repository clean-up.** Removed files nothing used any more: the
+  `scripts/` folder (two Builder checks no CI workflow ran, one of them
+  broken), the Builder design notes in `other_documents/` and five
+  Builder screenshots no article linked to. The installed package is
+  unchanged.
+
 ## CerebroNexus 8.1.1
 
 - **Faster Builder import.** The Builder no longer sorts every value of
