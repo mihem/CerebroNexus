@@ -2784,13 +2784,14 @@ server <- function(input, output, session) {
   ##   Gene ID conversion opens with;
   ## - the server code of the pages the data set has: sourced, its observers
   ##   made and run once, and compiled (the first session is not compiled while
-  ##   it starts, see R/launchCerebro.R). Not the Immune repertoire and HLA &
-  ##   TCR motifs pages, which compute from the repertoire as soon as they are
+  ##   it starts, see R/launchCerebro.R). Not the HLA & TCR motifs page, and
+  ##   the Immune repertoire page only with a Viewer Pack that has the
+  ##   repertoire encoded: both compute from the repertoire as soon as they are
   ##   loaded.
   viewer_idle_packages <- function() {
     setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
   }
-  viewer_idle_pack_assets <- function() {
+  viewer_idle_pack <- function() {
     signature <- tryCatch(
       viewerPackSourceSignature(isolate(viewer_dataset_request())$target),
       error = function(error) NULL
@@ -2798,7 +2799,25 @@ server <- function(input, output, session) {
     pack <- if (!is.null(signature)) {
       .viewer_pack_process_cache[[signature$key]]$descriptor
     }
+    if (is.list(pack)) pack
+  }
+  viewer_idle_pack_assets <- function() {
+    pack <- viewer_idle_pack()
     if (is.list(pack)) file.path(pack$path, pack$manifest$assets$path)
+  }
+  ## The Immune repertoire page reads the repertoire as soon as it is loaded:
+  ## from the Viewer Pack's integer encoding (0.1 s for 1.46 million cells), or,
+  ## with a Pack built before that encoding, by encoding it in memory (20 s and
+  ## more). Prepared only in the first case.
+  viewer_idle_immune_fast <- function() {
+    pack <- viewer_idle_pack()
+    is.list(pack) &&
+      length(pack$manifest$immune_receptors) > 0L &&
+      exists(".viewerPackImmuneOutdated", mode = "function") &&
+      isFALSE(tryCatch(
+        .viewerPackImmuneOutdated(pack$manifest),
+        error = function(error) NA
+      ))
   }
   viewer_prewarm_pages <- c(
     "groups",
@@ -2823,6 +2842,13 @@ server <- function(input, output, session) {
         function() loadNamespace(package)
       })
     }
+    ## The first loading spinner of a process costs 0.05 s to build (its CSS),
+    ## every later one 2 ms: the Immune repertoire page draws several.
+    if ("shinycssloaders" %in% loadedNamespaces()) {
+      tasks[["first spinner"]] <- function() {
+        shinycssloaders::withSpinner(shiny::div())
+      }
+    }
     for (path in viewer_idle_pack_assets()) {
       tasks[[path]] <- local({
         path <- path
@@ -2839,7 +2865,11 @@ server <- function(input, output, session) {
           .viewer_sorted_gene_choices(list(genes), function() sort(genes))
         }
       }
-      for (page in viewer_prewarm_pages) {
+      pages <- c(
+        viewer_prewarm_pages,
+        if (viewer_idle_immune_fast()) "immune_repertoire"
+      )
+      for (page in pages) {
         server_file <- deferred_viewer_server_files[[page]]
         if (
           !isTRUE(viewer_page_available[[page]]) ||
@@ -2851,6 +2881,14 @@ server <- function(input, output, session) {
           server_file <- server_file
           function() load_deferred_viewer_server(server_file)
         })
+      }
+      ## The repertoire's encoding, read from the Pack (0.08 s for 1.46 million
+      ## cells) by the first plot of the Immune repertoire page.
+      encoded <- server_scope$ir_encoded
+      if ("immune_repertoire" %in% pages && is.function(encoded)) {
+        tasks[[paste("immune encoding", session$token)]] <- function() {
+          isolate(encoded())
+        }
       }
     }
     tasks
