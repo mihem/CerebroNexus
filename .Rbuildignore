@@ -29,9 +29,6 @@ Rplots\.pdf$
 
 ^tests/testthat/_artifacts$
 
-# CRAN preparation (cran-meta)
-^other_documents$
-
 # CRAN size (cran-size)
 ^vignettes/articles$
 ^man/figures/(featured|builder)\.png$
