@@ -94,6 +94,18 @@
   over at 3.8 s. `initial_page` in `createShinyApp()` still chooses another
   start page (`"data_info"` for the earlier one); an App without a data set
   opens Data info, for the upload.
+- **The other pages are prepared while the first one is read.** Once a
+  session has had no input for three seconds, it loads the code of the pages
+  its data set has, sorts the gene list the gene selectors share, reads the
+  gene ID table and checks the Viewer Pack files, one task at a time, and
+  stops at the next click. With 1.3 million cells, opened after 15 s on the
+  Projection: Gene expression 0.43 s instead of 0.58 s, Gene ID conversion
+  0.33 s instead of 0.44 s, Trajectory 0.53 s instead of 0.64 s, Linked views
+  0.59 s instead of 0.65 s, Groups 0.23 s instead of 0.28 s. Opened after 4 s,
+  they open as before. The Immune repertoire and HLA & TCR motifs pages,
+  which compute from the repertoire as soon as they are loaded, wait for their
+  visit as before. The gene ID table is also read once per process instead of
+  at every render of its page.
 - **A page opened while the App connects no longer stays "Loading".** Since
   the page is on screen before its session starts, a page could be clicked
   while the browser was connecting. Shiny then sent that click ahead of its

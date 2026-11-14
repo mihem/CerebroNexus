@@ -13,7 +13,8 @@ test_that("gene conversion table escapes cell content", {
   shiny::testServer(
     function(input, output, session) {
       Cerebro.options <- list(cerebro_root = viewer_app_test_path())
-      read.table <- function(...) {
+      ## the table of each organism (shiny_server.R reads it once per process)
+      viewerGeneIdTable <- function(organism) {
         data.frame(symbol = '<img src=x onerror="alert(1)">', id = "ENSG1")
       }
       viewer_server_load(

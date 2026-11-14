@@ -38,6 +38,28 @@ viewerFirstViewPublishKept(Cerebro.options)
 ## sessions instead of reading the same sheet again for every browser tab.
 .extra_material_process_cache <- new.env(parent = emptyenv())
 
+## The gene ID tables of the Gene ID conversion page (inst/extdata), read once
+## per process: decompressing one takes 0.1 s, and the page read it again at
+## every render.
+.gene_id_tables <- new.env(parent = emptyenv())
+viewerGeneIdTable <- function(organism) {
+  file <- c(mouse = "mm10_gene_ID_name.tsv.xz", human = "hg38_gene_ID_name.tsv.xz")[
+    organism
+  ]
+  if (length(file) != 1L || is.na(file)) {
+    return(NULL)
+  }
+  if (is.null(.gene_id_tables[[organism]])) {
+    .gene_id_tables[[organism]] <- utils::read.table(
+      file.path(Cerebro.options$cerebro_root, "extdata", file),
+      sep = "\t",
+      header = TRUE,
+      stringsAsFactors = FALSE
+    )
+  }
+  .gene_id_tables[[organism]]
+}
+
 ## Process-owned query/cache functions do not capture a browser session.
 viewerSource(cerebro_root_path("viewer/msigdb.R"), environment())
 viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
@@ -1386,9 +1408,13 @@ server <- function(input, output, session) {
     viewer_loaded_dataset_context()$dataset_key
   })
 
+  ## Whether a data set is loaded, for work that must not load one itself
+  ## (the pages prepared while the session is quiet, below).
+  viewer_dataset_ready <- FALSE
   observe(
     {
       snapshot <- viewer_dataset_snapshot()
+      viewer_dataset_ready <<- isTRUE(snapshot$ok)
       if (isTRUE(snapshot$ok)) {
         viewer_send_dataset_phase("ready", snapshot$dataset_context)
       } else {
@@ -2469,6 +2495,15 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
+  ## The pages the loaded data set has: those every data set has, and the
+  ## conditional ones as toggleConditionalTab() finds them.
+  viewer_page_available <- list2env(list(
+    groups = TRUE,
+    geneExpression = TRUE,
+    color_management = TRUE,
+    geneIdConversion = TRUE,
+    about = TRUE
+  ), parent = emptyenv())
   toggleConditionalTab <- function(
     tab_name,
     check_fn,
@@ -2507,6 +2542,7 @@ server <- function(input, output, session) {
     })
     observe({
       should_show <- show_reactive()
+      viewer_page_available[[tab_name]] <- isTRUE(should_show)
       shinyjs::toggle(id = item_id, condition = should_show)
       if (
         !isTRUE(should_show) && identical(isolate(input[["sidebar"]]), tab_name)
@@ -2726,78 +2762,150 @@ server <- function(input, output, session) {
     },
     ignoreInit = FALSE
   )
-  ## A new process hashed each Viewer Pack file a page reads on the page's
-  ## first open. Hash them while Data info is shown.
-  session$onFlushed(
-    function() {
-      signature <- viewerPackSourceSignature(
-        isolate(viewer_dataset_request())$target
-      )
-      pack <- if (!is.null(signature)) {
-        .viewer_pack_process_cache[[signature$key]]$descriptor
-      }
-      assets <- if (is.list(pack)) {
-        file.path(pack$path, pack$manifest$assets$path)
-      }
-      tasks <- lapply(assets, function(path) function() .viewerFileMd5(path))
-      names(tasks) <- assets
-      viewerIdleRun(tasks, function() {
-        !session$isClosed() &&
-          identical(isolate(input[["sidebar"]]) %||% "loadData", "loadData")
-      })
-    },
-    once = TRUE
-  )
-
   ## What keeps something for the next start waits for the sessions to be quiet
   ## (R/quiet_queue.R).
   if (exists(".viewerSessionActivity", mode = "function")) {
     session$onFlushed(function() .viewerSessionActivity(), once = FALSE)
   }
 
-  ## launchCerebro() starts without the packages only some pages use
-  ## (`.idle_packages`: plotly, Matrix, ...). Load them once this session has
-  ## sent nothing for three seconds, one per turn of the event loop, and stop
-  ## as soon as it is busy again: the first page is never delayed, and a click
-  ## waits for one package at most. An App that attaches its packages has
-  ## nothing to load here.
+  ## Work a page would otherwise do when it is first opened, done while the
+  ## visitor reads the first one: once this session has sent nothing for three
+  ## seconds, one task per turn of the event loop, stopping as soon as the
+  ## session is busy again (a click waits for one task at most), and going on
+  ## at the next quiet moment.
+  ## - the packages only some pages use (`.idle_packages`: plotly, Matrix, ...),
+  ##   which launchCerebro() starts without; an App that attaches its packages
+  ##   has none to load;
+  ## - the checksums of the data set's Viewer Pack files, which a new process
+  ##   computes for each file a page reads (they were hashed while Data info was
+  ##   shown, the start page before the Projection);
+  ## - the sorted gene list the gene selectors share (a locale sort of the
+  ##   transcriptome, .viewer_sorted_gene_choices()), and the gene ID table
+  ##   Gene ID conversion opens with;
+  ## - the server code of the pages the data set has: sourced, its observers
+  ##   made and run once, and compiled (the first session is not compiled while
+  ##   it starts, see R/launchCerebro.R). Not the Immune repertoire and HLA &
+  ##   TCR motifs pages, which compute from the repertoire as soon as they are
+  ##   loaded.
   viewer_idle_packages <- function() {
     setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
   }
-  if (length(viewer_idle_packages())) {
-    viewer_idle_quiet <- FALSE
-    viewer_idle_cancel <- function() NULL
-    viewer_idle_load <- function() {
-      packages <- viewer_idle_packages()
-      if (session$isClosed() || !length(packages)) {
-        return()
-      }
-      viewer_idle_quiet <<- TRUE
-      tasks <- lapply(packages, function(package) {
+  viewer_idle_pack_assets <- function() {
+    signature <- tryCatch(
+      viewerPackSourceSignature(isolate(viewer_dataset_request())$target),
+      error = function(error) NULL
+    )
+    pack <- if (!is.null(signature)) {
+      .viewer_pack_process_cache[[signature$key]]$descriptor
+    }
+    if (is.list(pack)) file.path(pack$path, pack$manifest$assets$path)
+  }
+  viewer_prewarm_pages <- c(
+    "groups",
+    "geneExpression",
+    "coordinated_views",
+    "trajectory",
+    "color_management",
+    "geneIdConversion",
+    "about",
+    "markerGenes",
+    "mostExpressedGenes",
+    "enrichedPathways",
+    "extra_material",
+    "spatial",
+    "trekker"
+  )
+  viewer_idle_tasks <- function() {
+    tasks <- list()
+    for (package in viewer_idle_packages()) {
+      tasks[[paste("load package", package)]] <- local({
+        package <- package
         function() loadNamespace(package)
       })
-      names(tasks) <- paste0("load package ", packages)
-      viewerIdleRun(tasks, function() {
-        !session$isClosed() && viewer_idle_quiet
+    }
+    for (path in viewer_idle_pack_assets()) {
+      tasks[[path]] <- local({
+        path <- path
+        function() .viewerFileMd5(path)
       })
     }
-    viewer_idle_flushed <- function() {
-      viewer_idle_quiet <<- FALSE
-      viewer_idle_cancel()
-      if (!length(viewer_idle_packages())) {
-        return()
+    ## Only once the data set is loaded: before, a page cannot know what it
+    ## shows, and its sidebar item may still be hidden.
+    if (isTRUE(viewer_dataset_ready)) {
+      tasks[["gene ID table"]] <- function() viewerGeneIdTable("mouse")
+      tasks[[paste("sort genes", session$token)]] <- function() {
+        genes <- isolate(getGeneNames())
+        if (length(genes)) {
+          .viewer_sorted_gene_choices(list(genes), function() sort(genes))
+        }
       }
-      viewer_idle_cancel <<- later::later(viewer_idle_load, 3)
-      session$onFlushed(viewer_idle_flushed, once = TRUE)
+      for (page in viewer_prewarm_pages) {
+        server_file <- deferred_viewer_server_files[[page]]
+        if (
+          !isTRUE(viewer_page_available[[page]]) ||
+            exists(server_file, envir = deferred_viewer_server_loaded)
+        ) {
+          next
+        }
+        tasks[[paste("page", session$token, page)]] <- local({
+          server_file <- server_file
+          function() load_deferred_viewer_server(server_file)
+        })
+      }
     }
-    session$onFlushed(viewer_idle_flushed, once = TRUE)
-    session$onSessionEnded(function() viewer_idle_cancel())
+    tasks
   }
+  ## Quiet means no input from the browser: a click, or a page asking for its
+  ## next frame. A task's own output (a page's code renders what it shows
+  ## anyway) does not end it.
+  viewer_idle_quiet <- FALSE
+  viewer_idle_cancel <- function() NULL
+  viewer_idle_run <- function() {
+    if (session$isClosed()) {
+      return()
+    }
+    tasks <- viewer_idle_tasks()
+    ## done once per process (viewerIdleRun())
+    tasks <- tasks[!names(tasks) %in% ls(.viewer_idle_done, all.names = TRUE)]
+    if (!length(tasks)) {
+      return()
+    }
+    ## In the session's domain, as when a page is opened: the observers and
+    ## outputs a page's code makes belong to the session (they end with it, and
+    ## a cache bound to the session finds it), not to the later() callback.
+    tasks <- lapply(tasks, function(task) {
+      function() shiny::withReactiveDomain(session, task())
+    })
+    viewer_idle_quiet <<- TRUE
+    viewerIdleRun(
+      tasks,
+      function() {
+        !session$isClosed() && viewer_idle_quiet
+      },
+      ## a page that became available meanwhile is in the next list
+      done = function() {
+        if (viewer_idle_quiet) {
+          viewer_idle_cancel <<- later::later(viewer_idle_run, 0.05)
+        }
+      }
+    )
+  }
+  viewer_idle_activity <- function(...) {
+    viewer_idle_quiet <<- FALSE
+    viewer_idle_cancel()
+    viewer_idle_cancel <<- later::later(viewer_idle_run, 3)
+    invisible(NULL)
+  }
+  session$onFlushed(viewer_idle_activity, once = TRUE)
+  session$onInputReceived(viewer_idle_activity)
+  session$onSessionEnded(function() viewer_idle_cancel())
 
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).
   ##--------------------------------------------------------------------------##
   exportTestValues(
+    ## the pages whose server code is loaded (opened, or prepared while quiet)
+    loaded_pages = sort(ls(deferred_viewer_server_loaded)),
     overview_cells_to_show = {
       load_deferred_viewer_server("overview/server.R")
       if (is.null(data_set())) {

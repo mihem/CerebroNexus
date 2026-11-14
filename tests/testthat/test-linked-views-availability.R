@@ -109,6 +109,7 @@ test_that("dataset changes update the gate and leave an unavailable Linked page"
       }))
       initial_tab <- "coordinated_views"
       initial_page_applied <- shiny::reactiveVal(FALSE)
+      viewer_page_available <- new.env()
       navigation_log <- new.env()
       navigation_log$values <- character()
       updateTabItems <- function(session, id, selected) {

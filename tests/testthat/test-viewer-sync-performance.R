@@ -304,6 +304,40 @@ test_that("idle work runs one task per turn, once per process, while active", {
   expect_identical(ran, c("a", "b", "c"))
 })
 
+test_that("idle work says when every task ran, and not when it was stopped", {
+  cache_env <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("source_cache.R"), envir = cache_env)
+  done <- 0L
+  active <- TRUE
+  tasks <- list(
+    x = function() NULL,
+    y = function() active <<- FALSE,
+    w = function() NULL
+  )
+  cache_env$viewerIdleRun(
+    tasks,
+    function() active,
+    delay = 0,
+    done = function() done <<- done + 1L
+  )
+  for (i in 1:4) {
+    later::run_now()
+  }
+  ## stopped after y, before w: not done
+  expect_identical(done, 0L)
+  active <- TRUE
+  cache_env$viewerIdleRun(
+    list(z = function() NULL),
+    function() active,
+    delay = 0,
+    done = function() done <<- done + 1L
+  )
+  for (i in 1:3) {
+    later::run_now()
+  }
+  expect_identical(done, 1L)
+})
+
 test_that("viewer source runs the installed byte code of a file's helpers", {
   root <- withr::local_tempdir()
   dir.create(file.path(root, "viewer", "page"), recursive = TRUE)
