@@ -1009,3 +1009,60 @@ test_that("final metadata policies must prove their own consistency", {
     }
   })
 })
+
+test_that("a reference anywhere in the metadata policy is refused", {
+  reference <- new.env(parent = emptyenv())
+  hidden <- list(
+    policy_column = function(entry) {
+      entry$settings$metadata_policy$columns$cluster$owner <- reference
+      entry
+    },
+    policy_attribute = function(entry) {
+      attr(entry$settings$metadata_policy$retained, "owner") <- reference
+      entry
+    },
+    policy_field = function(entry) {
+      entry$settings$metadata_policy$note <- list(function() NULL)
+      entry
+    },
+    recommendation_column = function(entry) {
+      entry$settings$recommendations$metadata$columns$cluster$owner <-
+        reference
+      entry
+    },
+    recommendation_only = function(entry) {
+      entry$settings$metadata_policy <- NULL
+      entry$settings$recommendations$metadata$columns$cluster$owner <-
+        reference
+      entry
+    }
+  )
+  for (label in names(hidden)) {
+    entry <- hidden[[label]](metadata_retention_entry())
+    error <- tryCatch(
+      {
+        .builder_state_effective_metadata_policy(entry, entry$dataset_profile)
+        NULL
+      },
+      builder_state_error = identity
+    )
+    expect_s3_class(error, "builder_state_error")
+    expect_identical(error$code, "invalid_metadata_policy", info = label)
+  }
+
+  # Without recommendations the policy is searched in full.
+  alone <- metadata_retention_entry()
+  alone$settings$recommendations <- NULL
+  expect_no_error(
+    .builder_state_effective_metadata_policy(alone, alone$dataset_profile)
+  )
+  alone$settings$metadata_policy$columns$cluster$owner <- reference
+  error <- tryCatch(
+    {
+      .builder_state_effective_metadata_policy(alone, alone$dataset_profile)
+      NULL
+    },
+    builder_state_error = identity
+  )
+  expect_identical(error$code, "invalid_metadata_policy")
+})
