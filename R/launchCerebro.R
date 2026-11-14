@@ -459,6 +459,14 @@ launchCerebro <- function(
 ## `options(CerebroNexus.jit_level)`) does without until the first session has
 ## its page. An R session someone is working in keeps its setting.
 ##
+## The compiling is not saved but moved: the observers of every page run once
+## at the start of the session, uncompiled, and are compiled when they next
+## run, that is when their page is first opened. In the first session another
+## page therefore opens 0.1-0.27 s later the first time (Groups with 1.3
+## million cells: 0.30 s instead of 0.13 s), and a page never opened is never
+## compiled. Kept for the plot that comes 0.55 s sooner (2.7 s instead of
+## 3.2 s from the page request with 1.3 million cells).
+##
 ## The setting to return to is remembered once for the process, by the first
 ## App that switches compiling off; every App that does counts, and compiling
 ## is switched on again when the last of them has let go. Returns the function
