@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.1.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,8 +118,9 @@ data set (<code>closed</code>, removes the "Load data" element); defaults to
 Cerebro. Useful when using/hosting Cerebro in <code>closed</code> mode. To offer
 several data sets, pass a <em>named</em> character vector, e.g.
 <code>c(sampleA = "a.crb", sampleB = "b.crb")</code>: every name is the stable,
-unique data set identity used in links and saved state. Defaults to
-<code>NULL</code>.</p></dd>
+unique data set identity used in links and saved state. The files are read
+when the App starts, so a file that cannot be read stops the running App
+with its error. Defaults to <code>NULL</code>.</p></dd>
 
 
 <dt id="arg-welcome-message">welcome_message<a class="anchor" aria-label="anchor" href="#arg-welcome-message"></a></dt>
@@ -157,6 +158,20 @@ setting can be changed in the UI; defaults to TRUE.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Shiny application.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>To answer the first request sooner, start the App with the file
+<code>start.R</code> of the installed package instead of calling this function:
+<code>Rscript &lt;package directory&gt;/start.R --port=3838 data.crb</code>, with
+<code>system.file(package = "CerebroNexus")</code> as the package directory, or
+<code>source(system.file("start.R", package = "CerebroNexus"));
+cerebroStart("data.crb", port = 3838)</code> in R. It starts a small web server
+before CerebroNexus is loaded, which sends the page of the previous run,
+its files and the first view of the Projection page, and then runs
+<code>launchCerebro()</code> behind it; the App keeps the address it was given.
+The first start of an installation has no page to send yet and starts as
+<code>launchCerebro()</code> does.</p>
     </div>
 
     <div class="section level2">

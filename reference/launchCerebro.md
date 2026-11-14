@@ -36,8 +36,9 @@ launchCerebro(
   using/hosting Cerebro in `closed` mode. To offer several data sets,
   pass a *named* character vector, e.g.
   `c(sampleA = "a.crb", sampleB = "b.crb")`: every name is the stable,
-  unique data set identity used in links and saved state. Defaults to
-  `NULL`.
+  unique data set identity used in links and saved state. The files are
+  read when the App starts, so a file that cannot be read stops the
+  running App with its error. Defaults to `NULL`.
 
 - welcome_message:
 
@@ -74,6 +75,19 @@ launchCerebro(
 ## Value
 
 Shiny application.
+
+## Details
+
+To answer the first request sooner, start the App with the file
+`start.R` of the installed package instead of calling this function:
+`Rscript <package directory>/start.R --port=3838 data.crb`, with
+`system.file(package = "CerebroNexus")` as the package directory, or
+`source(system.file("start.R", package = "CerebroNexus")); cerebroStart("data.crb", port = 3838)`
+in R. It starts a small web server before CerebroNexus is loaded, which
+sends the page of the previous run, its files and the first view of the
+Projection page, and then runs `launchCerebro()` behind it; the App
+keeps the address it was given. The first start of an installation has
+no page to send yet and starts as `launchCerebro()` does.
 
 ## Examples
 
