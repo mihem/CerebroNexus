@@ -1078,8 +1078,15 @@ validateViewerPack <- function(
 
 ## `payload` is the CRB's serialized object when the caller has read it
 ## already (or has just written it): the CRB is then not read a second time, and
-## a thin CRB is matched through its recorded cell-name hash.
-.validateViewerPack <- function(file, pack, full, payload = NULL) {
+## a thin CRB is matched through its recorded cell-name hash. `crb_md5` is the
+## CRB's MD5 when the caller has just computed it from the file.
+.validateViewerPack <- function(
+  file,
+  pack,
+  full,
+  payload = NULL,
+  crb_md5 = NULL
+) {
   if (!file.exists(file) || dir.exists(file)) {
     return(.viewerPackInvalid("CRB is missing"))
   }
@@ -1100,7 +1107,7 @@ validateViewerPack <- function(
   if (
     !identical(
       manifest$dataset_fingerprint,
-      paste0("md5-crb-v1:", .viewerPackMd5(file))
+      paste0("md5-crb-v1:", crb_md5 %||% .viewerPackMd5(file))
     )
   ) {
     return(.viewerPackInvalid("Viewer Pack dataset fingerprint mismatch"))
@@ -1264,9 +1271,12 @@ buildViewerPack <- function(
     add = TRUE
   )
   built <- .viewerPackBuildAssets(object, stage)
+  ## The CRB is hashed once (0.7 s for 380 MB): the check of the staged pack
+  ## below compares the manifest with the same file, unchanged since.
+  crb_md5 <- .viewerPackMd5(file)
   manifest <- list(
     schema_version = .viewerPackSchemaVersion,
-    dataset_fingerprint = paste0("md5-crb-v1:", .viewerPackMd5(file)),
+    dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
     cell_order_fingerprint = .viewerPackCellOrderFingerprint(cells),
     n_cells = length(cells),
     modules = built$modules,
@@ -1288,7 +1298,13 @@ buildViewerPack <- function(
     pretty = TRUE,
     dataframe = "rows"
   )
-  check <- .validateViewerPack(file, stage, full = TRUE, payload = payload)
+  check <- .validateViewerPack(
+    file,
+    stage,
+    full = TRUE,
+    payload = payload,
+    crb_md5 = crb_md5
+  )
   if (!isTRUE(check$valid)) {
     stop("Built Viewer Pack failed validation: ", check$reason, call. = FALSE)
   }

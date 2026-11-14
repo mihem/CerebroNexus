@@ -91,6 +91,9 @@
   waited for good (5 of 19 starts of the 1.3 million cell data set with an
   empty cache, 14 of 20 with the page kept). No input is now sent before
   `init`; 31 of 31 starts drew their plot.
+- **A Viewer Pack is built 0.7 s sooner.** The CRB was hashed twice, for the
+  manifest and for the check of the pack right after; now once. A Build of
+  100,000 cells with the matrix in the CRB: 11.3 s instead of 12.1 s.
 
 # CerebroNexus 8.2.0
 
