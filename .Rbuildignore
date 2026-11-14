@@ -27,11 +27,7 @@ Rplots\.pdf$
 ^tests/node_modules$
 ^tests/bench$
 
-^scripts$
 ^tests/testthat/_artifacts$
-
-# CRAN preparation (cran-meta)
-^other_documents$
 
 # CRAN size (cran-size)
 ^vignettes/articles$
