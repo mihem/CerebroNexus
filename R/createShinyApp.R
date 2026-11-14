@@ -2461,6 +2461,12 @@ createShinyApp <- function(
   spatial_roi_settings = NULL,
   spatial_percentage_cells_to_show = 100
 ) {
+  ## An export reads each CRB whole (the preflight, the Viewer Pack check).
+  ## What it read is garbage once it returns, but R collects it only when it
+  ## next runs short, so a second export in the same R session read its CRB on
+  ## top of it: a peak of 3.3 GB instead of 2.5 GB for a 100,000 cell CRB with
+  ## its matrix inside. Collect before returning.
+  on.exit(invisible(gc(verbose = FALSE)), add = TRUE)
   # Validate inputs ----------------------------------------------------------##
   if (is.list(cerebro_data)) {
     valid_entries <- vapply(

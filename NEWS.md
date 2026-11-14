@@ -94,6 +94,10 @@
 - **A Viewer Pack is built 0.7 s sooner.** The CRB was hashed twice, for the
   manifest and for the check of the pack right after; now once. A Build of
   100,000 cells with the matrix in the CRB: 11.3 s instead of 12.1 s.
+- **`createShinyApp()` frees what it read before it returns.** It reads each
+  CRB whole, and R collected that only when it next ran short, so a second
+  export in the same R session read its CRB on top of it. Exporting a 100,000
+  cell CRB with its matrix inside twice now peaks at 2.5 GB instead of 3.3 GB.
 
 # CerebroNexus 8.2.0
 
