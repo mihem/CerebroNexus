@@ -15,8 +15,9 @@ ir_notify_slow_encoding <- function(pack) {
     } else {
       "This data set has no Viewer Pack"
     },
-    ", so its repertoire is encoded now: about a minute on a million cells, ",
-    "less when the next session reuses it. ",
+    ", so its repertoire is encoded now, in the background: about half a ",
+    "minute on a million cells; the page fills in when it is done, and the ",
+    "next session reuses it. ",
     "buildViewerPack(<crb file>, overwrite = TRUE) makes this page open in ",
     "seconds."
   )
@@ -36,36 +37,227 @@ ir_notify_slow_encoding <- function(pack) {
 ## ---- The encoded repertoire (encode.R) -------------------------------- ##
 ## The tabs read the repertoire's integer columns: the Viewer Pack's, or for a
 ## data set without a Pack, or with a Pack built before the encoding, the same
-## encoding made in memory, once per process for the data set's files.
+## encoding made from the repertoire, once per data set: kept in the user cache
+## for later sessions (ir_disk_cache_write()). A data set with its files on
+## disk is encoded by another R process (ir_encoded_background()): the
+## encoding takes 20 s and more for a million cells, during which this process
+## would answer no session; the pages say they wait, and fill in when it is
+## done.
 ir_encoded <- reactive({
   req(!is.null(data_set()))
   pack <- viewerPackCurrent()
   encoded <- if (is.list(pack)) {
     viewerPackImmuneEncoded(pack, IR_ENCODING_VERSION)
   }
-  if (!is.null(encoded)) {
-    encoded
-  } else {
-    ir_process_memo(
-      "encoded",
-      ir_dataset_process_key(data_set()),
-      function() {
-        repertoire <- getImmuneRepertoire()
-        if (!length(repertoire)) {
-          return(NULL)
-        }
-        ir_notify_slow_encoding(pack)
-        ## The ranks are sorted when a plot needs them (ir_clone_rank()).
-        ir_encode_repertoire(
-          repertoire,
-          as.character(getMetaData()$cell_barcode),
-          rank = FALSE
-        )
-      },
-      disk = TRUE
+  ## (no return() in a reactive's body: if/else)
+  if (!is.null(encoded)) encoded else ir_encoded_made(pack)
+})
+
+## The encoding of a data set whose Pack has none (ir_encoded()).
+ir_encoded_made <- function(pack) {
+  encode_here <- function() {
+    repertoire <- getImmuneRepertoire()
+    if (!length(repertoire)) {
+      return(NULL)
+    }
+    ir_notify_slow_encoding(pack)
+    ## The ranks are sorted when a plot needs them (ir_clone_rank()).
+    ir_encode_repertoire(
+      repertoire,
+      as.character(getMetaData()$cell_barcode),
+      rank = FALSE
     )
   }
-})
+  key <- ir_dataset_process_key(data_set())
+  state <- ir_encoded_background(key, pack, encode_here)
+  if (!isTRUE(state$done)) {
+    invalidateLater(500)
+    validate(need(
+      FALSE,
+      "Encoding the immune repertoire. The page fills in when it is done."
+    ))
+  }
+  state$value
+}
+
+## The jobs encoding a repertoire in another process, by data set: one per
+## process, whichever session asked first.
+ir_encode_jobs <- if (exists(".ir_encode_jobs", inherits = TRUE)) {
+  get(".ir_encode_jobs", inherits = TRUE)
+} else {
+  new.env(parent = emptyenv())
+}
+
+## The encoding of the data set `key` as list(done, value): from this process's
+## memo, from the user cache, or from a job it starts in another R process
+## (`done` FALSE while it runs). The job writes the user cache itself, so its
+## 400 MB of clone names are not sent back; it sends the encoding only when the
+## cache cannot be written. Without a key, for a small repertoire, or when no
+## job can run (no mirai), `encode_here()` encodes in this process, as before.
+ir_encoded_background <- function(key, pack, encode_here) {
+  if (is.null(key)) {
+    return(list(done = TRUE, value = encode_here()))
+  }
+  id <- paste0("encoded:", rlang::hash(key))
+  if (exists(id, envir = ir_process_cache, inherits = FALSE)) {
+    return(list(done = TRUE, value = get(id, envir = ir_process_cache)))
+  }
+  file <- ir_disk_cache_file("encoded", key)
+  finish <- function(value) {
+    assign(id, value, envir = ir_process_cache)
+    list(done = TRUE, value = value)
+  }
+  kept <- ir_disk_cache_read(file)
+  if (!is.null(kept)) {
+    return(finish(kept))
+  }
+  job <- ir_encode_jobs[[id]]
+  if (is.null(job)) {
+    if (
+      !exists(".viewerMirai", mode = "function") ||
+        !requireNamespace("mirai", quietly = TRUE)
+    ) {
+      value <- encode_here()
+      if (!is.null(value)) {
+        ir_disk_cache_write(file, value)
+      }
+      return(finish(value))
+    }
+    ## A repertoire in its sidecar file is read by the job: handing it over
+    ## (half a million rows of long strings) would hold this process for
+    ## seconds, as reading it does.
+    ds <- data_set()
+    backend <- tryCatch(ds$immune_repertoire_backend, error = function(e) NULL)
+    sidecar <- if (
+      !length(ds$immune_repertoire) &&
+        is.list(backend) &&
+        identical(backend$type, "file")
+    ) {
+      list(path = file.path(backend$root, backend$file), md5 = backend$md5)
+    }
+    repertoire <- if (is.null(sidecar)) getImmuneRepertoire()
+    if (is.null(sidecar) && !length(repertoire)) {
+      return(finish(NULL))
+    }
+    ## A small repertoire is encoded here: in less time than another R process
+    ## takes to start (50,000 rows, a 4 MB sidecar: about a second).
+    small <- if (is.null(sidecar)) {
+      sum(vapply(repertoire, NROW, integer(1))) < 50000L
+    } else {
+      isTRUE(file.size(sidecar$path) < 4 * 2^20)
+    }
+    if (small) {
+      value <- encode_here()
+      if (!is.null(value)) {
+        ir_disk_cache_write(file, value)
+      }
+      return(finish(value))
+    }
+    ir_notify_slow_encoding(pack)
+    root <- file.path(Cerebro.options[["cerebro_root"]], "viewer")
+    ## The cell names too: a Pack keeps them in the metadata's order (reading
+    ## them from the data set's H5 file held this process for two seconds).
+    cell_order <- if (
+      is.list(pack) &&
+        is.data.frame(pack$manifest$assets) &&
+        "common/cell_order.qs2" %in% pack$manifest$assets$path
+    ) {
+      list(
+        path = file.path(pack$path, "common", "cell_order.qs2"),
+        n = as.integer(pack$cell_count %||% pack$manifest$n_cells)
+      )
+    }
+    ir_encode_jobs[[id]] <- .viewerMirai(
+      {
+        if (is.null(cells)) {
+          cells <- qs2::qs_read(cell_order$path)
+          if (!is.character(cells) || length(cells) != cell_order$n) {
+            stop("The Viewer Pack's cell order does not match the data set.")
+          }
+        }
+        if (!is.null(sidecar)) {
+          ## as Cerebro$getImmuneRepertoire() reads it: the checked file, its
+          ## cell index (a thin CRB's) back to cell names
+          if (!identical(unname(tools::md5sum(sidecar$path)), sidecar$md5)) {
+            stop("The immune repertoire sidecar checksum does not match.")
+          }
+          connection <- file(sidecar$path, open = "rb")
+          magic <- readBin(connection, "raw", n = 4L)
+          close(connection)
+          repertoire <- if (identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+            qs2::qs_read(sidecar$path)
+          } else {
+            readRDS(sidecar$path)
+          }
+          repertoire <- lapply(repertoire, function(sample) {
+            column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
+            if (is.null(column)) {
+              return(sample)
+            }
+            index <- sample[[column]]
+            if (
+              !identical(column, "barcode") ||
+                !is.integer(index) ||
+                anyNA(index) ||
+                any(index < 1L | index > length(cells))
+            ) {
+              stop("The thin CRB stores an invalid repertoire cell index.")
+            }
+            attr(sample, "cerebro_cell_index_column") <- NULL
+            sample[[column]] <- cells[index]
+            sample
+          })
+        }
+        if (!length(repertoire)) {
+          return(list(written = FALSE, value = NULL))
+        }
+        scope <- new.env(parent = globalenv())
+        scope$`%||%` <- function(a, b) if (is.null(a)) b else a
+        sys.source(encode_file, envir = scope)
+        ## the functions of data.R that keep an encoding (not its reactives)
+        for (expression in parse(data_file, keep.source = FALSE)) {
+          if (
+            is.call(expression) &&
+              identical(expression[[1L]], as.name("<-")) &&
+              is.call(expression[[3L]]) &&
+              identical(expression[[3L]][[1L]], as.name("function"))
+          ) {
+            eval(expression, scope)
+          }
+        }
+        value <- scope$ir_encode_repertoire(repertoire, cells, rank = FALSE)
+        scope$ir_disk_cache_write(file, value)
+        written <- file.exists(file) &&
+          file.exists(scope$ir_disk_cache_names_file(file))
+        if (written) list(written = TRUE) else list(written = FALSE, value = value)
+      },
+      repertoire = repertoire,
+      sidecar = sidecar,
+      cell_order = cell_order,
+      cells = if (is.null(cell_order)) {
+        as.character(getMetaData()$cell_barcode)
+      },
+      file = file,
+      encode_file = file.path(root, "immune_repertoire", "encode.R"),
+      data_file = file.path(root, "immune_repertoire", "data.R")
+    )
+    return(list(done = FALSE))
+  }
+  if (mirai::unresolved(job)) {
+    return(list(done = FALSE))
+  }
+  rm(list = id, envir = ir_encode_jobs)
+  result <- job$data
+  if (mirai::is_error_value(result) || !is.list(result)) {
+    ## the other process failed: encode here, as before
+    value <- encode_here()
+    if (!is.null(value)) {
+      ir_disk_cache_write(file, value)
+    }
+    return(finish(value))
+  }
+  finish(if (isTRUE(result$written)) ir_disk_cache_read(file) else result$value)
+}
 
 ## The clones `ids` of `column` on `chain`: in memory, read from the file an
 ## encoding kept between sessions holds them in (ir_disk_cache_read()), or from

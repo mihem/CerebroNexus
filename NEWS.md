@@ -115,6 +115,13 @@
   names apart: they are read only by the clone tables and Compare, so a later
   session opens the page in 0.5 s instead of 5.6 s and holds 400 MB less. An
   encoding kept by an earlier release is converted at its next use.
+- **A large repertoire is encoded in another R process.** Encoding the
+  repertoire of a data set without a current Viewer Pack (Ren: 25 s) held the
+  App's R process, so every page of every session waited for it. Another
+  process encodes it now and keeps it in the user cache; the Immune
+  repertoire page says it waits and fills in when it is done, and the other
+  pages open as before meanwhile (Groups 0.3 s instead of 20 s). A small
+  repertoire (under 50,000 rows) is still encoded at once.
 - **A page opened while the App connects no longer stays "Loading".** Since
   the page is on screen before its session starts, a page could be clicked
   while the browser was connecting. Shiny then sent that click ahead of its

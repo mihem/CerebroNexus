@@ -121,6 +121,9 @@ viewerCellNamesKept <- function(fingerprint, n, target) {
 ## choices scanned from the whole repertoire), shared by every session of the
 ## process that opens the same files (see ir_process_memo()).
 .ir_process_cache <- new.env(parent = emptyenv())
+## The jobs encoding a repertoire in another R process (ir_encoded_background()),
+## one per data set for every session of the process.
+.ir_encode_jobs <- new.env(parent = emptyenv())
 ## Evaluated in a mirai daemon with `cells` (or NULL and the Pack's
 ## `asset_file`), the cell count `n`, the target `file` and, to keep the file
 ## for later processes, the directory `keep` and the `fingerprint` of the cell

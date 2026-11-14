@@ -144,3 +144,76 @@ test_that("encoding in memory says why and how to avoid it", {
     fixed = TRUE
   )
 })
+
+test_that("another R process encodes the repertoire, and keeps it for the next session", {
+  skip_on_cran()
+  skip_if_not_installed("qs2")
+  skip_if_not_installed("mirai")
+  withr::local_envvar(CEREBRO_IR_CACHE = withr::local_tempdir())
+  scope <- ir_cache_functions()
+  sys.source(viewer_test_path("immune_repertoire", "encode.R"), scope)
+  scope$ir_process_cache <- new.env()
+  scope$ir_encode_jobs <- new.env()
+  scope$Cerebro.options <- list(
+    cerebro_root = dirname(dirname(viewer_test_path("immune_repertoire")))
+  )
+  ## as .viewerMirai() in viewer/crb_cache.R starts it
+  scope$.viewerMirai <- function(.expr, ...) {
+    expr <- substitute(.expr)
+    mirai::mirai(expr, ...)
+  }
+  repertoire <- list(
+    s1 = data.frame(
+      barcode = c("a1", "a2", "a3"),
+      CTgene = c("TRAV1.TRAJ1_TRBV2.TRBJ1", "TRAV1.TRAJ1_TRBV2.TRBJ1", NA),
+      CTnt = c("x_y", "x_y", ""),
+      CTaa = c("CAA_CBB", "CAA_CBB", ""),
+      CTstrict = c("TRAV1.TRAJ1;x_TRBV2.TRBJ1;y", "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y", "")
+    )
+  )
+  cells <- c("a2", "a1", "a3", "a4")
+  ## large enough for another process (50,000 rows)
+  repertoire$s1 <- repertoire$s1[rep(1:3, length.out = 50001L), ]
+  scope$data_set <- function() list(immune_repertoire = repertoire)
+  scope$getImmuneRepertoire <- function() repertoire
+  scope$getMetaData <- function() data.frame(cell_barcode = cells)
+  scope$ir_notify_slow_encoding <- function(pack) invisible(NULL)
+  key <- list(path = "a.crb", size = 1, mtime = 2, repertoire = "")
+  here <- function() stop("encoded in this process")
+
+  first <- scope$ir_encoded_background(key, NULL, here)
+  expect_false(first$done)
+  ## a small repertoire is encoded at once, in this process
+  large <- scope$getImmuneRepertoire
+  scope$getImmuneRepertoire <- function() lapply(repertoire, utils::head, 3L)
+  small <- scope$ir_encoded_background(
+    modifyList(key, list(path = "small.crb")),
+    NULL,
+    function() list(version = 2L, encoded = "here")
+  )
+  scope$getImmuneRepertoire <- large
+  expect_true(small$done)
+  expect_identical(small$value$encoded, "here")
+  deadline <- Sys.time() + 60
+  repeat {
+    state <- scope$ir_encoded_background(key, NULL, here)
+    if (isTRUE(state$done) || Sys.time() > deadline) break
+    Sys.sleep(0.1)
+  }
+  expect_true(state$done)
+  expected <- scope$ir_encode_repertoire(repertoire, cells, rank = TRUE)
+  ## the same encoding, its names kept apart and read on demand
+  expect_identical(state$value$clones, expected$clones)
+  expect_identical(state$value$cell, expected$cell)
+  expect_identical(state$value$rank, expected$rank)
+  expect_null(state$value$names)
+  expect_identical(
+    scope$ir_clone_names(state$value, "CTaa", "both", 1L),
+    expected$names$CTaa$both[[1L]]
+  )
+  ## the next process reads it from the cache, without a job
+  scope$ir_process_cache <- new.env()
+  again <- scope$ir_encoded_background(key, NULL, here)
+  expect_true(again$done)
+  expect_identical(again$value$clones, expected$clones)
+})
