@@ -2,12 +2,9 @@
 ## load packages
 ##----------------------------------------------------------------------------##
 library(shiny)
-library(shinydashboard)
-library(shinyWidgets)
-library(shinyjs)
-library(DT)
-library(plotly)
-library(dplyr)
+## What only a session uses is attached once the first page is sent
+## (viewer/staged_start.R).
+source("viewer/staged_start.R", local = TRUE)
 
 source("viewer/million_cell_demo.R", local = TRUE)
 
@@ -240,18 +237,49 @@ Cerebro.options <- viewerAddTcellDemo(Cerebro.options)
 options(shiny.maxRequestSize = 6 * 1024^2)
 
 ##----------------------------------------------------------------------------##
-## load server and UI functions
+## The page now; the packages and the server code once the page is sent
 ##----------------------------------------------------------------------------##
+viewer_app_environment <- environment()
+viewer_start <- viewerStagedStart(
+  packages = c(
+    "shinydashboard",
+    "shinyWidgets",
+    "shinyjs",
+    "DT",
+    "plotly",
+    "dplyr"
+  ),
+  load_server = function() {
+    source("viewer/shiny_server.R", local = viewer_app_environment)
+    get("server", envir = viewer_app_environment, inherits = FALSE)
+  }
+)
 source("viewer/shiny_UI.R", local = TRUE)
-source("viewer/shiny_server.R", local = TRUE)
+source("viewer/transport_compat.R", local = TRUE)
+## The page as a file, when an earlier process of this Viewer kept it.
+source("viewer/core/kept_document.R", local = TRUE)
+viewer_document <- viewerStagedDocument(
+  viewer_start,
+  viewerUiCacheKey(
+    file.path(Cerebro.options[["cerebro_root"]], "viewer"),
+    c(
+      version = as.character(Cerebro.options[["cerebro_version"]]),
+      www_prefix = as.character(cerebro_www_prefix %||% ""),
+      transport = viewerDocumentTransport(viewerSockjsCompatEnabled())
+    )
+  )
+)
+## A page can ask for the first view of its Projection before its session
+## exists, so the kept ones are published before the server code is loaded.
+source("viewer/core/shared_resources.R", local = TRUE)
+try(viewerFirstViewPublishKept(Cerebro.options), silent = TRUE)
 
 ##----------------------------------------------------------------------------##
 ## Shiny Server cannot carry binary WebSocket frames; wrap them there only
 ##----------------------------------------------------------------------------##
-source("viewer/transport_compat.R", local = TRUE)
 app_transport <- viewerApplyTransportCompat(
-  ui,
-  server,
+  viewer_start$ui(ui),
+  viewer_start$server,
   Cerebro.options[["cerebro_root"]]
 )
 
@@ -263,5 +291,13 @@ shiny::shinyApp(
   server = app_transport$server,
   uiPattern = viewerDatasetUiPattern(
     names(Cerebro.options[["crb_file_to_load"]])
-  )
+  ),
+  onStart = function() {
+    ## With the page as a file nothing asks R for it: prepare at once.
+    viewer_start$on_start(if (is.null(viewer_document$directory)) 1 else 0.05)
+    viewer_document$on_start()
+    ## Viewer Pack files a page may ask for before its session exists get
+    ## their headers as soon as the web server runs.
+    later::later(viewerSharedResourceHeaders, 0)
+  }
 )

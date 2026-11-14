@@ -69,6 +69,24 @@
   everything runs in the order of the page; scripts with `defer` are joined
   among themselves. `options(CerebroNexus.bundle = FALSE)` serves the page as
   it was.
+- **Start of an App behind Shiny Server.** An App that Shiny runs from an
+  `app.R` (the demo App of the package under Shiny Server, or
+  `shiny::runApp()` on its directory) is usually started by its first visitor,
+  because Shiny Server stops an App nobody uses. That visitor now has the plot
+  3.6 s instead of 7.1 s after the page is requested, and 4.5 s instead of
+  8.0 s with 1.46 million cells; the preview of the first view after 1.6 s
+  instead of 4.6 s (3.0 s instead of 5.2 s); the first byte of the page after
+  1.1 s instead of 3.6 s; and the page takes 17 requests instead of 67 (one
+  Shiny Server in Docker, medians of 6 cold starts). `app.R` makes the page
+  and starts; plotly, DT, dplyr and the server code are loaded once the page
+  is sent, while the browser fetches its files, and the server function is
+  compiled to byte code after the first session has its page. From its second
+  start on such an App serves the page as a file with its scripts and styles
+  joined, as `launchCerebro()` does; under Shiny Server that was never kept,
+  because the process refused the request for its own page. The first start
+  after an installation, or after a change of Shiny Server's configuration,
+  sends the page as before. A visit to a process that already runs is
+  unchanged. Apps exported with `createShinyApp()` start as before.
 - **The H5 file is hashed once, and not before the first view.** A CRB
   written with its expression in an H5 file records the MD5 of that file, and
   the file was hashed twice in every process before the first session had its

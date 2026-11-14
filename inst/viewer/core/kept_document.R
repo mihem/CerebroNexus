@@ -30,8 +30,12 @@
 ## served from "cerebro-bundle/" with a header that lets a browser keep it.
 ## Both forms are kept; options(CerebroNexus.bundle = FALSE) uses the first.
 ##
-## Not under Shiny Server, where the page carries one more script
-## (transport_compat.R), and not with options(CerebroNexus.ui_cache = FALSE).
+## An app.R keeps and serves its page the same way (viewerStagedDocument() in
+## staged_start.R), also under Shiny Server. The page is another one there: it
+## carries one more script of the Viewer (transport_compat.R) and what Shiny
+## Server adds to every page it sends, so its key says how the page is sent
+## (viewerDocumentTransport()). launchCerebro() does not keep the page under
+## Shiny Server. Nothing is kept with options(CerebroNexus.ui_cache = FALSE).
 
 viewerDocumentDirectory <- function() {
   directory <- file.path(tempdir(), "cerebro-document")
@@ -535,6 +539,27 @@ viewerDocumentAddress <- function(server) {
   sprintf("http://%s:%d/", host, as.integer(server$getPort()))
 }
 
+## What the page as it is sent depends on besides the page: whether the
+## Viewer adds its script for Shiny Server (`sockjs`), and what the server
+## that runs the App adds to every page. Shiny Server does that with
+## options(shiny.http.response.filter), a function that holds the text it
+## inserts (its scripts, and the settings of its configuration file). A value
+## for the key of the document.
+viewerDocumentTransport <- function(sockjs = FALSE) {
+  filter <- getOption("shiny.http.response.filter")
+  added <- NULL
+  if (is.function(filter)) {
+    added <- tryCatch(
+      get0("inject", envir = environment(filter), inherits = FALSE),
+      error = function(error) NULL
+    )
+    if (!is.character(added)) {
+      added <- deparse(body(filter))
+    }
+  }
+  rlang::hash(list(sockjs = isTRUE(sockjs), added = added))
+}
+
 ## Fetches "/" from the running web server in a background R process (this one
 ## has to answer the request) and keeps the document for `key`. `fetch(address)`
 ## returns a mirai whose value is the raw response.
@@ -563,14 +588,25 @@ viewerDocumentCapture <- function(
 
 ## Started like every background task of the Viewer, through .viewerMirai()
 ## (crb_cache.R), which the prepared Viewer has loaded: the child R process
-## finds its packages where this one did.
+## finds its packages where this one did. Shiny Server lets the App answer
+## only requests that carry the secret it gave the process.
 viewerDocumentFetch <- function(address) {
+  secret <- getOption("shiny.sharedSecret")
   .viewerMirai(
     {
-      connection <- url(address, open = "rb")
+      connection <- if (is.character(secret) && nzchar(secret)) {
+        url(
+          address,
+          open = "rb",
+          headers = c("Shiny-Shared-Secret" = secret)
+        )
+      } else {
+        url(address, open = "rb")
+      }
       on.exit(close(connection))
       readBin(connection, "raw", n = 5e7)
     },
-    address = address
+    address = address,
+    secret = secret
   )
 }
