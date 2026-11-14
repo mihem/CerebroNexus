@@ -19,7 +19,7 @@ function session() {
   const c = {D: base, linkedBundle: base, linkedState: {selection: [42]},
     singleActive: null, singleSpaceIds: [], singleSpaceModes: {},
     lastVis: null, page: 'linked', surfaceHome: {panes: {}}, rebuildingBase: false,
-    drawAllDeferred: false,
+    drawAllDeferred: false, awaitingSupplement: null,
     deferredLinkedSupplements: [], pendingCloneSupplement: null, transportMetrics: {},
     linkedRequestTiming: {}, singleTiming: {}, saved: {}, restored: [], hydrated: [],
     frames: [], fallbacks: 0, performance: {now: () => 1},

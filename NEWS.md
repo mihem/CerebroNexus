@@ -133,6 +133,18 @@
   Ren. A thin CRB's repertoire is matched to its cells by their row, without
   reading the cell names. The notice that the repertoire is being encoded is
   shown on the Immune repertoire page only.
+- **Linked views opens 0.1 s sooner.** The workspace came in two parts: one
+  projection first, drawn and painted although it stays hidden until the rest
+  is there, and only then the request for the rest, after which everything was
+  built and drawn again. The rest is now requested as soon as the first part's
+  data is in, and the workspace is drawn once (if the rest is late, the first
+  part is drawn alone after 1.5 s, as before). Point colours by group or by a
+  continuous value are packed once per level or step instead of once per cell
+  (the trajectory panel of 1.3 million cells: 50 ms instead of 80 to 95 ms, at
+  every recolouring too), a group's cells are counted for the legend once
+  instead of at every render, and a slider is no longer rebuilt when its state
+  has not changed. With 1.3 million cells, after 15 s on the Projection: 0.57 s
+  instead of 0.66 s (WSL, headless Chrome).
 - **Colour management opens sooner for groups with many levels.** The page
   makes a colour picker for every level of every group: 661 for Ren, which
   took 2.4 s, most of it in the browser. A picker is now made when it comes

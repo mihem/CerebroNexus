@@ -53,6 +53,10 @@
   var linkedState = null;       // Linked workspace state while a single page owns the surface
   var pendingColorPatch = null; // palette received before its dataset bundle
   var progressiveRequestedKey = null;
+  // The progressive primary bundle whose supplement has been asked for before
+  // it is drawn (onBinaryData()): its frame stays concealed until the
+  // supplement is merged, so it is drawn once, with the supplement.
+  var awaitingSupplement = null;
   var assetCache = Object.create(null);
   var pendingAssets = new Set();
   var pendingCloneDetails = new Set();
@@ -858,6 +862,30 @@
     if (!r) return v / span;
     if (r.hi <= r.lo) return 0;
     return Math.max(0, Math.min(1, (v - r.lo) / (r.hi - r.lo)));
+  }
+
+  // The continuous colouring of panel p as colorOf() computes it, per cell
+  // value: the values, their scale, and the colour of each of the 256 steps.
+  // `missing`: a missing value is painted '#e6e7ea' (fields, not genes). Null
+  // for a categorical, RGB, constant or direct colouring.
+  function continuousColours(p) {
+    var mode = panelColorMode(p);
+    if (mode === GENE_MODE) {
+      return D.gene ? {
+        values: D.gene.v, span: 255, range: clipRange(p), missing: false,
+        colour: function (step) { return viridisCss(step / 255); }
+      } : null;
+    }
+    if (mode === RGB_MODE) return null;
+    var fld = fieldForMode(mode);
+    if (!fld || fld.constantColor || fld.colors) return null;
+    var palette = fld.palette;
+    return {
+      values: fld.v, span: fld.scale || 255, range: clipRange(p), missing: true,
+      colour: function (step) {
+        return palette ? palette[step] : viridisCss(step / 255);
+      }
+    };
   }
 
   function colorOf(i, p) {
@@ -2245,6 +2273,93 @@
       var packedRgba = (flatRgba[0] | (flatRgba[1] << 8) |
         (flatRgba[2] << 16) | (flatAlpha << 24)) >>> 0;
       new Uint32Array(colors.buffer).fill(packedRgba);
+    } else if (categoricalGroup && !hiSet) {
+      // Colour by group, nothing highlighted: one packed RGBA per level, with
+      // the panel's opacity, written as one 32-bit word per cell (1.3 million
+      // cells: 0.1 s less than four bytes and a rounding each).
+      var levelAlpha = pointOpacityOf(p);
+      var packLevel = function (rgba) {
+        return (rgba[0] | (rgba[1] << 8) | (rgba[2] << 16) |
+          (Math.round(rgba[3] * levelAlpha) << 24)) >>> 0;
+      };
+      var levelWords = new Uint32Array(categoricalRgba.map(packLevel));
+      var levelOpaque = categoricalRgba.map(function (rgba) { return rgba[3] === 255; });
+      var missingWord = packLevel(missingCategoricalRgba);
+      var missingOpaque = missingCategoricalRgba[3] === 255;
+      var levelCount = levelWords.length, words = new Uint32Array(colors.buffer);
+      var levelValues = categoricalGroup.values;
+      for (var cat_at = 0; cat_at < visits; cat_at++) {
+        i = order ? order[cat_at] : cells ? cells[cat_at] : cat_at;
+        if (pending) {
+          x = pending.x[i]; y = pending.y[i];
+          if (x != null && y != null && isFinite(x) && isFinite(y)) {
+            unit.nx[i] = (x - unit.x0) * unit.k;
+            unit.ny[i] = (y - unit.y0) * unit.ky;
+            unit.ok[i] = 1;
+            cmx += unit.nx[i]; cmy += unit.ny[i]; validCount++;
+            unit.occ[occIdx(unit.ny[i]) * OCC + occIdx(unit.nx[i])] = 1;
+          }
+        }
+        if (!unit.ok[i] || !shownMask[i]) continue;
+        vertexIndex[i] = out + 1;
+        positions[out * 2] = unit.nx[i];
+        positions[out * 2 + 1] = unit.ny[i];
+        var level = levelValues[i];
+        if (level == null || level < 0 || level >= levelCount) {
+          words[out] = missingWord;
+          if (!missingOpaque) opaque = false;
+        } else {
+          words[out] = levelWords[level];
+          if (!levelOpaque[level]) opaque = false;
+        }
+        out++;
+      }
+    } else if (!rgb && !hiSet && continuousColours(p)) {
+      // A continuous colouring, nothing highlighted: every colour is one of 256
+      // steps (colorOf()), packed once with the panel's opacity. A value off
+      // the scale (NaN) takes colorOf() as before.
+      var scale = continuousColours(p), stepAlpha = pointOpacityOf(p);
+      var stepWords = new Uint32Array(256), stepOpaque = new Uint8Array(256);
+      var stepDone = new Uint8Array(256), stepWordsOut = new Uint32Array(colors.buffer);
+      var stepWord = function (rgba) {
+        return (rgba[0] | (rgba[1] << 8) | (rgba[2] << 16) |
+          (Math.round(rgba[3] * stepAlpha) << 24)) >>> 0;
+      };
+      for (var step_at = 0; step_at < visits; step_at++) {
+        i = order ? order[step_at] : cells ? cells[step_at] : step_at;
+        if (pending) {
+          x = pending.x[i]; y = pending.y[i];
+          if (x != null && y != null && isFinite(x) && isFinite(y)) {
+            unit.nx[i] = (x - unit.x0) * unit.k;
+            unit.ny[i] = (y - unit.y0) * unit.ky;
+            unit.ok[i] = 1;
+            cmx += unit.nx[i]; cmy += unit.ny[i]; validCount++;
+            unit.occ[occIdx(unit.ny[i]) * OCC + occIdx(unit.nx[i])] = 1;
+          }
+        }
+        if (!unit.ok[i] || !shownMask[i]) continue;
+        vertexIndex[i] = out + 1;
+        positions[out * 2] = unit.nx[i];
+        positions[out * 2 + 1] = unit.ny[i];
+        var value = scale.values[i];
+        var step = scale.missing && (value == null || isNaN(value)) ? -1
+          : Math.round(clipT(value, scale.span, scale.range) * 255);
+        if (step >= 0 && step <= 255) {
+          if (!stepDone[step]) {
+            var stepRgba = gpuColor(scale.colour(step));
+            stepWords[step] = stepWord(stepRgba);
+            stepOpaque[step] = stepRgba[3] === 255 ? 1 : 0;
+            stepDone[step] = 1;
+          }
+          stepWordsOut[out] = stepWords[step];
+          if (!stepOpaque[step]) opaque = false;
+        } else {
+          var offRgba = gpuColor(colorOf(i, p));
+          stepWordsOut[out] = stepWord(offRgba);
+          if (offRgba[3] !== 255) opaque = false;
+        }
+        out++;
+      }
     } else {
       for (var at = 0; at < visits; at++) {
         i = order ? order[at] : cells ? cells[at] : at;
@@ -2612,7 +2727,7 @@
   }
   var drawAllDeferred = false;
   function drawAll() {
-    if (drawAllDeferred) return;
+    if (drawAllDeferred || (awaitingSupplement && awaitingSupplement === D)) return;
     var first = null;
     panels.forEach(function (p) {
       if (!p.spaceId) { p.cloneBase = null; return; }
@@ -2625,7 +2740,8 @@
   }
   // One panel whose own view changed (zoom, reset): the others are unchanged.
   function drawPanel(p) {
-    if (drawAllDeferred || !p || !p.spaceId) return;
+    if (drawAllDeferred || !p || !p.spaceId ||
+        (awaitingSupplement && awaitingSupplement === D)) return;
     var state = shownState(p);
     draw(p, state.mask, state.count);
     updateResetButtons();
@@ -2677,8 +2793,10 @@
     var el = $(id); if (!el) return;
     el.value = String(value);
     var slider = window.jQuery(el).data('ionRangeSlider');
-    // update() rebuilds the slider, ending a drag in progress on it.
-    if (!slider || (step == null && slider.result.from === Number(value))) return;
+    // update() rebuilds the slider, ending a drag in progress on it, and costs
+    // a layout: not for the value and step it shows already.
+    if (!slider || (slider.result.from === Number(value) &&
+        (step == null || slider.options.step === step))) return;
     var options = { from: Number(value) };
     if (step != null) options.step = step;
     el._cvSyncing = true;
@@ -2694,7 +2812,8 @@
     var el = $(id); if (!el) return;
     el.disabled = disabled;
     var slider = window.jQuery(el).data('ionRangeSlider');
-    if (!slider) return;
+    // Every readout asks; the slider is rebuilt only when the state changes.
+    if (!slider || !!slider.options.disable === !!disabled) return;
     el._cvSyncing = true;
     try { slider.update({ disable: disabled }); }
     finally { el._cvSyncing = false; }
@@ -4703,6 +4822,8 @@
       Number(field.max).toFixed(1);
     var note = $('cv-cbar-note'); if (note) note.textContent = '';
   }
+  // Each group's cell counts by its values array (renderLegend()).
+  var legendCounts = new WeakMap();
   function renderLegend() {
     var L = $('cv-legend'); if (!L) return;
     var singlePayload = singleActive && singleView(singleActive);
@@ -4805,14 +4926,23 @@
     if (!g) { appendEvidenceLegend(); return; }
     // A single view counts the cells it shows, also when "% of cells" and the
     // group filters are applied here rather than by the server.
-    var counts = new Float64Array(g.levels.length + 1), values = g.values;
+    var values = g.values;
     var mask = singleActive ? pctMask : null;
     var filtered = !!singleActive && Object.keys(groupFilter).length > 0;
-    for (var i = 0; i < D.n; i++) {
-      if (mask && !mask[i]) continue;
-      if (filtered && !activeCell(i)) continue;
-      var level = values[i];
-      if (level != null && level >= 0 && level < g.levels.length) counts[level]++;
+    // Unmasked counts depend on the values alone: counted once per array, not
+    // at each of the several renders of a load (1.3 million cells: 10 ms each).
+    var cacheable = !mask && !filtered && values && typeof values === 'object';
+    var counts = cacheable ? legendCounts.get(values) : null;
+    if (!counts || counts.length !== g.levels.length + 1 || counts.n !== D.n) {
+      counts = new Float64Array(g.levels.length + 1);
+      for (var i = 0; i < D.n; i++) {
+        if (mask && !mask[i]) continue;
+        if (filtered && !activeCell(i)) continue;
+        var level = values[i];
+        if (level != null && level >= 0 && level < g.levels.length) counts[level]++;
+      }
+      counts.n = D.n;
+      if (cacheable) legendCounts.set(values, counts);
     }
     g.levels.forEach(function (nm, li) {
       var col = cssColor((g.colors && g.colors[li]) || PAL[li % PAL.length]);
@@ -10215,6 +10345,7 @@
   function onData(bundle) {
     if (!datasetMessageFresh(bundle)) return false;
     wireToken++;
+    awaitingSupplement = null;
     applyData(bundle);
     return true;
   }
@@ -10252,7 +10383,26 @@
     hydrateLinkedPrimaryResources(decoded).then(function (hydrated) {
       if (token !== wireToken) return;
       var applyStarted = performance.now();
-      applyData(hydrated.bundle);
+      // A progressive primary frame is concealed until its supplement is
+      // merged: ask for the supplement now and draw both at once, instead of
+      // drawing and painting first a frame nobody sees (1.3 million cells:
+      // 0.2 s). Drawn alone if the supplement is late.
+      var bundle = hydrated.bundle;
+      awaitingSupplement = bundle && bundle.progressive === true &&
+        typeof Shiny !== 'undefined' && Shiny.setInputValue ? bundle : null;
+      applyData(bundle);
+      if (bundle && awaitingSupplement === bundle) {
+        if (D === bundle && requestSupplement(true)) {
+          window.setTimeout(function () {
+            if (awaitingSupplement !== bundle) return;
+            awaitingSupplement = null;
+            if (D === bundle) { drawAll(); reportWorkspaceReady(); }
+          }, 1500);
+        } else {
+          awaitingSupplement = null;
+          if (D === bundle) { drawAll(); reportWorkspaceReady(); }
+        }
+      }
       var applyMs = performance.now() - applyStarted;
       var rendererStats = panels.length && panels[0].gpu && panels[0].gpu.stats
         ? panels[0].gpu.stats() : {};
@@ -10495,6 +10645,9 @@
     // navigation has mounted another page's data in the shared renderer.
     if (holdSupplement({ extra: extra, metric: metric })) return;
     var drawStarted = performance.now();
+    // The primary frame waited for this supplement undrawn.
+    var undrawn = !!awaitingSupplement && awaitingSupplement === D;
+    awaitingSupplement = null;
     try {
       var structural = !!(extra.clone || extra.trekker ||
         (extra.spaces && extra.spaces.length) ||
@@ -10505,6 +10658,7 @@
         (!extra.projections || !Object.keys(extra.projections).length));
       if (cloneOnly && applyCloneSupplement(extra)) {
         if (extra.progressive_complete !== false) D.progressive = false;
+        if (undrawn) drawAll();
         reportWorkspaceReady();
       } else if (structural) {
         var saved = exportRuntimeWorkspace();
@@ -10540,6 +10694,7 @@
         fillColorPicker();
         renderGroupFilters();
         renderLegend();
+        if (undrawn) drawAll();
         reportWorkspaceReady();
       }
       transportMetrics[extra.progressive_complete === false
@@ -11604,22 +11759,31 @@
         eventKind: eventKind || 'primary'
       }
     }));
-    if (summary.primaryReady && D.progressive && Shiny.setInputValue) {
-      var fingerprint = configFingerprint();
-      var key = String(D.dataset_id || '') + '\u0000' + fingerprint +
-        '\u0000' + String(D.progressive_token || '');
-      if (progressiveRequestedKey !== key) {
-        progressiveRequestedKey = key;
-        Shiny.setInputValue('coordviews_primary_ready', {
-          dataset_context: D.dataset_context,
-          dataset_id: D.dataset_id,
-          dataset_fingerprint: fingerprint,
-          progressive_token: D.progressive_token,
-          modalities: requestedModalities(),
-          nonce: Date.now()
-        }, { priority: 'event' });
-      }
+    if (summary.primaryReady) requestSupplement(false);
+  }
+
+  // Asks the server for the rest of a progressive workspace, once per bundle:
+  // when its primary frame is drawn, or before (`early`, onBinaryData()).
+  // TRUE when it is asked now or was before.
+  function requestSupplement(early) {
+    if (!D || !D.progressive || typeof Shiny === 'undefined' ||
+        !Shiny.setInputValue) return false;
+    var fingerprint = configFingerprint();
+    if (early && !fingerprint) return false;
+    var key = String(D.dataset_id || '') + '\u0000' + fingerprint +
+      '\u0000' + String(D.progressive_token || '');
+    if (progressiveRequestedKey !== key) {
+      progressiveRequestedKey = key;
+      Shiny.setInputValue('coordviews_primary_ready', {
+        dataset_context: D.dataset_context,
+        dataset_id: D.dataset_id,
+        dataset_fingerprint: fingerprint,
+        progressive_token: D.progressive_token,
+        modalities: requestedModalities(),
+        nonce: Date.now()
+      }, { priority: 'event' });
     }
+    return true;
   }
 
   function reportWorkspaceReady(eventKind) {
