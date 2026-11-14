@@ -56,6 +56,52 @@ test_that("an encoding made in memory is kept for the next session", {
   expect_length(list.files(Sys.getenv("CEREBRO_IR_CACHE")), 2L)
 })
 
+test_that("a kept encoding reads its clone names only when they are asked for", {
+  skip_if_not_installed("qs2")
+  withr::local_envvar(CEREBRO_IR_CACHE = withr::local_tempdir())
+  scope <- ir_cache_functions()
+  sys.source(viewer_test_path("immune_repertoire", "encode.R"), scope)
+  scope$IR_ENCODING_VERSION <- 1L
+  scope$ir_process_cache <- new.env()
+  names_of <- list(CTaa = list(both = c("CASSZ", "CASSA", "CASSM")))
+  compute <- function() {
+    list(
+      version = 1L,
+      clones = list(CTaa = list(both = 1:3)),
+      names = names_of
+    )
+  }
+  key <- list(path = "a.crb", size = 1, mtime = 2, repertoire = "")
+  first <- scope$ir_process_memo("encoded", key, compute, new.env(), disk = TRUE)
+  ## the process that encoded keeps the names in memory
+  expect_identical(first$names, names_of)
+  file <- scope$ir_disk_cache_file("encoded", key)
+  names_file <- scope$ir_disk_cache_names_file(file)
+  expect_true(file.exists(names_file))
+  ## a later process reads the columns and the ranks, not the names
+  later <- scope$ir_process_memo(
+    "encoded",
+    key,
+    function() stop("encoded again"),
+    new.env(),
+    disk = TRUE
+  )
+  expect_null(later$names)
+  expect_identical(later$rank$CTaa$both, c(3L, 1L, 2L))
+  expect_identical(
+    scope$ir_clone_names(later, "CTaa", "both", c(2L, 3L)),
+    c("CASSA", "CASSM")
+  )
+  ## without its names file the kept encoding is not used
+  unlink(names_file)
+  expect_null(scope$ir_disk_cache_read(file))
+  ## one kept in one file by an earlier release is kept again in two
+  qs2::qs_save(compute(), file)
+  expect_identical(scope$ir_disk_cache_read(file)$names, names_of)
+  expect_true(file.exists(names_file))
+  expect_true(isTRUE(qs2::qs_read(file)$names_apart))
+})
+
 test_that("a damaged or outdated cache file is encoded again", {
   skip_if_not_installed("qs2")
   withr::local_envvar(CEREBRO_IR_CACHE = withr::local_tempdir())

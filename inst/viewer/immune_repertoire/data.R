@@ -67,10 +67,14 @@ ir_encoded <- reactive({
   }
 })
 
-## The clones `ids` of `column` on `chain`: in memory, or read from the
-## Pack's blocks of names that hold them.
+## The clones `ids` of `column` on `chain`: in memory, read from the file an
+## encoding kept between sessions holds them in (ir_disk_cache_read()), or from
+## the Pack's blocks of names that hold them.
 ir_clone_names <- function(encoded, column, chain, ids) {
   names <- encoded$names[[column]][[chain]]
+  if (is.null(names) && is.character(encoded$names_file)) {
+    names <- ir_disk_cache_names(encoded$names_file)[[column]][[chain]]
+  }
   if (!is.null(names)) {
     return(names[ids])
   }
@@ -330,14 +334,47 @@ ir_disk_cache_file <- function(name, key) {
   )
 }
 
+## An encoding is kept as two files: the integer columns with the clone ranks
+## (12 MB for the 1.46 million cells of Ren, read in 0.04 s), and the clone
+## names beside it (3.3 million strings: 400 MB in memory, seconds to read),
+## which only the clone tables and Compare need: they are read then, once per
+## process (ir_clone_names()).
+ir_disk_cache_names_file <- function(file) {
+  sub("[.]qs2$", ".names.qs2", file)
+}
+
+ir_disk_cache_names <- function(names_file) {
+  id <- paste0("names:", names_file)
+  if (!exists(id, envir = ir_process_cache, inherits = FALSE)) {
+    assign(
+      id,
+      tryCatch(qs2::qs_read(names_file), error = function(e) NULL),
+      envir = ir_process_cache
+    )
+  }
+  get(id, envir = ir_process_cache, inherits = FALSE)
+}
+
 ir_disk_cache_read <- function(file) {
   if (!file.exists(file)) {
     return(NULL)
   }
   value <- tryCatch(qs2::qs_read(file), error = function(e) NULL)
-  if (is.list(value) && identical(value$version, IR_ENCODING_VERSION)) {
-    value
+  if (!is.list(value) || !identical(value$version, IR_ENCODING_VERSION)) {
+    return(NULL)
   }
+  if (isTRUE(value$names_apart)) {
+    names_file <- ir_disk_cache_names_file(file)
+    ## Without its names an encoding cannot name its clones: encode again.
+    if (!file.exists(names_file)) {
+      return(NULL)
+    }
+    value$names_file <- names_file
+  } else if (!is.null(value$names)) {
+    ## kept by an earlier release in one file: kept again in two
+    ir_disk_cache_write(file, value)
+  }
+  value
 }
 
 ## Written through a temporary name, so a session that stops half way or reads
@@ -347,10 +384,23 @@ ir_disk_cache_write <- function(file, value) {
   tryCatch(
     {
       dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
-      partial <- paste0(file, ".", Sys.getpid(), ".tmp")
-      on.exit(unlink(partial), add = TRUE)
-      qs2::qs_save(value, partial)
-      file.rename(partial, file)
+      save <- function(object, target) {
+        partial <- paste0(target, ".", Sys.getpid(), ".tmp")
+        on.exit(unlink(partial), add = TRUE)
+        qs2::qs_save(object, partial)
+        file.rename(partial, target)
+      }
+      names_file <- ir_disk_cache_names_file(file)
+      if (!is.null(value$names)) {
+        ## the names apart, written first: an encoding found has its names
+        save(value$names, names_file)
+        if (is.null(value$rank)) {
+          value$rank <- ir_clone_ranks(value$names)
+        }
+        value$names <- NULL
+        value$names_apart <- TRUE
+      }
+      save(value, file)
       ## The data set's earlier entries (another file version, another encoding
       ## version) are out of date for good.
       same_path <- sub("-[0-9a-f]+[.]qs2$", "", basename(file))
@@ -358,7 +408,10 @@ ir_disk_cache_write <- function(file, value) {
         dirname(file),
         pattern = paste0("^", gsub("-v[0-9]+-", "-v[0-9]+-", same_path), "-")
       )
-      unlink(file.path(dirname(file), setdiff(stale, basename(file))))
+      unlink(file.path(
+        dirname(file),
+        setdiff(stale, basename(c(file, names_file)))
+      ))
     },
     error = function(e) NULL
   )

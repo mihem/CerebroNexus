@@ -106,6 +106,15 @@
   which compute from the repertoire as soon as they are loaded, wait for their
   visit as before. The gene ID table is also read once per process instead of
   at every render of its page.
+- **Immune repertoire opens sooner.** With a Viewer Pack that has the
+  repertoire encoded, the page is prepared like the others while the first one
+  is read, its encoding is read from the Pack then, and the first loading
+  spinner of the process is built: 0.33 s instead of 0.45 s for the 1.46
+  million cells of Ren. With a Pack built before that encoding, the encoding
+  the page made in memory is kept between sessions in two files, the clone
+  names apart: they are read only by the clone tables and Compare, so a later
+  session opens the page in 0.5 s instead of 5.6 s and holds 400 MB less. An
+  encoding kept by an earlier release is converted at its next use.
 - **A page opened while the App connects no longer stays "Loading".** Since
   the page is on screen before its session starts, a page could be clicked
   while the browser was connecting. Shiny then sent that click ahead of its
