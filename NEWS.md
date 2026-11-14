@@ -84,6 +84,13 @@
   accepted edit is derived once, and the search for references skips what the
   stored entry already has. With 63 metadata columns an edit takes 0.27 to 0.43 s
   in the browser.
+- **A page opened while the App connects no longer stays "Loading".** Since
+  the page is on screen before its session starts, a page could be clicked
+  while the browser was connecting. Shiny then sent that click ahead of its
+  `init` message, which set the server back to Data info, and the Projection
+  waited for good (5 of 19 starts of the 1.3 million cell data set with an
+  empty cache, 14 of 20 with the page kept). No input is now sent before
+  `init`; 31 of 31 starts drew their plot.
 
 # CerebroNexus 8.2.0
 

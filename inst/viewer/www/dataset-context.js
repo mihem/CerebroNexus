@@ -1,4 +1,55 @@
 /* Authoritative Viewer dataset-load context and freshness gate. */
+
+/* No input reaches the server before Shiny's `init`. Shiny sends `init` (the
+   values of every input when the page connected) right after the
+   shiny:connected handlers return. Inputs that changed before are held back
+   until then, but an input sent with priority "event" from one of those
+   handlers sends all of them at once, ahead of `init`, which then sets them
+   back on the server: a page opened while the App was connecting stayed
+   "Loading" for good, because the server still had Data info as the page.
+   Updates sent while the socket is open and `init` may not have gone out yet
+   wait for the end of that turn of the event loop. */
+(function () {
+  'use strict';
+  var S = window.Shiny;
+  if (!S || typeof S !== 'object') return;
+  function holdUntilInit(shinyapp) {
+    if (!shinyapp || typeof shinyapp.sendInput !== 'function' ||
+        shinyapp.cerebroHoldsUntilInit) return;
+    shinyapp.cerebroHoldsUntilInit = true;
+    var send = shinyapp.sendInput;
+    var initialised = null;
+    var held = [];
+    shinyapp.sendInput = function (values) {
+      var socket = shinyapp.$socket;
+      if (!socket || socket.readyState !== 1 || socket === initialised) {
+        return send.call(shinyapp, values);
+      }
+      held.push(values);
+      if (held.length > 1) return;
+      window.setTimeout(function () {
+        initialised = socket;
+        var pending = held;
+        held = [];
+        pending.forEach(function (value) { send.call(shinyapp, value); });
+      }, 0);
+    };
+  }
+  // Shiny creates its app object when it initialises, after this file ran.
+  var current = S.shinyapp;
+  try {
+    Object.defineProperty(S, 'shinyapp', {
+      configurable: true,
+      enumerable: true,
+      get: function () { return current; },
+      set: function (value) { current = value; holdUntilInit(value); }
+    });
+  } catch (e) {
+    // A Shiny object that cannot take the property keeps Shiny's behaviour.
+  }
+  holdUntilInit(current);
+})();
+
 (function () {
   'use strict';
 
