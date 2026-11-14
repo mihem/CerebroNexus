@@ -1,49 +1,5 @@
-# CerebroNexus 8.1.2
+# CerebroNexus 8.2.0
 
-- **Repository clean-up.** Removed files nothing used any more: the
-  `scripts/` folder (two Builder checks no CI workflow ran, one of them
-  broken), the Builder design notes in `other_documents/` and five Builder
-  screenshots no article linked to. The installed package is unchanged.
-
-# CerebroNexus 8.1.1
-
-- **Faster Builder import.** The Builder no longer sorts every value of a
-  metadata column to count its levels. A column with more than 100 distinct
-  values (continuous values, cell identifiers, clone names) cannot be a group;
-  its most frequent values are now counted by hashing. Inspecting a data set of
-  1 M cells with 60 metadata columns took 324 s and takes 23 s.
-- **Faster H5 export.** `expression_matrix_mode = "h5"` writes a `dgCMatrix`
-  straight into the TENx datasets instead of block by block through
-  `HDF5Array::writeTENxMatrix()`. The file is laid out as before. Writing
-  100,000 cells (198 M values) took 68 s and takes 12 s.
-- **A CRB is not read back to build its Viewer Pack.** The export functions and
-  `saveCerebro()` hand over the object they have just written, and
-  `buildViewerPack()` reads the CRB once instead of twice. An export no longer
-  hashes its H5 sidecar a second time. A Builder build of a 100,000-cell CRB
-  with an embedded matrix read the CRB four times and reads it once.
-- **Group colours show every level's cells.** For a group with more than 12
-  levels the colour panel showed 0 cells from the 13th level on. It now reads
-  the counts of all levels (up to 100) from the import profile.
-- **A Save adopts the caches of a Build that came first.** A Build run before
-  the Project existed left its CRBs unregistered, so the Save that created the
-  Project built every dataset cache again. The Save now registers those CRBs
-  for the datasets that have not changed since; every copied byte is still
-  checked against the release's MD5s. Saving 100,000 cells right after a Build
-  took 67 s (86 s on Windows) and takes 11 s (20 s).
-- **An H5 sidecar is reused when only the configuration changed.** The Builder
-  records a digest of the matrix in the sidecar and offers a cache build the
-  sidecar of the dataset's earlier cache. It is copied, after its MD5 and
-  digest are checked, instead of writing the same 2.4 GB again: that part of
-  the cache build takes 7 s instead of 21 s for 100,000 cells. Scripted
-  exports (`exportFromSeurat()`) do not hash the matrix and are unchanged.
-
-# CerebroNexus 8.1.0
-
-- **Page links.** `?page=<id>` opens the Viewer on a page (the `initial_page`
-  IDs, e.g. `?dataset=TCR&page=immune_repertoire`). The address bar now follows
-  the page and the data set being read, so a copied URL reopens them. A
-  `/<data set id>` link also works when the App is started with
-  `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
 - **First view.** A `?page=projection` link shows its plot before the session
   has started: 0.5 s instead of 1.2 s after the page is requested with 10,000
   cells, and 0.6 s with 1.3 million, on one Windows desktop.
@@ -57,7 +13,9 @@
   configured data set keep one URL for all sessions, so a browser downloads
   them once. The view of an address comes only from a frame of the data set
   that address opens, not from one the visitor switched to, and not for a link
-  that names a data set the App does not have.
+  that names a data set the App does not have. The preview lays out the legend
+  of the groups itself, so its cells are where the plot will draw them and do
+  not move when the plot takes over.
 - **Start before the data sets.** `launchCerebro()` starts its web server
   before it reads the data sets, so the App answers 0.7 s after the R process
   starts whatever their size: before, after the data sets were read (1.7 s
@@ -170,6 +128,53 @@
   next start instead of being built again (0.5 s); it is built anew when a
   Viewer file or a package the page uses changes.
   `options(CerebroNexus.ui_cache = FALSE)` turns that off.
+
+# CerebroNexus 8.1.2
+
+- **Repository clean-up.** Removed files nothing used any more: the
+  `scripts/` folder (two Builder checks no CI workflow ran, one of them
+  broken), the Builder design notes in `other_documents/` and five Builder
+  screenshots no article linked to. The installed package is unchanged.
+
+# CerebroNexus 8.1.1
+
+- **Faster Builder import.** The Builder no longer sorts every value of a
+  metadata column to count its levels. A column with more than 100 distinct
+  values (continuous values, cell identifiers, clone names) cannot be a group;
+  its most frequent values are now counted by hashing. Inspecting a data set of
+  1 M cells with 60 metadata columns took 324 s and takes 23 s.
+- **Faster H5 export.** `expression_matrix_mode = "h5"` writes a `dgCMatrix`
+  straight into the TENx datasets instead of block by block through
+  `HDF5Array::writeTENxMatrix()`. The file is laid out as before. Writing
+  100,000 cells (198 M values) took 68 s and takes 12 s.
+- **A CRB is not read back to build its Viewer Pack.** The export functions and
+  `saveCerebro()` hand over the object they have just written, and
+  `buildViewerPack()` reads the CRB once instead of twice. An export no longer
+  hashes its H5 sidecar a second time. A Builder build of a 100,000-cell CRB
+  with an embedded matrix read the CRB four times and reads it once.
+- **Group colours show every level's cells.** For a group with more than 12
+  levels the colour panel showed 0 cells from the 13th level on. It now reads
+  the counts of all levels (up to 100) from the import profile.
+- **A Save adopts the caches of a Build that came first.** A Build run before
+  the Project existed left its CRBs unregistered, so the Save that created the
+  Project built every dataset cache again. The Save now registers those CRBs
+  for the datasets that have not changed since; every copied byte is still
+  checked against the release's MD5s. Saving 100,000 cells right after a Build
+  took 67 s (86 s on Windows) and takes 11 s (20 s).
+- **An H5 sidecar is reused when only the configuration changed.** The Builder
+  records a digest of the matrix in the sidecar and offers a cache build the
+  sidecar of the dataset's earlier cache. It is copied, after its MD5 and
+  digest are checked, instead of writing the same 2.4 GB again: that part of
+  the cache build takes 7 s instead of 21 s for 100,000 cells. Scripted
+  exports (`exportFromSeurat()`) do not hash the matrix and are unchanged.
+
+# CerebroNexus 8.1.0
+
+- **Page links.** `?page=<id>` opens the Viewer on a page (the `initial_page`
+  IDs, e.g. `?dataset=TCR&page=immune_repertoire`). The address bar now follows
+  the page and the data set being read, so a copied URL reopens them. A
+  `/<data set id>` link also works when the App is started with
+  `launchCerebro()` or `shiny::runApp()`, not only under Shiny Server.
 - Opening the Viewer on a page that needs the data set no longer flashes the
   "Loading dataset" card as the startup cover fades; the card waits until the
   cover is gone.
