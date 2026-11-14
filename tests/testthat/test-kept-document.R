@@ -255,3 +255,82 @@ test_that("byte-code compiling is switched off while Apps run, and back on after
   expect_identical(jit(), 2L)
   expect_null(getOption("CerebroNexus.jit_level"))
 })
+
+test_that("the key of a document says how the page is sent", {
+  env <- kept_document_env()
+  withr::local_options(shiny.http.response.filter = NULL)
+  plain <- env$viewerDocumentTransport(FALSE)
+  expect_identical(env$viewerDocumentTransport(FALSE), plain)
+  expect_false(identical(env$viewerDocumentTransport(TRUE), plain))
+
+  ## Shiny Server inserts its scripts with a filter that holds their text.
+  filter <- local({
+    inject <- "<script src=\"__assets__/sockjs.min.js\"></script></head>"
+    function(...) list(...)[[...length()]]
+  })
+  withr::local_options(shiny.http.response.filter = filter)
+  served <- env$viewerDocumentTransport(TRUE)
+  expect_false(identical(served, env$viewerDocumentTransport(FALSE)))
+  expect_false(identical(served, plain))
+  ## another configuration of the server, another page
+  environment(
+    filter
+  )$inject <- "<script>preShinyInit({reconnect:false});</script></head>"
+  expect_false(identical(env$viewerDocumentTransport(TRUE), served))
+  ## a filter of another kind counts by what it does
+  withr::local_options(shiny.http.response.filter = function(
+    request,
+    response
+  ) {
+    response
+  })
+  other <- env$viewerDocumentTransport(TRUE)
+  expect_false(identical(other, served))
+  withr::local_options(shiny.http.response.filter = function(
+    request,
+    response
+  ) {
+    NULL
+  })
+  expect_false(identical(env$viewerDocumentTransport(TRUE), other))
+})
+
+test_that("the fetch carries the secret Shiny Server gave the process", {
+  skip_on_cran()
+  skip_if_not_installed("mirai")
+  env <- kept_document_env()
+  env$.viewerMirai <- function(.expr, ...) {
+    expr <- substitute(.expr)
+    mirai::mirai(expr, ...)
+  }
+  seen <- list()
+  server <- httpuv::startServer(
+    "127.0.0.1",
+    httpuv::randomPort(),
+    list(call = function(request) {
+      seen[[length(seen) + 1L]] <<- request$HTTP_SHINY_SHARED_SECRET
+      list(
+        status = 200L,
+        headers = list("Content-Type" = "text/html"),
+        body = "page"
+      )
+    })
+  )
+  withr::defer(server$stop())
+  fetch <- function() {
+    task <- env$viewerDocumentFetch(env$viewerDocumentAddress(server))
+    waited <- 0
+    while (mirai::unresolved(task) && waited < 30) {
+      later::run_now(0.05)
+      waited <- waited + 0.05
+    }
+    task$data
+  }
+  withr::local_options(shiny.sharedSecret = "a-secret")
+  expect_identical(fetch(), charToRaw("page"))
+  expect_identical(seen[[1L]], "a-secret")
+  ## no header where there is no secret
+  withr::local_options(shiny.sharedSecret = NULL)
+  expect_identical(fetch(), charToRaw("page"))
+  expect_null(seen[2L][[1L]])
+})

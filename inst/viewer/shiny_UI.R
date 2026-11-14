@@ -461,8 +461,9 @@ source(
 viewerUiBuild <- function() {
   ## An app.R that attaches its packages after the page is sent
   ## (staged_start.R) attaches them now: the page files use them.
-  if (exists("viewer_start", inherits = TRUE) && is.list(viewer_start)) {
-    viewer_start$attach()
+  staged <- get0("viewer_start", inherits = TRUE)
+  if (inherits(staged, "cerebro_staged_start")) {
+    staged$attach()
   }
   source(
     file.path(Cerebro.options[["cerebro_root"]], "viewer/ui_page.R"),

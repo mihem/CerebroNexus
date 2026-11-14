@@ -129,3 +129,71 @@ test_that("inst/app.R attaches no session package before it starts", {
   expect_match(text, "viewerStagedStart", fixed = TRUE)
   expect_no_match(text, "source\\(\"viewer/shiny_server.R\", local = TRUE\\)")
 })
+
+staged_document_env <- function() {
+  env <- staged_start_env()
+  sys.source(viewer_test_path("ui_cache.R"), env)
+  sys.source(viewer_test_path("core", "kept_document.R"), env)
+  env
+}
+
+test_that("the first process of an app.R keeps its page after the first session", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  env <- staged_document_env()
+  captured <- NULL
+  env$viewerDocumentCapture <- function(server, key) captured <<- key
+  web_server <- list(setStaticPath = function(.list) stop("nothing to serve"))
+  shiny::shinyOptions(server = web_server)
+  withr::defer(shiny::shinyOptions(server = NULL))
+
+  start <- env$viewerStagedStart(character(), function() function(...) NULL)
+  document <- env$viewerStagedDocument(start, "a-key")
+  expect_null(document$directory)
+  document$on_start()
+  later::run_now(0.2)
+  ## not before a session has its page
+  expect_null(captured)
+  start$server(NULL, NULL, NULL)
+  environment(start$server)$after_first_session()
+  waited <- 0
+  while (is.null(captured) && waited < 5) {
+    later::run_now(0.1)
+    waited <- waited + 0.1
+  }
+  expect_identical(captured, "a-key")
+})
+
+test_that("a later process of an app.R serves the kept page as a file", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  env <- staged_document_env()
+  unlink(env$viewerDocumentBundleDirectory(), recursive = TRUE)
+  html <- charToRaw(paste0(
+    "<!DOCTYPE html>\n<html><head>",
+    "<script src=\"shiny-javascript-1.0/shiny.min.js\"></script>",
+    "</head><body>page</body></html>"
+  ))
+  expect_false(is.null(env$viewerDocumentKeep("a-key", html)))
+  env$viewerDocumentCapture <- function(...) stop("the page is kept already")
+  paths <- NULL
+  shiny::shinyOptions(
+    server = list(setStaticPath = function(.list) paths <<- .list)
+  )
+  withr::defer(shiny::shinyOptions(server = NULL))
+
+  start <- env$viewerStagedStart(character(), function() function(...) NULL)
+  document <- env$viewerStagedDocument(start, "a-key")
+  expect_identical(
+    readBin(file.path(document$directory, "index.html"), "raw", n = 1e6),
+    html
+  )
+  document$on_start()
+  later::run_now(0.2)
+  expect_named(paths, "/")
+  expect_true(paths[["/"]]$options$indexhtml)
+
+  ## another way of sending the page is another document
+  expect_null(env$viewerStagedDocument(start, "another-key")$directory)
+  ## and nothing is kept or served when the page is not kept either
+  withr::local_options(CerebroNexus.ui_cache = FALSE)
+  expect_null(env$viewerStagedDocument(start, "a-key")$directory)
+})

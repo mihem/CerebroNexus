@@ -255,6 +255,20 @@ viewer_start <- viewerStagedStart(
   }
 )
 source("viewer/shiny_UI.R", local = TRUE)
+source("viewer/transport_compat.R", local = TRUE)
+## The page as a file, when an earlier process of this Viewer kept it.
+source("viewer/core/kept_document.R", local = TRUE)
+viewer_document <- viewerStagedDocument(
+  viewer_start,
+  viewerUiCacheKey(
+    file.path(Cerebro.options[["cerebro_root"]], "viewer"),
+    c(
+      version = as.character(Cerebro.options[["cerebro_version"]]),
+      www_prefix = as.character(cerebro_www_prefix %||% ""),
+      transport = viewerDocumentTransport(viewerSockjsCompatEnabled())
+    )
+  )
+)
 ## A page can ask for the first view of its Projection before its session
 ## exists, so the kept ones are published before the server code is loaded.
 source("viewer/core/shared_resources.R", local = TRUE)
@@ -263,7 +277,6 @@ try(viewerFirstViewPublishKept(Cerebro.options), silent = TRUE)
 ##----------------------------------------------------------------------------##
 ## Shiny Server cannot carry binary WebSocket frames; wrap them there only
 ##----------------------------------------------------------------------------##
-source("viewer/transport_compat.R", local = TRUE)
 app_transport <- viewerApplyTransportCompat(
   viewer_start$ui(ui),
   viewer_start$server,
@@ -280,7 +293,9 @@ shiny::shinyApp(
     names(Cerebro.options[["crb_file_to_load"]])
   ),
   onStart = function() {
-    viewer_start$on_start()
+    ## With the page as a file nothing asks R for it: prepare at once.
+    viewer_start$on_start(if (is.null(viewer_document$directory)) 1 else 0.05)
+    viewer_document$on_start()
     ## Viewer Pack files a page may ask for before its session exists get
     ## their headers as soon as the web server runs.
     later::later(viewerSharedResourceHeaders, 0)

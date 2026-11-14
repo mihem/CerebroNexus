@@ -22,13 +22,17 @@
 ## `load_server()`: loads the server code (it defines `server`) and returns
 ## the server function.
 ##
-## Returns a list:
+## Returns a list of class "cerebro_staged_start", which app.R keeps as
+## `viewer_start` (shiny_UI.R and shiny_server.R look for it):
 ## - `ui(page)`: the page as Shiny is given it;
 ## - `server`: the server function Shiny is given;
 ## - `attach()`: attaches the packages now (a page that has to be built needs
 ##   them, see viewerUiBuild() in shiny_UI.R);
 ## - `prepare()`: prepares the Viewer now;
-## - `on_start()`: for `onStart` of shiny::shinyApp().
+## - `after_first_session(task)`: runs `task()` once the first session has its
+##   page (what only keeps something for the next start);
+## - `on_start(delay)`: for `onStart` of shiny::shinyApp(). The Viewer is
+##   prepared `delay` seconds later when no page was asked for until then.
 viewerStagedStart <- function(packages, load_server) {
   state <- new.env(parent = emptyenv())
   state$attached <- FALSE
@@ -37,6 +41,7 @@ viewerStagedStart <- function(packages, load_server) {
   state$scheduled <- FALSE
   state$jit_release <- function() invisible()
   state$first_session <- FALSE
+  state$tasks <- list()
 
   attach <- function() {
     if (state$attached) {
@@ -96,6 +101,15 @@ viewerStagedStart <- function(packages, load_server) {
       compiler::cmpfun(state$server),
       error = function(error) state$server
     )
+    for (task in state$tasks) {
+      later::later(function() try(task(), silent = TRUE), 2)
+    }
+    state$tasks <- list()
+    invisible()
+  }
+  add_task <- function(task) {
+    force(task)
+    state$tasks[[length(state$tasks) + 1L]] <- task
     invisible()
   }
 
@@ -115,7 +129,7 @@ viewerStagedStart <- function(packages, load_server) {
     state$server(input, output, session)
   }
 
-  on_start <- function() {
+  on_start <- function(delay = 1) {
     ## The functions a session creates are new for every session and run once
     ## or twice while its first page is made: compiling them to byte code
     ## costs the first session more than it saves. A process that only runs
@@ -136,15 +150,64 @@ viewerStagedStart <- function(packages, load_server) {
     }
     ## A process is started for a visitor, whose page is on its way: the
     ## Viewer is prepared after it. Without a page request, soon.
-    schedule(1)
+    schedule(delay)
     invisible()
   }
 
+  structure(
+    list(
+      ui = ui,
+      server = server,
+      attach = attach,
+      prepare = prepare,
+      after_first_session = add_task,
+      on_start = on_start
+    ),
+    class = "cerebro_staged_start"
+  )
+}
+
+## The page as a file for such an App (core/kept_document.R, which says why,
+## and ui_cache.R are loaded where this is called): an earlier process of the
+## same Viewer kept the page it sent, with the scripts and the styles of the
+## page joined into a few files. This process then serves both as static
+## files, which costs no R time and 14 requests instead of 64. The first
+## process has nothing kept, sends the page as Shiny makes it and keeps it
+## once its first session has its page.
+##
+## `start`: what viewerStagedStart() returned; `key`: the key of the document
+## (the key of the page, and how it is sent). Returns a list: `directory`, of
+## the kept document or NULL, and `on_start()` for `onStart` of
+## shiny::shinyApp().
+viewerStagedDocument <- function(start, key) {
+  directory <- NULL
+  if (isTRUE(getOption("CerebroNexus.ui_cache", TRUE))) {
+    directory <- tryCatch(
+      viewerDocumentRestore(key),
+      error = function(error) NULL
+    )
+  } else {
+    return(list(directory = NULL, on_start = function() invisible()))
+  }
+  started <- function() {
+    server <- shiny::getShinyOption("server", default = NULL)
+    if (is.null(server)) {
+      return(invisible(FALSE))
+    }
+    if (!is.null(directory)) {
+      try(viewerDocumentServe(server, directory), silent = TRUE)
+    } else {
+      start$after_first_session(function() {
+        viewerDocumentCapture(server, key)
+      })
+    }
+    invisible(TRUE)
+  }
   list(
-    ui = ui,
-    server = server,
-    attach = attach,
-    prepare = prepare,
-    on_start = on_start
+    directory = directory,
+    on_start = function() {
+      later::later(started, 0)
+      invisible()
+    }
   )
 }
