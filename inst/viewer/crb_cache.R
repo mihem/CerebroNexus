@@ -125,18 +125,19 @@ crb_prefetch_abandon <- function(key) {
 ## renv, a launcher script). When mirai or qs2 lives there the child dies on
 ## loadNamespace() and mirai discards its stderr, so the task never answers. The
 ## child reads R_LIBS as it starts: set it to the Viewer's paths around the call
-## that spawns it, then restore it.
-.viewerMirai <- function(.expr, ...) {
+## that spawns it, then restore it. `.env`: more variables the child starts
+## with (as R_NSIZE and R_VSIZE, its first heap).
+.viewerMirai <- function(.expr, ..., .env = character()) {
   expr <- substitute(.expr)
-  previous <- Sys.getenv("R_LIBS", unset = NA)
-  Sys.setenv(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep))
-  on.exit(
-    if (is.na(previous)) {
-      Sys.unsetenv("R_LIBS")
-    } else {
-      Sys.setenv(R_LIBS = previous)
+  env <- c(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep), .env)
+  previous <- Sys.getenv(names(env), unset = NA, names = TRUE)
+  do.call(Sys.setenv, as.list(env))
+  on.exit({
+    Sys.unsetenv(names(previous)[is.na(previous)])
+    if (any(!is.na(previous))) {
+      do.call(Sys.setenv, as.list(previous[!is.na(previous)]))
     }
-  )
+  })
   mirai::mirai(expr, ...)
 }
 

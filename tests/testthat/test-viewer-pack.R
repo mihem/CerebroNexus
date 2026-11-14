@@ -865,6 +865,37 @@ test_that("Viewer Pack IR indexes first-frame coordinates without barcodes", {
       sprintf("cell-%03d", 1:4)
     )
   }
+
+  ## While another process encodes the repertoire (a Pack built before the
+  ## encoding), the CTgene map is drawn from the Pack's receptor index alike.
+  everyone <- scope$ir_clonal_umap_data(
+    "umap",
+    "TCR",
+    show_all = TRUE,
+    split_output = TRUE
+  )
+  scope$viewerPackImmuneIndex <- runtime$viewerPackImmuneIndex
+  scope$ir_encoded <- function() {
+    shiny::validate(shiny::need(FALSE, "Encoding the immune repertoire."))
+  }
+  expect_identical(
+    scope$ir_clonal_umap_data("umap", "TCR", show_all = FALSE),
+    out
+  )
+  expect_identical(
+    scope$ir_clonal_umap_data(
+      "umap",
+      "TCR",
+      show_all = TRUE,
+      split_output = TRUE
+    ),
+    everyone
+  )
+  ## other clone columns wait for the encoding
+  expect_error(
+    scope$ir_clonal_umap_data("umap", "TCR", cloneCall = "aa"),
+    class = "validation"
+  )
 })
 
 test_that("packed violin summaries survive serialization without altering statistics", {

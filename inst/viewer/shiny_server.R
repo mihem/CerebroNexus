@@ -43,7 +43,10 @@ viewerFirstViewPublishKept(Cerebro.options)
 ## every render.
 .gene_id_tables <- new.env(parent = emptyenv())
 viewerGeneIdTable <- function(organism) {
-  file <- c(mouse = "mm10_gene_ID_name.tsv.xz", human = "hg38_gene_ID_name.tsv.xz")[
+  file <- c(
+    mouse = "mm10_gene_ID_name.tsv.xz",
+    human = "hg38_gene_ID_name.tsv.xz"
+  )[
     organism
   ]
   if (length(file) != 1L || is.na(file)) {
@@ -2500,13 +2503,16 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## The pages the loaded data set has: those every data set has, and the
   ## conditional ones as toggleConditionalTab() finds them.
-  viewer_page_available <- list2env(list(
-    groups = TRUE,
-    geneExpression = TRUE,
-    color_management = TRUE,
-    geneIdConversion = TRUE,
-    about = TRUE
-  ), parent = emptyenv())
+  viewer_page_available <- list2env(
+    list(
+      groups = TRUE,
+      geneExpression = TRUE,
+      color_management = TRUE,
+      geneIdConversion = TRUE,
+      about = TRUE
+    ),
+    parent = emptyenv()
+  )
   toggleConditionalTab <- function(
     tab_name,
     check_fn,
@@ -2787,10 +2793,10 @@ server <- function(input, output, session) {
   ##   Gene ID conversion opens with;
   ## - the server code of the pages the data set has: sourced, its observers
   ##   made and run once, and compiled (the first session is not compiled while
-  ##   it starts, see R/launchCerebro.R). Not the HLA & TCR motifs page, and
-  ##   the Immune repertoire page only with a Viewer Pack that has the
-  ##   repertoire encoded: both compute from the repertoire as soon as they are
-  ##   loaded.
+  ##   it starts, see R/launchCerebro.R). Not the HLA & TCR motifs page: it
+  ##   computes from the repertoire as soon as it is loaded. The Immune
+  ##   repertoire page reads the Pack's encoding of the repertoire, or, first
+  ##   of all, has another R process encode it.
   viewer_idle_packages <- function() {
     setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
   }
@@ -2810,8 +2816,8 @@ server <- function(input, output, session) {
   }
   ## The Immune repertoire page reads the repertoire as soon as it is loaded:
   ## from the Viewer Pack's integer encoding (0.1 s for 1.46 million cells), or,
-  ## with a Pack built before that encoding, by encoding it in memory (20 s and
-  ## more). Prepared only in the first case.
+  ## without a Pack or with one built before that encoding, by encoding it
+  ## (immune_repertoire/data.R).
   viewer_idle_immune_fast <- function() {
     pack <- viewer_idle_pack()
     is.list(pack) &&
@@ -2868,10 +2874,22 @@ server <- function(input, output, session) {
           .viewer_sorted_gene_choices(list(genes), function() sort(genes))
         }
       }
-      pages <- c(
-        viewer_prewarm_pages,
-        if (viewer_idle_immune_fast()) "immune_repertoire"
-      )
+      ## A repertoire without the Pack's encoding is encoded by another R
+      ## process (immune_repertoire/data.R) in 10 s and more: started first,
+      ## so that it is done by the time it is looked at.
+      immune_first <- !viewer_idle_immune_fast()
+      pages <- if (immune_first) {
+        c("immune_repertoire", viewer_prewarm_pages)
+      } else {
+        c(viewer_prewarm_pages, "immune_repertoire")
+      }
+      encoding_task <- paste("immune encoding", session$token)
+      encoding <- function() {
+        encoded <- server_scope$ir_encoded
+        if (is.function(encoded)) {
+          isolate(encoded())
+        }
+      }
       for (page in pages) {
         server_file <- deferred_viewer_server_files[[page]]
         if (
@@ -2884,14 +2902,17 @@ server <- function(input, output, session) {
           server_file <- server_file
           function() load_deferred_viewer_server(server_file)
         })
-      }
-      ## The repertoire's encoding, read from the Pack (0.08 s for 1.46 million
-      ## cells) by the first plot of the Immune repertoire page.
-      encoded <- server_scope$ir_encoded
-      if ("immune_repertoire" %in% pages && is.function(encoded)) {
-        tasks[[paste("immune encoding", session$token)]] <- function() {
-          isolate(encoded())
+        if (identical(page, "immune_repertoire")) {
+          tasks[[encoding_task]] <- encoding
         }
+      }
+      ## The repertoire's encoding: read from the Pack (0.08 s for 1.46 million
+      ## cells) by the first plot of the Immune repertoire page, or started.
+      if (
+        isTRUE(viewer_page_available[["immune_repertoire"]]) &&
+          is.null(tasks[[encoding_task]])
+      ) {
+        tasks[[encoding_task]] <- encoding
       }
     }
     tasks

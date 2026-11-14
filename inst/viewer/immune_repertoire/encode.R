@@ -161,7 +161,44 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
     })
     unlist(values, use.names = FALSE) %||% character()
   }
-  barcodes <- column("barcode")
+  ## Each row's canonical cell row. A thin CRB's sidecar table holds it already
+  ## (attr "cerebro_cell_index_column"): its cells need no names to match.
+  indexed <- vapply(
+    frames,
+    function(frame) {
+      identical(
+        attr(frame, "cerebro_cell_index_column", exact = TRUE),
+        "barcode"
+      ) &&
+        is.integer(frame$barcode)
+    },
+    logical(1)
+  )
+  indexed_rows <- rep.int(indexed, sizes)
+  cell <- rep(NA_integer_, n)
+  if (any(indexed)) {
+    cell[indexed_rows] <- unlist(
+      lapply(frames[indexed], `[[`, "barcode"),
+      use.names = FALSE
+    )
+  }
+  if (!is.null(cells) && !all(indexed)) {
+    ## one match() for all tables: each call hashes the million cell names
+    named <- frames[!indexed]
+    cell[!indexed_rows] <- match(
+      unlist(
+        lapply(named, function(frame) {
+          if ("barcode" %in% names(frame)) {
+            as.character(frame$barcode)
+          } else {
+            rep(NA_character_, nrow(frame))
+          }
+        }),
+        use.names = FALSE
+      ),
+      cells
+    )
+  }
   genes <- column("CTgene")
   chains <- IR_ENCODED_CHAINS[vapply(
     IR_ENCODED_CHAINS,
@@ -302,11 +339,7 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
     version = IR_ENCODING_VERSION,
     samples = samples,
     sample = rep.int(seq_along(frames), sizes),
-    cell = if (is.null(cells)) {
-      rep(NA_integer_, n)
-    } else {
-      match(barcodes, cells)
-    },
+    cell = cell,
     receptor = receptor,
     receptors = c("TCR", "BCR")[c(
       any(bitwAnd(receptor, 1L) > 0L),

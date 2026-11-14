@@ -1,9 +1,10 @@
 ## While the visitor reads the first page, the session prepares the pages the
 ## data set has (shiny_server.R, viewer_idle_tasks()): their server code is
-## loaded before they are opened. Not the repertoire pages, which compute as
-## soon as they are loaded.
+## loaded before they are opened. Not the HLA & TCR motifs page, which computes
+## as soon as it is loaded; the Immune repertoire page first of all, which has
+## its repertoire encoded.
 
-test_that("a quiet session loads the code of the other pages, not the repertoire's", {
+test_that("a quiet session loads the code of the other pages, not the motifs'", {
   skip_on_cran()
   skip_if_demo_data_missing()
   app_dir <- viewer_app_test_path()
@@ -20,6 +21,7 @@ test_that("a quiet session loads the code of the other pages, not the repertoire
 
   loaded <- function() unlist(app$get_value(export = "loaded_pages"))
   expected <- c(
+    "immune_repertoire/server.R",
     "overview/server.R",
     "groups/server.R",
     "gene_expression/server.R",
@@ -35,7 +37,6 @@ test_that("a quiet session loads the code of the other pages, not the repertoire
     Sys.sleep(1)
   }
   expect_true(all(expected %in% pages))
-  expect_false("immune_repertoire/server.R" %in% loaded())
   expect_false("hla_tcr_motifs/server.R" %in% loaded())
 
   ## A page prepared this way opens as one opened the first time: its code ran

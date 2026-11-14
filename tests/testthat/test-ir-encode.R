@@ -219,6 +219,21 @@ test_that("an empty or column-less repertoire encodes without rows", {
   expect_identical(enc$receptors, character())
 })
 
+test_that("a thin CRB's cell index encodes the cells its names would", {
+  scope <- ir_encode_scope()
+  repertoire <- ir_encode_fixture()
+  cells <- c("b1", rev(paste0("a", 1:9)))
+  named <- scope$ir_encode_repertoire(repertoire, cells)
+  thin <- lapply(repertoire, function(frame) {
+    frame$barcode <- match(frame$barcode, cells)
+    attr(frame, "cerebro_cell_index_column") <- "barcode"
+    frame
+  })
+  expect_identical(scope$ir_encode_repertoire(thin, cells), named)
+  ## the cell names are not needed
+  expect_identical(scope$ir_encode_repertoire(thin)$cell, named$cell)
+})
+
 test_that("the Viewer Pack stores the encoded repertoire and its clone names", {
   root <- tempfile("viewer-pack-ir-encoded-")
   dir.create(root)

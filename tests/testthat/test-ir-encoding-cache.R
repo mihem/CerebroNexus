@@ -72,7 +72,13 @@ test_that("a kept encoding reads its clone names only when they are asked for", 
     )
   }
   key <- list(path = "a.crb", size = 1, mtime = 2, repertoire = "")
-  first <- scope$ir_process_memo("encoded", key, compute, new.env(), disk = TRUE)
+  first <- scope$ir_process_memo(
+    "encoded",
+    key,
+    compute,
+    new.env(),
+    disk = TRUE
+  )
   ## the process that encoded keeps the names in memory
   expect_identical(first$names, names_of)
   file <- scope$ir_disk_cache_file("encoded", key)
@@ -168,7 +174,11 @@ test_that("another R process encodes the repertoire, and keeps it for the next s
       CTgene = c("TRAV1.TRAJ1_TRBV2.TRBJ1", "TRAV1.TRAJ1_TRBV2.TRBJ1", NA),
       CTnt = c("x_y", "x_y", ""),
       CTaa = c("CAA_CBB", "CAA_CBB", ""),
-      CTstrict = c("TRAV1.TRAJ1;x_TRBV2.TRBJ1;y", "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y", "")
+      CTstrict = c(
+        "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y",
+        "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y",
+        ""
+      )
     )
   )
   cells <- c("a2", "a1", "a3", "a4")
@@ -197,7 +207,9 @@ test_that("another R process encodes the repertoire, and keeps it for the next s
   deadline <- Sys.time() + 60
   repeat {
     state <- scope$ir_encoded_background(key, NULL, here)
-    if (isTRUE(state$done) || Sys.time() > deadline) break
+    if (isTRUE(state$done) || Sys.time() > deadline) {
+      break
+    }
     Sys.sleep(0.1)
   }
   expect_true(state$done)
@@ -216,4 +228,75 @@ test_that("another R process encodes the repertoire, and keeps it for the next s
   again <- scope$ir_encoded_background(key, NULL, here)
   expect_true(again$done)
   expect_identical(again$value$clones, expected$clones)
+})
+
+test_that("the job reads a thin sidecar's cell rows, not the cell names", {
+  skip_on_cran()
+  skip_if_not_installed("qs2")
+  skip_if_not_installed("mirai")
+  withr::local_envvar(CEREBRO_IR_CACHE = withr::local_tempdir())
+  scope <- ir_cache_functions()
+  sys.source(viewer_test_path("immune_repertoire", "encode.R"), scope)
+  scope$ir_process_cache <- new.env()
+  scope$ir_encode_jobs <- new.env()
+  scope$Cerebro.options <- list(
+    cerebro_root = dirname(dirname(viewer_test_path("immune_repertoire")))
+  )
+  scope$.viewerMirai <- function(.expr, ..., .env = character()) {
+    expr <- substitute(.expr)
+    mirai::mirai(expr, ...)
+  }
+  cells <- c("a2", "a1", "a3", "a4")
+  named <- list(
+    s1 = data.frame(
+      barcode = c("a1", "a2", "a3"),
+      CTgene = c("TRAV1.TRAJ1_TRBV2.TRBJ1", "TRAV1.TRAJ1_TRBV2.TRBJ1", NA),
+      CTnt = c("x_y", "x_y", ""),
+      CTaa = c("CAA_CBB", "CAA_CBB", ""),
+      CTstrict = c(
+        "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y",
+        "TRAV1.TRAJ1;x_TRBV2.TRBJ1;y",
+        ""
+      )
+    )
+  )
+  thin <- named
+  thin$s1$barcode <- match(thin$s1$barcode, cells)
+  attr(thin$s1, "cerebro_cell_index_column") <- "barcode"
+  root <- withr::local_tempdir()
+  qs2::qs_save(thin, file.path(root, "x.immune.qs2"))
+  scope$data_set <- function() {
+    list(
+      immune_repertoire = NULL,
+      immune_repertoire_backend = list(
+        type = "file",
+        root = root,
+        file = "x.immune.qs2",
+        md5 = unname(tools::md5sum(file.path(root, "x.immune.qs2")))
+      )
+    )
+  }
+  ## a Pack whose cell names cannot be read: the job must not need them
+  pack <- list(
+    path = file.path(root, "missing.viewer"),
+    cell_count = length(cells),
+    manifest = list(
+      assets = data.frame(path = "common/cell_order.qs2"),
+      n_cells = length(cells)
+    )
+  )
+  here <- function() stop("encoded in this process")
+  key <- list(path = "thin.crb", size = 1, mtime = 2, repertoire = "")
+  deadline <- Sys.time() + 60
+  repeat {
+    state <- scope$ir_encoded_background(key, pack, here, here_bytes = 0)
+    if (isTRUE(state$done) || Sys.time() > deadline) {
+      break
+    }
+    Sys.sleep(0.1)
+  }
+  expect_true(state$done)
+  expected <- scope$ir_encode_repertoire(named, cells, rank = TRUE)
+  expect_identical(state$value$cell, expected$cell)
+  expect_identical(state$value$clones, expected$clones)
 })

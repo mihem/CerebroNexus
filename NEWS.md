@@ -102,10 +102,10 @@
   Projection: Gene expression 0.43 s instead of 0.58 s, Gene ID conversion
   0.33 s instead of 0.44 s, Trajectory 0.53 s instead of 0.64 s, Linked views
   0.59 s instead of 0.65 s, Groups 0.23 s instead of 0.28 s. Opened after 4 s,
-  they open as before. The Immune repertoire and HLA & TCR motifs pages,
-  which compute from the repertoire as soon as they are loaded, wait for their
-  visit as before. The gene ID table is also read once per process instead of
-  at every render of its page.
+  they open as before. The HLA & TCR motifs page, which computes from the
+  repertoire as soon as it is loaded, waits for its visit as before. The gene
+  ID table is also read once per process instead of at every render of its
+  page.
 - **Immune repertoire opens sooner.** With a Viewer Pack that has the
   repertoire encoded, the page is prepared like the others while the first one
   is read, its encoding is read from the Pack then, and the first loading
@@ -122,6 +122,17 @@
   repertoire page says it waits and fills in when it is done, and the other
   pages open as before meanwhile (Groups 0.3 s instead of 20 s). A small
   repertoire (under 50,000 rows) is still encoded at once.
+- **Immune repertoire draws its map at once while the repertoire is encoded.**
+  With a Viewer Pack built before the encoding, the page waited for all of it:
+  Ren drew its Clonal projection 26 s after the click. The map is now drawn
+  from the Pack's index of each receptor's cells, which gives the same cells,
+  clones and clone sizes, while the other process encodes the rest for the
+  other tabs: 1.1 to 1.5 s after the click. That process now starts while the
+  first page is read, instead of at the visit, and with a larger first heap
+  (most of its time went to garbage collection): 19 s instead of 27 s for
+  Ren. A thin CRB's repertoire is matched to its cells by their row, without
+  reading the cell names. The notice that the repertoire is being encoded is
+  shown on the Immune repertoire page only.
 - **Colour management opens sooner for groups with many levels.** The page
   makes a colour picker for every level of every group: 661 for Ren, which
   took 2.4 s, most of it in the browser. A picker is now made when it comes
