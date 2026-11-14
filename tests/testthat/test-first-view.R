@@ -97,6 +97,8 @@ test_that("only the default view of all cells from shared files is described", {
   expect_identical(view$version, 1L)
   expect_identical(view$cells, 4L)
   expect_identical(unclass(view$colors), c("#FFC312", "#C4E538"))
+  ## the names of the groups, for the legend the preview lays out
+  expect_identical(unclass(view$labels), c("a", "b"))
   expect_identical(unclass(view$code_map), c(-1L, 0L, 1L))
   expect_identical(view$projection$url, message$data$projection_resource$url)
   expect_identical(view$projection$bytes, 32)
@@ -375,6 +377,17 @@ test_that("a frame that carries its cells is described with two files", {
   inline <- env$viewerFirstViewInline(message)
   expect_identical(inline$view$cells, 5000L)
   expect_identical(unclass(inline$view$code_map), 0:2)
+  ## a frame names its groups in `meta$traces`; without a name for each
+  ## colour the description has none, and the preview guesses the legend
+  expect_null(inline$view$labels)
+  named <- message
+  named$meta$traces <- list("a", "b", "c")
+  expect_identical(
+    unclass(env$viewerFirstViewInline(named)$view$labels),
+    c("a", "b", "c")
+  )
+  named$meta$traces <- list("a", "b")
+  expect_null(env$viewerFirstViewInline(named)$view$labels)
   expect_identical(unclass(inline$view$x_range), c(-11, 16))
   expect_identical(unclass(inline$view$y_range), c(-9, 19))
   ## x and y of each cell side by side; a cell without a group has code 255

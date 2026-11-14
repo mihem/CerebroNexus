@@ -21,10 +21,16 @@
   // project() in cell_views.js keeps this margin around the cells.
   var PAD = 10;
   // Where the plot's canvas ends up inside its host, and the room it leaves
-  // below itself in the window. Only a first guess: the plot is laid out by
-  // code that measures its own legend and header, and the preview moves onto
-  // the real canvas when that exists.
+  // below itself in the window. The plot is laid out by code that measures
+  // its own legend and header, and the preview moves onto the real canvas
+  // when that exists. `top` is only the guess for a description without the
+  // names of the groups: with them the legend is laid out here as the plot
+  // will lay it out, and the canvas begins PLOT_HEAD below it (the margin
+  // and padding of the pane, and its title).
   var INSET = { left: 9, top: 83, right: 9, below: 32 };
+  var PLOT_HEAD = 40;
+  // The row of the page's selectors above the plot, which the session fills.
+  var SELECTORS_HEIGHT = 60;
   var MIN_HEIGHT = 240;
   var GIVE_UP_MS = 30000;
   var MISSING = '#e6e7ea';
@@ -73,6 +79,10 @@
         (view.x_range == null) !== (view.y_range == null)) return null;
     for (var i = 0; i < view.colors.length; i++) {
       if (!/^#[0-9A-Fa-f]{6}$/.test(view.colors[i])) return null;
+    }
+    // Optional: a description kept by an earlier release has no names.
+    if (!Array.isArray(view.labels) || view.labels.length !== view.colors.length) {
+      view.labels = null;
     }
     return view;
   }
@@ -144,8 +154,20 @@
       colorOfCode[i] = level >= 0 && level < view.colors.length
         ? packed(view.colors[level], view.point_opacity) : missing;
     }
+    // The legend of the plot: each group with the number of its cells.
+    var legend = null;
+    if (view.labels) {
+      var counts = new Float64Array(view.colors.length);
+      for (i = 0; i < n; i++) {
+        var group = codes[i] < view.code_map.length ? view.code_map[codes[i]] : -1;
+        if (group >= 0 && group < counts.length) counts[group]++;
+      }
+      legend = view.labels.map(function (label, index) {
+        return { label: String(label), color: view.colors[index], count: counts[index] };
+      });
+    }
     return { n: n, nx: nx, ny: ny, codes: codes, colorOfCode: colorOfCode,
-      pointSize: view.point_size };
+      pointSize: view.point_size, legend: legend };
   }
 
   // Each cell as the plot draws it, a disc of the point size, without the
@@ -195,7 +217,15 @@
       'html.cerebro-first-view .cerebro-page-loader,' +
       'html.cerebro-first-view .cerebro-dataset-loading { display: none !important; }' +
       '.cerebro-first-view-canvas { position: absolute; z-index: 3; pointer-events: none;' +
-      ' transform-origin: 0 0; }';
+      ' transform-origin: 0 0; }' +
+      // Out of the flow, so that the plot's own legend is not pushed down
+      // while both exist.
+      '.cerebro-first-view-legend { position: absolute; z-index: 3; left: 0; right: 0;' +
+      ' top: 0; pointer-events: none; }' +
+      // The selectors arrive with the session: their row is kept free, so the
+      // plot does not move down when they do.
+      'html.cerebro-first-view #shiny-tab-' + TAB + ' .cerebro-viz-primary' +
+      ' { min-height: ' + SELECTORS_HEIGHT + 'px; }';
     document.head.appendChild(style);
   }
 
@@ -215,17 +245,60 @@
     return true;
   }
 
+  // The legend as renderLegend() in cell_views.js builds it, with the classes
+  // its styles are written for, so that it wraps as the plot's legend will.
+  function legendElement(items) {
+    var wrap = document.createElement('div');
+    wrap.className = 'cerebro-cell-view-legend cerebro-first-view-legend';
+    wrap.setAttribute('aria-hidden', 'true');
+    var list = document.createElement('div');
+    list.className = 'cv-legend';
+    items.forEach(function (entry) {
+      var item = document.createElement('div');
+      item.className = 'cv-lg';
+      var dot = document.createElement('span');
+      dot.className = 'cv-dot';
+      dot.style.background = entry.color;
+      var count = document.createElement('span');
+      count.className = 'cv-lg-ct';
+      count.textContent = '(' + entry.count + ')';
+      item.appendChild(dot);
+      item.appendChild(document.createTextNode(entry.label + ' '));
+      item.appendChild(count);
+      list.appendChild(item);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  // Where the canvas begins below the top of the host: under the legend when
+  // the description names the groups. The legend gives way to the plot's own
+  // as soon as that has its entries; the place it measured stays.
+  function canvasTop() {
+    var legend = preview.legend;
+    if (!legend) return preview.top == null ? INSET.top : preview.top;
+    var real = preview.host.querySelector('.cerebro-cell-view-surface .cv-legend');
+    if (real && real.children.length) {
+      legend.parentNode.removeChild(legend);
+      preview.legend = null;
+    } else if (legend.offsetHeight) {
+      preview.top = legend.offsetHeight + PLOT_HEAD;
+    }
+    return preview.top == null ? INSET.top : preview.top;
+  }
+
   // The canvas box inside the host, in CSS pixels, or null while the page is
   // not laid out.
   function box(host) {
     var rect = host.getBoundingClientRect();
     if (!(rect.width > INSET.left + INSET.right + 50)) return null;
+    var top = canvasTop();
     return {
       left: INSET.left,
-      top: INSET.top,
+      top: top,
       width: Math.round(rect.width - INSET.left - INSET.right),
       height: Math.max(MIN_HEIGHT,
-        Math.round(window.innerHeight - rect.top - INSET.top - INSET.below))
+        Math.round(window.innerHeight - rect.top - top - INSET.below))
     };
   }
 
@@ -233,7 +306,8 @@
     if (!preview || finished) return;
     var next = box(preview.host);
     var current = preview.box;
-    if (next && (!current || next.width !== current.width || next.height !== current.height)) {
+    if (next && (!current || next.width !== current.width ||
+        next.height !== current.height || next.top !== current.top)) {
       var canvas = preview.canvas;
       canvas.style.left = next.left + 'px';
       canvas.style.top = next.top + 'px';
@@ -262,7 +336,11 @@
     canvas.className = 'cerebro-first-view-canvas';
     canvas.setAttribute('aria-hidden', 'true');
     host.appendChild(canvas);
-    preview = { canvas: canvas, host: host, box: null, frame: 0 };
+    preview = { canvas: canvas, host: host, box: null, frame: 0, legend: null, top: null };
+    if (data.legend) {
+      preview.legend = legendElement(data.legend);
+      host.appendChild(preview.legend);
+    }
     preview.timer = window.setTimeout(function () { finish(null); }, GIVE_UP_MS);
     place(data);
   }
@@ -279,6 +357,10 @@
     var canvas = preview.canvas, host = preview.host;
     window.cancelAnimationFrame(preview.frame);
     window.clearTimeout(preview.timer);
+    if (preview.legend && preview.legend.parentNode) {
+      preview.legend.parentNode.removeChild(preview.legend);
+    }
+    preview.legend = null;
     function remove() {
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       host.style.minHeight = '';

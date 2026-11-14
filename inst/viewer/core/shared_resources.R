@@ -209,6 +209,9 @@ viewerFirstViewPayload <- function(message) {
     point_size = as.numeric(data$point_size),
     point_opacity = as.numeric(data$point_opacity),
     colors = I(colors),
+    ## the names of the groups, in the order of the colours: the preview lays
+    ## out the legend with them, to know where the plot begins below it
+    labels = I(levels),
     code_map = I(as.integer(unlist(categories$code_map, use.names = FALSE))),
     projection = list(
       url = projection$url,
@@ -288,6 +291,12 @@ viewerFirstViewInline <- function(message) {
     colors = I(colors),
     code_map = I(seq_along(colors) - 1L)
   )
+  ## The names of the groups, as in viewerFirstViewPayload(); a frame that
+  ## does not name one for each colour is described without them.
+  labels <- as.character(unlist(meta$traces, use.names = FALSE))
+  if (length(labels) == length(colors) && !anyNA(labels)) {
+    view$labels <- I(labels)
+  }
   if (!is.null(x_range) && !is.null(y_range)) {
     view$x_range <- I(x_range)
     view$y_range <- I(y_range)
