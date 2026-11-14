@@ -100,7 +100,6 @@
 #' )
 #' }
 #'
-#' @import dplyr
 #' @importFrom methods as
 #' @importFrom rlang .data
 #'

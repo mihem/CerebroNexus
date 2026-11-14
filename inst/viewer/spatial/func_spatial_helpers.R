@@ -680,9 +680,31 @@ spatial_section_rows <- function(
   as.integer(index)
 }
 
+## The metadata rows of a section as a thin CRB stores them (the attribute
+## "cerebro_cell_index_rownames" of its coordinates), or NULL: the section has
+## its cell names, or never stored its rows. Reads no cell name, and does not
+## name the cells of the section as viewerSpatialCoordinates() does.
+spatial_stored_section_rows <- function(spatial_name) {
+  coordinates <- tryCatch(
+    data_set()$spatial[[spatial_name]][["coordinates"]],
+    error = function(error) NULL
+  )
+  if (
+    !is.data.frame(coordinates) ||
+      !isTRUE(attr(coordinates, "cerebro_cell_index_rownames", exact = TRUE))
+  ) {
+    return(NULL)
+  }
+  rows <- attr(coordinates, "row.names")
+  if (is.integer(rows) && !anyNA(rows)) rows else NULL
+}
+
 ## Canonical metadata rows of `cells` (NA when absent). Cells of one section,
 ## all of them or some, are found through the section's rows, which reads no
 ## cell names; anything else is matched against the metadata names.
+## The sections whose cells are named are looked at first: `cells` are nearly
+## always the cells of one of them, and the other sections of a thin CRB then
+## keep their rows instead of being given 100,000 names each for a comparison.
 spatial_canonical_rows <- function(cells) {
   section_rows <- function(name, coordinates) {
     tryCatch(
@@ -691,21 +713,28 @@ spatial_canonical_rows <- function(cells) {
     )
   }
   sections <- availableSpatial()
-  coordinates <- lapply(sections, viewerSpatialCoordinates)
-  for (i in seq_along(sections)) {
-    if (identical(rownames(coordinates[[i]]), cells)) {
-      rows <- section_rows(sections[[i]], coordinates[[i]])
-      if (!is.null(rows)) {
-        return(rows)
+  named <- vapply(
+    sections,
+    function(name) is.null(spatial_stored_section_rows(name)),
+    logical(1)
+  )
+  for (group in list(sections[named], sections[!named])) {
+    coordinates <- lapply(group, viewerSpatialCoordinates)
+    for (i in seq_along(group)) {
+      if (identical(rownames(coordinates[[i]]), cells)) {
+        rows <- section_rows(group[[i]], coordinates[[i]])
+        if (!is.null(rows)) {
+          return(rows)
+        }
       }
     }
-  }
-  for (i in seq_along(sections)) {
-    position <- match(cells, rownames(coordinates[[i]]))
-    if (!anyNA(position)) {
-      rows <- section_rows(sections[[i]], coordinates[[i]])
-      if (!is.null(rows)) {
-        return(rows[position])
+    for (i in seq_along(group)) {
+      position <- match(cells, rownames(coordinates[[i]]))
+      if (!anyNA(position)) {
+        rows <- section_rows(group[[i]], coordinates[[i]])
+        if (!is.null(rows)) {
+          return(rows[position])
+        }
       }
     }
   }
@@ -766,6 +795,17 @@ spatial_section_samples <- function() {
   spatial_names <- availableSpatial()
   metadata <- viewerProjectionFirstFrameMetadata()
   facets <- lapply(spatial_names, function(name) {
+    ## The rows a thin CRB stores for the section say which samples it has;
+    ## its cells are named only when the section is shown.
+    rows <- spatial_stored_section_rows(name)
+    if (!is.null(rows)) {
+      field <- spatial_metadata_field(metadata, spatial_sample_fields)
+      values <- if (!is.null(field)) as.character(metadata[[field]][rows])
+      return(list(
+        field = field,
+        values = unique(values[!is.na(values) & nzchar(values)])
+      ))
+    }
     record <- tryCatch(getSpatialData(name), error = function(error) list())
     spatial_metadata_facet(
       metadata,
@@ -810,19 +850,16 @@ spatial_sample_sections <- function(requested) {
   list(sample = sample, sections = sections)
 }
 
-spatial_metadata_facet <- function(metadata, cells, candidates) {
-  empty <- list(
-    field = NULL,
-    by_cell = stats::setNames(rep(NA_character_, length(cells)), cells),
-    values = character()
-  )
+## The metadata column a facet is read from: the first of `candidates` that
+## names one (without regard to case), when its values are atomic. NULL
+## otherwise.
+spatial_metadata_field <- function(metadata, candidates) {
   if (
     !is.data.frame(metadata) ||
-      !is.character(cells) ||
       !is.character(candidates) ||
       !length(candidates)
   ) {
-    return(empty)
+    return(NULL)
   }
   matches <- match(
     tolower(candidates),
@@ -831,13 +868,29 @@ spatial_metadata_facet <- function(metadata, cells, candidates) {
   )
   matches <- matches[matches > 0L]
   if (!length(matches)) {
-    return(empty)
+    return(NULL)
   }
   field <- colnames(metadata)[matches[[1L]]]
   column <- metadata[[field]]
   if (!is.atomic(column) || is.list(column)) {
+    return(NULL)
+  }
+  field
+}
+
+spatial_metadata_facet <- function(metadata, cells, candidates) {
+  empty <- list(
+    field = NULL,
+    by_cell = stats::setNames(rep(NA_character_, length(cells)), cells),
+    values = character()
+  )
+  field <- if (is.character(cells)) {
+    spatial_metadata_field(metadata, candidates)
+  }
+  if (is.null(field)) {
     return(empty)
   }
+  column <- metadata[[field]]
   rows <- spatial_metadata_rows(metadata, cells)
   by_cell <- rep(NA_character_, length(cells))
   valid <- !is.na(rows)

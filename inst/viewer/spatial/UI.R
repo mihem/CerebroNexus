@@ -2,13 +2,8 @@
 ## Tab: Spatial
 ##----------------------------------------------------------------------------##
 ## Drawing and image placement live in the app-wide cell-view engine. Spatial
-## keeps only its page-specific scroll indicator.
-js_code_spatial_page <- cerebro_read_file(
-  paste0(
-    Cerebro.options[["cerebro_root"]],
-    "/viewer/spatial/js_page_helpers.js"
-  )
-)
+## keeps only its page-specific scroll indicator (viewer_spatial_page_script,
+## made in shiny_UI.R).
 
 tab_spatial <- tabItem(
   tabName = "spatial",
@@ -24,10 +19,7 @@ tab_spatial <- tabItem(
 
     "
   ),
-  shinyjs::extendShinyjs(
-    text = js_code_spatial_page,
-    functions = c("showScrollDownIndicator", "hideScrollDownIndicator")
-  ),
+  viewer_spatial_page_script,
   cerebroVizPageHeader(
     "Spatial",
     "spatial_projection_info",

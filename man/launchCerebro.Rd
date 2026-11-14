@@ -29,8 +29,9 @@ data set (\code{closed}, removes the "Load data" element); defaults to
 Cerebro. Useful when using/hosting Cerebro in \code{closed} mode. To offer
 several data sets, pass a \emph{named} character vector, e.g.
 \code{c(sampleA = "a.crb", sampleB = "b.crb")}: every name is the stable,
-unique data set identity used in links and saved state. Defaults to
-\code{NULL}.}
+unique data set identity used in links and saved state. The files are read
+when the App starts, so a file that cannot be read stops the running App
+with its error. Defaults to \code{NULL}.}
 
 \item{welcome_message}{\code{string} with custom welcome message to display
 in the "Load data" tab. Can contain HTML formatting, e.g.
@@ -57,6 +58,19 @@ Shiny application.
 }
 \description{
 Launch the CerebroNexus Shiny application.
+}
+\details{
+To answer the first request sooner, start the App with the file
+\code{start.R} of the installed package instead of calling this function:
+\code{Rscript <package directory>/start.R --port=3838 data.crb}, with
+\code{system.file(package = "CerebroNexus")} as the package directory, or
+\code{source(system.file("start.R", package = "CerebroNexus"));
+cerebroStart("data.crb", port = 3838)} in R. It starts a small web server
+before CerebroNexus is loaded, which sends the page of the previous run,
+its files and the first view of the Projection page, and then runs
+\code{launchCerebro()} behind it; the App keeps the address it was given.
+The first start of an installation has no page to send yet and starts as
+\code{launchCerebro()} does.
 }
 \examples{
 if ( interactive() ) {

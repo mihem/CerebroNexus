@@ -30,7 +30,6 @@
 #' )
 #' }
 #'
-#' @import dplyr
 #' @importFrom utils read.delim
 #'
 #' @export

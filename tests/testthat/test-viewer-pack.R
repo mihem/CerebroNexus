@@ -218,6 +218,27 @@ test_that("Viewer Pack stores canonical trajectory row indexes", {
   expect_false(is.character(attr(compact, "row.names")))
   expect_identical(unname(as.list(compact)), unname(as.list(meta)))
 
+  ## A thin CRB that stores the rows by cell index: the Pack's index is the
+  ## same, so the trajectory is used without reading the cell names for it.
+  indexed_meta <- function(index) {
+    stored <- meta
+    attr(stored, "row.names") <- index
+    attr(stored, "cerebro_cell_index_rownames") <- TRUE
+    stored
+  }
+  indexed <- readCerebro(crb)
+  indexed$trajectories$monocle2$subset$meta <- indexed_meta(c(2L, 4L))
+  runtime$viewerPackDropTrajectoryNames(descriptor, indexed)
+  expect_identical(indexed$getTrajectory("monocle2", "subset")$meta, compact)
+  ## rows the Pack does not have stay as the CRB stores them
+  other <- readCerebro(crb)
+  other$trajectories$monocle2$subset$meta <- indexed_meta(c(1L, 4L))
+  runtime$viewerPackDropTrajectoryNames(descriptor, other)
+  expect_identical(
+    other$trajectories$monocle2$subset$meta,
+    indexed_meta(c(1L, 4L))
+  )
+
   frame <- runtime$viewerPackTrajectoryFrame(
     descriptor,
     "monocle2",
@@ -364,6 +385,68 @@ test_that("Viewer Pack stores canonical spatial row indexes", {
     runtime$viewerPackSpatialIndex(descriptor, "slice"),
     c(3L, 1L)
   )
+
+  ## A thin CRB that stores the cells of the section as metadata rows: the
+  ## Pack names them, and the object's getter has nothing left to restore.
+  object <- readCerebro(crb)
+  named <- object$getSpatialData("slice")$coordinates
+  indexed <- named
+  attr(indexed, "row.names") <- c(3L, 1L)
+  attr(indexed, "cerebro_cell_index_rownames") <- TRUE
+  object$spatial$slice$coordinates <- indexed
+  names_pack <- runtime$viewerPackOpen(crb)
+  expect_true(runtime$viewerPackRestoreSpatialNames(
+    names_pack,
+    object,
+    "slice"
+  ))
+  expect_identical(object$spatial$slice$coordinates, named)
+  expect_identical(object$getSpatialData("slice")$coordinates, named)
+  ## nothing to name, no such section, no Pack
+  expect_false(runtime$viewerPackRestoreSpatialNames(
+    names_pack,
+    object,
+    "slice"
+  ))
+  expect_false(runtime$viewerPackRestoreSpatialNames(
+    names_pack,
+    object,
+    "none"
+  ))
+  object$spatial$slice$coordinates <- indexed
+  expect_false(runtime$viewerPackRestoreSpatialNames(NULL, object, "slice"))
+  expect_identical(object$spatial$slice$coordinates, indexed)
+  ## rows the Pack has no cell for are left to the getter, which refuses them
+  outside <- indexed
+  attr(outside, "row.names") <- c(3L, 9L)
+  object$spatial$slice$coordinates <- outside
+  expect_false(runtime$viewerPackRestoreSpatialNames(
+    names_pack,
+    object,
+    "slice"
+  ))
+  expect_error(object$getSpatialData("slice"), "invalid spatial cell index")
+
+  ## The object the sessions of the process are cloned from is named with the
+  ## session's, so that a later session reads no cell names for the section.
+  prototype <- readCerebro(crb)
+  prototype$spatial$slice$coordinates <- indexed
+  session_object <- prototype$clone()
+  attr(session_object, "cerebro_dataset_path") <- crb
+  runtime$.crb_process_cache <- new.env(parent = emptyenv())
+  assign(
+    normalizePath(crb, winslash = "/", mustWork = FALSE),
+    list(object = prototype),
+    envir = runtime$.crb_process_cache
+  )
+  expect_true(runtime$viewerPackRestoreSpatialNames(
+    names_pack,
+    session_object,
+    "slice"
+  ))
+  expect_identical(session_object$spatial$slice$coordinates, named)
+  expect_identical(prototype$spatial$slice$coordinates, named)
+
   frame <- runtime$viewerPackSpatialFrame(descriptor, "slice")
   expect_identical(frame$cells, 2L)
   expect_identical(frame$dimensions, 2L)

@@ -13,7 +13,6 @@
 #' package) with gene sets, gene set names, and gene set descriptions stored in
 #' lists.
 #'
-#' @import dplyr
 #'
 .read_GMT_file <- function(
   file

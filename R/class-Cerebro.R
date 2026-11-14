@@ -1068,7 +1068,7 @@ Cerebro <- R6::R6Class(
           call. = FALSE
         )
       }
-      return(self$trajectories[[method]][[trajectory_name]])
+      return(private$restoreTrajectoryCells(method, trajectory_name))
     },
 
     #' @description
@@ -1317,6 +1317,11 @@ Cerebro <- R6::R6Class(
           )
         )
         self$spatial[[name]] <- data
+      }
+      coordinates <- private$restoreSpatialCells(data[["coordinates"]])
+      if (!identical(coordinates, data[["coordinates"]])) {
+        data[["coordinates"]] <- coordinates
+        self$spatial[[name]][["coordinates"]] <- coordinates
       }
       context <- paste0("Spatial data `", name, "`")
       images <- if ("histology_images" %in% names(data)) {
@@ -1691,6 +1696,78 @@ Cerebro <- R6::R6Class(
       })
       self$immune_repertoire <- repertoire
       repertoire
+    },
+
+    ## A trajectory whose `meta` rows a thin CRB stores as metadata rows gets
+    ## its cell names back, once. Self-contained like restoreRepertoireCells().
+    restoreTrajectoryCells = function(method, trajectory_name) {
+      trajectory <- self$trajectories[[method]][[trajectory_name]]
+      meta <- if (is.list(trajectory) && !is.data.frame(trajectory)) {
+        trajectory[["meta"]]
+      }
+      if (
+        !is.data.frame(meta) ||
+          !isTRUE(attr(meta, "cerebro_cell_index_rownames", exact = TRUE))
+      ) {
+        return(trajectory)
+      }
+      cells <- private$storedCellNames()
+      index <- attr(meta, "row.names")
+      if (
+        !is.integer(index) ||
+          length(index) != nrow(meta) ||
+          anyNA(index) ||
+          any(index < 1L | index > length(cells)) ||
+          anyDuplicated(index)
+      ) {
+        stop(
+          "The thin CRB stores an invalid trajectory cell index.",
+          call. = FALSE
+        )
+      }
+      attr(meta, "cerebro_cell_index_rownames") <- NULL
+      attr(meta, "row.names") <- cells[index]
+      trajectory[["meta"]] <- meta
+      self$trajectories[[method]][[trajectory_name]] <- trajectory
+      trajectory
+    },
+
+    ## The coordinates of a spatial section whose rows a thin CRB stores as
+    ## metadata rows get their cell names back, once. A thin CRB that is used
+    ## as it was read has no cell names: its rows stay metadata rows then (the
+    ## images of a data set are listed that way; the Viewer names the cells
+    ## before it uses a section).
+    restoreSpatialCells = function(coordinates) {
+      if (
+        !is.data.frame(coordinates) ||
+          !isTRUE(attr(
+            coordinates,
+            "cerebro_cell_index_rownames",
+            exact = TRUE
+          ))
+      ) {
+        return(coordinates)
+      }
+      cells <- self$meta_data[["cell_barcode"]]
+      if (!is.character(cells)) {
+        return(coordinates)
+      }
+      index <- attr(coordinates, "row.names")
+      if (
+        !is.integer(index) ||
+          length(index) != nrow(coordinates) ||
+          anyNA(index) ||
+          any(index < 1L | index > length(cells)) ||
+          anyDuplicated(index)
+      ) {
+        stop(
+          "The thin CRB stores an invalid spatial cell index.",
+          call. = FALSE
+        )
+      }
+      attr(coordinates, "cerebro_cell_index_rownames") <- NULL
+      attr(coordinates, "row.names") <- cells[index]
+      coordinates
     },
 
     ## Rows of the immune repertoire whose CTgene matches a receptor pattern.

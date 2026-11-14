@@ -22,6 +22,17 @@ viewerSource(cerebro_root_path("viewer/plotting_functions.R"), environment())
 viewerSource(cerebro_root_path("viewer/color_config.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/viewer_pack.R"), environment())
 viewerSource(cerebro_root_path("viewer/core/crb_contract.R"), environment())
+## launchCerebro() has loaded this file already, before the App started, and
+## the URL prefixes it gave out then are in its state: not a second time.
+if (!exists("viewerFirstViewPublishKept", mode = "function")) {
+  viewerSource(
+    cerebro_root_path("viewer/core/shared_resources.R"),
+    environment()
+  )
+}
+## Where a page finds the first view of its Projection before its session
+## exists.
+viewerFirstViewPublishKept(Cerebro.options)
 
 ## Generated Extra material tables are immutable. Share their lazy cache across
 ## sessions instead of reading the same sheet again for every browser tab.
@@ -30,20 +41,68 @@ viewerSource(cerebro_root_path("viewer/core/crb_contract.R"), environment())
 ## Process-owned query/cache functions do not capture a browser session.
 viewerSource(cerebro_root_path("viewer/msigdb.R"), environment())
 viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
-.reserveCrbHeap(Cerebro.options[["crb_file_to_load"]])
+## launchCerebro() reads the configured CRBs itself once this file is loaded
+## (viewerLaunchPrototypes() below takes them), and has raised the heap for
+## them already.
+.viewer_launch_reads_datasets <- isTRUE(
+  Cerebro.options[[".launch_reads_datasets"]]
+)
+if (!.viewer_launch_reads_datasets) {
+  .reserveCrbHeap(Cerebro.options[["crb_file_to_load"]])
+}
 .viewer_pack_process_cache <- new.env(parent = emptyenv())
 ## Canonical cell-name files by cell-order fingerprint, shared by all sessions
 ## of the process (see viewerCellNamesResource() in server()). A background
 ## process decodes a Pack's cell names and writes the file, started when the
 ## Pack is opened: decoding a million names took 0.7-2 s of the R thread right
 ## after the first view of a page.
+##
+## The file is also kept in the user's cache directory, by cell order: the
+## background process needs 3.8 s for 1.3 million cells, during which a view
+## waits for its names, and the next process of the same data set copies the
+## kept file instead (viewerCellNamesKept()). A kept file that was not used
+## for 60 days is removed.
 .viewer_cell_names_files <- new.env(parent = emptyenv())
+viewerCellNamesCache <- function() {
+  file.path(tools::R_user_dir("CerebroNexus", "cache"), "cell-names")
+}
+## Copies the kept file of a cell order to `target` and returns what the
+## background process would (the cell count and the decompressed size), or
+## NULL: nothing kept, or not for these cells.
+viewerCellNamesKept <- function(fingerprint, n, target) {
+  kept <- file.path(viewerCellNamesCache(), basename(target))
+  description <- sub("[.]bin[.]gz$", ".rds", kept)
+  if (!file.exists(kept) || !file.exists(description)) {
+    return(NULL)
+  }
+  meta <- tryCatch(readRDS(description), error = function(error) NULL)
+  valid <- is.list(meta) &&
+    identical(meta$fingerprint, fingerprint) &&
+    is.numeric(meta$cells) &&
+    length(meta$cells) == 1L &&
+    isTRUE(meta$cells == n) &&
+    is.numeric(meta$bytes) &&
+    length(meta$bytes) == 1L &&
+    !is.na(meta$bytes) &&
+    isTRUE(as.numeric(file.size(kept)) == as.numeric(meta$size))
+  if (!valid) {
+    return(NULL)
+  }
+  if (!file.exists(target) && !isTRUE(file.copy(kept, target))) {
+    return(NULL)
+  }
+  ## Renewed by use.
+  try(Sys.setFileTime(c(kept, description), Sys.time()), silent = TRUE)
+  list(cells = meta$cells, bytes = meta$bytes)
+}
 ## Immune repertoire results that depend only on a data set's files (control
 ## choices scanned from the whole repertoire), shared by every session of the
 ## process that opens the same files (see ir_process_memo()).
 .ir_process_cache <- new.env(parent = emptyenv())
 ## Evaluated in a mirai daemon with `cells` (or NULL and the Pack's
-## `asset_file`), the cell count `n` and the target `file`.
+## `asset_file`), the cell count `n`, the target `file` and, to keep the file
+## for later processes, the directory `keep` and the `fingerprint` of the cell
+## order.
 .viewer_cell_names_job <- quote({
   if (is.null(cells)) {
     cells <- qs2::qs_read(asset_file)
@@ -64,11 +123,39 @@ viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
       close(connection)
       file.rename(partial, file)
     }
-    list(
+    result <- list(
       cells = length(cells),
       ## Decompressed size: every name and its terminating NUL.
       bytes = sum(nchar(cells, type = "bytes")) + length(cells)
     )
+    if (is.character(keep) && file.exists(file)) {
+      try(
+        {
+          dir.create(keep, showWarnings = FALSE, recursive = TRUE)
+          kept <- file.path(keep, basename(file))
+          partial <- tempfile("cell-names-", keep)
+          if (file.copy(file, partial)) {
+            file.rename(partial, kept)
+            description <- tempfile("cell-names-", keep)
+            saveRDS(
+              c(
+                list(fingerprint = fingerprint, size = file.size(kept)),
+                result
+              ),
+              description
+            )
+            file.rename(description, sub("[.]bin[.]gz$", ".rds", kept))
+          }
+          unlink(partial)
+          old <- list.files(keep, full.names = TRUE)
+          unlink(old[
+            difftime(Sys.time(), file.mtime(old), units = "days") > 60
+          ])
+        },
+        silent = TRUE
+      )
+    }
+    result
   }
 })
 viewerCellNamesFile <- function(pack) {
@@ -99,11 +186,23 @@ viewerCellNamesFile <- function(pack) {
     directory,
     paste0(gsub("[^A-Za-z0-9_-]", "_", fingerprint), ".bin.gz")
   )
+  ## A file kept by an earlier process of these cells: nothing to decode.
+  kept <- tryCatch(
+    viewerCellNamesKept(fingerprint, pack$cell_count, entry$file),
+    error = function(error) NULL
+  )
+  if (is.list(kept)) {
+    entry$result <- kept
+    assign(fingerprint, entry, envir = .viewer_cell_names_files)
+    return(entry)
+  }
   entry$arguments <- list(
     cells = cells,
     asset_file = asset$file,
     n = pack$cell_count,
-    file = entry$file
+    file = entry$file,
+    keep = viewerCellNamesCache(),
+    fingerprint = fingerprint
   )
   ## A daemon that cannot start (a blocked socket) times out; the file is then
   ## written in the session. .viewerMirai() gives it the Viewer's library paths.
@@ -119,6 +218,75 @@ viewerCellNamesFile <- function(pack) {
   )
   assign(fingerprint, entry, envir = .viewer_cell_names_files)
   entry
+}
+## The names of the canonical rows `index` of `pack`, cut out of its cell
+## names file: only these strings are created. Naming the 100,000 cells of one
+## spatial section took 0.9 s when the 800,000 names of the Pack were read for
+## it. NULL while the file is not there; a caller then reads the Pack's cell
+## order (viewerPackCellBarcodesAt() in core/viewer_pack.R).
+viewerCellNamesRead <- function(pack, index) {
+  fingerprint <- as.character(pack$manifest$cell_order_fingerprint %||% "")
+  if (
+    !viewerPackCanonical(pack) ||
+      !is.environment(pack$cache) ||
+      length(fingerprint) != 1L ||
+      !nzchar(fingerprint)
+  ) {
+    return(NULL)
+  }
+  entry <- .viewer_cell_names_files[[fingerprint]]
+  if (
+    is.null(entry) ||
+      !is.list(entry$result) ||
+      !file.exists(entry$file) ||
+      !is.integer(index) ||
+      anyNA(index) ||
+      any(index < 1L | index > entry$result$cells)
+  ) {
+    return(NULL)
+  }
+  ## The bytes of the file and where each name ends, for the session.
+  layout <- get0("cell names file", envir = pack$cache, inherits = FALSE)
+  if (is.null(layout)) {
+    connection <- gzfile(entry$file, "rb")
+    on.exit(close(connection), add = TRUE)
+    bytes <- readBin(connection, "raw", n = entry$result$bytes)
+    ends <- which(bytes == as.raw(0L))
+    if (
+      length(bytes) != entry$result$bytes ||
+        length(ends) != entry$result$cells
+    ) {
+      return(NULL)
+    }
+    layout <- list(bytes = bytes, ends = ends)
+    assign("cell names file", layout, envir = pack$cache)
+  }
+  starts <- c(1L, layout$ends[-length(layout$ends)] + 1L)[index]
+  ## Each name with its terminating NUL, one after the other.
+  positions <- sequence(layout$ends[index] - starts + 1L, from = starts)
+  cells <- readBin(layout$bytes[positions], "character", n = length(index))
+  if (length(cells) != length(index)) {
+    return(NULL)
+  }
+  Encoding(cells) <- "UTF-8"
+  cells
+}
+## TRUE while the background process still writes the cell names of `pack`.
+## Only looks: viewerCellNamesFile() starts the process.
+viewerCellNamesPending <- function(pack) {
+  fingerprint <- as.character(pack$manifest$cell_order_fingerprint %||% "")
+  if (
+    !viewerPackCanonical(pack) ||
+      length(fingerprint) != 1L ||
+      !nzchar(fingerprint)
+  ) {
+    return(FALSE)
+  }
+  entry <- .viewer_cell_names_files[[fingerprint]]
+  !is.null(entry) &&
+    is.null(entry$result) &&
+    inherits(entry$task, "mirai") &&
+    mirai::unresolved(entry$task)
 }
 ## CRBs without a stored cell fingerprint would otherwise hash every barcode on
 ## each session's load. The value depends only on the file's cells.
@@ -143,12 +311,24 @@ viewerCellNamesFile <- function(pack) {
 }
 viewerSource(cerebro_root_path("viewer/core/dataset_overview.R"), environment())
 .crb_launch_state <- new.env(parent = emptyenv())
-.crb_launch_state$prototypes <- Cerebro.options[[".dataset_prototypes"]]
-if (!is.list(.crb_launch_state$prototypes)) {
-  .crb_launch_state$prototypes <- list()
+.crb_launch_state$prototypes <- list()
+## The CRBs launchCerebro() has read, by path. The first session hands them to
+## the Viewer's caches, so that no page reads the same file a second time.
+viewerLaunchPrototypes <- function(prototypes) {
+  .crb_launch_state$prototypes <- if (is.list(prototypes)) {
+    prototypes
+  } else {
+    list()
+  }
+  invisible(NULL)
 }
-if (length(.crb_launch_state$prototypes)) {
-  for (prototype_path in names(.crb_launch_state$prototypes)) {
+## The cell names of the configured Viewer Packs are written while
+## launchCerebro() reads the CRBs. Started after them, the file of a 1.3
+## million cell data set was not there yet when a browser that was already
+## waiting got its first view, and the names went into the message instead
+## (29 MB, 3 s).
+if (.viewer_launch_reads_datasets) {
+  for (prototype_path in Cerebro.options[["crb_file_to_load"]]) {
     viewerCellNamesFile(viewerPackOpenCached(
       prototype_path,
       .viewer_pack_process_cache
@@ -203,14 +383,63 @@ server <- function(input, output, session) {
     .crb_launch_state$prototypes <- NULL
   }
   source(cerebro_root_path("viewer/coordinated_views/config.R"), local = TRUE)
+  ## A view asks for the names and hover columns of its cells once it is
+  ## drawn. While the cell names file of the data set is still being written
+  ## the answer would carry every name itself: 29 MB for 1.3 million cells,
+  ## which kept R busy for 3 to 5 s right after the first view of a browser
+  ## that was waiting for the App. Such a request waits for the file instead;
+  ## the view is drawn already, and the background process ends within its
+  ## timeout whatever happens to it.
+  viewer_aux_waiting <- new.env(parent = emptyenv())
+  viewer_aux_waiting$requests <- list()
+  viewer_aux_waiting_tick <- reactiveVal(0L)
+  ## Answers `request`, or keeps it (FALSE) while the file is written or
+  ## earlier requests wait.
+  viewerAuxRequestReceive <- function(request) {
+    if (
+      length(viewer_aux_waiting$requests) ||
+        viewerCellNamesPending(viewerPackCurrent())
+    ) {
+      viewer_aux_waiting$requests <- c(
+        viewer_aux_waiting$requests,
+        list(request)
+      )
+      return(invisible(FALSE))
+    }
+    cerebroCellViewAuxRequest(request)
+    invisible(TRUE)
+  }
+  ## Answers the requests that waited, in the order they came; FALSE while the
+  ## file is still being written.
+  viewerAuxRequestRelease <- function() {
+    if (!length(viewer_aux_waiting$requests)) {
+      return(invisible(TRUE))
+    }
+    if (viewerCellNamesPending(viewerPackCurrent())) {
+      return(invisible(FALSE))
+    }
+    requests <- viewer_aux_waiting$requests
+    viewer_aux_waiting$requests <- list()
+    for (request in requests) {
+      cerebroCellViewAuxRequest(request)
+    }
+    invisible(TRUE)
+  }
   observeEvent(
     input[["cell_view_aux_request"]],
     {
-      request <- input[["cell_view_aux_request"]]
-      cerebroCellViewAuxRequest(request)
+      if (!viewerAuxRequestReceive(input[["cell_view_aux_request"]])) {
+        viewer_aux_waiting_tick(viewer_aux_waiting_tick() + 1L)
+      }
     },
     ignoreInit = TRUE
   )
+  observe({
+    viewer_aux_waiting_tick()
+    if (!isolate(viewerAuxRequestRelease())) {
+      invalidateLater(50, session)
+    }
+  })
   source(cerebro_root_path("viewer/clone_contract.R"), local = TRUE)
 
   ##--------------------------------------------------------------------------##
@@ -372,6 +601,11 @@ server <- function(input, output, session) {
   viewer_dataset_generation <- 0
   viewer_upload_serial <- 0L
   viewer_dataset_request <- reactiveVal(NULL)
+  ## The data set this session's address opens: the one its first request
+  ## selects, or NA when the address names a data set the app does not have.
+  ## The first view is published for that address, and only from a frame of
+  ## that data set (viewer_first_view_capture()).
+  viewer_first_view_dataset <- NULL
 
   viewer_send_dataset_phase <- function(
     phase,
@@ -731,6 +965,19 @@ server <- function(input, output, session) {
         available_crb_files$files,
         selection
       )
+    }
+    if (is.null(viewer_first_view_dataset)) {
+      link <- parseQueryString(session$clientData$url_search)[["dataset"]]
+      viewer_first_view_dataset <<- if (
+        is.character(link) &&
+          length(link) == 1L &&
+          nzchar(link) &&
+          !link %in% names(available_crb_files$files)
+      ) {
+        NA_character_
+      } else {
+        as.character(selection)
+      }
     }
     viewer_request_dataset(
       selection = selection,
@@ -1246,9 +1493,103 @@ server <- function(input, output, session) {
   viewer_resource_prefixes <- character()
   viewer_resource_counts <- new.env(parent = emptyenv())
   viewer_resource_by_directory <- new.env(parent = emptyenv())
+  ## Makes `directory` reachable under `prefix`.
+  viewerRegisterStaticResource <- function(
+    prefix,
+    directory,
+    immutable = FALSE
+  ) {
+    shiny::addResourcePath(prefix, directory)
+    ## These files are binary arrays or already gzip files, which httpuv would
+    ## otherwise gzip again for every request (10 MB of coordinates by 7 %,
+    ## in half a second).
+    server <- shiny::getShinyOption("server", default = NULL)
+    if (!is.null(server)) {
+      path <- if (immutable) {
+        ## A shared prefix: later sessions take the file from the browser cache.
+        viewerSharedResourceStaticPath(directory)
+      } else {
+        httpuv::staticPath(
+          normalizePath(directory, mustWork = TRUE),
+          headers = list("Content-Encoding" = "identity")
+        )
+      }
+      server$setStaticPath(.list = stats::setNames(list(path), prefix))
+    }
+  }
+  viewer_shared_resource_roots <- viewerSharedResourceRoots(Cerebro.options)
+  viewerSharedResourceHeaders()
+  ## The CRB file of the data set on screen when it is a configured one, whose
+  ## first view may be published; NULL for an upload.
+  viewer_shared_resource_sources <- viewerSharedResourceSources(Cerebro.options)
+  viewer_first_view_source <- function() {
+    path <- tryCatch(
+      isolate(viewerDatasetPath(
+        available_crb_files$files,
+        available_crb_files$selected
+      )),
+      error = function(error) NULL
+    )
+    if (
+      !is.character(path) ||
+        length(path) != 1L ||
+        is.na(path) ||
+        !file.exists(path)
+    ) {
+      return(NULL)
+    }
+    path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+    if (path %in% viewer_shared_resource_sources) path else NULL
+  }
+  ## Publishes the first view of this session's page from its first frame
+  ## (viewer/core/shared_resources.R). Never fails a render.
+  viewer_first_view_capture <- function(message) {
+    if (!length(viewer_shared_resource_sources)) {
+      return(invisible(NULL))
+    }
+    ## Not the frame of another data set than the address opens (one the user
+    ## switched to), and not for a link that names a data set the app does not
+    ## have: either would file cells under an address they do not belong to,
+    ## and a link can vary without end.
+    if (
+      is.null(viewer_first_view_dataset) ||
+        is.na(viewer_first_view_dataset) ||
+        !identical(
+          as.character(isolate(available_crb_files$selected)),
+          viewer_first_view_dataset
+        )
+    ) {
+      return(invisible(NULL))
+    }
+    try(
+      viewerFirstViewCapture(
+        message,
+        isolate(session$clientData$url_pathname),
+        isolate(session$clientData$url_search),
+        viewer_shared_resource_roots,
+        viewerFirstViewBasis(Cerebro.options),
+        viewer_first_view_source()
+      ),
+      silent = TRUE
+    )
+    invisible(NULL)
+  }
   viewerStaticResourcePrefix <- function(kind, directory) {
-    ## One prefix per directory and session: a new prefix for the same files
-    ## gives them a new URL, so the browser downloads and keeps them again
+    ## The Pack of a configured data set has one prefix for the whole process
+    ## (viewer/core/shared_resources.R).
+    shared <- viewerSharedResourcePrefix(
+      kind,
+      directory,
+      viewer_shared_resource_roots,
+      function(prefix, directory) {
+        viewerRegisterStaticResource(prefix, directory, immutable = TRUE)
+      }
+    )
+    if (!is.null(shared)) {
+      return(shared)
+    }
+    ## Otherwise one prefix per directory and session: a new prefix for the same
+    ## files gives them a new URL, so the browser downloads and keeps them again
     ## (the cell names, 1.46 million strings on Ren, on every frame).
     directory_key <- paste(kind, normalizePath(directory, mustWork = FALSE))
     if (
@@ -1279,21 +1620,7 @@ server <- function(input, output, session) {
       "-",
       count
     )
-    shiny::addResourcePath(prefix, directory)
-    ## These files are binary arrays or already gzip files, which httpuv would
-    ## otherwise gzip again for every request (10 MB of coordinates by 7 %).
-    server <- shiny::getShinyOption("server", default = NULL)
-    if (!is.null(server)) {
-      server$setStaticPath(
-        .list = stats::setNames(
-          list(httpuv::staticPath(
-            normalizePath(directory, mustWork = TRUE),
-            headers = list(`Content-Encoding` = "identity")
-          )),
-          prefix
-        )
-      )
-    }
+    viewerRegisterStaticResource(prefix, directory)
     assign(kind, count, envir = viewer_resource_counts)
     assign(directory_key, prefix, envir = viewer_resource_by_directory)
     viewer_resource_prefixes <<- c(viewer_resource_prefixes, prefix)
@@ -2419,6 +2746,51 @@ server <- function(input, output, session) {
     once = TRUE
   )
 
+  ## What keeps something for the next start waits for the sessions to be quiet
+  ## (R/quiet_queue.R).
+  if (exists(".viewerSessionActivity", mode = "function")) {
+    session$onFlushed(function() .viewerSessionActivity(), once = FALSE)
+  }
+
+  ## launchCerebro() starts without the packages only some pages use
+  ## (`.idle_packages`: plotly, Matrix, ...). Load them once this session has
+  ## sent nothing for three seconds, one per turn of the event loop, and stop
+  ## as soon as it is busy again: the first page is never delayed, and a click
+  ## waits for one package at most. An App that attaches its packages has
+  ## nothing to load here.
+  viewer_idle_packages <- function() {
+    setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
+  }
+  if (length(viewer_idle_packages())) {
+    viewer_idle_quiet <- FALSE
+    viewer_idle_cancel <- function() NULL
+    viewer_idle_load <- function() {
+      packages <- viewer_idle_packages()
+      if (session$isClosed() || !length(packages)) {
+        return()
+      }
+      viewer_idle_quiet <<- TRUE
+      tasks <- lapply(packages, function(package) {
+        function() loadNamespace(package)
+      })
+      names(tasks) <- paste0("load package ", packages)
+      viewerIdleRun(tasks, function() {
+        !session$isClosed() && viewer_idle_quiet
+      })
+    }
+    viewer_idle_flushed <- function() {
+      viewer_idle_quiet <<- FALSE
+      viewer_idle_cancel()
+      if (!length(viewer_idle_packages())) {
+        return()
+      }
+      viewer_idle_cancel <<- later::later(viewer_idle_load, 3)
+      session$onFlushed(viewer_idle_flushed, once = TRUE)
+    }
+    session$onFlushed(viewer_idle_flushed, once = TRUE)
+    session$onSessionEnded(function() viewer_idle_cancel())
+  }
+
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).
   ##--------------------------------------------------------------------------##
@@ -2455,6 +2827,23 @@ server <- function(input, output, session) {
   )
 }
 
-## Pay compilation cost at process startup, before accepting a login. This
-## compiles code only; it does not create a session or read any dataset.
-server <- compiler::cmpfun(server)
+## server() runs compiled from its first session. The installed package holds
+## its byte code (R/viewer_bytecode.R): compiling it here took 0.4-0.6 s of
+## every process start. A bundled App or a source checkout has none and pays
+## the compilation at process startup, before accepting a login. Either way
+## this handles code only; it creates no session and reads no dataset.
+.viewer_server_bytecode <- .viewerBytecode(
+  cerebro_root_path("viewer/shiny_server.R")
+)
+.viewer_server_index <- match("server", .viewer_server_bytecode$names)
+## Where the package is loaded from source (pkgload: the tests), the compiler
+## cannot place the names the lazy imports bind (R/lazy_imports.R), and the
+## server stays as it is; an installed package has its byte code already.
+if (is.na(.viewer_server_index)) {
+  server <- tryCatch(compiler::cmpfun(server), error = function(error) server)
+} else {
+  ## The compiled `server <- function(...)` of this file, evaluated where the
+  ## file is: the same closure, with a compiled body.
+  eval(.viewer_server_bytecode$code[[.viewer_server_index]], environment())
+}
+rm(.viewer_server_bytecode, .viewer_server_index)

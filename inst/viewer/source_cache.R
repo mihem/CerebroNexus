@@ -53,6 +53,7 @@
   ".fallbackRuntimeBackendPlan",
   ".runtimeBackendRecoveryAdvice",
   ".attachExternalExpression",
+  ".runtimeH5ChecksumRecord",
   ".verifyRuntimeH5Checksum",
   ".h5ExpressionRows",
   "extra_material_table_filter",

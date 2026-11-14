@@ -943,6 +943,12 @@ cv_build_projections <- function(
 ##     and FOV, with an optional per-image alignment preset and explicit bounds.
 ## Returns list(name, x, y, image) or NULL.
 cv_spatial_data <- function(crb, nm) {
+  ## Rows a thin CRB stores as metadata rows get the Pack's cell names first.
+  viewerPackRestoreSpatialNames(
+    attr(crb, "cerebro_viewer_pack", exact = TRUE),
+    crb,
+    nm
+  )
   crb$getSpatialData(nm, hydrate_molecules = FALSE)
 }
 

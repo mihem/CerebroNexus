@@ -644,10 +644,12 @@
 
 ## Treat the ordinary field as data. The getter binding is checked only as a
 ## format marker and is never invoked during preflight. Callers check the
-## location's portability with their own message.
+## location's portability with their own message. `verify = FALSE` only reads
+## the descriptor: the h5 file is not hashed.
 .readBundleBackend <- function(
   crb_path,
-  object = .readCerebroPayload(crb_path)
+  object = .readCerebroPayload(crb_path),
+  verify = TRUE
 ) {
   recognized <- .recognizedCerebroObject(object)
   if (recognized) {
@@ -679,7 +681,7 @@
   ## A replaced h5 sidecar must fail the build, not the first Viewer read.
   ## Other location problems are reported later with their own messages.
   md5 <- .subset2(object$expression_backend, "md5")
-  if (!is.null(md5) && !identical(descriptor$type, "embedded")) {
+  if (verify && !is.null(md5) && !identical(descriptor$type, "embedded")) {
     if (!.validMd5(md5)) {
       stop(
         "The Cerebro expression-backend descriptor is invalid.",
@@ -870,11 +872,14 @@
     overview_helpers
   )
   overview <- overview_helpers$viewerDatasetOverview(object)
-  # Thin CRBs omit expression. Read only the external matrix dimensions here.
+  # Thin CRBs omit expression. Read only the external matrix dimensions here:
+  # the file is not hashed for its gene count. This runs for every data set
+  # before launchCerebro() has its first session, where hashing took 0.9 s for
+  # a 234 MB file, and the Viewer checks the file before it reads expression.
   if (is.null(overview$genes)) {
     overview["genes"] <- list(tryCatch(
       {
-        descriptor <- .readBundleBackend(path, object)
+        descriptor <- .readBundleBackend(path, object, verify = FALSE)
         if (identical(descriptor$type, "h5")) {
           .h5Dim(.cerebroSidecar(path, descriptor))[[2L]]
         } else {
@@ -2416,7 +2421,6 @@
 #' }
 #'
 #' @importFrom later later
-#' @importFrom mirai mirai
 #' @importFrom promises promise
 #' @importFrom stats setNames
 #' @export
