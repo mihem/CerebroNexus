@@ -295,14 +295,13 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
   profile,
   entry,
   recommendation = NULL,
-  validate_dependencies = TRUE,
-  inert = FALSE
+  validate_dependencies = TRUE
 ) {
-  # `inert`: the caller has already searched this policy for references.
+  # The caller has already searched `policy` for references; a new caller
+  # must call .builder_state_has_reference() on it first.
   if (
     !is.list(policy) ||
       is.object(policy) ||
-      (!isTRUE(inert) && .builder_state_has_reference(policy)) ||
       !is.list(policy$columns) ||
       is.object(policy$columns)
   ) {
@@ -658,8 +657,7 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
         recommendation,
         profile,
         entry,
-        validate_dependencies = is.null(policy),
-        inert = TRUE
+        validate_dependencies = is.null(policy)
       )
     }
     if (!is.null(policy)) {
@@ -667,8 +665,7 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
         policy,
         profile,
         entry,
-        recommendation = recommendation,
-        inert = TRUE
+        recommendation = recommendation
       )
     }
   }

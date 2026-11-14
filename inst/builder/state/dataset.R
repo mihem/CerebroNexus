@@ -545,7 +545,10 @@ builder_reduce_state <- function(
     }
   } else if (identical(type, "replace")) {
     index <- require_id(action$id)
-    # The entry in the store passed this check when it was stored.
+    # The search below covers only what differs from the stored entry, so it
+    # relies on that entry holding no reference: every write to the store
+    # (add, replace, replace_all, builder_state()) validates first, and any
+    # future direct write to state$datasets must do the same.
     stored <- state$datasets[[index]]
     dataset_state <- .builder_store_validate_entry(action$entry, known = stored)
     entry <- builder_upgrade_viewer_content_entry(action$entry)
