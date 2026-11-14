@@ -1038,6 +1038,57 @@
     }
   });
 
+  // Colour management makes a colour picker for every level of every group:
+  // hundreds of them, which the browser took more than a second to make at
+  // once. The page sends them pending (color_picker() in
+  // color_management/server.R); each is made a picker when it comes within
+  // 300 px of the screen. A level without one keeps its default colour.
+  ready(function () {
+    if (!window.IntersectionObserver || !window.jQuery) return;
+    function activate(input) {
+      if (!input.classList.contains("cerebro-colour-pending") ||
+          !document.body.contains(input)) return;
+      // The picker's script arrives with the page's HTML; until it runs the
+      // colour binding finds nothing, and the input would be bound as text.
+      if (!window.jQuery.fn.colourpicker || !window.Shiny ||
+          !window.Shiny.bindAll || !window.Shiny.initializeInputs) {
+        window.setTimeout(function () { activate(input); }, 50);
+        return;
+      }
+      input.classList.remove("cerebro-colour-pending");
+      // a button until now, which no binding takes (Shiny binds, and marks as
+      // initialised, every text input it is given)
+      input.type = "text";
+      input.classList.add("shiny-colour-input");
+      // initialize (the picker itself), then bind, as Shiny does for new HTML
+      window.Shiny.initializeInputs(input.parentElement);
+      window.Shiny.bindAll(input.parentElement);
+    }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        observer.unobserve(entry.target);
+        activate(entry.target);
+      });
+    }, { rootMargin: "300px 0px" });
+    function watch(tries) {
+      var pending = document.querySelectorAll(
+        "#color_assignments_UI input.cerebro-colour-pending"
+      );
+      if (!pending.length) {
+        // The value arrives before its HTML is in the page.
+        if (tries > 0) window.requestAnimationFrame(function () { watch(tries - 1); });
+        return;
+      }
+      for (var i = 0; i < pending.length; i++) observer.observe(pending[i]);
+    }
+    window.jQuery(document).on("shiny:value", function (event) {
+      if (event.name !== "color_assignments_UI") return;
+      // the pickers of the page it replaces are gone
+      observer.disconnect();
+      watch(20);
+    });
+  });
   ready(function () {
     var overlay = null;
     var startedAt = 0;

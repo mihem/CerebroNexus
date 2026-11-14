@@ -122,6 +122,11 @@
   repertoire page says it waits and fills in when it is done, and the other
   pages open as before meanwhile (Groups 0.3 s instead of 20 s). A small
   repertoire (under 50,000 rows) is still encoded at once.
+- **Colour management opens sooner for groups with many levels.** The page
+  makes a colour picker for every level of every group: 661 for Ren, which
+  took 2.4 s, most of it in the browser. A picker is now made when it comes
+  near the screen (a level without one keeps its colour), and the pickers are
+  built without looking up colourpicker's version for each: 0.75 s.
 - **A page opened while the App connects no longer stays "Loading".** Since
   the page is on screen before its session starts, a page could be clicked
   while the browser was connecting. Shiny then sent that click ahead of its
