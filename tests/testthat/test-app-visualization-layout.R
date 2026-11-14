@@ -101,9 +101,12 @@ test_that("all visualization pages keep usable controls, legends and canvases", 
       expect_true(app$get_js(
         "!!document.getElementById('cv-pick-color').selectize"
       ))
-      app$run_js(
-        "window.__pngURL=null;window.__anchorClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){window.__pngURL=this.href};window.cerebroLinkedViewsState.downloadPNG();"
+      ## The export answers at once whether it had something to draw; a
+      ## failure names what the page looked like, not only a timeout.
+      exported <- app$get_js(
+        "(() => {window.__pngURL=null;window.__anchorClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){window.__pngURL=this.href};let result;try{result=String(window.cerebroLinkedViewsState.downloadPNG())}catch(error){result='error: '+error.message+' '+error.stack}return JSON.stringify({result:result,visibility:document.visibilityState,url:String(window.__pngURL).slice(0,30),panes:Array.from(document.querySelectorAll('#shiny-tab-coordinated_views .cv-pane')).map(p=>{const r=p.getBoundingClientRect();return {hidden:p.classList.contains('cv-hidden'),width:Math.round(r.width),height:Math.round(r.height),canvases:Array.from(p.querySelectorAll('canvas')).map(c=>c.width+'x'+c.height)}})})})()"
       )
+      expect_match(exported, '"result":"true"', fixed = TRUE)
       app$wait_for_js(
         "window.__pngURL?.startsWith('data:image/png;base64,')",
         timeout = 30000
