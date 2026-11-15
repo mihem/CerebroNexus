@@ -138,6 +138,26 @@ builder_default_percentage_cells_to_show <- function(
   FALSE
 }
 
+## The last value of each `slot` found to hold no reference. An edit leaves
+## the recommendations of an entry, with every metadata column, the same as
+## they were, and each validation of the entry searched them again.
+.builder_state_inert_values <- new.env(parent = emptyenv())
+
+## The same answer as `.builder_state_has_new_reference(value, known)`: a
+## value identical to one already found to hold no reference holds none
+## either, so it is not searched again.
+.builder_state_has_reference_once <- function(value, slot, known = NULL) {
+  seen <- get0(slot, envir = .builder_state_inert_values, inherits = FALSE)
+  if (!is.null(seen) && identical(value, seen)) {
+    return(FALSE)
+  }
+  if (.builder_state_has_new_reference(value, known)) {
+    return(TRUE)
+  }
+  assign(slot, value, envir = .builder_state_inert_values)
+  FALSE
+}
+
 .builder_state_plain_record <- function(value, recursive = TRUE) {
   if (!is.list(value) || is.object(value)) {
     return(FALSE)
@@ -1096,7 +1116,11 @@ builder_upgrade_viewer_content_entry <- function(entry) {
   if (is.null(recommendations)) {
     return(invisible(NULL))
   }
-  if (!.builder_state_plain_record(recommendations)) {
+  # A plain record, searched for references once for the same value.
+  if (
+    !.builder_state_plain_record(recommendations, recursive = FALSE) ||
+      .builder_state_has_reference_once(recommendations, "recommendations")
+  ) {
     .builder_state_abort(
       "invalid_recommendations",
       "Dataset recommendations must be a plain inert record."

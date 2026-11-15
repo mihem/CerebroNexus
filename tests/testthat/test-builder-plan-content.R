@@ -1066,3 +1066,78 @@ test_that("a reference anywhere in the metadata policy is refused", {
   )
   expect_identical(error$code, "invalid_metadata_policy")
 })
+
+test_that("a recommendation that passed is checked again only when it changes", {
+  home <- environment(.builder_state_effective_metadata_policy)
+  memo <- get(".builder_state_inert_values", envir = home)
+  rm(list = ls(memo, all.names = TRUE), envir = memo)
+  checked <- list()
+  walked <- 0L
+  validate <- .builder_state_validate_metadata_policy
+  walk <- .builder_state_has_reference
+  # The state functions are sourced into this file, not into a package
+  # namespace: they are rebound where they look each other up.
+  rlang::local_bindings(
+    .builder_state_validate_metadata_policy = function(policy, ...) {
+      checked[[length(checked) + 1L]] <<- policy
+      validate(policy, ...)
+    },
+    .builder_state_has_reference = function(value, depth = 0L) {
+      if (identical(depth, 0L)) {
+        walked <<- walked + 1L
+      }
+      walk(value, depth)
+    },
+    .env = home
+  )
+  effective <- function(entry) {
+    .builder_state_effective_metadata_policy(entry, entry$dataset_profile)
+  }
+  refused <- function(entry) {
+    tryCatch(
+      {
+        effective(entry)
+        NULL
+      },
+      builder_state_error = function(error) error$code
+    )
+  }
+
+  entry <- metadata_retention_entry()
+  first <- effective(entry)
+  expect_length(checked, 2L)
+  first_walks <- walked
+
+  # The same recommendation and profile: only the policy is checked, and the
+  # recommendations are not searched again.
+  checked <- list()
+  walked <- 0L
+  expect_identical(effective(entry), first)
+  expect_length(checked, 1L)
+  expect_lt(walked, first_walks)
+
+  # A changed recommendation is checked and refused as before.
+  malformed <- entry
+  malformed$settings$recommendations$metadata$columns$cluster$effective_included <-
+    "yes"
+  expect_identical(refused(malformed), "invalid_metadata_policy")
+  expect_identical(effective(entry), first)
+  reference <- entry
+  reference$settings$recommendations$metadata$columns$cluster$owner <-
+    new.env(parent = emptyenv())
+  expect_identical(refused(reference), "invalid_metadata_policy")
+
+  # So is the same recommendation against other profiled columns.
+  other <- entry
+  other$dataset_profile$metadata$columns$orig.ident <- NULL
+  expect_identical(refused(other), "invalid_metadata_policy")
+
+  # Without a policy the recommendation is checked with the entry's
+  # dependencies every time, whether it passes or not.
+  alone <- entry
+  alone$settings$metadata_policy <- NULL
+  checked <- list()
+  try(effective(alone), silent = TRUE)
+  try(effective(alone), silent = TRUE)
+  expect_length(checked, 2L)
+})

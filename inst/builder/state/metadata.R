@@ -603,7 +603,7 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
     !is.null(recommendations) &&
       (!is.list(recommendations) ||
         is.object(recommendations) ||
-        .builder_state_has_reference(recommendations))
+        .builder_state_has_reference_once(recommendations, "recommendations"))
   ) {
     .builder_state_metadata_policy_abort(
       "Metadata recommendations must be an inert record."
@@ -632,19 +632,29 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
   effective <- .builder_state_or(policy, recommendation)
   # The recommendation was searched as part of `recommendations`, and the
   # policy starts as a copy of it: only what the upgrade, the Group sync and
-  # the user's choices changed is searched again.
+  # the user's choices changed is searched again. The recommendation an edit
+  # leaves as it was is not searched again at all.
   candidates <- list(
-    list(value = recommendation, known = recommendations$metadata),
-    list(value = policy, known = recommendation)
+    list(
+      value = recommendation,
+      known = recommendations$metadata,
+      slot = "metadata_recommendation"
+    ),
+    list(value = policy, known = recommendation, slot = NULL)
   )
   for (candidate in candidates) {
     known <- candidate$known
+    slot <- candidate$slot
     candidate <- candidate$value
     if (
       !is.null(candidate) &&
         (!is.list(candidate) ||
           is.object(candidate) ||
-          .builder_state_has_new_reference(candidate, known))
+          (if (is.null(slot)) {
+            .builder_state_has_new_reference(candidate, known)
+          } else {
+            .builder_state_has_reference_once(candidate, slot, known)
+          }))
     ) {
       .builder_state_metadata_policy_abort(
         "Metadata policy values must be inert records."
@@ -652,13 +662,37 @@ builder_metadata_policy_set_groups <- function(policy, groups) {
     }
   }
   if (is.list(profile)) {
-    if (!is.null(recommendation)) {
+    # With a policy the recommendation is checked without the entry's
+    # dependencies: against the profiled columns only. An edit leaves both as
+    # they were, so a pair that passed is not checked again.
+    columns <- if (is.list(profile$metadata)) profile$metadata$columns
+    checked <- list(recommendation = recommendation, columns = columns)
+    if (
+      !is.null(recommendation) &&
+        (is.null(policy) ||
+          !is.list(columns) ||
+          !identical(
+            checked,
+            get0(
+              "metadata_recommendation_check",
+              envir = .builder_state_inert_values,
+              inherits = FALSE
+            )
+          ))
+    ) {
       .builder_state_validate_metadata_policy(
         recommendation,
         profile,
         entry,
         validate_dependencies = is.null(policy)
       )
+      if (!is.null(policy) && is.list(columns)) {
+        assign(
+          "metadata_recommendation_check",
+          checked,
+          envir = .builder_state_inert_values
+        )
+      }
     }
     if (!is.null(policy)) {
       .builder_state_validate_metadata_policy(
