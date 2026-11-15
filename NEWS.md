@@ -1,4 +1,4 @@
-# CerebroNexus 8.2.3
+# CerebroNexus 8.3.0
 
 - **Start of an App behind Shiny Server.** An App that Shiny runs from an
   `app.R` (the demo App of the package under Shiny Server, or
