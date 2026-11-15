@@ -1,5 +1,18 @@
 # Changelog
 
+## CerebroNexus 8.3.4
+
+- **Sparse expression after
+  [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md).**
+  In a fresh session, `nrow(crb$expression)` of a CRB with an embedded
+  sparse matrix returned `NULL`, because R loads Matrix only during that
+  first call.
+  [`readCerebro()`](https://www.mheming.com/CerebroNexus/reference/readCerebro.md)
+  now loads Matrix when the file holds such a matrix. 8.3.2 did this for
+  the package’s own getters only. H5-backed matrices stay unread until
+  first use, and the App start is not slowed: it reads data sets with
+  its own reader.
+
 ## CerebroNexus 8.3.3
 
 - **No empty projection after switching data sets.** Shiny keeps the
