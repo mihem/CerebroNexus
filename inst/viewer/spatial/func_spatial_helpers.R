@@ -793,24 +793,13 @@ spatial_section_samples <- function() {
     return(cache$value)
   }
   spatial_names <- availableSpatial()
-  metadata <- viewerProjectionFirstFrameMetadata()
+  ## A section's rows (the Viewer Pack's index, or the rows a thin CRB stores)
+  ## say which samples it has; its cells are named only when it is shown.
   facets <- lapply(spatial_names, function(name) {
-    ## The rows a thin CRB stores for the section say which samples it has;
-    ## its cells are named only when the section is shown.
-    rows <- spatial_stored_section_rows(name)
-    if (!is.null(rows)) {
-      field <- spatial_metadata_field(metadata, spatial_sample_fields)
-      values <- if (!is.null(field)) as.character(metadata[[field]][rows])
-      return(list(
-        field = field,
-        values = unique(values[!is.na(values) & nzchar(values)])
-      ))
-    }
-    record <- tryCatch(getSpatialData(name), error = function(error) list())
-    spatial_metadata_facet(
-      metadata,
-      rownames(record[["coordinates"]]) %||% character(),
-      spatial_sample_fields
+    sample <- spatial_section_entry(name, roi = FALSE)$sample
+    list(
+      field = sample$field,
+      values = unique(sample$values[!is.na(sample$values)])
     )
   })
   cache$value <- list(
@@ -820,6 +809,282 @@ spatial_section_samples <- function() {
   cache$dataset <- dataset
   cache$set <- TRUE
   cache$value
+}
+
+## The canonical metadata rows of a section, in the order of its coordinates,
+## found without naming its cells: the Viewer Pack's index of the section, or
+## the rows a thin CRB stores for it. NULL when there is neither.
+spatial_section_index <- function(spatial_name) {
+  coordinates <- tryCatch(
+    data_set()$spatial[[spatial_name]][["coordinates"]],
+    error = function(error) NULL
+  )
+  if (!is.data.frame(coordinates)) {
+    return(NULL)
+  }
+  index <- tryCatch(
+    viewerPackSpatialIndex(viewerPackCurrent(), spatial_name),
+    error = function(error) NULL
+  )
+  if (
+    is.integer(index) &&
+      length(index) == nrow(coordinates) &&
+      !anyNA(index) &&
+      isTRUE(all(index >= 1L))
+  ) {
+    return(index)
+  }
+  spatial_stored_section_rows(spatial_name)
+}
+
+## The cell names of a section, as its getter gives them.
+spatial_section_cell_names <- function(spatial_name) {
+  record <- tryCatch(
+    getSpatialData(spatial_name),
+    error = function(error) list()
+  )
+  rownames(record[["coordinates"]]) %||% character()
+}
+
+## The canonical metadata rows of a section's cells (NA for a cell the
+## metadata lacks): by integer index when there is one, otherwise by matching
+## the names `section_cells()` gives against the metadata.
+spatial_section_metadata_rows <- function(
+  spatial_name,
+  metadata = viewerProjectionFirstFrameMetadata(),
+  section_cells = function() spatial_section_cell_names(spatial_name)
+) {
+  rows <- spatial_section_index(spatial_name)
+  if (!is.null(rows)) {
+    return(rows)
+  }
+  spatial_metadata_rows(metadata, section_cells())
+}
+
+## The values at `rows` of the first metadata column `candidates` name, as
+## character, NA for a missing row, value or empty string.
+spatial_rows_facet <- function(metadata, rows, candidates) {
+  field <- spatial_metadata_field(metadata, candidates)
+  values <- rep(NA_character_, length(rows))
+  if (!is.null(field) && length(rows)) {
+    valid <- !is.na(rows)
+    values[valid] <- as.character(metadata[[field]][rows[valid]])
+    values[is.na(values) | !nzchar(values)] <- NA_character_
+  }
+  list(field = field, values = values)
+}
+
+## A section's metadata rows and the sample and ROI of each of its cells, by
+## position in its coordinates. The scene, the background picker, the plot
+## parameters and the ROI rotation all ask for them: they are computed once
+## for the metadata and what the rows were found from (the section's integer
+## index, or its cell names), which is checked again on each call and is the
+## same object while the data set is. Without a sample or ROI column no row is
+## looked up.
+.spatial_section_cache <- new.env(parent = emptyenv())
+spatial_section_entry <- function(
+  spatial_name,
+  metadata = viewerProjectionFirstFrameMetadata(),
+  section_cells = function() spatial_section_cell_names(spatial_name),
+  roi = TRUE
+) {
+  fields <- c(
+    spatial_metadata_field(metadata, spatial_sample_fields),
+    spatial_metadata_field(metadata, spatial_roi_fields)
+  )
+  if (!length(fields)) {
+    return(list(
+      rows = NULL,
+      sample = list(field = NULL, values = character()),
+      roi = list(field = NULL, values = character())
+    ))
+  }
+  cache <- .spatial_section_cache
+  if (!isTRUE(cache$set) || !identical(cache$metadata, metadata)) {
+    cache$metadata <- metadata
+    cache$entries <- list()
+    cache$set <- TRUE
+  }
+  index <- spatial_section_index(spatial_name)
+  source <- if (is.null(index)) section_cells() else index
+  key <- as.character(spatial_name)
+  entry <- cache$entries[[key]]
+  if (is.null(entry) || !identical(entry$source, source)) {
+    rows <- if (is.null(index)) {
+      spatial_metadata_rows(metadata, source)
+    } else {
+      index
+    }
+    entry <- list(
+      source = source,
+      rows = rows,
+      sample = spatial_rows_facet(metadata, rows, spatial_sample_fields)
+    )
+    cache$entries[[key]] <- entry
+  }
+  ## The ROIs of every section are not needed for the samples.
+  if (isTRUE(roi) && is.null(entry$roi)) {
+    entry$roi <- spatial_rows_facet(metadata, entry$rows, spatial_roi_fields)
+    cache$entries[[key]] <- entry
+  }
+  entry
+}
+
+## The cells of a section shown for `sample_value` ("" for every sample), as
+## positions in its coordinates, with their metadata rows and ROI values.
+## `rows` and `positions` are NULL when the metadata has no sample or ROI
+## column (then the section has no sample or ROI to scope by).
+spatial_section_scope <- function(
+  spatial_name,
+  sample_value = "",
+  metadata = viewerProjectionFirstFrameMetadata(),
+  section_cells = function() spatial_section_cell_names(spatial_name)
+) {
+  entry <- spatial_section_entry(spatial_name, metadata, section_cells)
+  positions <- if (!is.null(entry$rows)) seq_along(entry$rows)
+  if (
+    !is.null(positions) &&
+      is.character(sample_value) &&
+      length(sample_value) == 1L &&
+      !is.na(sample_value) &&
+      nzchar(sample_value)
+  ) {
+    samples <- entry$sample$values
+    positions <- which(!is.na(samples) & samples == sample_value)
+  }
+  roi <- entry$roi$values
+  shown_roi <- if (is.null(positions)) roi else roi[positions]
+  list(
+    rows = entry$rows,
+    positions = positions,
+    scoped_rows = if (!is.null(positions)) entry$rows[positions],
+    sample_field = entry$sample$field,
+    roi_field = entry$roi$field,
+    roi_by_position = roi,
+    roi_values = unique(shown_roi[!is.na(shown_roi)])
+  )
+}
+
+## The canonical metadata codes of a colour column (`resource`, as
+## viewerMetadataCodesAsset() describes them for the levels of
+## `color_assignments`) drawn for some cells only, whose `values` are given: the
+## levels in the order a frame of these values lists them
+## (cerebroCellViewScatterPayload(): the assigned levels the cells have, then
+## "(missing)"), and the code map onto them. With the colours of those levels,
+## or NULL when the codes cannot be mapped so.
+spatial_section_codes_resource <- function(
+  resource,
+  values,
+  color_assignments
+) {
+  map <- suppressWarnings(as.integer(resource[["code_map"]]))
+  full_levels <- as.character(resource[["levels"]])
+  if (
+    !is.list(resource) ||
+      length(map) < 1L ||
+      anyNA(map) ||
+      !length(color_assignments) ||
+      is.null(names(color_assignments)) ||
+      !(is.factor(values) || is.character(values) || is.logical(values))
+  ) {
+    return(NULL)
+  }
+  present <- if (is.factor(values)) {
+    levels(values)[
+      tabulate(as.integer(values)[!is.na(values)], nbins = nlevels(values)) > 0L
+    ]
+  } else {
+    unique(as.character(values[!is.na(values)]))
+  }
+  missing <- anyNA(values)
+  if (missing && !"(missing)" %in% names(color_assignments)) {
+    color_assignments <- c(color_assignments, `(missing)` = "#7b8794")
+  }
+  in_view <- c(present, if (missing) "(missing)")
+  if (!all(in_view %in% names(color_assignments))) {
+    return(NULL)
+  }
+  traces <- names(color_assignments)[names(color_assignments) %in% in_view]
+  to_trace <- match(full_levels, traces) - 1L
+  to_trace[is.na(to_trace)] <- -1L
+  ## Code map entry 1 is the Pack's code of a missing value.
+  code_map <- rep(
+    if (missing) match("(missing)", traces) - 1L else -1L,
+    length(map)
+  )
+  coded <- map >= 0L
+  if (any(map[coded] >= length(to_trace))) {
+    return(NULL)
+  }
+  code_map[coded] <- to_trace[map[coded] + 1L]
+  ## The browser types the codes by the size of the map (cell_views.js,
+  ## fetchMetadataCodesResource()).
+  limit <- if (length(code_map) - 2L <= 127L) {
+    127L
+  } else if (length(code_map) - 2L <= 32767L) {
+    32767L
+  } else {
+    .Machine$integer.max
+  }
+  if (max(code_map) > limit) {
+    return(NULL)
+  }
+  resource[["levels"]] <- I(traces)
+  resource[["code_map"]] <- I(as.integer(code_map))
+  list(resource = resource, color_assignments = color_assignments)
+}
+
+## spatial_roi_transform_context() by position: the ROI of each row of a
+## section's `coordinates`, the rows of the selected sample (`scoped`) and the
+## rotation pivots of its ROIs. `scope` is the section's
+## spatial_section_scope(); coordinates of another length take the cell-name
+## path.
+spatial_roi_section_context <- function(
+  coordinates,
+  scope,
+  metadata,
+  sample_value = "",
+  degrees = 0
+) {
+  n <- nrow(coordinates)
+  roi <- scope$roi_by_position
+  scoped <- scope$positions
+  if (is.null(scope$rows)) {
+    ## No sample or ROI column: no cell has a sample to be shown for.
+    roi <- rep(NA_character_, n)
+    scoped <- if (
+      is.character(sample_value) &&
+        length(sample_value) == 1L &&
+        !is.na(sample_value) &&
+        nzchar(sample_value)
+    ) {
+      integer()
+    } else {
+      seq_len(n)
+    }
+  }
+  if (length(roi) != n) {
+    context <- spatial_roi_transform_context(
+      coordinates,
+      metadata,
+      sample_value,
+      degrees
+    )
+    return(list(
+      roi_by_position = unname(context$roi_by_cell),
+      scoped = match(context$scoped_cells, rownames(coordinates)),
+      pivots = context$pivots
+    ))
+  }
+  list(
+    roi_by_position = roi,
+    scoped = scoped,
+    pivots = spatialRoiPivots(
+      coordinates[scoped, , drop = FALSE],
+      as.character(roi[scoped]),
+      degrees
+    )
+  )
 }
 
 ## The sample the Spatial main controls show for `requested` (the first sample
@@ -981,7 +1246,23 @@ spatial_split_columns <- function(
   ) {
     return(character())
   }
-  rows <- spatial_metadata_rows(metadata, cells)
+  spatial_split_columns_at(
+    metadata,
+    spatial_metadata_rows(metadata, cells),
+    groups
+  )
+}
+
+## spatial_split_columns() for the cells at metadata `rows`.
+spatial_split_columns_at <- function(metadata, rows, groups = character()) {
+  if (
+    !is.data.frame(metadata) ||
+      !is.numeric(rows) ||
+      !length(rows) ||
+      !is.character(groups)
+  ) {
+    return(character())
+  }
   rows <- rows[!is.na(rows)]
   n_rows <- length(unique(rows))
   candidates <- setdiff(colnames(metadata), "cell_barcode")

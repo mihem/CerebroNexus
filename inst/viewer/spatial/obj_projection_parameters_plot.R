@@ -320,28 +320,19 @@ spatial_projection_parameters_plot_current <- reactive({
   spatial_name <- controls$projection
   dataset <- viewer_current_dataset_key()
   selected_sample <- spatial_projection_selected_sample()
-  ## Facets match every barcode against the metadata. They depend only on the
-  ## section and sample, so colour or feature changes reuse them.
+  ## The section's ROIs for the sample, from its cells' metadata rows (the
+  ## Viewer Pack's section index), kept per section and data set. They depend
+  ## only on the section and sample, so colour or feature changes reuse them.
   roi_facet <- spatial_projection_facet_memo(
     list(data_set(), spatial_name, selected_sample),
     function() {
-      spatial_cells <- rownames(spatial_data$coordinates) %||% character()
-      if (nzchar(selected_sample)) {
-        sample_facet <- spatial_metadata_facet(
-          viewerProjectionFirstFrameMetadata(),
-          spatial_cells,
-          spatial_sample_fields
-        )
-        spatial_cells <- names(sample_facet$by_cell)[
-          !is.na(sample_facet$by_cell) &
-            sample_facet$by_cell == selected_sample
-        ]
-      }
-      spatial_metadata_facet(
+      scope <- spatial_section_scope(
+        spatial_name,
+        selected_sample,
         viewerProjectionFirstFrameMetadata(),
-        spatial_cells,
-        spatial_roi_fields
+        function() rownames(spatial_data$coordinates) %||% character()
       )
+      list(field = scope$roi_field, values = scope$roi_values)
     }
   )
   roi_values <- roi_facet$values

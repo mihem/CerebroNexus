@@ -18,6 +18,12 @@ spatial_projection_cell_index <- reactive({
   req(controls)
   spatial_name <- controls$projection
   req(spatial_name %in% availableSpatial())
+  ## The Viewer Pack's index of the section (or the rows a thin CRB stores)
+  ## needs no cell name.
+  index <- spatial_section_index(spatial_name)
+  if (!is.null(index)) {
+    return(index)
+  }
   coordinates <- viewerSpatialCoordinates(spatial_name)
   req(coordinates)
   spatial_section_rows(spatial_name, coordinates)

@@ -314,6 +314,19 @@ spatial_projection_update_plot <- function(input) {
   }
 
   n_dimensions <- plot_parameters[["n_dimensions"]]
+  ## A section's frame reads the codes of every cell of the data set and maps
+  ## them through its canonical rows (selection_rows below); the payload
+  ## checks the codes against the frame's cell count.
+  section_codes <- resource_first &&
+    is.list(categorical_resource) &&
+    !identical(
+      as.integer(categorical_resource$cells),
+      as.integer(input[["cell_count"]])
+    )
+  payload_codes <- categorical_resource
+  if (section_codes) {
+    payload_codes$cells <- as.integer(input[["cell_count"]])
+  }
   payload <- cerebroCellViewScatterPayload(
     coordinates = if (resource_first) list() else coordinates,
     color = color_input,
@@ -335,11 +348,14 @@ spatial_projection_update_plot <- function(input) {
     cell_count = input[["cell_count"]],
     coordinate_resource = if (resource_first) geometry_resource else NULL,
     categorical_resource = if (resource_first) {
-      categorical_resource
+      payload_codes
     } else {
       NULL
     }
   )
+  if (section_codes) {
+    payload$data$categorical_resource <- categorical_resource
+  }
   if (identical(plot_parameters[["plot_type"]], "ImageFeaturePlot")) {
     settings <- viewerExpressionColorSettings(
       if (exists("Cerebro.options")) Cerebro.options else list(),

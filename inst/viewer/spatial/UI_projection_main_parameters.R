@@ -14,7 +14,6 @@ spatial_projection_dataset <- function() {
 spatial_projection_selection_dataset <- reactiveVal(
   isolate(spatial_projection_dataset())
 )
-
 ## Sample, FOV and ROI choices depend on each other, so this reactive follows
 ## those inputs. Only the small scene output below rebuilds from it; the plot
 ## type and gene pickers rebuild for a new dataset, never for a scene change.
@@ -65,28 +64,23 @@ spatial_projection_scene <- reactive({
   if (is.null(current_spatial) || !(current_spatial %in% spatial_names)) {
     current_spatial <- spatial_names[[1L]]
   }
-  current_sd <- tryCatch(
-    getSpatialData(current_spatial),
-    error = function(error) list()
-  )
   spatial_choices <- stats::setNames(spatial_names, spatial_names)
-  current_cells <- rownames(current_sd[["coordinates"]]) %||% character()
-  if (nzchar(selected_sample)) {
-    current_sample <- spatial_metadata_facet(
-      metadata,
-      current_cells,
-      spatial_sample_fields
-    )
-    current_cells <- names(current_sample$by_cell)[
-      !is.na(current_sample$by_cell) &
-        current_sample$by_cell == selected_sample
-    ]
+  ## The section's cells by metadata row, kept for the data set: no cell name
+  ## is matched for a sample, FOV or ROI change. Its cell names are read only
+  ## without an integer index (no Viewer Pack and no stored rows).
+  current_cells <- function() {
+    record <- tryCatch(getSpatialData(current_spatial), error = function(e) {
+      list()
+    })
+    rownames(record[["coordinates"]]) %||% character()
   }
-  roi_values <- spatial_metadata_facet(
+  current_scope <- spatial_section_scope(
+    current_spatial,
+    selected_sample,
     metadata,
-    current_cells,
-    spatial_roi_fields
-  )$values
+    current_cells
+  )
+  roi_values <- current_scope$roi_values
   requested_roi <- input[["spatial_projection_roi"]]
   selected_roi <- if (dataset_changed) {
     spatial_default_roi_selection(roi_values)
@@ -98,9 +92,11 @@ spatial_projection_scene <- reactive({
   if (!selected_roi %in% c(roi_modes, roi_values)) {
     selected_roi <- spatial_default_roi_selection(roi_values)
   }
+  current_rows <- current_scope$scoped_rows %||%
+    spatial_section_metadata_rows(current_spatial, metadata, current_cells)
   split_columns <- intersect(
     metadata_cols,
-    spatial_split_columns(metadata, current_cells, getGroups())
+    spatial_split_columns_at(metadata, current_rows, getGroups())
   )
   spatial_split_none_value <- "__none__"
   selected_split <- if (dataset_changed) {
@@ -126,8 +122,34 @@ spatial_projection_scene <- reactive({
   )
 })
 
+## The scene the toolbar shows, published on change only. Its controls bind in
+## the browser with the values the scene chose; that recomputes the scene to
+## the same result, and must not render the scene and the background picker
+## again (a second and third round trip on the first visit).
+spatial_projection_scene_state <- reactiveVal(NULL)
+observe(
+  {
+    ## Off the Spatial page nothing shows the scene (unset in server tests).
+    sidebar <- input[["sidebar"]]
+    if (!is.null(sidebar) && !identical(sidebar, "spatial")) {
+      return(invisible(NULL))
+    }
+    scene <- tryCatch(spatial_projection_scene(), error = function(error) NULL)
+    if (!is.null(scene)) {
+      scene$dataset_changed <- NULL
+      viewerPublishChanged(spatial_projection_scene_state, scene)
+    }
+  },
+  priority = 1000
+)
+spatial_projection_scene_shown <- reactive({
+  scene <- spatial_projection_scene_state()
+  req(scene)
+  scene
+})
+
 output[["spatial_projection_scene_UI"]] <- renderUI({
-  scene <- spatial_projection_scene()
+  scene <- spatial_projection_scene_shown()
   tagList(
     if (length(scene$sample_values) > 1L) {
       selectInput(
@@ -167,7 +189,7 @@ observe({
   ## Nothing to update until the main controls have mounted the selector; a
   ## choice in it must not run this and reset it to the scene's old value.
   req(!is.null(isolate(input[["spatial_projection_split_by"]])))
-  scene <- spatial_projection_scene()
+  scene <- spatial_projection_scene_shown()
   updateSelectizeInput(
     session,
     "spatial_projection_split_by",
@@ -189,8 +211,10 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
   } else {
     isolate(input[["spatial_projection_plot_type"]]) %||% "ImageDimPlot"
   }
+  ## The scene controls (spatial_projection_scene_UI) are a sibling output in
+  ## the page shell (UI.R): nested here, they would wait for this output to
+  ## reach the browser and bind before rendering.
   tagList(
-    uiOutput("spatial_projection_scene_UI"),
     selectInput(
       "spatial_projection_plot_type",
       label = "Plot type",
@@ -276,45 +300,91 @@ output[["spatial_projection_main_parameters_UI"]] <- renderUI({
 
 spatial_background_selection_scope <- reactiveVal(NULL)
 
-output[["spatial_projection_background_selector_UI"]] <- renderUI({
+## The FOV, sample and ROI the background picker is for: the bound scene
+## inputs or, until they bind, the values they will bind with (the first
+## sample when there are several, the first section showing it), as the frame
+## takes them (obj_projection_parameters_plot.R). Published on change only, so
+## the scene controls binding in the browser do not render the picker again.
+spatial_background_scope <- reactive({
   req(data_set())
-  req(length(availableSpatial()) > 0)
-
-  current_spatial <- input[["spatial_projection_to_display"]]
+  spatial_names <- availableSpatial()
+  req(length(spatial_names) > 0)
+  selected_sample <- input[["spatial_projection_sample"]]
   if (
-    is.null(current_spatial) ||
-      !(current_spatial %in% availableSpatial())
+    is.null(selected_sample) &&
+      !"spatial_projection_sample" %in% isolate(names(input))
   ) {
-    current_spatial <- availableSpatial()[1]
-  }
-  current_sd <- tryCatch(
-    getSpatialData(current_spatial),
-    error = function(e) NULL
-  )
-  current_cells <- rownames(current_sd[["coordinates"]]) %||% character()
-  selected_sample <- input[["spatial_projection_sample"]] %||% ""
-  if (nzchar(selected_sample)) {
-    current_sample <- spatial_metadata_facet(
-      viewerProjectionFirstFrameMetadata(),
-      current_cells,
-      spatial_sample_fields
+    samples <- tryCatch(
+      unique(unlist(spatial_section_samples()$values, use.names = FALSE)),
+      error = function(error) character()
     )
-    current_cells <- names(current_sample$by_cell)[
-      !is.na(current_sample$by_cell) &
-        current_sample$by_cell == selected_sample
-    ]
+    selected_sample <- if (length(samples) > 1L) samples[[1L]] else ""
   }
-  roi_values <- spatial_metadata_facet(
+  selected_sample <- selected_sample %||% ""
+  current_spatial <- input[["spatial_projection_to_display"]]
+  if (is.null(current_spatial) || !(current_spatial %in% spatial_names)) {
+    shown <- tryCatch(
+      spatial_sample_sections(selected_sample)$sections,
+      error = function(error) character()
+    )
+    current_spatial <- if (length(shown) && shown[[1L]] %in% spatial_names) {
+      shown[[1L]]
+    } else {
+      spatial_names[[1L]]
+    }
+  }
+  roi_values <- spatial_section_scope(
+    current_spatial,
+    selected_sample,
     viewerProjectionFirstFrameMetadata(),
-    current_cells,
-    spatial_roi_fields
-  )$values
+    function() {
+      record <- tryCatch(getSpatialData(current_spatial), error = function(e) {
+        list()
+      })
+      rownames(record[["coordinates"]]) %||% character()
+    }
+  )$roi_values
   selected_roi <- input[["spatial_projection_roi"]] %||%
     spatial_default_roi_selection(roi_values)
   roi_modes <- c("__all__", if (length(roi_values) > 1L) "__separate__")
   if (!selected_roi %in% c(roi_modes, roi_values)) {
     selected_roi <- spatial_default_roi_selection(roi_values)
   }
+  list(
+    data = data_set(),
+    spatial = current_spatial,
+    sample = selected_sample,
+    roi_values = roi_values,
+    roi = selected_roi
+  )
+})
+spatial_background_scope_state <- reactiveVal(NULL)
+observe(
+  {
+    ## Off the Spatial page nothing shows the picker (unset in server tests).
+    sidebar <- input[["sidebar"]]
+    if (!is.null(sidebar) && !identical(sidebar, "spatial")) {
+      return(invisible(NULL))
+    }
+    scope <- tryCatch(spatial_background_scope(), error = function(error) NULL)
+    if (!is.null(scope)) {
+      viewerPublishChanged(spatial_background_scope_state, scope)
+    }
+  },
+  priority = 1000
+)
+
+output[["spatial_projection_background_selector_UI"]] <- renderUI({
+  scope <- spatial_background_scope_state()
+  req(scope)
+  current_spatial <- scope$spatial
+  selected_sample <- scope$sample
+  roi_values <- scope$roi_values
+  selected_roi <- scope$roi
+  current_sd <- tryCatch(
+    getSpatialData(current_spatial),
+    error = function(e) NULL
+  )
   embedded_images <- if (is.null(current_sd)) {
     list()
   } else {

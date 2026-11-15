@@ -35,6 +35,9 @@ tab_spatial <- tabItem(
         class = "cerebro-viz-toolbar",
         div(
           class = "cerebro-viz-primary",
+          ## Sample, FOV and ROI first, rendered beside (not inside) the main
+          ## controls so that both arrive with the first output flush.
+          uiOutput("spatial_projection_scene_UI"),
           uiOutput("spatial_projection_main_parameters_UI"),
           div(
             class = "cerebro-spatial-background-row",

@@ -62,7 +62,9 @@ spatial_scene_controls_server <- function(input, output, session) {
 test_that("Spatial controls offer split-by, reset choices and per-ROI images", {
   shiny::testServer(spatial_scene_controls_server, {
     main <- output$spatial_projection_main_parameters_UI$html
-    expect_match(main, 'id="spatial_projection_scene_UI"', fixed = TRUE)
+    ## The scene controls are a sibling output (UI.R), not one nested here
+    ## that waits for this output to bind.
+    expect_false(grepl('id="spatial_projection_scene_UI"', main, fixed = TRUE))
     expect_match(main, 'class="spatial-image-dim-controls"', fixed = TRUE)
     expect_match(main, 'id="spatial_projection_split_by"', fixed = TRUE)
     ## "None" resets the split; the cell type is offered because the cells of
@@ -111,6 +113,17 @@ test_that("Spatial draws split-by panels on the shared interactive Canvas", {
   sys.source(viewer_test_path("spatial", "UI.R"), scope)
   page <- htmltools::tagQuery(scope$tab_spatial)
   expect_equal(page$find("#spatial_projection_cell_view_host")$length(), 1L)
+  ## Sample/FOV/ROI controls render in the first output flush, before the
+  ## main controls.
+  primary <- page$find(".cerebro-viz-primary")$children()
+  expect_identical(
+    primary$selectedTags()[[1L]]$attribs$id,
+    "spatial_projection_scene_UI"
+  )
+  expect_identical(
+    primary$selectedTags()[[2L]]$attribs$id,
+    "spatial_projection_main_parameters_UI"
+  )
   expect_false(grepl(
     "spatial_projection_split_plot",
     as.character(scope$tab_spatial),
