@@ -204,7 +204,10 @@ test_that("an address without ?page= starts on the Projection when there is data
   ## the author's start page wins; otherwise the Projection of a data set
   expect_identical(env$viewerStartPage(list(initial_page = "groups")), "groups")
   expect_identical(
-    env$viewerStartPage(list(initial_page = "data_info", crb_file_to_load = crb)),
+    env$viewerStartPage(list(
+      initial_page = "data_info",
+      crb_file_to_load = crb
+    )),
     "data_info"
   )
   expect_identical(
@@ -213,10 +216,132 @@ test_that("an address without ?page= starts on the Projection when there is data
   )
   ## nothing to show (an App for uploads): Data info, as before
   expect_null(env$viewerStartPage(list()))
-  expect_null(env$viewerStartPage(list(crb_file_to_load = file.path(
-    tempdir(),
-    "missing.crb"
-  ))))
+  expect_null(env$viewerStartPage(list(
+    crb_file_to_load = file.path(
+      tempdir(),
+      "missing.crb"
+    )
+  )))
+})
+
+## The sidebar of a page as shinydashboard writes it: Data info marked as the
+## tab it opens first (menuItem(selected = TRUE) in ui_page.R).
+start_tab_sidebar <- function() {
+  paste0(
+    "<ul class=\"sidebar-menu\">",
+    "<li><a href=\"#shiny-tab-loadData\" data-toggle=\"tab\" ",
+    "data-value=\"loadData\" data-start-selected=\"1\"><span>Data info",
+    "</span></a></li>",
+    "<li id=\"sidebar_item_overview\"><a href=\"#shiny-tab-overview\" ",
+    "data-toggle=\"tab\" data-value=\"overview\"><span>Projection \u00e9",
+    "</span></a></li>",
+    "<li><a href=\"#shiny-tab-groups\" data-toggle=\"tab\" ",
+    "data-value=\"groups\"><span>Groups</span></a></li>",
+    "</ul><a href=\"https://example.org\">elsewhere</a>"
+  )
+}
+
+test_that("the page opens on the start page when every App has it", {
+  env <- first_view_env()
+  crb <- withr::local_tempfile(fileext = ".crb")
+  writeLines("x", crb)
+  expect_identical(env$viewerStartTab(list(crb_file_to_load = crb)), "overview")
+  expect_identical(env$viewerStartTab(list(initial_page = "groups")), "groups")
+  expect_identical(
+    env$viewerStartTab(list(initial_page = "gene_expression")),
+    "geneExpression"
+  )
+  ## nothing to show, or a page the session opens once it knows that the data
+  ## set has it: Data info, as the page is built
+  expect_identical(env$viewerStartTab(list()), "loadData")
+  expect_identical(
+    env$viewerStartTab(list(
+      initial_page = "trajectory",
+      crb_file_to_load = crb
+    )),
+    "loadData"
+  )
+  expect_identical(env$viewerStartTab(list(initial_page = "nope")), "loadData")
+})
+
+test_that("the start page is marked in the page, and only there", {
+  env <- first_view_env()
+  html <- start_tab_sidebar()
+  marked <- env$viewerStartTabHtml(html, "overview")
+  links <- regmatches(marked, gregexpr("<a\\b[^>]*>", marked, perl = TRUE))[[
+    1L
+  ]]
+  expect_identical(
+    grepl("data-start-selected=\"1\"", links, fixed = TRUE),
+    c(FALSE, TRUE, FALSE, FALSE)
+  )
+  ## nothing else of the page changes
+  expect_identical(
+    gsub(" data-start-selected=\"1\"", "", marked, fixed = TRUE),
+    gsub(" data-start-selected=\"1\"", "", html, fixed = TRUE)
+  )
+  ## the bytes of a kept document: bytes again, marked once only
+  original <- charToRaw(enc2utf8(html))
+  bytes <- env$viewerStartTabHtml(original, "overview")
+  expect_type(bytes, "raw")
+  expect_identical(env$viewerStartTabHtml(bytes, "overview"), bytes)
+  ## and back on Data info (a document kept by an App that had a data set)
+  expect_identical(env$viewerStartTabHtml(bytes, "loadData"), original)
+  ## a tab the page has no link for, or no tab: the page as it is
+  expect_identical(env$viewerStartTabHtml(html, "trajectory"), html)
+  expect_identical(env$viewerStartTabHtml(html, NULL), html)
+  expect_identical(env$viewerStartTabHtml(html, "a\"b"), html)
+  invalid <- as.raw(c(0xff, 0xfe, 0x3c))
+  expect_identical(env$viewerStartTabHtml(invalid, "overview"), invalid)
+})
+
+test_that("the page Shiny renders is marked, in tags and in rendered HTML", {
+  env <- first_view_env()
+  ui <- htmltools::tagList(
+    htmltools::tags$head(htmltools::tags$title("page")),
+    htmltools::div(
+      class = "main-sidebar",
+      htmltools::HTML(start_tab_sidebar())
+    ),
+    htmltools::div("body")
+  )
+  html <- as.character(
+    htmltools::renderTags(
+      env$viewerUiStartTab(ui, "overview")
+    )$html
+  )
+  expect_match(
+    html,
+    "data-value=\"overview\" data-start-selected=\"1\"",
+    fixed = TRUE
+  )
+  expect_no_match(
+    html,
+    "data-value=\"loadData\" data-start-selected",
+    fixed = TRUE
+  )
+  ## the links as tags: the mark moves from one to the other
+  menu <- htmltools::tags$ul(
+    htmltools::tags$li(htmltools::tags$a(
+      href = "#shiny-tab-loadData",
+      `data-toggle` = "tab",
+      `data-value` = "loadData",
+      `data-start-selected` = 1
+    )),
+    htmltools::tags$li(htmltools::tags$a(
+      href = "#shiny-tab-overview",
+      `data-toggle` = "tab",
+      `data-value` = "overview"
+    ))
+  )
+  items <- env$viewerUiStartTab(menu, "overview")$children
+  expect_null(items[[1L]]$children[[1L]]$attribs[["data-start-selected"]])
+  expect_identical(
+    items[[2L]]$children[[1L]]$attribs[["data-start-selected"]],
+    "1"
+  )
+  ## a page without a link of that tab stays as it is
+  expect_identical(env$viewerUiStartTab(ui, "trajectory"), ui)
 })
 
 test_that("a first view names the start page, also when a new process publishes it", {

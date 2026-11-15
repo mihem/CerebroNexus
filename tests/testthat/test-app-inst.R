@@ -102,7 +102,10 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
 test_that("{shinytest2} recording: overview", {
   app <- shared_app()
 
-  ## Data Info tab: verify key values from the loaded example.crb
+  ## Data Info tab: verify key values from the loaded example.crb. The App
+  ## opens on the Projection (viewerStartTab()), so Data info renders only once
+  ## it is shown.
+  activate_tab(app, "loadData", timeout = 30000)
   overview <- retry_get_value(app, output = "load_data_overview")$html
   expect_true(grepl("1,?000", overview))
   expect_true(grepl("Human", overview))
@@ -1023,7 +1026,9 @@ test_that("{shinytest2} recording: color_management", {
     timeout = 20000
   )
   first <- app$get_js(paste0(
-    "jQuery(document.querySelector('", pickers, "')).colourpicker('value')"
+    "jQuery(document.querySelector('",
+    pickers,
+    "')).colourpicker('value')"
   ))
   expect_match(first, "^#[0-9A-Fa-f]{6}$")
   last <- paste0(
@@ -1088,6 +1093,8 @@ test_that("createShinyApp bundles a working app", {
   )
   app$wait_for_idle(timeout = 20000)
 
+  ## The bundle opens on the Projection; Data info renders once it is shown.
+  activate_tab(app, "loadData", timeout = 30000)
   cells <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("1,?000", cells$html))
 

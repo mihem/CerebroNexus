@@ -167,27 +167,30 @@ launchCerebro <- function(
   ## send the page (see below). It runs as soon as the App has started, or when
   ## the App is first asked for its page or a session, whichever comes first;
   ## what it reports (a CRB file that cannot be read) then stops the App.
+  ##
+  ## In two steps: the page (viewer_prepare_ui()), then the rest. A request
+  ## for the page needs only the first, so a first start without a kept page
+  ## sends its page, and the browser fetches its files (served off the R
+  ## thread), while the data sets are read. A session needs both.
   ##--------------------------------------------------------------------------##
   viewer_jit_release <- function() invisible()
   viewer_jit_scheduled <- FALSE
+  viewer_ui_prepared <- FALSE
   viewer_prepared <- FALSE
   viewer_prepare_error <- NULL
-  viewer_prepare <- function() {
-    if (viewer_prepared) {
-      return(invisible(FALSE))
-    }
+  ## The UI functions and the page, before the data sets are read: the page
+  ## needs none of their content, and with a large CRB in memory every garbage
+  ## collection while it is built costs more (0.5 s for a 1.3 million cell
+  ## data set).
+  viewer_prepare_ui <- function() {
     if (!is.null(viewer_prepare_error)) {
       stop(viewer_prepare_error)
     }
+    if (viewer_ui_prepared) {
+      return(invisible(FALSE))
+    }
     tryCatch(
       {
-        ## The installed Viewer has no HLA core source; core_shim.R binds
-        ## these.
-        Cerebro.options[[".hla_core"]] <<- .viewerHLACore()
-        ## The UI functions before the data sets are read: the UI needs none
-        ## of their content, and with a large CRB in memory every garbage
-        ## collection while it is built costs more (0.5 s for a 1.3 million
-        ## cell data set).
         source(
           system.file(
             paste0("viewer/shiny_UI.R"),
@@ -195,6 +198,28 @@ launchCerebro <- function(
           ),
           local = viewer_env
         )
+        viewer_ui_prepared <<- TRUE
+      },
+      error = function(error) {
+        viewer_prepare_error <<- error
+        stop(error)
+      }
+    )
+    invisible(TRUE)
+  }
+  viewer_prepare <- function() {
+    if (!is.null(viewer_prepare_error)) {
+      stop(viewer_prepare_error)
+    }
+    if (viewer_prepared) {
+      return(invisible(FALSE))
+    }
+    viewer_prepare_ui()
+    tryCatch(
+      {
+        ## The installed Viewer has no HLA core source; core_shim.R binds
+        ## these.
+        Cerebro.options[[".hla_core"]] <<- .viewerHLACore()
         ## What every session needs is loaded before the data sets are in
         ## memory too (see R/lazy_imports.R), and so are the server
         ## functions: loading them starts the background work on the
@@ -241,7 +266,8 @@ launchCerebro <- function(
     invisible(TRUE)
   }
   ## The page and the server function Shiny is given: the Viewer's own, once
-  ## it is prepared.
+  ## it is prepared. The page waits only for the page (viewer_prepare_ui()),
+  ## not for the data sets; the session waits for all of it.
   viewer_ui <- function(request) {
     ## A request for the page that reaches R before the Viewer is prepared
     ## (the web server answers "/" from the file only once viewer_started()
@@ -255,7 +281,7 @@ launchCerebro <- function(
         headers = list("Cache-Control" = "no-cache")
       ))
     }
-    viewer_prepare()
+    viewer_prepare_ui()
     ui
   }
   viewer_server <- function(input, output, session) {
@@ -356,12 +382,18 @@ launchCerebro <- function(
           local = viewer_env
         )
         viewerSharedResourceAdopt(viewer_early, Cerebro.options)
-        viewer_document <- viewerDocumentRestore(viewer_document_key())
+        viewer_document <- viewerDocumentRestore(
+          viewer_document_key(),
+          start_tab = viewerStartTab(Cerebro.options)
+        )
       } else if (
         isTRUE(getOption("CerebroNexus.ui_cache", TRUE)) &&
           !isTRUE(transport_env$viewerSockjsCompatEnabled())
       ) {
-        viewer_document <- viewerDocumentRestore(viewer_document_key())
+        viewer_document <- viewerDocumentRestore(
+          viewer_document_key(),
+          start_tab = viewerStartTab(Cerebro.options)
+        )
         viewer_document_capture <- is.null(viewer_document)
       }
     },
@@ -384,32 +416,46 @@ launchCerebro <- function(
     }
     try(viewerFirstViewPublishKept(Cerebro.options), silent = TRUE)
     try(viewerSharedResourceHeaders(), silent = TRUE)
+    viewer_prepare_step <- function(step) {
+      tryCatch(
+        {
+          step()
+          TRUE
+        },
+        error = function(error) {
+          ## runApp() reports it, as launchCerebro() used to.
+          shiny::stopApp(stop(error))
+          FALSE
+        }
+      )
+    }
     later::later(
       function() {
-        prepared <- tryCatch(
-          {
-            viewer_prepare()
-            TRUE
-          },
-          error = function(error) {
-            ## runApp() reports it, as launchCerebro() used to.
-            shiny::stopApp(stop(error))
-            FALSE
-          }
-        )
-        ## The first process of an installation keeps the page it sends.
-        if (prepared && viewer_document_capture && !is.null(web_server)) {
-          viewer_document_capture <<- FALSE
-          .viewerWhenQuiet(function() {
-            try(
-              viewerDocumentCapture(
-                web_server,
-                viewer_document_key(cerebro_www_prefix)
-              ),
-              silent = TRUE
-            )
-          })
+        if (!viewer_prepare_step(viewer_prepare_ui)) {
+          return(invisible())
         }
+        ## The data sets after a turn of the event loop: a request for "/"
+        ## that came while the page was made is answered first, so the page
+        ## and its files load while the data sets are read.
+        later::later(
+          function() {
+            prepared <- viewer_prepare_step(viewer_prepare)
+            ## The first process of an installation keeps the page it sends.
+            if (prepared && viewer_document_capture && !is.null(web_server)) {
+              viewer_document_capture <<- FALSE
+              .viewerWhenQuiet(function() {
+                try(
+                  viewerDocumentCapture(
+                    web_server,
+                    viewer_document_key(cerebro_www_prefix)
+                  ),
+                  silent = TRUE
+                )
+              })
+            }
+          },
+          0
+        )
       },
       ## Not at once: a request that arrived before "/" was answered from the
       ## file is on its way to R, and is answered first (viewer_ui()).

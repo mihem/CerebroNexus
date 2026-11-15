@@ -748,9 +748,16 @@
   "rds"
 }
 
+## qs2 decompresses the blocks of a file on `nthreads` threads; its own default
+## (qs2::qopt("nthreads")) is one. The R objects are still built on R's thread,
+## so the object read is the same. At least four threads, or more where
+## qs2::qopt() was given more.
 .readCerebroPayload <- function(file) {
   if (identical(.cerebroPayloadCodec(file), "qs2")) {
-    return(qs2::qs_read(file))
+    return(qs2::qs_read(
+      file,
+      nthreads = as.integer(max(4L, qs2::qopt("nthreads")))
+    ))
   }
   readRDS(file)
 }

@@ -16,7 +16,11 @@ overview_projection_parameters_plot <- reactive({
   }
   color_variable <- input[["overview_projection_point_color"]]
   if (is.null(color_variable) || !color_variable %in% colnames(metadata)) {
-    color_variable <- defaults$color_variable
+    ## What "Colour by" opens with (UI_projection_main_parameters.R): the
+    ## first frame is drawn before the control binds, and its first value then
+    ## changes nothing.
+    color_variable <- viewerColourGroupChoices(metadata)$selected %||%
+      defaults$color_variable
   }
   appearance <- isolate(current_scatter_defaults())
   display <- current_page_display_defaults("projection")

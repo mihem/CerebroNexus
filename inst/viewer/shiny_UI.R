@@ -481,3 +481,19 @@ ui <- viewerUiCached(
   ),
   viewerUiBuild
 )
+
+## The page opens on the App's start page (viewerStartTab() in
+## viewer/core/shared_resources.R): its sidebar link is marked here, so that
+## Shiny's first message names that page and the session starts there instead
+## of on Data info. Not in the page that is kept (above), which does not
+## depend on the data sets; a kept document is marked as it is restored.
+if (!exists("viewerUiStartTab", mode = "function")) {
+  source(
+    file.path(
+      Cerebro.options[["cerebro_root"]],
+      "viewer/core/shared_resources.R"
+    ),
+    local = TRUE
+  )
+}
+ui <- viewerUiStartTab(ui, viewerStartTab(Cerebro.options))

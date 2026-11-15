@@ -387,16 +387,224 @@ viewerFirstViewBasis <- function(options) {
 ## options it was taken with.
 viewerStartPage <- function(options) {
   page <- options[["initial_page"]]
-  if (is.character(page) && length(page) == 1L && !is.na(page) && nzchar(page)) {
+  if (
+    is.character(page) && length(page) == 1L && !is.na(page) && nzchar(page)
+  ) {
     return(page)
   }
-  files <- as.character(unlist(options[["crb_file_to_load"]], use.names = FALSE))
+  files <- as.character(unlist(
+    options[["crb_file_to_load"]],
+    use.names = FALSE
+  ))
   files <- files[!is.na(files) & nzchar(files)]
   if (length(files) && any(file.exists(files) & !dir.exists(files))) {
     "projection"
   } else {
     NULL
   }
+}
+
+## ---- the start page in the page itself ---------------------------------------
+## shinydashboard opens the sidebar tab whose link carries
+## data-start-selected="1" (menuItem(selected = TRUE)) when the document is
+## ready, and Shiny's first message (`init`) names that tab as `sidebar`. The
+## page is built with Data info marked (ui_page.R), and the session moved to
+## the start page only after its first flush (cerebro_initial_page in
+## shiny_server.R): Data info was computed first, and the browser asked for
+## the Projection's first frame only once it had switched pages, a cycle and
+## a round trip later. The page served therefore marks the start page itself
+## (shiny_UI.R for the page Shiny renders, launchCerebro() and early_server.R
+## for a kept document), when it is a page every data set has. A conditional
+## page (Trajectory, Spatial, ...) is still opened by the session once it
+## knows that the data set has it.
+
+## The tab the page opens on: the tab of the start page (viewerStartPage())
+## when every App shows it, Data info otherwise.
+viewerStartTab <- function(options) {
+  tabs <- c(
+    data_info = "loadData",
+    projection = "overview",
+    groups = "groups",
+    gene_expression = "geneExpression",
+    gene_id_conversion = "geneIdConversion",
+    color_management = "color_management",
+    about = "about"
+  )
+  page <- tryCatch(viewerStartPage(options), error = function(error) NULL)
+  if (is.character(page) && length(page) == 1L && page %in% names(tabs)) {
+    unname(tabs[[page]])
+  } else {
+    "loadData"
+  }
+}
+
+## `text` (one UTF-8 string) with the mark on the sidebar link of `tab` only:
+## the mark is taken from every other sidebar link, and given to the link of
+## `tab` when `text` has it. NULL when `require` and `text` has no link of
+## `tab`. Each opening <a> tag is looked at by itself, whatever the order of
+## its attributes.
+.viewerStartTabText <- function(text, tab, require = TRUE) {
+  none <- if (require) NULL else text
+  if (!grepl("#shiny-tab-", text, fixed = TRUE)) {
+    return(none)
+  }
+  found <- gregexpr("<a\\b[^>]*>", text, perl = TRUE)
+  if (found[[1L]][[1L]] == -1L) {
+    return(none)
+  }
+  links <- regmatches(text, found)[[1L]]
+  sidebar <- grepl("\\shref=\"#shiny-tab-[^\"]*\"", links, perl = TRUE) &
+    grepl("\\sdata-toggle=\"tab\"", links, perl = TRUE)
+  target <- sidebar &
+    grepl(paste0("\\sdata-value=\"", tab, "\""), links, perl = TRUE)
+  if (require && !any(target)) {
+    return(NULL)
+  }
+  links[sidebar] <- gsub(
+    "\\sdata-start-selected=\"[^\"]*\"",
+    "",
+    links[sidebar],
+    perl = TRUE
+  )
+  if (any(target)) {
+    first <- which(target)[[1L]]
+    links[[first]] <- sub(
+      "\\s*(/?)>$",
+      " data-start-selected=\"1\"\\1>",
+      links[[first]],
+      perl = TRUE
+    )
+  }
+  regmatches(text, found) <- list(links)
+  text
+}
+
+## The page `html` (its bytes, or a string) with the sidebar link of `tab` as
+## the one shinydashboard opens, or `html` as it is: no such link, or not
+## UTF-8.
+viewerStartTabHtml <- function(html, tab) {
+  if (
+    !is.character(tab) ||
+      length(tab) != 1L ||
+      is.na(tab) ||
+      !grepl("^[A-Za-z0-9_]+$", tab)
+  ) {
+    return(html)
+  }
+  text <- tryCatch(
+    {
+      value <- if (is.raw(html)) rawToChar(html) else as.character(html)
+      if (length(value) == 1L && !is.na(value) && validUTF8(value)) {
+        Encoding(value) <- "UTF-8"
+        value
+      }
+    },
+    error = function(error) NULL
+  )
+  if (is.null(text)) {
+    return(html)
+  }
+  marked <- tryCatch(
+    .viewerStartTabText(text, tab),
+    error = function(error) NULL
+  )
+  if (is.null(marked)) {
+    return(html)
+  }
+  if (is.raw(html)) {
+    return(charToRaw(marked))
+  }
+  attributes(marked) <- attributes(html)
+  marked
+}
+
+## The page `ui` as shiny_UI.R has it (tags, and the branches viewerStaticUI()
+## has rendered to HTML) with the sidebar link of `tab` as the one opened
+## first; `ui` itself when it has no link to `tab`.
+viewerUiStartTab <- function(ui, tab) {
+  if (
+    !is.character(tab) ||
+      length(tab) != 1L ||
+      is.na(tab) ||
+      !grepl("^[A-Za-z0-9_]+$", tab)
+  ) {
+    return(ui)
+  }
+  link <- function(node) {
+    inherits(node, "shiny.tag") &&
+      identical(node$name, "a") &&
+      identical(as.character(node$attribs[["data-toggle"]]), "tab") &&
+      startsWith(
+        paste0(as.character(node$attribs[["href"]]), ""),
+        "#shiny-tab-"
+      )
+  }
+  target <- function(node) {
+    identical(as.character(node$attribs[["data-value"]]), tab)
+  }
+  html <- function(node) {
+    is.character(node) &&
+      inherits(node, "html") &&
+      length(node) == 1L &&
+      !is.na(node) &&
+      grepl("#shiny-tab-", node, fixed = TRUE)
+  }
+  children <- function(node) {
+    if (inherits(node, "shiny.tag")) {
+      node$children
+    } else if (is.list(node)) {
+      node
+    }
+  }
+  found <- FALSE
+  find <- function(node) {
+    if (found) {
+      return(invisible())
+    }
+    if (link(node)) {
+      found <<- target(node)
+    } else if (html(node)) {
+      found <<- !identical(viewerStartTabHtml(node, tab), node)
+    } else {
+      for (child in children(node)) {
+        find(child)
+      }
+    }
+    invisible()
+  }
+  mark <- function(node) {
+    if (link(node)) {
+      node$attribs[["data-start-selected"]] <- if (target(node)) "1"
+      return(node)
+    }
+    if (html(node)) {
+      text <- enc2utf8(as.character(node))
+      marked <- tryCatch(
+        .viewerStartTabText(text, tab, require = FALSE),
+        error = function(error) NULL
+      )
+      if (is.null(marked) || identical(marked, text)) {
+        return(node)
+      }
+      attributes(marked) <- attributes(node)
+      return(marked)
+    }
+    if (inherits(node, "shiny.tag")) {
+      if (length(node$children)) {
+        node$children[] <- lapply(node$children, mark)
+      }
+      return(node)
+    }
+    if (is.list(node) && length(node)) {
+      node[] <- lapply(node, mark)
+    }
+    node
+  }
+  find(ui)
+  if (!found) {
+    return(ui)
+  }
+  mark(ui)
 }
 
 ## When the Pack in `root` was built: its manifest is written last.

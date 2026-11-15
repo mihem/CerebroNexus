@@ -49,6 +49,13 @@
   // Without `?page=`, only where the description names the Projection as the
   // address's start page.
   var byDefault = page === null;
+  // The page comes marked to open on the App's start page (viewerStartTab() in
+  // viewer/core/shared_resources.R). An address that names another page opens
+  // on Data info until its session moves there, as it always did: not on the
+  // start page, whose first frame the session would make for nothing.
+  if (page !== null && page !== 'projection') {
+    whenParsed(function () { startOnTab('loadData'); });
+  }
   if ((page !== 'projection' && !byDefault) || !window.fetch ||
       !window.TextEncoder || !window.Promise || !window.requestAnimationFrame) {
     return;
@@ -241,11 +248,11 @@
   // ready, before Shiny reads which outputs are hidden. Marking the page's tab
   // here, earlier still, opens the page as if it had been configured as the
   // start page: no visit to Data info, and no second round with the server.
-  function startOnPage() {
+  function startOnTab(tab) {
     var links = document.querySelectorAll('.main-sidebar a[data-toggle="tab"]');
     var target = null, i;
     for (i = 0; i < links.length; i++) {
-      if (links[i].getAttribute('data-value') === TAB) target = links[i];
+      if (links[i].getAttribute('data-value') === tab) target = links[i];
     }
     if (!target) return false;
     for (i = 0; i < links.length; i++) links[i].removeAttribute('data-start-selected');
@@ -427,7 +434,7 @@
 
   function start() {
     var active = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
-    if (!(active ? openPage(active) : startOnPage())) {
+    if (!(active ? openPage(active) : startOnTab(TAB))) {
       finish(null);
       return;
     }

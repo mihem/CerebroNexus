@@ -106,6 +106,48 @@ test_that("a kept document is used only while its packages and paths are there",
   expect_null(env$viewerDocumentRestore("key", target = target))
 })
 
+test_that("a kept document opens on the start page of the process", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  env <- kept_document_env()
+  sys.source(viewer_test_path("core", "shared_resources.R"), env)
+  scripts <- normalizePath(system.file(package = "withr"), winslash = "/")
+  prefix <- "keptdocumentstarttab"
+  shiny::addResourcePath(prefix, scripts)
+  withr::defer(try(shiny::removeResourcePath(prefix), silent = TRUE))
+  ## kept by a process that opened on the Projection
+  html <- charToRaw(paste0(
+    "<!DOCTYPE html>\n<html><head>",
+    "<script src=\"",
+    prefix,
+    "/DESCRIPTION\"></script></head><body>",
+    "<a href=\"#shiny-tab-loadData\" data-toggle=\"tab\" ",
+    "data-value=\"loadData\">Data info</a>",
+    "<a href=\"#shiny-tab-overview\" data-toggle=\"tab\" ",
+    "data-value=\"overview\" data-start-selected=\"1\">Projection</a>",
+    "shiny</body></html>"
+  ))
+  expect_false(is.null(env$viewerDocumentKeep("key", html)))
+  page <- function(start_tab) {
+    target <- withr::local_tempdir(.local_envir = parent.frame())
+    env$viewerDocumentRestore("key", target = target, start_tab = start_tab)
+    rawToChar(readBin(file.path(target, "index.html"), "raw", n = 1e6))
+  }
+  ## a process without a data set opens on Data info
+  expect_match(
+    page("loadData"),
+    "data-value=\"loadData\" data-start-selected=\"1\">Data info",
+    fixed = TRUE
+  )
+  expect_no_match(
+    page("loadData"),
+    "data-value=\"overview\" data-start-selected",
+    fixed = TRUE
+  )
+  expect_identical(page("overview"), rawToChar(html))
+  ## without a start tab the document is the one kept
+  expect_identical(page(NULL), rawToChar(html))
+})
+
 test_that("the web server answers the page from the file, and Shiny the rest", {
   env <- kept_document_env()
   ## no bundle written by another test of this process

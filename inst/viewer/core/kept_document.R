@@ -452,11 +452,15 @@ viewerDocumentKeep <- function(
 
 ## Writes the kept document of `key` as `target`/index.html and registers the
 ## resource paths it names. Returns `target`, or NULL: nothing kept, or a
-## package that is no longer where or what it was.
+## package that is no longer where or what it was. With `start_tab` the page
+## opens on that tab (viewerStartTabHtml() in shared_resources.R): the kept
+## document is the page of the process that kept it, whose start page may have
+## been another.
 viewerDocumentRestore <- function(
   key,
   directory = viewerUiCacheDirectory(),
-  target = viewerDocumentDirectory()
+  target = viewerDocumentDirectory(),
+  start_tab = NULL
 ) {
   file <- viewerDocumentFile(key, directory)
   if (!file.exists(file)) {
@@ -497,6 +501,9 @@ viewerDocumentRestore <- function(
     shiny::addResourcePath(prefix, resource_paths[[prefix]])
   }
   page <- viewerDocumentPage(kept)
+  if (!is.null(start_tab)) {
+    page$html <- viewerStartTabHtml(page$html, start_tab)
+  }
   writeBin(page$html, file.path(target, "index.html"))
   viewerDocumentWriteFiles(page$files)
   ## Renewed by use, as the kept page is.
