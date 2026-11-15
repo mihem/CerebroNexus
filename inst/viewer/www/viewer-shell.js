@@ -83,6 +83,66 @@
   }
   ready(installInitialNavigation);
 
+  // A page's outputs are reported visible with the page change itself. Shiny
+  // reports an output's visibility from an IntersectionObserver, after the next
+  // layout and a 100 ms debounce, in a message after the one that names the
+  // page. The server loads a page's code when the page is named
+  // (shiny_server.R, load_deferred_viewer_server()) and Shiny suspends an output
+  // it does not yet know to be shown, so every output of a newly opened page
+  // (its toolbar, tables and plots) rendered only after the browser's next
+  // message: a round trip after the plot, on every page. Measured here as
+  // Shiny measures it (a box with a size), once the tab is shown, in the same
+  // turn as the page change, so both go in one message; Shiny's own report of
+  // the same value later is not sent again.
+  function installPageOutputVisibility() {
+    if (!window.jQuery) return;
+    function report(pane, shown, priority) {
+      var shiny = window.Shiny;
+      if (!pane || !shiny || typeof shiny.setInputValue !== "function") return;
+      var outputs = pane.querySelectorAll(".shiny-bound-output[id]");
+      for (var i = 0; i < outputs.length; i++) {
+        if (shown(outputs[i], pane)) {
+          shiny.setInputValue(
+            ".clientdata_output_" + outputs[i].id + "_hidden", false,
+            priority ? { priority: priority } : undefined
+          );
+        }
+      }
+    }
+    // Before the page is shown (it has no size yet): shown once it is, unless
+    // something between the output and the page hides it (a closed drawer, an
+    // inactive inner tab, a collapsed box). Shiny's own report corrects a guess.
+    function willShow(element, pane) {
+      for (var node = element; node && node !== pane; node = node.parentElement) {
+        if (window.getComputedStyle(node).display === "none") return false;
+      }
+      return true;
+    }
+    function hasSize(element) {
+      return element.offsetWidth > 0 || element.offsetHeight > 0;
+    }
+    function paneOf(link) {
+      var value = link && link.getAttribute("data-value");
+      return value ? document.getElementById("shiny-tab-" + value) : null;
+    }
+    // A click on the menu: sent at once ("event"), before the page change
+    // the click is about to send, so the server knows the outputs are shown
+    // when it loads the page's code for that change.
+    document.addEventListener("click", function (event) {
+      var link = event.target && event.target.closest &&
+        event.target.closest('.main-sidebar a[data-toggle="tab"]');
+      if (!link || link.parentElement && link.parentElement.classList.contains("active")) return;
+      report(paneOf(link), willShow, "event");
+    }, true);
+    // A page shown another way (the start page, a link): measured once shown.
+    window.jQuery(document).on(
+      "shown.bs.tab.cerebroPageOutputs",
+      '.main-sidebar a[data-toggle="tab"]',
+      function (event) { report(paneOf(event.target), hasSize); }
+    );
+  }
+  ready(installPageOutputVisibility);
+
   ready(function () {
     var body = document.body;
     var sidebar = document.querySelector(".main-sidebar");
