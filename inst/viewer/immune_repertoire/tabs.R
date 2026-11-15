@@ -37,14 +37,26 @@ ir_default_tab <- function() {
   }
 }
 
-## The tab the strip opens on (see visualizations.R): the remembered tab, else
-## the first visible one. The clonal projection reads it through
-## viewerControlValue() and is drawn before the strip reaches the browser.
+## The tab the strip opens on: the remembered tab while this dataset shows it
+## (`visible`, the visible sub-tabs), else the first visible one. The strip
+## (visualizations.R) can be built with it, and the clonal projection reads it
+## through viewerControlValue() (ir_tab) and is drawn before the strip reaches
+## the browser. The visible tabs are read only for a remembered tab, so the
+## first landing never waits for the sample count (see ir_default_tab()).
+ir_opening_tab <- function(visible = NULL) {
+  last_tab <- isolate(ir_last_tab())
+  if (!is.null(last_tab) && last_tab %in% (visible %||% ir_visible_tabs())) {
+    last_tab
+  } else {
+    ir_default_tab()
+  }
+}
+
 ir_tab <- viewerControlValue(input, "ir_tabs", function() {
   if (!has_scRepertoire() || !ir_repertoire_available()) {
     return(NULL)
   }
-  isolate(ir_last_tab()) %||% ir_default_tab()
+  ir_opening_tab()
 })
 
 ## ---- Attach tooltips to tab links via JS ------------------------------ ##

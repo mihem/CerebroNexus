@@ -268,6 +268,82 @@
 ## instead of decoding every barcode again: the 1.28 million row names of one
 ## trajectory made a 1.3 million cell CRB take 2.5 s to read instead of 0.2 s.
 
+## ---- The immune repertoire sidecar ------------------------------------- ##
+## A thin CRB keeps its repertoire in a sidecar file beside it (qs2 or RDS),
+## checked against the MD5 its descriptor records. One reader for every place
+## that opens it: Cerebro$getImmuneRepertoire(), and the Viewer's encoding of a
+## large repertoire in another R process (immune_repertoire/data.R), which keeps
+## the cell index of a thin CRB as the canonical cell rows it is. It uses base
+## R, tools and qs2 only, so that it runs there without this namespace
+## (.readRepertoireSidecarFunction()).
+
+## The object in `path` after checking that it exists and has the MD5 `md5`:
+## a qs2 file by its magic number, an RDS file otherwise. `missing` and
+## `mismatch` are the error messages.
+.readSidecarFile <- function(path, md5, missing, mismatch) {
+  if (!file.exists(path) || dir.exists(path)) {
+    stop(missing, call. = FALSE)
+  }
+  if (!identical(unname(tools::md5sum(path)), md5)) {
+    stop(mismatch, call. = FALSE)
+  }
+  connection <- file(path, open = "rb")
+  magic <- readBin(connection, "raw", n = 4L)
+  close(connection)
+  if (identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
+    qs2::qs_read(path)
+  } else {
+    readRDS(path)
+  }
+}
+
+## The repertoire (a list of samples) of the sidecar `path`, with its cell
+## indices as they are stored (integers into the `n_cells` cells of the data
+## set, for a sample whose "cerebro_cell_index_column" names its barcode
+## column), each checked: one per row, none missing or out of range.
+.readRepertoireSidecar <- function(path, md5, n_cells) {
+  repertoire <- .readSidecarFile(
+    path,
+    md5,
+    "The immune repertoire sidecar is missing.",
+    "The immune repertoire sidecar checksum does not match."
+  )
+  if (!is.list(repertoire)) {
+    stop("The immune repertoire sidecar is invalid.", call. = FALSE)
+  }
+  for (sample in repertoire) {
+    column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
+    if (is.null(column)) {
+      next
+    }
+    index <- sample[[column]]
+    if (
+      !identical(column, "barcode") ||
+        !is.integer(index) ||
+        length(index) != NROW(sample) ||
+        anyNA(index) ||
+        any(index < 1L | index > n_cells)
+    ) {
+      stop(
+        "The thin CRB stores an invalid repertoire cell index.",
+        call. = FALSE
+      )
+    }
+  }
+  repertoire
+}
+
+## .readRepertoireSidecar() as a function that needs nothing of this namespace,
+## for another R process (its environment holds .readSidecarFile() only).
+.readRepertoireSidecarFunction <- function() {
+  scope <- new.env(parent = baseenv())
+  scope$.readSidecarFile <- .readSidecarFile
+  environment(scope$.readSidecarFile) <- scope
+  reader <- .readRepertoireSidecar
+  environment(reader) <- scope
+  reader
+}
+
 .validCellIndex <- function(index, n, n_cells) {
   is.integer(index) &&
     length(index) == n &&
@@ -748,18 +824,34 @@
   "rds"
 }
 
-## qs2 decompresses the blocks of a file on `nthreads` threads; its own default
-## (qs2::qopt("nthreads")) is one. The R objects are still built on R's thread,
-## so the object read is the same. At least four threads, or more where
-## qs2::qopt() was given more.
+## qs2 decompresses the blocks of a file on `nthreads` threads; the R objects
+## are built on R's thread, so the object read is the same with any number.
+## The user's qs2::qopt("nthreads") decides (its default is one), never more
+## than the machine's cores, and at most two where R CMD check limits them.
 .readCerebroPayload <- function(file) {
   if (identical(.cerebroPayloadCodec(file), "qs2")) {
-    return(qs2::qs_read(
-      file,
-      nthreads = as.integer(max(4L, qs2::qopt("nthreads")))
-    ))
+    return(qs2::qs_read(file, nthreads = .cerebroReadThreads()))
   }
   readRDS(file)
+}
+
+.cerebroReadThreads <- function(
+  requested = qs2::qopt("nthreads"),
+  cores = parallel::detectCores(),
+  limit = Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+) {
+  threads <- suppressWarnings(as.integer(requested))
+  if (length(threads) != 1L || is.na(threads) || threads < 1L) {
+    threads <- 1L
+  }
+  cores <- suppressWarnings(as.integer(cores))
+  if (length(cores) == 1L && !is.na(cores) && cores >= 1L) {
+    threads <- min(threads, cores)
+  }
+  if (nzchar(limit) && !identical(toupper(limit), "FALSE")) {
+    threads <- min(threads, 2L)
+  }
+  threads
 }
 
 .spatialMoleculeSidecarName <- function(file) {

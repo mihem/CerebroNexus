@@ -119,13 +119,13 @@ output$ir_main_params_UI <- shiny::bindEvent(
         list(selectInput(
           "ir_cloneCall",
           "Clone call:",
-          choices = c("gene", "nt", "aa", "strict"),
+          choices = IR_CLONE_CALLS,
           ## Rebuilding the toolbar for another tab must keep the user's
           ## choice; resetting it also recomputed the new tab twice.
           selected = ir_keep_selection(
             isolate(input$ir_cloneCall),
-            c("gene", "nt", "aa", "strict"),
-            "gene"
+            IR_CLONE_CALLS,
+            IR_GLOBAL_DEFAULTS$ir_cloneCall
           ),
           selectize = FALSE
         ))
@@ -141,7 +141,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
           selected = ir_keep_selection(
             isolate(input$ir_chain),
             chain_choices,
-            "both"
+            IR_GLOBAL_DEFAULTS$ir_chain
           ),
           selectize = FALSE
         ))
@@ -156,7 +156,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
       default_gb <- if (!is.null(prev_gb) && prev_gb %in% available_groups) {
         prev_gb
       } else {
-        ""
+        IR_GLOBAL_DEFAULTS$ir_groupBy
       }
       group_label <- if (
         !is.null(tab) && tab %in% c("Paired Scatter", "Compare")
@@ -564,7 +564,7 @@ output$ir_cell_view_options_UI <- renderUI({
     return(NULL)
   }
   ## Grouped panels draw no group labels; border and square apply to both.
-  group_by <- ir_param("ir_p_umap_group_by", "")
+  group_by <- ir_param("ir_p_umap_group_by")
   grouped <- !is.null(group_by) && nzchar(group_by)
   tagList(
     if (!grouped) {

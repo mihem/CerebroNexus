@@ -17,6 +17,8 @@
 ## binding takes) until it comes near the screen (www/viewer-shell.js):
 ## the browser took 1.2 s to make the 600 pickers of a data set at once. A level
 ## without a picker has its default colour (color_picker_ids()).
+## test-viewer-color-config.R compares this markup, made a picker, with
+## colourInput()'s, so a colourpicker release that changes it is caught.
 color_picker_dependencies <- function() {
   htmltools::findDependencies(colourpicker::colourInput("x", "x", "#000000"))
 }

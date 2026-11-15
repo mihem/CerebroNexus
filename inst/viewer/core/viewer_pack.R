@@ -151,8 +151,12 @@ viewerPackOpenCached <- function(file, cache) {
 ## The md5 of a CRB, which names the data set its Viewer Pack was built from.
 ## Hashing a large CRB takes about 0.7 s per 380 MB, and every start of the
 ## Viewer did it before reading the data set: kept in the user cache by file
-## version (path, size and modification time, as .viewerFileMd5() keeps one per
-## process), so a later start of the same file reads it back.
+## version, so a later start of the same file reads it back. A file replaced by
+## another of the same size and modification time (cp -p, rsync -a, an archive
+## unpacked) must not keep the old md5, or the Pack of the old data would be
+## taken for it: the version also has the status change time (which a copy
+## cannot set on Unix), and a stored md5 is used only while the first and last
+## MiB of the file still hash as they did (.viewerCrbSample()).
 .viewerCrbMd5 <- function(file) {
   info <- suppressWarnings(file.info(file, extra_cols = FALSE))
   if (is.na(info$size) || isTRUE(info$isdir)) {
@@ -163,6 +167,7 @@ viewerPackOpenCached <- function(file, cache) {
     normalizePath(file, winslash = "/"),
     info$size,
     format(as.numeric(info$mtime), digits = 17),
+    format(as.numeric(info$ctime), digits = 17),
     sep = "\t"
   )
   cached <- .viewer_file_md5_cache[[key]]
@@ -177,18 +182,20 @@ viewerPackOpenCached <- function(file, cache) {
     ),
     error = function(error) NULL
   )
+  sample <- NULL
   value <- if (!is.null(store) && file.exists(store)) {
     stored <- tryCatch(
-      readLines(store, n = 2L, warn = FALSE),
+      readLines(store, n = 3L, warn = FALSE),
       error = function(error) character()
     )
-    ## The first line is the file version, the second its md5.
+    ## The file version, the hash of its first and last MiB, its md5.
     if (
-      length(stored) == 2L &&
+      length(stored) == 3L &&
         identical(stored[[1L]], version_line) &&
-        grepl("^[0-9a-f]{32}$", stored[[2L]])
+        grepl("^[0-9a-f]{32}$", stored[[3L]])
     ) {
-      stored[[2L]]
+      sample <- .viewerCrbSample(file, info$size)
+      if (identical(stored[[2L]], sample)) stored[[3L]]
     }
   }
   if (is.null(value)) {
@@ -198,8 +205,11 @@ viewerPackOpenCached <- function(file, cache) {
         {
           dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
           temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
+          if (is.null(sample)) {
+            sample <- .viewerCrbSample(file, info$size)
+          }
           writeLines(
-            c(version_line, value),
+            c(version_line, sample, value),
             temporary,
             useBytes = TRUE
           )
@@ -213,6 +223,19 @@ viewerPackOpenCached <- function(file, cache) {
     assign(key, value, envir = .viewer_file_md5_cache)
   }
   value
+}
+## The hash of the first and last MiB of a file of `size` bytes (the whole of
+## a smaller one): a replaced CRB differs there (its header, its payload's
+## last block), and reading them takes milliseconds.
+.viewerCrbSample <- function(file, size, bytes = 2^20) {
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  head <- readBin(connection, "raw", n = min(size, bytes))
+  tail <- if (size > bytes) {
+    seek(connection, max(bytes, size - bytes))
+    readBin(connection, "raw", n = bytes)
+  }
+  rlang::hash(c(head, tail))
 }
 ## A file name for a file version key (its md5, of the key's bytes).
 .viewerCrbMd5Key <- function(key) {

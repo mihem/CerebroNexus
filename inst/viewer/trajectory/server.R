@@ -6,16 +6,34 @@
 ## The method, trajectory and colour selectors (select_method_and_name.R), read
 ## through viewerControlValue(): the first frame is drawn with what the
 ## selectors will bind with (first supported method, its first trajectory, the
-## main group) before they reach the browser.
+## main group) before they reach the browser. The selectors are drawn with the
+## values of the functions below, so both agree.
 ##----------------------------------------------------------------------------##
-trajectory_default_method <- function() {
-  methods <- viewerSupportedTrajectoryMethods(getMethodsForTrajectories())
-  if (length(methods)) methods[[1L]] else NULL
+## `current` while it is one of `available`, else the first of `available`.
+trajectory_selector_value <- function(current, available) {
+  if (length(current) == 1L && !is.na(current) && current %in% available) {
+    current
+  } else if (length(available)) {
+    available[[1L]]
+  }
 }
-trajectory_default_name <- function() {
-  method <- trajectory_default_method()
-  names <- if (is.null(method)) NULL else getNamesOfTrajectories(method)
-  if (length(names)) names[[1L]] else NULL
+trajectory_default_method <- function(
+  current = NULL,
+  available = viewerSupportedTrajectoryMethods(getMethodsForTrajectories())
+) {
+  trajectory_selector_value(current, available)
+}
+trajectory_default_name <- function(
+  method = trajectory_default_method(),
+  current = NULL,
+  available = if (!is.null(method)) getNamesOfTrajectories(method)
+) {
+  trajectory_selector_value(current, available)
+}
+trajectory_default_point_color <- function(
+  colour_groups = viewerColourGroupChoices()
+) {
+  colour_groups$selected %||% "state"
 }
 trajectory_selected_method <- viewerControlValue(
   input,
@@ -30,7 +48,7 @@ trajectory_selected_name <- viewerControlValue(
 trajectory_point_color <- viewerControlValue(
   input,
   "trajectory_point_color",
-  function() viewerColourGroupChoices()$selected %||% "state"
+  trajectory_default_point_color
 )
 
 ##----------------------------------------------------------------------------##

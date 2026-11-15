@@ -525,25 +525,8 @@ server <- function(input, output, session) {
     }
   })
 
-  viewer_initial_page_tabs <- c(
-    data_info = "loadData",
-    projection = "overview",
-    linked_views = "coordinated_views",
-    groups = "groups",
-    marker_genes = "markerGenes",
-    most_expressed_genes = "mostExpressedGenes",
-    enriched_pathways = "enrichedPathways",
-    extra_material = "extra_material",
-    immune_repertoire = "immune_repertoire",
-    trajectory = "trajectory",
-    spatial = "spatial",
-    trekker = "trekker",
-    hla_tcr_motifs = "hla_tcr_motifs",
-    gene_expression = "geneExpression",
-    gene_id_conversion = "geneIdConversion",
-    color_management = "color_management",
-    about = "about"
-  )
+  ## page ID -> sidebar tab (viewerPageTabs() in viewer/core/shared_resources.R)
+  viewer_initial_page_tabs <- viewerPageTabs()
   ## The author's start page, Data info without one (viewerStartPage() in
   ## viewer/core/shared_resources.R).
   initial_page <- viewerStartPage(Cerebro.options)
@@ -564,17 +547,9 @@ server <- function(input, output, session) {
   } else {
     NULL
   }
-  conditional_tabs <- unname(viewer_initial_page_tabs[c(
-    "linked_views",
-    "marker_genes",
-    "most_expressed_genes",
-    "enriched_pathways",
-    "extra_material",
-    "immune_repertoire",
-    "trajectory",
-    "spatial",
-    "trekker",
-    "hla_tcr_motifs"
+  conditional_tabs <- unname(viewer_initial_page_tabs[setdiff(
+    names(viewer_initial_page_tabs),
+    viewerPagesAlways()
   )])
   initial_page_applied <- reactiveVal(FALSE)
   ## Keep the address bar on the page being read, so the copied URL reopens it.
@@ -2891,6 +2866,21 @@ server <- function(input, output, session) {
   ## shinycssloaders: 57 packages instead of 26, rmarkdown, knitr and stringi
   ## among them, which a Viewer session never loads).
   viewer_package_imports <- function(package) {
+    cache <- get0(
+      ".viewer_package_imports_cache",
+      mode = "environment",
+      inherits = TRUE
+    )
+    if (!is.null(cache) && exists(package, envir = cache, inherits = FALSE)) {
+      return(get(package, envir = cache, inherits = FALSE))
+    }
+    imports <- viewer_package_imports_read(package)
+    if (!is.null(cache)) {
+      assign(package, imports, envir = cache)
+    }
+    imports
+  }
+  viewer_package_imports_read <- function(package) {
     path <- system.file(package = package)
     namespace <- tryCatch(
       parseNamespaceFile(basename(path), dirname(path), mustExist = FALSE),

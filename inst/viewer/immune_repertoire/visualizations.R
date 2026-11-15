@@ -129,12 +129,8 @@ output$ir_visualizations_UI <- renderUI({
   # re-runs). Without `selected`, the rebuilt tabsetPanel would reset to the
   # first tab (Abundance).
   tab_names <- vapply(tabs, function(t) t$attribs$`data-value`, character(1))
-  last_tab <- isolate(ir_last_tab())
-  selected_tab <- if (!is.null(last_tab) && last_tab %in% tab_names) {
-    last_tab
-  } else {
-    NULL
-  }
+  ## the tab ir_tab() publishes before the strip binds (tabs.R)
+  selected_tab <- ir_opening_tab(tab_names)
 
   shiny::tagAppendAttributes(
     do.call(
@@ -721,7 +717,7 @@ observe(
       identical(input[["sidebar"]], "immune_repertoire"),
       identical(ir_tab(), "Clonal UMAP")
     )
-    group_by <- ir_param("ir_p_umap_group_by", "")
+    group_by <- ir_param("ir_p_umap_group_by")
     grouped <- !is.null(group_by) && nzchar(group_by)
 
     ## Receptor and projection arrive from the visible toolbar. Show-all and the
@@ -737,7 +733,7 @@ observe(
       })
       if (length(choices)) unname(choices[[1L]]) else NULL
     })
-    show_all <- ir_param("ir_p_umap_show_all", TRUE)
+    show_all <- ir_param("ir_p_umap_show_all")
     req(receptor, projection)
     ## Appearance is read without a dependency: labels, border and square are
     ## patched by the observer above, point size and opacity by the browser.
@@ -1106,18 +1102,8 @@ viewerSelectionSummaryOutputs(
 ## ---- BCR-specific renderers --------------------------------------------- ##
 ## The isotype shares of every group (bcr_isotype_counts()), bars in the order
 ## the groups first appear, the isotypes in class-switch order with the
-## colours bcr_isotype_plot() gives them; other isotypes are "NA".
-IR_ISOTYPES <- c(
-  "IGHM",
-  "IGHD",
-  "IGHG1",
-  "IGHG2",
-  "IGHG3",
-  "IGHG4",
-  "IGHA1",
-  "IGHA2",
-  "IGHE"
-)
+## colours bcr_isotype_plot() gives them (IR_ISOTYPES and ir_isotype_colors(),
+## server.R); other isotypes are "NA".
 ir_isotype_chart <- function(iso, group_col) {
   if (is.null(iso)) {
     return(ir_chart_message(
@@ -1138,7 +1124,7 @@ ir_isotype_chart <- function(iso, group_col) {
     values,
     groups,
     series,
-    c(cerebro_group_colors(length(IR_ISOTYPES)), "#cccccc")[seq_along(series)],
+    unname(ir_isotype_colors()[series]),
     x_title = group_col,
     y_title = "Proportion",
     legend_title = "Isotype",
@@ -1664,11 +1650,11 @@ ir_define_with_tab("Paired Scatter", function() {
           ir_row_values(encoded, group_by),
           x,
           y,
-          ir_param("ir_p_dot_size", "total")
+          ir_param("ir_p_dot_size")
         ),
         x,
         y,
-        ir_param("ir_p_graph", "proportion")
+        ir_param("ir_p_graph")
       ),
       "pairedScatter"
     ) %>%
@@ -1687,8 +1673,8 @@ ir_define_with_tab("Paired Scatter", function() {
       input$ir_pair_compare,
       input$ir_pair_x_group,
       input$ir_pair_y_group,
-      ir_param("ir_p_graph", "proportion"),
-      ir_param("ir_p_dot_size", "total")
+      ir_param("ir_p_graph"),
+      ir_param("ir_p_dot_size")
     )
   invisible(NULL)
 })
@@ -1732,11 +1718,11 @@ output$ir_plot_pairedScatter_facet <- renderPlot({
                 NULL,
                 s_a[1],
                 s_b[1],
-                ir_param("ir_p_dot_size", "total")
+                ir_param("ir_p_dot_size")
               ),
               s_a[1],
               s_b[1],
-              ir_param("ir_p_graph", "proportion"),
+              ir_param("ir_p_graph"),
               paste0(fl, ": ", lvls[1], " vs ", lvls[2])
             )
           },
@@ -1771,8 +1757,8 @@ output$ir_plot_pairedScatter_facet <- renderPlot({
     ir_params()$groupBy,
     input$ir_pair_compare,
     input$ir_pair_facet,
-    ir_param("ir_p_graph", "proportion"),
-    ir_param("ir_p_dot_size", "total")
+    ir_param("ir_p_graph"),
+    ir_param("ir_p_dot_size")
   )
 
 ## Units in clonalAbundance()'s order: sorted, or with order.by = "alphanumeric"
@@ -1897,7 +1883,7 @@ output$ir_plot_clonalAbundance <- renderCerebroChart({
   req(pars$chain, pars$cloneCall)
   ir_clonal_abundance_chart(
     ir_abundance_counts(),
-    scale = isTRUE(ir_param("ir_p_scale", FALSE)),
+    scale = isTRUE(ir_param("ir_p_scale")),
     order_by = ir_order_by(),
     legend = pars$groupBy %||% "Samples"
   )
@@ -1906,7 +1892,7 @@ output$ir_plot_clonalAbundance <- renderCerebroChart({
     ir_params()$cloneCall,
     ir_params()$chain,
     ir_params()$groupBy,
-    isTRUE(ir_param("ir_p_scale", FALSE)),
+    isTRUE(ir_param("ir_p_scale")),
     ir_order_by()
   )
 
@@ -1927,7 +1913,7 @@ ir_define_with_tab("Compare", function() {
     encoded <- ir_encoded()
     req(!is.null(encoded))
     pars <- ir_params()
-    proportion <- isTRUE(ir_param("ir_p_compare_prop", TRUE))
+    proportion <- isTRUE(ir_param("ir_p_compare_prop"))
 
     tryCatch(
       {
@@ -1941,7 +1927,7 @@ ir_define_with_tab("Compare", function() {
           chain = pars$chain,
           groups = ir_row_values(encoded, pars$groupBy),
           units = samples,
-          top_clones = as.numeric(ir_param("ir_p_top_clones", 10)),
+          top_clones = as.numeric(ir_param("ir_p_top_clones")),
           proportion = proportion,
           clone_rank = ir_clone_rank(encoded, clone_col, pars$chain),
           clone_names = function(ids) {
@@ -1978,8 +1964,8 @@ ir_define_with_tab("Compare", function() {
       ir_params()$chain,
       ir_params()$groupBy,
       input$ir_compare_samples,
-      as.numeric(ir_param("ir_p_top_clones", 10)),
-      isTRUE(ir_param("ir_p_compare_prop", TRUE)),
+      as.numeric(ir_param("ir_p_top_clones")),
+      isTRUE(ir_param("ir_p_compare_prop")),
       ir_order_by()
     )
   invisible(NULL)
@@ -2220,10 +2206,10 @@ ir_define_with_tab("Diversity", function() {
     encoded <- ir_encoded()
     req(!is.null(encoded))
     pars <- ir_params()
-    metric <- ir_param("ir_p_metric", "shannon")
-    x_axis <- ir_param("ir_p_x_axis", "")
+    metric <- ir_param("ir_p_metric")
+    x_axis <- ir_param("ir_p_x_axis")
     x_axis <- if (is.null(x_axis) || !nzchar(x_axis)) NULL else x_axis
-    n_boots <- as.numeric(ir_param("ir_p_n_boots", 20))
+    n_boots <- as.numeric(ir_param("ir_p_n_boots"))
     if (is.na(n_boots) || n_boots < 1) {
       n_boots <- 20
     }
@@ -2249,9 +2235,9 @@ ir_define_with_tab("Diversity", function() {
       ir_params()$cloneCall,
       ir_params()$chain,
       ir_params()$groupBy,
-      ir_param("ir_p_metric", "shannon"),
-      ir_param("ir_p_x_axis", ""),
-      ir_param("ir_p_n_boots", 20),
+      ir_param("ir_p_metric"),
+      ir_param("ir_p_x_axis"),
+      ir_param("ir_p_n_boots"),
       ir_order_by()
     )
   invisible(NULL)
@@ -2324,7 +2310,7 @@ ir_define_with_tab("SizeDist", function() {
     ir_render_ggplotly(
       ir_size_profile_plot(
         ir_size_distribution_profile(),
-        method = ir_param("ir_p_sd_method", "ward.D2")
+        method = ir_param("ir_p_sd_method")
       ),
       "clonalSizeDistribution"
     )
@@ -2332,8 +2318,8 @@ ir_define_with_tab("SizeDist", function() {
     ir_bindCache(
       ir_chain_groupBy()$chain,
       ir_chain_groupBy()$groupBy,
-      ir_param("ir_p_sd_method", "ward.D2"),
-      ir_param("ir_p_sd_threshold", 1)
+      ir_param("ir_p_sd_method"),
+      ir_param("ir_p_sd_threshold")
     )
   invisible(NULL)
 })

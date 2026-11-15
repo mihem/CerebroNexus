@@ -2,6 +2,15 @@
 ## Show content or info text when data is missing.
 ##----------------------------------------------------------------------------##
 
+## The switches' values as the table or plot opens: the switches are drawn
+## with these, and page code reads them through viewerControlValue() (below)
+## until the switches bind.
+extra_material_switch_defaults <- list(
+  number_formatting = TRUE,
+  color_highlighting = TRUE,
+  plot_interactive = TRUE
+)
+
 ##----------------------------------------------------------------------------##
 ## UI element for output.
 ##----------------------------------------------------------------------------#
@@ -25,14 +34,14 @@ output[["extra_material_content_UI"]] <- renderUI({
         shinyWidgets::materialSwitch(
           inputId = "extra_material_table_number_formatting",
           label = "Automatically format numbers:",
-          value = TRUE,
+          value = extra_material_switch_defaults$number_formatting,
           status = "primary",
           inline = TRUE
         ),
         shinyWidgets::materialSwitch(
           inputId = "extra_material_table_color_highlighting",
           label = "Highlight values with colours:",
-          value = TRUE,
+          value = extra_material_switch_defaults$color_highlighting,
           status = "primary",
           inline = TRUE
         )
@@ -48,7 +57,7 @@ output[["extra_material_content_UI"]] <- renderUI({
         shinyWidgets::materialSwitch(
           inputId = "extra_material_plot_interactive_switch",
           label = "Make plot interactive:",
-          value = TRUE,
+          value = extra_material_switch_defaults$plot_interactive,
           status = "primary",
           inline = TRUE
         )
@@ -60,53 +69,39 @@ output[["extra_material_content_UI"]] <- renderUI({
 
 ##----------------------------------------------------------------------------##
 ## The content selectors and switches as the first view reads them: bound, or
-## until bound the value extra_material_content_selectors() and the switches
+## until bound the values extra_material_content_values() and the switches
 ## start with, so the table or plot does not wait for each level of controls to
 ## reach the browser and back.
 ##----------------------------------------------------------------------------##
 extra_material_file <- viewerControlValue(
   input,
   "extra_material_selected_file",
-  function() {
-    if (
-      identical(extra_material_category(), "tables") && checkForExtraTables()
-    ) {
-      viewerFirstChoice(extra_material_table_choices(
-        extra_material_table_groups()
-      ))
-    }
-  }
+  function() extra_material_content_values(extra_material_category())$file
 )
 extra_material_content <- viewerControlValue(
   input,
   "extra_material_selected_content",
   function() {
-    category <- extra_material_category()
-    if (identical(category, "tables") && checkForExtraTables()) {
-      extra_material_table_selection(
-        extra_material_table_groups(),
-        file_key = extra_material_file(),
-        load = FALSE
-      )$sheet$key
-    } else if (identical(category, "plots") && isTRUE(checkForExtraPlots())) {
-      viewerFirstChoice(getNamesOfExtraPlots())
-    }
+    extra_material_content_values(
+      extra_material_category(),
+      extra_material_file()
+    )$content
   }
 )
 extra_material_number_formatting <- viewerControlValue(
   input,
   "extra_material_table_number_formatting",
-  function() TRUE
+  function() extra_material_switch_defaults$number_formatting
 )
 extra_material_color_highlighting <- viewerControlValue(
   input,
   "extra_material_table_color_highlighting",
-  function() TRUE
+  function() extra_material_switch_defaults$color_highlighting
 )
 extra_material_plot_interactive <- viewerControlValue(
   input,
   "extra_material_plot_interactive_switch",
-  function() TRUE
+  function() extra_material_switch_defaults$plot_interactive
 )
 
 ##----------------------------------------------------------------------------##

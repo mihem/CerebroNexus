@@ -24,23 +24,18 @@ output[["trajectory_primary_controls_UI"]] <- renderUI({
     illustrative = "Illustrative",
     published_pseudotime = "Published pseudotime"
   )
-  selected_method <- isolate(input[["trajectory_selected_method"]])
-  if (
-    length(selected_method) != 1L ||
-      is.na(selected_method) ||
-      !selected_method %in% available_methods
-  ) {
-    selected_method <- available_methods[[1L]]
-  }
+  ## The bound selections while still available, else the first ones; with
+  ## nothing bound, what server.R publishes until the selectors bind.
+  selected_method <- trajectory_default_method(
+    isolate(input[["trajectory_selected_method"]]),
+    available_methods
+  )
   available_names <- getNamesOfTrajectories(selected_method)
-  selected_name <- isolate(input[["trajectory_selected_name"]])
-  if (
-    length(selected_name) != 1L ||
-      is.na(selected_name) ||
-      !selected_name %in% available_names
-  ) {
-    selected_name <- available_names[[1L]]
-  }
+  selected_name <- trajectory_default_name(
+    selected_method,
+    isolate(input[["trajectory_selected_name"]]),
+    available_names
+  )
 
   colour_groups <- viewerColourGroupChoices()
 
@@ -69,7 +64,7 @@ output[["trajectory_primary_controls_UI"]] <- renderUI({
         "Trajectory" = c("State" = "state", "Pseudotime" = "pseudotime"),
         "Grouping variables" = colour_groups$choices
       ),
-      selected = colour_groups$selected %||% "state",
+      selected = trajectory_default_point_color(colour_groups),
       width = "100%"
     )
   )
@@ -84,14 +79,11 @@ observeEvent(
     )
     req(method %in% available_methods)
     available_names <- getNamesOfTrajectories(method)
-    selected_name <- isolate(input[["trajectory_selected_name"]])
-    if (
-      length(selected_name) != 1L ||
-        is.na(selected_name) ||
-        !selected_name %in% available_names
-    ) {
-      selected_name <- available_names[[1L]]
-    }
+    selected_name <- trajectory_default_name(
+      method,
+      isolate(input[["trajectory_selected_name"]]),
+      available_names
+    )
     updateSelectInput(
       session,
       "trajectory_selected_name",

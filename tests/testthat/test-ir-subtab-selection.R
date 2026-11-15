@@ -243,7 +243,7 @@ test_that("the App's tab strip shows only the kept sub-tabs", {
         viewer_server_load(
           tabs_file,
           scope,
-          names = c("ir_visible_tabs", "ir_default_tab")
+          names = c("ir_visible_tabs", "ir_default_tab", "ir_opening_tab")
         )
         viewer_server_load(
           viz,
@@ -350,4 +350,36 @@ test_that("an App without the Clonal projection does not point to it", {
   ## Nor while its strip is on the way.
   early <- page(c("Abundance", "Clone Sharing"), "Abundance", bound = FALSE)
   expect_null(early$status)
+})
+
+test_that("the tab strip and the clonal projection open on one tab", {
+  scope <- new.env(parent = asNamespace("shiny"))
+  scope$`%||%` <- function(a, b) if (is.null(a)) b else a
+  eval(
+    viewer_r_assignment(
+      viewer_test_path("immune_repertoire", "tabs.R"),
+      "ir_opening_tab"
+    ),
+    scope
+  )
+  visible_reads <- 0L
+  scope$ir_visible_tabs <- function() {
+    visible_reads <<- visible_reads + 1L
+    c("Clonal UMAP", "Abundance")
+  }
+  scope$ir_default_tab <- function() "Clonal UMAP"
+  scope$ir_last_tab <- shiny::reactiveVal(NULL)
+  ## First landing: the first visible tab, without reading the sample count.
+  expect_identical(scope$ir_opening_tab(), "Clonal UMAP")
+  expect_identical(visible_reads, 0L)
+  ## A remembered tab while this dataset shows it, else the first one.
+  scope$ir_last_tab("Abundance")
+  expect_identical(scope$ir_opening_tab(), "Abundance")
+  expect_identical(
+    scope$ir_opening_tab(c("Clonal UMAP", "Abundance")),
+    "Abundance"
+  )
+  scope$ir_last_tab("Compare")
+  expect_identical(scope$ir_opening_tab(), "Clonal UMAP")
+  expect_identical(scope$ir_opening_tab("Clonal UMAP"), "Clonal UMAP")
 })

@@ -1848,3 +1848,14 @@ test_that("the Viewer contracts load from a source checkout", {
     expect_true(isTRUE(fresh()$from_source_tree))
   }
 })
+
+test_that("a CRB is read on the threads the user allows, within the limits", {
+  ## the user's qs2 setting decides (its default is one thread)
+  expect_identical(.cerebroReadThreads(1L, 16L, ""), 1L)
+  expect_identical(.cerebroReadThreads(8L, 16L, ""), 8L)
+  ## never more than the cores, at most two under R CMD check's limit
+  expect_identical(.cerebroReadThreads(8L, 4L, ""), 4L)
+  expect_identical(.cerebroReadThreads(8L, 16L, "TRUE"), 2L)
+  expect_identical(.cerebroReadThreads(8L, 16L, "false"), 8L)
+  expect_identical(.cerebroReadThreads(NA, NA, ""), 1L)
+})

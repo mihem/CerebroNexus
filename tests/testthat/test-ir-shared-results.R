@@ -62,7 +62,15 @@ test_that("sharing units read the metadata at the encoded cells", {
 })
 
 test_that("an immune repertoire without heavy chains draws no isotype plot", {
-  scope <- ir_scope(c("bcr_isotype_counts", "bcr_isotype_plot"), "server.R")
+  scope <- ir_scope(
+    c(
+      "bcr_isotype_counts",
+      "IR_ISOTYPES",
+      "ir_isotype_colors",
+      "bcr_isotype_plot"
+    ),
+    "server.R"
+  )
   scope$cerebro_group_colors <- function(n) rep("#000000", n)
   tcr <- scope$ir_encode_repertoire(list(
     a = data.frame(barcode = "c1", CTgene = "TRAV1.TRAJ2_TRBV3.TRBJ4"),
@@ -77,13 +85,17 @@ test_that("an immune repertoire without heavy chains draws no isotype plot", {
 
 test_that("isotype bars hold every group's isotype shares and counts", {
   scope <- ir_scope(
+    c("bcr_isotype_counts", "IR_ISOTYPES", "ir_isotype_colors"),
+    "server.R"
+  )
+  scope <- ir_scope(
     c(
       "ir_chart_message",
       "ir_fill_bar_chart",
-      "IR_ISOTYPES",
       "ir_isotype_chart"
     ),
-    "visualizations.R"
+    "visualizations.R",
+    scope = scope
   )
   scope$cerebro_group_colors <- function(n) sprintf("#%06d", seq_len(n))
   expect_identical(scope$ir_isotype_chart(NULL, "sample")$type, "empty")
@@ -111,6 +123,17 @@ test_that("isotype bars hold every group's isotype shares and counts", {
   ## Only known isotypes: no NA series.
   chart <- scope$ir_isotype_chart(iso[iso$isotype != "IGHX", ], "patient")
   expect_identical(as.vector(chart$series), scope$IR_ISOTYPES)
+  ## The help's isotype plot draws the same isotypes in the same colours.
+  scope <- ir_scope("bcr_isotype_plot", "server.R", scope = scope)
+  bcr <- scope$ir_encode_repertoire(list(
+    a = data.frame(barcode = "c1", CTgene = "IGHV1.IGHJ2.IGHG1")
+  ))
+  fill <- scope$bcr_isotype_plot(bcr, "a")$scales$get_scales("fill")
+  expect_identical(
+    unname(fill$palette(length(scope$IR_ISOTYPES))),
+    as.vector(chart$colors)
+  )
+  expect_identical(fill$na.value, "#cccccc")
 })
 
 test_that("Abundance lines match plot_ly's split and colour mapping", {
@@ -208,6 +231,10 @@ test_that("sessions opening the same data set files share IR plots", {
     ir_bindCache <- function(x, ...) {
       shared_bind_cache(x, ..., cache = app_cache)
     }
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
@@ -215,6 +242,7 @@ test_that("sessions opening the same data set files share IR plots", {
         "ir_dataset_process_key",
         "ir_params",
         "ir_param",
+        "ir_param_default",
         "ir_order_by",
         "IR_CLONE_SIZE_NAMES",
         "IR_CLONE_SIZE_DEFAULT",
@@ -296,6 +324,10 @@ test_that("IR plots that show an error are not shared with other sessions", {
     ir_bindCache <- function(x, ...) {
       shared_bind_cache(x, ..., cache = app_cache)
     }
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
@@ -303,6 +335,7 @@ test_that("IR plots that show an error are not shared with other sessions", {
         "ir_dataset_process_key",
         "ir_params",
         "ir_param",
+        "ir_param_default",
         "ir_order_by",
         "IR_CLONE_SIZE_NAMES",
         "IR_CLONE_SIZE_DEFAULT",

@@ -5,6 +5,7 @@
 address_bar_server <- function() {
   sent <- list()
   scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "shared_resources.R"), envir = scope)
   scope$session <- list(
     sendCustomMessage = function(type, message) {
       sent[[length(sent) + 1L]] <<- list(type = type, message = message)

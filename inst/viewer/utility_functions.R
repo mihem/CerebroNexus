@@ -6080,6 +6080,15 @@ registerCellViewPointBorder <- function(
   shiny::outputOptions(output, square_id, suspendWhenHidden = FALSE)
 }
 
+## The switches of a stored-result table as it opens (cerebroResultTableControls()
+## and the Most expressed genes table): the switches are drawn with these, and
+## page code reads them through viewerControlValue() until the switches bind.
+cerebroResultTableDefaults <- list(
+  show_all = FALSE,
+  number_formatting = TRUE,
+  color_highlighting = TRUE
+)
+
 cerebroResultTableControls <- function(prefix, results_df, grouped) {
   shiny::fluidRow(
     shiny::column(
@@ -6087,21 +6096,21 @@ cerebroResultTableControls <- function(prefix, results_df, grouped) {
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_filter_switch"),
         label = "Show results for all subgroups (no pre-filtering):",
-        value = FALSE,
+        value = cerebroResultTableDefaults$show_all,
         status = "primary",
         inline = TRUE
       ),
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_number_formatting"),
         label = "Automatically format numbers:",
-        value = TRUE,
+        value = cerebroResultTableDefaults$number_formatting,
         status = "primary",
         inline = TRUE
       ),
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_color_highlighting"),
         label = "Highlight values with colours:",
-        value = TRUE,
+        value = cerebroResultTableDefaults$color_highlighting,
         status = "primary",
         inline = TRUE
       )
@@ -6126,17 +6135,13 @@ cerebroResultSubgroupUI <- function(results_df, show_all, grouped, input_id) {
   if (isTRUE(show_all) || !isTRUE(grouped)) {
     return(shiny::fluidRow())
   }
-  available_groups <- if (is.factor(results_df[[1L]])) {
-    levels(results_df[[1L]])
-  } else {
-    unique(as.character(results_df[[1L]]))
-  }
   shiny::fluidRow(shiny::column(
     12,
     shiny::selectInput(
       input_id,
       label = "Filter results for subgroup:",
-      choices = available_groups
+      choices = cerebroResultSubgroupChoices(results_df),
+      selected = cerebroResultSubgroupDefault(results_df, grouped)
     )
   ))
 }
@@ -6529,16 +6534,21 @@ viewerFirstChoice <- function(choices) {
   if (length(values)) values[[1L]]
 }
 
-## The subgroup a stored result table is first filtered to: the first choice
-## of cerebroResultSubgroupUI(), NULL when the table has no subgroup selector.
+## The subgroups a stored result table can be filtered to: the levels, or the
+## distinct values, of its first column.
+cerebroResultSubgroupChoices <- function(results_df) {
+  first <- results_df[[1L]]
+  if (is.factor(first)) levels(first) else unique(as.character(first))
+}
+
+## The subgroup a stored result table is first filtered to: the first choice,
+## which cerebroResultSubgroupUI() selects; NULL when the table has no
+## subgroup selector.
 cerebroResultSubgroupDefault <- function(results_df, grouped) {
   if (!is.data.frame(results_df) || !isTRUE(grouped)) {
     return(NULL)
   }
-  first <- results_df[[1L]]
-  viewerFirstChoice(
-    if (is.factor(first)) levels(first) else unique(as.character(first))
-  )
+  viewerFirstChoice(cerebroResultSubgroupChoices(results_df))
 }
 
 ## Server side of a stored-result page (Marker genes, Enriched pathways): a
@@ -6563,6 +6573,15 @@ cerebroResultPageServer <- function(
   id <- function(suffix) paste0(prefix, "_", suffix)
   method_id <- id("selected_method")
   table_id <- id("selected_table")
+  ## The method and grouping the selectors open on: the first method and its
+  ## first grouping. The selectors are drawn with these, and page code reads
+  ## them (below) until the selectors bind.
+  default_method <- function(available = methods()) {
+    viewerFirstChoice(available)
+  }
+  default_table <- function(method = default_method()) {
+    if (length(method)) viewerFirstChoice(groups(method))
+  }
   ## Resolve both initial selectors together. Changing the method updates only
   ## the group choices, so the surrounding controls do not disappear and rebind.
   output[[id("select_method_and_table_UI")]] <- shiny::renderUI({
@@ -6570,6 +6589,7 @@ cerebroResultPageServer <- function(
     if (!length(available)) {
       return(shiny::p(messages$no_methods))
     }
+    method <- default_method(available)
     shiny::fluidRow(
       shiny::column(
         6,
@@ -6577,7 +6597,7 @@ cerebroResultPageServer <- function(
           method_id,
           label = "Method",
           choices = available,
-          selected = available[[1L]],
+          selected = method,
           width = "100%"
         )
       ),
@@ -6586,7 +6606,8 @@ cerebroResultPageServer <- function(
         shiny::selectInput(
           table_id,
           label = "Grouping variable",
-          choices = groups(available[[1L]]),
+          choices = groups(method),
+          selected = default_table(method),
           width = "100%"
         )
       )
@@ -6618,27 +6639,22 @@ cerebroResultPageServer <- function(
   ## The controls as the first view reads them: bound, or until bound the
   ## value their renderUI selects, so the table does not wait for each level
   ## of controls to reach the browser and back.
-  selected_method <- viewerControlValue(input, method_id, function() {
-    viewerFirstChoice(methods())
-  })
-  selected_table <- viewerControlValue(input, table_id, function() {
-    available <- methods()
-    if (length(available)) viewerFirstChoice(groups(available[[1L]]))
-  })
+  selected_method <- viewerControlValue(input, method_id, default_method)
+  selected_table <- viewerControlValue(input, table_id, default_table)
   show_all <- viewerControlValue(
     input,
     id("table_filter_switch"),
-    function() FALSE
+    function() cerebroResultTableDefaults$show_all
   )
   number_formatting <- viewerControlValue(
     input,
     id("table_number_formatting"),
-    function() TRUE
+    function() cerebroResultTableDefaults$number_formatting
   )
   color_highlighting <- viewerControlValue(
     input,
     id("table_color_highlighting"),
-    function() TRUE
+    function() cerebroResultTableDefaults$color_highlighting
   )
   ## The stored table for the selected method and grouping; shared by the
   ## shell and the table so a selection reads it once.

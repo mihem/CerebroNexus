@@ -156,26 +156,22 @@
   )
 }
 
+## The Viewer's page IDs and their sidebar tabs, as the Viewer has them
+## (viewerPageTabs() in inst/viewer/core/shared_resources.R, a file of
+## function definitions).
 .viewerInitialPageTabs <- function() {
-  c(
-    data_info = "loadData",
-    projection = "overview",
-    linked_views = "coordinated_views",
-    groups = "groups",
-    marker_genes = "markerGenes",
-    most_expressed_genes = "mostExpressedGenes",
-    enriched_pathways = "enrichedPathways",
-    extra_material = "extra_material",
-    immune_repertoire = "immune_repertoire",
-    trajectory = "trajectory",
-    spatial = "spatial",
-    trekker = "trekker",
-    hla_tcr_motifs = "hla_tcr_motifs",
-    gene_expression = "geneExpression",
-    gene_id_conversion = "geneIdConversion",
-    color_management = "color_management",
-    about = "about"
+  scope <- new.env(parent = baseenv())
+  sys.source(
+    system.file(
+      "viewer",
+      "core",
+      "shared_resources.R",
+      package = "CerebroNexus"
+    ),
+    envir = scope,
+    keep.source = FALSE
   )
+  scope$viewerPageTabs()
 }
 
 # Portable bundle paths ----------------------------------------------------

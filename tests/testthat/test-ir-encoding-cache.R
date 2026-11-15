@@ -1,6 +1,7 @@
 ir_cache_functions <- function() {
   scope <- new.env(parent = globalenv())
   scope$IR_ENCODING_VERSION <- 1L
+  sys.source(viewer_test_path("immune_repertoire", "encoding_cache.R"), scope)
   for (expr in parse(viewer_test_path("immune_repertoire", "data.R"))) {
     if (
       is.call(expr) &&
@@ -13,6 +14,42 @@ ir_cache_functions <- function() {
   }
   scope
 }
+
+test_that("one reader opens a repertoire sidecar, also without the namespace", {
+  skip_if_not_installed("qs2")
+  root <- withr::local_tempdir()
+  thin <- list(
+    s1 = data.frame(barcode = c(2L, 1L, 3L), CTaa = c("A", "A", "B"))
+  )
+  attr(thin$s1, "cerebro_cell_index_column") <- "barcode"
+  file <- file.path(root, "x.immune.qs2")
+  qs2::qs_save(thin, file)
+  md5 <- unname(tools::md5sum(file))
+  expect_identical(.readRepertoireSidecar(file, md5, 4L), thin)
+  ## the copy another R process gets needs nothing of the namespace
+  reader <- .readRepertoireSidecarFunction()
+  expect_identical(environmentName(parent.env(environment(reader))), "base")
+  expect_identical(reader(file, md5, 4L), thin)
+  ## checks: the checksum, the range of the index, one index per row
+  expect_error(reader(file, "0", 4L), "checksum does not match")
+  expect_error(reader(file, md5, 2L), "invalid repertoire cell index")
+  short <- thin
+  short$s1 <- structure(
+    list(barcode = c(2L, 1L), CTaa = c("A", "A", "B")),
+    class = "data.frame",
+    row.names = 1:3,
+    cerebro_cell_index_column = "barcode"
+  )
+  qs2::qs_save(short, file)
+  expect_error(
+    reader(file, unname(tools::md5sum(file)), 4L),
+    "invalid repertoire cell index"
+  )
+  ## an RDS sidecar too
+  rds <- file.path(root, "x.immune.rds")
+  saveRDS(thin, rds)
+  expect_identical(reader(rds, unname(tools::md5sum(rds)), 4L), thin)
+})
 
 test_that("an encoding made in memory is kept for the next session", {
   skip_if_not_installed("qs2")

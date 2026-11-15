@@ -127,18 +127,30 @@
     }
     // A click on the menu: sent at once ("event"), before the page change
     // the click is about to send, so the server knows the outputs are shown
-    // when it loads the page's code for that change.
+    // when it loads the page's code for that change. At the end of the click's
+    // turn, and only for the page that is then shown: a second click in the
+    // same turn leaves the first page hidden, and outputs reported shown that
+    // Shiny never saw shown would stay so (and render while hidden).
     document.addEventListener("click", function (event) {
       var link = event.target && event.target.closest &&
         event.target.closest('.main-sidebar a[data-toggle="tab"]');
       if (!link || link.parentElement && link.parentElement.classList.contains("active")) return;
-      report(paneOf(link), willShow, "event");
+      var pane = paneOf(link);
+      if (!pane) return;
+      Promise.resolve().then(function () {
+        if (pane.classList.contains("active")) report(pane, willShow, "event");
+      });
     }, true);
     // A page shown another way (the start page, a link): measured once shown.
     window.jQuery(document).on(
       "shown.bs.tab.cerebroPageOutputs",
       '.main-sidebar a[data-toggle="tab"]',
-      function (event) { report(paneOf(event.target), hasSize); }
+      function (event) {
+        var pane = paneOf(event.target);
+        Promise.resolve().then(function () {
+          if (pane && pane.classList.contains("active")) report(pane, hasSize);
+        });
+      }
     );
   }
   ready(installPageOutputVisibility);

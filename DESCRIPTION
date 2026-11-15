@@ -42,6 +42,7 @@ Imports:
   Matrix (>= 1.2),
   methods,
   mirai,
+  parallel,
   plotly (>= 4.9.0),
   promises,
   qs2,

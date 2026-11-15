@@ -20,7 +20,8 @@ ir_abundance_functions <- function(...) {
 test_that("Abundance, Homeostasis and Isotype draw in the browser renderer", {
   skip_if_no_node()
   scope <- ir_abundance_functions(
-    viewer_test_path("immune_repertoire", "visualizations.R")
+    viewer_test_path("immune_repertoire", "visualizations.R"),
+    viewer_test_path("immune_repertoire", "server.R")
   )
   scope$IR_ISOTYPES <- c("IGHM", "IGHG1")
   scope$cerebro_group_colors <- function(n) rep("#123456", n)

@@ -228,48 +228,42 @@ bcr_isotype_counts <- function(encoded, groups, group_col = "sample") {
 
 
 ## ---- BCR-specific: isotype distribution plot ---------------------------- ##
+## The heavy-chain isotypes in class-switch order, and their colours named per
+## isotype ("NA": any other isotype), so the mapping is stable across plots: the
+## isotype bars (ir_isotype_chart(), visualizations.R) and bcr_isotype_plot()
+## (help.R) both draw with these. Low-saturation palette (was high-saturation
+## Set1), the family used app-wide via cerebro_group_colors().
+IR_ISOTYPES <- c(
+  "IGHM",
+  "IGHD",
+  "IGHG1",
+  "IGHG2",
+  "IGHG3",
+  "IGHG4",
+  "IGHA1",
+  "IGHA2",
+  "IGHE"
+)
+ir_isotype_colors <- function() {
+  c(
+    stats::setNames(cerebro_group_colors(length(IR_ISOTYPES)), IR_ISOTYPES),
+    "NA" = "#cccccc"
+  )
+}
+
 bcr_isotype_plot <- function(encoded, groups, group_col = "sample") {
   iso <- bcr_isotype_counts(encoded, groups, group_col)
   if (is.null(iso)) {
     return(NULL)
   }
 
-  iso$isotype <- factor(
-    iso$isotype,
-    levels = c(
-      "IGHM",
-      "IGHD",
-      "IGHG1",
-      "IGHG2",
-      "IGHG3",
-      "IGHG4",
-      "IGHA1",
-      "IGHA2",
-      "IGHE"
-    )
-  )
+  iso$isotype <- factor(iso$isotype, levels = IR_ISOTYPES)
   iso[[group_col]] <- factor(
     iso[[group_col]],
     levels = unique(iso[[group_col]])
   )
 
-  ## Low-saturation isotype palette (was high-saturation Set1). Same low-sat
-  ## family used app-wide via cerebro_group_colors(); named per isotype so the
-  ## mapping is stable across plots.
-  pal <- setNames(
-    cerebro_group_colors(9),
-    c(
-      "IGHM",
-      "IGHD",
-      "IGHG1",
-      "IGHG2",
-      "IGHG3",
-      "IGHG4",
-      "IGHA1",
-      "IGHA2",
-      "IGHE"
-    )
-  )
+  pal <- ir_isotype_colors()
 
   ggplot2::ggplot(
     iso,
@@ -277,8 +271,8 @@ bcr_isotype_plot <- function(encoded, groups, group_col = "sample") {
   ) +
     ggplot2::geom_col(position = "fill", colour = "white", linewidth = 0.1) +
     ggplot2::scale_fill_manual(
-      values = pal,
-      na.value = "grey80",
+      values = pal[IR_ISOTYPES],
+      na.value = pal[["NA"]],
       name = "Isotype",
       drop = FALSE
     ) +
@@ -378,6 +372,7 @@ ir_bindCache <- function(x, ..., cache = "app") {
 for (module_file in c(
   "param_spec.R",
   "encode.R",
+  "encoding_cache.R",
   "data.R",
   "settings.R",
   "tabs.R",

@@ -40,6 +40,27 @@ test_that("a quiet session loads the code of the other pages, not the motifs'", 
   expect_true(all(expected %in% pages))
   expect_false("hla_tcr_motifs/server.R" %in% loaded())
 
+  ## A page clicked but not shown (a second click came in the same turn): the
+  ## outputs reported shown with its click are reported hidden again, so the
+  ## server does not render them while the page stays hidden.
+  app$run_js(paste0(
+    "document.querySelector('a[href=\"#shiny-tab-groups\"]').click();",
+    "document.querySelector('a[href=\"#shiny-tab-about\"]').click();"
+  ))
+  app$wait_for_idle(timeout = 30000)
+  Sys.sleep(1.5)
+  app$wait_for_idle(timeout = 30000)
+  expect_identical(
+    app$get_js(
+      "document.querySelector('.tab-pane.active[id^=\"shiny-tab-\"]').id"
+    ),
+    "shiny-tab-about"
+  )
+  expect_null(tryCatch(
+    app$get_value(output = "groups_by_other_group_plot"),
+    error = function(error) NULL
+  ))
+
   ## A page prepared this way opens as one opened the first time: its code ran
   ## in the session (a cache bound to the session, as Groups' charts use,
   ## failed outside it).

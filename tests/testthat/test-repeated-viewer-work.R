@@ -38,6 +38,10 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
         viewer_test_path("immune_repertoire", "encode.R"),
         environment()
       )
+      sys.source(
+        viewer_test_path("immune_repertoire", "param_spec.R"),
+        environment()
+      )
       sys.source(viewer_test_path("immune_repertoire", "data.R"), environment())
       counters <- new.env()
       counters$encodings <- 0L
@@ -200,6 +204,7 @@ test_that("compact SizeDist renders the identical geometry", {
   skip_if_not_installed("ggdendro")
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("immune_repertoire", "encode.R"), env)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), env)
   repeat_definitions(viewer_test_path("immune_repertoire", "data.R"), env)
   raw <- list(
     A = data.frame(CTstrict = c("x", "x", "y")),
@@ -263,6 +268,7 @@ test_that("table classification is skipped only when neither feature uses it", {
 test_that("the faceted paired scatter compares levels of the grouping column", {
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("immune_repertoire", "encode.R"), env)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), env)
   repeat_definitions(viewer_test_path("immune_repertoire", "data.R"), env)
   repeat_definitions(
     viewer_test_path("immune_repertoire", "visualizations.R"),

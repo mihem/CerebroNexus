@@ -85,13 +85,15 @@
 
 - **The App starts sooner.** On a first start the page waited for the whole
   preparation, the data sets read included; it is now sent first and its files
-  load while R reads the CRB, which is read with four threads. The start page
-  is marked in the page itself, so the session starts on the Projection and
+  load while R reads the CRB (on the threads `qs2::qopt("nthreads")` allows,
+  at most two under R CMD check). The start page is marked in the page itself,
+  so a session that starts on the Projection (`initial_page = "projection"`)
   sends its first frame at once, without the browser asking for it. With 1.3
-  million cells the plot is drawn 5.2 s after the R process starts instead of
-  5.9 s with an empty cache, and 4.0 s instead of 4.2 s with a kept one. A
-  CRB's checksum, which names the data set of its Viewer Pack, is kept between
-  starts.
+  million cells and that start page the plot is drawn 5.2 s after the R
+  process starts instead of 5.9 s with an empty cache, and 4.0 s instead of
+  4.2 s with a kept one (measured with four threads). A CRB's checksum, which
+  names the data set of its Viewer Pack, is kept between starts; a file
+  replaced by another of the same size and modification time is hashed again.
 - **Less is sent, and less is computed per cell.** Gene expression recolours
   from 256 colour steps instead of computing every cell's colour, and finds an
   H5 gene's cells from the row it read: one gene 0.59 s instead of 0.68 s,

@@ -83,7 +83,8 @@ export_ir <- function(object, file = tempfile(fileext = ".crb"), ...) {
   invisible(file)
 }
 
-## A scope holding the Immune repertoire encoder (immune_repertoire/encode.R),
+## A scope holding the Immune repertoire encoder (immune_repertoire/encode.R)
+## and parameter spec (param_spec.R),
 ## the viewer files in `sources`, then the definitions `names` taken from
 ## immune_repertoire/<file>. Pass `scope` to add definitions to an existing one.
 ir_scope <- function(
@@ -97,6 +98,12 @@ ir_scope <- function(
     scope$`%||%` <- function(a, b) if (is.null(a)) b else a
     sys.source(
       viewer_test_path("immune_repertoire", "encode.R"),
+      envir = scope,
+      keep.source = FALSE
+    )
+    ## the analysis parameters and global controls' defaults the page reads
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
       envir = scope,
       keep.source = FALSE
     )

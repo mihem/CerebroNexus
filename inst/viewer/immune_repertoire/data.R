@@ -194,38 +194,15 @@ ir_encoded_background <- function(
           cells
         }
         if (!is.null(sidecar)) {
-          ## as Cerebro$getImmuneRepertoire() reads it: the checked file, and a
-          ## thin CRB's cell index, kept as the canonical cell row it is
-          ## (ir_encode_repertoire())
-          if (!identical(unname(tools::md5sum(sidecar$path)), sidecar$md5)) {
-            stop("The immune repertoire sidecar checksum does not match.")
-          }
-          connection <- file(sidecar$path, open = "rb")
-          magic <- readBin(connection, "raw", n = 4L)
-          close(connection)
-          repertoire <- if (
-            identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))
-          ) {
-            qs2::qs_read(sidecar$path)
-          } else {
-            readRDS(sidecar$path)
-          }
-          n_cells <- if (is.null(cells)) cell_order$n else length(cells)
-          for (sample in repertoire) {
-            column <- attr(sample, "cerebro_cell_index_column", exact = TRUE)
-            if (is.null(column)) {
-              next
-            }
-            index <- sample[[column]]
-            if (
-              !identical(column, "barcode") ||
-                !is.integer(index) ||
-                anyNA(index) ||
-                any(index < 1L | index > n_cells)
-            ) {
-              stop("The thin CRB stores an invalid repertoire cell index.")
-            }
-          }
+          ## read as Cerebro$getImmuneRepertoire() reads it, by the same
+          ## function (.readRepertoireSidecar(), R/cerebro_io.R): the checked
+          ## file, with a thin CRB's cell index kept as the canonical cell rows
+          ## it is (ir_encode_repertoire())
+          repertoire <- read_sidecar(
+            sidecar$path,
+            sidecar$md5,
+            if (is.null(cells)) cell_order$n else length(cells)
+          )
         }
         named <- vapply(
           repertoire,
@@ -242,18 +219,9 @@ ir_encoded_background <- function(
         }
         scope <- new.env(parent = globalenv())
         scope$`%||%` <- function(a, b) if (is.null(a)) b else a
+        ## the encoding and the files that keep it, as the session has them
         sys.source(encode_file, envir = scope)
-        ## the functions of data.R that keep an encoding (not its reactives)
-        for (expression in parse(data_file, keep.source = FALSE)) {
-          if (
-            is.call(expression) &&
-              identical(expression[[1L]], as.name("<-")) &&
-              is.call(expression[[3L]]) &&
-              identical(expression[[3L]][[1L]], as.name("function"))
-          ) {
-            eval(expression, scope)
-          }
-        }
+        sys.source(cache_file, envir = scope)
         value <- scope$ir_encode_repertoire(repertoire, cells, rank = FALSE)
         scope$ir_disk_cache_write(file, value)
         written <- file.exists(file) &&
@@ -271,8 +239,9 @@ ir_encoded_background <- function(
         as.character(getMetaData()$cell_barcode)
       },
       file = file,
+      read_sidecar = .readRepertoireSidecarFunction(),
       encode_file = file.path(root, "immune_repertoire", "encode.R"),
-      data_file = file.path(root, "immune_repertoire", "data.R"),
+      cache_file = file.path(root, "immune_repertoire", "encoding_cache.R"),
       ## Most of the encoding of millions of new strings is garbage collection
       ## while R's heap grows: started larger, the job takes 19 s instead of 27
       ## for 1.46 million cells, at the same peak memory.
@@ -383,7 +352,20 @@ ir_samples_with_clones <- function(encoded, clone_col) {
 ## The function-specific controls (IR_PARAM_SPEC) are rendered into a dynamic
 ## panel, so an input may be absent on tabs where the parameter doesn't apply.
 ## Returns `default` when the input is missing/empty.
-ir_param <- function(id, default = NULL) {
+## The default of an analysis parameter: its `value` in IR_PARAM_SPEC
+## (param_spec.R), which its control also opens on.
+ir_param_default <- function(id) {
+  for (tab in IR_PARAM_SPEC) {
+    for (spec in tab) {
+      if (identical(spec$id, id)) {
+        return(spec$value)
+      }
+    }
+  }
+  NULL
+}
+
+ir_param <- function(id, default = ir_param_default(id)) {
   v <- input[[id]]
   if (
     is.null(v) ||
@@ -539,39 +521,6 @@ ir_process_cache <- if (exists(".ir_process_cache", inherits = TRUE)) {
   new.env(parent = emptyenv())
 }
 
-## Where an encoding made in memory is kept between sessions: the user cache
-## directory (CEREBRO_IR_CACHE overrides it). The Pack's encoding is the real
-## store; this one spares a data set without it (or with a Pack built before
-## the encoding) the minute of encoding at every start.
-ir_disk_cache_file <- function(name, key) {
-  dir <- Sys.getenv("CEREBRO_IR_CACHE", unset = "")
-  if (!nzchar(dir)) {
-    dir <- file.path(tools::R_user_dir("CerebroNexus", "cache"), "immune")
-  }
-  file.path(
-    dir,
-    paste0(
-      name,
-      "-v",
-      IR_ENCODING_VERSION,
-      "-",
-      rlang::hash(as.character(key$path %||% "")),
-      "-",
-      rlang::hash(key),
-      ".qs2"
-    )
-  )
-}
-
-## An encoding is kept as two files: the integer columns with the clone ranks
-## (12 MB for the 1.46 million cells of Ren, read in 0.04 s), and the clone
-## names beside it (3.3 million strings: 400 MB in memory, seconds to read),
-## which only the clone tables and Compare need: they are read then, once per
-## process (ir_clone_names()).
-ir_disk_cache_names_file <- function(file) {
-  sub("[.]qs2$", ".names.qs2", file)
-}
-
 ir_disk_cache_names <- function(names_file) {
   id <- paste0("names:", names_file)
   if (!exists(id, envir = ir_process_cache, inherits = FALSE)) {
@@ -584,68 +533,8 @@ ir_disk_cache_names <- function(names_file) {
   get(id, envir = ir_process_cache, inherits = FALSE)
 }
 
-ir_disk_cache_read <- function(file) {
-  if (!file.exists(file)) {
-    return(NULL)
-  }
-  value <- tryCatch(qs2::qs_read(file), error = function(e) NULL)
-  if (!is.list(value) || !identical(value$version, IR_ENCODING_VERSION)) {
-    return(NULL)
-  }
-  if (isTRUE(value$names_apart)) {
-    names_file <- ir_disk_cache_names_file(file)
-    ## Without its names an encoding cannot name its clones: encode again.
-    if (!file.exists(names_file)) {
-      return(NULL)
-    }
-    value$names_file <- names_file
-  } else if (!is.null(value$names)) {
-    ## kept by an earlier release in one file: kept again in two
-    ir_disk_cache_write(file, value)
-  }
-  value
-}
-
-## Written through a temporary name, so a session that stops half way or reads
-## at the same time never sees a partial file. A failure (a read-only cache) is
-## not an error: the next start encodes again.
-ir_disk_cache_write <- function(file, value) {
-  tryCatch(
-    {
-      dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
-      save <- function(object, target) {
-        partial <- paste0(target, ".", Sys.getpid(), ".tmp")
-        on.exit(unlink(partial), add = TRUE)
-        qs2::qs_save(object, partial)
-        file.rename(partial, target)
-      }
-      names_file <- ir_disk_cache_names_file(file)
-      if (!is.null(value$names)) {
-        ## the names apart, written first: an encoding found has its names
-        save(value$names, names_file)
-        if (is.null(value$rank)) {
-          value$rank <- ir_clone_ranks(value$names)
-        }
-        value$names <- NULL
-        value$names_apart <- TRUE
-      }
-      save(value, file)
-      ## The data set's earlier entries (another file version, another encoding
-      ## version) are out of date for good.
-      same_path <- sub("-[0-9a-f]+[.]qs2$", "", basename(file))
-      stale <- list.files(
-        dirname(file),
-        pattern = paste0("^", gsub("-v[0-9]+-", "-v[0-9]+-", same_path), "-")
-      )
-      unlink(file.path(
-        dirname(file),
-        setdiff(stale, basename(c(file, names_file)))
-      ))
-    },
-    error = function(e) NULL
-  )
-  invisible(NULL)
-}
+## ir_disk_cache_file(), ir_disk_cache_names_file(), ir_disk_cache_read() and
+## ir_disk_cache_write(): encoding_cache.R, which the encoding job sources too.
 
 ## compute() once per (name, key) in the process; without a key, every call.
 ## `disk`: also keep the result in the user cache between sessions.
@@ -710,13 +599,13 @@ ir_params <- local({
       value <- input[[id]]
       if (is.null(value) && !id %in% bound) default else value
     }
-    gb <- control("ir_groupBy", "")
+    gb <- control("ir_groupBy", IR_GLOBAL_DEFAULTS$ir_groupBy)
     if (is.null(gb) || gb == "") {
       gb <- NULL
     }
     list(
-      cloneCall = control("ir_cloneCall", "gene"),
-      chain = control("ir_chain", "both"),
+      cloneCall = control("ir_cloneCall", IR_GLOBAL_DEFAULTS$ir_cloneCall),
+      chain = control("ir_chain", IR_GLOBAL_DEFAULTS$ir_chain),
       groupBy = gb
     )
   }
@@ -1359,7 +1248,7 @@ ir_size_distribution_profile <- reactive({
     encoded,
     chain,
     ir_row_values(encoded, pars$groupBy),
-    ir_param("ir_p_sd_threshold", 1)
+    ir_param("ir_p_sd_threshold")
   )
   # Keep just the current compact matrix, not the large named clone counts.
   if (!is.null(profiles)) {

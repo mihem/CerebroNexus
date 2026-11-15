@@ -31,7 +31,11 @@ test_that("idle package loading follows NAMESPACE imports, not DESCRIPTION", {
   env <- new.env(parent = globalenv())
   ## As in a session that has loaded nothing yet.
   env$loadedNamespaces <- function() "base"
-  for (name in c("viewer_package_imports", "viewer_package_load_order")) {
+  for (name in c(
+    "viewer_package_imports",
+    "viewer_package_imports_read",
+    "viewer_package_load_order"
+  )) {
     definition <- viewer_server_function(name)
     expect_false(is.null(definition), label = name)
     assign(name, eval(definition, env), envir = env)

@@ -74,6 +74,7 @@ ir_clonal_pack_scope <- function(descriptor, coordinates) {
   for (file in list(
     "clone_contract.R",
     c("immune_repertoire", "encode.R"),
+    c("immune_repertoire", "param_spec.R"),
     c("immune_repertoire", "data.R")
   )) {
     sys.source(

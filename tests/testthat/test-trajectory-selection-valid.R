@@ -56,8 +56,10 @@ test_that("Trajectory first frame uses the values its selectors bind with", {
         viewer_server_statements("trajectory", "server.R"),
         scope,
         names = c(
+          "trajectory_selector_value",
           "trajectory_default_method",
           "trajectory_default_name",
+          "trajectory_default_point_color",
           "trajectory_selected_method",
           "trajectory_selected_name",
           "trajectory_point_color"

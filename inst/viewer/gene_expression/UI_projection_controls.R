@@ -25,7 +25,7 @@ output[["expression_projection_genes_in_separate_panels_UI"]] <- renderUI({
       "Separate panels" = "separate",
       "RGB co-expression" = "rgb"
     ),
-    selected = "combined"
+    selected = expression_projection_default_display_mode
   )
 })
 
@@ -46,7 +46,7 @@ output[["expression_projection_gene_color_mode_UI"]] <- renderUI({
   )
   display_mode <- input[["expression_projection_genes_in_separate_panels"]]
   if (is.null(display_mode)) {
-    display_mode <- "combined"
+    display_mode <- expression_projection_default_display_mode
   }
   if (n_genes <= 1 || display_mode != "separate") {
     return(NULL)

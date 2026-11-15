@@ -234,3 +234,77 @@ test_that("the first Extra material table needs no bound control", {
     }
   )
 })
+
+test_that("Extra material selectors open on the content page code starts with", {
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      categories <- c("plots", "tables")
+      getExtraMaterialCategories <- function() categories
+      checkForExtraTables <- function() TRUE
+      checkForExtraPlots <- function() TRUE
+      getNamesOfExtraPlots <- function() c("umap", "violin")
+      extra_material_table_groups <- function() {
+        list(
+          list(
+            key = "book_a",
+            label = "A",
+            sheets = list(list(key = "a1", label = "a1"))
+          ),
+          list(
+            key = "book_b",
+            label = "B",
+            sheets = list(
+              list(key = "b1", label = "b1"),
+              list(key = "b2", label = "b2")
+            )
+          )
+        )
+      }
+      for (name in c(
+        "extra_material_table_choices",
+        "extra_material_table_group",
+        "extra_material_table_sheet",
+        "extra_material_table_selection"
+      )) {
+        eval(
+          viewer_r_assignment(viewer_test_path("utility_functions.R"), name),
+          scope
+        )
+      }
+      cerebroRegisterInfo <- function(...) invisible(NULL)
+      viewer_control_helpers_load(scope)
+      sys.source(viewer_test_path("extra_material", "select_content.R"), scope)
+      sys.source(viewer_test_path("extra_material", "content.R"), scope)
+    },
+    {
+      session$flushReact()
+      ## Plots first: the first plot, which the plot selector selects.
+      expect_identical(extra_material_category(), "plots")
+      expect_identical(extra_material_file(), NULL)
+      expect_identical(extra_material_content(), "umap")
+      html <- paste(
+        unlist(output$extra_material_select_category_and_content_UI),
+        collapse = ""
+      )
+      expect_match(html, '<option value="umap" selected>', fixed = TRUE)
+      expect_true(extra_material_plot_interactive())
+      ## Tables: the first workbook and its first table.
+      scope$categories <- c("tables", "plots")
+      expect_identical(
+        extra_material_content_values("tables"),
+        extra_material_content_values("tables", "book_a", "a1")
+      )
+      values <- extra_material_content_values("tables", "book_b")
+      expect_identical(values$file, "book_b")
+      expect_identical(values$content, "b1")
+      html <- as.character(extra_material_content_selectors(
+        scope$categories,
+        "tables",
+        "book_b"
+      ))
+      expect_match(html, '<option value="book_b" selected>', fixed = TRUE)
+      expect_match(html, '<option value="b1" selected>', fixed = TRUE)
+    }
+  )
+})

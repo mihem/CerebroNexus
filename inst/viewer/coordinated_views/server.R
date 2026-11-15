@@ -1058,8 +1058,7 @@ cv_attribute_resource <- function(
     return(NULL)
   }
   ## Exactly cv_build_groups()'s levels.
-  lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
-  lev <- lev[!is.na(lev)]
+  lev <- cv_group_levels(v)
   if (!length(lev)) {
     return(NULL)
   }

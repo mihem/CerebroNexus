@@ -97,6 +97,10 @@ test_that("IR renderers update parameters and isolate their session caches", {
         "safeRenderPlot"
       )
     )
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
@@ -105,6 +109,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
         "ir_params",
         "ir_chain_groupBy",
         "ir_param",
+        "ir_param_default",
         "ir_order_by",
         "IR_CLONE_SIZE_NAMES",
         "IR_CLONE_SIZE_DEFAULT",
@@ -317,11 +322,16 @@ clonal_projection_server <- function(names_resource = NULL) {
         list(...)
       )
     }
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
       names = c(
         "ir_param",
+        "ir_param_default",
         "IR_CLONE_LABELS",
         "ir_clonecall_col"
       )

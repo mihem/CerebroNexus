@@ -414,18 +414,50 @@ viewerStartPage <- function(options) {
 ## page (Trajectory, Spatial, ...) is still opened by the session once it
 ## knows that the data set has it.
 
-## The tab the page opens on: the tab of the start page (viewerStartPage())
-## when every App shows it, Data info otherwise.
-viewerStartTab <- function(options) {
-  tabs <- c(
+## The Viewer's stable page IDs (createShinyApp(initial_page =), ?page= links,
+## the address bar) and their sidebar tabs: the one list, which the server
+## (shiny_server.R) and createShinyApp() (.viewerInitialPageTabs(), which reads
+## this file) use too.
+viewerPageTabs <- function() {
+  c(
     data_info = "loadData",
     projection = "overview",
+    linked_views = "coordinated_views",
     groups = "groups",
+    marker_genes = "markerGenes",
+    most_expressed_genes = "mostExpressedGenes",
+    enriched_pathways = "enrichedPathways",
+    extra_material = "extra_material",
+    immune_repertoire = "immune_repertoire",
+    trajectory = "trajectory",
+    spatial = "spatial",
+    trekker = "trekker",
+    hla_tcr_motifs = "hla_tcr_motifs",
     gene_expression = "geneExpression",
     gene_id_conversion = "geneIdConversion",
     color_management = "color_management",
     about = "about"
   )
+}
+
+## The pages every data set has; the others are shown only for a data set with
+## their content.
+viewerPagesAlways <- function() {
+  c(
+    "data_info",
+    "projection",
+    "groups",
+    "gene_expression",
+    "gene_id_conversion",
+    "color_management",
+    "about"
+  )
+}
+
+## The tab the page opens on: the tab of the start page (viewerStartPage())
+## when every App shows it, Data info otherwise.
+viewerStartTab <- function(options) {
+  tabs <- viewerPageTabs()[viewerPagesAlways()]
   page <- tryCatch(viewerStartPage(options), error = function(error) NULL)
   if (is.character(page) && length(page) == 1L && page %in% names(tabs)) {
     unname(tabs[[page]])

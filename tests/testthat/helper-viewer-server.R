@@ -158,7 +158,9 @@ viewer_control_helpers_load <- function(scope) {
     "viewerControlValue",
     "viewerLazyRender",
     "viewerFirstChoice",
-    "cerebroResultSubgroupDefault"
+    "cerebroResultSubgroupChoices",
+    "cerebroResultSubgroupDefault",
+    "cerebroResultTableDefaults"
   )
   names <- names[!vapply(names, exists, logical(1), scope, inherits = FALSE)]
   for (statement in as.list(parse(viewer_test_path("utility_functions.R")))) {

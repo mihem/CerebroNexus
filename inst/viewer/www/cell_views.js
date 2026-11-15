@@ -11346,7 +11346,10 @@
     }
     syncSharedScatter();
     syncPointControls();
-    closeMore();   // a new data set starts with advanced settings closed
+    // A new data set starts with advanced settings closed. Not the same data
+    // set: its supplement (merged here once it arrives, applyHydratedSupplement())
+    // or a bundle sent again must leave a drawer the user opened meanwhile open.
+    if (dataChanged) closeMore();
     // Trekker controls reset
     dissolvePct = 0; dissolveThresh = null; evidenceOn = false; nicheRadius = 250;
     nicheSet = null;

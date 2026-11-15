@@ -891,6 +891,11 @@ test_that("Viewer Pack IR indexes first-frame coordinates without barcodes", {
     keep.source = FALSE
   )
   sys.source(
+    viewer_test_path("immune_repertoire", "param_spec.R"),
+    envir = scope,
+    keep.source = FALSE
+  )
+  sys.source(
     viewer_test_path("immune_repertoire", "data.R"),
     envir = scope,
     keep.source = FALSE
@@ -1109,4 +1114,31 @@ test_that("a pack built from the object in memory agrees with a qs2 CRB read bac
   expect_true(validateViewerPack(crb)$valid)
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
   expect_true(.bundleViewerPackValid(crb, .readCerebroPayload(crb)))
+})
+
+test_that("a CRB replaced with the same size and mtime does not keep its md5", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  file <- withr::local_tempfile(fileext = ".crb")
+  writeBin(as.raw(rep(1:200, 5L)), file)
+  when <- as.POSIXct("2026-01-02 03:04:05", tz = "UTC")
+  Sys.setFileTime(file, when)
+  first <- runtime$.viewerCrbMd5(file)
+  expect_identical(first, unname(tools::md5sum(file)))
+  ## another process (an empty process cache) reads the stored md5 back
+  rm(
+    list = ls(runtime$.viewer_file_md5_cache),
+    envir = runtime$.viewer_file_md5_cache
+  )
+  expect_identical(runtime$.viewerCrbMd5(file), first)
+  ## replaced by other bytes of the same size, with the same mtime (cp -p)
+  writeBin(as.raw(rep(201:250, 20L)), file)
+  Sys.setFileTime(file, when)
+  rm(
+    list = ls(runtime$.viewer_file_md5_cache),
+    envir = runtime$.viewer_file_md5_cache
+  )
+  expect_identical(runtime$.viewerCrbMd5(file), unname(tools::md5sum(file)))
+  expect_false(identical(runtime$.viewerCrbMd5(file), first))
 })

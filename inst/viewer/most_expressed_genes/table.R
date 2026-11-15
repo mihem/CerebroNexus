@@ -2,12 +2,24 @@
 ## Table or info text when data is missing.
 ##----------------------------------------------------------------------------##
 
+## See select_group.R.
 most_expressed_genes_available_groups <- reactive({
-  unique(c(
-    getGroupsWithMostExpressedGenes(),
-    getGroupsWithMeanExpression()
-  ))
+  most_expressed_genes_groups()
 })
+
+## The metric the selector opens on: `current` (the bound one) while the
+## grouping variable has it, else the first stored one. The selector is drawn
+## with it, and page code reads it (below) until the selector binds.
+most_expressed_genes_default_metric <- function(
+  choices = most_expressed_genes_metric_choices(),
+  current = NULL
+) {
+  if (length(current) == 1L && current %in% choices) {
+    current
+  } else {
+    viewerFirstChoice(choices)
+  }
+}
 
 ## The controls as the first view reads them: bound, or until bound the value
 ## their renderUI selects, so the table does not wait for each level of
@@ -15,17 +27,19 @@ most_expressed_genes_available_groups <- reactive({
 most_expressed_genes_group <- viewerControlValue(
   input,
   "most_expressed_genes_selected_group",
-  function() viewerFirstChoice(most_expressed_genes_available_groups())
+  function() {
+    most_expressed_genes_default_group(most_expressed_genes_available_groups())
+  }
 )
 most_expressed_genes_metric <- viewerControlValue(
   input,
   "most_expressed_genes_metric_type",
-  function() viewerFirstChoice(most_expressed_genes_metric_choices())
+  most_expressed_genes_default_metric
 )
 most_expressed_genes_show_all <- viewerControlValue(
   input,
   "most_expressed_genes_table_filter_switch",
-  function() FALSE
+  function() cerebroResultTableDefaults$show_all
 )
 
 most_expressed_genes_selected_tables <- reactive({
@@ -120,14 +134,10 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
         inputId = "most_expressed_genes_metric_type",
         label = "Expression metric:",
         choices = metric_choices,
-        selected = {
-          current <- isolate(input[["most_expressed_genes_metric_type"]])
-          if (length(current) == 1L && current %in% metric_choices) {
-            current
-          } else {
-            metric_choices[[1L]]
-          }
-        }
+        selected = most_expressed_genes_default_metric(
+          metric_choices,
+          isolate(input[["most_expressed_genes_metric_type"]])
+        )
       ),
       conditionalPanel(
         "input.most_expressed_genes_metric_type === 'pct'",
@@ -143,7 +153,7 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
       shinyWidgets::materialSwitch(
         inputId = "most_expressed_genes_table_filter_switch",
         label = "Show results for all subgroups (no pre-filtering):",
-        value = FALSE,
+        value = cerebroResultTableDefaults$show_all,
         status = "primary",
         inline = TRUE
       )
