@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,13 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.3.1" id="cerebronexus-831">CerebroNexus 8.3.1<a class="anchor" aria-label="anchor" href="#cerebronexus-831"></a></h2>
+<ul><li>
+<strong>Weekly update of the Nix environment.</strong> <code>create_env.R</code> gives rix the list of nixpkgs snapshots from GitHub. rix 0.18.5 checks the date against a copy of that list bundled at its release, which ends on 2026-08-24, and so rejected the date of the newest snapshot in the osmzhlab cache.</li>
+<li>
+<strong>Spatial expression in a fresh session.</strong> <code>getSpatialData()</code> loads Matrix when the expression it returns is a sparse matrix. Before, <code><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow()</a></code> and <code><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim()</a></code> of it returned <code>NULL</code> until something else had loaded Matrix.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.3.0" id="cerebronexus-830">CerebroNexus 8.3.0<a class="anchor" aria-label="anchor" href="#cerebronexus-830"></a></h2>
 <ul><li>
