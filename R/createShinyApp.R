@@ -871,6 +871,9 @@
     .cerebroPackageResource("viewer", "core", "dataset_overview.R"),
     overview_helpers
   )
+  ## The object keeps the methods of the version that saved it, so its
+  ## getGeneNames() may be the first call on a dgCMatrix, which returns NULL.
+  .loadMatrixFor(object$expression)
   overview <- overview_helpers$viewerDatasetOverview(object)
   # Thin CRBs omit expression. Read only the external matrix dimensions here:
   # the file is not hashed for its gene count. This runs for every data set

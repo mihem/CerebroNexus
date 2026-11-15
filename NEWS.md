@@ -1,3 +1,13 @@
+# CerebroNexus 8.3.2
+
+- **Sparse expression in a fresh session.** The first call on a sparse
+  expression matrix read from a `.crb` returned `NULL` or failed, because R
+  loads Matrix only during that call: `getGeneNames()`, `getCellNames()` and
+  the other expression getters now load Matrix first, as `getSpatialData()`
+  does since 8.3.1. In the Viewer the first data set showed no gene count in
+  its overview. The App start is as fast as before: Matrix is loaded at the
+  same moment.
+
 # CerebroNexus 8.3.1
 
 - **Weekly update of the Nix environment.** `create_env.R` gives rix the list
