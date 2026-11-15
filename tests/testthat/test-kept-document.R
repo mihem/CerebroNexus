@@ -77,6 +77,14 @@ test_that("a kept document comes back as a file, with its resource paths", {
 
 test_that("a kept document is used only while its packages and paths are there", {
   withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  ## A document is kept only with a resource path. Register one here: in a
+  ## fresh process (one test worker of R CMD check) no other test has.
+  prefix <- "keptdocumenttestvalidity"
+  shiny::addResourcePath(
+    prefix,
+    normalizePath(system.file(package = "withr"), winslash = "/")
+  )
+  withr::defer(try(shiny::removeResourcePath(prefix), silent = TRUE))
   env <- kept_document_env()
   target <- withr::local_tempdir()
   file <- env$viewerDocumentKeep("key", kept_document_page())
