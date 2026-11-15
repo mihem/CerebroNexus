@@ -84,28 +84,50 @@ ir_encode_part <- function(x, first) {
   out
 }
 
+## What ir_encode_sharing_parts() reads of the parts whatever the chain: each
+## pair's parts flattened, and the first allele of every gene part. Made once
+## for all chains (the regular expression over every part was most of a
+## chain's time).
+ir_encode_sharing_prep <- function(gene_parts, aa_parts) {
+  gene_flat <- unlist(gene_parts, use.names = FALSE)
+  sizes <- lengths(gene_parts)
+  aa_sizes <- lengths(aa_parts)
+  list(
+    gene_flat = gene_flat,
+    aa_flat = unlist(aa_parts, use.names = FALSE),
+    sizes = sizes,
+    aa_sizes = aa_sizes,
+    offsets = cumsum(sizes) - sizes,
+    aa_offsets = cumsum(aa_sizes) - aa_sizes,
+    owners = rep.int(seq_along(gene_parts), sizes),
+    first_allele = sub(";.*$", "", gene_flat)
+  )
+}
+
 ## The V;J;CDR3 clonotype of `chain` for each (CTgene, CTaa) pair: the first
 ## "_" part whose first allele names the chain, its first V and J genes and
 ## the CDR3 at the same position. NA when any of them is missing.
-ir_encode_sharing_parts <- function(gene_parts, aa_parts, chain) {
-  pick <- function(parts, slot) {
-    sizes <- lengths(parts)
+ir_encode_sharing_parts <- function(
+  gene_parts,
+  aa_parts,
+  chain,
+  prep = ir_encode_sharing_prep(gene_parts, aa_parts)
+) {
+  pick <- function(flat, sizes, offsets, slot) {
     valid <- !is.na(slot) & slot <= sizes
-    out <- rep(NA_character_, length(parts))
-    offsets <- cumsum(sizes) - sizes
-    out[valid] <- unlist(parts, use.names = FALSE)[offsets[valid] + slot[valid]]
+    out <- rep(NA_character_, length(sizes))
+    out[valid] <- flat[offsets[valid] + slot[valid]]
     out[is.na(out) | out == "NA" | !nzchar(out)] <- NA_character_
     sub(";.*$", "", out)
   }
-  sizes <- lengths(gene_parts)
-  owners <- rep.int(seq_along(gene_parts), sizes)
-  first_allele <- sub(";.*$", "", unlist(gene_parts, use.names = FALSE))
+  owners <- prep$owners
+  first_allele <- prep$first_allele
   hits <- which(grepl(chain, first_allele, fixed = TRUE) & first_allele != "NA")
   hits <- hits[!duplicated(owners[hits])]
   slot <- rep(NA_integer_, length(gene_parts))
-  slot[owners[hits]] <- hits - (cumsum(sizes) - sizes)[owners[hits]]
-  gene <- pick(gene_parts, slot)
-  cdr3 <- pick(aa_parts, slot)
+  slot[owners[hits]] <- hits - prep$offsets[owners[hits]]
+  gene <- pick(prep$gene_flat, prep$sizes, prep$offsets, slot)
+  cdr3 <- pick(prep$aa_flat, prep$aa_sizes, prep$aa_offsets, slot)
   tokens <- strsplit(gene, ".", fixed = TRUE)
   token_owner <- rep.int(seq_along(tokens), lengths(tokens))
   flat <- as.character(unlist(tokens, use.names = FALSE))
@@ -200,13 +222,23 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
     )
   }
   genes <- column("CTgene")
+  gene_ids <- ir_encode_ids(genes)
+  ## The chains named by any gene: looked for in the distinct genes, not in
+  ## every row.
   chains <- IR_ENCODED_CHAINS[vapply(
     IR_ENCODED_CHAINS,
-    function(chain) any(grepl(chain, genes, fixed = TRUE)),
+    function(chain) any(grepl(chain, gene_ids$levels, fixed = TRUE)),
     logical(1)
   )]
 
   ## Receptor of each row from CTstrict, or CTgene in a table without it.
+  ## When every table with rows has CTstrict, this is the CTstrict column,
+  ## and its ids are that column's clones below (one string hash less).
+  strict_everywhere <- all(vapply(
+    frames,
+    function(frame) !nrow(frame) || "CTstrict" %in% names(frame),
+    logical(1)
+  ))
   reference <- unlist(
     lapply(frames, function(frame) {
       name <- if ("CTstrict" %in% names(frame)) "CTstrict" else "CTgene"
@@ -234,7 +266,6 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
     has(c("IGH", "IGK", "IGL")) * 2L)[reference_ids$ids]
   receptor[is.na(receptor)] <- 0L
 
-  gene_ids <- ir_encode_ids(genes)
   ## Per chain, the genes whose part at the chain's position names another
   ## chain (its first three letters; "NA" and "Non" name none).
   other_genes <- list()
@@ -255,9 +286,25 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
   clones <- list()
   blank <- integer()
   names_of <- list()
+  aa <- NULL
+  aa_ids <- NULL
   for (name in IR_ENCODED_COLUMNS) {
-    values <- if (identical(name, "CTgene")) genes else column(name)
-    both <- ir_encode_ids(values)
+    ## The columns hashed already (CTgene, and CTstrict as the receptor's
+    ## reference) are not hashed again.
+    if (identical(name, "CTgene")) {
+      values <- genes
+      both <- gene_ids
+    } else if (identical(name, "CTstrict") && strict_everywhere) {
+      values <- reference
+      both <- reference_ids
+    } else {
+      values <- column(name)
+      both <- ir_encode_ids(values)
+    }
+    if (identical(name, "CTaa")) {
+      aa <- values
+      aa_ids <- both$ids
+    }
     clones[[name]] <- list(both = both$ids)
     names_of[[name]] <- list(both = both$levels)
     blank[[name]] <- match("", both$levels)
@@ -285,13 +332,18 @@ ir_encode_repertoire <- function(repertoire, cells = NULL, rank = TRUE) {
     }
   }
 
-  aa <- column("CTaa")
-  pairs <- ir_encode_pairs(gene_ids$ids, match(aa, unique(aa)))
+  ## The CTaa column and its clones from the loop above: ir_encode_pairs()
+  ## numbers the ids by first appearance as it numbered match(aa, unique(aa)),
+  ## an NA string being a class of its own either way.
+  pairs <- ir_encode_pairs(gene_ids$ids, aa_ids)
   gene_parts <- strsplit(genes[pairs$first], "_", fixed = TRUE)
   aa_parts <- strsplit(aa[pairs$first], "_", fixed = TRUE)
+  prep <- ir_encode_sharing_prep(gene_parts, aa_parts)
   sharing <- list()
   for (chain in chains) {
-    ids <- ir_encode_ids(ir_encode_sharing_parts(gene_parts, aa_parts, chain))
+    ids <- ir_encode_ids(
+      ir_encode_sharing_parts(gene_parts, aa_parts, chain, prep)
+    )
     sharing[[chain]] <- ids$ids[pairs$index]
   }
 
@@ -387,4 +439,123 @@ ir_clone_rank <- function(encoded, column, chain) {
     list(stats::setNames(list(names), chain)),
     column
   ))[[column]][[chain]]
+}
+
+## ---- The cells of a Clonal projection frame ----------------------------- ##
+## The Viewer draws the frame (immune_repertoire/data.R, ir_clonal_umap_data())
+## and the Viewer Pack builder stores the default one (R/viewer_pack.R) with
+## this function, so that both hold the same cells. 1: the cells and codes
+## below, the Pack's frame in the order the Viewer paints it.
+IR_CLONAL_FRAME_VERSION <- 1L
+
+## On the `n` canonical rows of a projection: the cells of `receptor` (a cell's
+## first row of the receptor with a clone of `clone_col`) as `coloured`, with
+## their clone-expansion `code` (the clone's size, counted over those cells,
+## cut by `bins` as findInterval(left.open = TRUE) cuts it), and with
+## `show_all` every other cell as `background`, at most `max_background` of
+## them. `cells` (canonical rows, NULL for all) and `percentage` narrow what is
+## shown, never the clone sizes. NULL when there is nothing to draw.
+ir_clonal_frame_cells <- function(
+  encoded,
+  receptor,
+  clone_col,
+  n,
+  bins,
+  cells = NULL,
+  show_all = TRUE,
+  percentage = 100,
+  max_background = 100000L
+) {
+  visible_indices <- seq_len(n)
+  if (!is.null(cells)) {
+    visible_indices <- visible_indices[visible_indices %in% cells]
+    if (!length(visible_indices)) {
+      return(NULL)
+    }
+  }
+  clone <- encoded$clones[[clone_col]]$both
+  blank <- encoded$blank[[clone_col]]
+  bit <- if (identical(receptor, "BCR")) 2L else 1L
+  rows <- which(
+    bitwAnd(encoded$receptor, bit) > 0L &
+      !is.na(clone) &
+      (is.na(blank) | clone != blank) &
+      !is.na(encoded$cell)
+  )
+  rows <- rows[!duplicated(encoded$cell[rows])]
+  coord_index <- encoded$cell[rows]
+  clones <- clone[rows]
+  # Display filters and sampling must not redefine the biological clone size.
+  size <- if (length(clones) && min(clones) >= 1L) {
+    ## Clone ids are 1..n_clones: count them in place.
+    tabulate(clones, nbins = max(clones))[clones]
+  } else {
+    tabulate(match(clones, unique(clones)))[match(clones, unique(clones))]
+  }
+  code <- findInterval(size, bins, left.open = TRUE)
+  ## Every row is visible unless `cells` narrows them (a lookup of each
+  ## receptor cell in a million-long index otherwise).
+  valid <- coord_index <= n
+  if (!is.null(cells)) {
+    valid <- valid & coord_index %in% visible_indices
+  }
+  coord_index <- coord_index[valid]
+  code <- code[valid]
+  # No receptor cells: with show_all the grey background is still drawn.
+  if (!length(coord_index) && !isTRUE(show_all)) {
+    return(NULL)
+  }
+  receptor_indices <- unique(coord_index)
+  keep_n <- min(
+    length(coord_index),
+    ceiling(length(coord_index) * percentage / 100)
+  )
+  if (keep_n < length(coord_index)) {
+    keep <- if (keep_n > 0L) {
+      unique(as.integer(round(seq(
+        1,
+        length(coord_index),
+        length.out = keep_n
+      ))))
+    } else {
+      integer()
+    }
+    coord_index <- coord_index[keep]
+    code <- code[keep]
+  }
+  if (!length(coord_index) && !isTRUE(show_all)) {
+    return(NULL)
+  }
+  # Background: every other cell in the projection, drawn in grey.
+  bg_idx <- integer()
+  if (isTRUE(show_all)) {
+    bg_mask <- if (is.null(cells)) {
+      rep(TRUE, n)
+    } else {
+      mask <- rep(FALSE, n)
+      mask[visible_indices] <- TRUE
+      mask
+    }
+    bg_mask[receptor_indices] <- FALSE
+    if (any(bg_mask)) {
+      bg_idx <- which(bg_mask)
+      target <- min(
+        length(bg_idx),
+        ceiling(length(bg_idx) * percentage / 100),
+        as.integer(max_background)
+      )
+      if (target < length(bg_idx)) {
+        keep <- if (target > 0L) {
+          unique(as.integer(round(seq(1, length(bg_idx), length.out = target))))
+        } else {
+          integer()
+        }
+        bg_idx <- bg_idx[keep]
+      }
+    }
+  }
+  if (length(bg_idx) + length(coord_index) == 0L) {
+    return(NULL)
+  }
+  list(coloured = coord_index, code = code, background = bg_idx)
 }

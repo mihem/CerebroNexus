@@ -75,32 +75,6 @@ cerebro_plotly_toolbar <- function(fig) {
   )
 }
 
-## A figure whose traces are written out in full (no `plot_ly()` mappings),
-## finished the way plotly_build() would, without running plotly_build() over
-## every trace: its attribute checks take about 3 ms per trace (0.5 s for 187
-## samples) and change nothing. The layout and defaults come from building the
-## figure with at most two of its traces; each trace gets the axis ids, the
-## `frame` and the markers mode that plotly_build() adds. The renderer then has
-## nothing left to build. test-ir-abundance-plot.R checks the result against
-## plotly_build() itself.
-cerebro_plotly_prebuilt <- function(figure) {
-  traces <- figure$x$data
-  skeleton <- figure
-  skeleton$x$data <- rep(traces[1L], min(length(traces), 2L))
-  built <- suppressMessages(plotly::plotly_build(skeleton))
-  built$x$data <- lapply(traces, function(trace) {
-    if (!is.null(trace$marker) && !grepl("markers", trace$mode, fixed = TRUE)) {
-      trace$mode <- paste0(trace$mode, "+markers")
-    }
-    trace$xaxis <- "x"
-    trace$yaxis <- "y"
-    trace$frame <- NA_character_
-    trace
-  })
-  built$preRenderHook <- identity
-  built
-}
-
 ##----------------------------------------------------------------------------##
 ## Violin summaries, e.g. for expression metrics.
 ##----------------------------------------------------------------------------##

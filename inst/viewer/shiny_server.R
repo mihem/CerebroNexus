@@ -2879,7 +2879,7 @@ server <- function(input, output, session) {
   }
   ## The HLA & TCR motifs page's code only makes observers that wait for the
   ## page to be shown. Its first view is drawn from the Viewer Pack's first
-  ## frame of the chain it opens on (hla_tcr/TRB.first.qs2, 1 MB for 1.46
+  ## frame of the chain it opens on (hla_tcr/TRB.first.v3.qs2, 1 MB for 1.46
   ## million cells), or, without a valid one, built from the repertoire (motif
   ## graph, segments): prepared only in the first case.
   viewer_idle_hla_fast <- function() {
@@ -2892,13 +2892,12 @@ server <- function(input, output, session) {
       return(FALSE)
     }
     chain <- if ("TRB" %in% chains) "TRB" else chains[[1L]]
-    !is.null(tryCatch(
-      viewerPackVerifiedAsset(
-        pack,
-        file.path("hla_tcr", paste0(chain, ".first.qs2"))
-      ),
-      error = function(error) NULL
-    ))
+    path <- viewerPackHlaFirstFramePath(pack, chain)
+    !is.null(path) &&
+      !is.null(tryCatch(
+        viewerPackVerifiedAsset(pack, path),
+        error = function(error) NULL
+      ))
   }
   viewer_prewarm_pages <- c(
     "groups",

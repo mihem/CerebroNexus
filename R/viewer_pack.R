@@ -1,4 +1,18 @@
 .viewerPackSchemaVersion <- 1L
+## The assets a Pack of this schema holds beyond the first release's, each
+## optional, so that the Viewer reads a Pack of any revision (manifest
+## `format_revision`, absent before 2):
+##   2: the default Clonal projection frames (`immune_clonal_frames`,
+##      immune/clonal/), and the HLA first frames without their segments
+##      (version 3, hla_tcr/<chain>.first.v3.qs2), which are in
+##      hla_tcr/<chain>.first.segments.qs2.
+## A Viewer uses each asset only when its manifest entry is present and valid,
+## so an older Pack opens as before and a newer one is never rejected. An asset
+## whose content changes gets a new path: a Viewer of revision 1 reads
+## hla_tcr/<chain>.first.qs2 without checking its version and takes its
+## segments from it, so a first frame without them must not be found there
+## (that Viewer builds the first view from the repertoire instead).
+.viewerPackFormatRevision <- 2L
 
 .viewerDatasetCapabilities <- function(object) {
   ## Each capability is one stored field. An object without the accessor
@@ -241,6 +255,108 @@
     scope
   }
 })
+
+## The clone-size bins of the Clonal projection (inst/viewer/clone_contract.R,
+## CEREBRO_CLONE_BINS); recorded with each frame, which the Viewer uses only
+## while its bins are these.
+.viewerPackImmuneClonalBins <- c(0, 1, 5, 20, 100, Inf)
+
+## The default Clonal projection frame of each receptor (Immune repertoire
+## page, clone call "gene", every cell shown, at most 100,000 grey background
+## cells), cut by the Viewer's own function (encode.R, ir_clonal_frame_cells()),
+## so that the Viewer draws it from these files instead of sending its
+## coordinates and rows (Ren: about 4 MB per frame) from the encoding:
+##   <receptor>.CTgene.subset.bin      the frame's canonical rows (0-based,
+##                                     uint32) in paint order: the background,
+##                                     then each expansion level, smallest first
+##   <receptor>.CTgene.codes.bin       each row's trace (uint8, 0-based)
+##   <receptor>.CTgene.dictionary.json each trace's expansion code (0: the
+##                                     background, k: bin k)
+## The frame holds the same cells on any projection, all of whose rows are the
+## canonical cells. `encoded` NULL: none (the manifest's empty table).
+.viewerPackImmuneClonalFrames <- function(encoded, n_cells, stage) {
+  frames <- list()
+  assets <- NULL
+  for (receptor in intersect(c("TCR", "BCR"), encoded$receptors)) {
+    encoder <- .viewerPackImmuneEncoder()
+    frame <- encoder$ir_clonal_frame_cells(
+      encoded,
+      receptor,
+      "CTgene",
+      n_cells,
+      .viewerPackImmuneClonalBins,
+      max_background = 100000L
+    )
+    if (is.null(frame)) {
+      next
+    }
+    ## Stable: the cells of a level keep their order, as in the Viewer's
+    ## traces.
+    coloured <- order(frame$code, method = "radix")
+    rows <- c(frame$background, frame$coloured[coloured])
+    trace_codes <- c(
+      if (length(frame$background)) 0L,
+      sort(unique(as.integer(frame$code)))
+    )
+    codes <- match(
+      c(rep.int(0L, length(frame$background)), frame$code[coloured]),
+      trace_codes
+    ) -
+      1L
+    prefix <- file.path("immune", "clonal", paste0(receptor, ".CTgene"))
+    paths <- paste0(prefix, c(".subset.bin", ".codes.bin", ".dictionary.json"))
+    assets <- rbind(
+      assets,
+      .viewerPackWriteAsset(
+        stage,
+        paths[[1L]],
+        rows - 1L,
+        "uint32",
+        length(rows)
+      ),
+      .viewerPackWriteAsset(stage, paths[[2L]], codes, "uint8", length(codes)),
+      .viewerPackWriteAsset(
+        stage,
+        paths[[3L]],
+        trace_codes,
+        "int32",
+        length(trace_codes)
+      )
+    )
+    frames[[length(frames) + 1L]] <- data.frame(
+      receptor = receptor,
+      clone_column = "CTgene",
+      version = encoder$IR_CLONAL_FRAME_VERSION,
+      cells = length(rows),
+      max_background = 100000L,
+      bins = paste(.viewerPackImmuneClonalBins, collapse = ","),
+      subset_path = paths[[1L]],
+      codes_path = paths[[2L]],
+      codes_dtype = "uint8",
+      dictionary_path = paths[[3L]],
+      stringsAsFactors = FALSE
+    )
+  }
+  table <- if (length(frames)) {
+    do.call(rbind, frames)
+  } else {
+    data.frame(
+      receptor = character(),
+      clone_column = character(),
+      version = integer(),
+      cells = integer(),
+      max_background = integer(),
+      bins = character(),
+      subset_path = character(),
+      codes_path = character(),
+      codes_dtype = character(),
+      dictionary_path = character(),
+      stringsAsFactors = FALSE
+    )
+  }
+  rownames(table) <- NULL
+  list(frames = table, assets = assets)
+}
 
 ## Each chain's clone names in blocks of `size`, each block serialized on its
 ## own, so the Viewer reads the few names it labels instead of every clone.
@@ -890,6 +1006,7 @@
     list()
   })
   receptors <- character()
+  clonal_frames <- .viewerPackImmuneClonalFrames(NULL, 0L, stage)$frames
   if (length(repertoire)) {
     references <- unlist(
       lapply(repertoire, function(frame) {
@@ -930,6 +1047,9 @@
       repertoire,
       cells
     )
+    clonal <- .viewerPackImmuneClonalFrames(encoded, length(cells), stage)
+    clonal_frames <- clonal$frames
+    assets <- rbind(assets, clonal$assets)
     clone_names <- encoded$names
     encoded$names <- NULL
     encoded$name_blocks <- list(size = 4096L, offsets = list())
@@ -980,6 +1100,13 @@
           names(value),
           c("CTgene", "CTnt", "CTaa", "CTstrict", "clone_vjc")
         )]
+        ## The first frame's segments in a file of their own (version 3): the
+        ## first view draws from its graph, so the Viewer reads and verifies
+        ## them only when they are needed (Ren TRB: about 18 MB of the file).
+        first <- .viewerPackHlaFirstFrame(value, object)
+        first_segments <- first$segments
+        first$segments <- NULL
+        first$version <- 3L
         assets <- rbind(
           assets,
           .viewerPackWriteAsset(
@@ -991,9 +1118,16 @@
           ),
           .viewerPackWriteAsset(
             stage,
-            file.path("hla_tcr", paste0(chain, ".first.qs2")),
-            .viewerPackHlaFirstFrame(value, object),
+            file.path("hla_tcr", paste0(chain, ".first.v3.qs2")),
+            first,
             "hla-first-frame"
+          ),
+          .viewerPackWriteAsset(
+            stage,
+            file.path("hla_tcr", paste0(chain, ".first.segments.qs2")),
+            first_segments,
+            "table",
+            dim(first_segments)
           )
         )
       }
@@ -1014,6 +1148,7 @@
     } else {
       0L
     },
+    immune_clonal_frames = clonal_frames,
     hla_chains = chains
   )
 }
@@ -1276,6 +1411,7 @@ buildViewerPack <- function(
   crb_md5 <- .viewerPackMd5(file)
   manifest <- list(
     schema_version = .viewerPackSchemaVersion,
+    format_revision = .viewerPackFormatRevision,
     dataset_fingerprint = paste0("md5-crb-v1:", crb_md5),
     cell_order_fingerprint = .viewerPackCellOrderFingerprint(cells),
     n_cells = length(cells),
@@ -1288,6 +1424,7 @@ buildViewerPack <- function(
     spatial_frames = built$spatial_frames,
     immune_receptors = built$immune_receptors,
     immune_encoding = built$immune_encoding,
+    immune_clonal_frames = built$immune_clonal_frames,
     hla_chains = built$hla_chains,
     assets = built$assets
   )

@@ -64,6 +64,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
     scope <- environment()
     output <- new.env()
     renderPlot <- render_value
+    renderCerebroChart <- render_value
     `%>%` <- dplyr::`%>%`
     available_crb_files <- reactiveValues(selected = "A")
     viewer_server_load(
@@ -84,6 +85,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
       names = c(
         "ir_dataset_process_key",
         "ir_params",
+        "ir_chain_groupBy",
         "ir_param",
         "ir_order_by",
         "IR_CLONE_SIZE_NAMES",
@@ -99,6 +101,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
     }
     ir_row_values <- function(encoded, name, ...) name
     ir_render_ggplotly <- function(expr, ...) expr
+    ir_render_chart <- function(expr, ...) expr
     ## Abundance counts the clones in the app: record what it counts from and
     ## what it draws.
     ir_abundance_counts_for <- function(pars, encoded) {
@@ -124,14 +127,14 @@ test_that("IR renderers update parameters and isolate their session caches", {
       )
       profiles
     }
-    ir_homeostasis_plot <- function(counts, clone_size, ...) {
+    ir_homeostasis_chart <- function(counts, clone_size, ...) {
       calls[[length(calls) + 1L]] <<- list(
         name = "homeostasis_plot",
         args = list(cloneSize = clone_size)
       )
       counts
     }
-    ir_clonal_abundance_plotly <- function(counts, ...) {
+    ir_clonal_abundance_chart <- function(counts, ...) {
       force(counts)
       calls[[length(calls) + 1L]] <<- list(
         name = "abundance_plot",

@@ -1,8 +1,10 @@
 /*
  * Summary charts: stacked bars, a vertical Sankey, violins (one or more
- * panels), filled lines and canvas scatter points, drawn from the compact
- * payloads built in plotting_functions.R. Hover text, tick formatting, legend
- * toggles and downloads all happen here, without a server round trip.
+ * panels), lines (filled or open, on a linear or log x axis) and canvas
+ * scatter points, drawn from the compact payloads built in
+ * plotting_functions.R (and immune_repertoire/visualizations.R). Hover text,
+ * tick formatting, legend toggles and downloads all happen here, without a
+ * server round trip.
  */
 (function (root) {
   'use strict';
@@ -142,6 +144,36 @@
     }
     return { values: out, step: step };
   }
+  // Ticks of a log10 axis, positions in log10 units from `lo` to `hi`: 1-9,
+  // 1-2-5 or 1 per decade, whichever has at most `count`, else every k-th
+  // power of ten.
+  function logTicks(lo, hi, count) {
+    var first = Math.floor(lo + 1e-9), last = Math.ceil(hi - 1e-9), out;
+    var sets = [[1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 5], [1]];
+    for (var s = 0; s < sets.length; s++) {
+      out = [];
+      for (var d = first; d <= last; d++) {
+        for (var m = 0; m < sets[s].length; m++) {
+          var v = d + Math.log(sets[s][m]) / Math.LN10;
+          if (v >= lo - 1e-9 && v <= hi + 1e-9) out.push(v);
+        }
+      }
+      if (out.length <= count) return { values: out, step: 1 };
+    }
+    var every = Math.ceil((last - first) / Math.max(1, count));
+    out = [];
+    // `+ 0` turns the -0 that Math.ceil() gives just below zero into 0.
+    for (d = Math.ceil(lo / every - 1e-9) * every + 0; d <= hi + 1e-9; d += every) out.push(d);
+    return { values: out, step: every };
+  }
+  function logLabel(v) {
+    return significant(Number(Math.pow(10, v).toPrecision(12)));
+  }
+  // Hover values: "integer", "number" (three significant digits), "percent",
+  // or a number of decimals.
+  function formatAs(value, format) {
+    return typeof format === 'number' ? fixed(value, format) : formatMode(value, format);
+  }
 
   // ---- shared SVG pieces ---------------------------------------------------
   function svgOpen(width, height, th, background) {
@@ -192,11 +224,12 @@
     var span = spec.hi - spec.lo;
     var x = function (v) { return spec.left + (v - spec.lo) / span * spec.width; };
     var digits = tickDigits(spec.ticks.step, false);
+    var label = spec.labels || function (v) { return fixed(v, digits); };
     var out = [], base = spec.top + spec.height;
     spec.ticks.values.forEach(function (v) {
       var xx = x(v);
       out.push(line(xx, spec.top, xx, base, th.grid, ' stroke-width="1"'));
-      out.push(text(xx, base + 16, fixed(v, digits), ' text-anchor="middle" fill="' + th.tick + '"'));
+      out.push(text(xx, base + 16, label(v), ' text-anchor="middle" fill="' + th.tick + '"'));
     });
     if (spec.title) {
       out.push(text(spec.left + spec.width / 2, base + 34, spec.title, ' text-anchor="middle" font-size="13" fill="' +
@@ -255,14 +288,15 @@
     var hi = percent ? 1 : maxOf(totals, 0) * 1.05;
     if (!(hi > 0)) hi = 1;
     var integer = !percent && model.format === 'integer';
-    var f = frame({ x: 0, y: 0, width: width, height: height }, [0, hi], categories, percent, integer);
+    var f = frame({ x: 0, y: 0, width: width, height: height }, [0, hi], categories, percent, integer,
+      model.xTitle);
     var axis = valueAxis({
       lo: 0, hi: hi, top: f.top, height: f.height, left: f.left, width: f.width,
       ticks: f.ticks, labels: f.format, title: model.yTitle
     }, th);
     var out = [svgOpen(width, height, th, exporting), axis.markup];
     var barWidth = Math.max(1, f.band * 0.8);
-    var outline = model.outline ? ' stroke="' + model.outline + '" stroke-width="1"' : '';
+    var outline = model.outline ? ' stroke="' + model.outline + '" stroke-width="' + model.outlineWidth + '"' : '';
     categories.forEach(function (category, j) {
       var cumulative = 0, x0 = f.x(j) - barWidth / 2;
       var rows = [];
@@ -275,7 +309,8 @@
           px(Math.max(0, y1 - y0)) + '" fill="' + fill + '"' + outline + '/>');
         cumulative += value;
         rows.push(swatch(fill) + '<b>' + esc(model.categoryColors ? category : series[i]) + ':</b> ' +
-          formatMode(value, percent ? 'percent' : model.format));
+          formatMode(value, percent ? 'percent' : model.format) +
+          (model.counts ? ' (' + fixed(model.counts[i][j] || 0, 0) + ')' : ''));
       }
       if (!exporting) {
         tips.push(model.categoryColors ? (rows[0] || '<b>' + esc(category) + ':</b> 0') :
@@ -284,6 +319,10 @@
       }
     });
     out.push(categoryLabels(f.axis, f.x, f.top + f.height, th));
+    if (model.xTitle) {
+      out.push(text(f.left + f.width / 2, height - 6, model.xTitle,
+        ' text-anchor="middle" font-size="13" fill="' + th.title + '"'));
+    }
     out.push('</svg>');
     return out.join('');
   }
@@ -416,15 +455,22 @@
   }
 
   // ---- filled lines --------------------------------------------------------
+  // `xLog` puts x on a log10 axis (points at x <= 0 are left out); `fill`
+  // false draws open lines. `hoverMode` "closest" shows the point nearest the
+  // pointer, else every series at the pointer's x.
   function linesSvg(model, width, height, hidden, th, tips, exporting, extras) {
+    var tx = model.xLog ? function (v) { return v > 0 ? Math.log(v) / Math.LN10 : NaN; } :
+      function (v) { return v; };
     var xs = [], ys = [];
     model.x.forEach(function (x, i) {
       if (hidden[i]) return;
-      xs.push(minOf(x, NaN), maxOf(x, NaN));
+      var t = x.map(tx).filter(isFinite);
+      xs.push(minOf(t, NaN), maxOf(t, NaN));
       ys.push(maxOf(model.y[i], 0));
     });
-    var xlo = model.xRange ? model.xRange[0] : minOf(xs.filter(isFinite), 0);
-    var xhi = model.xRange ? model.xRange[1] : maxOf(xs.filter(isFinite), 1);
+    var xlo = model.xRange ? tx(model.xRange[0]) : minOf(xs.filter(isFinite), 0);
+    var xhi = model.xRange ? tx(model.xRange[1]) : maxOf(xs.filter(isFinite), 1);
+    if (!isFinite(xlo)) xlo = 0;
     if (!(xhi > xlo)) xhi = xlo + 1;
     var yhi = maxOf(ys, 0) * 1.05;
     if (!(yhi > 0)) yhi = 1;
@@ -435,33 +481,65 @@
     var top = 12, plotWidth = Math.max(10, width - left - 16), plotHeight = Math.max(10, height - top - 46);
     var yaxis = valueAxis({ lo: 0, hi: yhi, top: top, height: plotHeight, left: left, width: plotWidth,
       ticks: yt, labels: yformat, title: model.yTitle }, th);
+    var xcount = Math.max(2, Math.round(plotWidth / 90));
     var xaxis = numberAxis({ lo: xlo, hi: xhi, top: top, height: plotHeight, left: left, width: plotWidth,
-      ticks: ticks(xlo, xhi, Math.max(2, Math.round(plotWidth / 90))), title: model.xTitle }, th);
+      ticks: model.xLog ? logTicks(xlo, xhi, xcount) : ticks(xlo, xhi, xcount),
+      labels: model.xLog ? logLabel : null, title: model.xTitle }, th);
     var out = [svgOpen(width, height, th, exporting), yaxis.markup, xaxis.markup];
     var base = px(yaxis.y(0));
+    // Screen positions of the drawn points, kept for the closest-point hover.
+    var screen = [];
     model.x.forEach(function (x, i) {
-      if (hidden[i] || x.length < 2) return;
-      var y = model.y[i], points = [];
-      for (var k = 0; k < x.length; k++) points.push(px(xaxis.x(x[k])) + ',' + px(yaxis.y(y[k])));
-      out.push('<path d="M' + px(xaxis.x(x[0])) + ',' + base + 'L' + points.join('L') + 'L' +
-        px(xaxis.x(x[x.length - 1])) + ',' + base + 'Z" fill="' + model.colors[i] + '" fill-opacity="' +
-        model.fillOpacity + '" stroke="' + model.colors[i] + '" stroke-width="1"/>');
+      if (hidden[i]) return;
+      var y = model.y[i], sx = [], sy = [], index = [];
+      for (var k = 0; k < x.length; k++) {
+        var xx = xaxis.x(tx(x[k])), yy = yaxis.y(y[k]);
+        if (!isFinite(xx) || !isFinite(yy)) continue;
+        sx.push(xx); sy.push(yy); index.push(k);
+      }
+      screen.push({ series: i, x: sx, y: sy, index: index });
+      if (sx.length < 2) return;
+      var points = sx.map(function (xx, k) { return px(xx) + ',' + px(sy[k]); });
+      var stroke = model.lineColor || model.colors[i];
+      out.push(model.fill ?
+        '<path d="M' + px(sx[0]) + ',' + base + 'L' + points.join('L') + 'L' + px(sx[sx.length - 1]) + ',' +
+          base + 'Z" fill="' + model.colors[i] + '" fill-opacity="' + model.fillOpacity + '" stroke="' + stroke +
+          '" stroke-width="' + model.lineWidth + '"/>' :
+        '<path d="M' + points.join('L') + '" fill="none" stroke="' + stroke + '" stroke-width="' +
+          model.lineWidth + '" stroke-linejoin="round"/>');
     });
     out.push('</svg>');
-    if (!exporting && extras) {
+    if (!exporting && extras && model.hoverMode === 'closest') {
+      extras.hover = function (mx, my) {
+        if (mx < left || mx > left + plotWidth || my < top || my > top + plotHeight) return null;
+        var best = null, bestDistance = 400;
+        screen.forEach(function (s) {
+          for (var k = 0; k < s.x.length; k++) {
+            var dx = s.x[k] - mx, dy = s.y[k] - my, d = dx * dx + dy * dy;
+            if (d < bestDistance) { bestDistance = d; best = { series: s.series, k: s.index[k] }; }
+          }
+        });
+        if (!best) return null;
+        var i = best.series;
+        return '<div class="cc-tip-title">' + swatch(model.colors[i]) + esc(model.namePrefix + model.series[i]) +
+          '</div><b>' + esc(model.hoverX) + ':</b> ' + formatAs(model.x[i][best.k], model.xFormat) + '<br><b>' +
+          esc(model.hoverY) + ':</b> ' + formatAs(model.y[i][best.k], model.yFormat);
+      };
+    } else if (!exporting && extras) {
       extras.hover = function (mx, my) {
         if (mx < left || mx > left + plotWidth || my < top || my > top + plotHeight) return null;
         var at = xlo + (mx - left) / plotWidth * (xhi - xlo), rows = [];
+        if (model.xLog) at = Math.pow(10, at);
         model.x.forEach(function (x, i) {
           if (hidden[i] || !x.length) return;
           var lo = 0, hi = x.length - 1;
           while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (x[mid] < at) lo = mid; else hi = mid; }
           var k = Math.abs(x[lo] - at) <= Math.abs(x[hi] - at) ? lo : hi;
           rows.push(swatch(model.colors[i]) + '<b>' + esc(model.namePrefix + model.series[i]) + ':</b> ' +
-            fixed(model.y[i][k], 2));
+            formatAs(model.y[i][k], model.yFormat));
         });
-        return rows.length ? '<div class="cc-tip-title">' + esc(model.xTitle) + ': ' + fixed(at, 2) + '</div>' +
-          '<b>' + esc(model.yTitle) + '</b><br>' + rows.join('<br>') : null;
+        return rows.length ? '<div class="cc-tip-title">' + esc(model.xTitle) + ': ' +
+          formatAs(at, model.xFormat) + '</div>' + '<b>' + esc(model.yTitle) + '</b><br>' + rows.join('<br>') : null;
       };
     }
     return out.join('');
@@ -708,7 +786,9 @@
         type: type, categories: categories, series: series,
         colors: arr(value.colors).map(color), categoryColors: categoryColors, values: values,
         percent: !!value.percent, format: value.format || 'integer', outline: value.outline ? color(value.outline) : '',
-        yTitle: value.y_title || '', legendTitle: value.legend_title || '',
+        outlineWidth: Number(value.outline_width) > 0 ? Number(value.outline_width) : 1,
+        counts: value.counts ? arr(value.counts).map(nums) : null,
+        xTitle: value.x_title || '', yTitle: value.y_title || '', legendTitle: value.legend_title || '',
         count: categoryColors ? categories.length : series.length
       };
     }
@@ -745,6 +825,12 @@
         x: arr(value.x).map(nums), y: arr(value.y).map(nums),
         xRange: range.length === 2 && range[1] > range[0] ? range : null,
         fillOpacity: isFinite(Number(value.fill_opacity)) ? Number(value.fill_opacity) : 0.5,
+        fill: value.fill !== false, xLog: !!value.x_log,
+        lineColor: value.line_color ? color(value.line_color) : '',
+        lineWidth: Number(value.line_width) > 0 ? Number(value.line_width) : 1,
+        hoverMode: value.hover || 'x', hoverX: value.hover_x || value.x_title || '',
+        hoverY: value.hover_y || value.y_title || '',
+        xFormat: value.x_format == null ? 2 : value.x_format, yFormat: value.y_format == null ? 2 : value.y_format,
         xTitle: value.x_title || '', yTitle: value.y_title || '',
         legendTitle: value.legend_title || '', namePrefix: value.name_prefix || '', count: names.length
       };
@@ -777,7 +863,8 @@
         trend: trend, count: n
       };
     }
-    return { type: 'empty', count: 0 };
+    // An empty chart may say why it is empty.
+    return { type: 'empty', count: 0, message: value && value.message ? String(value.message) : '' };
   }
 
   // Whole chart markup for a plot area of width x height. `extras` receives a
@@ -842,7 +929,8 @@
     state.tips = [];
     var model = state.model;
     if (!state.count) {
-      el.innerHTML = '<div class="cc-empty">No cells to display.</div>';
+      el.innerHTML = '<div class="cc-empty">' +
+        esc(model.message || 'No cells to display.').replace(/\n/g, '<br>') + '</div>';
       return true;
     }
     var legend = el.querySelector('.cc-legend');
@@ -1163,6 +1251,7 @@
     chartSvg: chartSvg,
     exportSvg: exportSvg,
     ticks: ticks,
+    logTicks: logTicks,
     fixed: fixed,
     render: render
   };

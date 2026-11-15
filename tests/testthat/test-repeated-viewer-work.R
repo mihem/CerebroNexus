@@ -54,10 +54,11 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
       }
     },
     {
+      ## Chain and clone call not bound yet: they stand at the values the
+      ## toolbar binds them with ("both", "gene").
       session$setInputs(
         ir_tabs = "Diversity",
         ir_groupBy = "severity",
-        ir_chain = "both",
         ir_p_sd_threshold = 1
       )
       profile <- ir_size_distribution_profile()
@@ -65,10 +66,13 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
       expect_equal(counters$preparations, 1L)
       expect_null(profile$clone_counts)
       expect_identical(rownames(profile$profile), c("high", "low"))
+      ## Neither the chain binding at the value it stood at nor a clone call
+      ## (the profiles count the strict clones) prepares them again.
       for (tab in c("Homeostasis", "Abundance", "Diversity")) {
         session$setInputs(
           ir_tabs = tab,
-          ir_cloneCall = "aa",
+          ir_chain = "both",
+          ir_cloneCall = if (identical(tab, "Abundance")) "nt" else "aa",
           ir_p_sd_method = "average"
         )
         expect_identical(ir_size_distribution_profile(), profile)

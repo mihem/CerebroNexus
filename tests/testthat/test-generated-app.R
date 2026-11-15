@@ -67,6 +67,27 @@ generated_app_expected_content_pages <- function(expected) {
   )))
 }
 
+## A chart drawn by www/cerebro-charts.js, as SVG, from a `type` model with at
+## least one series holding a point (the plotly check it replaces asked for a
+## trace with x values). Not a drawn <path>: a series with a single point (a
+## sample whose clones all have one size, as in these fixtures) has no line,
+## as geom_line() drew none either.
+.generated_app_e2e_wait_chart <- function(id, type = "lines", timeout = 60000) {
+  generated_app_e2e_driver()$wait_for_js(
+    paste0(
+      "(function(){var el=document.getElementById(",
+      .generated_app_e2e_js_value(id),
+      ");var state=el&&el.__cerebroChart;var model=state&&state.model;",
+      "return !!(model&&model.type===",
+      .generated_app_e2e_js_value(type),
+      "&&state.count>0&&model.x.some(function(x){return x.length>0;})",
+      "&&el.querySelector('.cc-plot > svg.cc-svg'));})()"
+    ),
+    timeout = timeout
+  )
+  invisible(id)
+}
+
 .generated_app_e2e_dom_text <- function(id, contains, timeout = 60000) {
   id_js <- .generated_app_e2e_js_value(id)
   contains_js <- .generated_app_e2e_js_value(as.list(as.character(contains)))
@@ -812,7 +833,7 @@ test_that("TCR and HLA fixture renders repertoire data and stored typing", {
   .generated_app_e2e_click_inner_tab("ir_tabs", "Abundance")
   expect_match(.generated_app_e2e_select_text("ir_chain"), "TRB", fixed = TRUE)
   generated_app_e2e_set_input("ir_chain", "TRB")
-  generated_app_e2e_wait_plotly("ir_plot_clonalAbundance")
+  .generated_app_e2e_wait_chart("ir_plot_clonalAbundance")
 
   generated_app_e2e_activate_tab("hla_tcr_motifs")
   .generated_app_e2e_click_inner_tab("hla_tabs", "Data & QC")
@@ -855,7 +876,7 @@ test_that("BCR-only fixture renders IGH repertoire without an HLA page", {
   .generated_app_e2e_click_inner_tab("ir_tabs", "Abundance")
   expect_match(.generated_app_e2e_select_text("ir_chain"), "IGH", fixed = TRUE)
   expect_identical(generated_app_e2e_value("input", "ir_chain"), "both")
-  generated_app_e2e_wait_plotly("ir_plot_clonalAbundance")
+  .generated_app_e2e_wait_chart("ir_plot_clonalAbundance")
   generated_app_e2e_expect_clean_browser()
 })
 

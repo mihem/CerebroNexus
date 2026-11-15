@@ -10,14 +10,42 @@ test_that("one table names the sub-tabs for the Builder and the Viewer", {
   expect_identical(tabs$id[[1L]], "Clonal UMAP")
   expect_identical(tabs$label[[1L]], "Clonal projection")
   expect_identical(tabs$id[tabs$min_samples > 1L], c("Compare", "SizeDist"))
-  ## The Viewer builds one tab for each of them.
+  ## The Viewer builds one tab for each of them: the Clonal projection as a
+  ## plain tabPanel (its view lives in UI.R), every other one through
+  ## ir_tab_panel(), whose body is drawn later into an output of its own.
   viz <- paste(
     readLines(viewer_test_path("immune_repertoire", "visualizations.R")),
     collapse = "\n"
   )
-  for (id in tabs$id) {
-    expect_match(viz, paste0('"', id, '" = tabPanel('), fixed = TRUE)
+  expect_match(viz, '"Clonal UMAP" = tabPanel(', fixed = TRUE)
+  lazy <- setdiff(tabs$id, "Clonal UMAP")
+  for (id in lazy) {
+    expect_match(
+      viz,
+      paste0('"', id, '" = ir_tab_panel("', id, '")'),
+      fixed = TRUE
+    )
   }
+  scope <- new.env(parent = asNamespace("shiny"))
+  viewer_server_load(
+    viewer_server_statements("immune_repertoire", "visualizations.R"),
+    scope,
+    names = c("IR_TAB_BODY_OUTPUTS", "ir_tab_panel", "ir_tab_body")
+  )
+  ## Each such tab has a body output, a tab panel that holds it and a body.
+  expect_identical(names(scope$IR_TAB_BODY_OUTPUTS), lazy)
+  expect_false(anyDuplicated(scope$IR_TAB_BODY_OUTPUTS) > 0L)
+  for (id in lazy) {
+    panel <- scope$ir_tab_panel(id)
+    expect_identical(panel$attribs$`data-value`, id)
+    expect_match(
+      as.character(panel),
+      paste0('id="', scope$IR_TAB_BODY_OUTPUTS[[id]], '"'),
+      fixed = TRUE
+    )
+  }
+  body_arms <- names(as.list(body(scope$ir_tab_body)[[2L]]))[-(1:2)]
+  expect_identical(body_arms, lazy)
 
   expect_identical(viewerImmuneRepertoireTabSelection(NULL), all_ir_tabs)
   expect_identical(
@@ -220,7 +248,11 @@ test_that("the App's tab strip shows only the kept sub-tabs", {
         viewer_server_load(
           viz,
           scope,
-          names = c("ir_fill_plot", "output$ir_visualizations_UI")
+          names = c(
+            "IR_TAB_BODY_OUTPUTS",
+            "ir_tab_panel",
+            "output$ir_visualizations_UI"
+          )
         )
       },
       {
@@ -231,7 +263,10 @@ test_that("the App's tab strip shows only the kept sub-tabs", {
             html,
             gregexpr('(?<=data-value=")[^"]+', html, perl = TRUE)
           )[[1L]]),
-          default = shiny::isolate(ir_default_tab())
+          default = shiny::isolate(ir_default_tab()),
+          ## The bodies are drawn into outputs of their own, later: no plot
+          ## output (nor plotly.js) comes with the strip.
+          plots = grepl("ir_plot_", html, fixed = TRUE)
         )
       }
     )
@@ -241,6 +276,7 @@ test_that("the App's tab strip shows only the kept sub-tabs", {
   every <- strip(NULL, 3L)
   expect_identical(every$tabs, all_ir_tabs)
   expect_identical(every$default, "Clonal UMAP")
+  expect_false(every$plots)
   expect_identical(strip(NULL, 1L)$tabs, all_ir_tabs[1:7])
 
   kept <- strip(c("Abundance", "Clone Sharing", "Compare"), 3L)

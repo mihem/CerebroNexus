@@ -697,21 +697,63 @@ ir_sharing_unit_choices <- reactive({
 
 
 ## ---- Reactive: parameters --------------------------------------------- ##
-ir_params <- reactive({
-  gb <- input$ir_groupBy
-  if (is.null(gb) || gb == "") {
-    gb <- NULL
+## Clone call, chain and grouping as the plots read them. The toolbar binds
+## these controls only once it is rebuilt for a tab that shows them (Clonal
+## projection hides them), so until a control has bound it stands at the value
+## the toolbar binds it with (settings.R: "gene", "both", None): a tab opened
+## from Clonal projection draws at once. The value is published only when it
+## changes, so that binding, of the same value, re-runs nothing.
+ir_params <- local({
+  resolve <- function() {
+    bound <- isolate(names(input))
+    control <- function(id, default) {
+      value <- input[[id]]
+      if (is.null(value) && !id %in% bound) default else value
+    }
+    gb <- control("ir_groupBy", "")
+    if (is.null(gb) || gb == "") {
+      gb <- NULL
+    }
+    list(
+      cloneCall = control("ir_cloneCall", "gene"),
+      chain = control("ir_chain", "both"),
+      groupBy = gb
+    )
   }
-  list(
-    cloneCall = input$ir_cloneCall,
-    chain = input$ir_chain,
-    groupBy = gb
+  params <- reactiveVal(isolate(resolve()))
+  observe(
+    {
+      value <- resolve()
+      if (!identical(isolate(params()), value)) {
+        params(value)
+      }
+    },
+    priority = 1000
   )
+  params
+})
+
+## Chain and grouping of ir_params() alone, for what the clone call does not
+## change (the SizeDist profiles, Clone Sharing): published only when one of
+## them changes, so a new clone call re-runs neither.
+ir_chain_groupBy <- local({
+  pick <- function() ir_params()[c("chain", "groupBy")]
+  value <- reactiveVal(isolate(pick()))
+  observe(
+    {
+      picked <- pick()
+      if (!identical(isolate(value()), picked)) {
+        value(picked)
+      }
+    },
+    priority = 999
+  )
+  value
 })
 
 ## ---- Resolve chain: for functions that don't accept "both" ------------ ##
 specific_chain <- reactive({
-  ch <- input$ir_chain
+  ch <- ir_chain_groupBy()$chain
   if (is.null(ch) || ch == "both") {
     chains <- ir_encoded()$chains
     if ("TRB" %in% chains) {
@@ -1310,11 +1352,13 @@ ir_clone_size_profiles <- function(
 
 ir_size_distribution_profile <- reactive({
   encoded <- ir_encoded()
-  chain <- req(input$ir_chain)
+  ## Not the clone call: the profiles count the strict clones.
+  pars <- ir_chain_groupBy()
+  chain <- req(pars$chain)
   profiles <- ir_clone_size_profiles(
     encoded,
     chain,
-    ir_row_values(encoded, ir_param("ir_groupBy", NULL)),
+    ir_row_values(encoded, pars$groupBy),
     ir_param("ir_p_sd_threshold", 1)
   )
   # Keep just the current compact matrix, not the large named clone counts.
@@ -1500,114 +1544,37 @@ ir_clonal_umap_data <- function(
   ) {
     max_background <- 100000L
   }
-  visible_indices <- seq_len(nrow(coords))
   ## `cells` are canonical (metadata) rows (ir_umap_cells_to_show()), the
-  ## rows of the canonical coordinates.
-  if (!is.null(cells)) {
-    visible_indices <- visible_indices[visible_indices %in% cells]
-    if (!length(visible_indices)) {
-      return(NULL)
-    }
-  }
-
-  clone <- encoded$clones[[clone_col]]$both
-  blank <- encoded$blank[[clone_col]]
-  bit <- if (identical(receptor, "BCR")) 2L else 1L
-  rows <- which(
-    bitwAnd(encoded$receptor, bit) > 0L &
-      !is.na(clone) &
-      (is.na(blank) | clone != blank) &
-      !is.na(encoded$cell)
+  ## rows of the canonical coordinates. The cells are chosen in encode.R
+  ## (ir_clonal_frame_cells()), where the Viewer Pack builder chooses the
+  ## default frame's.
+  frame <- ir_clonal_frame_cells(
+    encoded,
+    receptor,
+    clone_col,
+    nrow(coords),
+    IR_CLONE_BINS,
+    cells = cells,
+    show_all = show_all,
+    percentage = percentage,
+    max_background = max_background
   )
-  rows <- rows[!duplicated(encoded$cell[rows])]
-  coord_index <- encoded$cell[rows]
-  clones <- clone[rows]
-  # Display filters and sampling must not redefine the biological clone size.
-  size <- if (length(clones) && min(clones) >= 1L) {
-    ## Clone ids are 1..n_clones: count them in place.
-    tabulate(clones, nbins = max(clones))[clones]
-  } else {
-    tabulate(match(clones, unique(clones)))[match(clones, unique(clones))]
+  if (is.null(frame)) {
+    return(NULL)
   }
-  expansion_code <- findInterval(size, IR_CLONE_BINS, left.open = TRUE)
-  ## Every row is visible unless `cells` narrows them (a lookup of each
-  ## receptor cell in a million-long index otherwise).
-  valid <- coord_index <= nrow(coords)
-  if (!is.null(cells)) {
-    valid <- valid & coord_index %in% visible_indices
-  }
-  coord_index <- coord_index[valid]
-  has_receptor <- length(coord_index) > 0L
-  if (!has_receptor) {
-    # No receptor cells. With show_all we can still draw the grey background;
-    # otherwise there is nothing to plot.
-    if (!isTRUE(show_all)) {
-      return(NULL)
-    }
-    expansion <- factor(levels = IR_CLONE_LABELS)
-  } else {
-    expansion <- factor(
-      expansion_code[valid],
+  coord_index <- idx <- frame$coloured
+  bg_idx <- frame$background
+  expansion <- if (length(coord_index)) {
+    factor(
+      frame$code,
       levels = seq_along(IR_CLONE_LABELS),
       labels = IR_CLONE_LABELS
     )
-  }
-  receptor_indices <- unique(coord_index)
-
-  # Coloured layer: receptor cells with an expansion level, joined to coords.
-  if (has_receptor) {
-    idx <- coord_index
-    keep_n <- min(length(idx), ceiling(length(idx) * percentage / 100))
-    if (keep_n < length(idx)) {
-      keep <- if (keep_n > 0L) {
-        unique(as.integer(round(seq(1, length(idx), length.out = keep_n))))
-      } else {
-        integer()
-      }
-      coord_index <- coord_index[keep]
-      expansion <- expansion[keep]
-      idx <- idx[keep]
-    }
   } else {
-    idx <- integer(0)
-  }
-  if (length(idx) == 0 && !isTRUE(show_all)) {
-    return(NULL)
+    factor(levels = IR_CLONE_LABELS)
   }
   coord_x <- if (is.data.frame(coords)) coords[[1L]] else coords[, 1L]
   coord_y <- if (is.data.frame(coords)) coords[[2L]] else coords[, 2L]
-  # Background layer: every other cell in the projection, expansion = NA, so the
-  # renderer can draw them in grey. Only when show_all is requested.
-  bg_idx <- integer()
-  if (isTRUE(show_all)) {
-    bg_mask <- if (is.null(cells)) {
-      rep(TRUE, nrow(coords))
-    } else {
-      mask <- rep(FALSE, nrow(coords))
-      mask[visible_indices] <- TRUE
-      mask
-    }
-    bg_mask[receptor_indices] <- FALSE
-    if (any(bg_mask)) {
-      bg_idx <- which(bg_mask)
-      target <- min(
-        length(bg_idx),
-        ceiling(length(bg_idx) * percentage / 100),
-        as.integer(max_background)
-      )
-      if (target < length(bg_idx)) {
-        keep <- if (target > 0L) {
-          unique(as.integer(round(seq(1, length(bg_idx), length.out = target))))
-        } else {
-          integer()
-        }
-        bg_idx <- bg_idx[keep]
-      }
-    }
-  }
-  if (length(bg_idx) + length(idx) == 0L) {
-    return(NULL)
-  }
   if (isTRUE(split_output)) {
     expansion_codes <- as.integer(expansion)
     visible_expansions <- sort(unique(expansion_codes))
@@ -1651,6 +1618,132 @@ ir_clonal_umap_data <- function(
   )
 }
 
+
+## The default Clonal projection frame of `receptor` as the Viewer Pack stores
+## it (R/viewer_pack.R, .viewerPackImmuneClonalFrames()): its canonical rows in
+## the order they are painted and each row's trace, in two files beside the
+## projection's coordinates. The frame then names these files instead of
+## carrying the coordinates and rows, and needs no encoded repertoire. NULL
+## when the Pack has no valid frame of `receptor` (a Pack built before them),
+## the projection no 2-D Pack asset, the frame is small, or the browser failed
+## to read one of the files (`failed`, its URL): the frame is built as before.
+## The default frame only: every cell (no Group filter), "Show all cells",
+## 100 % of cells and clone call "gene"; the caller checks those.
+ir_clonal_frame_resource <- function(projection, receptor, failed = NULL) {
+  pack <- viewerPackCurrent()
+  if (
+    !viewerPackCanonical(pack) ||
+      !isTRUE(
+        projection %in%
+          tryCatch(availableProjections(), error = function(e) character())
+      )
+  ) {
+    return(NULL)
+  }
+  frame <- viewerPackImmuneClonalFrame(
+    pack,
+    receptor,
+    "CTgene",
+    version = IR_CLONAL_FRAME_VERSION,
+    bins = IR_CLONE_BINS,
+    max_background = 100000L
+  )
+  ## A small frame goes in one message with its cell names (see
+  ## cerebroCellViewRender()).
+  if (is.null(frame) || frame$cells < 4096L) {
+    return(NULL)
+  }
+  geometry <- viewerProjectionAsset(projection)
+  if (!is.list(geometry) || !identical(as.integer(geometry$dimensions), 2L)) {
+    return(NULL)
+  }
+  prefix <- viewerStaticResourcePrefix(
+    "immune-clonal",
+    dirname(frame$codes$file)
+  )
+  url <- function(asset) paste0(prefix, "/", basename(asset$file))
+  traces <- ifelse(
+    frame$trace_codes == 0L,
+    "Other cells",
+    IR_CLONE_LABELS[pmax(frame$trace_codes, 1L)]
+  )
+  canonical_cells <- as.integer(pack$cell_count)
+  ## The Trajectory page's frame descriptor (viewerTrajectoryFrameAsset() in
+  ## shiny_server.R), which the browser draws from a canonical projection, the
+  ## subset of its rows and one code per row.
+  resource <- c(
+    list(
+      protocol = "trajectory-frame-v1",
+      cells = frame$cells,
+      canonical_cells = canonical_cells,
+      geometry_kind = "canonical_projection",
+      projection = geometry,
+      subset = list(
+        protocol = "canonical-subset-v1",
+        kind = "include_uint32",
+        canonical_cells = canonical_cells,
+        cells = frame$cells,
+        index_base = 0L,
+        dtype = "uint32",
+        bytes = frame$subset$bytes,
+        checksum = frame$subset$checksum,
+        url = url(frame$subset)
+      ),
+      state = list(
+        url = url(frame$codes),
+        cells = frame$cells,
+        dtype = "uint8",
+        bytes = frame$codes$bytes,
+        checksum = frame$codes$checksum,
+        levels = I(traces)
+      )
+    ),
+    viewerCanonicalResourceIdentity(pack)
+  )
+  if (
+    length(failed) == 1L &&
+      !is.na(failed) &&
+      failed %in% c(geometry$url, resource$subset$url, resource$state$url)
+  ) {
+    return(NULL)
+  }
+  list(
+    resource = resource,
+    traces = traces,
+    colors = ifelse(
+      traces == "Other cells",
+      "#D9D9D9",
+      unname(IR_EXPANSION_COLORS[traces])
+    ),
+    cells = frame$cells,
+    subset_file = frame$subset$file
+  )
+}
+
+## The canonical rows (0-based, in frame order) of a Viewer Pack Clonal
+## projection frame (ir_clonal_frame_resource()), read from its subset file.
+ir_clonal_frame_rows <- function(frame) {
+  rows <- tryCatch(
+    readBin(
+      frame$subset_file,
+      "integer",
+      n = frame$cells,
+      size = 4L,
+      endian = "little"
+    ),
+    error = function(error) NULL
+  )
+  cells <- tryCatch(viewerPackCurrent()$cell_count, error = function(e) NULL)
+  if (
+    length(rows) != frame$cells ||
+      anyNA(rows) ||
+      !is.numeric(cells) ||
+      any(rows < 0L | rows >= cells)
+  ) {
+    return(NULL)
+  }
+  rows
+}
 
 ## The cell names of a Clonal UMAP frame's canonical rows.
 ir_clonal_umap_barcodes <- function(data) {

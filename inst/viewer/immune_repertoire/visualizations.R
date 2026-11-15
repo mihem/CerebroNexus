@@ -20,14 +20,28 @@ ir_fill_plot <- function(
   id,
   spinner = TRUE,
   plotly = FALSE,
-  height = NULL
+  height = NULL,
+  chart = FALSE
 ) {
   # height = NULL (the common case) -> fill the viewport via the shared
   # `.cerebro-fill` mechanism. An explicit height is for the faceted plots that
   # are DELIBERATELY tall (one panel per sample) and meant to scroll; those are
   # rendered as-is, never fill'd.
   fill <- is.null(height)
-  plot <- if (plotly) {
+  plot <- if (chart) {
+    # A chart drawn in the browser (www/cerebro-charts.js, no plotly.js). It
+    # reports its size (req_plot_space()) as a widget does, and fills the
+    # spinner container the way the CSS lays a widget over it.
+    shiny::tagAppendAttributes(
+      cerebroChartOutput(id),
+      class = "shiny-report-size",
+      style = if (fill && spinner) {
+        "position: absolute; top: 0; left: 0; right: 0; bottom: 0; height: 100%;"
+      } else {
+        paste0("height: ", if (fill) "100%" else validateCssUnit(height), ";")
+      }
+    )
+  } else if (plotly) {
     plotly::plotlyOutput(id, height = if (fill) "100%" else height)
   } else {
     plotOutput(id, height = if (fill) "100%" else height)
@@ -36,6 +50,42 @@ ir_fill_plot <- function(
     plot <- shinycssloaders::withSpinner(plot)
   }
   if (fill) tags$div(class = "cerebro-fill", plot) else plot
+}
+
+## ---- Sub-tab bodies --------------------------------------------------- ##
+## A sub-tab's body (its plot output and spinner) is drawn into an output of
+## its own instead of being sent with the tab strip: plotlyOutput() sends
+## plotly.js with the page, and the Clonal projection, the landing tab, draws
+## with neither. Clonal projection has no body here (the cell view in UI.R).
+IR_TAB_BODY_OUTPUTS <- c(
+  "Abundance" = "ir_tab_body_abundance",
+  "Diversity" = "ir_tab_body_diversity",
+  "Homeostasis" = "ir_tab_body_homeostasis",
+  "Isotype" = "ir_tab_body_isotype",
+  "Paired Scatter" = "ir_tab_body_paired_scatter",
+  "Clone Sharing" = "ir_tab_body_clone_sharing",
+  "Compare" = "ir_tab_body_compare",
+  "SizeDist" = "ir_tab_body_size_dist"
+)
+
+ir_tab_panel <- function(tab) {
+  tabPanel(tab, uiOutput(IR_TAB_BODY_OUTPUTS[[tab]]))
+}
+
+ir_tab_body <- function(tab) {
+  switch(
+    tab,
+    "Abundance" = ir_fill_plot("ir_plot_clonalAbundance", chart = TRUE),
+    "Diversity" = ir_fill_plot("ir_plot_clonalDiversity", plotly = TRUE),
+    "Homeostasis" = ir_fill_plot("ir_plot_clonalHomeostasis", chart = TRUE),
+    "Isotype" = ir_fill_plot("ir_plot_isotype", chart = TRUE),
+    "Paired Scatter" = shinycssloaders::withSpinner(uiOutput(
+      "ir_ui_pairedScatter"
+    )),
+    "Clone Sharing" = ir_fill_plot("ir_plot_cloneSharing", plotly = TRUE),
+    "Compare" = ir_fill_plot("ir_plot_clonalCompare", plotly = TRUE),
+    "SizeDist" = ir_fill_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
+  )
 }
 
 ## ---- Visualizations UI ------------------------------------------------ ##
@@ -64,40 +114,14 @@ output$ir_visualizations_UI <- renderUI({
       value = "Clonal UMAP"
       # Drawn by the shared cell-view host in UI.R, grouped or not.
     ),
-    "Abundance" = tabPanel(
-      "Abundance",
-      ir_fill_plot("ir_plot_clonalAbundance", plotly = TRUE)
-    ),
-    "Diversity" = tabPanel(
-      "Diversity",
-      ir_fill_plot("ir_plot_clonalDiversity", plotly = TRUE)
-    ),
-    "Homeostasis" = tabPanel(
-      "Homeostasis",
-      ir_fill_plot("ir_plot_clonalHomeostasis", plotly = TRUE)
-    ),
-    "Isotype" = tabPanel(
-      "Isotype",
-      ir_fill_plot("ir_plot_isotype", plotly = TRUE)
-    ),
-    "Paired Scatter" = tabPanel(
-      "Paired Scatter",
-      shinycssloaders::withSpinner(uiOutput(
-        "ir_ui_pairedScatter"
-      ))
-    ),
-    "Clone Sharing" = tabPanel(
-      "Clone Sharing",
-      ir_fill_plot("ir_plot_cloneSharing", plotly = TRUE)
-    ),
-    "Compare" = tabPanel(
-      "Compare",
-      ir_fill_plot("ir_plot_clonalCompare", plotly = TRUE)
-    ),
-    "SizeDist" = tabPanel(
-      "SizeDist",
-      ir_fill_plot("ir_plot_clonalSizeDistribution", plotly = TRUE)
-    )
+    "Abundance" = ir_tab_panel("Abundance"),
+    "Diversity" = ir_tab_panel("Diversity"),
+    "Homeostasis" = ir_tab_panel("Homeostasis"),
+    "Isotype" = ir_tab_panel("Isotype"),
+    "Paired Scatter" = ir_tab_panel("Paired Scatter"),
+    "Clone Sharing" = ir_tab_panel("Clone Sharing"),
+    "Compare" = ir_tab_panel("Compare"),
+    "SizeDist" = ir_tab_panel("SizeDist")
   )
   tabs <- unname(tabs[ir_visible_tabs()])
 
@@ -119,6 +143,64 @@ output$ir_visualizations_UI <- renderUI({
     ),
     class = "cerebro-analysis-tabs"
   )
+})
+
+## A body is drawn when its tab is selected (or is the tab the strip opens
+## on), and every body once the strip is in the browser and the session has
+## had no input for a moment, so that the first switch finds its body there.
+## The body outputs are not suspended while hidden: a body is drawn ahead of
+## its tab, and in the same flush as the selection that asks for it. Each
+## depends on its own flag only, which never goes back, so a body is drawn once
+## and never again (that would put a new, empty plot in its place).
+ir_tab_body_wanted <- lapply(IR_TAB_BODY_OUTPUTS, function(id) {
+  reactiveVal(FALSE)
+})
+invisible(lapply(names(IR_TAB_BODY_OUTPUTS), function(tab) {
+  id <- IR_TAB_BODY_OUTPUTS[[tab]]
+  wanted <- ir_tab_body_wanted[[tab]]
+  output[[id]] <- renderUI({
+    req(wanted())
+    ir_tab_body(tab)
+  })
+  outputOptions(output, id, suspendWhenHidden = FALSE)
+}))
+
+observe(
+  {
+    tab <- ir_tab()
+    if (length(tab) == 1L && tab %in% names(ir_tab_body_wanted)) {
+      ir_tab_body_wanted[[tab]](TRUE)
+    }
+  },
+  priority = 900
+)
+
+## Quiet: no input from the browser (a click, or a view asking for its next
+## frame) for IR_TAB_BODY_QUIET seconds, as the session's own idle tasks
+## (shiny_server.R) count it, so the bodies (and plotly.js) do not compete
+## with the Clonal projection while it loads.
+IR_TAB_BODY_QUIET <- 2
+local({
+  last_input <- Sys.time()
+  if (is.function(session$onInputReceived)) {
+    session$onInputReceived(function(...) {
+      last_input <<- Sys.time()
+      invisible(NULL)
+    })
+  }
+  prefetch <- observe({
+    ## the strip has reached the browser, on its landing tab or a later one
+    req(input$ir_tabs)
+    quiet <- as.numeric(difftime(Sys.time(), last_input, units = "secs"))
+    if (quiet < IR_TAB_BODY_QUIET) {
+      invalidateLater(ceiling((IR_TAB_BODY_QUIET - quiet) * 1000) + 50)
+      return()
+    }
+    for (wanted in ir_tab_body_wanted) {
+      wanted(TRUE)
+    }
+    prefetch$destroy()
+  })
 })
 
 ##------------------------------------------------------------------------##
@@ -221,6 +303,74 @@ ir_empty_plotly <- function(msg) {
         font = list(size = 14, color = "#666666")
       )
     )
+}
+
+## ---- Charts drawn in the browser ---------------------------------------- ##
+## Abundance (lines), Homeostasis and Isotype (stacked bars) go to
+## www/cerebro-charts.js as small columnar payloads (renderCerebroChart())
+## instead of plotly figures: plotly.js spent about a second drawing one trace
+## and legend entry per sample of a large repertoire, on top of plotly_build()
+## and the widget JSON here. The chart keeps hover, legend toggles and SVG/PNG
+## downloads.
+
+## An empty chart that says why it is empty.
+ir_chart_message <- function(msg) {
+  list(type = "empty", message = msg)
+}
+
+## The chart `expr` builds; when it fails, the message of the error figure
+## safeRenderPlot() makes (which also marks the result as not to be cached).
+## validate()/req() keep their usual placeholder.
+ir_render_chart <- function(expr, plot_name) {
+  chart <- safeRenderPlot(expr, plot_name)
+  if (inherits(chart, "ggplot")) {
+    label <- tryCatch(
+      as.character(ggplot2::layer_data(chart)$label),
+      error = function(e) character()
+    )
+    return(ir_chart_message(
+      if (length(label) == 1L) {
+        label
+      } else {
+        "This plot is not available for the current view."
+      }
+    ))
+  }
+  chart
+}
+
+## Stacked bars, one per category, each scaled to 1 (ggplot's position =
+## "fill"). `values` is a series-by-category matrix; `counts` adds the counts
+## to the hover.
+ir_fill_bar_chart <- function(
+  values,
+  categories,
+  series,
+  colors,
+  x_title,
+  y_title,
+  legend_title,
+  outline,
+  outline_width,
+  counts = FALSE
+) {
+  totals <- colSums(values)
+  shares <- values / rep(ifelse(totals > 0, totals, 1), each = nrow(values))
+  row <- function(m) lapply(seq_len(nrow(m)), function(i) I(unname(m[i, ])))
+  list(
+    type = "bar",
+    categories = I(as.character(categories)),
+    series = I(as.character(series)),
+    colors = I(unname(colors)),
+    values = row(signif(shares, 6)),
+    counts = if (isTRUE(counts)) row(values),
+    percent = TRUE,
+    outline = outline,
+    outline_width = outline_width,
+    x_title = x_title,
+    y_title = y_title,
+    legend_title = legend_title
+  )
 }
 
 ir_umap_grouped_data <- function(df, group_by) {
@@ -585,6 +735,21 @@ observe(
       percentage = percentage,
       group_by = if (grouped) as.character(group_by) else ""
     )
+    ## The default frame from the Viewer Pack's files (data.R,
+    ## ir_clonal_frame_resource()): the browser masks the hover of a frame
+    ## drawn from per-row codes by trace, as for one sent in traces (Ren: the
+    ## same pixels, legend and hover, 5.1 MB less over the websocket). A file
+    ## the browser could not read draws the frame from R; the option
+    ## cerebro.viewer.ir_clonal_frame_resource = FALSE always does.
+    pack_frame <- !isFALSE(getOption(
+      "cerebro.viewer.ir_clonal_frame_resource",
+      TRUE
+    ))
+    if (pack_frame) {
+      request_signature$resource_failed <- as.character(
+        input[["ir_clonalUMAP_projection_projection_resource_failed"]] %||% ""
+      )
+    }
     previous_signature <- ir_clonal_umap_last_request()
     if (identical(previous_signature, request_signature)) {
       return()
@@ -676,6 +841,91 @@ observe(
       ir_clonal_umap_drawn_appearance(list(
         grouped = TRUE,
         values = isolate(ir_clonal_umap_appearance(TRUE))
+      ))
+      return()
+    }
+    full_percentage <- suppressWarnings(as.numeric(percentage))
+    full_percentage <- length(full_percentage) != 1L ||
+      !is.finite(full_percentage) ||
+      full_percentage >= 100
+    frame_resource <- if (
+      pack_frame && show_all && is.null(cells) && full_percentage
+    ) {
+      tryCatch(
+        ir_clonal_frame_resource(
+          projection,
+          receptor,
+          failed = request_signature$resource_failed
+        ),
+        error = function(e) NULL
+      )
+    }
+    if (is.list(frame_resource)) {
+      traces <- frame_resource$traces
+      deferred_aux <- function() {
+        rows <- ir_clonal_frame_rows(frame_resource)
+        req(!is.null(rows))
+        names_resource <- viewerCellNamesResourceFor(rows + 1L)
+        aux <- cerebroCellViewDeferredAux(
+          selection_rows = seq_along(rows),
+          cell_barcodes = if (is.null(names_resource)) {
+            barcodes <- ir_clonal_umap_barcodes(data.frame(
+              cell_index = rows + 1L
+            ))
+            req(length(barcodes) == length(rows))
+            barcodes
+          },
+          names_resource = names_resource,
+          cell_rows = rows + 1L,
+          ## The browser holds these rows as the frame's subset.
+          frame_rows = rows
+        )
+        ## As on the frame built here: the cell name and expansion level, none
+        ## for the grey background.
+        aux$hover <- list(
+          hoverinfo = as.list(ifelse(traces == "Other cells", "skip", "text"))
+        )
+        aux
+      }
+      isolate(
+        cerebroCellViewRender(
+          "ir_clonalUMAP_projection",
+          list(
+            color_type = "categorical",
+            space_label = paste(
+              "Clonal",
+              ir_projection_display_name(projection)
+            ),
+            traces = traces,
+            color_variable = "expansion",
+            appearance = list(
+              group_labels = isTRUE(group_labels),
+              draw_border = point_border,
+              keep_square = keep_square
+            )
+          ),
+          list(
+            trajectory_frame_resource = frame_resource$resource,
+            deferred_selection_lengths = frame_resource$cells,
+            color = as.list(frame_resource$colors),
+            point_size = point_size,
+            point_opacity = alpha,
+            point_line = if (point_border) {
+              list(color = "rgb(196,196,196)", width = 1)
+            } else {
+              list()
+            },
+            reset_axes = TRUE
+          ),
+          list(hoverinfo = "skip"),
+          deferred_aux = deferred_aux,
+          dataset_context = dataset_context
+        )
+      )
+      ir_clonal_umap_last_request(request_signature)
+      ir_clonal_umap_drawn_appearance(list(
+        grouped = FALSE,
+        values = display_values
       ))
       return()
     }
@@ -825,26 +1075,70 @@ viewerSelectionSummaryOutputs(
 )
 
 ## ---- BCR-specific renderers --------------------------------------------- ##
-output$ir_plot_isotype <- plotly::renderPlotly({
+## The isotype shares of every group (bcr_isotype_counts()), bars in the order
+## the groups first appear, the isotypes in class-switch order with the
+## colours bcr_isotype_plot() gives them; other isotypes are "NA".
+IR_ISOTYPES <- c(
+  "IGHM",
+  "IGHD",
+  "IGHG1",
+  "IGHG2",
+  "IGHG3",
+  "IGHG4",
+  "IGHA1",
+  "IGHA2",
+  "IGHE"
+)
+ir_isotype_chart <- function(iso, group_col) {
+  if (is.null(iso)) {
+    return(ir_chart_message(
+      "No BCR isotype data available. Requires BCR data with CTgene column."
+    ))
+  }
+  isotype <- as.character(iso$isotype)
+  isotype[!isotype %in% IR_ISOTYPES] <- "NA"
+  series <- c(IR_ISOTYPES, if ("NA" %in% isotype) "NA")
+  groups <- unique(as.character(iso[[group_col]]))
+  values <- matrix(0, length(series), length(groups))
+  s <- match(isotype, series)
+  g <- match(as.character(iso[[group_col]]), groups)
+  for (k in seq_along(s)) {
+    values[s[[k]], g[[k]]] <- values[s[[k]], g[[k]]] + iso$n[[k]]
+  }
+  ir_fill_bar_chart(
+    values,
+    groups,
+    series,
+    c(cerebro_group_colors(length(IR_ISOTYPES)), "#cccccc")[seq_along(series)],
+    x_title = group_col,
+    y_title = "Proportion",
+    legend_title = "Isotype",
+    outline = "#ffffff",
+    outline_width = 0.5,
+    counts = TRUE
+  )
+}
+
+output$ir_plot_isotype <- renderCerebroChart({
   req_plot_space("ir_plot_isotype")
   encoded <- ir_encoded()
   req(!is.null(encoded))
   gb <- ir_params()$groupBy
   group_col <- if (is.null(gb)) "sample" else gb
-  p <- bcr_isotype_plot(
-    encoded,
-    ir_row_values(encoded, group_col, joined = !is.null(gb)),
-    group_col = group_col
+  ir_render_chart(
+    ir_isotype_chart(
+      bcr_isotype_counts(
+        encoded,
+        ir_row_values(encoded, group_col, joined = !is.null(gb)),
+        group_col = group_col
+      ),
+      group_col
+    ),
+    "isotype"
   )
-  if (is.null(p)) {
-    return(ir_empty_plotly(
-      "No BCR isotype data available. Requires BCR data with CTgene column."
-    ))
-  }
-  ir_render_ggplotly(p, "isotype")
 }) %>%
   ## Isotypes come from CTgene alone: clone call and chain do not change them.
-  ir_bindCache(input$ir_groupBy)
+  ir_bindCache(ir_params()$groupBy)
 
 ## ---- Paired Scatter (generic) ------------------------------------------- ##
 ir_sample_meta <- reactive({
@@ -1357,14 +1651,14 @@ output$ir_plot_pairedScatter <- plotly::renderPlotly({
     )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
     input$ir_pair_compare,
     input$ir_pair_x_group,
     input$ir_pair_y_group,
-    input$ir_p_graph,
-    input$ir_p_dot_size
+    ir_param("ir_p_graph", "proportion"),
+    ir_param("ir_p_dot_size", "total")
   )
 
 ## Faceted paired scatter -> static patchwork grid (plotly cannot lay out the
@@ -1440,13 +1734,13 @@ output$ir_plot_pairedScatter_facet <- renderPlot({
   )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
     input$ir_pair_compare,
     input$ir_pair_facet,
-    input$ir_p_graph,
-    input$ir_p_dot_size
+    ir_param("ir_p_graph", "proportion"),
+    ir_param("ir_p_dot_size", "total")
   )
 
 ## Units in clonalAbundance()'s order: sorted, or with order.by = "alphanumeric"
@@ -1486,22 +1780,20 @@ ir_abundance_density <- function(counts, units) {
   })
 }
 
-ir_clonal_abundance_plotly <- function(
+## One line per unit on a log abundance axis, coloured as plot_ly(split =
+## ~sample, color = ~sample) would: Set2 (RColorBrewer::brewer.pal(max(n, 3),
+## "Set2")) interpolated over the units. Lines only, as clonalAbundance()
+## draws them; with `scale` the filled, scaled densities. Hover shows the
+## point nearest the pointer, as Plotly's did.
+ir_clonal_abundance_chart <- function(
   counts,
   scale = FALSE,
   order_by = NULL,
-  legend = "Samples",
-  prebuild = TRUE
+  legend = "Samples"
 ) {
   if (!nrow(counts)) {
-    return(ir_empty_plotly("No clonotypes are available for this selection."))
+    return(ir_chart_message("No clonotypes are available for this selection."))
   }
-  ## One line per unit, coloured as plot_ly(split = ~sample, color = ~sample)
-  ## would: Set2 (RColorBrewer::brewer.pal(max(n, 3), "Set2")) interpolated
-  ## over the units. Lines only, as clonalAbundance() draws them: a marker
-  ## attribute makes plotly add markers to the mode (19,000 more SVG points
-  ## on 187 samples, 0.2 s in the browser). Building the traces directly takes 0.2 s for 187 samples
-  ## instead of 1.4 s in plotly_build's attribute mapping.
   samples <- ir_abundance_units(counts$sample, order_by)
   set2 <- c(
     "#66C2A5",
@@ -1514,91 +1806,41 @@ ir_clonal_abundance_plotly <- function(
     "#B3B3B3"
   )
   palette <- set2[seq_len(min(max(length(samples), 3L), length(set2)))]
-  colours <- plotly::toRGB(scales::col_factor(palette, levels = samples)(
-    samples
-  ))
-  if (isTRUE(scale)) {
+  colours <- scales::col_factor(palette, levels = samples)(samples)
+  scale <- isTRUE(scale)
+  if (scale) {
     curves <- ir_abundance_density(counts, samples)
-    traces <- Map(
-      function(curve, sample, colour) {
-        list(
-          type = "scatter",
-          mode = "lines",
-          x = curve$x,
-          y = curve$y,
-          fill = "tozeroy",
-          fillcolor = plotly::toRGB(colour, 0.5),
-          line = list(color = "black", width = 0.5),
-          text = paste0(
-            "<b>",
-            sample,
-            "</b><br>Abundance: ",
-            formatC(curve$x, format = "g", digits = 3),
-            "<br>Scaled density: ",
-            formatC(curve$y, format = "f", digits = 3)
-          ),
-          hoverinfo = "text",
-          name = sample
-        )
-      },
-      curves,
-      samples,
-      colours
-    )
-    y_title <- "Density of clones"
+    x <- lapply(curves, function(curve) I(signif(curve$x, 6)))
+    y <- lapply(curves, function(curve) I(signif(curve$y, 4)))
   } else {
-    hover <- paste0(
-      "<b>",
-      counts$sample,
-      "</b><br>",
-      "Abundance: ",
-      formatC(counts$abundance, format = "d"),
-      "<br>",
-      "Clones: ",
-      formatC(counts$n_clones, format = "d")
-    )
     rows <- split(
       seq_len(nrow(counts)),
       factor(counts$sample, levels = samples)
     )
-    traces <- Map(
-      function(index, sample, colour) {
-        index <- index[order(counts$abundance[index])]
-        list(
-          type = "scatter",
-          mode = "lines",
-          x = counts$abundance[index],
-          y = counts$n_clones[index],
-          text = hover[index],
-          hoverinfo = "text",
-          name = sample,
-          line = list(color = colour)
-        )
-      },
-      rows,
-      samples,
-      colours
-    )
-    y_title <- "Number of clones"
+    rows <- lapply(rows, function(index) index[order(counts$abundance[index])])
+    x <- lapply(rows, function(index) I(as.numeric(counts$abundance[index])))
+    y <- lapply(rows, function(index) I(as.numeric(counts$n_clones[index])))
   }
-  plot <- plotly::plot_ly()
-  plot$x$attrs <- list()
-  plot$x$data <- unname(traces)
-  plot <- plot %>%
-    plotly::layout(
-      xaxis = cerebro_plotly_axis("Abundance", mirror = FALSE, type = "log"),
-      yaxis = cerebro_plotly_axis(
-        y_title,
-        mirror = FALSE,
-        rangemode = "tozero"
-      ),
-      hoverlabel = cerebro_plotly_hoverlabel(),
-      plot_bgcolor = cerebro_plotly_theme()$transparent,
-      paper_bgcolor = cerebro_plotly_theme()$transparent,
-      legend = list(title = list(text = legend))
-    )
-  plot <- cerebro_plotly_toolbar(plot)
-  if (prebuild) cerebro_plotly_prebuilt(plot) else plot
+  list(
+    type = "lines",
+    series = I(samples),
+    colors = I(unname(colours)),
+    x = unname(x),
+    y = unname(y),
+    x_title = "Abundance",
+    y_title = if (scale) "Density of clones" else "Number of clones",
+    x_log = TRUE,
+    fill = scale,
+    fill_opacity = 0.5,
+    line_color = if (scale) "#000000" else "",
+    line_width = if (scale) 0.5 else 2,
+    hover = "closest",
+    hover_x = "Abundance",
+    hover_y = if (scale) "Scaled density" else "Clones",
+    x_format = if (scale) "number" else "integer",
+    y_format = if (scale) 3L else "integer",
+    legend_title = legend
+  )
 }
 
 ## The clone-size histogram depends on the clones only; scale and order are
@@ -1609,18 +1851,19 @@ ir_abundance_counts <- reactive({
   ir_abundance_counts_for(pars, ir_encoded())
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy
   )
 
-output$ir_plot_clonalAbundance <- plotly::renderPlotly({
+output$ir_plot_clonalAbundance <- renderCerebroChart({
   req_plot_space("ir_plot_clonalAbundance")
   pars <- ir_params()
   ## Tab navigation can reach this output before renderUI has bound its
-  ## controls. Do not count clones for a NULL chain/cloneCall during that gap.
+  ## controls; ir_params() then holds the values they bind with. Never count
+  ## clones for a NULL chain/cloneCall.
   req(pars$chain, pars$cloneCall)
-  ir_clonal_abundance_plotly(
+  ir_clonal_abundance_chart(
     ir_abundance_counts(),
     scale = isTRUE(ir_param("ir_p_scale", FALSE)),
     order_by = ir_order_by(),
@@ -1628,11 +1871,11 @@ output$ir_plot_clonalAbundance <- plotly::renderPlotly({
   )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
-    input$ir_p_scale,
-    input$ir_p_order_by
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
+    isTRUE(ir_param("ir_p_scale", FALSE)),
+    ir_order_by()
   )
 
 ## Compare -> interactive alluvial. scRepertoire's ggalluvial output does not
@@ -1694,13 +1937,13 @@ output$ir_plot_clonalCompare <- plotly::renderPlotly({
   )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
     input$ir_compare_samples,
-    input$ir_p_top_clones,
-    input$ir_p_compare_prop,
-    input$ir_p_order_by
+    as.numeric(ir_param("ir_p_top_clones", 10)),
+    isTRUE(ir_param("ir_p_compare_prop", TRUE)),
+    ir_order_by()
   )
 
 ## The diversity plot as Plotly traces, without ggplotly: one box per x level
@@ -1963,16 +2206,38 @@ output$ir_plot_clonalDiversity <- plotly::renderPlotly({
   )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
-    input$ir_p_metric,
-    input$ir_p_x_axis,
-    input$ir_p_n_boots,
-    input$ir_p_order_by
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
+    ir_param("ir_p_metric", "shannon"),
+    ir_param("ir_p_x_axis", ""),
+    ir_param("ir_p_n_boots", 20),
+    ir_order_by()
   )
 
-output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
+## The clone-size shares of every unit as ir_homeostasis_plot() stacks them:
+## units sorted (or by order.by), the smallest clone group at the bottom, each
+## group in its hcl.colors() colour, outlined in black.
+ir_homeostasis_chart <- function(counts, clone_size, palette, order_by = NULL) {
+  mat <- ir_homeostasis_matrix(counts, clone_size)
+  if (!nrow(mat)) {
+    return(ir_chart_message("No clonotypes are available for this selection."))
+  }
+  units <- ir_abundance_units(rownames(mat), order_by)
+  ir_fill_bar_chart(
+    t(mat[units, , drop = FALSE]),
+    units,
+    colnames(mat),
+    grDevices::hcl.colors(ncol(mat), palette),
+    x_title = "Samples",
+    y_title = "Relative Abundance",
+    legend_title = "Clonal Group",
+    outline = "#000000",
+    outline_width = 0.5
+  )
+}
+
+output$ir_plot_clonalHomeostasis <- renderCerebroChart({
   req_plot_space("ir_plot_clonalHomeostasis")
   pars <- ir_params()
   req(pars$chain, pars$cloneCall)
@@ -1980,7 +2245,7 @@ output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
   if (!is.null(pars$groupBy)) {
     req(pars$groupBy %in% getGroups())
   }
-  ir_render_ggplotly(
+  ir_render_chart(
     {
       encoded <- ir_encoded()
       req(!is.null(encoded))
@@ -1990,17 +2255,17 @@ output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
         pars$chain,
         ir_row_values(encoded, pars$groupBy)
       )
-      ir_homeostasis_plot(counts, ir_clone_size(), IR_PALETTE, ir_order_by())
+      ir_homeostasis_chart(counts, ir_clone_size(), IR_PALETTE, ir_order_by())
     },
     "clonalHomeostasis"
   )
 }) %>%
   ir_bindCache(
-    input$ir_cloneCall,
-    input$ir_chain,
-    input$ir_groupBy,
-    input$ir_p_clone_size,
-    input$ir_p_order_by
+    ir_params()$cloneCall,
+    ir_params()$chain,
+    ir_params()$groupBy,
+    ir_clone_size(),
+    ir_order_by()
   )
 
 ## Exact empirical clone-size profiles of the strict clones, clustered.
@@ -2010,7 +2275,9 @@ output$ir_plot_clonalHomeostasis <- plotly::renderPlotly({
 ## keeps the same group, linkage and threshold controls.
 output$ir_plot_clonalSizeDistribution <- plotly::renderPlotly({
   req_plot_space("ir_plot_clonalSizeDistribution")
-  req(input$ir_chain, !is.null(input$ir_groupBy))
+  ## Until the toolbar binds them, chain and grouping stand at the values they
+  ## bind with (ir_params()), so a switch from Clonal projection draws at once.
+  req(ir_chain_groupBy()$chain)
   ir_render_ggplotly(
     ir_size_profile_plot(
       ir_size_distribution_profile(),
@@ -2020,13 +2287,27 @@ output$ir_plot_clonalSizeDistribution <- plotly::renderPlotly({
   )
 }) %>%
   ir_bindCache(
-    input$ir_chain,
-    input$ir_groupBy,
-    input$ir_p_sd_method,
-    input$ir_p_sd_threshold
+    ir_chain_groupBy()$chain,
+    ir_chain_groupBy()$groupBy,
+    ir_param("ir_p_sd_method", "ward.D2"),
+    ir_param("ir_p_sd_threshold", 1)
   )
 
 ## ---- Sharing: cross-group clonotype sharing ---------------------------- ##
+## The sharing unit as the plot reads it: the toolbar shows its selector on
+## this tab only, and until it has bound, the value it binds with (settings.R):
+## sample, else the first unit. Published only when it changes, so the binding
+## of that same value does not draw the plot again.
+ir_sharing_unit <- viewerControlValue(input, "ir_sharing_unit", function() {
+  choices <- ir_sharing_unit_choices()
+  if ("sample" %in% choices) {
+    "sample"
+  } else if (length(choices)) {
+    choices[[1L]]
+  }
+})
+
+
 ## Classifies each clonotype (V+J+CDR3 of the active chain) as Private /
 ## Public(within-group) / Public(cross-group) using the chosen sharing unit and
 ## the active group.by, then bars the class counts.
@@ -2036,15 +2317,20 @@ output$ir_plot_cloneSharing <- plotly::renderPlotly({
   ## the namespace here.
   req(has_scRepertoire())
   req_plot_space("ir_plot_cloneSharing")
-  req(input$ir_chain, input$ir_sharing_unit, !is.null(input$ir_groupBy))
+  ## Chain, grouping and sharing unit stand at the values their controls bind
+  ## with until the toolbar is rebuilt for this tab (ir_params(),
+  ## ir_sharing_unit()), so a switch from Clonal projection draws at once.
+  pars <- ir_chain_groupBy()
+  unit <- ir_sharing_unit()
+  req(pars$chain, unit)
   encoded <- ir_encoded()
   req(!is.null(encoded))
   fig <- ir_render_ggplotly(
     ir_build_sharing_plot(
       encoded,
       specific_chain(),
-      ir_param("ir_sharing_unit", "sample"),
-      ir_params()$groupBy,
+      unit,
+      pars$groupBy,
       ir_cell_metadata()
     ),
     "ir_plot_cloneSharing",
@@ -2076,7 +2362,7 @@ output$ir_plot_cloneSharing <- plotly::renderPlotly({
   fig
 }) %>%
   ir_bindCache(
-    input$ir_chain,
-    input$ir_groupBy,
-    input$ir_sharing_unit
+    ir_chain_groupBy()$chain,
+    ir_chain_groupBy()$groupBy,
+    ir_sharing_unit()
   )

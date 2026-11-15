@@ -221,7 +221,7 @@ test_that("Abundance waits for dynamic controls before choosing a renderer", {
     viewer_test_path("immune_repertoire", "visualizations.R"),
     "output.ir_plot_clonalAbundance"
   )
-  # Evaluate the production renderPlotly body, without the output/cache wrapper.
+  # Evaluate the production renderer body, without the output/cache wrapper.
   scope <- new.env(parent = environment())
   scope$req <- shiny::req
   scope$req_plot_space <- function(...) NULL
@@ -237,7 +237,7 @@ test_that("Abundance waits for dynamic controls before choosing a renderer", {
   scope$ir_abundance_counts <- function() {
     scope$ir_clonecall_col(scope$parameters$cloneCall)
   }
-  scope$ir_clonal_abundance_plotly <- function(counts, ...) counts
+  scope$ir_clonal_abundance_chart <- function(counts, ...) counts
   render <- eval(
     call("function", pairlist(), definition[[3L]][[2L]][[2L]]),
     scope

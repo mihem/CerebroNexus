@@ -41,7 +41,10 @@ ir_test_body <- function(file, output, wrapper, env) {
 
 test_that("SizeDist draws the empirical profiles without scRepertoire", {
   env <- new.env(parent = asNamespace("shiny"))
-  env$input <- list(ir_chain = "both", ir_groupBy = "")
+  ## No toolbar input: chain and grouping come from ir_params(), at the values
+  ## the controls bind with until they have bound.
+  env$input <- list()
+  env$ir_chain_groupBy <- function() list(chain = "both", groupBy = NULL)
   env$req_plot_space <- function(...) NULL
   env$ir_param <- function(name, default) default
   env$req_scRepertoire <- function() stop("scRepertoire was loaded")
@@ -78,7 +81,7 @@ test_that("Abundance renderer counts the encoded clones", {
   env$ir_clonecall_col <- function(x) "CTgene"
   env$getImmuneRepertoire <- function() stop("unexpected sidecar hydration")
   env$ir_cell_metadata <- function() NULL
-  env$ir_clonal_abundance_plotly <- function(counts, ...) counts
+  env$ir_clonal_abundance_chart <- function(counts, ...) counts
   env$ir_abundance_counts <- function() {
     env$ir_abundance_counts_for(env$ir_params(), env$ir_encoded())
   }
@@ -94,7 +97,7 @@ test_that("Abundance renderer counts the encoded clones", {
   render <- ir_test_body(
     "visualizations.R",
     "ir_plot_clonalAbundance",
-    "plotly::renderPlotly",
+    "renderCerebroChart",
     env
   )
   ## The blank clone is not counted.
@@ -184,17 +187,17 @@ test_that("Homeostasis renderer counts the encoded clones of every chain", {
   env$ir_homeostasis_counts <- function(encoded, column, chain, groups) {
     list(encoded, column, chain, groups)
   }
-  env$ir_homeostasis_plot <- function(counts, clone_size, palette, order) {
+  env$ir_homeostasis_chart <- function(counts, clone_size, palette, order) {
     if (is.null(order)) counts else list(counts, order)
   }
   env$ir_clone_size <- function() 1
   env$IR_PALETTE <- "Harmonic"
-  env$ir_render_ggplotly <- function(expr, ...) force(expr)
+  env$ir_render_chart <- function(expr, ...) force(expr)
   env$req_scRepertoire <- function() stop("scRepertoire was loaded")
   render <- ir_test_body(
     "visualizations.R",
     "ir_plot_clonalHomeostasis",
-    "plotly::renderPlotly",
+    "renderCerebroChart",
     env
   )
   expect_identical(render(), list("encoded", "CTgene", "both", NULL))

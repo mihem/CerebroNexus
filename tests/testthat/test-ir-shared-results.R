@@ -75,37 +75,62 @@ test_that("an immune repertoire without heavy chains draws no isotype plot", {
   expect_s3_class(scope$bcr_isotype_plot(bcr, "a"), "ggplot")
 })
 
-test_that("Abundance lines match plot_ly's split and colour mapping", {
+test_that("isotype bars hold every group's isotype shares and counts", {
   scope <- ir_scope(
-    c("ir_clonal_abundance_plotly", "ir_abundance_units"),
+    c(
+      "ir_chart_message",
+      "ir_fill_bar_chart",
+      "IR_ISOTYPES",
+      "ir_isotype_chart"
+    ),
     "visualizations.R"
   )
-  scope$`%>%` <- dplyr::`%>%`
-  scope$cerebro_plotly_axis <- function(...) list()
-  scope$cerebro_plotly_hoverlabel <- function() list()
-  scope$cerebro_plotly_theme <- function() list(transparent = "rgba(0,0,0,0)")
-  scope$cerebro_plotly_toolbar <- identity
-  scope$cerebro_plotly_prebuilt <- identity
+  scope$cerebro_group_colors <- function(n) sprintf("#%06d", seq_len(n))
+  expect_identical(scope$ir_isotype_chart(NULL, "sample")$type, "empty")
+  iso <- data.frame(
+    patient = c("p2", "p2", "p1", "p1"),
+    isotype = c("IGHG1", "IGHX", "IGHM", "IGHG1"),
+    n = c(3L, 1L, 2L, 2L)
+  )
+  chart <- scope$ir_isotype_chart(iso, "patient")
+  expect_identical(as.vector(chart$categories), c("p2", "p1"))
+  expect_identical(
+    as.vector(chart$series),
+    c(scope$IR_ISOTYPES, "NA")
+  )
+  expect_identical(as.vector(chart$colors)[[10L]], "#cccccc")
+  series <- function(name, field) {
+    as.vector(chart[[field]][[match(name, chart$series)]])
+  }
+  expect_equal(series("IGHG1", "values"), c(.75, .5))
+  expect_equal(series("IGHM", "values"), c(0, .5))
+  expect_equal(series("NA", "values"), c(.25, 0))
+  expect_equal(series("IGHG1", "counts"), c(3, 2))
+  expect_true(chart$percent)
+  expect_identical(chart$x_title, "patient")
+  ## Only known isotypes: no NA series.
+  chart <- scope$ir_isotype_chart(iso[iso$isotype != "IGHX", ], "patient")
+  expect_identical(as.vector(chart$series), scope$IR_ISOTYPES)
+})
+
+test_that("Abundance lines match plot_ly's split and colour mapping", {
+  scope <- ir_scope(
+    c(
+      "ir_chart_message",
+      "ir_clonal_abundance_chart",
+      "ir_abundance_units",
+      "ir_abundance_density"
+    ),
+    "visualizations.R"
+  )
   for (n_samples in c(2L, 5L, 12L)) {
     samples <- sprintf("s%02d", rev(seq_len(n_samples)))
     counts <- data.frame(
       sample = rep(samples, each = 2L),
-      abundance = rep(c(1L, 3L), n_samples),
+      abundance = rep(c(3L, 1L), n_samples),
       n_clones = seq_len(2L * n_samples)
     )
-    built <- plotly::plotly_build(scope$ir_clonal_abundance_plotly(
-      counts
-    ))$x$data
-    counts$hover <- paste0(
-      "<b>",
-      counts$sample,
-      "</b><br>",
-      "Abundance: ",
-      formatC(counts$abundance, format = "d"),
-      "<br>",
-      "Clones: ",
-      formatC(counts$n_clones, format = "d")
-    )
+    chart <- scope$ir_clonal_abundance_chart(counts, legend = "patient")
     expected <- suppressWarnings(plotly::plotly_build(plotly::plot_ly(
       counts,
       x = ~abundance,
@@ -113,32 +138,47 @@ test_that("Abundance lines match plot_ly's split and colour mapping", {
       split = ~sample,
       color = ~sample,
       type = "scatter",
-      mode = "lines",
-      text = ~hover,
-      hoverinfo = "text"
+      mode = "lines"
     )))$x$data
-    expect_length(built, length(expected))
-    field <- function(traces, f, ...) lapply(traces, f, ...)
-    expect_identical(field(built, `[[`, "name"), field(expected, `[[`, "name"))
-    expect_equal(field(built, `[[`, "x"), field(expected, `[[`, "x"))
-    expect_equal(field(built, `[[`, "y"), field(expected, `[[`, "y"))
     expect_identical(
-      field(built, function(t) as.character(t$text)),
-      field(expected, function(t) as.character(t$text))
+      as.vector(chart$series),
+      vapply(expected, `[[`, "", "name")
     )
-    colour <- function(t) as.character(t$line$color)
-    expect_identical(field(built, colour), field(expected, colour))
+    expect_identical(
+      plotly::toRGB(as.vector(chart$colors)),
+      vapply(expected, function(t) as.character(t$line$color), "")
+    )
+    ## Each line runs along increasing abundance.
+    for (i in seq_along(chart$series)) {
+      rows <- counts[counts$sample == chart$series[[i]], ]
+      rows <- rows[order(rows$abundance), ]
+      expect_equal(as.vector(chart$x[[i]]), rows$abundance)
+      expect_equal(as.vector(chart$y[[i]]), rows$n_clones)
+    }
+    expect_true(chart$x_log)
+    expect_false(chart$fill)
+    expect_identical(chart$hover, "closest")
+    expect_identical(chart$y_format, "integer")
+    expect_identical(chart$legend_title, "patient")
   }
+  scaled <- scope$ir_clonal_abundance_chart(counts, scale = TRUE)
+  expect_true(scaled$fill)
+  expect_identical(scaled$y_title, "Density of clones")
+  expect_true(all(vapply(scaled$y, max, 0) == 1))
+  expect_true(all(lengths(scaled$x) == 512L))
+  ordered <- scope$ir_clonal_abundance_chart(
+    data.frame(sample = c("b10", "b2"), abundance = 1L, n_clones = 1L),
+    order_by = "alphanumeric"
+  )
+  expect_identical(as.vector(ordered$series), c("b2", "b10"))
+  empty <- scope$ir_clonal_abundance_chart(counts[0, ])
+  expect_identical(empty$type, "empty")
 })
 
 test_that("sessions opening the same data set files share IR plots", {
   render_value <- function(expr, ...) {
     shiny::reactive(substitute(expr), env = parent.frame(), quoted = TRUE)
   }
-  testthat::local_mocked_bindings(
-    renderPlotly = render_value,
-    .package = "plotly"
-  )
   calls <- 0L
   file <- withr::local_tempfile(fileext = ".crb")
   writeLines("one", file)
@@ -150,6 +190,7 @@ test_that("sessions opening the same data set files share IR plots", {
     scope <- environment()
     output <- new.env()
     `%>%` <- dplyr::`%>%`
+    renderCerebroChart <- render_value
     available_crb_files <- reactiveValues(selected = "A")
     data_set <- reactive(structure(list(), cerebro_dataset_path = path))
     viewer_server_load(
@@ -191,8 +232,8 @@ test_that("sessions opening the same data set files share IR plots", {
       calls <<- calls + 1L
       data.frame(sample = "sample", abundance = 1L, n_clones = 1L)
     }
-    ir_homeostasis_plot <- function(...) ggplot2::ggplot()
-    ir_render_ggplotly <- function(expr, ...) expr
+    ir_homeostasis_chart <- function(...) list(type = "bar")
+    ir_render_chart <- function(expr, ...) expr
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "visualizations.R"),
       scope,
@@ -227,10 +268,6 @@ test_that("IR plots that show an error are not shared with other sessions", {
   render_value <- function(expr, ...) {
     shiny::reactive(substitute(expr), env = parent.frame(), quoted = TRUE)
   }
-  testthat::local_mocked_bindings(
-    renderPlotly = render_value,
-    .package = "plotly"
-  )
   calls <- 0L
   fail <- TRUE
   file <- withr::local_tempfile(fileext = ".crb")
@@ -240,6 +277,7 @@ test_that("IR plots that show an error are not shared with other sessions", {
     scope <- environment()
     output <- new.env()
     `%>%` <- dplyr::`%>%`
+    renderCerebroChart <- render_value
     available_crb_files <- reactiveValues(selected = "A")
     data_set <- reactive(structure(list(), cerebro_dataset_path = file))
     viewer_server_load(
@@ -284,14 +322,16 @@ test_that("IR plots that show an error are not shared with other sessions", {
       }
       data.frame(sample = "sample", abundance = 1L, n_clones = 1L)
     }
-    ir_homeostasis_plot <- function(...) ggplot2::ggplot()
-    ir_render_ggplotly <- function(expr, plot_name, ...) {
-      safeRenderPlot(expr, plot_name)
-    }
+    ir_homeostasis_chart <- function(...) list(type = "bar")
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "visualizations.R"),
       scope,
-      names = c("IR_PALETTE", "output$ir_plot_clonalHomeostasis")
+      names = c(
+        "IR_PALETTE",
+        "ir_chart_message",
+        "ir_render_chart",
+        "output$ir_plot_clonalHomeostasis"
+      )
     )
   }
   draw <- function() {
@@ -304,14 +344,11 @@ test_that("IR plots that show an error are not shared with other sessions", {
       plot <<- scope$output$ir_plot_clonalHomeostasis()
     })
   }
-  ## The error figure is shown, and the next session draws again.
+  ## The error message is shown, and the next session draws again.
   plot <- NULL
   suppressMessages(draw())
-  expect_match(
-    ggplot2::ggplot_build(plot)$data[[1]]$label,
-    "disk unavailable",
-    fixed = TRUE
-  )
+  expect_identical(plot$type, "empty")
+  expect_match(plot$message, "disk unavailable", fixed = TRUE)
   suppressMessages(draw())
   expect_identical(calls, 2L)
   ## A drawn plot is shared.

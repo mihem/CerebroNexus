@@ -4,7 +4,8 @@ prepareDemoViewerPack <- function(file) {
   checked <- CerebroNexus::validateViewerPack(file, full = TRUE)
   if (isTRUE(checked$valid)) {
     chains <- as.character(checked$manifest$hla_chains)
-    first_frames <- file.path("hla_tcr", paste0(chains, ".first.qs2"))
+    ## First frames of version 3 (format revision 2): an older Pack is rebuilt.
+    first_frames <- file.path("hla_tcr", paste0(chains, ".first.v3.qs2"))
     ## A pack from before the integer encoding of the repertoire (or of another
     ## encoding version) makes the Immune repertoire page encode it at every
     ## start: rebuild it.
