@@ -164,6 +164,8 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
   ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
   env$ir_tab <- function() "Abundance"
+  ## the global controls' choices and defaults (IR_CLONE_CALLS, ...)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), envir = env)
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
@@ -254,6 +256,8 @@ test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
   ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
   env$ir_tab <- function() "Abundance"
+  ## the global controls' choices and defaults (IR_CLONE_CALLS, ...)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), envir = env)
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
