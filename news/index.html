@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.2.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.3.0" id="cerebronexus-830">CerebroNexus 8.3.0<a class="anchor" aria-label="anchor" href="#cerebronexus-830"></a></h2>
+<ul><li>
+<strong>Start of an App behind Shiny Server.</strong> An App that Shiny runs from an <code>app.R</code> (the demo App of the package under Shiny Server, or <code><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">shiny::runApp()</a></code> on its directory) is usually started by its first visitor, because Shiny Server stops an App nobody uses. That visitor now has the plot 3.6 s instead of 7.1 s after the page is requested, and 4.5 s instead of 8.0 s with 1.46 million cells; the preview of the first view after 1.6 s instead of 4.6 s (3.0 s instead of 5.2 s); the first byte of the page after 1.1 s instead of 3.6 s; and the page takes 17 requests instead of 67 (one Shiny Server in Docker, medians of 6 cold starts). <code>app.R</code> makes the page and starts; plotly, DT, dplyr and the server code are loaded once the page is sent, while the browser fetches its files, and the server function is compiled to byte code after the first session has its page. From its second start on such an App serves the page as a file with its scripts and styles joined, as <code><a href="../reference/launchCerebro.html">launchCerebro()</a></code> does; under Shiny Server that was never kept, because the process refused the request for its own page. The first start after an installation, or after a change of Shiny Server’s configuration, sends the page as before. A visit to a process that already runs is unchanged. Apps exported with <code><a href="../reference/createShinyApp.html">createShinyApp()</a></code> start as before.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.2.2" id="cerebronexus-822">CerebroNexus 8.2.2<a class="anchor" aria-label="anchor" href="#cerebronexus-822"></a></h2>
 <ul><li>
