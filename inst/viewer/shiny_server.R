@@ -2840,7 +2840,14 @@ server <- function(input, output, session) {
 ## cannot place the names the lazy imports bind (R/lazy_imports.R), and the
 ## server stays as it is; an installed package has its byte code already.
 if (is.na(.viewer_server_index)) {
-  server <- tryCatch(compiler::cmpfun(server), error = function(error) server)
+  ## Not where the server code is loaded while a visitor waits for it
+  ## (staged_start.R): compiling takes 0.9 s, and server() runs once per
+  ## session.
+  if (
+    !inherits(get0("viewer_start", inherits = TRUE), "cerebro_staged_start")
+  ) {
+    server <- tryCatch(compiler::cmpfun(server), error = function(error) server)
+  }
 } else {
   ## The compiled `server <- function(...)` of this file, evaluated where the
   ## file is: the same closure, with a compiled body.

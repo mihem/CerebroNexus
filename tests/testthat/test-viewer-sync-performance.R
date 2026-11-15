@@ -373,7 +373,23 @@ test_that("the Viewer server takes its byte code from the installation", {
   ## every process start again; it may only be the fallback.
   compile <- grep("compiler::cmpfun(server)", server_file, fixed = TRUE)
   expect_length(compile, 1L)
-  expect_match(server_file[[compile - 1L]], "if (is.na(", fixed = TRUE)
+  ## It stands in the branch without installed byte code, and not where the
+  ## server code is loaded while a visitor waits for it (staged_start.R).
+  fallback <- grep(
+    "if (is.na(.viewer_server_index)) {",
+    server_file,
+    fixed = TRUE
+  )
+  installed <- grep("^} else \\{$", server_file)
+  expect_length(fallback, 1L)
+  expect_true(
+    fallback < compile && compile < min(installed[installed > fallback])
+  )
+  expect_true(any(grepl(
+    '"cerebro_staged_start"',
+    server_file[fallback:compile],
+    fixed = TRUE
+  )))
   expect_true(any(grepl(
     'match("server", .viewer_server_bytecode$names)',
     server_file,
