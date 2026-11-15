@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.3.3" id="cerebronexus-833">CerebroNexus 8.3.3<a class="anchor" aria-label="anchor" href="#cerebronexus-833"></a></h2>
+<ul><li>
+<strong>No empty projection after switching data sets.</strong> Shiny keeps the last value of a group filter after its control is gone, so right after a switch the server still read the filters of the previous data set. Their levels do not exist in the new one, and the first frame of the Overview, Gene expression, Spatial or Trajectory projection had no cells until the filters were drawn again. A filter that names a level the group does not have now filters nothing.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.3.2" id="cerebronexus-832">CerebroNexus 8.3.2<a class="anchor" aria-label="anchor" href="#cerebronexus-832"></a></h2>
 <ul><li>

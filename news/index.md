@@ -1,5 +1,15 @@
 # Changelog
 
+## CerebroNexus 8.3.3
+
+- **No empty projection after switching data sets.** Shiny keeps the
+  last value of a group filter after its control is gone, so right after
+  a switch the server still read the filters of the previous data set.
+  Their levels do not exist in the new one, and the first frame of the
+  Overview, Gene expression, Spatial or Trajectory projection had no
+  cells until the filters were drawn again. A filter that names a level
+  the group does not have now filters nothing.
+
 ## CerebroNexus 8.3.2
 
 - **Sparse expression in a fresh session.** The first call on a sparse
