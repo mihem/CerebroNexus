@@ -168,3 +168,69 @@ test_that("single-sheet workbooks still show their table display names", {
     )
   })
 })
+
+test_that("the first Extra material table needs no bound control", {
+  utilities <- viewer_test_path("utility_functions.R")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      renders <- 0L
+      shown <- NULL
+      getExtraMaterialCategories <- function() "tables"
+      checkForExtraTables <- function() TRUE
+      checkForExtraPlots <- function() FALSE
+      extra_material_table_groups <- function() {
+        sheet <- function(key) {
+          list(key = key, label = key, table = data.frame(value = key))
+        }
+        list(
+          list(
+            key = "book_a",
+            label = "A",
+            sheets = list(sheet("a1"), sheet("a2"))
+          ),
+          list(key = "book_b", label = "B", sheets = list(sheet("b1")))
+        )
+      }
+      for (name in c(
+        "extra_material_table_choices",
+        "extra_material_table_group",
+        "extra_material_table_sheet",
+        "extra_material_table_selection"
+      )) {
+        eval(viewer_r_assignment(utilities, name), scope)
+      }
+      extra_material_table_filter <- function(...) "none"
+      cerebroRegisterInfo <- function(...) invisible(NULL)
+      cerebroResultTable <- function(results_df, ...) {
+        scope$renders <- scope$renders + 1L
+        scope$shown <- list(data = results_df, ...)
+        DT::datatable(results_df)
+      }
+      viewer_control_helpers_load(scope)
+      sys.source(viewer_test_path("extra_material", "select_content.R"), scope)
+      sys.source(viewer_test_path("extra_material", "content.R"), scope)
+    },
+    {
+      invisible(output$extra_material_table)
+      expect_identical(scope$renders, 1L)
+      expect_identical(scope$shown$data$value, "a1")
+      expect_true(scope$shown$number_formatting)
+      expect_true(scope$shown$color_highlighting)
+      ## The controls bind with the values the table was drawn with.
+      session$setInputs(
+        extra_material_selected_category = "tables",
+        extra_material_selected_file = "book_a",
+        extra_material_selected_content = "a1",
+        extra_material_table_number_formatting = TRUE,
+        extra_material_table_color_highlighting = TRUE
+      )
+      invisible(output$extra_material_table)
+      expect_identical(scope$renders, 1L)
+      session$setInputs(extra_material_selected_content = "a2")
+      invisible(output$extra_material_table)
+      expect_identical(scope$renders, 2L)
+      expect_identical(scope$shown$data$value, "a2")
+    }
+  )
+})

@@ -91,3 +91,28 @@ observeEvent(
   },
   ignoreInit = TRUE
 )
+
+## Server code reads these controls through viewerControlValue(): the first
+## frame is drawn with what groups_controls_UI binds them with (the first
+## group, the first other group, counts) before the controls exist.
+groups_selected_group <- viewerControlValue(
+  input,
+  "groups_selected_group",
+  function() {
+    groups <- getGroups()
+    if (length(groups)) groups[[1L]] else NULL
+  }
+)
+groups_by_other_group_second_group <- viewerControlValue(
+  input,
+  "groups_by_other_group_second_group",
+  function() {
+    groups <- getGroups()
+    if (length(groups) >= 2L) groups[groups != groups[[1L]]][[1L]] else NULL
+  }
+)
+groups_by_other_group_show_as_percent <- viewerControlValue(
+  input,
+  "groups_by_other_group_show_as_percent",
+  function() FALSE
+)

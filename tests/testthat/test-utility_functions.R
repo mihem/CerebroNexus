@@ -307,14 +307,11 @@ test_that("embedded Extra material escapes CRB-controlled HTML", {
     group = list(key = "embedded", label = "Embedded"),
     sheet = list(label = "Unsafe")
   )
-  input <- list(
-    extra_material_table_number_formatting = FALSE,
-    extra_material_table_color_highlighting = FALSE
-  )
   evaluation <- list2env(list(
     results_df = data.frame(value = '<img src=x onerror="alert(1)">'),
     selection = selection,
-    input = input,
+    extra_material_number_formatting = function() FALSE,
+    extra_material_color_highlighting = function() FALSE,
     extra_material_table_filter = function(...) "none",
     cerebroResultTable = utils_env$cerebroResultTable
   ))

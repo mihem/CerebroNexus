@@ -1388,37 +1388,39 @@ output[["coordviews_selected_cells_plot"]] <- renderCerebroChart({
 
 ## Table: meta data of the selected cells (same prettifyTable options as the
 ## Projection tab's table). Filtered by barcode; empty skeleton when nothing hit.
-output[["coordviews_selected_cells_table"]] <- DT::renderDataTable({
-  ## The browser lists a selection it reported by row.
-  req(
-    !viewerClientSelection(
-      "coordviews",
-      "table",
-      "coordviews_selection_indices"
+output[["coordviews_selected_cells_table"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    ## The browser lists a selection it reported by row.
+    req(
+      !viewerClientSelection(
+        "coordviews",
+        "table",
+        "coordviews_selection_indices"
+      )
     )
-  )
-  rows <- coordviews_selected_rows()
-  cells_df <- if (!is.null(rows)) viewerSelectedRowsMetadata(rows)
-  if (is.null(cells_df) || nrow(cells_df) == 0) {
-    viewerProjectionFirstFrameMetadata() %>%
-      dplyr::slice(0) %>%
-      prepareEmptyTable()
-  } else {
-    prettifyTable(
-      cells_df,
-      filter = list(position = "top", clear = TRUE),
-      dom = "Brtlip",
-      show_buttons = TRUE,
-      number_formatting = input[[
-        "coordviews_selected_cells_table_number_formatting"
-      ]],
-      color_highlighting = input[[
-        "coordviews_selected_cells_table_color_highlighting"
-      ]],
-      hide_long_columns = TRUE,
-      download_file_name = "linked_views_selected_cells"
-    )
-  }
+    rows <- coordviews_selected_rows()
+    cells_df <- if (!is.null(rows)) viewerSelectedRowsMetadata(rows)
+    if (is.null(cells_df) || nrow(cells_df) == 0) {
+      viewerProjectionFirstFrameMetadata() %>%
+        dplyr::slice(0) %>%
+        prepareEmptyTable()
+    } else {
+      prettifyTable(
+        cells_df,
+        filter = list(position = "top", clear = TRUE),
+        dom = "Brtlip",
+        show_buttons = TRUE,
+        number_formatting = input[[
+          "coordviews_selected_cells_table_number_formatting"
+        ]],
+        color_highlighting = input[[
+          "coordviews_selected_cells_table_color_highlighting"
+        ]],
+        hide_long_columns = TRUE,
+        download_file_name = "linked_views_selected_cells"
+      )
+    }
+  })
 })
 
 ## Info modals for the two panels.

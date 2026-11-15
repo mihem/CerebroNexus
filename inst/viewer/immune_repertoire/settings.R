@@ -53,7 +53,9 @@ output$ir_main_params_UI <- shiny::bindEvent(
     if (!has_scRepertoire()) {
       return(ir_scRepertoire_missing_ui())
     }
-    tab <- ir_param("ir_tabs", ir_default_tab())
+    ## The tab the strip opens on (ir_tab(), tabs.R) before the strip has
+    ## reported it: the toolbar is drawn with the plot, not a round trip later.
+    tab <- ir_tab() %||% ir_default_tab()
     packed_landing <- identical(tab, "Clonal UMAP")
     summary <- getImmuneRepertoireSummary()
     summary_chains <- as.character(summary$chains)
@@ -202,7 +204,7 @@ output$ir_main_params_UI <- shiny::bindEvent(
       }
     )
   }),
-  input$ir_tabs,
+  ir_tab(),
   data_set()
 )
 
@@ -354,7 +356,7 @@ ir_analysis_spec <- function(tab, more = FALSE) {
 }
 
 ir_analysis_panel <- function(more = FALSE) {
-  spec <- ir_analysis_spec(input$ir_tabs, more)
+  spec <- ir_analysis_spec(ir_tab(), more)
   if (length(spec) == 0) {
     if (more) {
       return(helpText("No additional analysis settings for this plot."))
@@ -452,7 +454,7 @@ output$ir_primary_param_panel <- shiny::bindEvent(
   renderUI({
     ir_analysis_panel(more = FALSE)
   }),
-  input$ir_tabs,
+  ir_tab(),
   data_set()
 )
 
@@ -757,6 +759,11 @@ observeEvent(input$ir_group_filters_info, {
 })
 
 ## Keep drawer controls alive while the drawer is closed.
+## Nested in ir_main_params_UI, which is shown whenever the page is: an output
+## that is not in the page until its parent renders cannot be reported shown
+## with the page change (viewer-shell.js), and a suspended one waited for the
+## browser to bind and report it, a round trip after the toolbar.
+outputOptions(output, "ir_primary_param_panel", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_additional_params_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_appearance_section_UI", suspendWhenHidden = FALSE)
 outputOptions(output, "ir_group_filters_UI", suspendWhenHidden = FALSE)

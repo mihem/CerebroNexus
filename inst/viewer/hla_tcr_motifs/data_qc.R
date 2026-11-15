@@ -166,54 +166,60 @@ output$hla_active_source_ui <- renderUI({
 })
 
 ## ---- Coverage table (per sample) -------------------------------------- ##
-output$hla_coverage_table <- DT::renderDataTable({
-  t <- hla_active_typing()
-  if (!hla_has_typing()) {
-    return(NULL)
-  }
-  cov <- hla_coverage_by_sample(t)
-  # scrollX + nowrap, like every table on this page: the widths here are the
-  # user's data (sample names, and a Loci cell listing every typed locus), not
-  # anything this layout can size for. Left to wrap, "HLA-A" breaks across two
-  # lines mid-token and an identifier stops reading as one value.
-  DT::datatable(
-    style = "bootstrap",
-    cov,
-    rownames = FALSE,
-    colnames = c("Sample", "# alleles", "Loci"),
-    class = "display nowrap",
-    options = list(pageLength = 10, dom = "t", scrollX = TRUE)
-  )
+output$hla_coverage_table <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    t <- hla_active_typing()
+    if (!hla_has_typing()) {
+      return(NULL)
+    }
+    cov <- hla_coverage_by_sample(t)
+    # scrollX + nowrap, like every table on this page: the widths here are the
+    # user's data (sample names, and a Loci cell listing every typed locus), not
+    # anything this layout can size for. Left to wrap, "HLA-A" breaks across two
+    # lines mid-token and an identifier stops reading as one value.
+    DT::datatable(
+      style = "bootstrap",
+      cov,
+      rownames = FALSE,
+      colnames = c("Sample", "# alleles", "Loci"),
+      class = "display nowrap",
+      options = list(pageLength = 10, dom = "t", scrollX = TRUE)
+    )
+  })
 })
 
-output$hla_normalized_preview <- DT::renderDataTable({
-  t <- hla_active_typing()
-  if (!hla_has_typing()) {
-    return(NULL)
-  }
-  DT::datatable(
-    style = "bootstrap",
-    t,
-    rownames = FALSE,
-    class = "display nowrap",
-    options = list(pageLength = 8, scrollX = TRUE, dom = "tip")
-  )
+output$hla_normalized_preview <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    t <- hla_active_typing()
+    if (!hla_has_typing()) {
+      return(NULL)
+    }
+    DT::datatable(
+      style = "bootstrap",
+      t,
+      rownames = FALSE,
+      class = "display nowrap",
+      options = list(pageLength = 8, scrollX = TRUE, dom = "tip")
+    )
+  })
 })
 
-output$hla_donor_mapping_preview <- DT::renderDataTable({
-  if (!hla_has_typing()) {
-    return(NULL)
-  }
-  samples <- hla_ir_samples()
-  map <- hla_analysis_unit_map(hla_active_typing(), samples)
-  DT::datatable(
-    style = "bootstrap",
-    map,
-    rownames = FALSE,
-    colnames = c("IR sample", "Analysis unit", "Unit type"),
-    class = "display nowrap",
-    options = list(pageLength = 10, dom = "t", scrollX = TRUE)
-  )
+output$hla_donor_mapping_preview <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    if (!hla_has_typing()) {
+      return(NULL)
+    }
+    samples <- hla_ir_samples()
+    map <- hla_analysis_unit_map(hla_active_typing(), samples)
+    DT::datatable(
+      style = "bootstrap",
+      map,
+      rownames = FALSE,
+      colnames = c("IR sample", "Analysis unit", "Unit type"),
+      class = "display nowrap",
+      options = list(pageLength = 10, dom = "t", scrollX = TRUE)
+    )
+  })
 })
 
 ## ---- Sample-mapping note (exact match only) --------------------------- ##
@@ -262,17 +268,19 @@ output$hla_qc_ui <- renderUI({
   DT::dataTableOutput("hla_qc_table_dt")
 })
 
-output$hla_qc_table_dt <- DT::renderDataTable({
-  qc <- hla_qc_table()
-  if (is.null(qc)) {
-    return(NULL)
-  }
-  DT::datatable(
-    style = "bootstrap",
-    qc,
-    rownames = FALSE,
-    options = list(pageLength = 10, dom = "t")
-  )
+output$hla_qc_table_dt <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    qc <- hla_qc_table()
+    if (is.null(qc)) {
+      return(NULL)
+    }
+    DT::datatable(
+      style = "bootstrap",
+      qc,
+      rownames = FALSE,
+      options = list(pageLength = 10, dom = "t")
+    )
+  })
 })
 
 ## ---- CSV template download -------------------------------------------- ##

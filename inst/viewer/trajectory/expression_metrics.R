@@ -170,8 +170,8 @@ for (trajectory_metric in names(trajectory_expression_metric_specs)) {
       )
     }) %>%
       cachePlot(
-        input[["trajectory_selected_method"]],
-        input[["trajectory_selected_name"]],
+        trajectory_selected_method(),
+        trajectory_selected_name(),
         metric,
         available_crb_files$selected
       )

@@ -1,7 +1,24 @@
+## Page code reads the method, trajectory and colour selectors through
+## viewerControlValue() (server.R); here they are the inputs themselves.
+trajectory_control_stubs <- function(scope) {
+  eval(
+    quote({
+      trajectory_selected_method <- function() {
+        input[["trajectory_selected_method"]]
+      }
+      trajectory_selected_name <- function() input[["trajectory_selected_name"]]
+      trajectory_point_color <- function() input[["trajectory_point_color"]]
+    }),
+    scope
+  )
+  invisible(scope)
+}
+
 test_that("trajectory static frames fall back when filters or resources change", {
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       viewer_runtime_env(scope)
       sys.source(viewer_test_path("color_setup.R"), scope)
       sys.source(viewer_test_path("plotting_functions.R"), scope)
@@ -122,6 +139,7 @@ test_that("trajectory preparation emits the first frame and coalesces rapid chan
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       viewer_runtime_env(scope)
       viewer_loaded_dataset_context <- function() {
         list(epoch = "s", dataset_key = "A", generation = 1)
@@ -208,6 +226,7 @@ test_that("a control binding with its value keeps the same shuffled trajectory c
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       viewer_runtime_env(scope)
       viewer_loaded_dataset_context <- function() {
         list(epoch = "s", dataset_key = "A", generation = 1)
@@ -275,6 +294,7 @@ test_that("trajectory consumers share row mapping and invalidate it on dataset c
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       viewer_runtime_env(scope)
       reads <- 0L
       metadata <- reactive({
@@ -374,6 +394,7 @@ test_that("supplementary trajectory controls appear only after projection and vi
   for (file in names(panels)) {
     panel <- panels[[file]]
     scope <- viewer_ui_test_env()
+    trajectory_control_stubs(scope)
     sys.source(viewer_test_path("plotting_functions.R"), scope)
     scope$output <- list()
     scope$renderUI <- function(expr) eval(substitute(expr), parent.frame())
@@ -420,6 +441,7 @@ test_that("trajectory expression metric outputs keep their IDs, messages and cac
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       cache_keys <- list()
       violins <- list()
       ## The metric outputs are created in a top-level loop, which
@@ -530,6 +552,7 @@ test_that("with a Viewer Pack, trajectory % of cells is left to the browser", {
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       viewer_runtime_env(scope)
       viewer_loaded_dataset_context <- function() {
         list(epoch = "s", dataset_key = "A", generation = 1)
@@ -602,6 +625,7 @@ test_that("a trajectory frame that failed to send is sent on the next run", {
   shiny::testServer(
     function(input, output, session) {
       scope <- environment()
+      trajectory_control_stubs(scope)
       context <- list(epoch = "s", dataset_key = "A", generation = 1)
       viewer_loaded_dataset_context <- function() context
       viewerDatasetContextEqual <- function(a, b) identical(a, b)

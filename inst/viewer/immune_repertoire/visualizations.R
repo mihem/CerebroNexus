@@ -152,6 +152,31 @@ output$ir_visualizations_UI <- renderUI({
 ## its tab, and in the same flush as the selection that asks for it. Each
 ## depends on its own flag only, which never goes back, so a body is drawn once
 ## and never again (that would put a new, empty plot in its place).
+## The plot outputs drawn with plotly are defined when their tab's body is
+## first built, not when the page's code is loaded: renderPlotly() loads plotly
+## and with it ggplot2, tidyr and data.table, about 0.4 s of the page's first
+## turn, and the Clonal projection, the landing tab, draws with neither.
+IR_PLOTLY_TABS <- c(
+  "Diversity",
+  "Paired Scatter",
+  "Clone Sharing",
+  "Compare",
+  "SizeDist"
+)
+ir_deferred_plot_outputs <- new.env(parent = emptyenv())
+ir_define_with_tab <- function(tab, define) {
+  assign(tab, define, envir = ir_deferred_plot_outputs)
+  invisible(NULL)
+}
+ir_define_tab_outputs <- function(tab) {
+  if (exists(tab, envir = ir_deferred_plot_outputs, inherits = FALSE)) {
+    define <- get(tab, envir = ir_deferred_plot_outputs, inherits = FALSE)
+    rm(list = tab, envir = ir_deferred_plot_outputs)
+    define()
+  }
+  invisible(NULL)
+}
+
 ir_tab_body_wanted <- lapply(IR_TAB_BODY_OUTPUTS, function(id) {
   reactiveVal(FALSE)
 })
@@ -160,6 +185,7 @@ invisible(lapply(names(IR_TAB_BODY_OUTPUTS), function(tab) {
   wanted <- ir_tab_body_wanted[[tab]]
   output[[id]] <- renderUI({
     req(wanted())
+    isolate(ir_define_tab_outputs(tab))
     ir_tab_body(tab)
   })
   outputOptions(output, id, suspendWhenHidden = FALSE)
@@ -196,8 +222,11 @@ local({
       invalidateLater(ceiling((IR_TAB_BODY_QUIET - quiet) * 1000) + 50)
       return()
     }
-    for (wanted in ir_tab_body_wanted) {
-      wanted(TRUE)
+    ## Not the plotly tabs: their bodies load plotly (0.4 s and more), which
+    ## would hold a click made meanwhile; the session's idle tasks load it
+    ## (shiny_server.R), and such a tab is built when it is chosen.
+    for (tab in setdiff(names(ir_tab_body_wanted), IR_PLOTLY_TABS)) {
+      ir_tab_body_wanted[[tab]](TRUE)
     }
     prefetch$destroy()
   })
@@ -1599,67 +1628,70 @@ ir_paired_scatter_look_js <- "function (el, x, look) {
 
 ## Single-panel paired scatter -> interactive plotly, counted in the app for
 ## the two compared groups only.
-output$ir_plot_pairedScatter <- plotly::renderPlotly({
-  req_plot_space("ir_plot_pairedScatter")
-  encoded <- ir_encoded()
-  req(!is.null(encoded))
-  pars <- ir_params()
-  groups <- ir_compare_groups()
-  req(length(groups) >= 2)
-  pair_mode <- input$ir_pair_compare
-  if (is.null(pair_mode) || !nzchar(pair_mode)) {
-    ## Groups of the previous grouping, before its controls are rebuilt: keep
-    ## the drawn plot until the controls send the new groups.
-    x <- input$ir_pair_x_group
-    y <- input$ir_pair_y_group
-    req(isTRUE(x %in% groups), isTRUE(y %in% groups), cancelOutput = TRUE)
-    validate(need(x != y, "Select two different groups."))
-    ## X and Y are levels of the grouping column, not samples.
-    group_by <- pars$groupBy
-  } else {
-    meta <- ir_sample_meta()
-    req(!is.null(meta))
-    lvls <- sort(unique(meta[[pair_mode]]))
-    req(length(lvls) == 2L)
-    x <- meta$.sample_name[meta[[pair_mode]] == lvls[1]][1]
-    y <- meta$.sample_name[meta[[pair_mode]] == lvls[2]][1]
-    group_by <- NULL
-  }
-  ir_render_ggplotly(
-    ir_scatter_plotly(
-      ir_scatter_table(
-        encoded,
-        ir_clonecall_col(pars$cloneCall),
-        pars$chain,
-        ir_row_values(encoded, group_by),
+ir_define_with_tab("Paired Scatter", function() {
+  output$ir_plot_pairedScatter <- plotly::renderPlotly({
+    req_plot_space("ir_plot_pairedScatter")
+    encoded <- ir_encoded()
+    req(!is.null(encoded))
+    pars <- ir_params()
+    groups <- ir_compare_groups()
+    req(length(groups) >= 2)
+    pair_mode <- input$ir_pair_compare
+    if (is.null(pair_mode) || !nzchar(pair_mode)) {
+      ## Groups of the previous grouping, before its controls are rebuilt: keep
+      ## the drawn plot until the controls send the new groups.
+      x <- input$ir_pair_x_group
+      y <- input$ir_pair_y_group
+      req(isTRUE(x %in% groups), isTRUE(y %in% groups), cancelOutput = TRUE)
+      validate(need(x != y, "Select two different groups."))
+      ## X and Y are levels of the grouping column, not samples.
+      group_by <- pars$groupBy
+    } else {
+      meta <- ir_sample_meta()
+      req(!is.null(meta))
+      lvls <- sort(unique(meta[[pair_mode]]))
+      req(length(lvls) == 2L)
+      x <- meta$.sample_name[meta[[pair_mode]] == lvls[1]][1]
+      y <- meta$.sample_name[meta[[pair_mode]] == lvls[2]][1]
+      group_by <- NULL
+    }
+    ir_render_ggplotly(
+      ir_scatter_plotly(
+        ir_scatter_table(
+          encoded,
+          ir_clonecall_col(pars$cloneCall),
+          pars$chain,
+          ir_row_values(encoded, group_by),
+          x,
+          y,
+          ir_param("ir_p_dot_size", "total")
+        ),
         x,
         y,
-        ir_param("ir_p_dot_size", "total")
+        ir_param("ir_p_graph", "proportion")
       ),
-      x,
-      y,
-      ir_param("ir_p_graph", "proportion")
-    ),
-    "pairedScatter"
-  ) %>%
-    htmlwidgets::onRender(
-      ir_paired_scatter_look_js,
-      data = with(
-        current_page_display_defaults("ir"),
-        list(size = scatter_point_size, opacity = scatter_opacity)
+      "pairedScatter"
+    ) %>%
+      htmlwidgets::onRender(
+        ir_paired_scatter_look_js,
+        data = with(
+          current_page_display_defaults("ir"),
+          list(size = scatter_point_size, opacity = scatter_opacity)
+        )
       )
+  }) %>%
+    ir_bindCache(
+      ir_params()$cloneCall,
+      ir_params()$chain,
+      ir_params()$groupBy,
+      input$ir_pair_compare,
+      input$ir_pair_x_group,
+      input$ir_pair_y_group,
+      ir_param("ir_p_graph", "proportion"),
+      ir_param("ir_p_dot_size", "total")
     )
-}) %>%
-  ir_bindCache(
-    ir_params()$cloneCall,
-    ir_params()$chain,
-    ir_params()$groupBy,
-    input$ir_pair_compare,
-    input$ir_pair_x_group,
-    input$ir_pair_y_group,
-    ir_param("ir_p_graph", "proportion"),
-    ir_param("ir_p_dot_size", "total")
-  )
+  invisible(NULL)
+})
 
 ## Faceted paired scatter -> static patchwork grid (plotly cannot lay out the
 ## multi-panel grid cleanly, so this variant stays a ggplot).
@@ -1884,67 +1916,74 @@ output$ir_plot_clonalAbundance <- renderCerebroChart({
 ## native Plotly polygons via the compare_helpers.R pure functions. The `area`
 ## graph mode was dropped: Compare is about tracking clones across groups, which
 ## is the alluvial, and mixing a plotOutput/plotlyOutput per mode is not worth it.
-output$ir_plot_clonalCompare <- plotly::renderPlotly({
-  req_plot_space("ir_plot_clonalCompare")
-  samples <- input$ir_compare_samples
-  req(!is.null(samples) && length(samples) >= 2)
-  ## Samples of the previous grouping, before its selector is rebuilt: keep the
-  ## drawn plot until the selector sends the new groups.
-  req(all(samples %in% ir_compare_groups()), cancelOutput = TRUE)
-  encoded <- ir_encoded()
-  req(!is.null(encoded))
-  pars <- ir_params()
-  proportion <- isTRUE(ir_param("ir_p_compare_prop", TRUE))
+ir_define_with_tab("Compare", function() {
+  output$ir_plot_clonalCompare <- plotly::renderPlotly({
+    req_plot_space("ir_plot_clonalCompare")
+    samples <- input$ir_compare_samples
+    req(!is.null(samples) && length(samples) >= 2)
+    ## Samples of the previous grouping, before its selector is rebuilt: keep the
+    ## drawn plot until the selector sends the new groups.
+    req(all(samples %in% ir_compare_groups()), cancelOutput = TRUE)
+    encoded <- ir_encoded()
+    req(!is.null(encoded))
+    pars <- ir_params()
+    proportion <- isTRUE(ir_param("ir_p_compare_prop", TRUE))
 
-  tryCatch(
-    {
-      ## clonalCompare(exportTable = TRUE), counted for the compared groups
-      ## only. The alluvial below follows the selection order, so order.by
-      ## does not change it.
-      clone_col <- ir_clonecall_col(pars$cloneCall)
-      tab <- ir_compare_table(
-        encoded,
-        clone_col,
-        chain = pars$chain,
-        groups = ir_row_values(encoded, pars$groupBy),
-        units = samples,
-        top_clones = as.numeric(ir_param("ir_p_top_clones", 10)),
-        proportion = proportion,
-        clone_rank = ir_clone_rank(encoded, clone_col, pars$chain),
-        clone_names = function(ids) {
-          ir_clone_names(encoded, clone_col, pars$chain, ids)
+    tryCatch(
+      {
+        ## clonalCompare(exportTable = TRUE), counted for the compared groups
+        ## only. The alluvial below follows the selection order, so order.by
+        ## does not change it.
+        clone_col <- ir_clonecall_col(pars$cloneCall)
+        tab <- ir_compare_table(
+          encoded,
+          clone_col,
+          chain = pars$chain,
+          groups = ir_row_values(encoded, pars$groupBy),
+          units = samples,
+          top_clones = as.numeric(ir_param("ir_p_top_clones", 10)),
+          proportion = proportion,
+          clone_rank = ir_clone_rank(encoded, clone_col, pars$chain),
+          clone_names = function(ids) {
+            ir_clone_names(encoded, clone_col, pars$chain, ids)
+          }
+        )
+        prep <- ir_prepare_compare_alluvial(
+          tab,
+          samples,
+          proportion = proportion
+        )
+        if (!isTRUE(prep$ok)) {
+          return(ir_empty_plotly(prep$message))
         }
-      )
-      prep <- ir_prepare_compare_alluvial(tab, samples, proportion = proportion)
-      if (!isTRUE(prep$ok)) {
-        return(ir_empty_plotly(prep$message))
+        ir_compare_alluvial_plotly(
+          prep,
+          palette = IR_COMPARE_PALETTE,
+          theme = cerebro_plotly_theme(),
+          hoverlabel = cerebro_plotly_hoverlabel()
+        )
+      },
+      error = function(e) {
+        ## validate()/req() keep their usual placeholder.
+        if (inherits(e, "shiny.silent.error")) {
+          stop(e)
+        }
+        ir_plot_failed()
+        ir_empty_plotly(paste("Compare plot error:", conditionMessage(e)))
       }
-      ir_compare_alluvial_plotly(
-        prep,
-        palette = IR_COMPARE_PALETTE,
-        theme = cerebro_plotly_theme(),
-        hoverlabel = cerebro_plotly_hoverlabel()
-      )
-    },
-    error = function(e) {
-      ## validate()/req() keep their usual placeholder.
-      if (inherits(e, "shiny.silent.error")) {
-        stop(e)
-      }
-      ir_plot_failed()
-      ir_empty_plotly(paste("Compare plot error:", conditionMessage(e)))
-    }
-  )
-}) %>%
-  ir_bindCache(
-    ir_params()$cloneCall,
-    ir_params()$chain,
-    ir_params()$groupBy,
-    input$ir_compare_samples,
-    as.numeric(ir_param("ir_p_top_clones", 10)),
-    isTRUE(ir_param("ir_p_compare_prop", TRUE)),
-    ir_order_by()
-  )
+    )
+  }) %>%
+    ir_bindCache(
+      ir_params()$cloneCall,
+      ir_params()$chain,
+      ir_params()$groupBy,
+      input$ir_compare_samples,
+      as.numeric(ir_param("ir_p_top_clones", 10)),
+      isTRUE(ir_param("ir_p_compare_prop", TRUE)),
+      ir_order_by()
+    )
+  invisible(NULL)
+})
 
 ## The diversity plot as Plotly traces, without ggplotly: one box per x level
 ## (quartiles and 1.5 IQR whiskers computed here, as geom_boxplot does) and the
@@ -2175,45 +2214,48 @@ ir_plot_clonal_diversity <- function(
     )
 }
 
-output$ir_plot_clonalDiversity <- plotly::renderPlotly({
-  req_plot_space("ir_plot_clonalDiversity")
-  encoded <- ir_encoded()
-  req(!is.null(encoded))
-  pars <- ir_params()
-  metric <- ir_param("ir_p_metric", "shannon")
-  x_axis <- ir_param("ir_p_x_axis", "")
-  x_axis <- if (is.null(x_axis) || !nzchar(x_axis)) NULL else x_axis
-  n_boots <- as.numeric(ir_param("ir_p_n_boots", 20))
-  if (is.na(n_boots) || n_boots < 1) {
-    n_boots <- 20
-  }
-  ir_render_ggplotly(
-    ir_plot_clonal_diversity(
-      encoded,
-      clone_call = pars$cloneCall,
-      chain = pars$chain,
-      group_by = pars$groupBy,
-      metric = metric,
-      x_axis = x_axis,
-      n_boots = n_boots,
-      palette = IR_PALETTE,
-      plotly = TRUE,
-      order_by = ir_order_by(),
-      groups = ir_row_values(encoded, pars$groupBy),
-      x_values = ir_row_values(encoded, x_axis)
-    ),
-    "clonalDiversity"
-  )
-}) %>%
-  ir_bindCache(
-    ir_params()$cloneCall,
-    ir_params()$chain,
-    ir_params()$groupBy,
-    ir_param("ir_p_metric", "shannon"),
-    ir_param("ir_p_x_axis", ""),
-    ir_param("ir_p_n_boots", 20),
-    ir_order_by()
-  )
+ir_define_with_tab("Diversity", function() {
+  output$ir_plot_clonalDiversity <- plotly::renderPlotly({
+    req_plot_space("ir_plot_clonalDiversity")
+    encoded <- ir_encoded()
+    req(!is.null(encoded))
+    pars <- ir_params()
+    metric <- ir_param("ir_p_metric", "shannon")
+    x_axis <- ir_param("ir_p_x_axis", "")
+    x_axis <- if (is.null(x_axis) || !nzchar(x_axis)) NULL else x_axis
+    n_boots <- as.numeric(ir_param("ir_p_n_boots", 20))
+    if (is.na(n_boots) || n_boots < 1) {
+      n_boots <- 20
+    }
+    ir_render_ggplotly(
+      ir_plot_clonal_diversity(
+        encoded,
+        clone_call = pars$cloneCall,
+        chain = pars$chain,
+        group_by = pars$groupBy,
+        metric = metric,
+        x_axis = x_axis,
+        n_boots = n_boots,
+        palette = IR_PALETTE,
+        plotly = TRUE,
+        order_by = ir_order_by(),
+        groups = ir_row_values(encoded, pars$groupBy),
+        x_values = ir_row_values(encoded, x_axis)
+      ),
+      "clonalDiversity"
+    )
+  }) %>%
+    ir_bindCache(
+      ir_params()$cloneCall,
+      ir_params()$chain,
+      ir_params()$groupBy,
+      ir_param("ir_p_metric", "shannon"),
+      ir_param("ir_p_x_axis", ""),
+      ir_param("ir_p_n_boots", 20),
+      ir_order_by()
+    )
+  invisible(NULL)
+})
 
 ## The clone-size shares of every unit as ir_homeostasis_plot() stacks them:
 ## units sorted (or by order.by), the smallest clone group at the bottom, each
@@ -2273,25 +2315,28 @@ output$ir_plot_clonalHomeostasis <- renderCerebroChart({
 ## matrix before fitting its model, which kept the Shiny R process busy for
 ## close to a minute on Ren's 194 samples; this is linear in the rows and
 ## keeps the same group, linkage and threshold controls.
-output$ir_plot_clonalSizeDistribution <- plotly::renderPlotly({
-  req_plot_space("ir_plot_clonalSizeDistribution")
-  ## Until the toolbar binds them, chain and grouping stand at the values they
-  ## bind with (ir_params()), so a switch from Clonal projection draws at once.
-  req(ir_chain_groupBy()$chain)
-  ir_render_ggplotly(
-    ir_size_profile_plot(
-      ir_size_distribution_profile(),
-      method = ir_param("ir_p_sd_method", "ward.D2")
-    ),
-    "clonalSizeDistribution"
-  )
-}) %>%
-  ir_bindCache(
-    ir_chain_groupBy()$chain,
-    ir_chain_groupBy()$groupBy,
-    ir_param("ir_p_sd_method", "ward.D2"),
-    ir_param("ir_p_sd_threshold", 1)
-  )
+ir_define_with_tab("SizeDist", function() {
+  output$ir_plot_clonalSizeDistribution <- plotly::renderPlotly({
+    req_plot_space("ir_plot_clonalSizeDistribution")
+    ## Until the toolbar binds them, chain and grouping stand at the values they
+    ## bind with (ir_params()), so a switch from Clonal projection draws at once.
+    req(ir_chain_groupBy()$chain)
+    ir_render_ggplotly(
+      ir_size_profile_plot(
+        ir_size_distribution_profile(),
+        method = ir_param("ir_p_sd_method", "ward.D2")
+      ),
+      "clonalSizeDistribution"
+    )
+  }) %>%
+    ir_bindCache(
+      ir_chain_groupBy()$chain,
+      ir_chain_groupBy()$groupBy,
+      ir_param("ir_p_sd_method", "ward.D2"),
+      ir_param("ir_p_sd_threshold", 1)
+    )
+  invisible(NULL)
+})
 
 ## ---- Sharing: cross-group clonotype sharing ---------------------------- ##
 ## The sharing unit as the plot reads it: the toolbar shows its selector on
@@ -2311,58 +2356,61 @@ ir_sharing_unit <- viewerControlValue(input, "ir_sharing_unit", function() {
 ## Classifies each clonotype (V+J+CDR3 of the active chain) as Private /
 ## Public(within-group) / Public(cross-group) using the chosen sharing unit and
 ## the active group.by, then bars the class counts.
-output$ir_plot_cloneSharing <- plotly::renderPlotly({
-  ## Self-made plot (ir_build_sharing_plot in data.R) — does NOT call
-  ## scRepertoire, so gate on the cheap availability probe only and never load
-  ## the namespace here.
-  req(has_scRepertoire())
-  req_plot_space("ir_plot_cloneSharing")
-  ## Chain, grouping and sharing unit stand at the values their controls bind
-  ## with until the toolbar is rebuilt for this tab (ir_params(),
-  ## ir_sharing_unit()), so a switch from Clonal projection draws at once.
-  pars <- ir_chain_groupBy()
-  unit <- ir_sharing_unit()
-  req(pars$chain, unit)
-  encoded <- ir_encoded()
-  req(!is.null(encoded))
-  fig <- ir_render_ggplotly(
-    ir_build_sharing_plot(
-      encoded,
-      specific_chain(),
-      unit,
-      pars$groupBy,
-      ir_cell_metadata()
-    ),
-    "ir_plot_cloneSharing",
-    tooltip = "text"
-  )
-  # The on-bar count labels come through as their own text-mode traces; stop
-  # them showing a second (redundant) tooltip on hover, so only the bars react.
-  if (inherits(fig, "plotly") && !is.null(fig$x$data)) {
-    fig$x$data <- lapply(fig$x$data, function(tr) {
-      if (identical(tr$mode, "text")) {
-        tr$hoverinfo <- "skip"
-      }
-      tr
-    })
-    # ggplotly ignores the ggplot `legend.position` and drops a horizontal
-    # legend along the TOP, where it collided with the plot title. Move it below
-    # the plot so the title sits cleanly on its own row.
-    fig <- plotly::layout(
-      fig,
-      legend = list(
-        orientation = "h",
-        x = 0.5,
-        xanchor = "center",
-        y = -0.14,
-        yanchor = "top"
-      )
+ir_define_with_tab("Clone Sharing", function() {
+  output$ir_plot_cloneSharing <- plotly::renderPlotly({
+    ## Self-made plot (ir_build_sharing_plot in data.R) — does NOT call
+    ## scRepertoire, so gate on the cheap availability probe only and never load
+    ## the namespace here.
+    req(has_scRepertoire())
+    req_plot_space("ir_plot_cloneSharing")
+    ## Chain, grouping and sharing unit stand at the values their controls bind
+    ## with until the toolbar is rebuilt for this tab (ir_params(),
+    ## ir_sharing_unit()), so a switch from Clonal projection draws at once.
+    pars <- ir_chain_groupBy()
+    unit <- ir_sharing_unit()
+    req(pars$chain, unit)
+    encoded <- ir_encoded()
+    req(!is.null(encoded))
+    fig <- ir_render_ggplotly(
+      ir_build_sharing_plot(
+        encoded,
+        specific_chain(),
+        unit,
+        pars$groupBy,
+        ir_cell_metadata()
+      ),
+      "ir_plot_cloneSharing",
+      tooltip = "text"
     )
-  }
-  fig
-}) %>%
-  ir_bindCache(
-    ir_chain_groupBy()$chain,
-    ir_chain_groupBy()$groupBy,
-    ir_sharing_unit()
-  )
+    # The on-bar count labels come through as their own text-mode traces; stop
+    # them showing a second (redundant) tooltip on hover, so only the bars react.
+    if (inherits(fig, "plotly") && !is.null(fig$x$data)) {
+      fig$x$data <- lapply(fig$x$data, function(tr) {
+        if (identical(tr$mode, "text")) {
+          tr$hoverinfo <- "skip"
+        }
+        tr
+      })
+      # ggplotly ignores the ggplot `legend.position` and drops a horizontal
+      # legend along the TOP, where it collided with the plot title. Move it below
+      # the plot so the title sits cleanly on its own row.
+      fig <- plotly::layout(
+        fig,
+        legend = list(
+          orientation = "h",
+          x = 0.5,
+          xanchor = "center",
+          y = -0.14,
+          yanchor = "top"
+        )
+      )
+    }
+    fig
+  }) %>%
+    ir_bindCache(
+      ir_chain_groupBy()$chain,
+      ir_chain_groupBy()$groupBy,
+      ir_sharing_unit()
+    )
+  invisible(NULL)
+})

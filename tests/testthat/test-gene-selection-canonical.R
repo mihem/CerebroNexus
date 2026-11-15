@@ -8,7 +8,16 @@ gene_selection_body <- function(file, output) {
     file.path(root, file),
     paste0("output.", output)
   )
-  assignment[[3]][[2]]
+  body <- assignment[[3]][[2]]
+  ## A table is defined as viewerLazyRender(function() DT::renderDataTable(...)).
+  if (identical(assignment[[3]][[1]], as.name("viewerLazyRender"))) {
+    render <- body[[3]]
+    if (is.call(render) && identical(render[[1]], as.name("{"))) {
+      render <- render[[2]]
+    }
+    body <- render[[2]]
+  }
+  body
 }
 
 test_that("Gene summary and table resolve canonical barcodes after deferred identity", {

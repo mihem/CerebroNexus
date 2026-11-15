@@ -155,7 +155,7 @@ trajectory_client_percentage_fields <- function() {
 ## the current request; an earlier one would show the previous state.
 trajectory_projection_request <- function() {
   list(
-    color_variable = input[["trajectory_point_color"]],
+    color_variable = trajectory_point_color(),
     filters = trajectory_active_group_filters(),
     percentage = trajectory_server_percentage()
   )
@@ -167,14 +167,14 @@ trajectory_projection_prepared_raw <- reactive({
   dataset_context <- viewer_loaded_dataset_context()
   req(
     trajectory_selection_ok(),
-    input[["trajectory_point_color"]]
+    trajectory_point_color()
   )
 
   trajectory_data <- trajectory_data_reactive()
 
   request <- trajectory_projection_request()
   group_filters <- request$filters
-  color_variable <- input[["trajectory_point_color"]]
+  color_variable <- trajectory_point_color()
   ## Sampling and shuffling are random. The same cells and request (evaluated
   ## again because a control bound with its current value) reuse the drawn
   ## cells, so the frame is identical and is not sent again. The cells are a
@@ -185,8 +185,8 @@ trajectory_projection_prepared_raw <- reactive({
     list(
       dataset_context,
       trajectory_data,
-      input[["trajectory_selected_method"]],
-      input[["trajectory_selected_name"]],
+      trajectory_selected_method(),
+      trajectory_selected_name(),
       request,
       color_variable
     ),
@@ -268,8 +268,8 @@ trajectory_projection_parameters_other <- reactiveValues(
 
 observeEvent(
   {
-    input[["trajectory_selected_method"]]
-    input[["trajectory_selected_name"]]
+    trajectory_selected_method()
+    trajectory_selected_name()
   },
   {
     trajectory_projection_parameters_other[["reset_axes"]] <- TRUE
@@ -316,7 +316,7 @@ trajectory_client_filters <- viewerClientFilters(
 ## The Viewer Pack frame for every trajectory cell, filters aside.
 trajectory_static_frame <- reactive({
   req(trajectory_selection_ok())
-  color_variable <- input[["trajectory_point_color"]]
+  color_variable <- trajectory_point_color()
   groups <- getGroups()
   if (
     !(identical(color_variable, "state") ||
@@ -325,8 +325,8 @@ trajectory_static_frame <- reactive({
   ) {
     return(NULL)
   }
-  method <- input[["trajectory_selected_method"]]
-  name <- input[["trajectory_selected_name"]]
+  method <- trajectory_selected_method()
+  name <- trajectory_selected_name()
   resource <- viewerTrajectoryFrameAsset(method, name)
   if (is.null(resource)) {
     return(NULL)
@@ -463,7 +463,7 @@ observe({
         draw_border = isTRUE(trajectory_projection_appearance$draw_border),
         keep_square = isTRUE(trajectory_projection_appearance$keep_square)
       )),
-      space_label = input[["trajectory_selected_name"]]
+      space_label = trajectory_selected_name()
     )
     primary <- list(
       color = as.list(unname(static_frame$colors)),
@@ -621,7 +621,7 @@ observe({
     color_assignments = color_assignments,
     hover_columns = list(),
     hover = FALSE,
-    space_label = input[["trajectory_selected_name"]]
+    space_label = trajectory_selected_name()
   )
   payload$data <- c(payload$data, trajectory_client_percentage_fields())
   selection_rows <- payload$data$selection_key
@@ -728,10 +728,10 @@ trajectory_projection_selected_cells <- reactive({
     selection,
     input[["trajectory_projection_hidden_groups"]],
     viewer_loaded_dataset_context(),
-    input[["trajectory_point_color"]],
+    trajectory_point_color(),
     function() {
       trajectory_cells_reactive(
-        input[["trajectory_point_color"]],
+        trajectory_point_color(),
         barcodes = TRUE
       )
     },
@@ -746,6 +746,6 @@ viewerSelectionSummaryOutputs(
   "trajectory_projection",
   "trajectory_number_of_selected_cells",
   function() trajectory_projection_selected_cells(),
-  source = function() input[["trajectory_selected_name"]],
-  color = function() input[["trajectory_point_color"]]
+  source = function() trajectory_selected_name(),
+  color = function() trajectory_point_color()
 )

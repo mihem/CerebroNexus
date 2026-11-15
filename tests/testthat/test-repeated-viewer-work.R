@@ -105,6 +105,8 @@ test_that("IR non-select controls preserve valid values including false and empt
   repeat_definitions(viewer_test_path("immune_repertoire", "settings.R"), env)
   source(viewer_test_path("immune_repertoire", "param_spec.R"), local = env)
   env$input <- list(ir_tabs = "Homeostasis", ir_p_clone_size = "custom")
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R).
+  local(ir_tab <- function() input$ir_tabs, envir = env)
   expect_match(
     as.character(env$ir_analysis_panel()),
     'value="custom"',
@@ -141,6 +143,12 @@ test_that("Groups shares counts across display forms but refreshes data", {
       counter$calls <- 0L
       generation <- shiny::reactiveVal(1)
       getGroups <- function() c("a", "b")
+      ## Page code reads the group controls through viewerControlValue()
+      ## (select_group.R); here they are the inputs themselves.
+      groups_selected_group <- function() input[["groups_selected_group"]]
+      groups_by_other_group_second_group <- function() {
+        input[["groups_by_other_group_second_group"]]
+      }
       repeat_definitions(
         viewer_test_path("groups", "composition.R"),
         environment()

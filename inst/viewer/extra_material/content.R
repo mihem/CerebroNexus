@@ -59,33 +59,86 @@ output[["extra_material_content_UI"]] <- renderUI({
 })
 
 ##----------------------------------------------------------------------------##
+## The content selectors and switches as the first view reads them: bound, or
+## until bound the value extra_material_content_selectors() and the switches
+## start with, so the table or plot does not wait for each level of controls to
+## reach the browser and back.
+##----------------------------------------------------------------------------##
+extra_material_file <- viewerControlValue(
+  input,
+  "extra_material_selected_file",
+  function() {
+    if (
+      identical(extra_material_category(), "tables") && checkForExtraTables()
+    ) {
+      viewerFirstChoice(extra_material_table_choices(
+        extra_material_table_groups()
+      ))
+    }
+  }
+)
+extra_material_content <- viewerControlValue(
+  input,
+  "extra_material_selected_content",
+  function() {
+    category <- extra_material_category()
+    if (identical(category, "tables") && checkForExtraTables()) {
+      extra_material_table_selection(
+        extra_material_table_groups(),
+        file_key = extra_material_file(),
+        load = FALSE
+      )$sheet$key
+    } else if (identical(category, "plots") && isTRUE(checkForExtraPlots())) {
+      viewerFirstChoice(getNamesOfExtraPlots())
+    }
+  }
+)
+extra_material_number_formatting <- viewerControlValue(
+  input,
+  "extra_material_table_number_formatting",
+  function() TRUE
+)
+extra_material_color_highlighting <- viewerControlValue(
+  input,
+  "extra_material_table_color_highlighting",
+  function() TRUE
+)
+extra_material_plot_interactive <- viewerControlValue(
+  input,
+  "extra_material_plot_interactive_switch",
+  function() TRUE
+)
+
+##----------------------------------------------------------------------------##
 ## Table.
 ##----------------------------------------------------------------------------##
-output[["extra_material_table"]] <- DT::renderDataTable({
-  req(input[["extra_material_selected_category"]] == "tables")
-  selection <- extra_material_table_selection(
-    extra_material_table_groups(),
-    file_key = input[["extra_material_selected_file"]],
-    sheet_key = input[["extra_material_selected_content"]]
-  )
-  req(!is.null(selection))
-  results_df <- selection$sheet$table
-  ## don't proceed if input is not a data frame
-  req(is.data.frame(results_df))
-  cerebroResultTable(
-    results_df,
-    paste0(
-      "extra_material_tables_",
-      gsub(
-        "[^[:alnum:]_-]+",
-        "_",
-        paste(selection$group$label, selection$sheet$label, sep = "_")
-      )
-    ),
-    number_formatting = input[["extra_material_table_number_formatting"]],
-    color_highlighting = input[["extra_material_table_color_highlighting"]],
-    filter = extra_material_table_filter(nrow(results_df), ncol(results_df))
-  )
+output[["extra_material_table"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    req(extra_material_category() == "tables")
+    selection <- extra_material_table_selection(
+      extra_material_table_groups(),
+      file_key = extra_material_file(),
+      sheet_key = extra_material_content()
+    )
+    req(!is.null(selection))
+    results_df <- selection$sheet$table
+    ## don't proceed if input is not a data frame
+    req(is.data.frame(results_df))
+    cerebroResultTable(
+      results_df,
+      paste0(
+        "extra_material_tables_",
+        gsub(
+          "[^[:alnum:]_-]+",
+          "_",
+          paste(selection$group$label, selection$sheet$label, sep = "_")
+        )
+      ),
+      number_formatting = extra_material_number_formatting(),
+      color_highlighting = extra_material_color_highlighting(),
+      filter = extra_material_table_filter(nrow(results_df), ncol(results_df))
+    )
+  })
 })
 
 ##----------------------------------------------------------------------------##
@@ -97,8 +150,8 @@ output[["extra_material_table"]] <- DT::renderDataTable({
 ## switch status
 ##----------------------------------------------------------------------------##
 output[["extra_material_plot_UI"]] <- renderUI({
-  req(!is.null(input[["extra_material_plot_interactive_switch"]]))
-  if (input[["extra_material_plot_interactive_switch"]] == TRUE) {
+  req(!is.null(extra_material_plot_interactive()))
+  if (extra_material_plot_interactive() == TRUE) {
     plotly::plotlyOutput(
       "extra_material_plot_interactive",
       width = "auto",
@@ -116,22 +169,24 @@ output[["extra_material_plot_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 ## UI element that contains interactive version of plot
 ##----------------------------------------------------------------------------##
-output[["extra_material_plot_interactive"]] <- plotly::renderPlotly({
-  req(
-    input[["extra_material_selected_category"]],
-    input[["extra_material_selected_content"]]
-  )
-  ## fetch results
-  plot <- getExtraPlot(input[["extra_material_selected_content"]])
-  ## don't proceed if input is not of class "ggplot"
-  req("ggplot" %in% class(plot))
-  ## convert to plotly
-  plot <- plotly::ggplotly(plot)
-  ## return plot either with WebGL or without, depending on setting
-  if (preferences$use_webgl == TRUE) {
-    plot <- plot %>% plotly::toWebGL()
-  }
-  cerebro_plotly_toolbar(plot)
+output[["extra_material_plot_interactive"]] <- viewerLazyRender(function() {
+  plotly::renderPlotly({
+    req(
+      extra_material_category(),
+      extra_material_content()
+    )
+    ## fetch results
+    plot <- getExtraPlot(extra_material_content())
+    ## don't proceed if input is not of class "ggplot"
+    req("ggplot" %in% class(plot))
+    ## convert to plotly
+    plot <- plotly::ggplotly(plot)
+    ## return plot either with WebGL or without, depending on setting
+    if (preferences$use_webgl == TRUE) {
+      plot <- plot %>% plotly::toWebGL()
+    }
+    cerebro_plotly_toolbar(plot)
+  })
 })
 
 ##----------------------------------------------------------------------------##
@@ -139,11 +194,11 @@ output[["extra_material_plot_interactive"]] <- plotly::renderPlotly({
 ##----------------------------------------------------------------------------##
 output[["extra_material_plot_plain"]] <- renderPlot({
   req(
-    input[["extra_material_selected_category"]],
-    input[["extra_material_selected_content"]]
+    extra_material_category(),
+    extra_material_content()
   )
   ## fetch results
-  plot <- getExtraPlot(input[["extra_material_selected_content"]])
+  plot <- getExtraPlot(extra_material_content())
   ## don't proceed if input is not of class "ggplot"
   req("ggplot" %in% class(plot))
   return(plot)

@@ -14,8 +14,8 @@ trajectory_selection_present <- viewerSelectionPresence(
 
 output[["trajectory_selected_cells_table_UI"]] <- renderUI({
   req(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
+    trajectory_selected_method(),
+    trajectory_selected_name(),
     trajectory_selection_present()
   )
 
@@ -26,50 +26,54 @@ output[["trajectory_selected_cells_table_UI"]] <- renderUI({
 ## Table.
 ##----------------------------------------------------------------------------##
 
-output[["trajectory_details_selected_cells_table"]] <- DT::renderDataTable({
-  ## The browser lists a selection it reported by row.
-  req(!viewerClientSelection("trajectory_projection", "table"))
-  ## Selection identity is sufficient; appearance controls are initialized
-  ## lazily and must not prevent a selected-cell table from rendering.
-  req(trajectory_selection_ok())
+output[["trajectory_details_selected_cells_table"]] <- viewerLazyRender(
+  function() {
+    DT::renderDataTable({
+      ## The browser lists a selection it reported by row.
+      req(!viewerClientSelection("trajectory_projection", "table"))
+      ## Selection identity is sufficient; appearance controls are initialized
+      ## lazily and must not prevent a selected-cell table from rendering.
+      req(trajectory_selection_ok())
 
-  selected_cells <- trajectory_projection_selected_cells()
-  cells_df <- trajectory_cells_reactive(
-    colnames(viewerProjectionFirstFrameMetadata()),
-    barcodes = TRUE
-  )
-  ## A selection by row is matched by position; the table then matches the
-  ## names of the selected cells only.
-  selected <- viewerSelectionRows(selected_cells)
-  if (!is.null(selected)) {
-    cells_df <- cells_df[
-      viewerRowMask(selected, cells_df[["cell_index"]]),
-      ,
-      drop = FALSE
-    ]
-    selected_cells <- data.frame(
-      selection_key = as.character(cells_df[["cell_barcode"]])
-    )
+      selected_cells <- trajectory_projection_selected_cells()
+      cells_df <- trajectory_cells_reactive(
+        colnames(viewerProjectionFirstFrameMetadata()),
+        barcodes = TRUE
+      )
+      ## A selection by row is matched by position; the table then matches the
+      ## names of the selected cells only.
+      selected <- viewerSelectionRows(selected_cells)
+      if (!is.null(selected)) {
+        cells_df <- cells_df[
+          viewerRowMask(selected, cells_df[["cell_index"]]),
+          ,
+          drop = FALSE
+        ]
+        selected_cells <- data.frame(
+          selection_key = as.character(cells_df[["cell_barcode"]])
+        )
+      }
+
+      ## The shared table expects the coordinates as its first two columns and
+      ## drops them from the output; the trajectory's own DR_1/DR_2 stay in place.
+      ## Selections match by barcode, falling back to "DR_1-DR_2" coordinates for
+      ## older Plotly event payloads without a stable selection_key.
+      cerebroSelectedCellsTable(
+        cells_df = cbind(cells_df[, c("DR_1", "DR_2"), drop = FALSE], cells_df),
+        empty_data = viewerProjectionFirstFrameMetadata(),
+        selection = selected_cells,
+        fallback_key = "identifier",
+        number_formatting = input[[
+          "trajectory_details_selected_cells_table_number_formatting"
+        ]],
+        color_highlighting = input[[
+          "trajectory_details_selected_cells_table_color_highlighting"
+        ]],
+        download_file_name = "trajectory_details_of_selected_cells"
+      )
+    })
   }
-
-  ## The shared table expects the coordinates as its first two columns and
-  ## drops them from the output; the trajectory's own DR_1/DR_2 stay in place.
-  ## Selections match by barcode, falling back to "DR_1-DR_2" coordinates for
-  ## older Plotly event payloads without a stable selection_key.
-  cerebroSelectedCellsTable(
-    cells_df = cbind(cells_df[, c("DR_1", "DR_2"), drop = FALSE], cells_df),
-    empty_data = viewerProjectionFirstFrameMetadata(),
-    selection = selected_cells,
-    fallback_key = "identifier",
-    number_formatting = input[[
-      "trajectory_details_selected_cells_table_number_formatting"
-    ]],
-    color_highlighting = input[[
-      "trajectory_details_selected_cells_table_color_highlighting"
-    ]],
-    download_file_name = "trajectory_details_of_selected_cells"
-  )
-})
+)
 
 ##----------------------------------------------------------------------------##
 ## The trajectory's own columns for the table of selected cells the browser
@@ -98,8 +102,8 @@ trajectory_table_resource <- reactive({
     paste0(
       rlang::hash(list(
         viewerDatasetIdentity(),
-        input[["trajectory_selected_method"]],
-        input[["trajectory_selected_name"]],
+        trajectory_selected_method(),
+        trajectory_selected_name(),
         sum(keep)
       )),
       ".bin"

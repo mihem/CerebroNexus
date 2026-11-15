@@ -22,19 +22,38 @@ ir_test_call <- function(expr, name) {
   NULL
 }
 
+## The assignment of `key`, at the top level or inside a call: the plotly
+## outputs are defined in ir_define_with_tab(tab, function() ...).
+ir_test_assignment <- function(expr, key) {
+  if (!is.call(expr)) {
+    return(NULL)
+  }
+  if (
+    as.character(expr[[1]])[1] %in%
+      c("<-", "=") &&
+      identical(viewer_server_key(expr[[2]]), key)
+  ) {
+    return(expr)
+  }
+  parts <- as.list(expr)[-1L]
+  for (i in seq_along(parts)) {
+    ## an empty argument (x[, 1]) is no expression to search
+    if (identical(parts[[i]], quote(expr = ))) {
+      next
+    }
+    found <- ir_test_assignment(parts[[i]], key)
+    if (!is.null(found)) return(found)
+  }
+  NULL
+}
+
 ir_test_body <- function(file, output, wrapper, env) {
   exprs <- parse(file.path(ir_test_root, file))
-  expr <- Filter(
-    function(x) {
-      is.call(x) &&
-        as.character(x[[1]])[1] %in% c("<-", "=") &&
-        identical(
-          viewer_server_key(x[[2]]),
-          paste0("output.", output)
-        )
-    },
-    as.list(exprs)
-  )[[1]]
+  expr <- NULL
+  for (x in as.list(exprs)) {
+    expr <- ir_test_assignment(x, paste0("output.", output))
+    if (!is.null(expr)) break
+  }
   body <- ir_test_call(expr[[3]], wrapper)[[2]]
   eval(call("function", as.pairlist(list()), body), env)
 }
@@ -143,6 +162,8 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   env$getGroups <- function() c("group", "missing")
   env$input <- list(ir_groupBy = "group")
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
+  env$ir_tab <- function() "Abundance"
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
@@ -231,6 +252,8 @@ test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
   env$getGroups <- function() "group"
   env$input <- list(ir_groupBy = "group", ir_cloneCall = "aa", ir_chain = "TRB")
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
+  env$ir_tab <- function() "Abundance"
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,

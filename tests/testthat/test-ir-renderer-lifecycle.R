@@ -1,3 +1,21 @@
+## The statements of an IR file, those of ir_define_with_tab(tab, function()
+## ...) (the plotly outputs) as top-level ones.
+ir_unwrapped_statements <- function(file) {
+  unlist(
+    lapply(
+      viewer_server_statements("immune_repertoire", file),
+      function(x) {
+        if (is.call(x) && identical(x[[1]], as.name("ir_define_with_tab"))) {
+          as.list(x[[3]][[3]])[-1L]
+        } else {
+          list(x)
+        }
+      }
+    ),
+    recursive = FALSE
+  )
+}
+
 test_that("IR error handling preserves validation and renders useful failures", {
   scope <- ir_scope(
     c("ir_plot_cache_state", "ir_plot_failed", "safeRenderPlot"),
@@ -143,7 +161,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
       counts
     }
     viewer_server_load(
-      viewer_server_statements("immune_repertoire", "visualizations.R"),
+      ir_unwrapped_statements("visualizations.R"),
       scope,
       names = c(
         "IR_PALETTE",
@@ -309,7 +327,7 @@ clonal_projection_server <- function(names_resource = NULL) {
       )
     )
     viewer_server_load(
-      viewer_server_statements("immune_repertoire", "visualizations.R"),
+      ir_unwrapped_statements("visualizations.R"),
       scope,
       names = c(
         "IR_EXPANSION_COLORS",

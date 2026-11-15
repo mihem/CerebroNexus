@@ -76,6 +76,9 @@ test_that("stored expression metric preference survives a grouping change", {
   )))
   wanted <- c(
     "most_expressed_genes_available_groups",
+    "most_expressed_genes_group",
+    "most_expressed_genes_metric",
+    "most_expressed_genes_metric_choices",
     "most_expressed_genes_selected_tables",
     "most_expressed_genes_selected_table",
     "most_expressed_genes_metric_description",
@@ -104,6 +107,7 @@ test_that("stored expression metric preference survives a grouping change", {
       getMeanExpression <- function(group) {
         data.frame(group = "x", gene = "Gad1", mean_expr = 1.5)
       }
+      viewer_control_helpers_load(environment())
       for (definition in definitions) {
         eval(definition, environment())
       }
@@ -146,6 +150,11 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
   )))
   wanted <- c(
     "most_expressed_genes_available_groups",
+    "most_expressed_genes_group",
+    "most_expressed_genes_metric",
+    "most_expressed_genes_show_all",
+    "most_expressed_genes_subgroup",
+    "most_expressed_genes_metric_choices",
     "most_expressed_genes_selected_tables",
     "most_expressed_genes_selected_table",
     'output[["most_expressed_genes_table"]]'
@@ -190,6 +199,7 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
         )
         DT::datatable(results_df)
       }
+      viewer_control_helpers_load(environment())
       for (definition in definitions) {
         eval(definition, environment())
       }
@@ -212,6 +222,64 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
       expect_identical(captured$result$data[["Stored score"]], c(0.5, 50))
       expect_false(captured$result$formatting)
       expect_null(captured$result$percentage)
+    }
+  )
+})
+
+test_that("most expressed genes draw the first table before its controls bind", {
+  utilities <- viewer_test_path("utility_functions.R")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      renders <- 0L
+      shown <- NULL
+      getGroupsWithMostExpressedGenes <- function() c("cluster", "sample")
+      getGroupsWithMeanExpression <- function() "cluster"
+      viewerGetMostExpressedGenes <- function(group) {
+        data.frame(
+          cluster = factor(c("b", "a"), levels = c("a", "b")),
+          gene = c("X", "Y"),
+          pct = c(0.5, 0.2)
+        )
+      }
+      getMeanExpression <- function(group) {
+        data.frame(cluster = "a", gene = "X", mean_expr = 1)
+      }
+      cerebroRegisterInfo <- function(...) invisible(NULL)
+      cerebroResultTable <- function(results_df, ...) {
+        scope$renders <- scope$renders + 1L
+        scope$shown <- results_df
+        DT::datatable(results_df)
+      }
+      for (name in c("cerebroFilterResultRows", "cerebroResultSubgroupUI")) {
+        eval(viewer_r_assignment(utilities, name), scope)
+      }
+      viewer_control_helpers_load(scope)
+      sys.source(viewer_test_path("most_expressed_genes", "table.R"), scope)
+    },
+    {
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 1L)
+      ## Filtered to the subgroup the selector starts with.
+      expect_identical(scope$shown$gene, "Y")
+      expect_match(
+        output$most_expressed_genes_table_or_text_UI$html,
+        'value="pct" selected',
+        fixed = TRUE
+      )
+      ## The controls bind with the values the table was drawn with.
+      session$setInputs(
+        most_expressed_genes_selected_group = "cluster",
+        most_expressed_genes_metric_type = "pct",
+        most_expressed_genes_table_filter_switch = FALSE,
+        most_expressed_genes_table_select_group_level = "a"
+      )
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 1L)
+      session$setInputs(most_expressed_genes_table_select_group_level = "b")
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 2L)
+      expect_identical(scope$shown$gene, "X")
     }
   )
 })

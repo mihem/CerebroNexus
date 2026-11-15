@@ -68,6 +68,8 @@ test_that("marker result shell distinguishes missing and empty results", {
         reads <<- reads + 1L
         result()
       }
+      ## The first subgroup of a table depends on whether it is grouped.
+      getGroups <- function() character()
       cerebroResultTableControls <- function(...) p("Table controls")
       viewer_result_page_load("marker_genes", scope)
     },
@@ -115,6 +117,63 @@ test_that("marker result shell distinguishes missing and empty results", {
         class = "shiny.silent.error"
       )
       expect_identical(scope$reads, before)
+    }
+  )
+})
+
+test_that("the first result table needs no bound control and binding changes nothing", {
+  utilities <- viewer_test_path("utility_functions.R")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      renders <- 0L
+      shown <- NULL
+      getGroups <- function() "cluster"
+      getMethodsForMarkerGenes <- function() c("A", "B")
+      getGroupsWithMarkerGenes <- function(method) c("cluster", "sample")
+      getMarkerGenes <- function(method, group) {
+        data.frame(
+          cluster = factor(c("b", "a"), levels = c("a", "b")),
+          gene = c("X", "Y")
+        )
+      }
+      cerebroResultTableControls <- function(...) p("Table controls")
+      eval(viewer_r_assignment(utilities, "cerebroFilterResultRows"), scope)
+      cerebroResultTable <- function(results_df, ...) {
+        scope$renders <- scope$renders + 1L
+        scope$shown <- list(data = results_df, ...)
+        DT::datatable(results_df)
+      }
+      viewer_result_page_load("marker_genes", scope)
+    },
+    {
+      invisible(output$marker_genes_table)
+      expect_identical(scope$renders, 1L)
+      ## The first method and grouping, filtered to the first subgroup.
+      expect_identical(scope$shown$data$gene, "Y")
+      expect_identical(scope$shown[[2L]], "marker_genes_by_A_cluster")
+      expect_true(scope$shown$number_formatting)
+      expect_true(scope$shown$color_highlighting)
+      expect_match(
+        output$marker_genes_table_or_text_UI$html,
+        "Table controls",
+        fixed = TRUE
+      )
+      ## The controls bind with the values the table was drawn with.
+      session$setInputs(
+        marker_genes_selected_method = "A",
+        marker_genes_selected_table = "cluster",
+        marker_genes_table_filter_switch = FALSE,
+        marker_genes_table_number_formatting = TRUE,
+        marker_genes_table_color_highlighting = TRUE,
+        marker_genes_table_select_group_level = "a"
+      )
+      invisible(output$marker_genes_table)
+      expect_identical(scope$renders, 1L)
+      session$setInputs(marker_genes_table_select_group_level = "b")
+      invisible(output$marker_genes_table)
+      expect_identical(scope$renders, 2L)
+      expect_identical(scope$shown$data$gene, "X")
     }
   )
 })

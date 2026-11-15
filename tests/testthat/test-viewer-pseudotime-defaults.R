@@ -32,6 +32,9 @@ test_that("pseudotime controls consume author defaults and hiding the trend stil
     )
     trajectory_data_reactive <- function() list(meta = cells)
     trajectory_cells_reactive <- function(...) cells
+    ## The trajectory's control values (trajectory/server.R), read as bound.
+    trajectory_selected_method <- function() input$trajectory_selected_method
+    trajectory_selected_name <- function() input$trajectory_selected_name
     assignColorsToGroups <- function(...) c(A = "#008080")
     cerebro_plotly_theme <- function() {
       list(transparent = "transparent", axis = "#222222", accent = "#cc6600")

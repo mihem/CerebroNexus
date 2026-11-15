@@ -150,10 +150,34 @@ viewer_server_load <- function(
   invisible(NULL)
 }
 
+## Define in `scope` the utility_functions.R helpers page code reads its
+## renderUI controls and lazy outputs with, unless `scope` stubs them.
+viewer_control_helpers_load <- function(scope) {
+  names <- c(
+    "viewerPublishChanged",
+    "viewerControlValue",
+    "viewerLazyRender",
+    "viewerFirstChoice",
+    "cerebroResultSubgroupDefault"
+  )
+  names <- names[!vapply(names, exists, logical(1), scope, inherits = FALSE)]
+  for (statement in as.list(parse(viewer_test_path("utility_functions.R")))) {
+    if (
+      is.call(statement) &&
+        as.character(statement[[1]])[1] %in% c("<-", "=") &&
+        viewer_server_key(statement[[2]]) %in% names
+    ) {
+      eval(statement, scope)
+    }
+  }
+  invisible(scope)
+}
+
 ## Load a stored-result page (marker_genes, enriched_pathways) into `scope`.
 ## The shared cerebroResultPageServer() is evaluated in `scope` too, so stubs
 ## defined there (getters, cerebroResultTableControls, ...) are the ones used.
 viewer_result_page_load <- function(page, scope) {
+  viewer_control_helpers_load(scope)
   eval(
     viewer_r_assignment(
       viewer_test_path("utility_functions.R"),

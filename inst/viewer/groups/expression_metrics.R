@@ -77,24 +77,24 @@ for (metric in names(groups_metric_specs)) {
         input[["groups_expression_metrics_render_request"]],
         groups_metrics_prefetching ||
           identical(input[["groups_expression_metrics_tabs"]], spec$title),
-        input[["groups_selected_group"]] %in% getGroups(),
+        groups_selected_group() %in% getGroups(),
         ## The tab input outlives a data set switch until the tabs are built
         ## again; a data set without this metric has no plot for it.
         metric %in% colnames(viewerProjectionFirstFrameMetadata())
       )
       cerebroViolinData(
-        table = groupsMetricData(input[["groups_selected_group"]], metric),
+        table = groupsMetricData(groups_selected_group(), metric),
         metric = metric,
-        coloring_variable = input[["groups_selected_group"]],
-        colors = reactive_group_colors(input[["groups_selected_group"]]),
+        coloring_variable = groups_selected_group(),
+        colors = reactive_group_colors(groups_selected_group()),
         y_title = spec$y_title,
         mode = spec$mode
       )
     }) %>%
       cachePlot(
-        input[["groups_selected_group"]],
+        groups_selected_group(),
         metric,
-        reactive_group_colors(input[["groups_selected_group"]]),
+        reactive_group_colors(groups_selected_group()),
         available_crb_files$selected
       )
   })
@@ -106,7 +106,7 @@ for (metric in names(groups_metric_specs)) {
 observeEvent(input[["groups_expression_metrics_prefetch"]], {
   req(identical(
     input[["groups_expression_metrics_prefetch"]],
-    input[["groups_selected_group"]]
+    groups_selected_group()
   ))
   outputs <- vapply(groups_metric_specs, `[[`, "", "output")
   groups_metrics_prefetching <<- TRUE
