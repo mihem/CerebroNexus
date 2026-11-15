@@ -159,6 +159,8 @@ colMeans <- function(x, na.rm = FALSE, dims = 1L, ...) {
 ## or `[` until Matrix is loaded. R loads Matrix during the first such call,
 ## but that call still returns NULL or fails. Loading it first costs no time:
 ## R would load it in the same call anyway. Matrix stays out of the start.
+## Cerebro methods use their own copy (private$loadMatrixFor()): a .crb keeps
+## its methods, which must work without CerebroNexus.
 .loadMatrixFor <- function(x) {
   if (
     identical(attr(class(x), "package"), "Matrix") &&

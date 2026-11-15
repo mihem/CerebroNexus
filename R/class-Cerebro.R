@@ -335,7 +335,7 @@ Cerebro <- R6::R6Class(
       }
 
       if (!is.null(self$expression)) {
-        .loadMatrixFor(self$expression)
+        private$loadMatrixFor()
         if (nrow(table) != ncol(self$expression)) {
           stop(glue::glue(
             "Number of rows in meta data ({nrow(table)}) must match number of columns in expression matrix ({ncol(self$expression)})."
@@ -479,7 +479,7 @@ Cerebro <- R6::R6Class(
     #' @return
     #' \code{vector} containing all cell names/barcodes.
     getCellNames = function() {
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       return(colnames(self$expression))
     },
 
@@ -489,7 +489,7 @@ Cerebro <- R6::R6Class(
     #' @return
     #' \code{vector} containing all gene names in transcript count matrix.
     getGeneNames = function() {
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       return(rownames(self$expression))
     },
 
@@ -537,7 +537,7 @@ Cerebro <- R6::R6Class(
     #' \code{vector} containing (mean) expression across all specified genes in
     #' each specified cell.
     getMeanExpressionForCells = function(cells = NULL, genes = NULL) {
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       if (is.null(genes)) {
         genes <- rownames(self$expression)
       }
@@ -742,7 +742,7 @@ Cerebro <- R6::R6Class(
         )
       }
       ## check dimensions
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       if (
         !is.null(self$expression) && nrow(projection) != ncol(self$expression)
       ) {
@@ -1341,7 +1341,7 @@ Cerebro <- R6::R6Class(
         data[["coordinates"]],
         context
       )
-      .loadMatrixFor(data[["expression"]])
+      private$loadMatrixFor(data[["expression"]])
       data
     },
 
@@ -1559,7 +1559,7 @@ Cerebro <- R6::R6Class(
     #' @description
     #' Show overview of object and the data it contains.
     print = function() {
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       message(
         paste0(
           'class: Cerebro',
@@ -1793,8 +1793,24 @@ Cerebro <- R6::R6Class(
       )]
     },
 
+    ## A Matrix-class matrix read from a .crb has no dim(), dimnames() or `[`
+    ## until Matrix is loaded. R loads Matrix during the first such call, but
+    ## that call still returns NULL or fails. Loading it first costs no time:
+    ## R would load it in the same call anyway. Base R only, like every
+    ## method a .crb stores: a bundled App reads it without CerebroNexus.
+    ## The package's own code uses .loadMatrixFor() (R/lazy_imports.R).
+    loadMatrixFor = function(x = self$expression) {
+      if (
+        identical(attr(class(x), "package"), "Matrix") &&
+          !isNamespaceLoaded("Matrix")
+      ) {
+        loadNamespace("Matrix")
+      }
+      invisible(x)
+    },
+
     resolveExpressionCells = function(cells) {
-      .loadMatrixFor(self$expression)
+      private$loadMatrixFor()
       cell_names <- colnames(self$expression)
       if (is.null(cells)) {
         return(list(indices = NULL, names = cell_names))
