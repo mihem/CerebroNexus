@@ -10,9 +10,11 @@ output[["extra_material_content_UI"]] <- renderUI({
   if (!length(categories)) {
     return(p("No extra material is included in this data set."))
   }
-  req(input[["extra_material_selected_category"]] %in% categories)
+  ## Drawn with the first category before its selector has reported.
+  category <- extra_material_category()
+  req(category %in% categories)
   ## if selected category is `tables`
-  if (input[["extra_material_selected_category"]] == 'tables') {
+  if (category == 'tables') {
     if (!checkForExtraTables()) {
       return(p("No non-empty tables available."))
     }
@@ -38,7 +40,7 @@ output[["extra_material_content_UI"]] <- renderUI({
       column(12, DT::dataTableOutput("extra_material_table"))
     )
     ## if selected category is `plots`
-  } else if (input[["extra_material_selected_category"]] == 'plots') {
+  } else if (category == 'plots') {
     ##
     fluidRow(
       column(

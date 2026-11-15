@@ -698,9 +698,14 @@
       loader.classList.remove("is-visible");
       // Show the card only for a page that is still loading: one whose
       // outputs have arrived is about to finish, so look again shortly instead
-      // of covering content that is already on screen.
+      // of covering content that is already on screen. 400 ms, not less: most
+      // pages finish by ~600 ms, and an earlier card flashed over content that
+      // was about to appear. A page that has painted its main content is
+      // ready (finish(): cerebro:cell-view-ready or a complete
+      // cerebro:linkedviews-ready for canvas pages, settled outputs for the
+      // rest), which cancels this timer; the ready check is a backstop.
       var showWhenStillLoading = function () {
-        if (pane !== activePane) return;
+        if (pane !== activePane || window.CerebroPageLifecycle.isReady(pane)) return;
         if (finishUnderway()) {
           showTimer = window.setTimeout(showWhenStillLoading, 100);
           return;
@@ -709,7 +714,7 @@
         loader.hidden = false;
         loader.classList.add("is-visible");
       };
-      showTimer = window.setTimeout(showWhenStillLoading, 180);
+      showTimer = window.setTimeout(showWhenStillLoading, 400);
       slowTimer = window.setTimeout(function () {
         if (pane === activePane) {
           showDetail("Still loading " + pageLabel(pane) + "…");

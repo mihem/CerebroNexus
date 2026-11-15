@@ -499,6 +499,48 @@ window.viewerScenarios = {
     t.equal(t.arcs('cv-cv-a').length,0,'None hides every cell');
     return true;
   },
+  async deferredResource() {
+    const t=viewerTest;
+    const identity={cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),
+      cell_order_fingerprint:'md5-cell-order-v1:'+'b'.repeat(32),pack_dataset_fingerprint:'md5-crb-v1:'+'c'.repeat(32)};
+    let downloads=0;
+    window.fetch=async()=>{downloads++;return {ok:true,arrayBuffer:async()=>new Uint8Array([1,0,2]).buffer};};
+    const colors=['#112233','#445566'];
+    const resource={protocol:'canonical-metadata-codes-v1',url:'metadata/002.codes.bin',cells:3,dtype:'uint8',bytes:3,
+      checksum:'',dataset_fingerprint:identity.cell_fingerprint,cell_order_fingerprint:identity.cell_order_fingerprint,
+      pack_dataset_fingerprint:identity.pack_dataset_fingerprint,metadata_name:'sample',code_map:[-1,0,1]};
+    const asked=()=>t.requests.filter(r=>r.name==='coordviews_attribute_request'&&r.value.name==='sample');
+    const reply=value=>t.send('coordviews_attribute',t.wire({dataset_id:t.context.dataset_key,dataset_context:{...t.context},
+      dataset_fingerprint:asked().at(-1).value.dataset_fingerprint,kind:'groups',name:'sample',value}));
+    const drawn=()=>t.arcs('cv-cv-a').map(p=>p.fill+'@'+p.args.slice(0,2).join(',')).sort();
+    const open=async (key,generation)=>{
+      t.dataset(key,generation);
+      t.linked({dataset_fingerprint:identity.cell_fingerprint,canonical_order_id:identity.cell_order_fingerprint,
+        pack_dataset_fingerprint:identity.pack_dataset_fingerprint,
+        groups:{cluster:{levels:['A','B'],values:[0,1,0],colors:['#ff0000','#0000ff']},
+          sample:{levels:['s1','s2'],values:null,deferred:true}}});
+      for(let i=0;i<3;i++)await t.settle();
+      t.change('cv-pick-color','sample');await t.settle();
+    };
+    // The websocket values, R's NA unpacked as null.
+    await open('A',1);const before=asked().length;
+    t.check(before>0&&asked().at(-1).value.wire_only===false,'Colouring by a deferred group asks for it');
+    t.resetPaint();reply({levels:['s1','s2'],colors,values:[0,null,1]});for(let i=0;i<3;i++)await t.settle();
+    const wire=drawn();t.equal(wire.length,3,'Every cell is drawn from the websocket values');
+    // The Viewer Pack codes (0 = missing) draw exactly the same cells.
+    await open('B',2);t.equal(asked().length,before+1,'A new data set asks once');
+    t.resetPaint();reply({levels:['s1','s2'],colors,values_resource:resource});for(let i=0;i<3;i++)await t.settle();
+    t.equal(downloads,1,'The codes come from the Pack resource');
+    t.equal(drawn(),wire,'Pack codes draw what the websocket values draw');
+    t.equal(asked().length,before+1,'No websocket values are asked for');
+    // A resource that fails its identity check falls back to the websocket.
+    await open('C',3);const failed=asked().length;
+    reply({levels:['s1','s2'],colors,values_resource:{...resource,pack_dataset_fingerprint:'wrong'}});
+    for(let i=0;i<3;i++)await t.settle();
+    t.equal(asked().length,failed+1,'A rejected resource asks again');
+    t.equal(asked().at(-1).value.wire_only,true,'The second request asks for websocket values');
+    return true;
+  },
   async slicePanels() {
     const t=viewerTest;t.dataset();const id='trajectory_projection';
     const identity={cell_count:5,cell_fingerprint:'md5-cell-set-v1:'+'a'.repeat(32),

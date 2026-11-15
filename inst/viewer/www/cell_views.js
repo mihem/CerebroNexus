@@ -795,18 +795,85 @@
     // retain their counting-sort path.
     var ord;
     if (vals && f && f.raw) {
-      var raw = f.raw;
-      ord = Array.from({ length: raw.length }, function (_, i) { return i; });
-      ord.sort(function (a, b) {
-        var av = raw[a], bv = raw[b];
-        var am = av == null || isNaN(av), bm = bv == null || isNaN(bv);
-        return am !== bm ? (am ? -1 : 1) : am ? a - b : (av - bv || a - b);
-      });
+      ord = rawPaintOrder(f.raw);
     } else {
       ord = vals ? quantisedOrder(vals, span) : null;
     }
     _ordD = D; _ordKey = key; _ordVal = ord;
     return ord;
+  }
+
+  // The full-precision order paintOrder() draws expression in: missing values
+  // first in index order, then ascending value with ties in index order --
+  // exactly what a comparator sort on (missing, value, index) gives, but as a
+  // most-significant-digit bucket sort, so a 1.3M-cell colouring costs a few
+  // linear passes instead of ~27M comparator calls. Each range handed down is
+  // in ascending index order and the scatter is stable, so ties never need a
+  // comparison; a range of one value is already in its final order.
+  var RAW_ORDER_BUCKETS = 1024, RAW_ORDER_SMALL = 32, RAW_ORDER_DEPTH = 4;
+  function rawPaintOrder(raw) {
+    var n = raw.length, order = new Uint32Array(n), missing = 0, rest, i, v;
+    for (i = 0; i < n; i++) {
+      v = raw[i];
+      if (v == null || isNaN(v)) missing++;
+    }
+    rest = missing; missing = 0;
+    for (i = 0; i < n; i++) {
+      v = raw[i];
+      if (v == null || isNaN(v)) order[missing++] = i; else order[rest++] = i;
+    }
+    var counts = [];
+    for (i = 0; i < RAW_ORDER_DEPTH; i++) {
+      counts.push(new Uint32Array(RAW_ORDER_BUCKETS));
+    }
+    sortRawRange(order, raw, missing, n, 0, new Uint32Array(n - missing), counts);
+    return order;
+  }
+  function sortRawRange(order, raw, s, e, depth, scratch, counts) {
+    var len = e - s, i, j, a, v, min = Infinity, max = -Infinity;
+    if (len < 2) return;
+    if (len <= RAW_ORDER_SMALL) {
+      // Insertion sort; strict > keeps equal values in index order.
+      for (i = s + 1; i < e; i++) {
+        a = order[i]; v = raw[a];
+        for (j = i - 1; j >= s && raw[order[j]] > v; j--) order[j + 1] = order[j];
+        order[j + 1] = a;
+      }
+      return;
+    }
+    for (i = s; i < e; i++) {
+      v = raw[order[i]];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (min === max) return;
+    var span = max - min;
+    if (depth >= RAW_ORDER_DEPTH || !isFinite(span)) {
+      order.subarray(s, e).sort(function (x, y) { return raw[x] - raw[y] || x - y; });
+      return;
+    }
+    // Bucket = floor((value - min) / span * K), the top value folded into the
+    // last bucket: monotone in the value (each step is), so concatenating the
+    // buckets in order keeps the ascending order. Dividing first cannot
+    // overflow, whatever the span.
+    var K = Math.min(RAW_ORDER_BUCKETS, len >> 2), c = counts[depth], b, total = s, cnt;
+    c.fill(0, 0, K);
+    for (i = s; i < e; i++) {
+      b = Math.floor((raw[order[i]] - min) / span * K);
+      c[b < K ? b : K - 1]++;
+    }
+    for (b = 0; b < K; b++) { cnt = c[b]; c[b] = total; total += cnt; }
+    for (i = s; i < e; i++) {
+      a = order[i];
+      b = Math.floor((raw[a] - min) / span * K);
+      scratch[c[b < K ? b : K - 1]++ - s] = a;
+    }
+    order.set(scratch.subarray(0, len), s);
+    // c[b] is now the end of bucket b.
+    for (b = 0, i = s; b < K; b++) {
+      if (c[b] - i > 1) sortRawRange(order, raw, i, c[b], depth + 1, scratch, counts);
+      i = c[b];
+    }
   }
 
   // ---- colour range --------------------------------------------------------
@@ -2161,6 +2228,9 @@
       return gpuColor((group.colors && group.colors[index]) || PAL[index % PAL.length]);
     }) : null;
     var missing = group ? gpuColor('#cccccc') : null;
+    // A continuous colouring: each colour is one of 256 steps, as in
+    // buildGpuData(); a value off the scale (NaN) takes colorOf().
+    var scale = group ? null : continuousColours(p), stepRgba = scale ? [] : null;
     var opacity = pointOpacityOf(p), opaque = true, foreground = false;
     for (at = 0; at < visits; at++) {
       i = cells ? cells[at] : at;
@@ -2169,9 +2239,19 @@
       var fg = !!(hiSet && hiSet.has(i));
       var alpha = hiSet ? (fg ? 0.95 : 0.05) : opacity;
       var category = group && group.values[i];
-      var rgba = group
-        ? (category == null || category < 0 || category >= palette.length ? missing : palette[category])
-        : gpuColor(colorOf(i, p));
+      var rgba;
+      if (group) {
+        rgba = category == null || category < 0 || category >= palette.length ? missing : palette[category];
+      } else if (scale) {
+        var value = scale.values[i];
+        var step = scale.missing && (value == null || isNaN(value)) ? -1
+          : Math.round(clipT(value, scale.span, scale.range) * 255);
+        rgba = step >= 0 && step <= 255
+          ? (stepRgba[step] || (stepRgba[step] = gpuColor(scale.colour(step))))
+          : gpuColor(colorOf(i, p));
+      } else {
+        rgba = gpuColor(colorOf(i, p));
+      }
       if (rgba[3] !== 255) opaque = false;
       colors[vertex * 4] = rgba[0];
       colors[vertex * 4 + 1] = rgba[1];
@@ -6598,12 +6678,18 @@
     if (!value || !value.deferred || value.requested ||
         typeof Shiny === 'undefined') return;
     value.requested = true;
+    sendAttributeRequest(name, false);
+  }
+  // `wireOnly`: the Viewer Pack codes failed, so send the values themselves.
+  function sendAttributeRequest(name, wireOnly) {
+    if (typeof Shiny === 'undefined') return;
     Shiny.setInputValue('coordviews_attribute_request', {
       dataset_context: D.dataset_context,
       dataset_id: D.dataset_id,
       dataset_fingerprint: configFingerprint(),
       kind: 'groups',
       name: name,
+      wire_only: !!wireOnly,
       nonce: Date.now()
     }, { priority: 'event' });
   }
@@ -8344,6 +8430,26 @@
     for (var i = 0; i < out.length; i++) out[i] = start + i;
     return out;
   }
+  // The canonical rows of a frame drawn from a Viewer Pack subset
+  // (`data.canonical_subset`), in frame order: what the server marks as
+  // {kind: 'frame_subset'} instead of sending them.
+  function frameSubsetRows(view, canonicalCells, length) {
+    var subset = view && view.data && view.data.canonical_subset;
+    if (!subset || subset.kind === 'identity' || !subset.indices) {
+      throw new Error('Frame subset unavailable');
+    }
+    var rows = new Int32Array(length), next = 0;
+    window.CBViewState.canonicalMapping.forEachIndex(
+      {kind: subset.kind, canonicalCells: canonicalCells, cells: length},
+      subset.indices,
+      function (canonicalIndex) {
+        if (next >= length) throw new Error('Frame subset overflow');
+        rows[next++] = canonicalIndex;
+      }
+    );
+    if (next !== length) throw new Error('Frame subset length mismatch');
+    return rows;
+  }
   // Turns canonical indices into selection keys before the message is applied.
   // `selection_index_all` stands for the indices 0..n-1 (every cell, in order).
   function resolveAuxCellNames(message) {
@@ -8356,6 +8462,9 @@
     var view = singleView(message.id, message.dataset_context);
     return fetchCellNames(resource, view && view.datasetIdentity).then(function (entry) {
       var names = entry.names;
+      if (index && String(index.kind) === 'frame_subset') {
+        index = frameSubsetRows(view, names.length, Number(index.length));
+      }
       // `selection_rows` keeps the canonical rows: a selection is reported by
       // row, so it never has to send these names back to the server.
       if (all) {
@@ -8822,6 +8931,27 @@
         (!groupResource || !groupResource.url)) {
       return Promise.resolve(message);
     }
+    // A Spatial section drawn from its Viewer Pack geometry reads the codes of
+    // every cell of the data set and keeps those of its canonical rows, which
+    // the frame names (a range, expanded above).
+    var sectionRows = null;
+    if (!frame && groupResource && groupResource.url &&
+        groupResource.protocol === 'canonical-metadata-codes-v1' &&
+        Number(groupResource.cells) !== Number(data.n)) {
+      sectionRows = data.selection_rows;
+      var canonicalCells = Number(groupResource.cells);
+      var rowsValid = sectionRows && typeof sectionRows.length === 'number' &&
+        sectionRows.length === Number(data.n);
+      for (var r = 0; rowsValid && r < sectionRows.length; r++) {
+        var row = sectionRows[r];
+        if (!(row >= 0 && row < canonicalCells && row === Math.floor(row))) {
+          rowsValid = false;
+        }
+      }
+      if (!rowsValid) {
+        return Promise.reject(new Error('Section rows mismatch'));
+      }
+    }
     var coordinatesPromise = resource && resource.url
       ? (subsetResource
         ? canonicalProjectionCoordinates(resource, message)
@@ -8834,7 +8964,8 @@
     var groupsPromise = groupResource && groupResource.url
       ? (groupResource.protocol === 'canonical-metadata-codes-v1'
         ? fetchValidatedMetadataCodesResource(
-          groupResource, canonicalGroup ? groupResource.cells : data.n,
+          groupResource,
+          canonicalGroup || sectionRows ? groupResource.cells : data.n,
           message && message.dataset_identity
         )
         : fetchCategoricalResource(groupResource, data.n))
@@ -8865,7 +8996,13 @@
           ? materializeCanonicalCodes(
             groupResult.values, subsetResult, Number(data.n)
           )
-          : groupResult.values;
+          : (sectionRows
+            ? materializeCanonicalCodes(
+              groupResult.values,
+              {kind: 'include_uint32', indices: sectionRows},
+              Number(data.n)
+            )
+            : groupResult.values);
       }
       delete data.projection_resource;
       delete data.projection_subset_resource;
@@ -10800,16 +10937,47 @@
           message.dataset_fingerprint !== configFingerprint()) return;
       var target = message.kind === 'groups' && D.groups;
       if (!target || !target[message.name] || !message.value) return;
-      target[message.name] = message.value;
-      if (deferredColorRequest === message.name) {
-        deferredColorRequest = null;
-        setColorBy(message.name);
-      } else if (groupFilter[message.name]) {
-        applyActiveChange();
-      }
+      var resource = message.value.values_resource;
+      if (!resource) { applyAttribute(message); return; }
+      // The Viewer Pack's codes for a canonical bundle. Anything the checks
+      // reject is asked for again over the websocket.
+      var bundle = D;
+      fetchValidatedMetadataCodesResource(
+        resource, bundle.n, linkedBundleResourceIdentity(bundle)
+      ).then(function (result) {
+        if (D !== bundle || !datasetMessageFresh(message)) return;
+        message.value.values = wireGroupCodes(result.values);
+        delete message.value.values_resource;
+        applyAttribute(message);
+      }).catch(function () {
+        if (D !== bundle || !datasetMessageFresh(message)) return;
+        sendAttributeRequest(message.name, true);
+      });
     } catch (error) {
       requestWireFallback(D && D.dataset_id, D && configFingerprint());
     }
+  }
+  function applyAttribute(message) {
+    var target = D && message.kind === 'groups' && D.groups;
+    if (!target || !target[message.name]) return;
+    target[message.name] = message.value;
+    if (deferredColorRequest === message.name) {
+      deferredColorRequest = null;
+      setColorBy(message.name);
+    } else if (groupFilter[message.name]) {
+      applyActiveChange();
+    }
+  }
+  // Pack codes mark a missing value -1; the websocket sends R's NA, which
+  // CBViewWire unpacks into a plain array holding null. Give a group the
+  // same values whichever way they came.
+  function wireGroupCodes(values) {
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] < 0) {
+        return Array.from(values, function (code) { return code < 0 ? null : code; });
+      }
+    }
+    return values;
   }
 
   function onSingleBinary(buffer) {
@@ -10946,6 +11114,17 @@
       var enabled = Array.isArray(modes)
         ? modes.some(function (mode) { return mode !== 'skip'; })
         : modes !== 'skip';
+      // A frame of canonical codes with a hover mode per trace (the Immune
+      // repertoire's Clonal projection from its Viewer Pack frame): a cell
+      // takes its trace's mode, as a cell of a trace sent in groups does.
+      var traceMask = null;
+      if (ArrayBuffer.isView(canonicalGroups) && Array.isArray(modes)) {
+        traceMask = new Uint8Array(canonicalGroups.length);
+        for (var maskAt = 0; maskAt < canonicalGroups.length; maskAt++) {
+          var traceMode = modes[canonicalGroups[maskAt]];
+          traceMask[maskAt] = traceMode != null && traceMode !== 'skip' ? 1 : 0;
+        }
+      }
       singleSpaceIds.forEach(function (spaceId) {
         var space = spaceById[spaceId];
         if (!space) return;
@@ -10962,7 +11141,7 @@
         space._hoverModes = modes;
         space._hoverOffsets = offsets;
         space._hoverEnabled = enabled;
-        space._hoverMask = null;
+        space._hoverMask = traceMask;
       });
       if (singleSpaceIds.length && view.meta && view.meta.space_label) {
         cacheSharedProjection(

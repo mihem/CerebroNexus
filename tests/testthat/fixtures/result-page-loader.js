@@ -249,4 +249,19 @@ function replaceTable(s) {
   t.flushBelow(100);t.emit('shiny:busy');t.flushBelow(1000);
   check(!t.loader.hidden,'more work after the first output still shows the card');
 }
+{
+  // The card waits 400 ms, so a page that finishes sooner never flashes it.
+  // Shiny is still working: a page shown while Shiny is idle schedules its
+  // quiet finish instead, so it is not "still loading".
+  const s=scenario('about');s.start();s.emit('shiny:busy');
+  s.flushBelow(400);
+  check(s.loader.hidden,'no card before 400 ms');
+  s.flushBelow(1000);
+  check(!s.loader.hidden,'a page still loading at 400 ms shows the card');
+  // A page that became ready while the timer ran is not covered.
+  const r=scenario('about');r.start();r.emit('shiny:busy');
+  r.pane.dataset.cerebroPageReady='true';
+  r.flushBelow(1000);
+  check(r.loader.hidden,'a ready page is not covered by a late card');
+}
 console.log(count+' result page loader assertions passed');

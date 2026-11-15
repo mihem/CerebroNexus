@@ -1,9 +1,25 @@
 expression_projection_render_state <- new.env(parent = emptyenv())
 expression_projection_render_state$geometry <- NULL
 
-expressionSparseColor <- function(values, max_density = 0.5) {
+## `entries` (expressionProjectionRowEntries()) are the cells of `values` read
+## as the H5 sidecar holds them: the same index and values the scan below
+## finds, without reading the million-value row again.
+expressionSparseColor <- function(values, max_density = 0.5, entries = NULL) {
   if (!is.numeric(values) || length(values) < 4096L) {
     return(NULL)
+  }
+  if (is.list(entries) && identical(entries$length, length(values))) {
+    if (entries$count >= length(values) * max_density) {
+      return(NULL)
+    }
+    if (!is.null(entries$index)) {
+      return(list(
+        protocol = "sparse-f64-v1",
+        length = length(values),
+        index = entries$index,
+        color = entries$color
+      ))
+    }
   }
   present <- which(is.na(values) | !is.finite(values) | values != 0)
   if (length(present) >= length(values) * max_density) {
@@ -17,8 +33,22 @@ expressionSparseColor <- function(values, max_density = 0.5) {
   )
 }
 
-expressionPackedColor <- function(values) {
-  sparse <- expressionSparseColor(values)
+## The entries the row cache kept for `gene`'s full row, when `values` is it.
+expressionColorEntries <- function(values, gene) {
+  if (
+    !exists(
+      "expressionProjectionCachedEntries",
+      mode = "function",
+      inherits = TRUE
+    )
+  ) {
+    return(NULL)
+  }
+  expressionProjectionCachedEntries(values, gene)
+}
+
+expressionPackedColor <- function(values, entries = NULL) {
+  sparse <- expressionSparseColor(values, entries = entries)
   if (!is.null(sparse)) {
     return(sparse)
   }
@@ -151,8 +181,17 @@ expression_projection_update_plot <- function(input) {
     output_data[["color"]] <- NULL
     if (!identical(display_mode, "rgb")) {
       output_data[["packed_colors"]] <- lapply(
-        expression_levels,
-        expressionPackedColor
+        stats::setNames(
+          seq_along(expression_levels),
+          names(expression_levels)
+        ),
+        function(i) {
+          values <- expression_levels[[i]]
+          expressionPackedColor(
+            values,
+            expressionColorEntries(values, names(expression_levels)[i])
+          )
+        }
       )
       output_data[["packed_color_cache_keys"]] <- expressionPackedColorKeys(
         names(expression_levels),
@@ -161,7 +200,12 @@ expression_projection_update_plot <- function(input) {
       )
     }
   } else {
-    sparse_color <- expressionSparseColor(expression_levels)
+    sparse_color <- expressionSparseColor(
+      expression_levels,
+      entries = if (length(color_settings[["genes"]]) == 1L) {
+        expressionColorEntries(expression_levels, color_settings[["genes"]])
+      }
+    )
     if (!is.null(sparse_color)) {
       output_data[["color"]] <- NULL
       output_data[["sparse_color"]] <- sparse_color

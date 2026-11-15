@@ -1024,6 +1024,61 @@ observeEvent(
   ignoreInit = TRUE
 )
 
+## A deferred group colouring whose codes the Viewer Pack already serves
+## (metadata/NNN.codes.bin): send the levels and colours, and let the browser
+## fetch the codes, instead of one integer per cell over the websocket. The
+## levels are the ones cv_build_groups() would send, and the Pack's code map is
+## built against exactly those levels, so the browser decodes the same values;
+## NULL (the websocket path) when the Pack cannot vouch for this column.
+cv_attribute_resource <- function(
+  crb,
+  md,
+  kind,
+  name,
+  resource_fn,
+  colors_fn
+) {
+  if (
+    !identical(kind, "groups") ||
+      !is.data.frame(md) ||
+      !is.function(resource_fn) ||
+      !is.character(name) ||
+      length(name) != 1L ||
+      is.na(name) ||
+      !nzchar(name)
+  ) {
+    return(NULL)
+  }
+  group_names <- tryCatch(crb$getGroups(), error = function(e) character(0))
+  v <- md[[name]]
+  if (
+    !name %in% group_names ||
+      !(is.factor(v) || is.character(v) || is.logical(v))
+  ) {
+    return(NULL)
+  }
+  ## Exactly cv_build_groups()'s levels.
+  lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
+  lev <- lev[!is.na(lev)]
+  if (!length(lev)) {
+    return(NULL)
+  }
+  resource <- tryCatch(resource_fn(name, lev), error = function(e) NULL)
+  if (
+    !is.list(resource) ||
+      !identical(as.character(resource$levels), lev) ||
+      !identical(as.integer(resource$cells), nrow(md))
+  ) {
+    return(NULL)
+  }
+  resource$levels <- NULL
+  list(
+    levels = I(lev),
+    colors = I(colors_fn(name, lev)),
+    values_resource = resource
+  )
+}
+
 observeEvent(
   input[["coordviews_attribute_request"]],
   {
@@ -1057,13 +1112,33 @@ observeEvent(
     } else {
       cv_canonical_metadata(getMetaData())
     }
-    value <- cv_build_attribute(
-      data_set(),
-      metadata,
-      kind,
-      name,
-      cv_group_colors
-    )
+    ## The first-frame metadata is the Viewer Pack's canonical rows, which are
+    ## the progressive bundle's cells (cv_build_bundle's use_first_frame), so
+    ## the Pack's own codes can stand in for the websocket vector. The browser
+    ## asks again with `wire_only` if the resource fails its checks.
+    value <- if (
+      !isTRUE(request$wire_only) &&
+        is.data.frame(first_frame$meta_data) &&
+        is.list(first_frame$projections)
+    ) {
+      cv_attribute_resource(
+        data_set(),
+        metadata,
+        kind,
+        name,
+        viewerMetadataCodesAsset,
+        cv_group_colors
+      )
+    }
+    if (is.null(value)) {
+      value <- cv_build_attribute(
+        data_set(),
+        metadata,
+        kind,
+        name,
+        cv_group_colors
+      )
+    }
     req(!is.null(value))
     session$sendBinaryMessage(
       "coordviews_attribute",

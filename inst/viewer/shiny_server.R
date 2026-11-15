@@ -1911,6 +1911,7 @@ server <- function(input, output, session) {
     resource_url <- function(file) paste0(prefix, "/", basename(file))
     if (!is.null(subset) && !identical(subset$kind, "identity")) {
       subset$url <- resource_url(subset_asset$file)
+      assign(subset$url, subset_asset$file, envir = viewer_trajectory_subsets)
     }
     descriptor <- c(
       list(
@@ -1944,6 +1945,53 @@ server <- function(input, output, session) {
     )
     assign(key, descriptor, envir = viewer_trajectory_resources)
     descriptor
+  }
+  ## The subset file of each trajectory frame resource, by its URL.
+  viewer_trajectory_subsets <- new.env(parent = emptyenv())
+  ## The canonical rows (0-based, in frame order) of a trajectory frame drawn
+  ## from a Viewer Pack subset, read from that file; NULL for an identity
+  ## frame (whose rows travel as a range) or a frame of its own geometry.
+  viewerTrajectoryFrameRows <- function(resource) {
+    subset <- resource$subset
+    if (
+      !is.list(subset) ||
+        !isTRUE(subset$kind %in% c("include_uint32", "exclude_uint32"))
+    ) {
+      return(NULL)
+    }
+    url <- as.character(subset$url %||% "")
+    if (!exists(url, envir = viewer_trajectory_subsets, inherits = FALSE)) {
+      return(NULL)
+    }
+    canonical <- as.integer(subset$canonical_cells)
+    count <- if (identical(subset$kind, "include_uint32")) {
+      as.integer(subset$cells)
+    } else {
+      canonical - as.integer(subset$cells)
+    }
+    stored <- tryCatch(
+      readBin(
+        get(url, envir = viewer_trajectory_subsets, inherits = FALSE),
+        "integer",
+        n = count,
+        size = 4L,
+        endian = "little"
+      ),
+      error = function(error) NULL
+    )
+    if (
+      length(stored) != count ||
+        anyNA(stored) ||
+        any(stored < 0L | stored >= canonical)
+    ) {
+      return(NULL)
+    }
+    if (identical(subset$kind, "include_uint32")) {
+      return(stored)
+    }
+    keep <- rep(TRUE, canonical)
+    keep[stored + 1L] <- FALSE
+    which(keep) - 1L
   }
   ## Spatial coordinates have their own physical coordinate system and row
   ## order. Publish only a Viewer Pack asset whose canonical cell mapping is an
@@ -2793,10 +2841,11 @@ server <- function(input, output, session) {
   ##   Gene ID conversion opens with;
   ## - the server code of the pages the data set has: sourced, its observers
   ##   made and run once, and compiled (the first session is not compiled while
-  ##   it starts, see R/launchCerebro.R). Not the HLA & TCR motifs page: it
-  ##   computes from the repertoire as soon as it is loaded. The Immune
-  ##   repertoire page reads the Pack's encoding of the repertoire, or, first
-  ##   of all, has another R process encode it.
+  ##   it starts, see R/launchCerebro.R). The HLA & TCR motifs page only with a
+  ##   Viewer Pack that has its first frame, which is then read too: without
+  ##   one, its first view computes from the repertoire. The Immune repertoire
+  ##   page reads the Pack's encoding of the repertoire, or, first of all, has
+  ##   another R process encode it.
   viewer_idle_packages <- function() {
     setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
   }
@@ -2827,6 +2876,29 @@ server <- function(input, output, session) {
         .viewerPackImmuneOutdated(pack$manifest),
         error = function(error) NA
       ))
+  }
+  ## The HLA & TCR motifs page's code only makes observers that wait for the
+  ## page to be shown. Its first view is drawn from the Viewer Pack's first
+  ## frame of the chain it opens on (hla_tcr/TRB.first.qs2, 1 MB for 1.46
+  ## million cells), or, without a valid one, built from the repertoire (motif
+  ## graph, segments): prepared only in the first case.
+  viewer_idle_hla_fast <- function() {
+    pack <- viewer_idle_pack()
+    chains <- intersect(
+      as.character(pack$manifest$hla_chains),
+      c("TRA", "TRB")
+    )
+    if (!length(chains)) {
+      return(FALSE)
+    }
+    chain <- if ("TRB" %in% chains) "TRB" else chains[[1L]]
+    !is.null(tryCatch(
+      viewerPackVerifiedAsset(
+        pack,
+        file.path("hla_tcr", paste0(chain, ".first.qs2"))
+      ),
+      error = function(error) NULL
+    ))
   }
   viewer_prewarm_pages <- c(
     "groups",
@@ -2883,6 +2955,10 @@ server <- function(input, output, session) {
       } else {
         c(viewer_prewarm_pages, "immune_repertoire")
       }
+      hla_fast <- viewer_idle_hla_fast()
+      if (hla_fast) {
+        pages <- c(pages, "hla_tcr_motifs")
+      }
       encoding_task <- paste("immune encoding", session$token)
       encoding <- function() {
         encoded <- server_scope$ir_encoded
@@ -2913,6 +2989,17 @@ server <- function(input, output, session) {
           is.null(tasks[[encoding_task]])
       ) {
         tasks[[encoding_task]] <- encoding
+      }
+      ## The motifs page's first frame, read from the Pack and kept in the
+      ## session's cache (hla_first_frame(), hla_tcr_motifs/data.R), which its
+      ## first view reads. After the page's own task, which defines it.
+      if (hla_fast && isTRUE(viewer_page_available[["hla_tcr_motifs"]])) {
+        tasks[[paste("hla first frame", session$token)]] <- function() {
+          first <- server_scope$hla_first_frame
+          if (is.function(first)) {
+            isolate(first())
+          }
+        }
       }
     }
     tasks

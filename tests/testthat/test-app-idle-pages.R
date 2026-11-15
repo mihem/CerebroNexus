@@ -1,8 +1,9 @@
 ## While the visitor reads the first page, the session prepares the pages the
 ## data set has (shiny_server.R, viewer_idle_tasks()): their server code is
-## loaded before they are opened. Not the HLA & TCR motifs page, which computes
-## as soon as it is loaded; the Immune repertoire page first of all, which has
-## its repertoire encoded.
+## loaded before they are opened. Not the HLA & TCR motifs page without a
+## Viewer Pack first frame (the demo data sets have no Pack), whose first view
+## computes from the repertoire; the Immune repertoire page first of all, which
+## has its repertoire encoded.
 
 test_that("a quiet session loads the code of the other pages, not the motifs'", {
   skip_on_cran()

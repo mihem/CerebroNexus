@@ -381,6 +381,8 @@ trajectory_static_frame <- reactive({
     trajectory_edges <- trajectory_data_reactive()[["edges"]]
   }
   list(
+    method = method,
+    name = name,
     resource = resource,
     color_variable = color_variable,
     levels = levels,
@@ -500,7 +502,9 @@ observe({
         },
         hover = static_frame$hover,
         names_resource = names_resource,
-        cell_rows = hover_cells[["cell_index"]]
+        cell_rows = hover_cells[["cell_index"]],
+        ## The browser holds these rows as the frame's subset: not sent again.
+        frame_rows = viewerTrajectoryFrameRows(resource)
       )
     }
     trajectory_projection_parameters_other[["reset_axes"]] <- FALSE
@@ -512,7 +516,20 @@ observe({
       extra = list(shapes = static_frame$trajectory_lines),
       deferred_aux = deferred_aux,
       dataset_context = current_context,
-      feedback = feedback
+      feedback = feedback,
+      ## The rows, barcodes and hover data depend only on these: a colour
+      ## change keeps them, so the browser reuses those already delivered.
+      ## The frame descriptor (less the colouring group) names the cells, their
+      ## order and the data set and Viewer Pack they come from; "% of cells"
+      ## is applied by the browser to these same cells.
+      aux_key = list(
+        page = "trajectory",
+        method = static_frame$method,
+        name = static_frame$name,
+        frame = resource[setdiff(names(resource), "group")],
+        hover = static_frame$hover,
+        hover_groups = if (static_frame$hover) getGroups()
+      )
     )
     trajectory_projection_last$key <- key
     trajectory_projection_last$feedback <- feedback

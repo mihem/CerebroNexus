@@ -9,6 +9,10 @@
 expression_projection_row_cache <- new.env(parent = emptyenv())
 expression_projection_row_cache_order <- character()
 expression_projection_row_cache_limit <- 4L
+## The non-zero cells of a cached row read from an H5 sidecar, under the same
+## key and evicted with it (see expressionProjectionRowEntries()). The colour
+## packet is built from them instead of scanning the dense row again.
+expression_projection_row_entries <- new.env(parent = emptyenv())
 expression_projection_progress_handle <- NULL
 expression_projection_progress_key <- NULL
 
@@ -103,9 +107,22 @@ expressionProjectionRowCacheGet <- function(key) {
   NULL
 }
 
-expressionProjectionRowCacheSet <- function(key, value) {
+expressionProjectionRowEntriesDrop <- function(key) {
+  if (
+    exists(key, envir = expression_projection_row_entries, inherits = FALSE)
+  ) {
+    rm(list = key, envir = expression_projection_row_entries)
+  }
+}
+
+expressionProjectionRowCacheSet <- function(key, value, entries = NULL) {
   if (!is.null(key)) {
     assign(key, value, envir = expression_projection_row_cache)
+    if (is.null(entries)) {
+      expressionProjectionRowEntriesDrop(key)
+    } else {
+      assign(key, entries, envir = expression_projection_row_entries)
+    }
     expression_projection_row_cache_order <<- c(
       setdiff(expression_projection_row_cache_order, key),
       key
@@ -118,6 +135,7 @@ expressionProjectionRowCacheSet <- function(key, value) {
       expression_projection_row_cache_order <<-
         expression_projection_row_cache_order[-1L]
       rm(list = evict, envir = expression_projection_row_cache)
+      expressionProjectionRowEntriesDrop(evict)
     }
   }
   invisible(value)
@@ -139,6 +157,18 @@ expressionProjectionCachedRows <- function(data, cells, genes) {
     genes
   )
   missing <- genes[vapply(values, is.null, logical(1))]
+  if (length(missing) && cacheable && is.numeric(cells)) {
+    read <- expressionProjectionH5Rows(data, missing)
+    for (gene in names(read)) {
+      values[[gene]] <- read[[gene]]$value
+      expressionProjectionRowCacheSet(
+        keys[[gene]],
+        read[[gene]]$value,
+        read[[gene]]$entries
+      )
+    }
+    missing <- setdiff(missing, names(read))
+  }
   if (length(missing)) {
     fetched <- viewerExpressionValues(data, cells, missing)
     for (gene in intersect(missing, names(fetched))) {
@@ -148,6 +178,95 @@ expressionProjectionCachedRows <- function(data, cells, genes) {
     }
   }
   values[!vapply(values, is.null, logical(1))]
+}
+
+## Full rows of genes from an H5 sidecar, which holds each gene as its
+## non-zero cells: list(value = the dense row, entries) per gene, the dense row
+## being what viewerExpressionValues() returns for every cell. NULL without a
+## sidecar or when it lacks one of the genes (the caller then reads them as
+## before).
+expressionProjectionH5Rows <- function(data, genes) {
+  rows <- attr(data, "cerebro_h5_rows", exact = TRUE)
+  if (!is.list(rows) || !is.function(rows$each_sparse) || !length(genes)) {
+    return(NULL)
+  }
+  n_cells <- rows$n_cells()
+  read <- stats::setNames(vector("list", length(genes)), genes)
+  found <- rows$each_sparse(genes, function(i, entries) {
+    ## As .h5ExpressionRows()$row() fills it.
+    value <- numeric(n_cells)
+    value[entries$index] <- entries$value
+    read[[i]] <<- list(
+      value = value,
+      entries = expressionProjectionRowEntries(entries, n_cells)
+    )
+  })
+  if (isTRUE(found)) read
+}
+
+## The cells expressionSparseColor() would find in the dense row filled from
+## `entries` (1-based `index`, `value`), and their values: list(length,
+## count, index = 0-based integer, color). Explicit zeros in the file are
+## dropped, as the dense scan does not see them. `index` and `color` are kept
+## only below the sparse packet's density (the packet is dense above it).
+## NULL for entries that are not strictly increasing cells of the row, whose
+## dense row the scan must read instead.
+expressionProjectionRowEntries <- function(
+  entries,
+  n_cells,
+  max_density = 0.5
+) {
+  index <- entries$index
+  value <- as.double(entries$value)
+  if (
+    length(index) != length(value) ||
+      !isFALSE(is.unsorted(index, strictly = TRUE)) ||
+      (length(index) && (index[[1L]] < 1 || index[[length(index)]] > n_cells))
+  ) {
+    return(NULL)
+  }
+  keep <- is.na(value) | value != 0
+  if (!all(keep)) {
+    index <- index[keep]
+    value <- value[keep]
+  }
+  count <- length(index)
+  if (count >= n_cells * max_density) {
+    return(list(length = n_cells, count = count))
+  }
+  list(
+    length = n_cells,
+    count = count,
+    index = as.integer(index - 1),
+    color = value
+  )
+}
+
+## The entries kept with `gene`'s cached row, when `values` is that row (the
+## very vector in the normal path, so identical() returns at once).
+expressionProjectionCachedEntries <- function(values, gene) {
+  dataset_key <- expressionProjectionDatasetKey()
+  gene <- as.character(gene)
+  if (is.null(dataset_key) || length(gene) != 1L || is.na(gene)) {
+    return(NULL)
+  }
+  key <- paste(dataset_key, gene, sep = "::")
+  entries <- get0(
+    key,
+    envir = expression_projection_row_entries,
+    inherits = FALSE
+  )
+  if (
+    is.null(entries) ||
+      !identical(
+        values,
+        get0(key, envir = expression_projection_row_cache, inherits = FALSE),
+        num.eq = FALSE
+      )
+  ) {
+    return(NULL)
+  }
+  entries
 }
 
 expressionProjectionCachedRow <- function(data, cells, gene) {

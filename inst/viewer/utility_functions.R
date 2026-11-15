@@ -1674,7 +1674,8 @@ cerebroCellViewDeferredAux <- function(
   hover = FALSE,
   names_resource = NULL,
   cell_rows = NULL,
-  keys = TRUE
+  keys = TRUE,
+  frame_rows = NULL
 ) {
   grouped <- is.list(selection_rows)
   reorder <- function(values) {
@@ -1699,9 +1700,18 @@ cerebroCellViewDeferredAux <- function(
     index <- reorder(as.integer(cell_rows) - 1L)
     list(
       ## Contiguous rows (every cell of a projection or trajectory in order)
-      ## travel as their range, not as a million integers.
+      ## travel as their range, not as a million integers; rows the browser
+      ## holds as the frame's Viewer Pack subset (`frame_rows`) as a mark.
       selection_index = if (!grouped) {
-        cerebroRowRange(index) %||% index
+        cerebroRowRange(index) %||%
+          if (
+            !is.null(frame_rows) &&
+              identical(as.integer(unclass(index)), as.integer(frame_rows))
+          ) {
+            list(kind = "frame_subset", length = length(index))
+          } else {
+            index
+          }
       } else {
         index
       },

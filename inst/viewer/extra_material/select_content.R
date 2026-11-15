@@ -6,6 +6,25 @@
 ## UI element to set layout for selection of category and specific content,
 ## which are split because the content depends on which category is selected.
 ##----------------------------------------------------------------------------##
+## The category shown: the selected one, or the first before the selector has
+## reported. A reactiveVal, so that the selector reporting the category the
+## page already shows changes nothing.
+extra_material_category <- reactiveVal(NULL)
+observe(
+  {
+    categories <- getExtraMaterialCategories()
+    chosen <- input[["extra_material_selected_category"]]
+    extra_material_category(
+      if (!is.null(chosen) && chosen %in% categories) {
+        chosen
+      } else if (length(categories)) {
+        categories[[1L]]
+      }
+    )
+  },
+  priority = 100
+)
+
 output[["extra_material_select_category_and_content_UI"]] <- renderUI({
   categories <- getExtraMaterialCategories()
   if (!length(categories)) {
@@ -25,7 +44,15 @@ output[["extra_material_select_category_and_content_UI"]] <- renderUI({
     } else {
       selector
     },
-    uiOutput("extra_material_selected_content_UI")
+    ## Filled at once with the first content's selectors, so that the table
+    ## does not wait for this output's first round trip.
+    htmltools::tagAppendChildren(
+      uiOutput("extra_material_selected_content_UI"),
+      tryCatch(
+        extra_material_content_selectors(categories, categories[[1L]]),
+        shiny.silent.error = function(error) NULL
+      )
+    )
   )
 })
 
@@ -39,6 +66,22 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
   if (is.null(category)) {
     category <- categories[[1L]]
   }
+  extra_material_content_selectors(
+    categories,
+    category,
+    input[["extra_material_selected_file"]],
+    isolate(input[["extra_material_selected_content"]])
+  )
+})
+
+## The selectors of a category's content: the file and table of "tables", the
+## plot of "plots".
+extra_material_content_selectors <- function(
+  categories,
+  category,
+  selected_file = NULL,
+  selected_sheet = NULL
+) {
   req(category %in% categories)
   ## if selected category is `tables`
   if (
@@ -48,7 +91,6 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
     groups <- extra_material_table_groups()
     file_choices <- extra_material_table_choices(groups)
     req(length(file_choices))
-    selected_file <- input[["extra_material_selected_file"]]
     if (is.null(selected_file) || !selected_file %in% unname(file_choices)) {
       selected_file <- unname(file_choices)[[1L]]
     }
@@ -62,7 +104,6 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
       vapply(selection$group$sheets, `[[`, character(1), "key"),
       vapply(selection$group$sheets, `[[`, character(1), "label")
     )
-    selected_sheet <- isolate(input[["extra_material_selected_content"]])
     if (is.null(selected_sheet) || !selected_sheet %in% unname(sheet_choices)) {
       selected_sheet <- unname(sheet_choices)[[1L]]
     }
@@ -99,4 +140,4 @@ output[["extra_material_selected_content_UI"]] <- renderUI({
       width = "100%"
     )
   }
-})
+}

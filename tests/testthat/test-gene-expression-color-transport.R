@@ -433,3 +433,185 @@ test_that("secondary expression summaries wait for the painted primary frame", {
     )
   }
 })
+
+test_that("H5 rows build the same sparse colour packet from their entries", {
+  scope <- new.env(parent = globalenv())
+  scope$reactiveVal <- shiny::reactiveVal
+  scope$reactive <- shiny::reactive
+  scope$observeEvent <- function(...) NULL
+  ## A real observer here has no session and would run in later tests.
+  scope$observe <- function(...) NULL
+  scope$viewerMemoOne <- function() function(key, compute) compute()
+  for (file in c(
+    "obj_projection_expression_levels.R",
+    "func_projection_update_plot.R"
+  )) {
+    sys.source(viewer_test_path("gene_expression", file), scope)
+  }
+  scope$`%||%` <- function(x, y) if (is.null(x)) y else x
+  scope$expressionProjectionDatasetKey <- function() "h5-test"
+  scope$viewerDatasetIdentity <- function() list(pack_fingerprint = "h5-test")
+  scope$expressionColorScale <- function(...) "scale"
+  scope$expressionReverseColorScale <- function(...) FALSE
+  scope$cerebroCellViewRender <- function(id, meta, data, ...) {
+    scope$captured <- data
+  }
+
+  n <- 10000L
+  ## Each gene's cells as the gene-major sidecar holds them (1-based, double
+  ## as .h5ExpressionRows() reads them), with a stored zero, NA, NaN, -Inf and
+  ## a value f32 would round. "Dense" is non-zero in 60 % of the cells.
+  stored <- list(
+    Sparse = list(
+      index = c(2, 7, 100, 101, 5000, 9999, 10000),
+      value = c(1.5, 0, NA, NaN, -Inf, -2.25, 1 + 2^-40)
+    ),
+    Dense = list(index = as.double(seq_len(6000L)), value = rep(0.5, 6000L)),
+    Empty = list(index = integer(), value = numeric()),
+    Unsorted = list(index = c(9, 3), value = c(1, 2))
+  )
+  dense_row <- function(gene) {
+    value <- numeric(n)
+    value[stored[[gene]]$index] <- stored[[gene]]$value
+    value
+  }
+  sparse_reads <- character()
+  rows <- list(
+    n_cells = function() n,
+    each_sparse = function(genes, visit) {
+      if (!all(genes %in% names(stored))) {
+        return(FALSE)
+      }
+      sparse_reads <<- c(sparse_reads, genes)
+      for (i in seq_along(genes)) {
+        visit(i, stored[[genes[[i]]]])
+      }
+      TRUE
+    }
+  )
+  dense_reads <- character()
+  scope$viewerExpressionCellCount <- function(data) n
+  scope$viewerExpressionValues <- function(data, cells, genes) {
+    dense_reads <<- c(dense_reads, genes)
+    stats::setNames(lapply(genes, function(gene) dense_row(gene)[cells]), genes)
+  }
+  data <- structure(list(), cerebro_h5_rows = rows)
+  wire <- viewer_runtime_env()
+  wire_bytes <- function(packet) {
+    wire$cv_wire_pack_message(list(data = list(sparse_color = packet)))
+  }
+
+  for (gene in names(stored)) {
+    row <- scope$expressionProjectionCachedRow(data, seq_len(n), gene)
+    ## The dense row the summaries and legends read is the one read before.
+    expect_identical(row, dense_row(gene))
+    entries <- scope$expressionColorEntries(row, gene)
+    expect_identical(is.null(entries), identical(gene, "Unsorted"))
+    expected <- scope$expressionSparseColor(row)
+    packed <- scope$expressionSparseColor(row, entries = entries)
+    expect_identical(packed, expected)
+    if (!is.null(expected)) {
+      expect_identical(wire_bytes(packed), wire_bytes(expected))
+    }
+  }
+  expect_identical(sparse_reads, names(stored))
+  expect_identical(dense_reads, character())
+  expect_identical(
+    scope$expressionSparseColor(
+      dense_row("Sparse"),
+      entries = scope$expressionColorEntries(dense_row("Sparse"), "Sparse")
+    )$index,
+    c(1L, 99L, 100L, 4999L, 9998L, 9999L)
+  )
+  ## The density gate is decided by the entries' count alone.
+  expect_null(scope$expressionSparseColor(dense_row("Dense")))
+  expect_null(scope$expressionColorEntries(dense_row("Dense"), "Dense")$index)
+
+  ## Entries go with the row they came from: not for another vector of the
+  ## same length, and not once the row is evicted or replaced.
+  changed <- dense_row("Sparse")
+  changed[[3L]] <- 1
+  expect_null(scope$expressionColorEntries(changed, "Sparse"))
+  for (gene in c("E1", "E2", "E3", "E4")) {
+    stored[[gene]] <- list(index = 1, value = 1)
+    scope$expressionProjectionCachedRow(data, seq_len(n), gene)
+  }
+  expect_null(scope$expressionColorEntries(dense_row("Sparse"), "Sparse"))
+  expect_false(exists(
+    "h5-test::Sparse",
+    envir = scope$expression_projection_row_entries,
+    inherits = FALSE
+  ))
+  scope$expressionProjectionRowCacheSet("h5-test::E4", dense_row("E4"))
+  expect_null(scope$expressionColorEntries(dense_row("E4"), "E4"))
+
+  ## A cell subset is not cached and reads as before.
+  scope$expressionProjectionCachedRow(data, rev(seq_len(n)), "Sparse")
+  expect_identical(dense_reads, "Sparse")
+
+  ## The primary frame takes the packet from the entries.
+  used <- 0L
+  cached_entries <- scope$expressionProjectionCachedEntries
+  scope$expressionProjectionCachedEntries <- function(values, gene) {
+    entries <- cached_entries(values, gene)
+    used <<- used + !is.null(entries)
+    entries
+  }
+  row <- scope$expressionProjectionCachedRow(data, seq_len(n), "Sparse")
+  frame <- list(
+    coordinates = data.frame(x = seq_len(n), y = rev(seq_len(n))),
+    reset_axes = FALSE,
+    expression_levels = row,
+    plot_parameters = list(
+      draw_border = FALSE,
+      keep_square = TRUE,
+      plot_order = "Natural order",
+      point_size = 1,
+      point_opacity = 1,
+      x_range = c(1, n),
+      y_range = c(1, n),
+      is_trajectory = FALSE,
+      hover_info = FALSE,
+      projection = "umap",
+      n_dimensions = 2L
+    ),
+    color_settings = list(
+      color_scale = "Viridis",
+      color_range = c(0, 1),
+      color_mode = "same",
+      genes = "Sparse"
+    ),
+    metadata = NULL,
+    trajectory = list(),
+    display_mode = "single",
+    cell_indices = seq_len(n),
+    projection_resource_failed = NULL,
+    separate_panels = FALSE
+  )
+  scope$expression_projection_update_plot(frame)
+  expect_identical(used, 1L)
+  expect_identical(
+    scope$captured$sparse_color,
+    scope$expressionSparseColor(dense_row("Sparse"))
+  )
+
+  separate <- frame
+  separate$expression_levels <- scope$expressionProjectionCachedRows(
+    data,
+    seq_len(n),
+    c("Sparse", "Dense")
+  )
+  separate$color_settings$genes <- c("Sparse", "Dense")
+  separate$color_settings$color_mode <- "shared"
+  separate$display_mode <- "separate"
+  separate$separate_panels <- TRUE
+  scope$expression_projection_update_plot(separate)
+  expect_identical(used, 3L)
+  expect_identical(
+    scope$captured$packed_colors,
+    lapply(
+      list(Sparse = dense_row("Sparse"), Dense = dense_row("Dense")),
+      scope$expressionPackedColor
+    )
+  )
+})
