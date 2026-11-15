@@ -101,9 +101,11 @@ viewerStagedStart <- function(packages, load_server) {
       compiler::cmpfun(state$server),
       error = function(error) state$server
     )
-    for (task in state$tasks) {
+    ## A function for each task: the callbacks of a for loop would share its
+    ## variable and all run the last task.
+    lapply(state$tasks, function(task) {
       later::later(function() try(task(), silent = TRUE), 2)
-    }
+    })
     state$tasks <- list()
     invisible()
   }

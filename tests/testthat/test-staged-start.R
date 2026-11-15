@@ -109,6 +109,23 @@ test_that("the server function is compiled after the first session", {
   expect_identical(start$server(NULL, NULL, NULL), "session")
 })
 
+test_that("every task after the first session runs, each once", {
+  env <- staged_start_env()
+  start <- env$viewerStagedStart(character(), function() function(...) NULL)
+  ran <- character()
+  start$after_first_session(function() ran <<- c(ran, "a"))
+  start$after_first_session(function() ran <<- c(ran, "b"))
+  start$server(NULL, NULL, NULL)
+  environment(start$server)$after_first_session()
+  waited <- 0
+  while (length(ran) < 2L && waited < 5) {
+    later::run_now(0.1)
+    waited <- waited + 0.1
+  }
+  expect_setequal(ran, c("a", "b"))
+  expect_length(ran, 2L)
+})
+
 test_that("inst/app.R attaches no session package before it starts", {
   code <- parse(
     inst_test_path("app.R"),
