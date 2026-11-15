@@ -2846,8 +2846,82 @@ server <- function(input, output, session) {
   ##   one, its first view computes from the repertoire. The Immune repertoire
   ##   page reads the Pack's encoding of the repertoire, or, first of all, has
   ##   another R process encode it.
+  ## The packages to load and, before each, the packages it imports that are
+  ## not loaded yet, in the order loadNamespace() would load them: one task
+  ## each. Loading plotly in one call held the session 0.35 to 1.2 s and a
+  ## click made meanwhile waited for all of it; one package at a time, a click
+  ## waits for one. Matrix only for a data set that keeps a sparse matrix in
+  ## memory (an H5 file's rows are read as plain vectors).
   viewer_idle_packages <- function() {
-    setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
+    packages <- Cerebro.options[[".idle_packages"]]
+    h5 <- tryCatch(
+      identical(isolate(data_set())$expression_backend$type, "h5"),
+      error = function(error) FALSE
+    )
+    if (isTRUE(h5)) {
+      packages <- setdiff(packages, "Matrix")
+    }
+    viewer_package_load_order(packages)
+  }
+  ## The packages `package`'s NAMESPACE imports: those loadNamespace() loads
+  ## with it. Not the DESCRIPTION's Depends and Imports, which also name
+  ## packages only used through `pkg::` (DT, plotly, Matrix, colourpicker and
+  ## shinycssloaders: 57 packages instead of 26, rmarkdown, knitr and stringi
+  ## among them, which a Viewer session never loads).
+  viewer_package_imports <- function(package) {
+    path <- system.file(package = package)
+    namespace <- tryCatch(
+      parseNamespaceFile(basename(path), dirname(path), mustExist = FALSE),
+      error = function(error) NULL,
+      warning = function(warning) NULL
+    )
+    if (is.null(namespace)) {
+      return(character())
+    }
+    unique(vapply(
+      c(namespace$imports, namespace$importClasses, namespace$importMethods),
+      function(import) as.character(import[[1L]]),
+      ""
+    ))
+  }
+  viewer_package_load_order <- function(packages) {
+    base <- c(
+      "R",
+      "base",
+      "compiler",
+      "datasets",
+      "grDevices",
+      "graphics",
+      "grid",
+      "methods",
+      "parallel",
+      "splines",
+      "stats",
+      "stats4",
+      "tcltk",
+      "tools",
+      "utils"
+    )
+    order <- character()
+    visit <- function(package, path) {
+      if (
+        package %in%
+          c(base, order, path) ||
+          package %in% loadedNamespaces() ||
+          !nzchar(system.file(package = package))
+      ) {
+        return(invisible(NULL))
+      }
+      for (import in viewer_package_imports(package)) {
+        visit(import, c(path, package))
+      }
+      order <<- c(order, package)
+      invisible(NULL)
+    }
+    for (package in packages) {
+      visit(package, character())
+    }
+    order
   }
   viewer_idle_pack <- function() {
     signature <- tryCatch(
@@ -2916,19 +2990,6 @@ server <- function(input, output, session) {
   )
   viewer_idle_tasks <- function() {
     tasks <- list()
-    for (package in viewer_idle_packages()) {
-      tasks[[paste("load package", package)]] <- local({
-        package <- package
-        function() loadNamespace(package)
-      })
-    }
-    ## The first loading spinner of a process costs 0.05 s to build (its CSS),
-    ## every later one 2 ms: the Immune repertoire page draws several.
-    if ("shinycssloaders" %in% loadedNamespaces()) {
-      tasks[["first spinner"]] <- function() {
-        shinycssloaders::withSpinner(shiny::div())
-      }
-    }
     for (path in viewer_idle_pack_assets()) {
       tasks[[path]] <- local({
         path <- path
@@ -2999,6 +3060,22 @@ server <- function(input, output, session) {
             isolate(first())
           }
         }
+      }
+    }
+    ## The packages last, after the pages' own work: a page opened early finds
+    ## its code loaded, and a package is loaded when its first output renders
+    ## (viewerLazyRender()) if the visitor gets there first.
+    for (package in viewer_idle_packages()) {
+      tasks[[paste("load package", package)]] <- local({
+        package <- package
+        function() loadNamespace(package)
+      })
+    }
+    ## The first loading spinner of a process costs 0.05 s to build (its CSS),
+    ## every later one 2 ms: the Immune repertoire page draws several.
+    tasks[["first spinner"]] <- function() {
+      if ("shinycssloaders" %in% loadedNamespaces()) {
+        shinycssloaders::withSpinner(shiny::div())
       }
     }
     tasks

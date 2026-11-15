@@ -148,12 +148,20 @@ colMeans <- function(x, na.rm = FALSE, dims = 1L, ...) {
 ## cells) to 1.4 s.
 .lazy_imports_session <- c("dplyr", "mirai")
 
-## Packages only some pages need (plotly: the charts; Matrix: sparse
-## expression). The Viewer loads them one at a time once a session has been
-## quiet for a few seconds (`.idle_packages` in inst/viewer/shiny_server.R), so
-## that the first of those pages does not wait for them: 0.5-0.9 s for plotly
-## and 0.5-1.8 s for Matrix, the more the larger the data set in memory.
-.lazy_imports_idle <- c("plotly", "Matrix", "colourpicker", "shinycssloaders")
+## Packages only some pages need (plotly: the charts; DT: the tables; Matrix:
+## sparse expression). The Viewer loads them, and the packages they import, one
+## at a time once a session has been quiet for a few seconds (`.idle_packages`
+## in inst/viewer/shiny_server.R), so that the first of those pages does not
+## wait for them: 0.5-0.9 s for plotly and 0.5-1.8 s for Matrix, the more the
+## larger the data set in memory. Their outputs load them at the first render
+## otherwise (viewerLazyRender(), inst/viewer/utility_functions.R).
+.lazy_imports_idle <- c(
+  "DT",
+  "plotly",
+  "Matrix",
+  "colourpicker",
+  "shinycssloaders"
+)
 
 ## A Matrix-class matrix read from a .crb (dgCMatrix) has no dim(), dimnames()
 ## or `[` until Matrix is loaded. R loads Matrix during the first such call,
