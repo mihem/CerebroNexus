@@ -8,7 +8,13 @@ first_call_in_fresh_session <- function(getter) {
   callr::r(
     function(lib_paths, crb, getter) {
       .libPaths(lib_paths)
-      object <- CerebroNexus::readCerebro(crb)
+      ## readCerebro() loads Matrix for an embedded matrix; read the object
+      ## as it does but without that step, so each getter is the first call.
+      loadNamespace("dplyr")
+      object <- CerebroNexus:::.hydrateCerebroPayload(
+        CerebroNexus:::.readCurrentCerebroPayload(crb),
+        crb
+      )
       list(
         matrix_loaded_by_read = "Matrix" %in% loadedNamespaces(),
         value = getter(object)
@@ -54,7 +60,7 @@ test_that("expression getters work as the first call in a fresh session", {
   )
   for (name in names(getters)) {
     result <- first_call_in_fresh_session(getters[[name]])
-    ## readCerebro() leaves Matrix to the first getter that needs it.
+    ## The read leaves Matrix to the first getter that needs it.
     expect_false(result$matrix_loaded_by_read, label = name)
     expect_true(
       is.numeric(result$value) && result$value > 0L,

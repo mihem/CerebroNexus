@@ -1281,7 +1281,17 @@ readCerebro <- function(file) {
   ## loads it, since dplyr is bound lazily (R/lazy_imports.R).
   loadNamespace("dplyr")
   file <- normalizePath(file, mustWork = TRUE)
-  .hydrateCerebroPayload(.readCurrentCerebroPayload(file), file)
+  serialized <- .readCurrentCerebroPayload(file)
+  object <- .hydrateCerebroPayload(serialized, file)
+  ## An embedded dgCMatrix has no dim(), dimnames() or `[` until Matrix is
+  ## loaded: nrow(object$expression) would return NULL in a fresh session.
+  ## Only an embedded matrix: an H5-backed one stays unread until first use.
+  ## The App reads its data sets without readCerebro(), so its start is not
+  ## slowed.
+  if (identical(.cerebroBackend(serialized)$type, "embedded")) {
+    .loadMatrixFor(object$expression)
+  }
+  object
 }
 
 ## The serialized object of a CRB this version reads, before it is hydrated.
