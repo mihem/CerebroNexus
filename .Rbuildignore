@@ -95,4 +95,5 @@ Rplots\.pdf$
 ^tests/testthat/test-builder-worker.R$
 ^tests/testthat/test-demo-h5-transpose.R$
 ^tests/testthat/test-h5ad-anndatar-agreement.R$
+^tests/testthat/test-read-cerebro-matrix.R$
 ^tests/testthat/test-storage-runtime-load-order.R$

@@ -1,3 +1,6 @@
+## Starts a separate R process, like test-expression-matrix-first-call.R: CI only.
+skip_on_cran()
+
 test_that("the expression matrix of a read CRB has dimensions in a fresh session", {
   skip_if_not_installed("callr")
   crb <- system.file("extdata/examples/example.crb", package = "CerebroNexus")
