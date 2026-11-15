@@ -1,3 +1,13 @@
+# CerebroNexus 8.3.5
+
+- **Builder from the package sources.** When the Builder runs next to the
+  package sources (`CEREBRO_PACKAGE_SOURCE`, or a source folder at `..` or
+  `../..`), it reads CRBs with `R/cerebro_io.R` alone. Two of those readers
+  called `.isString()`, defined in another file, so making an App stopped
+  with "The staged App inputs differ from the frozen plan". The helper now
+  lives in `R/cerebro_io.R`, and that message names its cause. Installed use
+  was not affected.
+
 # CerebroNexus 8.3.4
 
 - **Sparse expression after `readCerebro()`.** In a fresh session,
