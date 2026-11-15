@@ -397,97 +397,101 @@ builder_viewer_spatial_scene_label <- function(id, annotations) {
   )
 }
 
-builder_viewer_page_catalog <- function() {
-  list(
-    always = .builder_page_table(
-      id = c(
-        "data_info",
-        "projection",
-        "linked_views",
-        "groups",
-        "gene_expression",
-        "gene_id_conversion",
-        "color_management",
-        "about"
-      ),
-      tab_name = c(
-        "loadData",
-        "overview",
-        "coordinated_views",
-        "groups",
-        "geneExpression",
-        "geneIdConversion",
-        "color_management",
-        "about"
-      ),
-      label = c(
-        "Data info",
-        "Projection",
-        "Linked views",
-        "Groups",
-        "Gene expression",
-        "Gene ID conversion",
-        "Color management",
-        "About"
-      ),
-      icon = c(
-        "info",
-        "home",
-        "link",
-        "layer-group",
-        "signal",
-        "barcode",
-        "palette",
-        "at"
-      )
+## The catalog is the same for as long as R runs and every manifest validation
+## reads it, several hundred times for one edit in the Builder: build it once.
+.builder_viewer_pages <- list(
+  always = .builder_page_table(
+    id = c(
+      "data_info",
+      "projection",
+      "linked_views",
+      "groups",
+      "gene_expression",
+      "gene_id_conversion",
+      "color_management",
+      "about"
     ),
-    conditional = .builder_page_table(
-      id = c(
-        "marker_genes",
-        "most_expressed_genes",
-        "enriched_pathways",
-        "extra_material",
-        "immune_repertoire",
-        "trajectory",
-        "spatial",
-        "trekker",
-        "hla_tcr_motifs"
-      ),
-      tab_name = c(
-        "markerGenes",
-        "mostExpressedGenes",
-        "enrichedPathways",
-        "extra_material",
-        "immune_repertoire",
-        "trajectory",
-        "spatial",
-        "trekker",
-        "hla_tcr_motifs"
-      ),
-      label = c(
-        "Marker genes",
-        "Most expressed genes",
-        "Enriched pathways",
-        "Extra material",
-        "Immune repertoire",
-        "Trajectory",
-        "Spatial",
-        "Trekker",
-        "HLA & TCR Motifs"
-      ),
-      icon = c(
-        "list-alt",
-        "bullhorn",
-        "project-diagram",
-        "gift",
-        "dna",
-        "route",
-        "map-pin",
-        "map-marked-alt",
-        "project-diagram"
-      )
+    tab_name = c(
+      "loadData",
+      "overview",
+      "coordinated_views",
+      "groups",
+      "geneExpression",
+      "geneIdConversion",
+      "color_management",
+      "about"
+    ),
+    label = c(
+      "Data info",
+      "Projection",
+      "Linked views",
+      "Groups",
+      "Gene expression",
+      "Gene ID conversion",
+      "Color management",
+      "About"
+    ),
+    icon = c(
+      "info",
+      "home",
+      "link",
+      "layer-group",
+      "signal",
+      "barcode",
+      "palette",
+      "at"
+    )
+  ),
+  conditional = .builder_page_table(
+    id = c(
+      "marker_genes",
+      "most_expressed_genes",
+      "enriched_pathways",
+      "extra_material",
+      "immune_repertoire",
+      "trajectory",
+      "spatial",
+      "trekker",
+      "hla_tcr_motifs"
+    ),
+    tab_name = c(
+      "markerGenes",
+      "mostExpressedGenes",
+      "enrichedPathways",
+      "extra_material",
+      "immune_repertoire",
+      "trajectory",
+      "spatial",
+      "trekker",
+      "hla_tcr_motifs"
+    ),
+    label = c(
+      "Marker genes",
+      "Most expressed genes",
+      "Enriched pathways",
+      "Extra material",
+      "Immune repertoire",
+      "Trajectory",
+      "Spatial",
+      "Trekker",
+      "HLA & TCR Motifs"
+    ),
+    icon = c(
+      "list-alt",
+      "bullhorn",
+      "project-diagram",
+      "gift",
+      "dna",
+      "route",
+      "map-pin",
+      "map-marked-alt",
+      "project-diagram"
     )
   )
+)
+
+builder_viewer_page_catalog <- function() {
+  .builder_viewer_pages
 }
 
 builder_viewer_known_page_ids <- function() {

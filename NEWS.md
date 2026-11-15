@@ -1,3 +1,20 @@
+# CerebroNexus 8.2.2
+
+- **New logo.** The hexagon logo is redrawn: the brain sits in the middle with
+  its two halves in the colours of the clusters, linked to a UMAP, a spatial
+  section and antibodies, over the name. It heads the README and the pkgdown
+  site and appears in the Viewer's About tab.
+
+# CerebroNexus 8.2.1
+
+- **Faster edits in the Builder's Configure page.** A change (a Group ticked, a
+  default chosen, an analysis switched on) took 0.8 to 0.9 s whatever the size of
+  the data set, because the whole data set entry was validated again, several
+  times over. The Viewer page catalog is built once, the dataset state of an
+  accepted edit is derived once, and the search for references skips what the
+  stored entry already has. With 63 metadata columns an edit takes 0.27 to 0.43 s
+  in the browser.
+
 # CerebroNexus 8.2.0
 
 - **First view.** A `?page=projection` link shows its plot before the session
