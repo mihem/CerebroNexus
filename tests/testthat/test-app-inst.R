@@ -102,9 +102,8 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
 test_that("{shinytest2} recording: overview", {
   app <- shared_app()
 
-  ## Data Info tab: verify key values from the loaded example.crb. The App
-  ## opens on the Projection (viewerStartTab()), so Data info renders only once
-  ## it is shown.
+  ## Data Info tab (the start page, viewerStartTab()): verify key values from
+  ## the loaded example.crb.
   activate_tab(app, "loadData", timeout = 30000)
   overview <- retry_get_value(app, output = "load_data_overview")$html
   expect_true(grepl("1,?000", overview))
@@ -569,8 +568,6 @@ test_that("Spatial panels refit when the page above them grows", {
 
 test_that("Data info bars carry the colour of their category", {
   app <- shared_app()
-  ## The App opens on the Projection: Data info draws its bars once shown.
-  activate_tab(app, "loadData", timeout = 30000)
   wait_for_input(app, "load_data_annotation", timeout = 30000)
   ## The bars start in the accent colour and take their category colours once
   ## the data set is loaded, the same ones the other pages draw.
@@ -1093,7 +1090,7 @@ test_that("createShinyApp bundles a working app", {
   )
   app$wait_for_idle(timeout = 20000)
 
-  ## The bundle opens on the Projection; Data info renders once it is shown.
+  ## The bundle opens on Data info.
   activate_tab(app, "loadData", timeout = 30000)
   cells <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("1,?000", cells$html))

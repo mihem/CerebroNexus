@@ -2338,9 +2338,9 @@
 #'   for the first loaded dataset. Initial routing is attempted only once, so
 #'   switching datasets later never triggers a delayed redirect. Shared links
 #'   take precedence after restoration. \code{NULL} (the default) opens
-#'   \code{"projection"}, with a preview of its plot from an earlier start
-#'   while the session starts; \code{"data_info"} when the App has no dataset
-#'   to show.
+#'   \code{"data_info"}, and the Projection is prepared while it is read: a
+#'   click on Projection shows the plot at once, or a preview of it while the
+#'   data set is still being read.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Point size from 1 through 20. Supply one number for every
 #'   dataset, or a named numeric vector/list whose names exactly match

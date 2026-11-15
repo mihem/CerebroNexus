@@ -1,9 +1,16 @@
 ##----------------------------------------------------------------------------##
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
-## shiny::debounce() evaluates this eagerly; only the visible page may pay for it.
+## shiny::debounce() evaluates this eagerly; only the visible page may pay for
+## it, and the first frame prepared behind Data info (the start page): code
+## loaded while Data info is shown prepares that frame, until it is sent
+## (overview_projection_first_frame, event_projection_update_plot.R).
+overview_projection_preparing <- reactiveVal(
+  identical(isolate(input[["sidebar"]]), "loadData")
+)
 overview_projection_active <- function() {
-  identical(input[["sidebar"]], "overview")
+  identical(input[["sidebar"]], "overview") ||
+    isTRUE(overview_projection_preparing())
 }
 overview_projection_data_to_plot_raw <- reactive({
   req(overview_projection_active())

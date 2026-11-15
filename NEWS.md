@@ -1,15 +1,17 @@
 # CerebroNexus 8.4.0
 
-- **The App opens on the Projection, with its preview.** An address without
-  `?page=` opened Data info, and the plot came only after a click on
-  Projection and the start of the session; the preview of 8.2.0 was drawn only
-  for a `?page=projection` link. An App with a data set now opens the
-  Projection, previewed from an earlier start: with 1.3 million cells the
-  cells are on screen 1.0 s after the R process starts (before: 4.3 s at the
-  earliest, with a click the moment the session existed), and the plot takes
-  over at 3.8 s. `initial_page` in `createShinyApp()` still chooses another
-  start page (`"data_info"` for the earlier one); an App without a data set
-  opens Data info, for the upload.
+- **The Projection is prepared while Data info is read.** Data info stays the
+  start page, and a click on Projection no longer waits for the session to
+  build the plot: as soon as the data set is read and Data info sent, the
+  session sends the Projection's first frame, which the browser keeps and
+  draws when the page is first shown. The browser has also fetched the Viewer
+  Pack files of the plot's preview by then, and draws that preview at once if
+  the click comes before the frame. With 1.3 million cells (WSL, software
+  WebGL, medians of 5), a click 10 s after Data info appeared shows the plot
+  in 0.49 s (8.3.5: 0.74 s), and a click before the data set is read shows
+  the preview after 0.08 s. `initial_page` in `createShinyApp()` still
+  chooses another start page (`"projection"` opens on the plot, with its
+  preview while the session starts).
 - **The other pages are prepared while the first one is read.** Once a
   session has had no input for three seconds, it loads the code of the pages
   its data set has, sorts the gene list the gene selectors share, reads the

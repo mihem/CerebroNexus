@@ -373,18 +373,23 @@ viewerFirstViewBasis <- function(options) {
     "colors",
     "initial_page"
   )]
+  ## Without `initial_page` the start page is Data info (viewerStartPage()):
+  ## a description kept while it was the Projection says otherwise.
+  basis$default_start_page <- "data_info"
   file <- tempfile("first-view-basis-")
   on.exit(unlink(file), add = TRUE)
   writeBin(serialize(basis, NULL, version = 2L), file)
   unname(tools::md5sum(file))
 }
 
-## The page an address without `?page=` opens: the author's start page, or the
-## Projection when the App has a data set to show (and Data info, where one is
-## uploaded, when it has none). A first view says it (`start_page`), so that
-## first-view.js previews the Projection at such an address only when the
-## session will open it; the basis above keeps a description to the author's
-## options it was taken with.
+## The page an address without `?page=` opens when it is not Data info: the
+## author's start page (`initial_page`), or NULL. A first view says it
+## (`start_page`), so that first-view.js previews the Projection at such an
+## address only when the session will open it; the basis above keeps a
+## description to the author's options it was taken with. Data info is the
+## start page otherwise, and the Projection is prepared behind it: first-view.js
+## fetches its preview files, and the session sends its first frame while Data
+## info is read (overview/event_projection_update_plot.R).
 viewerStartPage <- function(options) {
   page <- options[["initial_page"]]
   if (
@@ -392,16 +397,7 @@ viewerStartPage <- function(options) {
   ) {
     return(page)
   }
-  files <- as.character(unlist(
-    options[["crb_file_to_load"]],
-    use.names = FALSE
-  ))
-  files <- files[!is.na(files) & nzchar(files)]
-  if (length(files) && any(file.exists(files) & !dir.exists(files))) {
-    "projection"
-  } else {
-    NULL
-  }
+  NULL
 }
 
 ## ---- the start page in the page itself ---------------------------------------

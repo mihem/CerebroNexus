@@ -36,6 +36,10 @@
   // be allowed to recreate that cache entry after a switch.
   var singleViews = {};
   var singleRequests = new Set();
+  // The views this page has asked the server for, by singleRequestKey(): a
+  // frame that came unasked (the Projection's, prepared while Data info is
+  // read) is drawn from what the page kept, and asked for once when shown.
+  var singleAsked = new Set();
   var singleResourceDescriptors = new Map();
   var singleDefaultResourceNames = new Map();
   var singleCategoryResourceDescriptors = new Map();
@@ -10050,6 +10054,14 @@
     renderSelbar();
     if (!drawn) drawAll();
     reportSingleHiddenGroups(); reportSelection(eventKind || 'interaction', restoreReport);
+    var heldView = singleView(id), heldAux = heldView && heldView._heldAux;
+    if (heldAux) {
+      heldView._heldAux = null;
+      if (sameDatasetContext(heldAux.dataset_context, heldView.dataset_context) &&
+          Number(heldView.aux_render_token) === Number(heldAux.render_token)) {
+        applyActiveSingleAux(heldView, heldAux);
+      }
+    }
     // Gene's selection core is requested by click or brush, and, once the page
     // is idle, in the background: sending all cell IDs at once would compete
     // with the user's first gene operation on the R thread.
@@ -10152,6 +10164,7 @@
     if (previous.render_token != null && renderToken <= previous.render_token) {
       return false;
     }
+    var unrequested = !singleRequests.has(singleRequestKey(id, context));
     singleRequests.delete(singleRequestKey(id, context));
     var meta = message.meta || {};
     var data = message.data || {};
@@ -10191,6 +10204,7 @@
       background_identity: backgroundIdentity,
       background_identity_value: backgroundIdentityValue
     });
+    singleViews[cacheKey].unrequested = unrequested;
     if (changedGroup) singleViews[cacheKey].hiddenGroups = [];
     if (data.reset_axes) singleViews[cacheKey].lenses = [];
     var pending = singleViews[cacheKey].pendingSavedState;
@@ -11079,7 +11093,19 @@
         });
       }
       view.hover = message.hover || {};
-      if (singleActive !== message.id) return;
+      // Hidden (a frame prepared behind Data info): its cells and hover reach
+      // the page's state when the view is shown (activateSingle()).
+      if (singleActive !== message.id) { view._heldAux = message; return; }
+      applyActiveSingleAux(view, message);
+    } catch (error) {
+      return;
+    }
+  }
+
+  // The cells and hover of an accepted aux message, for the view on screen.
+  function applyActiveSingleAux(view, message) {
+    try {
+      var hasCells = message.selection_key != null;
       var canonicalGroups = view.data.canonical_group;
       if (hasCells) {
         var cells = singlePayloadCells(view);
@@ -12447,9 +12473,25 @@
       var phase = datasetContextApi() && datasetContextApi().phase();
       if (!context || (phase !== 'ready' && phase !== 'pending')) return false;
       var requestKey = singleRequestKey(id, context);
-      if (!id || singleView(id) || singleRequests.has(requestKey) ||
+      var kept = id && singleView(id);
+      // A frame the server sent before the page asked (prepared behind Data
+      // info) is drawn from the page's copy. The request still goes out once:
+      // it arms the page's observer on the server, which answers it with the
+      // frame's acknowledgement only (overview_projection_adopt_request()).
+      if (kept && kept.unrequested && phase === 'ready' &&
+          !singleAsked.has(requestKey) && Shiny.setInputValue) {
+        singleAsked.add(requestKey);
+        kept.unrequested = false;
+        // `kept`: the page holds the frame this request is answered by.
+        Shiny.setInputValue(id + '_render_request', {nonce:Date.now(), dataset_context:context, kept:true}, {
+          priority: 'event'
+        });
+        return false;
+      }
+      if (!id || kept || singleRequests.has(requestKey) ||
           !Shiny.setInputValue) return false;
       singleRequests.add(requestKey);
+      singleAsked.add(requestKey);
       CBViewState.specialistLifecycle.begin(singleTiming, id, true);
       prefetchRegisteredSingleResource(id);
       prefetchRegisteredSingleCategory(id);

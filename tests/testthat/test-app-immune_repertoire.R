@@ -745,8 +745,8 @@ test_that("lazy-load boundary: self-made plots stay unloaded, scRepertoire plots
   expect_identical(app$get_value(export = "ir_heavy_deps_loaded"), FALSE)
 
   ## The module does not break the main app: Data info of an app that has never
-  ## opened the repertoire page shows the example's 1000 cells. (The App opens
-  ## on the Projection; Data info renders once it is shown.)
+  ## opened the repertoire page shows the example's 1000 cells. (Shown again
+  ## here, in case an earlier step left the page.)
   app$run_js(
     "document.querySelector('a[href=\"#shiny-tab-loadData\"]').click();"
   )

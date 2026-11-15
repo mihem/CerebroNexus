@@ -5,6 +5,7 @@ overview_projection_last_render <- NULL
 overview_projection_last_feedback_token <- NULL
 ## A first frame that was sent before the browser asked for it (below): its
 ## dataset context and when it was sent, until the browser's request comes.
+## `background`: sent while Data info was shown.
 overview_projection_unrequested <- NULL
 
 ## Sends the frame of `data` for `render_request`, or only the feedback for
@@ -50,6 +51,10 @@ overview_projection_send <- function(render_request, data, current_context) {
 ## sent again for it. Only the first request after that frame, within seconds
 ## of it, for its data set, on the first connection, and not after the cell
 ## names file failed: the browser asks again then, and that request is drawn.
+## A frame prepared behind Data info is kept by the browser until the page is
+## first shown, whenever that is: its request is adopted when the browser says
+## it holds the frame (`kept`), and is drawn otherwise (a frame that reached
+## the page before it could take it, for one).
 overview_projection_adopt_seconds <- 5
 overview_projection_adopt_request <- function(render_request) {
   unrequested <- overview_projection_unrequested
@@ -68,10 +73,14 @@ overview_projection_adopt_request <- function(render_request) {
       render_request$dataset_context,
       unrequested$dataset_context
     ) &&
-    isTRUE(
-      difftime(Sys.time(), unrequested$sent, units = "secs") <=
-        overview_projection_adopt_seconds
-    ) &&
+    (if (isTRUE(unrequested$background)) {
+      isTRUE(render_request$kept)
+    } else {
+      isTRUE(
+        difftime(Sys.time(), unrequested$sent, units = "secs") <=
+          overview_projection_adopt_seconds
+      )
+    }) &&
     is.null(isolate(input[["cell_view_names_resource_failed"]])) &&
     length(connection) == 1L &&
     isTRUE(connection <= 1)
@@ -110,18 +119,30 @@ observe({
 ## page and the rest of the session first; with a priority above theirs this
 ## frame leaves within the cycle, right after the data set has been made.
 ##
+## The same frame is prepared behind Data info, the start page: this code is
+## then loaded while the visitor reads Data info (a task of the quiet session,
+## shiny_server.R), and the frame is sent to the browser, which keeps it and
+## draws it when the Projection is first shown (a plot cannot be laid out in a
+## hidden page). The click then shows the plot without a round trip; the
+## browser's request that follows is the one the frame answers.
+##
 ## Only while no frame was sent and no request has come, and only while the
-## page is shown: otherwise, and once it has sent its frame, it stops for good,
-## and the observer above draws every frame. Not with Linked views' shared
-## projection, a frame the browser may have to ask for again.
+## page (or Data info, before its first visit) is shown: otherwise, and once it
+## has sent its frame, it stops for good, and the observer above draws every
+## frame. Not with Linked views' shared projection, a frame the browser may
+## have to ask for again.
 overview_projection_first_frame <- observe(
   {
+    sidebar <- input[["sidebar"]]
+    background <- identical(sidebar, "loadData") &&
+      isTRUE(isolate(overview_projection_preparing()))
     if (
-      !identical(input[["sidebar"]], "overview") ||
+      (!identical(sidebar, "overview") && !background) ||
         !is.null(input[["overview_projection_render_request"]]) ||
         !is.null(overview_projection_last_render) ||
         length(isolate(input[["coordviews_shared_base"]]))
     ) {
+      overview_projection_preparing(FALSE)
       overview_projection_first_frame$destroy()
       return()
     }
@@ -135,9 +156,11 @@ overview_projection_first_frame <- observe(
     if (isTRUE(sent)) {
       overview_projection_unrequested <<- list(
         dataset_context = current_context,
-        sent = Sys.time()
+        sent = Sys.time(),
+        background = background
       )
     }
+    overview_projection_preparing(FALSE)
     overview_projection_first_frame$destroy()
   },
   priority = 900

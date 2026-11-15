@@ -197,31 +197,30 @@ test_that("a first frame is published once and kept for later processes", {
   expect_length(list.files(env$viewerFirstViewDirectory()), 1L)
 })
 
-test_that("an address without ?page= starts on the Projection when there is data", {
+test_that("an address without ?page= starts on Data info unless the author chose a page", {
   env <- first_view_env()
   crb <- withr::local_tempfile(fileext = ".crb")
   writeLines("x", crb)
-  ## the author's start page wins; otherwise the Projection of a data set
+  ## the author's start page wins
   expect_identical(env$viewerStartPage(list(initial_page = "groups")), "groups")
   expect_identical(
     env$viewerStartPage(list(
-      initial_page = "data_info",
+      initial_page = "projection",
       crb_file_to_load = crb
     )),
-    "data_info"
-  )
-  expect_identical(
-    env$viewerStartPage(list(crb_file_to_load = c(A = crb))),
     "projection"
   )
-  ## nothing to show (an App for uploads): Data info, as before
+  ## otherwise Data info (NULL), with a data set to show or without one
+  expect_null(env$viewerStartPage(list(crb_file_to_load = c(A = crb))))
   expect_null(env$viewerStartPage(list()))
-  expect_null(env$viewerStartPage(list(
-    crb_file_to_load = file.path(
-      tempdir(),
-      "missing.crb"
-    )
-  )))
+  expect_identical(
+    env$viewerStartTab(list(crb_file_to_load = c(A = crb))),
+    "loadData"
+  )
+  expect_identical(
+    env$viewerStartTab(list(initial_page = "projection")),
+    "overview"
+  )
 })
 
 ## The sidebar of a page as shinydashboard writes it: Data info marked as the
@@ -245,7 +244,14 @@ test_that("the page opens on the start page when every App has it", {
   env <- first_view_env()
   crb <- withr::local_tempfile(fileext = ".crb")
   writeLines("x", crb)
-  expect_identical(env$viewerStartTab(list(crb_file_to_load = crb)), "overview")
+  expect_identical(env$viewerStartTab(list(crb_file_to_load = crb)), "loadData")
+  expect_identical(
+    env$viewerStartTab(list(
+      initial_page = "projection",
+      crb_file_to_load = crb
+    )),
+    "overview"
+  )
   expect_identical(env$viewerStartTab(list(initial_page = "groups")), "groups")
   expect_identical(
     env$viewerStartTab(list(initial_page = "gene_expression")),

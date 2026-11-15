@@ -544,8 +544,8 @@ server <- function(input, output, session) {
     color_management = "color_management",
     about = "about"
   )
-  ## The author's start page, or the Projection when there is a data set to show
-  ## (viewerStartPage() in viewer/core/shared_resources.R).
+  ## The author's start page, Data info without one (viewerStartPage() in
+  ## viewer/core/shared_resources.R).
   initial_page <- viewerStartPage(Cerebro.options)
   ## A `?page=<id>` link overrides the start page for this visit.
   url_page <- viewerPageFromQuery(
@@ -1423,6 +1423,28 @@ server <- function(input, output, session) {
       viewer_dataset_ready <<- isTRUE(snapshot$ok)
       if (isTRUE(snapshot$ok)) {
         viewer_send_dataset_phase("ready", snapshot$dataset_context)
+        ## Behind Data info, the Projection's code (which sends its first
+        ## frame, overview/event_projection_update_plot.R) is loaded as soon
+        ## as Data info has been sent, not after the session has been quiet
+        ## for the other pages' work: a click a second later finds the frame.
+        if (identical(isolate(input[["sidebar"]]), "loadData")) {
+          session$onFlushed(
+            function() {
+              later::later(function() {
+                if (
+                  !session$isClosed() &&
+                    identical(isolate(input[["sidebar"]]), "loadData")
+                ) {
+                  shiny::withReactiveDomain(
+                    session,
+                    load_deferred_viewer_server("overview/server.R")
+                  )
+                }
+              })
+            },
+            once = TRUE
+          )
+        }
       } else {
         warning(
           "Viewer data set failed to load: ",
@@ -3019,6 +3041,10 @@ server <- function(input, output, session) {
       if (hla_fast) {
         pages <- c(pages, "hla_tcr_motifs")
       }
+      ## The Projection first of all, behind Data info (the start page): its
+      ## code sends the page's first frame, which the browser keeps until the
+      ## page is first shown (overview/event_projection_update_plot.R).
+      pages <- c("overview", pages)
       encoding_task <- paste("immune encoding", session$token)
       encoding <- function() {
         encoded <- server_scope$ir_encoded
