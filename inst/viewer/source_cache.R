@@ -162,7 +162,9 @@ viewerIdleRun <- function(tasks, active, delay = 0.01, done = NULL) {
   step <- function(i) {
     if (i > length(tasks) || !isTRUE(active())) {
       ## `done` when every task ran, not when the run was stopped
-      if (i > length(tasks) && is.function(done)) done()
+      if (i > length(tasks) && is.function(done)) {
+        done()
+      }
       return(invisible())
     }
     assign(names(tasks)[[i]], TRUE, envir = .viewer_idle_done)
