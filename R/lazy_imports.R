@@ -154,3 +154,17 @@ colMeans <- function(x, na.rm = FALSE, dims = 1L, ...) {
 ## that the first of those pages does not wait for them: 0.5-0.9 s for plotly
 ## and 0.5-1.8 s for Matrix, the more the larger the data set in memory.
 .lazy_imports_idle <- c("plotly", "Matrix", "colourpicker", "shinycssloaders")
+
+## A Matrix-class matrix read from a .crb (dgCMatrix) has no dim(), dimnames()
+## or `[` until Matrix is loaded. R loads Matrix during the first such call,
+## but that call still returns NULL or fails. Loading it first costs no time:
+## R would load it in the same call anyway. Matrix stays out of the start.
+.loadMatrixFor <- function(x) {
+  if (
+    identical(attr(class(x), "package"), "Matrix") &&
+      !isNamespaceLoaded("Matrix")
+  ) {
+    loadNamespace("Matrix")
+  }
+  invisible(x)
+}

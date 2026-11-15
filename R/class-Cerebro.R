@@ -335,6 +335,7 @@ Cerebro <- R6::R6Class(
       }
 
       if (!is.null(self$expression)) {
+        .loadMatrixFor(self$expression)
         if (nrow(table) != ncol(self$expression)) {
           stop(glue::glue(
             "Number of rows in meta data ({nrow(table)}) must match number of columns in expression matrix ({ncol(self$expression)})."
@@ -478,6 +479,7 @@ Cerebro <- R6::R6Class(
     #' @return
     #' \code{vector} containing all cell names/barcodes.
     getCellNames = function() {
+      .loadMatrixFor(self$expression)
       return(colnames(self$expression))
     },
 
@@ -487,6 +489,7 @@ Cerebro <- R6::R6Class(
     #' @return
     #' \code{vector} containing all gene names in transcript count matrix.
     getGeneNames = function() {
+      .loadMatrixFor(self$expression)
       return(rownames(self$expression))
     },
 
@@ -534,6 +537,7 @@ Cerebro <- R6::R6Class(
     #' \code{vector} containing (mean) expression across all specified genes in
     #' each specified cell.
     getMeanExpressionForCells = function(cells = NULL, genes = NULL) {
+      .loadMatrixFor(self$expression)
       if (is.null(genes)) {
         genes <- rownames(self$expression)
       }
@@ -738,6 +742,7 @@ Cerebro <- R6::R6Class(
         )
       }
       ## check dimensions
+      .loadMatrixFor(self$expression)
       if (
         !is.null(self$expression) && nrow(projection) != ncol(self$expression)
       ) {
@@ -1336,12 +1341,7 @@ Cerebro <- R6::R6Class(
         data[["coordinates"]],
         context
       )
-      ## A dgCMatrix read from a .crb has no dim() or `[` until Matrix is
-      ## loaded. Load it here rather than with the package, which would add
-      ## ~0.65 s to every App start.
-      if (identical(attr(class(data[["expression"]]), "package"), "Matrix")) {
-        loadNamespace("Matrix")
-      }
+      .loadMatrixFor(data[["expression"]])
       data
     },
 
@@ -1559,6 +1559,7 @@ Cerebro <- R6::R6Class(
     #' @description
     #' Show overview of object and the data it contains.
     print = function() {
+      .loadMatrixFor(self$expression)
       message(
         paste0(
           'class: Cerebro',
@@ -1793,6 +1794,7 @@ Cerebro <- R6::R6Class(
     },
 
     resolveExpressionCells = function(cells) {
+      .loadMatrixFor(self$expression)
       cell_names <- colnames(self$expression)
       if (is.null(cells)) {
         return(list(indices = NULL, names = cell_names))
