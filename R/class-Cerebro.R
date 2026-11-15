@@ -31,10 +31,6 @@ setOldClass(Classes = 'package_version')
 #' A new \code{Cerebro} object.
 #'
 #' @importFrom R6 R6Class
-## A .crb stores expression as Matrix classes (dgCMatrix). Importing from
-## Matrix loads its namespace with CerebroNexus, so dim() and nrow() work on
-## them in a fresh session; without it they return NULL.
-#' @importFrom Matrix sparseMatrix
 #
 #' @examples
 #' cerebro <- Cerebro$new()
@@ -1340,6 +1336,12 @@ Cerebro <- R6::R6Class(
         data[["coordinates"]],
         context
       )
+      ## A dgCMatrix read from a .crb has no dim() or `[` until Matrix is
+      ## loaded. Load it here rather than with the package, which would add
+      ## ~0.65 s to every App start.
+      if (identical(attr(class(data[["expression"]]), "package"), "Matrix")) {
+        loadNamespace("Matrix")
+      }
       data
     },
 
