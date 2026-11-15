@@ -964,6 +964,23 @@ viewerTrajectoryCellIndex <- function(trajectory, method, name) {
   as.integer(index)
 }
 
+## Whether a group filter's `value` was chosen for another data set. Shiny
+## keeps an input's last value after its control is removed, so right after a
+## data set switch the server still reads the previous data set's selection
+## until the control is drawn again with this data set's levels. Such a value
+## names a level this group does not have; it must not filter, or the first
+## frame of the new data set can be empty.
+viewerGroupFilterStale <- function(value, group) {
+  if (is.null(value)) {
+    return(FALSE)
+  }
+  levels <- tryCatch(
+    as.character(getGroupLevels(group)),
+    error = function(error_condition) character()
+  )
+  length(levels) > 0L && !all(as.character(value) %in% levels)
+}
+
 ## The group filters of `prefix` that leave cells out: group -> allowed levels.
 viewerProjectionGroupFilters <- function(prefix, metadata = getMetaData()) {
   groups <- getGroups()
@@ -989,6 +1006,8 @@ viewerProjectionGroupFilters <- function(prefix, metadata = getMetaData()) {
         } else {
           getGroupLevels(group)
         }
+      } else if (viewerGroupFilterStale(value, group)) {
+        getGroupLevels(group)
       } else {
         value
       }
