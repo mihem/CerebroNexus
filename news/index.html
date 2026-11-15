@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,6 +77,11 @@
       <small>Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="8.3.2" id="cerebronexus-832">CerebroNexus 8.3.2<a class="anchor" aria-label="anchor" href="#cerebronexus-832"></a></h2>
+<ul><li>
+<strong>Sparse expression in a fresh session.</strong> The first call on a sparse expression matrix read from a <code>.crb</code> returned <code>NULL</code> or failed, because R loads Matrix only during that call: <code>getGeneNames()</code>, <code>getCellNames()</code> and the other expression getters now load Matrix first, as <code>getSpatialData()</code> does since 8.3.1. In the Viewer the first data set showed no gene count in its overview. The App start is as fast as before: Matrix is loaded at the same moment.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="8.3.1" id="cerebronexus-831">CerebroNexus 8.3.1<a class="anchor" aria-label="anchor" href="#cerebronexus-831"></a></h2>
 <ul><li>
