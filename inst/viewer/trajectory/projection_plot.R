@@ -105,6 +105,11 @@ trajectory_active_group_filters <- function() {
     groups
   )
   filters <- filters[!vapply(filters, is.null, logical(1))]
+  filters <- filters[!vapply(
+    names(filters),
+    function(group) viewerGroupFilterStale(filters[[group]], group),
+    logical(1)
+  )]
   everything <- vapply(
     names(filters),
     function(group) {
