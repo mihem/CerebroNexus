@@ -1,3 +1,10 @@
+## TRUE for one string that is neither missing nor empty. Defined here, not in
+## globals.R: the Builder's source mode sources this file alone
+## (inst/builder/app_bundle/backend.R), and its readers call it.
+.isString <- function(x) {
+  is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x)
+}
+
 ## The CRB reading contract shared with the Viewer runtime; load it once per
 ## R process.
 .crbContract <- local({
