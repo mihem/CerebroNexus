@@ -31,6 +31,10 @@ setOldClass(Classes = 'package_version')
 #' A new \code{Cerebro} object.
 #'
 #' @importFrom R6 R6Class
+## A .crb stores expression as Matrix classes (dgCMatrix). Importing from
+## Matrix loads its namespace with CerebroNexus, so dim() and nrow() work on
+## them in a fresh session; without it they return NULL.
+#' @importFrom Matrix sparseMatrix
 #
 #' @examples
 #' cerebro <- Cerebro$new()

@@ -4,6 +4,10 @@
   of nixpkgs snapshots from GitHub. rix 0.18.5 checks the date against a copy
   of that list bundled at its release, which ends on 2026-08-24, and so
   rejected the date of the newest snapshot in the osmzhlab cache.
+- **Dimensions of expression matrices in a fresh session.** Loading
+  CerebroNexus now loads Matrix too. Before, `nrow()` and `dim()` of an
+  expression matrix read from a `.crb` (for example `getSpatialData()`) returned
+  `NULL` until something else had loaded Matrix.
 
 # CerebroNexus 8.3.0
 
