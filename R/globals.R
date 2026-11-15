@@ -25,11 +25,6 @@ utils::globalVariables(c(
 #' @noRd
 NULL
 
-## TRUE for one string that is neither missing nor empty.
-.isString <- function(x) {
-  is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x)
-}
-
 ## Stops with a BiocManager install hint when Bioconductor packages from
 ## Suggests are missing. `reason` reads like "to run gene set enrichment".
 .checkBiocInstalled <- function(packages, reason) {

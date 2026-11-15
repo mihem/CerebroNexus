@@ -1619,9 +1619,12 @@ builder_coordinator_publish <- function(
     )
     # The request and the expectation derive their App fields from the same
     # frozen plan through .builder_app_request_options().
+    ## Name the cause: any error of the request lands here, not only a
+    ## mismatch with the plan.
     if (inherits(parent_request, "condition")) {
       stop(
-        "The staged App inputs differ from the frozen plan.",
+        "The staged App inputs differ from the frozen plan: ",
+        conditionMessage(parent_request),
         call. = FALSE
       )
     }
