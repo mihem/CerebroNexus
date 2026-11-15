@@ -73,7 +73,7 @@
 let
   pkgs = import (fetchTarball {
     url = "https://github.com/rstats-on-nix/nixpkgs/archive/2026-10-13.tar.gz";
-    sha256 = "0z41sx0as5b547gkzksaknpjxhkxc49xxyff94afkxy9hr43xrwy";
+    sha256 = "0dk4dnnwh4c00racswxiqhgqq50043jq7pp1s7s7vp6f6c2ldzi8";
   }) {};
  
   rpkgs = builtins.attrValues {
