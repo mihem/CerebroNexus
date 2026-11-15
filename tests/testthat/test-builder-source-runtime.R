@@ -5,6 +5,9 @@
 ## internals are on the search path and hide such a gap, so this test resolves
 ## the calls itself instead of running the readers.
 
+## Needs the package sources, which a CRAN check does not have: CI only.
+skip_on_cran()
+
 test_that("the Builder's source runtime defines what its readers call", {
   source_file <- testthat::test_path("..", "..", "R", "cerebro_io.R")
   builder_dir <- testthat::test_path("..", "..", "inst", "builder")

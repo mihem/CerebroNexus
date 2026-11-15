@@ -86,6 +86,7 @@ Rplots\.pdf$
 ^tests/testthat/test-builder-sce-sources.R$
 ^tests/testthat/test-builder-seurat-omnibus.R$
 ^tests/testthat/test-builder-snapshots.R$
+^tests/testthat/test-builder-source-runtime.R$
 ^tests/testthat/test-builder-spatial.R$
 ^tests/testthat/test-builder-stage-contract.R$
 ^tests/testthat/test-builder-stage-server.R$
