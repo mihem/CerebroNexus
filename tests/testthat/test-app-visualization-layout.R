@@ -101,10 +101,21 @@ test_that("all visualization pages keep usable controls, legends and canvases", 
       expect_true(app$get_js(
         "!!document.getElementById('cv-pick-color').selectize"
       ))
+      ## A canvas with a size is not yet a painted workspace: until it is,
+      ## the page has .cv-workspace-pending, which hides the panes
+      ## (visibility, custom.css), and the export has nothing visible to draw.
+      ## The class goes in the frame after ready() turns true.
+      app$wait_for_js(
+        paste0(
+          "window.cerebroLinkedViewsState?.ready() === true && ",
+          "!document.querySelector('.linked-views-page.cv-workspace-pending')"
+        ),
+        timeout = 60000
+      )
       ## The export answers at once whether it had something to draw; a
       ## failure names what the page looked like, not only a timeout.
       exported <- app$get_js(
-        "(() => {window.__pngURL=null;window.__anchorClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){window.__pngURL=this.href};let result;try{result=String(window.cerebroLinkedViewsState.downloadPNG())}catch(error){result='error: '+error.message+' '+error.stack}return JSON.stringify({result:result,visibility:document.visibilityState,url:String(window.__pngURL).slice(0,30),panes:Array.from(document.querySelectorAll('#shiny-tab-coordinated_views .cv-pane')).map(p=>{const r=p.getBoundingClientRect();return {hidden:p.classList.contains('cv-hidden'),width:Math.round(r.width),height:Math.round(r.height),canvases:Array.from(p.querySelectorAll('canvas')).map(c=>c.width+'x'+c.height)}})})})()"
+        "(() => {window.__pngURL=null;window.__anchorClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){window.__pngURL=this.href};let result;try{result=String(window.cerebroLinkedViewsState.downloadPNG())}catch(error){result='error: '+error.message+' '+error.stack}return JSON.stringify({result:result,visibility:document.visibilityState,pending:!!document.querySelector('.linked-views-page.cv-workspace-pending'),url:String(window.__pngURL).slice(0,30),panes:Array.from(document.querySelectorAll('#shiny-tab-coordinated_views .cv-pane')).map(p=>{const r=p.getBoundingClientRect();return {hidden:p.classList.contains('cv-hidden'),width:Math.round(r.width),height:Math.round(r.height),canvases:Array.from(p.querySelectorAll('canvas')).map(c=>c.width+'x'+c.height)}})})})()"
       )
       expect_match(exported, '"result":"true"', fixed = TRUE)
       app$wait_for_js(
