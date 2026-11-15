@@ -21,6 +21,16 @@ if (length(latest_date) == 0 || is.na(latest_date)) {
 }
 cat("Using latest_date:", latest_date, "\n")
 
+# rix 0.18.5 checks `date` against the available_df.csv bundled in the package,
+# which ends at the date of its CRAN release. rix reads this option before its
+# bundled copy, so load the list rix keeps up to date on GitHub instead; a newer
+# rstats-on-nix snapshot is then accepted.
+options(
+  rix.available_df_cache = read.csv(
+    "https://raw.githubusercontent.com/ropensci/rix/refs/heads/main/inst/extdata/available_df.csv"
+  )
+)
+
 
 rix(
   date = latest_date,

@@ -1336,6 +1336,12 @@ Cerebro <- R6::R6Class(
         data[["coordinates"]],
         context
       )
+      ## A dgCMatrix read from a .crb has no dim() or `[` until Matrix is
+      ## loaded. Load it here rather than with the package, which would add
+      ## ~0.65 s to every App start.
+      if (identical(attr(class(data[["expression"]]), "package"), "Matrix")) {
+        loadNamespace("Matrix")
+      }
       data
     },
 
