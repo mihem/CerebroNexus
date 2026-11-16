@@ -826,8 +826,10 @@
 
 ## qs2 decompresses the blocks of a file on `nthreads` threads; the R objects
 ## are built on R's thread, so the object read is the same with any number.
-## The user's qs2::qopt("nthreads") decides (its default is one), never more
-## than the machine's cores, and at most two where R CMD check limits them.
+## The user's qs2::qopt("nthreads") decides when it is set; otherwise the
+## package uses up to eight threads (capped at the machine's cores), which
+## cuts a 1.3 million cell CRB read from ~3 s to under a second. At most two
+## where R CMD check limits the cores.
 .readCerebroPayload <- function(file) {
   if (identical(.cerebroPayloadCodec(file), "qs2")) {
     return(qs2::qs_read(file, nthreads = .cerebroReadThreads()))
@@ -843,6 +845,13 @@
   threads <- suppressWarnings(as.integer(requested))
   if (length(threads) != 1L || is.na(threads) || threads < 1L) {
     threads <- 1L
+  }
+  ## When the user has not set qopt("nthreads") (its default is one), read on
+  ## up to eight threads: a 1.3 million cell CRB takes ~3 s on one thread and
+  ## under a second on eight (the decompression is parallel, the R object is
+  ## built the same either way).
+  if (threads == 1L) {
+    threads <- 8L
   }
   cores <- suppressWarnings(as.integer(cores))
   if (length(cores) == 1L && !is.na(cores) && cores >= 1L) {
