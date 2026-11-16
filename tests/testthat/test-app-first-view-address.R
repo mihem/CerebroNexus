@@ -100,4 +100,50 @@ test_that("the first view is published only for the data set an address opens", 
   own <- plotted()
   expect_false(own == other)
   expect_equal(published("/"), own)
+
+  ## The address without ?page= opens Data info, with the Projection prepared
+  ## behind it: its first view names no start page, the page fetches the
+  ## preview files once it has loaded, and the session sends the Projection's
+  ## first frame while Data info is read, which the page keeps. Shown then, the
+  ## Projection draws that frame itself, without the preview.
+  view <- httr::content(
+    httr::GET(paste0(
+      sub("/$", "", app$get_url()),
+      "/cerebro-first-view/",
+      key("/"),
+      ".json"
+    )),
+    "text",
+    encoding = "UTF-8"
+  )
+  expect_null(jsonlite::fromJSON(view)$start_page)
+  app$get_chromote_session()$Page$navigate(paste0(
+    sub("/$", "", app$get_url()),
+    "/"
+  ))
+  app$wait_for_js(
+    "!!(window.CerebroFirstView && window.CerebroFirstView.prefetched)",
+    timeout = 60000
+  )
+  expect_identical(
+    app$get_js(
+      "document.querySelector('.tab-pane.active[id^=\"shiny-tab-\"]').id"
+    ),
+    "shiny-tab-loadData"
+  )
+  app$wait_for_js(
+    paste0(
+      "document.getElementById('overview_projection_cell_view_host')",
+      ".dataset.renderState === 'received'"
+    ),
+    timeout = 60000
+  )
+  app$run_js(
+    "document.querySelector('a[href=\"#shiny-tab-overview\"]').click();"
+  )
+  app$wait_for_js(ready, timeout = 30000)
+  expect_equal(plotted(), own)
+  expect_false(isTRUE(app$get_js(
+    "!!(window.CerebroFirstView && window.CerebroFirstView.shown)"
+  )))
 })

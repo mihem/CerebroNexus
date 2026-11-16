@@ -157,10 +157,18 @@ viewerSource <- function(path, envir = parent.frame()) {
 ## while `active()` is TRUE, so a click waits for one task at most. Each name is
 ## done once per process.
 .viewer_idle_done <- new.env(parent = emptyenv())
-viewerIdleRun <- function(tasks, active, delay = 0.01) {
+## The packages each package's NAMESPACE imports (viewer_package_imports() in
+## shiny_server.R), read once per process: parsing them on every quiet moment
+## cost 0.13 s for the 26 packages the Viewer loads while idle.
+.viewer_package_imports_cache <- new.env(parent = emptyenv())
+viewerIdleRun <- function(tasks, active, delay = 0.01, done = NULL) {
   tasks <- tasks[!names(tasks) %in% ls(.viewer_idle_done, all.names = TRUE)]
   step <- function(i) {
     if (i > length(tasks) || !isTRUE(active())) {
+      ## `done` when every task ran, not when the run was stopped
+      if (i > length(tasks) && is.function(done)) {
+        done()
+      }
       return(invisible())
     }
     assign(names(tasks)[[i]], TRUE, envir = .viewer_idle_done)

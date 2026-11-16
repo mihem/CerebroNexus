@@ -12,8 +12,8 @@ output[["trajectory_distribution_along_pseudotime_UI"]] <- renderUI({
   req(input[["trajectory_distribution_section_visible"]])
   req(trajectory_projection_sent())
   req(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]]
+    trajectory_selected_method(),
+    trajectory_selected_name()
   )
   display_defaults <- current_page_display_defaults("trajectory")
 
@@ -92,8 +92,8 @@ output[[
 ]] <- renderCerebroChart({
   ## don't do anything before these inputs are selected
   req(
-    input[["trajectory_selected_method"]],
-    input[["trajectory_selected_name"]],
+    trajectory_selected_method(),
+    trajectory_selected_name(),
     input[["trajectory_distribution_along_pseudotime_select_variable"]],
     !is.null(input[[
       "trajectory_distribution_along_pseudotime_show_trend_line"

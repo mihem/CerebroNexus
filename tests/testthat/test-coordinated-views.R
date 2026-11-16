@@ -1014,6 +1014,121 @@ test_that("deferred metadata builds only the requested attribute", {
   ))
 })
 
+test_that("a deferred group from Viewer Pack codes matches its websocket values", {
+  scope <- new.env(parent = cv_env)
+  eval(
+    viewer_r_assignment(
+      viewer_test_path("coordinated_views", "server.R"),
+      "cv_attribute_resource"
+    ),
+    scope
+  )
+  metadata <- data.frame(
+    sample = c("s2", NA, "s1", "s2", ""),
+    cell_type = factor(c("B", "A", NA, "B", "A"), levels = c("B", "A", "Z")),
+    score = c(1, 2, 3, 4, 5),
+    stringsAsFactors = FALSE
+  )
+  crb <- list(getGroups = function() c("sample", "cell_type", "score"))
+  colors <- function(name, levels) paste0(name, ":", levels)
+  requested <- list()
+  ## What viewerMetadataCodesAsset() serves for a column the Viewer Pack wrote
+  ## (R/viewer_pack.R): codes 1..K into a first-seen dictionary, 0 = missing,
+  ## and a code map onto the requested levels.
+  pack <- function(name, levels) {
+    requested[[name]] <<- levels
+    value <- metadata[[name]]
+    dictionary <- if (is.factor(value)) {
+      levels(value)
+    } else {
+      unique(as.character(value[!is.na(value)]))
+    }
+    codes <- match(as.character(value), dictionary)
+    codes[is.na(codes)] <- 0L
+    list(
+      protocol = "canonical-metadata-codes-v1",
+      url = paste0("metadata/", name, ".codes.bin"),
+      cells = nrow(metadata),
+      dtype = "uint8",
+      codes = codes,
+      levels = I(levels),
+      code_map = I(c(-1L, match(dictionary, levels) - 1L))
+    )
+  }
+  for (name in c("sample", "cell_type")) {
+    wire <- cv_env$cv_build_attribute(crb, metadata, "groups", name, colors)
+    value <- scope$cv_attribute_resource(
+      crb,
+      metadata,
+      "groups",
+      name,
+      pack,
+      colors
+    )
+    expect_null(value[["values"]])
+    expect_identical(value$levels, wire$levels)
+    expect_identical(value$colors, wire$colors)
+    expect_identical(requested[[name]], as.character(wire$levels))
+    expect_null(value$values_resource$levels)
+    decoded <- as.integer(value$values_resource$code_map)[
+      value$values_resource$codes + 1L
+    ]
+    decoded[decoded < 0L] <- NA_integer_
+    expect_identical(decoded, as.integer(wire$values))
+  }
+
+  expect_null(scope$cv_attribute_resource(
+    crb,
+    metadata,
+    "cat_extra",
+    "sample",
+    pack,
+    colors
+  ))
+  expect_null(scope$cv_attribute_resource(
+    list(getGroups = function() "cell_type"),
+    metadata,
+    "groups",
+    "sample",
+    pack,
+    colors
+  ))
+  expect_null(scope$cv_attribute_resource(
+    crb,
+    metadata,
+    "groups",
+    "score",
+    pack,
+    colors
+  ))
+  expect_null(scope$cv_attribute_resource(
+    crb,
+    metadata,
+    "groups",
+    "sample",
+    function(name, levels) NULL,
+    colors
+  ))
+  expect_null(scope$cv_attribute_resource(
+    crb,
+    metadata,
+    "groups",
+    "sample",
+    function(name, levels) modifyList(pack(name, levels), list(cells = 4L)),
+    colors
+  ))
+  expect_null(scope$cv_attribute_resource(
+    crb,
+    metadata,
+    "groups",
+    "sample",
+    function(name, levels) {
+      modifyList(pack(name, levels), list(levels = I(rev(levels))))
+    },
+    colors
+  ))
+})
+
 test_that("deferred assets leave only descriptors in the supplement", {
   value <- list(
     dataset_id = "xenium",

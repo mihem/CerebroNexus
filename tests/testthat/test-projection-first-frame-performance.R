@@ -422,6 +422,10 @@ test_that("a new projection mount redraws unchanged data", {
       )
     })
     overview_projection_data_to_plot_raw <- overview_projection_data_to_plot
+    ## as obj_projection_data_to_plot.R: prepared behind Data info only
+    overview_projection_preparing <- reactiveVal(
+      identical(isolate(input[["sidebar"]]), "loadData")
+    )
     overview_projection_group_filters <- function() list()
     cerebroFeedbackControls <- function(...) list()
     cerebroSendViewFeedback <- function(...) invisible(NULL)
@@ -469,6 +473,178 @@ test_that("a new projection mount redraws unchanged data", {
     )
     expect_identical(session$userData$render_count(), 2L)
   })
+})
+
+## The page code of the Projection's frames, with a data set that is in and a
+## frame that is counted instead of sent.
+first_frame_server <- function(input, output, session) {
+  renders <- 0L
+  overview_projection_parameters_other <- reactiveValues(reset_axes = TRUE)
+  context <- list(epoch = "test", dataset_key = "A", generation = 1L)
+  viewer_loaded_dataset_context <- function() context
+  viewerDatasetContextEqual <- function(a, b) identical(a, b)
+  overview_projection_data_to_plot <- reactive({
+    input[["late_bound_control"]]
+    list(
+      value = 1L,
+      dataset_context = context,
+      reset_axes = isolate(overview_projection_parameters_other[[
+        "reset_axes"
+      ]])
+    )
+  })
+  overview_projection_data_to_plot_raw <- overview_projection_data_to_plot
+  ## as obj_projection_data_to_plot.R: prepared behind Data info only
+  overview_projection_preparing <- reactiveVal(
+    identical(isolate(input[["sidebar"]]), "loadData")
+  )
+  overview_projection_group_filters <- function() list()
+  cerebroFeedbackControls <- function(...) list()
+  cerebroSendViewFeedback <- function(...) invisible(NULL)
+  overview_projection_update_plot <- function(data) {
+    renders <<- renders + 1L
+  }
+  sys.source(
+    viewer_test_path("overview", "event_projection_update_plot.R"),
+    envir = environment()
+  )
+  session$userData$render_count <- function() renders
+}
+
+## A session whose browser opened on the Projection: `sidebar` and the other
+## values of Shiny's first message are there when the server starts.
+first_frame_session <- function(sidebar = "overview", ...) {
+  session <- shiny::MockShinySession$new()
+  session$setInputs(sidebar = sidebar, ...)
+  session
+}
+
+test_that("the first frame does not wait for the browser's request", {
+  shiny::testServer(first_frame_server, session = first_frame_session(), {
+    session$setInputs(late_bound_control = 1)
+    expect_identical(session$userData$render_count(), 1L)
+    ## the browser's request for it, sent before the frame reached it, and
+    ## controls that bind with the values it was drawn with: nothing more
+    session$setInputs(
+      overview_projection_render_request = list(
+        nonce = 1,
+        dataset_context = context
+      )
+    )
+    expect_identical(session$userData$render_count(), 1L)
+    session$setInputs(late_bound_control = 2)
+    expect_identical(session$userData$render_count(), 1L)
+    ## a later request (the view mounted again) is drawn
+    session$setInputs(
+      overview_projection_render_request = list(
+        nonce = 2,
+        dataset_context = context
+      )
+    )
+    expect_identical(session$userData$render_count(), 2L)
+  })
+})
+
+test_that("a request the first frame cannot answer is drawn", {
+  ## after a new connection, and after the cell names file failed
+  for (mock in list(
+    first_frame_session(viewer_dataset_context_sync = list(nonce = 2)),
+    first_frame_session(cell_view_names_resource_failed = "names.bin")
+  )) {
+    shiny::testServer(first_frame_server, session = mock, {
+      session$setInputs(late_bound_control = 1)
+      expect_identical(session$userData$render_count(), 1L)
+      session$setInputs(
+        overview_projection_render_request = list(
+          nonce = 1,
+          dataset_context = context
+        )
+      )
+      expect_identical(session$userData$render_count(), 2L)
+    })
+  }
+  ## a request that came first is drawn as before, once
+  shiny::testServer(
+    first_frame_server,
+    session = first_frame_session(
+      overview_projection_render_request = list(
+        nonce = 1,
+        dataset_context = list(
+          epoch = "test",
+          dataset_key = "A",
+          generation = 1L
+        )
+      )
+    ),
+    {
+      session$setInputs(late_bound_control = 1)
+      expect_identical(session$userData$render_count(), 1L)
+    }
+  )
+  ## a frame sent behind Data info that the page could not keep: the request
+  ## without `kept` is drawn
+  shiny::testServer(
+    first_frame_server,
+    session = first_frame_session(sidebar = "loadData"),
+    {
+      session$setInputs(late_bound_control = 1)
+      expect_identical(session$userData$render_count(), 1L)
+      session$setInputs(sidebar = "overview")
+      session$setInputs(
+        overview_projection_render_request = list(
+          nonce = 1,
+          dataset_context = context
+        )
+      )
+      expect_identical(session$userData$render_count(), 2L)
+    }
+  )
+  ## code loaded on another page than the Projection and Data info: its frame
+  ## waits for the browser's request
+  shiny::testServer(
+    first_frame_server,
+    session = first_frame_session(sidebar = "groups"),
+    {
+      session$setInputs(late_bound_control = 1)
+      session$setInputs(sidebar = "overview")
+      expect_identical(session$userData$render_count(), 0L)
+    }
+  )
+})
+
+test_that("the first frame is prepared behind Data info and answers the later request", {
+  shiny::testServer(
+    first_frame_server,
+    session = first_frame_session(sidebar = "loadData"),
+    {
+      session$setInputs(late_bound_control = 1)
+      ## sent while Data info is shown, once
+      expect_identical(session$userData$render_count(), 1L)
+      session$setInputs(late_bound_control = 2)
+      expect_identical(session$userData$render_count(), 1L)
+      ## shown later, much later than an adopted request may come otherwise:
+      ## the browser draws the frame it kept, and its request is answered by
+      ## that frame, not by a second one
+      overview_projection_unrequested$sent <<- Sys.time() - 60
+      session$setInputs(sidebar = "overview")
+      session$setInputs(
+        overview_projection_render_request = list(
+          nonce = 1,
+          dataset_context = context,
+          kept = TRUE
+        )
+      )
+      expect_identical(session$userData$render_count(), 1L)
+      ## a later request (the view mounted again) is drawn
+      session$setInputs(
+        overview_projection_render_request = list(
+          nonce = 2,
+          dataset_context = context
+        )
+      )
+      expect_identical(session$userData$render_count(), 2L)
+    }
+  )
 })
 
 test_that("only another projection resets the Projection axes", {

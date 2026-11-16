@@ -83,6 +83,78 @@
   }
   ready(installInitialNavigation);
 
+  // A page's outputs are reported visible with the page change itself. Shiny
+  // reports an output's visibility from an IntersectionObserver, after the next
+  // layout and a 100 ms debounce, in a message after the one that names the
+  // page. The server loads a page's code when the page is named
+  // (shiny_server.R, load_deferred_viewer_server()) and Shiny suspends an output
+  // it does not yet know to be shown, so every output of a newly opened page
+  // (its toolbar, tables and plots) rendered only after the browser's next
+  // message: a round trip after the plot, on every page. Measured here as
+  // Shiny measures it (a box with a size), once the tab is shown, in the same
+  // turn as the page change, so both go in one message; Shiny's own report of
+  // the same value later is not sent again.
+  function installPageOutputVisibility() {
+    if (!window.jQuery) return;
+    function report(pane, shown, priority) {
+      var shiny = window.Shiny;
+      if (!pane || !shiny || typeof shiny.setInputValue !== "function") return;
+      var outputs = pane.querySelectorAll(".shiny-bound-output[id]");
+      for (var i = 0; i < outputs.length; i++) {
+        if (shown(outputs[i], pane)) {
+          shiny.setInputValue(
+            ".clientdata_output_" + outputs[i].id + "_hidden", false,
+            priority ? { priority: priority } : undefined
+          );
+        }
+      }
+    }
+    // Before the page is shown (it has no size yet): shown once it is, unless
+    // something between the output and the page hides it (a closed drawer, an
+    // inactive inner tab, a collapsed box). Shiny's own report corrects a guess.
+    function willShow(element, pane) {
+      for (var node = element; node && node !== pane; node = node.parentElement) {
+        if (window.getComputedStyle(node).display === "none") return false;
+      }
+      return true;
+    }
+    function hasSize(element) {
+      return element.offsetWidth > 0 || element.offsetHeight > 0;
+    }
+    function paneOf(link) {
+      var value = link && link.getAttribute("data-value");
+      return value ? document.getElementById("shiny-tab-" + value) : null;
+    }
+    // A click on the menu: sent at once ("event"), before the page change
+    // the click is about to send, so the server knows the outputs are shown
+    // when it loads the page's code for that change. At the end of the click's
+    // turn, and only for the page that is then shown: a second click in the
+    // same turn leaves the first page hidden, and outputs reported shown that
+    // Shiny never saw shown would stay so (and render while hidden).
+    document.addEventListener("click", function (event) {
+      var link = event.target && event.target.closest &&
+        event.target.closest('.main-sidebar a[data-toggle="tab"]');
+      if (!link || link.parentElement && link.parentElement.classList.contains("active")) return;
+      var pane = paneOf(link);
+      if (!pane) return;
+      Promise.resolve().then(function () {
+        if (pane.classList.contains("active")) report(pane, willShow, "event");
+      });
+    }, true);
+    // A page shown another way (the start page, a link): measured once shown.
+    window.jQuery(document).on(
+      "shown.bs.tab.cerebroPageOutputs",
+      '.main-sidebar a[data-toggle="tab"]',
+      function (event) {
+        var pane = paneOf(event.target);
+        Promise.resolve().then(function () {
+          if (pane && pane.classList.contains("active")) report(pane, hasSize);
+        });
+      }
+    );
+  }
+  ready(installPageOutputVisibility);
+
   ready(function () {
     var body = document.body;
     var sidebar = document.querySelector(".main-sidebar");
@@ -698,9 +770,14 @@
       loader.classList.remove("is-visible");
       // Show the card only for a page that is still loading: one whose
       // outputs have arrived is about to finish, so look again shortly instead
-      // of covering content that is already on screen.
+      // of covering content that is already on screen. 400 ms, not less: most
+      // pages finish by ~600 ms, and an earlier card flashed over content that
+      // was about to appear. A page that has painted its main content is
+      // ready (finish(): cerebro:cell-view-ready or a complete
+      // cerebro:linkedviews-ready for canvas pages, settled outputs for the
+      // rest), which cancels this timer; the ready check is a backstop.
       var showWhenStillLoading = function () {
-        if (pane !== activePane) return;
+        if (pane !== activePane || window.CerebroPageLifecycle.isReady(pane)) return;
         if (finishUnderway()) {
           showTimer = window.setTimeout(showWhenStillLoading, 100);
           return;
@@ -709,7 +786,7 @@
         loader.hidden = false;
         loader.classList.add("is-visible");
       };
-      showTimer = window.setTimeout(showWhenStillLoading, 180);
+      showTimer = window.setTimeout(showWhenStillLoading, 400);
       slowTimer = window.setTimeout(function () {
         if (pane === activePane) {
           showDetail("Still loading " + pageLabel(pane) + "…");
@@ -1038,6 +1115,57 @@
     }
   });
 
+  // Colour management makes a colour picker for every level of every group:
+  // hundreds of them, which the browser took more than a second to make at
+  // once. The page sends them pending (color_picker() in
+  // color_management/server.R); each is made a picker when it comes within
+  // 300 px of the screen. A level without one keeps its default colour.
+  ready(function () {
+    if (!window.IntersectionObserver || !window.jQuery) return;
+    function activate(input) {
+      if (!input.classList.contains("cerebro-colour-pending") ||
+          !document.body.contains(input)) return;
+      // The picker's script arrives with the page's HTML; until it runs the
+      // colour binding finds nothing, and the input would be bound as text.
+      if (!window.jQuery.fn.colourpicker || !window.Shiny ||
+          !window.Shiny.bindAll || !window.Shiny.initializeInputs) {
+        window.setTimeout(function () { activate(input); }, 50);
+        return;
+      }
+      input.classList.remove("cerebro-colour-pending");
+      // a button until now, which no binding takes (Shiny binds, and marks as
+      // initialised, every text input it is given)
+      input.type = "text";
+      input.classList.add("shiny-colour-input");
+      // initialize (the picker itself), then bind, as Shiny does for new HTML
+      window.Shiny.initializeInputs(input.parentElement);
+      window.Shiny.bindAll(input.parentElement);
+    }
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        observer.unobserve(entry.target);
+        activate(entry.target);
+      });
+    }, { rootMargin: "300px 0px" });
+    function watch(tries) {
+      var pending = document.querySelectorAll(
+        "#color_assignments_UI input.cerebro-colour-pending"
+      );
+      if (!pending.length) {
+        // The value arrives before its HTML is in the page.
+        if (tries > 0) window.requestAnimationFrame(function () { watch(tries - 1); });
+        return;
+      }
+      for (var i = 0; i < pending.length; i++) observer.observe(pending[i]);
+    }
+    window.jQuery(document).on("shiny:value", function (event) {
+      if (event.name !== "color_assignments_UI") return;
+      // the pickers of the page it replaces are gone
+      observer.disconnect();
+      watch(20);
+    });
+  });
   ready(function () {
     var overlay = null;
     var startedAt = 0;

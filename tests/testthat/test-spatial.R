@@ -1056,6 +1056,18 @@ test_that("spatial first frames replace only exact flat geometry with an asset",
   expect_null(rendered$data[["x"]])
   expect_null(rendered$data[["y"]])
   expect_null(rendered$data[["canonical_group"]])
+
+  ## A section of a larger data set: the codes of every cell go out, and the
+  ## browser keeps those of the frame's canonical rows (a range).
+  value$categorical_resource$cells <- 3L * n
+  value$cell_indices <- n + seq_len(n)
+  renderer$spatial_projection_update_plot(value)
+  expect_identical(rendered$data$categorical_resource$cells, 3L * n)
+  expect_identical(rendered$data$projection_resource, resource)
+  expect_identical(
+    rendered$data$selection_rows,
+    list(kind = "range", start = n, length = n)
+  )
 })
 
 test_that("Spatial geometry catalog is registered but fetched only on page request", {
@@ -1607,6 +1619,113 @@ test_that("ROI rotation pivots use the selected sample and ROI field", {
     )
   )
   expect_equal(context$pivots$lesion, c(x = 1, y = 0))
+})
+
+test_that("a section's samples and ROIs are read at its Viewer Pack rows", {
+  scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("spatial", "func_spatial_helpers.R"), scope)
+  scope$spatialRoiPivots <- spatialRoiPivots
+  dataset <- new.env(parent = emptyenv())
+  dataset$spatial <- list(
+    A = list(
+      coordinates = data.frame(
+        x = c(0, 2, 4),
+        y = 0,
+        row.names = c("a1", "a2", "a3")
+      )
+    ),
+    B = list(coordinates = data.frame(x = 1, y = 1, row.names = "b1"))
+  )
+  scope$data_set <- function() dataset
+  scope$availableSpatial <- function() names(dataset$spatial)
+  scope$viewerPackCurrent <- function() list(cell_count = 4L)
+  scope$viewerPackSpatialIndex <- function(pack, name) {
+    list(A = c(4L, 1L, 2L), B = 3L)[[name]]
+  }
+  scope$getSpatialData <- function(name) stop("no cell name is read")
+  scope$getMetaData <- function() stop("no cell name is matched")
+  metadata <- data.frame(
+    sample = c("S1", "S2", "S2", "S1"),
+    roi = c("R1", "", "R3", "R2")
+  )
+  scope$viewerProjectionFirstFrameMetadata <- function() metadata
+
+  every <- scope$spatial_section_scope("A")
+  expect_identical(every$rows, c(4L, 1L, 2L))
+  expect_identical(every$positions, 1:3)
+  expect_identical(every$roi_by_position, c("R2", "R1", NA))
+  expect_identical(every$roi_values, c("R2", "R1"))
+  first <- scope$spatial_section_scope("A", "S1")
+  expect_identical(first$positions, 1:2)
+  expect_identical(first$scoped_rows, c(4L, 1L))
+  expect_identical(first$roi_field, "roi")
+  expect_identical(
+    scope$spatial_section_samples()$values,
+    list(A = c("S1", "S2"), B = "S2")
+  )
+
+  ## The same context as by cell name.
+  coordinates <- dataset$spatial$A$coordinates
+  by_position <- scope$spatial_roi_section_context(
+    coordinates,
+    first,
+    metadata,
+    "S1"
+  )
+  by_name <- scope$spatial_roi_transform_context(
+    coordinates,
+    cbind(cell_barcode = c("a2", "a3", "b1", "a1"), metadata),
+    "S1"
+  )
+  expect_identical(by_position$roi_by_position, unname(by_name$roi_by_cell))
+  expect_identical(
+    by_position$scoped,
+    match(by_name$scoped_cells, rownames(coordinates))
+  )
+  expect_identical(by_position$pivots, by_name$pivots)
+
+  ## Without a sample or ROI column no row is looked up.
+  metadata <- data.frame(cluster = c("x", "y", "x", "y"))
+  plain <- scope$spatial_section_scope("A")
+  expect_null(plain$rows)
+  expect_null(plain$positions)
+  expect_identical(plain$roi_values, character())
+  context <- scope$spatial_roi_section_context(coordinates, plain, metadata)
+  expect_identical(context$scoped, 1:3)
+})
+
+test_that("a section's colour codes list the levels its cells have", {
+  resource <- list(
+    url = "codes.bin",
+    cells = 6L,
+    levels = I(c("T", "B", "NK")),
+    ## Pack code 0 is missing; dictionary c("NK", "T", "B")
+    code_map = I(c(-1L, 2L, 0L, 1L))
+  )
+  colors <- c(T = "#111111", B = "#222222", NK = "#333333")
+  values <- factor(c("NK", NA, "T"), levels = c("T", "B", "NK"))
+  section <- spatial_section_codes_resource(resource, values, colors)
+  expect_identical(
+    as.character(section$resource$levels),
+    c("T", "NK", "(missing)")
+  )
+  ## missing -> "(missing)", NK -> 1, T -> 0, B (absent) -> -1
+  expect_identical(
+    as.integer(section$resource$code_map),
+    c(2L, 1L, 0L, -1L)
+  )
+  expect_identical(
+    unname(section$color_assignments[c("T", "NK", "(missing)")]),
+    c("#111111", "#333333", "#7b8794")
+  )
+  expect_identical(section$resource$cells, 6L)
+  ## A level without a colour is left to the frame R builds.
+  expect_null(spatial_section_codes_resource(
+    resource,
+    factor("DC"),
+    colors
+  ))
+  expect_null(spatial_section_codes_resource(resource, c(1, 2), colors))
 })
 
 test_that("spatial sampling is scoped to the selected FOV, sample, and ROI", {

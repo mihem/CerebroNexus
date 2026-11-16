@@ -1134,15 +1134,14 @@ Cerebro <- R6::R6Class(
             call. = FALSE
           )
         }
-        repertoire <- private$readSidecar(
+        ## The package's reader (cerebro_io.R), which the Viewer's encoding
+        ## job uses too. A sidecar backend is set by readCerebro(), so the
+        ## namespace is loaded whenever this runs.
+        repertoire <- .readRepertoireSidecar(
           file.path(backend$root, backend$file),
           backend$md5,
-          "The immune repertoire sidecar is missing.",
-          "The immune repertoire sidecar checksum does not match."
+          NROW(self$meta_data)
         )
-        if (!is.list(repertoire)) {
-          stop("The immune repertoire sidecar is invalid.", call. = FALSE)
-        }
         repertoire <- private$restoreRepertoireCells(repertoire)
         self$immune_repertoire <- repertoire
         return(repertoire)
@@ -1933,22 +1932,11 @@ Cerebro <- R6::R6Class(
     },
 
     ## Read a qs2 or RDS sidecar after checking that it exists and matches its
-    ## MD5 checksum; `missing` and `mismatch` are the error messages.
+    ## MD5 checksum; `missing` and `mismatch` are the error messages. The
+    ## package's reader (.readSidecarFile(), cerebro_io.R): a sidecar backend
+    ## is set by readCerebro(), so the namespace is loaded whenever this runs.
     readSidecar = function(path, md5, missing, mismatch) {
-      if (!file.exists(path) || dir.exists(path)) {
-        stop(missing, call. = FALSE)
-      }
-      if (!identical(unname(tools::md5sum(path)), md5)) {
-        stop(mismatch, call. = FALSE)
-      }
-      connection <- file(path, open = "rb")
-      magic <- readBin(connection, "raw", n = 4L)
-      close(connection)
-      if (identical(magic, as.raw(c(0x0b, 0x0e, 0x0a, 0xc1)))) {
-        qs2::qs_read(path)
-      } else {
-        readRDS(path)
-      }
+      .readSidecarFile(path, md5, missing, mismatch)
     }
   )
 )

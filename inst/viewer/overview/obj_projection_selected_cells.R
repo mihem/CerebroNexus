@@ -3,6 +3,10 @@
 ## projection).
 ##----------------------------------------------------------------------------##
 overview_projection_selected_cells <- reactive({
+  ## The browser's selection first, so that a later selection runs this again
+  ## also when the frame was not there the first time (the code loaded behind
+  ## Data info, which prepares the Projection's first frame).
+  persistent <- input[["overview_projection_persistent_selection"]]
   ## make sure plot parameters are set because it means that the plot can be
   ## generated. Isolated: a recolour must not rebuild a large selection (its
   ## coordinate identifiers are formatted for every selected cell); the browser
@@ -17,7 +21,7 @@ overview_projection_selected_cells <- reactive({
   ## same way the table keys cells (paste0 with '-'), so downstream filtering is
   ## unchanged.
   selection <- viewerPersistentSelection(
-    input[["overview_projection_persistent_selection"]],
+    persistent,
     viewer_loaded_dataset_context()
   )
   if (is.null(selection)) {

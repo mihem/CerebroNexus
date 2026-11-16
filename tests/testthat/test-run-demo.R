@@ -134,7 +134,7 @@ test_that("demo preparation reuses valid packs and rebuilds missing or stale fir
     manifest = list(
       hla_chains = c("TRA", "TRB"),
       assets = data.frame(
-        path = c("hla_tcr/TRA.first.qs2", "hla_tcr/TRB.first.qs2")
+        path = c("hla_tcr/TRA.first.v3.qs2", "hla_tcr/TRB.first.v3.qs2")
       )
     )
   )

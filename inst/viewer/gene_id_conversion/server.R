@@ -1,38 +1,28 @@
 ##----------------------------------------------------------------------------##
 ## Table of gene IDs and symbols.
 ##----------------------------------------------------------------------------##
-output[["gene_info"]] <- DT::renderDataTable({
-  if (input[["geneIdConversion_organism"]] == "mouse") {
-    conversion_table <- read.table(
-      paste0(Cerebro.options$cerebro_root, "/extdata/mm10_gene_ID_name.tsv.xz"),
-      sep = "\t",
-      header = TRUE,
-      stringsAsFactors = FALSE
+output[["gene_info"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    ## read once per process (viewerGeneIdTable() in shiny_server.R)
+    conversion_table <- viewerGeneIdTable(input[["geneIdConversion_organism"]])
+    req(conversion_table)
+    DT::datatable(
+      style = "bootstrap",
+      conversion_table,
+      filter = "none",
+      selection = "multiple",
+      escape = TRUE,
+      rownames = FALSE,
+      extensions = "Buttons",
+      options = list(
+        scrollX = TRUE,
+        dom = "Bfrtip",
+        buttons = c("copy", "excel", "csv", "print"),
+        lengthMenu = c(15, 30, 50, 100),
+        pageLength = 50
+      )
     )
-  } else if (input[["geneIdConversion_organism"]] == "human") {
-    conversion_table <- read.table(
-      paste0(Cerebro.options$cerebro_root, "/extdata/hg38_gene_ID_name.tsv.xz"),
-      sep = "\t",
-      header = TRUE,
-      stringsAsFactors = FALSE
-    )
-  }
-  DT::datatable(
-    style = "bootstrap",
-    conversion_table,
-    filter = "none",
-    selection = "multiple",
-    escape = TRUE,
-    rownames = FALSE,
-    extensions = "Buttons",
-    options = list(
-      scrollX = TRUE,
-      dom = "Bfrtip",
-      buttons = c("copy", "excel", "csv", "print"),
-      lengthMenu = c(15, 30, 50, 100),
-      pageLength = 50
-    )
-  )
+  })
 })
 
 ##----------------------------------------------------------------------------##

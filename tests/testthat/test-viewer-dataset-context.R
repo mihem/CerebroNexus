@@ -88,6 +88,44 @@ test_that("dataset context freshness is epoch/key/generation exact", {
   )
 })
 
+test_that("no input update goes out before Shiny's init on an open socket", {
+  output <- run_dataset_context_node(c(
+    "const timers = []; window.setTimeout = fn => { timers.push(fn); return timers.length; };",
+    "const sent = [];",
+    "const socket = {readyState: 0};",
+    "Shiny.shinyapp = {$socket: socket, sendInput: function (v) { sent.push(v.name); }};",
+    "const app = Shiny.shinyapp; const result = {};",
+    "app.sendInput({name: 'connecting'});",
+    "result.connectingSent = sent.slice();",
+    "socket.readyState = 1;",
+    "app.sendInput({name: 'sidebar'}); app.sendInput({name: 'sync'});",
+    "result.heldInOpenTurn = sent.length === 1;",
+    "timers.splice(0).forEach(fn => fn());",
+    "result.afterTurn = sent.slice();",
+    "app.sendInput({name: 'later'});",
+    "result.laterAtOnce = sent[sent.length - 1] === 'later';",
+    "const reopened = {readyState: 1}; app.$socket = reopened;",
+    "app.sendInput({name: 'reconnected'});",
+    "result.heldAfterReconnect = sent[sent.length - 1] === 'later';",
+    "timers.splice(0).forEach(fn => fn());",
+    "result.reconnectedSent = sent[sent.length - 1] === 'reconnected';",
+    "console.log(JSON.stringify(result));"
+  ))
+
+  expect_equal(attr(output, "status"), NULL)
+  expect_identical(
+    jsonlite::fromJSON(output, simplifyVector = FALSE),
+    list(
+      connectingSent = list("connecting"),
+      heldInOpenTurn = TRUE,
+      afterTurn = list("connecting", "sidebar", "sync"),
+      laterAtOnce = TRUE,
+      heldAfterReconnect = TRUE,
+      reconnectedSent = TRUE
+    )
+  )
+})
+
 test_that("R dataset contexts validate and compare the full identity", {
   runtime <- viewer_runtime_env()
 

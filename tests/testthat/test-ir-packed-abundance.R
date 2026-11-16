@@ -22,26 +22,48 @@ ir_test_call <- function(expr, name) {
   NULL
 }
 
+## The assignment of `key`, at the top level or inside a call: the plotly
+## outputs are defined in ir_define_with_tab(tab, function() ...).
+ir_test_assignment <- function(expr, key) {
+  if (!is.call(expr)) {
+    return(NULL)
+  }
+  if (
+    as.character(expr[[1]])[1] %in%
+      c("<-", "=") &&
+      identical(viewer_server_key(expr[[2]]), key)
+  ) {
+    return(expr)
+  }
+  parts <- as.list(expr)[-1L]
+  for (i in seq_along(parts)) {
+    ## an empty argument (x[, 1]) is no expression to search
+    if (identical(parts[[i]], quote(expr = ))) {
+      next
+    }
+    found <- ir_test_assignment(parts[[i]], key)
+    if (!is.null(found)) return(found)
+  }
+  NULL
+}
+
 ir_test_body <- function(file, output, wrapper, env) {
   exprs <- parse(file.path(ir_test_root, file))
-  expr <- Filter(
-    function(x) {
-      is.call(x) &&
-        as.character(x[[1]])[1] %in% c("<-", "=") &&
-        identical(
-          viewer_server_key(x[[2]]),
-          paste0("output.", output)
-        )
-    },
-    as.list(exprs)
-  )[[1]]
+  expr <- NULL
+  for (x in as.list(exprs)) {
+    expr <- ir_test_assignment(x, paste0("output.", output))
+    if (!is.null(expr)) break
+  }
   body <- ir_test_call(expr[[3]], wrapper)[[2]]
   eval(call("function", as.pairlist(list()), body), env)
 }
 
 test_that("SizeDist draws the empirical profiles without scRepertoire", {
   env <- new.env(parent = asNamespace("shiny"))
-  env$input <- list(ir_chain = "both", ir_groupBy = "")
+  ## No toolbar input: chain and grouping come from ir_params(), at the values
+  ## the controls bind with until they have bound.
+  env$input <- list()
+  env$ir_chain_groupBy <- function() list(chain = "both", groupBy = NULL)
   env$req_plot_space <- function(...) NULL
   env$ir_param <- function(name, default) default
   env$req_scRepertoire <- function() stop("scRepertoire was loaded")
@@ -78,7 +100,7 @@ test_that("Abundance renderer counts the encoded clones", {
   env$ir_clonecall_col <- function(x) "CTgene"
   env$getImmuneRepertoire <- function() stop("unexpected sidecar hydration")
   env$ir_cell_metadata <- function() NULL
-  env$ir_clonal_abundance_plotly <- function(counts, ...) counts
+  env$ir_clonal_abundance_chart <- function(counts, ...) counts
   env$ir_abundance_counts <- function() {
     env$ir_abundance_counts_for(env$ir_params(), env$ir_encoded())
   }
@@ -94,7 +116,7 @@ test_that("Abundance renderer counts the encoded clones", {
   render <- ir_test_body(
     "visualizations.R",
     "ir_plot_clonalAbundance",
-    "plotly::renderPlotly",
+    "renderCerebroChart",
     env
   )
   ## The blank clone is not counted.
@@ -140,6 +162,10 @@ test_that("IR controls use descriptor chains and retain legacy detection", {
   env$getGroups <- function() c("group", "missing")
   env$input <- list(ir_groupBy = "group")
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
+  env$ir_tab <- function() "Abundance"
+  ## the global controls' choices and defaults (IR_CLONE_CALLS, ...)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), envir = env)
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,
@@ -184,17 +210,17 @@ test_that("Homeostasis renderer counts the encoded clones of every chain", {
   env$ir_homeostasis_counts <- function(encoded, column, chain, groups) {
     list(encoded, column, chain, groups)
   }
-  env$ir_homeostasis_plot <- function(counts, clone_size, palette, order) {
+  env$ir_homeostasis_chart <- function(counts, clone_size, palette, order) {
     if (is.null(order)) counts else list(counts, order)
   }
   env$ir_clone_size <- function() 1
   env$IR_PALETTE <- "Harmonic"
-  env$ir_render_ggplotly <- function(expr, ...) force(expr)
+  env$ir_render_chart <- function(expr, ...) force(expr)
   env$req_scRepertoire <- function() stop("scRepertoire was loaded")
   render <- ir_test_body(
     "visualizations.R",
     "ir_plot_clonalHomeostasis",
-    "plotly::renderPlotly",
+    "renderCerebroChart",
     env
   )
   expect_identical(render(), list("encoded", "CTgene", "both", NULL))
@@ -228,6 +254,10 @@ test_that("rebuilt IR toolbars keep the chosen clone call and chain", {
   env$getGroups <- function() "group"
   env$input <- list(ir_groupBy = "group", ir_cloneCall = "aa", ir_chain = "TRB")
   env$ir_flow_controls <- function(x) do.call(shiny::tagList, x)
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R), as ir_param() above.
+  env$ir_tab <- function() "Abundance"
+  ## the global controls' choices and defaults (IR_CLONE_CALLS, ...)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), envir = env)
   viewer_server_load(
     viewer_server_statements("immune_repertoire", "settings.R"),
     env,

@@ -102,7 +102,9 @@ activate_tab <- function(app, tab_name, timeout = 20000) {
 test_that("{shinytest2} recording: overview", {
   app <- shared_app()
 
-  ## Data Info tab: verify key values from the loaded example.crb
+  ## Data Info tab (the start page, viewerStartTab()): verify key values from
+  ## the loaded example.crb.
+  activate_tab(app, "loadData", timeout = 30000)
   overview <- retry_get_value(app, output = "load_data_overview")$html
   expect_true(grepl("1,?000", overview))
   expect_true(grepl("Human", overview))
@@ -1011,6 +1013,38 @@ test_that("{shinytest2} recording: color_management", {
 
   ui_val <- retry_get_value(app, output = "color_assignments_UI")
   expect_false(is.null(ui_val))
+
+  ## A picker is made when it comes near the screen (www/viewer-shell.js): the
+  ## ones on screen are pickers with their colour, and the last one becomes one
+  ## when it is scrolled to.
+  pickers <- "#color_assignments_UI input.colourpicker-input"
+  app$wait_for_js(
+    paste0("document.querySelectorAll('", pickers, "').length > 0"),
+    timeout = 20000
+  )
+  first <- app$get_js(paste0(
+    "jQuery(document.querySelector('",
+    pickers,
+    "')).colourpicker('value')"
+  ))
+  expect_match(first, "^#[0-9A-Fa-f]{6}$")
+  last <- paste0(
+    "Array.from(document.querySelectorAll('#color_assignments_UI input'))",
+    ".slice(-1)[0]"
+  )
+  app$run_js(paste0(last, ".scrollIntoView()"))
+  app$wait_for_js(
+    paste0(last, ".classList.contains('colourpicker-input')"),
+    timeout = 20000
+  )
+  expect_identical(
+    app$get_js(paste0("jQuery(", last, ").colourpicker('value')")),
+    app$get_js(paste0(last, ".getAttribute('data-init-value')"))
+  )
+  app$run_js(paste0(
+    "document.querySelector('#shiny-tab-color_management')",
+    ".scrollIntoView()"
+  ))
 })
 
 test_that("{shinytest2} recording: about", {
@@ -1056,6 +1090,8 @@ test_that("createShinyApp bundles a working app", {
   )
   app$wait_for_idle(timeout = 20000)
 
+  ## The bundle opens on Data info.
+  activate_tab(app, "loadData", timeout = 30000)
   cells <- retry_get_value(app, output = "load_data_overview")
   expect_true(grepl("1,?000", cells$html))
 

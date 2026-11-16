@@ -5,6 +5,7 @@
 address_bar_server <- function() {
   sent <- list()
   scope <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "shared_resources.R"), envir = scope)
   scope$session <- list(
     sendCustomMessage = function(type, message) {
       sent[[length(sent) + 1L]] <<- list(type = type, message = message)
@@ -50,6 +51,34 @@ test_that("every sidebar tab has exactly one page id", {
   tabs <- address_bar_server()$scope$viewer_initial_page_tabs
   expect_false(anyDuplicated(tabs) > 0L)
   expect_false(anyDuplicated(names(tabs)) > 0L)
+})
+
+test_that("the page opens on the tab the server names for its start page", {
+  tabs <- address_bar_server()$scope$viewer_initial_page_tabs
+  env <- new.env()
+  sys.source(viewer_test_path("core", "shared_resources.R"), env)
+  marked <- vapply(
+    names(tabs),
+    function(page) env$viewerStartTab(list(initial_page = page)),
+    character(1)
+  )
+  ## the pages every App has open on their own tab; a conditional page is
+  ## opened by the session, from Data info
+  conditional <- c(
+    "linked_views",
+    "marker_genes",
+    "most_expressed_genes",
+    "enriched_pathways",
+    "extra_material",
+    "immune_repertoire",
+    "trajectory",
+    "spatial",
+    "trekker",
+    "hla_tcr_motifs"
+  )
+  always <- setdiff(names(tabs), conditional)
+  expect_identical(marked[always], tabs[always])
+  expect_true(all(marked[conditional] == "loadData"))
 })
 
 test_that("the data set observer sends the id of a configured data set", {

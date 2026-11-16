@@ -509,3 +509,37 @@ test_that("gene expression panels follow gene, selection, and display mode", {
   app$wait_for_js(hidden, timeout = 30000)
   expect_length(app$get_js("genePanelErrors"), 0L)
 })
+
+test_that("the display mode selector opens on the mode page code starts with", {
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      viewer_control_helpers_load(scope)
+      viewer_server_load(
+        viewer_server_statements(
+          "gene_expression",
+          "obj_projection_parameters_plot.R"
+        ),
+        scope,
+        names = c(
+          "expression_projection_default_display_mode",
+          "expression_projection_display_mode"
+        )
+      )
+      viewer_server_load(
+        viewer_server_statements("gene_expression", "UI_projection_controls.R"),
+        scope,
+        names = 'output[["expression_projection_genes_in_separate_panels_UI"]]'
+      )
+    },
+    {
+      session$flushReact()
+      expect_identical(expression_projection_display_mode(), "combined")
+      expect_match(
+        output$expression_projection_genes_in_separate_panels_UI$html,
+        '<option value="combined" selected>',
+        fixed = TRUE
+      )
+    }
+  )
+})

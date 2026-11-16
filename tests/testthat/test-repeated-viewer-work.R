@@ -38,6 +38,10 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
         viewer_test_path("immune_repertoire", "encode.R"),
         environment()
       )
+      sys.source(
+        viewer_test_path("immune_repertoire", "param_spec.R"),
+        environment()
+      )
       sys.source(viewer_test_path("immune_repertoire", "data.R"), environment())
       counters <- new.env()
       counters$encodings <- 0L
@@ -54,10 +58,11 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
       }
     },
     {
+      ## Chain and clone call not bound yet: they stand at the values the
+      ## toolbar binds them with ("both", "gene").
       session$setInputs(
         ir_tabs = "Diversity",
         ir_groupBy = "severity",
-        ir_chain = "both",
         ir_p_sd_threshold = 1
       )
       profile <- ir_size_distribution_profile()
@@ -65,10 +70,13 @@ test_that("IR encoding and compact profiles follow semantic data changes only", 
       expect_equal(counters$preparations, 1L)
       expect_null(profile$clone_counts)
       expect_identical(rownames(profile$profile), c("high", "low"))
+      ## Neither the chain binding at the value it stood at nor a clone call
+      ## (the profiles count the strict clones) prepares them again.
       for (tab in c("Homeostasis", "Abundance", "Diversity")) {
         session$setInputs(
           ir_tabs = tab,
-          ir_cloneCall = "aa",
+          ir_chain = "both",
+          ir_cloneCall = if (identical(tab, "Abundance")) "nt" else "aa",
           ir_p_sd_method = "average"
         )
         expect_identical(ir_size_distribution_profile(), profile)
@@ -101,6 +109,8 @@ test_that("IR non-select controls preserve valid values including false and empt
   repeat_definitions(viewer_test_path("immune_repertoire", "settings.R"), env)
   source(viewer_test_path("immune_repertoire", "param_spec.R"), local = env)
   env$input <- list(ir_tabs = "Homeostasis", ir_p_clone_size = "custom")
+  ## The tab the toolbar is drawn for (ir_tab(), tabs.R).
+  local(ir_tab <- function() input$ir_tabs, envir = env)
   expect_match(
     as.character(env$ir_analysis_panel()),
     'value="custom"',
@@ -137,6 +147,12 @@ test_that("Groups shares counts across display forms but refreshes data", {
       counter$calls <- 0L
       generation <- shiny::reactiveVal(1)
       getGroups <- function() c("a", "b")
+      ## Page code reads the group controls through viewerControlValue()
+      ## (select_group.R); here they are the inputs themselves.
+      groups_selected_group <- function() input[["groups_selected_group"]]
+      groups_by_other_group_second_group <- function() {
+        input[["groups_by_other_group_second_group"]]
+      }
       repeat_definitions(
         viewer_test_path("groups", "composition.R"),
         environment()
@@ -188,6 +204,7 @@ test_that("compact SizeDist renders the identical geometry", {
   skip_if_not_installed("ggdendro")
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("immune_repertoire", "encode.R"), env)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), env)
   repeat_definitions(viewer_test_path("immune_repertoire", "data.R"), env)
   raw <- list(
     A = data.frame(CTstrict = c("x", "x", "y")),
@@ -251,6 +268,7 @@ test_that("table classification is skipped only when neither feature uses it", {
 test_that("the faceted paired scatter compares levels of the grouping column", {
   env <- new.env(parent = globalenv())
   sys.source(viewer_test_path("immune_repertoire", "encode.R"), env)
+  sys.source(viewer_test_path("immune_repertoire", "param_spec.R"), env)
   repeat_definitions(viewer_test_path("immune_repertoire", "data.R"), env)
   repeat_definitions(
     viewer_test_path("immune_repertoire", "visualizations.R"),

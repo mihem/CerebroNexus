@@ -140,44 +140,46 @@ output[["states_by_group_plot"]] <- renderCerebroChart({
 ## Table.
 ##----------------------------------------------------------------------------##
 
-output[["states_by_group_table"]] <- DT::renderDataTable({
-  ## wait for these inputs
-  req(
-    trajectory_selection_ok(),
-    input[["states_by_group_select_other_group"]]
-  )
-
-  ##
-  grouping_variable <- input[["states_by_group_select_other_group"]]
-  cells_df <- trajectory_cells_reactive(grouping_variable)
-
-  ## generate table
-  composition_df <- cells_df %>%
-    calculateTableAB(
-      "state",
-      grouping_variable,
-      mode = "wide",
-      percent = input[["states_by_group_show_as_percent"]]
+output[["states_by_group_table"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    ## wait for these inputs
+    req(
+      trajectory_selection_ok(),
+      input[["states_by_group_select_other_group"]]
     )
 
-  ## get indices of columns that should be formatted as percent
-  if (input[["states_by_group_show_as_percent"]] == TRUE) {
-    columns_percentage <- c(3:ncol(composition_df))
-  } else {
-    columns_percentage <- NULL
-  }
+    ##
+    grouping_variable <- input[["states_by_group_select_other_group"]]
+    cells_df <- trajectory_cells_reactive(grouping_variable)
 
-  composition_df %>%
-    dplyr::rename("# of cells" = total_cell_count) %>%
-    prettifyTable(
-      filter = "none",
-      dom = "Brtlip",
-      show_buttons = FALSE,
-      number_formatting = TRUE,
-      color_highlighting = FALSE,
-      hide_long_columns = TRUE,
-      columns_percentage = columns_percentage
-    )
+    ## generate table
+    composition_df <- cells_df %>%
+      calculateTableAB(
+        "state",
+        grouping_variable,
+        mode = "wide",
+        percent = input[["states_by_group_show_as_percent"]]
+      )
+
+    ## get indices of columns that should be formatted as percent
+    if (input[["states_by_group_show_as_percent"]] == TRUE) {
+      columns_percentage <- c(3:ncol(composition_df))
+    } else {
+      columns_percentage <- NULL
+    }
+
+    composition_df %>%
+      dplyr::rename("# of cells" = total_cell_count) %>%
+      prettifyTable(
+        filter = "none",
+        dom = "Brtlip",
+        show_buttons = FALSE,
+        number_formatting = TRUE,
+        color_highlighting = FALSE,
+        hide_long_columns = TRUE,
+        columns_percentage = columns_percentage
+      )
+  })
 })
 
 ##----------------------------------------------------------------------------##

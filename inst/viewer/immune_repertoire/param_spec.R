@@ -17,6 +17,16 @@
 ##   min/max/step : for numeric
 ## ---------------------------------------------------------------------------
 
+## ---- Global controls ---------------------------------------------------- ##
+## Their choices and the values they open on: settings.R builds the controls
+## from these, ir_params() (data.R) reads them before the controls bind.
+IR_CLONE_CALLS <- c("gene", "nt", "aa", "strict")
+IR_GLOBAL_DEFAULTS <- list(
+  ir_cloneCall = "gene",
+  ir_chain = "both",
+  ir_groupBy = ""
+)
+
 ## ---- Global control visibility ----------------------------------------- ##
 IR_GLOBAL_CONTROL_HIDDEN <- list(
   # Clonal UMAP colours by clone size and uses its own Receptor selector; the

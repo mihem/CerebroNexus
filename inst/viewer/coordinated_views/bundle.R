@@ -780,6 +780,15 @@ cv_clone <- function(
   )
 }
 
+## The levels a categorical column is coloured by: a factor's levels, else its
+## sorted distinct values; never NA. Every path that sends a grouping's levels
+## (cv_build_groups(), cv_build_deferred_metadata(), cv_attribute_resource() in
+## server.R) uses these, so the codes each path sends decode to the same values.
+cv_group_levels <- function(v) {
+  lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
+  lev[!is.na(lev)]
+}
+
 ## Categorical groupings: each md group column -> {values, levels, colors}.
 cv_build_groups <- function(crb, md, colors_fn, only = NULL) {
   group_names <- tryCatch(crb$getGroups(), error = function(e) character(0))
@@ -792,8 +801,7 @@ cv_build_groups <- function(crb, md, colors_fn, only = NULL) {
     if (is.null(v)) {
       next
     }
-    lev <- if (is.factor(v)) levels(v) else sort(unique(as.character(v)))
-    lev <- lev[!is.na(lev)]
+    lev <- cv_group_levels(v)
     if (!length(lev)) {
       next
     }
@@ -2135,12 +2143,7 @@ cv_build_bundle <- function(
 
 cv_build_deferred_metadata <- function(crb, md, primary) {
   deferred_group <- function(name, value) {
-    levels <- if (is.factor(value)) {
-      levels(value)
-    } else {
-      sort(unique(as.character(value)))
-    }
-    levels <- levels[!is.na(levels)]
+    levels <- cv_group_levels(value)
     if (!length(levels)) {
       return(NULL)
     }

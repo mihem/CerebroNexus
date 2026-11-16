@@ -9,10 +9,12 @@
 
 ## ---- Optional-dependency gate ----------------------------------------- ##
 ## stringdist + igraph are Suggests; without them the page shows an install
-## hint instead of the network.
+## hint instead of the network. Whether they are installed, not loaded: the
+## Viewer Pack's first frame draws without either, and igraph:: or
+## stringdist:: loads its package when a graph is built.
 hla_has_deps <- function() {
-  requireNamespace("stringdist", quietly = TRUE) &&
-    requireNamespace("igraph", quietly = TRUE)
+  nzchar(system.file(package = "stringdist")) &&
+    nzchar(system.file(package = "igraph"))
 }
 
 ## ---- Per-session cache wrapper (module-local, no cross-module coupling) ##
@@ -715,8 +717,19 @@ hla_segments <- reactive({
   if (!is.null(first) && isTRUE(hla_first_frame_filters_match())) {
     # This table is already cached inside the viewer-pack asset. Passing its
     # 18 MB payload through bindCache makes Shiny size and copy it again before
-    # the first graph can render.
-    return(first$segments)
+    # the first graph can render. A first frame of version 3 does not hold it:
+    # it is read from its own Pack file here, when it is first needed (the
+    # first view draws from the graph snapshot without it).
+    segments <- first$segments
+    if (is.null(segments)) {
+      segments <- viewerPackHlaFirstSegments(
+        viewerPackCurrent(),
+        hla_active_chain()
+      )
+    }
+    if (!is.null(segments)) {
+      return(segments)
+    }
   }
   hla_segments_fallback()
 })

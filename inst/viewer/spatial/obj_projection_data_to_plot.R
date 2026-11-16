@@ -1,23 +1,39 @@
 ##----------------------------------------------------------------------------##
 ## Collect data required to update projection.
 ##----------------------------------------------------------------------------##
-## ROI membership, sample scope and pivots for a section. Ranges, hulls and the
-## frame all need it with the same inputs; computing it matches every barcode
-## (about a second for a million cells), so share one result.
+## ROI membership, sample scope and pivots for a section, by position in its
+## coordinates: `roi_by_position` (the ROI of each row), `scoped` (the rows of
+## the selected sample) and `pivots`. Ranges, hulls and the frame all need it
+## with the same inputs, so share one result. The ROIs come from the section's
+## metadata rows (spatial_section_scope()), not from matching cell names.
 spatial_projection_roi_context_memo <- viewerMemoOne()
 spatial_projection_roi_context <- function(spatial_name, rotation_angle) {
   sample_value <- spatial_projection_selected_sample()
   spatial_projection_roi_context_memo(
     list(data_set(), spatial_name, sample_value, rotation_angle),
     function() {
-      spatial_roi_transform_context(
-        viewerSpatialCoordinates(spatial_name),
-        viewerProjectionFirstFrameMetadata(),
+      coordinates <- viewerSpatialCoordinates(spatial_name)
+      metadata <- viewerProjectionFirstFrameMetadata()
+      spatial_roi_section_context(
+        coordinates,
+        spatial_section_scope(
+          spatial_name,
+          sample_value,
+          metadata,
+          function() rownames(coordinates) %||% character()
+        ),
+        metadata,
         sample_value,
         rotation_angle
       )
     }
   )
+}
+## The ROI of each drawn cell (spatial_projection_coordinates()).
+spatial_projection_drawn_roi <- function(roi_context) {
+  rows <- spatial_projection_coordinate_rows()
+  roi <- roi_context$roi_by_position
+  as.character(if (is.null(rows)) roi else roi[rows])
 }
 
 spatial_projection_full_ranges <- reactive({
@@ -35,17 +51,15 @@ spatial_projection_full_ranges <- reactive({
   full_coords <- viewerSpatialCoordinates(spatial_name)
   if (parameters[["roi_mode"]] %in% c("single", "separate")) {
     roi_context <- spatial_projection_roi_context(spatial_name, rotation_angle)
-    scoped_cells <- roi_context$scoped_cells
+    scoped <- roi_context$scoped
+    roi <- roi_context$roi_by_position
     selected_roi <- spatial_roi_value(parameters[["roi_selection"]])
     if (nzchar(selected_roi)) {
-      scoped_cells <- scoped_cells[
-        !is.na(roi_context$roi_by_cell[scoped_cells]) &
-          roi_context$roi_by_cell[scoped_cells] == selected_roi
-      ]
+      scoped <- scoped[!is.na(roi[scoped]) & roi[scoped] == selected_roi]
     }
     full_coords <- rotateSpatialCoordinatesByRoi(
-      full_coords[scoped_cells, , drop = FALSE],
-      as.character(roi_context$roi_by_cell[scoped_cells]),
+      full_coords[scoped, , drop = FALSE],
+      as.character(roi[scoped]),
       spatialRoiSettings(Cerebro.options, dataset, spatial_name),
       rotation_angle,
       pivots = roi_context$pivots
@@ -92,7 +106,7 @@ spatial_projection_group_hulls <- reactive({
     roi_context <- spatial_projection_roi_context(spatial_name, rotation_angle)
     coordinates <- rotateSpatialCoordinatesByRoi(
       coordinates,
-      as.character(roi_context$roi_by_cell[rownames(coordinates)]),
+      spatial_projection_drawn_roi(roi_context),
       spatialRoiSettings(Cerebro.options, dataset, spatial_name),
       rotation_angle,
       pivots = roi_context$pivots
@@ -182,11 +196,22 @@ spatial_projection_data_to_plot_raw <- reactive({
       },
       logical(1)
     ))
+  ## A section of a data set of several: the geometry asset exists only for
+  ## exactly the section's cells in the Pack's order, unrotated. The browser
+  ## draws it from the Pack too: it maps the canonical codes of the colour
+  ## column through the frame's canonical rows, which travel as a range
+  ## (cell_views.js, hydrateSingleProjectionResource()). Its colours are those
+  ## of the whole column only for a factor or a group with assigned colours (a
+  ## character column is coloured by the levels the frame has).
+  section_frame <- !isTRUE(full_canonical_frame) &&
+    is.list(geometry_resource) &&
+    !is.null(cerebroRowRange(as.integer(cells_to_extract) - 1L)) &&
+    (is.factor(full_color) || color_variable %in% names(reactive_colors()))
   resource_first_candidate <-
     identical(plot_parameters[["plot_type"]], "ImageDimPlot") &&
     !nzchar(plot_parameters[["split_by"]] %||% "") &&
     is.list(geometry_resource) &&
-    isTRUE(full_canonical_frame) &&
+    (isTRUE(full_canonical_frame) || isTRUE(section_frame)) &&
     !is.numeric(full_color) &&
     isTRUE(background_geometry_ready) &&
     !roi_rotation_needed
@@ -204,11 +229,24 @@ spatial_projection_data_to_plot_raw <- reactive({
   } else {
     NULL
   }
+  codes_cells <- geometry_resource$cells
+  if (isTRUE(section_frame) && is.list(categorical_resource)) {
+    ## The section's legend lists the levels its cells have, as the frame of
+    ## its values would.
+    section_codes <- spatial_section_codes_resource(
+      categorical_resource,
+      full_color[as.integer(cells_to_extract)],
+      color_assignments
+    )
+    categorical_resource <- section_codes$resource
+    color_assignments <- section_codes$color_assignments
+    codes_cells <- nrow(full_metadata)
+  }
   resource_first <- resource_first_candidate &&
     is.list(categorical_resource) &&
     identical(
       as.integer(categorical_resource$cells),
-      as.integer(geometry_resource$cells)
+      as.integer(codes_cells)
     )
   metadata <- if (resource_first) NULL else spatial_projection_metadata()
 
@@ -293,12 +331,10 @@ spatial_projection_data_to_plot_raw <- reactive({
       plot_parameters[["projection"]]
     )
     displayed_coordinates <- spatial_projection_coordinates()
-    displayed_roi <- as.character(
-      roi_context$roi_by_cell[rownames(displayed_coordinates)]
-    )
-    scoped_cells <- roi_context$scoped_cells
-    scoped_coordinates <- full_coordinates[scoped_cells, , drop = FALSE]
-    scoped_roi <- as.character(roi_context$roi_by_cell[scoped_cells])
+    displayed_roi <- spatial_projection_drawn_roi(roi_context)
+    scoped <- roi_context$scoped
+    scoped_coordinates <- full_coordinates[scoped, , drop = FALSE]
+    scoped_roi <- as.character(roi_context$roi_by_position[scoped])
     if (identical(plot_parameters[["roi_mode"]], "separate")) {
       transformed_full <- rotateSpatialCoordinatesByRoi(
         scoped_coordinates,

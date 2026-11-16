@@ -316,8 +316,22 @@ observeEvent(
   ignoreInit = TRUE
 )
 
+## The catalog of the last model asked for. A Group edit asks for the stored
+## entry's catalog (the handler) and then twice for the edited entry's (the
+## detail and the preview); the next edit's handler asks for that one again.
+group_catalog_memo <- new.env(parent = emptyenv())
 group_catalog_for_entry <- function(entry) {
-  builder_group_catalog_model(list(
+  model <- group_catalog_input(entry)
+  if (!identical(model, group_catalog_memo$model)) {
+    catalog <- builder_group_catalog_model(model)
+    group_catalog_memo$catalog <- catalog
+    group_catalog_memo$model <- model
+  }
+  group_catalog_memo$catalog
+}
+
+group_catalog_input <- function(entry) {
+  list(
     metadata_catalog = entry$dataset_profile$viewer_content$metadata %||%
       entry$profile$viewer_content$metadata %||%
       list(),
@@ -333,7 +347,7 @@ group_catalog_for_entry <- function(entry) {
       entry$settings$recommendations$metadata %||%
       list(),
     levels = entry$levels %||% list()
-  ))
+  )
 }
 
 ## The revision a client state message carries: the stored dataset's when it
@@ -936,8 +950,33 @@ observeEvent(
 group_color_ui_revision <- reactiveVal(0L)
 group_preview_ui_revision <- reactiveVal(0L)
 
+## What the browser shows of the Group detail and the metadata preview, which
+## every Group edit renders again. An edit that leaves one as it was keeps its
+## content instead of sending it and rebuilding it in the browser (for the
+## detail, with the colour editor inside it). Each render takes the record
+## first, so a render that stops (req) or fails leaves none.
+group_ui_shown <- new.env(parent = emptyenv())
+group_ui_take <- function(name) {
+  shown <- group_ui_shown[[name]]
+  group_ui_shown[[name]] <- NULL
+  shown
+}
+## Stops the render and keeps the output when it would show `value` again.
+group_ui_keep_unchanged <- function(name, shown, value) {
+  if (is.list(shown) && identical(shown$value, value)) {
+    group_ui_shown[[name]] <- shown
+    req(FALSE, cancelOutput = TRUE)
+  }
+  invisible(FALSE)
+}
+group_ui_render <- function(name, value, ui) {
+  group_ui_shown[[name]] <- list(value = value)
+  ui
+}
+
 output[["core-group_detail"]] <- renderUI({
   group_preview_ui_revision()
+  shown <- group_ui_take("detail")
   entry <- rendered_core_entry()
   if (is.null(entry)) {
     return(NULL)
@@ -946,20 +985,23 @@ output[["core-group_detail"]] <- renderUI({
   focus <- group_focus_value(input[["core-group_focus"]]) %||%
     entry$settings$default_group %||%
     catalog$focus
-  builder_group_detail_ui(
-    "core",
-    builder_group_detail_model(catalog, focus)
-  )
+  model <- builder_group_detail_model(catalog, focus)
+  ## builder_group_detail_ui() draws `model$item` only.
+  group_ui_keep_unchanged("detail", shown, model$item)
+  group_ui_render("detail", model$item, builder_group_detail_ui("core", model))
 })
 
 output[["core-metadata_preview"]] <- renderUI({
   group_preview_ui_revision()
+  shown <- group_ui_take("preview")
   id <- current()
   req(!is.null(id), identical(input[["core-rendered_for"]], id))
   entry <- builder_upgrade_viewer_content_entry(isolate(entry_of(id)))
   req(entry)
   catalog <- group_catalog_for_entry(entry)
-  builder_metadata_preview_ui(catalog$metadata_preview)
+  preview <- catalog$metadata_preview
+  group_ui_keep_unchanged("preview", shown, preview)
+  group_ui_render("preview", preview, builder_metadata_preview_ui(preview))
 })
 
 output[["core-group_colors"]] <- renderUI({

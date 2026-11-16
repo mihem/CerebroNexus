@@ -292,60 +292,62 @@ observe({
   }
 })
 
-output$hla_network_table <- DT::renderDataTable({
-  df <- hla_network_table_data()
-  if (is.null(df)) {
-    df <- data.frame(Note = "No rows in the current network scope.")
-  }
-  # The multi-value "samples" column (a comma-separated donor list) is shown as
-  # the first sample + an ellipsis, with the full list on hover via a title
-  # attribute. Display only -- the render returns the raw value for every other
-  # DataTables type, so search / sort and the CSV export keep the full list.
-  # Only that column is left un-escaped (it emits a <span>); every other column
-  # stays HTML-escaped.
-  #
-  # Because DataTables escaping is off for this column, the cell is built as DOM
-  # nodes and never by string concatenation. A sample name is arbitrary data
-  # coming from the .crb, so a value like `<img src=x onerror=...>` pasted into
-  # an HTML string would execute in the app's origin. Assigning to .textContent
-  # and .title makes the browser escape both the text and the attribute for us,
-  # which is why outerHTML is safe to return here.
-  s_idx <- which(colnames(df) == "samples")
-  col_defs <- list()
-  escape_cols <- seq_len(ncol(df))
-  if (length(s_idx) == 1) {
-    escape_cols <- which(colnames(df) != "samples")
-    col_defs <- list(list(
-      targets = s_idx - 1L,
-      render = DT::JS(
-        "function(data, type, row) {",
-        "  if (type !== 'display' || data === null) { return data; }",
-        "  var full = String(data);",
-        "  var span = document.createElement('span');",
-        "  if (full.indexOf(',') === -1) {",
-        "    span.textContent = full;",
-        "  } else {",
-        "    span.title = full;",
-        "    span.textContent = full.split(',')[0] + '\\u2026';",
-        "  }",
-        "  return span.outerHTML;",
-        "}"
+output$hla_network_table <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    df <- hla_network_table_data()
+    if (is.null(df)) {
+      df <- data.frame(Note = "No rows in the current network scope.")
+    }
+    # The multi-value "samples" column (a comma-separated donor list) is shown as
+    # the first sample + an ellipsis, with the full list on hover via a title
+    # attribute. Display only -- the render returns the raw value for every other
+    # DataTables type, so search / sort and the CSV export keep the full list.
+    # Only that column is left un-escaped (it emits a <span>); every other column
+    # stays HTML-escaped.
+    #
+    # Because DataTables escaping is off for this column, the cell is built as DOM
+    # nodes and never by string concatenation. A sample name is arbitrary data
+    # coming from the .crb, so a value like `<img src=x onerror=...>` pasted into
+    # an HTML string would execute in the app's origin. Assigning to .textContent
+    # and .title makes the browser escape both the text and the attribute for us,
+    # which is why outerHTML is safe to return here.
+    s_idx <- which(colnames(df) == "samples")
+    col_defs <- list()
+    escape_cols <- seq_len(ncol(df))
+    if (length(s_idx) == 1) {
+      escape_cols <- which(colnames(df) != "samples")
+      col_defs <- list(list(
+        targets = s_idx - 1L,
+        render = DT::JS(
+          "function(data, type, row) {",
+          "  if (type !== 'display' || data === null) { return data; }",
+          "  var full = String(data);",
+          "  var span = document.createElement('span');",
+          "  if (full.indexOf(',') === -1) {",
+          "    span.textContent = full;",
+          "  } else {",
+          "    span.title = full;",
+          "    span.textContent = full.split(',')[0] + '\\u2026';",
+          "  }",
+          "  return span.outerHTML;",
+          "}"
+        )
+      ))
+    }
+    DT::datatable(
+      style = "bootstrap",
+      df,
+      rownames = FALSE,
+      filter = "top",
+      escape = escape_cols,
+      class = "display nowrap",
+      options = list(
+        pageLength = 25,
+        scrollX = TRUE,
+        columnDefs = col_defs
       )
-    ))
-  }
-  DT::datatable(
-    style = "bootstrap",
-    df,
-    rownames = FALSE,
-    filter = "top",
-    escape = escape_cols,
-    class = "display nowrap",
-    options = list(
-      pageLength = 25,
-      scrollX = TRUE,
-      columnDefs = col_defs
     )
-  )
+  })
 })
 
 output$hla_network_download <- downloadHandler(

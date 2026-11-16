@@ -330,7 +330,7 @@ output$hla_associations_ui <- renderUI({
 ##
 ## `skeleton` is the empty data frame the widget is rendered from; `headers`,
 ## when given, is called inside the render so it may read reactives. Returns the
-## proxy.
+## output id.
 hla_overlap_live_table <- function(
   id,
   data,
@@ -338,17 +338,20 @@ hla_overlap_live_table <- function(
   options,
   headers = NULL
 ) {
-  output[[id]] <- DT::renderDataTable(
-    DT::datatable(
-      style = "bootstrap",
-      skeleton,
-      rownames = FALSE,
-      colnames = if (is.null(headers)) colnames(skeleton) else headers(),
-      class = "display nowrap",
-      options = options
+  output[[id]] <- viewerLazyRender(function() {
+    DT::renderDataTable(
+      DT::datatable(
+        style = "bootstrap",
+        skeleton,
+        rownames = FALSE,
+        colnames = if (is.null(headers)) colnames(skeleton) else headers(),
+        class = "display nowrap",
+        options = options
+      )
     )
-  )
-  proxy <- DT::dataTableProxy(id)
+  })
+  ## The proxy is made when the first rows are sent, so that defining the
+  ## table does not load DT (viewerLazyRender()).
   observeEvent(
     {
       req(hla_association_consumer_ready())
@@ -356,14 +359,14 @@ hla_overlap_live_table <- function(
     },
     {
       DT::replaceData(
-        proxy,
+        DT::dataTableProxy(id),
         data(),
         resetPaging = FALSE,
         rownames = FALSE
       )
     }
   )
-  proxy
+  invisible(id)
 }
 
 ## ---- Observed overlap summary ---------------------------------------------- ##
@@ -462,19 +465,21 @@ hla_overlap_table_proxy <- hla_overlap_live_table(
   }
 )
 
-output$hla_allele_matrix <- DT::renderDataTable({
-  if (!hla_has_typing()) {
-    return(NULL)
-  }
-  mat <- hla_unit_allele_matrix(
-    hla_active_typing(),
-    samples = hla_ir_samples()
-  )
-  DT::datatable(
-    style = "bootstrap",
-    mat,
-    rownames = FALSE,
-    class = "display nowrap",
-    options = list(pageLength = 10, scrollX = TRUE, dom = "tip")
-  )
+output$hla_allele_matrix <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    if (!hla_has_typing()) {
+      return(NULL)
+    }
+    mat <- hla_unit_allele_matrix(
+      hla_active_typing(),
+      samples = hla_ir_samples()
+    )
+    DT::datatable(
+      style = "bootstrap",
+      mat,
+      rownames = FALSE,
+      class = "display nowrap",
+      options = list(pageLength = 10, scrollX = TRUE, dom = "tip")
+    )
+  })
 })

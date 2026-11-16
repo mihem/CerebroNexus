@@ -1,3 +1,21 @@
+## The statements of an IR file, those of ir_define_with_tab(tab, function()
+## ...) (the plotly outputs) as top-level ones.
+ir_unwrapped_statements <- function(file) {
+  unlist(
+    lapply(
+      viewer_server_statements("immune_repertoire", file),
+      function(x) {
+        if (is.call(x) && identical(x[[1]], as.name("ir_define_with_tab"))) {
+          as.list(x[[3]][[3]])[-1L]
+        } else {
+          list(x)
+        }
+      }
+    ),
+    recursive = FALSE
+  )
+}
+
 test_that("IR error handling preserves validation and renders useful failures", {
   scope <- ir_scope(
     c("ir_plot_cache_state", "ir_plot_failed", "safeRenderPlot"),
@@ -64,6 +82,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
     scope <- environment()
     output <- new.env()
     renderPlot <- render_value
+    renderCerebroChart <- render_value
     `%>%` <- dplyr::`%>%`
     available_crb_files <- reactiveValues(selected = "A")
     viewer_server_load(
@@ -78,13 +97,19 @@ test_that("IR renderers update parameters and isolate their session caches", {
         "safeRenderPlot"
       )
     )
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
       names = c(
         "ir_dataset_process_key",
         "ir_params",
+        "ir_chain_groupBy",
         "ir_param",
+        "ir_param_default",
         "ir_order_by",
         "IR_CLONE_SIZE_NAMES",
         "IR_CLONE_SIZE_DEFAULT",
@@ -99,6 +124,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
     }
     ir_row_values <- function(encoded, name, ...) name
     ir_render_ggplotly <- function(expr, ...) expr
+    ir_render_chart <- function(expr, ...) expr
     ## Abundance counts the clones in the app: record what it counts from and
     ## what it draws.
     ir_abundance_counts_for <- function(pars, encoded) {
@@ -124,14 +150,14 @@ test_that("IR renderers update parameters and isolate their session caches", {
       )
       profiles
     }
-    ir_homeostasis_plot <- function(counts, clone_size, ...) {
+    ir_homeostasis_chart <- function(counts, clone_size, ...) {
       calls[[length(calls) + 1L]] <<- list(
         name = "homeostasis_plot",
         args = list(cloneSize = clone_size)
       )
       counts
     }
-    ir_clonal_abundance_plotly <- function(counts, ...) {
+    ir_clonal_abundance_chart <- function(counts, ...) {
       force(counts)
       calls[[length(calls) + 1L]] <<- list(
         name = "abundance_plot",
@@ -140,7 +166,7 @@ test_that("IR renderers update parameters and isolate their session caches", {
       counts
     }
     viewer_server_load(
-      viewer_server_statements("immune_repertoire", "visualizations.R"),
+      ir_unwrapped_statements("visualizations.R"),
       scope,
       names = c(
         "IR_PALETTE",
@@ -296,17 +322,22 @@ clonal_projection_server <- function(names_resource = NULL) {
         list(...)
       )
     }
+    sys.source(
+      viewer_test_path("immune_repertoire", "param_spec.R"),
+      envir = scope
+    )
     viewer_server_load(
       viewer_server_statements("immune_repertoire", "data.R"),
       scope,
       names = c(
         "ir_param",
+        "ir_param_default",
         "IR_CLONE_LABELS",
         "ir_clonecall_col"
       )
     )
     viewer_server_load(
-      viewer_server_statements("immune_repertoire", "visualizations.R"),
+      ir_unwrapped_statements("visualizations.R"),
       scope,
       names = c(
         "IR_EXPANSION_COLORS",

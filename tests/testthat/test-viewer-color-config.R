@@ -230,3 +230,51 @@ test_that("colour input ids are the hex bytes of data set, variable and level", 
   )
   expect_identical(scope$color_input_ids("group", character()), character())
 })
+
+test_that("the deferred colour picker is colourpicker::colourInput()'s markup", {
+  skip_if_not_installed("colourpicker")
+  ## color_picker() builds the picker by hand (see color_management/server.R);
+  ## this catches a colourpicker release that changes the markup it binds.
+  scope <- new.env(parent = asNamespace("shiny"))
+  eval(
+    viewer_r_assignment(
+      viewer_test_path("color_management", "server.R"),
+      "color_picker"
+    ),
+    scope
+  )
+  pending <- scope$color_picker("colour_a", "a <b>", "#123456")
+  reference <- colourpicker::colourInput(
+    "colour_a",
+    "a <b>",
+    "#123456",
+    showColour = "both",
+    palette = "square"
+  )
+  ## The pending picker is a button showing its colour, which
+  ## www/viewer-shell.js makes the text input colourInput() draws.
+  shell <- paste(
+    readLines(viewer_test_path("www", "viewer-shell.js"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(shell, 'input.type = "text";', fixed = TRUE)
+  expect_match(
+    shell,
+    'classList.remove("cerebro-colour-pending")',
+    fixed = TRUE
+  )
+  expect_match(shell, 'classList.add("shiny-colour-input")', fixed = TRUE)
+  field <- pending$children[[2L]]
+  expect_identical(field$attribs$type, "button")
+  expect_identical(field$attribs$value, "#123456")
+  field$attribs$type <- "text"
+  field$attribs$class <- sub(
+    "cerebro-colour-pending",
+    "shiny-colour-input",
+    field$attribs$class,
+    fixed = TRUE
+  )
+  field$attribs$value <- NULL
+  pending$children[[2L]] <- field
+  expect_identical(as.character(pending), as.character(reference))
+})

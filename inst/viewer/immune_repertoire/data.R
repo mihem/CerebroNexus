@@ -5,9 +5,9 @@ ir_repertoire_available <- reactive({
   isTRUE(getImmuneRepertoireSummary()$available)
 })
 
-## Said once, when the repertoire really is encoded in memory (not read from
-## the process memo or the cache): the page takes about a minute on a million
-## cells, and the way out is to rebuild the Pack.
+## Said once per session, on this page, while another process encodes the
+## repertoire (not read from the process memo or the cache): the page waits
+## about 20 s for a million cells, and the way out is to rebuild the Pack.
 ir_notify_slow_encoding <- function(pack) {
   text <- paste0(
     if (is.list(pack)) {
@@ -15,8 +15,9 @@ ir_notify_slow_encoding <- function(pack) {
     } else {
       "This data set has no Viewer Pack"
     },
-    ", so its repertoire is encoded now: about a minute on a million cells, ",
-    "less when the next session reuses it. ",
+    ", so its repertoire is encoded now, in the background: about 20 ",
+    "seconds for a million cells; the page fills in when it is done, and the ",
+    "next session reuses it. ",
     "buildViewerPack(<crb file>, overwrite = TRUE) makes this page open in ",
     "seconds."
   )
@@ -36,41 +37,242 @@ ir_notify_slow_encoding <- function(pack) {
 ## ---- The encoded repertoire (encode.R) -------------------------------- ##
 ## The tabs read the repertoire's integer columns: the Viewer Pack's, or for a
 ## data set without a Pack, or with a Pack built before the encoding, the same
-## encoding made in memory, once per process for the data set's files.
+## encoding made from the repertoire, once per data set: kept in the user cache
+## for later sessions (ir_disk_cache_write()). A data set with its files on
+## disk is encoded by another R process (ir_encoded_background()): the
+## encoding takes 20 s and more for a million cells, during which this process
+## would answer no session; the pages say they wait, and fill in when it is
+## done.
 ir_encoded <- reactive({
   req(!is.null(data_set()))
   pack <- viewerPackCurrent()
   encoded <- if (is.list(pack)) {
     viewerPackImmuneEncoded(pack, IR_ENCODING_VERSION)
   }
-  if (!is.null(encoded)) {
-    encoded
-  } else {
-    ir_process_memo(
-      "encoded",
-      ir_dataset_process_key(data_set()),
-      function() {
-        repertoire <- getImmuneRepertoire()
-        if (!length(repertoire)) {
-          return(NULL)
-        }
-        ir_notify_slow_encoding(pack)
-        ## The ranks are sorted when a plot needs them (ir_clone_rank()).
-        ir_encode_repertoire(
-          repertoire,
-          as.character(getMetaData()$cell_barcode),
-          rank = FALSE
-        )
-      },
-      disk = TRUE
-    )
-  }
+  ## (no return() in a reactive's body: if/else)
+  if (!is.null(encoded)) encoded else ir_encoded_made(pack)
 })
 
-## The clones `ids` of `column` on `chain`: in memory, or read from the
-## Pack's blocks of names that hold them.
+## The encoding of a data set whose Pack has none (ir_encoded()).
+ir_encoded_made <- function(pack) {
+  encode_here <- function() {
+    repertoire <- getImmuneRepertoire()
+    if (!length(repertoire)) {
+      return(NULL)
+    }
+    ## The ranks are sorted when a plot needs them (ir_clone_rank()).
+    ir_encode_repertoire(
+      repertoire,
+      as.character(getMetaData()$cell_barcode),
+      rank = FALSE
+    )
+  }
+  key <- ir_dataset_process_key(data_set())
+  state <- ir_encoded_background(key, pack, encode_here)
+  if (!isTRUE(state$done)) {
+    ## Said on this page only: the encoding may have started while another
+    ## page was read (the idle tasks of shiny_server.R).
+    if (
+      !isTRUE(session$userData$ir_slow_notified) &&
+        identical(isolate(input[["sidebar"]]), "immune_repertoire")
+    ) {
+      session$userData$ir_slow_notified <- TRUE
+      ir_notify_slow_encoding(pack)
+    }
+    invalidateLater(500)
+    validate(need(
+      FALSE,
+      "Encoding the immune repertoire. The page fills in when it is done."
+    ))
+  }
+  state$value
+}
+
+## The jobs encoding a repertoire in another process, by data set: one per
+## process, whichever session asked first.
+ir_encode_jobs <- if (exists(".ir_encode_jobs", inherits = TRUE)) {
+  get(".ir_encode_jobs", inherits = TRUE)
+} else {
+  new.env(parent = emptyenv())
+}
+
+## The encoding of the data set `key` as list(done, value): from this process's
+## memo, from the user cache, or from a job it starts in another R process
+## (`done` FALSE while it runs). The job writes the user cache itself, so its
+## 400 MB of clone names are not sent back; it sends the encoding only when the
+## cache cannot be written. Without a key, for a small repertoire, or when no
+## job can run (no mirai), `encode_here()` encodes in this process, as before.
+## `here_bytes`: the largest sidecar file encoded in this process.
+ir_encoded_background <- function(
+  key,
+  pack,
+  encode_here,
+  here_bytes = 4 * 2^20
+) {
+  if (is.null(key)) {
+    return(list(done = TRUE, value = encode_here()))
+  }
+  id <- paste0("encoded:", rlang::hash(key))
+  if (exists(id, envir = ir_process_cache, inherits = FALSE)) {
+    return(list(done = TRUE, value = get(id, envir = ir_process_cache)))
+  }
+  file <- ir_disk_cache_file("encoded", key)
+  finish <- function(value) {
+    assign(id, value, envir = ir_process_cache)
+    list(done = TRUE, value = value)
+  }
+  kept <- ir_disk_cache_read(file)
+  if (!is.null(kept)) {
+    return(finish(kept))
+  }
+  job <- ir_encode_jobs[[id]]
+  if (is.null(job)) {
+    if (
+      !exists(".viewerMirai", mode = "function") ||
+        !requireNamespace("mirai", quietly = TRUE)
+    ) {
+      value <- encode_here()
+      if (!is.null(value)) {
+        ir_disk_cache_write(file, value)
+      }
+      return(finish(value))
+    }
+    ## A repertoire in its sidecar file is read by the job: handing it over
+    ## (half a million rows of long strings) would hold this process for
+    ## seconds, as reading it does.
+    ds <- data_set()
+    backend <- tryCatch(ds$immune_repertoire_backend, error = function(e) NULL)
+    sidecar <- if (
+      !length(ds$immune_repertoire) &&
+        is.list(backend) &&
+        identical(backend$type, "file")
+    ) {
+      list(path = file.path(backend$root, backend$file), md5 = backend$md5)
+    }
+    repertoire <- if (is.null(sidecar)) getImmuneRepertoire()
+    if (is.null(sidecar) && !length(repertoire)) {
+      return(finish(NULL))
+    }
+    ## A small repertoire is encoded here: in less time than another R process
+    ## takes to start (50,000 rows, a 4 MB sidecar: about a second).
+    small <- if (is.null(sidecar)) {
+      sum(vapply(repertoire, NROW, integer(1))) < 50000L
+    } else {
+      isTRUE(file.size(sidecar$path) < here_bytes)
+    }
+    if (small) {
+      value <- encode_here()
+      if (!is.null(value)) {
+        ir_disk_cache_write(file, value)
+      }
+      return(finish(value))
+    }
+    root <- file.path(Cerebro.options[["cerebro_root"]], "viewer")
+    ## The cell names too: a Pack keeps them in the metadata's order (reading
+    ## them from the data set's H5 file held this process for two seconds).
+    cell_order <- if (
+      is.list(pack) &&
+        is.data.frame(pack$manifest$assets) &&
+        "common/cell_order.qs2" %in% pack$manifest$assets$path
+    ) {
+      list(
+        path = file.path(pack$path, "common", "cell_order.qs2"),
+        n = as.integer(pack$cell_count %||% pack$manifest$n_cells)
+      )
+    }
+    ir_encode_jobs[[id]] <- .viewerMirai(
+      {
+        ## 1.46 million cell names take 1.5 s to read: only for a table that
+        ## names its cells
+        read_cells <- function() {
+          if (is.null(cells)) {
+            cells <<- qs2::qs_read(cell_order$path)
+            if (!is.character(cells) || length(cells) != cell_order$n) {
+              stop("The Viewer Pack's cell order does not match the data set.")
+            }
+          }
+          cells
+        }
+        if (!is.null(sidecar)) {
+          ## read as Cerebro$getImmuneRepertoire() reads it, by the same
+          ## function (.readRepertoireSidecar(), R/cerebro_io.R): the checked
+          ## file, with a thin CRB's cell index kept as the canonical cell rows
+          ## it is (ir_encode_repertoire())
+          repertoire <- read_sidecar(
+            sidecar$path,
+            sidecar$md5,
+            if (is.null(cells)) cell_order$n else length(cells)
+          )
+        }
+        named <- vapply(
+          repertoire,
+          function(sample) {
+            is.null(attr(sample, "cerebro_cell_index_column", exact = TRUE))
+          },
+          logical(1)
+        )
+        if (any(named)) {
+          read_cells()
+        }
+        if (!length(repertoire)) {
+          return(list(written = FALSE, value = NULL))
+        }
+        scope <- new.env(parent = globalenv())
+        scope$`%||%` <- function(a, b) if (is.null(a)) b else a
+        ## the encoding and the files that keep it, as the session has them
+        sys.source(encode_file, envir = scope)
+        sys.source(cache_file, envir = scope)
+        value <- scope$ir_encode_repertoire(repertoire, cells, rank = FALSE)
+        scope$ir_disk_cache_write(file, value)
+        written <- file.exists(file) &&
+          file.exists(scope$ir_disk_cache_names_file(file))
+        if (written) {
+          list(written = TRUE)
+        } else {
+          list(written = FALSE, value = value)
+        }
+      },
+      repertoire = repertoire,
+      sidecar = sidecar,
+      cell_order = cell_order,
+      cells = if (is.null(cell_order)) {
+        as.character(getMetaData()$cell_barcode)
+      },
+      file = file,
+      read_sidecar = .readRepertoireSidecarFunction(),
+      encode_file = file.path(root, "immune_repertoire", "encode.R"),
+      cache_file = file.path(root, "immune_repertoire", "encoding_cache.R"),
+      ## Most of the encoding of millions of new strings is garbage collection
+      ## while R's heap grows: started larger, the job takes 19 s instead of 27
+      ## for 1.46 million cells, at the same peak memory.
+      .env = c(R_NSIZE = "20000000", R_VSIZE = "1000000000")
+    )
+    return(list(done = FALSE))
+  }
+  if (mirai::unresolved(job)) {
+    return(list(done = FALSE))
+  }
+  rm(list = id, envir = ir_encode_jobs)
+  result <- job$data
+  if (mirai::is_error_value(result) || !is.list(result)) {
+    ## the other process failed: encode here, as before
+    value <- encode_here()
+    if (!is.null(value)) {
+      ir_disk_cache_write(file, value)
+    }
+    return(finish(value))
+  }
+  finish(if (isTRUE(result$written)) ir_disk_cache_read(file) else result$value)
+}
+
+## The clones `ids` of `column` on `chain`: in memory, read from the file an
+## encoding kept between sessions holds them in (ir_disk_cache_read()), or from
+## the Pack's blocks of names that hold them.
 ir_clone_names <- function(encoded, column, chain, ids) {
   names <- encoded$names[[column]][[chain]]
+  if (is.null(names) && is.character(encoded$names_file)) {
+    names <- ir_disk_cache_names(encoded$names_file)[[column]][[chain]]
+  }
   if (!is.null(names)) {
     return(names[ids])
   }
@@ -150,7 +352,20 @@ ir_samples_with_clones <- function(encoded, clone_col) {
 ## The function-specific controls (IR_PARAM_SPEC) are rendered into a dynamic
 ## panel, so an input may be absent on tabs where the parameter doesn't apply.
 ## Returns `default` when the input is missing/empty.
-ir_param <- function(id, default = NULL) {
+## The default of an analysis parameter: its `value` in IR_PARAM_SPEC
+## (param_spec.R), which its control also opens on.
+ir_param_default <- function(id) {
+  for (tab in IR_PARAM_SPEC) {
+    for (spec in tab) {
+      if (identical(spec$id, id)) {
+        return(spec$value)
+      }
+    }
+  }
+  NULL
+}
+
+ir_param <- function(id, default = ir_param_default(id)) {
   v <- input[[id]]
   if (
     is.null(v) ||
@@ -306,64 +521,20 @@ ir_process_cache <- if (exists(".ir_process_cache", inherits = TRUE)) {
   new.env(parent = emptyenv())
 }
 
-## Where an encoding made in memory is kept between sessions: the user cache
-## directory (CEREBRO_IR_CACHE overrides it). The Pack's encoding is the real
-## store; this one spares a data set without it (or with a Pack built before
-## the encoding) the minute of encoding at every start.
-ir_disk_cache_file <- function(name, key) {
-  dir <- Sys.getenv("CEREBRO_IR_CACHE", unset = "")
-  if (!nzchar(dir)) {
-    dir <- file.path(tools::R_user_dir("CerebroNexus", "cache"), "immune")
-  }
-  file.path(
-    dir,
-    paste0(
-      name,
-      "-v",
-      IR_ENCODING_VERSION,
-      "-",
-      rlang::hash(as.character(key$path %||% "")),
-      "-",
-      rlang::hash(key),
-      ".qs2"
+ir_disk_cache_names <- function(names_file) {
+  id <- paste0("names:", names_file)
+  if (!exists(id, envir = ir_process_cache, inherits = FALSE)) {
+    assign(
+      id,
+      tryCatch(qs2::qs_read(names_file), error = function(e) NULL),
+      envir = ir_process_cache
     )
-  )
+  }
+  get(id, envir = ir_process_cache, inherits = FALSE)
 }
 
-ir_disk_cache_read <- function(file) {
-  if (!file.exists(file)) {
-    return(NULL)
-  }
-  value <- tryCatch(qs2::qs_read(file), error = function(e) NULL)
-  if (is.list(value) && identical(value$version, IR_ENCODING_VERSION)) {
-    value
-  }
-}
-
-## Written through a temporary name, so a session that stops half way or reads
-## at the same time never sees a partial file. A failure (a read-only cache) is
-## not an error: the next start encodes again.
-ir_disk_cache_write <- function(file, value) {
-  tryCatch(
-    {
-      dir.create(dirname(file), recursive = TRUE, showWarnings = FALSE)
-      partial <- paste0(file, ".", Sys.getpid(), ".tmp")
-      on.exit(unlink(partial), add = TRUE)
-      qs2::qs_save(value, partial)
-      file.rename(partial, file)
-      ## The data set's earlier entries (another file version, another encoding
-      ## version) are out of date for good.
-      same_path <- sub("-[0-9a-f]+[.]qs2$", "", basename(file))
-      stale <- list.files(
-        dirname(file),
-        pattern = paste0("^", gsub("-v[0-9]+-", "-v[0-9]+-", same_path), "-")
-      )
-      unlink(file.path(dirname(file), setdiff(stale, basename(file))))
-    },
-    error = function(e) NULL
-  )
-  invisible(NULL)
-}
+## ir_disk_cache_file(), ir_disk_cache_names_file(), ir_disk_cache_read() and
+## ir_disk_cache_write(): encoding_cache.R, which the encoding job sources too.
 
 ## compute() once per (name, key) in the process; without a key, every call.
 ## `disk`: also keep the result in the user cache between sessions.
@@ -415,21 +586,63 @@ ir_sharing_unit_choices <- reactive({
 
 
 ## ---- Reactive: parameters --------------------------------------------- ##
-ir_params <- reactive({
-  gb <- input$ir_groupBy
-  if (is.null(gb) || gb == "") {
-    gb <- NULL
+## Clone call, chain and grouping as the plots read them. The toolbar binds
+## these controls only once it is rebuilt for a tab that shows them (Clonal
+## projection hides them), so until a control has bound it stands at the value
+## the toolbar binds it with (settings.R: "gene", "both", None): a tab opened
+## from Clonal projection draws at once. The value is published only when it
+## changes, so that binding, of the same value, re-runs nothing.
+ir_params <- local({
+  resolve <- function() {
+    bound <- isolate(names(input))
+    control <- function(id, default) {
+      value <- input[[id]]
+      if (is.null(value) && !id %in% bound) default else value
+    }
+    gb <- control("ir_groupBy", IR_GLOBAL_DEFAULTS$ir_groupBy)
+    if (is.null(gb) || gb == "") {
+      gb <- NULL
+    }
+    list(
+      cloneCall = control("ir_cloneCall", IR_GLOBAL_DEFAULTS$ir_cloneCall),
+      chain = control("ir_chain", IR_GLOBAL_DEFAULTS$ir_chain),
+      groupBy = gb
+    )
   }
-  list(
-    cloneCall = input$ir_cloneCall,
-    chain = input$ir_chain,
-    groupBy = gb
+  params <- reactiveVal(isolate(resolve()))
+  observe(
+    {
+      value <- resolve()
+      if (!identical(isolate(params()), value)) {
+        params(value)
+      }
+    },
+    priority = 1000
   )
+  params
+})
+
+## Chain and grouping of ir_params() alone, for what the clone call does not
+## change (the SizeDist profiles, Clone Sharing): published only when one of
+## them changes, so a new clone call re-runs neither.
+ir_chain_groupBy <- local({
+  pick <- function() ir_params()[c("chain", "groupBy")]
+  value <- reactiveVal(isolate(pick()))
+  observe(
+    {
+      picked <- pick()
+      if (!identical(isolate(value()), picked)) {
+        value(picked)
+      }
+    },
+    priority = 999
+  )
+  value
 })
 
 ## ---- Resolve chain: for functions that don't accept "both" ------------ ##
 specific_chain <- reactive({
-  ch <- input$ir_chain
+  ch <- ir_chain_groupBy()$chain
   if (is.null(ch) || ch == "both") {
     chains <- ir_encoded()$chains
     if ("TRB" %in% chains) {
@@ -1028,12 +1241,14 @@ ir_clone_size_profiles <- function(
 
 ir_size_distribution_profile <- reactive({
   encoded <- ir_encoded()
-  chain <- req(input$ir_chain)
+  ## Not the clone call: the profiles count the strict clones.
+  pars <- ir_chain_groupBy()
+  chain <- req(pars$chain)
   profiles <- ir_clone_size_profiles(
     encoded,
     chain,
-    ir_row_values(encoded, ir_param("ir_groupBy", NULL)),
-    ir_param("ir_p_sd_threshold", 1)
+    ir_row_values(encoded, pars$groupBy),
+    ir_param("ir_p_sd_threshold")
   )
   # Keep just the current compact matrix, not the large named clone counts.
   if (!is.null(profiles)) {
@@ -1141,6 +1356,39 @@ ir_clonecall_col <- function(cloneCall) {
 ##                deferred key sources. This avoids intermediate data.frames on
 ##                the interactive path. The default preserves the static-plot
 ##                contract.
+## The encoding a Clonal UMAP reads. While another process still encodes the
+## repertoire (its Pack was built before the encoding), a CTgene map is drawn
+## from the Pack's index of each receptor's cells (immune/TCR.qs2: every
+## cell's first row with a clone, and that row's CTgene): the same cells,
+## clones and clone sizes, at once instead of 20 s later.
+## `error`: ir_encoded()'s, raised again when the map needs the encoding.
+ir_clonal_umap_packed <- function(receptor, clone_col, error) {
+  index <- if (identical(clone_col, "CTgene")) {
+    tryCatch(
+      viewerPackImmuneIndex(viewerPackCurrent(), receptor),
+      error = function(e) NULL
+    )
+  }
+  if (
+    !is.list(index) ||
+      !is.integer(index$cell_index) ||
+      length(index$clone) != length(index$cell_index)
+  ) {
+    stop(error)
+  }
+  list(
+    receptor = rep.int(
+      if (identical(receptor, "BCR")) 2L else 1L,
+      length(index$cell_index)
+    ),
+    cell = index$cell_index,
+    clones = list(
+      CTgene = list(both = match(index$clone, unique(index$clone)))
+    ),
+    blank = c(CTgene = NA_integer_)
+  )
+}
+
 ir_clonal_umap_data <- function(
   projection,
   receptor,
@@ -1160,7 +1408,10 @@ ir_clonal_umap_data <- function(
   ) {
     return(NULL)
   }
-  encoded <- ir_encoded()
+  clone_col <- ir_clonecall_col(cloneCall)
+  encoded <- tryCatch(ir_encoded(), validation = function(error) {
+    ir_clonal_umap_packed(receptor, clone_col, error)
+  })
   if (is.null(encoded)) {
     return(NULL)
   }
@@ -1182,115 +1433,37 @@ ir_clonal_umap_data <- function(
   ) {
     max_background <- 100000L
   }
-  visible_indices <- seq_len(nrow(coords))
   ## `cells` are canonical (metadata) rows (ir_umap_cells_to_show()), the
-  ## rows of the canonical coordinates.
-  if (!is.null(cells)) {
-    visible_indices <- visible_indices[visible_indices %in% cells]
-    if (!length(visible_indices)) {
-      return(NULL)
-    }
-  }
-
-  clone_col <- ir_clonecall_col(cloneCall)
-  clone <- encoded$clones[[clone_col]]$both
-  blank <- encoded$blank[[clone_col]]
-  bit <- if (identical(receptor, "BCR")) 2L else 1L
-  rows <- which(
-    bitwAnd(encoded$receptor, bit) > 0L &
-      !is.na(clone) &
-      (is.na(blank) | clone != blank) &
-      !is.na(encoded$cell)
+  ## rows of the canonical coordinates. The cells are chosen in encode.R
+  ## (ir_clonal_frame_cells()), where the Viewer Pack builder chooses the
+  ## default frame's.
+  frame <- ir_clonal_frame_cells(
+    encoded,
+    receptor,
+    clone_col,
+    nrow(coords),
+    IR_CLONE_BINS,
+    cells = cells,
+    show_all = show_all,
+    percentage = percentage,
+    max_background = max_background
   )
-  rows <- rows[!duplicated(encoded$cell[rows])]
-  coord_index <- encoded$cell[rows]
-  clones <- clone[rows]
-  # Display filters and sampling must not redefine the biological clone size.
-  size <- if (length(clones) && min(clones) >= 1L) {
-    ## Clone ids are 1..n_clones: count them in place.
-    tabulate(clones, nbins = max(clones))[clones]
-  } else {
-    tabulate(match(clones, unique(clones)))[match(clones, unique(clones))]
+  if (is.null(frame)) {
+    return(NULL)
   }
-  expansion_code <- findInterval(size, IR_CLONE_BINS, left.open = TRUE)
-  ## Every row is visible unless `cells` narrows them (a lookup of each
-  ## receptor cell in a million-long index otherwise).
-  valid <- coord_index <= nrow(coords)
-  if (!is.null(cells)) {
-    valid <- valid & coord_index %in% visible_indices
-  }
-  coord_index <- coord_index[valid]
-  has_receptor <- length(coord_index) > 0L
-  if (!has_receptor) {
-    # No receptor cells. With show_all we can still draw the grey background;
-    # otherwise there is nothing to plot.
-    if (!isTRUE(show_all)) {
-      return(NULL)
-    }
-    expansion <- factor(levels = IR_CLONE_LABELS)
-  } else {
-    expansion <- factor(
-      expansion_code[valid],
+  coord_index <- idx <- frame$coloured
+  bg_idx <- frame$background
+  expansion <- if (length(coord_index)) {
+    factor(
+      frame$code,
       levels = seq_along(IR_CLONE_LABELS),
       labels = IR_CLONE_LABELS
     )
-  }
-  receptor_indices <- unique(coord_index)
-
-  # Coloured layer: receptor cells with an expansion level, joined to coords.
-  if (has_receptor) {
-    idx <- coord_index
-    keep_n <- min(length(idx), ceiling(length(idx) * percentage / 100))
-    if (keep_n < length(idx)) {
-      keep <- if (keep_n > 0L) {
-        unique(as.integer(round(seq(1, length(idx), length.out = keep_n))))
-      } else {
-        integer()
-      }
-      coord_index <- coord_index[keep]
-      expansion <- expansion[keep]
-      idx <- idx[keep]
-    }
   } else {
-    idx <- integer(0)
-  }
-  if (length(idx) == 0 && !isTRUE(show_all)) {
-    return(NULL)
+    factor(levels = IR_CLONE_LABELS)
   }
   coord_x <- if (is.data.frame(coords)) coords[[1L]] else coords[, 1L]
   coord_y <- if (is.data.frame(coords)) coords[[2L]] else coords[, 2L]
-  # Background layer: every other cell in the projection, expansion = NA, so the
-  # renderer can draw them in grey. Only when show_all is requested.
-  bg_idx <- integer()
-  if (isTRUE(show_all)) {
-    bg_mask <- if (is.null(cells)) {
-      rep(TRUE, nrow(coords))
-    } else {
-      mask <- rep(FALSE, nrow(coords))
-      mask[visible_indices] <- TRUE
-      mask
-    }
-    bg_mask[receptor_indices] <- FALSE
-    if (any(bg_mask)) {
-      bg_idx <- which(bg_mask)
-      target <- min(
-        length(bg_idx),
-        ceiling(length(bg_idx) * percentage / 100),
-        as.integer(max_background)
-      )
-      if (target < length(bg_idx)) {
-        keep <- if (target > 0L) {
-          unique(as.integer(round(seq(1, length(bg_idx), length.out = target))))
-        } else {
-          integer()
-        }
-        bg_idx <- bg_idx[keep]
-      }
-    }
-  }
-  if (length(bg_idx) + length(idx) == 0L) {
-    return(NULL)
-  }
   if (isTRUE(split_output)) {
     expansion_codes <- as.integer(expansion)
     visible_expansions <- sort(unique(expansion_codes))
@@ -1334,6 +1507,132 @@ ir_clonal_umap_data <- function(
   )
 }
 
+
+## The default Clonal projection frame of `receptor` as the Viewer Pack stores
+## it (R/viewer_pack.R, .viewerPackImmuneClonalFrames()): its canonical rows in
+## the order they are painted and each row's trace, in two files beside the
+## projection's coordinates. The frame then names these files instead of
+## carrying the coordinates and rows, and needs no encoded repertoire. NULL
+## when the Pack has no valid frame of `receptor` (a Pack built before them),
+## the projection no 2-D Pack asset, the frame is small, or the browser failed
+## to read one of the files (`failed`, its URL): the frame is built as before.
+## The default frame only: every cell (no Group filter), "Show all cells",
+## 100 % of cells and clone call "gene"; the caller checks those.
+ir_clonal_frame_resource <- function(projection, receptor, failed = NULL) {
+  pack <- viewerPackCurrent()
+  if (
+    !viewerPackCanonical(pack) ||
+      !isTRUE(
+        projection %in%
+          tryCatch(availableProjections(), error = function(e) character())
+      )
+  ) {
+    return(NULL)
+  }
+  frame <- viewerPackImmuneClonalFrame(
+    pack,
+    receptor,
+    "CTgene",
+    version = IR_CLONAL_FRAME_VERSION,
+    bins = IR_CLONE_BINS,
+    max_background = 100000L
+  )
+  ## A small frame goes in one message with its cell names (see
+  ## cerebroCellViewRender()).
+  if (is.null(frame) || frame$cells < 4096L) {
+    return(NULL)
+  }
+  geometry <- viewerProjectionAsset(projection)
+  if (!is.list(geometry) || !identical(as.integer(geometry$dimensions), 2L)) {
+    return(NULL)
+  }
+  prefix <- viewerStaticResourcePrefix(
+    "immune-clonal",
+    dirname(frame$codes$file)
+  )
+  url <- function(asset) paste0(prefix, "/", basename(asset$file))
+  traces <- ifelse(
+    frame$trace_codes == 0L,
+    "Other cells",
+    IR_CLONE_LABELS[pmax(frame$trace_codes, 1L)]
+  )
+  canonical_cells <- as.integer(pack$cell_count)
+  ## The Trajectory page's frame descriptor (viewerTrajectoryFrameAsset() in
+  ## shiny_server.R), which the browser draws from a canonical projection, the
+  ## subset of its rows and one code per row.
+  resource <- c(
+    list(
+      protocol = "trajectory-frame-v1",
+      cells = frame$cells,
+      canonical_cells = canonical_cells,
+      geometry_kind = "canonical_projection",
+      projection = geometry,
+      subset = list(
+        protocol = "canonical-subset-v1",
+        kind = "include_uint32",
+        canonical_cells = canonical_cells,
+        cells = frame$cells,
+        index_base = 0L,
+        dtype = "uint32",
+        bytes = frame$subset$bytes,
+        checksum = frame$subset$checksum,
+        url = url(frame$subset)
+      ),
+      state = list(
+        url = url(frame$codes),
+        cells = frame$cells,
+        dtype = "uint8",
+        bytes = frame$codes$bytes,
+        checksum = frame$codes$checksum,
+        levels = I(traces)
+      )
+    ),
+    viewerCanonicalResourceIdentity(pack)
+  )
+  if (
+    length(failed) == 1L &&
+      !is.na(failed) &&
+      failed %in% c(geometry$url, resource$subset$url, resource$state$url)
+  ) {
+    return(NULL)
+  }
+  list(
+    resource = resource,
+    traces = traces,
+    colors = ifelse(
+      traces == "Other cells",
+      "#D9D9D9",
+      unname(IR_EXPANSION_COLORS[traces])
+    ),
+    cells = frame$cells,
+    subset_file = frame$subset$file
+  )
+}
+
+## The canonical rows (0-based, in frame order) of a Viewer Pack Clonal
+## projection frame (ir_clonal_frame_resource()), read from its subset file.
+ir_clonal_frame_rows <- function(frame) {
+  rows <- tryCatch(
+    readBin(
+      frame$subset_file,
+      "integer",
+      n = frame$cells,
+      size = 4L,
+      endian = "little"
+    ),
+    error = function(error) NULL
+  )
+  cells <- tryCatch(viewerPackCurrent()$cell_count, error = function(e) NULL)
+  if (
+    length(rows) != frame$cells ||
+      anyNA(rows) ||
+      !is.numeric(cells) ||
+      any(rows < 0L | rows >= cells)
+  ) {
+    return(NULL)
+  }
+  rows
+}
 
 ## The cell names of a Clonal UMAP frame's canonical rows.
 ir_clonal_umap_barcodes <- function(data) {

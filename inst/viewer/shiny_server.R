@@ -38,6 +38,31 @@ viewerFirstViewPublishKept(Cerebro.options)
 ## sessions instead of reading the same sheet again for every browser tab.
 .extra_material_process_cache <- new.env(parent = emptyenv())
 
+## The gene ID tables of the Gene ID conversion page (inst/extdata), read once
+## per process: decompressing one takes 0.1 s, and the page read it again at
+## every render.
+.gene_id_tables <- new.env(parent = emptyenv())
+viewerGeneIdTable <- function(organism) {
+  file <- c(
+    mouse = "mm10_gene_ID_name.tsv.xz",
+    human = "hg38_gene_ID_name.tsv.xz"
+  )[
+    organism
+  ]
+  if (length(file) != 1L || is.na(file)) {
+    return(NULL)
+  }
+  if (is.null(.gene_id_tables[[organism]])) {
+    .gene_id_tables[[organism]] <- utils::read.table(
+      file.path(Cerebro.options$cerebro_root, "extdata", file),
+      sep = "\t",
+      header = TRUE,
+      stringsAsFactors = FALSE
+    )
+  }
+  .gene_id_tables[[organism]]
+}
+
 ## Process-owned query/cache functions do not capture a browser session.
 viewerSource(cerebro_root_path("viewer/msigdb.R"), environment())
 viewerSource(cerebro_root_path("viewer/crb_cache.R"), environment())
@@ -99,6 +124,9 @@ viewerCellNamesKept <- function(fingerprint, n, target) {
 ## choices scanned from the whole repertoire), shared by every session of the
 ## process that opens the same files (see ir_process_memo()).
 .ir_process_cache <- new.env(parent = emptyenv())
+## The jobs encoding a repertoire in another R process (ir_encoded_background()),
+## one per data set for every session of the process.
+.ir_encode_jobs <- new.env(parent = emptyenv())
 ## Evaluated in a mirai daemon with `cells` (or NULL and the Pack's
 ## `asset_file`), the cell count `n`, the target `file` and, to keep the file
 ## for later processes, the directory `keep` and the `fingerprint` of the cell
@@ -497,27 +525,12 @@ server <- function(input, output, session) {
     }
   })
 
-  viewer_initial_page_tabs <- c(
-    data_info = "loadData",
-    projection = "overview",
-    linked_views = "coordinated_views",
-    groups = "groups",
-    marker_genes = "markerGenes",
-    most_expressed_genes = "mostExpressedGenes",
-    enriched_pathways = "enrichedPathways",
-    extra_material = "extra_material",
-    immune_repertoire = "immune_repertoire",
-    trajectory = "trajectory",
-    spatial = "spatial",
-    trekker = "trekker",
-    hla_tcr_motifs = "hla_tcr_motifs",
-    gene_expression = "geneExpression",
-    gene_id_conversion = "geneIdConversion",
-    color_management = "color_management",
-    about = "about"
-  )
-  initial_page <- Cerebro.options[["initial_page"]]
-  ## A `?page=<id>` link overrides the author's initial page for this visit.
+  ## page ID -> sidebar tab (viewerPageTabs() in viewer/core/shared_resources.R)
+  viewer_initial_page_tabs <- viewerPageTabs()
+  ## The author's start page, Data info without one (viewerStartPage() in
+  ## viewer/core/shared_resources.R).
+  initial_page <- viewerStartPage(Cerebro.options)
+  ## A `?page=<id>` link overrides the start page for this visit.
   url_page <- viewerPageFromQuery(
     isolate(session$clientData$url_search),
     names(viewer_initial_page_tabs)
@@ -534,17 +547,9 @@ server <- function(input, output, session) {
   } else {
     NULL
   }
-  conditional_tabs <- unname(viewer_initial_page_tabs[c(
-    "linked_views",
-    "marker_genes",
-    "most_expressed_genes",
-    "enriched_pathways",
-    "extra_material",
-    "immune_repertoire",
-    "trajectory",
-    "spatial",
-    "trekker",
-    "hla_tcr_motifs"
+  conditional_tabs <- unname(viewer_initial_page_tabs[setdiff(
+    names(viewer_initial_page_tabs),
+    viewerPagesAlways()
   )])
   initial_page_applied <- reactiveVal(FALSE)
   ## Keep the address bar on the page being read, so the copied URL reopens it.
@@ -1384,11 +1389,37 @@ server <- function(input, output, session) {
     viewer_loaded_dataset_context()$dataset_key
   })
 
+  ## Whether a data set is loaded, for work that must not load one itself
+  ## (the pages prepared while the session is quiet, below).
+  viewer_dataset_ready <- FALSE
   observe(
     {
       snapshot <- viewer_dataset_snapshot()
+      viewer_dataset_ready <<- isTRUE(snapshot$ok)
       if (isTRUE(snapshot$ok)) {
         viewer_send_dataset_phase("ready", snapshot$dataset_context)
+        ## Behind Data info, the Projection's code (which sends its first
+        ## frame, overview/event_projection_update_plot.R) is loaded as soon
+        ## as Data info has been sent, not after the session has been quiet
+        ## for the other pages' work: a click a second later finds the frame.
+        if (identical(isolate(input[["sidebar"]]), "loadData")) {
+          session$onFlushed(
+            function() {
+              later::later(function() {
+                if (
+                  !session$isClosed() &&
+                    identical(isolate(input[["sidebar"]]), "loadData")
+                ) {
+                  shiny::withReactiveDomain(
+                    session,
+                    load_deferred_viewer_server("overview/server.R")
+                  )
+                }
+              })
+            },
+            once = TRUE
+          )
+        }
       } else {
         warning(
           "Viewer data set failed to load: ",
@@ -1568,7 +1599,8 @@ server <- function(input, output, session) {
         isolate(session$clientData$url_search),
         viewer_shared_resource_roots,
         viewerFirstViewBasis(Cerebro.options),
-        viewer_first_view_source()
+        viewer_first_view_source(),
+        viewerStartPage(Cerebro.options)
       ),
       silent = TRUE
     )
@@ -1876,6 +1908,7 @@ server <- function(input, output, session) {
     resource_url <- function(file) paste0(prefix, "/", basename(file))
     if (!is.null(subset) && !identical(subset$kind, "identity")) {
       subset$url <- resource_url(subset_asset$file)
+      assign(subset$url, subset_asset$file, envir = viewer_trajectory_subsets)
     }
     descriptor <- c(
       list(
@@ -1909,6 +1942,53 @@ server <- function(input, output, session) {
     )
     assign(key, descriptor, envir = viewer_trajectory_resources)
     descriptor
+  }
+  ## The subset file of each trajectory frame resource, by its URL.
+  viewer_trajectory_subsets <- new.env(parent = emptyenv())
+  ## The canonical rows (0-based, in frame order) of a trajectory frame drawn
+  ## from a Viewer Pack subset, read from that file; NULL for an identity
+  ## frame (whose rows travel as a range) or a frame of its own geometry.
+  viewerTrajectoryFrameRows <- function(resource) {
+    subset <- resource$subset
+    if (
+      !is.list(subset) ||
+        !isTRUE(subset$kind %in% c("include_uint32", "exclude_uint32"))
+    ) {
+      return(NULL)
+    }
+    url <- as.character(subset$url %||% "")
+    if (!exists(url, envir = viewer_trajectory_subsets, inherits = FALSE)) {
+      return(NULL)
+    }
+    canonical <- as.integer(subset$canonical_cells)
+    count <- if (identical(subset$kind, "include_uint32")) {
+      as.integer(subset$cells)
+    } else {
+      canonical - as.integer(subset$cells)
+    }
+    stored <- tryCatch(
+      readBin(
+        get(url, envir = viewer_trajectory_subsets, inherits = FALSE),
+        "integer",
+        n = count,
+        size = 4L,
+        endian = "little"
+      ),
+      error = function(error) NULL
+    )
+    if (
+      length(stored) != count ||
+        anyNA(stored) ||
+        any(stored < 0L | stored >= canonical)
+    ) {
+      return(NULL)
+    }
+    if (identical(subset$kind, "include_uint32")) {
+      return(stored)
+    }
+    keep <- rep(TRUE, canonical)
+    keep[stored + 1L] <- FALSE
+    which(keep) - 1L
   }
   ## Spatial coordinates have their own physical coordinate system and row
   ## order. Publish only a Viewer Pack asset whose canonical cell mapping is an
@@ -2466,6 +2546,18 @@ server <- function(input, output, session) {
   ##--------------------------------------------------------------------------##
   ## Dynamic sidebar: show/hide conditional tabs based on dataset content.
   ##--------------------------------------------------------------------------##
+  ## The pages the loaded data set has: those every data set has, and the
+  ## conditional ones as toggleConditionalTab() finds them.
+  viewer_page_available <- list2env(
+    list(
+      groups = TRUE,
+      geneExpression = TRUE,
+      color_management = TRUE,
+      geneIdConversion = TRUE,
+      about = TRUE
+    ),
+    parent = emptyenv()
+  )
   toggleConditionalTab <- function(
     tab_name,
     check_fn,
@@ -2504,6 +2596,7 @@ server <- function(input, output, session) {
     })
     observe({
       should_show <- show_reactive()
+      viewer_page_available[[tab_name]] <- isTRUE(should_show)
       shinyjs::toggle(id = item_id, condition = should_show)
       if (
         !isTRUE(should_show) && identical(isolate(input[["sidebar"]]), tab_name)
@@ -2723,78 +2816,337 @@ server <- function(input, output, session) {
     },
     ignoreInit = FALSE
   )
-  ## A new process hashed each Viewer Pack file a page reads on the page's
-  ## first open. Hash them while Data info is shown.
-  session$onFlushed(
-    function() {
-      signature <- viewerPackSourceSignature(
-        isolate(viewer_dataset_request())$target
-      )
-      pack <- if (!is.null(signature)) {
-        .viewer_pack_process_cache[[signature$key]]$descriptor
-      }
-      assets <- if (is.list(pack)) {
-        file.path(pack$path, pack$manifest$assets$path)
-      }
-      tasks <- lapply(assets, function(path) function() .viewerFileMd5(path))
-      names(tasks) <- assets
-      viewerIdleRun(tasks, function() {
-        !session$isClosed() &&
-          identical(isolate(input[["sidebar"]]) %||% "loadData", "loadData")
-      })
-    },
-    once = TRUE
-  )
-
   ## What keeps something for the next start waits for the sessions to be quiet
   ## (R/quiet_queue.R).
   if (exists(".viewerSessionActivity", mode = "function")) {
     session$onFlushed(function() .viewerSessionActivity(), once = FALSE)
   }
 
-  ## launchCerebro() starts without the packages only some pages use
-  ## (`.idle_packages`: plotly, Matrix, ...). Load them once this session has
-  ## sent nothing for three seconds, one per turn of the event loop, and stop
-  ## as soon as it is busy again: the first page is never delayed, and a click
-  ## waits for one package at most. An App that attaches its packages has
-  ## nothing to load here.
+  ## Work a page would otherwise do when it is first opened, done while the
+  ## visitor reads the first one: once this session has sent nothing for three
+  ## seconds, one task per turn of the event loop, stopping as soon as the
+  ## session is busy again (a click waits for one task at most), and going on
+  ## at the next quiet moment.
+  ## - the packages only some pages use (`.idle_packages`: plotly, Matrix, ...),
+  ##   which launchCerebro() starts without; an App that attaches its packages
+  ##   has none to load;
+  ## - the checksums of the data set's Viewer Pack files, which a new process
+  ##   computes for each file a page reads (they were hashed while Data info was
+  ##   shown, the start page before the Projection);
+  ## - the sorted gene list the gene selectors share (a locale sort of the
+  ##   transcriptome, .viewer_sorted_gene_choices()), and the gene ID table
+  ##   Gene ID conversion opens with;
+  ## - the server code of the pages the data set has: sourced, its observers
+  ##   made and run once, and compiled (the first session is not compiled while
+  ##   it starts, see R/launchCerebro.R). The HLA & TCR motifs page only with a
+  ##   Viewer Pack that has its first frame, which is then read too: without
+  ##   one, its first view computes from the repertoire. The Immune repertoire
+  ##   page reads the Pack's encoding of the repertoire, or, first of all, has
+  ##   another R process encode it.
+  ## The packages to load and, before each, the packages it imports that are
+  ## not loaded yet, in the order loadNamespace() would load them: one task
+  ## each. Loading plotly in one call held the session 0.35 to 1.2 s and a
+  ## click made meanwhile waited for all of it; one package at a time, a click
+  ## waits for one. Matrix only for a data set that keeps a sparse matrix in
+  ## memory (an H5 file's rows are read as plain vectors).
   viewer_idle_packages <- function() {
-    setdiff(Cerebro.options[[".idle_packages"]], loadedNamespaces())
+    packages <- Cerebro.options[[".idle_packages"]]
+    h5 <- tryCatch(
+      identical(isolate(data_set())$expression_backend$type, "h5"),
+      error = function(error) FALSE
+    )
+    if (isTRUE(h5)) {
+      packages <- setdiff(packages, "Matrix")
+    }
+    viewer_package_load_order(packages)
   }
-  if (length(viewer_idle_packages())) {
-    viewer_idle_quiet <- FALSE
-    viewer_idle_cancel <- function() NULL
-    viewer_idle_load <- function() {
-      packages <- viewer_idle_packages()
-      if (session$isClosed() || !length(packages)) {
-        return()
+  ## The packages `package`'s NAMESPACE imports: those loadNamespace() loads
+  ## with it. Not the DESCRIPTION's Depends and Imports, which also name
+  ## packages only used through `pkg::` (DT, plotly, Matrix, colourpicker and
+  ## shinycssloaders: 57 packages instead of 26, rmarkdown, knitr and stringi
+  ## among them, which a Viewer session never loads).
+  viewer_package_imports <- function(package) {
+    cache <- get0(
+      ".viewer_package_imports_cache",
+      mode = "environment",
+      inherits = TRUE
+    )
+    if (!is.null(cache) && exists(package, envir = cache, inherits = FALSE)) {
+      return(get(package, envir = cache, inherits = FALSE))
+    }
+    imports <- viewer_package_imports_read(package)
+    if (!is.null(cache)) {
+      assign(package, imports, envir = cache)
+    }
+    imports
+  }
+  viewer_package_imports_read <- function(package) {
+    path <- system.file(package = package)
+    namespace <- tryCatch(
+      parseNamespaceFile(basename(path), dirname(path), mustExist = FALSE),
+      error = function(error) NULL,
+      warning = function(warning) NULL
+    )
+    if (is.null(namespace)) {
+      return(character())
+    }
+    unique(vapply(
+      c(namespace$imports, namespace$importClasses, namespace$importMethods),
+      function(import) as.character(import[[1L]]),
+      ""
+    ))
+  }
+  viewer_package_load_order <- function(packages) {
+    base <- c(
+      "R",
+      "base",
+      "compiler",
+      "datasets",
+      "grDevices",
+      "graphics",
+      "grid",
+      "methods",
+      "parallel",
+      "splines",
+      "stats",
+      "stats4",
+      "tcltk",
+      "tools",
+      "utils"
+    )
+    order <- character()
+    visit <- function(package, path) {
+      if (
+        package %in%
+          c(base, order, path) ||
+          package %in% loadedNamespaces() ||
+          !nzchar(system.file(package = package))
+      ) {
+        return(invisible(NULL))
       }
-      viewer_idle_quiet <<- TRUE
-      tasks <- lapply(packages, function(package) {
+      for (import in viewer_package_imports(package)) {
+        visit(import, c(path, package))
+      }
+      order <<- c(order, package)
+      invisible(NULL)
+    }
+    for (package in packages) {
+      visit(package, character())
+    }
+    order
+  }
+  viewer_idle_pack <- function() {
+    signature <- tryCatch(
+      viewerPackSourceSignature(isolate(viewer_dataset_request())$target),
+      error = function(error) NULL
+    )
+    pack <- if (!is.null(signature)) {
+      .viewer_pack_process_cache[[signature$key]]$descriptor
+    }
+    if (is.list(pack)) pack
+  }
+  viewer_idle_pack_assets <- function() {
+    pack <- viewer_idle_pack()
+    if (is.list(pack)) file.path(pack$path, pack$manifest$assets$path)
+  }
+  ## The Immune repertoire page reads the repertoire as soon as it is loaded:
+  ## from the Viewer Pack's integer encoding (0.1 s for 1.46 million cells), or,
+  ## without a Pack or with one built before that encoding, by encoding it
+  ## (immune_repertoire/data.R).
+  viewer_idle_immune_fast <- function() {
+    pack <- viewer_idle_pack()
+    is.list(pack) &&
+      length(pack$manifest$immune_receptors) > 0L &&
+      exists(".viewerPackImmuneOutdated", mode = "function") &&
+      isFALSE(tryCatch(
+        .viewerPackImmuneOutdated(pack$manifest),
+        error = function(error) NA
+      ))
+  }
+  ## The HLA & TCR motifs page's code only makes observers that wait for the
+  ## page to be shown. Its first view is drawn from the Viewer Pack's first
+  ## frame of the chain it opens on (hla_tcr/TRB.first.v3.qs2, 1 MB for 1.46
+  ## million cells), or, without a valid one, built from the repertoire (motif
+  ## graph, segments): prepared only in the first case.
+  viewer_idle_hla_fast <- function() {
+    pack <- viewer_idle_pack()
+    chains <- intersect(
+      as.character(pack$manifest$hla_chains),
+      c("TRA", "TRB")
+    )
+    if (!length(chains)) {
+      return(FALSE)
+    }
+    chain <- if ("TRB" %in% chains) "TRB" else chains[[1L]]
+    path <- viewerPackHlaFirstFramePath(pack, chain)
+    !is.null(path) &&
+      !is.null(tryCatch(
+        viewerPackVerifiedAsset(pack, path),
+        error = function(error) NULL
+      ))
+  }
+  viewer_prewarm_pages <- c(
+    "groups",
+    "geneExpression",
+    "coordinated_views",
+    "trajectory",
+    "color_management",
+    "geneIdConversion",
+    "about",
+    "markerGenes",
+    "mostExpressedGenes",
+    "enrichedPathways",
+    "extra_material",
+    "spatial",
+    "trekker"
+  )
+  viewer_idle_tasks <- function() {
+    tasks <- list()
+    for (path in viewer_idle_pack_assets()) {
+      tasks[[path]] <- local({
+        path <- path
+        function() .viewerFileMd5(path)
+      })
+    }
+    ## Only once the data set is loaded: before, a page cannot know what it
+    ## shows, and its sidebar item may still be hidden.
+    if (isTRUE(viewer_dataset_ready)) {
+      tasks[["gene ID table"]] <- function() viewerGeneIdTable("mouse")
+      tasks[[paste("sort genes", session$token)]] <- function() {
+        genes <- isolate(getGeneNames())
+        if (length(genes)) {
+          .viewer_sorted_gene_choices(list(genes), function() sort(genes))
+        }
+      }
+      ## A repertoire without the Pack's encoding is encoded by another R
+      ## process (immune_repertoire/data.R) in 10 s and more: started first,
+      ## so that it is done by the time it is looked at.
+      immune_first <- !viewer_idle_immune_fast()
+      pages <- if (immune_first) {
+        c("immune_repertoire", viewer_prewarm_pages)
+      } else {
+        c(viewer_prewarm_pages, "immune_repertoire")
+      }
+      hla_fast <- viewer_idle_hla_fast()
+      if (hla_fast) {
+        pages <- c(pages, "hla_tcr_motifs")
+      }
+      ## The Projection first of all, behind Data info (the start page): its
+      ## code sends the page's first frame, which the browser keeps until the
+      ## page is first shown (overview/event_projection_update_plot.R).
+      pages <- c("overview", pages)
+      encoding_task <- paste("immune encoding", session$token)
+      encoding <- function() {
+        encoded <- server_scope$ir_encoded
+        if (is.function(encoded)) {
+          isolate(encoded())
+        }
+      }
+      for (page in pages) {
+        server_file <- deferred_viewer_server_files[[page]]
+        if (
+          !isTRUE(viewer_page_available[[page]]) ||
+            exists(server_file, envir = deferred_viewer_server_loaded)
+        ) {
+          next
+        }
+        tasks[[paste("page", session$token, page)]] <- local({
+          server_file <- server_file
+          function() load_deferred_viewer_server(server_file)
+        })
+        if (identical(page, "immune_repertoire")) {
+          tasks[[encoding_task]] <- encoding
+        }
+      }
+      ## The repertoire's encoding: read from the Pack (0.08 s for 1.46 million
+      ## cells) by the first plot of the Immune repertoire page, or started.
+      if (
+        isTRUE(viewer_page_available[["immune_repertoire"]]) &&
+          is.null(tasks[[encoding_task]])
+      ) {
+        tasks[[encoding_task]] <- encoding
+      }
+      ## The motifs page's first frame, read from the Pack and kept in the
+      ## session's cache (hla_first_frame(), hla_tcr_motifs/data.R), which its
+      ## first view reads. After the page's own task, which defines it.
+      if (hla_fast && isTRUE(viewer_page_available[["hla_tcr_motifs"]])) {
+        tasks[[paste("hla first frame", session$token)]] <- function() {
+          first <- server_scope$hla_first_frame
+          if (is.function(first)) {
+            isolate(first())
+          }
+        }
+      }
+    }
+    ## The packages last, after the pages' own work: a page opened early finds
+    ## its code loaded, and a package is loaded when its first output renders
+    ## (viewerLazyRender()) if the visitor gets there first.
+    for (package in viewer_idle_packages()) {
+      tasks[[paste("load package", package)]] <- local({
+        package <- package
         function() loadNamespace(package)
       })
-      names(tasks) <- paste0("load package ", packages)
-      viewerIdleRun(tasks, function() {
-        !session$isClosed() && viewer_idle_quiet
-      })
     }
-    viewer_idle_flushed <- function() {
-      viewer_idle_quiet <<- FALSE
-      viewer_idle_cancel()
-      if (!length(viewer_idle_packages())) {
-        return()
+    ## The first loading spinner of a process costs 0.05 s to build (its CSS),
+    ## every later one 2 ms: the Immune repertoire page draws several.
+    tasks[["first spinner"]] <- function() {
+      if ("shinycssloaders" %in% loadedNamespaces()) {
+        shinycssloaders::withSpinner(shiny::div())
       }
-      viewer_idle_cancel <<- later::later(viewer_idle_load, 3)
-      session$onFlushed(viewer_idle_flushed, once = TRUE)
     }
-    session$onFlushed(viewer_idle_flushed, once = TRUE)
-    session$onSessionEnded(function() viewer_idle_cancel())
+    tasks
   }
+  ## Quiet means no input from the browser: a click, or a page asking for its
+  ## next frame. A task's own output (a page's code renders what it shows
+  ## anyway) does not end it.
+  viewer_idle_quiet <- FALSE
+  viewer_idle_cancel <- function() NULL
+  viewer_idle_run <- function() {
+    if (session$isClosed()) {
+      return()
+    }
+    tasks <- viewer_idle_tasks()
+    ## done once per process (viewerIdleRun())
+    tasks <- tasks[!names(tasks) %in% ls(.viewer_idle_done, all.names = TRUE)]
+    if (!length(tasks)) {
+      return()
+    }
+    ## In the session's domain, as when a page is opened: the observers and
+    ## outputs a page's code makes belong to the session (they end with it, and
+    ## a cache bound to the session finds it), not to the later() callback.
+    tasks <- lapply(tasks, function(task) {
+      function() shiny::withReactiveDomain(session, task())
+    })
+    viewer_idle_quiet <<- TRUE
+    viewerIdleRun(
+      tasks,
+      function() {
+        !session$isClosed() && viewer_idle_quiet
+      },
+      ## a page that became available meanwhile is in the next list
+      done = function() {
+        if (viewer_idle_quiet) {
+          viewer_idle_cancel <<- later::later(viewer_idle_run, 0.05)
+        }
+      }
+    )
+  }
+  viewer_idle_activity <- function(...) {
+    viewer_idle_quiet <<- FALSE
+    viewer_idle_cancel()
+    viewer_idle_cancel <<- later::later(viewer_idle_run, 3)
+    invisible(NULL)
+  }
+  session$onFlushed(viewer_idle_activity, once = TRUE)
+  session$onInputReceived(viewer_idle_activity)
+  session$onSessionEnded(function() viewer_idle_cancel())
 
   ##--------------------------------------------------------------------------##
   ## Export reactive values for testing (shinytest2).
   ##--------------------------------------------------------------------------##
   exportTestValues(
+    ## the pages whose server code is loaded (opened, or prepared while quiet)
+    loaded_pages = sort(ls(deferred_viewer_server_loaded)),
     overview_cells_to_show = {
       load_deferred_viewer_server("overview/server.R")
       if (is.null(data_set())) {

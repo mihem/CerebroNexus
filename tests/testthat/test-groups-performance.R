@@ -35,6 +35,9 @@ test_that("Groups reads only the active columns after its viewport gate", {
       }
       available_crb_files <- list(selected = "tiny")
       cerebroRegisterInfo <- function(...) NULL
+      ## Page code reads the group control through viewerControlValue()
+      ## (select_group.R); here it is the input itself.
+      groups_selected_group <- function() input[["groups_selected_group"]]
       ## The metric outputs are created in a loop, which viewer_server_load()
       ## skips, so source the whole file.
       sys.source(viewer_test_path("groups", "expression_metrics.R"), scope)
@@ -217,6 +220,47 @@ test_that("single-group controls keep expression metrics usable across dataset c
       groups(character())
       session$flushReact()
       expect_match(output$groups_controls_UI$html, "No grouping variables")
+    }
+  )
+})
+
+test_that("Groups composition starts with the values its controls bind with", {
+  withr::local_package("shiny")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      viewer_runtime_env(scope)
+      getGroups <- function() c("sample", "condition", "cluster")
+      sys.source(viewer_test_path("groups", "select_group.R"), scope)
+      runs <- 0L
+      observe({
+        groups_selected_group()
+        groups_by_other_group_second_group()
+        groups_by_other_group_show_as_percent()
+        runs <<- runs + 1L
+      })
+    },
+    {
+      session$flushReact()
+      ## Before the controls reach the browser: what they will bind with.
+      expect_identical(groups_selected_group(), "sample")
+      expect_identical(groups_by_other_group_second_group(), "condition")
+      expect_false(groups_by_other_group_show_as_percent())
+      html <- output$groups_controls_UI$html
+      expect_match(html, '<option value="sample" selected>', fixed = TRUE)
+      expect_match(html, '<option value="condition" selected>', fixed = TRUE)
+      ## Their binding with those values invalidates nothing.
+      runs_before <- scope$runs
+      expect_gt(runs_before, 0L)
+      session$setInputs(
+        groups_selected_group = "sample",
+        groups_by_other_group_second_group = "condition",
+        groups_by_other_group_show_as_percent = FALSE
+      )
+      expect_identical(scope$runs, runs_before)
+      session$setInputs(groups_by_other_group_second_group = "cluster")
+      expect_identical(groups_by_other_group_second_group(), "cluster")
+      expect_identical(scope$runs, runs_before + 1L)
     }
   )
 })

@@ -47,7 +47,7 @@ viewerPackOpen <- function(file) {
       !identical(manifest$schema_version, VIEWER_PACK_SCHEMA_VERSION) ||
       !identical(
         manifest$dataset_fingerprint,
-        paste0("md5-crb-v1:", unname(tools::md5sum(file)))
+        paste0("md5-crb-v1:", .viewerCrbMd5(file))
       )
   ) {
     return(NULL)
@@ -147,6 +147,102 @@ viewerPackOpenCached <- function(file, cache) {
     format(as.numeric(info$mtime), digits = 17),
     sep = "\r"
   )
+}
+## The md5 of a CRB, which names the data set its Viewer Pack was built from.
+## Hashing a large CRB takes about 0.7 s per 380 MB, and every start of the
+## Viewer did it before reading the data set: kept in the user cache by file
+## version, so a later start of the same file reads it back. A file replaced by
+## another of the same size and modification time (cp -p, rsync -a, an archive
+## unpacked) must not keep the old md5, or the Pack of the old data would be
+## taken for it: the version also has the status change time (which a copy
+## cannot set on Unix), and a stored md5 is used only while the first and last
+## MiB of the file still hash as they did (.viewerCrbSample()).
+.viewerCrbMd5 <- function(file) {
+  info <- suppressWarnings(file.info(file, extra_cols = FALSE))
+  if (is.na(info$size) || isTRUE(info$isdir)) {
+    return(unname(tools::md5sum(file)))
+  }
+  key <- .viewerFileVersionKey(normalizePath(file, winslash = "/"), info)
+  version_line <- paste(
+    normalizePath(file, winslash = "/"),
+    info$size,
+    format(as.numeric(info$mtime), digits = 17),
+    format(as.numeric(info$ctime), digits = 17),
+    sep = "\t"
+  )
+  cached <- .viewer_file_md5_cache[[key]]
+  if (!is.null(cached)) {
+    return(cached)
+  }
+  store <- tryCatch(
+    file.path(
+      tools::R_user_dir("CerebroNexus", "cache"),
+      "crb-md5",
+      paste0(.viewerCrbMd5Key(key), ".txt")
+    ),
+    error = function(error) NULL
+  )
+  sample <- NULL
+  value <- if (!is.null(store) && file.exists(store)) {
+    stored <- tryCatch(
+      readLines(store, n = 3L, warn = FALSE),
+      error = function(error) character()
+    )
+    ## The file version, the hash of its first and last MiB, its md5.
+    if (
+      length(stored) == 3L &&
+        identical(stored[[1L]], version_line) &&
+        grepl("^[0-9a-f]{32}$", stored[[3L]])
+    ) {
+      sample <- .viewerCrbSample(file, info$size)
+      if (identical(stored[[2L]], sample)) stored[[3L]]
+    }
+  }
+  if (is.null(value)) {
+    value <- unname(tools::md5sum(file))
+    if (!is.na(value) && !is.null(store)) {
+      tryCatch(
+        {
+          dir.create(dirname(store), recursive = TRUE, showWarnings = FALSE)
+          temporary <- paste0(store, ".", Sys.getpid(), ".tmp")
+          if (is.null(sample)) {
+            sample <- .viewerCrbSample(file, info$size)
+          }
+          writeLines(
+            c(version_line, sample, value),
+            temporary,
+            useBytes = TRUE
+          )
+          file.rename(temporary, store)
+        },
+        error = function(error) NULL
+      )
+    }
+  }
+  if (!is.na(value)) {
+    assign(key, value, envir = .viewer_file_md5_cache)
+  }
+  value
+}
+## The hash of the first and last MiB of a file of `size` bytes (the whole of
+## a smaller one): a replaced CRB differs there (its header, its payload's
+## last block), and reading them takes milliseconds.
+.viewerCrbSample <- function(file, size, bytes = 2^20) {
+  connection <- file(file, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  head <- readBin(connection, "raw", n = min(size, bytes))
+  tail <- if (size > bytes) {
+    seek(connection, max(bytes, size - bytes))
+    readBin(connection, "raw", n = bytes)
+  }
+  rlang::hash(c(head, tail))
+}
+## A file name for a file version key (its md5, of the key's bytes).
+.viewerCrbMd5Key <- function(key) {
+  path <- tempfile("crb-md5-key-")
+  on.exit(unlink(path), add = TRUE)
+  writeBin(charToRaw(enc2utf8(key)), path)
+  unname(tools::md5sum(path))
 }
 ## Viewer Pack assets are verified against their manifest checksum before a
 ## session exposes them. Hash each file version once per process, not once per
@@ -570,16 +666,53 @@ viewerPackHlaSegments <- function(pack, chain) {
   viewerPackReadAsset(pack, file.path("hla_tcr", paste0(chain, ".qs2")))
 }
 
+## The first frame of a chain: version 3 (format revision 2, without its
+## segments) under its own name, else version 2 of an older Pack (with them).
 viewerPackHlaFirstFrame <- function(pack, chain) {
   if (
     !is.character(chain) || length(chain) != 1L || !chain %in% c("TRA", "TRB")
   ) {
     return(NULL)
   }
-  viewerPackReadAsset(
+  first <- viewerPackReadAsset(
+    pack,
+    file.path("hla_tcr", paste0(chain, ".first.v3.qs2"))
+  )
+  if (is.list(first) && identical(first$version, 3L)) {
+    return(first)
+  }
+  first <- viewerPackReadAsset(
     pack,
     file.path("hla_tcr", paste0(chain, ".first.qs2"))
   )
+  if (is.list(first) && !identical(first$version, 3L)) first else NULL
+}
+
+## The Pack path of a chain's first frame, NULL without one.
+viewerPackHlaFirstFramePath <- function(pack, chain) {
+  paths <- file.path(
+    "hla_tcr",
+    paste0(chain, c(".first.v3.qs2", ".first.qs2"))
+  )
+  paths <- paths[paths %in% as.character(pack$manifest$assets$path)]
+  if (length(paths)) paths[[1L]] else NULL
+}
+
+## The segments of a first frame (the initial samples' parsed rows). A Pack of
+## format revision 2 keeps them out of the first frame (version 3), in a file
+## read only when they are needed, not before the first view draws: NULL for a
+## Pack without that file, whose first frame (version 2) holds them.
+viewerPackHlaFirstSegments <- function(pack, chain) {
+  if (
+    !is.character(chain) || length(chain) != 1L || !chain %in% c("TRA", "TRB")
+  ) {
+    return(NULL)
+  }
+  value <- viewerPackReadAsset(
+    pack,
+    file.path("hla_tcr", paste0(chain, ".first.segments.qs2"))
+  )
+  if (is.data.frame(value)) value else NULL
 }
 
 viewerPackImmuneIndex <- function(pack, receptor) {
@@ -601,6 +734,112 @@ viewerPackImmuneEncoded <- function(pack, version) {
   }
   value <- viewerPackReadAsset(pack, "immune/encoded.qs2")
   if (is.list(value) && identical(value$version, version)) value else NULL
+}
+
+## The default Clonal projection frame of `receptor` and clone column `column`
+## (R/viewer_pack.R, .viewerPackImmuneClonalFrames()), from the Pack's
+## `immune_clonal_frames`: its rows (`cells`), the verified `subset` (uint32
+## canonical rows in paint order) and `codes` (uint8, each row's trace) assets
+## and the traces' expansion codes (`trace_codes`, 0 the grey background).
+## NULL for a Pack without one (built before them), or one made with another
+## frame `version`, clone-size `bins` or `max_background` than the Viewer's.
+viewerPackImmuneClonalFrame <- function(
+  pack,
+  receptor,
+  column,
+  version,
+  bins,
+  max_background
+) {
+  frames <- pack$manifest$immune_clonal_frames
+  if (!is.data.frame(frames) || !nrow(frames)) {
+    return(NULL)
+  }
+  row <- which(
+    as.character(frames$receptor) == as.character(receptor) &
+      as.character(frames$clone_column) == as.character(column)
+  )
+  if (length(row) != 1L) {
+    return(NULL)
+  }
+  frame <- lapply(as.list(frames[row, , drop = FALSE]), function(value) {
+    value[[1L]]
+  })
+  string <- function(value) {
+    is.character(value) && length(value) == 1L && !is.na(value) && nzchar(value)
+  }
+  cells <- suppressWarnings(as.integer(frame$cells))
+  stored_bins <- if (string(frame$bins)) {
+    suppressWarnings(as.numeric(strsplit(frame$bins, ",", fixed = TRUE)[[1L]]))
+  }
+  if (
+    !identical(
+      suppressWarnings(as.integer(frame$version)),
+      as.integer(version)
+    ) ||
+      !identical(stored_bins, as.numeric(bins)) ||
+      !identical(
+        suppressWarnings(as.integer(frame$max_background)),
+        as.integer(max_background)
+      ) ||
+      length(cells) != 1L ||
+      is.na(cells) ||
+      cells < 1L ||
+      cells > pack$cell_count ||
+      !identical(frame$codes_dtype, "uint8") ||
+      !string(frame$subset_path) ||
+      !string(frame$codes_path) ||
+      !string(frame$dictionary_path)
+  ) {
+    return(NULL)
+  }
+  subset <- viewerPackVerifiedAsset(
+    pack,
+    frame$subset_path,
+    accept = function(asset) {
+      identical(asset$dtype, "uint32") &&
+        identical(asset$dimensions, cells) &&
+        identical(asset$bytes, as.numeric(cells) * 4)
+    }
+  )
+  codes <- if (!is.null(subset)) {
+    viewerPackVerifiedAsset(
+      pack,
+      frame$codes_path,
+      accept = function(asset) {
+        identical(asset$dtype, "uint8") &&
+          identical(asset$dimensions, cells) &&
+          identical(asset$bytes, as.numeric(cells))
+      }
+    )
+  }
+  dictionary <- if (!is.null(codes)) {
+    viewerPackVerifiedAsset(pack, frame$dictionary_path)
+  }
+  if (is.null(dictionary)) {
+    return(NULL)
+  }
+  trace_codes <- tryCatch(
+    as.integer(jsonlite::read_json(dictionary$file, simplifyVector = TRUE)),
+    error = function(error) NULL
+  )
+  if (
+    !length(trace_codes) ||
+      !identical(length(trace_codes), dictionary$dimensions) ||
+      anyNA(trace_codes) ||
+      anyDuplicated(trace_codes) ||
+      any(trace_codes < 0L | trace_codes >= length(bins))
+  ) {
+    return(NULL)
+  }
+  list(
+    receptor = as.character(receptor),
+    column = as.character(column),
+    cells = cells,
+    subset = subset,
+    codes = codes,
+    trace_codes = trace_codes
+  )
 }
 
 ## The clones `ids` of `column` on `chain`, read from the blocks that hold

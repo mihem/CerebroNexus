@@ -156,26 +156,22 @@
   )
 }
 
+## The Viewer's page IDs and their sidebar tabs, as the Viewer has them
+## (viewerPageTabs() in inst/viewer/core/shared_resources.R, a file of
+## function definitions).
 .viewerInitialPageTabs <- function() {
-  c(
-    data_info = "loadData",
-    projection = "overview",
-    linked_views = "coordinated_views",
-    groups = "groups",
-    marker_genes = "markerGenes",
-    most_expressed_genes = "mostExpressedGenes",
-    enriched_pathways = "enrichedPathways",
-    extra_material = "extra_material",
-    immune_repertoire = "immune_repertoire",
-    trajectory = "trajectory",
-    spatial = "spatial",
-    trekker = "trekker",
-    hla_tcr_motifs = "hla_tcr_motifs",
-    gene_expression = "geneExpression",
-    gene_id_conversion = "geneIdConversion",
-    color_management = "color_management",
-    about = "about"
+  scope <- new.env(parent = baseenv())
+  sys.source(
+    system.file(
+      "viewer",
+      "core",
+      "shared_resources.R",
+      package = "CerebroNexus"
+    ),
+    envir = scope,
+    keep.source = FALSE
   )
+  scope$viewerPageTabs()
 }
 
 # Portable bundle paths ----------------------------------------------------
@@ -2337,7 +2333,10 @@
 #'   \code{"about"}. A conditional page is selected only when it is available
 #'   for the first loaded dataset. Initial routing is attempted only once, so
 #'   switching datasets later never triggers a delayed redirect. Shared links
-#'   take precedence after restoration.
+#'   take precedence after restoration. \code{NULL} (the default) opens
+#'   \code{"data_info"}, and the Projection is prepared while it is read: a
+#'   click on Projection shows the plot at once, or a preview of it while the
+#'   data set is still being read.
 #' @param welcome_message Welcome message shown in the Load Data tab.
 #' @param point_size Point size from 1 through 20. Supply one number for every
 #'   dataset, or a named numeric vector/list whose names exactly match
@@ -2461,6 +2460,12 @@ createShinyApp <- function(
   spatial_roi_settings = NULL,
   spatial_percentage_cells_to_show = 100
 ) {
+  ## An export reads each CRB whole (the preflight, the Viewer Pack check).
+  ## What it read is garbage once it returns, but R collects it only when it
+  ## next runs short, so a second export in the same R session read its CRB on
+  ## top of it: a peak of 3.3 GB instead of 2.5 GB for a 100,000 cell CRB with
+  ## its matrix inside. Collect before returning.
+  on.exit(invisible(gc(verbose = FALSE)), add = TRUE)
   # Validate inputs ----------------------------------------------------------##
   if (is.list(cerebro_data)) {
     valid_entries <- vapply(

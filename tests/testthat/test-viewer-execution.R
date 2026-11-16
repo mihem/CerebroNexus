@@ -102,6 +102,10 @@ test_that("A filter on a deferred group draws once its values arrive", {
   viewer_browser_test("deferredFilter")
 })
 
+test_that("A deferred group from Viewer Pack codes draws as its websocket values", {
+  viewer_browser_test("deferredResource")
+})
+
 test_that("Slice panels draw shared rows named through the cell-name resource", {
   viewer_browser_test("slicePanels")
 })

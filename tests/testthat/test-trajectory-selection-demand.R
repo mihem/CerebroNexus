@@ -1,8 +1,20 @@
-test_that("selected table does not require lazy appearance controls", {
+## The table is defined as viewerLazyRender(function() DT::renderDataTable(...)):
+## the assignment with the real render call in place of the lazy wrapper.
+trajectory_table_assignment <- function() {
   expr <- viewer_r_assignment(
     viewer_test_path("trajectory", "selected_cells_table.R"),
     "output.trajectory_details_selected_cells_table"
   )
+  render <- expr[[3]][[2]][[3]]
+  if (is.call(render) && identical(render[[1]], as.name("{"))) {
+    render <- render[[2]]
+  }
+  expr[[3]] <- render
+  expr
+}
+
+test_that("selected table does not require lazy appearance controls", {
+  expr <- trajectory_table_assignment()
   # Execute the actual output expression until data access, with no appearance
   # input initialized. A silent req failure would stop before this sentinel.
   scope <- new.env(parent = globalenv())
@@ -26,10 +38,7 @@ test_that("selected table does not require lazy appearance controls", {
 })
 
 test_that("selected table matches barcodes first and coordinates as fallback", {
-  expr <- viewer_r_assignment(
-    viewer_test_path("trajectory", "selected_cells_table.R"),
-    "output.trajectory_details_selected_cells_table"
-  )
+  expr <- trajectory_table_assignment()
   scope <- viewer_runtime_env()
   scope$output <- list()
   local_mocked_bindings(

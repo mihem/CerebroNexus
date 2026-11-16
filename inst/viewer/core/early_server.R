@@ -95,7 +95,12 @@ viewerEarlyServerStart <- function(root, host, port, options) {
   document <- file.path(tempdir(), "cerebro-early-document")
   dir.create(document, showWarnings = FALSE, recursive = TRUE)
   page <- env$viewerDocumentPage(kept)
-  writeBin(page$html, file.path(document, "index.html"))
+  ## On the start page of this App (viewerStartTabHtml()): the kept document
+  ## is the page of the process that kept it.
+  writeBin(
+    env$viewerStartTabHtml(page$html, env$viewerStartTab(options)),
+    file.path(document, "index.html")
+  )
   bundle <- env$viewerDocumentWriteFiles(page$files)
 
   files <- function(directory) {

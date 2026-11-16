@@ -2,15 +2,48 @@
 ## Table or info text when data is missing.
 ##----------------------------------------------------------------------------##
 
+## See select_group.R.
 most_expressed_genes_available_groups <- reactive({
-  unique(c(
-    getGroupsWithMostExpressedGenes(),
-    getGroupsWithMeanExpression()
-  ))
+  most_expressed_genes_groups()
 })
 
+## The metric the selector opens on: `current` (the bound one) while the
+## grouping variable has it, else the first stored one. The selector is drawn
+## with it, and page code reads it (below) until the selector binds.
+most_expressed_genes_default_metric <- function(
+  choices = most_expressed_genes_metric_choices(),
+  current = NULL
+) {
+  if (length(current) == 1L && current %in% choices) {
+    current
+  } else {
+    viewerFirstChoice(choices)
+  }
+}
+
+## The controls as the first view reads them: bound, or until bound the value
+## their renderUI selects, so the table does not wait for each level of
+## controls to reach the browser and back.
+most_expressed_genes_group <- viewerControlValue(
+  input,
+  "most_expressed_genes_selected_group",
+  function() {
+    most_expressed_genes_default_group(most_expressed_genes_available_groups())
+  }
+)
+most_expressed_genes_metric <- viewerControlValue(
+  input,
+  "most_expressed_genes_metric_type",
+  most_expressed_genes_default_metric
+)
+most_expressed_genes_show_all <- viewerControlValue(
+  input,
+  "most_expressed_genes_table_filter_switch",
+  function() cerebroResultTableDefaults$show_all
+)
+
 most_expressed_genes_selected_tables <- reactive({
-  selected_group <- input[["most_expressed_genes_selected_group"]]
+  selected_group <- most_expressed_genes_group()
   req(
     selected_group,
     selected_group %in% most_expressed_genes_available_groups()
@@ -29,9 +62,41 @@ most_expressed_genes_selected_tables <- reactive({
 })
 
 most_expressed_genes_selected_table <- reactive({
-  metric_type <- input[["most_expressed_genes_metric_type"]]
+  metric_type <- most_expressed_genes_metric()
   req(metric_type)
   most_expressed_genes_selected_tables()[[metric_type]]
+})
+
+most_expressed_genes_subgroup <- viewerControlValue(
+  input,
+  "most_expressed_genes_table_select_group_level",
+  function() {
+    results_df <- most_expressed_genes_selected_table()
+    cerebroResultSubgroupDefault(
+      results_df,
+      is.data.frame(results_df) &&
+        identical(colnames(results_df)[[1L]], most_expressed_genes_group())
+    )
+  }
+)
+
+## The metrics stored for the selected grouping variable.
+most_expressed_genes_metric_choices <- reactive({
+  ## Build available metric choices based on data availability
+  metric_choices <- c()
+  tables <- most_expressed_genes_selected_tables()
+  pct_data <- tables$pct
+
+  if (!is.null(pct_data) && is.data.frame(pct_data) && nrow(pct_data) > 0) {
+    metric_choices <- c(metric_choices, "Stored expression score (pct)" = "pct")
+  }
+
+  mean_data <- tables$mean_expr
+
+  if (!is.null(mean_data) && is.data.frame(mean_data) && nrow(mean_data) > 0) {
+    metric_choices <- c(metric_choices, "Mean expression" = "mean_expr")
+  }
+  metric_choices
 })
 
 ##----------------------------------------------------------------------------##
@@ -48,20 +113,7 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
       "Expression summaries are not included in this data set. Choose a data set with stored expression summaries."
     ))
   }
-  ## Build available metric choices based on data availability
-  metric_choices <- c()
-  tables <- most_expressed_genes_selected_tables()
-  pct_data <- tables$pct
-
-  if (!is.null(pct_data) && is.data.frame(pct_data) && nrow(pct_data) > 0) {
-    metric_choices <- c(metric_choices, "Stored expression score (pct)" = "pct")
-  }
-
-  mean_data <- tables$mean_expr
-
-  if (!is.null(mean_data) && is.data.frame(mean_data) && nrow(mean_data) > 0) {
-    metric_choices <- c(metric_choices, "Mean expression" = "mean_expr")
-  }
+  metric_choices <- most_expressed_genes_metric_choices()
 
   ## If no data available, show message
   if (length(metric_choices) == 0) {
@@ -82,14 +134,10 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
         inputId = "most_expressed_genes_metric_type",
         label = "Expression metric:",
         choices = metric_choices,
-        selected = {
-          current <- isolate(input[["most_expressed_genes_metric_type"]])
-          if (length(current) == 1L && current %in% metric_choices) {
-            current
-          } else {
-            metric_choices[[1L]]
-          }
-        }
+        selected = most_expressed_genes_default_metric(
+          metric_choices,
+          isolate(input[["most_expressed_genes_metric_type"]])
+        )
       ),
       conditionalPanel(
         "input.most_expressed_genes_metric_type === 'pct'",
@@ -105,7 +153,7 @@ output[["most_expressed_genes_table_or_text_UI"]] <- renderUI({
       shinyWidgets::materialSwitch(
         inputId = "most_expressed_genes_table_filter_switch",
         label = "Show results for all subgroups (no pre-filtering):",
-        value = FALSE,
+        value = cerebroResultTableDefaults$show_all,
         status = "primary",
         inline = TRUE
       )
@@ -144,16 +192,16 @@ most_expressed_genes_metric_description <- function(metric_type) {
 ## UI element for sub-filtering of results (if toggled).
 ##----------------------------------------------------------------------------##
 output[["most_expressed_genes_filter_subgroups_UI"]] <- renderUI({
-  req(!is.null(input[["most_expressed_genes_table_filter_switch"]]))
-  req(!is.null(input[["most_expressed_genes_metric_type"]]))
-  selected_group <- input[['most_expressed_genes_selected_group']]
+  req(!is.null(most_expressed_genes_show_all()))
+  req(!is.null(most_expressed_genes_metric()))
+  selected_group <- most_expressed_genes_group()
   req(selected_group %in% most_expressed_genes_available_groups())
   results_df <- most_expressed_genes_selected_table()
   ## don't proceed if input is not a data frame
   req(is.data.frame(results_df))
   cerebroResultSubgroupUI(
     results_df,
-    input[["most_expressed_genes_table_filter_switch"]],
+    most_expressed_genes_show_all(),
     identical(colnames(results_df)[[1L]], selected_group),
     "most_expressed_genes_table_select_group_level"
   )
@@ -162,48 +210,50 @@ output[["most_expressed_genes_filter_subgroups_UI"]] <- renderUI({
 ##----------------------------------------------------------------------------##
 ## Table with results.
 ##----------------------------------------------------------------------------##
-output[["most_expressed_genes_table"]] <- DT::renderDataTable({
-  selected_group <- input[['most_expressed_genes_selected_group']]
-  req(selected_group %in% most_expressed_genes_available_groups())
-  req(!is.null(input[["most_expressed_genes_metric_type"]]))
-  metric_type <- input[["most_expressed_genes_metric_type"]]
-  results_df <- most_expressed_genes_selected_table()
-  ## don't proceed if input is not a data frame
-  req(is.data.frame(results_df))
-  grouped <- identical(colnames(results_df)[[1L]], selected_group)
-  if (!isTRUE(input[["most_expressed_genes_table_filter_switch"]]) && grouped) {
-    req(input[["most_expressed_genes_table_select_group_level"]])
-  }
-  results_df <- cerebroFilterResultRows(
-    results_df,
-    input[["most_expressed_genes_table_filter_switch"]],
-    grouped,
-    input[["most_expressed_genes_table_select_group_level"]]
-  )
-  if (identical(metric_type, "pct") && "pct" %in% colnames(results_df)) {
-    ## getMostExpressedGenes() and convertSeuratToCerebro() store different
-    ## quantities and scales as pct. Without metric provenance, neither the
-    ## values nor their range identify a unit.
-    results_df <- dplyr::rename(results_df, "Stored score" = pct)
-  } else if (
-    !identical(metric_type, "pct") &&
-      "mean_expr" %in% colnames(results_df)
-  ) {
-    results_df <- dplyr::rename(results_df, "Mean expression" = mean_expr)
-  }
-  cerebroResultTable(
-    results_df,
-    paste0(
-      ifelse(
-        metric_type == "pct",
-        "stored_expression_score_",
-        "mean_expression_"
+output[["most_expressed_genes_table"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    selected_group <- most_expressed_genes_group()
+    req(selected_group %in% most_expressed_genes_available_groups())
+    req(!is.null(most_expressed_genes_metric()))
+    metric_type <- most_expressed_genes_metric()
+    results_df <- most_expressed_genes_selected_table()
+    ## don't proceed if input is not a data frame
+    req(is.data.frame(results_df))
+    grouped <- identical(colnames(results_df)[[1L]], selected_group)
+    if (!isTRUE(most_expressed_genes_show_all()) && grouped) {
+      req(most_expressed_genes_subgroup())
+    }
+    results_df <- cerebroFilterResultRows(
+      results_df,
+      most_expressed_genes_show_all(),
+      grouped,
+      most_expressed_genes_subgroup()
+    )
+    if (identical(metric_type, "pct") && "pct" %in% colnames(results_df)) {
+      ## getMostExpressedGenes() and convertSeuratToCerebro() store different
+      ## quantities and scales as pct. Without metric provenance, neither the
+      ## values nor their range identify a unit.
+      results_df <- dplyr::rename(results_df, "Stored score" = pct)
+    } else if (
+      !identical(metric_type, "pct") &&
+        "mean_expr" %in% colnames(results_df)
+    ) {
+      results_df <- dplyr::rename(results_df, "Mean expression" = mean_expr)
+    }
+    cerebroResultTable(
+      results_df,
+      paste0(
+        ifelse(
+          metric_type == "pct",
+          "stored_expression_score_",
+          "mean_expression_"
+        ),
+        selected_group
       ),
-      input[["most_expressed_genes_selected_group"]]
-    ),
-    hide_long_columns = FALSE,
-    number_formatting = !identical(metric_type, "pct")
-  )
+      hide_long_columns = FALSE,
+      number_formatting = !identical(metric_type, "pct")
+    )
+  })
 })
 
 ##----------------------------------------------------------------------------##

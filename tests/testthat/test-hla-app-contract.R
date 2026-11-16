@@ -612,3 +612,83 @@ test_that("Viewer Pack first frames bypass cold HLA preparation", {
     }
   )
 })
+
+test_that("a version 3 first frame reads its segments only when needed", {
+  skip_if_not_installed("igraph")
+  withr::local_package("magrittr")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      available_crb_files <- list(selected = "tiny")
+      data_set <- function() TRUE
+      hla_active_chain <- function() "TRB"
+      ## A Pack of format revision 2: no segments in the first frame.
+      first <- list(
+        version = 3L,
+        filter_levels = list(sample = "s1"),
+        filter_groups = "sample",
+        initial_samples = "s1",
+        by_v = FALSE,
+        node_meta_cols = "sample",
+        lineage_col = NULL,
+        available_cols = "sample",
+        graph_raw = igraph::make_ring(3)
+      )
+      reads <- 0L
+      viewerPackCurrent <- function() "packed"
+      viewerPackHlaFirstFrame <- function(pack, chain) first
+      viewerPackHlaFirstSegments <- function(pack, chain) {
+        stopifnot(identical(pack, "packed"), identical(chain, "TRB"))
+        reads <<- reads + 1L
+        if (isTRUE(input$corrupt)) {
+          NULL
+        } else {
+          data.frame(sample = "s1", cdr3 = "AAA")
+        }
+      }
+      viewerPackHlaSegments <- function(pack, chain) NULL
+      hla_ir_annotated <- function() stop("cold metadata hydration")
+      hla_unfiltered_segments <- function() stop("cold segment parsing")
+      hla_segments_fallback <- function() {
+        data.frame(sample = "s1", cdr3 = "FALLBACK")
+      }
+      hla_node_meta_cols <- function() "sample"
+      hla_celltype_col <- function() NA_character_
+      hla_default_min_nodes <- function() 2L
+      hla_params_ready <- function() TRUE
+      hla_motif_graph_cached <- function() igraph::make_empty_graph()
+      viewer_server_load(
+        viewer_server_statements("hla_tcr_motifs", "data.R"),
+        scope,
+        names = c(
+          "hla_bindCache",
+          "hla_param",
+          "hla_first_frame",
+          "hla_packed_segments",
+          "hla_filter_groups",
+          "hla_filter_levels",
+          "hla_initial_samples",
+          "hla_default_filter_selections",
+          "hla_filter_input_id",
+          "hla_filter_selections",
+          "hla_first_frame_filters_match",
+          "hla_by_v_default",
+          "hla_segments",
+          "hla_first_frame_graph_matches",
+          "hla_motif_graph"
+        )
+      )
+    },
+    {
+      ## The first view (the graph) does not read the segments.
+      expect_equal(igraph::vcount(hla_motif_graph()), 3L)
+      expect_identical(scope$reads, 0L)
+      expect_equal(hla_segments()$cdr3, "AAA")
+      expect_identical(scope$reads, 1L)
+      ## A missing or corrupt segments file: the segments are built as for a
+      ## data set without a first frame.
+      session$setInputs(corrupt = TRUE)
+      expect_equal(hla_segments()$cdr3, "FALLBACK")
+    }
+  )
+})

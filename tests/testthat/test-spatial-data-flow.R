@@ -35,7 +35,14 @@ spatial_flow_server <- function(input, output, session) {
   }
   availableSpatial <- function() "slice"
   getGroups <- function() "group"
-  viewerProjectionFirstFrameMetadata <- function() metadata
+  ## A factor colours a section from the codes of every cell (section_frame).
+  viewerProjectionFirstFrameMetadata <- function() {
+    if (isTRUE(input$factor_group)) {
+      transform(metadata, group = factor(group))
+    } else {
+      metadata
+    }
+  }
   viewerSpatialFirstFrameData <- function(name) {
     bounds <- c(xmin = 0, xmax = 10, ymin = 0, ymax = 10)
     if (isTRUE(input$list_bounds)) {
@@ -72,12 +79,31 @@ spatial_flow_server <- function(input, output, session) {
     coordinate_reads <<- coordinate_reads + 1L
     coords
   }
+  ## The geometry of the drawn cells (`section`: rows 2 and 3 of four).
   viewerSpatialGeometryAsset <- function(...) {
-    if (isTRUE(input$packed)) list(url = "coords.bin", cells = 4L) else NULL
+    if (isTRUE(input$packed)) {
+      list(
+        url = "coords.bin",
+        cells = length(spatial_projection_cells_to_show())
+      )
+    }
   }
-  viewerMetadataCodesAsset <- function(...) list(url = "groups.bin", cells = 4L)
+  viewerMetadataCodesAsset <- function(name, levels = NULL) {
+    list(
+      url = "groups.bin",
+      cells = 4L,
+      levels = I(levels),
+      code_map = I(c(-1L, seq_along(levels) - 1L))
+    )
+  }
   spatial_projection_cells_to_show <- function() {
-    if (isTRUE(input$subset)) c(1L, 3L) else 1:4
+    if (isTRUE(input$section)) {
+      2:3
+    } else if (isTRUE(input$subset)) {
+      c(1L, 3L)
+    } else {
+      1:4
+    }
   }
   spatial_projection_metadata <- function() {
     metadata[spatial_projection_cells_to_show(), , drop = FALSE]
@@ -259,6 +285,40 @@ test_that("Spatial feature and RGB frames read real expression in canonical row 
     ## An unusable alignment is no longer expressed by the old bounds input: it
     ## travels with the background request, and the next test asserts that such a
     ## request is refused instead of taking the resource path.
+  })
+})
+
+test_that("a section of several draws from the Viewer Pack with its own legend", {
+  shiny::testServer(spatial_flow_server, {
+    session$setInputs(
+      spatial_projection_render_request = 1,
+      spatial_projection_to_display = "slice",
+      spatial_projection_plot_type = "ImageDimPlot",
+      packed = TRUE,
+      section = TRUE,
+      factor_group = TRUE
+    )
+    frame <- spatial_projection_data_to_plot_raw()
+    ## Neither metadata nor coordinates: the browser reads the section's
+    ## geometry and maps the codes of all four cells through rows 2 and 3.
+    expect_true(frame$resource_first)
+    expect_null(frame$cells_df)
+    expect_null(frame$coordinates)
+    expect_identical(frame$cell_indices, 2:3)
+    expect_identical(frame$cell_count, 2L)
+    expect_identical(frame$categorical_resource$cells, 4L)
+    expect_identical(as.character(frame$categorical_resource$levels), "A")
+    expect_identical(
+      as.integer(frame$categorical_resource$code_map),
+      c(-1L, 0L)
+    )
+
+    ## A character column without assigned colours is coloured by the levels
+    ## the section has: R builds that frame.
+    session$setInputs(factor_group = FALSE)
+    frame <- spatial_projection_data_to_plot_raw()
+    expect_false(frame$resource_first)
+    expect_identical(nrow(frame$cells_df), 2L)
   })
 })
 

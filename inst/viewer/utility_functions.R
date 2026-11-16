@@ -748,20 +748,43 @@ viewerPublishChanged <- function(state, value) {
 ## first frame then need not wait for the controls to reach the browser and
 ## back, and the binding of an equal value invalidates nothing. Bound inputs
 ## keep their value even when it is NULL (a cleared multi-select), so presence
-## in `input` separates "not yet bound" from "none".
+## in `input` separates "not yet bound" from "none". A default that cannot be
+## computed (data not read yet, a table that fails to read) is no value: the
+## output that reads the data shows the error, not the session.
 viewerControlValue <- function(input, id, default) {
   value <- shiny::reactiveVal(NULL)
   shiny::observe(
     {
       current <- input[[id]]
       if (is.null(current) && !id %in% shiny::isolate(names(input))) {
-        current <- default()
+        current <- tryCatch(default(), error = function(error) NULL)
       }
       viewerPublishChanged(value, current)
     },
     priority = 1000
   )
   value
+}
+
+## An output whose package is loaded when the output first renders, not when
+## the page's code defines it. `make` returns the real render function
+## (DT::renderDataTable(...), plotly::renderPlotly(...)): defining one of those
+## loads DT or plotly (with htmlwidgets, crosstalk, ggplot2, data.table ...),
+## 0.1 to 1 s of the turn a page is opened in, for a table or plot the first
+## view mostly does not show. Not for an output with bindCache(): its cache
+## needs the real function's hooks when it is bound (see ir_define_with_tab()).
+viewerLazyRender <- function(make) {
+  real <- NULL
+  shiny::markRenderFunction(
+    uiFunc = function(...) NULL,
+    renderFunc = function(...) {
+      if (is.null(real)) {
+        real <<- make()
+      }
+      real(...)
+    },
+    cacheHint = list(lazy = body(make))
+  )
 }
 
 ## A slider bounded by one preference's min/max/step limits.
@@ -1674,7 +1697,8 @@ cerebroCellViewDeferredAux <- function(
   hover = FALSE,
   names_resource = NULL,
   cell_rows = NULL,
-  keys = TRUE
+  keys = TRUE,
+  frame_rows = NULL
 ) {
   grouped <- is.list(selection_rows)
   reorder <- function(values) {
@@ -1699,9 +1723,18 @@ cerebroCellViewDeferredAux <- function(
     index <- reorder(as.integer(cell_rows) - 1L)
     list(
       ## Contiguous rows (every cell of a projection or trajectory in order)
-      ## travel as their range, not as a million integers.
+      ## travel as their range, not as a million integers; rows the browser
+      ## holds as the frame's Viewer Pack subset (`frame_rows`) as a mark.
       selection_index = if (!grouped) {
-        cerebroRowRange(index) %||% index
+        cerebroRowRange(index) %||%
+          if (
+            !is.null(frame_rows) &&
+              identical(as.integer(unclass(index)), as.integer(frame_rows))
+          ) {
+            list(kind = "frame_subset", length = length(index))
+          } else {
+            index
+          }
       } else {
         index
       },
@@ -6047,6 +6080,15 @@ registerCellViewPointBorder <- function(
   shiny::outputOptions(output, square_id, suspendWhenHidden = FALSE)
 }
 
+## The switches of a stored-result table as it opens (cerebroResultTableControls()
+## and the Most expressed genes table): the switches are drawn with these, and
+## page code reads them through viewerControlValue() until the switches bind.
+cerebroResultTableDefaults <- list(
+  show_all = FALSE,
+  number_formatting = TRUE,
+  color_highlighting = TRUE
+)
+
 cerebroResultTableControls <- function(prefix, results_df, grouped) {
   shiny::fluidRow(
     shiny::column(
@@ -6054,21 +6096,21 @@ cerebroResultTableControls <- function(prefix, results_df, grouped) {
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_filter_switch"),
         label = "Show results for all subgroups (no pre-filtering):",
-        value = FALSE,
+        value = cerebroResultTableDefaults$show_all,
         status = "primary",
         inline = TRUE
       ),
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_number_formatting"),
         label = "Automatically format numbers:",
-        value = TRUE,
+        value = cerebroResultTableDefaults$number_formatting,
         status = "primary",
         inline = TRUE
       ),
       shinyWidgets::materialSwitch(
         inputId = paste0(prefix, "_table_color_highlighting"),
         label = "Highlight values with colours:",
-        value = TRUE,
+        value = cerebroResultTableDefaults$color_highlighting,
         status = "primary",
         inline = TRUE
       )
@@ -6093,17 +6135,13 @@ cerebroResultSubgroupUI <- function(results_df, show_all, grouped, input_id) {
   if (isTRUE(show_all) || !isTRUE(grouped)) {
     return(shiny::fluidRow())
   }
-  available_groups <- if (is.factor(results_df[[1L]])) {
-    levels(results_df[[1L]])
-  } else {
-    unique(as.character(results_df[[1L]]))
-  }
   shiny::fluidRow(shiny::column(
     12,
     shiny::selectInput(
       input_id,
       label = "Filter results for subgroup:",
-      choices = available_groups
+      choices = cerebroResultSubgroupChoices(results_df),
+      selected = cerebroResultSubgroupDefault(results_df, grouped)
     )
   ))
 }
@@ -6490,6 +6528,29 @@ viewerTrekkerBackground <- function(tk) {
   )
 }
 
+## The value a selectInput() without `selected` binds with: its first choice.
+viewerFirstChoice <- function(choices) {
+  values <- as.character(unlist(choices, use.names = FALSE))
+  if (length(values)) values[[1L]]
+}
+
+## The subgroups a stored result table can be filtered to: the levels, or the
+## distinct values, of its first column.
+cerebroResultSubgroupChoices <- function(results_df) {
+  first <- results_df[[1L]]
+  if (is.factor(first)) levels(first) else unique(as.character(first))
+}
+
+## The subgroup a stored result table is first filtered to: the first choice,
+## which cerebroResultSubgroupUI() selects; NULL when the table has no
+## subgroup selector.
+cerebroResultSubgroupDefault <- function(results_df, grouped) {
+  if (!is.data.frame(results_df) || !isTRUE(grouped)) {
+    return(NULL)
+  }
+  viewerFirstChoice(cerebroResultSubgroupChoices(results_df))
+}
+
 ## Server side of a stored-result page (Marker genes, Enriched pathways): a
 ## method/grouping selector pair, the table-or-message shell and the table.
 ## Getters and messages are arguments, so each page passes its own and tests
@@ -6512,6 +6573,15 @@ cerebroResultPageServer <- function(
   id <- function(suffix) paste0(prefix, "_", suffix)
   method_id <- id("selected_method")
   table_id <- id("selected_table")
+  ## The method and grouping the selectors open on: the first method and its
+  ## first grouping. The selectors are drawn with these, and page code reads
+  ## them (below) until the selectors bind.
+  default_method <- function(available = methods()) {
+    viewerFirstChoice(available)
+  }
+  default_table <- function(method = default_method()) {
+    if (length(method)) viewerFirstChoice(groups(method))
+  }
   ## Resolve both initial selectors together. Changing the method updates only
   ## the group choices, so the surrounding controls do not disappear and rebind.
   output[[id("select_method_and_table_UI")]] <- shiny::renderUI({
@@ -6519,6 +6589,7 @@ cerebroResultPageServer <- function(
     if (!length(available)) {
       return(shiny::p(messages$no_methods))
     }
+    method <- default_method(available)
     shiny::fluidRow(
       shiny::column(
         6,
@@ -6526,7 +6597,7 @@ cerebroResultPageServer <- function(
           method_id,
           label = "Method",
           choices = available,
-          selected = available[[1L]],
+          selected = method,
           width = "100%"
         )
       ),
@@ -6535,7 +6606,8 @@ cerebroResultPageServer <- function(
         shiny::selectInput(
           table_id,
           label = "Grouping variable",
-          choices = groups(available[[1L]]),
+          choices = groups(method),
+          selected = default_table(method),
           width = "100%"
         )
       )
@@ -6564,24 +6636,55 @@ cerebroResultPageServer <- function(
     },
     ignoreInit = TRUE
   )
+  ## The controls as the first view reads them: bound, or until bound the
+  ## value their renderUI selects, so the table does not wait for each level
+  ## of controls to reach the browser and back.
+  selected_method <- viewerControlValue(input, method_id, default_method)
+  selected_table <- viewerControlValue(input, table_id, default_table)
+  show_all <- viewerControlValue(
+    input,
+    id("table_filter_switch"),
+    function() cerebroResultTableDefaults$show_all
+  )
+  number_formatting <- viewerControlValue(
+    input,
+    id("table_number_formatting"),
+    function() cerebroResultTableDefaults$number_formatting
+  )
+  color_highlighting <- viewerControlValue(
+    input,
+    id("table_color_highlighting"),
+    function() cerebroResultTableDefaults$color_highlighting
+  )
   ## The stored table for the selected method and grouping; shared by the
   ## shell and the table so a selection reads it once.
   selected_result <- shiny::reactive({
     shiny::req(
-      input[[method_id]],
-      input[[table_id]],
-      input[[method_id]] %in% methods(),
-      input[[table_id]] %in% groups(input[[method_id]])
+      selected_method(),
+      selected_table(),
+      selected_method() %in% methods(),
+      selected_table() %in% groups(selected_method())
     )
-    results(input[[method_id]], input[[table_id]])
+    results(selected_method(), selected_table())
   })
+  subgroup <- viewerControlValue(
+    input,
+    id("table_select_group_level"),
+    function() {
+      result <- selected_result()
+      cerebroResultSubgroupDefault(
+        result,
+        is.data.frame(result) && colnames(result)[[1L]] %in% getGroups()
+      )
+    }
+  )
   ## Table controls, or a message when the data set has no such results.
   output[[id("table_or_text_UI")]] <- shiny::renderUI({
     available <- methods()
     if (!length(available)) {
       return(shiny::p(messages$not_included))
     }
-    method <- input[[method_id]]
+    method <- selected_method()
     shiny::req(method %in% available)
     if (!length(groups(method))) {
       return(shiny::p(messages$no_groups))
@@ -6603,48 +6706,50 @@ cerebroResultPageServer <- function(
       shiny::p(messages$no_results)
     }
   })
-  output[[id("table")]] <- DT::renderDataTable({
-    shiny::req(
-      input[[method_id]],
-      input[[table_id]],
-      input[[table_id]] %in% groups(input[[method_id]])
-    )
-    step <- if (is.null(progress)) function(...) NULL else shiny::incProgress
-    render <- function() {
-      results_df <- selected_result()
-      shiny::req(is.data.frame(results_df))
-      step(0.3, detail = "Filtering data...")
-      ## Filter for one subgroup only if the user asked for it.
-      grouped <- colnames(results_df)[[1L]] %in% getGroups()
-      if (!isTRUE(input[[id("table_filter_switch")]]) && grouped) {
-        shiny::req(input[[id("table_select_group_level")]])
+  output[[id("table")]] <- viewerLazyRender(function() {
+    DT::renderDataTable({
+      shiny::req(
+        selected_method(),
+        selected_table(),
+        selected_table() %in% groups(selected_method())
+      )
+      step <- if (is.null(progress)) function(...) NULL else shiny::incProgress
+      render <- function() {
+        results_df <- selected_result()
+        shiny::req(is.data.frame(results_df))
+        step(0.3, detail = "Filtering data...")
+        ## Filter for one subgroup only if the user asked for it.
+        grouped <- colnames(results_df)[[1L]] %in% getGroups()
+        if (!isTRUE(show_all()) && grouped) {
+          shiny::req(subgroup())
+        }
+        results_df <- cerebroFilterResultRows(
+          results_df,
+          show_all(),
+          grouped,
+          subgroup()
+        )
+        step(0.6, detail = "Rendering table...")
+        cerebroResultTable(
+          results_df,
+          paste0(
+            prefix,
+            "_by_",
+            selected_method(),
+            "_",
+            selected_table()
+          ),
+          number_formatting = number_formatting(),
+          color_highlighting = color_highlighting(),
+          columns_hide = columns_hide(results_df)
+        )
       }
-      results_df <- cerebroFilterResultRows(
-        results_df,
-        input[[id("table_filter_switch")]],
-        grouped,
-        input[[id("table_select_group_level")]]
-      )
-      step(0.6, detail = "Rendering table...")
-      cerebroResultTable(
-        results_df,
-        paste0(
-          prefix,
-          "_by_",
-          input[[method_id]],
-          "_",
-          input[[table_id]]
-        ),
-        number_formatting = input[[id("table_number_formatting")]],
-        color_highlighting = input[[id("table_color_highlighting")]],
-        columns_hide = columns_hide(results_df)
-      )
-    }
-    if (is.null(progress)) {
-      render()
-    } else {
-      shiny::withProgress(message = progress, value = 0, render())
-    }
+      if (is.null(progress)) {
+        render()
+      } else {
+        shiny::withProgress(message = progress, value = 0, render())
+      }
+    })
   })
   invisible(NULL)
 }

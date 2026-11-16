@@ -21,6 +21,9 @@ expressionPlotOrderLabel <- function(highest_on_top) {
   if (isTRUE(highest_on_top)) "Highest expression on top" else "Input order"
 }
 
+## The display mode the selector (UI_projection_controls.R) opens on.
+expression_projection_default_display_mode <- "combined"
+
 expression_projection_default_plotting_order <- function() {
   identical(
     current_page_display_defaults("gene")$plotting_order,
@@ -43,7 +46,7 @@ expression_projection_plotting_order <- viewerControlValue(
 expression_projection_display_mode <- viewerControlValue(
   input,
   "expression_projection_genes_in_separate_panels",
-  function() "combined"
+  function() expression_projection_default_display_mode
 )
 
 cerebroObserveLocalAppearance("expression_projection", input, session)
@@ -61,17 +64,7 @@ expression_projection_selected_projection <- reactive({
           available_trajectory_names
         )
   ) {
-    shared <- isolate(input[["coordviews_shared_base"]])
-    selected_projection <- as.character(shared$projection %||% "")
-    if (!selected_projection %in% available_projections) {
-      selected_projection <- if (length(available_projections)) {
-        available_projections[[1L]]
-      } else if (length(available_trajectory_names)) {
-        available_trajectory_names[[1L]]
-      } else {
-        NULL
-      }
-    }
+    selected_projection <- expression_projection_default_projection()
   }
   req(
     selected_projection,

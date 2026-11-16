@@ -594,6 +594,34 @@ test_that("Viewer Pack rejects corruption and preserves the CRB fallback", {
   expect_true(validateViewerPack(crb, rebuilt, full = TRUE)$valid)
 })
 
+test_that("Viewer Pack HLA first frame reads version 3 by its own path, else version 2", {
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  pack <- function(frames) {
+    cache <- list2env(frames)
+    list(
+      cache = cache,
+      manifest = list(assets = data.frame(path = names(frames)))
+    )
+  }
+  v2 <- list(version = 2L, segments = data.frame(a = 1L))
+  v3 <- list(version = 3L)
+  old <- pack(list("hla_tcr/TRB.first.qs2" = v2))
+  expect_identical(runtime$viewerPackHlaFirstFrame(old, "TRB"), v2)
+  expect_identical(
+    runtime$viewerPackHlaFirstFramePath(old, "TRB"),
+    "hla_tcr/TRB.first.qs2"
+  )
+  new <- pack(list("hla_tcr/TRB.first.v3.qs2" = v3))
+  expect_identical(runtime$viewerPackHlaFirstFrame(new, "TRB"), v3)
+  ## A version-3 frame under the old path is never taken as version 2.
+  expect_null(runtime$viewerPackHlaFirstFrame(
+    pack(list("hla_tcr/TRB.first.qs2" = v3)),
+    "TRB"
+  ))
+  expect_null(runtime$viewerPackHlaFirstFramePath(pack(list()), "TRB"))
+})
+
 test_that("Viewer Pack runtime loads HLA assets with exact fallback", {
   skip_if_not_installed("igraph")
   skip_if_not_installed("stringdist")
@@ -637,11 +665,32 @@ test_that("Viewer Pack runtime loads HLA assets with exact fallback", {
     expected_segments
   )
   first_frame <- runtime$viewerPackHlaFirstFrame(descriptor, "TRB")
-  expect_identical(first_frame$version, 2L)
+  ## Version 3: the segments are in a file of their own, read when needed.
+  expect_identical(first_frame$version, 3L)
+  ## Under a path of its own: a Viewer of format revision 1 reads
+  ## <chain>.first.qs2 as version 2 and would take NULL segments from it.
+  paths <- as.character(descriptor$manifest$assets$path)
+  expect_true("hla_tcr/TRB.first.v3.qs2" %in% paths)
+  expect_false(any(
+    c("hla_tcr/TRA.first.qs2", "hla_tcr/TRB.first.qs2") %in% paths
+  ))
+  expect_identical(
+    runtime$viewerPackHlaFirstFramePath(descriptor, "TRB"),
+    "hla_tcr/TRB.first.v3.qs2"
+  )
   expect_identical(first_frame$filter_groups, "sample")
   expect_identical(first_frame$filter_levels$sample, "sample_1")
   expect_identical(first_frame$initial_samples, "sample_1")
-  expect_identical(first_frame$segments$sample, rep("sample_1", 4L))
+  expect_null(first_frame$segments)
+  expect_false(exists(
+    "hla_tcr/TRB.first.segments.qs2",
+    envir = descriptor$cache,
+    inherits = FALSE
+  ))
+  expect_identical(
+    runtime$viewerPackHlaFirstSegments(descriptor, "TRB")$sample,
+    rep("sample_1", 4L)
+  )
   expect_false(first_frame$by_v)
   expect_identical(first_frame$node_meta_cols, "sample")
   expect_null(first_frame$lineage_col)
@@ -681,7 +730,7 @@ test_that("Viewer Pack runtime loads HLA assets with exact fallback", {
     simplifyVector = TRUE
   )
   first_path <- manifest$assets$path[
-    grepl("hla_tcr/TRB[.]first[.]qs2$", manifest$assets$path)
+    grepl("hla_tcr/TRB[.]first[.]v3[.]qs2$", manifest$assets$path)
   ]
   expect_length(first_path, 1L)
   writeBin(as.raw(1:3), file.path(pack, first_path))
@@ -842,6 +891,11 @@ test_that("Viewer Pack IR indexes first-frame coordinates without barcodes", {
     keep.source = FALSE
   )
   sys.source(
+    viewer_test_path("immune_repertoire", "param_spec.R"),
+    envir = scope,
+    keep.source = FALSE
+  )
+  sys.source(
     viewer_test_path("immune_repertoire", "data.R"),
     envir = scope,
     keep.source = FALSE
@@ -865,6 +919,37 @@ test_that("Viewer Pack IR indexes first-frame coordinates without barcodes", {
       sprintf("cell-%03d", 1:4)
     )
   }
+
+  ## While another process encodes the repertoire (a Pack built before the
+  ## encoding), the CTgene map is drawn from the Pack's receptor index alike.
+  everyone <- scope$ir_clonal_umap_data(
+    "umap",
+    "TCR",
+    show_all = TRUE,
+    split_output = TRUE
+  )
+  scope$viewerPackImmuneIndex <- runtime$viewerPackImmuneIndex
+  scope$ir_encoded <- function() {
+    shiny::validate(shiny::need(FALSE, "Encoding the immune repertoire."))
+  }
+  expect_identical(
+    scope$ir_clonal_umap_data("umap", "TCR", show_all = FALSE),
+    out
+  )
+  expect_identical(
+    scope$ir_clonal_umap_data(
+      "umap",
+      "TCR",
+      show_all = TRUE,
+      split_output = TRUE
+    ),
+    everyone
+  )
+  ## other clone columns wait for the encoding
+  expect_error(
+    scope$ir_clonal_umap_data("umap", "TCR", cloneCall = "aa"),
+    class = "validation"
+  )
 })
 
 test_that("packed violin summaries survive serialization without altering statistics", {
@@ -1029,4 +1114,31 @@ test_that("a pack built from the object in memory agrees with a qs2 CRB read bac
   expect_true(validateViewerPack(crb)$valid)
   expect_true(validateViewerPack(crb, pack, full = TRUE)$valid)
   expect_true(.bundleViewerPackValid(crb, .readCerebroPayload(crb)))
+})
+
+test_that("a CRB replaced with the same size and mtime does not keep its md5", {
+  withr::local_envvar(R_USER_CACHE_DIR = withr::local_tempdir())
+  runtime <- new.env(parent = globalenv())
+  sys.source(viewer_test_path("core", "viewer_pack.R"), envir = runtime)
+  file <- withr::local_tempfile(fileext = ".crb")
+  writeBin(as.raw(rep(1:200, 5L)), file)
+  when <- as.POSIXct("2026-01-02 03:04:05", tz = "UTC")
+  Sys.setFileTime(file, when)
+  first <- runtime$.viewerCrbMd5(file)
+  expect_identical(first, unname(tools::md5sum(file)))
+  ## another process (an empty process cache) reads the stored md5 back
+  rm(
+    list = ls(runtime$.viewer_file_md5_cache),
+    envir = runtime$.viewer_file_md5_cache
+  )
+  expect_identical(runtime$.viewerCrbMd5(file), first)
+  ## replaced by other bytes of the same size, with the same mtime (cp -p)
+  writeBin(as.raw(rep(201:250, 20L)), file)
+  Sys.setFileTime(file, when)
+  rm(
+    list = ls(runtime$.viewer_file_md5_cache),
+    envir = runtime$.viewer_file_md5_cache
+  )
+  expect_identical(runtime$.viewerCrbMd5(file), unname(tools::md5sum(file)))
+  expect_false(identical(runtime$.viewerCrbMd5(file), first))
 })

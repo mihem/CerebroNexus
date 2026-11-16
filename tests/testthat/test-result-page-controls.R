@@ -76,6 +76,10 @@ test_that("stored expression metric preference survives a grouping change", {
   )))
   wanted <- c(
     "most_expressed_genes_available_groups",
+    "most_expressed_genes_group",
+    "most_expressed_genes_metric",
+    "most_expressed_genes_metric_choices",
+    "most_expressed_genes_default_metric",
     "most_expressed_genes_selected_tables",
     "most_expressed_genes_selected_table",
     "most_expressed_genes_metric_description",
@@ -104,6 +108,11 @@ test_that("stored expression metric preference survives a grouping change", {
       getMeanExpression <- function(group) {
         data.frame(group = "x", gene = "Gad1", mean_expr = 1.5)
       }
+      viewer_control_helpers_load(environment())
+      sys.source(
+        viewer_test_path("most_expressed_genes", "select_group.R"),
+        environment()
+      )
       for (definition in definitions) {
         eval(definition, environment())
       }
@@ -146,6 +155,12 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
   )))
   wanted <- c(
     "most_expressed_genes_available_groups",
+    "most_expressed_genes_group",
+    "most_expressed_genes_metric",
+    "most_expressed_genes_show_all",
+    "most_expressed_genes_subgroup",
+    "most_expressed_genes_metric_choices",
+    "most_expressed_genes_default_metric",
     "most_expressed_genes_selected_tables",
     "most_expressed_genes_selected_table",
     'output[["most_expressed_genes_table"]]'
@@ -190,6 +205,11 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
         )
         DT::datatable(results_df)
       }
+      viewer_control_helpers_load(environment())
+      sys.source(
+        viewer_test_path("most_expressed_genes", "select_group.R"),
+        environment()
+      )
       for (definition in definitions) {
         eval(definition, environment())
       }
@@ -216,12 +236,85 @@ test_that("ambiguous legacy pct values reach the table without unit conversion",
   )
 })
 
+test_that("most expressed genes draw the first table before its controls bind", {
+  utilities <- viewer_test_path("utility_functions.R")
+  shiny::testServer(
+    function(input, output, session) {
+      scope <- environment()
+      renders <- 0L
+      shown <- NULL
+      getGroupsWithMostExpressedGenes <- function() c("cluster", "sample")
+      getGroupsWithMeanExpression <- function() "cluster"
+      viewerGetMostExpressedGenes <- function(group) {
+        data.frame(
+          cluster = factor(c("b", "a"), levels = c("a", "b")),
+          gene = c("X", "Y"),
+          pct = c(0.5, 0.2)
+        )
+      }
+      getMeanExpression <- function(group) {
+        data.frame(cluster = "a", gene = "X", mean_expr = 1)
+      }
+      cerebroRegisterInfo <- function(...) invisible(NULL)
+      cerebroResultTable <- function(results_df, ...) {
+        scope$renders <- scope$renders + 1L
+        scope$shown <- results_df
+        DT::datatable(results_df)
+      }
+      for (name in c("cerebroFilterResultRows", "cerebroResultSubgroupUI")) {
+        eval(viewer_r_assignment(utilities, name), scope)
+      }
+      viewer_control_helpers_load(scope)
+      sys.source(
+        viewer_test_path("most_expressed_genes", "select_group.R"),
+        scope
+      )
+      sys.source(viewer_test_path("most_expressed_genes", "table.R"), scope)
+    },
+    {
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 1L)
+      ## Drawn with the values the selectors are drawn with.
+      expect_identical(most_expressed_genes_group(), "cluster")
+      expect_match(
+        output$most_expressed_genes_select_group_UI$html,
+        '<option value="cluster" selected>',
+        fixed = TRUE
+      )
+      expect_identical(
+        most_expressed_genes_show_all(),
+        cerebroResultTableDefaults$show_all
+      )
+      ## Filtered to the subgroup the selector starts with.
+      expect_identical(scope$shown$gene, "Y")
+      expect_match(
+        output$most_expressed_genes_table_or_text_UI$html,
+        'value="pct" selected',
+        fixed = TRUE
+      )
+      ## The controls bind with the values the table was drawn with.
+      session$setInputs(
+        most_expressed_genes_selected_group = "cluster",
+        most_expressed_genes_metric_type = "pct",
+        most_expressed_genes_table_filter_switch = FALSE,
+        most_expressed_genes_table_select_group_level = "a"
+      )
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 1L)
+      session$setInputs(most_expressed_genes_table_select_group_level = "b")
+      invisible(output$most_expressed_genes_table)
+      expect_identical(scope$renders, 2L)
+      expect_identical(scope$shown$gene, "X")
+    }
+  )
+})
+
 test_that("Abundance waits for dynamic controls before choosing a renderer", {
   definition <- viewer_r_assignment(
     viewer_test_path("immune_repertoire", "visualizations.R"),
     "output.ir_plot_clonalAbundance"
   )
-  # Evaluate the production renderPlotly body, without the output/cache wrapper.
+  # Evaluate the production renderer body, without the output/cache wrapper.
   scope <- new.env(parent = environment())
   scope$req <- shiny::req
   scope$req_plot_space <- function(...) NULL
@@ -237,7 +330,7 @@ test_that("Abundance waits for dynamic controls before choosing a renderer", {
   scope$ir_abundance_counts <- function() {
     scope$ir_clonecall_col(scope$parameters$cloneCall)
   }
-  scope$ir_clonal_abundance_plotly <- function(counts, ...) counts
+  scope$ir_clonal_abundance_chart <- function(counts, ...) counts
   render <- eval(
     call("function", pairlist(), definition[[3L]][[2L]][[2L]]),
     scope
@@ -249,4 +342,39 @@ test_that("Abundance waits for dynamic controls before choosing a renderer", {
   expect_identical(render(), "gene")
   scope$parameters$cloneCall <- character()
   expect_error(render(), class = "shiny.silent.error")
+})
+
+test_that("stored-result controls open on the values page code starts with", {
+  scope <- viewer_runtime_env()
+  results <- data.frame(
+    cluster = factor(c("b", "a"), levels = c("c", "a", "b")),
+    gene = c("X", "Y")
+  )
+  html <- as.character(scope$cerebroResultTableControls(
+    "marker_genes",
+    results,
+    TRUE
+  ))
+  ## The subgroup selector selects cerebroResultSubgroupDefault().
+  expect_identical(scope$cerebroResultSubgroupDefault(results, TRUE), "c")
+  expect_match(html, '<option value="c" selected>', fixed = TRUE)
+  ## Every switch is drawn with cerebroResultTableDefaults.
+  switch_value <- function(id) {
+    tag <- regmatches(
+      html,
+      regexpr(paste0('<input[^>]*id="marker_genes_', id, '"[^>]*>'), html)
+    )
+    expect_length(tag, 1L)
+    grepl("checked", tag, fixed = TRUE)
+  }
+  defaults <- scope$cerebroResultTableDefaults
+  expect_identical(switch_value("table_filter_switch"), defaults$show_all)
+  expect_identical(
+    switch_value("table_number_formatting"),
+    defaults$number_formatting
+  )
+  expect_identical(
+    switch_value("table_color_highlighting"),
+    defaults$color_highlighting
+  )
 })

@@ -10,6 +10,15 @@
    draws the cells where the plot will be. The plot itself replaces the preview
    when it has painted its first frame.
 
+   An address without `?page=` opens the Projection too when the App's author
+   made it the start page: the description says so (`start_page`). Otherwise
+   it opens Data info, and the Projection is prepared behind it: once the page
+   has loaded, the two files are fetched, and when the Projection is first
+   shown before its plot is in, the preview is drawn there at once. The
+   session sends the plot's first frame while Data info is read
+   (overview/event_projection_update_plot.R): shown after that, the page
+   draws the plot itself and nothing here is drawn.
+
    The preview is a picture: it does not zoom, select or answer the pointer.
    Without a description (a first visit, a login, a data set without a Viewer
    Pack) nothing here runs and the page opens as before. */
@@ -41,7 +50,18 @@
   } catch (error) {
     return;
   }
-  if (params.get('page') !== 'projection' || !window.fetch ||
+  var page = params.get('page');
+  // Without `?page=`: opened there where the description names the Projection
+  // as the address's start page, prepared behind Data info otherwise.
+  var byDefault = page === null;
+  // The page comes marked to open on the App's start page (viewerStartTab() in
+  // viewer/core/shared_resources.R). An address that names another page opens
+  // on Data info until its session moves there, as it always did: not on the
+  // start page, whose first frame the session would make for nothing.
+  if (page !== null && page !== 'projection') {
+    whenParsed(function () { startOnTab('loadData'); });
+  }
+  if ((page !== 'projection' && !byDefault) || !window.fetch ||
       !window.TextEncoder || !window.Promise || !window.requestAnimationFrame) {
     return;
   }
@@ -105,15 +125,21 @@
     return response.ok ? response.json() : null;
   }).then(validDescription).catch(function () { return null; });
 
-  // The cells in unit coordinates and their colours, once both files are here.
-  var cells = description.then(function (view) {
-    if (!view) return null;
-    return Promise.all([
-      fetchBuffer(view.projection), fetchBuffer(view.categories)
-    ]).then(function (buffers) {
-      return prepare(view, new Float32Array(buffers[0]), new Uint8Array(buffers[1]));
-    });
-  }).catch(function () { return null; });
+  // The cells in unit coordinates and their colours, once both files are here:
+  // fetched at the first call, and only once.
+  var cells = null;
+  function loadCells() {
+    if (cells) return cells;
+    cells = description.then(function (view) {
+      if (!view) return null;
+      return Promise.all([
+        fetchBuffer(view.projection), fetchBuffer(view.categories)
+      ]).then(function (buffers) {
+        return prepare(view, new Float32Array(buffers[0]), new Uint8Array(buffers[1]));
+      });
+    }).catch(function () { return null; });
+    return cells;
+  }
 
   function packed(hex, opacity) {
     var value = parseInt(hex.slice(1), 16);
@@ -233,11 +259,11 @@
   // ready, before Shiny reads which outputs are hidden. Marking the page's tab
   // here, earlier still, opens the page as if it had been configured as the
   // start page: no visit to Data info, and no second round with the server.
-  function startOnPage() {
+  function startOnTab(tab) {
     var links = document.querySelectorAll('.main-sidebar a[data-toggle="tab"]');
     var target = null, i;
     for (i = 0; i < links.length; i++) {
-      if (links[i].getAttribute('data-value') === TAB) target = links[i];
+      if (links[i].getAttribute('data-value') === tab) target = links[i];
     }
     if (!target) return false;
     for (i = 0; i < links.length; i++) links[i].removeAttribute('data-start-selected');
@@ -324,7 +350,7 @@
 
   function shown() {
     root.classList.add('cerebro-first-view');
-    window.CerebroFirstView = { shown: true };
+    window.CerebroFirstView = Object.assign(window.CerebroFirstView || {}, { shown: true });
     // startup.js lifts the cover for a page that already shows its plot.
     window.dispatchEvent(new CustomEvent('cerebro:first-view', { detail: { id: VIEW_ID } }));
   }
@@ -353,6 +379,7 @@
     finished = true;
     window.removeEventListener('cerebro:cell-view-ready', onPlotReady);
     window.removeEventListener('cerebro:dataset-context', onContext);
+    if (window.jQuery) window.jQuery(document).off('.cerebroFirstView');
     if (!preview) return;
     var canvas = preview.canvas, host = preview.host;
     window.cancelAnimationFrame(preview.frame);
@@ -387,8 +414,16 @@
     var surface = host && host.querySelector('.cerebro-cell-view-surface');
     finish(surface && surface.querySelector('canvas'));
   }
+  // The data set the address opened: a preview drawn behind Data info is of
+  // that one only, not of one picked meanwhile.
+  var openedDataset = null;
   function onContext(event) {
-    if (event.detail && event.detail.phase === 'error') finish(null);
+    var detail = event.detail || {};
+    if (detail.phase === 'error') return finish(null);
+    var key = detail.dataset_context && detail.dataset_context.dataset_key;
+    if (detail.phase !== 'ready' || key == null) return;
+    if (openedDataset == null) openedDataset = String(key);
+    else if (String(key) !== openedDataset) finish(null);
   }
   window.addEventListener('cerebro:cell-view-ready', onPlotReady);
   window.addEventListener('cerebro:dataset-context', onContext);
@@ -401,15 +436,70 @@
     }
   }
 
-  whenParsed(function () {
-    if (!startOnPage()) {
+  // The page once shinydashboard has shown its start tab (the description came
+  // later), as the session's own start page message shows it (viewer-shell.js):
+  // not a click, which would count as the visitor's own navigation. Not when
+  // the visitor has gone to another page than Data info meanwhile.
+  function openPage(active) {
+    if (active.id === 'shiny-tab-' + TAB) return true;
+    if (active.id !== 'shiny-tab-loadData' || !window.jQuery) return false;
+    var link = document.querySelector('.main-sidebar a[data-toggle="tab"][data-value="' + TAB + '"]');
+    if (!link) return false;
+    window.jQuery(link).tab('show');
+    // What Shiny reads as the page when it binds the sidebar: before that, only
+    // this attribute (as shinydashboard's own ensureActivatedTab() sets it).
+    window.jQuery('.sidebarMenuSelectedTabItem').attr('data-value', TAB);
+    return true;
+  }
+
+  function start() {
+    var active = document.querySelector('.tab-pane.active[id^="shiny-tab-"]');
+    if (!(active ? openPage(active) : startOnTab(TAB))) {
       finish(null);
       return;
     }
-    cells.then(function (data) {
+    loadCells().then(function (data) {
       if (!data || finished) return finish(null);
       installStyle();
       mount(data);
+    });
+  }
+
+  // Behind Data info: the files once the page has loaded (they do not delay
+  // its own), and the preview when the Projection is first shown before the
+  // session's frame for it is in. A page that already holds that frame
+  // (renderState "received", set by cell_views.js) draws it itself.
+  function behind() {
+    function fetchFiles() {
+      loadCells().then(function (data) {
+        if (data && !finished) {
+          window.CerebroFirstView = Object.assign(window.CerebroFirstView || {}, { prefetched: true });
+        }
+      });
+    }
+    if (document.readyState === 'complete') fetchFiles();
+    else window.addEventListener('load', fetchFiles, { once: true });
+    if (!window.jQuery) return finish(null);
+    window.jQuery(document).one('shown.bs.tab.cerebroFirstView',
+      '.main-sidebar a[data-toggle="tab"][data-value="' + TAB + '"]', function () {
+        var host = document.getElementById(VIEW_ID + '_cell_view_host');
+        if (finished || !host || host.dataset.renderState === 'received') return finish(null);
+        loadCells().then(function (data) {
+          if (!data || finished || host.dataset.renderState === 'received') return finish(null);
+          installStyle();
+          mount(data);
+        });
+      });
+  }
+
+  whenParsed(function () {
+    if (!byDefault) return start();
+    // The description is usually here before the document is parsed; its
+    // promise then resolves before shinydashboard shows a tab.
+    description.then(function (view) {
+      if (!view) return finish(null);
+      if (view.start_page === 'projection') return start();
+      behind();
     });
   });
 })();

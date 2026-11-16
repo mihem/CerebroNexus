@@ -9,8 +9,8 @@ groupsMetadataColumns <- function(columns) {
 }
 
 groups_composition_counts <- reactive({
-  first <- input[["groups_selected_group"]]
-  second <- input[["groups_by_other_group_second_group"]]
+  first <- groups_selected_group()
+  second <- groups_by_other_group_second_group()
   req(first %in% getGroups(), second %in% getGroups(), first != second)
   calculateTableAB(
     groupsMetadataColumns(c(first, second)),
@@ -24,8 +24,8 @@ groups_composition_counts <- reactive({
 groupsCompositionTable <- function(mode, percent) {
   formatTableAB(
     groups_composition_counts(),
-    input[["groups_selected_group"]],
-    input[["groups_by_other_group_second_group"]],
+    groups_selected_group(),
+    groups_by_other_group_second_group(),
     mode,
     percent
   )
@@ -41,13 +41,12 @@ output[["groups_by_other_group_plot"]] <- renderCerebroChart({
   ## only proceed if the two groups are not the same (otherwise it can give an
   ## error when switching between groups)
   req(
-    input[["groups_selected_group"]] %in% getGroups(),
-    input[["groups_by_other_group_second_group"]] %in% getGroups(),
-    input[["groups_selected_group"]] !=
-      input[["groups_by_other_group_second_group"]]
+    groups_selected_group() %in% getGroups(),
+    groups_by_other_group_second_group() %in% getGroups(),
+    groups_selected_group() != groups_by_other_group_second_group()
   )
-  first <- input[["groups_selected_group"]]
-  second <- input[["groups_by_other_group_second_group"]]
+  first <- groups_selected_group()
+  second <- groups_by_other_group_second_group()
   colors_second <- reactive_group_colors(second)
   bar <- function(percent) {
     cerebroBarChartData(
@@ -81,47 +80,48 @@ output[["groups_by_other_group_plot"]] <- renderCerebroChart({
   )
 }) %>%
   cachePlot(
-    input[["groups_selected_group"]],
-    input[["groups_by_other_group_second_group"]],
-    reactive_group_colors(input[["groups_selected_group"]]),
-    reactive_group_colors(input[["groups_by_other_group_second_group"]]),
+    groups_selected_group(),
+    groups_by_other_group_second_group(),
+    reactive_group_colors(groups_selected_group()),
+    reactive_group_colors(groups_by_other_group_second_group()),
     available_crb_files$selected
   )
 
 ##----------------------------------------------------------------------------##
 ## Table showing numbers of plot.
 ##----------------------------------------------------------------------------##
-output[["groups_by_other_group_table"]] <- DT::renderDataTable({
-  ## only proceed if the two groups are not the same (otherwise it can give an
-  ## error when switching between groups)
-  req(
-    input[["groups_selected_group"]],
-    input[["groups_by_other_group_second_group"]],
-    input[["groups_selected_group"]] !=
-      input[["groups_by_other_group_second_group"]]
-  )
-  ## generate table
-  composition_df <- groupsCompositionTable(
-    mode = "wide",
-    percent = input[["groups_by_other_group_show_as_percent"]]
-  )
-  ## get indices of columns that should be formatted as percent
-  if (input[["groups_by_other_group_show_as_percent"]] == TRUE) {
-    columns_percentage <- c(3:ncol(composition_df))
-  } else {
-    columns_percentage <- NULL
-  }
-  composition_df %>%
-    dplyr::rename("# of cells" = total_cell_count) %>%
-    prettifyTable(
-      filter = "none",
-      dom = "Brtlip",
-      show_buttons = FALSE,
-      number_formatting = TRUE,
-      color_highlighting = FALSE,
-      hide_long_columns = TRUE,
-      columns_percentage = columns_percentage
+output[["groups_by_other_group_table"]] <- viewerLazyRender(function() {
+  DT::renderDataTable({
+    ## only proceed if the two groups are not the same (otherwise it can give an
+    ## error when switching between groups)
+    req(
+      groups_selected_group(),
+      groups_by_other_group_second_group(),
+      groups_selected_group() != groups_by_other_group_second_group()
     )
+    ## generate table
+    composition_df <- groupsCompositionTable(
+      mode = "wide",
+      percent = groups_by_other_group_show_as_percent()
+    )
+    ## get indices of columns that should be formatted as percent
+    if (groups_by_other_group_show_as_percent() == TRUE) {
+      columns_percentage <- c(3:ncol(composition_df))
+    } else {
+      columns_percentage <- NULL
+    }
+    composition_df %>%
+      dplyr::rename("# of cells" = total_cell_count) %>%
+      prettifyTable(
+        filter = "none",
+        dom = "Brtlip",
+        show_buttons = FALSE,
+        number_formatting = TRUE,
+        color_highlighting = FALSE,
+        hide_long_columns = TRUE,
+        columns_percentage = columns_percentage
+      )
+  })
 })
 
 ##----------------------------------------------------------------------------##

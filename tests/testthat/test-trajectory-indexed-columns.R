@@ -41,6 +41,14 @@ test_that("trajectory metadata columns preserve exact values, order and row name
 
 test_that("empty Trajectory selection preserves summary without hydrating metadata", {
   scope <- viewer_runtime_env()
+  ## Page code reads the selectors through viewerControlValue() (server.R).
+  eval(
+    quote({
+      trajectory_selected_name <- function() input[["trajectory_selected_name"]]
+      trajectory_point_color <- function() input[["trajectory_point_color"]]
+    }),
+    scope
+  )
   full <- data.frame(
     cell_barcode = c("a", "b", "c"),
     cluster = c("X", "X", "Y")

@@ -1206,3 +1206,38 @@ test_that("a dataset without QC columns keeps applying later Core edits", {
     )
   })
 })
+
+test_that("the Group catalog is built once for the same entry", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("plotly")
+  app_env <- configure_observer_app()
+  shiny::testServer(app_env$server, {
+    built <- 0L
+    # group_catalog_for_entry() finds the catalog builder from the server's
+    # environment, where the counting one replaces it for this session.
+    assign(
+      "builder_group_catalog_model",
+      function(model) {
+        built <<- built + 1L
+        app_env$builder_group_catalog_model(model)
+      },
+      envir = environment(group_catalog_for_entry)
+    )
+    entry <- configure_observer_entry(app_env, "dataset-a")
+    expected <- app_env$builder_group_catalog_model(group_catalog_input(entry))
+
+    expect_identical(group_catalog_for_entry(entry), expected)
+    expect_identical(group_catalog_for_entry(entry), expected)
+    expect_identical(built, 1L)
+
+    edited <- entry
+    edited$settings$default_group <- "sample"
+    expect_identical(
+      group_catalog_for_entry(edited),
+      app_env$builder_group_catalog_model(group_catalog_input(edited))
+    )
+    expect_identical(built, 2L)
+    expect_identical(group_catalog_for_entry(entry), expected)
+    expect_identical(built, 3L)
+  })
+})

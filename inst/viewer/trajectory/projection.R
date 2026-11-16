@@ -32,7 +32,7 @@ trajectory_update_appearance <- function(name, value) {
 
 output[["trajectory_projection_appearance_UI"]] <- renderUI({
   req(input[["trajectory_projection_more_render_request"]])
-  color_variable <- input[["trajectory_point_color"]]
+  color_variable <- trajectory_point_color()
   categorical <- FALSE
   if (!is.null(color_variable)) {
     metadata <- trajectory_cells_reactive(color_variable)
