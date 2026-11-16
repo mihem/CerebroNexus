@@ -1,5 +1,191 @@
 # Changelog
 
+## CerebroNexus 8.4.0
+
+- **The Projection is prepared while Data info is read.** Data info
+  stays the start page, and a click on Projection no longer waits for
+  the session to build the plot: as soon as the data set is read and
+  Data info sent, the session sends the Projection’s first frame, which
+  the browser keeps and draws when the page is first shown. The browser
+  has also fetched the Viewer Pack files of the plot’s preview by then,
+  and draws that preview at once if the click comes before the frame.
+  With 1.3 million cells (WSL, software WebGL, medians of 5), a click 10
+  s after Data info appeared shows the plot in 0.49 s (8.3.5: 0.74 s),
+  and a click before the data set is read shows the preview after
+  0.08 s. `initial_page` in
+  [`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
+  still chooses another start page (`"projection"` opens on the plot,
+  with its preview while the session starts).
+
+- **The other pages are prepared while the first one is read.** Once a
+  session has had no input for three seconds, it loads the code of the
+  pages its data set has, sorts the gene list the gene selectors share,
+  reads the gene ID table and checks the Viewer Pack files, one task at
+  a time, and stops at the next click. With 1.3 million cells, opened
+  after 15 s on the Projection: Gene expression 0.43 s instead of 0.58
+  s, Gene ID conversion 0.33 s instead of 0.44 s, Trajectory 0.53 s
+  instead of 0.64 s, Linked views 0.59 s instead of 0.65 s, Groups 0.23
+  s instead of 0.28 s. Opened after 4 s, they open as before. The HLA &
+  TCR motifs page, which computes from the repertoire as soon as it is
+  loaded, waits for its visit as before. The gene ID table is also read
+  once per process instead of at every render of its page.
+
+- **Immune repertoire opens sooner.** With a Viewer Pack that has the
+  repertoire encoded, the page is prepared like the others while the
+  first one is read, its encoding is read from the Pack then, and the
+  first loading spinner of the process is built: 0.33 s instead of 0.45
+  s for the 1.46 million cells of Ren. With a Pack built before that
+  encoding, the encoding the page made in memory is kept between
+  sessions in two files, the clone names apart: they are read only by
+  the clone tables and Compare, so a later session opens the page in 0.5
+  s instead of 5.6 s and holds 400 MB less. An encoding kept by an
+  earlier release is converted at its next use.
+
+- **A large repertoire is encoded in another R process.** Encoding the
+  repertoire of a data set without a current Viewer Pack (Ren: 25 s)
+  held the App’s R process, so every page of every session waited for
+  it. Another process encodes it now and keeps it in the user cache; the
+  Immune repertoire page says it waits and fills in when it is done, and
+  the other pages open as before meanwhile (Groups 0.3 s instead of 20
+  s). A small repertoire (under 50,000 rows) is still encoded at once.
+
+- **Immune repertoire draws its map at once while the repertoire is
+  encoded.** With a Viewer Pack built before the encoding, the page
+  waited for all of it: Ren drew its Clonal projection 26 s after the
+  click. The map is now drawn from the Pack’s index of each receptor’s
+  cells, which gives the same cells, clones and clone sizes, while the
+  other process encodes the rest for the other tabs: 1.1 to 1.5 s after
+  the click. That process now starts while the first page is read,
+  instead of at the visit, and with a larger first heap (most of its
+  time went to garbage collection): 19 s instead of 27 s for Ren. A thin
+  CRB’s repertoire is matched to its cells by their row, without reading
+  the cell names. The notice that the repertoire is being encoded is
+  shown on the Immune repertoire page only.
+
+- **Linked views opens 0.1 s sooner.** The workspace came in two parts:
+  one projection first, drawn and painted although it stays hidden until
+  the rest is there, and only then the request for the rest, after which
+  everything was built and drawn again. The rest is now requested as
+  soon as the first part’s data is in, and the workspace is drawn once
+  (if the rest is late, the first part is drawn alone after 1.5 s, as
+  before). Point colours by group or by a continuous value are packed
+  once per level or step instead of once per cell (the trajectory panel
+  of 1.3 million cells: 50 ms instead of 80 to 95 ms, at every
+  recolouring too), a group’s cells are counted for the legend once
+  instead of at every render, and a slider is no longer rebuilt when its
+  state has not changed. With 1.3 million cells, after 15 s on the
+  Projection: 0.57 s instead of 0.66 s (WSL, headless Chrome).
+
+- **Colour management opens sooner for groups with many levels.** The
+  page makes a colour picker for every level of every group: 661 for
+  Ren, which took 2.4 s, most of it in the browser. A picker is now made
+  when it comes near the screen (a level without one keeps its colour),
+  and the pickers are built without looking up colourpicker’s version
+  for each: 0.75 s.
+
+- **A page opened while the App connects no longer stays “Loading”.**
+  Since the page is on screen before its session starts, a page could be
+  clicked while the browser was connecting. Shiny then sent that click
+  ahead of its `init` message, which set the server back to Data info,
+  and the Projection waited for good (5 of 19 starts of the 1.3 million
+  cell data set with an empty cache, 14 of 20 with the page kept). No
+  input is now sent before `init`; 31 of 31 starts drew their plot.
+
+- **A Viewer Pack is built 0.7 s sooner.** The CRB was hashed twice, for
+  the manifest and for the check of the pack right after; now once. A
+  Build of 100,000 cells with the matrix in the CRB: 11.3 s instead of
+  12.1 s.
+
+- **[`createShinyApp()`](https://www.mheming.com/CerebroNexus/reference/createShinyApp.md)
+  frees what it read before it returns.** It reads each CRB whole, and R
+  collected that only when it next ran short, so a second export in the
+  same R session read its CRB on top of it. Exporting a 100,000 cell CRB
+  with its matrix inside twice now peaks at 2.5 GB instead of 3.3 GB.
+
+- **The App starts sooner.** On a first start the page waited for the
+  whole preparation, the data sets read included; it is now sent first
+  and its files load while R reads the CRB (on the threads
+  `qs2::qopt("nthreads")` allows, at most two under R CMD check). The
+  start page is marked in the page itself, so a session that starts on
+  the Projection (`initial_page = "projection"`) sends its first frame
+  at once, without the browser asking for it. With 1.3 million cells and
+  that start page the plot is drawn 5.2 s after the R process starts
+  instead of 5.9 s with an empty cache, and 4.0 s instead of 4.2 s with
+  a kept one (measured with four threads). A CRB’s checksum, which names
+  the data set of its Viewer Pack, is kept between starts; a file
+  replaced by another of the same size and modification time is hashed
+  again.
+
+- **Less is sent, and less is computed per cell.** Gene expression
+  recolours from 256 colour steps instead of computing every cell’s
+  colour, and finds an H5 gene’s cells from the row it read: one gene
+  0.59 s instead of 0.68 s, twelve genes 0.78 s instead of 0.92 s.
+  “Highest expression on top” sorts the cells by their values in
+  buckets, in the same order. Trajectory no longer sends an index of its
+  1.3 million cells the browser already has from the Viewer Pack (49 KB
+  instead of 6.9 MB when it opens), Linked views colours by a group from
+  the Pack’s codes (7 ms instead of 148 ms), Extra material draws its
+  table with the page instead of after two round trips (0.29 s instead
+  of 0.39 s), and HLA & TCR motifs no longer loads igraph and stringdist
+  for its first view and is prepared while the first page is read. The
+  result page loader shows after 400 ms instead of 180 ms, and not on a
+  page already drawn.
+
+- **Viewer Pack revision 2.** A Pack built again with
+  `buildViewerPack(overwrite = TRUE)` holds the default Clonal
+  projection of each receptor and the HLA & TCR motifs first frame
+  without its segments (older Packs work as before). With it, for the
+  1.46 million cells of Ren: Immune repertoire 0.50 s instead of 0.66 s,
+  with the same pixels, legend and hover and 0.2 MB instead of 5.4 MB
+  over the websocket; HLA & TCR motifs 0.21 s instead of 0.53 s. The
+  repertoire is encoded in fewer passes: the same encoding, 13 s instead
+  of 20 s for Ren. The analysis tabs are built when first shown or once
+  the page is quiet, so plotly.js no longer loads with the Clonal
+  projection, and they no longer wait for the toolbar controls hidden on
+  the Clonal projection: the next tab (Abundance) 0.24 s instead of
+  0.45 s. Abundance, Homeostasis and Isotype are drawn by the Viewer’s
+  own charts instead of plotly; they have no zoom, pan or box selection,
+  and download as SVG or PNG.
+
+- **A page draws its first view without waiting for the browser between
+  steps.** Every page gains from three changes:
+
+  - The outputs of a page whose code loads on the click are no longer
+    held until the browser reports them visible: the browser reports
+    them with the click.
+  - Tables and plotly charts load DT and plotly when they first draw,
+    not when the page’s code loads.
+  - The controls a page makes on the server are read, until they reach
+    the browser, with the value they will have. A table or plot no
+    longer waits for them to make the round trip.
+
+  The packages loaded while a session is quiet are loaded one at a time,
+  after the pages, so a click waits for one package at most. Times in a
+  separate run:
+
+  | Page                                | Before | After  |
+  |-------------------------------------|--------|--------|
+  | Most expressed genes                | 0.60 s | 0.37 s |
+  | Marker genes                        | 0.54 s | 0.41 s |
+  | Trajectory                          | 0.49 s | 0.21 s |
+  | Colour management, opened in a tour | 0.25 s | 0.13 s |
+
+- **Spatial finds a section’s cells by the Viewer Pack’s index** instead
+  of by their names, and draws a single unrotated section from the Pack:
+  CosMx 0.62 s instead of 0.75 s, with the same pixels.
+
+- **Faster edits in the Builder’s Configure page, again.** An edit no
+  longer searches the recommendations for references or validates the
+  metadata recommendation again when neither changed, builds the Group
+  catalog once instead of three times, and does not send the Group
+  detail and the metadata preview again when they are unchanged: 18 ms
+  instead of 27 ms in the Shiny process for an edit with 64 metadata
+  columns.
+
+Times above: Windows, medians of 4 rounds (12 for the result pages)
+against commit 05b200515 of this branch, measured with the paper’s
+standard (`measure_session.R`).
+
 ## CerebroNexus 8.3.5
 
 - **Builder from the package sources.** When the Builder runs next to

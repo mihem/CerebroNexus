@@ -15,7 +15,7 @@ run with shiny::runApp(result_dir)."><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -319,7 +319,10 @@ session's current selection take precedence.</p></dd>
 <code>"about"</code>. A conditional page is selected only when it is available
 for the first loaded dataset. Initial routing is attempted only once, so
 switching datasets later never triggers a delayed redirect. Shared links
-take precedence after restoration.</p></dd>
+take precedence after restoration. <code>NULL</code> (the default) opens
+<code>"data_info"</code>, and the Projection is prepared while it is read: a
+click on Projection shows the plot at once, or a preview of it while the
+data set is still being read.</p></dd>
 
 
 <dt id="arg-initial-projections">initial_projections<a class="anchor" aria-label="anchor" href="#arg-initial-projections"></a></dt>
@@ -439,7 +442,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Shiny app successfully created!</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4475-2870972215/Rtmp1dxcAG/my_app</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> App directory: /tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Data file(s):</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   - PBMC example : example.crb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Port: 8080</span>
@@ -447,7 +450,7 @@ while the build is running; the target build lock does not protect inputs.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Launch browser: TRUE</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> To launch the app, run:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4475-2870972215/Rtmp1dxcAG/my_app')</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   shiny::runApp('/tmp/nix-shell-4527-980447843/RtmpGlheD1/my_app')</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> ========================================</span>
 <span class="r-in"><span><span class="co"># Run with shiny::runApp(app_dir) or deploy the directory to Shiny Server.</span></span></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>

@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">CerebroNexus</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.3.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">8.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -102,7 +102,7 @@
                         <h4 data-toc-skip class="author">Xuesong
 Wang</h4>
             
-            <h4 data-toc-skip class="date">15 November, 2026</h4>
+            <h4 data-toc-skip class="date">16 November, 2026</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mihem/CerebroNexus/blob/master/vignettes/articles/create_a_self_contained_shiny_app.Rmd" class="external-link"><code>vignettes/articles/create_a_self_contained_shiny_app.Rmd</code></a></small>
       <div class="d-none name"><code>create_a_self_contained_shiny_app.Rmd</code></div>
@@ -267,7 +267,8 @@ for generated apps</td>
 </tr>
 <tr class="even">
 <td><code>initial_page</code></td>
-<td>stable Viewer page ID used once when the first dataset loads</td>
+<td>stable Viewer page ID used once when the first dataset loads; Data
+info by default</td>
 </tr>
 <tr class="odd">
 <td>
@@ -330,9 +331,11 @@ by all datasets or a named numeric vector/list whose names exactly match
 <div class="section level2">
 <h2 id="initial-page">Initial page<a class="anchor" aria-label="anchor" href="#initial-page"></a>
 </h2>
-<p>Use <code>initial_page</code> with a stable page ID such as
-<code>"linked_views"</code>, <code>"extra_material"</code>, or
-<code>"spatial"</code>:</p>
+<p>Without <code>initial_page</code>, the App opens on Data info, and
+prepares the Projection while it is read: a click on Projection then
+shows the plot at once. Use <code>initial_page</code> with a stable page
+ID such as <code>"linked_views"</code>, <code>"extra_material"</code>,
+or <code>"spatial"</code>:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/createShinyApp.html">createShinyApp</a></span><span class="op">(</span></span>
 <span>  cerebro_data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"PBMC example"</span> <span class="op">=</span> <span class="va">crb</span><span class="op">)</span>,</span>

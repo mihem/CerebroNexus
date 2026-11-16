@@ -97,7 +97,7 @@ real service account, then start the service normally. See
 | `cerebro_options` | extra entries merged into `Cerebro.options` |
 | `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
 | `show_upload_ui` | allow users to upload their own data; defaults to `FALSE` for generated apps |
-| `initial_page` | stable Viewer page ID used once when the first dataset loads |
+| `initial_page` | stable Viewer page ID used once when the first dataset loads; Data info by default |
 | `point_size`, `point_opacity`, `percentage_cells_to_show` | scalar or named per-dataset scatter defaults |
 | `variable_to_compare` | forwarded into `Cerebro.options` |
 | `extra_tables`, `extra_tables_sheets` | external delimited files or Excel workbooks, plus optional displayed sheet names |
@@ -142,8 +142,10 @@ datasets or a named numeric vector/list whose names exactly match
 
 ## Initial page
 
-Use `initial_page` with a stable page ID such as `"linked_views"`,
-`"extra_material"`, or `"spatial"`:
+Without `initial_page`, the App opens on Data info, and prepares the
+Projection while it is read: a click on Projection then shows the plot
+at once. Use `initial_page` with a stable page ID such as
+`"linked_views"`, `"extra_material"`, or `"spatial"`:
 
 ``` r
 createShinyApp(
