@@ -1850,12 +1850,18 @@ test_that("the Viewer contracts load from a source checkout", {
 })
 
 test_that("a CRB is read on the threads the user allows, within the limits", {
-  ## the user's qs2 setting decides (its default is one thread)
-  expect_identical(.cerebroReadThreads(1L, 16L, ""), 1L)
+  ## the user's qs2 setting decides when it is set; otherwise eight threads
+  ## (the package's default), capped by the cores and R CMD check's limit
+  expect_identical(.cerebroReadThreads(1L, 16L, ""), 8L)
   expect_identical(.cerebroReadThreads(8L, 16L, ""), 8L)
+  ## the default is capped by the cores when there are fewer than eight
+  expect_identical(.cerebroReadThreads(1L, 4L, ""), 4L)
+  expect_identical(.cerebroReadThreads(1L, 2L, ""), 2L)
   ## never more than the cores, at most two under R CMD check's limit
   expect_identical(.cerebroReadThreads(8L, 4L, ""), 4L)
+  expect_identical(.cerebroReadThreads(1L, 16L, "TRUE"), 2L)
   expect_identical(.cerebroReadThreads(8L, 16L, "TRUE"), 2L)
   expect_identical(.cerebroReadThreads(8L, 16L, "false"), 8L)
-  expect_identical(.cerebroReadThreads(NA, NA, ""), 1L)
+  ## a missing value (the qopt is not set) falls back to the default
+  expect_identical(.cerebroReadThreads(NA, NA, ""), 8L)
 })
