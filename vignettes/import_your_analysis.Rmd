@@ -65,7 +65,7 @@ crb <- convertSeuratToCerebro(
 
 To add tables of most expressed genes, marker genes and enriched pathways
 before the export, see
-[Introduction to the CerebroNexus workflow (Seurat)](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.html).
+[Introduction to the CerebroNexus workflow (Seurat)](cerebronexus_workflow_seurat.html).
 
 # From an AnnData file
 

@@ -25,7 +25,7 @@ It does not cover quality control, normalization, clustering or dimensional redu
 
 The functions shown here take a Seurat object.
 The same steps, except the gene set enrichment, can also be switched on in the Builder (`launchCerebroBuilder()`); see [Build a data set by pointing](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
-If your analysis lives in a SingleCellExperiment or an AnnData (scanpy) file, see [Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus](https://www.mheming.com/CerebroNexus/articles/import_your_analysis.html).
+If your analysis lives in a SingleCellExperiment or an AnnData (scanpy) file, see [Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus](import_your_analysis.html).
 
 # Installation
 
