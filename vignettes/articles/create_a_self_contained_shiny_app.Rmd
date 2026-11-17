@@ -318,5 +318,5 @@ rsconnect::deployApp(appDir = out_dir)
 # Reference
 
 - `?createShinyApp`
-- `vignette("cerebronexus_workflow_seurat")` for end-to-end Seurat → `.crb` → app
+- `vignette("import_your_analysis")` for getting a Seurat, scanpy or SingleCellExperiment analysis into a `.crb` file
 - `vignette("host_cerebro_on_shinyapps")` for shinyapps.io specifics

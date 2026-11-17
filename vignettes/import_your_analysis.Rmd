@@ -1,11 +1,11 @@
 ---
-title: "Use SingleCellExperiment and AnnData data"
+title: "Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Use SingleCellExperiment and AnnData data}
+  %\VignetteIndexEntry{Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -20,25 +20,56 @@ knitr::opts_chunk$set(
 
 # Overview
 
-Cerebro does not need a Seurat object. A `.crb` file is the common format, and
-three kinds of input lead to it:
+CerebroNexus is compatible with Seurat, SingleCellExperiment and AnnData
+(scanpy) objects, and with SpatialData stores. It shows an analysis that is
+already done: quality control, normalization, clustering and embeddings stay in
+the toolkit you already use. For the preprocessing steps, please see:
+
+* [Seurat tutorials](https://satijalab.org/seurat/)
+* [Orchestrating Single-Cell Analysis with Bioconductor](https://bioconductor.org/books/release/OSCA/)
+  for SingleCellExperiment
+* [scanpy tutorials](https://scanpy.readthedocs.io/en/latest/tutorials/basics/index.html)
+
+A `.crb` file is the common format, and four kinds of input lead to it:
 
 | You have | Convert with |
 |---|---|
 | Seurat object (`.rds`, `.qs2`) | `convertSeuratToCerebro()` |
 | SingleCellExperiment (`.rds`, `.qs2`) | `convertSCEToCerebro()` |
 | AnnData / scanpy file (`.h5ad`), MuData (`.h5mu`) | `convertH5adToCerebro()` |
+| SpatialData store (`.zarr`) | `convertSpatialDataToCerebro()` |
+
+`convertSeuratToCerebro()` and `convertSCEToCerebro()` take either the object
+in memory or a file path, and write the `.crb` file into `result_dir`. To choose
+the file name yourself, use `exportFromSeurat()` or `exportFromSCE()`, which take
+an object and a `file` argument; set `nUMI` and `nGene` to the meta data columns
+that hold the number of transcripts and genes per cell.
 
 Because `.crb` is the hub, the formats also convert into each other: a Seurat
 object can be written as `.h5ad` for scanpy, an `.h5ad` file can be turned into
 a SingleCellExperiment, and so on. AnnData files are read natively with
 `rhdf5`; no Python is needed.
 
+# From a Seurat object
+
+```{r seurat}
+library(CerebroNexus)
+
+crb <- convertSeuratToCerebro(
+  "my_seurat.rds",
+  result_dir = "cerebro",
+  groups = c("seurat_clusters", "sample"),
+  organism = "Human"
+)
+```
+
+To add tables of most expressed genes, marker genes and enriched pathways
+before the export, see
+[Introduction to the CerebroNexus workflow (Seurat)](https://www.mheming.com/CerebroNexus/articles/cerebronexus_workflow_seurat.html).
+
 # From an AnnData file
 
 ```{r h5ad}
-library(CerebroNexus)
-
 crb <- convertH5adToCerebro(
   "pbmc.h5ad",
   result_dir = "cerebro",

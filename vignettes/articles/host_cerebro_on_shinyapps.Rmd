@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 # Overview
 
 In this vignette, I explain how one can host Cerebro on [shinyapps.io](https://www.shinyapps.io).
-For a more detailed tutorial on how to host Shiny apps on shinyapps.io, take a look here: <https://shiny.rstudio.com/articles/shinyapps.html>
+For a more detailed tutorial on how to host Shiny apps on shinyapps.io, take a look here: <https://shiny.posit.co/r/articles/share/shinyapps/>
 
 [shinyapps.io](https://www.shinyapps.io) is a great place to host Shiny apps and make them accessible for other users.
 You will need an account on the website.

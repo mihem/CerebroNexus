@@ -87,7 +87,7 @@ createShinyApp(
 ```
 
 No Python is needed to read AnnData or SpatialData; see the vignette
-[Use SingleCellExperiment and AnnData data](vignettes/use_sce_and_anndata_data.Rmd).
+[Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus](vignettes/import_your_analysis.Rmd).
 
 ## License
 
