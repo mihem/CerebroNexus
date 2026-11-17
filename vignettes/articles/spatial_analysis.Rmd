@@ -240,6 +240,6 @@ Missing settings default to a no-op (no flip, scale 1.0, no rotation).
 
 # See also
 
-- `vignette("cerebronexus_workflow_seurat")` for the complete export workflow.
+- `vignette("import_your_analysis")` for converting Seurat, AnnData and SpatialData data to a `.crb` file.
 - `vignette("create_a_self_contained_shiny_app")` for app bundling options.
 - `vignette("multi_crb")` for hosting several datasets in one app.

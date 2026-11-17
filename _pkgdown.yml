@@ -1,5 +1,8 @@
 url: https://www.mheming.com/CerebroNexus/
 
+redirects:
+  - ["articles/use_sce_and_anndata_data.html", "articles/import_your_analysis.html"]
+
 template:
   bootstrap: 5
   light-switch: true
@@ -50,9 +53,8 @@ articles:
   - title: "Workflows"
     navbar: Workflows
     contents:
+      - import_your_analysis
       - cerebronexus_workflow_seurat
-      - articles/export_a_data_set_in_SCE_format
-      - use_sce_and_anndata_data
   - title: "Data model"
     navbar: Interface
     contents:
