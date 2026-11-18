@@ -218,9 +218,14 @@
     if (file.exists(h5_abs)) {
       file.remove(h5_abs)
     }
+    ## A matrix too large to read (an h5ad, see R/h5ad_stream.R): the object
+    ## holds an empty stand-in and the file is written from the h5ad itself.
+    stream <- getOption("cerebro.expression_stream")
     ## Hashing the matrix pays only for a caller that keeps sidecars to
     ## reuse (the Builder sets the option, if only to an empty list).
-    content_digest <- if (!is.null(getOption("cerebro.expression_sidecars"))) {
+    content_digest <- if (
+      is.null(stream) && !is.null(getOption("cerebro.expression_sidecars"))
+    ) {
       .expressionContentDigest(expression_data, h5_compression_level)
     }
     ## An earlier sidecar written from this very matrix is taken as it is.
@@ -232,7 +237,19 @@
       )
     }
 
-    if (is.null(h5_md5)) {
+    if (!is.null(stream)) {
+      if (verbose) {
+        .logStep("Streaming the expression matrix to TENx HDF5 file: ", h5_abs)
+      }
+      .h5adStreamWriteTENx(
+        stream,
+        h5_abs,
+        group = "expression",
+        dimnames = rev(dimnames(expression_data)),
+        level = h5_compression_level
+      )
+      h5_md5 <- unname(tools::md5sum(h5_abs))
+    } else if (is.null(h5_md5)) {
       ## transpose genes x cells -> cells x genes for storage
       m_disk <- if (
         inherits(expression_data, c("RleMatrix", "DelayedMatrix"))

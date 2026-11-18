@@ -172,8 +172,13 @@ convertH5adToCerebro <- function(
     airr_sample = airr_sample,
     spatial_images = spatial_images,
     extra_modalities = extra_modalities,
-    verbose = verbose
+    verbose = verbose,
+    .stream_x = identical(expression_matrix_mode, "h5") && identical(assay, "X")
   )
+  ## An X with more than 2^31 - 1 non-zero values was not read: it is streamed
+  ## into the expression file (see R/h5ad_stream.R).
+  x_stream <- sce@metadata$.h5ad_x_stream
+  sce@metadata$.h5ad_x_stream <- NULL
 
   obs_columns <- names(SummarizedExperiment::colData(sce))
   if (is.null(nUMI)) {
@@ -218,6 +223,7 @@ convertH5adToCerebro <- function(
     add_most_expressed_genes = add_most_expressed_genes,
     most_expressed_genes = most_expressed_genes,
     spatial_split_by = spatial_split_by,
-    .source_name = h5ad_file
+    .source_name = h5ad_file,
+    .x_stream = x_stream
   )
 }
