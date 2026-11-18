@@ -1,7 +1,6 @@
 ## NanoString CosMx SMI non-small-cell lung cancer (NSCLC) FFPE data set
 ## (He et al. 2022, Nature Biotechnology 40:1794): 8 sections of 5 tissues, 960
 ## genes, one flat-file archive per section. See cosmx.ATTRIBUTION.md.
-.viewerCosMxVersion <- 2L
 
 .viewerCosMxBaseUrl <- paste0(
   "https://nanostring-public-share.s3.us-west-2.amazonaws.com/",
@@ -57,7 +56,7 @@
     samples <- .viewerCosMxSamples()$sample
   }
   root <- file.path(.demoLargeCacheDir(cache_dir), "cosmx")
-  prepared <- file.path(root, paste0("cerebro-v", .viewerCosMxVersion))
+  prepared <- .demoPreparedDir(root)
   list(
     root = root,
     source_dir = file.path(root, "source"),
@@ -378,7 +377,7 @@
     )
   )
   saveCerebro(object, paths$crb)
-  writeLines(as.character(.viewerCosMxVersion), paths$stamp)
+  .demoStampWrite(paths$stamp, .viewerCosMxRecipe)
   paths$crb
 }
 
@@ -387,11 +386,7 @@
     !dir.exists(paths$crb) &&
     file.exists(paths$sidecar) &&
     !dir.exists(paths$sidecar) &&
-    file.exists(paths$stamp) &&
-    identical(
-      readLines(paths$stamp, warn = FALSE),
-      as.character(.viewerCosMxVersion)
-    )
+    .demoStampCurrent(paths$stamp, .viewerCosMxRecipe)
 }
 
 prepareViewerCosMxDemoData <- function(cache_dir = NULL) {
@@ -411,7 +406,7 @@ prepareViewerCosMxDemoData <- function(cache_dir = NULL) {
   ## Build privately. A failed preparation must not delete a working data set.
   dir.create(paths$root, recursive = TRUE, showWarnings = FALSE)
   stage <- tempfile(
-    paste0("cerebro-v", .viewerCosMxVersion, "-stage-"),
+    "prepared-stage-",
     paths$root
   )
   dir.create(stage)
@@ -430,3 +425,7 @@ prepareViewerCosMxDemoData <- function(cache_dir = NULL) {
   .demoPublishStage(stage, dirname(paths$crb), paths$root, "CosMx")
   paths$crb
 }
+
+## What the stamp of these files records (.demoRecipe()), taken now: after the
+## last function of this script.
+.viewerCosMxRecipe <- .demoRecipe(environment(), "CosMx")

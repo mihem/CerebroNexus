@@ -20,28 +20,25 @@ repo_root <- if (length(script_arg)) {
   normalizePath(".", mustWork = TRUE)
 }
 
-## Each demo: its preparation function, the variable the Viewer reads and the
-## version stamp (rebuilt when it changes).
+## Each demo: its preparation function and the variable the Viewer reads. A
+## demo is prepared again when its stamp no longer matches this checkout
+## (.demoStampKey() in data-raw/large-demo/download_helpers.R).
 demos <- list(
   "1m" = list(
     prepare = function() prepareViewer1mBenchmarkData(),
-    variable = "CEREBRO_1M_DEMO_CRB",
-    version = function() .viewer1mVersion
+    variable = "CEREBRO_1M_DEMO_CRB"
   ),
   ren = list(
     prepare = function() prepareViewerRenDemoData(),
-    variable = "CEREBRO_REN_DEMO_CRB",
-    version = function() .viewerRenVersion
+    variable = "CEREBRO_REN_DEMO_CRB"
   ),
   cosmx = list(
     prepare = function() prepareViewerCosMxDemoData(),
-    variable = "CEREBRO_COSMX_DEMO_CRB",
-    version = function() .viewerCosMxVersion
+    variable = "CEREBRO_COSMX_DEMO_CRB"
   ),
   tcell = list(
     prepare = function() prepareViewerTcellDemoData(),
-    variable = "CEREBRO_TCELL_DEMO_CRB",
-    version = function() .viewerTcellVersion
+    variable = "CEREBRO_TCELL_DEMO_CRB"
   )
 )
 
@@ -71,8 +68,8 @@ if (!requireNamespace("pkgload", quietly = TRUE)) {
 pkgload::load_all(repo_root, export_all = FALSE, quiet = TRUE, helpers = FALSE)
 message("Viewer source: ", repo_root)
 for (script in c(
-  "prepare_viewer_1m_data.R",
   "download_helpers.R",
+  "prepare_viewer_1m_data.R",
   "prepare_viewer_ren_data.R",
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
@@ -93,7 +90,7 @@ for (name in names(demos)) {
     Sys.setenv,
     stats::setNames(list(normalizePath(crb, mustWork = TRUE)), demo$variable)
   )
-  message(name, " data version ", demo$version(), ": ", crb)
+  message(name, " data: ", crb)
 }
 if ("--prepare-only" %in% args) {
   quit(save = "no", status = 0)

@@ -180,7 +180,7 @@ test_that("a preparation keeps the previous data set until a new one is complete
   for (demo in c("CosMx", "Tcell")) {
     env <- large_demo_env(sprintf("prepare_viewer_%s_data.R", tolower(demo)))
     prepare <- env[[sprintf("prepareViewer%sDemoData", demo)]]
-    version <- env[[sprintf(".viewer%sVersion", demo)]]
+    recipe <- env[[sprintf(".viewer%sRecipe", demo)]]
     build <- sprintf(".viewer%sBuildObject", demo)
     root <- withr::local_tempdir()
     paths <- env[[sprintf(".viewer%sPaths", demo)]](root)
@@ -200,11 +200,11 @@ test_that("a preparation keeps the previous data set until a new one is complete
     env[[build]] <- function(paths, work) {
       writeLines("new", paths$crb)
       file.create(paths$sidecar, if (!is.null(paths$immune)) paths$immune)
-      writeLines(as.character(version), paths$stamp)
+      env$.demoStampWrite(paths$stamp, recipe)
     }
     expect_identical(prepare(root), paths$crb, info = demo)
     expect_identical(readLines(paths$crb), "new", info = demo)
-    ## A finished build of the current version is reused; another stamp is not.
+    ## A finished build of the current recipe is reused; another stamp is not.
     env[[build]] <- function(...) stop("must reuse the cache")
     expect_identical(prepare(root), paths$crb, info = demo)
     writeLines("0", paths$stamp)
