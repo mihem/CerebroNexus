@@ -521,7 +521,7 @@
 }
 
 ## Writes the Ren counts as the `<stem>.h5` expression sidecar: cells x genes,
-## group "expression", uncompressed, like exportFromSeurat(). Returns the
+## group "expression", gzip level 1, like exportFromSeurat(). Returns the
 ## lazily read genes x cells view the Cerebro object would attach at runtime.
 .viewerRenWriteSidecar <- function(h5ad, sidecar, expected_cells = 1462702L) {
   if (file.exists(sidecar)) {
@@ -552,18 +552,23 @@
     stop("The Ren expression matrix needs unique gene names.", call. = FALSE)
   }
   dimnames(matrix) <- list(genes, cells)
-  ## writeTENxMatrix() would scan the whole source once per block of genes.
-  if (!exists(".demoWriteH5Transposed", mode = "function")) {
-    stop(
-      "Source data-raw/large-demo/h5_transposed_write.R before building the demo data.",
-      call. = FALSE
-    )
+  ## writeTENxMatrix() would scan the whole source once per block of genes: the
+  ## CSR arrays are read directly and written by the package's streaming writer.
+  encoding <- rhdf5::h5readAttributes(h5ad, group)[["encoding-type"]]
+  if (!identical(as.character(encoding), "csr_matrix")) {
+    stop("The Ren count matrix must be stored as CSR (by cell).", call. = FALSE)
   }
-  ## `group` is read directly (CSR arrays) when the file stores it that way.
-  .demoWriteH5Transposed(
-    matrix,
+  CerebroNexus:::.h5adStreamWriteTENx(
+    CerebroNexus:::.h5adStreamSource(
+      h5ad,
+      group,
+      n_obs = length(cells),
+      n_vars = length(genes)
+    ),
     sidecar,
-    source = .demoAnnDataCsrSource(h5ad, group)
+    group = "expression",
+    dimnames = list(cells, genes),
+    level = 1L
   )
   DelayedArray::t(HDF5Array::TENxMatrix(sidecar, group = "expression"))
 }

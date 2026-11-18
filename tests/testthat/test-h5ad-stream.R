@@ -36,7 +36,8 @@ test_that("a streamed matrix gives the same expression file and summaries", {
   withr::local_options(
     cerebro.h5ad_stream_nnz = 0,
     cerebro.h5ad_stream_budget = 40,
-    cerebro.h5ad_stream_block = 25
+    cerebro.h5ad_stream_block = 25,
+    cerebro.h5ad_stream_workers = 2
   )
   streamed_dir <- withr::local_tempdir()
   expect_message(
@@ -69,5 +70,95 @@ test_that("the blocks and passes do not change what is written", {
     dir <- withr::local_tempdir()
     quiet(stream_convert(dir, verbose = FALSE))
     expect_equal(read_sidecar(dir), expected)
+  }
+})
+
+## The writer on its own, against HDF5Array's writer, on a matrix stored by cell
+## (an AnnData CSR; the genes of a cell in reverse order, as an unsorted source
+## may have them), with ranges and blocks that do not divide the matrix evenly,
+## in one process and in two.
+stream_fixture <- function() {
+  set.seed(2)
+  genes_by_cells <- abs(Matrix::rsparsematrix(40L, 700L, 0.1))
+  genes_by_cells@x <- round(genes_by_cells@x * 10) + 1
+  dimnames(genes_by_cells) <- list(paste0("g", 1:40), paste0("c", 1:700))
+  expected <- withr::local_tempfile(
+    fileext = ".h5",
+    .local_envir = parent.frame()
+  )
+  HDF5Array::writeTENxMatrix(
+    methods::as(Matrix::t(genes_by_cells), "CsparseMatrix"),
+    expected,
+    group = "expression",
+    level = 0L
+  )
+  by_cell <- methods::as(Matrix::t(genes_by_cells), "RsparseMatrix")
+  order <- unlist(lapply(seq_len(nrow(by_cell)), function(row) {
+    first <- by_cell@p[[row]] + 1L
+    last <- by_cell@p[[row + 1L]]
+    if (last >= first) rev(first:last) else integer()
+  }))
+  h5ad <- withr::local_tempfile(fileext = ".h5ad", .local_envir = parent.frame())
+  rhdf5::h5createFile(h5ad)
+  rhdf5::h5createGroup(h5ad, "raw")
+  rhdf5::h5createGroup(h5ad, "raw/X")
+  rhdf5::h5write(by_cell@j[order], h5ad, "raw/X/indices")
+  rhdf5::h5write(by_cell@x[order], h5ad, "raw/X/data")
+  rhdf5::h5write(as.integer(by_cell@p), h5ad, "raw/X/indptr")
+  list(matrix = genes_by_cells, expected = expected, h5ad = h5ad)
+}
+
+test_that("the streaming writer matches writeTENxMatrix on a cell-major source", {
+  fixture <- stream_fixture()
+  for (workers in c(1L, 2L)) {
+    withr::local_options(
+      cerebro.h5ad_stream_block = 250,
+      cerebro.h5ad_stream_workers = workers
+    )
+    written <- withr::local_tempfile(fileext = ".h5")
+    source <- .h5adStreamSource(fixture$h5ad, "raw/X", 700, 40)
+    .h5adStreamWriteTENx(
+      source,
+      written,
+      group = "expression",
+      dimnames = list(colnames(fixture$matrix), rownames(fixture$matrix)),
+      level = 0L,
+      budget = 150
+    )
+    for (dataset in c("data", "indices", "indptr", "shape", "genes", "barcodes")) {
+      expect_identical(
+        as.vector(rhdf5::h5read(written, paste0("expression/", dataset))),
+        as.vector(rhdf5::h5read(fixture$expected, paste0("expression/", dataset))),
+        info = paste(workers, "worker(s):", dataset)
+      )
+    }
+    expect_length(
+      list.files(dirname(written), pattern = "^h5-stream-"),
+      0L
+    )
+  }
+})
+
+test_that("the group sums over blocks and workers match the whole matrix", {
+  fixture <- stream_fixture()
+  source <- .h5adStreamSource(fixture$h5ad, "raw/X", 700, 40)
+  members <- Matrix::sparseMatrix(
+    i = 1:700,
+    j = rep(1:3, length.out = 700),
+    x = 1,
+    dims = c(700L, 3L)
+  )
+  expected_sums <- as.matrix(fixture$matrix %*% members)
+  positive <- fixture$matrix
+  positive@x <- as.numeric(positive@x > 0)
+  expected_positive <- as.matrix(positive %*% members)
+  for (workers in c(1L, 2L, 3L)) {
+    withr::local_options(
+      cerebro.h5ad_stream_block = 120,
+      cerebro.h5ad_stream_workers = workers
+    )
+    sums <- .h5adStreamGroupSums(source, members)
+    expect_equal(sums$sums, expected_sums, ignore_attr = TRUE)
+    expect_equal(sums$positive, expected_positive, ignore_attr = TRUE)
   }
 })

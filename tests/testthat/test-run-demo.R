@@ -55,12 +55,9 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
       scope$prepareViewerTcellDemoData <- fake("tcell")
       scope$.viewer1mVersion <- scope$.viewerRenVersion <- 1L
       scope$.viewerCosMxVersion <- scope$.viewerTcellVersion <- 1L
-      ## A Viewer Pack for each prepared data set and its compressed twin.
+      ## A Viewer Pack for each prepared data set.
       scope$prepareDemoViewerPack <- function(crb) {
         packs <<- c(packs, basename(crb))
-      }
-      scope$prepareCompressedDemoVariant <- function(crb) {
-        paste0(crb, "_compressed")
       }
     }
     run_demo(run$options, scope)
@@ -68,11 +65,7 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
     expect_identical(loaded, root, label = label)
     expect_identical(prepared, run$expected, label = label)
     names <- basename(datasets[run$expected])
-    expect_identical(
-      packs,
-      as.vector(rbind(names, paste0(names, "_compressed"))),
-      label = label
-    )
+    expect_identical(packs, as.vector(names), label = label)
     expect_identical(
       unname(Sys.getenv(variables)),
       unname(ifelse(keys %in% run$expected, normalizePath(datasets), "")),

@@ -123,7 +123,7 @@
     dims = length(x),
     H5type = "H5T_NATIVE_UINT8",
     chunk = max(1L, min(length(x), 65536L)),
-    level = 4L
+    level = 1L
   )
   rhdf5::h5write(as.integer(x), file, path)
 }

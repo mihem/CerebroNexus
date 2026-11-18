@@ -13,7 +13,7 @@ Rscript run-demo.R --data=1m,ren,cosmx,tcell   # all four large data sets
 Rscript run-demo.R --data=ren --prepare-only   # download and convert, do not start the Viewer
 ```
 
-`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx` and `tcell`; without it the launcher prepares the mouse brain. Each prepared data set also gets a compressed twin of its H5 file next to it (deflate level 3, 65,536-value chunks; `CEREBRO_DEMO_H5_LEVEL` and `CEREBRO_DEMO_H5_CHUNK` change them), listed in the data set menu as "<name> [compressed]", so the two can be compared.
+`--data` takes a comma-separated list of `1m` (the mouse brain), `ren`, `cosmx` and `tcell`; without it the launcher prepares the mouse brain.
 
 The launcher loads this checkout with `pkgload`, sources the scripts below, prepares each data set (a complete cache is reused, so only the first run downloads and converts), builds the Viewer Pack, and starts the app on `http://127.0.0.1:7451`. It needs `pkgload`, `rhdf5`, `HDF5Array`, `DelayedArray`, `readxl` and `qs2`, plus the packages the Viewer itself uses.
 
@@ -36,7 +36,6 @@ To prepare a data set from an R session without starting the Viewer, source the 
 
 ```r
 pkgload::load_all(".")
-source("data-raw/large-demo/h5_transposed_write.R")
 source("data-raw/large-demo/prepare_viewer_ren_data.R")
 crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 ```
@@ -51,11 +50,11 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 - `prepare_viewer_tcell_data.R`: downloads the Zenodo files of the pan-cancer T-cell atlas (14.1 GB), joins the 70 per-data-set expression objects, computes the joint embedding and builds the `.crb` with the TCR repertoire and the CD8 trajectory. Entry function: `prepareViewerTcellDemoData()`. Source, licence and changes: [`tcell.ATTRIBUTION.md`](tcell.ATTRIBUTION.md).
 - `download_helpers.R`: the cache folder, the checked download (size, then MD5 or SHA256, resumable) and the publish-by-rename shared by the two scripts above. `run-demo.R` sources it before them.
 - `prepare_viewer_pack.R`: builds or reuses the Viewer Pack of a prepared `.crb`. Entry function: `prepareDemoViewerPack()`.
-- `h5_transposed_write.R`: a helper, not a script to run. Both `prepare_viewer_*_data.R` scripts call its `.demoWriteH5Transposed()` to write the expression matrix as the cells x genes H5 sidecar, so it has to be sourced before them (`run-demo.R` does this). It exists because `HDF5Array::writeTENxMatrix()` can only write one gene after the other, and a source stored by cells is then scanned from start to end for every block of genes, which takes days for these atlases. The helper reads the cells once in chunks (directly from the CSR arrays for an AnnData file) on several processes, then assembles blocks of genes from the chunk files and appends each block to the H5 file. It is kept in its own file because two scripts share it.
+- The expression matrix of the mouse brain and Ren data sets is written as the cells x genes H5 sidecar by the package's own streaming writer (`R/h5ad_stream.R`, the one `convertH5adToCerebro()` uses for an h5ad with more than 2^31 - 1 non-zero values), not by a script of this folder: `HDF5Array::writeTENxMatrix()` can only write one gene after the other, and a source stored by cells is then scanned from start to end for every block of genes, which takes days for these atlases. The writer reads the CSR arrays directly, in several R processes.
 
 ## Where the data goes
 
-Downloads and prepared files are written to the user cache directory (`tools::R_user_dir("CerebroNexus", "cache")`, under `large-examples/`), shared by all checkouts and worktrees. Set `CEREBRO_LARGE_CACHE` to use another folder, for example on a cluster. The Ren data set alone needs about 105 GB. The conversion of the counts to H5 runs on 2 R processes by default; set `CEREBRO_DEMO_WORKERS` to use more (each process needs about 3 to 5 GB of memory, an estimate, not a measurement). On a 24-core workstation, reading the 1.46M Ren cells took about 80 seconds on 8 processes.
+Downloads and prepared files are written to the user cache directory (`tools::R_user_dir("CerebroNexus", "cache")`, under `large-examples/`), shared by all checkouts and worktrees. Set `CEREBRO_LARGE_CACHE` to use another folder, for example on a cluster. The Ren data set alone needs about 105 GB. The conversion of the counts to H5 runs on several R processes (the option `cerebro.h5ad_stream_workers`; each process needs about 3 to 5 GB of memory, an estimate, not a measurement). On a 24-core workstation, reading the 1.46M Ren cells took about 80 seconds on 8 processes.
 
 ## The CosMx and T-cell data sets
 

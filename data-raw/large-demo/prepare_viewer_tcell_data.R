@@ -733,8 +733,12 @@
 
   message("Writing the H5 expression sidecar...")
   dir.create(dirname(paths$sidecar), recursive = TRUE, showWarnings = FALSE)
-  ## The matrix is in memory: one process, so it is not copied to workers.
-  .demoWriteH5Transposed(expression, paths$sidecar, workers = 1L)
+  CerebroNexus:::.writeTENxExpression(
+    methods::as(Matrix::t(expression), "CsparseMatrix"),
+    paths$sidecar,
+    group = "expression",
+    level = 1L
+  )
 
   message("Computing the joint embedding...")
   projection <- .viewerTcellEmbedding(expression, meta$dataset)
