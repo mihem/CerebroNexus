@@ -132,7 +132,7 @@
   x,
   path,
   group,
-  level = NULL,
+  level = 1L,
   slice = 2^24
 ) {
   if (!inherits(x, "dgCMatrix")) {
@@ -263,10 +263,10 @@
         .logStep("Writing expression matrix to TENx HDF5 file: ", h5_abs)
       }
 
-      ## A level of 0 stores the data without compression (the shuffle and
-      ## deflate filters are still applied): on 1.3-1.5M-cell sources single
-      ## genes read ~30% faster than at HDF5Array's default level 6, at roughly
-      ## 7x the file size. NULL leaves HDF5Array's default.
+      ## Gzip level 1 by default: within 3 % of the size at level 6 and written
+      ## about 40 % faster. A level of 0 stores the data without compression
+      ## (the shuffle and deflate filters are still applied), at about 3 times
+      ## the file size.
       .writeTENxExpression(
         m_disk,
         h5_abs,

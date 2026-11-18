@@ -4,10 +4,8 @@
 ##
 ##   Rscript run-demo.R [--data=1m,ren,cosmx,tcell] [--prepare-only]
 ##
-## --data names the data sets to prepare (default: 1m, the mouse brain). Each
-## prepared data set also gets a compressed twin of its H5 file, listed in the
-## menu as "<name> [compressed]". --prepare-only downloads and converts without
-## starting the Viewer.
+## --data names the data sets to prepare (default: 1m, the mouse brain).
+## --prepare-only downloads and converts without starting the Viewer.
 
 script_arg <- grep("^--file=", commandArgs(FALSE), value = TRUE)
 repo_root <- if (length(script_arg)) {
@@ -73,14 +71,12 @@ if (!requireNamespace("pkgload", quietly = TRUE)) {
 pkgload::load_all(repo_root, export_all = FALSE, quiet = TRUE, helpers = FALSE)
 message("Viewer source: ", repo_root)
 for (script in c(
-  "h5_transposed_write.R",
   "prepare_viewer_1m_data.R",
   "download_helpers.R",
   "prepare_viewer_ren_data.R",
   "prepare_viewer_cosmx_data.R",
   "prepare_viewer_tcell_data.R",
-  "prepare_viewer_pack.R",
-  "h5_compressed_variant.R"
+  "prepare_viewer_pack.R"
 )) {
   source(file.path(repo_root, "data-raw", "large-demo", script), local = TRUE)
 }
@@ -93,7 +89,6 @@ for (name in names(demos)) {
   }
   crb <- demo$prepare()
   prepareDemoViewerPack(crb)
-  prepareDemoViewerPack(prepareCompressedDemoVariant(crb))
   do.call(
     Sys.setenv,
     stats::setNames(list(normalizePath(crb, mustWork = TRUE)), demo$variable)

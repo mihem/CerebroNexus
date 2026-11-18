@@ -666,23 +666,25 @@
   )
 }
 
-.viewerDemoRequireTransposedWriter <- function() {
-  if (!exists(".demoWriteH5Transposed", mode = "function")) {
-    stop(
-      "Source data-raw/large-demo/h5_transposed_write.R before building the demo data.",
-      call. = FALSE
-    )
-  }
-}
-
 ## The CRB for the selected cells. The counts go to `<stem>.h5` (cells x genes,
-## group "expression", uncompressed), and only metadata and the projection are
+## group "expression", gzip level 1), and only metadata and the projection are
 ## kept in the CRB.
 .viewer1mBuildCrb <- function(matrix, analysis, paths) {
   dir.create(dirname(paths$crb), recursive = TRUE, showWarnings = FALSE)
   unlink(c(paths$sidecar, paths$stamp), force = TRUE)
-  .viewerDemoRequireTransposedWriter()
-  .demoWriteH5Transposed(matrix, paths$sidecar)
+  ## The 10x file stores the matrix by cell: the package's streaming writer reads
+  ## its arrays and writes the cells x genes sidecar (writeTENxMatrix() would scan
+  ## the source once per block of genes).
+  CerebroNexus:::.h5adStreamWriteTENx(
+    CerebroNexus:::.h5adStreamFrom10x(
+      paths$source,
+      .viewer1mSourceGroup(paths$source)
+    ),
+    paths$sidecar,
+    group = "expression",
+    dimnames = rev(dimnames(matrix)),
+    level = 1L
+  )
   cells <- analysis$cells
   cluster_levels <- unique(analysis$clusters)
   cluster_levels <- cluster_levels[order(as.integer(cluster_levels))]
