@@ -188,7 +188,7 @@
   export_stage_dir,
   final_file,
   verbose,
-  h5_compression_level = NULL
+  h5_compression_level = 1L
 ) {
   if (expression_matrix_mode == "embedded") {
     expression_data <- .delayedExportExpression(

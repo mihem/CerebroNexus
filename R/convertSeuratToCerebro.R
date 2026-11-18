@@ -358,8 +358,8 @@
 #'   Supplied images are embedded in the generated CRB; existing embedded images
 #'   declared by the Seurat object are retained.
 #' @param h5_compression_level,immune_sidecar,immune_sidecar_threshold Passed to
-#'   \code{\link{exportFromSeurat}}: the gzip level of the H5 file (default 0,
-#'   uncompressed), and whether and from which size the immune repertoire is
+#'   \code{\link{exportFromSeurat}}: the gzip level of the H5 file (default 1;
+#'   0 is uncompressed), and whether and from which size the immune repertoire is
 #'   stored in a sibling file.
 #' @param verbose Logical indicating whether to print progress messages; default:
 #'   \code{TRUE}.
@@ -460,7 +460,7 @@ convertSeuratToCerebro <- function(
   most_expressed_genes = NULL,
   bcr_file = NULL,
   tcr_file = NULL,
-  h5_compression_level = 0L,
+  h5_compression_level = 1L,
   immune_sidecar = c("auto", "always", "never"),
   immune_sidecar_threshold = 100000L
 ) {

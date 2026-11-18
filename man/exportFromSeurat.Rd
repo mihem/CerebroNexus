@@ -19,7 +19,7 @@ exportFromSeurat(
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
   expression_matrix_mode = c("embedded", "h5"),
-  h5_compression_level = 0L,
+  h5_compression_level = 1L,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
   viewer_binary_threshold = 100000L,
@@ -103,8 +103,8 @@ such as \code{dgCMatrix} from the \code{Matrix} package. Ignored when
   RAM stays close to the \code{.crb} metadata size. The \code{.crb} is thin:
   the cell names are kept once, in the H5 file, and the \code{.crb} records
   their order and a checksum. The gzip level is set by
-  \code{h5_compression_level}; the default (no compression) is several
-  times larger than a compressed file but builds and reads faster.
+  \code{h5_compression_level}; the default (1) gives a file several times
+  smaller than level 0 (no compression), which builds and reads faster.
   Requires the \pkg{HDF5Array} package.
 }
 The CRB and any sidecar are built and validated in a private sibling stage.
@@ -122,11 +122,14 @@ responsibility on every platform.}
 
 \item{h5_compression_level}{Gzip compression level, from 0 to 9, of the
 H5 file written when \code{expression_matrix_mode = "h5"}; ignored by the
-other modes. The default 0 writes the data without compression: the file
-is about 7 times larger than at HDF5Array's default level 6 (about 69 GiB
-instead of 10 GiB for 1.5 million human prefrontal cortex cells), but it
-builds about three times faster and single-gene reads are about a third
-faster. Set 6 when disk space matters more than speed.}
+other modes. The default 1 gives a file within 3 % of the size at level 6
+(3.95 and 4.06 GiB for 500,000 mouse brain cells) and writes it about 40 %
+faster (222 s instead of 361 s); the file is about 3 times smaller than one
+written without compression (level 0: 11.4 GiB), which is also what the
+Viewer's checksum of the file, copying it and keeping it in the operating
+system's file cache cost. Level 0 writes the data without compression: it
+builds faster and reads a single gene about a third faster, for a larger file.
+Before 8.4.1 the default was 0.}
 
 \item{codec}{Serialization codec for the CRB payload. Defaults to
 \code{"qs2"}; use \code{"rds"} when direct compatibility with
