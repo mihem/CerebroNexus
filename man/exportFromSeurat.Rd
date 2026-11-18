@@ -18,7 +18,7 @@ exportFromSeurat(
   nGene = "nGene",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   h5_compression_level = 1L,
   codec = c("qs2", "rds"),
   viewer_binary = c("auto", "always", "never"),
@@ -86,8 +86,14 @@ such as \code{dgCMatrix} from the \code{Matrix} package. Ignored when
 \code{expression_matrix_mode} is set to an external backend.}
 
 \item{expression_matrix_mode}{How to persist the expression matrix. One of
-\code{"embedded"} (default) or \code{"h5"}.
+\code{"auto"} (default), \code{"embedded"} or \code{"h5"}.
 \itemize{
+  \item \code{"auto"} is \code{"h5"} for more than 200,000 cells and
+  \code{"embedded"} otherwise (the option \code{cerebro.h5_cell_threshold}
+  sets the number). A large matrix inside the \code{.crb} is read whole into
+  memory at every start of the Viewer; from the H5 file it reads only the
+  genes it shows. The \code{"h5"} mode needs \code{file} to end in
+  \code{.crb} and the \pkg{HDF5Array} package.
   \item \code{"embedded"} stores the matrix inside the \code{.crb} file.
   \item \code{"h5"} writes the matrix, laid out as
   \code{HDF5Array::writeTENxMatrix()} writes it,
@@ -128,8 +134,8 @@ faster (222 s instead of 361 s); the file is about 3 times smaller than one
 written without compression (level 0: 11.4 GiB), which is also what the
 Viewer's checksum of the file, copying it and keeping it in the operating
 system's file cache cost. Level 0 writes the data without compression: it
-builds faster and reads a single gene about a third faster, for a larger file.
-Before 8.4.1 the default was 0.}
+builds faster and reads a single gene about a third faster, for a larger
+file. Before 8.4.1 the default was 0.}
 
 \item{codec}{Serialization codec for the CRB payload. Defaults to
 \code{"qs2"}; use \code{"rds"} when direct compatibility with

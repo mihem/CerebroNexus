@@ -32,8 +32,20 @@
   file,
   expression_matrix_mode,
   use_delayed_array,
-  verbose
+  verbose,
+  auto = FALSE
 ) {
+  ## A mode the caller did not choose is named in the errors
+  chosen <- if (isTRUE(auto) && identical(expression_matrix_mode, "h5")) {
+    paste0(
+      " (expression_matrix_mode = \"auto\" chose \"h5\" for more than ",
+      format(.h5CellThreshold(), big.mark = ",", scientific = FALSE),
+      " cells; pass expression_matrix_mode = \"embedded\" to keep the matrix ",
+      "in the file)"
+    )
+  } else {
+    ""
+  }
   if (
     !is.character(file) ||
       length(file) != 1L ||
@@ -49,7 +61,9 @@
     if (!identical(tolower(tools::file_ext(file)), "crb")) {
       stop(
         "External expression backends require `file` to end in .crb so the ",
-        "Cerebro object and its sidecar have distinct portable names. Received: ",
+        "Cerebro object and its sidecar have distinct portable names",
+        chosen,
+        ". Received: ",
         file,
         call. = FALSE
       )
@@ -61,8 +75,9 @@
       !requireNamespace("HDF5Array", quietly = TRUE)
   ) {
     stop(
-      "expression_matrix_mode = \"h5\" requires the HDF5Array package. ",
-      "Install it via BiocManager::install(\"HDF5Array\") and re-run, or ",
+      "expression_matrix_mode = \"h5\" requires the HDF5Array package",
+      chosen,
+      ". Install it via BiocManager::install(\"HDF5Array\") and re-run, or ",
       "switch to expression_matrix_mode = \"embedded\".",
       call. = FALSE
     )
@@ -119,6 +134,39 @@
   export$setVersion(package_version(.cerebroRuntimeVersion()))
 
   export
+}
+
+#' The number of cells above which `expression_matrix_mode = "auto"` writes the
+#' matrix to an H5 file (`cerebro.h5_cell_threshold`, 200,000 by default).
+#' @keywords internal
+#' @noRd
+.h5CellThreshold <- function() {
+  threshold <- getOption("cerebro.h5_cell_threshold", 200000L)
+  if (!is.numeric(threshold) || length(threshold) != 1L || is.na(threshold)) {
+    stop("`cerebro.h5_cell_threshold` must be one number.", call. = FALSE)
+  }
+  threshold
+}
+
+#' `"auto"` as the mode it stands for: `"h5"` for more than `.h5CellThreshold()`
+#' cells, `"embedded"` otherwise. The other modes are returned as they are.
+#' @keywords internal
+#' @noRd
+.resolveExpressionMatrixMode <- function(mode, n_cells, verbose = FALSE) {
+  if (!identical(mode, "auto")) {
+    return(mode)
+  }
+  resolved <- if (isTRUE(n_cells > .h5CellThreshold())) "h5" else "embedded"
+  if (isTRUE(verbose)) {
+    .logStep(
+      "expression_matrix_mode = \"auto\": ",
+      format(n_cells, big.mark = ","),
+      " cells, so \"",
+      resolved,
+      "\"."
+    )
+  }
+  resolved
 }
 
 #' Write a matrix as a TENxMatrix-format group. A `dgCMatrix` already holds the
