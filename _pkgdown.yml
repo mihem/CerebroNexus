@@ -2,6 +2,9 @@ url: https://www.mheming.com/CerebroNexus/
 
 redirects:
   - ["articles/use_sce_and_anndata_data.html", "articles/import_your_analysis.html"]
+  - ["articles/multi_crb.html", "articles/create_a_self_contained_shiny_app.html"]
+  - ["articles/launch_cerebro_with_pre-loaded_data_set.html", "articles/create_a_self_contained_shiny_app.html"]
+  - ["articles/host_cerebro_on_shinyapps.html", "articles/create_a_self_contained_shiny_app.html"]
 
 template:
   bootstrap: 5
@@ -68,11 +71,8 @@ articles:
       - articles/create_a_self_contained_shiny_app
       - articles/create_expression_matrix_in_h5_format
       - articles/million_cell_crb_artifacts
-      - articles/launch_cerebro_with_pre-loaded_data_set
-      - articles/multi_crb
       - articles/export_and_visualize_custom_tables_and_plots
       - articles/control_access_to_cerebro_with_a_login_page
-      - articles/host_cerebro_on_shinyapps
   - title: "Benchmarks"
     navbar: Benchmarks
     contents:
