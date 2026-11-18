@@ -98,7 +98,10 @@ stream_fixture <- function() {
     last <- by_cell@p[[row + 1L]]
     if (last >= first) rev(first:last) else integer()
   }))
-  h5ad <- withr::local_tempfile(fileext = ".h5ad", .local_envir = parent.frame())
+  h5ad <- withr::local_tempfile(
+    fileext = ".h5ad",
+    .local_envir = parent.frame()
+  )
   rhdf5::h5createFile(h5ad)
   rhdf5::h5createGroup(h5ad, "raw")
   rhdf5::h5createGroup(h5ad, "raw/X")
@@ -110,10 +113,21 @@ stream_fixture <- function() {
 
 test_that("the streaming writer matches writeTENxMatrix on a cell-major source", {
   fixture <- stream_fixture()
-  for (workers in c(1L, 2L)) {
+  ## the buckets of the block files: one, uneven ones, one per gene; their
+  ## compression where R has zstd, and none
+  settings <- list(
+    list(workers = 1L, buckets = 256L, codec = "none"),
+    list(workers = 2L, buckets = 7L, codec = .h5adStreamCodec()),
+    list(workers = 2L, buckets = 1L, codec = "none"),
+    list(workers = 3L, buckets = 40L, codec = .h5adStreamCodec())
+  )
+  for (setting in settings) {
+    workers <- setting$workers
     withr::local_options(
       cerebro.h5ad_stream_block = 250,
-      cerebro.h5ad_stream_workers = workers
+      cerebro.h5ad_stream_workers = workers,
+      cerebro.h5ad_stream_buckets = setting$buckets,
+      cerebro.h5ad_stream_codec = setting$codec
     )
     written <- withr::local_tempfile(fileext = ".h5")
     source <- .h5adStreamSource(fixture$h5ad, "raw/X", 700, 40)
@@ -125,11 +139,29 @@ test_that("the streaming writer matches writeTENxMatrix on a cell-major source",
       level = 0L,
       budget = 150
     )
-    for (dataset in c("data", "indices", "indptr", "shape", "genes", "barcodes")) {
+    for (dataset in c(
+      "data",
+      "indices",
+      "indptr",
+      "shape",
+      "genes",
+      "barcodes"
+    )) {
       expect_identical(
         as.vector(rhdf5::h5read(written, paste0("expression/", dataset))),
-        as.vector(rhdf5::h5read(fixture$expected, paste0("expression/", dataset))),
-        info = paste(workers, "worker(s):", dataset)
+        as.vector(rhdf5::h5read(
+          fixture$expected,
+          paste0("expression/", dataset)
+        )),
+        info = paste(
+          workers,
+          "worker(s),",
+          setting$buckets,
+          "bucket(s),",
+          setting$codec,
+          ":",
+          dataset
+        )
       )
     }
     expect_length(
