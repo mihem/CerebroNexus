@@ -1,9 +1,8 @@
 ## Needs download_helpers.R (sourced first).
-.viewerRenVersion <- 2L
 
 .viewerRenPaths <- function(cache_dir = NULL) {
   root <- file.path(.demoLargeCacheDir(cache_dir), "ren")
-  prepared <- file.path(root, paste0("cerebro-v", .viewerRenVersion))
+  prepared <- .demoPreparedDir(root)
   list(
     root = root,
     source_dir = file.path(root, "source"),
@@ -665,7 +664,7 @@
     )
   )
   saveCerebro(object, paths$crb)
-  writeLines(as.character(.viewerRenVersion), paths$stamp)
+  .demoStampWrite(paths$stamp, .viewerRenRecipe)
   paths$crb
 }
 
@@ -675,11 +674,7 @@
     file.exists(paths$sidecar) &&
     !dir.exists(paths$sidecar) &&
     file.exists(paths$immune) &&
-    file.exists(paths$stamp) &&
-    identical(
-      readLines(paths$stamp, warn = FALSE),
-      as.character(.viewerRenVersion)
-    )
+    .demoStampCurrent(paths$stamp, .viewerRenRecipe)
 }
 
 prepareViewerRenDemoData <- function(cache_dir = NULL) {
@@ -700,7 +695,7 @@ prepareViewerRenDemoData <- function(cache_dir = NULL) {
   ## Build privately. A failed preparation must not delete a working atlas,
   ## including the unversioned cache used by earlier Viewer revisions.
   stage <- tempfile(
-    paste0("cerebro-v", .viewerRenVersion, "-stage-"),
+    "prepared-stage-",
     paths$root
   )
   dir.create(stage)
@@ -716,3 +711,7 @@ prepareViewerRenDemoData <- function(cache_dir = NULL) {
   .demoPublishStage(stage, dirname(paths$crb), paths$root, "Ren")
   paths$crb
 }
+
+## What the stamp of these files records (.demoRecipe()), taken now: after the
+## last function of this script.
+.viewerRenRecipe <- .demoRecipe(environment(), "Ren")

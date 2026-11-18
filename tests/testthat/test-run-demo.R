@@ -53,8 +53,6 @@ test_that("run-demo prepares the data sets --data names and opens the Viewer", {
       scope$prepareViewerRenDemoData <- fake("ren")
       scope$prepareViewerCosMxDemoData <- fake("cosmx")
       scope$prepareViewerTcellDemoData <- fake("tcell")
-      scope$.viewer1mVersion <- scope$.viewerRenVersion <- 1L
-      scope$.viewerCosMxVersion <- scope$.viewerTcellVersion <- 1L
       ## A Viewer Pack for each prepared data set.
       scope$prepareDemoViewerPack <- function(crb) {
         packs <<- c(packs, basename(crb))

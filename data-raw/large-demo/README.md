@@ -54,11 +54,13 @@ crb <- prepareViewerRenDemoData()   # returns the path of the prepared .crb
 
 ## Where the data goes
 
-Downloads and prepared files are written to the user cache directory (`tools::R_user_dir("CerebroNexus", "cache")`, under `large-examples/`), shared by all checkouts and worktrees. Set `CEREBRO_LARGE_CACHE` to use another folder, for example on a cluster. The Ren data set alone needs about 105 GB. The conversion of the counts to H5 runs on several R processes (the option `cerebro.h5ad_stream_workers`; each process needs about 3 to 5 GB of memory, an estimate, not a measurement). On a 24-core workstation, reading the 1.46M Ren cells took about 80 seconds on 8 processes.
+Downloads and prepared files are written to the user cache directory (`tools::R_user_dir("CerebroNexus", "cache")`, under `large-examples/`), shared by all checkouts and worktrees. Set `CEREBRO_LARGE_CACHE` to use another folder, for example on a cluster, or to keep one copy of the data outside the cache. The Ren data set alone needs about 105 GB. The conversion of the counts to H5 runs on several R processes (the option `cerebro.h5ad_stream_workers`; each process needs about 3 to 5 GB of memory, an estimate, not a measurement). On a 24-core workstation, reading the 1.46M Ren cells took about 80 seconds on 8 processes.
+
+Each data set has two folders there: `<name>/source/` with the downloads and `<name>/prepared/` with the `.crb`, its `.h5` (and repertoire) file and `demo-version`. The folder names do not change. `demo-version` is the stamp of the preparation: the CerebroNexus version and a hash of the functions of the data set's script (the "recipe"), plus when it was written. A run prepares the data set again when the stamp differs from what the checkout would write, that is after a new release or a change of the script; nothing has to be bumped by hand. Data prepared before this scheme (folders `cerebro-v2`, `cerebro-v3`) is not used: delete those folders.
 
 ## The CosMx and T-cell data sets
 
-Both are built the way the Ren data set is: the sources are downloaded once into `large-examples/<name>/source/` (each file is checked against its published size and checksum; a complete file is not downloaded again and an interrupted download is resumed), the result is built in a temporary folder of the cache and renamed to `cerebro-v<version>/` only when it is complete, and the last file written is `demo-version`. A change of the version number in the script (`.viewerCosMxVersion`, `.viewerTcellVersion`) makes the next run build the data set again.
+Both are built the way the Ren data set is: the sources are downloaded once into `large-examples/<name>/source/` (each file is checked against its published size and checksum; a complete file is not downloaded again and an interrupted download is resumed), the result is built in a temporary folder of the cache and renamed to `prepared/` only when it is complete, and the last file written is `demo-version`. A stamp that no longer matches (a new release, or a change of the script) makes the next run build the data set again.
 
 | | `--data=cosmx` | `--data=tcell` |
 |---|---|---|
