@@ -31,8 +31,8 @@ There are two ways to let other people browse your `.crb` files:
 | `launchCerebro(mode = "closed")` | You start the app yourself, on your computer or on a server with CerebroNexus installed, and want to show fixed data sets without uploads. |
 | `createShinyApp()` | You want a directory that runs on its own: hand it to a colleague, or deploy it to Shiny Server, Posit Connect or shinyapps.io. |
 
-Both can show several data sets with a switcher, open on a page of your choice,
-and show your own welcome message.
+Both can show several data sets with a switcher and your own welcome message;
+`createShinyApp()` can also set the page the App opens on.
 
 # Launch with pre-loaded data sets
 
@@ -57,7 +57,7 @@ launchCerebro(
 )
 ```
 
-To change the message on the "Load data" page, for example to link to a
+To change the message on the Data info page, for example to link to a
 publication or introduce the data set, use `welcome_message`. For
 `launchCerebro()` it can contain HTML:
 
@@ -100,7 +100,7 @@ file.exists(crb)
 
 ## Quick start
 
-`cerebro_data` must be a **named** character vector (or list). Names must be non-missing and unique because they become the dataset labels shown in the Load Data tab; the values are paths to `.crb` (or `.rds`) files.
+`cerebro_data` must be a **named** character vector (or list). Names must be non-missing and unique because they are the data set identities used in links; unless you set `dataset_labels`, they are also the names shown in the **Dataset** dropdown. The values are paths to `.crb` (or `.rds`) files.
 
 ```{r}
 out_dir <- file.path(tempdir(), "cerebro_app")
@@ -132,10 +132,11 @@ On Linux, `bash viewer/start-linux.sh` from `out_dir` prepares authentication-fi
 | `max_request_size` | finite positive numeric request cap in MB; defaults to `8000`; closed Viewers use at most 6 MiB |
 | `port`, `host` | whole-number port `1`-`65535` and a non-empty host string; defaults to `8080` / `127.0.0.1` |
 | `launch_browser`, `quiet`, `display_mode` | non-missing logical flags and exactly `auto`, `normal`, or `showcase` for `shiny::runApp()` |
-| `welcome_message` | text shown in the Load Data tab |
+| `welcome_message` | text shown on the Data info page |
 | `colors` | optional `dataset -> variable -> named level colours` list |
 | `cerebro_options` | extra entries merged into `Cerebro.options` |
 | `crb_pick_smallest_file` | forwarded into `Cerebro.options` |
+| `initial_dataset` | name of the data set loaded first; see [Default file selection](#default-file-selection) |
 | `show_upload_ui` | allow dataset and session-only HLA typing uploads; defaults to `FALSE` for generated apps |
 | `initial_page` | stable Viewer page ID used once when the first dataset loads; Data info by default |
 | `point_size`, `point_opacity`, `percentage_cells_to_show` | scalar or named per-dataset scatter defaults |
@@ -153,8 +154,8 @@ view-configuration JSON imports remain available.
 # Several data sets
 
 CerebroNexus can load **multiple `.crb` files** in a single app. When more
-than one file is supplied to `createShinyApp()`, a **"Select dataset:"**
-switcher appears in the sidebar so users can move between data sets without
+than one file is supplied to `createShinyApp()`, a **Dataset** dropdown
+appears in the sidebar so users can move between data sets without
 restarting the app. Each data set keeps its own expression data, metadata, and
 module-specific slots — including the immune repertoire — so conditional tabs
 (such as *Immune Repertoire*) appear or disappear as you switch.
@@ -185,6 +186,11 @@ createShinyApp(
 | Mouse hippocampus (Slide-seq v2) | spatial (beads, no image)        | Spatial |
 | Mouse ileum (MERFISH)            | spatial (imaging, embedded DAPI) | Spatial |
 | Mouse brain (Xenium)             | spatial (imaging, external DAPI variants) | Spatial |
+
+External images are separate files, not part of the `.crb`, so this call shows
+the Visium and Xenium sections without a tissue background. To add them, pass
+the image files through `spatial_images`; see
+[Placing histological images](spatial_analysis.html#placing-histological-images).
 
 When the app starts, the sidebar shows a dropdown with these samples. Switching
 changes the whole data set — the UMAP, the cell-type composition, and the
@@ -240,6 +246,9 @@ createShinyApp(
 )
 ```
 
+To open a particular data set whatever its size or position, name it with
+`initial_dataset`, for example `initial_dataset = "b"` to load `file_b.crb`.
+A link that names a data set (see below) takes precedence over both settings.
 Once a file is chosen from the dropdown, that selection persists until the user
 switches again.
 
@@ -257,9 +266,11 @@ https://your-host/app/TCR
 The token is the **last path segment** (so it works even when the app is mounted
 under a sub-path such as `/app/`), or the value of the `dataset` query
 parameter. It is matched against the **names** you gave in `cerebro_data`; file
-names are not links. If no match is found, the smallest-file default applies.
-The path form also works when you start the App yourself with `launchCerebro()`
-or `shiny::runApp()`; write it without a trailing slash (`/TCR`, not `/TCR/`).
+names are not links. A `?dataset=` value that matches no name opens the default
+data set (see [Default file selection](#default-file-selection)) with a warning;
+a path that matches no name is not served (HTTP 404). The path form also works
+when you start the App yourself with `launchCerebro()` or `shiny::runApp()`;
+write it without a trailing slash (`/TCR`, not `/TCR/`).
 When both forms are present, the query parameter wins.
 
 The address bar follows the data set you are reading: when you pick another one
@@ -308,7 +319,7 @@ manual navigation. Restored shared links take precedence over this default.
 
 `createShinyApp()` has the same `welcome_message` argument as `launchCerebro()`
 (see [Launch with pre-loaded data sets](#launch-with-pre-loaded-data-sets)); it
-sets the text of the Load Data tab in the generated app.
+sets the text on the Data info page of the generated app.
 
 # External Extra material tables
 
@@ -379,7 +390,7 @@ rsconnect::deployApp(appDir = out_dir)
 
 shinyapps.io is moving to Posit Connect Cloud. Accounts that have not moved
 themselves are migrated automatically in waves starting on January 28, 2027;
-see Posit's [migration guide](https://docs.posit.co/shinyapps.io/guide/migration/).
+see the [shinyapps.io migration guide](https://docs.posit.co/shinyapps.io/guide/migration/).
 
 To deploy to shinyapps.io, you need an account there and the `rsconnect`
 package:
@@ -448,9 +459,9 @@ retired.
 ### Private data and spatial assets
 
 Files explicitly passed through `spatial_images` are copied under
-`spatial-assets/`. The server-side renderer reads them from disk and embeds them
-as data URIs when drawing the plot; the directory is not registered as an HTTP
-resource. Raw `.crb`, H5 and immune repertoire sidecar files stay under `private-data/`, which
+`spatial-assets/`. The server exposes each selected image through a private,
+session-scoped URL; the image bytes are not Base64-encoded, and the directory is
+not registered as a public HTTP resource. Raw `.crb`, H5 and immune repertoire sidecar files stay under `private-data/`, which
 is likewise never registered with `addResourcePath()`. The historical `data/`
 directory
 name is deliberately not reused: a still-running older generated app can retain
@@ -459,7 +470,7 @@ its former `/data` resource mapping while the bundle directory is replaced.
 This boundary prevents ordinary HTTP download through the generated Shiny app;
 it is not encryption or an operating-system access-control boundary. Anyone
 with filesystem access to the deployment account can still read the files.
-Missing optional spatial images are omitted with a warning.
+A `spatial_images` path that does not exist stops the build with an error.
 
 Generated bundles follow the standard Shiny deployment model of one app per R
 process. They use process-global `Cerebro.options` and do not claim isolation
