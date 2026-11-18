@@ -18,7 +18,7 @@ convertSeuratToCerebro(
   nGene = "nFeature_RNA",
   add_all_meta_data = TRUE,
   use_delayed_array = FALSE,
-  expression_matrix_mode = c("embedded", "h5"),
+  expression_matrix_mode = c("auto", "embedded", "h5"),
   codec = c("qs2", "rds"),
   spatial_images = NULL,
   verbose = TRUE,
@@ -78,7 +78,9 @@ data to DelayedArray format for memory efficiency; default: \code{FALSE}.
 Ignored when \code{expression_matrix_mode} is set to an external backend.}
 
 \item{expression_matrix_mode}{How to persist the expression matrix in the
-generated \code{.crb}. One of \code{"embedded"} (default) or \code{"h5"}.
+generated \code{.crb}. One of \code{"auto"} (default: \code{"h5"} for
+more than 200,000 cells, \code{"embedded"} otherwise), \code{"embedded"}
+or \code{"h5"}.
 See \code{\link{exportFromSeurat}} for details; briefly, \code{"embedded"}
 stores the matrix inside the \code{.crb}, and \code{"h5"} writes a
 TENx-format HDF5 file next to the \code{.crb} that the Viewer loads lazily,
