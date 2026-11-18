@@ -673,7 +673,8 @@ cachePlot <- function(x, ...) {
 }
 
 ## Return the first complete reactive value immediately; debounce only later
-## invalidations caused by interactive controls.
+## invalidations caused by interactive controls, and of those only the ones
+## that follow another within `millis`.
 ##
 ## shiny::debounce() evaluates its source eagerly on every invalidation, so a
 ## page-owned `reactive` should req() its page itself. Pass the same predicate
@@ -701,18 +702,32 @@ debounceAfterFirst <- function(reactive, millis, active = NULL) {
     if (!initialized) {
       current <<- reactive()
       initialized <<- TRUE
+      publish <- function(next_value) {
+        if (!identical(current, next_value)) {
+          current <<- next_value
+          revision(shiny::isolate(revision()) + 1L)
+        }
+      }
+      ## A change after `millis` without one (a click: another colour, a
+      ## section) is taken at once; one that follows another sooner (a slider
+      ## dragged, controls redrawn by the first change) waits for the burst to
+      ## settle, and its last value is taken then.
+      last_change <- Sys.time()
+      shiny::observeEvent(reactive(), {
+        next_value <- reactive()
+        ## Its first run sees the value taken above, unless it changed since.
+        if (identical(current, next_value)) {
+          return()
+        }
+        now <- Sys.time()
+        quiet <- as.numeric(difftime(now, last_change, units = "secs")) *
+          1000 >=
+          millis
+        last_change <<- now
+        if (quiet) publish(next_value)
+      })
       delayed <- shiny::debounce(reactive, millis)
-      shiny::observeEvent(
-        delayed(),
-        {
-          next_value <- delayed()
-          if (!identical(current, next_value)) {
-            current <<- next_value
-            revision(shiny::isolate(revision()) + 1L)
-          }
-        },
-        ignoreInit = TRUE
-      )
+      shiny::observeEvent(delayed(), publish(delayed()), ignoreInit = TRUE)
     }
     current
   })
