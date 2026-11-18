@@ -2240,6 +2240,15 @@ body .shiny-notification:has(.shiny-progress-notification) {
   padding: 16px 20px !important;
   border-radius: var(--r-lg) !important;
   box-shadow: var(--shadow-3) !important;
+  /* Shown from 400 ms on, like the page's loading card: work that ends sooner
+     never flashes a card (viewer-shell.js hides one as it closes). */
+  animation: cerebro-progress-late 1ms linear 400ms backwards;
+}
+body .shiny-notification.cerebro-notification-leaving {
+  visibility: hidden !important;
+}
+@keyframes cerebro-progress-late {
+  from, to { visibility: hidden; }
 }
 body .shiny-progress-notification .progress-message,
 body .shiny-progress-container .progress-message {

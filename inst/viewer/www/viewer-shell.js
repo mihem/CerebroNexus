@@ -12,6 +12,35 @@
   }
   document.addEventListener("transitionend", guardSidebarTransition, true);
 
+  // Shiny fades a closed progress notification out over 250 ms (jQuery
+  // fadeOut, which writes the card's inline opacity), its spinner turning all
+  // the while: the work is done, but the screen keeps changing. A progress card
+  // leaves at once instead. Shiny never fades one in, so an inline opacity
+  // means it is closing. The panel is made with the first card, on <body>.
+  function watchNotificationPanel(panel) {
+    if (panel.__cerebroWatched) return;
+    panel.__cerebroWatched = true;
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        var card = record.target;
+        if (card.classList && card.classList.contains("shiny-notification") &&
+            card.style.opacity !== "" &&
+            card.querySelector(".shiny-progress-notification")) {
+          card.classList.add("cerebro-notification-leaving");
+        }
+      });
+    }).observe(panel, { attributes: true, attributeFilter: ["style"], subtree: true });
+  }
+  function watchNotifications() {
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.id === "shiny-notification-panel") watchNotificationPanel(node);
+        });
+      });
+    }).observe(document.body, { childList: true });
+  }
+
   var MOBILE_QUERY = "(max-width: 767px)";
   function ready(fn) {
     if (document.readyState === "loading") {
@@ -116,6 +145,7 @@
     install();
   }
   ready(installInitialNavigation);
+  ready(watchNotifications);
 
   // A page's outputs are reported visible with the page change itself. Shiny
   // reports an output's visibility from an IntersectionObserver, after the next
