@@ -388,36 +388,59 @@
 }
 
 #' Run `fun(item)` for every item, `workers` at a time in R processes (in this
-#' process for one worker). `after(result, item)` is called in item order, wave
-#' by wave, while no worker is running.
+#' process for one worker). `after(result, item)` is called in item order, in
+#' this process, as soon as the result of an item and of those before it are
+#' in: the workers go on with the next items meanwhile. Waves of `workers` items
+#' each, with the appending after a wave, left the workers idle while this
+#' process wrote, and the whole wave waiting for its slowest item.
+#'
+#' The workers are mirai daemons of a compute profile of their own, so that
+#' they neither use nor end daemons that the caller (or the Viewer) runs.
+#' `fun` is sent to each of them once.
 #' @keywords internal
 #' @noRd
 .h5adStreamRun <- function(items, fun, workers, after = NULL) {
   results <- vector("list", length(items))
-  cluster <- NULL
-  if (workers > 1L) {
-    cluster <- parallel::makeCluster(workers)
-    on.exit(parallel::stopCluster(cluster), add = TRUE)
-    parallel::clusterCall(
-      cluster,
-      function(paths) .libPaths(paths),
-      .libPaths()
-    )
+  finish <- function(k, value) {
+    results[[k]] <<- if (is.null(after)) value else after(value, items[[k]])
   }
-  waves <- split(seq_along(items), ceiling(seq_along(items) / workers))
-  for (wave in waves) {
-    done <- if (is.null(cluster)) {
-      lapply(items[wave], fun)
-    } else {
-      parallel::parLapply(cluster, items[wave], fun)
+  if (workers <= 1L || length(items) <= 1L) {
+    for (k in seq_along(items)) {
+      finish(k, fun(items[[k]]))
     }
-    for (j in seq_along(wave)) {
-      results[[wave[[j]]]] <- if (is.null(after)) {
-        done[[j]]
-      } else {
-        after(done[[j]], items[[wave[[j]]]])
-      }
+    return(results)
+  }
+  profile <- paste0(
+    "cerebro-h5-stream-",
+    Sys.getpid(),
+    "-",
+    sample.int(1e9, 1L)
+  )
+  mirai::daemons(workers, dispatcher = TRUE, .compute = profile)
+  on.exit(mirai::daemons(0, .compute = profile), add = TRUE)
+  mirai::everywhere(
+    {
+      .libPaths(paths)
+      NULL
+    },
+    paths = .libPaths(),
+    task = fun,
+    .compute = profile
+  )
+  tasks <- lapply(items, function(item) {
+    mirai::mirai(task(item), .args = list(item = item), .compute = profile)
+  })
+  for (k in seq_along(items)) {
+    value <- mirai::call_mirai(tasks[[k]])$data
+    tasks[k] <- list(NULL)
+    if (mirai::is_error_value(value)) {
+      stop(
+        "A worker of the H5 writer failed: ",
+        paste(as.character(value), collapse = " "),
+        call. = FALSE
+      )
     }
+    finish(k, value)
   }
   results
 }
