@@ -1,11 +1,11 @@
 ---
-title: "Introduction to the CerebroNexus workflow (Seurat)"
+title: "Introduction to the CerebroNexus workflow"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Introduction to the CerebroNexus workflow (Seurat)}
+  %\VignetteIndexEntry{Introduction to the CerebroNexus workflow}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,26 +22,14 @@ knitr::opts_chunk$set(
 This vignette starts from a Seurat object in which the analysis is already done, adds the tables that CerebroNexus pre-computes (most expressed genes, marker genes, enriched pathways), and exports everything to a `.crb` file.
 It does not cover quality control, normalization, clustering or dimensional reduction; for those steps, please see the [Seurat tutorials](https://satijalab.org/seurat/).
 
+These steps are optional: a Seurat object can also be imported as it is, with the Builder or `convertSeuratToCerebro()`; see [Import your analysis](import_your_analysis.html).
 The functions shown here take a Seurat object.
-The same steps, except the gene set enrichment, can also be switched on in the Builder (`launchCerebroBuilder()`); see [Build a data set by pointing](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
-If your analysis lives in a SingleCellExperiment or an AnnData (scanpy) file, see [Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus](import_your_analysis.html).
+The same steps, except the gene set enrichment, can also be switched on in the Builder (`launchCerebroBuilder()`); see [Build a data set without writing code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html).
 
 # Installation
 
-Install `CerebroNexus` and [`Seurat`](https://satijalab.org/seurat/).
-[`GSVA`](https://bioconductor.org/packages/release/bioc/html/GSVA.html) and [`qvalue`](https://bioconductor.org/packages/release/bioc/html/qvalue.html) are only needed for the gene set enrichment step.
-
-```{r installation, message=FALSE, warning=FALSE, eval=FALSE}
-if ( 'BiocManager' %in% installed.packages() == FALSE ) install.packages('BiocManager')
-if ( 'remotes' %in% installed.packages() == FALSE ) install.packages('remotes')
-
-library(BiocManager)
-
-if ( !'CerebroNexus' %in% rownames(installed.packages()) ) remotes::install_github('mihem/CerebroNexus')
-if ( 'Seurat' %in% installed.packages() == FALSE ) install('Seurat')
-if ( 'GSVA' %in% installed.packages() == FALSE ) install('GSVA')
-if ( 'qvalue' %in% installed.packages() == FALSE ) install('qvalue')
-```
+Install CerebroNexus as described in the [installation instructions](https://www.mheming.com/CerebroNexus/#id_1-installation).
+This guide also uses [Seurat](https://satijalab.org/seurat/) (`install.packages('Seurat')`).
 
 # Start from a processed Seurat object
 
@@ -59,8 +47,6 @@ With your own data, load your object instead and use your own column names.
 ```{r setup, message=FALSE, warning=FALSE, eval=FALSE}
 library(Seurat)
 library(CerebroNexus)
-
-set.seed(1234567)
 
 data('pbmc_small')
 seurat <- UpdateSeuratObject(pbmc_small)
@@ -133,6 +119,12 @@ seurat <- getEnrichedPathways(
 
 On top of querying the databases of the [Enrichr](https://maayanlab.cloud/Enrichr/) service, one can also perform gene set enrichment analysis on gene sets provided as a `.gmt` file, e.g. from the [MSigDB](https://www.gsea-msigdb.org/gsea/msigdb/index.jsp).
 The `performGeneSetEnrichmentAnalysis()` function uses the [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html) method in combination with additional statistics as published by [Diaz-Mejia et al.](https://f1000research.com/articles/8-296).
+It needs the Bioconductor packages [GSVA](https://bioconductor.org/packages/release/bioc/html/GSVA.html) and [qvalue](https://bioconductor.org/packages/release/bioc/html/qvalue.html):
+
+```{r install_gsva, eval=FALSE}
+install.packages('BiocManager')
+BiocManager::install(c('GSVA', 'qvalue'))
+```
 
 ```{r performGeneSetEnrichmentAnalysis, eval=FALSE}
 example_gene_set <- system.file("extdata/example_gene_set.gmt", package = "CerebroNexus")
@@ -157,18 +149,7 @@ The example data has too few cell cycle genes to calculate it here.
 
 ## 3D projections
 
-By default, every dimensional reduction except PCA is exported; one with three dimensions is shown as a 3D projection.
-
-```{r umap_3d, eval=FALSE}
-seurat <- RunUMAP(
-  seurat,
-  dims = 1:10,
-  n.components = 3,
-  reduction.name = 'UMAP_3D',
-  reduction.key = 'UMAP3D_',
-  verbose = FALSE
-)
-```
+By default, every dimensional reduction except PCA is exported; one with three dimensions, such as a UMAP computed with `n.components = 3`, is shown as a 3D projection.
 
 # Trajectories (optional)
 
@@ -204,6 +185,8 @@ Open the file in the CerebroNexus user interface with `launchCerebro()`.
 Tables can be downloaded in CSV or Excel format.
 
 For a direct image export, click **Download PNG** in the plot toolbar. If the current view supports portable sharing, you can instead open **Share view** and click **Download PNG** there. The Share view dialog also lets you download or open a portable JSON configuration containing the current display state and selected cell barcodes, so the same view can be restored in another compatible CerebroNexus session without including the source data.
+
+To share the data set itself, see [Share data sets as a Shiny app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.html).
 
 # See also
 
