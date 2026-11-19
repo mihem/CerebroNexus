@@ -1,8 +1,5 @@
 ---
 title: "Control access to CerebroNexus with a login page"
-author:
-  - "Roman Hillje"
-  - "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 toc-title: "Contents"
 output:
@@ -402,6 +399,5 @@ matching secret. Keep the old pair only for the approved rollback window.
 
 # See also
 
-- [Create a self-contained Shiny App](create_a_self_contained_shiny_app.html)
-- [Host CerebroNexus on shinyapps.io](host_cerebro_on_shinyapps.html)
+- [Share data sets as a Shiny app](create_a_self_contained_shiny_app.html), including deployment to shinyapps.io
 - [`shinymanager::create_db()`](https://datastorm-open.github.io/shinymanager/reference/create_db.html)

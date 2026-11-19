@@ -1,6 +1,5 @@
 ---
 title: "HLA Associations on bulk TCRβ with real donor HLA"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -32,7 +31,7 @@ But the **HLA Associations** tab also accepts an input that has no cells at all 
 Nothing here is shipped with the package: there is no bundled bulk demo to open.
 Instead this guide shows you how to build one, either from a real public cohort ([Option A](#option-a-the-real-public-cohort-pubtcrs-emerson-2017)) or as a small synthetic object you can run in the next five minutes ([Option B](#option-b-a-small-synthetic-bulk-crb-you-can-run-now)).
 
-If you have not read the main guide, skim its "two ideas" section first — this one assumes you know what a CDR3, a motif, and an HLA allele are.
+If you have not read [the main guide](hla_tcr_motifs.html), skim its "two ideas" section first — this one assumes you know what a CDR3, a motif, and an HLA allele are.
 As before, every code block runs on its own (base R + `Matrix` + `CerebroNexus`, no downloads), and we print each object as we build it.
 
 ## How bulk data is different
@@ -381,7 +380,8 @@ Bulk immunoSEQ reports only the V family and the CDR3; the parser leaves `j_gene
 
 # See also
 
-- **HLA & TCR Motifs: from synthetic data to an interactive app** — the single-cell workflow (Seurat → `.crb` → app) and a full tour of the page.
+- [HLA & TCR Motifs: from synthetic data to an interactive app](hla_tcr_motifs.html) — the single-cell workflow (Seurat → `.crb` → app) and a full tour of the page.
+- [A real antigen-selected single-cell TCR demo, end to end](hla_tcr_antigen_selected.html) — how the shipped single-cell HLA demo is built from public 10x data.
 - `data-raw/build_hla_tcr_bulk_demo.R` — the real pubtcrs → `.crb` pipeline.
 - `data-raw/DATASETS.md` — provenance for the shipped HLA demo, and for the two demos this package no longer ships.
 

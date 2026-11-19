@@ -1,6 +1,5 @@
 ---
 title: "Data integrity from Seurat to a self-contained Cerebro app"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
@@ -278,4 +277,4 @@ Warnings mean that the result remains interpretable:
 - [Seurat v5 layered assays](seurat_v5_layered_assays.html)
 - [Create a self-contained Shiny app](create_a_self_contained_shiny_app.html)
 - [Immune repertoire analysis](immune_repertoire_analysis.html)
-- [Create an H5 expression matrix](create_expression_matrix_in_h5_format.html)
+- [Store the expression matrix in an H5 file](million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)
