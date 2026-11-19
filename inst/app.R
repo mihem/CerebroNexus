@@ -149,13 +149,13 @@ Cerebro.options <- list(
   "welcome_message" = custom_welcome_message,
   ## One appearance per dataset, shared by every cell scatter page.
   "point_size" = c(
-    "PBMC - Full (T+B)" = 6,
+    "PBMC - Full (T+B)" = 5,
     "Mouse brain (Visium)" = 5,
     "Mouse hippocampus (Slide-seq v2)" = 5,
     "Mouse ileum (MERFISH)" = 5,
     "Mouse brain (Xenium)" = 5,
-    "Mouse brain (Trekker)" = 4.4,
-    "HLA & TCR" = 1
+    "Mouse brain (Trekker)" = 5,
+    "HLA & TCR" = 5
   ),
   "point_opacity" = c(
     "PBMC - Full (T+B)" = 1,
@@ -163,8 +163,8 @@ Cerebro.options <- list(
     "Mouse hippocampus (Slide-seq v2)" = 1,
     "Mouse ileum (MERFISH)" = 1,
     "Mouse brain (Xenium)" = 1,
-    "Mouse brain (Trekker)" = 0.85,
-    "HLA & TCR" = 0.3
+    "Mouse brain (Trekker)" = 1,
+    "HLA & TCR" = 1
   ),
   "percentage_cells_to_show" = 100,
   "projections_show_hover_info" = TRUE

@@ -25,8 +25,8 @@ test_that("the 1M demo is opt-in and validates its H5 file", {
     unname(configured$crb_file_to_load[label]),
     normalizePath(crb)
   )
-  expect_equal(unname(configured$point_size[label]), 1)
-  expect_equal(unname(configured$point_opacity[label]), 0.5)
+  expect_equal(unname(configured$point_size[label]), 5)
+  expect_equal(unname(configured$point_opacity[label]), 1)
   expect_equal(unname(configured$percentage_cells_to_show[label]), 100)
   expect_null(configured$expression_point_size)
 
