@@ -241,3 +241,4 @@ Missing settings default to a no-op (no flip, scale 1.0, no rotation).
 
 - `vignette("import_your_analysis")` for converting Seurat, AnnData and SpatialData data to a `.crb` file.
 - [Share data sets as a Shiny app](create_a_self_contained_shiny_app.html) for app bundling options and hosting several datasets in one app.
+- [Trekker single-cell spatial mapping](trekker_spatial_mapping.html) for Trekker data, which has its own page.
