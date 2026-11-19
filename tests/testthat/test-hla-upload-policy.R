@@ -60,7 +60,15 @@ test_that("closed and unspecified modes hide HLA override controls, not stored d
       )) {
         expect_no_match(html, paste0('id="', id, '"'), fixed = TRUE)
       }
-      expect_match(html, "HLA uploads are disabled", fixed = TRUE)
+      expect_no_match(html, "Stored HLA typing", fixed = TRUE)
+      expect_no_match(html, "HLA uploads are disabled", fixed = TRUE)
+      coverage <- xml2::xml_find_first(
+        xml2::read_html(html),
+        '//*[@id="hla_coverage_table"]'
+      )
+      coverage_column <- xml2::xml_parent(coverage)
+      expect_identical(xml2::xml_attr(coverage_column, "class"), "col-sm-12")
+      expect_length(xml2::xml_children(xml2::xml_parent(coverage_column)), 1L)
       for (id in c(
         "hla_coverage_table",
         "hla_normalized_preview",
@@ -125,6 +133,13 @@ test_that("open mode keeps CSV and TSV HLA overrides session-only and clearable"
     )
     shiny::testServer(hla_upload_policy_server(list(mode = "open")), {
       html <- output$hla_data_qc_ui$html
+      coverage <- xml2::xml_find_first(
+        xml2::read_html(html),
+        '//*[@id="hla_coverage_table"]'
+      )
+      coverage_column <- xml2::xml_parent(coverage)
+      expect_identical(xml2::xml_attr(coverage_column, "class"), "col-sm-6")
+      expect_length(xml2::xml_children(xml2::xml_parent(coverage_column)), 2L)
       for (id in c(
         "hla_upload",
         "hla_upload_source_type",

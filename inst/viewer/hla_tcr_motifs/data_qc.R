@@ -87,57 +87,45 @@ hla_qc_table <- reactive({
 
 ## ---- The Data & QC tab body ------------------------------------------- ##
 output$hla_data_qc_ui <- renderUI({
+  uploads_enabled <- viewerUploadsEnabled(Cerebro.options)
   tagList(
     fluidRow(
-      column(
-        width = 6,
-        if (viewerUploadsEnabled(Cerebro.options)) {
-          tagList(
-            tags$h4("Provide HLA typing"),
-            tags$p(
-              class = "text-muted",
-              style = "font-size: 12px;",
-              paste(
-                "Upload a CSV/TSV. Accepted shapes: a long table (sample, locus,",
-                "allele) or a wide table (a 'sample' column plus HLA-*_1 / HLA-*_2",
-                "columns). Uploads are session-only and never modify the .crb."
-              )
-            ),
-            selectInput(
-              "hla_upload_source_type",
-              "Data provenance:",
-              choices = c(
-                "Directly genotyped" = "genotyped",
-                "Imputed" = "imputed",
-                "Synthetic (demo)" = "synthetic",
-                "Unknown" = "unknown"
-              ),
-              selected = "unknown"
-            ),
-            fileInput(
-              "hla_upload",
-              NULL,
-              accept = c(".csv", ".tsv", "text/csv", "text/tab-separated-values")
-            ),
-            actionButton("hla_clear_session", "Clear session override"),
-            tags$hr(),
-            downloadButton("hla_download_template", "Download CSV template")
-          )
-        } else {
-          tagList(
-            tags$h4("Stored HLA typing"),
-            tags$p(
-              class = "text-muted",
-              paste(
-                "HLA uploads are disabled in this Viewer.",
-                "Analyses use the HLA typing stored in the data set, if present."
-              )
+      if (uploads_enabled) {
+        column(
+          width = 6,
+          tags$h4("Provide HLA typing"),
+          tags$p(
+            class = "text-muted",
+            style = "font-size: 12px;",
+            paste(
+              "Upload a CSV/TSV. Accepted shapes: a long table (sample, locus,",
+              "allele) or a wide table (a 'sample' column plus HLA-*_1 / HLA-*_2",
+              "columns). Uploads are session-only and never modify the .crb."
             )
-          )
-        }
-      ),
+          ),
+          selectInput(
+            "hla_upload_source_type",
+            "Data provenance:",
+            choices = c(
+              "Directly genotyped" = "genotyped",
+              "Imputed" = "imputed",
+              "Synthetic (demo)" = "synthetic",
+              "Unknown" = "unknown"
+            ),
+            selected = "unknown"
+          ),
+          fileInput(
+            "hla_upload",
+            NULL,
+            accept = c(".csv", ".tsv", "text/csv", "text/tab-separated-values")
+          ),
+          actionButton("hla_clear_session", "Clear session override"),
+          tags$hr(),
+          downloadButton("hla_download_template", "Download CSV template")
+        )
+      },
       column(
-        width = 6,
+        width = if (uploads_enabled) 6 else 12,
         tags$h4("Coverage"),
         uiOutput("hla_active_source_ui"),
         tags$p(
