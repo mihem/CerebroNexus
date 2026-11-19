@@ -1,13 +1,15 @@
 ---
-title: "Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus"
+title: "Import your analysis"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Show your Seurat, scanpy and SingleCellExperiment analysis with CerebroNexus}
+  %\VignetteIndexEntry{Import your analysis}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+resource_files:
+  - img/workflow-overview.svg
 ---
 
 ```{r, include = FALSE}
@@ -16,9 +18,20 @@ knitr::opts_chunk$set(
   comment = "#>",
   eval = FALSE
 )
+## The Builder screenshots appear on the website only: they are left out of
+## the package (see .Rbuildignore), and pkgdown sets IN_PKGDOWN. Their chunks
+## set fig.class, because pkgdown inverts images of the class r-plt in dark mode.
+builder_figure <- function(file) {
+  path <- file.path("..", "man", "figures", file)
+  if (identical(Sys.getenv("IN_PKGDOWN"), "true") && file.exists(path)) {
+    knitr::include_graphics(path)
+  }
+}
 ```
 
-# Overview
+```{r overview, echo = FALSE, eval = TRUE, out.width = "100%", fig.cap = "The CerebroNexus workflow, with the main areas of the Viewer below.", fig.alt = "Prepared objects (Seurat, SingleCellExperiment, AnnData, SpatialData) go into the Builder (configure, review, build); the Viewer opens the result (select, compare, export). Below, the main areas of the Viewer: expression, linked views, spatial, immune repertoire, and HLA and TCR motifs."}
+knitr::include_graphics("img/workflow-overview.svg")
+```
 
 CerebroNexus is compatible with Seurat, SingleCellExperiment and AnnData
 (scanpy) objects, and with SpatialData stores. It shows an analysis that is
@@ -30,7 +43,54 @@ the toolkit you already use. For the preprocessing steps, please see:
   for SingleCellExperiment
 * [scanpy tutorials](https://scanpy.readthedocs.io/en/latest/tutorials/basics/index.html)
 
-A `.crb` file is the common format, and four kinds of input lead to it:
+Importing turns your object into a `.crb` file, which the Viewer opens. The
+Builder does this by pointing and clicking; in R, the `convert*()` functions do
+the same.
+
+# With the Builder
+
+```{r builder}
+library(CerebroNexus)
+launchCerebroBuilder()
+```
+
+The Builder opens in your browser. It needs a few suggested packages, such as
+Seurat; see the
+[installation instructions](https://www.mheming.com/CerebroNexus/#id_1-installation).
+
+1. **Data**: add your files, or click **Load example datasets** to try the
+   Builder with three examples. It reads Seurat and SingleCellExperiment objects
+   saved as `.rds` or `.qs2`, AnnData `.h5ad` and MuData `.h5mu` files, and a
+   `.zip` of a SpatialData `.zarr` folder.
+2. **Configure**: check the name, organism, assay and layer of each data set,
+   choose what the Viewer shows, then click **Finish Checking**.
+
+```{r builder-configure, echo = FALSE, eval = TRUE, out.width = "100%", fig.class = "img-fluid", fig.alt = "The Configure step of the Builder with the three example data sets."}
+builder_figure("builder.png")
+```
+
+3. **Review**: confirm what will be built.
+
+```{r builder-review, echo = FALSE, eval = TRUE, out.width = "100%", fig.class = "img-fluid", fig.alt = "The Review step of the Builder: everything is ready to build."}
+builder_figure("builder-review.png")
+```
+
+4. **Build**: choose a Viewer app or CRB files only, set what visitors see
+   first, click **Build** and choose a folder. When the build is complete,
+   **Open App** starts the result.
+
+```{r builder-build, echo = FALSE, eval = TRUE, out.width = "100%", fig.class = "img-fluid", fig.alt = "The Build step of the Builder after a complete build, with the Open App button."}
+builder_figure("builder-build.png")
+```
+
+The Builder can also add most expressed genes, marker genes and other tables,
+and offers PAGA, scVelo and pseudotime trajectories next to monocle2. See
+[Build a data set without writing code](https://www.mheming.com/CerebroNexus/articles/build_a_data_set_by_pointing.html)
+for all options.
+
+# With R
+
+Four kinds of input lead to a `.crb` file:
 
 | You have | Convert with |
 |---|---|
@@ -50,7 +110,7 @@ object can be written as `.h5ad` for scanpy, an `.h5ad` file can be turned into
 a SingleCellExperiment, and so on. AnnData files are read natively with
 `rhdf5`; no Python is needed.
 
-# From a Seurat object
+## From a Seurat object
 
 ```{r seurat}
 library(CerebroNexus)
@@ -63,11 +123,21 @@ crb <- convertSeuratToCerebro(
 )
 ```
 
-To add tables of most expressed genes, marker genes and enriched pathways
-before the export, see
-[Introduction to the CerebroNexus workflow (Seurat)](cerebronexus_workflow_seurat.html).
+To add tables of marker genes and enriched pathways before the export, see
+[Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html).
 
-# From an AnnData file
+## From a SingleCellExperiment
+
+```{r sce}
+crb <- convertSCEToCerebro(
+  "sce.rds",
+  result_dir = "cerebro",
+  assay = "logcounts",
+  groups = c("cluster", "sample")
+)
+```
+
+## From an AnnData file
 
 ```{r h5ad}
 crb <- convertH5adToCerebro(
@@ -92,18 +162,7 @@ Use `use_raw = TRUE` for `adata.raw`, `modality =` to pick one modality of an
 `.h5mu` file, and `gene_names =` to name genes by a `var` column when the index
 holds Ensembl IDs.
 
-# From a SingleCellExperiment
-
-```{r sce}
-crb <- convertSCEToCerebro(
-  "sce.rds",
-  result_dir = "cerebro",
-  assay = "logcounts",
-  groups = c("cluster", "sample")
-)
-```
-
-# From a SpatialData store
+## From a SpatialData store
 
 ```{r spatialdata}
 crb <- convertSpatialDataToCerebro(
@@ -123,7 +182,7 @@ stops with the codec's name. Blosc chunks are decoded in R, lz4 (the numcodecs
 default) at about 4 MB/s, so re-save a large store with zstd, or use an
 `.h5ad` file.
 
-# Back to scanpy
+## Back to scanpy
 
 ```{r back}
 exportToH5ad("cerebro/cerebro_pbmc.crb", "pbmc_back.h5ad")
@@ -138,10 +197,12 @@ Expression, cell metadata, projections, marker genes, category colours and, for
 spatial data, coordinates and tissue images are written. A message lists what
 `.h5ad` has no place for (immune repertoire, trajectories, trees, ...).
 
-# In the Builder
+# Next steps
 
-`launchCerebroBuilder()` accepts `.h5ad`, `.h5mu`, a `.zip` of a SpatialData
-`.zarr` folder, and SingleCellExperiment `.rds` / `.qs2` files like Seurat ones, and offers PAGA, scVelo and pseudotime
-trajectories next to monocle2. Spatial coordinates arrive as one spatial section
-per `library_id`, and Visium tissue pictures are attached to their sections as
-images at the position their scale factor gives.
+* Open the `.crb` file with `launchCerebro()`, or the app the Builder made with
+  **Open App**.
+* To add CerebroNexus analyses to a Seurat object first (marker genes,
+  enriched pathways, gene set enrichment), see
+  [Introduction to the CerebroNexus workflow](cerebronexus_workflow_seurat.html).
+* To share the result, see
+  [Share data sets as a Shiny app](https://www.mheming.com/CerebroNexus/articles/create_a_self_contained_shiny_app.html).
