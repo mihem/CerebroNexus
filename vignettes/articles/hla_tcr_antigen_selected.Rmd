@@ -1,6 +1,5 @@
 ---
 title: "A real antigen-selected single-cell TCR demo, end to end"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

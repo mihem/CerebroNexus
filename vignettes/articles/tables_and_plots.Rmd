@@ -1,6 +1,5 @@
 ---
 title: "Tables and plots in the Viewer"
-author: "Xuesong Wang and Roman Hillje"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

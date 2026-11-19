@@ -1,8 +1,5 @@
 ---
 title: "Control access to CerebroNexus with a login page"
-author:
-  - "Roman Hillje"
-  - "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 toc-title: "Contents"
 output:

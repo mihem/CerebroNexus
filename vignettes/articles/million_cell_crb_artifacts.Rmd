@@ -1,6 +1,5 @@
 ---
 title: "Working with large datasets"
-author: "Xuesong Wang"
 output:
   html_document:
     toc: true
