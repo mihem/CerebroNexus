@@ -23,7 +23,9 @@ viewerAddLargeDemo <- function(
   options,
   path,
   variable,
-  label
+  label,
+  point_size = 1,
+  point_opacity = 0.5
 ) {
   if (!nzchar(path)) {
     return(options)
@@ -47,8 +49,8 @@ viewerAddLargeDemo <- function(
 
   datasets[label] <- path
   options[["crb_file_to_load"]] <- datasets
-  add_setting("point_size", 5)
-  add_setting("point_opacity", 1)
+  add_setting("point_size", point_size)
+  add_setting("point_opacity", point_opacity)
   add_setting("percentage_cells_to_show", 100)
 
   ## run-demo.R writes a compressed twin of the H5 file as <stem>_compressed.crb
@@ -63,7 +65,9 @@ viewerAddLargeDemo <- function(
       options,
       twin,
       variable,
-      paste(label, "[compressed]")
+      paste(label, "[compressed]"),
+      point_size,
+      point_opacity
     )
   }
   options
@@ -93,6 +97,8 @@ viewerAddRenDemo <- function(
   )
 }
 
+## Spatial scatter of single cells: small, fairly opaque points keep the
+## tissue outline readable at around a million cells.
 viewerAddCosMxDemo <- function(
   options,
   path = Sys.getenv("CEREBRO_COSMX_DEMO_CRB", unset = "")
@@ -101,7 +107,9 @@ viewerAddCosMxDemo <- function(
     options,
     path,
     "CEREBRO_COSMX_DEMO_CRB",
-    "CosMx SMI NSCLC (8 sections)"
+    "CosMx SMI NSCLC (8 sections)",
+    point_size = 1,
+    point_opacity = 0.6
   )
 }
 

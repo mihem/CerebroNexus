@@ -18,12 +18,13 @@
   offset, flip or uneven scale (such as the MERFISH demo) draw as before;
   hand-written settings that combine a rotation with them need re-checking.
   The Builder writes settings in the new form.
-- **Every demo data set draws its cells at size 5 and full opacity.** The
-  bundled app gave HLA & TCR points of size 1 at opacity 0.3, so its 2,000
-  cells of one cell type (light yellow) were close to invisible on the
-  Projection page. The demos in `inst/app.R` and the large demos
-  (`inst/viewer/million_cell_demo.R`) now all start at size 5 and opacity 1,
-  the defaults of `launchCerebro()`; the settings drawer still changes them.
+- **The bundled demo data sets draw their cells at size 5 and full opacity.**
+  The app gave HLA & TCR points of size 1 at opacity 0.3, so its 2,000 cells
+  of one cell type (light yellow) were close to invisible on the Projection
+  page. All demos in `inst/app.R` (PBMC was at size 6, Trekker at 4.4 and
+  opacity 0.85) now start at the defaults of `launchCerebro()`; the settings
+  drawer still changes them. The large demos of about a million cells keep
+  their small points (size 1).
 
 # CerebroNexus 8.4.0
 
