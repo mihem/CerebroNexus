@@ -617,6 +617,23 @@
     group = group,
     level = level
   )
+  ## Values the source stores as 32-bit floats are kept so: half the bytes to
+  ## compress (on one R thread, most of the writer's time) and to read back,
+  ## and a reader gets the same doubles. The dataset is made as HDF5Array
+  ## makes it (chunks of 16384 values, deflate with shuffle), in float32.
+  if (identical(source$value_size, 4L)) {
+    rhdf5::h5delete(path, paste0(group, "/data"))
+    rhdf5::h5createDataset(
+      path,
+      paste0(group, "/data"),
+      dims = 0,
+      maxdims = max(1, as.numeric(source$n_obs) * as.numeric(n_vars)),
+      storage.mode = "double",
+      H5type = "H5T_IEEE_F32LE",
+      chunk = 16384,
+      level = level %||% 6L
+    )
+  }
   write <- function(name, values, start, n) {
     dataset <- paste0(group, "/", name)
     for (from in seq(1, n, by = slice)) {
