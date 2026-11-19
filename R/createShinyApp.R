@@ -2318,7 +2318,10 @@
 #' @param verbose Print progress messages; defaults to TRUE.
 #' @param crb_pick_smallest_file Forwarded to \code{Cerebro.options}.
 #' @param show_upload_ui One non-missing logical controlling whether users may
-#'   upload their own data; defaults to \code{FALSE}.
+#'   upload their own data sets and session-only HLA typing; defaults to
+#'   \code{FALSE}. When \code{FALSE}, both upload handlers reject uploads and
+#'   their controls are hidden. Stored HLA analyses and view-configuration JSON
+#'   imports remain available.
 #' @param initial_dataset Optional exact dataset identity to load initially. This
 #'   does not change the order of \code{cerebro_data}. URL selection and a
 #'   session's current selection take precedence.

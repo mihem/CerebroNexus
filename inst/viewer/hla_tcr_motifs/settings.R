@@ -491,8 +491,9 @@ output$hla_status_ui <- renderUI({
         class = "text-muted",
         style = "font-size: 12px;",
         paste(
-          "Motif network uses cell-type / sample colouring only. Provide HLA",
-          "typing in the Data & QC tab to enable donor-level HLA context."
+          "Motif network uses cell-type / sample colouring only. Add HLA typing",
+          "to the data set, or upload it in Data & QC in open mode, to enable",
+          "donor-level HLA context."
         )
       ),
       lineage_note

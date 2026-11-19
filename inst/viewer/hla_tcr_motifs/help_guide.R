@@ -1065,7 +1065,8 @@ hla_guide_content <- list(
         hla_guide_code(".crb"),
         " at build time via ",
         hla_guide_code("addHLATyping()"),
-        ", or uploaded here as a CSV/TSV."
+        ", or uploaded here as a CSV/TSV in open mode. Closed Viewers use only",
+        " the stored typing and do not allow session overrides."
       ),
       hla_guide_warn(
         tags$b("An upload is session-only. "),

@@ -159,8 +159,8 @@ output$hla_associations_ui <- renderUI({
     return(tags$p(
       class = "text-muted",
       paste(
-        "No HLA typing loaded. Provide HLA typing in Data & QC to inspect",
-        "feature-specific descriptive overlap."
+        "No HLA typing loaded. Add typing to the data set, or upload it in",
+        "Data & QC in open mode, to inspect feature-specific descriptive overlap."
       )
     ))
   }
