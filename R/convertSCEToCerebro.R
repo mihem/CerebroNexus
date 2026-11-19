@@ -275,8 +275,22 @@ convertSCEToCerebro <- function(
         call. = FALSE
       )
     }
-    old_options <- options(cerebro.expression_stream = .x_stream)
-    on.exit(options(old_options), add = TRUE)
+    ## The block files of the one read of the matrix (R/h5ad_stream.R) wait
+    ## from the group summaries to the expression file next to the result.
+    old_options <- options(
+      cerebro.expression_stream = .x_stream,
+      cerebro.h5ad_stream_scratch = getOption(
+        "cerebro.h5ad_stream_scratch",
+        result_dir
+      )
+    )
+    on.exit(
+      {
+        .h5adStreamDrop(.x_stream)
+        options(old_options)
+      },
+      add = TRUE
+    )
   }
   sce <- .sceEnsureQcColumns(sce, nUMI, nGene, assay, verbose)
   if (!is.null(extra_features) && !isFALSE(extra_features)) {

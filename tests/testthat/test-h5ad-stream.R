@@ -77,7 +77,9 @@ test_that("the blocks and passes do not change what is written", {
 ## (an AnnData CSR; the genes of a cell in reverse order, as an unsorted source
 ## may have them), with ranges and blocks that do not divide the matrix evenly,
 ## in one process and in two.
-stream_fixture <- function() {
+## `float32`: the values stored as 32-bit floats, as scanpy writes them; the
+## block files then keep 4 bytes a value.
+stream_fixture <- function(float32 = FALSE) {
   set.seed(2)
   genes_by_cells <- abs(Matrix::rsparsematrix(40L, 700L, 0.1))
   genes_by_cells@x <- round(genes_by_cells@x * 10) + 1
@@ -106,6 +108,15 @@ stream_fixture <- function() {
   rhdf5::h5createGroup(h5ad, "raw")
   rhdf5::h5createGroup(h5ad, "raw/X")
   rhdf5::h5write(by_cell@j[order], h5ad, "raw/X/indices")
+  if (float32) {
+    rhdf5::h5createDataset(
+      h5ad,
+      "raw/X/data",
+      dims = length(order),
+      H5type = "H5T_IEEE_F32LE",
+      chunk = length(order)
+    )
+  }
   rhdf5::h5write(by_cell@x[order], h5ad, "raw/X/data")
   rhdf5::h5write(as.integer(by_cell@p), h5ad, "raw/X/indptr")
   list(matrix = genes_by_cells, expected = expected, h5ad = h5ad)
@@ -119,9 +130,13 @@ test_that("the streaming writer matches writeTENxMatrix on a cell-major source",
     list(workers = 1L, buckets = 256L, codec = "none"),
     list(workers = 2L, buckets = 7L, codec = .h5adStreamCodec()),
     list(workers = 2L, buckets = 1L, codec = "none"),
-    list(workers = 3L, buckets = 40L, codec = .h5adStreamCodec())
+    list(workers = 3L, buckets = 40L, codec = .h5adStreamCodec()),
+    list(workers = 2L, buckets = 7L, codec = .h5adStreamCodec(), f32 = TRUE)
   )
   for (setting in settings) {
+    if (isTRUE(setting$f32)) {
+      fixture <- stream_fixture(float32 = TRUE)
+    }
     workers <- setting$workers
     withr::local_options(
       cerebro.h5ad_stream_block = 250,
@@ -131,6 +146,7 @@ test_that("the streaming writer matches writeTENxMatrix on a cell-major source",
     )
     written <- withr::local_tempfile(fileext = ".h5")
     source <- .h5adStreamSource(fixture$h5ad, "raw/X", 700, 40)
+    expect_identical(source$value_size, if (isTRUE(setting$f32)) 4L else 8L)
     .h5adStreamWriteTENx(
       source,
       written,
@@ -189,8 +205,33 @@ test_that("the group sums over blocks and workers match the whole matrix", {
       cerebro.h5ad_stream_block = 120,
       cerebro.h5ad_stream_workers = workers
     )
+    scratch <- withr::local_tempdir()
+    withr::local_options(cerebro.h5ad_stream_scratch = scratch)
     sums <- .h5adStreamGroupSums(source, members)
     expect_equal(sums$sums, expected_sums, ignore_attr = TRUE)
     expect_equal(sums$positive, expected_positive, ignore_attr = TRUE)
+    ## the writer takes the blocks the sums left, without reading the source
+    expect_false(is.null(source$cache$split))
+    written <- withr::local_tempfile(fileext = ".h5")
+    .h5adStreamWriteTENx(
+      source,
+      written,
+      group = "expression",
+      dimnames = list(colnames(fixture$matrix), rownames(fixture$matrix)),
+      level = 0L,
+      budget = 150
+    )
+    expect_null(source$cache$split)
+    expect_length(list.files(scratch), 0L)
+    for (dataset in c("data", "indices", "indptr")) {
+      expect_identical(
+        as.vector(rhdf5::h5read(written, paste0("expression/", dataset))),
+        as.vector(rhdf5::h5read(
+          fixture$expected,
+          paste0("expression/", dataset)
+        )),
+        info = paste(workers, "worker(s):", dataset)
+      )
+    }
   }
 })

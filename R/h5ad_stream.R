@@ -2,26 +2,28 @@
 ## A dgCMatrix cannot hold them (its column pointers are 32-bit), so a matrix
 ## that is stored cell by cell in an HDF5 file (the CSR `X` of an h5ad file, or a
 ## 10x file, whose columns are cells) is not read into R when it is that large.
-## It is streamed: read in blocks of cells, the sums the group summaries need are
-## accumulated block by block, and the gene-major expression file the Viewer
-## reads (TENx CSC of cells x genes) is written in two steps. The source is read
-## once: each block of cells is sorted by gene and left in a scratch file, cut
-## into buckets of genes that are compressed one by one. Then the genes are cut
-## into ranges, and each range is collected from the buckets that hold its genes.
-## Both steps run in several R processes (`cerebro.h5ad_stream_workers`); the
-## ranges are left in scratch files for the main process to append, in gene
-## order, to the H5 file.
+## It is streamed, and the source is read once, in blocks of cells: each block is
+## sorted by gene, adds its share to the sums the group summaries need, and is
+## left in a scratch file, cut into buckets of genes that are compressed one by
+## one. Then the genes are cut into ranges, and each range is collected from the
+## buckets that hold its genes, for the gene-major expression file the Viewer
+## reads (TENx CSC of cells x genes). Both steps run in several R processes
+## (`cerebro.h5ad_stream_workers`); the ranges are left in scratch files for the
+## main process to append, in gene order, to the H5 file. In a conversion the
+## summaries come before the file: the block files they leave wait for the
+## writer in the source's `cache` (`.h5adStreamGroupSums()`).
 ##
 ## Reading the source is the costly part: a 10x file of 1.3 million cells and
 ## 2.6 billion values takes about two minutes to read and decompress. The ranges
 ## used to be collected by a pass over the whole source each: about ten passes
-## for that file, 9 of the writer's 12 minutes.
+## for that file, 9 of the writer's 12 minutes; and the summaries read the whole
+## source once more before the writer did (3 of the 13 minutes of converting the
+## 21 GB h5ad of those cells).
 ##
 ## The functions that run in worker processes (`.h5adStreamReadBlock`,
-## `.h5adStreamBuild`, `.h5adStreamSplitTask`, `.h5adStreamRangeTask`,
-## `.h5adStreamSumsTask`) use only base R, Matrix, methods and rhdf5, and are
-## shipped with `globalenv()` as their environment, so a worker does not need
-## this package installed.
+## `.h5adStreamSplitTask`, `.h5adStreamRangeTask`) use only base R, Matrix,
+## methods and rhdf5, and are shipped with `globalenv()` as their environment, so
+## a worker does not need this package installed.
 
 #' Number of non-zero values from which an h5ad X is streamed, not read.
 #' @keywords internal
@@ -56,8 +58,34 @@
     n_obs = n_obs,
     n_vars = n_vars,
     nnz = indptr[[length(indptr)]],
-    indptr = indptr
+    indptr = indptr,
+    value_size = .h5adStreamValueSize(file, paste0(prefix, path, "/data")),
+    ## shared by the copies of the source: block files left for the writer
+    cache = new.env(parent = emptyenv())
   )
+}
+
+#' Bytes a value of the matrix keeps in the block files: 4 for values stored as
+#' 32-bit floats (which R reads back exactly), 8 otherwise.
+#' @keywords internal
+#' @noRd
+.h5adStreamValueSize <- function(file, dataset) {
+  size <- tryCatch(
+    {
+      handle <- rhdf5::H5Fopen(file, flags = "H5F_ACC_RDONLY")
+      on.exit(rhdf5::H5Fclose(handle), add = TRUE)
+      data <- rhdf5::H5Dopen(handle, dataset)
+      on.exit(rhdf5::H5Dclose(data), add = TRUE, after = FALSE)
+      type <- rhdf5::H5Dget_type(data)
+      if (identical(rhdf5::H5Tget_class(type), "H5T_FLOAT")) {
+        rhdf5::H5Tget_size(type)
+      } else {
+        8L
+      }
+    },
+    error = function(error) 8L
+  )
+  if (identical(as.integer(size), 4L)) 4L else 8L
 }
 
 #' The cell-major matrix of a 10x HDF5 file (CSC of genes x cells, group such as
@@ -140,57 +168,6 @@
   )
 }
 
-#' A block as a genes x cells dgCMatrix. The CSR rows of the file are the columns
-#' of it; when the indices of a row are not sorted the matrix is built from
-#' triplets instead. Runs in worker processes: base, Matrix and methods only.
-#' @keywords internal
-#' @noRd
-.h5adStreamBuild <- function(x, n_vars) {
-  nc <- length(x$p) - 1L
-  built <- tryCatch(
-    methods::new(
-      "dgCMatrix",
-      i = x$gene,
-      p = x$p,
-      x = x$value,
-      Dim = c(n_vars, nc)
-    ),
-    error = function(e) NULL
-  )
-  if (is.null(built)) {
-    built <- Matrix::sparseMatrix(
-      i = x$gene + 1L,
-      j = rep.int(seq_len(nc), diff(x$p)),
-      x = x$value,
-      dims = c(n_vars, nc)
-    )
-  }
-  built
-}
-
-#' Sums over some blocks of cells: per level of `members` (cells x levels, all
-#' groups side by side), the summed values and the number of positive values of
-#' every gene. Runs in worker processes.
-#' @keywords internal
-#' @noRd
-.h5adStreamSumsTask <- function(blocks, source, members, helpers) {
-  loadNamespace("Matrix")
-  k <- ncol(members)
-  sums <- matrix(0, source$n_vars, k)
-  positive <- matrix(0, source$n_vars, k)
-  for (b in seq_along(blocks$from)) {
-    c0 <- blocks$from[[b]]
-    c1 <- blocks$to[[b]]
-    x <- helpers$read(source, c0, c1)
-    expr <- helpers$build(x, source$n_vars)
-    m <- members[(c0 + 1):c1, , drop = FALSE]
-    sums <- sums + as.matrix(expr %*% m)
-    expr@x <- as.numeric(expr@x > 0)
-    positive <- positive + as.matrix(expr %*% m)
-  }
-  list(sums = sums, positive = positive)
-}
-
 #' Edges of the buckets of genes a block file is cut into: 0-based, from 0 to
 #' `n_vars`, at most `buckets` buckets of consecutive genes.
 #' @keywords internal
@@ -216,10 +193,12 @@
 
 #' One block of cells (`item`: 0-based `c0`, `c1`, and `id`), sorted by gene,
 #' with the cells ascending within a gene, left in `<dir>/block-<id>.bin`. Each
-#' bucket of genes (`edges`) is there as its values (float64) and then its
-#' 0-based cells (int32), each compressed on its own with `codec`. Returns the
-#' file, the values per gene and, per bucket, the byte offset and length of the
-#' values and of the cells. Runs in worker processes.
+#' bucket of genes (`edges`) is there as its values (`source$value_size` bytes
+#' each) and then its 0-based cells (int32), each compressed on its own with
+#' `codec`. Returns the file, the values per gene and, per bucket, the byte
+#' offset and length of the values and of the cells. With `item$members` (the
+#' block's cells x levels indicator), also the block's summed values and number
+#' of positive values per gene and level. Runs in worker processes.
 #' @keywords internal
 #' @noRd
 .h5adStreamSplitTask <- function(item, source, edges, dir, codec, helpers) {
@@ -235,9 +214,23 @@
   value <- x$value[o]
   cell <- cell[o]
   rm(x, o)
+  sums <- positive <- NULL
+  if (!is.null(item$members)) {
+    ## sorted by gene, the block is a valid cells x genes dgCMatrix as it is
+    loadNamespace("Matrix")
+    block <- methods::new("dgCMatrix")
+    block@Dim <- c(as.integer(item$c1 - item$c0), as.integer(n_vars))
+    block@p <- as.integer(c(0, cumsum(counts)))
+    block@i <- cell - as.integer(item$c0)
+    block@x <- value
+    sums <- as.matrix(Matrix::crossprod(block, item$members))
+    block@x <- as.numeric(value > 0)
+    positive <- as.matrix(Matrix::crossprod(block, item$members))
+    rm(block)
+  }
   at <- c(0, cumsum(counts))[edges + 1]
-  pack <- function(v) {
-    bytes <- writeBin(v, raw())
+  pack <- function(v, size = NA_integer_) {
+    bytes <- writeBin(v, raw(), size = size)
     if (identical(codec, "none")) bytes else memCompress(bytes, codec)
   }
   path <- file.path(dir, sprintf("block-%05d.bin", item$id))
@@ -248,7 +241,7 @@
   for (k in seq_len(length(edges) - 1L)) {
     if (at[[k + 1L]] > at[[k]]) {
       i <- (at[[k]] + 1):at[[k + 1L]]
-      values <- pack(value[i])
+      values <- pack(value[i], source$value_size)
       cells <- pack(cell[i])
       writeBin(values, connection)
       writeBin(cells, connection)
@@ -263,7 +256,14 @@
     )
     offset <- offset + length(values) + length(cells)
   }
-  list(path = path, counts = counts, index = index)
+  list(
+    path = path,
+    counts = counts,
+    index = index,
+    value_size = source$value_size,
+    sums = sums,
+    positive = positive
+  )
 }
 
 #' One range of genes `g0`..`g1` (0-based, end excluded): the values of those
@@ -294,13 +294,13 @@
   ## the buckets that hold genes of the range
   from <- findInterval(g0, edges)
   to <- findInterval(g1 - 1, edges)
-  unpack <- function(connection, at, bytes, what, n) {
+  unpack <- function(connection, at, bytes, what, n, size = NA_integer_) {
     seek(connection, at)
     raw_bytes <- readBin(connection, "raw", n = bytes)
     if (!identical(codec, "none")) {
       raw_bytes <- memDecompress(raw_bytes, codec)
     }
-    readBin(raw_bytes, what, n = n)
+    readBin(raw_bytes, what, n = n, size = size)
   }
   for (block in blocks) {
     connection <- file(block$path, open = "rb")
@@ -316,7 +316,8 @@
         block$index[k, 1L],
         block$index[k, 2L],
         "double",
-        n
+        n,
+        block$value_size
       )
       cells <- unpack(
         connection,
@@ -380,10 +381,8 @@
   }
   list(
     read = ship(.h5adStreamReadBlock),
-    build = ship(.h5adStreamBuild),
     split = ship(.h5adStreamSplitTask),
-    range = ship(.h5adStreamRangeTask),
-    sums = ship(.h5adStreamSumsTask)
+    range = ship(.h5adStreamRangeTask)
   )
 }
 
@@ -445,40 +444,95 @@
   results
 }
 
-#' The function a worker runs for its share of the blocks.
-#' @keywords internal
-#' @noRd
-.h5adStreamSumsCall <- function(shipped, source, members) {
-  function(item) {
-    shipped$sums(item, source, members, shipped)
-  }
-}
-
 #' Per group level: the summed values and the number of positive values of every
 #' gene, accumulated over the blocks. `members` is a cells x levels indicator
-#' matrix (all groups side by side). Returns two genes x levels matrices.
+#' matrix (all groups side by side). Returns two genes x levels matrices. The
+#' blocks are split for the writer on the way (`.h5adStreamSplit()`) and kept
+#' in `source$cache` until `.h5adStreamWriteTENx()` takes them, so that a
+#' conversion reads the source once.
 #' @keywords internal
 #' @noRd
 .h5adStreamGroupSums <- function(source, members) {
+  .h5adStreamDrop(source)
+  scratch_dir <- getOption("cerebro.h5ad_stream_scratch", tempdir())
+  split <- .h5adStreamSplit(source, scratch_dir, members)
+  if (is.environment(source$cache)) {
+    source$cache$split <- split
+    reg.finalizer(source$cache, .h5adStreamDrop, onexit = TRUE)
+  } else {
+    unlink(split$scratch, recursive = TRUE, force = TRUE)
+  }
+  list(sums = split$sums, positive = split$positive)
+}
+
+#' Removes the block files a source keeps for its writer (`source` or its
+#' cache).
+#' @keywords internal
+#' @noRd
+.h5adStreamDrop <- function(source) {
+  cache <- if (is.environment(source)) source else source$cache
+  if (is.environment(cache) && !is.null(cache$split)) {
+    unlink(cache$split$scratch, recursive = TRUE, force = TRUE)
+    cache$split <- NULL
+  }
+  invisible(NULL)
+}
+
+#' The source, read once: one block file per block of cells in a new scratch
+#' directory under `scratch_dir`, and with `members` the group sums over all
+#' blocks. Returns the directory, the blocks and the sums.
+#' @keywords internal
+#' @noRd
+.h5adStreamSplit <- function(source, scratch_dir, members = NULL) {
   blocks <- .h5adStreamBlocks(source)
-  workers <- .h5adStreamWorkers(length(blocks$from))
   shipped <- .h5adStreamShipped()
-  ## each worker gets a share of the blocks
-  share <- split(
-    seq_along(blocks$from),
-    rep_len(seq_len(workers), length(blocks$from))
+  dir.create(scratch_dir, recursive = TRUE, showWarnings = FALSE)
+  scratch <- tempfile("h5-stream-", scratch_dir)
+  dir.create(scratch, recursive = TRUE)
+  done <- FALSE
+  on.exit(
+    if (!done) unlink(scratch, recursive = TRUE, force = TRUE),
+    add = TRUE
   )
-  items <- lapply(share, function(i) {
-    list(from = blocks$from[i], to = blocks$to[i])
+  edges <- .h5adStreamBucketEdges(source$n_vars)
+  codec <- .h5adStreamCodec()
+  items <- lapply(seq_along(blocks$from), function(b) {
+    c0 <- blocks$from[[b]]
+    c1 <- blocks$to[[b]]
+    list(
+      c0 = c0,
+      c1 = c1,
+      id = b,
+      members = if (!is.null(members)) members[(c0 + 1):c1, , drop = FALSE]
+    )
   })
-  parts <- .h5adStreamRun(
+  sums <- positive <- NULL
+  ## the sums are added up as the blocks come in, not kept per block
+  add <- function(block, item) {
+    if (!is.null(block$sums)) {
+      sums <<- if (is.null(sums)) block$sums else sums + block$sums
+      positive <<- if (is.null(positive)) {
+        block$positive
+      } else {
+        positive + block$positive
+      }
+    }
+    block[c("path", "counts", "index", "value_size")]
+  }
+  split <- .h5adStreamRun(
     items,
-    .h5adStreamSumsCall(shipped, source, members),
-    workers
+    .h5adStreamSplitCall(shipped, source, edges, scratch, codec),
+    .h5adStreamWorkers(length(items)),
+    after = add
   )
+  done <- TRUE
   list(
-    sums = Reduce(`+`, lapply(parts, `[[`, "sums")),
-    positive = Reduce(`+`, lapply(parts, `[[`, "positive"))
+    scratch = scratch,
+    edges = edges,
+    codec = codec,
+    blocks = split,
+    sums = sums,
+    positive = positive
   )
 }
 
@@ -526,23 +580,20 @@
   scratch_dir = dirname(path)
 ) {
   n_vars <- source$n_vars
-  blocks <- .h5adStreamBlocks(source)
   shipped <- .h5adStreamShipped()
-  scratch <- tempfile("h5-stream-", scratch_dir)
-  dir.create(scratch, recursive = TRUE)
+  ## The source, read once: one block file per block of cells, left by the
+  ## group summaries of a conversion or made now
+  made <- if (is.environment(source$cache)) source$cache$split
+  if (!is.null(made)) {
+    source$cache$split <- NULL
+  } else {
+    made <- .h5adStreamSplit(source, scratch_dir)
+  }
+  scratch <- made$scratch
   on.exit(unlink(scratch, recursive = TRUE, force = TRUE), add = TRUE)
-
-  ## The source, read once: one block file per block of cells
-  edges <- .h5adStreamBucketEdges(n_vars)
-  codec <- .h5adStreamCodec()
-  items <- lapply(seq_along(blocks$from), function(b) {
-    list(c0 = blocks$from[[b]], c1 = blocks$to[[b]], id = b)
-  })
-  split <- .h5adStreamRun(
-    items,
-    .h5adStreamSplitCall(shipped, source, edges, scratch, codec),
-    .h5adStreamWorkers(length(items))
-  )
+  edges <- made$edges
+  codec <- made$codec
+  split <- made$blocks
 
   ## values per gene
   counts <- numeric(n_vars)
@@ -638,7 +689,7 @@
     ranges,
     .h5adStreamRangeCall(
       shipped,
-      lapply(split, function(block) block[c("path", "counts", "index")]),
+      split,
       edges,
       gene_ptr,
       codec,
