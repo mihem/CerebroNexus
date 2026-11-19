@@ -619,7 +619,7 @@ Cells from one donor share that genotype, so they are not independent observatio
 
 # See also
 
-- **Introduction to the CerebroNexus workflow (Seurat)** — the general Seurat → `.crb` export basics, if this is your first CerebroNexus export; the HLA slots above just ride along with it.
+- **Introduction to the CerebroNexus workflow** — the general Seurat → `.crb` export basics, if this is your first CerebroNexus export; the HLA slots above just ride along with it.
 - **HLA Associations on bulk TCRβ with real donor HLA** — the companion workflow for bulk immunosequencing: real genotypes, no single cells, and the positive-control caveat that comes with them.
 - **Immune Repertoire Analysis in CerebroNexus** — the scRepertoire-based module that produces the same `@misc$immune_repertoire` slot from real 10x data.
 - `?exportFromSeurat`, `?createShinyApp`, and `?Cerebro` (see `addHLATyping` / `getHLATyping`).
