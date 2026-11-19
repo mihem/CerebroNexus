@@ -180,6 +180,15 @@ test_that("the streaming writer matches writeTENxMatrix on a cell-major source",
         )
       )
     }
+    ## values stored as 32-bit floats stay 32-bit floats in the file
+    handle <- rhdf5::H5Fopen(written, flags = "H5F_ACC_RDONLY")
+    data <- rhdf5::H5Dopen(handle, "expression/data")
+    expect_identical(
+      rhdf5::H5Tget_size(rhdf5::H5Dget_type(data)),
+      if (isTRUE(setting$f32)) 4L else 8L
+    )
+    rhdf5::H5Dclose(data)
+    rhdf5::H5Fclose(handle)
     expect_length(
       list.files(dirname(written), pattern = "^h5-stream-"),
       0L
