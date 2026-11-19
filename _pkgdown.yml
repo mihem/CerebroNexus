@@ -9,6 +9,7 @@ redirects:
   - ["articles/enriched_pathways.html", "articles/tables_and_plots.html"]
   - ["articles/extra_material.html", "articles/tables_and_plots.html"]
   - ["articles/export_and_visualize_custom_tables_and_plots.html", "articles/tables_and_plots.html"]
+  - ["articles/create_expression_matrix_in_h5_format.html", "articles/million_cell_crb_artifacts.html"]
 
 template:
   bootstrap: 5
@@ -73,7 +74,6 @@ articles:
       - articles/data_integrity_contracts
       - articles/seurat_v5_layered_assays
       - articles/create_a_self_contained_shiny_app
-      - articles/create_expression_matrix_in_h5_format
       - articles/million_cell_crb_artifacts
       - articles/control_access_to_cerebro_with_a_login_page
   - title: "Benchmarks"

@@ -453,7 +453,8 @@ test_that("h5 attach is lazy: .attachExternalExpression returns a DelayedMatrix
 
   ## the attach must NOT materialise a dgCMatrix in RAM — that defeats the
   ## entire point of the h5 backend (Roman Hillje's vignette
-  ## `create_expression_matrix_in_h5_format.Rmd`).
+  ## `create_expression_matrix_in_h5_format.Rmd`, now the H5 section of
+  ## `million_cell_crb_artifacts.Rmd`).
   expect_false(
     inherits(attached$expression, "dgCMatrix"),
     info = "h5 attach must stay lazy; got an in-memory dgCMatrix"

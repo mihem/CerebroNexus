@@ -615,7 +615,7 @@ workflow discovers files by name alone.
 # See also
 
 - [Introduction to the CerebroNexus workflow with Seurat](cerebronexus_workflow_seurat.html)
-- [Create an expression matrix in HDF5 format](create_expression_matrix_in_h5_format.html)
+- [Store the expression matrix in an H5 file](million_cell_crb_artifacts.html#store-the-expression-matrix-in-an-h5-file)
 - [Create a self-contained Shiny application](create_a_self_contained_shiny_app.html)
 
 # Session information
