@@ -1,6 +1,5 @@
 ---
 title: "Data integrity from Seurat to a self-contained Cerebro app"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

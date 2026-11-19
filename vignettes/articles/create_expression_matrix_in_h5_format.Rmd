@@ -1,6 +1,5 @@
 ---
 title: "Store the expression matrix in H5 format"
-author: "Roman Hillje and Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

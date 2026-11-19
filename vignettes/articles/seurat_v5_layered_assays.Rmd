@@ -1,6 +1,5 @@
 ---
 title: "Seurat v5 layered assays: complete and safe expression matrices"
-author: "CerebroNexus contributors"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

@@ -1,6 +1,5 @@
 ---
 title: "HLA Associations on bulk TCRβ with real donor HLA"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:

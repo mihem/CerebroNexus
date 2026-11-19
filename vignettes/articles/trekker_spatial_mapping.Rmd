@@ -1,6 +1,5 @@
 ---
 title: "Trekker single-cell spatial mapping: from a vendor bundle to an interactive app"
-author: "Xuesong Wang"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
