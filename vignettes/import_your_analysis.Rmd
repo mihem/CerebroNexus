@@ -29,7 +29,7 @@ builder_figure <- function(file) {
 }
 ```
 
-```{r overview, echo = FALSE, eval = TRUE, out.width = "100%", fig.cap = "The CerebroNexus workflow, with the main areas of the Viewer below.", fig.alt = "Prepared objects (Seurat, SingleCellExperiment, AnnData, SpatialData) go into the Builder (configure, review, build); the Viewer opens the result (select, compare, export). Below, the main areas of the Viewer: expression, linked views, spatial, immune repertoire, and HLA and TCR motifs."}
+```{r overview, echo = FALSE, eval = TRUE, out.width = "100%", fig.cap = "The CerebroNexus workflow and five pages of the Viewer. Gene expression is always there; the other four appear when a data set has the content they need.", fig.alt = "Prepared objects (Seurat, SingleCellExperiment, AnnData, SpatialData) go into the Builder (data, configure, review, build); the Viewer opens the result (select, compare, export). Below, five pages of the Viewer: gene expression, linked views, spatial, immune repertoire, and HLA and TCR motifs."}
 knitr::include_graphics("img/workflow-overview.svg")
 ```
 
