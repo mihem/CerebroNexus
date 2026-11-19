@@ -25,21 +25,21 @@ builder_preview_point <- function(u, v, record, W, H) {
 }
 
 ## Where the Viewer (cell_views.js drawImage) puts the same pixel for the
-## settings it receives: bounds rotated about the data origin, flips and
-## scale after the rotation, offset added to the rotated centre.
+## settings it receives: offset, flips and scale in the image's own unrotated
+## frame about its centre, then rotation about the data origin.
 viewer_point <- function(u, v, setting, bounds, W, H) {
   a <- setting$rotation * pi / 180
-  rot <- function(x, y) c(cos(a) * x - sin(a) * y, sin(a) * x + cos(a) * y)
-  p <- rot(
+  centre <- c((bounds$xmin + bounds$xmax) / 2, (bounds$ymin + bounds$ymax) / 2)
+  p <- c(
     bounds$xmin + u / W * (bounds$xmax - bounds$xmin),
     bounds$ymax - v / H * (bounds$ymax - bounds$ymin)
   )
-  cr <- rot((bounds$xmin + bounds$xmax) / 2, (bounds$ymin + bounds$ymax) / 2)
   d <- c(
     setting$scale_x * if (isTRUE(setting$flip_x)) -1 else 1,
     setting$scale_y * if (isTRUE(setting$flip_y)) -1 else 1
   )
-  c(setting$offset_x, setting$offset_y) + cr + d * (p - cr)
+  q <- centre + c(setting$offset_x, setting$offset_y) + d * (p - centre)
+  c(cos(a) * q[1] - sin(a) * q[2], sin(a) * q[1] + cos(a) * q[2])
 }
 
 builder_viewer_alignment_cases <- function() {

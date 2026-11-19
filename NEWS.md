@@ -159,6 +159,17 @@
   instead of three times, and does not send the Group detail and the metadata
   preview again when they are unchanged: 18 ms instead of 27 ms in the Shiny
   process for an edit with 64 metadata columns.
+- **A rotated, flipped background image is no longer mirrored against its
+  cells.** In `spatial_image_settings`, `offset_x`/`offset_y`, `scale_x`/
+  `scale_y` and `flip_x`/`flip_y` now act in the image's own unrotated frame,
+  and `rotation` is applied last, about the coordinate origin, as
+  `spatial_plot_rotation` rotates the cells. Settings found for the unrotated
+  section therefore stay aligned when the same `rotation` is added to the image
+  and to the plot. Before, flips and offsets were read after the rotation, so
+  `flip_y` acted as `flip_x` at 90 degrees. Settings with a rotation and no
+  offset, flip or uneven scale (such as the MERFISH demo) draw as before;
+  hand-written settings that combine a rotation with them need re-checking.
+  The Builder writes settings in the new form.
 
 Times above: Windows, medians of 4 rounds (12 for the result pages) against commit 05b200515 of this
 branch, measured with the paper's standard (`measure_session.R`).

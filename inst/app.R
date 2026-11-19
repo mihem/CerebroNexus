@@ -139,7 +139,9 @@ Cerebro.options <- list(
     )
   ),
   ## Plot rotation is independent of per-image alignment above and is resolved
-  ## for one exact dataset + spatial entry.
+  ## for one exact dataset + spatial entry. To turn an aligned image with its
+  ## cells, give the image the same `rotation`; its offsets and flips stay as
+  ## found on the unrotated section (they are applied before the rotation).
   "spatial_plot_rotation" = list(
     "Mouse ileum (MERFISH)" = c("fov" = 90)
   ),

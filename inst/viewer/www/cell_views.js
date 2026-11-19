@@ -1342,14 +1342,8 @@
   }
 
   // Draw the histology image behind the points of the spatial panel. The image's
-  // data-space bounds are mapped to screen with the SAME transform as the cells,
-  // so it aligns; opacity/offset/scale/flip/rotate then adjust it on top.
-  function rotateDataPoint(x, y, degrees) {
-    if (!degrees) return [x, y];
-    var theta = degrees * Math.PI / 180;
-    return [x * Math.cos(theta) - y * Math.sin(theta),
-      x * Math.sin(theta) + y * Math.cos(theta)];
-  }
+  // data-space corners (alignment applied, see CerebroBackgroundModel.corners)
+  // are mapped to screen with the SAME transform as the cells, so it aligns.
   function drawImage(p, context) {
     if (!singleActive && !linkedBackgroundsOn) return;
     var sp = spaceById[p.spaceId];
@@ -1360,37 +1354,16 @@
     if (!b) return;
     // Embedded images already carry their saved calibration in the pixels.
     state = imageRenderState(cimg, state);
-    // Rotate the image in DATA space about the origin, exactly as R rotates the
-    // cell coordinates (rotateSpatialCoordinates). Rotating on screen about the
-    // image centre instead moves the image away from the cells it belongs to.
-    var tlData = rotateDataPoint(b.xmin, b.ymax, state.rotate);
-    var trData = rotateDataPoint(b.xmax, b.ymax, state.rotate);
-    var blData = rotateDataPoint(b.xmin, b.ymin, state.rotate);
-    var centerData = rotateDataPoint(
-      (Number(b.xmin) + Number(b.xmax)) / 2,
-      (Number(b.ymin) + Number(b.ymax)) / 2,
-      state.rotate
-    );
-    var tl = dataToScreen(p, tlData[0], tlData[1]);
-    var tr = dataToScreen(p, trData[0], trData[1]);
-    var bl = dataToScreen(p, blData[0], blData[1]);
-    var center = dataToScreen(p, centerData[0], centerData[1]);
-    if (!tl || !tr || !bl || !center) return;
-    // Convert the DATA-unit offset to screen pixels by mapping two points through
-    // the same projection the cells use (handles scale + the y-axis inversion).
-    var o1 = dataToScreen(p, centerData[0] + state.offsetX,
-      centerData[1] + state.offsetY);
-    var offSX = o1 ? (o1[0] - center[0]) : 0;
-    var offSY = o1 ? (o1[1] - center[1]) : 0;
+    var corners = backgrounds.corners(b, state);
+    var tl = dataToScreen(p, corners[0][0], corners[0][1]);
+    var tr = dataToScreen(p, corners[1][0], corners[1][1]);
+    var bl = dataToScreen(p, corners[2][0], corners[2][1]);
+    if (!tl || !tr || !bl) return;
     var c = context || p.ctx;
     c.save();
     c.globalAlpha = state.opacity;
-    c.translate(center[0] + offSX, center[1] + offSY);
-    c.scale(state.scaleX * (state.flipX ? -1 : 1),
-      state.scaleY * (state.flipY ? -1 : 1));
     c.transform(tr[0] - tl[0], tr[1] - tl[1],
-      bl[0] - tl[0], bl[1] - tl[1],
-      tl[0] - center[0], tl[1] - center[1]);
+      bl[0] - tl[0], bl[1] - tl[1], tl[0], tl[1]);
     c.drawImage(sp._imgEl, 0, 0, 1, 1);
     c.restore();
     c.globalAlpha = 1;

@@ -125,6 +125,12 @@ may contain only \code{flip_x}, \code{flip_y}, \code{scale_x},
 \code{scale_y}, \code{offset_x}, \code{offset_y}, and \code{rotation}.
 \code{image_opacity} may additionally set the initial image opacity from
 0 through 1 (default 1).
+Offsets, scales and flips act in the image's own unrotated frame, about
+the centre of its bounds; \code{rotation} (degrees, counter-clockwise) is
+applied last, about the coordinate origin, as
+\code{spatial_plot_rotation} rotates the cells. Settings found for the
+unrotated section therefore stay aligned when the same \code{rotation} is
+added to the image and to \code{spatial_plot_rotation}.
 A leaf may target an embedded or external image available under that exact
 dataset and spatial entry. The image label must exist in the union of the
 CRB's embedded images and this call's \code{spatial_images}; unknown
@@ -132,9 +138,10 @@ identities are rejected. Labels are user-facing names, not protocol names.}
 
 \item{spatial_plot_rotation}{Optional nested rotations in
 \code{dataset -> spatial entry -> degrees} form, applied only to spatial
-cell coordinates. Dataset names must match \code{cerebro_data}; spatial
-names must match the corresponding CRB's \code{availableSpatial()}. A
-per-dataset numeric vector is rejected.}
+cell coordinates; background images follow only through their own
+\code{rotation} in \code{spatial_image_settings}. Dataset names must
+match \code{cerebro_data}; spatial names must match the corresponding
+CRB's \code{availableSpatial()}. A per-dataset numeric vector is rejected.}
 
 \item{auth}{Optional authentication settings. \code{NULL}, the default,
 leaves the generated Viewer public. To require a login, provide a named

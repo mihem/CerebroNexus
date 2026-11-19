@@ -80,6 +80,27 @@
       rotate: state.rotate - (Number(pr.rotation) || 0)
     };
   }
+  // Data-space corners [top-left, top-right, bottom-left] of a background image
+  // after alignment. Offset, scale and flip are read in the image's own,
+  // unrotated coordinates (about its bounds centre); rotation comes last, about
+  // the data origin, exactly as R rotates cell coordinates. A preset found on
+  // the unrotated slice therefore keeps working once `rotation` is added.
+  function imageCorners(bounds, state) {
+    var cx = (Number(bounds.xmin) + Number(bounds.xmax)) / 2;
+    var cy = (Number(bounds.ymin) + Number(bounds.ymax)) / 2;
+    var sx = (Number(state.scaleX) || 1) * (state.flipX ? -1 : 1);
+    var sy = (Number(state.scaleY) || 1) * (state.flipY ? -1 : 1);
+    var tx = cx + (Number(state.offsetX) || 0);
+    var ty = cy + (Number(state.offsetY) || 0);
+    var theta = (Number(state.rotate) || 0) * Math.PI / 180;
+    var cos = Math.cos(theta), sin = Math.sin(theta);
+    function place(x, y) {
+      var ax = tx + sx * (Number(x) - cx), ay = ty + sy * (Number(y) - cy);
+      return theta ? [ax * cos - ay * sin, ax * sin + ay * cos] : [ax, ay];
+    }
+    return [place(bounds.xmin, bounds.ymax), place(bounds.xmax, bounds.ymax),
+      place(bounds.xmin, bounds.ymin)];
+  }
   // Order-independent text for a background identity, so two equal identities
   // compare equal however their object keys were ordered.
   function canonicalIdentity(value) {
@@ -100,6 +121,7 @@
     stateKey: backgroundStateKey,
     imageKey: imgKey,
     presetState: presetState,
-    renderState: imageRenderState
+    renderState: imageRenderState,
+    corners: imageCorners
   });
 })();

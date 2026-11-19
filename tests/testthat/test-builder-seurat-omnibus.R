@@ -64,28 +64,26 @@ test_that("Spatial alignment demo restores the Visium H&E and transform", {
   )
 
   ## In the generated Viewer every spot's pixel lands on the spot: the
-  ## settings it receives, drawn as cell_views.js drawImage() does (bounds
-  ## rotated about the origin, flips and scale after the rotation).
+  ## settings it receives, drawn as cell_views.js drawImage() does (offset,
+  ## flips and scale in the image frame, then rotation about the origin).
   setting <- builder_omnibus_env$builder_alignment_viewer_setting(image)
   b <- image$base_bounds
   a <- setting$rotation * pi / 180
-  rot <- function(x, y) cbind(cos(a) * x - sin(a) * y, sin(a) * x + cos(a) * y)
   cells <- SeuratObject::GetTissueCoordinates(
     loaded$object[["visium_breast"]]
   )
-  p <- rot(
-    b$xmin + cells$x / width * (b$xmax - b$xmin),
-    b$ymax - cells$y / height * (b$ymax - b$ymin)
-  )
-  cr <- rot((b$xmin + b$xmax) / 2, (b$ymin + b$ymax) / 2)
+  centre <- c((b$xmin + b$xmax) / 2, (b$ymin + b$ymax) / 2)
   d <- c(
     setting$scale_x * if (isTRUE(setting$flip_x)) -1 else 1,
     setting$scale_y * if (isTRUE(setting$flip_y)) -1 else 1
   )
-  drawn <- cbind(
-    setting$offset_x + cr[1] + d[1] * (p[, 1] - cr[1]),
-    setting$offset_y + cr[2] + d[2] * (p[, 2] - cr[2])
-  )
+  x <- centre[1] +
+    setting$offset_x +
+    d[1] * (b$xmin + cells$x / width * (b$xmax - b$xmin) - centre[1])
+  y <- centre[2] +
+    setting$offset_y +
+    d[2] * (b$ymax - cells$y / height * (b$ymax - b$ymin) - centre[2])
+  drawn <- cbind(cos(a) * x - sin(a) * y, sin(a) * x + cos(a) * y)
   expect_equal(unname(drawn), unname(cbind(cells$x, cells$y)), tolerance = 1e-9)
 
   ## The coordinates really are the H&E's: the stain under each spot

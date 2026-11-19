@@ -5,6 +5,7 @@
 // top-left, top-right and bottom-left corners.
 // argv: cell_views.js, builder-spatial-canvas.js, cases.json
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
+const path = require('path');
 const viewerSource = fs.readFileSync(process.argv[2], 'utf8');
 const builderSource = fs.readFileSync(process.argv[3], 'utf8');
 const cases = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
@@ -41,14 +42,18 @@ function trackingContext() {
 // Screen = data with the y axis flipped, for both pages.
 const toScreen = (x, y) => [x, -y];
 
+const models = {window: {}};
+vm.runInNewContext(fs.readFileSync(path.join(path.dirname(process.argv[2]),
+  'background-model.js'), 'utf8'), models);
 const viewer = {
+  backgrounds: models.window.CerebroBackgroundModel,
   singleActive: 'spatial_projection', linkedBackgroundsOn: false,
   spaceById: {}, currentImage: null,
   imageRenderState: (img, state) => state,
   dataToScreen: (p, x, y) => toScreen(x, y)
 };
 vm.createContext(viewer);
-vm.runInContext(['rotateDataPoint', 'drawImage'].map((n) => fn(viewerSource, n)).join('\n'), viewer);
+vm.runInContext(fn(viewerSource, 'drawImage'), viewer);
 
 const builder = {
   NONPOSITIVE_SCALE_FALLBACK: 0.02, state: {}, Math,
