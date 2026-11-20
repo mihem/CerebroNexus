@@ -3897,6 +3897,93 @@
       esc(spec.unit || 'cells') + ' · by ' + esc(column.name) +
       '</div><div class="cerebro-selection-composition-rows">' + rowsHtml + '</div></div>';
   }
+  // ---- where the Composition card sits ------------------------------------
+  // With several panels the card sits at the bottom left of the panel the
+  // cells were selected in, not of the whole workspace. It moves with a new
+  // selection in another panel; a card dragged keeps its place until then.
+  function compositionSourcePane() {
+    if (!selectionSourceSpace) return null;
+    var shown = panels.filter(function (p) {
+      return p.spaceId && p.pane && !p.pane.classList.contains('cv-hidden') &&
+        p.pane.getClientRects().length;
+    });
+    if (shown.length < 2) return null;
+    var hit = shown.filter(function (p) { return p.spaceId === selectionSourceSpace; })[0];
+    return hit ? hit.pane : null;
+  }
+  function anchorCompositionSlot(slot, pane) {
+    if (!slot || !slot.parentElement) return;
+    var key = pane ? String(selectionSourceSpace) : '';
+    if (slot.dataset.anchor !== key) {
+      slot.dataset.anchor = key;
+      delete slot.dataset.dragged;
+      slot.style.left = slot.style.top = slot.style.bottom = slot.style.maxWidth = '';
+    }
+    if (!pane || slot.dataset.dragged === 'true' ||
+        window.matchMedia('(max-width: 700px)').matches) return;
+    var frame = slot.parentElement.getBoundingClientRect(), r = pane.getBoundingClientRect();
+    slot.style.left = Math.round(r.left - frame.left + 12) + 'px';
+    slot.style.top = 'auto';
+    slot.style.bottom = Math.round(frame.bottom - r.bottom + 12) + 'px';
+    slot.style.maxWidth = Math.max(120, Math.round(r.width - 24)) + 'px';
+  }
+  function anchorComposition(id) {
+    var pane = compositionSourcePane();
+    if (!id) { anchorCompositionSlot(linkedCompositionSlot(false), pane); return; }
+    var output = $(id + '_composition');
+    if (!output) return;
+    anchorCompositionSlot(output, pane);
+    var twin = output.nextElementSibling;
+    if (twin && twin.getAttribute('data-client-twin') === output.id) {
+      anchorCompositionSlot(twin, pane);
+    }
+  }
+  // Linked views' card: the same floating card, over its panels.
+  function linkedCompositionSlot(create) {
+    var panes = document.querySelector('#shiny-tab-coordinated_views .cv-panes');
+    var frame = panes && panes.parentElement;
+    if (!frame) return null;
+    var slot = frame.querySelector('.cerebro-selection-composition-slot[data-linked]');
+    if (!slot && create) {
+      slot = document.createElement('div');
+      slot.className = 'cerebro-selection-composition-slot';
+      slot.setAttribute('data-linked', 'true');
+      if (getComputedStyle(frame).position === 'static') frame.style.position = 'relative';
+      frame.appendChild(slot);
+    }
+    return slot;
+  }
+  function renderLinkedComposition() {
+    var groupName = compGroupName(), g = catOf(groupName);
+    var slot = linkedCompositionSlot(!singleActive && !!(sel && sel.size && g));
+    if (!slot) return;
+    if (singleActive || !sel || !sel.size || !g) {
+      slot.innerHTML = '';
+      slot.style.display = 'none';
+      return;
+    }
+    slot.style.display = '';
+    var rows = [];
+    sel.forEach(function (i) { rows.push(i); });
+    renderClientComposition(slot, { total: D.n, unit: 'cells' }, rows, {
+      name: groupLabel(groupName),
+      levels: g.levels,
+      values: g.values,
+      colors: g.levels.map(function (level, k) {
+        return (g.colors && g.colors[k]) || PAL[k % PAL.length];
+      })
+    });
+    anchorCompositionSlot(slot, compositionSourcePane());
+  }
+  if (window.jQuery) {
+    window.jQuery(document).on('shiny:value', function (event) {
+      var id = event.target && event.target.id;
+      if (!id || !/_composition$/.test(id)) return;
+      window.requestAnimationFrame(function () {
+        anchorComposition(id.replace(/_composition$/, ''));
+      });
+    });
+  }
   function updateClientSelectionSummary(id) {
     var view = singleView(id), spec = clientSummarySpec(id, view);
     if (!spec || !sel || !sel.size || !D || !D.rows) {
@@ -3934,6 +4021,7 @@
       names.forEach(function (name, k) { byName[name] = columns[k]; });
       renderClientCount(countEl, spec, rows, byName[profileName], source);
       renderClientComposition(compositionEl, spec, rows, byName[compositionName]);
+      anchorComposition(id);
     }).catch(function () { clientSummaryFailed(id); });
     renderClientSelectionPlot(id);
   }
@@ -4762,6 +4850,7 @@
     }, { priority: 'event' });
   }
   function renderReadout() {
+    renderLinkedComposition();
     var host = $('cv-readout'); if (!host) return;
     host.style.display = '';
     updateNicheEnabled();
@@ -4780,17 +4869,9 @@
     // (only numeric meta) has no composition to show — the clonotype readout and
     // the selected-cell panels below still work, so we simply omit this column
     // instead of throwing on g.values.
-    var compGroup = compGroupName();
-    var g = catOf(compGroup);
+    // The composition is the floating card over the panels
+    // (renderLinkedComposition()).
     var compHtml = '';
-    if (g) {
-      var comp = {};
-      idxs.forEach(function (i) { var lv = g.values[i]; comp[lv] = (comp[lv] || 0) + 1; });
-      // Same rise as the server-rendered plot/table below, first in the stagger.
-      compHtml = '<div class="cv-readcol cv-rise"><h4 class="cv-read-h">Composition ' +
-        '<span class="cv-read-sub">by ' + esc(groupLabel(compGroup)) + '</span></h4>' +
-        '<div class="cv-bars">' + compBars(comp, g) + '</div></div>';
-    }
 
     // top clonotypes among the selection (the immune axis in the loop)
     var cloneHtml = '';
@@ -4833,6 +4914,7 @@
     }
 
     host.innerHTML = fieldSummaryHtml() + compHtml + cloneHtml;
+    if (!host.innerHTML) host.style.display = 'none';
 
     // wire clonotype-row -> select its cells (repertoire selection into the loop)
     Array.prototype.forEach.call(host.querySelectorAll('.cv-crow'), function (tr) {
@@ -8124,6 +8206,7 @@
     updateFocusButtons();
     drawAll();
     if ((sel && sel.size) || (pick != null && nicheSet)) renderSelbar();
+    anchorComposition(singleActive);
     // Layout advice uses canvas CSS dimensions, never the spread of the cells.
     var hintView = singleActive && singleView(singleActive);
     var hintId = singleActive || 'linked';

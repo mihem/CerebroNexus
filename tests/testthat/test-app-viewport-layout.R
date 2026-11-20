@@ -178,7 +178,8 @@ test_that("shared selection actions and layouts survive navigation and resize", 
       ".find(el => el.textContent.includes('B cell maturation'))",
       ".closest('.cv-pane').querySelector('.cv-zsel-btn').offsetParent !== null && ",
       "document.getElementById('cv-config-open').offsetParent !== null && ",
-      "document.getElementById('cv-readout').offsetParent !== null"
+      "document.querySelector('.cerebro-selection-composition-slot[data-linked] ",
+      ".cerebro-selection-composition-card') !== null"
     ),
     timeout = 10000
   )
