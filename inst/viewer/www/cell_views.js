@@ -8476,7 +8476,8 @@
     var data = message && message.data;
     if (!frameNeedsCellNames(message)) return Promise.resolve(message);
     return fetchCellNames(data.cell_names_resource, message.dataset_identity).then(function (entry) {
-      var rows = data.selection_index;
+      // Contiguous rows travel as their range ({kind: 'range'}).
+      var rows = expandRowRange(data.selection_index);
       var resolved = Object.assign({}, data, {
         selection_key: namesAt(entry.names, rows), selection_rows: rows
       });

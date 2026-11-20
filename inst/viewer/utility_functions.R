@@ -2089,6 +2089,11 @@ cerebroCellViewRender <- function(
   } else if (is.function(deferred_aux)) {
     auxiliary <- deferred_aux()
     message$data$selection_key <- auxiliary$selection_key
+    ## With a cell-name resource the cells are named by canonical row; the
+    ## browser reads their names before it draws the frame
+    ## (resolveFrameCellNames()). Without these a frame of panels had no keys.
+    message$data$selection_index <- auxiliary$selection_index
+    message$data$cell_names_resource <- auxiliary$cell_names_resource
     message$hover <- auxiliary$hover
   }
 
