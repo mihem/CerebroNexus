@@ -3665,3 +3665,30 @@ body .coordviews-page .cv-topbar .cerebro-toolbar-actions {
   order: 98;
   align-self: flex-end;
 }
+
+/* Stored-result pages (Groups, Marker genes, Most expressed genes, Enriched
+   pathways) take the same toolbar: their Bootstrap rows and columns pass
+   their fields into its one flow. */
+body .cerebro-viz-toolbar.cerebro-result-controls > .row,
+body .cerebro-viz-toolbar.cerebro-groups-controls > .row,
+body .cerebro-viz-toolbar.cerebro-result-controls > .row > [class*="col-"],
+body .cerebro-viz-toolbar.cerebro-groups-controls > .row > [class*="col-"] {
+  display: contents;
+}
+body .cerebro-viz-toolbar.cerebro-groups-controls .form-group:has(.material-switch),
+body .cerebro-viz-toolbar.cerebro-groups-controls .form-group:has(.btn-group-container-sw) {
+  min-width: 0 !important;
+}
+body .cerebro-viz-toolbar .cerebro-groups-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: flex-end;
+  gap: 4px 14px;
+  min-height: var(--c-toolbar-control-height);
+}
+body .cerebro-viz-toolbar .cerebro-groups-switches .form-group { min-width: 0 !important; }
+/* shinyWidgets puts a <br> between a button group and its label. */
+body .cerebro-viz-toolbar .shiny-input-radiogroup > br { display: none; }
+/* A filled result toolbar is as low as its fields. */
+.cerebro-result-controls.cerebro-viz-toolbar:not(:empty) { min-height: 0; }

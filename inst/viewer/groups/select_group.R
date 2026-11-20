@@ -54,35 +54,28 @@ output[["groups_controls_UI"]] <- renderUI({
       choices = groups_other_groups(groups, selected_group),
       selected = groups_default_second_group(groups)
     ),
-    fluidRow(
-      column(
-        width = 3,
-        shinyWidgets::radioGroupButtons(
-          inputId = "groups_by_other_group_plot_type",
-          label = "Plot type",
-          choices = c("Bar chart", "Sankey plot"),
-          status = "primary",
-          justified = TRUE,
-          width = "100%",
-          size = "sm"
-        )
+    ## Flat, so the toolbar lays these out with the selectors.
+    shinyWidgets::radioGroupButtons(
+      inputId = "groups_by_other_group_plot_type",
+      label = "Plot type",
+      choices = c("Bar chart", "Sankey plot"),
+      status = "primary",
+      size = "sm"
+    ),
+    div(
+      class = "cerebro-groups-switches",
+      shinyWidgets::materialSwitch(
+        inputId = "groups_by_other_group_show_as_percent",
+        label = "Show composition as percent [%] (not in Sankey plot):",
+        value = groups_default_show_as_percent,
+        status = "primary",
+        inline = TRUE
       ),
-      column(
-        width = 9,
-        style = "padding: 5px;",
-        shinyWidgets::materialSwitch(
-          inputId = "groups_by_other_group_show_as_percent",
-          label = "Show composition as percent [%] (not in Sankey plot):",
-          value = groups_default_show_as_percent,
-          status = "primary",
-          inline = TRUE
-        ),
-        shinyWidgets::materialSwitch(
-          inputId = "groups_by_other_group_show_table",
-          label = "Show table:",
-          status = "primary",
-          inline = TRUE
-        )
+      shinyWidgets::materialSwitch(
+        inputId = "groups_by_other_group_show_table",
+        label = "Show table:",
+        status = "primary",
+        inline = TRUE
       )
     )
   )
