@@ -24,7 +24,7 @@ expressionPlotOrderLabel <- function(highest_on_top) {
 ## The display mode the selector (UI_projection_controls.R) opens on.
 expression_projection_default_display_mode <- "combined"
 
-## The sidebar's "Highest on top" (load_data/preferences.R) when it is bound,
+## The sidebar's "Expression on top" (load_data/preferences.R) when it is bound,
 ## else the author's page default.
 expression_projection_default_plotting_order <- function() {
   chosen <- isolate(input[["expression_on_top_checkbox"]])

@@ -1386,4 +1386,37 @@
       document.documentElement.classList.remove("cerebro-resizing");
     }, 300);
   });
+
+  // The "i" after a Preferences switch: a click (or Enter / Space) keeps its
+  // help bubble open until a click elsewhere or Escape. It sits inside the
+  // switch's label, so the click must not toggle the switch.
+  function setPreferenceHelp(row, open) {
+    row.classList.toggle("is-open", open);
+    var info = row.querySelector(".cerebro-pref-info");
+    if (info) info.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function closePreferenceHelp(except) {
+    document.querySelectorAll(".cerebro-preference.is-open").forEach(function (row) {
+      if (row !== except) setPreferenceHelp(row, false);
+    });
+  }
+  function togglePreferenceHelp(event) {
+    var info = event.target.closest && event.target.closest(".cerebro-pref-info");
+    if (!info) {
+      if (event.type === "click") closePreferenceHelp(null);
+      return;
+    }
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    var row = info.closest(".cerebro-preference");
+    if (!row) return;
+    closePreferenceHelp(row);
+    setPreferenceHelp(row, !row.classList.contains("is-open"));
+  }
+  document.addEventListener("click", togglePreferenceHelp, true);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closePreferenceHelp(null);
+    else togglePreferenceHelp(event);
+  }, true);
 }());

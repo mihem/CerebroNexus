@@ -228,7 +228,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   expect_identical(
     retry_get_value(
       app,
-      input = "spatial_projection_to_display",
+      input = "spatial_projection_sections",
       timeout = 30000,
       validate = function(value) identical(value, "anterior1")
     ),
@@ -285,7 +285,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   wait_for_input(app, "spatial_projection_background_image", timeout = 30000)
   app$wait_for_js(
     paste0(
-      "document.getElementById('spatial_projection_to_display')?.",
+      "document.getElementById('spatial_projection_sections')?.",
       "selectize?.options.fov_colour !== undefined"
     ),
     timeout = 30000
@@ -297,7 +297,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
     ),
     timeout = 30000
   )
-  app$set_inputs(spatial_projection_to_display = "fov_colour", wait_ = FALSE)
+  app$set_inputs(spatial_projection_sections = "fov_colour", wait_ = FALSE)
   app$wait_for_js(
     paste0(
       "document.getElementById('spatial_projection_background_image').value === ",
@@ -337,7 +337,7 @@ test_that("Spatial backgrounds reset when the spatial dataset changes", {
   expect_identical(
     retry_get_value(
       app,
-      input = "spatial_projection_to_display",
+      input = "spatial_projection_sections",
       timeout = 30000,
       validate = function(value) identical(value, "image")
     ),

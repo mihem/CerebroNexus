@@ -42,6 +42,13 @@
 - **Linked views fills the window.** Its panels have one size and their rows
   share the window's height, so the views end at the window's bottom edge
   instead of leaving it empty.
+- **Expression on top in Preferences, on by default.** The sidebar's
+  Preferences have an *Expression on top* switch, the same setting as Gene
+  expression's *Highest expression on top*: changing either changes the other.
+  Gene expression now draws the highest values on top by default; authors who
+  want the input order choose it in the Builder (*Input order*), as before.
+  Each Preferences switch has a small *i* that shows a short help on hover or
+  click, and the block takes less height.
 - **The Builder chooses how Spatial opens.** Its Viewer display settings have
   *Open Spatial with: The first section | All sections* in the Spatial card,
   stored as `spatial_layout` with the other page defaults; a data set with one

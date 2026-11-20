@@ -341,6 +341,39 @@ body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
   .cerebro-sidebar-preferences input[type=checkbox],
   .cerebro-sidebar-preferences input[type=checkbox]::before { transition: none; }
 }
+/* A Preferences switch's "i": a small ring raised to the label's cap height.
+   Its help bubble opens above the row on hover, on focus or after a click. */
+.cerebro-preference { position: relative; }
+.cerebro-pref-label { display: inline-flex; align-items: flex-start; gap: 4px; }
+.cerebro-pref-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 12px; height: 12px; margin-top: -3px; border: 1px solid currentColor;
+  border-radius: 50%; color: var(--c-text-3);
+  font: italic 600 8.5px/1 Georgia, "Times New Roman", serif;
+  cursor: help; transition: color .15s ease, background .15s ease;
+}
+.cerebro-pref-info:hover, .cerebro-pref-info:focus-visible,
+.cerebro-preference.is-open .cerebro-pref-info {
+  color: var(--c-amber-700); background: var(--c-amber-50); outline: none;
+}
+.cerebro-pref-tip {
+  position: absolute; left: 0; right: -4px; bottom: calc(100% - 2px); z-index: 1030;
+  padding: 7px 10px; border-radius: 8px;
+  background: rgba(17, 24, 39, .94); color: #f9fafb;
+  font-size: 12px; line-height: 1.45; font-weight: 400;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .18);
+  opacity: 0; visibility: hidden; transform: translateY(3px); pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease, visibility 0s linear .12s;
+}
+.cerebro-preference:has(.cerebro-pref-info:hover) .cerebro-pref-tip,
+.cerebro-preference:has(.cerebro-pref-info:focus-visible) .cerebro-pref-tip,
+.cerebro-preference.is-open .cerebro-pref-tip {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cerebro-pref-tip, .cerebro-pref-info { transition: none; }
+}
 /* Brand block at the top of the sidebar. The inline SVG wordmark inherits the
    sidebar text colour, with an accent on "Nexus". */
 body.skin-blue .sidebar .cerebro-brand {
@@ -3623,7 +3656,9 @@ body .cerebro-viz-toolbar .cerebro-toolbar-actions {
 
 /* Page titles sit at the top of the content area: the title row starts 8px
    below the window edge (was 18px plus AdminLTE's 15px). */
-body .content-wrapper, body .right-side { padding-top: 8px !important; }
+@media (min-width: 768px) {
+  body .content-wrapper, body .right-side { padding-top: 8px !important; }
+}
 body section.content { padding-top: 0 !important; }
 .cerebro-viz-page-heading { margin-bottom: 6px; }
 

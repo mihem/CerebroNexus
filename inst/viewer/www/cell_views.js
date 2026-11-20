@@ -2065,8 +2065,8 @@
     reportRendererStatus();
   }
 
-  // The active backends are appended to the GPU acceleration tooltip so the
-  // switch explains what is currently drawing without a separate badge.
+  // The active backends are appended to the GPU acceleration help bubble so
+  // the switch explains what is currently drawing without a separate badge.
   function reportRendererStatus() {
     var checkbox = document.getElementById('webgl_checkbox');
     var row = checkbox && checkbox.closest('.cerebro-preference');
@@ -2095,7 +2095,6 @@
     }
     var title = (row.dataset.help || '') + (backends.length
       ? ' Current plots: ' + backends.join(', ') + '.' : '');
-    if (row.title !== title) row.title = title;
     var help = document.getElementById('webgl_checkbox_help');
     if (help && help.textContent !== title) help.textContent = title;
   }
@@ -7802,7 +7801,9 @@
   // needs. `fill` (Linked views) gives every row the same share of the
   // window's height, so the panels end at its bottom edge.
   var GRID_MIN_DRAWN = 120;
-  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill) {
+  function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill, minSide) {
+    // The smallest panel side that still reads; Linked views keeps its own floor.
+    var floor = minSide || GRID_MIN_DRAWN;
     var aspectAt = function (i) {
       return typeof aspect === 'number' ? aspect : (aspect && aspect[i]) || 1;
     };
@@ -7832,12 +7833,12 @@
         for (var i = row.start; i < row.start + row.count; i++) {
           var a = aspectAt(i);
           var drawnW = Math.min(row.width, row.height * a), drawnH = Math.min(row.height, row.width / a);
-          smallest = Math.min(smallest, drawnW, drawnH);
+          smallest = Math.min(smallest, fill ? Math.min(row.width, row.height) : Math.min(drawnW, drawnH));
           area += drawnW * drawnH;
         }
         delete row.cap; delete row.start;
       });
-      return { rows: rows, area: area, fits: smallest >= GRID_MIN_DRAWN };
+      return { rows: rows, area: area, fits: smallest >= floor };
     };
     var finish = function (choice) {
       var rows = choice.rows;
@@ -7856,7 +7857,7 @@
       var width = widthOf(cols);
       return finish({ rows: counts.map(function (count) {
         return { count: count, width: width,
-          height: Math.max(GRID_MIN_DRAWN, Math.round(width / aspectAt(0))) };
+          height: Math.max(floor, Math.round(width / aspectAt(0))) };
       }) });
     };
     if (fixedCols) {
@@ -7884,7 +7885,7 @@
     if (best) return finish(best);
     // Scrolling: the widest panels that still put two sections side by side.
     var scrollCols = 1;
-    for (var c = 1; c <= k; c++) if (widthOf(c) >= 260) scrollCols = c;
+    for (var c = 1; c <= k; c++) if (widthOf(c) >= Math.max(260, floor)) scrollCols = c;
     return scrolling(scrollCols);
   }
   function sectionGridRowOf(pack, index) {
@@ -7980,7 +7981,8 @@
     var gridPack = !focusPanel && k > 1 && (sectionGridActive() || !singleActive)
       ? sectionGridPacking(k, usableW, Math.max(1, availH), chromeX, overhead, gap,
         keepPlotsSquare ? 1 : (sectionGridActive() ? sectionGridAspect() : panelsAspect(vis)),
-        gridColumnsChoice(k), !sectionGridActive())
+        gridColumnsChoice(k), !sectionGridActive(),
+        sectionGridActive() ? null : MIN_SIDE_HARD)
       : null;
     if (gridPack) cols = gridPack.cols;
     var single = cols === 1;
