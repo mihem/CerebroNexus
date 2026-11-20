@@ -1,3 +1,26 @@
+# CerebroNexus 8.5.0
+
+- **Spatial shows all sections side by side.** A data set with more than one
+  spatial entry (tissue sections, FOVs, capture areas) gets a **Layout**
+  switch on the Spatial page: *Single section* as before, or *Grid* with one
+  panel per section. All sections are coloured by the same metadata column or
+  gene. A group has one colour in every section, and a gene has one colour
+  scale whose range covers all sections, so a value has the same colour in
+  each section. Each section shows the first histology image bound to it, and
+  a section without one shows its cells without an image. **Sections** picks
+  which sections are shown and their order, **Columns** fixes the number of
+  columns, and **Sync zoom** moves the other sections with the one being
+  zoomed or panned; none of them reloads data. **Embedding** adds a UMAP (or
+  another projection) panel: selecting cells in it highlights them in every
+  section, and the selected-cells plot and table list the cells of all
+  sections. The panels share one copy of the cells' positions instead of one
+  per panel. With 1.2 million cells in 12 sections (Windows, Chrome, WebGPU),
+  the grid opens in 1.2 to 1.8 s, recolouring by a gene takes 1.4 to 2.1 s,
+  and a synced zoom 13 to 31 ms; with the 800,000 cells of the 8 sections of
+  CosMx NSCLC, 0.9 s to open and to recolour. Exports and CRB files are
+  unchanged. RGB co-expression, ROIs and region outlines stay single-section
+  views.
+
 # CerebroNexus 8.4.3
 
 - **CI formatting uses the latest official Air binary.** The formatting workflow

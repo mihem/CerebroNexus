@@ -102,6 +102,34 @@ Lasso or box-select cells in the projection to view:
 - **Table of selected cells**: interactive DT table with metadata, exportable to
   CSV or Excel.
 
+## Section grid
+
+When a dataset has more than one spatial entry (one per tissue section, FOV or
+capture area), **Layout** switches between one section at a time and a grid of
+all of them. The grid needs no change to the data or the export.
+
+- **Same colours, same scale**: every section is coloured by the same metadata
+  column or gene. A group has one colour in every section, and a gene has one
+  colour scale whose range covers all sections, so the same value has the same
+  colour in each section.
+- **Own image**: each section shows the first histology image bound to it
+  (embedded, or from `spatial_images`). A section without an image shows its
+  cells without one.
+- **Sections** and **Columns**: the panels follow the order of the sections in
+  the field; remove a section to hide it, and add it back to move it to the
+  end. **Columns** fixes the number of columns; *Auto* fits them to the window.
+  Both only rearrange the drawn panels and do not reload data.
+- **Embedding**: adds a UMAP (or another projection) panel. Selecting cells in
+  it highlights them in every section, and selecting cells in a section
+  highlights them in the embedding. The selected-cells plot and table list the
+  cells of all sections.
+- **Sync zoom**: zooming or panning one section moves the others to the same
+  relative region.
+
+Each panel zooms and pans on its own and shows the usual tooltips. RGB
+co-expression, the ROI controls and region outlines apply to a single section
+and are not available in the grid.
+
 # Data preparation
 
 Spatial data must be embedded in the `.crb` file by the export pipeline.
