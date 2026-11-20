@@ -1390,6 +1390,25 @@ authorized_spatial_image_path <- function(
 
 spatial_grid_layouts <- c("Single section" = "single", "Grid" = "grid")
 
+## The layout Spatial opens with: the author's (Builder's display setting
+## `spatial_layout`, read here without its page prefix), and the grid only
+## for a data set with more than one section.
+spatial_default_layout <- function(display, sections) {
+  layout <- if (is.list(display)) display[["layout"]] else NULL
+  if (identical(layout, "grid") && length(sections) > 1L) "grid" else "single"
+}
+
+## The layout the author chose for the session's data set. A Viewer without
+## page display settings (or a test harness) opens one section.
+spatial_projection_default_layout <- function() {
+  display <- tryCatch(
+    current_page_display_defaults("spatial"),
+    error = function(error) list()
+  )
+  sections <- tryCatch(availableSpatial(), error = function(error) character())
+  spatial_default_layout(display, sections)
+}
+
 ## The grid colours by a metadata column or by one gene; RGB co-expression
 ## stays a single-section view.
 spatial_grid_plot_types <- c("ImageDimPlot", "ImageFeaturePlot")

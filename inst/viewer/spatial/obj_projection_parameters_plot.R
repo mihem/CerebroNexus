@@ -118,7 +118,12 @@ observe(
     ## The grid shows every section of the data set, whatever their samples;
     ## which of them and in what order is the browser's choice (cell_views.js),
     ## so it is not a control.
-    layout <- input[["spatial_projection_layout"]] %||% "single"
+    ## Until the Layout control binds, the layout it will bind with.
+    layout <- input[["spatial_projection_layout"]]
+    if (is.null(layout) && !spatial_input_bound("spatial_projection_layout")) {
+      layout <- spatial_projection_default_layout()
+    }
+    layout <- layout %||% "single"
     grid_sections <- if (
       spatial_grid_active(layout, spatial_names, plot_type[[1L]])
     ) {

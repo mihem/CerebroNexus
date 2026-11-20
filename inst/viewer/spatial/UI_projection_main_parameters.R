@@ -113,9 +113,10 @@ spatial_projection_scene <- reactive({
   ## with all of its sections.
   all_sections <- availableSpatial()
   layout <- if (dataset_changed) {
-    "single"
+    spatial_projection_default_layout()
   } else {
-    isolate(input[["spatial_projection_layout"]]) %||% "single"
+    isolate(input[["spatial_projection_layout"]]) %||%
+      spatial_projection_default_layout()
   }
   grid_selected <- if (dataset_changed) {
     NULL

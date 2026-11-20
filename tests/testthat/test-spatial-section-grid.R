@@ -367,3 +367,57 @@ test_that("the browser shares, arranges and zooms the section grid", {
     pass = "PASS synced zoom gives every shown section the same relative view"
   )
 })
+
+test_that("the author's Spatial layout is a display setting, grid only with sections", {
+  ## Older projects and Apps carry no layout: they open one section.
+  expect_identical(builderViewerDisplayDefaults()$spatial_layout, "single")
+  display <- builderViewerDisplayDefaults(list(spatial_layout = "grid"))
+  expect_identical(display$spatial_layout, "grid")
+  expect_identical(
+    builderViewerDisplayDefaults(
+      jsonlite::fromJSON(jsonlite::toJSON(display, auto_unbox = TRUE))
+    ),
+    display
+  )
+  expect_error(
+    builderViewerDisplayDefaults(list(spatial_layout = "mosaic")),
+    "invalid"
+  )
+  options <- list(viewer_content = list(ds = list(display = display)))
+  page <- viewerPageDisplayDefaults(options, "ds", "spatial")
+  expect_identical(page$layout, "grid")
+  ## The grid needs more than one section; without settings, one section.
+  expect_identical(spatial_default_layout(page, c("a", "b")), "grid")
+  expect_identical(spatial_default_layout(page, "a"), "single")
+  expect_identical(
+    spatial_default_layout(
+      viewerPageDisplayDefaults(list(), "x", "spatial"),
+      c("a", "b")
+    ),
+    "single"
+  )
+  expect_identical(spatial_default_layout(NULL, c("a", "b")), "single")
+})
+
+test_that("the Builder offers the Spatial layout with the author's choice", {
+  skip_if_not_installed("shiny")
+  runtime <- new.env(parent = globalenv())
+  builder_stage_contract_source_runtime(runtime)
+  render <- function(layout) {
+    entry <- list(
+      id = "ds1",
+      settings = list(viewer_display = list(spatial_layout = layout))
+    )
+    builder_stage_html(runtime$builder_viewer_display_ui("core", entry, 1L))
+  }
+  html <- render("grid")
+  expect_match(html, 'data-display-field="spatial_layout"', fixed = TRUE)
+  expect_match(html, "Open Spatial as", fixed = TRUE)
+  expect_match(html, '<option value="grid" selected="selected">', fixed = TRUE)
+  expect_match(html, "Square panels", fixed = TRUE)
+  expect_match(
+    render("single"),
+    '<option value="single" selected="selected">',
+    fixed = TRUE
+  )
+})
