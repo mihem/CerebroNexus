@@ -171,3 +171,72 @@ test_that("open mode keeps CSV and TSV HLA overrides session-only and clearable"
     })
   }
 })
+
+test_that("HLA empty states suggest uploads only in explicit open mode", {
+  for (options in list(
+    list(mode = "closed"),
+    list(),
+    NULL,
+    list(mode = TRUE),
+    list(mode = "unexpected"),
+    list(mode = "open")
+  )) {
+    shiny::testServer(
+      function(input, output, session) {
+        scope <- environment()
+        Cerebro.options <- options
+        hla_active_typing <- hla_session_typing <- function() NULL
+        hla_has_typing <- function() FALSE
+        hla_ir_samples <- function() character()
+        hla_celltype_col <- function() NA_character_
+        hla_association_page_requested <- function() TRUE
+        viewer_server_load(
+          viewer_server_statements("utility_functions.R"),
+          scope,
+          names = "viewerUploadsEnabled"
+        )
+        viewer_server_load(
+          viewer_server_statements("hla_tcr_motifs", "settings.R"),
+          scope,
+          names = "output$hla_status_ui"
+        )
+        viewer_server_load(
+          viewer_server_statements("hla_tcr_motifs", "associations.R"),
+          scope,
+          names = "output$hla_associations_ui"
+        )
+      },
+      {
+        text <- vapply(
+          c("hla_status_ui", "hla_associations_ui"),
+          function(id) xml2::xml_text(xml2::read_html(output[[id]]$html)),
+          character(1)
+        )
+        expect_match(
+          text[["hla_status_ui"]],
+          "Motif network uses cell-type / sample colouring only.",
+          fixed = TRUE
+        )
+        for (message in text) {
+          if (identical(Cerebro.options[["mode"]], "open")) {
+            expect_match(message, "Upload HLA typing in Data & QC", fixed = TRUE)
+          } else {
+            expect_no_match(message, "upload|Data & QC|open mode", ignore.case = TRUE)
+            expect_match(
+              message,
+              "No HLA typing is stored in this data set.",
+              fixed = TRUE
+            )
+          }
+        }
+        if (!identical(Cerebro.options[["mode"]], "open")) {
+          expect_match(
+            text[["hla_associations_ui"]],
+            "HLA association analysis is unavailable.",
+            fixed = TRUE
+          )
+        }
+      }
+    )
+  }
+})

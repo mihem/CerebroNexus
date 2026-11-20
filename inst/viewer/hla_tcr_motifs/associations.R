@@ -158,10 +158,17 @@ output$hla_associations_ui <- renderUI({
   if (!hla_has_typing()) {
     return(tags$p(
       class = "text-muted",
-      paste(
-        "No HLA typing loaded. Add typing to the data set, or upload it in",
-        "Data & QC in open mode, to inspect feature-specific descriptive overlap."
-      )
+      if (viewerUploadsEnabled(Cerebro.options)) {
+        paste(
+          "No HLA typing loaded. Upload HLA typing in Data & QC to inspect",
+          "feature-specific descriptive overlap."
+        )
+      } else {
+        paste(
+          "No HLA typing is stored in this data set.",
+          "HLA association analysis is unavailable."
+        )
+      }
     ))
   }
   # Same labelling/order as the network's picker: an alphabetical list of every

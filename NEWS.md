@@ -5,7 +5,8 @@
   clear-override events unless the Viewer is explicitly in open mode.
   Stored HLA typing, analyses and downloads remain available, as do
   view-configuration JSON imports. Coverage uses the full row in closed mode,
-  without an empty upload panel.
+  without an empty upload panel. When stored typing is absent, closed-mode
+  messages explain the limitation without suggesting an unavailable upload.
 
 # CerebroNexus 8.4.0
 
