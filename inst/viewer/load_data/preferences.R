@@ -31,8 +31,51 @@ output[["preferences_options"]] <- renderUI({
       "Cell tooltips",
       isTRUE(Cerebro.options[['projections_show_hover_info']] %||% TRUE),
       "Show brief information on hover in all cell views and the HLA motif network. Click a cell to pin its summary and open Details, even when tooltips are off. Cross-view highlighting is controlled separately."
+    ),
+    preference(
+      "expression_on_top_checkbox",
+      "Highest on top",
+      ## The author's Gene expression default.
+      identical(
+        tryCatch(
+          current_page_display_defaults("gene")$plotting_order,
+          error = function(error) NULL
+        ),
+        "Highest expression on top"
+      ),
+      "Gene expression draws the cells with the highest expression on top. Off keeps the input cell order, like Seurat FeaturePlot(order = FALSE). The same as Highest expression on top in the page's settings."
     )
   )
+})
+
+##----------------------------------------------------------------------------##
+## "Highest on top" and Gene expression's "Highest expression on top" are one
+## setting: each follows the other. The page's control may not exist yet; it
+## then opens with this value (expression_projection_default_plotting_order()).
+##----------------------------------------------------------------------------##
+preferences_expression_on_top_seen <- NULL
+observeEvent(input[["expression_on_top_checkbox"]], {
+  value <- isTRUE(input[["expression_on_top_checkbox"]])
+  ## Its first value is only the switch binding, not a choice.
+  first <- is.null(preferences_expression_on_top_seen)
+  preferences_expression_on_top_seen <<- value
+  if (first) {
+    return()
+  }
+  page <- input[["expression_projection_plotting_order"]]
+  if (!is.null(page) && !identical(isTRUE(page), value)) {
+    updateCheckboxInput(
+      session,
+      "expression_projection_plotting_order",
+      value = value
+    )
+  }
+})
+observeEvent(input[["expression_projection_plotting_order"]], {
+  value <- isTRUE(input[["expression_projection_plotting_order"]])
+  if (!identical(isTRUE(input[["expression_on_top_checkbox"]]), value)) {
+    updateCheckboxInput(session, "expression_on_top_checkbox", value = value)
+  }
 })
 
 ##----------------------------------------------------------------------------##

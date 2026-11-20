@@ -307,11 +307,11 @@ body.skin-blue .sidebar > .sidebar-menu {
   flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto !important;
 }
 .cerebro-sidebar-preferences {
-  flex: 0 0 auto; margin: 8px 14px 0; padding: 12px 0 14px;
+  flex: 0 0 auto; margin: 6px 14px 0; padding: 8px 0 8px;
   border-top: 1px solid var(--c-border);
 }
 .cerebro-preferences-heading {
-  margin-bottom: 7px; color: var(--c-text-2); font-size: 12px; font-weight: 600;
+  margin-bottom: 2px; color: var(--c-text-2); font-size: 12px; font-weight: 600;
 }
 body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
   width: 100%; min-width: 0; margin: 0; padding: 0;
@@ -319,7 +319,7 @@ body .sidebar .cerebro-sidebar-preferences .shiny-input-container {
 .cerebro-sidebar-preferences .checkbox { margin: 0; }
 .cerebro-sidebar-preferences .checkbox label {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; min-height: 34px; padding: 0; font-size: 13px;
+  gap: 8px; min-height: 28px; padding: 0; font-size: 13px;
   color: var(--c-text); font-weight: 400; cursor: pointer;
 }
 .cerebro-sidebar-preferences input[type=checkbox] {
