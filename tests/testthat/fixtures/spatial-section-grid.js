@@ -147,13 +147,20 @@ assert.ok(fit.rowSizes.every(function (row) {
   return row.height <= Math.round(row.width / 1.3) + 1 && row.height >= 120;
 }), 'no taller than the section needs, and readable');
 assert.strictEqual(fit.rowSizes.reduce(function (n, row) { return n + row.count; }, 0), 12);
-// Five sections: a short row gets wider panels instead of an empty slot.
+// Five sections: every panel one size, so all are drawn at one scale; a
+// short last row leaves its slots empty.
 var five = sectionGridPacking(5, 1600, 1200, 18, 58, 8, 1.5, null);
-assert.ok(five.rowSizes.length > 1 && five.rowSizes.every(function (row, i, rows) {
-  return row.count * (row.width + 18) + (row.count - 1) * 8 >= 1600 - row.count - 8;
-}), 'every row is as wide as the window: ' + JSON.stringify(five.rowSizes));
-assert.ok(five.rowSizes[five.rowSizes.length - 1].width > five.rowSizes[0].width ||
-  five.rowSizes[0].count === five.rowSizes[five.rowSizes.length - 1].count);
+assert.ok(five.rowSizes.length > 1 && five.rowSizes.every(function (row) {
+  return row.width === five.width && row.height === five.height;
+}), 'one panel size: ' + JSON.stringify(five.rowSizes));
+assert.ok(five.cols * (five.width + 18) + (five.cols - 1) * 8 >= 1600 - five.cols - 8,
+  'the full rows are as wide as the window');
+// Linked views: panels of mixed shapes fill the window's height, one size.
+var mixed = sectionGridPacking(5, 1400, 1100, 18, 58, 8, [1, 1.6, 1.6, 1.6, 1.2], null, true);
+assert.ok(Math.abs(rowsHeight(mixed) - 1100) <= mixed.rows + 1, 'fills the height: ' + JSON.stringify(mixed));
+assert.ok(mixed.rowSizes.every(function (row) {
+  return row.width === mixed.width && row.height === mixed.height;
+}));
 // Wide sections take fewer columns than tall ones in the same window.
 var wide = sectionGridPacking(6, 1600, 900, 18, 58, 8, 3, null);
 var tall = sectionGridPacking(6, 1600, 900, 18, 58, 8, 0.4, null);

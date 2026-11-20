@@ -7791,17 +7791,16 @@
       return ratio ? Math.max(0.25, Math.min(4, ratio)) : 1;
     });
   }
-  // Panels of a Spatial grid are as tall as their sections are wide for
-  // their width, and the rows fill the window: the panels of a row share its
-  // width (rows with fewer panels get wider ones, so 5 sections are 3 + 2,
-  // not 3 + 2 and an empty slot), and the rows share its height, scaled down
-  // together when they would not fit. Every row count is tried and the one
-  // that draws the most tissue kept; a window too small for readable panels
-  // lets the page scroll instead. `fixedCols` (the user's Columns) keeps every
-  // panel one column wide. `aspect` is one width/height for every panel or
-  // one per panel (Linked views); a row is as tall as its tallest drawing
-  // needs. `fill` gives the rows the height none of them needs as well, so
-  // the panels end at the window's bottom edge.
+  // Every panel of a grid has the same size, so sections side by side are
+  // drawn at one scale (5 sections are 3 + 2 with an empty slot, not a last
+  // row of wider panels). Panels are as tall as their sections are wide for
+  // their width, and the rows share the window's height. Every column count
+  // is tried and the one that draws the most kept; a window too small for
+  // readable panels lets the page scroll instead. `fixedCols` (the user's
+  // Columns) fixes the columns. `aspect` is one width/height for every panel
+  // or one per panel (Linked views); a row is as tall as its tallest drawing
+  // needs. `fill` (Linked views) gives every row the same share of the
+  // window's height, so the panels end at its bottom edge.
   var GRID_MIN_DRAWN = 120;
   function sectionGridPacking(k, availW, availH, chromeX, chromeY, gap, aspect, fixedCols, fill) {
     var aspectAt = function (i) {
@@ -7822,23 +7821,14 @@
         start += count;
         return row;
       });
+      // One height for every row: its share of the window, and no more than
+      // the tallest drawing needs unless the panels fill the window.
       var room = availH - rows.length * chromeY - (rows.length - 1) * gap;
-      var open = rows, left = room;
-      while (open.length) {
-        var share = left / open.length;
-        var capped = open.filter(function (row) { return row.cap <= share; });
-        if (!capped.length) {
-          open.forEach(function (row) { row.height = share; });
-          break;
-        }
-        capped.forEach(function (row) { row.height = row.cap; left -= row.cap; });
-        open = open.filter(function (row) { return row.cap > share; });
-      }
-      var spare = room - rows.reduce(function (sum, row) { return sum + row.height; }, 0);
+      var height = room / rows.length;
+      if (!fill) height = Math.min(height, Math.max.apply(null, rows.map(function (row) { return row.cap; })));
       var area = 0, smallest = Infinity;
       rows.forEach(function (row) {
-        if (fill && spare > 0) row.height += spare / rows.length;
-        row.height = Math.floor(row.height);
+        row.height = Math.floor(height);
         for (var i = row.start; i < row.start + row.count; i++) {
           var a = aspectAt(i);
           var drawnW = Math.min(row.width, row.height * a), drawnH = Math.min(row.height, row.width / a);
@@ -7866,7 +7856,7 @@
       var width = widthOf(cols);
       return finish({ rows: counts.map(function (count) {
         return { count: count, width: width,
-          height: Math.max(GRID_MIN_DRAWN, Math.round(width / aspect)) };
+          height: Math.max(GRID_MIN_DRAWN, Math.round(width / aspectAt(0))) };
       }) });
     };
     if (fixedCols) {
@@ -7876,13 +7866,16 @@
       return fixed.fits ? finish(fixed) : scrolling(cols);
     }
     var best = null;
-    for (var rowsCount = 1; rowsCount <= k; rowsCount++) {
-      var base = Math.floor(k / rowsCount), extra = k % rowsCount, split = [];
-      for (var r = 0; r < rowsCount; r++) split.push(base + (r < extra ? 1 : 0));
-      if (widthOf(split[0]) < 60) continue;
-      var candidate = layout(split);
+    for (var colsCount = k; colsCount >= 1; colsCount--) {
+      // Only the fewest columns for a row count: 5 panels in 2 rows are 3 + 2.
+      if (colsCount > 1 && Math.ceil(k / colsCount) === Math.ceil(k / (colsCount - 1))) continue;
+      if (widthOf(colsCount) < 60) continue;
+      var split = [];
+      for (var rest = k; rest > 0; rest -= colsCount) split.push(Math.min(colsCount, rest));
+      var extra = k % colsCount;
+      var candidate = layout(split, widthOf(colsCount));
       if (!candidate.fits) continue;
-      // Within a few percent, rows of one size read better than mixed ones.
+      // Within a few percent, full rows read better than an empty slot.
       if (!best || candidate.area > best.area * 1.04 ||
           (candidate.area > best.area * 0.96 && !extra && best.extra)) {
         best = candidate; best.extra = extra;
